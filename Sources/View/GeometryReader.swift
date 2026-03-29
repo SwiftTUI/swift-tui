@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 /// A terminal-native geometry proxy.
 ///

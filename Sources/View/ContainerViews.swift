@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 /// A transparent structural container that groups child views.
 public struct Group: View, ResolvableView {
@@ -638,6 +638,7 @@ public struct ZStack: View, ResolvableView {
     ]
   }
 }
+@MainActor
 func resolveDeclaredChildren(
   _ children: [AnyView],
   in context: ResolveContext,
@@ -659,6 +660,7 @@ func resolveDeclaredChildren(
   return resolved
 }
 
+@MainActor
 func composedView(from children: [AnyView]) -> AnyView {
   switch children.count {
   case 0:

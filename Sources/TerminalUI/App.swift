@@ -1,5 +1,5 @@
 import Core
-import View
+public import View
 
 /// Errors thrown while turning an ``App`` or ``Scene`` declaration into a
 /// runtime configuration.
@@ -18,9 +18,11 @@ public enum AppLaunchError: Error, Equatable, Sendable, CustomStringConvertible 
 }
 
 /// A scene declaration for terminal applications.
+@preconcurrency @MainActor
 public protocol Scene {
   associatedtype Body: Scene
 
+  @MainActor @preconcurrency
   var body: Body { get }
 }
 
@@ -33,6 +35,7 @@ extension Never: Scene {
   }
 }
 
+@MainActor
 package protocol SceneConfigurationProviding {
   func parallelWindowSceneConfigurations() -> [WindowSceneConfiguration]
 }
@@ -41,7 +44,7 @@ package struct WindowSceneConfiguration {
   package var identifier: String
   package var title: String?
   package var rootIdentity: Identity
-  package var makeRootView: () -> AnyView
+  package var makeRootView: @MainActor () -> AnyView
 }
 
 package struct WindowHostLayout: Layout {
@@ -111,14 +114,16 @@ package struct WindowHostView: View {
 }
 
 package struct AnyScene {
-  private let configurationsClosure: () -> [WindowSceneConfiguration]
+  private let configurationsClosure: @MainActor () -> [WindowSceneConfiguration]
 
+  @MainActor
   package init<S: Scene>(_ scene: S) {
     configurationsClosure = {
       collectWindowSceneConfigurations(from: scene)
     }
   }
 
+  @MainActor
   package func sceneConfigurations() -> [WindowSceneConfiguration] {
     configurationsClosure()
   }
@@ -148,6 +153,7 @@ extension SceneGroup: SceneConfigurationProviding {
 
 @resultBuilder
 /// Builds typed scene trees from ``Scene`` expressions.
+@MainActor
 public enum SceneBuilder {
   public static func buildExpression<S: Scene>(_ expression: S) -> SceneGroup {
     SceneGroup(scenes: [AnyScene(expression)])
@@ -190,7 +196,7 @@ public struct WindowGroup: Scene {
   public let title: String?
   public let id: String
 
-  private let contentBuilder: () -> AnyView
+  private let contentBuilder: @MainActor () -> AnyView
 
   /// Creates a window scene with an explicit identifier.
   public init<Content: View>(
@@ -234,14 +240,18 @@ extension WindowGroup: SceneConfigurationProviding {
 }
 
 /// A terminal application declaration composed of scenes.
+@preconcurrency @MainActor
 public protocol App {
   associatedtype Body: Scene
 
+  @MainActor @preconcurrency
   init()
 
-  @SceneBuilder var body: Body { get }
+  @SceneBuilder @MainActor @preconcurrency
+  var body: Body { get }
 }
 
+@MainActor
 package func collectWindowSceneConfigurations<S: Scene>(
   from scene: S
 ) -> [WindowSceneConfiguration] {
@@ -252,6 +262,7 @@ package func collectWindowSceneConfigurations<S: Scene>(
   return collectWindowSceneConfigurations(from: scene.body)
 }
 
+@MainActor
 package func primaryWindowSceneConfiguration<S: Scene>(
   from scene: S
 ) throws -> WindowSceneConfiguration {

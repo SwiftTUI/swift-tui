@@ -10,9 +10,11 @@ Choose the level that matches your app:
 - use ``RunLoop`` when you want full control over state, focus, input handling, and terminal hosting
 - use scene declarations plus `TerminalUIScenes.MultiSceneLauncher` when you want the higher-level app story that also scales to multiple windows
 
+`App`, `Scene`, and `DefaultRenderer` are `@MainActor` authoring APIs. Construct app values and evaluate fresh `View` trees on the main actor, then hand the resulting runtime or pipeline artifacts to whichever layer you need next.
+
 ## `DefaultRenderer`
 
-`DefaultRenderer` is the simplest way to turn a `View` into inspectable output.
+`DefaultRenderer` is the simplest way to turn a `View` into inspectable output from the main actor.
 
 It gives you:
 

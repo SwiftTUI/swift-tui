@@ -13,21 +13,17 @@ package enum LocalKeyEvent: Equatable, Sendable {
   case ctrlC
 }
 
-// SAFETY: Created and exclusively accessed on @MainActor during resolve/event phases.
-// Contains non-Sendable closures (Handler = (LocalKeyEvent) -> Bool).
-// All mutable state protected by OSAllocatedUnfairLock.
-package final class LocalKeyHandlerRegistry: @unchecked Sendable, Equatable {
-  package typealias Handler = (LocalKeyEvent) -> Bool
+@MainActor
+package final class LocalKeyHandlerRegistry: Equatable {
+  package typealias Handler = @MainActor (LocalKeyEvent) -> Bool
 
-  private struct Storage {
-    var handlers: [Identity: Handler] = [:]
-  }
-
-  private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+  private var handlers: [Identity: Handler] = [:]
 
   package init() {}
 
-  package static func == (lhs: LocalKeyHandlerRegistry, rhs: LocalKeyHandlerRegistry) -> Bool {
+  nonisolated package static func == (lhs: LocalKeyHandlerRegistry, rhs: LocalKeyHandlerRegistry)
+    -> Bool
+  {
     lhs === rhs
   }
 
@@ -35,9 +31,7 @@ package final class LocalKeyHandlerRegistry: @unchecked Sendable, Equatable {
     identity: Identity,
     handler: @escaping Handler
   ) {
-    storage.withLockUnchecked { storage in
-      storage.handlers[identity] = handler
-    }
+    handlers[identity] = handler
   }
 
   @discardableResult
@@ -45,30 +39,21 @@ package final class LocalKeyHandlerRegistry: @unchecked Sendable, Equatable {
     identity: Identity,
     event: LocalKeyEvent
   ) -> Bool {
-    let handler = storage.withLockUnchecked { storage in
-      storage.handlers[identity]
-    }
-    return handler?(event) ?? false
+    handlers[identity]?(event) ?? false
   }
 
   package func hasHandler(
     identity: Identity
   ) -> Bool {
-    storage.withLockUnchecked { storage in
-      storage.handlers[identity] != nil
-    }
+    handlers[identity] != nil
   }
 
   package func reset() {
-    storage.withLockUnchecked { storage in
-      storage.handlers.removeAll(keepingCapacity: true)
-    }
+    handlers.removeAll(keepingCapacity: true)
   }
 
   package func snapshot() -> [Identity: Handler] {
-    storage.withLockUnchecked { storage in
-      storage.handlers
-    }
+    handlers
   }
 
   package func restore(_ snapshot: [Identity: Handler]) {
@@ -76,10 +61,8 @@ package final class LocalKeyHandlerRegistry: @unchecked Sendable, Equatable {
       return
     }
 
-    storage.withLockUnchecked { storage in
-      for (identity, handler) in snapshot {
-        storage.handlers[identity] = handler
-      }
+    for (identity, handler) in snapshot {
+      handlers[identity] = handler
     }
   }
 }

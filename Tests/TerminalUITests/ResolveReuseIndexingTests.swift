@@ -5,6 +5,7 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
+@MainActor
 @Suite
 struct ResolveReuseIndexingTests {
   @Test("retained resolve frame indexes resolved subtrees by identity")

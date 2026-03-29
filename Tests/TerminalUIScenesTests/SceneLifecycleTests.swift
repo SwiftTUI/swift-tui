@@ -2,6 +2,7 @@ import Testing
 
 @testable import TerminalUIScenes
 
+@MainActor
 struct SceneLifecycleTests {
   @Test("Initial state is created")
   func initialStateIsCreated() {

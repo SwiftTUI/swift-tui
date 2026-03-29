@@ -9,6 +9,7 @@ import Testing
   import Glibc
 #endif
 
+@MainActor
 @Suite
 struct Phase1PresentationIntegrationTests {
   @Test("button press presents as a thin incremental span")

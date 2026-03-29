@@ -1,5 +1,6 @@
 public import Core
 
+@MainActor
 package protocol ViewNode {
   func resolve(in context: ResolveContext) -> ResolvedNode
 }
@@ -9,9 +10,11 @@ package protocol ViewNode {
 /// Implement `body` the same way you would in SwiftUI: compose smaller views,
 /// modifiers, and property wrappers rather than constructing render nodes
 /// directly.
+@preconcurrency @MainActor
 public protocol View {
   associatedtype Body: View = Never
 
+  @ViewBuilder @MainActor @preconcurrency
   var body: Body { get }
 }
 
@@ -24,10 +27,12 @@ extension Never: View {
   }
 }
 
+@MainActor
 package protocol ResolvableView {
   func resolveElements(in context: ResolveContext) -> [ResolvedNode]
 }
 
+@MainActor
 package protocol BuilderCompositeView {
   var builderChildren: [AnyView] { get }
 }
@@ -139,6 +144,7 @@ public struct VariadicView<Content: View>: View, ResolvableView, BuilderComposit
 ///
 /// `ViewBuilder` mirrors SwiftUI's builder shape closely so authored APIs can
 /// stay body-driven and declarative.
+@MainActor
 public enum ViewBuilder {
   public static func buildBlock() -> EmptyView {
     EmptyView()
@@ -223,7 +229,7 @@ public enum ViewBuilder {
 /// Use `AnyView` when a call site must store heterogeneous view values while
 /// still participating in the normal authored `View` surface.
 public struct AnyView: View, ResolvableView {
-  private let resolveElementsClosure: (ResolveContext) -> [ResolvedNode]
+  private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
 
   package init<V: View & ResolvableView>(resolving view: V) {
     resolveElementsClosure = { context in
@@ -275,6 +281,7 @@ public struct Resolver {
   public init() {}
 
   /// Resolves `root` in the supplied context.
+  @MainActor
   public func resolve<V: View>(
     _ root: V,
     in context: ResolveContext = .init()
@@ -283,6 +290,7 @@ public struct Resolver {
   }
 }
 
+@MainActor
 package func parallelBuilderChildren<V: View>(
   from view: V
 ) -> [AnyView] {
@@ -293,12 +301,14 @@ package func parallelBuilderChildren<V: View>(
   return [AnyView(view)]
 }
 
+@MainActor
 package func parallelBuilderChildren<V: View & BuilderCompositeView>(
   from view: V
 ) -> [AnyView] {
   view.builderChildren
 }
 
+@MainActor
 package func parallelResolveElements<V: View>(
   _ view: V,
   in context: ResolveContext
@@ -312,6 +322,7 @@ package func parallelResolveElements<V: View>(
   }
 }
 
+@MainActor
 package func parallelResolveElements<V: View & ResolvableView>(
   _ view: V,
   in context: ResolveContext
@@ -319,6 +330,7 @@ package func parallelResolveElements<V: View & ResolvableView>(
   view.resolveElements(in: context)
 }
 
+@MainActor
 package func parallelNormalizeResolvedElements(
   _ resolvedElements: [ResolvedNode],
   in context: ResolveContext
@@ -345,6 +357,7 @@ package func parallelNormalizeResolvedElements(
   }
 }
 
+@MainActor
 package func parallelResolve<V: View>(
   _ view: V,
   in context: ResolveContext

@@ -1,13 +1,13 @@
 #if canImport(UnixSignals)
-  import UnixSignals
+  public import UnixSignals
 
   /// Reads Unix signals and exposes them as strings for the runtime.
   public final class SignalReader: SignalReading {
     private let signals: [UnixSignal]
 
     /// Creates a signal reader for the supplied signals.
-    public init(signals: [UnixSignal] = [.sigint, .sigterm, .sigwinch]) {
-      self.signals = signals
+    public init(signals: [UnixSignal]? = nil) {
+      self.signals = signals ?? [.sigint, .sigterm, .sigwinch]
     }
 
     public func events() -> AsyncStream<String> {

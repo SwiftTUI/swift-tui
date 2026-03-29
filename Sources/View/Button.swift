@@ -1,9 +1,9 @@
-import Core
+public import Core
 
 /// A focusable control that triggers an action when activated.
 public struct Button: View, ResolvableView {
   public var role: ButtonRole?
-  private var action: (() -> Void)?
+  private var action: (@MainActor @Sendable () -> Void)?
   private var labelViews: [AnyView]
 
   public init(
@@ -27,7 +27,7 @@ public struct Button: View, ResolvableView {
   public init(
     _ title: String,
     role: ButtonRole? = nil,
-    action: @escaping () -> Void
+    action: @escaping @MainActor @Sendable () -> Void
   ) {
     self.role = role
     self.action = action
@@ -36,7 +36,7 @@ public struct Button: View, ResolvableView {
 
   public init<Label: View>(
     role: ButtonRole? = nil,
-    action: @escaping () -> Void,
+    action: @escaping @MainActor @Sendable () -> Void,
     @ViewBuilder label: () -> Label
   ) {
     self.role = role

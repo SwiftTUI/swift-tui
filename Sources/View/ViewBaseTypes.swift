@@ -16,18 +16,31 @@ public typealias LayoutRect = Rect
 @propertyWrapper
 /// A mutable projection into another owned value.
 public struct Binding<Value> {
-  private let getter: () -> Value
-  private let setter: (Value) -> Void
+  private let getter: @MainActor () -> Value
+  private let setter: @MainActor (Value) -> Void
 
-  /// Creates a binding from explicit getter and setter closures.
-  public init(
-    get: @escaping () -> Value,
-    set: @escaping (Value) -> Void
+  package init(
+    mainActorGet getter: @escaping @MainActor () -> Value,
+    set setter: @escaping @MainActor (Value) -> Void
   ) {
-    getter = get
-    setter = set
+    self.getter = getter
+    self.setter = setter
   }
 
+  /// Creates a binding from explicit getter and setter closures.
+  @preconcurrency
+  public init(
+    @_inheritActorContext get: @escaping @isolated(any) @Sendable () -> Value,
+    @_inheritActorContext set: @escaping @isolated(any) @Sendable (Value) -> Void
+  ) {
+    // Binding dereferences remain @MainActor in this package's authoring model.
+    // The public initializer still matches SwiftUI-style actor-inheriting closure
+    // signatures so call sites compose naturally from authored view contexts.
+    self.getter = unsafeBitCast(get, to: (@MainActor () -> Value).self)
+    self.setter = unsafeBitCast(set, to: (@MainActor (Value) -> Void).self)
+  }
+
+  @MainActor
   public var wrappedValue: Value {
     get { getter() }
     nonmutating set { setter(newValue) }
@@ -38,26 +51,22 @@ public struct Binding<Value> {
   }
 
   /// Returns a read-only binding that ignores writes.
+  @MainActor
   public static func constant(_ value: Value) -> Self {
     Self(
-      get: { value },
+      mainActorGet: { value },
       set: { _ in }
     )
   }
 
+  @MainActor
   public subscript<Member>(
     dynamicMember keyPath: WritableKeyPath<Value, Member>
   ) -> Binding<Member> {
     Binding<Member>(
-      get: { wrappedValue[keyPath: keyPath] },
+      mainActorGet: { wrappedValue[keyPath: keyPath] },
       set: { wrappedValue[keyPath: keyPath] = $0 }
     )
-  }
-}
-
-extension Binding: Equatable where Value: Equatable {
-  public static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.wrappedValue == rhs.wrappedValue
   }
 }
 
@@ -88,6 +97,7 @@ public struct Bindable<Model> where Model: AnyObject, Model: Observable {
     self
   }
 
+  @MainActor
   public subscript<Value>(
     dynamicMember keyPath: ReferenceWritableKeyPath<Model, Value>
   ) -> Binding<Value> {
@@ -95,7 +105,7 @@ public struct Bindable<Model> where Model: AnyObject, Model: Observable {
     // being built so writes map back into the existing invalidation pipeline.
     _ = wrappedValue[keyPath: keyPath]
     return Binding(
-      get: { wrappedValue[keyPath: keyPath] },
+      mainActorGet: { wrappedValue[keyPath: keyPath] },
       set: { wrappedValue[keyPath: keyPath] = $0 }
     )
   }

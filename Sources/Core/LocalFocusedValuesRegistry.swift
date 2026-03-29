@@ -14,19 +14,13 @@ package struct FocusedValuesRegistrationSnapshot: Sendable {
   }
 }
 
-// SAFETY: Created and exclusively accessed on @MainActor during resolve/event phases.
-// All mutable state protected by OSAllocatedUnfairLock. Contains Sendable data types only,
-// but the compiler cannot prove Sendability through the lock's unchecked state parameter.
-package final class LocalFocusedValuesRegistry: @unchecked Sendable, Equatable {
-  private struct Storage {
-    var registrations: [FocusedValuesRegistrationSnapshot] = []
-  }
-
-  private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+@MainActor
+package final class LocalFocusedValuesRegistry: Equatable {
+  private var registrations: [FocusedValuesRegistrationSnapshot] = []
 
   package init() {}
 
-  package static func == (
+  nonisolated package static func == (
     lhs: LocalFocusedValuesRegistry,
     rhs: LocalFocusedValuesRegistry
   ) -> Bool {
@@ -42,21 +36,19 @@ package final class LocalFocusedValuesRegistry: @unchecked Sendable, Equatable {
       return
     }
 
-    storage.withLockUnchecked { storage in
-      let registration = FocusedValuesRegistrationSnapshot(
-        identity: identity,
-        descendantIdentities: descendantIdentities ?? [identity],
-        values: values
-      )
+    let registration = FocusedValuesRegistrationSnapshot(
+      identity: identity,
+      descendantIdentities: descendantIdentities ?? [identity],
+      values: values
+    )
 
-      if let existingIndex = storage.registrations.firstIndex(where: { $0.identity == identity }) {
-        storage.registrations[existingIndex].descendantIdentities.formUnion(
-          registration.descendantIdentities
-        )
-        storage.registrations[existingIndex].values.merge(registration.values)
-      } else {
-        storage.registrations.append(registration)
-      }
+    if let existingIndex = registrations.firstIndex(where: { $0.identity == identity }) {
+      registrations[existingIndex].descendantIdentities.formUnion(
+        registration.descendantIdentities
+      )
+      registrations[existingIndex].values.merge(registration.values)
+    } else {
+      registrations.append(registration)
     }
   }
 
@@ -110,15 +102,11 @@ package final class LocalFocusedValuesRegistry: @unchecked Sendable, Equatable {
   }
 
   package func reset() {
-    storage.withLockUnchecked { storage in
-      storage.registrations.removeAll(keepingCapacity: true)
-    }
+    registrations.removeAll(keepingCapacity: true)
   }
 
   package func snapshot() -> [FocusedValuesRegistrationSnapshot] {
-    storage.withLockUnchecked { storage in
-      storage.registrations
-    }
+    registrations
   }
 
   package func restore(
@@ -128,8 +116,6 @@ package final class LocalFocusedValuesRegistry: @unchecked Sendable, Equatable {
       return
     }
 
-    storage.withLockUnchecked { storage in
-      storage.registrations.append(contentsOf: snapshot)
-    }
+    registrations.append(contentsOf: snapshot)
   }
 }

@@ -5,6 +5,7 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
+@MainActor
 @Suite
 struct Phase5ReliabilityGatesTests {
   @MainActor
@@ -36,6 +37,7 @@ private struct Phase5PresentationFrame {
   let presentation: TerminalPresentationMetrics
 }
 
+@MainActor
 private final class Phase5PresentationHarness {
   private let renderer = DefaultRenderer(
     layoutEngine: .init(cache: MeasurementCache())

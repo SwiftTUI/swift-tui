@@ -2,7 +2,7 @@
 
 Last updated: March 29, 2026
 
-This page is the post-migration reference for the public surface of the package. It separates the canonical SwiftUI-shaped API from package-only seams that still exist in the codebase.
+This page is the post-migration reference for the public surface of the package. It separates the canonical SwiftUI-shaped API and actor-isolation model from package-only seams that still exist in the codebase.
 
 ## How To Read This
 
@@ -30,6 +30,9 @@ The canonical authoring surface is the SwiftUI-shaped one:
 Important public-surface rules after the lowering migration:
 
 - `View` is body-only. It no longer inherits any low-level resolver protocol.
+- `View`, `Scene`, and `App` are `@MainActor` authoring protocols.
+- APIs that evaluate authored `body` trees, including `Resolver.resolve(...)` and `DefaultRenderer.render(...)`, are `@MainActor`.
+- Callback-bearing authoring APIs follow the same model: `Binding.init(get:set:)` and `.task(...)` use actor-inheriting closure signatures, while button actions, `OpenLinkAction`, `.onAppear`, and `.onDisappear` stay explicitly `@MainActor`. In ordinary authored view code those all still resolve to main-actor authoring because `View.body` is `@MainActor`.
 - `ViewBuilder` no longer exposes `[AnyView]` in public closure signatures.
 - `AnyView` remains public as `View` erasure, but `AnyView.init(erasing:)` is no longer public.
 

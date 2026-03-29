@@ -5,6 +5,7 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
+@MainActor
 @Suite
 struct ImageSurfaceTests {
   @Test("embedded PNG bytes resolve into a raster image attachment")

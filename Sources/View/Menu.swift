@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 /// A focusable command menu that expands inline when activated.
 public struct Menu: View, ResolvableView {

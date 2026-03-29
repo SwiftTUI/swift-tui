@@ -3,6 +3,7 @@ import Testing
 @testable import Core
 @testable import View
 
+@MainActor
 @Suite
 struct EnvironmentRuntimeStateTests {
   @Test("runtime focus and press state do not affect environment equality")

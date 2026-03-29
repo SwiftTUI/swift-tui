@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 /// Toggles a boolean binding on or off.
 public struct Toggle: View, ResolvableView {
@@ -123,6 +123,7 @@ extension Toggle {
 }
 
 /// Edits a string binding using keyboard input.
+@MainActor
 package func registerTextEntryBinding(
   _ binding: Binding<String>,
   in context: ResolveContext
@@ -186,6 +187,7 @@ package func textEntryDisplayText(
   )
 }
 
+@MainActor
 package func textEntryFieldBody(
   displayText: String,
   isShowingPrompt: Bool,

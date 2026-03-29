@@ -8,6 +8,7 @@ import Testing
   import Glibc
 #endif
 
+@MainActor
 @Suite
 struct TerminalHostPresentationBatchingTests {
   @Test("terminal host batches a full repaint into one write")

@@ -7,6 +7,7 @@ TerminalUI is for teams who want the ergonomics of declarative SwiftUI authoring
 ## Why TerminalUI
 
 - SwiftUI-shaped authoring. You write body-only `View` types, `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, repo-owned `@Bindable`, `Layout`, environment modifiers, and scene declarations with familiar SwiftUI structure.
+- SwiftUI-style actor isolation. `View`, `Scene`, `App`, `Resolver.resolve`, and `DefaultRenderer.render` are `@MainActor` authoring APIs, while the pure `Core` pipeline stays nonisolated.
 - A real rendering pipeline. Frames move through a strict `resolve -> measure -> place -> semantics -> draw -> raster -> commit` pipeline, which keeps layout, interaction, presentation, and lifecycle work separate and testable.
 - Runtime behavior designed for real TUIs. The runtime owns alternate-screen presentation, terminal sizing, keyboard and mouse input, Unix signals, focus routing, lifecycle staging, and task start or cancellation after commit.
 - Capability-aware output. The same frame artifacts can be rendered for previews, snapshot tests, or live terminals with ASCII, ANSI16, ANSI256, or true-color output.
@@ -36,15 +37,17 @@ struct BuildSummary: View {
   }
 }
 
-let renderer = DefaultRenderer()
-let frame = renderer.render(
-  BuildSummary(),
-  proposal: .init(width: 40, height: 8)
-)
+let output = await MainActor.run {
+  let renderer = DefaultRenderer()
+  let frame = renderer.render(
+    BuildSummary(),
+    proposal: .init(width: 40, height: 8)
+  )
 
-let output = TerminalSurfaceRenderer(
-  capabilityProfile: .previewUnicode
-).render(frame.rasterSurface)
+  return TerminalSurfaceRenderer(
+    capabilityProfile: .previewUnicode
+  ).render(frame.rasterSurface)
+}
 
 print(output)
 ```
@@ -70,6 +73,7 @@ struct DemoApp: App {
 ```
 
 `MultiSceneLauncher` gracefully falls back to the single-scene runtime when the app only declares one `WindowGroup`, so the same launch path works for single-window and multi-window apps today.
+App and scene construction follow the same main-actor model as SwiftUI, so construct app values on the main actor before launching when you are outside an already main-actor-isolated entry point.
 
 ## What Ships Today
 

@@ -3,6 +3,7 @@ import Testing
 
 @testable import TerminalUIScenes
 
+@MainActor
 struct SceneConfigurationAccessTests {
   @Test("collectWindowSceneConfigurations extracts multiple scenes")
   func collectsMultipleScenes() {

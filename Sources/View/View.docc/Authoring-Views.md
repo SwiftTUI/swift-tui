@@ -11,6 +11,17 @@ The main difference is that TerminalUI eventually renders into a cell surface in
 - keyboard-first focus and selection
 - terminal-safe incremental updates instead of animation-heavy transitions
 
+## Actor Isolation
+
+TerminalUI now follows SwiftUI-style actor isolation for authored view trees.
+
+- `View` bodies are `@MainActor`
+- `Resolver.resolve(...)` and `DefaultRenderer.render(...)` evaluate view trees on the main actor
+- `Binding.init(get:set:)` and `.task(...)` inherit the current actor context, while button actions, `.onAppear`, and `.onDisappear` stay explicitly `@MainActor`
+- because `View.body` itself is `@MainActor`, ordinary authored view code still uses those APIs from the main actor
+
+The pure `Core` pipeline remains nonisolated. If you need off-main inspection, move to already-resolved or already-rendered pipeline artifacts rather than evaluating a fresh `View` tree off the main actor.
+
 ## Containers And Controls
 
 The core container and control surface is already broad enough for many dashboards, forms, and editor-like flows:
@@ -35,7 +46,7 @@ Concrete wrapper views behind those modifiers are package-only. Call sites shoul
 
 ## Preview And Inspection
 
-When you want to inspect authored output without running a full terminal session, use ``Resolver`` inside `View`, or the higher-level `DefaultRenderer` type from `TerminalUI`, to produce resolved trees, frame artifacts, or rendered terminal text.
+When you want to inspect authored output without running a full terminal session, use ``Resolver`` inside `View`, or the higher-level `DefaultRenderer` type from `TerminalUI`, from the main actor to produce resolved trees, frame artifacts, or rendered terminal text.
 
 See also:
 

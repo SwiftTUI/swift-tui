@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 /// Displays a title paired with an icon or glyph view.
 public struct Label: View, ResolvableView {

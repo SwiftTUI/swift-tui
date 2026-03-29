@@ -61,6 +61,7 @@ private final class ResolveProbeRecorder: @unchecked Sendable {
   }
 }
 
+@MainActor
 private func resolvedProbeTextNode(
   _ content: String,
   in context: ResolveContext
@@ -182,6 +183,7 @@ private struct ResolveProbeRoot: View, ResolvableView {
   }
 }
 
+@MainActor
 @Suite
 struct DiagnosticsAndCacheTests {
   @Test("measurement cache reuses entries for repeated probes with the same proposal")

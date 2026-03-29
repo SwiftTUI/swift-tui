@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 /// A view with no rendered content.
 public struct EmptyView: View, ResolvableView {
@@ -241,6 +241,7 @@ public struct Divider: View, ResolvableView {
 private func idealTextSize(for content: String) -> Size {
   parallelTextLayout(for: content, width: Optional<Int>.none).size
 }
+@MainActor
 func parallelResolveLeaf(
   kindName: String,
   intrinsicSize: Size? = nil,

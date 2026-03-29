@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 enum ThemeOverrideKey: EnvironmentKey {
   static let defaultValue: Theme? = nil

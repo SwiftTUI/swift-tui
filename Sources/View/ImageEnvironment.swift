@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 private enum ImageResourceRootsKey: EnvironmentKey {
   static let defaultValue: [String] = []

@@ -7,6 +7,7 @@ private enum TestKey: EnvironmentKey {
   static let defaultValue: Int = 42
 }
 
+@MainActor
 @Suite
 struct EnvironmentTests {
   @Test("environment key returns default value when not set")

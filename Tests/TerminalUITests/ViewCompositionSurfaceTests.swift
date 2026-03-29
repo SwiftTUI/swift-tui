@@ -3,6 +3,7 @@ import Testing
 @testable import Core
 @testable import View
 
+@MainActor
 @Suite
 struct ViewCompositionSurfaceTests {
   @Test("resolver assigns stable indexed identities to grouped children")

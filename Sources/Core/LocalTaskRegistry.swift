@@ -1,13 +1,11 @@
-// SAFETY: All stored properties are either Sendable (descriptor) or explicitly @Sendable
-// (operationClosure). The @unchecked is needed because the compiler cannot prove Sendability
-// of the class type through its stored property analysis alone.
+@MainActor
 package final class TaskRegistration: @unchecked Sendable {
   package let descriptor: TaskDescriptor
-  private let operationClosure: @Sendable () async -> Void
+  private let operationClosure: @MainActor @Sendable () async -> Void
 
   package init(
     descriptor: TaskDescriptor,
-    operation: @escaping @Sendable () async -> Void
+    operation: @escaping @MainActor @Sendable () async -> Void
   ) {
     self.descriptor = descriptor
     operationClosure = operation
@@ -18,18 +16,13 @@ package final class TaskRegistration: @unchecked Sendable {
   }
 }
 
-// SAFETY: Created and exclusively accessed on @MainActor during resolve/event phases.
-// Contains non-Sendable TaskRegistration values. All mutable state protected by OSAllocatedUnfairLock.
-package final class LocalTaskRegistry: @unchecked Sendable, Equatable {
-  private struct Storage {
-    var registrations: [Identity: TaskRegistration] = [:]
-  }
-
-  private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+@MainActor
+package final class LocalTaskRegistry: Equatable {
+  private var registrations: [Identity: TaskRegistration] = [:]
 
   package init() {}
 
-  package static func == (
+  nonisolated package static func == (
     lhs: LocalTaskRegistry,
     rhs: LocalTaskRegistry
   ) -> Bool {
@@ -40,29 +33,21 @@ package final class LocalTaskRegistry: @unchecked Sendable, Equatable {
     identity: Identity,
     registration: TaskRegistration
   ) {
-    storage.withLockUnchecked { storage in
-      storage.registrations[identity] = registration
-    }
+    registrations[identity] = registration
   }
 
   package func registration(
     for identity: Identity
   ) -> TaskRegistration? {
-    storage.withLockUnchecked { storage in
-      storage.registrations[identity]
-    }
+    registrations[identity]
   }
 
   package func reset() {
-    storage.withLockUnchecked { storage in
-      storage.registrations.removeAll(keepingCapacity: true)
-    }
+    registrations.removeAll(keepingCapacity: true)
   }
 
   package func snapshot() -> [Identity: TaskRegistration] {
-    storage.withLockUnchecked { storage in
-      storage.registrations
-    }
+    registrations
   }
 
   package func restore(
@@ -72,10 +57,8 @@ package final class LocalTaskRegistry: @unchecked Sendable, Equatable {
       return
     }
 
-    storage.withLockUnchecked { storage in
-      for (identity, registration) in snapshot {
-        storage.registrations[identity] = registration
-      }
+    for (identity, registration) in snapshot {
+      registrations[identity] = registration
     }
   }
 }

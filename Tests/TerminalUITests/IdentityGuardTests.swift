@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 
+@MainActor
 @Suite
 struct IdentityGuardTests {
   @Test("shared and web sources do not reintroduce legacy string identity paths")

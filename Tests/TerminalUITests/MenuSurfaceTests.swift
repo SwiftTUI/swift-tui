@@ -20,6 +20,7 @@ extension ResolvedNode {
   }
 }
 
+@MainActor
 struct MenuSurfaceTests {
   @Test("Menu is focusable and starts collapsed")
   func menuIsFocusableAndStartsCollapsed() {

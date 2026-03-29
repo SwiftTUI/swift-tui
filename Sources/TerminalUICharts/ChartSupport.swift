@@ -1,6 +1,7 @@
 import Core
 import View
 
+@MainActor
 func timelineEntryView(
   _ entry: TimelineEntry,
   isLast: Bool
@@ -37,6 +38,7 @@ func timelineEntryView(
   )
 }
 
+@MainActor
 func legendItemView(
   _ item: LegendItem
 ) -> AnyView {
@@ -61,6 +63,7 @@ func bulletChartSummaryText(
   "t \(metricValueString(target))"
 }
 
+@MainActor
 func bulletChartTrackView(
   value: Double,
   target: Double,
@@ -138,6 +141,7 @@ func comparisonEntryTone(
   return trendTone(value: entry.current - entry.baseline, preferred: .automatic)
 }
 
+@MainActor
 func comparisonTrackView(
   current: Double,
   baseline: Double,
@@ -184,6 +188,7 @@ func comparisonTrackView(
   )
 }
 
+@MainActor
 func comparisonChartRow(
   _ entry: ComparisonEntry,
   maximumValue: Double,
@@ -281,6 +286,7 @@ func stackedBarWidths(
   return widths
 }
 
+@MainActor
 func stackedBarTrackView(
   _ entries: [BarChartEntry],
   total: Double,
@@ -352,6 +358,7 @@ func thresholdBandTone(
   return thresholdBandsSorted(bands, total: effectiveTotal).last?.tone ?? .info
 }
 
+@MainActor
 func thresholdGaugeTrackView(
   value: Double,
   total: Double,
@@ -423,6 +430,7 @@ func columnChartFilledHeight(
   return min(chartHeight, max(1, Int((normalized * Double(chartHeight)).rounded(.awayFromZero))))
 }
 
+@MainActor
 func columnChartBody(
   entries: [BarChartEntry],
   maximumValue: Double,
@@ -492,6 +500,7 @@ func heatStripGlyph(
   }
 }
 
+@MainActor
 func heatStripBody(
   entries: [BarChartEntry],
   maximumValue: Double,
@@ -529,6 +538,7 @@ func heatStripBody(
   )
 }
 
+@MainActor
 func barChartRow(
   _ entry: BarChartEntry,
   maximumValue: Double,

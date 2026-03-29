@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 /// A decorative tiled pattern that can be used as a lightweight background layer.
 public struct TileBackground: View, ResolvableView {

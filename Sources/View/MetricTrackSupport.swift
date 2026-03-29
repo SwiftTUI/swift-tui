@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 package func progressFraction(
   value: Double,
@@ -62,6 +62,7 @@ package func metricTrackString(
   )
 }
 
+@MainActor
 package func metricTrackView(
   labelViews: [AnyView],
   trailingViews: [AnyView],

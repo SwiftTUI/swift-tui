@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 extension Text {
   /// Alias for the low-level text line decoration style.

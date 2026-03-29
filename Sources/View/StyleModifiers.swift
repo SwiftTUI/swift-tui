@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 extension View {
   public func preferredColorScheme(

@@ -2,6 +2,7 @@ import Testing
 
 @testable import Core
 
+@MainActor
 @Suite
 struct TextLayoutTests {
   @Test("word-boundary wrapping prefers whitespace breaks and consumes separator whitespace")

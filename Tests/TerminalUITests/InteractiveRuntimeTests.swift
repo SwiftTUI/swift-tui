@@ -16,6 +16,7 @@ private enum FocusedTitleKey: FocusedValueKey {
   typealias Value = String
 }
 
+@MainActor
 @Suite
 struct InteractiveRuntimeTests {
   private let lifecycleProbeIdentity = testIdentity("LifecycleRuntimeRoot", "RuntimeRoot[0]")
@@ -509,7 +510,10 @@ struct InteractiveRuntimeTests {
     let writerTask = Task {
       for _ in 0..<20 {
         try writeAllBytes(scrollSequence, to: writeDescriptor)
-        try? await Task.sleep(nanoseconds: 200_000)
+        // Keep writes staggered but still well inside the 1 ms flush window.
+        // Task.sleep() was coarse enough on some runners to miss coalescing
+        // entirely and turn this into a scheduler test instead.
+        usleep(50)
       }
     }
 
@@ -1988,6 +1992,7 @@ private final class RunLoopInvalidationRecorder: @unchecked Sendable {
   }
 }
 
+@MainActor
 private func interactiveProbeTextNode(
   _ content: String,
   in context: ResolveContext
@@ -2569,6 +2574,7 @@ private func focusRegion(
   )
 }
 
+@MainActor
 private func scopeSectionFixture() -> some View {
   VStack(alignment: .leading, spacing: 0) {
     VStack(alignment: .leading, spacing: 0) {
@@ -2704,6 +2710,7 @@ private func bottomPoint(
   )
 }
 
+@MainActor
 private final class MouseControlBox {
   var buttonTaps = 0
   var stepperValue = 1
@@ -2715,6 +2722,7 @@ private final class MouseControlBox {
   var text = ""
 }
 
+@MainActor
 private func mouseControlFixture(
   box: MouseControlBox
 ) -> some View {

@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 /// Edits a string binding using keyboard input while masking the rendered value.
 public struct SecureField: View, ResolvableView {

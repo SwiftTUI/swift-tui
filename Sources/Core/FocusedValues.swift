@@ -1,6 +1,6 @@
 /// Declares a typed focused value exported by the currently focused subtree.
 public protocol FocusedValueKey {
-  associatedtype Value: Equatable & Sendable
+  associatedtype Value: Sendable
 }
 
 private protocol FocusedValueBox: Sendable {
@@ -12,7 +12,7 @@ private protocol FocusedValueBox: Sendable {
   ) -> Bool
 }
 
-private struct TypedFocusedValueBox<Value: Equatable & Sendable>: FocusedValueBox {
+private struct TypedFocusedValueBox<Value: Sendable>: FocusedValueBox {
   let base: Value
 
   var valueTypeDescription: String {
@@ -29,7 +29,16 @@ private struct TypedFocusedValueBox<Value: Equatable & Sendable>: FocusedValueBo
     guard let otherValue: Value = other.value(as: Value.self) else {
       return false
     }
-    return base == otherValue
+
+    if let lhs = base as? AnyHashable,
+      let rhs = otherValue as? AnyHashable
+    {
+      return lhs == rhs
+    }
+
+    // Non-equatable focused values still need stable "same shape" comparisons
+    // so focused bindings do not force spurious rerender loops.
+    return true
   }
 }
 

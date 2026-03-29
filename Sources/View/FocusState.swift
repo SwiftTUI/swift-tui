@@ -1,13 +1,11 @@
-import Core
+package import Core
 
 private struct FocusStateSnapshot<Value: Equatable> {
   var value: Value
   var hasPendingRequest: Bool
 }
 
-// SAFETY: All mutable state is protected by OSAllocatedUnfairLock. The @unchecked is needed
-// because Value's Sendable conformance cannot be proven through the generic constraint (only
-// Equatable is required). In practice, focus state values are simple enums or optionals.
+@MainActor
 private final class FocusStateStorage<Value: Equatable>: @unchecked Sendable {
   private let snapshot: OSAllocatedUnfairLock<FocusStateSnapshot<Value>>
 
@@ -48,6 +46,7 @@ private final class FocusStateStorage<Value: Equatable>: @unchecked Sendable {
   }
 }
 
+@MainActor
 private struct FocusStateLocation<Value: Equatable> {
   var bindingID: String
   var snapshot: () -> FocusStateSnapshot<Value>
@@ -55,6 +54,7 @@ private struct FocusStateLocation<Value: Equatable> {
   var applyRuntimeValue: (Value) -> Bool
 }
 
+@MainActor
 private final class FocusStateBox<Value: Equatable> {
   let sourceLocation: String
 
@@ -123,6 +123,7 @@ extension DynamicPropertyScope {
 }
 
 @propertyWrapper
+@MainActor
 /// A focus-owned value synchronized with the runtime focus system.
 public struct FocusState<Value: Equatable> {
   /// A projection used by `.focused(...)` modifiers.
@@ -136,6 +137,7 @@ public struct FocusState<Value: Equatable> {
     }
 
     /// The current authored focus value.
+    @MainActor
     public var wrappedValue: Value {
       get { location.snapshot().value }
       nonmutating set { location.requestValue(newValue) }
@@ -276,6 +278,7 @@ public struct FocusState<Value: Equatable> {
   }
 }
 
+@MainActor
 extension FocusState.Binding {
   package var bindingID: String {
     location.bindingID
@@ -309,6 +312,7 @@ extension View {
   }
 }
 
+@MainActor
 private struct BoolFocusBindingModifier<Content: View>: View, ResolvableView {
   var content: Content
   var binding: FocusState<Bool>.Binding
@@ -328,6 +332,7 @@ private struct BoolFocusBindingModifier<Content: View>: View, ResolvableView {
   }
 }
 
+@MainActor
 private struct OptionalFocusBindingModifier<Content: View, Value: Hashable>: View,
   ResolvableView
 {

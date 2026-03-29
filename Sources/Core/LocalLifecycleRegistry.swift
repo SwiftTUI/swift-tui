@@ -13,21 +13,16 @@ package struct LifecycleHandlerSnapshot: @unchecked Sendable {
   }
 }
 
-// SAFETY: Created and exclusively accessed on @MainActor during resolve/event phases.
-// Contains non-Sendable closures (@MainActor Handler). All mutable state protected by OSAllocatedUnfairLock.
-package final class LocalLifecycleRegistry: @unchecked Sendable, Equatable {
+@MainActor
+package final class LocalLifecycleRegistry: Equatable {
   package typealias Handler = @MainActor () -> Void
 
-  private struct Storage {
-    var appearHandlers: [String: Handler] = [:]
-    var disappearHandlers: [String: Handler] = [:]
-  }
-
-  private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+  private var appearHandlers: [String: Handler] = [:]
+  private var disappearHandlers: [String: Handler] = [:]
 
   package init() {}
 
-  package static func == (
+  nonisolated package static func == (
     lhs: LocalLifecycleRegistry,
     rhs: LocalLifecycleRegistry
   ) -> Bool {
@@ -38,50 +33,38 @@ package final class LocalLifecycleRegistry: @unchecked Sendable, Equatable {
     handlerID: String,
     handler: @escaping Handler
   ) {
-    storage.withLockUnchecked { storage in
-      storage.appearHandlers[handlerID] = handler
-    }
+    appearHandlers[handlerID] = handler
   }
 
   package func registerDisappear(
     handlerID: String,
     handler: @escaping Handler
   ) {
-    storage.withLockUnchecked { storage in
-      storage.disappearHandlers[handlerID] = handler
-    }
+    disappearHandlers[handlerID] = handler
   }
 
   package func appearHandler(
     for handlerID: String
   ) -> Handler? {
-    storage.withLockUnchecked { storage in
-      storage.appearHandlers[handlerID]
-    }
+    appearHandlers[handlerID]
   }
 
   package func disappearHandler(
     for handlerID: String
   ) -> Handler? {
-    storage.withLockUnchecked { storage in
-      storage.disappearHandlers[handlerID]
-    }
+    disappearHandlers[handlerID]
   }
 
   package func reset() {
-    storage.withLockUnchecked { storage in
-      storage.appearHandlers.removeAll(keepingCapacity: true)
-      storage.disappearHandlers.removeAll(keepingCapacity: true)
-    }
+    appearHandlers.removeAll(keepingCapacity: true)
+    disappearHandlers.removeAll(keepingCapacity: true)
   }
 
   package func snapshot() -> LifecycleHandlerSnapshot {
-    storage.withLockUnchecked { storage in
-      .init(
-        appearHandlers: storage.appearHandlers,
-        disappearHandlers: storage.disappearHandlers
-      )
-    }
+    .init(
+      appearHandlers: appearHandlers,
+      disappearHandlers: disappearHandlers
+    )
   }
 
   package func restore(
@@ -91,13 +74,11 @@ package final class LocalLifecycleRegistry: @unchecked Sendable, Equatable {
       return
     }
 
-    storage.withLockUnchecked { storage in
-      for (handlerID, handler) in snapshot.appearHandlers {
-        storage.appearHandlers[handlerID] = handler
-      }
-      for (handlerID, handler) in snapshot.disappearHandlers {
-        storage.disappearHandlers[handlerID] = handler
-      }
+    for (handlerID, handler) in snapshot.appearHandlers {
+      appearHandlers[handlerID] = handler
+    }
+    for (handlerID, handler) in snapshot.disappearHandlers {
+      disappearHandlers[handlerID] = handler
     }
   }
 }

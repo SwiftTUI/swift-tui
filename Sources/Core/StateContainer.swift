@@ -1,8 +1,7 @@
-import Synchronization
-
 /// Thread-safe storage for runtime state with invalidation support.
+@MainActor
 public final class StateContainer<State: Equatable & Sendable> {
-  private let storage: Mutex<State>
+  private var storage: State
   public weak var invalidator: (any Invalidating)?
   public let invalidationIdentities: Set<Identity>
 
@@ -10,44 +9,32 @@ public final class StateContainer<State: Equatable & Sendable> {
     initialState: State,
     invalidationIdentities: Set<Identity> = [Identity(components: [])]
   ) {
-    storage = Mutex(initialState)
+    storage = initialState
     self.invalidationIdentities = invalidationIdentities
   }
 
   public var state: State {
-    storage.withLock { $0 }
+    storage
   }
 
   @discardableResult
   public func replace(with newState: State) -> Bool {
-    let didChange = storage.withLock { state in
-      guard newState != state else {
-        return false
-      }
-      state = newState
-      return true
-    }
-    guard didChange else {
+    guard newState != storage else {
       return false
     }
+    storage = newState
     invalidator?.requestInvalidation(of: invalidationIdentities)
     return true
   }
 
   @discardableResult
   public func mutate(_ update: (inout State) -> Void) -> Bool {
-    let didChange = storage.withLock { state in
-      var candidate = state
-      update(&candidate)
-      guard candidate != state else {
-        return false
-      }
-      state = candidate
-      return true
-    }
-    guard didChange else {
+    var candidate = storage
+    update(&candidate)
+    guard candidate != storage else {
       return false
     }
+    storage = candidate
     invalidator?.requestInvalidation(of: invalidationIdentities)
     return true
   }

@@ -2,13 +2,13 @@ import Core
 import Synchronization
 
 #if canImport(Darwin)
-  import Darwin
+  package import Darwin
 #elseif canImport(Glibc)
-  import Glibc
+  package import Glibc
 #elseif canImport(Android)
-  import Android
+  package import Android
 #elseif canImport(WASILibc)
-  import WASILibc
+  package import WASILibc
 #endif
 
 #if canImport(Darwin)
@@ -413,8 +413,8 @@ extension TerminalHosting {
     private var transmittedKittyImages: Set<UInt32> = []
 
     public convenience init(
-      inputFileDescriptor: Int32 = STDIN_FILENO,
-      outputFileDescriptor: Int32 = STDOUT_FILENO,
+      inputFileDescriptor: Int32 = 0,
+      outputFileDescriptor: Int32 = 1,
       fallbackSize: Size = .init(width: 80, height: 24),
       capabilityProfile: TerminalCapabilityProfile? = nil,
       environment: [String: String]? = nil

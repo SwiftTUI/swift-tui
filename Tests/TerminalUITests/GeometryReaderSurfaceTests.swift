@@ -4,6 +4,7 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
+@MainActor
 @Suite
 struct GeometryReaderSurfaceTests {
   @Test("geometry reader exposes the current terminal surface size")

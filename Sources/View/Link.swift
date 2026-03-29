@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 /// Displays focusable hyperlink text.
 public struct Link: View, ResolvableView {
@@ -58,6 +58,7 @@ extension Link {
   }
 }
 
+@MainActor
 package func parallelResolvedRichTextPayload(
   for text: Text,
   in context: ResolveContext
@@ -76,6 +77,7 @@ package func parallelResolvedRichTextPayload(
   return payload
 }
 
+@MainActor
 package func parallelResolvedRichTextPayload(
   for link: Link,
   in context: ResolveContext
@@ -109,6 +111,7 @@ package func parallelInlineTextStyle(
   )
 }
 
+@MainActor
 private struct ResolvedRichTextBuilder {
   let context: ResolveContext
   let rootIdentity: Identity
@@ -234,6 +237,7 @@ private struct ResolvedRichTextBuilder {
   }
 }
 
+@MainActor
 private func parallelLinkTextStyle(
   for identity: Identity,
   in context: ResolveContext
@@ -262,6 +266,7 @@ private func parallelLinkTextStyle(
   return style
 }
 
+@MainActor
 private func parallelRegisterOpenLinkAction(
   destination: String,
   identity: Identity,

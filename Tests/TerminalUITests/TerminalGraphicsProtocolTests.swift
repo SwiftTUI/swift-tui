@@ -10,6 +10,7 @@ import Testing
   import Glibc
 #endif
 
+@MainActor
 @Suite
 struct TerminalGraphicsProtocolTests {
   @Test(

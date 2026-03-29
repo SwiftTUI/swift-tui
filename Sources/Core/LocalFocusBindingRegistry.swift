@@ -12,14 +12,14 @@ package struct FocusBindingRegistrationSnapshot: @unchecked Sendable {
   package var bindingID: String
   package var hasPendingRequest: Bool
   package var isSelected: Bool
-  package var applyRuntimeFocus: (Bool) -> Bool
+  package var applyRuntimeFocus: @MainActor (Bool) -> Bool
 
   package init(
     identity: Identity,
     bindingID: String,
     hasPendingRequest: Bool,
     isSelected: Bool,
-    applyRuntimeFocus: @escaping (Bool) -> Bool
+    applyRuntimeFocus: @escaping @MainActor (Bool) -> Bool
   ) {
     self.identity = identity
     self.bindingID = bindingID
@@ -29,19 +29,13 @@ package struct FocusBindingRegistrationSnapshot: @unchecked Sendable {
   }
 }
 
-// SAFETY: Created and exclusively accessed on @MainActor during resolve/event phases.
-// Contains non-Sendable closures via FocusBindingRegistrationSnapshot.
-// All mutable state protected by OSAllocatedUnfairLock.
-package final class LocalFocusBindingRegistry: @unchecked Sendable, Equatable {
-  private struct Storage {
-    var registrations: [FocusBindingRegistrationSnapshot] = []
-  }
-
-  private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+@MainActor
+package final class LocalFocusBindingRegistry: Equatable {
+  private var registrations: [FocusBindingRegistrationSnapshot] = []
 
   package init() {}
 
-  package static func == (
+  nonisolated package static func == (
     lhs: LocalFocusBindingRegistry,
     rhs: LocalFocusBindingRegistry
   ) -> Bool {
@@ -53,19 +47,17 @@ package final class LocalFocusBindingRegistry: @unchecked Sendable, Equatable {
     bindingID: String,
     hasPendingRequest: Bool,
     isSelected: Bool,
-    applyRuntimeFocus: @escaping (Bool) -> Bool
+    applyRuntimeFocus: @escaping @MainActor (Bool) -> Bool
   ) {
-    storage.withLockUnchecked { storage in
-      storage.registrations.append(
-        .init(
-          identity: identity,
-          bindingID: bindingID,
-          hasPendingRequest: hasPendingRequest,
-          isSelected: isSelected,
-          applyRuntimeFocus: applyRuntimeFocus
-        )
+    registrations.append(
+      .init(
+        identity: identity,
+        bindingID: bindingID,
+        hasPendingRequest: hasPendingRequest,
+        isSelected: isSelected,
+        applyRuntimeFocus: applyRuntimeFocus
       )
-    }
+    )
   }
 
   package func desiredFocusRequest(
@@ -119,15 +111,11 @@ package final class LocalFocusBindingRegistry: @unchecked Sendable, Equatable {
   }
 
   package func reset() {
-    storage.withLockUnchecked { storage in
-      storage.registrations.removeAll(keepingCapacity: true)
-    }
+    registrations.removeAll(keepingCapacity: true)
   }
 
   package func snapshot() -> [FocusBindingRegistrationSnapshot] {
-    storage.withLockUnchecked { storage in
-      storage.registrations
-    }
+    registrations
   }
 
   package func restore(
@@ -137,9 +125,7 @@ package final class LocalFocusBindingRegistry: @unchecked Sendable, Equatable {
       return
     }
 
-    storage.withLock { storage in
-      storage.registrations.append(contentsOf: snapshot)
-    }
+    registrations.append(contentsOf: snapshot)
   }
 
   private func orderedGroups(

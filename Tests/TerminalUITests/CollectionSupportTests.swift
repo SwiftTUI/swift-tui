@@ -3,6 +3,7 @@ import Testing
 @testable import Core
 @testable import View
 
+@MainActor
 @Suite
 struct CollectionSupportTests {
   @Test("picker selection helpers support exact and optional matches")

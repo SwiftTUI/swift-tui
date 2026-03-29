@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import Core
@@ -5,6 +6,7 @@ import Testing
 @testable import TerminalUIScenes
 @testable import View
 
+@MainActor
 @Suite
 struct AppRuntimeTests {
   @Test("App body resolves a single WindowGroup into a terminal scene")

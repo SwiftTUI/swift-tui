@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 /// Increments or decrements an integer binding.
 public struct Stepper: View, ResolvableView {
@@ -502,6 +502,7 @@ extension Slider {
   }
 }
 
+@MainActor
 private func updateBoundIntControlValue(
   _ binding: Binding<Int>,
   delta: Int,

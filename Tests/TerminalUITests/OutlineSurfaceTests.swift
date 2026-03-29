@@ -3,6 +3,7 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
+@MainActor
 @Suite
 struct OutlineSurfaceTests {
   private struct OutlineNode: Identifiable {

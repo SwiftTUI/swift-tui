@@ -5,6 +5,7 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
+@MainActor
 @Suite
 struct LayoutReuseAncestorInvalidationTests {
   @Test("root invalidation still reuses clean descendant layout work")

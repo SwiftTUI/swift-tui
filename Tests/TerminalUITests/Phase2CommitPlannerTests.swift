@@ -2,6 +2,7 @@ import Testing
 
 @testable import Core
 
+@MainActor
 @Suite
 struct Phase2CommitPlannerTests {
   @Test("new lifecycle owner emits appear and task start deltas")

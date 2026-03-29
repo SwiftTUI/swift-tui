@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 /// Selects one value from a set of tagged options.
 public struct Picker<SelectionValue: Hashable>: View, ResolvableView {

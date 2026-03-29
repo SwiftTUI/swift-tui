@@ -1,37 +1,27 @@
 @_exported import Core
 @_exported import View
 
-// SAFETY: All mutable state is protected by OSAllocatedUnfairLock. The @unchecked is needed
-// because Storage contains FrameArtifacts and RetainedResolveFrame which hold non-Sendable
-// closures from the registry snapshots.
-private final class RetainedFrameStore: @unchecked Sendable {
-  private struct Storage {
-    var previousFrame: FrameArtifacts?
-    var previousResolveFrame: RetainedResolveFrame?
-  }
-
-  private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+@MainActor
+private final class RetainedFrameStore {
+  private var previousFrame: FrameArtifacts?
+  private var previousResolveFrame: RetainedResolveFrame?
 
   func layoutSession(
     invalidatedIdentities: Set<Identity>
   ) -> RetainedLayoutSession {
-    storage.withLockUnchecked { storage in
-      RetainedLayoutSession(
-        previousFrame: storage.previousFrame,
-        invalidatedIdentities: invalidatedIdentities
-      )
-    }
+    RetainedLayoutSession(
+      previousFrame: previousFrame,
+      invalidatedIdentities: invalidatedIdentities
+    )
   }
 
   func resolveSession(
     invalidatedIdentities: Set<Identity>
   ) -> ResolveReuseSession {
-    storage.withLockUnchecked { storage in
-      ResolveReuseSession(
-        previousFrame: storage.previousResolveFrame,
-        invalidatedIdentities: invalidatedIdentities
-      )
-    }
+    ResolveReuseSession(
+      previousFrame: previousResolveFrame,
+      invalidatedIdentities: invalidatedIdentities
+    )
   }
 
   func store(
@@ -44,25 +34,21 @@ private final class RetainedFrameStore: @unchecked Sendable {
     lifecycleRegistry: LocalLifecycleRegistry?,
     taskRegistry: LocalTaskRegistry?
   ) {
-    storage.withLockUnchecked { storage in
-      storage.previousFrame = artifacts
-      storage.previousResolveFrame = RetainedResolveFrame(
-        resolvedTree: artifacts.resolvedTree,
-        actionHandlers: actionRegistry?.snapshot() ?? [:],
-        pointerHandlers: pointerHandlerRegistry?.snapshot() ?? [:],
-        focusBindings: focusBindingRegistry?.snapshot() ?? [],
-        focusedValues: focusedValuesRegistry?.snapshot() ?? [],
-        keyHandlers: keyHandlerRegistry?.snapshot() ?? [:],
-        lifecycleHandlers: lifecycleRegistry?.snapshot() ?? .init(),
-        taskRegistrations: taskRegistry?.snapshot() ?? [:]
-      )
-    }
+    previousFrame = artifacts
+    previousResolveFrame = RetainedResolveFrame(
+      resolvedTree: artifacts.resolvedTree,
+      actionHandlers: actionRegistry?.snapshot() ?? [:],
+      pointerHandlers: pointerHandlerRegistry?.snapshot() ?? [:],
+      focusBindings: focusBindingRegistry?.snapshot() ?? [],
+      focusedValues: focusedValuesRegistry?.snapshot() ?? [],
+      keyHandlers: keyHandlerRegistry?.snapshot() ?? [:],
+      lifecycleHandlers: lifecycleRegistry?.snapshot() ?? .init(),
+      taskRegistrations: taskRegistry?.snapshot() ?? [:]
+    )
   }
 
   func latestResolvedTreeIndex() -> ResolvedTreeIndex? {
-    storage.withLockUnchecked { storage in
-      storage.previousResolveFrame?.resolvedTreeIndex
-    }
+    previousResolveFrame?.resolvedTreeIndex
   }
 }
 
@@ -102,6 +88,7 @@ public struct DefaultRenderer {
   }
 
   /// Renders `root` into complete frame artifacts.
+  @MainActor
   public func render<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
@@ -115,6 +102,7 @@ public struct DefaultRenderer {
     )
   }
 
+  @MainActor
   package func render<V: View>(
     _ root: V,
     context: ResolveContext = .init(),
@@ -129,10 +117,12 @@ public struct DefaultRenderer {
     )
   }
 
+  @MainActor
   package func latestResolvedTreeIndex() -> ResolvedTreeIndex? {
     retainedFrames.latestResolvedTreeIndex()
   }
 
+  @MainActor
   private func renderView<V: View>(
     _ root: V,
     context: ResolveContext,

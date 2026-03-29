@@ -5,6 +5,7 @@ import View
 
 @testable import TerminalUIScenes
 
+@MainActor
 struct MultiSceneLauncherTests {
   @Test("Extracts multiple scene configurations from App body")
   func extractsMultipleConfigurations() {

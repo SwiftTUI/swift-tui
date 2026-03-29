@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 extension View {
   public var body: Never {
@@ -76,7 +76,8 @@ extension View {
 
   public func task(
     priority: TaskPriority = .medium,
-    _ action: @escaping @Sendable () async -> Void
+    @_inheritActorContext
+    _ action: @escaping @isolated(any) @Sendable () async -> Void
   ) -> some View {
     TaskLifecycleModifier(
       content: self,
@@ -89,7 +90,8 @@ extension View {
   public func task<ID: Hashable & Sendable>(
     id value: ID,
     priority: TaskPriority = .medium,
-    _ action: @escaping @Sendable () async -> Void
+    @_inheritActorContext
+    _ action: @escaping @isolated(any) @Sendable () async -> Void
   ) -> some View {
     TaskLifecycleModifier(
       content: self,
@@ -644,6 +646,7 @@ package struct OverlayView<Base: View, OverlayContent: View>: View, ResolvableVi
 }
 
 @inline(never)
+@MainActor
 private func resolveWrapperContent<Content: View>(
   _ content: Content,
   in context: ResolveContext

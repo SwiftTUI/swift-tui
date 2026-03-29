@@ -2,6 +2,7 @@ import Testing
 
 @testable import Core
 
+@MainActor
 @Suite
 struct Phase2LifecycleFixtureTests {
   @Test("branch swaps emit disappearance before insertion")

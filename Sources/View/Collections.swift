@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 /// Groups related collection content with optional header and footer content.
 public struct Section: View, ResolvableView {

@@ -1,5 +1,6 @@
-import Core
+package import Core
 
+@MainActor
 package func combinedView(
   from views: [AnyView],
   kindName: String
@@ -19,6 +20,7 @@ package func combinedView(
   }
 }
 
+@MainActor
 private func parallelResolveGroup(
   kindName: String = "Group",
   children: [AnyView],
@@ -49,6 +51,7 @@ private func parallelResolveGroup(
   )
 }
 
+@MainActor
 private struct NamedGroupView: View, ResolvableView {
   var kindName: String
   var children: [AnyView]

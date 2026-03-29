@@ -44,21 +44,17 @@ package struct LocalPointerEvent: Equatable, Sendable {
   }
 }
 
-// SAFETY: Created and exclusively accessed on @MainActor during resolve/event phases.
-// Contains non-Sendable closures (Handler = (LocalPointerEvent) -> Bool).
-// All mutable state protected by OSAllocatedUnfairLock.
-package final class LocalPointerHandlerRegistry: @unchecked Sendable, Equatable {
-  package typealias Handler = (LocalPointerEvent) -> Bool
+@MainActor
+package final class LocalPointerHandlerRegistry: Equatable {
+  package typealias Handler = @MainActor (LocalPointerEvent) -> Bool
 
-  private struct Storage {
-    var handlers: [RouteID: Handler] = [:]
-  }
-
-  private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+  private var handlers: [RouteID: Handler] = [:]
 
   package init() {}
 
-  package static func == (lhs: LocalPointerHandlerRegistry, rhs: LocalPointerHandlerRegistry)
+  nonisolated package static func == (
+    lhs: LocalPointerHandlerRegistry, rhs: LocalPointerHandlerRegistry
+  )
     -> Bool
   {
     lhs === rhs
@@ -68,17 +64,13 @@ package final class LocalPointerHandlerRegistry: @unchecked Sendable, Equatable 
     routeID: RouteID,
     handler: @escaping Handler
   ) {
-    storage.withLockUnchecked { storage in
-      storage.handlers[routeID] = handler
-    }
+    handlers[routeID] = handler
   }
 
   package func hasHandler(
     routeID: RouteID
   ) -> Bool {
-    storage.withLockUnchecked { storage in
-      storage.handlers[routeID] != nil
-    }
+    handlers[routeID] != nil
   }
 
   @discardableResult
@@ -86,22 +78,15 @@ package final class LocalPointerHandlerRegistry: @unchecked Sendable, Equatable 
     routeID: RouteID,
     event: LocalPointerEvent
   ) -> Bool {
-    let handler = storage.withLockUnchecked { storage in
-      storage.handlers[routeID]
-    }
-    return handler?(event) ?? false
+    handlers[routeID]?(event) ?? false
   }
 
   package func reset() {
-    storage.withLockUnchecked { storage in
-      storage.handlers.removeAll(keepingCapacity: true)
-    }
+    handlers.removeAll(keepingCapacity: true)
   }
 
   package func snapshot() -> [RouteID: Handler] {
-    storage.withLockUnchecked { storage in
-      storage.handlers
-    }
+    handlers
   }
 
   package func restore(_ snapshot: [RouteID: Handler]) {
@@ -109,10 +94,8 @@ package final class LocalPointerHandlerRegistry: @unchecked Sendable, Equatable 
       return
     }
 
-    storage.withLockUnchecked { storage in
-      for (routeID, handler) in snapshot {
-        storage.handlers[routeID] = handler
-      }
+    for (routeID, handler) in snapshot {
+      handlers[routeID] = handler
     }
   }
 }

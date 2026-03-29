@@ -194,6 +194,7 @@ private struct BodyBasedStatefulField: View {
   }
 }
 
+@MainActor
 @Suite(.serialized)
 struct SwiftUISurfaceTests {
   @Test("ViewBuilder flattens Group and drops EmptyView during container resolution")

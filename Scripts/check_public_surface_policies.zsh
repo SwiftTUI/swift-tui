@@ -75,6 +75,107 @@ else
     || fail "The public View protocol block must not expose resolveElements."
 fi
 
+if ! rg -U -n -P --quiet -- '@preconcurrency @MainActor\s+public protocol View \{' \
+  Sources/View/ViewFoundation.swift
+then
+  fail "The public View protocol must stay @MainActor-annotated."
+fi
+
+if ! rg -U -n -P --quiet -- '@ViewBuilder @MainActor @preconcurrency\s+var body: Body \{ get \}' \
+  Sources/View/ViewFoundation.swift
+then
+  fail "View.body must stay @ViewBuilder @MainActor @preconcurrency."
+fi
+
+if ! rg -U -n -P --quiet -- '@preconcurrency @MainActor\s+public protocol Scene \{' \
+  Sources/TerminalUI/App.swift
+then
+  fail "The public Scene protocol must stay @MainActor-annotated."
+fi
+
+if ! rg -U -n -P --quiet -- '@MainActor @preconcurrency\s+var body: Body \{ get \}' \
+  Sources/TerminalUI/App.swift
+then
+  fail "Scene.body must stay @MainActor @preconcurrency."
+fi
+
+if ! rg -U -n -P --quiet -- '@preconcurrency @MainActor\s+public protocol App \{' \
+  Sources/TerminalUI/App.swift
+then
+  fail "The public App protocol must stay @MainActor-annotated."
+fi
+
+if ! rg -U -n -P --quiet -- '@MainActor @preconcurrency\s+init\(\)' \
+  Sources/TerminalUI/App.swift
+then
+  fail "App.init must stay @MainActor @preconcurrency."
+fi
+
+if ! rg -U -n -P --quiet -- '@SceneBuilder @MainActor @preconcurrency\s+var body: Body \{ get \}' \
+  Sources/TerminalUI/App.swift
+then
+  fail "App.body must stay @SceneBuilder @MainActor @preconcurrency."
+fi
+
+if ! rg -U -n -P --quiet -- '@MainActor\s+public func resolve<' \
+  Sources/View/ViewFoundation.swift
+then
+  fail "Resolver.resolve must stay @MainActor."
+fi
+
+if ! rg -U -n -P --quiet -- '@MainActor\s+public func render<' \
+  Sources/TerminalUI/TerminalUI.swift
+then
+  fail "DefaultRenderer.render must stay @MainActor."
+fi
+
+if ! rg -U -n -P --quiet -- '@preconcurrency\s+public init\s*\(\s*@_inheritActorContext get: @escaping @isolated\(any\) @Sendable \(\) -> Value,\s*@_inheritActorContext set: @escaping @isolated\(any\) @Sendable \(Value\) -> Void' \
+  Sources/View/ViewBaseTypes.swift
+then
+  fail "Binding.init(get:set:) must keep its actor-inheriting SwiftUI-style signature."
+fi
+
+if ! rg -n --fixed-strings --quiet -- '@_inheritActorContext' Sources/View/ViewModifiers.swift; then
+  fail "ViewModifiers.task must keep actor-inheriting task closures."
+fi
+
+if ! rg -n --fixed-strings --quiet -- 'public func task<ID: Hashable & Sendable>(' \
+  Sources/View/ViewModifiers.swift
+then
+  fail "The public task(id:) overload must stay available."
+fi
+
+if ! rg -n --fixed-strings --quiet -- 'action: @escaping @MainActor @Sendable () -> Void' \
+  Sources/View/Button.swift
+then
+  fail "Button public actions must stay @MainActor @Sendable."
+fi
+
+if ! rg -n --fixed-strings --quiet -- 'private let handler: @MainActor @Sendable (String) -> Bool' \
+  Sources/View/Environment.swift
+then
+  fail "OpenLinkAction must stay main-actor-aware."
+fi
+
+actor_isolation_docs=(
+  "README.md"
+  "docs/RUNTIME.md"
+  "docs/STATUS.md"
+  "docs/PUBLIC_API_INVENTORY.md"
+  "Sources/View/View.docc/Authoring-Views.md"
+  "Sources/TerminalUI/TerminalUI.docc/Running-Apps.md"
+)
+
+for doc_file in "${actor_isolation_docs[@]}"; do
+  if ! rg -n --fixed-strings --quiet -- '@MainActor' "$doc_file"; then
+    fail "$doc_file should document the @MainActor authoring model."
+  fi
+done
+
+if [[ ! -f Tests/ViewTests/ActorIsolationSurfaceTests.swift ]]; then
+  fail "Tests/ViewTests/ActorIsolationSurfaceTests.swift should exist to pin the actor-isolated surface."
+fi
+
 public_surface_patterns=(
   '@ViewBuilder\s+[A-Za-z_]+\s*:\s*\(\)\s*->\s*\[AnyView\]'
   'public\s+(var|let)\s+[A-Za-z_]+\s*:\s*\[AnyView\]'
@@ -142,7 +243,6 @@ retired_legacy_identifier_tokens=(
   'emphasis: [String]'
   'styleRawValue'
   'RouteID.rawValue'
-  'ExpressibleByStringLiteral'
   'ActionDispatcher'
   'keyboardActionRole'
   'pointerHitPolicy'

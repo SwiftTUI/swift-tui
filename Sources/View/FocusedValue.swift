@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 private enum FocusedValuesKey: EnvironmentKey {
   static let defaultValue = FocusedValues()
@@ -12,8 +12,9 @@ extension EnvironmentValues {
 }
 
 @propertyWrapper
+@MainActor
 /// Reads a value exported by the currently focused subtree.
-public struct FocusedValue<Value: Equatable & Sendable> {
+public struct FocusedValue<Value: Sendable> {
   private let keyPath: KeyPath<FocusedValues, Value?>
 
   /// Creates a focused-value reader for `keyPath`.
@@ -29,8 +30,9 @@ public struct FocusedValue<Value: Equatable & Sendable> {
 }
 
 @propertyWrapper
+@MainActor
 /// Reads and writes a binding exported by the currently focused subtree.
-public struct FocusedBinding<Value: Equatable & Sendable> {
+public struct FocusedBinding<Value: Sendable> {
   private let keyPath: KeyPath<FocusedValues, Binding<Value>?>
 
   /// Creates a focused-binding reader for `keyPath`.
@@ -60,7 +62,7 @@ public struct FocusedBinding<Value: Equatable & Sendable> {
 }
 
 extension View {
-  public func focusedValue<Value: Equatable & Sendable>(
+  public func focusedValue<Value: Sendable>(
     _ keyPath: WritableKeyPath<FocusedValues, Value?>,
     _ value: Value
   ) -> some View {
@@ -71,7 +73,7 @@ extension View {
     )
   }
 
-  public func focusedValue<Value: Equatable & Sendable>(
+  public func focusedValue<Value: Sendable>(
     _ keyPath: WritableKeyPath<FocusedValues, Value?>,
     _ value: Value?
   ) -> some View {
@@ -82,14 +84,14 @@ extension View {
     )
   }
 
-  public func focusedSceneValue<Value: Equatable & Sendable>(
+  public func focusedSceneValue<Value: Sendable>(
     _ keyPath: WritableKeyPath<FocusedValues, Value?>,
     _ value: Value
   ) -> some View {
     focusedValue(keyPath, value)
   }
 
-  public func focusedSceneValue<Value: Equatable & Sendable>(
+  public func focusedSceneValue<Value: Sendable>(
     _ keyPath: WritableKeyPath<FocusedValues, Value?>,
     _ value: Value?
   ) -> some View {
@@ -97,7 +99,7 @@ extension View {
   }
 }
 
-private struct FocusedValueWritingModifier<Content: View, Value: Equatable & Sendable>: View,
+private struct FocusedValueWritingModifier<Content: View, Value: Sendable>: View,
   ResolvableView
 {
   var content: Content

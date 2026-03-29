@@ -1,18 +1,12 @@
-// SAFETY: Created and exclusively accessed on @MainActor during resolve/event phases.
-// Contains non-Sendable closures (Handler = () -> Bool).
-// All mutable state protected by OSAllocatedUnfairLock.
-package final class LocalActionRegistry: @unchecked Sendable, Equatable {
-  package typealias Handler = () -> Bool
+@MainActor
+package final class LocalActionRegistry: Equatable {
+  package typealias Handler = @MainActor () -> Bool
 
-  private struct Storage {
-    var handlers: [Identity: Handler] = [:]
-  }
-
-  private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
+  private var handlers: [Identity: Handler] = [:]
 
   package init() {}
 
-  package static func == (lhs: LocalActionRegistry, rhs: LocalActionRegistry) -> Bool {
+  nonisolated package static func == (lhs: LocalActionRegistry, rhs: LocalActionRegistry) -> Bool {
     lhs === rhs
   }
 
@@ -20,37 +14,26 @@ package final class LocalActionRegistry: @unchecked Sendable, Equatable {
     identity: Identity,
     handler: @escaping Handler
   ) {
-    storage.withLockUnchecked { storage in
-      storage.handlers[identity] = handler
-    }
+    handlers[identity] = handler
   }
 
   @discardableResult
   package func dispatch(identity: Identity) -> Bool {
-    let handler = storage.withLockUnchecked { storage in
-      storage.handlers[identity]
-    }
-    return handler?() ?? false
+    handlers[identity]?() ?? false
   }
 
   package func hasHandler(
     identity: Identity
   ) -> Bool {
-    storage.withLockUnchecked { storage in
-      storage.handlers[identity] != nil
-    }
+    handlers[identity] != nil
   }
 
   package func reset() {
-    storage.withLockUnchecked { storage in
-      storage.handlers.removeAll(keepingCapacity: true)
-    }
+    handlers.removeAll(keepingCapacity: true)
   }
 
   package func snapshot() -> [Identity: Handler] {
-    storage.withLockUnchecked { storage in
-      storage.handlers
-    }
+    handlers
   }
 
   package func restore(_ snapshot: [Identity: Handler]) {
@@ -58,10 +41,8 @@ package final class LocalActionRegistry: @unchecked Sendable, Equatable {
       return
     }
 
-    storage.withLockUnchecked { storage in
-      for (identity, handler) in snapshot {
-        storage.handlers[identity] = handler
-      }
+    for (identity, handler) in snapshot {
+      handlers[identity] = handler
     }
   }
 }

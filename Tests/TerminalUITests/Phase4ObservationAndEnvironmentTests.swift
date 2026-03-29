@@ -6,6 +6,7 @@ import Testing
 @testable import TerminalUIScenes
 @testable import View
 
+@MainActor
 @Suite(.serialized)
 struct Phase4ObservationAndEnvironmentTests {
   @Test("observable child mutations invalidate only the observed subtree identity")

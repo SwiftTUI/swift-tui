@@ -5,6 +5,7 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
+@MainActor
 @Suite
 struct ResolveReuseAncestorInvalidationTests {
   @Test("ancestor invalidation recomputes binding-driven descendants")

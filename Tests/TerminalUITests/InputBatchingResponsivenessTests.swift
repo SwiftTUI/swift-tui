@@ -2,6 +2,7 @@ import Testing
 
 @testable import TerminalUI
 
+@MainActor
 @Suite
 struct InputBatchingResponsivenessTests {
   @Test("pointer batching keeps a short debounce window")

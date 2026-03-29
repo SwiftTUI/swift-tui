@@ -3,6 +3,7 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
+@MainActor
 @Suite
 struct TimingDiagnosticsTests {
   @Test("default renderer records per-phase timings")

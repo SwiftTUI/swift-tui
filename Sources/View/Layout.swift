@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 /// Declares a typed value exchanged between a parent layout and its subviews.
 public protocol LayoutValueKey {
@@ -128,6 +128,7 @@ extension Layout {
     cache = makeCache(subviews: subviews)
   }
 
+  @MainActor
   public func callAsFunction<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {
@@ -316,6 +317,7 @@ public struct AnyLayout: Layout {
 }
 
 extension AnyLayout {
+  @MainActor
   public func callAsFunction<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {

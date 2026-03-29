@@ -3,6 +3,7 @@ import Testing
 @testable import Core
 @testable import View
 
+@MainActor
 @Suite
 struct ViewResolutionTests {
   @Test("Text view resolves to a single node")

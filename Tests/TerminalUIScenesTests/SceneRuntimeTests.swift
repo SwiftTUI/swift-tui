@@ -1,6 +1,6 @@
 import Dispatch
-import TerminalUI
 import Synchronization
+import TerminalUI
 import Testing
 import View
 

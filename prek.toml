@@ -26,7 +26,7 @@ hooks = [
     name = "enforce public surface and documentation guardrails",
     entry = "./Scripts/check_public_surface_policies.zsh",
     language = "system",
-    files = '^(Package\.swift|README\.md|docs/PUBLIC_(API_INVENTORY|SURFACE_POLICY)\.md|Sources/.*\.swift|Tests/TerminalUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
+    files = '^(Package\.swift|README\.md|docs/(RUNTIME|STATUS|PUBLIC_(API_INVENTORY|SURFACE_POLICY))\.md|Sources/.*\.swift|Sources/View/View\.docc/Authoring-Views\.md|Sources/TerminalUI/TerminalUI\.docc/Running-Apps\.md|Examples/todoist/Sources/TodoistDemo/main\.swift|Tests/ViewTests/ActorIsolationSurfaceTests\.swift|Tests/TerminalUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
     pass_filenames = false
   },
   {

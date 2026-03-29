@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 /// A view that renders a geometric shape using fill or stroke operations.
 public protocol Shape: View {

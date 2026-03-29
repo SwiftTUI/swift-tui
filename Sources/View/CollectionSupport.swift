@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 func parallelNodeLabelText(
   from node: ResolvedNode

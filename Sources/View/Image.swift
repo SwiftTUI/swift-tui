@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 /// Displays a PNG image sourced from an explicit resource path, local file URL,
 /// or bytes embedded directly in the binary.

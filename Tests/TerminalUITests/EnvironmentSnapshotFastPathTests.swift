@@ -3,6 +3,7 @@ import Testing
 @testable import Core
 @testable import View
 
+@MainActor
 @Suite
 struct EnvironmentSnapshotFastPathTests {
   @Test("snapshots with equal contents compare equal even when stored separately")

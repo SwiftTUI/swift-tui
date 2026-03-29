@@ -1,5 +1,5 @@
 import Core
-import TerminalUI
+public import TerminalUI
 import View
 
 #if canImport(Darwin)

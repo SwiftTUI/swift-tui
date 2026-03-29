@@ -92,7 +92,7 @@ public struct UnixSignalsSequence: AsyncSequence, Sendable {
     }
 
     public mutating func next() async -> UnixSignal? {
-      return await iterator.next()
+      await iterator.next(isolation: nil)
     }
   }
 }

@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 extension View {
   public func defaultFocus(

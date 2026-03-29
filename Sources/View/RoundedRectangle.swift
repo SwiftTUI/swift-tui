@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 /// A rectangle with rounded corners expressed in terminal cells.
 public struct RoundedRectangle: Shape, ResolvableView {

@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 /// Declares a typed environment value.
 public protocol EnvironmentKey {
@@ -33,10 +33,10 @@ private struct TypedEnvironmentValueBox<Value: Sendable>: EnvironmentValueBox {
 public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
   package let isPlaceholder: Bool
-  private let handler: @Sendable (String) -> Bool
+  private let handler: @MainActor @Sendable (String) -> Bool
 
   public init(
-    _ handler: @escaping @Sendable (String) -> Bool
+    _ handler: @escaping @MainActor @Sendable (String) -> Bool
   ) {
     snapshotLabel = "OpenLinkAction.custom"
     isPlaceholder = false
@@ -44,7 +44,7 @@ public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStri
   }
 
   public init(
-    action handler: @escaping @Sendable (String) -> Void
+    action handler: @escaping @MainActor @Sendable (String) -> Void
   ) {
     self.init { destination in
       handler(destination)
@@ -53,6 +53,7 @@ public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStri
   }
 
   @discardableResult
+  @MainActor
   public func callAsFunction(
     _ destination: String
   ) -> Bool {
@@ -70,7 +71,7 @@ public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStri
   package init(
     snapshotLabel: String,
     isPlaceholder: Bool,
-    handler: @escaping @Sendable (String) -> Bool
+    handler: @escaping @MainActor @Sendable (String) -> Bool
   ) {
     self.snapshotLabel = snapshotLabel
     self.isPlaceholder = isPlaceholder
@@ -288,16 +289,19 @@ public struct ResolveContext: Equatable, Sendable {
     }
   }
 
+  @MainActor
   package func reusedResolvedSubtreeIfAvailable() -> ResolvedNode? {
     resolveReuseSession?.reusedResolvedSubtree(for: self)
   }
 
+  @MainActor
   package func recordResolvedComputation(
     count: Int = 1
   ) {
     resolveReuseSession?.workMetrics.resolvedNodesComputed += max(0, count)
   }
 
+  @MainActor
   package func trackingObservableAccess<T>(
     _ apply: () -> T
   ) -> T {
@@ -391,6 +395,7 @@ extension ResolveContext {
 // SAFETY: Created per-frame and exclusively accessed on @MainActor during the resolve phase.
 // Contains RetainedResolveFrame (non-Sendable due to closure storage) and mutable workMetrics.
 // Never shared across isolation domains.
+@MainActor
 package final class ResolveReuseSession: @unchecked Sendable {
   package let invalidatedIdentities: Set<Identity>
   private let previousFrame: RetainedResolveFrame?

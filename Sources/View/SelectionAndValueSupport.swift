@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 protocol OptionalSelectionValue {
   static func parallelOptionalSelectionValue(from tag: AnyHashable) -> Self?
@@ -159,6 +159,7 @@ func sliderValue(
   return candidates[candidateIndex]
 }
 
+@MainActor
 func setBoundSelection<SelectionValue: Hashable>(
   _ binding: Binding<SelectionValue>,
   to tag: SelectionTag
@@ -172,6 +173,7 @@ func setBoundSelection<SelectionValue: Hashable>(
   return true
 }
 
+@MainActor
 func stepBoundSelection<SelectionValue: Hashable>(
   _ binding: Binding<SelectionValue>,
   orderedTags: [SelectionTag],

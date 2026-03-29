@@ -2,6 +2,7 @@ import Testing
 
 @testable import Core
 
+@MainActor
 @Suite
 struct TextLayoutCacheTests {
   @Test("identical layout requests hit the cache")

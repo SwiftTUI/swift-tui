@@ -1,6 +1,6 @@
 # Runtime
 
-Last updated: March 26, 2026
+Last updated: March 29, 2026
 
 This document is the stable reference for runtime behavior. It captures the shipped lifecycle rules, state and observation model, input handling, and the current incremental delivery cost model.
 
@@ -56,24 +56,32 @@ The practical rule is simple: if identity is preserved, it is not a lifecycle tr
 
 ## State, Environment, Observation, And Isolation
 
-The package still uses `.defaultIsolation(.none)` in `Package.swift`. That is deliberate.
+The package still uses `.defaultIsolation(.none)` in `Package.swift`. That is deliberate. The shipped model now matches SwiftUI-style authoring isolation through explicit `@MainActor` annotations rather than through blanket target isolation.
 
 The shipped ownership model is split into three categories:
 
-- Main-actor runtime coordination:
+- Main-actor authoring and body evaluation:
+  - `View`, `Scene`, and `App`
+  - `Resolver.resolve(...)`
+  - `DefaultRenderer.render(...)`
+  - scene collection helpers and `WindowGroup` root-view construction
+  - action-bearing authoring APIs such as `Binding.init(get:set:)`, button actions, `OpenLinkAction`, `.onAppear`, `.onDisappear`, and `.task(...)`
+- Main-actor runtime coordination and ownership:
   - `RunLoop`
-  - scheduler attachment and wake handling
-  - focus, pressed identity, lifecycle staging, and task reconciliation
-  - terminal presentation commit boundaries
-- Runtime-owned mutable stores with explicit synchronization or narrow ownership:
   - `StateContainer`
   - local action, focused-value, key, lifecycle, task, and pointer registries
-  - retained frame and layout reuse stores
-  - measurement cache
-- Pure frame products:
+  - retained frame and resolve-reuse stores
+  - focus, pressed identity, lifecycle staging, and task reconciliation
+  - terminal presentation commit boundaries
+- Pure nonisolated frame products:
   - `ResolveContext`
   - `EnvironmentSnapshot`
   - resolved, measured, placed, semantic, draw, raster, and commit artifacts
+- Genuinely concurrent I/O and host plumbing:
+  - input readers
+  - signal readers
+  - terminal-host I/O
+  - graphics or image transport support
 
 ### State Model
 
@@ -97,7 +105,7 @@ Regression coverage exists for nested overrides, `transformEnvironment`, wrapper
 Observation is built on the same invalidation path as `@State`, not on a parallel runtime.
 
 - `resolveBody` and `EnvironmentReader` track observable reads through `ObservationBridge`
-- observable callbacks invalidate the exact observed identity
+- observable callbacks invalidate the exact observed identity on the main actor
 - generation tracking suppresses stale callbacks from older frames
 - committed-frame pruning stops removed identities from continuing to invalidate hidden subtrees
 - the package provides its own `@Bindable`

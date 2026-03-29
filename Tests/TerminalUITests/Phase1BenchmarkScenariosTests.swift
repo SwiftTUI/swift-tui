@@ -11,6 +11,7 @@ import Testing
   import Glibc
 #endif
 
+@MainActor
 @Suite
 struct Phase1BenchmarkScenariosTests {
   @Test("idle rerender reuses all layout work and writes nothing on the second frame")
@@ -143,6 +144,7 @@ private struct BenchmarkFrame {
   let presentation: TerminalPresentationMetrics
 }
 
+@MainActor
 private final class BenchmarkHarness {
   private let renderer = DefaultRenderer(
     layoutEngine: .init(cache: MeasurementCache())

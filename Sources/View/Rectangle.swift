@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 /// A rectangular shape.
 public struct Rectangle: Shape, ResolvableView {

@@ -60,13 +60,19 @@ let package = Package(
       name: "UnixSignals",
       dependencies: [
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
-      ], path: "Sources/Vendor/UnixSignals"),
+      ],
+      path: "Sources/Vendor/UnixSignals",
+      swiftSettings: swiftSettings()
+    ),
     .testTarget(
       name: "UnixSignalsTests",
       dependencies: [
         "UnixSignals",
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-      ], path: "Sources/Vendor/UnixSignalsTests"),
+      ],
+      path: "Sources/Vendor/UnixSignalsTests",
+      swiftSettings: swiftSettings()
+    ),
     .target(
       name: "Core",
       dependencies: [
@@ -78,11 +84,16 @@ let package = Package(
       swiftSettings: swiftSettings()
     ),
 
-    .target(name: "View", dependencies: ["Core"]),
+    .target(
+      name: "View",
+      dependencies: ["Core"],
+      swiftSettings: swiftSettings()
+    ),
 
     .target(
       name: "TerminalUICharts",
-      dependencies: ["Core", "View"]
+      dependencies: ["Core", "View"],
+      swiftSettings: swiftSettings()
     ),
 
     .target(
@@ -96,7 +107,8 @@ let package = Package(
         ),
         .product(name: "PNG", package: "swift-png"),
       ],
-      resources: []
+      resources: [],
+      swiftSettings: swiftSettings()
     ),
     .target(
       name: "TerminalUIScenes",
@@ -106,20 +118,24 @@ let package = Package(
           name: "UnixSignals",
           condition: .when(platforms: nativeRuntimePlatforms)
         ),
-      ]
+      ],
+      swiftSettings: swiftSettings()
     ),
     .testTarget(
       name: "CoreTests",
       dependencies: [
         "Core"
-      ]
+      ],
+      swiftSettings: swiftSettings()
     ),
     .testTarget(
       name: "ViewTests",
       dependencies: [
         "Core",
         "View",
-      ]
+        "TerminalUI",
+      ],
+      swiftSettings: swiftSettings()
     ),
     .testTarget(
       name: "TerminalUITests",
@@ -131,7 +147,8 @@ let package = Package(
         "TerminalUICharts",
         .product(name: "PNG", package: "swift-png"),
       ],
-      exclude: ["Fixtures"]
+      exclude: ["Fixtures"],
+      swiftSettings: swiftSettings()
     ),
     .testTarget(
       name: "TerminalUIScenesTests",
@@ -140,7 +157,8 @@ let package = Package(
         "TerminalUI",
         "Core",
         "View",
-      ]
+      ],
+      swiftSettings: swiftSettings()
     ),
   ]
 )

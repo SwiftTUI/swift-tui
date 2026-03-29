@@ -234,6 +234,7 @@ package struct ResolvedTreeIndex: Sendable {
 // SAFETY: Created on @MainActor at end of resolve phase, retained for next frame's reuse session.
 // Contains non-Sendable closures (action/key/pointer/lifecycle handlers) and closure-bearing
 // snapshots (FocusBindingRegistrationSnapshot, TaskRegistration). All access is on @MainActor.
+@MainActor
 package final class RetainedResolveFrame: @unchecked Sendable {
   package var resolvedTree: ResolvedNode
   package let resolvedTreeIndex: ResolvedTreeIndex

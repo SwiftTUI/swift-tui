@@ -10,6 +10,7 @@ import Testing
   import Glibc
 #endif
 
+@MainActor
 @Suite
 struct TerminalPresentationTests {
   @Test("capability detection prefers true color under UTF-8 terminals")

@@ -9,6 +9,7 @@ import Testing
   import Glibc
 #endif
 
+@MainActor
 @Suite
 struct InputReaderControlMessageTests {
   @Test("input reader routes resize control messages without leaking them as key input")

@@ -515,7 +515,7 @@ public final class InputReader: InputReading, TerminalInputReading {
 
   /// Creates an input reader bound to `fileDescriptor`.
   public init(
-    fileDescriptor: Int32 = STDIN_FILENO,
+    fileDescriptor: Int32 = 0,
     controlHandler: @escaping @Sendable (TerminalControlMessage) -> Void = { _ in }
   ) {
     self.fileDescriptor = fileDescriptor

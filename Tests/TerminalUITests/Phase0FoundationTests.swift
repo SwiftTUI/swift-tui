@@ -84,6 +84,7 @@ private func samplePlacedNode(
   )
 }
 
+@MainActor
 @Suite
 struct Phase0FoundationTests {
   @Test("renderer executes the fresh-core phase order strictly")

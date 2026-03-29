@@ -1,4 +1,4 @@
-import TerminalUI
+public import TerminalUI
 
 package enum InteractiveDemoSelectionMode: String, CaseIterable, Equatable, Sendable {
   case inspect
@@ -164,6 +164,7 @@ extension EnvironmentValues {
   }
 }
 
+@MainActor
 package func handleFocusedInteractiveDemoInput(
   keyEvent: KeyEvent,
   focusedIdentity: Identity?,
@@ -197,6 +198,7 @@ package func handleFocusedInteractiveDemoInput(
   }
 }
 
+@MainActor
 package func interactiveDemoScene(
   state: InteractiveDemoState,
   focusedIdentity: Identity?
@@ -208,6 +210,7 @@ package func interactiveDemoScene(
   )
 }
 
+@MainActor
 package struct InteractiveDemoBindings {
   package var accentPreviewEnabled: Binding<Bool>
   package var value: Binding<Int>
@@ -230,6 +233,7 @@ package struct InteractiveDemoBindings {
   }
 }
 
+@MainActor
 package func interactiveDemoBindings(
   stateContainer: StateContainer<InteractiveDemoState>
 ) -> InteractiveDemoBindings {
@@ -288,6 +292,7 @@ package func interactiveDemoBindings(
   )
 }
 
+@MainActor
 package func interactiveDemoScene(
   state: InteractiveDemoState,
   focusedIdentity: Identity?,
@@ -300,6 +305,7 @@ package func interactiveDemoScene(
   )
 }
 
+@MainActor
 private func interactiveDemoRootView(
   state: InteractiveDemoState,
   focusedIdentity: Identity?,
@@ -353,6 +359,7 @@ private func interactiveDemoRootView(
   )
 }
 
+@MainActor
 private func controlsColumn(
   state: InteractiveDemoState,
   bindings: InteractiveDemoBindings
@@ -388,6 +395,7 @@ private func controlsColumn(
   )
 }
 
+@MainActor
 private func showcaseColumn(
   state: InteractiveDemoState,
   bindings: InteractiveDemoBindings
@@ -427,6 +435,7 @@ private func showcaseColumn(
   )
 }
 
+@MainActor
 private func selectionSummary(
   state: InteractiveDemoState
 ) -> AnyView {
@@ -448,6 +457,7 @@ private func selectionSummary(
   )
 }
 
+@MainActor
 private func textLabColumn(
   state: InteractiveDemoState,
   bindings: InteractiveDemoBindings
@@ -535,6 +545,7 @@ private func textLabColumn(
   )
 }
 
+@MainActor
 private func accentToggleRow(
   bindings: InteractiveDemoBindings
 ) -> AnyView {
@@ -545,6 +556,7 @@ private func accentToggleRow(
   )
 }
 
+@MainActor
 private func buttonRow(
   state: InteractiveDemoState,
   bindings: InteractiveDemoBindings
@@ -586,10 +598,11 @@ private func buttonRow(
   )
 }
 
+@MainActor
 private func buttonControl(
   identity: Identity,
   label: String,
-  action: @escaping () -> Void,
+  action: @escaping @MainActor @Sendable () -> Void,
   buttonRole: ButtonRole? = nil,
   buttonStyle: ButtonStyle = .automatic,
   disabled: Bool = false
@@ -613,6 +626,7 @@ private func buttonControl(
   )
 }
 
+@MainActor
 private func quickPresetMenuView(
   state: InteractiveDemoState,
   bindings: InteractiveDemoBindings
@@ -631,6 +645,7 @@ private func quickPresetMenuView(
   )
 }
 
+@MainActor
 private func presetListView(
   state: InteractiveDemoState,
   bindings: InteractiveDemoBindings
@@ -670,6 +685,7 @@ private func presetListView(
   )
 }
 
+@MainActor
 private func presetRowBackgroundStyle(
   preset: Int,
   currentValue: Int
@@ -683,6 +699,7 @@ private func presetRowBackgroundStyle(
   return AnyShapeStyle(.warning)
 }
 
+@MainActor
 private func directSetField(
   bindings: InteractiveDemoBindings
 ) -> AnyView {
@@ -698,6 +715,7 @@ private func directSetField(
   )
 }
 
+@MainActor
 private func interactiveDemoCapabilityBadge(
   _ profile: TerminalCapabilityProfile,
   appearance: TerminalAppearance
@@ -726,6 +744,7 @@ private func interactiveDemoCapabilityBadge(
   return "\(glyphLabel) | \(colorLabel) | \(styleLabel) | \(appearance.colorScheme.rawValue)"
 }
 
+@MainActor
 private func presetRowLabel(
   preset: Int,
   isCurrentValue: Bool

@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 private enum OutlineStyleKey: EnvironmentKey {
   static let defaultValue = OutlineStyle.automatic

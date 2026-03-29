@@ -16,15 +16,15 @@ The package is already usable for real terminal interfaces. The main gaps are no
 
 ### Authoring surface
 
-- SwiftUI-shaped `View` authoring with body-only `View`, `@ViewBuilder`, `TupleView`, `ConditionalContent`, `AnyView`, and `Resolver`
+- SwiftUI-shaped `@MainActor`-isolated `View` authoring with body-only `View`, `@ViewBuilder`, `TupleView`, `ConditionalContent`, `AnyView`, and `Resolver`
 - Layout and containers including `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `ViewThatFits`, `GeometryReader`, and custom `Layout`
 - Controls and primitives including `Text`, rich `Text` interpolation, `Link`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `Spacer`, `Divider`, and shapes
 - PNG-backed `Image` with named-resource, local-file-URL, and embedded-byte sources plus `.resizable()`, `.scaledToFit()`, and `.scaledToFill()`
-- Environment, observation, and focus including `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`, `@FocusedValue`, `@FocusedBinding`, `OpenLinkAction`, and default-focus modifiers
+- Environment, observation, and focus including `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`, `@FocusedValue`, `@FocusedBinding`, `OpenLinkAction`, actor-context-aware `.task(...)`, and default-focus modifiers
 
 ### Runtime surface
 
-- `DefaultRenderer` for one-shot rendering and pipeline inspection
+- `DefaultRenderer` for one-shot rendering and pipeline inspection from the main actor
 - `RunLoop` for interactive terminal sessions
 - `TerminalHost`, terminal appearance detection, graphics-capability probing, capability-aware presentation, and OSC 8 hyperlink emission when supported
 - Keyboard parsing, mouse input parsing, Unix signal handling, and runtime scheduling
@@ -33,7 +33,7 @@ The package is already usable for real terminal interfaces. The main gaps are no
 
 ### Scene and multi-scene surface
 
-- `App`, `Scene`, `SceneBuilder`, and `WindowGroup` declarations in `TerminalUI`
+- `@MainActor` `App`, `Scene`, `SceneBuilder`, and `WindowGroup` declarations in `TerminalUI`
 - `MultiSceneLauncher` in `TerminalUIScenes` for public scene launch, including the single-window case today
 - Pty-backed secondary scenes, Unix-domain-socket discovery, scene attachment, and lazy rendering of unattached secondary scenes
 

@@ -1,15 +1,8 @@
-import Core
+package import Core
 
-// SAFETY: Mutable state is protected by OSAllocatedUnfairLock. The @unchecked is needed because
-// Storage contains `any DynamicStateEntryBox` existentials and the `invalidator` weak reference
-// is a non-Sendable existential. The weak `invalidator` is only accessed on @MainActor.
-package final class DynamicStateStore: @unchecked Sendable, Equatable {
-  private struct Storage {
-    var entries: [String: any DynamicStateEntryBox] = [:]
-  }
-
-  private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
-
+@MainActor
+package final class DynamicStateStore: Equatable {
+  private var entries: [String: any DynamicStateEntryBox] = [:]
   package weak var invalidator: (any Invalidating)?
   package let invalidationIdentities: Set<Identity>
 
@@ -17,7 +10,7 @@ package final class DynamicStateStore: @unchecked Sendable, Equatable {
     self.invalidationIdentities = invalidationIdentities
   }
 
-  package static func == (
+  nonisolated package static func == (
     lhs: DynamicStateStore,
     rhs: DynamicStateStore
   ) -> Bool {
@@ -28,20 +21,18 @@ package final class DynamicStateStore: @unchecked Sendable, Equatable {
     for key: String,
     seedValue: @autoclosure () -> Value
   ) -> Value {
-    storage.withLockUnchecked { storage in
-      if let existing = storage.entries[key] {
-        guard let typed: Value = existing.value(as: Value.self) else {
-          fatalError(
-            "State type mismatch for key \(key). Expected \(Value.self), found \(existing.valueType)."
-          )
-        }
-        return typed
+    if let existing = entries[key] {
+      guard let typed: Value = existing.value(as: Value.self) else {
+        fatalError(
+          "State type mismatch for key \(key). Expected \(Value.self), found \(existing.valueType)."
+        )
       }
-
-      let initialValue = seedValue()
-      storage.entries[key] = DynamicStateEntry(initialValue)
-      return initialValue
+      return typed
     }
+
+    let initialValue = seedValue()
+    entries[key] = DynamicStateEntry(initialValue)
+    return initialValue
   }
 
   package func set<Value>(
@@ -49,12 +40,10 @@ package final class DynamicStateStore: @unchecked Sendable, Equatable {
     for key: String,
     invalidationIdentity: Identity? = nil
   ) {
-    storage.withLockUnchecked { storage in
-      if let existing = storage.entries[key] {
-        existing.set(value)
-      } else {
-        storage.entries[key] = DynamicStateEntry(value)
-      }
+    if let existing = entries[key] {
+      existing.set(value)
+    } else {
+      entries[key] = DynamicStateEntry(value)
     }
     let identities =
       invalidationIdentity.map { Set([$0]) }
@@ -63,6 +52,7 @@ package final class DynamicStateStore: @unchecked Sendable, Equatable {
   }
 }
 
+@MainActor
 private protocol DynamicStateEntryBox: AnyObject {
   var valueType: Any.Type { get }
 
@@ -70,21 +60,20 @@ private protocol DynamicStateEntryBox: AnyObject {
   func set<Value>(_ value: Value)
 }
 
+@MainActor
 private final class DynamicStateEntry<StoredValue>: DynamicStateEntryBox {
-  private let storage: OSAllocatedUnfairLock<StoredValue>
+  private var storedValue: StoredValue
   let valueType: Any.Type = StoredValue.self
 
   init(_ value: StoredValue) {
-    storage = OSAllocatedUnfairLock(uncheckedState: value)
+    storedValue = value
   }
 
   func value<Value>(as type: Value.Type) -> Value? {
     guard self.valueType == type else {
       return nil
     }
-    return storage.withLockUnchecked { value in
-      value as? Value
-    }
+    return storedValue as? Value
   }
 
   func set<Value>(_ value: Value) {
@@ -93,13 +82,12 @@ private final class DynamicStateEntry<StoredValue>: DynamicStateEntryBox {
         "State type mismatch for entry. Expected \(self.valueType), received \(Value.self)."
       )
     }
-    storage.withLockUnchecked { value in
-      value = typed
-    }
+    storedValue = typed
   }
 }
 
-package struct DynamicPropertyScope: Sendable {
+@MainActor
+package struct DynamicPropertyScope {
   var viewIdentity: Identity
   var stateStore: DynamicStateStore?
   var environmentValues: EnvironmentValues?
@@ -114,10 +102,12 @@ package enum DynamicPropertyScopeStorage {
   @TaskLocal static var current: DynamicPropertyScope?
 }
 
+@MainActor
 package func currentDynamicPropertyScope() -> DynamicPropertyScope? {
   DynamicPropertyScopeStorage.current
 }
 
+@MainActor
 package func withDynamicPropertyScope<Result>(
   _ scope: DynamicPropertyScope?,
   _ apply: () -> Result
@@ -127,6 +117,7 @@ package func withDynamicPropertyScope<Result>(
   }
 }
 
+@MainActor
 package func withDynamicPropertyScope<Result>(
   _ scope: DynamicPropertyScope?,
   _ apply: () async -> Result
@@ -136,67 +127,53 @@ package func withDynamicPropertyScope<Result>(
   }
 }
 
+@MainActor
 private struct DynamicStateLocation<Value> {
-  var getValue: () -> Value
-  var setValue: (Value) -> Void
+  var getValue: @MainActor () -> Value
+  var setValue: @MainActor (Value) -> Void
 
   var binding: Binding<Value> {
     Binding(
-      get: getValue,
+      mainActorGet: getValue,
       set: setValue
     )
   }
 }
 
+@MainActor
 private final class StateBox<Value> {
   let sourceLocation: String
-  private struct Storage {
-    var seedValue: Value
-    var boundLocation: DynamicStateLocation<Value>?
-  }
-
-  private let storage: OSAllocatedUnfairLock<Storage>
+  private var seedValue: Value
+  private var boundLocation: DynamicStateLocation<Value>?
 
   init(
     seedValue: Value,
     sourceLocation: String
   ) {
     self.sourceLocation = sourceLocation
-    storage = OSAllocatedUnfairLock(
-      uncheckedState:
-        Storage(
-          seedValue: seedValue,
-          boundLocation: nil
-        )
-    )
+    self.seedValue = seedValue
+    boundLocation = nil
   }
 
   func currentSeedValue() -> Value {
-    storage.withLockUnchecked { storage in
-      storage.seedValue
-    }
+    seedValue
   }
 
   func updateSeedValue(_ newValue: Value) {
-    storage.withLockUnchecked { storage in
-      storage.seedValue = newValue
-    }
+    seedValue = newValue
   }
 
   func remember(_ location: DynamicStateLocation<Value>) {
-    storage.withLockUnchecked { storage in
-      storage.boundLocation = location
-    }
+    boundLocation = location
   }
 
   func currentLocation() -> DynamicStateLocation<Value>? {
-    storage.withLockUnchecked { storage in
-      storage.boundLocation
-    }
+    boundLocation
   }
 }
 
 @propertyWrapper
+@MainActor
 /// Local value storage owned by a view identity.
 ///
 /// `@State` persistence is keyed by the view's identity path plus source
@@ -246,7 +223,7 @@ public struct State<Value> {
   public var projectedValue: Binding<Value> {
     activeLocation()?.binding
       ?? Binding(
-        get: { wrappedValue },
+        mainActorGet: { wrappedValue },
         set: { wrappedValue = $0 }
       )
   }
@@ -294,6 +271,7 @@ public struct State<Value> {
 }
 
 extension View {
+  @MainActor
   func resolveBody(
     in context: ResolveContext,
     body makeBody: () -> Body
