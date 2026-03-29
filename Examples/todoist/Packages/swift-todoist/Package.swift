@@ -15,15 +15,11 @@ let package = Package(
             targets: ["TodoistAPI"],
         ),
     ],
-    dependencies: [
-        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.33.1")
-    ],
+    dependencies: [],
     targets: [
         .target(
             name: "TodoistAPI",
-            dependencies: [
-                .product(name: "AsyncHTTPClient", package: "async-http-client"),
-            ],
+            dependencies: [],
         ),
         .testTarget(
             name: "TodoistAPITests",

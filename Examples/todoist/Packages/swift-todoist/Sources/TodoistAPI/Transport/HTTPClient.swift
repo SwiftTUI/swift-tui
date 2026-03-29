@@ -1,6 +1,6 @@
 import Foundation
 
-public struct TodoistHTTPClient {
+public struct TodoistHTTPClient: Sendable {
     public let transport: Transport
     public let baseURL: String
     public let authToken: String?

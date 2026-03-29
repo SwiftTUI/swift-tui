@@ -648,8 +648,8 @@ private enum TodoistClientSupport {
     }
 }
 
-public final class TodoistClient {
-    final class Configuration {
+public final class TodoistClient: Sendable {
+    struct Configuration: Sendable {
         let authToken: String
         let transport: Transport
         let syncBaseURL: String
@@ -801,7 +801,7 @@ public final class TodoistClient {
         }
     }
 
-    public struct TasksService {
+    public struct TasksService: Sendable {
         fileprivate let configuration: Configuration
 
         public func get(_ id: String) async throws -> Task {
@@ -931,7 +931,7 @@ public final class TodoistClient {
         }
     }
 
-    public struct ProjectsService {
+    public struct ProjectsService: Sendable {
         fileprivate let configuration: Configuration
 
         public func get(_ id: String) async throws -> Project {
@@ -994,7 +994,7 @@ public final class TodoistClient {
         }
     }
 
-    public struct SectionsService {
+    public struct SectionsService: Sendable {
         fileprivate let configuration: Configuration
 
         public func get(_ id: String) async throws -> Section {
@@ -1057,7 +1057,7 @@ public final class TodoistClient {
         }
     }
 
-    public struct LabelsService {
+    public struct LabelsService: Sendable {
         fileprivate let configuration: Configuration
 
         public func get(_ id: String) async throws -> Label {
@@ -1102,7 +1102,7 @@ public final class TodoistClient {
         }
     }
 
-    public struct CommentsService {
+    public struct CommentsService: Sendable {
         fileprivate let configuration: Configuration
 
         public func get(_ id: String) async throws -> Comment {
@@ -1160,7 +1160,7 @@ public final class TodoistClient {
         }
     }
 
-    public struct RemindersService {
+    public struct RemindersService: Sendable {
         fileprivate let configuration: Configuration
 
         public func list(_ query: ReminderQuery = .init()) async throws -> TodoistPage<Reminder> {
@@ -1328,7 +1328,7 @@ public final class TodoistClient {
         }
     }
 
-    public struct UploadsService {
+    public struct UploadsService: Sendable {
         fileprivate let configuration: Configuration
 
         public func upload(_ request: UploadRequest, requestId: String? = nil) async throws -> Attachment {
@@ -1380,7 +1380,7 @@ public final class TodoistClient {
         }
     }
 
-    public struct BackupsService {
+    public struct BackupsService: Sendable {
         fileprivate let configuration: Configuration
 
         public func list(mfaToken: String? = nil) async throws -> [Backup] {
@@ -1410,7 +1410,7 @@ public final class TodoistClient {
         }
     }
 
-    public struct TemplatesService {
+    public struct TemplatesService: Sendable {
         fileprivate let configuration: Configuration
 
         public func exportAsFile(projectId: String, useRelativeDates: Bool? = nil) async throws -> String {
@@ -1488,7 +1488,7 @@ public final class TodoistClient {
         }
     }
 
-    public struct WorkspacesService {
+    public struct WorkspacesService: Sendable {
         fileprivate let configuration: Configuration
 
         public func list(requestId: String? = nil) async throws -> [Workspace] {
@@ -1528,7 +1528,7 @@ public final class TodoistClient {
         }
     }
 
-    public struct SyncService {
+    public struct SyncService: Sendable {
         fileprivate let configuration: Configuration
 
         public func execute(_ request: SyncRequest, requestId: String? = nil) async throws -> SyncResponse {

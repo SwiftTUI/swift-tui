@@ -1,7 +1,4 @@
-import AsyncHTTPClient
 import Foundation
-import NIOCore
-import NIOHTTP1
 
 public struct DefaultTodoistTransport: Transport {
     public struct RetryPolicy: Sendable {
@@ -22,10 +19,10 @@ public struct DefaultTodoistTransport: Transport {
     private let policy: RetryPolicy
     private let executor: @Sendable (TodoistHTTPRequest) async throws -> TodoistHTTPResponse
 
-    public init(client: HTTPClient = .shared, policy: RetryPolicy = .init()) {
+    public init(policy: RetryPolicy = .init()) {
         self.policy = policy
         self.executor = { request in
-            try await Self.send(request, using: client)
+            try await Self.send(request)
         }
     }
 
@@ -63,77 +60,37 @@ public struct DefaultTodoistTransport: Transport {
         throw lastError ?? URLError(.unknown)
     }
 
-    private static func send(_ request: TodoistHTTPRequest, using client: HTTPClient) async throws -> TodoistHTTPResponse {
-        var httpRequest = HTTPClientRequest(url: request.url.absoluteString)
-        httpRequest.method = httpMethod(for: request.method)
+    private static func send(_ request: TodoistHTTPRequest) async throws -> TodoistHTTPResponse {
+        var urlRequest = URLRequest(url: request.url)
+        urlRequest.httpMethod = request.method.rawValue
+        urlRequest.timeoutInterval = timeoutInterval(for: request.timeoutInterval)
+        urlRequest.httpBody = request.httpBody
 
         for (key, value) in request.allHTTPHeaderFields {
-            httpRequest.headers.add(name: key, value: value)
+            urlRequest.setValue(value, forHTTPHeaderField: key)
         }
 
-        if let body = request.httpBody {
-            httpRequest.body = .bytes(body)
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
         }
 
-        let response = try await client.execute(httpRequest, timeout: timeout(for: request.timeoutInterval))
-        let buffer = try await response.body.collect(upTo: Int.max)
-        let data = Data(buffer.readableBytesView)
-
-        let headers = response.headers.reduce(into: [String: String]()) { result, entry in
-            result[entry.name.lowercased()] = entry.value
+        let headers = httpResponse.allHeaderFields.reduce(into: [String: String]()) { result, entry in
+            guard let key = entry.key as? String else {
+                return
+            }
+            result[key.lowercased()] = String(describing: entry.value)
         }
 
         return TodoistHTTPResponse(
-            statusCode: Int(response.status.code),
-            statusText: response.status.reasonPhrase,
+            statusCode: httpResponse.statusCode,
+            statusText: HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode),
             headers: headers,
             data: data,
         )
     }
 
-    private static func httpMethod(for method: HTTPMethod) -> NIOHTTP1.HTTPMethod {
-        switch method {
-        case .get:
-            return .GET
-        case .post:
-            return .POST
-        case .put:
-            return .PUT
-        case .delete:
-            return .DELETE
-        }
-    }
-
-    private static func timeout(for timeoutInterval: TimeInterval) -> TimeAmount {
-        guard timeoutInterval.isFinite, timeoutInterval > 0 else {
-            return .seconds(30)
-        }
-
-        let nanoseconds = timeoutInterval * 1_000_000_000
-        if nanoseconds >= Double(Int64.max) {
-            return .nanoseconds(Int64.max)
-        }
-
-        return .nanoseconds(Int64(nanoseconds.rounded()))
-    }
-
     public static func isNetworkError(_ error: Error) -> Bool {
-        if let clientError = error as? HTTPClientError {
-            return [
-                .cancelled,
-                .connectTimeout,
-                .deadlineExceeded,
-                .getConnectionFromPoolTimeout,
-                .httpProxyHandshakeTimeout,
-                .readTimeout,
-                .remoteConnectionClosed,
-                .requestStreamCancelled,
-                .socksHandshakeTimeout,
-                .tlsHandshakeTimeout,
-                .writeTimeout,
-            ].contains(clientError)
-        }
-
         let nsError = error as NSError
         guard nsError.domain == NSURLErrorDomain else {
             return false
@@ -150,5 +107,12 @@ public struct DefaultTodoistTransport: Transport {
             NSURLErrorDataNotAllowed,
         ]
         return networkCodes.contains(nsError.code)
+    }
+
+    private static func timeoutInterval(for timeoutInterval: TimeInterval) -> TimeInterval {
+        guard timeoutInterval.isFinite, timeoutInterval > 0 else {
+            return 30
+        }
+        return timeoutInterval
     }
 }
