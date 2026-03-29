@@ -1,0 +1,11 @@
+fixture timeline
+configuration true-color
+surface 28x6
+capability glyph=unicode color=trueColor styles=true
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
+01│\u{001B}[38;2;86;182;194m├\u{001B}[0m·\u{001B}[38;2;236;239;244mQueued\u{001B}[0m
+02│\u{001B}[38;2;75;79;86m│\u{001B}[0m·\u{001B}[38;2;137;141;147mDeploy·added·to·wave·3\u{001B}[0m
+03│\u{001B}[38;2;235;179;60m├\u{001B}[0m·\u{001B}[38;2;236;239;244mCanary\u{001B}[0m
+04│\u{001B}[38;2;75;79;86m│\u{001B}[0m·\u{001B}[38;2;137;141;147m4/10·hosts·healthy\u{001B}[0m
+05│·\u{001B}[38;2;236;239;244mComplete\u{001B}[0m
+06│·\u{001B}[38;2;137;141;147mWaiting·for·regional…\u{001B}[0m

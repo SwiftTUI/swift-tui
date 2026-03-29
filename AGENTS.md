@@ -1,0 +1,100 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Build & Test Commands
+
+```bash
+swift build                  # Build all targets
+swift test                   # Run all tests
+swift test --filter TerminalUITests.SwiftUISurfaceTests  # Run a single test suite
+swift test --filter TerminalUITests.SwiftUISurfaceTests/testName  # Run a single test
+swift format format -i --configuration .swift-format.json Sources/ Tests/  # Format all code
+
+
+## Development Guidelines
+
+- When implementing a new feature that replaces or extends an existing constraint (e.g., single-scene → multi-scene), search for and remove ALL old guards/assertions that enforce the previous constraint.
+```
+- When working with this Swift TUI framework, always run the full test suite (`swift test`) after making changes and confirm all tests pass before considering work complete.
+
+## Pre-commit Hooks (prek)
+
+- **swift-format**: Auto-formats staged `.swift` files on commit.
+- **no-foundation-in-library-products**: Blocks commits that add `import Foundation` or `public import Foundation` in `Sources/Core`, `Sources/View`, `Sources/TerminalUI`, or `Sources/TerminalUICharts`. Foundation is forbidden in all library product sources.
+- **phase5-source-layout-guardrails**: Enforces the standing `Sources/Core` and `Sources/View` file map, retired monolith removals, and per-file line budgets.
+- **public-surface-policies**: Enforces public surface guardrails, prototype target packaging rules, and the docs that describe that policy.
+- **rendered-text-fixture-matrix**: Ensures every committed rendered-text fixture case contains the full supported terminal configuration matrix.
+
+## Code Style
+
+- 2-space indentation, 100-character line length.
+- `private` (not `fileprivate`) for file-scoped declarations.
+- Ordered imports. No block comments. No void return on function signatures.
+- Full config in `.swift-format.json`.
+
+## Swift Language Settings
+
+- Swift 6.2 with strict memory safety and Swift 6 language mode.
+- Upcoming features enabled: `ExistentialAny`, `NonisolatedNonsendingByDefault`, `MemberImportVisibility`, `InternalImportsByDefault`, among others.
+- Platforms: macOS 15+, iOS 18+.
+
+## Architecture
+
+### Target Dependency Chain
+
+```
+TerminalUI  ->  View  ->  Core
+```
+
+- **Core** -- Pure, terminal-IO-free pipeline: geometry, styling, layout engine, semantic extraction, draw extraction, rasterizer, scheduler, commit planner.
+- **View** -- SwiftUI-shaped authoring surface: `View` protocol, `@State`/`@Binding`/`@FocusState`, containers (`VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `Table`), controls (`Button`, `Toggle`, `TextField`, etc.), environment, and focus system.
+- **TerminalUI** -- Terminal runtime: `RunLoop`, `TerminalHost`, input parsing, signal handling, alternate-screen management, lifecycle coordination. Re-exports View and Core.
+- **TerminalUICharts** -- Separate track for compact chart/metric views (not core roadmap).
+
+Each layer re-exports its dependency via `@_exported import`, so importing `TerminalUI` gives you everything.
+
+### Frame Pipeline
+
+Every render frame flows through seven strict phases:
+
+```
+resolve -> measure -> place -> semantics -> draw -> raster -> commit
+```
+
+- **Resolve**: Public `View` values lowered into `ResolvedNode` tree. Environment merged, structural views (Group, ForEach, conditionals) expand children.
+- **Measure**: `LayoutEngine` probes nodes under size proposals. Produces cacheable `MeasuredNode` tree. Parent proposes, child chooses (SwiftUI layout model).
+- **Place**: Measured nodes placed into final geometry (`PlacedNode`). Authoritative source for interaction regions and scroll content.
+- **Semantics**: Focus regions, action routes, selection routes extracted from placed tree.
+- **Draw**: Placed nodes lowered into draw commands (styling, text, shapes, clipping).
+- **Raster**: Draw commands converted to 2D cell grid (`RasterSurface`).
+- **Commit**: Lifecycle diffs (appear/disappear/task start/cancel), handler packaging.
+
+### Key Design Rules
+
+- **SwiftUI-faithful layout**: Recursive parent-child negotiation, not global constraint solving. Modifier order matters.
+- **No terminal I/O in Core**: All terminal interaction is isolated to TerminalUI.
+- **Incremental rendering**: Measurement cache, retained layout sessions, cursor-addressed presentation updates. A second idle frame should reuse all work and write zero bytes.
+- **State keyed by identity path + source location**: `@State` persistence uses view identity in the tree, not reference identity.
+
+## Test Organization
+
+All tests live in `Tests/TerminalUITests/`. Tests are phase-oriented:
+- `Phase0FoundationTests` through `Phase5ReliabilityGatesTests` -- progressive pipeline and runtime coverage
+- `SwiftUISurfaceTests` -- public API surface coverage (largest suite)
+- `InteractiveRuntimeTests` -- interactive session behavior
+
+Repository-shape and policy regressions that do not require execution are enforced in `prek`
+hooks under `Scripts/`.
+
+Fixture updates require explanation when they cross unrelated subsystems or alter previously-stable scenarios. See `docs/TESTING_AND_FIXTURE_POLICY.md`.
+
+## Documentation
+
+Detailed design docs live in `/docs/`:
+- `ARCHITECTURE.md` -- target boundaries and pipeline
+- `RUNTIME.md` -- lifecycle, task semantics, incremental rendering model
+- `SOURCE_LAYOUT.md` -- per-file ownership map
+- `PUBLIC_API_INVENTORY.md` -- public surface classification
+- `FOCUS.md` -- focus system design
+- `VISION.md` -- project philosophy and scope

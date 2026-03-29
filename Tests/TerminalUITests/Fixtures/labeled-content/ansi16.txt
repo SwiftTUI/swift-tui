@@ -1,0 +1,6 @@
+fixture labeled-content
+configuration ansi16
+surface 20x1
+capability glyph=unicode color=ansi16 styles=true
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
+01│\u{001B}[90mMode\u{001B}[0m·········\u{001B}[97mInspect\u{001B}[0m

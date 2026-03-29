@@ -1,0 +1,398 @@
+extension LayoutEngine {
+  package func measureStackChildren(
+    for resolved: ResolvedNode,
+    parentProposal: ProposedSize,
+    axis: Axis,
+    spacing: Int?,
+    passContext: LayoutPassContext?
+  ) -> [MeasuredNode] {
+    let idealProposal = stackProposal(
+      axis: axis,
+      main: .unspecified,
+      cross: crossDimension(of: parentProposal, for: axis)
+    )
+    let idealMeasurements = resolved.children.map { child in
+      measure(child, proposal: idealProposal, passContext: passContext)
+    }
+
+    guard case .finite(let proposedMain) = mainDimension(of: parentProposal, for: axis) else {
+      return idealMeasurements
+    }
+
+    let spacingBudget = resolvedStackSpacings(
+      for: resolved.children,
+      axis: axis,
+      spacingOverride: spacing
+    ).reduce(0, +)
+    let availableMain = max(0, proposedMain - spacingBudget)
+    let idealMainSizes = idealMeasurements.map { mainDimension(of: $0.measuredSize, for: axis) }
+    var allocatedMainSizes = idealMainSizes
+    let idealMainTotal = idealMainSizes.reduce(0, +)
+
+    if idealMainTotal < availableMain {
+      distributeExtraSpaceToSpacers(
+        resolved.children,
+        into: &allocatedMainSizes,
+        extraSpace: availableMain - idealMainTotal
+      )
+    } else if idealMainTotal > availableMain {
+      compressStackChildren(
+        resolved.children,
+        idealMeasurements: idealMeasurements,
+        axis: axis,
+        allocatedMainSizes: &allocatedMainSizes,
+        overflow: idealMainTotal - availableMain
+      )
+    }
+
+    return resolved.children.enumerated().map { index, child in
+      var measurement = measure(
+        child,
+        proposal: stackProposal(
+          axis: axis,
+          main: .finite(allocatedMainSizes[index]),
+          cross: crossDimension(of: parentProposal, for: axis)
+        ),
+        passContext: passContext
+      )
+      if isSpacer(child) {
+        measurement.measuredSize = settingMainDimension(
+          of: measurement.measuredSize,
+          for: axis,
+          to: allocatedMainSizes[index]
+        )
+      }
+      return measurement
+    }
+  }
+
+  package func resolvedStackSpacings(
+    for children: [ResolvedNode],
+    axis: Axis,
+    spacingOverride: Int?
+  ) -> [Int] {
+    guard children.count > 1 else {
+      return []
+    }
+
+    if let spacingOverride {
+      return Array(repeating: spacingOverride, count: children.count - 1)
+    }
+
+    return children.indices.dropLast().map { index in
+      preferredSpacingDistance(
+        from: children[index].layoutMetadata.spacing,
+        to: children[index + 1].layoutMetadata.spacing,
+        axis: axis
+      )
+    }
+  }
+
+  package func preferredSpacingDistance(
+    from current: Spacing,
+    to next: Spacing,
+    axis: Axis
+  ) -> Int {
+    switch axis {
+    case .horizontal:
+      return max(current.horizontal ?? 1, next.horizontal ?? 1)
+    case .vertical:
+      return max(current.vertical ?? 0, next.vertical ?? 0)
+    }
+  }
+
+  package func stackCrossMetrics(
+    for children: [ResolvedNode],
+    childMeasurements: [MeasuredNode],
+    axis: Axis,
+    horizontalAlignment: HorizontalAlignment,
+    verticalAlignment: VerticalAlignment
+  ) -> (leading: Int, trailing: Int) {
+    let dimensions = zip(children, childMeasurements).map { child, measurement in
+      viewDimensions(for: child, measured: measurement)
+    }
+
+    switch axis {
+    case .horizontal:
+      let leading = dimensions.map { max(0, $0[verticalAlignment]) }.max() ?? 0
+      let trailing = dimensions.map { max(0, $0.height - $0[verticalAlignment]) }.max() ?? 0
+      return (leading, trailing)
+    case .vertical:
+      let leading = dimensions.map { max(0, $0[horizontalAlignment]) }.max() ?? 0
+      let trailing = dimensions.map { max(0, $0.width - $0[horizontalAlignment]) }.max() ?? 0
+      return (leading, trailing)
+    }
+  }
+
+  package func distributeExtraSpaceToSpacers(
+    _ children: [ResolvedNode],
+    into allocatedMainSizes: inout [Int],
+    extraSpace: Int
+  ) {
+    guard extraSpace > 0 else {
+      return
+    }
+
+    let spacerIndices = children.indices.filter { isSpacer(children[$0]) }
+    guard !spacerIndices.isEmpty else {
+      return
+    }
+
+    let baseShare = extraSpace / spacerIndices.count
+    var remainder = extraSpace % spacerIndices.count
+
+    for index in spacerIndices {
+      allocatedMainSizes[index] += baseShare
+      if remainder > 0 {
+        allocatedMainSizes[index] += 1
+        remainder -= 1
+      }
+    }
+  }
+
+  package func compressStackChildren(
+    _ children: [ResolvedNode],
+    idealMeasurements: [MeasuredNode],
+    axis: Axis,
+    allocatedMainSizes: inout [Int],
+    overflow: Int
+  ) {
+    var remainingOverflow = overflow
+    let priorities = Set(children.map { $0.layoutMetadata.layoutPriority }).sorted()
+
+    for priority in priorities where remainingOverflow > 0 {
+      let indices = children.indices.filter {
+        children[$0].layoutMetadata.layoutPriority == priority
+      }
+      let minimumSizes = indices.map {
+        minimumMainSize(for: children[$0], idealMeasurement: idealMeasurements[$0], axis: axis)
+      }
+      let compressibles = indices.enumerated().map { offset, index in
+        max(0, allocatedMainSizes[index] - minimumSizes[offset])
+      }
+      let totalCompressible = compressibles.reduce(0, +)
+
+      guard totalCompressible > 0 else {
+        continue
+      }
+
+      if remainingOverflow >= totalCompressible {
+        for (offset, index) in indices.enumerated() {
+          allocatedMainSizes[index] = minimumSizes[offset]
+        }
+        remainingOverflow -= totalCompressible
+        continue
+      }
+
+      var reductions = Array(repeating: 0, count: indices.count)
+      var distributed = 0
+
+      for offset in indices.indices {
+        let reduction = (remainingOverflow * compressibles[offset]) / totalCompressible
+        reductions[offset] = reduction
+        distributed += reduction
+      }
+
+      var remainder = remainingOverflow - distributed
+      for offset in indices.indices where remainder > 0 {
+        guard reductions[offset] < compressibles[offset] else {
+          continue
+        }
+        reductions[offset] += 1
+        remainder -= 1
+      }
+
+      for (offset, index) in indices.enumerated() {
+        allocatedMainSizes[index] = max(
+          minimumSizes[offset],
+          allocatedMainSizes[index] - reductions[offset]
+        )
+      }
+
+      remainingOverflow = 0
+    }
+
+  }
+
+  package func minimumMainSize(
+    for child: ResolvedNode,
+    idealMeasurement: MeasuredNode,
+    axis: Axis
+  ) -> Int {
+    max(
+      minimumMainDimension(
+        for: child.layoutMetadata,
+        axis: axis
+      ) ?? 0,
+      derivedMinimumMainSize(
+        for: child,
+        idealMeasurement: idealMeasurement,
+        axis: axis
+      )
+    )
+  }
+
+  package func stackProposal(
+    axis: Axis,
+    main: ProposedDimension,
+    cross: ProposedDimension
+  ) -> ProposedSize {
+    switch axis {
+    case .horizontal:
+      return ProposedSize(width: main, height: cross)
+    case .vertical:
+      return ProposedSize(width: cross, height: main)
+    }
+  }
+
+  package func mainDimension(
+    of proposal: ProposedSize,
+    for axis: Axis
+  ) -> ProposedDimension {
+    switch axis {
+    case .horizontal:
+      return proposal.width
+    case .vertical:
+      return proposal.height
+    }
+  }
+
+  package func crossDimension(
+    of proposal: ProposedSize,
+    for axis: Axis
+  ) -> ProposedDimension {
+    switch axis {
+    case .horizontal:
+      return proposal.height
+    case .vertical:
+      return proposal.width
+    }
+  }
+
+  package func mainDimension(
+    of size: Size,
+    for axis: Axis
+  ) -> Int {
+    switch axis {
+    case .horizontal:
+      return size.width
+    case .vertical:
+      return size.height
+    }
+  }
+
+  package func settingMainDimension(
+    of size: Size,
+    for axis: Axis,
+    to value: Int
+  ) -> Size {
+    switch axis {
+    case .horizontal:
+      return Size(width: value, height: size.height)
+    case .vertical:
+      return Size(width: size.width, height: value)
+    }
+  }
+
+  package func isSpacer(_ child: ResolvedNode) -> Bool {
+    child.kind == .view("Spacer")
+  }
+
+  package func isFixedSize(
+    _ metadata: LayoutMetadata,
+    on axis: Axis
+  ) -> Bool {
+    switch axis {
+    case .horizontal:
+      return metadata.fixedSizeHorizontal
+    case .vertical:
+      return metadata.fixedSizeVertical
+    }
+  }
+
+  package func minimumMainDimension(
+    for metadata: LayoutMetadata,
+    axis: Axis
+  ) -> Int? {
+    switch axis {
+    case .horizontal:
+      return metadata.minimumWidth
+    case .vertical:
+      return metadata.minimumHeight
+    }
+  }
+
+  package func derivedMinimumMainSize(
+    for node: ResolvedNode,
+    idealMeasurement: MeasuredNode,
+    axis: Axis
+  ) -> Int {
+    if isFixedSize(node.layoutMetadata, on: axis) || isSpacer(node) {
+      return mainDimension(of: idealMeasurement.measuredSize, for: axis)
+    }
+
+    let childMinimums = zip(node.children, idealMeasurement.childMeasurements).map {
+      child, measurement in
+      minimumMainSize(
+        for: child,
+        idealMeasurement: measurement,
+        axis: axis
+      )
+    }
+
+    switch node.layoutBehavior {
+    case .intrinsic:
+      if case .text(let content) = node.drawPayload,
+        axis == .vertical,
+        !content.isEmpty
+      {
+        return min(1, mainDimension(of: idealMeasurement.measuredSize, for: axis))
+      }
+      return childMinimums.max() ?? 0
+    case .overlay, .decoration:
+      return childMinimums.max() ?? 0
+    case .stack(
+      axis: let stackAxis, let spacing,
+      horizontalAlignment: _,
+      verticalAlignment: _
+    ):
+      if stackAxis == axis {
+        let spacingBudget = resolvedStackSpacings(
+          for: node.children,
+          axis: axis,
+          spacingOverride: spacing
+        ).reduce(0, +)
+        return childMinimums.reduce(0, +) + spacingBudget
+      }
+      return childMinimums.max() ?? 0
+    case .padding(let insets):
+      let contentMinimum = childMinimums.first ?? 0
+      return contentMinimum + (axis == .horizontal ? insets.horizontal : insets.vertical)
+    case .frame(let width, let height, _):
+      let explicit =
+        switch axis {
+        case .horizontal:
+          width
+        case .vertical:
+          height
+        }
+      return max(explicit ?? 0, childMinimums.first ?? 0)
+    case .flexibleFrame(let minW, _, _, let minH, _, _, _):
+      let minDim: ProposedDimension? =
+        switch axis {
+        case .horizontal:
+          minW
+        case .vertical:
+          minH
+        }
+      if case .finite(let v) = minDim {
+        return max(v, childMinimums.first ?? 0)
+      }
+      return childMinimums.first ?? 0
+    case .viewThatFits:
+      return childMinimums.max() ?? 0
+    case .custom:
+      return 0
+    }
+  }
+}

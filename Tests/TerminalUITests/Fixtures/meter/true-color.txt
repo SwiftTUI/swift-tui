@@ -1,0 +1,7 @@
+fixture meter
+configuration true-color
+surface 26x2
+capability glyph=unicode color=trueColor styles=true
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
+01│\u{001B}[38;2;137;141;147mBudget\u{001B}[0m·················\u{001B}[38;2;137;141;147m84%\u{001B}[0m
+02│\u{001B}[38;2;235;179;60m██████████\u{001B}[0m\u{001B}[38;2;75;79;86m──\u{001B}[0m

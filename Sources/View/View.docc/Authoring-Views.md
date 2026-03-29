@@ -1,0 +1,43 @@
+# Authoring Views
+
+## Overview
+
+Use the `View` module the same way you would approach a small SwiftUI feature: compose containers, local state, focused controls, and modifiers around a body-driven tree.
+
+The main difference is that TerminalUI eventually renders into a cell surface instead of a pixel buffer. That means you should think in terms of:
+
+- integer sizes rather than fractional points
+- text width and wrapping rather than arbitrary text bounds
+- keyboard-first focus and selection
+- terminal-safe incremental updates instead of animation-heavy transitions
+
+## Containers And Controls
+
+The core container and control surface is already broad enough for many dashboards, forms, and editor-like flows:
+
+- stacks, sections, scroll views, lists, outline groups, and tables
+- text, labels, group boxes, control groups, and shapes
+- buttons, toggles, steppers, sliders, pickers, disclosure groups, and text fields
+
+Use built-in containers first. Reach for custom ``Layout`` only when the authored structure genuinely has a reusable layout rule that stacks and frames cannot express clearly.
+
+## Modifiers
+
+Most familiar modifier categories are available:
+
+- layout modifiers such as padding, frame, spacing, fixed-size, and clipping
+- style modifiers such as foreground style, tint, and disabled state
+- focus modifiers such as `.focused(...)`, `.defaultFocus(...)`, and `.focusEffectDisabled()`
+- environment modifiers such as `.environment(...)` and `.transformEnvironment(...)`
+- lifecycle modifiers such as `.onAppear`, `.onDisappear`, and `.task(...)`
+
+Concrete wrapper views behind those modifiers are package-only. Call sites should stay on the modifier surface.
+
+## Preview And Inspection
+
+When you want to inspect authored output without running a full terminal session, use ``Resolver`` inside `View`, or the higher-level `DefaultRenderer` type from `TerminalUI`, to produce resolved trees, frame artifacts, or rendered terminal text.
+
+See also:
+
+- <doc:State-Environment-And-Focus>
+- ``Resolver``

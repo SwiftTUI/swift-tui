@@ -1,0 +1,40 @@
+# Configuration file for `prek`, a git hook framework written in Rust.
+# See https://prek.j178.dev for more information.
+#:schema https://www.schemastore.org/prek.json
+
+[[repos]]
+repo = "local"
+hooks = [
+  {
+    id = "swift-format",
+    name = "run swift-format format",
+    entry = "swift format format -i --configuration .swift-format.json",
+    language = "system",
+    files = '.*\.swift$',
+    pass_filenames = true
+  },
+  {
+    id = "no-foundation-in-library-products",
+    name = "forbid Foundation imports in library products",
+    entry = """zsh -lc 'if rg -n --glob "*.swift" "^(public import|import) Foundation$" Sources/Core Sources/View Sources/TerminalUI Sources/TerminalUICharts; then echo "Foundation imports are forbidden in library product sources."; exit 1; fi'""",
+    language = "system",
+    files = '^Sources/(Core|View|TerminalUI|TerminalUICharts)/.*\.swift$',
+    pass_filenames = false
+  },
+  {
+    id = "public-surface-policies",
+    name = "enforce public surface and documentation guardrails",
+    entry = "./Scripts/check_public_surface_policies.zsh",
+    language = "system",
+    files = '^(Package\.swift|README\.md|docs/PUBLIC_(API_INVENTORY|SURFACE_POLICY)\.md|Sources/.*\.swift|Tests/TerminalUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
+    pass_filenames = false
+  },
+  {
+    id = "rendered-text-fixture-matrix",
+    name = "enforce rendered text fixture matrix completeness",
+    entry = "./Scripts/check_rendered_text_fixture_matrix.zsh",
+    language = "system",
+    files = '^(Tests/TerminalUITests/Fixtures/.*|Tests/TerminalUITests/Support/RenderedTextFixtureSupport\.swift)$',
+    pass_filenames = false
+  }
+]

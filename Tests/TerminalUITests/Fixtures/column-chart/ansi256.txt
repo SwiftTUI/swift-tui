@@ -1,0 +1,11 @@
+fixture column-chart
+configuration ansi256
+surface 24x6
+capability glyph=unicode color=ansi256 styles=true
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
+01│\u{001B}[38;5;145mLoad\u{001B}[0m··············\u{001B}[38;5;145mmax·18\u{001B}[0m
+02│\u{001B}[38;5;117m██\u{001B}[0m·\u{001B}[38;5;114m··\u{001B}[0m·\u{001B}[38;5;179m··\u{001B}[0m
+03│\u{001B}[38;5;117m██\u{001B}[0m·\u{001B}[38;5;114m██\u{001B}[0m·\u{001B}[38;5;179m··\u{001B}[0m
+04│\u{001B}[38;5;117m██\u{001B}[0m·\u{001B}[38;5;114m██\u{001B}[0m·\u{001B}[38;5;179m██\u{001B}[0m
+05│\u{001B}[38;5;117m██\u{001B}[0m·\u{001B}[38;5;114m██\u{001B}[0m·\u{001B}[38;5;179m██\u{001B}[0m
+06│\u{001B}[38;5;145msy\u{001B}[0m·\u{001B}[38;5;145map\u{001B}[0m·\u{001B}[38;5;145mjo\u{001B}[0m

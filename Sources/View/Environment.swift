@@ -1,0 +1,535 @@
+import Core
+
+/// Declares a typed environment value.
+public protocol EnvironmentKey {
+  associatedtype Value: Sendable
+  static var defaultValue: Value { get }
+}
+
+private protocol EnvironmentValueBox: Sendable {
+  var snapshotValue: String { get }
+  var valueTypeDescription: String { get }
+
+  func value<Value>(as type: Value.Type) -> Value?
+}
+
+private struct TypedEnvironmentValueBox<Value: Sendable>: EnvironmentValueBox {
+  let base: Value
+
+  var snapshotValue: String {
+    String(reflecting: base)
+  }
+
+  var valueTypeDescription: String {
+    String(reflecting: Value.self)
+  }
+
+  func value<T>(as type: T.Type) -> T? {
+    base as? T
+  }
+}
+
+/// The inherited environment available while resolving a view subtree.
+public struct EnvironmentValues: Equatable, Sendable {
+  private var storage: [ObjectIdentifier: any EnvironmentValueBox]
+  private var snapshotValues: [String: String]
+  package var _parallelFocusedIdentity: Identity?
+  package var _parallelPressedIdentity: Identity?
+
+  /// Creates an empty environment container.
+  public init() {
+    storage = [:]
+    snapshotValues = [:]
+    _parallelFocusedIdentity = nil
+    _parallelPressedIdentity = nil
+  }
+
+  public subscript<K: EnvironmentKey>(key: K.Type) -> K.Value {
+    get {
+      let identifier = ObjectIdentifier(key)
+      guard let boxed = storage[identifier] else {
+        return K.defaultValue
+      }
+      guard let typed: K.Value = boxed.value(as: K.Value.self) else {
+        preconditionFailure(
+          "Environment type mismatch for \(String(reflecting: key)). Expected \(K.Value.self), found \(boxed.valueTypeDescription)."
+        )
+      }
+      return typed
+    }
+    set {
+      let identifier = ObjectIdentifier(key)
+      let box = TypedEnvironmentValueBox(base: newValue)
+      storage[identifier] = box
+      snapshotValues[String(reflecting: key)] = box.snapshotValue
+    }
+  }
+
+  fileprivate func applying(
+    to snapshot: EnvironmentSnapshot
+  ) -> EnvironmentSnapshot {
+    var merged = snapshot
+    merged.values.merge(snapshotValues) { _, new in new }
+    merged.style = StyleEnvironmentSnapshot(
+      appearance: terminalAppearance,
+      themeOverride: parallelThemeOverride,
+      foregroundStyle: foregroundStyle,
+      tintStyle: tintStyle,
+      preferredColorScheme: preferredColorScheme,
+      isEnabled: isEnabled
+    )
+    return merged
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.snapshotValues == rhs.snapshotValues
+  }
+}
+
+/// Public configuration for resolving a view subtree.
+///
+/// `ResolveContext` exposes the authored identity, environment, transaction,
+/// and invalidation scope that affect a resolve pass. Runtime registries and
+/// other lowering seams remain package-only.
+public struct ResolveContext: Equatable, Sendable {
+  public var identity: Identity
+  public var environment: EnvironmentSnapshot
+  public var environmentValues: EnvironmentValues
+  package var focusedValues: FocusedValues
+  public var transaction: TransactionSnapshot
+  public var invalidatedIdentities: Set<Identity>
+  package var resolveReuseSession: ResolveReuseSession?
+  package var localActionRegistry: LocalActionRegistry?
+  package var localPointerHandlerRegistry: LocalPointerHandlerRegistry?
+  package var localFocusBindingRegistry: LocalFocusBindingRegistry?
+  package var localFocusedValuesRegistry: LocalFocusedValuesRegistry?
+  package var localKeyHandlerRegistry: LocalKeyHandlerRegistry?
+  package var localLifecycleRegistry: LocalLifecycleRegistry?
+  package var localTaskRegistry: LocalTaskRegistry?
+  package var dynamicStateStore: DynamicStateStore?
+  package var observationBridge: ObservationBridge?
+  package var imageAssetResolver: ImageAssetResolver?
+
+  /// Creates a public resolve context from authored configuration only.
+  public init(
+    identity: Identity = .init(components: []),
+    environment: EnvironmentSnapshot = .init(),
+    environmentValues: EnvironmentValues = .init(),
+    transaction: TransactionSnapshot = .init(),
+    invalidatedIdentities: Set<Identity> = []
+  ) {
+    self.init(
+      identity: identity,
+      environment: environment,
+      environmentValues: environmentValues,
+      transaction: transaction,
+      invalidatedIdentities: invalidatedIdentities,
+      localActionRegistry: nil,
+      localKeyHandlerRegistry: nil,
+      localLifecycleRegistry: nil,
+      localTaskRegistry: nil,
+      applyEnvironmentValues: true
+    )
+  }
+
+  package func child(component: String) -> Self {
+    var childContext = Self(
+      identity: identity.child(component),
+      environment: environment,
+      environmentValues: environmentValues,
+      transaction: transaction,
+      invalidatedIdentities: invalidatedIdentities,
+      localActionRegistry: localActionRegistry,
+      localKeyHandlerRegistry: localKeyHandlerRegistry,
+      localLifecycleRegistry: localLifecycleRegistry,
+      localTaskRegistry: localTaskRegistry,
+      applyEnvironmentValues: false
+    )
+    childContext.localPointerHandlerRegistry = localPointerHandlerRegistry
+    childContext.localFocusBindingRegistry = localFocusBindingRegistry
+    childContext.localFocusedValuesRegistry = localFocusedValuesRegistry
+    childContext.dynamicStateStore = dynamicStateStore
+    childContext.observationBridge = observationBridge
+    childContext.resolveReuseSession = resolveReuseSession
+    childContext.focusedValues = focusedValues
+    childContext.imageAssetResolver = imageAssetResolver
+    return childContext
+  }
+
+  package func indexedChild(kind: String, index: Int) -> Self {
+    child(component: "\(kind)[\(index)]")
+  }
+
+  package func replacingIdentity(with identity: Identity) -> Self {
+    var replacedContext = Self(
+      identity: identity,
+      environment: environment,
+      environmentValues: environmentValues,
+      transaction: transaction,
+      invalidatedIdentities: invalidatedIdentities,
+      localActionRegistry: localActionRegistry,
+      localKeyHandlerRegistry: localKeyHandlerRegistry,
+      localLifecycleRegistry: localLifecycleRegistry,
+      localTaskRegistry: localTaskRegistry,
+      applyEnvironmentValues: false
+    )
+    replacedContext.localPointerHandlerRegistry = localPointerHandlerRegistry
+    replacedContext.localFocusBindingRegistry = localFocusBindingRegistry
+    replacedContext.localFocusedValuesRegistry = localFocusedValuesRegistry
+    replacedContext.dynamicStateStore = dynamicStateStore
+    replacedContext.observationBridge = observationBridge
+    replacedContext.resolveReuseSession = resolveReuseSession
+    replacedContext.focusedValues = focusedValues
+    replacedContext.imageAssetResolver = imageAssetResolver
+    return replacedContext
+  }
+
+  package func settingEnvironment<Value>(
+    _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
+    to value: Value
+  ) -> Self {
+    var copy = self
+    copy.environmentValues[keyPath: keyPath] = value
+    copy.environmentValues = Self.contextualEnvironmentValues(
+      copy.environmentValues,
+      for: copy.identity
+    )
+    copy.environment = copy.environmentValues.applying(to: copy.environment)
+    return copy
+  }
+
+  package func transformingEnvironment<Value>(
+    _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
+    transform: (inout Value) -> Void
+  ) -> Self {
+    var copy = self
+    transform(&copy.environmentValues[keyPath: keyPath])
+    copy.environmentValues = Self.contextualEnvironmentValues(
+      copy.environmentValues,
+      for: copy.identity
+    )
+    copy.environment = copy.environmentValues.applying(to: copy.environment)
+    return copy
+  }
+
+  /// Returns whether `identity` is directly invalidated in this context.
+  public func isInvalidated(_ identity: Identity) -> Bool {
+    invalidatedIdentities.contains(identity)
+  }
+
+  /// Returns whether the invalidation set intersects the subtree rooted at
+  /// `identity`.
+  public func invalidationAffectsSubtree(
+    at identity: Identity? = nil
+  ) -> Bool {
+    let targetIdentity = identity ?? self.identity
+    return invalidatedIdentities.contains { invalidatedIdentity in
+      invalidatedIdentity.isDescendant(of: targetIdentity)
+        || targetIdentity.isDescendant(of: invalidatedIdentity)
+    }
+  }
+
+  package func reusedResolvedSubtreeIfAvailable() -> ResolvedNode? {
+    resolveReuseSession?.reusedResolvedSubtree(for: self)
+  }
+
+  package func recordResolvedComputation(
+    count: Int = 1
+  ) {
+    resolveReuseSession?.workMetrics.resolvedNodesComputed += max(0, count)
+  }
+
+  package func trackingObservableAccess<T>(
+    _ apply: () -> T
+  ) -> T {
+    observationBridge?.track(identity: identity, apply) ?? apply()
+  }
+
+  private static func contextualEnvironmentValues(
+    _ environmentValues: EnvironmentValues,
+    for identity: Identity
+  ) -> EnvironmentValues {
+    var resolvedEnvironmentValues = environmentValues
+    resolvedEnvironmentValues.isFocused =
+      environmentValues.parallelFocusedIdentity.map { focusedIdentity in
+        identity == focusedIdentity
+          || focusedIdentity.isDescendant(of: identity)
+          || identity.isDescendant(of: focusedIdentity)
+      } ?? false
+    return resolvedEnvironmentValues
+  }
+}
+
+extension ResolveContext {
+  package init(
+    identity: Identity = .init(components: []),
+    environment: EnvironmentSnapshot = .init(),
+    environmentValues: EnvironmentValues = .init(),
+    transaction: TransactionSnapshot = .init(),
+    invalidatedIdentities: Set<Identity> = [],
+    localActionRegistry: LocalActionRegistry? = nil,
+    localFocusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
+    localKeyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
+    localLifecycleRegistry: LocalLifecycleRegistry? = nil,
+    localTaskRegistry: LocalTaskRegistry? = nil,
+    applyEnvironmentValues: Bool
+  ) {
+    let resolvedEnvironmentValues = Self.contextualEnvironmentValues(
+      environmentValues,
+      for: identity
+    )
+    self.identity = identity
+    self.environmentValues = resolvedEnvironmentValues
+    focusedValues = resolvedEnvironmentValues.parallelFocusedValues
+    self.environment =
+      applyEnvironmentValues
+      ? resolvedEnvironmentValues.applying(to: environment)
+      : environment
+    self.transaction = transaction
+    self.invalidatedIdentities = invalidatedIdentities
+    resolveReuseSession = nil
+    self.localActionRegistry = localActionRegistry
+    self.localPointerHandlerRegistry = nil
+    self.localFocusBindingRegistry = nil
+    self.localFocusedValuesRegistry = localFocusedValuesRegistry
+    self.localKeyHandlerRegistry = localKeyHandlerRegistry
+    self.localLifecycleRegistry = localLifecycleRegistry
+    self.localTaskRegistry = localTaskRegistry
+    dynamicStateStore = nil
+    observationBridge = nil
+    imageAssetResolver = nil
+  }
+}
+
+extension ResolveContext {
+  public static func == (
+    lhs: ResolveContext,
+    rhs: ResolveContext
+  ) -> Bool {
+    lhs.identity == rhs.identity
+      && lhs.environment == rhs.environment
+      && lhs.environmentValues == rhs.environmentValues
+      && lhs.transaction == rhs.transaction
+      && lhs.invalidatedIdentities == rhs.invalidatedIdentities
+      && lhs.localActionRegistry == rhs.localActionRegistry
+      && lhs.localFocusBindingRegistry == rhs.localFocusBindingRegistry
+      && lhs.localFocusedValuesRegistry == rhs.localFocusedValuesRegistry
+      && lhs.localKeyHandlerRegistry == rhs.localKeyHandlerRegistry
+      && lhs.localLifecycleRegistry == rhs.localLifecycleRegistry
+      && lhs.localTaskRegistry == rhs.localTaskRegistry
+      && lhs.dynamicStateStore == rhs.dynamicStateStore
+      && lhs.observationBridge == rhs.observationBridge
+  }
+}
+
+// SAFETY: Created per-frame and exclusively accessed on @MainActor during the resolve phase.
+// Contains RetainedResolveFrame (non-Sendable due to closure storage) and mutable workMetrics.
+// Never shared across isolation domains.
+package final class ResolveReuseSession: @unchecked Sendable {
+  package let invalidatedIdentities: Set<Identity>
+  private let previousFrame: RetainedResolveFrame?
+  package var workMetrics = ResolveWorkMetrics()
+
+  package init(
+    previousFrame: RetainedResolveFrame?,
+    invalidatedIdentities: Set<Identity>
+  ) {
+    self.previousFrame = previousFrame
+    self.invalidatedIdentities = invalidatedIdentities
+  }
+
+  package func reusedResolvedSubtree(
+    for context: ResolveContext
+  ) -> ResolvedNode? {
+    guard let previousFrame,
+      let candidate = previousFrame.resolvedTreeIndex.resolvedNode(
+        for: context.identity
+      ),
+      canReuse(candidate, for: context)
+    else {
+      return nil
+    }
+
+    workMetrics.resolvedNodesReused +=
+      previousFrame.resolvedTreeIndex.subtreeNodeCount(
+        for: context.identity
+      ) ?? candidate.subtreeNodeCount
+    replayRegistrations(for: context.identity, into: context)
+    return candidate
+  }
+
+  private func canReuse(
+    _ node: ResolvedNode,
+    for context: ResolveContext
+  ) -> Bool {
+    guard !invalidatedIdentities.isEmpty else {
+      return false
+    }
+    guard !hasInvalidatedSelfOrAncestor(context.identity) else {
+      return false
+    }
+    guard !invalidatedIdentities.contains(context.identity) else {
+      return false
+    }
+    guard !subtreeContainsInvalidatedIdentity(context.identity) else {
+      return false
+    }
+    return node.environmentSnapshot == context.environment
+      && node.transactionSnapshot == context.transaction
+  }
+
+  private func hasInvalidatedSelfOrAncestor(
+    _ identity: Identity
+  ) -> Bool {
+    if let previousFrame {
+      return invalidatedIdentities.contains { invalidatedIdentity in
+        previousFrame.resolvedTreeIndex.contains(
+          identity,
+          inSubtreeOf: invalidatedIdentity
+        )
+      }
+    }
+
+    return invalidatedIdentities.contains { invalidatedIdentity in
+      identity.isDescendant(of: invalidatedIdentity)
+    }
+  }
+
+  private func subtreeContainsInvalidatedIdentity(
+    _ subtreeIdentity: Identity
+  ) -> Bool {
+    if let previousFrame {
+      return invalidatedIdentities.contains { invalidatedIdentity in
+        previousFrame.resolvedTreeIndex.contains(
+          invalidatedIdentity,
+          inSubtreeOf: subtreeIdentity
+        )
+      }
+    }
+
+    return invalidatedIdentities.contains { invalidatedIdentity in
+      invalidatedIdentity.isDescendant(of: subtreeIdentity)
+    }
+  }
+
+  private func replayRegistrations(
+    for subtreeIdentity: Identity,
+    into context: ResolveContext
+  ) {
+    guard let previousFrame else {
+      return
+    }
+
+    guard
+      let subtreeIdentities = previousFrame.resolvedTreeIndex.subtreeIdentities(
+        for: subtreeIdentity
+      )
+    else {
+      return
+    }
+
+    for identity in subtreeIdentities {
+      if let actionRegistry = context.localActionRegistry,
+        let handler = previousFrame.actionHandlers[identity]
+      {
+        actionRegistry.register(identity: identity, handler: handler)
+      }
+      if let keyHandlerRegistry = context.localKeyHandlerRegistry,
+        let handler = previousFrame.keyHandlers[identity]
+      {
+        keyHandlerRegistry.register(identity: identity, handler: handler)
+      }
+      if let taskRegistry = context.localTaskRegistry,
+        let registration = previousFrame.taskRegistrations[identity]
+      {
+        taskRegistry.register(identity: identity, registration: registration)
+      }
+    }
+
+    if let pointerHandlerRegistry = context.localPointerHandlerRegistry {
+      for (routeID, handler) in previousFrame.pointerHandlers
+      where previousFrame.resolvedTreeIndex.contains(
+        routeID.identity,
+        inSubtreeOf: subtreeIdentity
+      ) {
+        pointerHandlerRegistry.register(routeID: routeID, handler: handler)
+      }
+    }
+
+    if let focusBindingRegistry = context.localFocusBindingRegistry {
+      focusBindingRegistry.restore(
+        previousFrame.focusBindings.filter { snapshot in
+          previousFrame.resolvedTreeIndex.contains(
+            snapshot.identity,
+            inSubtreeOf: subtreeIdentity
+          )
+        }
+      )
+    }
+    if let focusedValuesRegistry = context.localFocusedValuesRegistry {
+      focusedValuesRegistry.restore(
+        previousFrame.focusedValues.filter { snapshot in
+          previousFrame.resolvedTreeIndex.contains(
+            snapshot.identity,
+            inSubtreeOf: subtreeIdentity
+          )
+        }
+      )
+    }
+
+    guard let lifecycleRegistry = context.localLifecycleRegistry else {
+      return
+    }
+
+    var appearIDs: [String] = []
+    var disappearIDs: [String] = []
+    for identity in subtreeIdentities {
+      guard
+        let lifecycleMetadata = previousFrame.resolvedTreeIndex.resolvedNode(
+          for: identity
+        )?.lifecycleMetadata
+      else {
+        continue
+      }
+      appearIDs.append(contentsOf: lifecycleMetadata.appearHandlerIDs)
+      disappearIDs.append(contentsOf: lifecycleMetadata.disappearHandlerIDs)
+    }
+
+    lifecycleRegistry.restore(
+      .init(
+        appearHandlers: Dictionary(
+          uniqueKeysWithValues: appearIDs.compactMap { handlerID in
+            previousFrame.lifecycleHandlers.appearHandlers[handlerID].map { (handlerID, $0) }
+          }
+        ),
+        disappearHandlers: Dictionary(
+          uniqueKeysWithValues: disappearIDs.compactMap { handlerID in
+            previousFrame.lifecycleHandlers.disappearHandlers[handlerID].map { (handlerID, $0) }
+          }
+        )
+      )
+    )
+  }
+}
+/// Reads an environment value and maps it into authored content.
+public struct EnvironmentReader<Value>: View, ResolvableView {
+  private let keyPath: KeyPath<EnvironmentValues, Value>
+  private let content: (Value) -> AnyView
+
+  public init<Content: View>(
+    _ keyPath: KeyPath<EnvironmentValues, Value>,
+    @ViewBuilder content: @escaping (Value) -> Content
+  ) {
+    self.keyPath = keyPath
+    self.content = { value in
+      AnyView(content(value))
+    }
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let view = context.trackingObservableAccess {
+      content(context.environmentValues[keyPath: keyPath])
+    }
+    return view.resolveElements(in: context)
+  }
+}

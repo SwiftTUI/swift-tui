@@ -1,0 +1,543 @@
+/// Horizontal and vertical spacing preferences for a view.
+public struct Spacing: Equatable, Sendable {
+  public var horizontal: Int?
+  public var vertical: Int?
+
+  public init(horizontal: Int? = nil, vertical: Int? = nil) {
+    self.horizontal = horizontal
+    self.vertical = vertical
+  }
+
+  public func merging(_ other: Self) -> Self {
+    Self(
+      horizontal: other.horizontal ?? horizontal,
+      vertical: other.vertical ?? vertical
+    )
+  }
+}
+
+/// Edge insets expressed in terminal cells.
+public struct EdgeInsets: Equatable, Sendable {
+  public var top: Int
+  public var leading: Int
+  public var bottom: Int
+  public var trailing: Int
+
+  public init(
+    top: Int = 0,
+    leading: Int = 0,
+    bottom: Int = 0,
+    trailing: Int = 0
+  ) {
+    self.top = top
+    self.leading = leading
+    self.bottom = bottom
+    self.trailing = trailing
+  }
+
+  public init(all value: Int) {
+    self.init(top: value, leading: value, bottom: value, trailing: value)
+  }
+
+  public init(horizontal: Int = 0, vertical: Int = 0) {
+    self.init(top: vertical, leading: horizontal, bottom: vertical, trailing: horizontal)
+  }
+
+  public var horizontal: Int {
+    leading + trailing
+  }
+
+  public var vertical: Int {
+    top + bottom
+  }
+}
+
+/// A combined horizontal and vertical alignment.
+public struct Alignment: Equatable, Hashable, Sendable {
+  public let horizontal: HorizontalAlignment
+  public let vertical: VerticalAlignment
+
+  public init(
+    horizontal: HorizontalAlignment,
+    vertical: VerticalAlignment
+  ) {
+    self.horizontal = horizontal
+    self.vertical = vertical
+  }
+
+  public var debugName: String {
+    switch (horizontal, vertical) {
+    case (.leading, .top):
+      return "topLeading"
+    case (.center, .top):
+      return "top"
+    case (.trailing, .top):
+      return "topTrailing"
+    case (.leading, .center):
+      return "leading"
+    case (.center, .center):
+      return "center"
+    case (.trailing, .center):
+      return "trailing"
+    case (.leading, .bottom):
+      return "bottomLeading"
+    case (.center, .bottom):
+      return "bottom"
+    case (.trailing, .bottom):
+      return "bottomTrailing"
+    default:
+      return "\(horizontal.debugName)-\(vertical.debugName)"
+    }
+  }
+
+  public var rawValue: String {
+    debugName
+  }
+}
+
+/// Protocol used to define custom alignment guides.
+public protocol AlignmentID: Sendable {
+  static func defaultValue(in context: ViewDimensions) -> Int
+}
+
+/// A horizontal alignment guide.
+public struct HorizontalAlignment: Sendable {
+  package let key: ObjectIdentifier
+  public let debugName: String
+  private let defaultValueProvider: @Sendable (ViewDimensions) -> Int
+
+  public init(_ id: any AlignmentID.Type) {
+    key = ObjectIdentifier(id)
+    debugName = String(reflecting: id)
+    defaultValueProvider = { context in
+      id.defaultValue(in: context)
+    }
+  }
+
+  fileprivate init(
+    key: ObjectIdentifier,
+    debugName: String,
+    defaultValueProvider: @escaping @Sendable (ViewDimensions) -> Int
+  ) {
+    self.key = key
+    self.debugName = debugName
+    self.defaultValueProvider = defaultValueProvider
+  }
+
+  fileprivate func defaultValue(in context: ViewDimensions) -> Int {
+    defaultValueProvider(context)
+  }
+}
+
+extension HorizontalAlignment: Equatable {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.key == rhs.key
+  }
+}
+
+extension HorizontalAlignment: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(key)
+  }
+}
+
+/// A vertical alignment guide.
+public struct VerticalAlignment: Sendable {
+  package let key: ObjectIdentifier
+  public let debugName: String
+  private let defaultValueProvider: @Sendable (ViewDimensions) -> Int
+
+  public init(_ id: any AlignmentID.Type) {
+    key = ObjectIdentifier(id)
+    debugName = String(reflecting: id)
+    defaultValueProvider = { context in
+      id.defaultValue(in: context)
+    }
+  }
+
+  fileprivate init(
+    key: ObjectIdentifier,
+    debugName: String,
+    defaultValueProvider: @escaping @Sendable (ViewDimensions) -> Int
+  ) {
+    self.key = key
+    self.debugName = debugName
+    self.defaultValueProvider = defaultValueProvider
+  }
+
+  fileprivate func defaultValue(in context: ViewDimensions) -> Int {
+    defaultValueProvider(context)
+  }
+}
+
+extension VerticalAlignment: Equatable {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.key == rhs.key
+  }
+}
+
+extension VerticalAlignment: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(key)
+  }
+}
+
+/// Size and alignment guide values exposed during layout.
+public struct ViewDimensions: Sendable {
+  public let width: Int
+  public let height: Int
+  private let explicitHorizontalGuideProvider: @Sendable (HorizontalAlignment) -> Int?
+  private let explicitVerticalGuideProvider: @Sendable (VerticalAlignment) -> Int?
+
+  public init(width: Int, height: Int) {
+    self.init(
+      width: width,
+      height: height,
+      explicitHorizontalGuideProvider: { _ in nil },
+      explicitVerticalGuideProvider: { _ in nil }
+    )
+  }
+
+  public subscript(guide: HorizontalAlignment) -> Int {
+    explicitHorizontalGuideProvider(guide) ?? guide.defaultValue(in: self)
+  }
+
+  public subscript(guide: VerticalAlignment) -> Int {
+    explicitVerticalGuideProvider(guide) ?? guide.defaultValue(in: self)
+  }
+
+  func explicitValue(for guide: HorizontalAlignment) -> Int? {
+    explicitHorizontalGuideProvider(guide)
+  }
+
+  func explicitValue(for guide: VerticalAlignment) -> Int? {
+    explicitVerticalGuideProvider(guide)
+  }
+
+  func overridingHorizontalGuides(
+    with provider: @escaping @Sendable (HorizontalAlignment) -> Int?
+  ) -> Self {
+    let currentHorizontalProvider = explicitHorizontalGuideProvider
+    return Self(
+      width: width,
+      height: height,
+      explicitHorizontalGuideProvider: { alignment in
+        provider(alignment) ?? currentHorizontalProvider(alignment)
+      },
+      explicitVerticalGuideProvider: explicitVerticalGuideProvider
+    )
+  }
+
+  func overridingVerticalGuides(
+    with provider: @escaping @Sendable (VerticalAlignment) -> Int?
+  ) -> Self {
+    let currentVerticalProvider = explicitVerticalGuideProvider
+    return Self(
+      width: width,
+      height: height,
+      explicitHorizontalGuideProvider: explicitHorizontalGuideProvider,
+      explicitVerticalGuideProvider: { alignment in
+        provider(alignment) ?? currentVerticalProvider(alignment)
+      }
+    )
+  }
+
+  fileprivate init(
+    width: Int,
+    height: Int,
+    explicitHorizontalGuideProvider: @escaping @Sendable (HorizontalAlignment) -> Int?,
+    explicitVerticalGuideProvider: @escaping @Sendable (VerticalAlignment) -> Int?
+  ) {
+    self.width = width
+    self.height = height
+    self.explicitHorizontalGuideProvider = explicitHorizontalGuideProvider
+    self.explicitVerticalGuideProvider = explicitVerticalGuideProvider
+  }
+}
+
+private enum LeadingAlignmentID: AlignmentID {
+  static func defaultValue(in _: ViewDimensions) -> Int { 0 }
+}
+
+private enum HorizontalCenterAlignmentID: AlignmentID {
+  static func defaultValue(in context: ViewDimensions) -> Int { context.width / 2 }
+}
+
+private enum TrailingAlignmentID: AlignmentID {
+  static func defaultValue(in context: ViewDimensions) -> Int { context.width }
+}
+
+private enum TopAlignmentID: AlignmentID {
+  static func defaultValue(in _: ViewDimensions) -> Int { 0 }
+}
+
+private enum VerticalCenterAlignmentID: AlignmentID {
+  static func defaultValue(in context: ViewDimensions) -> Int { context.height / 2 }
+}
+
+private enum BottomAlignmentID: AlignmentID {
+  static func defaultValue(in context: ViewDimensions) -> Int { context.height }
+}
+
+private enum FirstTextBaselineAlignmentID: AlignmentID {
+  static func defaultValue(in context: ViewDimensions) -> Int { context.height }
+}
+
+private enum LastTextBaselineAlignmentID: AlignmentID {
+  static func defaultValue(in context: ViewDimensions) -> Int { context.height }
+}
+
+extension HorizontalAlignment {
+  public static let leading = Self(
+    key: ObjectIdentifier(LeadingAlignmentID.self),
+    debugName: "leading",
+    defaultValueProvider: { _ in 0 }
+  )
+  public static let center = Self(
+    key: ObjectIdentifier(HorizontalCenterAlignmentID.self),
+    debugName: "center",
+    defaultValueProvider: { context in context.width / 2 }
+  )
+  public static let trailing = Self(
+    key: ObjectIdentifier(TrailingAlignmentID.self),
+    debugName: "trailing",
+    defaultValueProvider: { context in context.width }
+  )
+}
+
+extension VerticalAlignment {
+  public static let top = Self(
+    key: ObjectIdentifier(TopAlignmentID.self),
+    debugName: "top",
+    defaultValueProvider: { _ in 0 }
+  )
+  public static let center = Self(
+    key: ObjectIdentifier(VerticalCenterAlignmentID.self),
+    debugName: "center",
+    defaultValueProvider: { context in context.height / 2 }
+  )
+  public static let bottom = Self(
+    key: ObjectIdentifier(BottomAlignmentID.self),
+    debugName: "bottom",
+    defaultValueProvider: { context in context.height }
+  )
+  public static let firstTextBaseline = Self(
+    key: ObjectIdentifier(FirstTextBaselineAlignmentID.self),
+    debugName: "firstTextBaseline",
+    defaultValueProvider: { context in context.height }
+  )
+  public static let lastTextBaseline = Self(
+    key: ObjectIdentifier(LastTextBaselineAlignmentID.self),
+    debugName: "lastTextBaseline",
+    defaultValueProvider: { context in context.height }
+  )
+}
+
+extension Alignment {
+  public static let topLeading = Self(horizontal: .leading, vertical: .top)
+  public static let top = Self(horizontal: .center, vertical: .top)
+  public static let topTrailing = Self(horizontal: .trailing, vertical: .top)
+  public static let leading = Self(horizontal: .leading, vertical: .center)
+  public static let center = Self(horizontal: .center, vertical: .center)
+  public static let trailing = Self(horizontal: .trailing, vertical: .center)
+  public static let bottomLeading = Self(horizontal: .leading, vertical: .bottom)
+  public static let bottom = Self(horizontal: .center, vertical: .bottom)
+  public static let bottomTrailing = Self(horizontal: .trailing, vertical: .bottom)
+  public static let leadingLastTextBaseline = Self(
+    horizontal: .leading,
+    vertical: .lastTextBaseline
+  )
+  public static let trailingFirstTextBaseline = Self(
+    horizontal: .trailing,
+    vertical: .firstTextBaseline
+  )
+}
+
+/// The high-level phases of the rendering pipeline.
+public enum Phase: String, CaseIterable, Sendable {
+  case resolve
+  case measure
+  case place
+  case semantics
+  case draw
+  case raster
+  case commit
+}
+
+/// A stable identity path used to key state and runtime bookkeeping.
+public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringConvertible {
+  public let components: [String]
+
+  public init(components: [String]) {
+    self.components = components
+  }
+
+  public var path: String {
+    components.joined(separator: "/")
+  }
+
+  public var description: String {
+    path
+  }
+
+  public var parent: Self? {
+    guard !components.isEmpty else {
+      return nil
+    }
+    return Self(components: Array(components.dropLast()))
+  }
+
+  public func child(_ component: String) -> Self {
+    Self(components: components + [component])
+  }
+
+  public var lastComponent: String? {
+    components.last
+  }
+
+  public func explicitID<ID: Hashable>(_ id: ID) -> Self {
+    child("ID[\(escapedExplicitIDComponent(String(reflecting: id)))]")
+  }
+
+  public func isAncestor(of other: Self) -> Bool {
+    guard components.count <= other.components.count else {
+      return false
+    }
+
+    return zip(components, other.components).allSatisfy(==)
+  }
+
+  public func isDescendant(of other: Self) -> Bool {
+    other.isAncestor(of: self)
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.path < rhs.path
+  }
+
+  private func escapedExplicitIDComponent(_ component: String) -> String {
+    let escaped = component.reduce(into: "") { escaped, character in
+      switch character {
+      case "%":
+        escaped.append("%25")
+      case "/":
+        escaped.append("%2F")
+      default:
+        escaped.append(character)
+      }
+    }
+    return escaped.isEmpty ? "<empty>" : escaped
+  }
+}
+
+/// A 2D point in terminal cell coordinates.
+public struct Point: Equatable, Sendable {
+  public var x: Int
+  public var y: Int
+
+  public init(x: Int, y: Int) {
+    self.x = x
+    self.y = y
+  }
+
+  public static let zero = Self(x: 0, y: 0)
+}
+
+/// A 2D size in terminal cell units.
+public struct Size: Equatable, Sendable {
+  public var width: Int
+  public var height: Int
+
+  public init(width: Int, height: Int) {
+    self.width = width
+    self.height = height
+  }
+
+  public static let zero = Self(width: 0, height: 0)
+}
+
+/// A rectangle in terminal cell coordinates.
+public struct Rect: Equatable, Sendable {
+  public var origin: Point
+  public var size: Size
+
+  public init(origin: Point, size: Size) {
+    self.origin = origin
+    self.size = size
+  }
+
+  public static let zero = Self(origin: .zero, size: .zero)
+
+  public var isEmpty: Bool {
+    size.width <= 0 || size.height <= 0
+  }
+
+  public var maxX: Int {
+    origin.x + size.width
+  }
+
+  public var maxY: Int {
+    origin.y + size.height
+  }
+
+  public func contains(_ point: Point) -> Bool {
+    guard !isEmpty else {
+      return false
+    }
+
+    return point.x >= origin.x
+      && point.x < maxX
+      && point.y >= origin.y
+      && point.y < maxY
+  }
+
+  public func intersection(_ other: Rect) -> Rect? {
+    let minX = max(origin.x, other.origin.x)
+    let minY = max(origin.y, other.origin.y)
+    let maxX = min(self.maxX, other.maxX)
+    let maxY = min(self.maxY, other.maxY)
+
+    guard maxX > minX, maxY > minY else {
+      return nil
+    }
+
+    return Rect(
+      origin: .init(x: minX, y: minY),
+      size: .init(width: maxX - minX, height: maxY - minY)
+    )
+  }
+}
+
+/// A single proposed dimension used during measure.
+public enum ProposedDimension: Equatable, Hashable, Sendable {
+  case unspecified
+  case finite(Int)
+  case infinity
+}
+
+extension ProposedDimension: ExpressibleByIntegerLiteral {
+  public init(integerLiteral value: Int) {
+    self = .finite(value)
+  }
+}
+
+/// A width and height proposal passed from parent to child during layout.
+public struct ProposedSize: Equatable, Hashable, Sendable {
+  public var width: ProposedDimension
+  public var height: ProposedDimension
+
+  public init(
+    width: ProposedDimension = .unspecified,
+    height: ProposedDimension = .unspecified
+  ) {
+    self.width = width
+    self.height = height
+  }
+
+  public init(width: Int?, height: Int?) {
+    self.width = width.map(ProposedDimension.finite) ?? .unspecified
+    self.height = height.map(ProposedDimension.finite) ?? .unspecified
+  }
+
+  public static let unspecified = Self()
+}
