@@ -30,13 +30,18 @@ final class TodoistAppModel: @unchecked Sendable {
       }
   }
 
-  static func live() throws -> TodoistAppModel {
-    let databaseURL = try defaultDatabaseURL()
-    let authToken = ProcessInfo.processInfo.environment["TODOIST_API_TOKEN"]
-    let repository = try TodoistRepository(databaseURL: databaseURL, authToken: authToken)
+  static func live(authTokenOverride: String? = nil) throws -> TodoistAppModel {
+    let paths = try TodoistDemoConfiguration.paths()
+    let authToken =
+      if let authTokenOverride {
+        authTokenOverride
+      } else {
+        try TodoistDemoConfiguration.resolvedAuthToken()
+      }
+    let repository = try TodoistRepository(databaseURL: paths.databaseURL, authToken: authToken)
     return TodoistAppModel(
       repository: repository,
-      databasePath: databaseURL.path,
+      databasePath: paths.databaseURL.path,
       isAuthenticated: !(authToken?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
     )
   }
@@ -212,20 +217,5 @@ extension TodoistAppModel {
     if !visibleTasks.contains(where: { $0.id == selectedTaskID }) {
       selectedTaskID = ""
     }
-  }
-
-  private static func defaultDatabaseURL() throws -> URL {
-    let appSupport =
-      try FileManager.default.url(
-        for: .applicationSupportDirectory,
-        in: .userDomainMask,
-        appropriateFor: nil,
-        create: true
-      )
-
-    return appSupport
-      .appendingPathComponent("swift-terminal-ui")
-      .appendingPathComponent("todoist-demo")
-      .appendingPathComponent("todoist.sqlite3")
   }
 }

@@ -5,18 +5,17 @@ GRDB-backed caching and `swift-structured-queries` powered SQLite reads.
 
 ## Run
 
-Set a Todoist API token if you want live sync:
-
-```bash
-export TODOIST_API_TOKEN=...
-```
-
-Then run the executable package:
+Run the executable package:
 
 ```bash
 cd Examples/todoist
 swift run todoist-demo
 ```
 
-Without a token, the app still launches and reads whatever is already cached in
-the local SQLite database.
+On first launch the demo presents a setup screen that:
+- asks for a required Todoist API token
+- stores it locally under Application Support
+- initializes the local GRDB-backed SQLite cache
+
+You can still bypass the setup prompt by exporting `TODOIST_API_TOKEN` before
+launching the app.

@@ -1,6 +1,66 @@
 import Observation
 import TerminalUI
 
+struct TodoistDemoSceneView: View {
+  @Bindable var launcher: TodoistDemoLauncher
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if let model = launcher.model {
+        TodoistDemoRootView(model: model)
+      } else {
+        TodoistSetupView(launcher: launcher)
+      }
+    }
+    .tint(Color.red)
+  }
+}
+
+struct TodoistSetupView: View {
+  @Bindable var launcher: TodoistDemoLauncher
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Todoist Terminal Demo")
+        .bold()
+        .foregroundStyle(Color.red)
+
+      Text("A Todoist API token is required before the demo can sync and initialize its local SQLite cache.")
+        .foregroundStyle(.muted)
+
+      GroupBox("Setup") {
+        VStack(alignment: .leading, spacing: 1) {
+          SecureField("Todoist API token", text: $launcher.apiTokenInput)
+            .frame(width: 44, alignment: .leading)
+
+          Text("The demo stores the token locally unless TODOIST_API_TOKEN is already set in the environment.")
+            .foregroundStyle(.muted)
+
+          Button("Initialize Database", action: launcher.requestInitialize)
+            .buttonStyle(.borderedProminent)
+            .disabled(!launcher.canInitialize)
+        }
+      }
+
+      GroupBox("Local Cache") {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Database")
+            .bold()
+          Text(launcher.databasePath)
+            .foregroundStyle(.muted)
+        }
+      }
+
+      Text(launcher.setupStatusMessage)
+        .foregroundStyle(launcher.isInitializing ? .foreground : .muted)
+
+      Text("Tab moves focus, enter activates controls, and q exits.")
+        .foregroundStyle(.muted)
+    }
+    .padding(1)
+  }
+}
+
 struct TodoistDemoRootView: View {
   @Bindable var model: TodoistAppModel
 
@@ -23,6 +83,7 @@ struct TodoistDemoRootView: View {
       VStack(alignment: .leading, spacing: 0) {
         Text("Todoist Terminal Demo")
           .bold()
+          .foregroundStyle(Color.red)
         Text(model.subtitleText)
           .foregroundStyle(.muted)
       }
@@ -151,6 +212,7 @@ struct TodoistLaunchErrorView: View {
     VStack(alignment: .leading, spacing: 1) {
       Text("Todoist demo failed to launch")
         .bold()
+        .foregroundStyle(Color.red)
       Text(message)
       Text("Check the example package dependencies and local database path, then try again.")
         .foregroundStyle(.muted)
