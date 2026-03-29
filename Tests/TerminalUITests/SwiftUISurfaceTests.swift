@@ -3139,6 +3139,116 @@ struct SwiftUISurfaceTests {
       ])
   }
 
+  @Test("Link resolves as focusable rich text and dispatches open-link actions")
+  func linkResolvesAsFocusableRichText() {
+    final class OpenLinkRecorder: @unchecked Sendable {
+      var destinations: [String] = []
+    }
+
+    let recorder = OpenLinkRecorder()
+    let actionRegistry = LocalActionRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.openLinkAction = OpenLinkAction { destination in
+      recorder.destinations.append(destination)
+      return true
+    }
+
+    let artifacts = DefaultRenderer().render(
+      Link("Docs", destination: "https://example.com")
+        .id(testIdentity("DocsLink")),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(artifacts.resolvedTree.kind == .view("Link"))
+    #expect(artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("DocsLink")])
+
+    guard case .richText(let payload) = artifacts.resolvedTree.drawPayload else {
+      Issue.record("Expected Link to resolve to a rich text payload")
+      return
+    }
+
+    #expect(payload.visibleText == "Docs")
+    #expect(payload.runs.map(\.destination) == ["https://example.com"])
+    #expect(actionRegistry.dispatch(identity: testIdentity("DocsLink")))
+    #expect(recorder.destinations == ["https://example.com"])
+  }
+
+  @Test("Text interpolation keeps inline links in one rich text payload and separate focus targets")
+  func textInterpolationBuildsRichLinkPayload() {
+    let artifacts = DefaultRenderer().render(
+      Text(
+        "See \(Text("v1").bold()) \(Link("Docs", destination: "https://example.com")) or \(Link("API", destination: "https://example.org"))"
+      ),
+      context: .init(identity: testIdentity("InlineText"))
+    )
+
+    guard case .richText(let payload) = artifacts.resolvedTree.drawPayload else {
+      Issue.record("Expected interpolated Text to resolve to a rich text payload")
+      return
+    }
+
+    #expect(payload.visibleText == "See v1 Docs or API")
+    #expect(payload.runs.map(\.text) == ["See ", "v1", " ", "Docs", " or ", "API"])
+    #expect(payload.runs[1].style.emphasis.contains(.bold))
+    #expect(payload.runs[3].destination == "https://example.com")
+    #expect(payload.runs[3].linkIdentifier == "InlineLink[0]")
+    #expect(payload.runs[5].destination == "https://example.org")
+    #expect(payload.runs[5].linkIdentifier == "InlineLink[1]")
+    #expect(
+      artifacts.semanticSnapshot.focusRegions.map(\.identity) == [
+        testIdentity("InlineText", "InlineLink[0]"),
+        testIdentity("InlineText", "InlineLink[1]"),
+      ]
+    )
+  }
+
+  @Test("focused standalone and inline links use highlighted link chrome")
+  func focusedLinksUseHighlightedChrome() throws {
+    let appearance = TerminalAppearance(
+      foregroundColor: .black,
+      backgroundColor: .white,
+      tintColor: .blue,
+      source: .override
+    )
+
+    var standaloneEnvironment = EnvironmentValues()
+    standaloneEnvironment.terminalAppearance = appearance
+    standaloneEnvironment.parallelFocusedIdentity = testIdentity("DocsLink")
+    let standaloneArtifacts = DefaultRenderer().render(
+      Link("Docs", destination: "https://example.com")
+        .id(testIdentity("DocsLink")),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: standaloneEnvironment
+      )
+    )
+    let standaloneStyle = try #require(standaloneArtifacts.rasterSurface.styleRuns.first?.style)
+    #expect(standaloneStyle.underlineStyle == .init(pattern: .solid))
+    #expect(standaloneStyle.backgroundColor != nil)
+
+    var inlineEnvironment = EnvironmentValues()
+    inlineEnvironment.terminalAppearance = appearance
+    inlineEnvironment.parallelFocusedIdentity = parallelInlineLinkIdentity(
+      parent: testIdentity("InlineFocused"),
+      identifier: "InlineLink[0]"
+    )
+    let inlineArtifacts = DefaultRenderer().render(
+      Text("Go \(Link("Docs", destination: "https://example.com"))"),
+      context: .init(
+        identity: testIdentity("InlineFocused"),
+        environmentValues: inlineEnvironment
+      )
+    )
+    let inlineStyle = try #require(inlineArtifacts.rasterSurface.styleRuns.last?.style)
+    #expect(inlineStyle.underlineStyle == .init(pattern: .solid))
+    #expect(inlineStyle.backgroundColor != nil)
+  }
+
   @Test(
     "Button automatic border shape stays rectangular at standard prominence and rounds when increased"
   )
@@ -3743,6 +3853,36 @@ struct SwiftUISurfaceTests {
     #expect(middleArtifacts.rasterSurface.lines == ["A…C–"])
     #expect(multilineArtifacts.measuredTree.measuredSize == .init(width: 3, height: 2))
     #expect(multilineArtifacts.rasterSurface.lines == ["AB–", "–C…"])
+  }
+
+  @Test("rich Text wrapping and truncation treat inline links as one text layout")
+  func richTextWrappingAndTruncationTreatLinksAsSingleLayout() throws {
+    let artifacts = DefaultRenderer().render(
+      Text("Alpha \(Link("Beta", destination: "https://example.com")) Gamma")
+        .lineLimit(2)
+        .textWrappingStrategy(.wordBoundary),
+      context: .init(identity: testIdentity("RichWrap")),
+      proposal: .init(width: 5, height: nil)
+    )
+
+    guard case .richText(let payload) = artifacts.resolvedTree.drawPayload else {
+      Issue.record("Expected wrapped rich Text to resolve to a rich text payload")
+      return
+    }
+
+    #expect(payload.visibleText == "Alpha Beta Gamma")
+    #expect(artifacts.measuredTree.measuredSize == .init(width: 5, height: 2))
+    #expect(artifacts.rasterSurface.lines == ["Alpha", "Beta…"])
+
+    let focusRegion = try #require(artifacts.semanticSnapshot.focusRegions.first)
+    #expect(focusRegion.identity == testIdentity("RichWrap", "InlineLink[0]"))
+    #expect(
+      focusRegion.rect
+        == Rect(
+          origin: .init(x: 0, y: 1),
+          size: .init(width: 4, height: 1)
+        )
+    )
   }
 
   @Test("multiline Text exposes distinct first and last baselines")

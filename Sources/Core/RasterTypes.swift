@@ -38,17 +38,20 @@ public struct RasterCell: Equatable, Sendable {
   public var spanWidth: Int
   public var continuationLeadX: Int?
   public var style: ResolvedTextStyle?
+  public var hyperlink: String?
 
   public init(
     character: Character = " ",
     spanWidth: Int = 1,
     continuationLeadX: Int? = nil,
-    style: ResolvedTextStyle? = nil
+    style: ResolvedTextStyle? = nil,
+    hyperlink: String? = nil
   ) {
     self.character = character
     self.spanWidth = spanWidth
     self.continuationLeadX = continuationLeadX
     self.style = style
+    self.hyperlink = hyperlink
   }
 
   public static let empty = Self()
@@ -132,7 +135,8 @@ public struct RasterSurface: Equatable, Sendable {
         cells[y][x] = RasterCell(
           character: cluster.character,
           spanWidth: max(1, cluster.cellWidth),
-          style: style
+          style: style,
+          hyperlink: nil
         )
         if cluster.cellWidth > 1 {
           for offset in 1..<cluster.cellWidth where x + offset < width {
@@ -140,7 +144,8 @@ public struct RasterSurface: Equatable, Sendable {
               character: " ",
               spanWidth: 0,
               continuationLeadX: x,
-              style: style
+              style: style,
+              hyperlink: nil
             )
           }
         }

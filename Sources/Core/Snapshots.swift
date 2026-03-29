@@ -264,6 +264,8 @@ extension SnapshotRenderer {
       return "none"
     case .text(let content):
       return "text(\(content))"
+    case .richText(let payload):
+      return "richText(text=\(payload.visibleText),links=\(payload.linkCount))"
     case .image(let payload):
       return "image(source=\(describe(payload.source)),asset=\(describe(payload.resolvedAsset)))"
     case .shape(let payload):
@@ -348,6 +350,28 @@ extension SnapshotRenderer {
       }
       if !style.isDefault {
         details += " style=\(describe(style))"
+      }
+      details += "]"
+      return details
+    case .richText(
+      let bounds,
+      let payload,
+      let lineLimit,
+      let truncationMode,
+      let wrappingStrategy
+    ):
+      var details = "richText[\(describe(bounds))=\"\(payload.visibleText)\""
+      if lineLimit != nil {
+        details += " lines=\(lineLimit!)"
+      }
+      if truncationMode != .tail {
+        details += " truncation=\(truncationMode.rawValue)"
+      }
+      if wrappingStrategy != .wordBoundary {
+        details += " wrapping=\(wrappingStrategy.rawValue)"
+      }
+      if payload.linkCount > 0 {
+        details += " links=\(payload.linkCount)"
       }
       details += "]"
       return details

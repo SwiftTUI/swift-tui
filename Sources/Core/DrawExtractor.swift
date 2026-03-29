@@ -108,6 +108,16 @@ extension DrawExtractor {
           wrappingStrategy: layoutMetadata.textWrappingStrategy ?? .wordBoundary
         )
       )
+    case .richText(let payload):
+      commands.append(
+        .richText(
+          bounds: bounds,
+          payload: payload,
+          lineLimit: layoutMetadata.lineLimit,
+          truncationMode: layoutMetadata.textTruncationMode ?? .tail,
+          wrappingStrategy: layoutMetadata.textWrappingStrategy ?? .wordBoundary
+        )
+      )
     case .image(let payload):
       commands.append(
         .image(

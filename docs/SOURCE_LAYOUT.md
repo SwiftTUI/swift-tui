@@ -1,6 +1,6 @@
 # Source Layout
 
-Last updated: March 28, 2026
+Last updated: March 29, 2026
 
 This is the current ownership map for the codebase. It documents where subsystems live after the source split and should stay aligned with future file moves.
 
@@ -25,9 +25,10 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `TerminalGraphicsCapabilities.swift`: Kitty, Sixel, and cell-pixel capability probing helpers
 - `TerminalImageRendering.swift`: image protocol emitters, fallback compositing, and dithering support
 - `ImageAssetRepository.swift`: shared PNG decoding and image metadata cache
-- `TerminalPresentation.swift`: capability-aware text rendering and incremental presentation planning
+- `TerminalPresentation.swift`: capability-aware text rendering, OSC 8 hyperlink emission, and incremental presentation planning
 - `TerminalAppearanceDetection.swift`: host appearance probing
 - `InputReader.swift`: keyboard and mouse input decoding
+- `LinkOpening.swift`: package-only runtime opener used by focusable links in interactive sessions
 - `TerminalUI.docc/`: module landing page and runtime guides
 
 ## `TerminalUIScenes`
@@ -47,6 +48,7 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `LayoutTypes.swift`: layout behavior, layout metadata, measured and placed node infrastructure, and custom layout handles
 - `LayoutEngine.swift`: measurement and placement engine
 - `RenderMetadataTypes.swift`: text style, base style, draw metadata, and collection payloads
+- `RichText.swift`: rich-text runs, payloads, and inline-link identity helpers
 - `ImageTypes.swift`: image-source, resolved-image, and raster-image-attachment data types
 - `RenderTreeAndSemanticsTypes.swift`: semantic metadata, lifecycle metadata, resolved tree, semantic snapshot, and draw-tree types
 - `Semantics.swift`: semantic extraction and routing
@@ -91,12 +93,12 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `ViewFoundation.swift`: `View`, `ViewBuilder`, `AnyView`, resolver entry points, and typed builder plumbing
 - `State.swift`: `@State` and binding-facing state support
 - `Observation.swift`: observable bridging and repo-owned `@Bindable`
-- `Environment.swift`: environment keys, public `ResolveContext` configuration, and package-only runtime plumbing
+- `Environment.swift`: environment keys, `OpenLinkAction`, public `ResolveContext` configuration, and package-only runtime plumbing
 - `ImageEnvironment.swift`: image resource-root and terminal cell-pixel environment values
 - `FocusedValue.swift`: focused-value property wrappers and modifiers
 - `FocusState.swift`: `@FocusState` and focus-binding surface
 - `Layout.swift`: `Layout` protocol support, layout modifiers, stack layouts, and alignment helpers
-- `ViewPrimitives.swift`: `EmptyView`, `Text`, `Spacer`, and `Divider`
+- `ViewPrimitives.swift`: `EmptyView`, rich-interpolated `Text`, `Spacer`, and `Divider`
 - `Image.swift`: SwiftUI-shaped PNG image surface
 - `GeometryReader.swift`: terminal-surface geometry proxy and reader
 - `ContainerViews.swift`: `Group`, `ForEach`, `ViewThatFits`, `ScrollView`, `VStack`, `HStack`, and `ZStack`
@@ -115,6 +117,7 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `Picker.swift`: `Picker` and picker body builders
 - `Menu.swift` and `MenuRendering.swift`: standalone menu control and inline expansion rendering
 - `Button.swift`: `Button` and button chrome helpers
+- `Link.swift`: text-backed `Link` plus rich-text lowering helpers for inline hyperlinks
 - `MetricTrackSupport.swift`: shared compact metric-track helpers used by core progress surfaces and charts
 - `ViewCompositionHelpers.swift`: shared group composition helpers and internal lowering support
 - `ShapesAndTextStyle.swift`: shapes plus `Text` styling extensions

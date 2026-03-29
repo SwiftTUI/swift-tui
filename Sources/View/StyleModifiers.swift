@@ -61,6 +61,12 @@ extension View {
     environment(\.tableHeaderVisibility, visibility)
   }
 
+  public func openLinkAction(
+    _ action: OpenLinkAction
+  ) -> some View {
+    environment(\.openLinkAction, action)
+  }
+
   public func foregroundStyle<S: ShapeStyle>(_ style: S) -> some View {
     environment(\.foregroundStyle, AnyShapeStyle(style))
   }

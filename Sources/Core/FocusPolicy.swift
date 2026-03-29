@@ -8,6 +8,7 @@ package enum AutomaticFocusPolicy {
   private static let focusablePresentationRoles: Set<PresentationRole> = [
     .button,
     .disclosureGroup,
+    .link,
     .list,
     .menu,
     .picker,
@@ -31,7 +32,7 @@ package enum AutomaticFocusPolicy {
     }
 
     switch name {
-    case "Button", "DisclosureGroup", "List", "Picker", "Slider", "Stepper",
+    case "Button", "DisclosureGroup", "Link", "List", "Picker", "Slider", "Stepper",
       "Table", "TextField", "Toggle", "Menu":
       return true
     default:

@@ -33,7 +33,11 @@ struct Phase1PresentationIntegrationTests {
     #expect(result.metrics.strategy == .incremental)
     #expect(result.metrics.cellsChanged == 1)
     #expect(result.metrics.bytesWritten < result.fullRepaintMetrics.bytesWritten)
-    #expect(result.incrementalWrites.contains("\u{001B}[1;8H"))
+    #expect(
+      result.incrementalWrites.contains { write in
+        write.contains("\u{001B}[1;8H")
+      }
+    )
   }
 
   @Test("text input updates through a single cursor-addressed span")
@@ -58,7 +62,11 @@ struct Phase1PresentationIntegrationTests {
     #expect(result.metrics.strategy == .incremental)
     #expect(result.metrics.cellsChanged == 2)
     #expect(result.metrics.bytesWritten < result.fullRepaintMetrics.bytesWritten)
-    #expect(result.incrementalWrites.contains("\u{001B}[1;10H"))
+    #expect(
+      result.incrementalWrites.contains { write in
+        write.contains("\u{001B}[1;10H")
+      }
+    )
   }
 
   @Test("focus movement only rewrites the touched focus markers")
@@ -84,8 +92,16 @@ struct Phase1PresentationIntegrationTests {
     #expect(result.metrics.linesTouched == 2)
     #expect(result.metrics.cellsChanged == 2)
     #expect(result.metrics.bytesWritten < result.fullRepaintMetrics.bytesWritten)
-    #expect(result.incrementalWrites.contains("\u{001B}[1;1H"))
-    #expect(result.incrementalWrites.contains("\u{001B}[2;1H"))
+    #expect(
+      result.incrementalWrites.contains { write in
+        write.contains("\u{001B}[1;1H")
+      }
+    )
+    #expect(
+      result.incrementalWrites.contains { write in
+        write.contains("\u{001B}[2;1H")
+      }
+    )
   }
 
   @Test("scroll steps stay incremental and smaller than a full repaint")
@@ -140,13 +156,9 @@ struct Phase1PresentationIntegrationTests {
     #expect(metrics.strategy == .fullRepaint)
     #expect(metrics.usedFullRepaint)
     #expect(
-      Array(controller.writes.suffix(5)) == [
-        "\u{001B}[2J",
-        "\u{001B}[1;1H",
-        "alpha",
-        "\u{001B}[2;1H",
-        "bravo",
-      ])
+      controller.writes.last
+        == "\u{001B}[2J\u{001B}[1;1Halpha\u{001B}[2;1Hbravo"
+    )
   }
 }
 

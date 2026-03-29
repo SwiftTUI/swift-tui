@@ -28,6 +28,9 @@ func parallelCollectedTextParts(
   if case .text(let content) = node.drawPayload, !content.isEmpty {
     parts.append(content)
   }
+  if case .richText(let payload) = node.drawPayload, !payload.visibleText.isEmpty {
+    parts.append(payload.visibleText)
+  }
   for child in node.children {
     parts.append(contentsOf: parallelCollectedTextParts(from: child))
   }

@@ -50,6 +50,7 @@ struct TerminalPresentationTests {
           glyphLevel: .unicode,
           colorLevel: .none,
           emitsStyleEscapeSequences: false,
+          supportsHyperlinks: true,
           supportsMouseReporting: true
         )
     )
@@ -90,6 +91,35 @@ struct TerminalPresentationTests {
     #expect(supported.supportsMouseReporting)
     #expect(!dumb.supportsMouseReporting)
     #expect(!redirected.supportsMouseReporting)
+  }
+
+  @Test("capability detection enables hyperlinks only for supported tty terminals")
+  func capabilityDetectionTracksHyperlinkSupport() {
+    let supported = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "wezterm",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: true
+    )
+    let dumb = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "dumb",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: true
+    )
+    let redirected = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "wezterm",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: false
+    )
+
+    #expect(supported.supportsHyperlinks)
+    #expect(!dumb.supportsHyperlinks)
+    #expect(!redirected.supportsHyperlinks)
   }
 
   @Test("appearance detection derives defaults from COLORFGBG heuristics")
@@ -208,6 +238,85 @@ struct TerminalPresentationTests {
     )
 
     #expect(rendered == "+-+\r\n|??|\r\n+-+")
+  }
+
+  @Test("renderer emits OSC 8 hyperlinks on full repaint and preserves style ordering")
+  func rendererEmitsHyperlinksOnFullRepaint() {
+    let renderer = TerminalSurfaceRenderer(
+      capabilityProfile: .trueColor
+    )
+    let surface = RasterSurface(
+      size: .init(width: 2, height: 1),
+      cells: [
+        [
+          RasterCell(
+            character: "H",
+            style: .init(
+              foregroundColor: .cyan,
+              emphasis: .bold
+            ),
+            hyperlink: "https://example.com"
+          ),
+          RasterCell(
+            character: "i",
+            style: .init(
+              foregroundColor: .cyan,
+              emphasis: .bold
+            ),
+            hyperlink: "https://example.com"
+          ),
+        ]
+      ]
+    )
+
+    #expect(
+      renderer.render(surface)
+        == "\u{001B}]8;;https://example.com\u{001B}\\\u{001B}[1;38;2;86;182;194mHi\u{001B}]8;;\u{001B}\\\u{001B}[0m"
+    )
+  }
+
+  @Test("renderer emits self-contained hyperlink spans for incremental updates")
+  func rendererEmitsSelfContainedHyperlinkSpans() {
+    let renderer = TerminalSurfaceRenderer(
+      capabilityProfile: .ansi16
+    )
+    let row = [
+      RasterCell(
+        character: "X",
+        style: .init(foregroundColor: .cyan),
+        hyperlink: "https://one.example"
+      ),
+      RasterCell(
+        character: "Y",
+        style: .init(foregroundColor: .magenta),
+        hyperlink: "https://two.example"
+      ),
+    ]
+
+    #expect(
+      renderer.renderSpan(row, from: 0, to: 2)
+        == "\u{001B}]8;;https://one.example\u{001B}\\\u{001B}[96mX\u{001B}]8;;\u{001B}\\\u{001B}]8;;https://two.example\u{001B}\\\u{001B}[0m\u{001B}[95mY\u{001B}]8;;\u{001B}\\\u{001B}[0m"
+    )
+  }
+
+  @Test("renderer omits hyperlink escapes when hyperlink support is disabled")
+  func rendererOmitsHyperlinksWhenUnsupported() {
+    let renderer = TerminalSurfaceRenderer(
+      capabilityProfile: .previewUnicode
+    )
+    let surface = RasterSurface(
+      size: .init(width: 4, height: 1),
+      cells: [
+        [
+          RasterCell(character: "L", hyperlink: "https://example.com"),
+          RasterCell(character: "i", hyperlink: "https://example.com"),
+          RasterCell(character: "n", hyperlink: "https://example.com"),
+          RasterCell(character: "k", hyperlink: "https://example.com"),
+        ]
+      ]
+    )
+
+    #expect(renderer.render(surface) == "Link")
   }
 
   @Test("presentation planner falls back to full repaint when size attachments or metadata differ")

@@ -2,6 +2,7 @@
 public enum DrawPayload: Equatable, Sendable {
   case none
   case text(String)
+  case richText(RichTextPayload)
   case image(ImagePayload)
   case shape(ShapePayload)
   case rule(StrokeStyle?)

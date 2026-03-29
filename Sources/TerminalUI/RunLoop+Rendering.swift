@@ -86,6 +86,9 @@ extension RunLoop {
     effectiveEnvironmentValues.parallelFocusedIdentity = focusTracker.currentFocusIdentity
     effectiveEnvironmentValues.parallelFocusedValues = currentFocusedValues
     effectiveEnvironmentValues.parallelPressedIdentity = pressedIdentity
+    if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
+      effectiveEnvironmentValues.openLinkAction = parallelSystemOpenLinkAction()
+    }
     localActionRegistry.reset()
     localPointerHandlerRegistry.reset()
     localFocusBindingRegistry.reset()

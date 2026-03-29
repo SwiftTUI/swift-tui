@@ -86,6 +86,38 @@ struct CollectionSupportTests {
     )
   }
 
+  @Test("collection text extraction flattens rich text payloads to visible text")
+  func collectionTextExtractionFlattensRichTextPayloads() {
+    let richPayload = RichTextPayload(
+      runs: [
+        .init(text: "Alpha "),
+        .init(
+          text: "Docs",
+          destination: "https://example.com",
+          linkIdentifier: "InlineLink[0]"
+        ),
+      ]
+    )
+    let node = ResolvedNode(
+      identity: testIdentity("RichRow"),
+      kind: .view("Group"),
+      children: [
+        .init(
+          identity: testIdentity("RichRow", "0"),
+          kind: .view("Text"),
+          drawPayload: .richText(richPayload)
+        ),
+        .init(
+          identity: testIdentity("RichRow", "1"),
+          kind: .view("Text"),
+          drawPayload: .text("Beta")
+        ),
+      ]
+    )
+
+    #expect(parallelNodeLabelText(from: node) == "Alpha Docs Beta")
+  }
+
   @Test("table row cell payloads preserve per-cell text and merged row styling")
   func tableRowCellPayloadsPreserveMergedCellStyling() {
     let row = ResolvedNode(

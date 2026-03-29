@@ -427,6 +427,13 @@ public indirect enum DrawCommand: Equatable, Sendable {
     truncationMode: TextTruncationMode,
     wrappingStrategy: TextWrappingStrategy
   )
+  case richText(
+    bounds: Rect,
+    payload: RichTextPayload,
+    lineLimit: Int?,
+    truncationMode: TextTruncationMode,
+    wrappingStrategy: TextWrappingStrategy
+  )
   case image(bounds: Rect, identity: Identity, payload: ImagePayload)
   case fill(
     bounds: Rect,

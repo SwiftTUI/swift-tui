@@ -1,9 +1,8 @@
 import Foundation
 import Observation
 
-@MainActor
 @Observable
-final class TodoistAppModel {
+final class TodoistAppModel: @unchecked Sendable {
   @ObservationIgnored private let repository: TodoistRepository
   @ObservationIgnored private var didStart = false
 
@@ -19,7 +18,7 @@ final class TodoistAppModel {
   var isBusy = false
   var statusMessage: String
 
-  nonisolated init(repository: TodoistRepository, databasePath: String, isAuthenticated: Bool) {
+  init(repository: TodoistRepository, databasePath: String, isAuthenticated: Bool) {
     self.repository = repository
     self.databasePath = databasePath
     self.isAuthenticated = isAuthenticated

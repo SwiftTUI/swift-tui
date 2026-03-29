@@ -348,6 +348,12 @@ extension LayoutEngine {
       {
         return min(1, mainDimension(of: idealMeasurement.measuredSize, for: axis))
       }
+      if case .richText(let payload) = node.drawPayload,
+        axis == .vertical,
+        !payload.visibleText.isEmpty
+      {
+        return min(1, mainDimension(of: idealMeasurement.measuredSize, for: axis))
+      }
       return childMinimums.max() ?? 0
     case .overlay, .decoration:
       return childMinimums.max() ?? 0

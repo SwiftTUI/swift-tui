@@ -58,10 +58,13 @@ public struct SemanticExtractor {
         }
 
         if isEnabled {
-          appendPayloadInteractionRegions(
+          appendPayloadSemantics(
             for: node,
+            scopePath: scopePath,
+            sectionIdentity: sectionIdentity,
             clippedTo: clipRect,
             interactionRegions: &interactionRegions,
+            focusRegions: &focusRegions,
             nextHitTestOrder: &nextHitTestOrder
           )
         }
@@ -190,13 +193,27 @@ extension SemanticExtractor {
     return node.bounds.intersection(clipRect)
   }
 
-  private func appendPayloadInteractionRegions(
+  private func appendPayloadSemantics(
     for node: PlacedNode,
+    scopePath: [Identity],
+    sectionIdentity: Identity?,
     clippedTo clipRect: Rect?,
     interactionRegions: inout [InteractionRegion],
+    focusRegions: inout [FocusRegion],
     nextHitTestOrder: inout Int
   ) {
     switch node.drawPayload {
+    case .richText(let payload):
+      appendRichTextSemantics(
+        for: node,
+        payload: payload,
+        scopePath: scopePath,
+        sectionIdentity: sectionIdentity,
+        clippedTo: clipRect,
+        interactionRegions: &interactionRegions,
+        focusRegions: &focusRegions,
+        nextHitTestOrder: &nextHitTestOrder
+      )
     case .list(let payload):
       let layout = DrawExtractor().visibleListLayout(
         for: payload,
@@ -283,6 +300,116 @@ extension SemanticExtractor {
     }
   }
 
+  private func appendRichTextSemantics(
+    for node: PlacedNode,
+    payload: RichTextPayload,
+    scopePath: [Identity],
+    sectionIdentity: Identity?,
+    clippedTo clipRect: Rect?,
+    interactionRegions: inout [InteractionRegion],
+    focusRegions: inout [FocusRegion],
+    nextHitTestOrder: inout Int
+  ) {
+    guard node.bounds.size.width > 0, node.bounds.size.height > 0, payload.linkCount > 0 else {
+      return
+    }
+
+    let layout = parallelRichTextLayout(
+      for: payload,
+      options: .init(
+        width: node.bounds.size.width,
+        lineLimit: node.layoutMetadata.lineLimit,
+        truncationMode: node.layoutMetadata.textTruncationMode ?? .tail,
+        wrappingStrategy: node.layoutMetadata.textWrappingStrategy ?? .wordBoundary
+      )
+    )
+    var focusRegionIndices: [Identity: Int] = [:]
+
+    for (lineIndex, line) in layout.lines.prefix(node.bounds.size.height).enumerated() {
+      var fragmentIdentity: Identity?
+      var fragmentStartX: Int?
+      var fragmentWidth = 0
+      var x = 0
+
+      func flushFragment() {
+        guard
+          let fragmentIdentity,
+          let fragmentStartX,
+          fragmentWidth > 0
+        else {
+          return
+        }
+
+        let rect = Rect(
+          origin: .init(
+            x: node.bounds.origin.x + fragmentStartX,
+            y: node.bounds.origin.y + lineIndex
+          ),
+          size: .init(width: fragmentWidth, height: 1)
+        )
+        guard let clippedRect = clippedRect(for: rect, clippedTo: clipRect) else {
+          return
+        }
+
+        interactionRegions.append(
+          InteractionRegion(
+            identity: fragmentIdentity,
+            rect: clippedRect,
+            routeID: parallelPrimaryRouteID(for: fragmentIdentity),
+            hitTestOrder: nextHitTestOrder
+          )
+        )
+        nextHitTestOrder += 1
+
+        if let existingIndex = focusRegionIndices[fragmentIdentity] {
+          focusRegions[existingIndex].rect = union(
+            focusRegions[existingIndex].rect,
+            clippedRect
+          )
+        } else {
+          focusRegionIndices[fragmentIdentity] = focusRegions.count
+          focusRegions.append(
+            FocusRegion(
+              identity: fragmentIdentity,
+              rect: clippedRect,
+              focusInteractions: .activate,
+              scopePath: scopePath,
+              sectionIdentity: sectionIdentity
+            )
+          )
+        }
+      }
+
+      for cluster in line.clusters {
+        let clusterWidth = max(1, cluster.cellWidth)
+        let clusterIdentity = cluster.runIndex.flatMap { runIndex -> Identity? in
+          guard payload.runs.indices.contains(runIndex),
+            let identifier = payload.runs[runIndex].linkIdentifier
+          else {
+            return nil
+          }
+          return parallelInlineLinkIdentity(
+            parent: node.identity,
+            identifier: identifier
+          )
+        }
+
+        if clusterIdentity != fragmentIdentity {
+          flushFragment()
+          fragmentIdentity = clusterIdentity
+          fragmentStartX = clusterIdentity == nil ? nil : x
+          fragmentWidth = clusterIdentity == nil ? 0 : clusterWidth
+        } else if clusterIdentity != nil {
+          fragmentWidth += clusterWidth
+        }
+
+        x += clusterWidth
+      }
+
+      flushFragment()
+    }
+  }
+
   private func appendScrollIndicatorSemantics(
     for node: PlacedNode,
     scopePath: [Identity],
@@ -349,5 +476,20 @@ extension SemanticExtractor {
       return rect
     }
     return rect.intersection(clipRect)
+  }
+
+  private func union(
+    _ lhs: Rect,
+    _ rhs: Rect
+  ) -> Rect {
+    let minX = min(lhs.origin.x, rhs.origin.x)
+    let minY = min(lhs.origin.y, rhs.origin.y)
+    let maxX = max(lhs.maxX, rhs.maxX)
+    let maxY = max(lhs.maxY, rhs.maxY)
+
+    return Rect(
+      origin: .init(x: minX, y: minY),
+      size: .init(width: maxX - minX, height: maxY - minY)
+    )
   }
 }

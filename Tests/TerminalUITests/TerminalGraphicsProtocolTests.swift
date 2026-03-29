@@ -12,7 +12,8 @@ import Testing
 
 @Suite
 struct TerminalGraphicsProtocolTests {
-  @Test("terminal host emits Kitty direct RGBA payloads when Kitty graphics are available", .disabled())
+  @Test(
+    "terminal host emits Kitty direct RGBA payloads when Kitty graphics are available", .disabled())
   func terminalHostEmitsKittyPayloads() throws {
     let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
     let controller = GraphicsProtocolMockTerminalController(
@@ -161,7 +162,6 @@ struct TerminalGraphicsProtocolTests {
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
       readResponses: [
-        [],
         Array("\u{001B}[?4;1c".utf8),
         Array("\u{001B}[?1;0;16S".utf8),
         Array("\u{001B}[?2;0;640;480S".utf8),
@@ -312,14 +312,14 @@ struct TerminalGraphicsProtocolTests {
     )
   }
 
-  @Test("Kitty protocol clears background colors in image area cells")
-  func kittyProtocolClearsBackgroundColorsInImageArea() throws {
-    let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
+  @Test("graphics protocols clear background colors in image area cells")
+  func graphicsProtocolsClearBackgroundColorsInImageArea() throws {
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
       readResponses: [
-        Array("\u{001B}_Gi=\(kittyQueryID);OK\u{001B}\\".utf8),
-        [],
+        Array("\u{001B}[?4;1c".utf8),
+        Array("\u{001B}[?1;0;16S".utf8),
+        Array("\u{001B}[?2;0;640;480S".utf8),
       ],
       cellPixelSize: .init(width: 8, height: 16)
     )
@@ -373,9 +373,9 @@ struct TerminalGraphicsProtocolTests {
 
     _ = try host.present(surface)
 
-    // Kitty image commands should be emitted
+    // A graphics-protocol image command should be emitted.
     #expect(
-      controller.writes.contains { $0.contains("_Ga=T") }
+      controller.writes.contains { $0.contains("\u{001B}P0;1;0q") }
     )
 
     // Text writes for cells OUTSIDE the image bounds should contain

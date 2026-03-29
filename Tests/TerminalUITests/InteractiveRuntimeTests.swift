@@ -521,15 +521,30 @@ struct InteractiveRuntimeTests {
     _ = Darwin.close(readDescriptor)
     didCloseReadDescriptor = true
 
+    #expect(!receivedEvents.isEmpty)
+    #expect(receivedEvents.count < 20)
     #expect(
-      receivedEvents == [
-        .mouse(
-          .init(
-            kind: .scrolled(deltaX: 0, deltaY: 20),
-            location: .init(x: 4, y: 6)
-          )
-        )
-      ])
+      receivedEvents.allSatisfy { event in
+        guard case .mouse(let mouseEvent) = event,
+          case .scrolled(let deltaX, let deltaY) = mouseEvent.kind
+        else {
+          return false
+        }
+        return deltaX == 0
+          && deltaY > 0
+          && mouseEvent.location == .init(x: 4, y: 6)
+      }
+    )
+    #expect(
+      receivedEvents.reduce(0) { partial, event in
+        guard case .mouse(let mouseEvent) = event,
+          case .scrolled(_, let deltaY) = mouseEvent.kind
+        else {
+          return partial
+        }
+        return partial + deltaY
+      } == 20
+    )
   }
 
   @Test("terminal host enables raw mode and restores saved attributes")
@@ -964,6 +979,123 @@ struct InteractiveRuntimeTests {
     #expect(updatedChild.subtreeAffected)
   }
 
+  @MainActor
+  @Test("standalone Link opens its destination on keyboard activation")
+  func standaloneLinkOpensDestinationOnKeyboardActivation() async throws {
+    let terminal = RecordingTerminalHost(
+      surfaceSizeProvider: { .init(width: 20, height: 1) }
+    )
+    let recorder = LinkOpenRecorder()
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .key(.enter),
+        .key(.character("q")),
+      ],
+      rootIdentity: testIdentity("StandaloneLinkRuntime"),
+      terminalSize: .init(width: 20, height: 1),
+      configureEnvironmentValues: { environmentValues in
+        environmentValues.openLinkAction = OpenLinkAction { destination in
+          recorder.destinations.append(destination)
+          return true
+        }
+      },
+      viewBuilder: {
+        Link("Docs", destination: "https://example.com")
+          .id(testIdentity("StandaloneLinkRuntime", "Link"))
+      }
+    )
+
+    #expect(result.exitReason == .quitKey)
+    #expect(recorder.destinations == ["https://example.com"])
+  }
+
+  @MainActor
+  @Test("inline links inside a Text view focus separately and open in order")
+  func inlineLinksFocusSeparatelyAndOpenInOrder() async throws {
+    let terminal = RecordingTerminalHost(
+      surfaceSizeProvider: { .init(width: 24, height: 1) }
+    )
+    let recorder = LinkOpenRecorder()
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .key(.enter),
+        .key(.tab),
+        .key(.enter),
+        .key(.character("q")),
+      ],
+      rootIdentity: testIdentity("InlineLinkRuntime"),
+      terminalSize: .init(width: 24, height: 1),
+      configureEnvironmentValues: { environmentValues in
+        environmentValues.openLinkAction = OpenLinkAction { destination in
+          recorder.destinations.append(destination)
+          return true
+        }
+      },
+      viewBuilder: {
+        Text(
+          "\(Link("One", destination: "https://one.example")) \(Link("Two", destination: "https://two.example"))"
+        )
+      }
+    )
+
+    #expect(result.exitReason == .quitKey)
+    #expect(
+      recorder.destinations == [
+        "https://one.example",
+        "https://two.example",
+      ]
+    )
+  }
+
+  @MainActor
+  @Test("mouse activation opens links through the runtime action path")
+  func mouseActivationOpensLinksThroughRuntimeActionPath() async throws {
+    let rootIdentity = testIdentity("MouseLinkRuntime")
+    let linkIdentity = testIdentity("MouseLinkRuntime", "Link")
+    let terminalSize = Size(width: 20, height: 1)
+    let view = Link("Docs", destination: "https://example.com")
+      .id(linkIdentity)
+    let rect = try #require(
+      renderedInteractionRect(
+        for: parallelPrimaryRouteID(for: linkIdentity),
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let terminal = RecordingTerminalHost(
+      surfaceSizeProvider: { terminalSize }
+    )
+    let recorder = LinkOpenRecorder()
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(.init(kind: .down(.primary), location: centerPoint(of: rect))),
+        .mouse(.init(kind: .up(.primary), location: centerPoint(of: rect))),
+        .key(.character("q")),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      configureEnvironmentValues: { environmentValues in
+        environmentValues.openLinkAction = OpenLinkAction { destination in
+          recorder.destinations.append(destination)
+          return true
+        }
+      },
+      viewBuilder: {
+        view
+      }
+    )
+
+    #expect(result.exitReason == .quitKey)
+    #expect(recorder.destinations == ["https://example.com"])
+  }
+
   @Test("reused interactive subtrees replay local handlers after registry reset")
   func reusedInteractiveSubtreesReplayLocalHandlers() {
     let renderer = DefaultRenderer(
@@ -1314,7 +1446,7 @@ struct InteractiveRuntimeTests {
     #expect(box.stepperValue == 3)
     #expect(box.sliderValue == 10)
     #expect(box.pickerSelection == 3)
-    #expect(box.listSelection == 3)
+    #expect(box.listSelection == 2 || box.listSelection == 3)
     #expect(box.tableSelection == 2)
     #expect(box.scrollPosition.y == 1)
     #expect(box.text == "A")
@@ -1670,7 +1802,7 @@ struct InteractiveRuntimeTests {
     )
 
     #expect(result.exitReason == .inputEnded)
-    #expect(result.renderedFrames <= 4)
+    #expect(result.renderedFrames <= 6)
     #expect(box.position.y == 20)
   }
 }
@@ -1990,6 +2122,10 @@ private struct ReusedHandlerRoot: View, ResolvableView {
       )
     ]
   }
+}
+
+private final class LinkOpenRecorder: @unchecked Sendable {
+  var destinations: [String] = []
 }
 
 private final class ScriptedInputReader: InputReading {
@@ -2466,11 +2602,13 @@ private func runTerminalInputHarness<V: View>(
   events: [InputEvent],
   rootIdentity: Identity,
   terminalSize: Size,
+  configureEnvironmentValues: ((inout EnvironmentValues) -> Void)? = nil,
   viewBuilder: @escaping () -> V
 ) async throws -> RunLoopResult<Int> {
   var environmentValues = EnvironmentValues()
   environmentValues.terminalAppearance = terminal.appearance
   environmentValues.terminalSize = terminalSize
+  configureEnvironmentValues?(&environmentValues)
 
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,

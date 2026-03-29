@@ -19,6 +19,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
   public var glyphLevel: GlyphLevel
   public var colorLevel: ColorLevel
   public var emitsStyleEscapeSequences: Bool
+  public var supportsHyperlinks: Bool
   public var supportsMouseReporting: Bool
 
   /// Creates a terminal capability profile explicitly.
@@ -26,11 +27,13 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     glyphLevel: GlyphLevel,
     colorLevel: ColorLevel,
     emitsStyleEscapeSequences: Bool,
+    supportsHyperlinks: Bool = false,
     supportsMouseReporting: Bool = false
   ) {
     self.glyphLevel = glyphLevel
     self.colorLevel = colorLevel
     self.emitsStyleEscapeSequences = emitsStyleEscapeSequences
+    self.supportsHyperlinks = supportsHyperlinks
     self.supportsMouseReporting = supportsMouseReporting
   }
 
@@ -38,6 +41,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     glyphLevel: .unicode,
     colorLevel: .none,
     emitsStyleEscapeSequences: false,
+    supportsHyperlinks: false,
     supportsMouseReporting: false
   )
 
@@ -45,6 +49,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     glyphLevel: .ascii,
     colorLevel: .none,
     emitsStyleEscapeSequences: false,
+    supportsHyperlinks: false,
     supportsMouseReporting: false
   )
 
@@ -52,6 +57,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     glyphLevel: .unicode,
     colorLevel: .ansi16,
     emitsStyleEscapeSequences: true,
+    supportsHyperlinks: true,
     supportsMouseReporting: true
   )
 
@@ -59,6 +65,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     glyphLevel: .unicode,
     colorLevel: .ansi256,
     emitsStyleEscapeSequences: true,
+    supportsHyperlinks: true,
     supportsMouseReporting: true
   )
 
@@ -66,6 +73,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     glyphLevel: .unicode,
     colorLevel: .trueColor,
     emitsStyleEscapeSequences: true,
+    supportsHyperlinks: true,
     supportsMouseReporting: true
   )
 
@@ -96,6 +104,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
         glyphLevel: glyphLevel,
         colorLevel: .none,
         emitsStyleEscapeSequences: false,
+        supportsHyperlinks: false,
         supportsMouseReporting: false
       )
     }
@@ -115,11 +124,24 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
       glyphLevel: glyphLevel,
       colorLevel: colorLevel,
       emitsStyleEscapeSequences: colorLevel != .none,
+      supportsHyperlinks: supportsHyperlinks(term: term),
       supportsMouseReporting: supportsMouseReporting(term: term)
     )
   }
 
+  private static func supportsHyperlinks(
+    term: String
+  ) -> Bool {
+    supportsRichTerminalFeatures(term: term)
+  }
+
   private static func supportsMouseReporting(
+    term: String
+  ) -> Bool {
+    supportsRichTerminalFeatures(term: term)
+  }
+
+  private static func supportsRichTerminalFeatures(
     term: String
   ) -> Bool {
     guard !term.isEmpty, term != "dumb" else {
@@ -375,6 +397,7 @@ extension TerminalSurfaceRenderer {
 
     var result = ""
     var activeStyle: ResolvedTextStyle?
+    var activeHyperlink: String?
     var renderedWidth = 0
 
     for index in start..<max(start, end) {
@@ -383,6 +406,17 @@ extension TerminalSurfaceRenderer {
         continue
       }
       let style = cell.style
+      let hyperlink = cell.hyperlink
+
+      if hyperlink != activeHyperlink {
+        if activeHyperlink != nil, capabilityProfile.supportsHyperlinks {
+          result += closeHyperlinkSequence()
+        }
+        if let hyperlink, capabilityProfile.supportsHyperlinks {
+          result += openHyperlinkSequence(for: hyperlink)
+        }
+        activeHyperlink = hyperlink
+      }
 
       if style != activeStyle {
         if activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
@@ -401,6 +435,9 @@ extension TerminalSurfaceRenderer {
       renderedWidth += max(1, cell.spanWidth)
     }
 
+    if activeHyperlink != nil, capabilityProfile.supportsHyperlinks {
+      result += closeHyperlinkSequence()
+    }
     if activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
       result += escapeSequence(forCodes: [0])
     }
@@ -731,6 +768,16 @@ extension TerminalSurfaceRenderer {
     forCodeStrings codes: [String]
   ) -> String {
     "\u{001B}[\(codes.joined(separator: ";"))m"
+  }
+
+  private func openHyperlinkSequence(
+    for destination: String
+  ) -> String {
+    "\u{001B}]8;;\(destination)\u{001B}\\"
+  }
+
+  private func closeHyperlinkSequence() -> String {
+    "\u{001B}]8;;\u{001B}\\"
   }
 
   private func backgroundCode(

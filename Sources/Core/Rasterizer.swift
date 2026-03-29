@@ -155,6 +155,62 @@ extension Rasterizer {
           }
         }
       }
+    case .richText(
+      let bounds,
+      let payload,
+      let lineLimit,
+      let truncationMode,
+      let wrappingStrategy
+    ):
+      guard bounds.size.height > 0, bounds.size.width > 0 else {
+        return
+      }
+
+      let layout = parallelRichTextLayout(
+        for: payload,
+        options: .init(
+          width: bounds.size.width,
+          lineLimit: lineLimit,
+          truncationMode: truncationMode,
+          wrappingStrategy: wrappingStrategy
+        )
+      )
+
+      for (lineIndex, line) in layout.lines.prefix(bounds.size.height).enumerated() {
+        var x = bounds.origin.x
+        for cluster in line.clusters {
+          guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
+            break
+          }
+
+          let run = cluster.runIndex.flatMap { runIndex in
+            payload.runs.indices.contains(runIndex) ? payload.runs[runIndex] : nil
+          }
+          let resolvedStyle = resolveTextStyle(
+            run?.style ?? .init(),
+            environment: environment,
+            bounds: bounds,
+            sampleX: x,
+            sampleY: bounds.origin.y + lineIndex,
+            width: cluster.cellWidth
+          )
+
+          write(
+            cluster.character,
+            width: cluster.cellWidth,
+            style: resolvedStyle.isDefault ? nil : resolvedStyle,
+            hyperlink: run?.destination,
+            atX: x,
+            y: bounds.origin.y + lineIndex,
+            cells: &cells,
+            clip: clip
+          )
+          x += cluster.cellWidth
+          if x >= bounds.origin.x + bounds.size.width {
+            break
+          }
+        }
+      }
     case .image(let bounds, let identity, let payload):
       imageAttachments.append(
         RasterImageAttachment(
@@ -1085,6 +1141,7 @@ extension Rasterizer {
     _ character: Character,
     width: Int = 1,
     style: ResolvedTextStyle? = nil,
+    hyperlink: String? = nil,
     atX x: Int,
     y: Int,
     cells: inout [[RasterCell]],
@@ -1130,7 +1187,8 @@ extension Rasterizer {
     cells[y][x] = RasterCell(
       character: character,
       spanWidth: glyphWidth,
-      style: finalStyle
+      style: finalStyle,
+      hyperlink: hyperlink
     )
 
     guard glyphWidth > 1 else {
@@ -1146,7 +1204,8 @@ extension Rasterizer {
         character: " ",
         spanWidth: 0,
         continuationLeadX: x,
-        style: finalStyle
+        style: finalStyle,
+        hyperlink: hyperlink
       )
     }
   }

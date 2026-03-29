@@ -132,6 +132,12 @@ extension DrawPayload {
       return true
     case (.text(let lhsText), .text(let rhsText)):
       return lhsText == rhsText
+    case (.text(let lhsText), .richText(let rhsPayload)):
+      return lhsText == rhsPayload.visibleText
+    case (.richText(let lhsPayload), .text(let rhsText)):
+      return lhsPayload.visibleText == rhsText
+    case (.richText(let lhsPayload), .richText(let rhsPayload)):
+      return lhsPayload.visibleText == rhsPayload.visibleText
     case (.image(let lhsPayload), .image(let rhsPayload)):
       return lhsPayload.isEquivalentForMeasurement(to: rhsPayload)
     case (.shape, .shape):

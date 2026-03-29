@@ -29,6 +29,65 @@ private struct TypedEnvironmentValueBox<Value: Sendable>: EnvironmentValueBox {
   }
 }
 
+/// A semantic action that attempts to open a link destination.
+public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
+  package let snapshotLabel: String
+  package let isPlaceholder: Bool
+  private let handler: @Sendable (String) -> Bool
+
+  public init(
+    _ handler: @escaping @Sendable (String) -> Bool
+  ) {
+    snapshotLabel = "OpenLinkAction.custom"
+    isPlaceholder = false
+    self.handler = handler
+  }
+
+  public init(
+    action handler: @escaping @Sendable (String) -> Void
+  ) {
+    self.init { destination in
+      handler(destination)
+      return true
+    }
+  }
+
+  @discardableResult
+  public func callAsFunction(
+    _ destination: String
+  ) -> Bool {
+    handler(destination)
+  }
+
+  public var description: String {
+    snapshotLabel
+  }
+
+  public var debugDescription: String {
+    snapshotLabel
+  }
+
+  package init(
+    snapshotLabel: String,
+    isPlaceholder: Bool,
+    handler: @escaping @Sendable (String) -> Bool
+  ) {
+    self.snapshotLabel = snapshotLabel
+    self.isPlaceholder = isPlaceholder
+    self.handler = handler
+  }
+
+  package static let placeholder = Self(
+    snapshotLabel: "OpenLinkAction.default",
+    isPlaceholder: true,
+    handler: { _ in false }
+  )
+}
+
+private enum OpenLinkActionKey: EnvironmentKey {
+  static let defaultValue = OpenLinkAction.placeholder
+}
+
 /// The inherited environment available while resolving a view subtree.
 public struct EnvironmentValues: Equatable, Sendable {
   private var storage: [ObjectIdentifier: any EnvironmentValueBox]
@@ -301,6 +360,13 @@ extension ResolveContext {
   }
 }
 
+extension EnvironmentValues {
+  public var openLinkAction: OpenLinkAction {
+    get { self[OpenLinkActionKey.self] }
+    set { self[OpenLinkActionKey.self] = newValue }
+  }
+}
+
 extension ResolveContext {
   public static func == (
     lhs: ResolveContext,
@@ -403,7 +469,7 @@ package final class ResolveReuseSession: @unchecked Sendable {
         previousFrame.resolvedTreeIndex.contains(
           invalidatedIdentity,
           inSubtreeOf: subtreeIdentity
-        )
+        ) || invalidatedIdentity.isDescendant(of: subtreeIdentity)
       }
     }
 

@@ -1,6 +1,6 @@
 # Public API Inventory
 
-Last updated: March 28, 2026
+Last updated: March 29, 2026
 
 This page is the post-migration reference for the public surface of the package. It separates the canonical SwiftUI-shaped API from package-only seams that still exist in the codebase.
 
@@ -16,12 +16,12 @@ This page is the post-migration reference for the public surface of the package.
 
 The canonical authoring surface is the SwiftUI-shaped one:
 
-- `View`, `ViewBuilder`, `AnyView`, `TupleView`, `ConditionalContent`, `VariadicView`, `EmptyView`, `Text`, `Image`, `Spacer`, `Divider`, `Group`
-- text layout enums exposed through `Text`, including `Text.TruncationMode` and `Text.WrappingStrategy`
+- `View`, `ViewBuilder`, `AnyView`, `TupleView`, `ConditionalContent`, `VariadicView`, `EmptyView`, `Text`, `Link`, `Image`, `Spacer`, `Divider`, `Group`
+- text layout enums and interpolation support exposed through `Text`, including `Text.TruncationMode`, `Text.WrappingStrategy`, and rich interpolation of embedded `Text` and `Link` segments
 - `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `GeometryReader`
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`
-- `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `FocusInteractions`
+- `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `FocusInteractions`, `OpenLinkAction`
 - image-source environment configuration such as `EnvironmentValues.imageResourceRoots`
 - `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, repo-owned `@Bindable`, `@SceneBuilder`, `@main`
 - canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.background(...)`, `.overlay(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`

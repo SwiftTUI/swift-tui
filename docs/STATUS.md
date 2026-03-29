@@ -1,6 +1,6 @@
 # Status
 
-Last updated: March 28, 2026
+Last updated: March 29, 2026
 
 ## Product Status
 
@@ -18,15 +18,15 @@ The package is already usable for real terminal interfaces. The main gaps are no
 
 - SwiftUI-shaped `View` authoring with body-only `View`, `@ViewBuilder`, `TupleView`, `ConditionalContent`, `AnyView`, and `Resolver`
 - Layout and containers including `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `ViewThatFits`, `GeometryReader`, and custom `Layout`
-- Controls and primitives including `Text`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `Spacer`, `Divider`, and shapes
+- Controls and primitives including `Text`, rich `Text` interpolation, `Link`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `Spacer`, `Divider`, and shapes
 - PNG-backed `Image` with named-resource, local-file-URL, and embedded-byte sources plus `.resizable()`, `.scaledToFit()`, and `.scaledToFill()`
-- Environment, observation, and focus including `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`, `@FocusedValue`, `@FocusedBinding`, and default-focus modifiers
+- Environment, observation, and focus including `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`, `@FocusedValue`, `@FocusedBinding`, `OpenLinkAction`, and default-focus modifiers
 
 ### Runtime surface
 
 - `DefaultRenderer` for one-shot rendering and pipeline inspection
 - `RunLoop` for interactive terminal sessions
-- `TerminalHost`, terminal appearance detection, graphics-capability probing, and capability-aware presentation
+- `TerminalHost`, terminal appearance detection, graphics-capability probing, capability-aware presentation, and OSC 8 hyperlink emission when supported
 - Keyboard parsing, mouse input parsing, Unix signal handling, and runtime scheduling
 - Identity-driven lifecycle diffs with post-present appear, disappear, task start, and task cancel staging
 - Kitty and Sixel image presentation with ANSI or ASCII fallback compositing when graphics protocols are unavailable

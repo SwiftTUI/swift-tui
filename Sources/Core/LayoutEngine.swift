@@ -362,6 +362,12 @@ public struct LayoutEngine {
           metadata: resolved.layoutMetadata,
           proposal: proposal
         )
+      case .richText(let payload):
+        return measuredTextSize(
+          for: payload.visibleText,
+          metadata: resolved.layoutMetadata,
+          proposal: proposal
+        )
       case .image(let payload):
         return measuredImageSize(
           for: payload,

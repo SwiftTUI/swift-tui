@@ -2,10 +2,16 @@
 public struct TextCluster: Equatable, Sendable {
   public var character: Character
   public var cellWidth: Int
+  package var runIndex: Int?
 
-  public init(character: Character, cellWidth: Int) {
+  public init(
+    character: Character,
+    cellWidth: Int,
+    runIndex: Int? = nil
+  ) {
     self.character = character
     self.cellWidth = max(0, cellWidth)
+    self.runIndex = runIndex
   }
 }
 
@@ -233,16 +239,30 @@ public func parallelTextLayout(
   )
 }
 
+package func parallelRichTextLayout(
+  for payload: RichTextPayload,
+  options: TextLayoutOptions
+) -> TextLayoutResult {
+  uncachedTextLayout(
+    sourceLines: explicitClusterLines(for: payload),
+    options: options
+  )
+}
+
 private func uncachedTextLayout(
   for content: String,
   options: TextLayoutOptions
 ) -> TextLayoutResult {
-  let explicitLines =
-    content
-    .split(separator: "\n", omittingEmptySubsequences: false)
-    .map(String.init)
-  let sourceLines = explicitLines.isEmpty ? [""] : explicitLines
+  uncachedTextLayout(
+    sourceLines: explicitClusterLines(for: content),
+    options: options
+  )
+}
 
+private func uncachedTextLayout(
+  sourceLines: [[TextCluster]],
+  options: TextLayoutOptions
+) -> TextLayoutResult {
   let wrappedLines = sourceLines.flatMap { line in
     wrapTextLine(
       line,
@@ -273,31 +293,70 @@ private func uncachedTextLayout(
 }
 
 private func wrapTextLine(
-  _ line: String,
+  _ line: [TextCluster],
   width: Int?,
   wrappingStrategy: TextWrappingStrategy
 ) -> [TextLayoutLine] {
-  let clusters = textClusters(in: line)
-
   guard let width else {
-    return [TextLayoutLine(clusters: clusters)]
+    return [TextLayoutLine(clusters: line)]
   }
 
   guard width > 0 else {
     return [.init()]
   }
 
-  guard !clusters.isEmpty else {
+  guard !line.isEmpty else {
     return [.init()]
   }
 
   switch wrappingStrategy {
   case .wordBoundary:
     return wrapTextLineOnWordBoundaries(
-      clusters,
+      line,
       width: width
     )
   }
+}
+
+private func explicitClusterLines(
+  for content: String
+) -> [[TextCluster]] {
+  explicitClusterLines(
+    from: [
+      RichTextRun(text: content)
+    ]
+  )
+}
+
+private func explicitClusterLines(
+  for payload: RichTextPayload
+) -> [[TextCluster]] {
+  explicitClusterLines(from: payload.runs)
+}
+
+private func explicitClusterLines(
+  from runs: [RichTextRun]
+) -> [[TextCluster]] {
+  var lines: [[TextCluster]] = [[]]
+
+  for (runIndex, run) in runs.enumerated() {
+    for character in run.text {
+      if character == "\n" {
+        lines.append([])
+        continue
+      }
+
+      lines[lines.count - 1].append(
+        TextCluster(
+          character: character,
+          cellWidth: cellWidth(of: character),
+          runIndex: runIndex
+        )
+      )
+    }
+  }
+
+  return lines.isEmpty ? [[]] : lines
 }
 
 private struct TextWrapRun: Sendable {
@@ -674,11 +733,15 @@ private func fittingTrailingClusters(
   return result.reversed()
 }
 
-private func textClusters(in line: String) -> [TextCluster] {
+private func textClusters(
+  in line: String,
+  runIndex: Int? = nil
+) -> [TextCluster] {
   line.map { character in
     TextCluster(
       character: character,
-      cellWidth: cellWidth(of: character)
+      cellWidth: cellWidth(of: character),
+      runIndex: runIndex
     )
   }
 }

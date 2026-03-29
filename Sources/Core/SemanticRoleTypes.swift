@@ -38,6 +38,7 @@ public enum SectionRole: Hashable, Sendable, CustomStringConvertible {
 public enum PresentationRole: Hashable, Sendable, CustomStringConvertible {
   case button
   case disclosureGroup
+  case link
   case list
   case menu
   case picker
@@ -57,6 +58,8 @@ public enum PresentationRole: Hashable, Sendable, CustomStringConvertible {
       "button"
     case .disclosureGroup:
       "disclosureGroup"
+    case .link:
+      "link"
     case .list:
       "list"
     case .menu:
