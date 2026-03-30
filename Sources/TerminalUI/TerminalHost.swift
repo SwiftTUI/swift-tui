@@ -17,7 +17,7 @@ import Synchronization
     _ buffer: UnsafeRawPointer?,
     _ count: Int
   ) -> Int {
-    Darwin.write(fileDescriptor, buffer, count)
+    unsafe Darwin.write(fileDescriptor, buffer, count)
   }
 
   private func platformRead(
@@ -25,7 +25,7 @@ import Synchronization
     _ buffer: UnsafeMutableRawPointer?,
     _ count: Int
   ) -> Int {
-    Darwin.read(fileDescriptor, buffer, count)
+    unsafe Darwin.read(fileDescriptor, buffer, count)
   }
 
   private func platformPoll(
@@ -33,7 +33,7 @@ import Synchronization
     _ count: nfds_t,
     _ timeoutMilliseconds: Int32
   ) -> Int32 {
-    Darwin.poll(descriptors, count, timeoutMilliseconds)
+    unsafe Darwin.poll(descriptors, count, timeoutMilliseconds)
   }
 #elseif canImport(Glibc)
   private func platformWrite(

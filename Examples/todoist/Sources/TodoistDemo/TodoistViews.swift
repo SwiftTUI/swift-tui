@@ -144,7 +144,13 @@ struct TodoistDemoRootView: View {
         )
       Divider()
       tasksPane
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(
+          minWidth: .finite(36),
+          maxWidth: .infinity,
+          maxHeight: .infinity,
+          alignment: .topLeading
+        )
+        .layoutPriority(1)
       Divider()
       inspectorPane
         .frame(
@@ -173,20 +179,25 @@ struct TodoistDemoRootView: View {
       .padding(.init(horizontal: 1, vertical: 0))
       Divider()
 
-      List(selection: $model.selectedProject) {
-        projectRow(
-          title: "All Tasks",
-          detail: "\(model.taskCount(for: .all)) active",
-          tag: .all
-        )
-
-        ForEach(model.projects) { project in
+      ScrollView(.vertical) {
+        VStack(alignment: .leading, spacing: 0) {
           projectRow(
-            title: project.name,
-            detail: "\(model.taskCount(for: .project(project.id))) active",
-            tag: .project(project.id)
+            title: "All Tasks",
+            detail: "\(model.taskCount(for: .all)) active",
+            selection: .all
           )
+
+          ForEach(model.projects) { project in
+            projectRow(
+              title: project.name,
+              detail: "\(model.taskCount(for: .project(project.id))) active",
+              selection: .project(project.id)
+            )
+          }
+
+          Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -195,17 +206,28 @@ struct TodoistDemoRootView: View {
   private func projectRow(
     title: String,
     detail: String,
-    tag: ProjectSelection
+    selection: ProjectSelection
   ) -> some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Text(title)
-        .bold()
-      Text(detail)
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .foregroundStyle(.separator)
+    Button {
+      model.selectedProject = selection
+    } label: {
+      VStack(alignment: .leading, spacing: 0) {
+        Text(title)
+          .bold()
+        Text(detail)
+          .lineLimit(1)
+          .truncationMode(.tail)
+          .foregroundStyle(.separator)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.init(horizontal: 1, vertical: 0))
+      .background {
+        if model.selectedProject == selection {
+          Rectangle().fill(.terminalRow(.accent, isSelected: true))
+        }
+      }
     }
-    .tag(tag)
+    .buttonStyle(.plain)
   }
 
   private var tasksPane: some View {
@@ -243,22 +265,12 @@ struct TodoistDemoRootView: View {
             .foregroundStyle(.separator)
         }
         .padding(1)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+        Spacer(minLength: 0)
       } else {
-        List(selection: $model.selectedTaskID) {
-          ForEach(model.visibleTasks) { task in
-            VStack(alignment: .leading, spacing: 0) {
-              Text(task.titleText)
-                .bold()
-              Text(task.detailText)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .foregroundStyle(.separator)
-            }
-            .tag(task.id)
-          }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        taskContentRegion
+          .layoutPriority(1)
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
 
       Divider()
@@ -276,6 +288,23 @@ struct TodoistDemoRootView: View {
       }
       .padding(.init(horizontal: 1, vertical: 0))
     }
+  }
+
+  private var taskContentRegion: some View {
+    List(selection: $model.selectedTaskID) {
+      ForEach(model.visibleTasks) { task in
+        VStack(alignment: .leading, spacing: 0) {
+          Text(task.titleText)
+            .bold()
+          Text(task.detailText)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .foregroundStyle(.separator)
+        }
+        .tag(task.id)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private var inspectorPane: some View {
@@ -397,12 +426,13 @@ private struct DemoHelpStrip: View {
           }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .fixedSize(horizontal: true, vertical: false)
     }
     .frame(
       maxWidth: .infinity,
       minHeight: .finite(1),
       idealHeight: .finite(1),
+      maxHeight: .finite(1),
       alignment: .leading
     )
   }

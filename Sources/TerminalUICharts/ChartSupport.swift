@@ -2,14 +2,14 @@ import Core
 import View
 
 @MainActor
+@ViewBuilder
 func timelineEntryView(
   _ entry: TimelineEntry,
   isLast: Bool
-) -> AnyView {
+) -> some View {
   let accentStyle = metricAccentStyle(for: entry.tone)
 
   if let detail = entry.detail {
-    return AnyView(
       HStack(alignment: .top, spacing: 1) {
         VStack(alignment: .leading, spacing: 0) {
           Text(isLast ? "╰" : "├")
@@ -25,36 +25,32 @@ func timelineEntryView(
             .lineLimit(1)
         }
       }
-    )
-  }
-
-  return AnyView(
+  } else {
     HStack(alignment: .top, spacing: 1) {
       Text(isLast ? "╰" : "├")
         .foregroundStyle(accentStyle)
       Text(entry.title)
         .lineLimit(1)
     }
-  )
+  }
 }
 
 @MainActor
+@ViewBuilder
 func legendItemView(
   _ item: LegendItem
-) -> AnyView {
+) -> some View {
   let accentStyle =
     item.tone == .automatic
     ? AnyShapeStyle(.tint)
     : metricAccentStyle(for: item.tone)
 
-  return AnyView(
     HStack(alignment: .center, spacing: 1) {
       Text("■")
         .foregroundStyle(accentStyle)
       Text(item.label)
         .foregroundStyle(.foreground)
     }
-  )
 }
 
 func bulletChartSummaryText(

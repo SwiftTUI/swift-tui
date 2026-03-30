@@ -1,0 +1,13 @@
+rasterizer
+sixel
+preconcurrency
+WASILibc
+COLORTERM
+LC_CTYPE
+nfds_t
+pollfd
+termios
+errno
+isatty
+TCSAFLUSH
+winsize

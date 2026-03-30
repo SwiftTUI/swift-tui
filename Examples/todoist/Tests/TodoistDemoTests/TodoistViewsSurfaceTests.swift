@@ -79,6 +79,31 @@ struct TodoistViewsSurfaceTests {
     #expect(surface.contains("Close Selected"))
   }
 
+  @Test("Todoist workspace keeps empty-state panes readable on a terminal-sized surface")
+  func workspaceKeepsEmptyStateReadable() throws {
+    let launcher = try TodoistDemoLauncher()
+    let model = sampleModel()
+    model.projects = []
+    model.tasks = []
+    model.selectedProject = .all
+    model.selectedTaskID = ""
+    model.statusMessage = "Ready to sync Todoist."
+    launcher.model = model
+
+    let surface = renderText(
+      TodoistDemoSceneView(launcher: launcher)
+        .preferredColorScheme(.dark),
+      width: 121,
+      height: 24
+    )
+
+    #expect(surface.contains("Projects"))
+    #expect(surface.contains("Inspector"))
+    #expect(surface.contains("No tasks match the current filter."))
+    #expect(surface.contains("No task selected"))
+    #expect(surface.contains("move focus"))
+  }
+
   @Test("Filled and plain controls render different default chrome")
   func filledControlsRenderDifferentChrome() {
     let plainText = renderText(
