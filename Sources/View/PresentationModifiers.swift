@@ -171,14 +171,12 @@ private struct TerminalPresentationSurface: View {
         Text(title)
           .bold()
         Spacer(minLength: 0)
-        Button("×", action: dismiss)
+        Button("×", role: .close, action: dismiss)
           .buttonStyle(.borderedProminent)
       }
       .frame(height: 1, alignment: .leading)
       .padding(.init(horizontal: 1, vertical: 0))
       .background(.terminalRow(kind == .alert ? .neutral : .accent, isSelected: true))
-
-      Divider()
 
       ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
@@ -187,20 +185,17 @@ private struct TerminalPresentationSurface: View {
               combinedView(from: messageViews, kindName: "PresentationMessage")
             }
             .padding(.init(horizontal: 1, vertical: 1))
-
-            Divider()
           }
-
-          presentationActions
         }
       }
       .frame(
         maxWidth: .infinity,
-        minHeight: .finite(kind == .alert ? 4 : 3),
+        minHeight: .finite(kind == .alert ? 2 : 3),
         idealHeight: .finite(kind == .alert ? 6 : 4),
         maxHeight: .finite(kind == .alert ? 10 : 6),
         alignment: .topLeading
       )
+      presentationActions
     }
     .padding(.init(horizontal: 1, vertical: 1))
     .background {
@@ -225,14 +220,14 @@ private struct TerminalPresentationSurface: View {
   }
 
   private var presentationActions: some View {
-    VStack(alignment: .leading, spacing: 0) {
+    HStack(spacing: 1) {
       ForEach(actionViews.indices, id: \.self) { index in
         actionViews[index]
-          .fixedSize(horizontal: false, vertical: true)
-          .frame(maxWidth: .infinity, alignment: .leading)
+          .fixedSize()
       }
     }
-    .fixedSize(horizontal: false, vertical: true)
-    .padding(.init(horizontal: 1, vertical: 1))
+    .fixedSize()
+    .padding(.init(horizontal: 1, vertical: 0))
+
   }
 }

@@ -4145,6 +4145,31 @@ struct SwiftUISurfaceTests {
     #expect(surface.contains("Tail"))
   }
 
+  @Test("width-only flexible frames preserve intrinsic width in horizontal stacks")
+  func widthOnlyFlexibleFramesPreserveIntrinsicWidthInHorizontalStacks() {
+    let artifacts = DefaultRenderer().render(
+      HStack(alignment: .top, spacing: 1) {
+        Text("Nav")
+          .frame(width: 4, alignment: .leading)
+
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Latency")
+          Text("Errors")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      },
+      context: .init(identity: testIdentity("HorizontalFlexibleFrameRoot")),
+      proposal: .init(width: 24, height: nil)
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(artifacts.measuredTree.measuredSize == .init(width: 12, height: 2))
+    #expect(artifacts.measuredTree.childMeasurements[1].measuredSize.width == 7)
+    #expect(surface.contains("Latency"))
+    #expect(surface.contains("Errors"))
+  }
+
   @Test("Divider expands across the stack minor axis under finite proposals")
   func dividerExpandsAcrossMinorAxis() {
     let verticalArtifacts = DefaultRenderer().render(

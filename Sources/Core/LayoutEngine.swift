@@ -521,6 +521,14 @@ public struct LayoutEngine {
     min != nil || ideal != nil || max != nil
   }
 
+  private func hasFiniteFlexibleConstraint(
+    min: ProposedDimension?,
+    ideal: ProposedDimension?,
+    max: ProposedDimension?
+  ) -> Bool {
+    finiteValue(min) != nil || finiteValue(ideal) != nil || finiteValue(max) != nil
+  }
+
   private func flexibleFrameChildProposalDimension(
     proposal: ProposedDimension,
     min: ProposedDimension?,
@@ -528,6 +536,10 @@ public struct LayoutEngine {
     max: ProposedDimension?
   ) -> ProposedDimension {
     guard hasFlexibleConstraint(min: min, ideal: ideal, max: max) else {
+      return proposal
+    }
+
+    guard hasFiniteFlexibleConstraint(min: min, ideal: ideal, max: max) else {
       return proposal
     }
 
@@ -552,12 +564,32 @@ public struct LayoutEngine {
       return child
     }
 
-    return resolveFlexibleDimension(
-      proposal: proposal,
-      min: min,
-      ideal: ideal,
-      max: max
-    )
+    if hasFiniteFlexibleConstraint(min: min, ideal: ideal, max: max) {
+      switch proposal {
+      case .unspecified:
+        let minVal = finiteValue(min)
+        let idealVal = finiteValue(ideal)
+        let maxVal = finiteValue(max)
+        var result = idealVal ?? child
+        if let lo = minVal { result = Swift.max(lo, result) }
+        if let hi = maxVal { result = Swift.min(hi, result) }
+        return result
+      case .finite, .infinity:
+        return resolveFlexibleDimension(
+          proposal: proposal,
+          min: min,
+          ideal: ideal,
+          max: max
+        )
+      }
+    }
+
+    switch proposal {
+    case .finite(let value):
+      return value
+    case .unspecified, .infinity:
+      return child
+    }
   }
 
   private func resolveFlexibleDimension(

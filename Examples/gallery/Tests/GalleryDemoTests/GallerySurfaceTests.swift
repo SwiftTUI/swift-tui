@@ -89,6 +89,26 @@ struct GallerySurfaceTests {
     #expect(!surface.contains("Show Controls"))
   }
 
+  @Test("Gallery browser preview keeps the table metrics visible")
+  func galleryBrowserPreviewKeepsTableMetricsVisible() {
+    let model = GalleryDemoModel()
+    model.activeTab = "collections"
+    model.selectedCollectionDemo = "browser"
+
+    let artifacts = DefaultRenderer().render(
+      GalleryDemoSceneView(model: model)
+        .frame(width: 96, height: 28, alignment: .topLeading),
+      context: .init(identity: testIdentity("GalleryBrowserRoot"))
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(surface.contains("List + Table"))
+    #expect(surface.contains("Alpha"))
+    #expect(surface.contains("Metric"))
+    #expect(surface.contains("Latency"))
+    #expect(surface.contains("Errors"))
+  }
+
   @Test("Gallery palette preserves command details when filtered to one result")
   func galleryPalettePreservesCommandDetailsWhenFiltered() {
     let model = GalleryDemoModel()

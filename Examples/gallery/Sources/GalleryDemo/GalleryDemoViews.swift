@@ -58,15 +58,15 @@ struct GalleryDemoSceneView: View {
       "Reset gallery state?",
       isPresented: $isResetAlertPresented,
       actions: {
-        Button("Reset") {
+        Button("Reset", role: .destructive) {
           model.reset()
         }
-        Button("Cancel") {
+        Button("Cancel", role: .cancel) {
           isResetAlertPresented = false
         }
       },
       message: {
-        Text("This clears the interactive control and appearance samples.")
+        Text("Clears the interactive control and appearance samples?")
       }
     )
   }
@@ -185,7 +185,7 @@ struct GalleryDemoSceneView: View {
           Button("Primary") {
             model.increment()
           }
-          Button("Reset") {
+          Button("Reset", role: .destructive) {
             isResetAlertPresented = true
           }
           Button("Plain") {
