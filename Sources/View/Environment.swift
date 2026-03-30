@@ -583,6 +583,8 @@ package final class ResolveReuseSession: @unchecked Sendable {
     )
   }
 }
+// AnyView policy: retain deferred authored-content capture here so
+// EnvironmentReader closures keep their original dynamic-property scope.
 /// Reads an environment value and maps it into authored content.
 public struct EnvironmentReader<Value>: View, ResolvableView {
   private let keyPath: KeyPath<EnvironmentValues, Value>

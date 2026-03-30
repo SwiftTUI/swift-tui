@@ -1,6 +1,8 @@
 import Core
 import View
 
+// AnyView policy: retain heterogeneous child storage here for authored label
+// and summary content.
 /// A compact strip of heat-style cells for relative intensity data.
 public struct HeatStrip: View, ResolvableView {
   public var entries: [BarChartEntry]

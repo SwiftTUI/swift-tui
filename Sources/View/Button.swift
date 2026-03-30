@@ -1,5 +1,7 @@
 public import Core
 
+// AnyView policy: retain heterogeneous child storage here for authored labels
+// and local branch unification in button rendering.
 /// A focusable control that triggers an action when activated.
 public struct Button: View, ResolvableView {
   public var role: ButtonRole?

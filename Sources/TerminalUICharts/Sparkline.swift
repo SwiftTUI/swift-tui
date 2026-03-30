@@ -1,6 +1,8 @@
 import Core
 import View
 
+// AnyView policy: retain heterogeneous child storage here for authored label
+// and trailing content.
 /// A compact trend line rendered in terminal cells.
 public struct Sparkline: View, ResolvableView {
   public var tone: BannerTone

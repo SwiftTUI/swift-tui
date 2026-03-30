@@ -481,6 +481,8 @@ public struct ZStackLayout: Layout, BuiltinLayoutBehaviorProviding {
   }
 }
 
+// AnyView policy: retain typed builder plumbing here while layout containers
+// store heterogeneous authored children.
 private struct LayoutContainer: View, ResolvableView {
   var layout: AnyLayout
   var children: [AnyView]

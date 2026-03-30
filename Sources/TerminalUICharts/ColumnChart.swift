@@ -1,6 +1,8 @@
 import Core
 import View
 
+// AnyView policy: retain heterogeneous child storage here for authored label
+// and summary content.
 /// A vertical column chart for comparing labeled values.
 public struct ColumnChart: View, ResolvableView {
   public var entries: [BarChartEntry]

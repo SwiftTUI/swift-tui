@@ -1,5 +1,7 @@
 package import Core
 
+// AnyView policy: retain heterogeneous child storage here for authored label,
+// title, icon, and value content.
 /// Displays a title paired with an icon or glyph view.
 public struct Label: View, ResolvableView {
   private var titleViews: [AnyView]

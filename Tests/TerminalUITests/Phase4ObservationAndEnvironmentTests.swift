@@ -661,6 +661,45 @@ struct Phase4ObservationAndEnvironmentTests {
     #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 1") != nil)
   }
 
+  @Test("WindowGroup stored content preserves deferred authoring scope")
+  func windowGroupStoredContentPreservesDeferredAuthoringScope() throws {
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+    let scopeIdentity = testIdentity("WindowGroupAuthoring")
+    let scopeRecorder = Phase4ScopeRecorder()
+    let authoringScope = DynamicPropertyScope(
+      viewIdentity: scopeIdentity,
+      stateStore: nil,
+      environmentValues: EnvironmentValues(),
+      focusedValues: FocusedValues()
+    )
+
+    let scene = withDynamicPropertyScope(authoringScope) {
+      WindowGroup("Scoped Window") {
+        ForEach([0], id: \.self) { _ in
+          Button("Primary") {
+            scopeRecorder.identity = currentDynamicPropertyScope()?.viewIdentity
+          }
+          .id(testIdentity("WindowGroupForEachAction"))
+        }
+      }
+    }
+
+    let configuration = try primaryWindowSceneConfiguration(from: scene)
+    let artifacts = renderer.render(
+      configuration.makeRootView(),
+      context: .init(
+        identity: configuration.rootIdentity,
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(artifacts.resolvedTree.descendant(withText: "Primary") != nil)
+    #expect(actionRegistry.dispatch(identity: testIdentity("WindowGroupForEachAction")))
+    #expect(scopeRecorder.identity == scopeIdentity)
+  }
+
   @Test("Picker arrow-key handlers preserve the original state owner")
   func pickerArrowKeyHandlersPreserveTheOriginalStateOwner() throws {
     let invalidator = Phase4RecordingInvalidator()
@@ -1369,6 +1408,11 @@ private final class Phase4RecordingInvalidator: Invalidating {
   func clear() {
     requests.removeAll(keepingCapacity: true)
   }
+}
+
+@MainActor
+private final class Phase4ScopeRecorder {
+  var identity: Identity?
 }
 
 private final class Phase4RecordingTerminalHost: TerminalHosting {

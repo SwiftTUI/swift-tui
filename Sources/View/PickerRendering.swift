@@ -1,5 +1,7 @@
 import Core
 
+// AnyView policy: retain local branch unification here while picker rendering
+// composes style-specific bodies and row collections.
 extension Picker {
   func pickerBody(
     controlIdentity: Identity,

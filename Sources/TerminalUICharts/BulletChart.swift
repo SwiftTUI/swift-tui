@@ -1,6 +1,8 @@
 import Core
 import View
 
+// AnyView policy: retain heterogeneous child storage here for authored label
+// and summary content.
 /// A bullet chart that compares a current value against a target or range.
 public struct BulletChart: View, ResolvableView {
   public var value: Double

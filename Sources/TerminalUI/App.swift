@@ -68,6 +68,8 @@ package struct WindowSceneConfiguration {
   package var identifier: WindowIdentifier
   package var title: String?
   package var rootIdentity: Identity
+  // AnyView policy: retain an erased root-view builder here for deferred
+  // authored-content capture between scene declarations and the runtime.
   package var makeRootView: @MainActor () -> AnyView
 }
 
@@ -220,6 +222,9 @@ public struct WindowGroup: Scene {
   public let title: String?
   public let id: WindowIdentifier
 
+  // AnyView policy: retain this stored erased builder for deferred
+  // authored-content capture, and restore the original dynamic-property scope
+  // when the scene root is built later.
   private let contentBuilder: @MainActor () -> AnyView
 
   /// Creates a window scene with an explicit identifier.
@@ -229,7 +234,12 @@ public struct WindowGroup: Scene {
   ) {
     self.title = nil
     self.id = id
-    contentBuilder = { AnyView(content()) }
+    let authoringScope = currentDynamicPropertyScope()
+    contentBuilder = {
+      scopedAnyView(authoringScope: authoringScope) {
+        content()
+      }
+    }
   }
 
   /// Creates a window scene with a display title and optional explicit
@@ -242,7 +252,12 @@ public struct WindowGroup: Scene {
     let normalizedTitle = String(title)
     self.title = normalizedTitle
     self.id = id ?? WindowIdentifier(normalizedTitle)
-    contentBuilder = { AnyView(content()) }
+    let authoringScope = currentDynamicPropertyScope()
+    contentBuilder = {
+      scopedAnyView(authoringScope: authoringScope) {
+        content()
+      }
+    }
   }
 
   public var body: Never {

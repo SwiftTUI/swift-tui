@@ -208,6 +208,7 @@ if [[ ! -f Tests/ViewTests/ActorIsolationSurfaceTests.swift ]]; then
 fi
 
 public_surface_patterns=(
+  'public\s+typealias\s+[A-Za-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*=\s*(?:\n\s*)?\([^)]*\)\s*->\s*AnyView'
   '@ViewBuilder\s+[A-Za-z_]+\s*:\s*\(\)\s*->\s*\[AnyView\]'
   'public\s+(var|let)\s+[A-Za-z_]+\s*:\s*\[AnyView\]'
   'public\s+(var|let)\s+[A-Za-z_]+\s*:\s*\([^)]*\)\s*->\s*AnyView'
@@ -273,20 +274,17 @@ stored_anyview_matches="$(
 )"
 
 if [[ -n "$stored_anyview_matches" ]]; then
-  match_files=("${(@f)stored_anyview_matches}")
-  match_line=""
+  matched_files=("${(@f)$(print -r -- "$stored_anyview_matches" | cut -d: -f1 | sort -u)}")
   file=""
-  for match_line in "${match_files[@]}"; do
-    file="${match_line%%:*}"
-    if contains_file "$file" "${stored_anyview_allowlist[@]}"; then
+  for file in "${matched_files[@]}"; do
+    if ! contains_file "$file" "${stored_anyview_allowlist[@]}"; then
+      fail "$file introduces stored AnyView erasure without an allowlist entry."
       continue
     fi
 
-    if rg -n --fixed-strings --quiet -- 'AnyView policy:' "$file"; then
-      continue
+    if ! rg -n --fixed-strings --quiet -- 'AnyView policy:' "$file"; then
+      fail "$file retains stored AnyView erasure on the allowlist but lacks an 'AnyView policy:' comment."
     fi
-
-    fail "$file introduces stored AnyView erasure without an allowlist entry or nearby 'AnyView policy:' comment."
   done
 fi
 

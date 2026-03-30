@@ -1,5 +1,7 @@
 package import Core
 
+// AnyView policy: retain heterogeneous child storage here for authored labels
+// around secure-field rendering.
 /// Edits a string binding using keyboard input while masking the rendered value.
 public struct SecureField: View, ResolvableView {
   public var text: Binding<String>

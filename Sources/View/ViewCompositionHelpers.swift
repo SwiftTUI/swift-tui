@@ -1,5 +1,7 @@
 import Core
 
+// AnyView policy: retain typed builder plumbing here while composition
+// helpers normalize heterogeneous authored children.
 @MainActor
 package func combinedView(
   from views: [AnyView],

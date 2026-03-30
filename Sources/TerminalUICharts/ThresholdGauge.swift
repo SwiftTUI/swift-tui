@@ -1,6 +1,8 @@
 import Core
 import View
 
+// AnyView policy: retain heterogeneous child storage here for authored label
+// and summary content.
 /// A gauge that changes tone across authored threshold bands.
 public struct ThresholdGauge: View, ResolvableView {
   public var value: Double

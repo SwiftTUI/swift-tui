@@ -1,6 +1,8 @@
 import Core
 import View
 
+// AnyView policy: retain heterogeneous child storage here for authored label
+// content.
 /// A compact legend that pairs labels with semantic tones.
 public struct Legend: View, ResolvableView {
   public var items: [LegendItem]

@@ -5,6 +5,7 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
+// AnyView policy: retain erased fixture roots here for test support only.
 @Suite
 @MainActor
 struct NonAggregatingViewFixtureTests {

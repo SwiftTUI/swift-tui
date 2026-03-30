@@ -1,6 +1,8 @@
 import Core
 import View
 
+// AnyView policy: retain heterogeneous child storage here for authored label
+// and current-value content.
 /// A compact meter for displaying a single fractional value.
 public struct Meter: View, ResolvableView {
   public var tone: BannerTone

@@ -117,6 +117,8 @@ private func defaultPresentationActions(
   ]
 }
 
+// AnyView policy: retain heterogeneous child storage here for authored message
+// and action content in terminal presentations.
 private struct TerminalPresentationModifier<Content: View>: View {
   var content: Content
   var title: String

@@ -1,5 +1,7 @@
 package import Core
 
+// AnyView policy: retain heterogeneous child storage here for authored labels
+// and local branch unification in value-control rendering.
 /// Toggles a boolean binding on or off.
 public struct Toggle: View, ResolvableView {
   public var isOn: Binding<Bool>

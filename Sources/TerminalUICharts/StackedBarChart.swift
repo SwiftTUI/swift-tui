@@ -1,6 +1,8 @@
 import Core
 import View
 
+// AnyView policy: retain heterogeneous child storage here for authored label
+// and summary content.
 /// A stacked bar chart for segmented totals.
 public struct StackedBarChart: View, ResolvableView {
   public var entries: [BarChartEntry]

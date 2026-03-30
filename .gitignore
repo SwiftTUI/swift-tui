@@ -67,3 +67,4 @@ xcuserdata/
 .claude/worktrees/
 .claude/worktrees/*
 .swiftpm
+.worktrees

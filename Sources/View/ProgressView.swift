@@ -1,5 +1,7 @@
 package import Core
 
+// AnyView policy: retain heterogeneous child storage here for authored labels
+// and current-value content.
 /// A compact progress bar with optional label and current-value content.
 public struct ProgressView: View, ResolvableView {
   public var value: Double

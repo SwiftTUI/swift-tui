@@ -1,5 +1,7 @@
 package import Core
 
+// AnyView policy: retain heterogeneous child storage here for authored labels
+// and menu content.
 /// A focusable command menu that expands inline when activated.
 public struct Menu: View, ResolvableView {
   @State private var isExpanded = false

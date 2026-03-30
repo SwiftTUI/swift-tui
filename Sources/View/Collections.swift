@@ -1,5 +1,7 @@
 package import Core
 
+// AnyView policy: retain heterogeneous child storage here for authored
+// collection header, footer, and row content.
 /// Groups related collection content with optional header and footer content.
 public struct Section: View, ResolvableView {
   private var headerViews: [AnyView]

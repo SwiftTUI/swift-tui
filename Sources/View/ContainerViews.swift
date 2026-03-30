@@ -1,5 +1,7 @@
 public import Core
 
+// AnyView policy: retain typed builder plumbing and deferred authored-content
+// capture here for structural container views.
 /// A transparent structural container that groups child views.
 public struct Group: View, ResolvableView {
   package var children: [AnyView]

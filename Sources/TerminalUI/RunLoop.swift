@@ -2,8 +2,9 @@ import Core
 import Synchronization
 import View
 
-/// Builds the root view for the current run-loop state.
-public typealias StateBodyBuilder<State: Equatable & Sendable> =
+// AnyView policy: retain this internal erased builder as typed runtime plumbing
+// for the run loop while keeping the public authoring surface generic.
+package typealias ErasedStateBodyBuilder<State: Equatable & Sendable> =
   (_ state: State, _ focusedIdentity: Identity?) -> AnyView
 
 /// Handles a key event and may mutate run-loop state.
@@ -93,7 +94,7 @@ public final class RunLoop<State: Equatable & Sendable> {
   package let stateContainer: StateContainer<State>
   package let focusTracker: FocusTracker
   package let keyHandler: StateKeyHandler<State>?
-  package let viewBuilder: StateBodyBuilder<State>
+  package let viewBuilder: ErasedStateBodyBuilder<State>
   package let environment: EnvironmentSnapshot
   package let environmentValues: EnvironmentValues
   package let proposalOverride: ProposedSize?
@@ -116,8 +117,7 @@ public final class RunLoop<State: Equatable & Sendable> {
   package var capturedPointerRouteID: RouteID?
   package var postActionInvalidationIdentities: Set<Identity> = []
 
-  /// Creates a run loop from a view builder that already returns `AnyView`.
-  public init(
+  package init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
     terminalHost: any TerminalHosting,
@@ -130,7 +130,7 @@ public final class RunLoop<State: Equatable & Sendable> {
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     proposal: ProposedSize? = nil,
-    viewBuilder: @escaping StateBodyBuilder<State>
+    viewBuilder: @escaping ErasedStateBodyBuilder<State>
   ) {
     self.rootIdentity = rootIdentity
     self.renderer = renderer
@@ -147,8 +147,7 @@ public final class RunLoop<State: Equatable & Sendable> {
     self.viewBuilder = viewBuilder
   }
 
-  /// Creates a run loop from a keyboard-only input source.
-  public convenience init(
+  package convenience init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
     terminalHost: any TerminalHosting,
@@ -161,7 +160,7 @@ public final class RunLoop<State: Equatable & Sendable> {
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     proposal: ProposedSize? = nil,
-    viewBuilder: @escaping StateBodyBuilder<State>
+    viewBuilder: @escaping ErasedStateBodyBuilder<State>
   ) {
     self.init(
       rootIdentity: rootIdentity,

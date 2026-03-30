@@ -1,6 +1,8 @@
 import Core
 import View
 
+// AnyView policy: retain heterogeneous child storage here for authored label
+// and summary content.
 /// A chart that shows current values against baselines.
 public struct ComparisonChart: View, ResolvableView {
   public var entries: [ComparisonEntry]

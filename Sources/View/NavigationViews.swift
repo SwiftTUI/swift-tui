@@ -1,5 +1,7 @@
 public import Core
 
+// AnyView policy: retain heterogeneous child storage and deferred
+// authored-content capture here for navigation containers.
 /// Selects one child view from a tagged set and renders a terminal-native tab
 /// strip above the active content.
 public struct TabView<SelectionValue: Hashable>: View, ResolvableView {

@@ -104,4 +104,47 @@ struct ActorIsolationSurfaceTests {
     #expect(configuration.identifier == WindowIdentifier("Actor-Surface"))
     #expect(artifacts.resolvedTree.identity == configuration.rootIdentity)
   }
+
+  @Test("RunLoop typed builders still accept AnyView via Content == AnyView")
+  func runLoopTypedBuilderStillAcceptsAnyView() {
+    final class SurfaceTerminalHost: TerminalHosting {
+      let surfaceSize: Size = .init(width: 40, height: 12)
+      let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+      let appearance: TerminalAppearance = .fallback
+
+      func enableRawMode() throws {}
+      func disableRawMode() throws {}
+      func write(_: String) throws {}
+      func clearScreen() throws {}
+      func moveCursor(to _: Point) throws {}
+    }
+
+    final class SurfaceInputReader: InputReading {
+      func events() -> AsyncStream<KeyEvent> {
+        AsyncStream { continuation in
+          continuation.finish()
+        }
+      }
+    }
+
+    func makeRunLoop<Content: View>(
+      viewBuilder: @escaping (_ state: Int, _ focusedIdentity: Identity?) -> Content
+    ) -> RunLoop<Int> {
+      let identity = testIdentity("ActorIsolation", "RunLoop")
+      return RunLoop(
+        rootIdentity: identity,
+        terminalHost: SurfaceTerminalHost(),
+        inputReader: SurfaceInputReader(),
+        stateContainer: StateContainer(initialState: 0),
+        focusTracker: FocusTracker(invalidationIdentities: [identity]),
+        viewBuilder: viewBuilder
+      )
+    }
+
+    let runLoop = makeRunLoop { state, _ in
+      AnyView(Text("State \(state)"))
+    }
+
+    #expect(runLoop.rootIdentity == testIdentity("ActorIsolation", "RunLoop"))
+  }
 }

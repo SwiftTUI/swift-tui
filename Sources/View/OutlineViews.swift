@@ -11,6 +11,8 @@ extension EnvironmentValues {
   }
 }
 
+// AnyView policy: retain deferred authored-content capture here so outline row
+// builders keep their original dynamic-property scope.
 /// Presents hierarchical collection data as an outline.
 public struct OutlineGroup<Data, ID>: View
 where Data: RandomAccessCollection, ID: Hashable {

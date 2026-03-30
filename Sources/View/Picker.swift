@@ -1,5 +1,7 @@
 package import Core
 
+// AnyView policy: retain heterogeneous child storage here for authored labels
+// and picker option content.
 /// Selects one value from a set of tagged options.
 public struct Picker<SelectionValue: Hashable>: View, ResolvableView {
   public var selection: Binding<SelectionValue>

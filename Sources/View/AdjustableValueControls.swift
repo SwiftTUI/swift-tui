@@ -1,5 +1,7 @@
 package import Core
 
+// AnyView policy: retain heterogeneous child storage here for authored labels
+// and control branches.
 /// Increments or decrements an integer binding.
 public struct Stepper: View, ResolvableView {
   public var value: Binding<Int>
