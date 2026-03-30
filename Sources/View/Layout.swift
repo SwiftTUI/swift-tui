@@ -134,7 +134,7 @@ extension Layout {
   ) -> some View {
     LayoutContainer(
       layout: AnyLayout(self),
-      children: parallelBuilderChildren(from: content())
+      children: declaredBuilderChildren(from: content())
     )
   }
 }
@@ -323,7 +323,7 @@ extension AnyLayout {
   ) -> some View {
     LayoutContainer(
       layout: self,
-      children: parallelBuilderChildren(from: content())
+      children: declaredBuilderChildren(from: content())
     )
   }
 }

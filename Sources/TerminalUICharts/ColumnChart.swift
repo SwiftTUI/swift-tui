@@ -44,8 +44,8 @@ public struct ColumnChart: View, ResolvableView {
     self.entries = entries
     self.chartHeight = chartHeight
     self.columnWidth = columnWidth
-    labelViews = parallelBuilderChildren(from: label())
-    summaryViews = parallelBuilderChildren(from: summary())
+    labelViews = declaredBuilderChildren(from: label())
+    summaryViews = declaredBuilderChildren(from: summary())
   }
 
   package func resolveElements(

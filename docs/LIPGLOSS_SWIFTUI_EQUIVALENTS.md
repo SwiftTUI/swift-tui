@@ -2,7 +2,18 @@
 
 ## Why This Document Exists
 
-[Lip Gloss](https://github.com/charmbracelet/lipgloss) and [Bubble Tea](https://github.com/charmbracelet/bubbletea) are used as aesthetic guidance and as a signal for which components matter most in TUI applications. We do not adopt their abstractions, but we read them as evidence: when Lip Gloss ships a first-class `tree` package, that tells us hierarchical tree display is important enough to treat seriously in TerminalUI.
+[Lip Gloss](https://github.com/charmbracelet/lipgloss) and
+[Bubble Tea](https://github.com/charmbracelet/bubbletea) are used as aesthetic
+guidance and as a signal for which components matter most in TUI applications.
+We do not adopt their abstractions, but we read them as evidence: when Lip
+Gloss ships a first-class `tree` package, that tells us hierarchical tree
+display is important enough to treat seriously in TerminalUI.
+
+The most important lesson is not "copy Lip Gloss styling." The stronger lesson
+is that terminal styling should be composable, capability-aware, and applied
+with restraint. Modern terminal-native apps usually treat the terminal
+background as the canvas, keep borders structural rather than decorative, and
+make focus, selection, help, and mode more prominent than ornamental chrome.
 
 This document maps Lip Gloss concepts to their SwiftUI equivalents, which tells us:
 

@@ -3,5 +3,5 @@ configuration true-color
 surface 28x2
 capability glyph=unicode color=trueColor styles=true
 appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
-01│\u{001B}[38;2;86;182;194mMix\u{001B}[0m··················\u{001B}[38;2;75;79;86msum·100\u{001B}[0m
+01│\u{001B}[38;2;59;111;121mMix\u{001B}[0m··················\u{001B}[38;2;75;79;86msum·100\u{001B}[0m
 02│\u{001B}[38;2;86;182;194m█████\u{001B}[0m\u{001B}[38;2;97;198;123m█████\u{001B}[0m\u{001B}[38;2;235;179;60m██████\u{001B}[0m

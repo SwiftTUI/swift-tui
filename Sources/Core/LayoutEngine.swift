@@ -547,7 +547,7 @@ public struct LayoutEngine {
       case .unspecified, .infinity:
         nil
       }
-    return parallelTextLayout(
+    return layoutText(
       for: content,
       width: wrapWidth,
       lineLimit: metadata.lineLimit,

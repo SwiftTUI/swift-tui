@@ -13,7 +13,7 @@ extension Shape {
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
-      parallelResolveLeaf(
+      resolveLeafNode(
         kindName: kindName,
         drawPayload: .shape(
           .init(
@@ -114,7 +114,7 @@ extension Shape {
     )
   }
 
-  package func parallelInteriorFill<S: ShapeStyle>(
+  package func chromeFill<S: ShapeStyle>(
     _ style: S,
     strokeWidth: Int = 1
   ) -> some View {
@@ -128,7 +128,7 @@ extension Shape {
     )
   }
 
-  package func parallelStrokeBorder<S: ShapeStyle>(
+  package func chromeStrokeBorder<S: ShapeStyle>(
     _ style: S,
     style strokeStyle: StrokeStyle = .init(),
     backgroundStyle: AnyShapeStyle? = nil
@@ -153,7 +153,7 @@ private struct ShapeRenderView: View, ResolvableView {
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
-      parallelResolveLeaf(
+      resolveLeafNode(
         kindName: kindName,
         drawPayload: .shape(
           .init(

@@ -42,8 +42,8 @@ public struct BulletChart: View, ResolvableView {
     self.total = total
     self.tone = tone
     self.barWidth = barWidth
-    labelViews = parallelBuilderChildren(from: label())
-    summaryViews = parallelBuilderChildren(from: summary())
+    labelViews = declaredBuilderChildren(from: label())
+    summaryViews = declaredBuilderChildren(from: summary())
   }
 
   package func resolveElements(

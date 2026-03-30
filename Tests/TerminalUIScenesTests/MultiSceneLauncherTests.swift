@@ -11,10 +11,10 @@ struct MultiSceneLauncherTests {
   func extractsMultipleConfigurations() {
     struct TwoSceneApp: App {
       var body: some Scene {
-        WindowGroup("Dashboard", id: "dashboard") {
+        WindowGroup("Dashboard", id: WindowIdentifier("dashboard")) {
           Text("A")
         }
-        WindowGroup("Controls", id: "controls") {
+        WindowGroup("Controls", id: WindowIdentifier("controls")) {
           Text("B")
         }
       }
@@ -23,9 +23,9 @@ struct MultiSceneLauncherTests {
     let app = TwoSceneApp()
     let configs = collectWindowSceneConfigurations(from: app.body)
     #expect(configs.count == 2)
-    #expect(configs[0].identifier == "dashboard")
+    #expect(configs[0].identifier == WindowIdentifier("dashboard"))
     #expect(configs[0].title == "Dashboard")
-    #expect(configs[1].identifier == "controls")
+    #expect(configs[1].identifier == WindowIdentifier("controls"))
     #expect(configs[1].title == "Controls")
   }
 
@@ -48,10 +48,10 @@ struct MultiSceneLauncherTests {
   func sceneIdentitiesDistinct() {
     struct TwoSceneApp: App {
       var body: some Scene {
-        WindowGroup("Alpha", id: "alpha") {
+        WindowGroup("Alpha", id: WindowIdentifier("alpha")) {
           Text("A")
         }
-        WindowGroup("Beta", id: "beta") {
+        WindowGroup("Beta", id: WindowIdentifier("beta")) {
           Text("B")
         }
       }

@@ -49,7 +49,7 @@ private struct BoolDefaultFocusModifier<Content: View>: View, ResolvableView {
     guard value else {
       return
     }
-    guard context.environmentValues.parallelFocusedIdentity == nil else {
+    guard context.environmentValues.focusedIdentity == nil else {
       return
     }
     guard consumeDefaultFocusSeed(in: context), !binding.wrappedValue else {
@@ -91,7 +91,7 @@ private struct OptionalDefaultFocusModifier<Content: View, Value: Hashable>: Vie
   private func applyDefaultFocus(
     in context: ResolveContext
   ) {
-    guard context.environmentValues.parallelFocusedIdentity == nil else {
+    guard context.environmentValues.focusedIdentity == nil else {
       return
     }
     guard consumeDefaultFocusSeed(in: context), binding.wrappedValue == nil else {

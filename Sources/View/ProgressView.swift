@@ -43,8 +43,8 @@ public struct ProgressView: View, ResolvableView {
     self.value = value
     self.total = total
     self.barWidth = barWidth
-    labelViews = parallelBuilderChildren(from: label())
-    currentValueViews = parallelBuilderChildren(from: currentValueLabel())
+    labelViews = declaredBuilderChildren(from: label())
+    currentValueViews = declaredBuilderChildren(from: currentValueLabel())
   }
 
   package func resolveElements(

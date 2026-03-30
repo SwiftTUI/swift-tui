@@ -415,10 +415,10 @@ struct SwiftUISurfaceTests {
   @Test("focus changes do not emit lifecycle deltas for stable public lifecycle owners")
   func focusChangesDoNotEmitLifecycleDeltas() {
     var unfocusedEnvironment = EnvironmentValues()
-    unfocusedEnvironment.parallelFocusedIdentity = nil
+    unfocusedEnvironment.focusedIdentity = nil
 
     var focusedEnvironment = EnvironmentValues()
-    focusedEnvironment.parallelFocusedIdentity = testIdentity("Focusable")
+    focusedEnvironment.focusedIdentity = testIdentity("Focusable")
 
     let view = Text("Focus")
       .focusable()
@@ -991,7 +991,7 @@ struct SwiftUISurfaceTests {
   func strokedShapesKeepBorderCellsFreeOfInteriorFill() {
     let artifacts = DefaultRenderer().render(
       RoundedRectangle(cornerRadius: 1)
-        .parallelInteriorFill(.warning)
+        .chromeFill(.warning)
         .overlay {
           RoundedRectangle(cornerRadius: 1).strokeBorder(.danger)
         }
@@ -1014,7 +1014,7 @@ struct SwiftUISurfaceTests {
   func roundedInteriorFillsCoverInsetCornerCells() {
     let artifacts = DefaultRenderer().render(
       RoundedRectangle(cornerRadius: 1)
-        .parallelInteriorFill(.warning)
+        .chromeFill(.warning)
         .overlay {
           RoundedRectangle(cornerRadius: 1).strokeBorder(.danger)
         }
@@ -1041,7 +1041,7 @@ struct SwiftUISurfaceTests {
   func explicitBorderBackgroundOnlyStylesBorderRing() {
     let artifacts = DefaultRenderer().render(
       RoundedRectangle(cornerRadius: 1)
-        .parallelStrokeBorder(.danger, backgroundStyle: AnyShapeStyle(.warning))
+        .chromeStrokeBorder(.danger, backgroundStyle: AnyShapeStyle(.warning))
         .frame(width: 5, height: 3, alignment: .topLeading),
       context: .init(identity: testIdentity("BorderBackground"))
     )
@@ -1228,7 +1228,7 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.cells[1][0].style?.foregroundColor == Color.blue)
   }
 
-  @Test("parallelResolveColorResult surfaces recursion and empty-gradient diagnostics")
+  @Test("resolveStyleColorResult surfaces recursion and empty-gradient diagnostics")
   func colorResolutionDiagnosticsAreExplicit() {
     let recursiveTheme = Theme(
       foreground: .semantic(.foreground)
@@ -1240,13 +1240,13 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(
-      parallelResolveColorResult(
+      resolveStyleColorResult(
         style: .semantic(.foreground),
         theme: recursiveTheme
       ) == .failure(.recursionLimitExceeded(limit: 8, style: .semantic(.foreground)))
     )
     #expect(
-      parallelResolveColorResult(
+      resolveStyleColorResult(
         style: .linearGradient(emptyGradient),
         theme: .default
       ) == .failure(.emptyGradient)
@@ -1263,15 +1263,15 @@ struct SwiftUISurfaceTests {
     )
     let theme = appearance.semanticTheme()
 
-    let accent = parallelResolveColor(
+    let accent = resolveStyleColor(
       style: AnyShapeStyle(.terminalAccent(.warning)),
       theme: theme
     )
-    let surface = parallelResolveColor(
+    let surface = resolveStyleColor(
       style: AnyShapeStyle(.terminalSurface(.warning)),
       theme: theme
     )
-    let row = parallelResolveColor(
+    let row = resolveStyleColor(
       style: AnyShapeStyle(.terminalRow(.warning, isSelected: true)),
       theme: theme
     )
@@ -1357,18 +1357,18 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(idle.foregroundStyle == semanticTheme.foreground)
-    #expect(parallelResolveColor(style: idle.backgroundStyle, theme: semanticTheme) != nil)
-    #expect(parallelResolveColor(style: idle.borderStyle, theme: semanticTheme) != nil)
+    #expect(resolveStyleColor(style: idle.backgroundStyle, theme: semanticTheme) != nil)
+    #expect(resolveStyleColor(style: idle.borderStyle, theme: semanticTheme) != nil)
     #expect(idle.opacity == 1)
 
-    #expect(parallelResolveColor(style: focused.backgroundStyle, theme: semanticTheme) != nil)
-    #expect(parallelResolveColor(style: focused.borderStyle, theme: semanticTheme) != nil)
+    #expect(resolveStyleColor(style: focused.backgroundStyle, theme: semanticTheme) != nil)
+    #expect(resolveStyleColor(style: focused.borderStyle, theme: semanticTheme) != nil)
     #expect(idle.borderStyle != focused.borderStyle)
     #expect(focused.opacity == 1)
 
     #expect(disabled.foregroundStyle == semanticTheme.placeholder)
-    #expect(parallelResolveColor(style: disabled.backgroundStyle, theme: semanticTheme) != nil)
-    #expect(parallelResolveColor(style: disabled.borderStyle, theme: semanticTheme) != nil)
+    #expect(resolveStyleColor(style: disabled.backgroundStyle, theme: semanticTheme) != nil)
+    #expect(resolveStyleColor(style: disabled.borderStyle, theme: semanticTheme) != nil)
     #expect(disabled.opacity == 0.65)
   }
 
@@ -1404,7 +1404,7 @@ struct SwiftUISurfaceTests {
     let box = ToggleBox()
     let registry = LocalActionRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("AccentToggle")
+    environmentValues.focusedIdentity = testIdentity("AccentToggle")
 
     let artifacts = DefaultRenderer().render(
       Toggle(
@@ -1441,7 +1441,7 @@ struct SwiftUISurfaceTests {
     let actionRegistry = LocalActionRegistry()
     let keyRegistry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("CountStepper")
+    environmentValues.focusedIdentity = testIdentity("CountStepper")
 
     let artifacts = DefaultRenderer().render(
       Stepper(
@@ -1484,7 +1484,7 @@ struct SwiftUISurfaceTests {
     let box = ValueBox()
     let keyRegistry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("ValueSlider")
+    environmentValues.focusedIdentity = testIdentity("ValueSlider")
 
     let artifacts = DefaultRenderer().render(
       Slider(
@@ -1519,7 +1519,7 @@ struct SwiftUISurfaceTests {
   func stepperRendersEditingChromeFromFocus() {
     func render(focused: Bool) -> RasterSurface {
       var environmentValues = EnvironmentValues()
-      environmentValues.parallelFocusedIdentity = focused ? testIdentity("ActiveStepper") : nil
+      environmentValues.focusedIdentity = focused ? testIdentity("ActiveStepper") : nil
       return DefaultRenderer().render(
         Stepper("Count", value: .constant(1), in: 0...4)
           .id(testIdentity("ActiveStepper")),
@@ -1537,7 +1537,7 @@ struct SwiftUISurfaceTests {
   func sliderRendersEditingChromeFromFocus() {
     func render(focused: Bool) -> RasterSurface {
       var environmentValues = EnvironmentValues()
-      environmentValues.parallelFocusedIdentity = focused ? testIdentity("ActiveSlider") : nil
+      environmentValues.focusedIdentity = focused ? testIdentity("ActiveSlider") : nil
       return DefaultRenderer().render(
         Slider("Value", value: .constant(2), in: 0...4)
           .id(testIdentity("ActiveSlider")),
@@ -1562,7 +1562,7 @@ struct SwiftUISurfaceTests {
     let box = TextBox()
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("NameField")
+    environmentValues.focusedIdentity = testIdentity("NameField")
 
     let focusedArtifacts = DefaultRenderer().render(
       TextField(
@@ -1608,7 +1608,7 @@ struct SwiftUISurfaceTests {
         identity: testIdentity("Root"),
         environmentValues: {
           var values = EnvironmentValues()
-          values.parallelFocusedIdentity = testIdentity("PlainField")
+          values.focusedIdentity = testIdentity("PlainField")
           return values
         }()
       )
@@ -1641,7 +1641,7 @@ struct SwiftUISurfaceTests {
     let box = ExpansionBox()
     let registry = LocalActionRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("Disclosure")
+    environmentValues.focusedIdentity = testIdentity("Disclosure")
 
     let collapsedArtifacts = DefaultRenderer().render(
       DisclosureGroup(
@@ -1696,7 +1696,7 @@ struct SwiftUISurfaceTests {
     let box = SelectionBox()
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("PresetPicker")
+    environmentValues.focusedIdentity = testIdentity("PresetPicker")
 
     let root = Picker(
       "Preset",
@@ -1738,7 +1738,7 @@ struct SwiftUISurfaceTests {
     let box = SelectionBox()
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("ModePicker")
+    environmentValues.focusedIdentity = testIdentity("ModePicker")
 
     let artifacts = DefaultRenderer().render(
       Picker(
@@ -1775,7 +1775,7 @@ struct SwiftUISurfaceTests {
     let box = SelectionBox()
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("RadioPicker")
+    environmentValues.focusedIdentity = testIdentity("RadioPicker")
 
     let artifacts = DefaultRenderer().render(
       Picker(
@@ -1873,7 +1873,7 @@ struct SwiftUISurfaceTests {
 
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("MenuPicker")
+    environmentValues.focusedIdentity = testIdentity("MenuPicker")
     let expandedArtifacts = DefaultRenderer().render(
       Picker(
         "Mode",
@@ -1935,7 +1935,7 @@ struct SwiftUISurfaceTests {
         )
       ).rasterSurface
       var focusedValues = EnvironmentValues()
-      focusedValues.parallelFocusedIdentity = id
+      focusedValues.focusedIdentity = id
       let focused = DefaultRenderer().render(
         picker,
         context: .init(
@@ -1965,7 +1965,7 @@ struct SwiftUISurfaceTests {
       } label: {
         EmptyView()
       }
-      .parallelPickerViewportLineCount(5)
+      .pickerViewportLineCount(5)
       .pickerStyle(.inline),
       context: .init(identity: testIdentity("ViewportPicker"))
     )
@@ -1984,7 +1984,7 @@ struct SwiftUISurfaceTests {
     let box = SelectionBox()
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("PresetList")
+    environmentValues.focusedIdentity = testIdentity("PresetList")
 
     let artifacts = DefaultRenderer().render(
       List(
@@ -2016,7 +2016,7 @@ struct SwiftUISurfaceTests {
   @Test("plain List leaves Section headers and footers unobscured inline with tagged row content")
   func listRendersSectionHeaders() {
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("SectionList")
+    environmentValues.focusedIdentity = testIdentity("SectionList")
 
     let artifacts = DefaultRenderer().render(
       List(selection: .constant(1)) {
@@ -2047,7 +2047,7 @@ struct SwiftUISurfaceTests {
   @Test("insetGrouped List preserves grouped chrome while rendering multiple sections")
   func insetGroupedListRendersGroupedChromeAndSections() {
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("GroupedList")
+    environmentValues.focusedIdentity = testIdentity("GroupedList")
 
     let artifacts = DefaultRenderer().render(
       List(selection: .constant(2)) {
@@ -2076,7 +2076,7 @@ struct SwiftUISurfaceTests {
   @Test("listRowSeparator hides plain-list separators on requested edges")
   func listRowSeparatorHidesRequestedEdges() {
     var defaultEnvironment = EnvironmentValues()
-    defaultEnvironment.parallelFocusedIdentity = testIdentity("DefaultRowSeparators")
+    defaultEnvironment.focusedIdentity = testIdentity("DefaultRowSeparators")
     let defaultArtifacts = DefaultRenderer().render(
       List(selection: .constant(1)) {
         Text("One").tag(1)
@@ -2089,7 +2089,7 @@ struct SwiftUISurfaceTests {
       )
     )
     var hiddenEnvironment = EnvironmentValues()
-    hiddenEnvironment.parallelFocusedIdentity = testIdentity("HiddenRowSeparators")
+    hiddenEnvironment.focusedIdentity = testIdentity("HiddenRowSeparators")
     let hiddenArtifacts = DefaultRenderer().render(
       List(selection: .constant(1)) {
         Text("One")
@@ -2154,7 +2154,7 @@ struct SwiftUISurfaceTests {
   @Test("List viewport markers derive from actual bounds")
   func listViewportMarkersStayDeterministic() {
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("ViewportListControl")
+    environmentValues.focusedIdentity = testIdentity("ViewportListControl")
 
     let artifacts = DefaultRenderer().render(
       List(selection: .constant(2)) {
@@ -2181,7 +2181,7 @@ struct SwiftUISurfaceTests {
     "List scrollIndicators hidden suppresses viewport markers without changing the selected row")
   func listScrollIndicatorsCanBeHidden() {
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("HiddenViewportListControl")
+    environmentValues.focusedIdentity = testIdentity("HiddenViewportListControl")
 
     let artifacts = DefaultRenderer().render(
       List(selection: .constant(2)) {
@@ -2249,7 +2249,7 @@ struct SwiftUISurfaceTests {
     let box = SelectionBox()
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("MetricsTable")
+    environmentValues.focusedIdentity = testIdentity("MetricsTable")
 
     let artifacts = DefaultRenderer().render(
       Table(
@@ -2294,7 +2294,7 @@ struct SwiftUISurfaceTests {
   @Test("Table renders headers, separators, and explicit-width truncation")
   func tableRendersHeadersAndTruncatesCells() {
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("TruncatingTable")
+    environmentValues.focusedIdentity = testIdentity("TruncatingTable")
 
     let artifacts = DefaultRenderer().render(
       Table(
@@ -2405,7 +2405,7 @@ struct SwiftUISurfaceTests {
   @Test("Table respects listStyle and scrollIndicators environment controls")
   func tableHonorsListChromeAndIndicatorVisibility() {
     var visibleEnvironment = EnvironmentValues()
-    visibleEnvironment.parallelFocusedIdentity = testIdentity("VisibleGroupedTableControl")
+    visibleEnvironment.focusedIdentity = testIdentity("VisibleGroupedTableControl")
     let visibleArtifacts = DefaultRenderer().render(
       Table(
         selection: .constant(3),
@@ -2431,7 +2431,7 @@ struct SwiftUISurfaceTests {
       )
     )
     var hiddenEnvironment = EnvironmentValues()
-    hiddenEnvironment.parallelFocusedIdentity = testIdentity("HiddenGroupedTableControl")
+    hiddenEnvironment.focusedIdentity = testIdentity("HiddenGroupedTableControl")
     let hiddenArtifacts = DefaultRenderer().render(
       Table(
         selection: .constant(3),
@@ -2471,7 +2471,7 @@ struct SwiftUISurfaceTests {
   @Test("Table headers can be hidden through the environment-driven surface")
   func tableHeadersCanBeHidden() {
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("HeaderlessTable")
+    environmentValues.focusedIdentity = testIdentity("HeaderlessTable")
 
     let artifacts = DefaultRenderer().render(
       Table(
@@ -2509,7 +2509,7 @@ struct SwiftUISurfaceTests {
   @Test("Table columns can align header titles independently from cell content")
   func tableColumnHeaderAlignmentCanDifferFromCellAlignment() {
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("HeaderAlignmentTable")
+    environmentValues.focusedIdentity = testIdentity("HeaderAlignmentTable")
 
     let artifacts = DefaultRenderer().render(
       Table(
@@ -2539,7 +2539,7 @@ struct SwiftUISurfaceTests {
   func readOnlyTableSkipsSelectionChrome() {
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("ReadOnlyTable")
+    environmentValues.focusedIdentity = testIdentity("ReadOnlyTable")
 
     let artifacts = DefaultRenderer().render(
       Table(
@@ -2579,7 +2579,7 @@ struct SwiftUISurfaceTests {
   func listAndTableRenderEditingChromeDirectlyFromFocus() {
     func renderList(focused: Bool) -> RasterSurface {
       var environmentValues = EnvironmentValues()
-      environmentValues.parallelFocusedIdentity = focused ? testIdentity("ActiveList") : nil
+      environmentValues.focusedIdentity = focused ? testIdentity("ActiveList") : nil
       return DefaultRenderer().render(
         List(selection: .constant(1)) {
           Text("One").tag(1)
@@ -2596,7 +2596,7 @@ struct SwiftUISurfaceTests {
 
     func renderTable(focused: Bool) -> RasterSurface {
       var environmentValues = EnvironmentValues()
-      environmentValues.parallelFocusedIdentity = focused ? testIdentity("ActiveTable") : nil
+      environmentValues.focusedIdentity = focused ? testIdentity("ActiveTable") : nil
       return DefaultRenderer().render(
         Table(
           selection: .constant(1),
@@ -2798,7 +2798,7 @@ struct SwiftUISurfaceTests {
     )
 
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = parallelVerticalScrollIndicatorIdentity(
+    environmentValues.focusedIdentity = verticalScrollIndicatorIdentity(
       for: testIdentity("Scrollable")
     )
     let focusedArtifacts = DefaultRenderer().render(
@@ -2838,7 +2838,7 @@ struct SwiftUISurfaceTests {
     )
 
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("InnerButton")
+    environmentValues.focusedIdentity = testIdentity("InnerButton")
     let artifacts = DefaultRenderer().render(
       view,
       context: .init(
@@ -2861,9 +2861,9 @@ struct SwiftUISurfaceTests {
 
     let box = ScrollBox()
     let registry = LocalKeyHandlerRegistry()
-    let indicatorIdentity = parallelVerticalScrollIndicatorIdentity(for: testIdentity("Scrollable"))
+    let indicatorIdentity = verticalScrollIndicatorIdentity(for: testIdentity("Scrollable"))
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = indicatorIdentity
+    environmentValues.focusedIdentity = indicatorIdentity
 
     let view = ScrollView(
       .vertical,
@@ -2907,7 +2907,7 @@ struct SwiftUISurfaceTests {
     let box = ScrollBox()
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("Scrollable")
+    environmentValues.focusedIdentity = testIdentity("Scrollable")
 
     let view = ScrollView(
       .vertical,
@@ -2992,7 +2992,7 @@ struct SwiftUISurfaceTests {
     ).rasterSurface
 
     var focusedValues = EnvironmentValues()
-    focusedValues.parallelFocusedIdentity = testIdentity("ActiveScroll")
+    focusedValues.focusedIdentity = testIdentity("ActiveScroll")
     let focused = DefaultRenderer().render(
       view,
       context: .init(
@@ -3014,7 +3014,7 @@ struct SwiftUISurfaceTests {
       source: .override
     )
     environmentValues.terminalAppearance = appearance
-    environmentValues.parallelFocusedIdentity = testIdentity("DeleteButton")
+    environmentValues.focusedIdentity = testIdentity("DeleteButton")
     final class TapBox {
       var didTap = false
     }
@@ -3104,7 +3104,7 @@ struct SwiftUISurfaceTests {
     environmentValues.terminalAppearance = appearance
 
     let theme = appearance.semanticTheme()
-    let expectedLinkColor = parallelResolveColor(
+    let expectedLinkColor = resolveStyleColor(
       style: theme.link,
       theme: theme
     )
@@ -3152,7 +3152,7 @@ struct SwiftUISurfaceTests {
   @Test("Link resolves as focusable rich text and dispatches open-link actions")
   func linkResolvesAsFocusableRichText() {
     final class OpenLinkRecorder: @unchecked Sendable {
-      var destinations: [String] = []
+      var destinations: [LinkDestination] = []
     }
 
     let recorder = OpenLinkRecorder()
@@ -3183,7 +3183,7 @@ struct SwiftUISurfaceTests {
     }
 
     #expect(payload.visibleText == "Docs")
-    #expect(payload.runs.map(\.destination) == ["https://example.com"])
+    #expect(payload.runs.compactMap(\.destination) == ["https://example.com"])
     #expect(actionRegistry.dispatch(identity: testIdentity("DocsLink")))
     #expect(recorder.destinations == ["https://example.com"])
   }
@@ -3205,9 +3205,9 @@ struct SwiftUISurfaceTests {
     #expect(payload.visibleText == "See v1 Docs or API")
     #expect(payload.runs.map(\.text) == ["See ", "v1", " ", "Docs", " or ", "API"])
     #expect(payload.runs[1].style.emphasis.contains(.bold))
-    #expect(payload.runs[3].destination == "https://example.com")
+    #expect(payload.runs[3].destination?.rawValue == "https://example.com")
     #expect(payload.runs[3].linkIdentifier == "InlineLink[0]")
-    #expect(payload.runs[5].destination == "https://example.org")
+    #expect(payload.runs[5].destination?.rawValue == "https://example.org")
     #expect(payload.runs[5].linkIdentifier == "InlineLink[1]")
     #expect(
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [
@@ -3228,7 +3228,7 @@ struct SwiftUISurfaceTests {
 
     var standaloneEnvironment = EnvironmentValues()
     standaloneEnvironment.terminalAppearance = appearance
-    standaloneEnvironment.parallelFocusedIdentity = testIdentity("DocsLink")
+    standaloneEnvironment.focusedIdentity = testIdentity("DocsLink")
     let standaloneArtifacts = DefaultRenderer().render(
       Link("Docs", destination: "https://example.com")
         .id(testIdentity("DocsLink")),
@@ -3243,7 +3243,7 @@ struct SwiftUISurfaceTests {
 
     var inlineEnvironment = EnvironmentValues()
     inlineEnvironment.terminalAppearance = appearance
-    inlineEnvironment.parallelFocusedIdentity = parallelInlineLinkIdentity(
+    inlineEnvironment.focusedIdentity = inlineLinkIdentity(
       parent: testIdentity("InlineFocused"),
       identifier: "InlineLink[0]"
     )
@@ -3287,7 +3287,7 @@ struct SwiftUISurfaceTests {
       source: .override
     )
     environmentValues.terminalAppearance = appearance
-    environmentValues.parallelFocusedIdentity = testIdentity("OutlineButton")
+    environmentValues.focusedIdentity = testIdentity("OutlineButton")
 
     let artifacts = DefaultRenderer().render(
       Button("OK") {}
@@ -3332,7 +3332,7 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    environmentValues.parallelFocusedIdentity = testIdentity("ProminentButton")
+    environmentValues.focusedIdentity = testIdentity("ProminentButton")
     let focusedArtifacts = DefaultRenderer().render(
       Button("OK") {}
         .id(testIdentity("ProminentButton"))
@@ -3351,7 +3351,7 @@ struct SwiftUISurfaceTests {
   @Test("pressed Button renders a distinct activated chrome state")
   func pressedButtonUsesActivatedChrome() {
     var focusedEnvironment = EnvironmentValues()
-    focusedEnvironment.parallelFocusedIdentity = testIdentity("PressableButton")
+    focusedEnvironment.focusedIdentity = testIdentity("PressableButton")
     let focusedArtifacts = DefaultRenderer().render(
       Button("OK") {}
         .id(testIdentity("PressableButton")),
@@ -3362,7 +3362,7 @@ struct SwiftUISurfaceTests {
     )
 
     var pressedEnvironment = focusedEnvironment
-    pressedEnvironment.parallelPressedIdentity = testIdentity("PressableButton")
+    pressedEnvironment.pressedIdentity = testIdentity("PressableButton")
     let pressedArtifacts = DefaultRenderer().render(
       Button("OK") {}
         .id(testIdentity("PressableButton")),
@@ -3379,7 +3379,7 @@ struct SwiftUISurfaceTests {
   @Test("focused Toggle uses a rail highlight without obscuring its label")
   func focusedToggleUsesRailHighlight() {
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("AccentToggle")
+    environmentValues.focusedIdentity = testIdentity("AccentToggle")
 
     let artifacts = DefaultRenderer().render(
       Toggle("Accent Preview", isOn: .constant(false))
@@ -4353,7 +4353,7 @@ struct SwiftUISurfaceTests {
         .padding(1)
         .frame(width: 8, height: 3, alignment: .center)
         .background {
-          RoundedRectangle(cornerRadius: 1).parallelInteriorFill(.fill)
+          RoundedRectangle(cornerRadius: 1).chromeFill(.fill)
         }
         .overlay {
           RoundedRectangle(cornerRadius: 1)
@@ -4438,7 +4438,7 @@ struct SwiftUISurfaceTests {
             .padding(1)
             .frame(width: 8, height: 3, alignment: .center)
             .background {
-              RoundedRectangle(cornerRadius: 1).parallelInteriorFill(.fill)
+              RoundedRectangle(cornerRadius: 1).chromeFill(.fill)
             }
             .overlay {
               RoundedRectangle(cornerRadius: 1)

@@ -15,6 +15,7 @@ package enum AutomaticFocusPolicy {
     .slider,
     .stepper,
     .table,
+    .tabView,
     .textField,
     .toggle,
   ]

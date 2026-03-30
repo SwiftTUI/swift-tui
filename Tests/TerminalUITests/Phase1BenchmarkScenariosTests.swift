@@ -293,7 +293,7 @@ private func benchmarkContext(
   focusedIdentity: Identity?
 ) -> ResolveContext {
   var environmentValues = EnvironmentValues()
-  environmentValues.parallelFocusedIdentity = focusedIdentity
+  environmentValues.focusedIdentity = focusedIdentity
   return .init(
     identity: Phase1BenchmarkIdentity.root,
     environmentValues: environmentValues

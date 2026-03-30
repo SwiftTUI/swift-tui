@@ -64,8 +64,8 @@ The shipped ownership model is split into three categories:
   - `View`, `Scene`, and `App`
   - `Resolver.resolve(...)`
   - `DefaultRenderer.render(...)`
-  - scene collection helpers and `WindowGroup` root-view construction
-  - action-bearing authoring APIs such as `Binding.init(get:set:)`, button actions, `OpenLinkAction`, `.onAppear`, `.onDisappear`, and `.task(...)`
+  - scene collection helpers, typed `WindowIdentifier` values, and `WindowGroup` root-view construction
+  - action-bearing authoring APIs such as `Binding.init(get:set:)`, button actions, `OpenLinkAction` over typed `LinkDestination`s, `.onAppear`, `.onDisappear`, and `.task(...)`
 - Main-actor runtime coordination and ownership:
   - `RunLoop`
   - `StateContainer`
@@ -102,7 +102,7 @@ Regression coverage exists for nested overrides, `transformEnvironment`, wrapper
 
 ### Observation Model
 
-Observation is built on the same invalidation path as `@State`, not on a parallel runtime.
+Observation is built on the same invalidation path as `@State`, not on a separate runtime.
 
 - `resolveBody` and `EnvironmentReader` track observable reads through `ObservationBridge`
 - observable callbacks invalidate the exact observed identity on the main actor

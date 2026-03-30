@@ -44,7 +44,7 @@ package enum SceneSession {
     )
     environmentSnapshot.values["surface"] = resources.surfaceName
     environmentSnapshot.values["session"] = sessionName
-    environmentSnapshot.values["scene"] = configuration.identifier
+    environmentSnapshot.values["scene"] = configuration.identifier.rawValue
     if let title = configuration.title {
       environmentSnapshot.values["windowTitle"] = title
     }

@@ -129,7 +129,7 @@ public enum MultiSceneLauncher {
 
       var sceneTasks: [Task<RunLoopResult<MultiSceneRuntimeState>, Error>] = []
       for runtime in sceneRuntimes {
-        let sceneID = runtime.configuration.identifier
+        let sceneID = runtime.configuration.identifier.rawValue
         let task = Task { @MainActor in
           try await runtime.run(
             sessionName: sessionName,
@@ -325,7 +325,7 @@ public enum MultiSceneLauncher {
         return configurations[0]
       }
 
-      return configurations.first(where: { $0.identifier == selector }) ?? configurations[0]
+      return configurations.first(where: { $0.identifier.rawValue == selector }) ?? configurations[0]
     }
 
     @MainActor

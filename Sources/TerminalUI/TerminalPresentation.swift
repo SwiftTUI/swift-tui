@@ -413,7 +413,7 @@ extension TerminalSurfaceRenderer {
           result += closeHyperlinkSequence()
         }
         if let hyperlink, capabilityProfile.supportsHyperlinks {
-          result += openHyperlinkSequence(for: hyperlink)
+          result += openHyperlinkSequence(for: .init(hyperlink))
         }
         activeHyperlink = hyperlink
       }
@@ -771,9 +771,9 @@ extension TerminalSurfaceRenderer {
   }
 
   private func openHyperlinkSequence(
-    for destination: String
+    for destination: LinkDestination
   ) -> String {
-    "\u{001B}]8;;\(destination)\u{001B}\\"
+    "\u{001B}]8;;\(destination.rawValue)\u{001B}\\"
   }
 
   private func closeHyperlinkSequence() -> String {

@@ -43,10 +43,19 @@ Deviations are permitted only when all of the following are true:
 2. The deviation solves a real terminal problem rather than copying another TUI framework by habit
 3. The deviation is documented here and reflected in the public API inventory
 
+When SwiftUI precedent and terminal-native practice disagree, TerminalUI should
+keep the SwiftUI-shaped authoring story only if it still produces a good
+terminal experience. If a direct translation would create page-like,
+mouse-centric, overdecorated, or otherwise non-native terminal behavior, the
+framework should reinterpret the behavior toward terminal-native defaults.
+
 Confirmed deviations today:
 
 - **Tree-forward collection presentation.** Hierarchical list and outline presentation is more central in TUI software than it is in common SwiftUI app design. TerminalUI supports tree-style collection display as a first-class authoring pattern while still staying close to SwiftUI’s `OutlineGroup` and `children` vocabulary.
 - **Repo-owned `@Bindable`.** The package ships its own bindable wrapper to keep observable editing on the same invalidation path as `@State` and the rest of the runtime.
+- **Terminal-native reinterpretation of defaults.** Automatic chrome, app shell
+  composition, and navigation-oriented surfaces may intentionally diverge from
+  desktop SwiftUI precedent when modern terminal UX has a clearly better answer.
 
 ### Input Philosophy
 
@@ -64,12 +73,19 @@ Some SwiftUI concepts likely belong in TerminalUI eventually, but the package do
 
 Deferred items:
 
-- `NavigationStack` and `NavigationSplitView`
+- `NavigationStack`
 - `Toolbar` and `ToolbarItem`
 - alerts and confirmation dialogs
 - sheets and popovers
 
-These should not be implemented just because terminal frameworks often have analogous surfaces. They should land only once the terminal-specific interaction model is clear and the API still reads like the same product.
+These should not be implemented just because terminal frameworks often have
+analogous surfaces. They should land only once the terminal-specific interaction
+model is clear and the API still reads like the same product.
+
+Navigation-oriented surfaces that are especially central to terminal UX, such as
+`NavigationSplitView` and `TabView`, may land earlier than their desktop-GUI
+counterparts if they are expressed as a SwiftUI-shaped but terminal-native
+subset.
 
 Current implementation status and short-term constraints live in [STATUS.md](STATUS.md). Deferred items should not jump ahead of foundation work without an explicit tradeoff.
 

@@ -6,11 +6,11 @@ extension View {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    parallelResolveElements(self, in: context)
+    resolveViewElements(self, in: context)
   }
 
   package func resolve(in context: ResolveContext) -> ResolvedNode {
-    parallelResolve(self, in: context)
+    resolveView(self, in: context)
   }
 
   public var erasedToAnyView: AnyView {
@@ -158,13 +158,13 @@ extension View {
 
   public func focusScope() -> some View {
     semanticMetadata(
-      parallelFocusStructureMetadata(scopeBoundary: true)
+      focusStructureMetadata(scopeBoundary: true)
     )
   }
 
   public func focusSection() -> some View {
     semanticMetadata(
-      parallelFocusStructureMetadata(sectionBoundary: true)
+      focusStructureMetadata(sectionBoundary: true)
     )
   }
 
@@ -259,7 +259,7 @@ extension View {
   }
 }
 
-package func parallelFocusableControlMetadata(
+package func focusableControlMetadata(
   isFocusable: Bool? = nil,
   focusInteractions: FocusInteractions = .automatic,
   scrollRole: ScrollRole? = nil,
@@ -274,7 +274,7 @@ package func parallelFocusableControlMetadata(
   )
 }
 
-package func parallelScrollViewMetadata(
+package func scrollViewMetadata(
   presentationRole: PresentationRole
 ) -> SemanticMetadata {
   .init(
@@ -285,7 +285,7 @@ package func parallelScrollViewMetadata(
   )
 }
 
-package func parallelFocusStructureMetadata(
+package func focusStructureMetadata(
   scopeBoundary: Bool = false,
   sectionBoundary: Bool = false
 ) -> SemanticMetadata {
@@ -513,7 +513,7 @@ package struct PaddingView<Content: View>: View, ResolvableView {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let contentNode = resolveWrapperContent(
       content,
-      in: context.child(component: "content")
+      in: context.child(component: .named("content"))
     )
     return [
       ResolvedNode(
@@ -550,7 +550,7 @@ package struct FrameView<Content: View>: View, ResolvableView {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let contentNode = resolveWrapperContent(
       content,
-      in: context.child(component: "content")
+      in: context.child(component: .named("content"))
     )
     return [
       ResolvedNode(
@@ -599,7 +599,7 @@ package struct FlexibleFrameView<Content: View>: View, ResolvableView {
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let contentNode = resolveWrapperContent(
       content,
-      in: context.child(component: "content")
+      in: context.child(component: .named("content"))
     )
     return [
       ResolvedNode(
@@ -630,8 +630,8 @@ package struct OverlayView<Base: View, OverlayContent: View>: View, ResolvableVi
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let baseNode = base.resolve(in: context.child(component: "base"))
-    let overlayNode = overlay.resolve(in: context.child(component: "overlay"))
+    let baseNode = base.resolve(in: context.child(component: .named("base")))
+    let overlayNode = overlay.resolve(in: context.child(component: .named("overlay")))
     return [
       ResolvedNode(
         identity: context.identity,
@@ -687,8 +687,8 @@ package struct BackgroundView<Base: View, BackgroundContent: View>: View, Resolv
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let backgroundNode = background.resolve(in: context.child(component: "background"))
-    let baseNode = base.resolve(in: context.child(component: "base"))
+    let backgroundNode = background.resolve(in: context.child(component: .named("background")))
+    let baseNode = base.resolve(in: context.child(component: .named("base")))
     return [
       ResolvedNode(
         identity: context.identity,

@@ -62,7 +62,7 @@ public struct Image: View, ResolvableView {
     )
 
     return [
-      parallelResolveLeaf(
+      resolveLeafNode(
         kindName: "Image",
         intrinsicSize: resolvedAsset?.intrinsicCellSize ?? .zero,
         drawPayload: .image(

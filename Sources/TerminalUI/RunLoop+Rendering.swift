@@ -83,11 +83,11 @@ extension RunLoop {
     effectiveEnvironmentValues.terminalSize = terminalHost.surfaceSize
     effectiveEnvironmentValues.terminalCellPixelSize =
       terminalHost.graphicsCapabilities.cellPixelSize ?? .init(width: 8, height: 16)
-    effectiveEnvironmentValues.parallelFocusedIdentity = focusTracker.currentFocusIdentity
-    effectiveEnvironmentValues.parallelFocusedValues = currentFocusedValues
-    effectiveEnvironmentValues.parallelPressedIdentity = pressedIdentity
+    effectiveEnvironmentValues.focusedIdentity = focusTracker.currentFocusIdentity
+    effectiveEnvironmentValues.focusedValues = currentFocusedValues
+    effectiveEnvironmentValues.pressedIdentity = pressedIdentity
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
-      effectiveEnvironmentValues.openLinkAction = parallelSystemOpenLinkAction()
+      effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
     }
     localActionRegistry.reset()
     localPointerHandlerRegistry.reset()

@@ -18,7 +18,7 @@ struct SecureFieldSurfaceTests {
     let box = SecretBox()
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("SecretField")
+    environmentValues.focusedIdentity = testIdentity("SecretField")
 
     let focusedArtifacts = DefaultRenderer().render(
       SecureField(

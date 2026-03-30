@@ -18,7 +18,7 @@ struct SceneRuntimeTests {
   @Test("Secondary scene input end suspends and reattaches")
   func secondarySceneSuspendsAndReattaches() async throws {
     let configuration = collectWindowSceneConfigurations(
-      from: WindowGroup("Secondary", id: "secondary") {
+      from: WindowGroup("Secondary", id: WindowIdentifier("secondary")) {
         Text("Secondary")
       }
     )[0]

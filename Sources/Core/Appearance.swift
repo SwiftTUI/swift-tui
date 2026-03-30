@@ -266,19 +266,19 @@ public struct TerminalAppearance: Equatable, Sendable {
   ) -> ControlChrome {
     let theme = semanticTheme()
     let accentStyle = buttonAccentStyle(theme: theme, role: role)
-    let accentColor = parallelResolveColor(style: accentStyle, theme: theme) ?? tintColor
+    let accentColor = resolveStyleColor(style: accentStyle, theme: theme) ?? tintColor
     let standardForegroundStyle = buttonForegroundStyle(theme: theme, role: role)
     let standardBorderColor =
-      parallelResolveColor(style: buttonBorderStyle(theme: theme, role: role), theme: theme)
+      resolveStyleColor(style: buttonBorderStyle(theme: theme, role: role), theme: theme)
       ?? foregroundColor
     let standardBorderStyle = gleamBorderStyle(base: standardBorderColor)
     let idleSurfaceStyle = gleamSurfaceStyle(
-      base: parallelResolveColor(style: theme.fill, theme: theme)
+      base: resolveStyleColor(style: theme.fill, theme: theme)
         ?? elevatedSurface(from: backgroundColor, scheme: colorScheme, amount: 0.08)
     )
     let focusedSurfaceStyle = gleamSurfaceStyle(
       base: mix(
-        parallelResolveColor(style: theme.fill, theme: theme)
+        resolveStyleColor(style: theme.fill, theme: theme)
           ?? elevatedSurface(from: backgroundColor, scheme: colorScheme, amount: 0.08),
         accentColor,
         amount: colorScheme == .dark ? 0.08 : 0.05
@@ -302,12 +302,12 @@ public struct TerminalAppearance: Equatable, Sendable {
       return .init(
         foregroundStyle: theme.placeholder,
         contentBackgroundStyle: gleamSurfaceStyle(
-          base: parallelResolveColor(style: theme.windowBackground, theme: theme)
+          base: resolveStyleColor(style: theme.windowBackground, theme: theme)
             ?? elevatedSurface(
               from: backgroundColor, scheme: colorScheme, amount: 0.04, invert: true)
         ),
         borderForegroundStyle: gleamBorderStyle(
-          base: parallelResolveColor(style: theme.separator, theme: theme)
+          base: resolveStyleColor(style: theme.separator, theme: theme)
             ?? mix(backgroundColor, foregroundColor, amount: separatorMixAmount)
         ),
         opacity: 0.65
@@ -366,7 +366,7 @@ public struct TerminalAppearance: Equatable, Sendable {
         foregroundStyle: standardForegroundStyle,
         contentBackgroundStyle: gleamSurfaceStyle(
           base: mix(
-            parallelResolveColor(style: theme.fill, theme: theme)
+            resolveStyleColor(style: theme.fill, theme: theme)
               ?? elevatedSurface(from: backgroundColor, scheme: colorScheme, amount: 0.08),
             accentColor,
             amount: colorScheme == .dark ? 0.14 : 0.1
@@ -400,7 +400,7 @@ public struct TerminalAppearance: Equatable, Sendable {
   ) -> ControlChrome {
     let theme = semanticTheme()
     let accentStyle = buttonAccentStyle(theme: theme, role: role)
-    let accentColor = parallelResolveColor(style: accentStyle, theme: theme) ?? tintColor
+    let accentColor = resolveStyleColor(style: accentStyle, theme: theme) ?? tintColor
     let neutralRowBase = mix(
       backgroundColor,
       foregroundColor,
@@ -449,7 +449,7 @@ public struct TerminalAppearance: Equatable, Sendable {
       foregroundStyle: theme.foreground,
       contentBackgroundStyle: .color(neutralRowBase),
       borderForegroundStyle: gleamBorderStyle(
-        base: parallelResolveColor(style: theme.separator, theme: theme)
+        base: resolveStyleColor(style: theme.separator, theme: theme)
           ?? mix(backgroundColor, foregroundColor, amount: separatorMixAmount)
       )
     )
@@ -488,8 +488,8 @@ public struct TerminalAppearance: Equatable, Sendable {
     case .link:
       let foregroundStyle = buttonLinkForegroundStyle(theme: theme, role: role)
       let linkColor =
-        parallelResolveColor(style: foregroundStyle, theme: theme)
-        ?? parallelResolveColor(style: theme.link, theme: theme)
+        resolveStyleColor(style: foregroundStyle, theme: theme)
+        ?? resolveStyleColor(style: theme.link, theme: theme)
         ?? tintColor
 
       if !isEnabled {
@@ -534,10 +534,10 @@ public struct TerminalAppearance: Equatable, Sendable {
   ) -> ContainerChrome {
     let theme = semanticTheme()
     let backgroundBase =
-      parallelResolveColor(style: theme.windowBackground, theme: theme)
+      resolveStyleColor(style: theme.windowBackground, theme: theme)
       ?? elevatedSurface(from: backgroundColor, scheme: colorScheme, amount: 0.04, invert: true)
     let fillBase =
-      parallelResolveColor(style: theme.fill, theme: theme)
+      resolveStyleColor(style: theme.fill, theme: theme)
       ?? elevatedSurface(from: backgroundColor, scheme: colorScheme, amount: 0.08)
 
     switch prominence {
@@ -554,7 +554,7 @@ public struct TerminalAppearance: Equatable, Sendable {
         foregroundStyle: theme.foreground,
         backgroundStyle: gleamSurfaceStyle(base: backgroundBase),
         borderStyle: gleamBorderStyle(
-          base: parallelResolveColor(style: theme.separator, theme: theme)
+          base: resolveStyleColor(style: theme.separator, theme: theme)
             ?? mix(backgroundColor, foregroundColor, amount: separatorMixAmount)
         )
       )
@@ -883,9 +883,9 @@ extension StyleEnvironmentSnapshot {
     role: ButtonRole?
   ) -> ControlChrome {
     let tone = chromeTone(for: role)
-    let neutralSurface = AnyShapeStyle(.terminalSurface(.neutral))
+    let neutralSurface = theme.background
     let focusedSurface = AnyShapeStyle(
-      prominence == .increased ? .terminalAccent(tone) : .terminalSurface(tone)
+      prominence == .increased ? .terminalAccent(tone) : .terminalRow(tone, isSelected: true)
     )
     let selectedSurface = AnyShapeStyle(.terminalRow(tone, isSelected: true))
     let neutralBorder = AnyShapeStyle(.terminalBorder(.neutral))
@@ -951,7 +951,7 @@ extension StyleEnvironmentSnapshot {
     role: ButtonRole?
   ) -> ControlChrome {
     let tone = chromeTone(for: role)
-    let idleBackground = AnyShapeStyle(.terminalRow(.neutral))
+    let idleBackground = theme.background
     let activeBackground = AnyShapeStyle(.terminalRow(tone, isSelected: true))
     let activeBorder = AnyShapeStyle(.terminalBorder(tone))
     let idleBorder = AnyShapeStyle(.terminalBorder(.neutral))
@@ -1025,9 +1025,7 @@ extension StyleEnvironmentSnapshot {
     let tone: TerminalTone = prominence == .increased ? .accent : .neutral
     return .init(
       foregroundStyle: theme.foreground,
-      backgroundStyle: AnyShapeStyle(
-        prominence == .increased ? .terminalSurface(.accent) : .terminalSurfaceBackground
-      ),
+      backgroundStyle: theme.background,
       borderStyle: AnyShapeStyle(.terminalBorder(tone))
     )
   }
@@ -1115,7 +1113,7 @@ extension StyleEnvironmentSnapshot {
   private func contrastingForegroundStyle(
     on style: AnyShapeStyle
   ) -> AnyShapeStyle {
-    guard let backgroundColor = parallelResolveColor(style: style, theme: theme) else {
+    guard let backgroundColor = resolveStyleColor(style: style, theme: theme) else {
       return theme.foreground
     }
 

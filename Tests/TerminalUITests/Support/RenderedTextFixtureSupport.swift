@@ -104,7 +104,7 @@ func assertRenderedTextFixtures<Content: View>(
     )
     return
   }
-  let rootView = composedFixtureRoot(from: parallelBuilderChildren(from: view()))
+  let rootView = composedFixtureRoot(from: declaredBuilderChildren(from: view()))
 
   let fixtureRootDirectory =
     fixtureDirectory

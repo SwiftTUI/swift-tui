@@ -16,7 +16,9 @@ public final class FocusTracker {
 
   public init(
     focusRegions: [FocusRegion] = [],
-    invalidationIdentities: Set<Identity> = [Identity(components: [])]
+    invalidationIdentities: Set<Identity> = [
+      Identity(components: [] as [IdentityComponent])
+    ]
   ) {
     self.focusRegions = focusRegions
     self.invalidationIdentities = invalidationIdentities

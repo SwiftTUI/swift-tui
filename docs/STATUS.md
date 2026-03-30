@@ -10,7 +10,9 @@ The core terminal UI stack is implemented and regression-tested across the full 
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-The package is already usable for real terminal interfaces. The main gaps are not around the fundamental pipeline anymore; they are around breadth of surface area, app-launch ergonomics, and a few still-conservative runtime paths.
+The package is already usable for real terminal interfaces. The main gaps are
+not around the fundamental pipeline anymore; they are around breadth of surface
+area, app-shell ergonomics, and a few still-conservative runtime paths.
 
 ## Shipped Surface
 
@@ -33,9 +35,10 @@ The package is already usable for real terminal interfaces. The main gaps are no
 
 ### Scene and multi-scene surface
 
-- `@MainActor` `App`, `Scene`, `SceneBuilder`, and `WindowGroup` declarations in `TerminalUI`
+- `@MainActor` `App`, `Scene`, `SceneBuilder`, `WindowIdentifier`, and `WindowGroup` declarations in `TerminalUI`
 - `MultiSceneLauncher` in `TerminalUIScenes` for public scene launch, including the single-window case today
 - Pty-backed secondary scenes, Unix-domain-socket discovery, scene attachment, and lazy rendering of unattached secondary scenes
+- `TabView` and `NavigationSplitView` for terminal-native shell composition
 
 ### Charts
 
@@ -50,6 +53,10 @@ The package is already usable for real terminal interfaces. The main gaps are no
 - Some focus surfaces are still missing:
   - namespace-scoped default-focus APIs such as `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus`
   - object-focused wrappers such as `@FocusedObject`
+- Some higher-level workflow surfaces are still missing:
+  - `TextEditor`
+  - indeterminate `ProgressView`
+  - settled help/keybinding and command-palette surfaces
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
   - `ResolvableView`
@@ -58,10 +65,15 @@ The package is already usable for real terminal interfaces. The main gaps are no
 
 See [VISION.md](VISION.md) for the rationale and the intended ordering.
 
-- `NavigationStack` and `NavigationSplitView`
+- `NavigationStack`
 - `Toolbar` and `ToolbarItem`
-- alerts, confirmation dialogs, sheets, and popover-style presentation
+- sheets and popover-style presentation
 - richer accessibility and assistive-technology modeling beyond the current semantic tree
+
+The project now treats terminal-native reinterpretation as a first-class design
+rule. The remaining gaps are therefore prioritized around terminal workspaces:
+split navigation, tabs, multiline editing, visible help surfaces, and
+terminal-native confirmation or workflow affordances.
 
 ## Documentation Status
 

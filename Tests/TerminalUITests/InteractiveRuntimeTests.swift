@@ -724,7 +724,7 @@ struct InteractiveRuntimeTests {
       InteractiveDemoIdentity.inputField,
       InteractiveDemoIdentity.selectionModePicker,
       InteractiveDemoIdentity.textLabDisclosure,
-      parallelVerticalScrollIndicatorIdentity(for: InteractiveDemoIdentity.textLabScrollPreview),
+      verticalScrollIndicatorIdentity(for: InteractiveDemoIdentity.textLabScrollPreview),
     ]
 
     #expect(artifacts.semanticSnapshot.focusRegions.map(\.identity) == expectedOrder)
@@ -782,7 +782,7 @@ struct InteractiveRuntimeTests {
         InteractiveDemoIdentity.inputField,
         InteractiveDemoIdentity.selectionModePicker,
         InteractiveDemoIdentity.textLabDisclosure,
-        parallelVerticalScrollIndicatorIdentity(for: InteractiveDemoIdentity.textLabScrollPreview),
+        verticalScrollIndicatorIdentity(for: InteractiveDemoIdentity.textLabScrollPreview),
       ])
     #expect(
       disabledArtifacts.semanticSnapshot.interactionRegions.contains {
@@ -1065,7 +1065,7 @@ struct InteractiveRuntimeTests {
       .id(linkIdentity)
     let rect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: linkIdentity),
+        for: primaryRouteID(for: linkIdentity),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1319,7 +1319,7 @@ struct InteractiveRuntimeTests {
 
     let buttonRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: testIdentity("MouseFixture", "Button")),
+        for: primaryRouteID(for: testIdentity("MouseFixture", "Button")),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1327,7 +1327,7 @@ struct InteractiveRuntimeTests {
     )
     let stepperRootRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: testIdentity("MouseFixture", "Stepper")),
+        for: primaryRouteID(for: testIdentity("MouseFixture", "Stepper")),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1335,8 +1335,8 @@ struct InteractiveRuntimeTests {
     )
     let stepperIncrementRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(
-          for: parallelStepperIncrementIdentity(for: testIdentity("MouseFixture", "Stepper"))
+        for: primaryRouteID(
+          for: stepperIncrementIdentity(for: testIdentity("MouseFixture", "Stepper"))
         ),
         in: view,
         rootIdentity: rootIdentity,
@@ -1345,8 +1345,8 @@ struct InteractiveRuntimeTests {
     )
     let sliderTrackRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(
-          for: parallelSliderTrackIdentity(for: testIdentity("MouseFixture", "Slider"))
+        for: primaryRouteID(
+          for: sliderTrackIdentity(for: testIdentity("MouseFixture", "Slider"))
         ),
         in: view,
         rootIdentity: rootIdentity,
@@ -1355,7 +1355,7 @@ struct InteractiveRuntimeTests {
     )
     let pickerRootRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: testIdentity("MouseFixture", "Picker")),
+        for: primaryRouteID(for: testIdentity("MouseFixture", "Picker")),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1363,8 +1363,8 @@ struct InteractiveRuntimeTests {
     )
     let pickerOptionRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(
-          for: parallelPickerOptionIdentity(for: testIdentity("MouseFixture", "Picker"), index: 2)
+        for: primaryRouteID(
+          for: pickerOptionIdentity(for: testIdentity("MouseFixture", "Picker"), index: 2)
         ),
         in: view,
         rootIdentity: rootIdentity,
@@ -1373,7 +1373,7 @@ struct InteractiveRuntimeTests {
     )
     let listRootRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: testIdentity("MouseFixture", "List")),
+        for: primaryRouteID(for: testIdentity("MouseFixture", "List")),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1381,8 +1381,8 @@ struct InteractiveRuntimeTests {
     )
     let listRowRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(
-          for: parallelListRowIdentity(for: testIdentity("MouseFixture", "List"), rowIndex: 2)
+        for: primaryRouteID(
+          for: listRowIdentity(for: testIdentity("MouseFixture", "List"), rowIndex: 2)
         ),
         in: view,
         rootIdentity: rootIdentity,
@@ -1391,7 +1391,7 @@ struct InteractiveRuntimeTests {
     )
     let tableRootRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: testIdentity("MouseFixture", "Table")),
+        for: primaryRouteID(for: testIdentity("MouseFixture", "Table")),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1399,7 +1399,7 @@ struct InteractiveRuntimeTests {
     )
     let scrollRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: testIdentity("MouseFixture", "Scroll")),
+        for: primaryRouteID(for: testIdentity("MouseFixture", "Scroll")),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1407,7 +1407,7 @@ struct InteractiveRuntimeTests {
     )
     let fieldRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: testIdentity("MouseFixture", "Field")),
+        for: primaryRouteID(for: testIdentity("MouseFixture", "Field")),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1481,8 +1481,8 @@ struct InteractiveRuntimeTests {
 
     let indicatorRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(
-          for: parallelVerticalScrollIndicatorIdentity(
+        for: primaryRouteID(
+          for: verticalScrollIndicatorIdentity(
             for: testIdentity("ScrollIndicatorClickFixture", "Scroll")
           )
         ),
@@ -1531,8 +1531,8 @@ struct InteractiveRuntimeTests {
 
     let indicatorRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(
-          for: parallelVerticalScrollIndicatorIdentity(
+        for: primaryRouteID(
+          for: verticalScrollIndicatorIdentity(
             for: testIdentity("ScrollIndicatorDragFixture", "Scroll")
           )
         ),
@@ -1619,7 +1619,7 @@ struct InteractiveRuntimeTests {
 
     let scrollRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: testIdentity("ImplicitPointerScrollFixture", "Scroll")),
+        for: primaryRouteID(for: testIdentity("ImplicitPointerScrollFixture", "Scroll")),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1627,8 +1627,8 @@ struct InteractiveRuntimeTests {
     )
     let indicatorRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(
-          for: parallelVerticalScrollIndicatorIdentity(
+        for: primaryRouteID(
+          for: verticalScrollIndicatorIdentity(
             for: testIdentity("ImplicitPointerScrollFixture", "Scroll")
           )
         ),
@@ -1672,7 +1672,7 @@ struct InteractiveRuntimeTests {
 
     let buttonRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: testIdentity("CancelFixture", "Button")),
+        for: primaryRouteID(for: testIdentity("CancelFixture", "Button")),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1724,7 +1724,7 @@ struct InteractiveRuntimeTests {
 
     let buttonRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: testIdentity("HoverFixture", "Button")),
+        for: primaryRouteID(for: testIdentity("HoverFixture", "Button")),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1781,7 +1781,7 @@ struct InteractiveRuntimeTests {
 
     let scrollRect = try #require(
       renderedInteractionRect(
-        for: parallelPrimaryRouteID(for: scrollIdentity),
+        for: primaryRouteID(for: scrollIdentity),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -2047,12 +2047,12 @@ private struct RunLoopInvalidationProbeRoot: View, ResolvableView {
       )
     )
 
-    let child = parallelResolve(
+    let child = resolveView(
       RunLoopInvalidationProbeLeaf(
         state: state,
         recorder: recorder
       ),
-      in: context.indexedChild(kind: "ProbeRoot", index: 0)
+      in: context.indexedChild(kind: .named("ProbeRoot"), index: 0)
     )
     return [
       ResolvedNode(
@@ -2109,13 +2109,13 @@ private struct ReusedHandlerRoot: View, ResolvableView {
       return [reused]
     }
     context.recordResolvedComputation()
-    let interactiveChild = parallelResolve(
+    let interactiveChild = resolveView(
       ReusedHandlerProbe(recorder: recorder),
-      in: context.indexedChild(kind: "Harness", index: 0)
+      in: context.indexedChild(kind: .named("Harness"), index: 0)
     )
     let dirtyChild = interactiveProbeTextNode(
       dirtyLabel,
-      in: context.indexedChild(kind: "Harness", index: 1)
+      in: context.indexedChild(kind: .named("Harness"), index: 1)
     )
     return [
       ResolvedNode(
@@ -2130,7 +2130,7 @@ private struct ReusedHandlerRoot: View, ResolvableView {
 }
 
 private final class LinkOpenRecorder: @unchecked Sendable {
-  var destinations: [String] = []
+  var destinations: [LinkDestination] = []
 }
 
 private final class ScriptedInputReader: InputReading {
@@ -2410,12 +2410,12 @@ private struct LifecycleRuntimeRoot: View, ResolvableView {
     let children =
       state.showChild
       ? [
-        parallelResolve(
+        resolveView(
           LifecycleRuntimeProbe(
             recorder: recorder,
             focusable: focusable
           ),
-          in: context.indexedChild(kind: "RuntimeRoot", index: 0)
+          in: context.indexedChild(kind: .named("RuntimeRoot"), index: 0)
         )
       ]
       : []
@@ -2649,7 +2649,7 @@ private func renderedInteractionRect<V: View>(
 ) -> Rect? {
   var environmentValues = EnvironmentValues()
   environmentValues.terminalSize = terminalSize
-  environmentValues.parallelFocusedIdentity = focusedIdentity
+  environmentValues.focusedIdentity = focusedIdentity
 
   let artifacts = DefaultRenderer().render(
     view,

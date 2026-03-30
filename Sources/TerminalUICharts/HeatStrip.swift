@@ -37,8 +37,8 @@ public struct HeatStrip: View, ResolvableView {
   ) {
     self.entries = entries
     self.cellWidth = cellWidth
-    labelViews = parallelBuilderChildren(from: label())
-    summaryViews = parallelBuilderChildren(from: summary())
+    labelViews = declaredBuilderChildren(from: label())
+    summaryViews = declaredBuilderChildren(from: summary())
   }
 
   package func resolveElements(

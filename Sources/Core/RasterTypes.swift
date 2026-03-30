@@ -114,7 +114,7 @@ public struct RasterSurface: Equatable, Sendable {
     let height = max(size.height, lines.count)
     let width = max(
       size.width,
-      lines.map { parallelTextLayout(for: $0, width: nil).size.width }.max() ?? 0
+      lines.map { layoutText(for: $0, width: nil).size.width }.max() ?? 0
     )
     guard width > 0, height > 0 else {
       return []
@@ -126,7 +126,7 @@ public struct RasterSurface: Equatable, Sendable {
     )
 
     for (y, line) in lines.enumerated() where y < height {
-      let clusters = parallelTextLayout(for: line, width: nil).lines.first?.clusters ?? []
+      let clusters = layoutText(for: line, width: nil).lines.first?.clusters ?? []
       var x = 0
       for cluster in clusters where x < width {
         let style = styleRuns.first {

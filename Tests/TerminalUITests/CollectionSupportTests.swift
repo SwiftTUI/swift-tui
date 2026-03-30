@@ -72,7 +72,7 @@ struct CollectionSupportTests {
       ]
     )
 
-    #expect(parallelNodeLabelText(from: node) == "Alpha Beta")
+    #expect(resolvedNodeLabelText(from: node) == "Alpha Beta")
     #expect(
       tableRowCells(
         from: ResolvedNode(
@@ -116,7 +116,7 @@ struct CollectionSupportTests {
       ]
     )
 
-    #expect(parallelNodeLabelText(from: node) == "Alpha Docs Beta")
+    #expect(resolvedNodeLabelText(from: node) == "Alpha Docs Beta")
   }
 
   @Test("table row cell payloads preserve per-cell text and merged row styling")

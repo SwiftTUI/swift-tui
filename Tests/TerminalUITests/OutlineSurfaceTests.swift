@@ -68,7 +68,7 @@ struct OutlineSurfaceTests {
     let box = SelectionBox()
     let registry = LocalKeyHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("OutlineList")
+    environmentValues.focusedIdentity = testIdentity("OutlineList")
 
     let artifacts = DefaultRenderer().render(
       List(
@@ -116,7 +116,7 @@ struct OutlineSurfaceTests {
   @Test("tagged OutlineGroup rows keep their connector prefixes when rendered inside List")
   func manualOutlineGroupRowsRenderAsSelectableListRows() {
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("TaggedOutlineList")
+    environmentValues.focusedIdentity = testIdentity("TaggedOutlineList")
 
     let artifacts = DefaultRenderer().render(
       List(selection: .constant("leaf")) {

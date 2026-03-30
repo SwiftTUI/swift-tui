@@ -21,7 +21,7 @@ package func combinedView(
 }
 
 @MainActor
-private func parallelResolveGroup(
+private func resolveGroupElements(
   kindName: String = "Group",
   children: [AnyView],
   layoutBehavior: LayoutBehavior = .intrinsic,
@@ -35,7 +35,7 @@ private func parallelResolveGroup(
   }
   context.recordResolvedComputation()
   let resolvedChildren = children.enumerated().map { index, child in
-    child.resolve(in: context.indexedChild(kind: kindName, index: index))
+    child.resolve(in: context.indexedChild(kind: .init(rawValue: kindName), index: index))
   }
 
   return ResolvedNode(
@@ -58,7 +58,7 @@ private struct NamedGroupView: View, ResolvableView {
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
-      parallelResolveGroup(
+      resolveGroupElements(
         kindName: kindName,
         children: children,
         in: context

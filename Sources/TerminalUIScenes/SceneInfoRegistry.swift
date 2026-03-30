@@ -16,7 +16,7 @@
     init(runtimes: [SceneRuntime]) {
       self.entries = runtimes.map {
         Entry(
-          id: $0.configuration.identifier,
+          id: $0.configuration.identifier.rawValue,
           title: $0.configuration.title,
           ptyPath: $0.sceneInfo.ptyPath,
           isPrimary: $0.isPrimary

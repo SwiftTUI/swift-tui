@@ -158,7 +158,7 @@ They avoid:
 - fixed-width islands scattered across the terminal
 
 Terminal screens are shallow in height and precious in width. Great apps own
-that width and use it to preserve context, preview information, and parallel
+that width and use it to preserve context, preview information, and multi-pane
 navigation.
 
 ### 7. Scrolling Is Usually Pane-Local, Not Page-Level

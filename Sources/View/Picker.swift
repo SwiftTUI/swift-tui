@@ -13,7 +13,7 @@ public struct Picker<SelectionValue: Hashable>: View, ResolvableView {
   ) {
     self.selection = selection
     labelViews = [AnyView(Text(String(title)))]
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   public init<Content: View, Label: View>(
@@ -22,8 +22,8 @@ public struct Picker<SelectionValue: Hashable>: View, ResolvableView {
     @ViewBuilder label: () -> Label
   ) {
     self.selection = selection
-    labelViews = parallelBuilderChildren(from: label())
-    contentViews = parallelBuilderChildren(from: content())
+    labelViews = declaredBuilderChildren(from: label())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   package func resolveElements(
@@ -42,15 +42,15 @@ extension Picker {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let pickerStyle =
       context.environmentValues.pickerStyle == .automatic
       ? PickerStyle.inline
       : context.environmentValues.pickerStyle
-    let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
+    let isFocused = context.environmentValues.focusedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let options = resolvedOptions(in: context.child(component: "PickerOptions"))
+    let options = resolvedOptions(in: context.child(component: .named("PickerOptions")))
     let selectedIndex = options.firstIndex { option in
       pickerSelectionMatches(
         option.tag,
@@ -95,7 +95,7 @@ extension Picker {
         )
       }
 
-      let rootRouteID = parallelPrimaryRouteID(for: context.identity)
+      let rootRouteID = primaryRouteID(for: context.identity)
       context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
@@ -113,8 +113,8 @@ extension Picker {
       }
 
       for (index, option) in options.enumerated() {
-        let routeID = parallelPrimaryRouteID(
-          for: parallelPickerOptionIdentity(
+        let routeID = primaryRouteID(
+          for: pickerOptionIdentity(
             for: context.identity,
             index: index
           )
@@ -131,8 +131,8 @@ extension Picker {
       }
 
       if pickerStyle == .menu {
-        let triggerRouteID = parallelPrimaryRouteID(
-          for: parallelPickerTriggerIdentity(for: context.identity)
+        let triggerRouteID = primaryRouteID(
+          for: pickerTriggerIdentity(for: context.identity)
         )
         context.localPointerHandlerRegistry?.register(routeID: triggerRouteID) { _ in
           false
@@ -150,11 +150,11 @@ extension Picker {
       showsFocusEffect: showsFocusEffect,
       isEnabled: isEnabled,
       styleEnvironment: styleEnvironment,
-      viewportLineCount: context.environmentValues.parallelPickerViewportLineCount,
-      lineWidth: context.environmentValues.parallelPickerLineWidth
+      viewportLineCount: context.environmentValues.pickerViewportLineCount,
+      lineWidth: context.environmentValues.pickerLineWidth
     )
     let child = body.resolve(
-      in: context.child(component: "PickerBody")
+      in: context.child(component: .named("PickerBody"))
     )
 
     return ResolvedNode(
@@ -163,7 +163,7 @@ extension Picker {
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         presentationRole: .picker
       )
@@ -190,7 +190,7 @@ extension Picker {
         options.append(
           Option(
             tag: tag,
-            label: parallelNodeLabelText(from: node)
+            label: resolvedNodeLabelText(from: node)
           )
         )
       } else {

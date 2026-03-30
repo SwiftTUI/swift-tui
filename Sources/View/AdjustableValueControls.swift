@@ -28,7 +28,7 @@ public struct Stepper: View, ResolvableView {
     self.value = value
     self.bounds = bounds
     self.step = max(1, step)
-    labelViews = parallelBuilderChildren(from: label())
+    labelViews = declaredBuilderChildren(from: label())
   }
 
   package func resolveElements(
@@ -42,10 +42,10 @@ extension Stepper {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
-    let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
+    let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
+    let isPressed = context.environmentValues.pressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let currentValue = clampedControlValue(value.wrappedValue, to: bounds)
     let canDecrement = stepperCanAdjust(currentValue, delta: -step, bounds: bounds)
@@ -98,12 +98,12 @@ extension Stepper {
         )
       }
 
-      let rootRouteID = parallelPrimaryRouteID(for: context.identity)
-      let decrementRouteID = parallelPrimaryRouteID(
-        for: parallelStepperDecrementIdentity(for: context.identity)
+      let rootRouteID = primaryRouteID(for: context.identity)
+      let decrementRouteID = primaryRouteID(
+        for: stepperDecrementIdentity(for: context.identity)
       )
-      let incrementRouteID = parallelPrimaryRouteID(
-        for: parallelStepperIncrementIdentity(for: context.identity)
+      let incrementRouteID = primaryRouteID(
+        for: stepperIncrementIdentity(for: context.identity)
       )
 
       context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
@@ -159,7 +159,7 @@ extension Stepper {
       chrome: chrome,
       contentChrome: contentChrome
     ).resolve(
-      in: context.child(component: "StepperBody")
+      in: context.child(component: .named("StepperBody"))
     )
 
     return ResolvedNode(
@@ -168,7 +168,7 @@ extension Stepper {
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         presentationRole: .stepper
       )
@@ -196,11 +196,11 @@ extension Stepper {
       : AnyShapeStyle(.separator)
     let decrementControl = Text(canDecrement ? "[-]" : "[ ]")
       .foregroundStyle(canDecrement ? controlAccent : inactiveStyle)
-      .id(parallelStepperDecrementIdentity(for: controlIdentity))
+      .id(stepperDecrementIdentity(for: controlIdentity))
       .semanticMetadata(.init(participatesInPointerHitTesting: true))
     let incrementControl = Text(canIncrement ? "[+]" : "[ ]")
       .foregroundStyle(canIncrement ? controlAccent : inactiveStyle)
-      .id(parallelStepperIncrementIdentity(for: controlIdentity))
+      .id(stepperIncrementIdentity(for: controlIdentity))
       .semanticMetadata(.init(participatesInPointerHitTesting: true))
     let controls = AnyView(
       HStack(alignment: .center, spacing: 1) {
@@ -275,7 +275,7 @@ public struct Slider: View, ResolvableView {
     self.value = value
     self.bounds = bounds
     self.step = max(1, step)
-    labelViews = parallelBuilderChildren(from: label())
+    labelViews = declaredBuilderChildren(from: label())
   }
 
   package func resolveElements(
@@ -289,10 +289,10 @@ extension Slider {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
-    let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
+    let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
+    let isPressed = context.environmentValues.pressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let currentValue = clampedControlValue(value.wrappedValue, to: bounds)
     let chrome = styleEnvironment.rowChrome(
@@ -343,9 +343,9 @@ extension Slider {
         )
       }
 
-      let rootRouteID = parallelPrimaryRouteID(for: context.identity)
-      let trackRouteID = parallelPrimaryRouteID(
-        for: parallelSliderTrackIdentity(for: context.identity)
+      let rootRouteID = primaryRouteID(for: context.identity)
+      let trackRouteID = primaryRouteID(
+        for: sliderTrackIdentity(for: context.identity)
       )
 
       context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
@@ -401,7 +401,7 @@ extension Slider {
       chrome: chrome,
       contentChrome: contentChrome
     ).resolve(
-      in: context.child(component: "SliderBody")
+      in: context.child(component: .named("SliderBody"))
     )
 
     return ResolvedNode(
@@ -410,7 +410,7 @@ extension Slider {
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         presentationRole: .slider
       )
@@ -436,7 +436,7 @@ extension Slider {
       : chrome.foregroundStyle
     let trackView = Text(track)
       .foregroundStyle(trackStyle)
-      .id(parallelSliderTrackIdentity(for: controlIdentity))
+      .id(sliderTrackIdentity(for: controlIdentity))
       .semanticMetadata(.init(participatesInPointerHitTesting: true))
     let controls = AnyView(
       HStack(alignment: .center, spacing: 1) {

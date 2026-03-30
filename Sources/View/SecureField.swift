@@ -22,7 +22,7 @@ public struct SecureField: View, ResolvableView {
   ) {
     self.text = text
     self.prompt = prompt
-    labelViews = parallelBuilderChildren(from: label())
+    labelViews = declaredBuilderChildren(from: label())
   }
 
   package func resolveElements(
@@ -36,8 +36,8 @@ extension SecureField {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
-    let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
+    let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
     let fieldText = text.wrappedValue
@@ -66,7 +66,7 @@ extension SecureField {
       placeholderStyle: styleEnvironment.theme.placeholder,
       chromePreset: styleEnvironment.chromePreset
     ).resolve(
-      in: context.child(component: "SecureFieldBody")
+      in: context.child(component: .named("SecureFieldBody"))
     )
 
     return ResolvedNode(
@@ -75,7 +75,7 @@ extension SecureField {
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         presentationRole: .textField
       )

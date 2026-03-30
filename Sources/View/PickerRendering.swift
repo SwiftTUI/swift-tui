@@ -95,7 +95,7 @@ extension Picker {
       }
       .foregroundStyle(triggerChrome.foregroundStyle)
       .drawMetadata(.init(opacity: triggerChrome.opacity))
-      .id(parallelPickerTriggerIdentity(for: controlIdentity))
+      .id(pickerTriggerIdentity(for: controlIdentity))
       .semanticMetadata(.init(participatesInPointerHitTesting: true))
     )
 
@@ -125,7 +125,7 @@ extension Picker {
                 isEnabled: isEnabled,
                 styleEnvironment: styleEnvironment,
                 lineWidth: nil,
-                routeIdentity: parallelPickerOptionIdentity(
+                routeIdentity: pickerOptionIdentity(
                   for: controlIdentity,
                   index: index
                 )
@@ -189,10 +189,10 @@ extension Picker {
           .init(horizontal: 1, vertical: 1)
         )
         .background {
-          RoundedRectangle(cornerRadius: 1).parallelInteriorFill(containerChrome.backgroundStyle)
+          RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
         }
         .overlay {
-          RoundedRectangle(cornerRadius: 1).parallelStrokeBorder(
+          RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
             containerChrome.borderStyle,
             backgroundStyle: containerChrome.borderBackgroundStyle
           )
@@ -260,7 +260,7 @@ extension Picker {
           isEnabled: isEnabled,
           styleEnvironment: styleEnvironment,
           lineWidth: lineWidth,
-          routeIdentity: parallelPickerOptionIdentity(
+          routeIdentity: pickerOptionIdentity(
             for: controlIdentity,
             index: option.offset
           )
@@ -388,7 +388,7 @@ extension Picker {
               )
               .background {
                 if isSelected && isActiveNavigation && showsFocusEffect {
-                  RoundedRectangle(cornerRadius: 1).parallelInteriorFill(
+                  RoundedRectangle(cornerRadius: 1).chromeFill(
                     segmentChrome.backgroundStyle
                   )
                 }
@@ -396,7 +396,7 @@ extension Picker {
               .foregroundStyle(segmentChrome.foregroundStyle)
               .drawMetadata(.init(opacity: segmentChrome.opacity))
               .id(
-                parallelPickerOptionIdentity(
+                pickerOptionIdentity(
                   for: controlIdentity,
                   index: index
                 )
@@ -408,10 +408,10 @@ extension Picker {
           .init(horizontal: 1, vertical: 1)
         )
         .background {
-          RoundedRectangle(cornerRadius: 1).parallelInteriorFill(containerChrome.backgroundStyle)
+          RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
         }
         .overlay {
-          RoundedRectangle(cornerRadius: 1).parallelStrokeBorder(
+          RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
             containerChrome.borderStyle,
             backgroundStyle: containerChrome.borderBackgroundStyle
           )
@@ -453,7 +453,7 @@ extension Picker {
               isFocused: isActiveNavigation && showsFocusEffect && index == selectedIndex,
               isEnabled: isEnabled,
               styleEnvironment: styleEnvironment,
-              routeIdentity: parallelPickerOptionIdentity(
+              routeIdentity: pickerOptionIdentity(
                 for: controlIdentity,
                 index: index
               )
@@ -464,10 +464,10 @@ extension Picker {
           .init(horizontal: 1, vertical: 1)
         )
         .background {
-          RoundedRectangle(cornerRadius: 1).parallelInteriorFill(containerChrome.backgroundStyle)
+          RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
         }
         .overlay {
-          RoundedRectangle(cornerRadius: 1).parallelStrokeBorder(
+          RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
             containerChrome.borderStyle,
             backgroundStyle: containerChrome.borderBackgroundStyle
           )

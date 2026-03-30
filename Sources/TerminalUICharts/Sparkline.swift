@@ -37,8 +37,8 @@ public struct Sparkline: View, ResolvableView {
   ) {
     self.tone = tone
     self.values = values
-    labelViews = parallelBuilderChildren(from: label())
-    trailingViews = parallelBuilderChildren(from: summary())
+    labelViews = declaredBuilderChildren(from: label())
+    trailingViews = declaredBuilderChildren(from: summary())
   }
 
   package func resolveElements(

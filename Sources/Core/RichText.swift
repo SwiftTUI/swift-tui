@@ -1,14 +1,44 @@
+/// A typed link destination that stays Foundation-free in Core and View.
+public struct LinkDestination: Equatable, Hashable, Sendable, CustomStringConvertible,
+  CustomDebugStringConvertible, ExpressibleByStringLiteral
+{
+  public var rawValue: String
+
+  public init(
+    _ rawValue: String
+  ) {
+    self.rawValue = rawValue
+  }
+
+  public init(
+    stringLiteral value: String
+  ) {
+    rawValue = value
+  }
+  public var description: String {
+    rawValue
+  }
+
+  public var debugDescription: String {
+    rawValue
+  }
+
+  public var isEmpty: Bool {
+    rawValue.isEmpty
+  }
+}
+
 /// A single inline run within a rich text payload.
 public struct RichTextRun: Equatable, Sendable {
   public var text: String
   public var style: TextStyle
-  public var destination: String?
+  public var destination: LinkDestination?
   package var linkIdentifier: String?
 
   public init(
     text: String,
     style: TextStyle = .init(),
-    destination: String? = nil,
+    destination: LinkDestination? = nil,
     linkIdentifier: String? = nil
   ) {
     self.text = text
@@ -72,7 +102,7 @@ extension TextStyle {
   }
 }
 
-package func parallelInlineLinkIdentity(
+package func inlineLinkIdentity(
   parent: Identity,
   identifier: String
 ) -> Identity {

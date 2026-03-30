@@ -36,10 +36,10 @@ extension Menu {
       }
       .padding(.init(horizontal: 1, vertical: 1))
       .background {
-        RoundedRectangle(cornerRadius: 1).parallelInteriorFill(chrome.backgroundStyle)
+        RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
       }
       .overlay {
-        RoundedRectangle(cornerRadius: 1).parallelStrokeBorder(
+        RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
           chrome.borderStyle,
           backgroundStyle: chrome.borderBackgroundStyle
         )

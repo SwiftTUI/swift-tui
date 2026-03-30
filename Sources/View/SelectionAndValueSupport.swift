@@ -1,15 +1,15 @@
 package import Core
 
 protocol OptionalSelectionValue {
-  static func parallelOptionalSelectionValue(from tag: AnyHashable) -> Self?
+  static func optionalSelectionValue(from tag: AnyHashable) -> Self?
 }
 
 protocol OptionalSelectionMatchable {
-  var parallelWrappedTagValue: AnyHashable? { get }
+  var wrappedTagValue: AnyHashable? { get }
 }
 
 extension Optional: OptionalSelectionValue where Wrapped: Hashable {
-  static func parallelOptionalSelectionValue(from tag: AnyHashable) -> Wrapped?? {
+  static func optionalSelectionValue(from tag: AnyHashable) -> Wrapped?? {
     guard let wrapped = tag.base as? Wrapped else {
       return nil
     }
@@ -18,7 +18,7 @@ extension Optional: OptionalSelectionValue where Wrapped: Hashable {
 }
 
 extension Optional: OptionalSelectionMatchable where Wrapped: Hashable {
-  var parallelWrappedTagValue: AnyHashable? {
+  var wrappedTagValue: AnyHashable? {
     switch self {
     case .some(let wrapped):
       return AnyHashable(wrapped)
@@ -42,7 +42,7 @@ func pickerSelectionMatches<SelectionValue: Hashable>(
     return false
   }
 
-  return optionalSelection.parallelWrappedTagValue == tag.value
+  return optionalSelection.wrappedTagValue == tag.value
 }
 
 func pickerSelectionValue<SelectionValue: Hashable>(
@@ -59,7 +59,7 @@ func pickerSelectionValue<SelectionValue: Hashable>(
     return nil
   }
 
-  return optionalType.parallelOptionalSelectionValue(from: tag.value) as? SelectionValue
+  return optionalType.optionalSelectionValue(from: tag.value) as? SelectionValue
 }
 
 func clampedControlValue(
@@ -213,7 +213,7 @@ struct PointerRouteView<Content: View>: View, ResolvableView {
   ) -> [ResolvedNode] {
     let wrapperContext = context.replacingIdentity(with: identity)
     let child = content.resolve(
-      in: wrapperContext.child(component: "content")
+      in: wrapperContext.child(component: .named("content"))
     )
     return [
       ResolvedNode(

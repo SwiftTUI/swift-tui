@@ -19,9 +19,10 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - `View`, `ViewBuilder`, `AnyView`, `TupleView`, `ConditionalContent`, `VariadicView`, `EmptyView`, `Text`, `Link`, `Image`, `Spacer`, `Divider`, `Group`
 - text layout enums and interpolation support exposed through `Text`, including `Text.TruncationMode`, `Text.WrappingStrategy`, and rich interpolation of embedded `Text` and `Link` segments
 - `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `GeometryReader`
+- `TabItemLabel`, `TabView`, `NavigationSplitView`
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`
-- `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `FocusInteractions`, `OpenLinkAction`
+- `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `FocusInteractions`, `LinkDestination`, `OpenLinkAction`
 - image-source environment configuration such as `EnvironmentValues.imageResourceRoots`
 - `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, repo-owned `@Bindable`, `@SceneBuilder`, `@main`
 - canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.background(...)`, `.overlay(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`
@@ -32,7 +33,7 @@ Important public-surface rules after the lowering migration:
 - `View` is body-only. It no longer inherits any low-level resolver protocol.
 - `View`, `Scene`, and `App` are `@MainActor` authoring protocols.
 - APIs that evaluate authored `body` trees, including `Resolver.resolve(...)` and `DefaultRenderer.render(...)`, are `@MainActor`.
-- Callback-bearing authoring APIs follow the same model: `Binding.init(get:set:)` and `.task(...)` use actor-inheriting closure signatures, while button actions, `OpenLinkAction`, `.onAppear`, and `.onDisappear` stay explicitly `@MainActor`. In ordinary authored view code those all still resolve to main-actor authoring because `View.body` is `@MainActor`.
+- Callback-bearing authoring APIs follow the same model: `Binding.init(get:set:)` and `.task(...)` use actor-inheriting closure signatures, while button actions, `OpenLinkAction` over typed `LinkDestination`s, `.onAppear`, and `.onDisappear` stay explicitly `@MainActor`. In ordinary authored view code those all still resolve to main-actor authoring because `View.body` is `@MainActor`.
 - `ViewBuilder` no longer exposes `[AnyView]` in public closure signatures.
 - `AnyView` remains public as `View` erasure, but `AnyView.init(erasing:)` is no longer public.
 
@@ -117,6 +118,9 @@ Current rule:
 - `PrototypeUIComponents` is a package target used by experiments and tests, not a library product that downstream packages should import as a supported API surface
 - prototype widgets are allowed to inform future canonical APIs, but they should not be documented as the framework's primary authoring model
 - README and architecture-facing docs should describe prototype code as exploratory or showcase-only when it appears at all
+- terminal-native interaction surfaces that are still being shaped, such as help
+  models, command palettes, or launcher-like flows, should land here first
+  rather than forcing premature API commitments onto `View`
 
 ## Policy Summary
 
@@ -124,3 +128,6 @@ Current rule:
 - Package-only seams should not be promoted as ordinary examples.
 - If a new feature can be expressed on `View`, it should usually be documented there rather than through `*` construction.
 - If a new public symbol is added, it should be classified here before it becomes the default example in the README or architecture docs.
+- SwiftUI-shaped APIs may intentionally reinterpret behavior toward
+  terminal-native defaults when a literal desktop translation would degrade the
+  TUI experience.

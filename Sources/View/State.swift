@@ -6,7 +6,11 @@ package final class DynamicStateStore: Equatable {
   package weak var invalidator: (any Invalidating)?
   package let invalidationIdentities: Set<Identity>
 
-  package init(invalidationIdentities: Set<Identity> = [.init(components: [])]) {
+  package init(
+    invalidationIdentities: Set<Identity> = [
+      .init(components: [] as [IdentityComponent])
+    ]
+  ) {
     self.invalidationIdentities = invalidationIdentities
   }
 

@@ -157,7 +157,7 @@ extension EnvironmentValues {
     set { self[TableHeaderVisibilityKey.self] = newValue }
   }
 
-  var parallelThemeOverride: Theme? {
+  var themeOverride: Theme? {
     get { self[ThemeOverrideKey.self] }
     set { self[ThemeOverrideKey.self] = newValue }
   }
@@ -187,30 +187,30 @@ extension EnvironmentValues {
     set { self[IsFocusEffectEnabledKey.self] = newValue }
   }
 
-  package var parallelFocusedIdentity: Identity? {
-    get { _parallelFocusedIdentity }
-    set { _parallelFocusedIdentity = newValue }
+  package var focusedIdentity: Identity? {
+    get { _focusedIdentity }
+    set { _focusedIdentity = newValue }
   }
 
-  package var parallelPressedIdentity: Identity? {
-    get { _parallelPressedIdentity }
-    set { _parallelPressedIdentity = newValue }
+  package var pressedIdentity: Identity? {
+    get { _pressedIdentity }
+    set { _pressedIdentity = newValue }
   }
 
-  package var parallelPickerViewportLineCount: Int? {
+  package var pickerViewportLineCount: Int? {
     get { self[PickerViewportLineCountKey.self] }
     set { self[PickerViewportLineCountKey.self] = newValue }
   }
 
-  package var parallelPickerLineWidth: Int? {
+  package var pickerLineWidth: Int? {
     get { self[PickerLineWidthKey.self] }
     set { self[PickerLineWidthKey.self] = newValue }
   }
 
-  package var parallelStyleEnvironmentSnapshot: StyleEnvironmentSnapshot {
+  package var styleEnvironmentSnapshot: StyleEnvironmentSnapshot {
     .init(
       appearance: terminalAppearance,
-      themeOverride: parallelThemeOverride,
+      themeOverride: themeOverride,
       foregroundStyle: foregroundStyle,
       tintStyle: tintStyle,
       preferredColorScheme: preferredColorScheme,

@@ -15,7 +15,7 @@ struct AppRuntimeTests {
       from: GreetingApp().body
     )
 
-    #expect(configuration.identifier == "Greeting-Window")
+    #expect(configuration.identifier == WindowIdentifier("Greeting-Window"))
     #expect(configuration.rootIdentity == testIdentity("App", "Greeting-Window"))
 
     let artifacts = DefaultRenderer().render(
@@ -370,8 +370,8 @@ struct AppRuntimeTests {
     )
 
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("FocusedBindingWindow", "Second")
-    environmentValues.parallelFocusedValues = focusedValues
+    environmentValues.focusedIdentity = testIdentity("FocusedBindingWindow", "Second")
+    environmentValues.focusedValues = focusedValues
 
     let focusedArtifacts = DefaultRenderer().render(
       view,
@@ -396,7 +396,7 @@ struct AppRuntimeTests {
     )
 
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = focusedIdentity
+    environmentValues.focusedIdentity = focusedIdentity
     let artifacts = DefaultRenderer().render(
       FocusEnvironmentWindow(),
       context: .init(
@@ -485,7 +485,7 @@ private struct StatefulFormWindow: View {
 private struct FocusReadoutWindow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      EnvironmentReader(\.parallelFocusedIdentity) { focusedIdentity in
+      EnvironmentReader(\.focusedIdentity) { focusedIdentity in
         Text("Focus: \(focusedIdentity.map(\.description) ?? "none")")
       }
       Button("First") {}
@@ -501,7 +501,7 @@ private struct DisappearingFocusWindow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      EnvironmentReader(\.parallelFocusedIdentity) { focusedIdentity in
+      EnvironmentReader(\.focusedIdentity) { focusedIdentity in
         Text("Focus: \(focusedIdentity.map(\.description) ?? "none")")
       }
       Button("First") {}
@@ -520,7 +520,7 @@ private struct DisappearingFocusWindow: View {
 private struct GeometryFocusWindow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      EnvironmentReader(\.parallelFocusedIdentity) { focusedIdentity in
+      EnvironmentReader(\.focusedIdentity) { focusedIdentity in
         Text("Focus: \(focusedIdentity.map(\.description) ?? "none")")
       }
       HStack(alignment: .top, spacing: 4) {
@@ -546,7 +546,7 @@ private struct BoolFocusStateWindow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      EnvironmentReader(\.parallelFocusedIdentity) { focusedIdentity in
+      EnvironmentReader(\.focusedIdentity) { focusedIdentity in
         Text("Focus: \(focusedIdentity.map(\.description) ?? "none")")
       }
       Text("First focused: \(isFirstFocused)")
@@ -569,7 +569,7 @@ private struct RequestedBoolFocusWindow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      EnvironmentReader(\.parallelFocusedIdentity) { focusedIdentity in
+      EnvironmentReader(\.focusedIdentity) { focusedIdentity in
         Text("Focus: \(focusedIdentity.map(\.description) ?? "none")")
       }
       Text("Second requested: \(isSecondFocused)")
@@ -621,7 +621,7 @@ private struct OptionalFocusStateWindow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      EnvironmentReader(\.parallelFocusedIdentity) { focusedIdentity in
+      EnvironmentReader(\.focusedIdentity) { focusedIdentity in
         Text("Focus: \(focusedIdentity.map(\.description) ?? "none")")
       }
       Text("Field: \(focusedField?.rawValue ?? "none")")
@@ -681,7 +681,7 @@ private struct DefaultFocusWindow: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      EnvironmentReader(\.parallelFocusedIdentity) { focusedIdentity in
+      EnvironmentReader(\.focusedIdentity) { focusedIdentity in
         Text("Focus: \(focusedIdentity.map(\.description) ?? "none")")
       }
       Text("Field: \(focusedField?.rawValue ?? "none")")

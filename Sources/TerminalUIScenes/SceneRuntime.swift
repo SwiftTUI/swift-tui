@@ -105,7 +105,7 @@ final class SceneRuntime {
 
   var sceneInfo: SceneInfo {
     SceneInfo(
-      id: configuration.identifier,
+      id: configuration.identifier.rawValue,
       title: configuration.title,
       ptyPath: ptyPair?.slavePath,
       isAttached: lifecycle.state == .rendering

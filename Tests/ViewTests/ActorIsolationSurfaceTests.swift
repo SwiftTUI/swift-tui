@@ -101,7 +101,7 @@ struct ActorIsolationSurfaceTests {
       context: .init(identity: configuration.rootIdentity)
     )
 
-    #expect(configuration.identifier == "Actor-Surface")
+    #expect(configuration.identifier == WindowIdentifier("Actor-Surface"))
     #expect(artifacts.resolvedTree.identity == configuration.rootIdentity)
   }
 }

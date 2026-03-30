@@ -24,7 +24,7 @@ extension LayoutEngine {
       switch item.kind {
       case .header, .footer:
         partial.width = max(
-          partial.width, parallelTextLayout(for: item.text, width: nil).size.width)
+          partial.width, layoutText(for: item.text, width: nil).size.width)
         partial.height += 1
       case .row:
         let prefix =
@@ -35,7 +35,7 @@ extension LayoutEngine {
           }
         partial.width = max(
           partial.width,
-          parallelTextLayout(for: prefix + item.text, width: nil).size.width
+          layoutText(for: prefix + item.text, width: nil).size.width
         )
         partial.height += 1
         if isPlainStyle,

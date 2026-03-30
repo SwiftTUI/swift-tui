@@ -37,7 +37,7 @@ struct LifecycleDiffFixture: Sendable {
   }
 }
 
-func parallelLifecycleTree(
+func lifecycleTree(
   identity: Identity = testIdentity("LifecycleRoot"),
   children: [ResolvedNode] = []
 ) -> ResolvedNode {
@@ -48,7 +48,7 @@ func parallelLifecycleTree(
   )
 }
 
-func parallelLifecycleNode(
+func lifecycleNode(
   _ identity: Identity,
   kind: NodeKind = .view("LifecycleFixture"),
   appearHandlerIDs: [String] = [],

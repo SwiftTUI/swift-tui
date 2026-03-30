@@ -14,12 +14,12 @@ extension LayoutEngine {
   package func measuredTableIdealSize(
     for payload: TablePayload
   ) -> Size {
-    let widths = parallelTableColumnWidths(
+    let widths = measureTableColumnWidths(
       columns: payload.columns,
       rows: payload.rows
     )
     var lineMetrics = (
-      width: parallelBorderedTableLineWidth(widths: widths),
+      width: borderedTableLineWidth(widths: widths),
       height: 2
     )
 
@@ -29,7 +29,7 @@ extension LayoutEngine {
 
     for (index, row) in payload.rows.enumerated() {
       lineMetrics.height += 1
-      if parallelTableRowSeparatorIsVisible(
+      if showsTableRowSeparator(
         current: row,
         next: payload.rows.dropFirst(index + 1).first
       ) {
@@ -43,7 +43,7 @@ extension LayoutEngine {
     )
   }
 
-  package func parallelTableRowSeparatorIsVisible(
+  package func showsTableRowSeparator(
     current: TableRowPayload,
     next: TableRowPayload?
   ) -> Bool {

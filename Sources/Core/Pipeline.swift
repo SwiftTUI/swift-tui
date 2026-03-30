@@ -4,7 +4,7 @@ public struct NoOpRoot: Equatable, Sendable {
   public var intrinsicSize: Size
 
   public init(
-    identity: Identity = .init(components: []),
+    identity: Identity = .init(components: [] as [IdentityComponent]),
     intrinsicSize: Size = .zero
   ) {
     self.identity = identity

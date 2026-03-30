@@ -75,7 +75,7 @@ extension DrawExtractor {
           )
         }
 
-        let markerWidth = parallelTextLayout(for: marker, width: nil).size.width
+        let markerWidth = layoutText(for: marker, width: nil).size.width
         let markerBounds = Rect(
           origin: lineBounds.origin,
           size: .init(width: min(lineBounds.size.width, markerWidth), height: 1)

@@ -210,14 +210,14 @@ public struct TextLayoutResult: Equatable, Sendable {
 }
 
 /// Lays out text using explicit width and truncation options.
-public func parallelTextLayout(
+public func layoutText(
   for content: String,
   width: Int?,
   lineLimit: Int? = nil,
   truncationMode: TextTruncationMode = .tail,
   wrappingStrategy: TextWrappingStrategy = .wordBoundary
 ) -> TextLayoutResult {
-  parallelTextLayout(
+  layoutText(
     for: content,
     options: .init(
       width: width,
@@ -229,7 +229,7 @@ public func parallelTextLayout(
 }
 
 /// Lays out text using a reusable options value.
-public func parallelTextLayout(
+public func layoutText(
   for content: String,
   options: TextLayoutOptions
 ) -> TextLayoutResult {
@@ -239,7 +239,7 @@ public func parallelTextLayout(
   )
 }
 
-package func parallelRichTextLayout(
+package func layoutRichText(
   for payload: RichTextPayload,
   options: TextLayoutOptions
 ) -> TextLayoutResult {

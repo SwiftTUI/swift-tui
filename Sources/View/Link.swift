@@ -1,13 +1,13 @@
-package import Core
+public import Core
 
 /// Displays focusable hyperlink text.
 public struct Link: View, ResolvableView {
   public var label: Text
-  public var destination: String
+  public var destination: LinkDestination
 
   public init(
     _ title: String,
-    destination: String
+    destination: LinkDestination
   ) {
     label = Text(title)
     self.destination = destination
@@ -15,7 +15,7 @@ public struct Link: View, ResolvableView {
 
   public init(
     _ label: Text,
-    destination: String
+    destination: LinkDestination
   ) {
     self.label = label
     self.destination = destination
@@ -32,7 +32,7 @@ extension Link {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    parallelRegisterOpenLinkAction(
+    registerOpenLinkAction(
       destination: destination,
       identity: context.identity,
       in: context
@@ -44,12 +44,12 @@ extension Link {
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
       drawMetadata: .init(),
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
         presentationRole: .link
       ),
       drawPayload: .richText(
-        parallelResolvedRichTextPayload(
+        resolvedRichTextPayload(
           for: self,
           in: context
         )
@@ -59,7 +59,7 @@ extension Link {
 }
 
 @MainActor
-package func parallelResolvedRichTextPayload(
+package func resolvedRichTextPayload(
   for text: Text,
   in context: ResolveContext
 ) -> RichTextPayload {
@@ -78,7 +78,7 @@ package func parallelResolvedRichTextPayload(
 }
 
 @MainActor
-package func parallelResolvedRichTextPayload(
+package func resolvedRichTextPayload(
   for link: Link,
   in context: ResolveContext
 ) -> RichTextPayload {
@@ -98,7 +98,7 @@ package func parallelResolvedRichTextPayload(
   return payload
 }
 
-package func parallelInlineTextStyle(
+package func inlineTextStyle(
   from metadata: DrawMetadata
 ) -> TextStyle {
   TextStyle(
@@ -116,14 +116,14 @@ private struct ResolvedRichTextBuilder {
   let context: ResolveContext
   let rootIdentity: Identity
   var nextInlineLinkIndex = 0
-  var inlineLinkActions: [(identifier: String, destination: String)] = []
+  var inlineLinkActions: [(identifier: String, destination: LinkDestination)] = []
 
   mutating func runs(
     for text: Text,
     inheritedStyle: TextStyle
   ) -> [RichTextRun] {
     let effectiveStyle = inheritedStyle.merging(
-      parallelInlineTextStyle(from: text.drawMetadata)
+      inlineTextStyle(from: text.drawMetadata)
     )
 
     switch text.storage {
@@ -173,7 +173,7 @@ private struct ResolvedRichTextBuilder {
       case .link(let link):
         let inlineIdentifier = "InlineLink[\(nextInlineLinkIndex)]"
         nextInlineLinkIndex += 1
-        let linkIdentity = parallelInlineLinkIdentity(
+        let linkIdentity = inlineLinkIdentity(
           parent: rootIdentity,
           identifier: inlineIdentifier
         )
@@ -198,7 +198,7 @@ private struct ResolvedRichTextBuilder {
     linkIdentity: Identity
   ) -> [RichTextRun] {
     let linkStyle = inheritedStyle.merging(
-      parallelLinkTextStyle(
+      linkTextStyle(
         for: linkIdentity,
         in: context
       )
@@ -225,9 +225,9 @@ private struct ResolvedRichTextBuilder {
 
   mutating func registerInlineLinkActions() {
     for action in inlineLinkActions {
-      parallelRegisterOpenLinkAction(
+      registerOpenLinkAction(
         destination: action.destination,
-        identity: parallelInlineLinkIdentity(
+        identity: inlineLinkIdentity(
           parent: rootIdentity,
           identifier: action.identifier
         ),
@@ -238,14 +238,14 @@ private struct ResolvedRichTextBuilder {
 }
 
 @MainActor
-private func parallelLinkTextStyle(
+private func linkTextStyle(
   for identity: Identity,
   in context: ResolveContext
 ) -> TextStyle {
-  let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
-  let isFocused = context.environmentValues.parallelFocusedIdentity == identity
+  let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
+  let isFocused = context.environmentValues.focusedIdentity == identity
   let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-  let isPressed = context.environmentValues.parallelPressedIdentity == identity
+  let isPressed = context.environmentValues.pressedIdentity == identity
   let chrome = styleEnvironment.buttonChrome(
     buttonStyle: .link,
     isEnabled: context.environmentValues.isEnabled,
@@ -268,8 +268,8 @@ private func parallelLinkTextStyle(
 }
 
 @MainActor
-private func parallelRegisterOpenLinkAction(
-  destination: String,
+private func registerOpenLinkAction(
+  destination: LinkDestination,
   identity: Identity,
   in context: ResolveContext
 ) {

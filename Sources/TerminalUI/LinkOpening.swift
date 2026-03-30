@@ -8,16 +8,16 @@ import View
   import Android
 #endif
 
-package func parallelSystemOpenLinkAction() -> OpenLinkAction {
+package func systemOpenLinkAction() -> OpenLinkAction {
   OpenLinkAction(
     snapshotLabel: "OpenLinkAction.systemDefault",
     isPlaceholder: false,
-    handler: parallelOpenLinkInSystem
+    handler: openLinkInSystem
   )
 }
 
-package func parallelOpenLinkInSystem(
-  _ destination: String
+package func openLinkInSystem(
+  _ destination: LinkDestination
 ) -> Bool {
   guard !destination.isEmpty else {
     return false
@@ -26,13 +26,13 @@ package func parallelOpenLinkInSystem(
   #if os(macOS)
     return spawnDetachedProcess(
       command: "/usr/bin/open",
-      arguments: ["/usr/bin/open", destination],
+      arguments: ["/usr/bin/open", destination.rawValue],
       searchPath: false
     )
   #elseif os(Linux) || os(Android)
     return spawnDetachedProcess(
       command: "xdg-open",
-      arguments: ["xdg-open", destination],
+      arguments: ["xdg-open", destination.rawValue],
       searchPath: true
     )
   #else

@@ -290,7 +290,7 @@ private func focusedEnvironmentValues(
   identity: Identity = testIdentity("Fixture")
 ) -> EnvironmentValues {
   var values = EnvironmentValues()
-  values.parallelFocusedIdentity = identity
+  values.focusedIdentity = identity
   return values
 }
 

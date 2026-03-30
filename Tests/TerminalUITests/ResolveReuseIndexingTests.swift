@@ -81,7 +81,7 @@ struct ResolveReuseIndexingTests {
     }
 
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = targetIdentity
+    environmentValues.focusedIdentity = targetIdentity
 
     _ = renderer.render(
       makeRoot(secondLine: "World"),

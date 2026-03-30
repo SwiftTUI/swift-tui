@@ -11,15 +11,15 @@ public struct Menu: View, ResolvableView {
     @ViewBuilder content: () -> Content
   ) {
     labelViews = [AnyView(Text(String(title)))]
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   public init<Label: View, Content: View>(
     @ViewBuilder label: () -> Label,
     @ViewBuilder content: () -> Content
   ) {
-    labelViews = parallelBuilderChildren(from: label())
-    contentViews = parallelBuilderChildren(from: content())
+    labelViews = declaredBuilderChildren(from: label())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   package func resolveElements(
@@ -37,10 +37,10 @@ extension Menu {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
-    let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
+    let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
+    let isPressed = context.environmentValues.pressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
@@ -65,7 +65,7 @@ extension Menu {
       isPressed: isPressed,
       chrome: chrome
     ).resolve(
-      in: context.child(component: "MenuBody")
+      in: context.child(component: .named("MenuBody"))
     )
 
     return ResolvedNode(
@@ -74,7 +74,7 @@ extension Menu {
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
         presentationRole: .menu
       )

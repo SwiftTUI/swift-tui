@@ -116,7 +116,7 @@ extension Rasterizer {
         return
       }
 
-      let layout = parallelTextLayout(
+      let layout = layoutText(
         for: content,
         width: bounds.size.width,
         lineLimit: lineLimit,
@@ -166,7 +166,7 @@ extension Rasterizer {
         return
       }
 
-      let layout = parallelRichTextLayout(
+      let layout = layoutRichText(
         for: payload,
         options: .init(
           width: bounds.size.width,
@@ -199,7 +199,7 @@ extension Rasterizer {
             cluster.character,
             width: cluster.cellWidth,
             style: resolvedStyle.isDefault ? nil : resolvedStyle,
-            hyperlink: run?.destination,
+            hyperlink: run?.destination?.rawValue,
             atX: x,
             y: bounds.origin.y + lineIndex,
             cells: &cells,

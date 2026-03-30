@@ -1,104 +1,112 @@
 package enum BuiltinPointerRouteComponent {
-  package static let sliderTrack = "SliderTrack"
-  package static let stepperDecrement = "StepperDecrement"
-  package static let stepperIncrement = "StepperIncrement"
-  package static let pickerTrigger = "PickerTrigger"
-  package static let verticalScrollIndicator = "VerticalScrollIndicator"
-  package static let horizontalScrollIndicator = "HorizontalScrollIndicator"
+  case sliderTrack
+  case stepperDecrement
+  case stepperIncrement
+  case pickerTrigger
+  case verticalScrollIndicator
+  case horizontalScrollIndicator
+  case pickerOption(Int)
+  case listRow(Int)
+  case tableRow(Int)
 
-  package static func pickerOption(
-    _ index: Int
-  ) -> String {
-    "PickerOption[\(index)]"
-  }
-
-  package static func listRow(
-    _ rowIndex: Int
-  ) -> String {
-    "ListRow[\(rowIndex)]"
-  }
-
-  package static func tableRow(
-    _ rowIndex: Int
-  ) -> String {
-    "TableRow[\(rowIndex)]"
+  package var identityComponent: IdentityComponent {
+    switch self {
+    case .sliderTrack:
+      .named("SliderTrack")
+    case .stepperDecrement:
+      .named("StepperDecrement")
+    case .stepperIncrement:
+      .named("StepperIncrement")
+    case .pickerTrigger:
+      .named("PickerTrigger")
+    case .verticalScrollIndicator:
+      .named("VerticalScrollIndicator")
+    case .horizontalScrollIndicator:
+      .named("HorizontalScrollIndicator")
+    case .pickerOption(let index):
+      .indexed("PickerOption", index: index)
+    case .listRow(let rowIndex):
+      .indexed("ListRow", index: rowIndex)
+    case .tableRow(let rowIndex):
+      .indexed("TableRow", index: rowIndex)
+    }
   }
 }
 
-package func parallelPrimaryRouteID(
+package func primaryRouteID(
   for identity: Identity
 ) -> RouteID {
   RouteID(identity: identity)
 }
 
-package func parallelChildRouteID(
+package func childRouteID(
   parent: Identity,
-  component: String
+  component: IdentityComponent
 ) -> RouteID {
-  parallelPrimaryRouteID(for: parent.child(component))
+  primaryRouteID(for: parent.child(component))
 }
 
-package func parallelSliderTrackIdentity(
+package func sliderTrackIdentity(
   for controlIdentity: Identity
 ) -> Identity {
-  controlIdentity.child(BuiltinPointerRouteComponent.sliderTrack)
+  controlIdentity.child(BuiltinPointerRouteComponent.sliderTrack.identityComponent)
 }
 
-package func parallelStepperDecrementIdentity(
+package func stepperDecrementIdentity(
   for controlIdentity: Identity
 ) -> Identity {
-  controlIdentity.child(BuiltinPointerRouteComponent.stepperDecrement)
+  controlIdentity.child(BuiltinPointerRouteComponent.stepperDecrement.identityComponent)
 }
 
-package func parallelStepperIncrementIdentity(
+package func stepperIncrementIdentity(
   for controlIdentity: Identity
 ) -> Identity {
-  controlIdentity.child(BuiltinPointerRouteComponent.stepperIncrement)
+  controlIdentity.child(BuiltinPointerRouteComponent.stepperIncrement.identityComponent)
 }
 
-package func parallelPickerTriggerIdentity(
+package func pickerTriggerIdentity(
   for controlIdentity: Identity
 ) -> Identity {
-  controlIdentity.child(BuiltinPointerRouteComponent.pickerTrigger)
+  controlIdentity.child(BuiltinPointerRouteComponent.pickerTrigger.identityComponent)
 }
 
-package func parallelVerticalScrollIndicatorIdentity(
+package func verticalScrollIndicatorIdentity(
   for controlIdentity: Identity
 ) -> Identity {
-  controlIdentity.child(BuiltinPointerRouteComponent.verticalScrollIndicator)
+  controlIdentity.child(BuiltinPointerRouteComponent.verticalScrollIndicator.identityComponent)
 }
 
-package func parallelHorizontalScrollIndicatorIdentity(
+package func horizontalScrollIndicatorIdentity(
   for controlIdentity: Identity
 ) -> Identity {
-  controlIdentity.child(BuiltinPointerRouteComponent.horizontalScrollIndicator)
+  controlIdentity.child(BuiltinPointerRouteComponent.horizontalScrollIndicator.identityComponent)
 }
 
-package func parallelPickerOptionIdentity(
+package func pickerOptionIdentity(
   for controlIdentity: Identity,
   index: Int
 ) -> Identity {
-  controlIdentity.child(BuiltinPointerRouteComponent.pickerOption(index))
+  controlIdentity.child(BuiltinPointerRouteComponent.pickerOption(index).identityComponent)
 }
 
-package func parallelListRowIdentity(
+package func listRowIdentity(
   for controlIdentity: Identity,
   rowIndex: Int
 ) -> Identity {
-  controlIdentity.child(BuiltinPointerRouteComponent.listRow(rowIndex))
+  controlIdentity.child(BuiltinPointerRouteComponent.listRow(rowIndex).identityComponent)
 }
 
-package func parallelTableRowIdentity(
+package func tableRowIdentity(
   for controlIdentity: Identity,
   rowIndex: Int
 ) -> Identity {
-  controlIdentity.child(BuiltinPointerRouteComponent.tableRow(rowIndex))
+  controlIdentity.child(BuiltinPointerRouteComponent.tableRow(rowIndex).identityComponent)
 }
 
-package func parallelRouteID(
+package func routeIDHasTerminalComponent(
   _ routeID: RouteID,
-  hasTerminalComponent component: String
+  hasTerminalComponent component: BuiltinPointerRouteComponent
 ) -> Bool {
   routeID.kind == .primary
-    && routeID.identity.lastComponent == component
+    && routeID.identity.lastComponent == component.identityComponent.rawValue
 }

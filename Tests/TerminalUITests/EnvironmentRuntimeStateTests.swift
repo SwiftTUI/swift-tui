@@ -9,12 +9,12 @@ struct EnvironmentRuntimeStateTests {
   @Test("runtime focus and press state do not affect environment equality")
   func runtimeStateDoesNotAffectEquality() {
     var left = EnvironmentValues()
-    left.parallelFocusedIdentity = testIdentity("Root", "Left")
-    left.parallelPressedIdentity = testIdentity("Root", "Pressed")
+    left.focusedIdentity = testIdentity("Root", "Left")
+    left.pressedIdentity = testIdentity("Root", "Pressed")
 
     var right = EnvironmentValues()
-    right.parallelFocusedIdentity = testIdentity("Root", "Right")
-    right.parallelPressedIdentity = nil
+    right.focusedIdentity = testIdentity("Root", "Right")
+    right.pressedIdentity = nil
 
     #expect(left == right)
 

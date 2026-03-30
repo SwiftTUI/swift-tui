@@ -5,7 +5,7 @@ private enum FocusedValuesKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-  package var parallelFocusedValues: FocusedValues {
+  package var focusedValues: FocusedValues {
     get { self[FocusedValuesKey.self] }
     set { self[FocusedValuesKey.self] = newValue }
   }

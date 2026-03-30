@@ -33,7 +33,7 @@ public struct Legend: View, ResolvableView {
   ) {
     self.items = items
     self.itemSpacing = itemSpacing
-    labelViews = parallelBuilderChildren(from: label())
+    labelViews = declaredBuilderChildren(from: label())
   }
 
   package func resolveElements(

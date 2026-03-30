@@ -353,7 +353,7 @@ private func interactiveDemoRootView(
     .background {
       Rectangle().fill(.background)
     }
-    .environment(\.parallelFocusedIdentity, focusedIdentity)
+    .environment(\.focusedIdentity, focusedIdentity)
     .foregroundStyle(.foreground)
     .tint(.tint)
   )
@@ -449,10 +449,10 @@ private func selectionSummary(
     }
     .padding(1)
     .background {
-      RoundedRectangle(cornerRadius: 1).parallelInteriorFill(.windowBackground)
+      RoundedRectangle(cornerRadius: 1).chromeFill(.windowBackground)
     }
     .overlay {
-      RoundedRectangle(cornerRadius: 1).parallelStrokeBorder(.separator)
+      RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(.separator)
     }
   )
 }
@@ -526,10 +526,10 @@ private func textLabColumn(
             .lineLimit(1)
             .padding(.init(horizontal: 1))
             .background {
-              RoundedRectangle(cornerRadius: 1).parallelInteriorFill(.windowBackground)
+              RoundedRectangle(cornerRadius: 1).chromeFill(.windowBackground)
             }
             .overlay {
-              RoundedRectangle(cornerRadius: 1).parallelStrokeBorder(
+              RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
                 state.accentPreviewEnabled ? .success : .info
               )
             }

@@ -8,9 +8,9 @@ struct Phase2LifecycleFixtureTests {
   @Test("branch swaps emit disappearance before insertion")
   func branchSwapEmitsDisappearanceBeforeInsertion() {
     let fixture = LifecycleDiffFixture(
-      previous: parallelLifecycleTree(
+      previous: lifecycleTree(
         children: [
-          parallelLifecycleNode(
+          lifecycleNode(
             testIdentity("Branch", "A"),
             appearHandlerIDs: ["appear-A"],
             disappearHandlerIDs: ["disappear-A"],
@@ -18,9 +18,9 @@ struct Phase2LifecycleFixtureTests {
           )
         ]
       ),
-      next: parallelLifecycleTree(
+      next: lifecycleTree(
         children: [
-          parallelLifecycleNode(
+          lifecycleNode(
             testIdentity("Branch", "B"),
             appearHandlerIDs: ["appear-B"],
             disappearHandlerIDs: ["disappear-B"],
@@ -56,20 +56,20 @@ struct Phase2LifecycleFixtureTests {
   @Test("nested child lifecycle metadata is diffed independently of stable parents")
   func nestedChildLifecycleMetadataIsDiffedIndependentlyOfStableParents() {
     let fixture = LifecycleDiffFixture(
-      previous: parallelLifecycleTree(
+      previous: lifecycleTree(
         children: [
-          parallelLifecycleNode(
+          lifecycleNode(
             testIdentity("Container"),
             children: []
           )
         ]
       ),
-      next: parallelLifecycleTree(
+      next: lifecycleTree(
         children: [
-          parallelLifecycleNode(
+          lifecycleNode(
             testIdentity("Container"),
             children: [
-              parallelLifecycleNode(
+              lifecycleNode(
                 testIdentity("Container", "Leaf"),
                 appearHandlerIDs: ["appear-leaf"],
                 disappearHandlerIDs: ["disappear-leaf"],

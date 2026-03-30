@@ -27,10 +27,11 @@ struct TodoistViewsSurfaceTests {
       height: 28
     )
 
-    #expect(surface.contains("Todoist Terminal Demo"))
+    #expect(surface.contains("Todoist"))
+    #expect(surface.contains("Setup"))
     #expect(surface.contains("Initialize Database"))
-    #expect(surface.contains("A Todoist API token is required"))
-    #expect(surface.contains("Local Cache"))
+    #expect(surface.contains("Todoist API token"))
+    #expect(surface.contains("Database"))
   }
 
   @Test("Todoist scene renders distinct light and dark chrome")
@@ -52,10 +53,12 @@ struct TodoistViewsSurfaceTests {
     )
 
     #expect(light != dark)
-    #expect(light.contains("Todoist Terminal Demo"))
-    #expect(dark.contains("Todoist Terminal Demo"))
-    #expect(light.contains("Projects"))
-    #expect(dark.contains("Projects"))
+    #expect(light.contains("Todoist"))
+    #expect(dark.contains("Todoist"))
+    #expect(light.contains("Workspace"))
+    #expect(dark.contains("Workspace"))
+    #expect(light.contains("Ship dense chrome refresh"))
+    #expect(dark.contains("Ship dense chrome refresh"))
   }
 
   @Test("Filled and plain controls render different default chrome")

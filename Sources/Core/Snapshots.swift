@@ -222,13 +222,13 @@ extension SnapshotRenderer {
       if let spacing, alignmentDescription == "center" {
         return "stack(\(axis.rawValue),\(spacing))"
       }
-      let spacingDescription = spacing.map(String.init) ?? "default"
+      let spacingDescription = spacing.map { String($0) } ?? "default"
       return "stack(\(axis.rawValue),\(spacingDescription),\(alignmentDescription))"
     case .padding(let insets):
       return "padding(\(insets.top),\(insets.leading),\(insets.bottom),\(insets.trailing))"
     case .frame(let width, let height, let alignment):
-      let widthDescription = width.map(String.init) ?? "nil"
-      let heightDescription = height.map(String.init) ?? "nil"
+      let widthDescription = width.map { String($0) } ?? "nil"
+      let heightDescription = height.map { String($0) } ?? "nil"
       return "frame(\(widthDescription),\(heightDescription),\(alignment.rawValue))"
     case .flexibleFrame(
       let minW, let idealW, let maxW, let minH, let idealH, let maxH, let alignment):
@@ -274,10 +274,10 @@ extension SnapshotRenderer {
       return "rule(\(describe(strokeStyle ?? .init())))"
     case .list(let payload):
       return
-        "list(style=\(payload.style),items=\(payload.items.count),selected=\(payload.selectedRowIndex.map(String.init) ?? "nil"))"
+        "list(style=\(payload.style),items=\(payload.items.count),selected=\(payload.selectedRowIndex.map { String($0) } ?? "nil"))"
     case .table(let payload):
       return
-        "table(style=\(payload.style),rows=\(payload.rows.count),selected=\(payload.selectedRowIndex.map(String.init) ?? "nil"))"
+        "table(style=\(payload.style),rows=\(payload.rows.count),selected=\(payload.selectedRowIndex.map { String($0) } ?? "nil"))"
     }
   }
 

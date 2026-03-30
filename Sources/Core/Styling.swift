@@ -586,10 +586,10 @@ extension ResolvedTextStyle {
   ) {
     self.init(
       foregroundColor: style.foregroundStyle.flatMap {
-        parallelResolveColor(style: $0, theme: theme)
+        resolveStyleColor(style: $0, theme: theme)
       },
       backgroundColor: style.backgroundStyle.flatMap {
-        parallelResolveColor(style: $0, theme: theme)
+        resolveStyleColor(style: $0, theme: theme)
       },
       emphasis: style.emphasis,
       underlineStyle: style.underlineStyle,
@@ -605,12 +605,12 @@ public enum ColorResolutionError: Equatable, Error, Sendable {
   case emptyGradient
 }
 
-public func parallelResolveColorResult(
+public func resolveStyleColorResult(
   style: AnyShapeStyle,
   theme: Theme,
   depthLimit: Int = 8
 ) -> Result<Color, ColorResolutionError> {
-  parallelResolveColorResult(
+  resolveStyleColorResult(
     style: style,
     theme: theme,
     depth: 0,
@@ -618,12 +618,12 @@ public func parallelResolveColorResult(
   )
 }
 
-func parallelResolveColor(
+func resolveStyleColor(
   style: AnyShapeStyle,
   theme: Theme,
   depth: Int = 0
 ) -> Color? {
-  switch parallelResolveColorResult(
+  switch resolveStyleColorResult(
     style: style,
     theme: theme,
     depth: depth,
@@ -632,12 +632,12 @@ func parallelResolveColor(
   case .success(let color):
     return color
   case .failure(let error):
-    assertionFailure("parallelResolveColor failed: \(error)")
+    assertionFailure("resolveStyleColor failed: \(error)")
     return nil
   }
 }
 
-private func parallelResolveColorResult(
+private func resolveStyleColorResult(
   style: AnyShapeStyle,
   theme: Theme,
   depth: Int,
@@ -657,14 +657,14 @@ private func parallelResolveColorResult(
     return .success(firstColor)
   case .terminalChrome(let chromeStyle):
     let appearance = synthesizedAppearance(for: theme)
-    return parallelResolveColorResult(
+    return resolveStyleColorResult(
       style: appearance.resolvedStyle(for: chromeStyle),
       theme: theme,
       depth: depth + 1,
       depthLimit: depthLimit
     )
   case .semantic(let role):
-    return parallelResolveColorResult(
+    return resolveStyleColorResult(
       style: theme.style(for: role),
       theme: theme,
       depth: depth + 1,

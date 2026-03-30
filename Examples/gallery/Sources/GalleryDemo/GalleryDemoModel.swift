@@ -2,6 +2,11 @@ import Observation
 
 @Observable
 final class GalleryDemoModel: @unchecked Sendable {
+  var activeTab = "controls"
+  var selectedControlDemo = "buttons"
+  var selectedCollectionDemo = "picker"
+  var selectedAppearanceDemo = "light"
+  var selectedChartDemo = "progress"
   var primaryCount = 0
   var toggleEnabled = true
   var stepperValue = 2
@@ -13,6 +18,11 @@ final class GalleryDemoModel: @unchecked Sendable {
   var tableSelection = "latency"
 
   func reset() {
+    activeTab = "controls"
+    selectedControlDemo = "buttons"
+    selectedCollectionDemo = "picker"
+    selectedAppearanceDemo = "light"
+    selectedChartDemo = "progress"
     primaryCount = 0
     toggleEnabled = true
     stepperValue = 2

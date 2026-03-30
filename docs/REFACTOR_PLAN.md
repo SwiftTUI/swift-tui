@@ -60,7 +60,7 @@
 | `LayoutEngine+Placement.swift` | `childPlacements` (all cases), `placedNode`, `combinedContentBounds`, `union`, `resolvedContentBounds`, `semanticRole` | ~350 |
 | `LayoutEngine+Alignment.swift` | `alignedOrigin` (all overloads), `simpleAlignedOrigin`, `simpleAlignedCoordinate`, `overlayAlignmentMetrics`, `viewDimensions`, `propagatedViewDimensions` | ~300 |
 | `LayoutEngine+List.swift` | `measuredListSize`, `measuredListIdealSize`, `resolvedListDimension`, `resolvedExpandingListDimension`, `listSectionSeparatorIsVisible`, `listRowSeparatorIsVisible` | ~200 |
-| `LayoutEngine+Table.swift` | `measuredTableSize`, `measuredTableIdealSize`, `parallelTableRowSeparatorIsVisible` | ~100 |
+| `LayoutEngine+Table.swift` | `measuredTableSize`, `measuredTableIdealSize`, `showsTableRowSeparator` | ~100 |
 | `LayoutEngine+Utility.swift` | `clampedSize`, `clamp`, `finiteDimension`, `proposalApplyingFixedSizeMetadata`, `clampingProposal`, `proposalByRelaxingAxes`, `fits`, `selectedChildIndex`, `containerAllocationSnapshot` | ~250 |
 
 **Remaining in `LayoutEngine.swift`:** `MeasurementCache`, `LayoutEngine` struct, `measure()`, `place()` public API, `measureChildren`, `measuredSize`, `overlaySize`, `measuredTextSize`, `measuredRuleSize`, `measuredShapeSize`, retained-layout helpers (~450 lines).
@@ -166,10 +166,10 @@
 ## Execution Order
 
 ```
-Phase 1 (parallel, no dependencies):
+Phase 1 (independent, no dependencies):
   1.1 String-typed roles  ──┐
   1.2 @unchecked Sendable ──┤
-                             ├── Phase 2 (parallel, after Phase 1):
+                             ├── Phase 2 (independent, after Phase 1):
 Phase 2:                     │     2.1 LayoutEngine decomposition
   2.1 LayoutEngine ──────────┤     2.2 RunLoop decomposition
   2.2 RunLoop ───────────────┤

@@ -1,3 +1,35 @@
+/// Structured metadata for a tab item label.
+public struct TabItemLabel: Equatable, Sendable, CustomStringConvertible {
+  public var title: String
+  public var detail: String?
+  public var badge: String?
+
+  public init<S: StringProtocol>(
+    _ title: S,
+    detail: S? = nil,
+    badge: S? = nil
+  ) {
+    self.title = String(title)
+    self.detail = detail.map { String($0) }
+    self.badge = badge.map { String($0) }
+  }
+
+  public var displayText: String {
+    var parts: [String] = [title]
+    if let detail, !detail.isEmpty {
+      parts.append(detail)
+    }
+    if let badge, !badge.isEmpty {
+      parts.append("[\(badge)]")
+    }
+    return parts.joined(separator: " · ")
+  }
+
+  public var description: String {
+    displayText
+  }
+}
+
 /// Semantic and interaction metadata attached to a resolved node.
 public struct SemanticMetadata: Equatable, Sendable {
   private var explicitFocusability: Bool?
@@ -9,6 +41,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var sectionRole: SectionRole?
   public var presentationRole: PresentationRole?
   public var selectionTag: SelectionTag?
+  public var tabItemLabel: TabItemLabel?
 
   public var isFocusable: Bool {
     get { explicitFocusability ?? false }
@@ -33,7 +66,8 @@ public struct SemanticMetadata: Equatable, Sendable {
     scrollRole: ScrollRole? = nil,
     sectionRole: SectionRole? = nil,
     presentationRole: PresentationRole? = nil,
-    selectionTag: SelectionTag? = nil
+    selectionTag: SelectionTag? = nil,
+    tabItemLabel: TabItemLabel? = nil
   ) {
     self.init(
       isFocusable: isFocusable,
@@ -44,7 +78,8 @@ public struct SemanticMetadata: Equatable, Sendable {
       scrollRole: scrollRole,
       sectionRole: sectionRole,
       presentationRole: presentationRole,
-      selectionTag: selectionTag
+      selectionTag: selectionTag,
+      tabItemLabel: tabItemLabel
     )
   }
 
@@ -57,7 +92,8 @@ public struct SemanticMetadata: Equatable, Sendable {
     scrollRole: ScrollRole? = nil,
     sectionRole: SectionRole? = nil,
     presentationRole: PresentationRole? = nil,
-    selectionTag: SelectionTag? = nil
+    selectionTag: SelectionTag? = nil,
+    tabItemLabel: TabItemLabel? = nil
   ) {
     explicitFocusability = isFocusable
     self.focusScopeBoundary = focusScopeBoundary
@@ -68,6 +104,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.sectionRole = sectionRole
     self.presentationRole = presentationRole
     self.selectionTag = selectionTag
+    self.tabItemLabel = tabItemLabel
   }
 
   public func merging(_ other: Self) -> Self {
@@ -83,7 +120,8 @@ public struct SemanticMetadata: Equatable, Sendable {
       scrollRole: other.scrollRole ?? scrollRole,
       sectionRole: other.sectionRole ?? sectionRole,
       presentationRole: other.presentationRole ?? presentationRole,
-      selectionTag: other.selectionTag ?? selectionTag
+      selectionTag: other.selectionTag ?? selectionTag,
+      tabItemLabel: other.tabItemLabel ?? tabItemLabel
     )
   }
 }

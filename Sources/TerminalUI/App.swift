@@ -26,6 +26,30 @@ public protocol Scene {
   var body: Body { get }
 }
 
+/// A typed identifier for a terminal window scene.
+public struct WindowIdentifier: Hashable, Sendable, Codable, RawRepresentable,
+  ExpressibleByStringLiteral, CustomStringConvertible
+{
+  public typealias RawValue = String
+  public let rawValue: String
+
+  public init(rawValue: String) {
+    self.rawValue = normalizedWindowIdentifier(rawValue)
+  }
+
+  public init<S: StringProtocol>(_ rawValue: S) {
+    self.init(rawValue: String(rawValue))
+  }
+
+  public init(stringLiteral value: StringLiteralType) {
+    self.init(value)
+  }
+
+  public var description: String {
+    rawValue
+  }
+}
+
 extension Never: Scene {
   /// Primitive scenes use `Never` as their body type.
   public typealias Body = Never
@@ -37,11 +61,11 @@ extension Never: Scene {
 
 @MainActor
 package protocol SceneConfigurationProviding {
-  func parallelWindowSceneConfigurations() -> [WindowSceneConfiguration]
+  func windowSceneConfigurations() -> [WindowSceneConfiguration]
 }
 
 package struct WindowSceneConfiguration {
-  package var identifier: String
+  package var identifier: WindowIdentifier
   package var title: String?
   package var rootIdentity: Identity
   package var makeRootView: @MainActor () -> AnyView
@@ -146,7 +170,7 @@ public struct SceneGroup: Scene {
 }
 
 extension SceneGroup: SceneConfigurationProviding {
-  package func parallelWindowSceneConfigurations() -> [WindowSceneConfiguration] {
+  package func windowSceneConfigurations() -> [WindowSceneConfiguration] {
     scenes.flatMap { $0.sceneConfigurations() }
   }
 }
@@ -194,17 +218,17 @@ public struct WindowGroup: Scene {
   public typealias Body = Never
 
   public let title: String?
-  public let id: String
+  public let id: WindowIdentifier
 
   private let contentBuilder: @MainActor () -> AnyView
 
   /// Creates a window scene with an explicit identifier.
   public init<Content: View>(
-    id: String = "window",
+    id: WindowIdentifier = "window",
     @ViewBuilder content: @escaping () -> Content
   ) {
     self.title = nil
-    self.id = normalizedWindowIdentifier(id)
+    self.id = id
     contentBuilder = { AnyView(content()) }
   }
 
@@ -212,12 +236,12 @@ public struct WindowGroup: Scene {
   /// identifier.
   public init<S: StringProtocol, Content: View>(
     _ title: S,
-    id: String? = nil,
+    id: WindowIdentifier? = nil,
     @ViewBuilder content: @escaping () -> Content
   ) {
     let normalizedTitle = String(title)
     self.title = normalizedTitle
-    self.id = normalizedWindowIdentifier(id ?? normalizedTitle)
+    self.id = id ?? WindowIdentifier(normalizedTitle)
     contentBuilder = { AnyView(content()) }
   }
 
@@ -227,12 +251,12 @@ public struct WindowGroup: Scene {
 }
 
 extension WindowGroup: SceneConfigurationProviding {
-  package func parallelWindowSceneConfigurations() -> [WindowSceneConfiguration] {
+  package func windowSceneConfigurations() -> [WindowSceneConfiguration] {
     [
       WindowSceneConfiguration(
         identifier: id,
         title: title,
-        rootIdentity: Identity(components: ["App", id]),
+        rootIdentity: Identity(components: ["App", id.rawValue]),
         makeRootView: contentBuilder
       )
     ]
@@ -256,7 +280,7 @@ package func collectWindowSceneConfigurations<S: Scene>(
   from scene: S
 ) -> [WindowSceneConfiguration] {
   if let provider = scene as? any SceneConfigurationProviding {
-    return provider.parallelWindowSceneConfigurations()
+    return provider.windowSceneConfigurations()
   }
 
   return collectWindowSceneConfigurations(from: scene.body)

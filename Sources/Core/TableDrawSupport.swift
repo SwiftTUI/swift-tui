@@ -70,7 +70,7 @@ extension DrawExtractor {
       segments: rowSegments(
         cells: widths.enumerated().map { index, width in
           TableDisplaySegment(
-            content: parallelPaddedTableCell(
+            content: renderTableCell(
               symbol,
               width: width,
               alignment: payload.columns[index].alignment

@@ -236,15 +236,15 @@ extension View {
 }
 
 extension View {
-  package func parallelPickerViewportLineCount(
+  package func pickerViewportLineCount(
     _ count: Int?
   ) -> some View {
-    environment(\.parallelPickerViewportLineCount, count)
+    environment(\.pickerViewportLineCount, count)
   }
 
-  package func parallelPickerLineWidth(
+  package func pickerLineWidth(
     _ width: Int?
   ) -> some View {
-    environment(\.parallelPickerLineWidth, width)
+    environment(\.pickerLineWidth, width)
   }
 }

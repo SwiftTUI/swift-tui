@@ -10,8 +10,8 @@ struct SceneInfoRegistryTests {
   @Test("Scene info registry reflects attachment changes")
   func reflectsAttachmentChanges() throws {
     let group = SceneGroup(scenes: [
-      AnyScene(WindowGroup("Primary", id: "primary") { EmptyView() }),
-      AnyScene(WindowGroup("Secondary", id: "secondary") { EmptyView() }),
+      AnyScene(WindowGroup("Primary", id: WindowIdentifier("primary")) { EmptyView() }),
+      AnyScene(WindowGroup("Secondary", id: WindowIdentifier("secondary")) { EmptyView() }),
     ])
     let configurations = collectWindowSceneConfigurations(from: group)
 

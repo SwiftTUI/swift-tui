@@ -7,7 +7,7 @@ import Testing
 struct TextLayoutTests {
   @Test("word-boundary wrapping prefers whitespace breaks and consumes separator whitespace")
   func wordBoundaryWrappingConsumesSeparatorWhitespace() {
-    let layout = parallelTextLayout(
+    let layout = layoutText(
       for: "alpha beta",
       width: 5
     )
@@ -18,7 +18,7 @@ struct TextLayoutTests {
 
   @Test("word-boundary wrapping preserves explicit leading whitespace")
   func wordBoundaryWrappingPreservesLeadingWhitespace() {
-    let layout = parallelTextLayout(
+    let layout = layoutText(
       for: "  alpha beta",
       width: 7
     )
@@ -28,11 +28,11 @@ struct TextLayoutTests {
 
   @Test("word-boundary wrapping adds continuation markers for oversized word-like tokens")
   func wordBoundaryWrappingAddsContinuationMarkers() {
-    let twoLine = parallelTextLayout(
+    let twoLine = layoutText(
       for: "planet",
       width: 5
     )
-    let multiLine = parallelTextLayout(
+    let multiLine = layoutText(
       for: "abcdefgh",
       width: 4
     )
@@ -43,7 +43,7 @@ struct TextLayoutTests {
 
   @Test("narrow widths fall back to cluster wrapping without continuation markers")
   func narrowWidthsFallBackToClusterWrapping() {
-    let layout = parallelTextLayout(
+    let layout = layoutText(
       for: "hello",
       width: 2
     )
@@ -53,7 +53,7 @@ struct TextLayoutTests {
 
   @Test("wide glyph runs keep cluster wrapping without continuation markers")
   func wideGlyphRunsKeepClusterWrapping() {
-    let layout = parallelTextLayout(
+    let layout = layoutText(
       for: "界界界",
       width: 2
     )
@@ -63,7 +63,7 @@ struct TextLayoutTests {
 
   @Test("line limits truncate after the word-boundary wrap pass")
   func lineLimitTruncatesAfterWordBoundaryWrapping() {
-    let layout = parallelTextLayout(
+    let layout = layoutText(
       for: "alpha beta gamma",
       width: 5,
       lineLimit: 2

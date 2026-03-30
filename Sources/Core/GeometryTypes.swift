@@ -365,11 +365,40 @@ public enum Phase: String, CaseIterable, Sendable {
 }
 
 /// A stable identity path used to key state and runtime bookkeeping.
+public struct IdentityComponent: Hashable, Sendable, Codable, CustomStringConvertible {
+  public let rawValue: String
+
+  package init(rawValue: String) {
+    self.rawValue = rawValue
+  }
+
+  public static func named(
+    _ name: StaticString
+  ) -> Self {
+    .init(rawValue: String(describing: name))
+  }
+
+  public static func indexed(
+    _ kind: StaticString,
+    index: Int
+  ) -> Self {
+    .init(rawValue: "\(String(describing: kind))[\(index)]")
+  }
+
+  public var description: String {
+    rawValue
+  }
+}
+
 public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringConvertible {
   public let components: [String]
 
   public init(components: [String]) {
     self.components = components
+  }
+
+  public init(components: [IdentityComponent]) {
+    self.components = components.map(\.rawValue)
   }
 
   public var path: String {
@@ -389,6 +418,12 @@ public struct Identity: Hashable, Comparable, Sendable, Codable, CustomStringCon
 
   public func child(_ component: String) -> Self {
     Self(components: components + [component])
+  }
+
+  public func child(
+    _ component: IdentityComponent
+  ) -> Self {
+    Self(components: components + [component.rawValue])
   }
 
   public var lastComponent: String? {

@@ -6,7 +6,7 @@ public struct Group: View, ResolvableView {
   public init<Content: View>(
     @ViewBuilder content: () -> Content
   ) {
-    children = parallelBuilderChildren(from: content())
+    children = declaredBuilderChildren(from: content())
   }
   package init(children: [AnyView]) {
     self.children = children
@@ -76,7 +76,7 @@ public struct ViewThatFits: View, ResolvableView {
     @ViewBuilder content: () -> Content
   ) {
     self.axes = axes
-    children = parallelBuilderChildren(from: content())
+    children = declaredBuilderChildren(from: content())
   }
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let resolvedChildren = resolveDeclaredChildren(children, in: context, kindName: "ViewThatFits")
@@ -359,16 +359,16 @@ public struct ScrollView: View, ResolvableView {
     let indicatorVisibility = effectiveIndicatorVisibility(
       environment: context.environmentValues.scrollIndicatorVisibility
     )
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
-    let focusedIdentity = context.environmentValues.parallelFocusedIdentity
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
+    let focusedIdentity = context.environmentValues.focusedIdentity
     let isFocused = focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     var focusedIndicatorAxes: AxisSet = []
     if indicatorVisibility == .visible {
-      if focusedIdentity == parallelVerticalScrollIndicatorIdentity(for: context.identity) {
+      if focusedIdentity == verticalScrollIndicatorIdentity(for: context.identity) {
         focusedIndicatorAxes.insert(.vertical)
       }
-      if focusedIdentity == parallelHorizontalScrollIndicatorIdentity(for: context.identity) {
+      if focusedIdentity == horizontalScrollIndicatorIdentity(for: context.identity) {
         focusedIndicatorAxes.insert(.horizontal)
       }
     }
@@ -395,13 +395,13 @@ public struct ScrollView: View, ResolvableView {
         }
       }
       registerKeyHandler(context.identity, nil)
-      registerKeyHandler(parallelVerticalScrollIndicatorIdentity(for: context.identity), .vertical)
+      registerKeyHandler(verticalScrollIndicatorIdentity(for: context.identity), .vertical)
       registerKeyHandler(
-        parallelHorizontalScrollIndicatorIdentity(for: context.identity),
+        horizontalScrollIndicatorIdentity(for: context.identity),
         .horizontal
       )
 
-      let rootRouteID = parallelPrimaryRouteID(for: context.identity)
+      let rootRouteID = primaryRouteID(for: context.identity)
       context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind else {
           return false
@@ -428,7 +428,7 @@ public struct ScrollView: View, ResolvableView {
 
       let registerIndicatorPointerHandler: (ScrollIndicatorAxis, Identity) -> Void = {
         axis, identity in
-        let routeID = parallelPrimaryRouteID(for: identity)
+        let routeID = primaryRouteID(for: identity)
         context.localPointerHandlerRegistry?.register(routeID: routeID) { event in
           switch event.kind {
           case .down(.primary), .dragged(.primary), .up(.primary):
@@ -472,14 +472,14 @@ public struct ScrollView: View, ResolvableView {
       }
       registerIndicatorPointerHandler(
         .vertical,
-        parallelVerticalScrollIndicatorIdentity(for: context.identity)
+        verticalScrollIndicatorIdentity(for: context.identity)
       )
       registerIndicatorPointerHandler(
         .horizontal,
-        parallelHorizontalScrollIndicatorIdentity(for: context.identity)
+        horizontalScrollIndicatorIdentity(for: context.identity)
       )
     }
-    let child = content.resolve(in: context.child(component: "ScrollContent"))
+    let child = content.resolve(in: context.child(component: .named("ScrollContent")))
     let indicatorFocusStyle =
       showsFocusEffect && !focusedIndicatorAxes.isEmpty
       ? styleEnvironment.controlChrome(
@@ -510,7 +510,7 @@ public struct ScrollView: View, ResolvableView {
           opacity: isFocused && showsFocusEffect ? contentChrome.opacity : containerChrome.opacity,
           clipsToBounds: true
         ),
-        semanticMetadata: parallelScrollViewMetadata(
+        semanticMetadata: scrollViewMetadata(
           presentationRole: indicatorVisibility == .visible
             ? .scrollViewWithIndicators : .scrollView
         )
@@ -532,7 +532,7 @@ public struct VStack: View, ResolvableView {
   ) {
     self.alignment = alignment
     self.spacing = spacing
-    children = parallelBuilderChildren(from: content())
+    children = declaredBuilderChildren(from: content())
   }
   package init(
     alignment: HorizontalAlignment = .center,
@@ -575,7 +575,7 @@ public struct HStack: View, ResolvableView {
   ) {
     self.alignment = alignment
     self.spacing = spacing
-    children = parallelBuilderChildren(from: content())
+    children = declaredBuilderChildren(from: content())
   }
   package init(
     alignment: VerticalAlignment = .center,
@@ -615,7 +615,7 @@ public struct ZStack: View, ResolvableView {
     @ViewBuilder content: () -> Content
   ) {
     self.alignment = alignment
-    children = parallelBuilderChildren(from: content())
+    children = declaredBuilderChildren(from: content())
   }
   package init(
     alignment: Alignment = .center,
@@ -647,7 +647,7 @@ func resolveDeclaredChildren(
   var resolved: [ResolvedNode] = []
   resolved.reserveCapacity(children.count)
   for (index, child) in children.enumerated() {
-    let childContext = context.indexedChild(kind: kindName, index: index)
+    let childContext = context.indexedChild(kind: .init(rawValue: kindName), index: index)
     if let reused = childContext.reusedResolvedSubtreeIfAvailable() {
       resolved.append(reused)
       continue

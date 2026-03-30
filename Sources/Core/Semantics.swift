@@ -23,7 +23,7 @@ public struct SemanticExtractor {
         nextHitTestOrder
         in
         let isEnabled = node.environmentSnapshot.style.isEnabled
-        let routeID = parallelPrimaryRouteID(for: node.identity)
+        let routeID = primaryRouteID(for: node.identity)
 
         let participatesInTopLevelFocus = node.participatesInTopLevelFocus
 
@@ -239,7 +239,7 @@ extension SemanticExtractor {
           continue
         }
 
-        let identity = parallelListRowIdentity(
+        let identity = listRowIdentity(
           for: node.identity,
           rowIndex: rowIndex
         )
@@ -247,7 +247,7 @@ extension SemanticExtractor {
           InteractionRegion(
             identity: identity,
             rect: clippedRect,
-            routeID: parallelPrimaryRouteID(for: identity),
+            routeID: primaryRouteID(for: identity),
             hitTestOrder: nextHitTestOrder
           )
         )
@@ -281,7 +281,7 @@ extension SemanticExtractor {
           continue
         }
 
-        let identity = parallelTableRowIdentity(
+        let identity = tableRowIdentity(
           for: node.identity,
           rowIndex: rowIndex
         )
@@ -289,7 +289,7 @@ extension SemanticExtractor {
           InteractionRegion(
             identity: identity,
             rect: clippedRect,
-            routeID: parallelPrimaryRouteID(for: identity),
+            routeID: primaryRouteID(for: identity),
             hitTestOrder: nextHitTestOrder
           )
         )
@@ -314,7 +314,7 @@ extension SemanticExtractor {
       return
     }
 
-    let layout = parallelRichTextLayout(
+    let layout = layoutRichText(
       for: payload,
       options: .init(
         width: node.bounds.size.width,
@@ -355,7 +355,7 @@ extension SemanticExtractor {
           InteractionRegion(
             identity: fragmentIdentity,
             rect: clippedRect,
-            routeID: parallelPrimaryRouteID(for: fragmentIdentity),
+            routeID: primaryRouteID(for: fragmentIdentity),
             hitTestOrder: nextHitTestOrder
           )
         )
@@ -388,7 +388,7 @@ extension SemanticExtractor {
           else {
             return nil
           }
-          return parallelInlineLinkIdentity(
+          return inlineLinkIdentity(
             parent: node.identity,
             identifier: identifier
           )
@@ -439,16 +439,16 @@ extension SemanticExtractor {
       let identity: Identity
       switch axis {
       case .vertical:
-        identity = parallelVerticalScrollIndicatorIdentity(for: node.identity)
+        identity = verticalScrollIndicatorIdentity(for: node.identity)
       case .horizontal:
-        identity = parallelHorizontalScrollIndicatorIdentity(for: node.identity)
+        identity = horizontalScrollIndicatorIdentity(for: node.identity)
       }
 
       interactionRegions.append(
         InteractionRegion(
           identity: identity,
           rect: clippedRect,
-          routeID: parallelPrimaryRouteID(for: identity),
+          routeID: primaryRouteID(for: identity),
           hitTestOrder: nextHitTestOrder
         )
       )

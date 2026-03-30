@@ -45,7 +45,7 @@ extension DrawExtractor {
       let lineMaxX = lineBounds.origin.x + lineBounds.size.width
 
       for segment in line.segments {
-        let segmentWidth = parallelTextLayout(for: segment.content, width: nil).size.width
+        let segmentWidth = layoutText(for: segment.content, width: nil).size.width
         guard segmentWidth > 0 else {
           continue
         }
@@ -84,7 +84,7 @@ extension DrawExtractor {
   ) -> (lines: [TableDisplayLine], widths: [Int]) {
     let tableStyle: ResolvedTableStyle =
       payload.style == .plain ? .plain : .insetGrouped
-    let widths = parallelTableColumnWidths(
+    let widths = measureTableColumnWidths(
       columns: payload.columns,
       rows: payload.rows
     )
@@ -232,7 +232,7 @@ extension DrawExtractor {
           segments: rowSegments(
             cells: payload.columns.enumerated().map { index, column in
               .init(
-                content: parallelPaddedTableCell(
+                content: renderTableCell(
                   column.title,
                   width: widths[index],
                   alignment: column.titleAlignment
@@ -286,7 +286,7 @@ extension DrawExtractor {
           )
           : rowTextStyle
         return TableDisplaySegment(
-          content: parallelPaddedTableCell(
+          content: renderTableCell(
             content,
             width: width,
             alignment: payload.columns[columnIndex].alignment

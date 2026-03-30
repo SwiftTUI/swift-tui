@@ -49,6 +49,7 @@ public enum PresentationRole: Hashable, Sendable, CustomStringConvertible {
   case stepper
   case table
   case tableRow
+  case tabView
   case textField
   case toggle
 
@@ -80,6 +81,8 @@ public enum PresentationRole: Hashable, Sendable, CustomStringConvertible {
       "table"
     case .tableRow:
       "tableRow"
+    case .tabView:
+      "tabView"
     case .textField:
       "textField"
     case .toggle:

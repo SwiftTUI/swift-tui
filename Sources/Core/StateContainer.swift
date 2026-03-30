@@ -7,7 +7,9 @@ public final class StateContainer<State: Equatable & Sendable> {
 
   public init(
     initialState: State,
-    invalidationIdentities: Set<Identity> = [Identity(components: [])]
+    invalidationIdentities: Set<Identity> = [
+      Identity(components: [] as [IdentityComponent])
+    ]
   ) {
     storage = initialState
     self.invalidationIdentities = invalidationIdentities

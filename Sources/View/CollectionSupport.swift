@@ -1,9 +1,9 @@
 package import Core
 
-func parallelNodeLabelText(
+func resolvedNodeLabelText(
   from node: ResolvedNode
 ) -> String {
-  parallelCollectedTextParts(from: node)
+  collectedNodeTextParts(from: node)
     .joined(separator: " ")
     .trimmedUnicodeWhitespace()
 }
@@ -21,7 +21,7 @@ func listItemTextStyle(
   )
 }
 
-func parallelCollectedTextParts(
+func collectedNodeTextParts(
   from node: ResolvedNode
 ) -> [String] {
   var parts: [String] = []
@@ -32,7 +32,7 @@ func parallelCollectedTextParts(
     parts.append(payload.visibleText)
   }
   for child in node.children {
-    parts.append(contentsOf: parallelCollectedTextParts(from: child))
+    parts.append(contentsOf: collectedNodeTextParts(from: child))
   }
   return parts
 }
@@ -43,10 +43,10 @@ package struct ResolvedListRow {
   var drawMetadata: DrawMetadata
 }
 
-func parallelResolvedListRow(
+func resolvedListRow(
   from node: ResolvedNode
 ) -> ResolvedListRow? {
-  let taggedNodes = parallelTaggedListRowNodes(in: node)
+  let taggedNodes = taggedListRowNodes(in: node)
   guard taggedNodes.count == 1,
     let taggedNode = taggedNodes.first,
     let tag = taggedNode.semanticMetadata.selectionTag
@@ -61,12 +61,12 @@ func parallelResolvedListRow(
   )
 }
 
-func parallelListItemPayload(
+func listItemPayload(
   from row: ResolvedListRow
 ) -> ListItemPayload {
   .init(
     kind: .row,
-    text: parallelNodeLabelText(from: row.labelNode),
+    text: resolvedNodeLabelText(from: row.labelNode),
     style: listItemTextStyle(from: row.drawMetadata),
     rowForegroundStyle: row.drawMetadata.listStyle?.rowForegroundStyle,
     rowBackgroundStyle: row.drawMetadata.listStyle?.rowBackgroundStyle,
@@ -89,7 +89,7 @@ func tableRowCellPayloads(
   let usesRowAsSingleCell = node.children.isEmpty
   let cellNodes = usesRowAsSingleCell ? [node] : node.children
   return cellNodes.map { cellNode in
-    let trimmedText = parallelNodeLabelText(from: cellNode)
+    let trimmedText = resolvedNodeLabelText(from: cellNode)
       .trimmedUnicodeWhitespace()
     let styleMetadata =
       usesRowAsSingleCell
@@ -106,13 +106,13 @@ func resolvedTableColumnWidths(
   columns: [TableColumn],
   rows: [TableRowPayload]
 ) -> [Int] {
-  parallelTableColumnWidths(
+  measureTableColumnWidths(
     columns: columns.map { column in
       .init(
         title: column.title,
         width: column.width,
-        alignment: parallelTableCellAlignment(from: column.alignment),
-        titleAlignment: parallelTableCellAlignment(from: column.titleAlignment)
+        alignment: resolvedTableCellAlignment(from: column.alignment),
+        titleAlignment: resolvedTableCellAlignment(from: column.titleAlignment)
       )
     },
     rows: rows
@@ -125,15 +125,15 @@ func formattedTableLine(
   columns: [TableColumn],
   usesTitleAlignment: Bool = false
 ) -> String {
-  parallelFormattedTableLine(
+  renderTableLine(
     cells: cells,
     widths: widths,
     columns: columns.map { column in
       .init(
         title: column.title,
         width: column.width,
-        alignment: parallelTableCellAlignment(from: column.alignment),
-        titleAlignment: parallelTableCellAlignment(from: column.titleAlignment)
+        alignment: resolvedTableCellAlignment(from: column.alignment),
+        titleAlignment: resolvedTableCellAlignment(from: column.titleAlignment)
       )
     },
     usesTitleAlignment: usesTitleAlignment
@@ -145,14 +145,14 @@ func paddedTableCell(
   width: Int,
   alignment: TableColumnAlignment
 ) -> String {
-  parallelPaddedTableCell(
+  renderTableCell(
     content,
     width: width,
-    alignment: parallelTableCellAlignment(from: alignment)
+    alignment: resolvedTableCellAlignment(from: alignment)
   )
 }
 
-private func parallelTaggedListRowNodes(
+private func taggedListRowNodes(
   in node: ResolvedNode
 ) -> [ResolvedNode] {
   var tagged: [ResolvedNode] = []
@@ -160,12 +160,12 @@ private func parallelTaggedListRowNodes(
     tagged.append(node)
   }
   for child in node.children {
-    tagged.append(contentsOf: parallelTaggedListRowNodes(in: child))
+    tagged.append(contentsOf: taggedListRowNodes(in: child))
   }
   return tagged
 }
 
-private func parallelTableCellAlignment(
+private func resolvedTableCellAlignment(
   from alignment: TableColumnAlignment
 ) -> TableCellAlignment {
   if alignment == .center {

@@ -11,18 +11,18 @@ public struct Section: View, ResolvableView {
     @ViewBuilder header: () -> Header,
     @ViewBuilder footer: () -> Footer
   ) {
-    headerViews = parallelBuilderChildren(from: header())
-    footerViews = parallelBuilderChildren(from: footer())
-    contentViews = parallelBuilderChildren(from: content())
+    headerViews = declaredBuilderChildren(from: header())
+    footerViews = declaredBuilderChildren(from: footer())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   public init<Content: View, Header: View>(
     @ViewBuilder content: () -> Content,
     @ViewBuilder header: () -> Header
   ) {
-    headerViews = parallelBuilderChildren(from: header())
+    headerViews = declaredBuilderChildren(from: header())
     footerViews = []
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   public init<S: StringProtocol, Content: View>(
@@ -31,7 +31,7 @@ public struct Section: View, ResolvableView {
   ) {
     headerViews = [AnyView(Text(String(title)))]
     footerViews = []
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   package func resolveElements(
@@ -51,7 +51,7 @@ extension Section {
       children.append(
         sectionChild(
           in: context,
-          component: "Header",
+          component: .named("Header"),
           role: .header,
           views: headerViews
         )
@@ -61,7 +61,7 @@ extension Section {
     children.append(
       sectionChild(
         in: context,
-        component: "Content",
+        component: .named("Content"),
         role: .content,
         views: contentViews
       )
@@ -71,7 +71,7 @@ extension Section {
       children.append(
         sectionChild(
           in: context,
-          component: "Footer",
+          component: .named("Footer"),
           role: .footer,
           views: footerViews
         )
@@ -93,16 +93,16 @@ extension Section {
 
   private func sectionChild(
     in context: ResolveContext,
-    component: String,
+    component: IdentityComponent,
     role: SectionRole,
     views: [AnyView]
   ) -> ResolvedNode {
     let childContext = context.child(component: component)
     return ResolvedNode(
       identity: childContext.identity,
-      kind: .view("Section\(component)"),
-      children: combinedView(from: views, kindName: "Section\(component)")
-        .resolveElements(in: childContext.child(component: "Views")),
+      kind: .view("Section\(component.rawValue)"),
+      children: combinedView(from: views, kindName: "Section\(component.rawValue)")
+        .resolveElements(in: childContext.child(component: .named("Views"))),
       environmentSnapshot: childContext.environment,
       transactionSnapshot: childContext.transaction,
       semanticMetadata: .init(sectionRole: role)
@@ -120,7 +120,7 @@ public struct List<SelectionValue: Hashable>: View, ResolvableView {
     @ViewBuilder content: () -> Content
   ) {
     self.selection = selection
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   package init(
@@ -145,7 +145,7 @@ public struct TableRow: View, ResolvableView {
   public init<Content: View>(
     @ViewBuilder content: () -> Content
   ) {
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   package func resolveElements(
@@ -164,7 +164,7 @@ extension TableRow {
       kind: .view("TableRow"),
       children: contentViews.enumerated().flatMap { index, view in
         view.resolveElements(
-          in: context.indexedChild(kind: "Cell", index: index)
+          in: context.indexedChild(kind: .named("Cell"), index: index)
         )
       },
       environmentSnapshot: context.environment,
@@ -182,17 +182,17 @@ extension List {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let listStyle =
       context.environmentValues.listStyle == .automatic
       ? ListStyle.insetGrouped
       : context.environmentValues.listStyle
-    let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
+    let isFocused = context.environmentValues.focusedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let showsIndicators =
       context.environmentValues.scrollIndicatorVisibility != .hidden
-    let resolvedContent = resolvedItems(in: context.child(component: "ListItems"))
+    let resolvedContent = resolvedItems(in: context.child(component: .named("ListItems")))
     let rows = resolvedContent.rows
     let selectedIndex = rows.firstIndex { row in
       pickerSelectionMatches(
@@ -235,7 +235,7 @@ extension List {
         )
       }
 
-      let rootRouteID = parallelPrimaryRouteID(for: context.identity)
+      let rootRouteID = primaryRouteID(for: context.identity)
       context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
@@ -253,8 +253,8 @@ extension List {
       }
 
       for (rowIndex, row) in rows.enumerated() {
-        let routeID = parallelPrimaryRouteID(
-          for: parallelListRowIdentity(
+        let routeID = primaryRouteID(
+          for: listRowIdentity(
             for: context.identity,
             rowIndex: rowIndex
           )
@@ -291,7 +291,7 @@ extension List {
       kind: .view("List"),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         scrollRole: .list,
         presentationRole: .list
@@ -345,8 +345,8 @@ extension List {
         previousSectionBottomVisibility =
           node.drawMetadata.listStyle?.sectionSeparatorBottomVisibility
         hasEmittedSection = true
-      } else if let row = parallelResolvedListRow(from: node) {
-        items.append(parallelListItemPayload(from: row))
+      } else if let row = resolvedListRow(from: node) {
+        items.append(listItemPayload(from: row))
         rows.append(.init(tag: row.tag))
       } else {
         collectTopLevelItems(
@@ -368,7 +368,7 @@ extension List {
     for child in node.children {
       switch child.semanticMetadata.sectionRole {
       case .header:
-        let label = parallelNodeLabelText(from: child)
+        let label = resolvedNodeLabelText(from: child)
         if !label.isEmpty {
           items.append(
             .init(
@@ -379,7 +379,7 @@ extension List {
           )
         }
       case .footer:
-        let label = parallelNodeLabelText(from: child)
+        let label = resolvedNodeLabelText(from: child)
         if !label.isEmpty {
           items.append(
             .init(
@@ -401,8 +401,8 @@ extension List {
     rows: inout [RowSelection]
   ) {
     for node in nodes {
-      if let row = parallelResolvedListRow(from: node) {
-        items.append(parallelListItemPayload(from: row))
+      if let row = resolvedListRow(from: node) {
+        items.append(listItemPayload(from: row))
         rows.append(.init(tag: row.tag))
       } else {
         collectItems(from: node.children, into: &items, rows: &rows)
@@ -424,7 +424,7 @@ public struct Table<SelectionValue: Hashable>: View, ResolvableView {
   ) {
     self.columns = columns
     self.selection = selection
-    rowViews = parallelBuilderChildren(from: rows())
+    rowViews = declaredBuilderChildren(from: rows())
   }
 
   public init<Rows: View>(
@@ -433,7 +433,7 @@ public struct Table<SelectionValue: Hashable>: View, ResolvableView {
   ) where SelectionValue == Never {
     self.columns = columns
     selection = nil
-    rowViews = parallelBuilderChildren(from: rows())
+    rowViews = declaredBuilderChildren(from: rows())
   }
 
   package func resolveElements(
@@ -447,8 +447,8 @@ extension Table {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
-    let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
+    let isFocused = context.environmentValues.focusedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isSelectable = selection != nil
@@ -460,8 +460,8 @@ extension Table {
       context.environmentValues.scrollIndicatorVisibility != .hidden
     let showsHeaders =
       context.environmentValues.tableHeaderVisibility != .hidden
-    let resolvedColumns = columns.map(\.parallelTableColumnPayload)
-    let resolvedRows = resolvedRows(in: context.child(component: "TableRows"))
+    let resolvedColumns = columns.map(\.resolvedTableColumnPayload)
+    let resolvedRows = resolvedRows(in: context.child(component: .named("TableRows")))
     let selectableRowIndices = resolvedRows.indices.filter { index in
       resolvedRows[index].tag != nil
     }
@@ -512,7 +512,7 @@ extension Table {
         )
       }
 
-      let rootRouteID = parallelPrimaryRouteID(for: context.identity)
+      let rootRouteID = primaryRouteID(for: context.identity)
       context.localPointerHandlerRegistry?.register(routeID: rootRouteID) { event in
         guard case .scrolled(let deltaX, let deltaY) = event.kind,
           let delta = pointerSelectionDelta(deltaX: deltaX, deltaY: deltaY)
@@ -534,8 +534,8 @@ extension Table {
           continue
         }
 
-        let routeID = parallelPrimaryRouteID(
-          for: parallelTableRowIdentity(
+        let routeID = primaryRouteID(
+          for: tableRowIdentity(
             for: context.identity,
             rowIndex: rowIndex
           )
@@ -574,7 +574,7 @@ extension Table {
       kind: .view("Table"),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         isFocusable: isSelectable ? nil : false,
         focusInteractions: isSelectable ? .edit : .automatic,
         scrollRole: .table,
@@ -621,7 +621,7 @@ extension Table {
 }
 
 extension TableColumnAlignment {
-  fileprivate var parallelTableCellAlignment: TableCellAlignment {
+  fileprivate var resolvedTableCellAlignment: TableCellAlignment {
     if self == .center {
       return .center
     }
@@ -633,12 +633,12 @@ extension TableColumnAlignment {
 }
 
 extension TableColumn {
-  fileprivate var parallelTableColumnPayload: TableColumnPayload {
+  fileprivate var resolvedTableColumnPayload: TableColumnPayload {
     .init(
       title: title,
       width: width,
-      alignment: alignment.parallelTableCellAlignment,
-      titleAlignment: titleAlignment.parallelTableCellAlignment
+      alignment: alignment.resolvedTableCellAlignment,
+      titleAlignment: titleAlignment.resolvedTableCellAlignment
     )
   }
 }

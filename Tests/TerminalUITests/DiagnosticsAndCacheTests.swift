@@ -130,9 +130,9 @@ private struct RecordingBranchRoot: View, ResolvableView {
     }
     context.recordResolvedComputation()
     let children = labels.enumerated().map { index, label in
-      parallelResolve(
+      resolveView(
         RecordingBranchLeaf(label: label, recorder: recorder),
-        in: context.indexedChild(kind: "Branches", index: index)
+        in: context.indexedChild(kind: .named("Branches"), index: index)
       )
     }
     return [
@@ -167,9 +167,9 @@ private struct ResolveProbeRoot: View, ResolvableView {
       )
     )
 
-    let child = parallelResolve(
+    let child = resolveView(
       ResolveProbeLeaf(recorder: recorder),
-      in: context.indexedChild(kind: "ProbeRoot", index: 0)
+      in: context.indexedChild(kind: .named("ProbeRoot"), index: 0)
     )
     return [
       ResolvedNode(
@@ -496,7 +496,7 @@ struct DiagnosticsAndCacheTests {
     }
 
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("CountStepper")
+    environmentValues.focusedIdentity = testIdentity("CountStepper")
 
     _ = renderer.render(
       makeRoot(secondLine: "World"),
@@ -550,8 +550,8 @@ struct DiagnosticsAndCacheTests {
     }
 
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("FocusedReuseButton")
-    environmentValues.parallelFocusedValues = .init()
+    environmentValues.focusedIdentity = testIdentity("FocusedReuseButton")
+    environmentValues.focusedValues = .init()
 
     var initialContext = ResolveContext(
       identity: testIdentity("Root"),
@@ -593,7 +593,7 @@ struct DiagnosticsAndCacheTests {
     )
 
     var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("FocusedMergeButton")
+    environmentValues.focusedIdentity = testIdentity("FocusedMergeButton")
 
     var context = ResolveContext(
       identity: testIdentity("Root"),

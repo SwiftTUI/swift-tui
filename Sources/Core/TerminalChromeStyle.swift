@@ -98,19 +98,19 @@ extension TerminalAppearance {
   ) -> AnyShapeStyle {
     switch chromeStyle.kind {
     case .accent(let tone):
-      return terminalAccentStyle(tone: tone)
+      return .color(terminalToneColor(for: tone))
     case .surface(let tone):
       return terminalSurfaceStyle(tone: tone)
     case .surfaceBackground:
-      return .color(terminalSurfaceBase)
+      return .color(backgroundColor)
     case .border(let tone):
       return terminalBorderStyle(tone: tone)
     case .tile(let tone):
       return .color(
         mix(
+          backgroundColor,
           terminalToneColor(for: tone),
-          colorScheme == .dark ? .white : .black,
-          amount: colorScheme == .dark ? 0.42 : 0.22
+          amount: colorScheme == .dark ? 0.18 : 0.1
         )
       )
     case .row(let tone, let isSelected, let isOdd):
@@ -121,32 +121,38 @@ extension TerminalAppearance {
       )
     case .badge(let tone, let emphasized):
       if emphasized {
-        return terminalAccentStyle(tone: tone)
+        return .color(terminalToneColor(for: tone))
       }
       return .color(
         mix(
+          backgroundColor,
           terminalToneColor(for: tone),
-          colorScheme == .dark ? .black : .white,
-          amount: colorScheme == .dark ? 0.28 : 0.12
+          amount: colorScheme == .dark ? 0.16 : 0.08
         )
       )
     case .keycap(let tone):
       return .color(
         mix(
+          backgroundColor,
           terminalToneColor(for: tone),
-          colorScheme == .dark ? .black : .white,
-          amount: colorScheme == .dark ? 0.22 : 0.08
+          amount: colorScheme == .dark ? 0.1 : 0.05
         )
       )
     case .tab(let tone, let isSelected):
       if isSelected {
-        return terminalAccentStyle(tone: tone)
+        return .color(
+          mix(
+            backgroundColor,
+            terminalToneColor(for: tone),
+            amount: colorScheme == .dark ? 0.22 : 0.14
+          )
+        )
       }
       return .color(
         mix(
-          terminalTabBase,
+          backgroundColor,
           terminalToneColor(for: tone),
-          amount: colorScheme == .dark ? 0.16 : 0.06
+          amount: colorScheme == .dark ? 0.06 : 0.03
         )
       )
     }
@@ -216,62 +222,14 @@ extension TerminalAppearance {
     }
   }
 
-  private func terminalAccentHighlight(
-    for tone: TerminalTone
-  ) -> Color {
-    mix(
-      terminalToneColor(for: tone),
-      colorScheme == .dark ? .white : .black,
-      amount: colorScheme == .dark ? 0.18 : 0.1
-    )
-  }
-
-  private func terminalAccentShadow(
-    for tone: TerminalTone
-  ) -> Color {
-    mix(
-      terminalToneColor(for: tone),
-      colorScheme == .dark ? .black : .white,
-      amount: colorScheme == .dark ? 0.24 : 0.12
-    )
-  }
-
-  private func terminalAccentStyle(
-    tone: TerminalTone
-  ) -> AnyShapeStyle {
-    .linearGradient(
-      .init(
-        colors: [
-          terminalAccentHighlight(for: tone),
-          terminalToneColor(for: tone),
-          terminalAccentShadow(for: tone),
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-      )
-    )
-  }
-
   private func terminalSurfaceStyle(
     tone: TerminalTone
   ) -> AnyShapeStyle {
-    let accent = terminalToneColor(for: tone)
-    let lifted = mix(
-      terminalSurfaceBase,
-      accent,
-      amount: colorScheme == .dark ? 0.12 : 0.06
-    )
-    let grounded = mix(
-      terminalSurfaceBase,
-      colorScheme == .dark ? .black : .white,
-      amount: colorScheme == .dark ? 0.18 : 0.08
-    )
-
-    return .linearGradient(
-      .init(
-        colors: [lifted, terminalSurfaceBase, grounded],
-        startPoint: .top,
-        endPoint: .bottom
+    .color(
+      mix(
+        backgroundColor,
+        terminalToneColor(for: tone),
+        amount: colorScheme == .dark ? 0.1 : 0.05
       )
     )
   }
@@ -279,18 +237,14 @@ extension TerminalAppearance {
   private func terminalBorderStyle(
     tone: TerminalTone
   ) -> AnyShapeStyle {
-    .linearGradient(
-      .init(
-        colors: [
-          terminalAccentHighlight(for: tone),
-          terminalToneColor(for: tone),
-          terminalColorForScheme(
-            dark: .init(hex: 0x4A5568),
-            light: .init(hex: 0xD0D5DD)
-          ),
-        ],
-        startPoint: .top,
-        endPoint: .bottom
+    .color(
+      mix(
+        backgroundColor,
+        terminalToneColor(for: tone),
+        amount:
+          tone == .neutral
+          ? (colorScheme == .dark ? 0.24 : 0.18)
+          : (colorScheme == .dark ? 0.52 : 0.36)
       )
     )
   }
@@ -300,41 +254,27 @@ extension TerminalAppearance {
     isSelected: Bool,
     isOdd: Bool
   ) -> AnyShapeStyle {
-    let neutralBase = terminalColorForScheme(
-      dark: .init(hex: 0x171B26),
-      light: .white
-    )
+    let neutralBase = backgroundColor
 
     if isSelected {
-      return .linearGradient(
-        .init(
-          colors: [
-            mix(
-              neutralBase,
-              terminalToneColor(for: tone),
-              amount: colorScheme == .dark ? 0.3 : 0.12
-            ),
-            mix(
-              neutralBase,
-              terminalToneColor(for: .accent),
-              amount: colorScheme == .dark ? 0.22 : 0.08
-            ),
-          ],
-          startPoint: .leading,
-          endPoint: .trailing
+      return .color(
+        mix(
+          neutralBase,
+          terminalToneColor(for: tone),
+          amount: colorScheme == .dark ? 0.18 : 0.11
         )
       )
     }
 
     let overlayStrength =
       isOdd
-      ? (colorScheme == .dark ? 0.08 : 0.04)
+      ? (colorScheme == .dark ? 0.04 : 0.02)
       : (colorScheme == .dark ? 0.03 : 0.01)
 
     return .color(
       mix(
         neutralBase,
-        terminalToneColor(for: tone),
+        foregroundColor,
         amount: overlayStrength
       )
     )

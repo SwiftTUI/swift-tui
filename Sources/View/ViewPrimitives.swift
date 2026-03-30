@@ -62,7 +62,7 @@ public struct Text: View, ResolvableView {
         .text(content)
       case .rich:
         .richText(
-          parallelResolvedRichTextPayload(
+          resolvedRichTextPayload(
             for: self,
             in: context
           )
@@ -208,7 +208,7 @@ public struct Spacer: View, ResolvableView {
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
-      parallelResolveLeaf(
+      resolveLeafNode(
         kindName: "Spacer",
         intrinsicSize: .init(width: minLength, height: minLength),
         in: context
@@ -227,7 +227,7 @@ public struct Divider: View, ResolvableView {
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
-      parallelResolveLeaf(
+      resolveLeafNode(
         kindName: "Divider",
         intrinsicSize: .init(width: 1, height: 1),
         drawMetadata: drawMetadata,
@@ -239,10 +239,10 @@ public struct Divider: View, ResolvableView {
 }
 
 private func idealTextSize(for content: String) -> Size {
-  parallelTextLayout(for: content, width: Optional<Int>.none).size
+  layoutText(for: content, width: Optional<Int>.none).size
 }
 @MainActor
-func parallelResolveLeaf(
+func resolveLeafNode(
   kindName: String,
   intrinsicSize: Size? = nil,
   layoutBehavior: LayoutBehavior = .intrinsic,

@@ -33,29 +33,20 @@ private struct TypedEnvironmentValueBox<Value: Sendable>: EnvironmentValueBox {
 public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
   package let isPlaceholder: Bool
-  private let handler: @MainActor @Sendable (String) -> Bool
+  private let handler: @MainActor @Sendable (LinkDestination) -> Bool
 
   public init(
-    _ handler: @escaping @MainActor @Sendable (String) -> Bool
+    _ handler: @escaping @MainActor @Sendable (LinkDestination) -> Bool
   ) {
     snapshotLabel = "OpenLinkAction.custom"
     isPlaceholder = false
     self.handler = handler
   }
 
-  public init(
-    action handler: @escaping @MainActor @Sendable (String) -> Void
-  ) {
-    self.init { destination in
-      handler(destination)
-      return true
-    }
-  }
-
   @discardableResult
   @MainActor
   public func callAsFunction(
-    _ destination: String
+    _ destination: LinkDestination
   ) -> Bool {
     handler(destination)
   }
@@ -71,7 +62,7 @@ public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStri
   package init(
     snapshotLabel: String,
     isPlaceholder: Bool,
-    handler: @escaping @MainActor @Sendable (String) -> Bool
+    handler: @escaping @MainActor @Sendable (LinkDestination) -> Bool
   ) {
     self.snapshotLabel = snapshotLabel
     self.isPlaceholder = isPlaceholder
@@ -93,15 +84,15 @@ private enum OpenLinkActionKey: EnvironmentKey {
 public struct EnvironmentValues: Equatable, Sendable {
   private var storage: [ObjectIdentifier: any EnvironmentValueBox]
   private var snapshotValues: [String: String]
-  package var _parallelFocusedIdentity: Identity?
-  package var _parallelPressedIdentity: Identity?
+  package var _focusedIdentity: Identity?
+  package var _pressedIdentity: Identity?
 
   /// Creates an empty environment container.
   public init() {
     storage = [:]
     snapshotValues = [:]
-    _parallelFocusedIdentity = nil
-    _parallelPressedIdentity = nil
+    _focusedIdentity = nil
+    _pressedIdentity = nil
   }
 
   public subscript<K: EnvironmentKey>(key: K.Type) -> K.Value {
@@ -132,7 +123,7 @@ public struct EnvironmentValues: Equatable, Sendable {
     merged.values.merge(snapshotValues) { _, new in new }
     merged.style = StyleEnvironmentSnapshot(
       appearance: terminalAppearance,
-      themeOverride: parallelThemeOverride,
+      themeOverride: themeOverride,
       foregroundStyle: foregroundStyle,
       tintStyle: tintStyle,
       preferredColorScheme: preferredColorScheme,
@@ -173,7 +164,7 @@ public struct ResolveContext: Equatable, Sendable {
 
   /// Creates a public resolve context from authored configuration only.
   public init(
-    identity: Identity = .init(components: []),
+    identity: Identity = .init(components: [] as [IdentityComponent]),
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     transaction: TransactionSnapshot = .init(),
@@ -193,7 +184,7 @@ public struct ResolveContext: Equatable, Sendable {
     )
   }
 
-  package func child(component: String) -> Self {
+  package func child(component: IdentityComponent) -> Self {
     var childContext = Self(
       identity: identity.child(component),
       environment: environment,
@@ -217,8 +208,12 @@ public struct ResolveContext: Equatable, Sendable {
     return childContext
   }
 
-  package func indexedChild(kind: String, index: Int) -> Self {
-    child(component: "\(kind)[\(index)]")
+  package func indexedChild(kind: IdentityComponent, index: Int) -> Self {
+    child(
+      component: .init(
+        rawValue: "\(kind.rawValue)[\(index)]"
+      )
+    )
   }
 
   package func replacingIdentity(with identity: Identity) -> Self {
@@ -315,7 +310,7 @@ public struct ResolveContext: Equatable, Sendable {
   ) -> EnvironmentValues {
     var resolvedEnvironmentValues = environmentValues
     resolvedEnvironmentValues.isFocused =
-      environmentValues.parallelFocusedIdentity.map { focusedIdentity in
+      environmentValues.focusedIdentity.map { focusedIdentity in
         identity == focusedIdentity
           || focusedIdentity.isDescendant(of: identity)
           || identity.isDescendant(of: focusedIdentity)
@@ -326,7 +321,7 @@ public struct ResolveContext: Equatable, Sendable {
 
 extension ResolveContext {
   package init(
-    identity: Identity = .init(components: []),
+    identity: Identity = .init(components: [] as [IdentityComponent]),
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     transaction: TransactionSnapshot = .init(),
@@ -344,7 +339,7 @@ extension ResolveContext {
     )
     self.identity = identity
     self.environmentValues = resolvedEnvironmentValues
-    focusedValues = resolvedEnvironmentValues.parallelFocusedValues
+    focusedValues = resolvedEnvironmentValues.focusedValues
     self.environment =
       applyEnvironmentValues
       ? resolvedEnvironmentValues.applying(to: environment)

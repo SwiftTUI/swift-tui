@@ -21,7 +21,7 @@ public struct Button: View, ResolvableView {
   ) {
     self.role = role
     action = nil
-    labelViews = parallelBuilderChildren(from: label())
+    labelViews = declaredBuilderChildren(from: label())
   }
 
   public init(
@@ -41,7 +41,7 @@ public struct Button: View, ResolvableView {
   ) {
     self.role = role
     self.action = action
-    labelViews = parallelBuilderChildren(from: label())
+    labelViews = declaredBuilderChildren(from: label())
   }
 
   package func resolveElements(
@@ -61,10 +61,10 @@ extension Button {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
-    let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
+    let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
+    let isPressed = context.environmentValues.pressedIdentity == context.identity
     let buttonStyle = context.environmentValues.buttonStyle
     let effectiveProminence =
       buttonStyle == .borderedProminent
@@ -96,7 +96,7 @@ extension Button {
       borderShape: context.environmentValues.buttonBorderShape
     )
     let child = body.resolve(
-      in: context.child(component: "ButtonBody")
+      in: context.child(component: .named("ButtonBody"))
     )
 
     return ResolvedNode(
@@ -105,7 +105,7 @@ extension Button {
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
         presentationRole: .button
       )
@@ -218,11 +218,11 @@ extension Button {
     switch (borderShape, prominence) {
     case (.roundedRectangle, _), (.automatic, .increased):
       return AnyView(
-        RoundedRectangle(cornerRadius: 1).parallelInteriorFill(style)
+        RoundedRectangle(cornerRadius: 1).chromeFill(style)
       )
     default:
       return AnyView(
-        Rectangle().parallelInteriorFill(style)
+        Rectangle().chromeFill(style)
       )
     }
   }
@@ -236,14 +236,14 @@ extension Button {
     switch (borderShape, prominence) {
     case (.roundedRectangle, _), (.automatic, .increased):
       return AnyView(
-        RoundedRectangle(cornerRadius: 1).parallelStrokeBorder(
+        RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
           style,
           backgroundStyle: backgroundStyle
         )
       )
     default:
       return AnyView(
-        Rectangle().parallelStrokeBorder(
+        Rectangle().chromeStrokeBorder(
           style,
           backgroundStyle: backgroundStyle
         )

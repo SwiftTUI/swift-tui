@@ -115,7 +115,7 @@ public struct TablePayload: Equatable, Sendable {
   }
 }
 
-package func parallelTableColumnWidths(
+package func measureTableColumnWidths(
   columns: [TableColumnPayload],
   rows: [TableRowPayload]
 ) -> [Int] {
@@ -124,16 +124,16 @@ package func parallelTableColumnWidths(
       return max(1, width)
     }
 
-    let titleWidth = parallelTextLayout(for: column.title, width: nil).size.width
+    let titleWidth = layoutText(for: column.title, width: nil).size.width
     let rowWidth = rows.reduce(0) { partial, row in
       let cell = index < row.cells.count ? row.cells[index].text : ""
-      return max(partial, parallelTextLayout(for: cell, width: nil).size.width)
+      return max(partial, layoutText(for: cell, width: nil).size.width)
     }
     return max(1, max(titleWidth, rowWidth))
   }
 }
 
-package func parallelFormattedTableLineWidth(
+package func formattedTableLineWidth(
   widths: [Int],
   prefixWidth: Int = 0
 ) -> Int {
@@ -144,7 +144,7 @@ package func parallelFormattedTableLineWidth(
   return widths.reduce(0, +) + widths.count + 1
 }
 
-package func parallelBorderedTableLineWidth(
+package func borderedTableLineWidth(
   widths: [Int]
 ) -> Int {
   guard !widths.isEmpty else {
@@ -154,7 +154,7 @@ package func parallelBorderedTableLineWidth(
   return widths.reduce(0, +) + (widths.count * 3) + 1
 }
 
-package func parallelFormattedTableLine(
+package func renderTableLine(
   cells: [String],
   widths: [Int],
   columns: [TableColumnPayload],
@@ -168,25 +168,25 @@ package func parallelFormattedTableLine(
       } else {
         TableCellAlignment.leading
       }
-    return parallelPaddedTableCell(cell, width: width, alignment: alignment)
+    return renderTableCell(cell, width: width, alignment: alignment)
   }
   .joined(separator: " | ")
 }
 
-package func parallelPaddedTableCell(
+package func renderTableCell(
   _ content: String,
   width: Int,
   alignment: TableCellAlignment
 ) -> String {
   let resolvedWidth = max(1, width)
-  let line = parallelTextLayout(
+  let line = layoutText(
     for: content,
     width: resolvedWidth,
     lineLimit: 1,
     truncationMode: .tail,
     wrappingStrategy: .wordBoundary
   ).lines[0].text
-  let usedWidth = parallelTextLayout(for: line, width: nil).size.width
+  let usedWidth = layoutText(for: line, width: nil).size.width
   let remaining = max(0, resolvedWidth - usedWidth)
 
   switch alignment {
@@ -203,7 +203,7 @@ package func parallelPaddedTableCell(
   }
 }
 
-package func parallelTableRowSeparatorIsVisible(
+package func showsTableRowSeparator(
   current: TableRowPayload,
   next: TableRowPayload?
 ) -> Bool {

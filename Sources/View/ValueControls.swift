@@ -10,7 +10,7 @@ public struct Toggle: View, ResolvableView {
     @ViewBuilder label: () -> Label
   ) {
     self.isOn = isOn
-    labelViews = parallelBuilderChildren(from: label())
+    labelViews = declaredBuilderChildren(from: label())
   }
 
   public init<S: StringProtocol>(
@@ -32,10 +32,10 @@ extension Toggle {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
-    let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
+    let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
+    let isPressed = context.environmentValues.pressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let isSelected = isOn.wrappedValue
     let chrome = styleEnvironment.rowChrome(
@@ -62,7 +62,7 @@ extension Toggle {
       isPressed: isPressed,
       chrome: chrome
     ).resolve(
-      in: context.child(component: "ToggleBody")
+      in: context.child(component: .named("ToggleBody"))
     )
 
     return ResolvedNode(
@@ -71,7 +71,7 @@ extension Toggle {
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
         presentationRole: .toggle
       )
@@ -222,10 +222,10 @@ package func textEntryFieldBody(
         stretchedField
           .padding(.init(horizontal: 1, vertical: 1))
           .background {
-            RoundedRectangle(cornerRadius: 1).parallelInteriorFill(chrome.backgroundStyle)
+            RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
           }
           .overlay {
-            RoundedRectangle(cornerRadius: 1).parallelStrokeBorder(
+            RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
               chrome.borderStyle,
               backgroundStyle: chrome.borderBackgroundStyle
             )
@@ -284,7 +284,7 @@ public struct TextField: View, ResolvableView {
   ) {
     self.text = text
     self.prompt = prompt
-    labelViews = parallelBuilderChildren(from: label())
+    labelViews = declaredBuilderChildren(from: label())
   }
 
   package func resolveElements(
@@ -298,8 +298,8 @@ extension TextField {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
-    let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
+    let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
     let fieldText = text.wrappedValue
@@ -328,7 +328,7 @@ extension TextField {
       placeholderStyle: styleEnvironment.theme.placeholder,
       chromePreset: styleEnvironment.chromePreset
     ).resolve(
-      in: context.child(component: "TextFieldBody")
+      in: context.child(component: .named("TextFieldBody"))
     )
 
     return ResolvedNode(
@@ -337,7 +337,7 @@ extension TextField {
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         focusInteractions: .edit,
         presentationRole: .textField
       )
@@ -357,8 +357,8 @@ public struct DisclosureGroup: View, ResolvableView {
     @ViewBuilder label: () -> Label
   ) {
     self.isExpanded = isExpanded
-    labelViews = parallelBuilderChildren(from: label())
-    contentViews = parallelBuilderChildren(from: content())
+    labelViews = declaredBuilderChildren(from: label())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   public init<S: StringProtocol, Content: View>(
@@ -368,7 +368,7 @@ public struct DisclosureGroup: View, ResolvableView {
   ) {
     self.isExpanded = isExpanded
     labelViews = [AnyView(Text(String(title)))]
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   package func resolveElements(
@@ -382,10 +382,10 @@ extension DisclosureGroup {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
-    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
-    let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
+    let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
+    let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
+    let isPressed = context.environmentValues.pressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let expanded = isExpanded.wrappedValue
     let chrome = styleEnvironment.rowChrome(
@@ -411,7 +411,7 @@ extension DisclosureGroup {
       isPressed: isPressed,
       chrome: chrome
     ).resolve(
-      in: context.child(component: "DisclosureBody")
+      in: context.child(component: .named("DisclosureBody"))
     )
 
     return ResolvedNode(
@@ -420,7 +420,7 @@ extension DisclosureGroup {
       children: [child],
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
-      semanticMetadata: parallelFocusableControlMetadata(
+      semanticMetadata: focusableControlMetadata(
         focusInteractions: .activate,
         presentationRole: .disclosureGroup
       )

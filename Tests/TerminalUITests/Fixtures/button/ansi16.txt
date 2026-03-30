@@ -3,6 +3,6 @@ configuration ansi16
 surface 18x3
 capability glyph=unicode color=ansi16 styles=true
 appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
-01│\u{001B}[106m·\u{001B}[0m\u{001B}[30;106mD\u{001B}[0m\u{001B}[30;106me\u{001B}[0m\u{001B}[30;106mp\u{001B}[0m\u{001B}[30;106ml\u{001B}[0m\u{001B}[30;106mo\u{001B}[0m\u{001B}[30;104my\u{001B}[0m\u{001B}[102m·\u{001B}[0m
+01│\u{001B}[106m·\u{001B}[0m\u{001B}[30;106mDeploy\u{001B}[0m\u{001B}[106m·\u{001B}[0m
 02│
 03│

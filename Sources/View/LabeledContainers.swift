@@ -9,8 +9,8 @@ public struct Label: View, ResolvableView {
     @ViewBuilder title: () -> Title,
     @ViewBuilder icon: () -> Icon
   ) {
-    titleViews = parallelBuilderChildren(from: title())
-    iconViews = parallelBuilderChildren(from: icon())
+    titleViews = declaredBuilderChildren(from: title())
+    iconViews = declaredBuilderChildren(from: icon())
   }
 
   public init<S: StringProtocol, Icon: View>(
@@ -18,7 +18,7 @@ public struct Label: View, ResolvableView {
     @ViewBuilder icon: () -> Icon
   ) {
     titleViews = [AnyView(Text(String(title)))]
-    iconViews = parallelBuilderChildren(from: icon())
+    iconViews = declaredBuilderChildren(from: icon())
   }
 
   package func resolveElements(
@@ -42,8 +42,8 @@ public struct LabeledContent: View, ResolvableView {
     @ViewBuilder content: () -> Content,
     @ViewBuilder label: () -> Label
   ) {
-    labelViews = parallelBuilderChildren(from: label())
-    contentViews = parallelBuilderChildren(from: content())
+    labelViews = declaredBuilderChildren(from: label())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   public init<S: StringProtocol, Content: View>(
@@ -51,7 +51,7 @@ public struct LabeledContent: View, ResolvableView {
     @ViewBuilder content: () -> Content
   ) {
     labelViews = [AnyView(Text(String(title)))]
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   public init<S1: StringProtocol, S2: StringProtocol>(
@@ -68,7 +68,7 @@ public struct LabeledContent: View, ResolvableView {
     AnyView(
       HStack(alignment: .firstTextBaseline, spacing: 1) {
         combinedView(from: labelViews, kindName: "LabeledContentLabel")
-          .foregroundStyle(.terminalBorder(.accent))
+          .foregroundStyle(.separator)
         Spacer()
         combinedView(from: contentViews, kindName: "LabeledContentValue")
       }
@@ -85,7 +85,7 @@ public struct ControlGroup: View, ResolvableView {
     @ViewBuilder content: () -> Content
   ) {
     labelViews = []
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   public init<S: StringProtocol, Content: View>(
@@ -93,15 +93,15 @@ public struct ControlGroup: View, ResolvableView {
     @ViewBuilder content: () -> Content
   ) {
     labelViews = [AnyView(Text(String(title)))]
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   public init<Content: View, Label: View>(
     @ViewBuilder content: () -> Content,
     @ViewBuilder label: () -> Label
   ) {
-    labelViews = parallelBuilderChildren(from: label())
-    contentViews = parallelBuilderChildren(from: content())
+    labelViews = declaredBuilderChildren(from: label())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   package func resolveElements(
@@ -128,7 +128,7 @@ public struct ControlGroup: View, ResolvableView {
   private func composedLabel() -> AnyView {
     AnyView(
       combinedView(from: labelViews, kindName: "ControlGroupLabel")
-        .foregroundStyle(.terminalBorder(.accent))
+        .foregroundStyle(.separator)
     )
   }
 }
@@ -142,7 +142,7 @@ public struct GroupBox: View, ResolvableView {
     @ViewBuilder content: () -> Content
   ) {
     labelViews = []
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   public init<S: StringProtocol, Content: View>(
@@ -150,15 +150,15 @@ public struct GroupBox: View, ResolvableView {
     @ViewBuilder content: () -> Content
   ) {
     labelViews = [AnyView(Text(String(title)))]
-    contentViews = parallelBuilderChildren(from: content())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   public init<Content: View, Label: View>(
     @ViewBuilder content: () -> Content,
     @ViewBuilder label: () -> Label
   ) {
-    labelViews = parallelBuilderChildren(from: label())
-    contentViews = parallelBuilderChildren(from: content())
+    labelViews = declaredBuilderChildren(from: label())
+    contentViews = declaredBuilderChildren(from: content())
   }
 
   package func resolveElements(
@@ -169,16 +169,16 @@ public struct GroupBox: View, ResolvableView {
 
   private func composedView() -> AnyView {
     AnyView(
-      EnvironmentReader(\.parallelStyleEnvironmentSnapshot) { styleEnvironment in
+      EnvironmentReader(\.styleEnvironmentSnapshot) { styleEnvironment in
         EnvironmentReader(\.controlProminence) { prominence in
           let chrome = styleEnvironment.groupBoxChrome(prominence: prominence)
           let content = groupBoxContent()
             .padding(.init(horizontal: 1, vertical: 1))
             .background {
-              RoundedRectangle(cornerRadius: 1).parallelInteriorFill(chrome.backgroundStyle)
+              RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
             }
             .overlay {
-              RoundedRectangle(cornerRadius: 1).parallelStrokeBorder(chrome.borderStyle)
+              RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(chrome.borderStyle)
             }
             .foregroundStyle(chrome.foregroundStyle)
 
@@ -218,7 +218,7 @@ public struct GroupBox: View, ResolvableView {
   private func groupBoxLabel() -> AnyView {
     AnyView(
       combinedView(from: labelViews, kindName: "GroupBoxLabel")
-        .foregroundStyle(.terminalBorder(.accent))
+        .foregroundStyle(.separator)
     )
   }
 }

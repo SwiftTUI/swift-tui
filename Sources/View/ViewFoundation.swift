@@ -93,21 +93,21 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
   package var builderChildren: [AnyView] {
     switch storage {
     case .trueContent(let content):
-      return parallelBuilderChildren(from: content)
+      return declaredBuilderChildren(from: content)
     case .falseContent(let content):
       if collapsesImplicitEmptyFalseBranch, content is EmptyView {
         return []
       }
-      return parallelBuilderChildren(from: content)
+      return declaredBuilderChildren(from: content)
     }
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     switch storage {
     case .trueContent(let content):
-      return parallelResolveElements(content, in: context)
+      return resolveViewElements(content, in: context)
     case .falseContent(let content):
-      return parallelResolveElements(content, in: context)
+      return resolveViewElements(content, in: context)
     }
   }
 }
@@ -170,8 +170,8 @@ public enum ViewBuilder {
   ) -> TupleView<(Accumulated, Next)> {
     TupleView(
       (accumulated, next),
-      children: parallelBuilderChildren(from: accumulated)
-        + parallelBuilderChildren(from: next)
+      children: declaredBuilderChildren(from: accumulated)
+        + declaredBuilderChildren(from: next)
     )
   }
 
@@ -213,7 +213,7 @@ public enum ViewBuilder {
   ) -> VariadicView<Content> {
     VariadicView(
       components,
-      children: components.flatMap { parallelBuilderChildren(from: $0) }
+      children: components.flatMap { declaredBuilderChildren(from: $0) }
     )
   }
 
@@ -248,7 +248,7 @@ public struct AnyView: View, ResolvableView {
     }
 
     resolveElementsClosure = { context in
-      parallelResolveElements(view, in: context)
+      resolveViewElements(view, in: context)
     }
   }
 
@@ -269,7 +269,7 @@ public struct AnyView: View, ResolvableView {
 
 extension AnyView: ViewNode {
   package func resolve(in context: ResolveContext) -> ResolvedNode {
-    parallelResolve(self, in: context)
+    resolveView(self, in: context)
   }
 }
 
@@ -286,12 +286,12 @@ public struct Resolver {
     _ root: V,
     in context: ResolveContext = .init()
   ) -> ResolvedNode {
-    parallelResolve(root, in: context)
+    resolveView(root, in: context)
   }
 }
 
 @MainActor
-package func parallelBuilderChildren<V: View>(
+package func declaredBuilderChildren<V: View>(
   from view: V
 ) -> [AnyView] {
   let erased: Any = view
@@ -302,14 +302,14 @@ package func parallelBuilderChildren<V: View>(
 }
 
 @MainActor
-package func parallelBuilderChildren<V: View & BuilderCompositeView>(
+package func declaredBuilderChildren<V: View & BuilderCompositeView>(
   from view: V
 ) -> [AnyView] {
   view.builderChildren
 }
 
 @MainActor
-package func parallelResolveElements<V: View>(
+package func resolveViewElements<V: View>(
   _ view: V,
   in context: ResolveContext
 ) -> [ResolvedNode] {
@@ -323,7 +323,7 @@ package func parallelResolveElements<V: View>(
 }
 
 @MainActor
-package func parallelResolveElements<V: View & ResolvableView>(
+package func resolveViewElements<V: View & ResolvableView>(
   _ view: V,
   in context: ResolveContext
 ) -> [ResolvedNode] {
@@ -331,7 +331,7 @@ package func parallelResolveElements<V: View & ResolvableView>(
 }
 
 @MainActor
-package func parallelNormalizeResolvedElements(
+package func normalizeResolvedElements(
   _ resolvedElements: [ResolvedNode],
   in context: ResolveContext
 ) -> ResolvedNode {
@@ -358,7 +358,7 @@ package func parallelNormalizeResolvedElements(
 }
 
 @MainActor
-package func parallelResolve<V: View>(
+package func resolveView<V: View>(
   _ view: V,
   in context: ResolveContext
 ) -> ResolvedNode {
@@ -366,8 +366,8 @@ package func parallelResolve<V: View>(
     return reused
   }
   context.recordResolvedComputation()
-  return parallelNormalizeResolvedElements(
-    parallelResolveElements(view, in: context),
+  return normalizeResolvedElements(
+    resolveViewElements(view, in: context),
     in: context
   )
 }

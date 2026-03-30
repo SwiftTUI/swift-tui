@@ -44,8 +44,8 @@ public struct ComparisonChart: View, ResolvableView {
     self.entries = entries
     self.barWidth = barWidth
     self.labelWidth = labelWidth
-    labelViews = parallelBuilderChildren(from: label())
-    summaryViews = parallelBuilderChildren(from: summary())
+    labelViews = declaredBuilderChildren(from: label())
+    summaryViews = declaredBuilderChildren(from: summary())
   }
 
   package func resolveElements(

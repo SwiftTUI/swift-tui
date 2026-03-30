@@ -44,6 +44,7 @@ Scene declarations such as ``App`` and ``WindowGroup`` also live here, but the c
 - ``App``
 - ``Scene``
 - ``SceneBuilder``
+- ``WindowIdentifier``
 - ``WindowGroup``
 
 ### Guide

@@ -48,7 +48,7 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `LayoutTypes.swift`: layout behavior, layout metadata, measured and placed node infrastructure, and custom layout handles
 - `LayoutEngine.swift`: measurement and placement engine
 - `RenderMetadataTypes.swift`: text style, base style, draw metadata, and collection payloads
-- `RichText.swift`: rich-text runs, payloads, and inline-link identity helpers
+- `RichText.swift`: rich-text runs, `LinkDestination`, payloads, and inline-link identity helpers
 - `ImageTypes.swift`: image-source, resolved-image, and raster-image-attachment data types
 - `RenderTreeAndSemanticsTypes.swift`: semantic metadata, lifecycle metadata, resolved tree, semantic snapshot, and draw-tree types
 - `Semantics.swift`: semantic extraction and routing
@@ -93,7 +93,7 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `ViewFoundation.swift`: `View`, `ViewBuilder`, `AnyView`, resolver entry points, and typed builder plumbing
 - `State.swift`: `@State` and binding-facing state support
 - `Observation.swift`: observable bridging and repo-owned `@Bindable`
-- `Environment.swift`: environment keys, `OpenLinkAction`, public `ResolveContext` configuration, and package-only runtime plumbing
+- `Environment.swift`: environment keys, typed `OpenLinkAction`, public `ResolveContext` configuration, and package-only runtime plumbing
 - `ImageEnvironment.swift`: image resource-root and terminal cell-pixel environment values
 - `FocusedValue.swift`: focused-value property wrappers and modifiers
 - `FocusState.swift`: `@FocusState` and focus-binding surface
@@ -102,6 +102,7 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `Image.swift`: SwiftUI-shaped PNG image surface
 - `GeometryReader.swift`: terminal-surface geometry proxy and reader
 - `ContainerViews.swift`: `Group`, `ForEach`, `ViewThatFits`, `ScrollView`, `VStack`, `HStack`, and `ZStack`
+- `NavigationViews.swift`: terminal-native `TabView`, `NavigationSplitView`, and related shell composition support
 - `OutlineViews.swift`: outline and hierarchical collection views
 - `ViewModifiers.swift`: public modifiers and package-only wrapper views such as padding, frame, overlay, and background
 - `StylePrimitives.swift`: style enums and primitive style values

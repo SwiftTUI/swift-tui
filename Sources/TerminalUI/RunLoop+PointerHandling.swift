@@ -286,7 +286,7 @@ extension RunLoop {
     var nextIdentity: Identity? = identity
 
     while let current = nextIdentity {
-      let candidateRouteID = parallelPrimaryRouteID(for: current)
+      let candidateRouteID = primaryRouteID(for: current)
       if candidateRouteID != routeID {
         candidates.append(candidateRouteID)
       }
@@ -305,15 +305,15 @@ extension RunLoop {
   package func shouldCapturePointer(
     routeID: RouteID
   ) -> Bool {
-    parallelRouteID(
+    routeIDHasTerminalComponent(
       routeID,
       hasTerminalComponent: BuiltinPointerRouteComponent.sliderTrack
     )
-      || parallelRouteID(
+      || routeIDHasTerminalComponent(
         routeID,
         hasTerminalComponent: BuiltinPointerRouteComponent.verticalScrollIndicator
       )
-      || parallelRouteID(
+      || routeIDHasTerminalComponent(
         routeID,
         hasTerminalComponent: BuiltinPointerRouteComponent.horizontalScrollIndicator
       )
