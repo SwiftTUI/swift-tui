@@ -28,6 +28,9 @@ public struct GeometryReader<Content: View>: View, ResolvableView {
     let proxy = context.trackingObservableAccess {
       GeometryProxy(size: context.environmentValues.terminalSize)
     }
-    return content(proxy).resolveElements(in: context)
+    let view = context.trackingObservableAccess {
+      content(proxy)
+    }
+    return view.resolveElements(in: context)
   }
 }

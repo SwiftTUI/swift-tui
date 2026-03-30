@@ -43,7 +43,10 @@ where Data: RandomAccessCollection, ID: Hashable {
       let elementContext = context.replacingIdentity(
         with: context.identity.explicitID(element[keyPath: id])
       )
-      resolved.append(contentsOf: content(element).resolveElements(in: elementContext))
+      let view = elementContext.trackingObservableAccess {
+        content(element)
+      }
+      resolved.append(contentsOf: view.resolveElements(in: elementContext))
     }
     return resolved
   }

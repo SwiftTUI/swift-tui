@@ -192,6 +192,88 @@ struct Phase4ObservationAndEnvironmentTests {
     #expect(invalidator.requests == [[testIdentity("Root")]])
   }
 
+  @Test("geometry reader closures invalidate the root when sibling previews depend on observable state")
+  func geometryReaderClosuresInvalidateTheRootWhenSiblingPreviewsDependOnObservableState() throws {
+    let model = Phase4SelectionModel()
+    let invalidator = Phase4RecordingInvalidator()
+    let bridge = ObservationBridge()
+    bridge.attachInvalidator(invalidator)
+
+    let renderer = DefaultRenderer()
+    var initialContext = ResolveContext(identity: testIdentity("Root"))
+    initialContext.observationBridge = bridge
+
+    let initialArtifacts = renderer.render(
+      GeometryReaderSelectionWorkbench(model: model),
+      context: initialContext,
+      proposal: .init(width: 32, height: 4)
+    )
+    let initialSurface = initialArtifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(initialSurface.contains("Mode browser"))
+    #expect(initialSurface.contains("Browser Pane"))
+
+    model.selection = "outline"
+
+    #expect(invalidator.requests == [[testIdentity("Root")]])
+
+    var updatedContext = ResolveContext(
+      identity: testIdentity("Root"),
+      invalidatedIdentities: invalidator.requests[0].union([testIdentity("SelectionHeader")])
+    )
+    updatedContext.observationBridge = bridge
+
+    let updatedArtifacts = renderer.render(
+      GeometryReaderSelectionWorkbench(model: model),
+      context: updatedContext,
+      proposal: .init(width: 32, height: 4)
+    )
+    let updatedSurface = updatedArtifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(updatedSurface.contains("Mode outline"))
+    #expect(updatedSurface.contains("Outline Pane"))
+    #expect(!updatedSurface.contains("Browser Pane"))
+  }
+
+  @Test("for each row builders observe row models read inside their content")
+  func forEachRowBuildersObserveRowModelsReadInsideTheirContent() {
+    let rows = [
+      Phase4ObservableRow(id: 1, title: "Alpha"),
+      Phase4ObservableRow(id: 2, title: "Beta"),
+    ]
+    let invalidator = Phase4RecordingInvalidator()
+    let bridge = ObservationBridge()
+    bridge.attachInvalidator(invalidator)
+
+    let renderer = DefaultRenderer()
+    var initialContext = ResolveContext(identity: testIdentity("Root"))
+    initialContext.observationBridge = bridge
+
+    _ = renderer.render(
+      ObservableRowsView(rows: rows),
+      context: initialContext
+    )
+
+    rows[1].title = "Gamma"
+
+    #expect(invalidator.requests == [[testIdentity("Root", "VStack[0]").explicitID(2)]])
+
+    var updatedContext = ResolveContext(
+      identity: testIdentity("Root"),
+      invalidatedIdentities: invalidator.requests[0]
+    )
+    updatedContext.observationBridge = bridge
+
+    let updatedArtifacts = renderer.render(
+      ObservableRowsView(rows: rows),
+      context: updatedContext
+    )
+
+    #expect(updatedArtifacts.rasterSurface.lines.contains("Alpha"))
+    #expect(updatedArtifacts.rasterSurface.lines.contains("Gamma"))
+    #expect(updatedArtifacts.diagnostics.measuredNodesReused >= 1)
+    #expect(updatedArtifacts.diagnostics.placedNodesReused >= 1)
+  }
+
   @Test("nested environment overrides stay local to their subtree snapshots")
   func nestedEnvironmentOverridesStayLocal() throws {
     var rootEnvironmentValues = EnvironmentValues()
@@ -390,6 +472,22 @@ private final class Phase4ObservableForm: @unchecked Sendable {
   var name = ""
 }
 
+@Observable
+private final class Phase4SelectionModel: @unchecked Sendable {
+  var selection = "browser"
+}
+
+@Observable
+private final class Phase4ObservableRow: Identifiable, @unchecked Sendable {
+  let id: Int
+  var title: String
+
+  init(id: Int, title: String) {
+    self.id = id
+    self.title = title
+  }
+}
+
 private struct Phase4Theme: Equatable, Sendable {
   var accent: String
   var emphasis: String
@@ -480,6 +578,38 @@ private struct TerminalSizeProbeView: View {
   var body: some View {
     EnvironmentReader(\.terminalSize) { terminalSize in
       Text("Terminal \(terminalSize.width)x\(terminalSize.height)")
+    }
+  }
+}
+
+private struct GeometryReaderSelectionWorkbench: View {
+  let model: Phase4SelectionModel
+
+  var body: some View {
+    GeometryReader { _ in
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Mode \(model.selection)")
+          .id(testIdentity("SelectionHeader"))
+        if model.selection == "browser" {
+          Text("Browser Pane")
+        } else {
+          Text("Outline Pane")
+        }
+      }
+    }
+  }
+}
+
+private struct ObservableRowsView: View {
+  let rows: [Phase4ObservableRow]
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(rows) { row in
+        Text(row.title)
+      }
+
+      Text("Stable sibling")
     }
   }
 }
