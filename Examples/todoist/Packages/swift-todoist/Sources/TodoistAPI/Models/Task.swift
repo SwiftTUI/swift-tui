@@ -86,6 +86,69 @@ public struct Task: Codable, Sendable {
         self.hasSubTasks = hasSubTasks
         self.url = url
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId
+        case projectId
+        case sectionId
+        case parentId
+        case assignedByUid
+        case responsibleUid
+        case labels
+        case deadline
+        case duration
+        case checked
+        case isDeleted
+        case addedAt
+        case completedAt
+        case updatedAt
+        case due
+        case priority
+        case childOrder
+        case content
+        case description
+        case dayOrder
+        case isCollapsed
+        case isUncompletable
+        case order
+        case recurring
+        case hasSubTasks
+        case url
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        id = try container.decode(String.self, forKey: .id)
+        userId = try container.decodeIfPresent(String.self, forKey: .userId)
+        projectId = try container.decodeIfPresent(String.self, forKey: .projectId)
+        sectionId = try container.decodeIfPresent(String.self, forKey: .sectionId)
+        parentId = try container.decodeIfPresent(String.self, forKey: .parentId)
+        assignedByUid = try container.decodeIfPresent(String.self, forKey: .assignedByUid)
+        responsibleUid = try container.decodeIfPresent(String.self, forKey: .responsibleUid)
+        labels = try container.decodeIfPresent([String].self, forKey: .labels) ?? []
+        deadline = try container.decodeIfPresent(Deadline.self, forKey: .deadline)
+        duration = try container.decodeIfPresent(Duration.self, forKey: .duration)
+        checked = try container.decode(Bool.self, forKey: .checked)
+        isDeleted = try container.decode(Bool.self, forKey: .isDeleted)
+        addedAt = try container.decodeIfPresent(String.self, forKey: .addedAt)
+        completedAt = try container.decodeIfPresent(String.self, forKey: .completedAt)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+        due = try container.decodeIfPresent(DueDate.self, forKey: .due)
+        priority = try container.decodeIfPresent(Int.self, forKey: .priority)
+        childOrder = try container.decodeIfPresent(Int.self, forKey: .childOrder)
+        content = try container.decode(String.self, forKey: .content)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        dayOrder = try container.decodeIfPresent(Int.self, forKey: .dayOrder)
+        isCollapsed = try container.decodeIfPresent(Bool.self, forKey: .isCollapsed) ?? false
+        isUncompletable =
+            try container.decodeIfPresent(Bool.self, forKey: .isUncompletable) ?? false
+        order = try container.decodeIfPresent(Int.self, forKey: .order)
+        recurring = try container.decodeIfPresent(Bool.self, forKey: .recurring)
+        hasSubTasks = try container.decodeIfPresent(Bool.self, forKey: .hasSubTasks)
+        url = try container.decodeIfPresent(String.self, forKey: .url)
+    }
 }
 
 public struct Deadline: Codable, Sendable {

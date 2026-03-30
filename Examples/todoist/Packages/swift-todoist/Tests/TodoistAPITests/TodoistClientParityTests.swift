@@ -223,4 +223,19 @@ struct TodoistClientParityTests {
         #expect(items["is_deleted"] == "true")
         #expect(items["limit"] == "20")
     }
+
+    @Test("task decoding defaults missing is_uncompletable to false like the TS client")
+    func taskDecodingDefaultsMissingIsUncompletableToFalse() throws {
+        var liveLikeTask = taskJSON(defaultTask)
+        liveLikeTask["is_uncompletable"] = nil
+
+        let data = try JSONSerialization.data(withJSONObject: [
+            "results": [liveLikeTask],
+        ])
+
+        let page = try JSONDecoder.default.decode(TodoistPage<Task>.self, from: data)
+
+        #expect(page.results.count == 1)
+        #expect(page.results[0].isUncompletable == false)
+    }
 }

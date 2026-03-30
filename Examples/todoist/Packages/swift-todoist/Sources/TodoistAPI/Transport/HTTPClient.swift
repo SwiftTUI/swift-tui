@@ -65,9 +65,11 @@ public struct TodoistHTTPClient: Sendable {
             let value = try decoder.decode(T.self, from: response.data)
             return (response, value)
         } catch {
-            let stringBody = String(data: response.data, encoding: .utf8) ?? ""
             throw TodoistRequestError(
-                stringBody,
+                decodingFailureMessage(
+                    for: T.self,
+                    error: error,
+                ),
                 httpStatusCode: response.statusCode,
                 responseData: response.data,
             )
@@ -131,6 +133,43 @@ public struct TodoistHTTPClient: Sendable {
             return error
         }
         return response.statusText
+    }
+
+    private func decodingFailureMessage<T>(for type: T.Type, error: Error) -> String {
+        if let decodingError = error as? DecodingError {
+            return "Response decoding failed: "
+                + decodingErrorDescription(decodingError)
+                + " while decoding \(String(reflecting: type))"
+        }
+
+        return "Response decoding failed while decoding \(String(reflecting: type)): "
+            + error.localizedDescription
+    }
+
+    private func decodingErrorDescription(_ error: DecodingError) -> String {
+        switch error {
+        case let .dataCorrupted(context):
+            return context.debugDescription
+        case let .keyNotFound(key, context):
+            let path = codingPath(context.codingPath + [key])
+            return "missing key \(path)"
+        case let .typeMismatch(_, context):
+            let path = codingPath(context.codingPath)
+            return "type mismatch at \(path): \(context.debugDescription)"
+        case let .valueNotFound(_, context):
+            let path = codingPath(context.codingPath)
+            return "missing value at \(path): \(context.debugDescription)"
+        @unknown default:
+            return error.localizedDescription
+        }
+    }
+
+    private func codingPath(_ codingPath: [CodingKey]) -> String {
+        guard !codingPath.isEmpty else {
+            return "<root>"
+        }
+
+        return codingPath.map(\.stringValue).joined(separator: ".")
     }
 }
 

@@ -1,4 +1,3 @@
-import AsyncHTTPClient
 import Foundation
 import Testing
 @testable import TodoistAPI
@@ -8,8 +7,8 @@ struct TransportTests {
     @Test("retries network errors and eventually succeeds")
     func retriesNetworkErrorsAndEventuallySucceeds() async throws {
         let state = MockExecutorState()
-        await state.enqueue(.failure(HTTPClientError.deadlineExceeded))
-        await state.enqueue(.failure(HTTPClientError.remoteConnectionClosed))
+        await state.enqueue(.failure(URLError(.timedOut)))
+        await state.enqueue(.failure(URLError(.networkConnectionLost)))
         await state.enqueue(.success(statusCode: 200, headers: ["content-type": "application/json"], data: Data("{\"ok\":true}".utf8)))
 
         let transport = DefaultTodoistTransport(policy: .init()) { request in
@@ -25,7 +24,7 @@ struct TransportTests {
         #expect(requests.count == 3)
     }
 
-    @Test("forces a 30 second timeout on AsyncHTTPClient requests")
+    @Test("forces a 30 second timeout on transport requests")
     func forcesThirtySecondTimeout() async throws {
         let state = MockExecutorState()
         await state.enqueue(.success(statusCode: 204, data: Data()))
@@ -85,7 +84,7 @@ private actor MockExecutorState {
 
     func nextResponse() throws -> TodoistHTTPResponse {
         guard let action = nextAction() else {
-            throw HTTPClientError.remoteConnectionClosed
+            throw URLError(.networkConnectionLost)
         }
 
         switch action {

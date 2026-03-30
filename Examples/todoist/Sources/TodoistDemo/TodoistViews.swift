@@ -312,17 +312,31 @@ struct TodoistDemoRootView: View {
       Text("Inspector")
         .bold()
       Divider()
+      Text("Status")
+        .bold()
+      Text(model.statusMessage)
+        .foregroundStyle(.separator)
+
+      if let lastErrorDetails = model.lastErrorDetails {
+        Divider()
+        Text("Last Error")
+          .bold()
+          .foregroundStyle(.warning)
+        Text(lastErrorDetails)
+          .lineLimit(6)
+          .truncationMode(.tail)
+          .foregroundStyle(.separator)
+      }
+
+      Divider()
 
       if let task = model.selectedTask {
         Text(task.titleText)
           .bold()
         Text(task.detailText)
+          .lineLimit(2)
+          .truncationMode(.tail)
           .foregroundStyle(.separator)
-        Divider()
-        LabeledContent("Project", value: task.projectName ?? "Inbox")
-        LabeledContent("Due", value: task.dueText ?? "None")
-        LabeledContent("State", value: model.isBusy ? "Syncing" : "Ready")
-        Divider()
         Button("Close Selected") {
           isCloseConfirmationPresented = true
         }
@@ -343,15 +357,16 @@ struct TodoistDemoRootView: View {
             Text("This completes the task in Todoist and removes it from the active task list.")
           }
         )
+        Divider()
+        LabeledContent("Project", value: task.projectName ?? "Inbox")
+        LabeledContent("Due", value: task.dueText ?? "None")
+        LabeledContent("State", value: model.isBusy ? "Syncing" : "Ready")
       } else {
         Text("No task selected")
         Text("Choose a task to inspect and close it from here.")
           .foregroundStyle(.separator)
       }
 
-      Divider()
-      Text(model.statusMessage)
-        .foregroundStyle(.separator)
       Spacer(minLength: 0)
     }
     .padding(1)

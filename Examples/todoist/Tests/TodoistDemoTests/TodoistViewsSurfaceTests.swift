@@ -104,6 +104,27 @@ struct TodoistViewsSurfaceTests {
     #expect(surface.contains("move focus"))
   }
 
+  @Test("Inspector surfaces last error details")
+  func inspectorSurfacesLastErrorDetails() throws {
+    let launcher = try TodoistDemoLauncher()
+    let model = sampleModel()
+    model.statusMessage = "Sync failed. See Last Error in the inspector."
+    model.lastErrorDetails =
+      "Decode Error: missing key results.0.isUncompletable\nExpected Type: TodoistAPI.TodoistPage<TodoistAPI.Task>"
+    launcher.model = model
+
+    let surface = renderText(
+      TodoistDemoSceneView(launcher: launcher)
+        .preferredColorScheme(.dark),
+      width: 121,
+      height: 30
+    )
+
+    #expect(surface.contains("Last Error"))
+    #expect(surface.contains("Decode Error"))
+    #expect(surface.contains("Status"))
+  }
+
   @Test("Filled and plain controls render different default chrome")
   func filledControlsRenderDifferentChrome() {
     let plainText = renderText(

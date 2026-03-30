@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import TodoistAPI
 
 @Observable
 final class TodoistAppModel: @unchecked Sendable {
@@ -17,6 +18,7 @@ final class TodoistAppModel: @unchecked Sendable {
   var isAuthenticated: Bool
   var isBusy = false
   var statusMessage: String
+  var lastErrorDetails: String?
 
   init(repository: TodoistRepository, databasePath: String, isAuthenticated: Bool) {
     self.repository = repository
@@ -28,6 +30,7 @@ final class TodoistAppModel: @unchecked Sendable {
       } else {
         "Running offline. Set TODOIST_API_TOKEN to enable live sync."
       }
+    lastErrorDetails = nil
   }
 
   static func live(authTokenOverride: String? = nil) throws -> TodoistAppModel {
@@ -97,19 +100,19 @@ final class TodoistAppModel: @unchecked Sendable {
   }
 
   func requestRefresh() {
-    Task { @MainActor in
+    Swift.Task { @MainActor in
       await refresh()
     }
   }
 
   func requestAddTask() {
-    Task { @MainActor in
+    Swift.Task { @MainActor in
       await addTask()
     }
   }
 
   func requestCloseSelectedTask() {
-    Task { @MainActor in
+    Swift.Task { @MainActor in
       await closeSelectedTask()
     }
   }
@@ -146,10 +149,11 @@ extension TodoistAppModel {
 
     do {
       apply(snapshot: try await repository.sync())
+      clearLastError()
       statusMessage =
         "Sync complete. Loaded \(projects.count) projects and \(tasks.count) active tasks."
     } catch {
-      statusMessage = error.localizedDescription
+      recordError(error, summary: "Sync failed. See Last Error in the inspector.")
     }
   }
 
@@ -168,9 +172,10 @@ extension TodoistAppModel {
         snapshot: try await repository.addTask(
           content: newTaskText, projectID: selectedProject.projectID))
       newTaskText = ""
+      clearLastError()
       statusMessage = "Task added."
     } catch {
-      statusMessage = error.localizedDescription
+      recordError(error, summary: "Task creation failed. See Last Error in the inspector.")
     }
   }
 
@@ -186,9 +191,10 @@ extension TodoistAppModel {
 
     do {
       apply(snapshot: try await repository.closeTask(id: task.id))
+      clearLastError()
       statusMessage = "Task closed."
     } catch {
-      statusMessage = error.localizedDescription
+      recordError(error, summary: "Closing the task failed. See Last Error in the inspector.")
     }
   }
 
@@ -196,6 +202,7 @@ extension TodoistAppModel {
   private func reloadCache(statusOverride: String?) async {
     do {
       apply(snapshot: try await repository.loadSnapshot())
+      clearLastError()
       if let statusOverride {
         statusMessage = statusOverride
       } else if tasks.isEmpty {
@@ -205,7 +212,7 @@ extension TodoistAppModel {
           : "Offline cache is empty. Set TODOIST_API_TOKEN and press Refresh."
       }
     } catch {
-      statusMessage = error.localizedDescription
+      recordError(error, summary: "Loading the cache failed. See Last Error in the inspector.")
     }
   }
 
@@ -220,5 +227,61 @@ extension TodoistAppModel {
     if !visibleTasks.contains(where: { $0.id == selectedTaskID }) {
       selectedTaskID = ""
     }
+  }
+
+  private func clearLastError() {
+    lastErrorDetails = nil
+  }
+
+  private func recordError(_ error: Error, summary: String) {
+    statusMessage = summary
+    lastErrorDetails = Self.errorDetails(for: error)
+  }
+
+  private static func errorDetails(for error: Error) -> String {
+    if let requestError = error as? TodoistRequestError {
+      var lines: [String] = []
+
+      if let decodeLines = decodeErrorLines(for: requestError.message) {
+        lines.append(contentsOf: decodeLines)
+      } else {
+        lines.append("Message: \(requestError.message)")
+      }
+
+      if let statusCode = requestError.httpStatusCode {
+        lines.append("HTTP Status: \(statusCode)")
+      }
+
+      if let responseData = requestError.responseData,
+        let body = String(data: responseData, encoding: .utf8)?
+          .trimmingCharacters(in: .whitespacesAndNewlines),
+        !body.isEmpty,
+        body != requestError.message
+      {
+        let preview = body.count > 600 ? String(body.prefix(600)) + "..." : body
+        lines.append("Response Body: \(preview)")
+      }
+
+      return lines.joined(separator: "\n")
+    }
+
+    return "Type: \(String(reflecting: type(of: error)))\nMessage: \(error.localizedDescription)"
+  }
+
+  private static func decodeErrorLines(for message: String) -> [String]? {
+    let prefix = "Response decoding failed: "
+    let separator = " while decoding "
+
+    guard message.hasPrefix(prefix), let separatorRange = message.range(of: separator) else {
+      return nil
+    }
+
+    let detail = String(message[message.index(message.startIndex, offsetBy: prefix.count)..<separatorRange.lowerBound])
+    let type = String(message[separatorRange.upperBound...])
+
+    return [
+      "Decode Error: \(detail)",
+      "Expected Type: \(type)",
+    ]
   }
 }
