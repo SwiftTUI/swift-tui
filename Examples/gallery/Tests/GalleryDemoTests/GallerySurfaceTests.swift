@@ -56,6 +56,26 @@ struct GallerySurfaceTests {
     #expect(surface.contains("Flag"))
   }
 
+  @Test("Gallery color mode exposes named, semantic, and palette colors")
+  func galleryShowsAvailableColors() {
+    let model = GalleryDemoModel()
+    model.activeTab = "appearance"
+    model.selectedAppearanceDemo = "colors"
+    let artifacts = DefaultRenderer().render(
+      GalleryDemoSceneView(model: model)
+        .frame(width: 96, height: 40, alignment: .topLeading),
+      context: .init(identity: testIdentity("GalleryColorsRoot"))
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(surface.contains("Color Gallery"))
+    #expect(surface.contains("Named colors"))
+    #expect(surface.contains("Semantic roles"))
+    #expect(surface.contains("Terminal palette"))
+    #expect(surface.contains("magenta"))
+    #expect(surface.contains("warning"))
+  }
+
   @Test("Gallery value controls preview shows indeterminate progress")
   func galleryValueControlsPreviewShowsSyncProgress() {
     let model = GalleryDemoModel()

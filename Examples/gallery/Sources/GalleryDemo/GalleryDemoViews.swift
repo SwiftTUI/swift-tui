@@ -43,13 +43,13 @@ struct GalleryDemoSceneView: View {
       .disabled(model.isPalettePresented)
 
       if model.isPalettePresented {
-            GalleryCommandPalette(
-      query: $model.paletteQuery,
-      commands: paletteCommands,
-      dismiss: dismissPalette,
-      runCommand: runPaletteCommand
-    )
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        GalleryCommandPalette(
+          query: $model.paletteQuery,
+          commands: paletteCommands,
+          dismiss: dismissPalette,
+          runCommand: runPaletteCommand
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
       }
     }
     .tint(Color.cyan)
@@ -192,7 +192,7 @@ struct GalleryDemoSceneView: View {
             model.increment()
             model.increment()
           }
-            .buttonStyle(.plain)
+          .buttonStyle(.plain)
         }
         Text("Pressed \(model.primaryCount) times")
           .foregroundStyle(.separator)
@@ -334,6 +334,7 @@ struct GalleryDemoSceneView: View {
         ("Light", "light"),
         ("Dark", "dark"),
         ("Accent", "accent"),
+        ("Colors", "colors"),
       ],
       title: appearanceTitle,
       subtitle: appearanceSubtitle
@@ -348,6 +349,8 @@ struct GalleryDemoSceneView: View {
       "Dark Mode"
     case "accent":
       "Accent Propagation"
+    case "colors":
+      "Color Gallery"
     default:
       "Light Mode"
     }
@@ -359,26 +362,34 @@ struct GalleryDemoSceneView: View {
       "Foreground contrast must stay explicit and legible in dark terminals."
     case "accent":
       "Tint should affect selection, borders, and highlights coherently."
+    case "colors":
+      "Named colors, semantic roles, and palette slots available to the demo."
     default:
       "Light terminals need explicit dark foregrounds by default."
     }
   }
 
+  @ViewBuilder
   private var appearancePreview: some View {
-    HStack(alignment: .top, spacing: 1) {
-      appearanceSample(
-        title: "Preferred light mode",
-        scheme: model.selectedAppearanceDemo == "dark" ? .dark : .light,
-        tint: model.selectedAppearanceDemo == "accent" ? Color.green : Color.blue
-      )
-      .frame(width: 28, alignment: .topLeading)
+    switch model.selectedAppearanceDemo {
+    case "colors":
+      GalleryColorGallery()
+    default:
+      HStack(alignment: .top, spacing: 1) {
+        appearanceSample(
+          title: "Preferred light mode",
+          scheme: model.selectedAppearanceDemo == "dark" ? .dark : .light,
+          tint: model.selectedAppearanceDemo == "accent" ? Color.green : Color.blue
+        )
+        .frame(width: 28, alignment: .topLeading)
 
-      appearanceSample(
-        title: "Preferred dark mode",
-        scheme: .dark,
-        tint: model.selectedAppearanceDemo == "accent" ? Color.green : Color.blue
-      )
-      .frame(width: 28, alignment: .topLeading)
+        appearanceSample(
+          title: "Preferred dark mode",
+          scheme: .dark,
+          tint: model.selectedAppearanceDemo == "accent" ? Color.green : Color.blue
+        )
+        .frame(width: 28, alignment: .topLeading)
+      }
     }
   }
 
@@ -543,8 +554,8 @@ struct GalleryDemoSceneView: View {
       .init(
         id: "appearance",
         title: "Show Appearance",
-        detail: "Compare light, dark, and accent propagation",
-        keywords: ["theme", "light", "dark", "accent"]
+        detail: "Compare light, dark, accent propagation, and available colors",
+        keywords: ["theme", "light", "dark", "accent", "colors", "palette"]
       ),
       .init(
         id: "charts",
