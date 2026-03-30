@@ -1,21 +1,41 @@
-# bun-react-template
+# WebExample
 
-To install dependencies:
+Minimal Bun web app that embeds a Swift `TerminalUI` executable through
+[`GUI/WebTUIGUI`](/Users/adamz/Developer/repos/swift-terminal-ui/GUI/WebTUIGUI).
+
+The example has two parts:
+
+- `TerminalApp/`: a tiny Swift package that defines the `WebExampleApp` executable
+- `src/`: the Bun host that builds the manifest and wasm assets, serves them, and mounts `WebTUIGUI`
+
+## Toolchains
+
+- Use `swiftly` and Swift 6.3.0 for the Swift build path
+- Use Bun for the web app
+
+## Setup
 
 ```bash
 bun install
 ```
 
-To start a development server:
+## Development
 
 ```bash
 bun dev
 ```
 
-To run for production:
+`bun dev` first builds `TerminalApp/dist/scene-manifest.json` and
+`TerminalApp/dist/assets/app.wasm`, then starts the Bun server.
+
+## Production Build
 
 ```bash
+bun build
 bun start
 ```
 
-This project was created using `bun init` in bun v1.3.11. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+## Notes
+
+- `src/build-terminal.ts` drives the Swift manifest and wasm build.
+- `src/scene-runtime.ts` provides the example-specific WASI bootstrap that runs `WebExampleApp` inside each `WebTUIGUI` scene runtime.

@@ -1,20 +1,20 @@
 {
-  "name": "bun-react-template",
+  "name": "web-example",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --hot src/index.ts",
-    "build": "bun build ./src/index.html --outdir=dist --sourcemap --target=browser --minify --define:process.env.NODE_ENV='\"production\"' --env='BUN_PUBLIC_*'",
-    "start": "NODE_ENV=production bun src/index.ts"
+    "build:terminal": "bun run src/build-terminal.ts",
+    "dev": "bun run build:terminal && bun --hot src/index.ts",
+    "build": "bun run build:terminal && bun build ./src/index.html --outdir=dist --sourcemap --target=browser --minify",
+    "start": "NODE_ENV=production bun src/index.ts",
+    "test": "bun test"
   },
   "dependencies": {
-    "react": "^19",
-    "react-dom": "^19"
+    "@bjorn3/browser_wasi_shim": "^0.4.2",
+    "webtuigui": "file:../../GUI/WebTUIGUI"
   },
   "devDependencies": {
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
     "@types/bun": "latest"
   }
 }

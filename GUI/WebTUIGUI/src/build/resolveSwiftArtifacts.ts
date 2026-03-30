@@ -13,6 +13,24 @@ export interface SwiftArtifactPaths {
 export async function resolveSwiftArtifacts(
   options: ResolveSwiftArtifactsOptions
 ): Promise<SwiftArtifactPaths> {
+  const environment = {
+    ...process.env,
+    TERMINALUI_ENABLE_WASM: "1",
+  };
+
+  await runCommand([
+    "swift",
+    "build",
+    "--package-path",
+    options.packagePath,
+    "--swift-sdk",
+    "swift-6.3-RELEASE_wasm",
+    "--product",
+    options.product,
+    "-c",
+    "release",
+  ], environment);
+
   const binPath = await runCommand([
     "swift",
     "build",
@@ -20,8 +38,10 @@ export async function resolveSwiftArtifacts(
     options.packagePath,
     "--swift-sdk",
     "swift-6.3-RELEASE_wasm",
+    "-c",
+    "release",
     "--show-bin-path",
-  ]);
+  ], environment);
 
   const wasmPath = join(binPath.trim(), `${options.product}.wasm`);
   return {
@@ -31,10 +51,12 @@ export async function resolveSwiftArtifacts(
 }
 
 async function runCommand(
-  cmd: string[]
+  cmd: string[],
+  env?: Record<string, string | undefined>
 ): Promise<string> {
   const proc = Bun.spawn({
     cmd,
+    env,
     stdout: "pipe",
     stderr: "pipe",
   });
