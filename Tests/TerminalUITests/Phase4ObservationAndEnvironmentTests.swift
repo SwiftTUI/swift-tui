@@ -192,7 +192,8 @@ struct Phase4ObservationAndEnvironmentTests {
     #expect(invalidator.requests == [[testIdentity("Root")]])
   }
 
-  @Test("geometry reader closures invalidate the root when sibling previews depend on observable state")
+  @Test(
+    "geometry reader closures invalidate the root when sibling previews depend on observable state")
   func geometryReaderClosuresInvalidateTheRootWhenSiblingPreviewsDependOnObservableState() throws {
     let model = Phase4SelectionModel()
     let invalidator = Phase4RecordingInvalidator()
@@ -371,6 +372,373 @@ struct Phase4ObservationAndEnvironmentTests {
       secondArtifacts.resolvedTree.environmentSnapshot.style.foregroundStyle
         == AnyShapeStyle(Color.red)
     )
+  }
+
+  @Test(
+    "observable button actions stay invalidated through wrapper bodies that share the same identity"
+  )
+  func observableButtonActionsStayInvalidatedThroughWrapperBodies() throws {
+    let model = Phase4ObservableCounter()
+    let invalidator = Phase4RecordingInvalidator()
+    let bridge = ObservationBridge()
+    bridge.attachInvalidator(invalidator)
+
+    let renderer = DefaultRenderer()
+    let actionRegistry = LocalActionRegistry()
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      localActionRegistry: actionRegistry,
+      applyEnvironmentValues: true
+    )
+    initialContext.observationBridge = bridge
+
+    let initialArtifacts = renderer.render(
+      ObservableAlertCounterView(
+        model: model,
+        initialAlertPresented: false
+      ),
+      context: initialContext
+    )
+    #expect(initialArtifacts.resolvedTree.descendant(withText: "Count 0") != nil)
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("PrimaryAction")))
+    #expect(model.count == 1)
+
+    let invalidatedIdentities = invalidator.requests.reduce(into: Set<Identity>()) {
+      partial, request in
+      partial.formUnion(request)
+    }
+    #expect(!invalidatedIdentities.isEmpty)
+
+    var updatedContext = initialContext
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    let updatedArtifacts = renderer.render(
+      ObservableAlertCounterView(
+        model: model,
+        initialAlertPresented: false
+      ),
+      context: updatedContext
+    )
+
+    #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 1") != nil)
+  }
+
+  @Test(
+    "alert action buttons preserve the original state owner when dismissed from stored builder children"
+  )
+  func alertActionButtonsPreserveTheOriginalStateOwner() throws {
+    let invalidator = Phase4RecordingInvalidator()
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
+    dynamicStateStore.invalidator = invalidator
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      localActionRegistry: actionRegistry,
+      applyEnvironmentValues: true
+    )
+    initialContext.dynamicStateStore = dynamicStateStore
+
+    let initialArtifacts = renderer.render(
+      PresentedAlertDismissView(),
+      context: initialContext
+    )
+    #expect(
+      initialArtifacts.resolvedTree.descendant(withIdentity: testIdentity("CancelAction")) != nil)
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("CancelAction")))
+
+    let invalidatedIdentities = invalidator.requests.reduce(into: Set<Identity>()) {
+      partial, request in
+      partial.formUnion(request)
+    }
+    #expect(!invalidatedIdentities.isEmpty)
+
+    var updatedContext = initialContext
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    let updatedArtifacts = renderer.render(
+      PresentedAlertDismissView(),
+      context: updatedContext
+    )
+
+    #expect(
+      updatedArtifacts.resolvedTree.descendant(withIdentity: testIdentity("CancelAction")) == nil)
+  }
+
+  @Test("alert action buttons rerender observed models inside wrapped content")
+  func alertActionButtonsRerenderObservedModelsInsideWrappedContent() throws {
+    let model = Phase4ObservableCounter()
+    model.count = 3
+
+    let invalidator = Phase4RecordingInvalidator()
+    let bridge = ObservationBridge()
+    bridge.attachInvalidator(invalidator)
+
+    let renderer = DefaultRenderer()
+    let actionRegistry = LocalActionRegistry()
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      localActionRegistry: actionRegistry,
+      applyEnvironmentValues: true
+    )
+    initialContext.observationBridge = bridge
+
+    let initialArtifacts = renderer.render(
+      ObservableAlertCounterView(
+        model: model,
+        initialAlertPresented: true
+      ),
+      context: initialContext
+    )
+    #expect(initialArtifacts.resolvedTree.descendant(withText: "Count 3") != nil)
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("ResetAction")))
+    #expect(model.count == 0)
+
+    let invalidatedIdentities = invalidator.requests.reduce(into: Set<Identity>()) {
+      partial, request in
+      partial.formUnion(request)
+    }
+    #expect(!invalidatedIdentities.isEmpty)
+
+    var updatedContext = initialContext
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    let updatedArtifacts = renderer.render(
+      ObservableAlertCounterView(
+        model: model,
+        initialAlertPresented: true
+      ),
+      context: updatedContext
+    )
+
+    #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 0") != nil)
+  }
+
+  @Test("ForEach content closures preserve the original state owner")
+  func forEachContentClosuresPreserveTheOriginalStateOwner() throws {
+    let invalidator = Phase4RecordingInvalidator()
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
+    dynamicStateStore.invalidator = invalidator
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      localActionRegistry: actionRegistry,
+      applyEnvironmentValues: true
+    )
+    initialContext.dynamicStateStore = dynamicStateStore
+
+    let initialArtifacts = renderer.render(
+      ForEachActionCounterView(),
+      context: initialContext
+    )
+    #expect(initialArtifacts.resolvedTree.descendant(withText: "Count 0") != nil)
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("ForEachAction")))
+
+    let invalidatedIdentities = collectedInvalidatedIdentities(from: invalidator)
+    #expect(!invalidatedIdentities.isEmpty)
+
+    var updatedContext = initialContext
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    let updatedArtifacts = renderer.render(
+      ForEachActionCounterView(),
+      context: updatedContext
+    )
+
+    #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 1") != nil)
+  }
+
+  @Test("EnvironmentReader content closures preserve the original state owner")
+  func environmentReaderContentClosuresPreserveTheOriginalStateOwner() throws {
+    let invalidator = Phase4RecordingInvalidator()
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
+    dynamicStateStore.invalidator = invalidator
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      localActionRegistry: actionRegistry,
+      applyEnvironmentValues: true
+    )
+    initialContext.dynamicStateStore = dynamicStateStore
+
+    let initialArtifacts = renderer.render(
+      EnvironmentReaderActionCounterView(),
+      context: initialContext
+    )
+    #expect(initialArtifacts.resolvedTree.descendant(withText: "Count 0") != nil)
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("EnvironmentReaderAction")))
+
+    let invalidatedIdentities = collectedInvalidatedIdentities(from: invalidator)
+    #expect(!invalidatedIdentities.isEmpty)
+
+    var updatedContext = initialContext
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    let updatedArtifacts = renderer.render(
+      EnvironmentReaderActionCounterView(),
+      context: updatedContext
+    )
+
+    #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 1") != nil)
+  }
+
+  @Test("NavigationSplitView preserves stored builder panels under stateful actions")
+  func navigationSplitViewPreservesStoredBuilderPanels() throws {
+    let invalidator = Phase4RecordingInvalidator()
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
+    dynamicStateStore.invalidator = invalidator
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      localActionRegistry: actionRegistry,
+      applyEnvironmentValues: true
+    )
+    initialContext.dynamicStateStore = dynamicStateStore
+
+    let initialArtifacts = renderer.render(
+      NavigationSplitActionCounterView(),
+      context: initialContext
+    )
+    #expect(initialArtifacts.resolvedTree.descendant(withText: "Count 0") != nil)
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("NavigationSplitAction")))
+
+    let invalidatedIdentities = collectedInvalidatedIdentities(from: invalidator)
+    #expect(!invalidatedIdentities.isEmpty)
+
+    var updatedContext = initialContext
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    let updatedArtifacts = renderer.render(
+      NavigationSplitActionCounterView(),
+      context: updatedContext
+    )
+
+    #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 1") != nil)
+  }
+
+  @Test("OutlineGroup row builders preserve the original state owner")
+  func outlineGroupRowBuildersPreserveTheOriginalStateOwner() throws {
+    let invalidator = Phase4RecordingInvalidator()
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
+    dynamicStateStore.invalidator = invalidator
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      localActionRegistry: actionRegistry,
+      applyEnvironmentValues: true
+    )
+    initialContext.dynamicStateStore = dynamicStateStore
+
+    let initialArtifacts = renderer.render(
+      OutlineActionCounterView(),
+      context: initialContext
+    )
+    #expect(initialArtifacts.resolvedTree.descendant(withText: "Count 0") != nil)
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("OutlineAction")))
+
+    let invalidatedIdentities = collectedInvalidatedIdentities(from: invalidator)
+    #expect(!invalidatedIdentities.isEmpty)
+
+    var updatedContext = initialContext
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    let updatedArtifacts = renderer.render(
+      OutlineActionCounterView(),
+      context: updatedContext
+    )
+
+    #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 1") != nil)
+  }
+
+  @Test("Picker arrow-key handlers preserve the original state owner")
+  func pickerArrowKeyHandlersPreserveTheOriginalStateOwner() throws {
+    let invalidator = Phase4RecordingInvalidator()
+    let keyRegistry = LocalKeyHandlerRegistry()
+    let renderer = DefaultRenderer()
+    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
+    dynamicStateStore.invalidator = invalidator
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = testIdentity("StatefulPicker")
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      environmentValues: environmentValues,
+      localKeyHandlerRegistry: keyRegistry,
+      applyEnvironmentValues: true
+    )
+    initialContext.dynamicStateStore = dynamicStateStore
+
+    let initialArtifacts = renderer.render(
+      StatefulPickerCounterView(),
+      context: initialContext
+    )
+    #expect(initialArtifacts.resolvedTree.descendant(withText: "Selection 0") != nil)
+
+    #expect(keyRegistry.dispatch(identity: testIdentity("StatefulPicker"), event: .arrowDown))
+
+    let invalidatedIdentities = collectedInvalidatedIdentities(from: invalidator)
+    #expect(!invalidatedIdentities.isEmpty)
+
+    var updatedContext = initialContext
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    let updatedArtifacts = renderer.render(
+      StatefulPickerCounterView(),
+      context: updatedContext
+    )
+
+    #expect(updatedArtifacts.resolvedTree.descendant(withText: "Selection 2") != nil)
+  }
+
+  @Test("Stepper arrow-key handlers preserve the original state owner")
+  func stepperArrowKeyHandlersPreserveTheOriginalStateOwner() throws {
+    let invalidator = Phase4RecordingInvalidator()
+    let keyRegistry = LocalKeyHandlerRegistry()
+    let renderer = DefaultRenderer()
+    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
+    dynamicStateStore.invalidator = invalidator
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = testIdentity("StatefulStepper")
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      environmentValues: environmentValues,
+      localKeyHandlerRegistry: keyRegistry,
+      applyEnvironmentValues: true
+    )
+    initialContext.dynamicStateStore = dynamicStateStore
+
+    let initialArtifacts = renderer.render(
+      StatefulStepperCounterView(),
+      context: initialContext
+    )
+    #expect(initialArtifacts.resolvedTree.descendant(withText: "Value 0") != nil)
+
+    #expect(keyRegistry.dispatch(identity: testIdentity("StatefulStepper"), event: .arrowRight))
+
+    let invalidatedIdentities = collectedInvalidatedIdentities(from: invalidator)
+    #expect(!invalidatedIdentities.isEmpty)
+
+    var updatedContext = initialContext
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    let updatedArtifacts = renderer.render(
+      StatefulStepperCounterView(),
+      context: updatedContext
+    )
+
+    #expect(updatedArtifacts.resolvedTree.descendant(withText: "Value 1") != nil)
   }
 
   @MainActor
@@ -563,6 +931,168 @@ private struct BindableFormView: View {
   }
 }
 
+private struct ObservableAlertCounterView: View {
+  @Bindable var model: Phase4ObservableCounter
+  @State private var isAlertPresented: Bool
+
+  init(
+    model: Phase4ObservableCounter,
+    initialAlertPresented: Bool
+  ) {
+    self.model = model
+    _isAlertPresented = State(initialValue: initialAlertPresented)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Button("Primary") {
+        model.count += 1
+      }
+      .id(testIdentity("PrimaryAction"))
+
+      Text("Count \(model.count)")
+    }
+    .alert(
+      "Reset counter?",
+      isPresented: $isAlertPresented,
+      actions: {
+        Button("Reset") {
+          model.count = 0
+        }
+        .id(testIdentity("ResetAction"))
+
+        Button("Cancel") {
+          isAlertPresented = false
+        }
+        .id(testIdentity("CancelAction"))
+      },
+      message: {
+        Text("Reset the observed counter?")
+      }
+    )
+  }
+}
+
+private struct PresentedAlertDismissView: View {
+  @State private var isAlertPresented = true
+
+  var body: some View {
+    Text("Background")
+      .alert(
+        "Dismiss me?",
+        isPresented: $isAlertPresented,
+        actions: {
+          Button("Cancel") {
+            isAlertPresented = false
+          }
+          .id(testIdentity("CancelAction"))
+        },
+        message: {
+          Text("Close the alert")
+        }
+      )
+  }
+}
+
+private struct ForEachActionCounterView: View {
+  @State private var count = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      ForEach([0], id: \.self) { _ in
+        Button("Primary") {
+          count += 1
+        }
+        .id(testIdentity("ForEachAction"))
+      }
+
+      Text("Count \(count)")
+    }
+  }
+}
+
+private struct EnvironmentReaderActionCounterView: View {
+  @State private var count = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      EnvironmentReader(\.colorScheme) { _ in
+        Button("Primary") {
+          count += 1
+        }
+        .id(testIdentity("EnvironmentReaderAction"))
+      }
+
+      Text("Count \(count)")
+    }
+  }
+}
+
+private struct NavigationSplitActionCounterView: View {
+  @State private var count = 0
+
+  var body: some View {
+    NavigationSplitView {
+      Button("Primary") {
+        count += 1
+      }
+      .id(testIdentity("NavigationSplitAction"))
+    } detail: {
+      Text("Count \(count)")
+    }
+  }
+}
+
+private struct OutlineActionCounterView: View {
+  @State private var count = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      OutlineGroup(
+        [Phase4OutlineNode(id: 1, title: "Primary", children: nil)],
+        children: \.children
+      ) { node in
+        Button(node.title) {
+          count += 1
+        }
+        .id(testIdentity("OutlineAction"))
+      }
+
+      Text("Count \(count)")
+    }
+  }
+}
+
+private struct StatefulPickerCounterView: View {
+  @State private var selection = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Picker("Mode", selection: $selection) {
+        Text("Zero").tag(0)
+        Text("Two").tag(2)
+      }
+      .id(testIdentity("StatefulPicker"))
+      .pickerStyle(.inline)
+
+      Text("Selection \(selection)")
+    }
+  }
+}
+
+private struct StatefulStepperCounterView: View {
+  @State private var value = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Stepper("Count", value: $value, in: 0...2)
+        .id(testIdentity("StatefulStepper"))
+
+      Text("Value \(value)")
+    }
+  }
+}
+
 private struct AppearanceProbeView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
@@ -611,6 +1141,20 @@ private struct ObservableRowsView: View {
 
       Text("Stable sibling")
     }
+  }
+}
+
+private struct Phase4OutlineNode: Identifiable {
+  let id: Int
+  let title: String
+  let children: [Phase4OutlineNode]?
+}
+
+private func collectedInvalidatedIdentities(
+  from invalidator: Phase4RecordingInvalidator
+) -> Set<Identity> {
+  invalidator.requests.reduce(into: Set<Identity>()) { partial, request in
+    partial.formUnion(request)
   }
 }
 

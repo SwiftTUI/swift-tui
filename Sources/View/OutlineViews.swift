@@ -22,16 +22,19 @@ where Data: RandomAccessCollection, ID: Hashable {
     children: KeyPath<Data.Element, [Data.Element]?>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   ) {
-    rootView = AnyView(
+    let authoringScope = currentDynamicPropertyScope()
+    rootView = scopedAnyView(authoringScope: authoringScope) {
       OutlineTree(
         elements: Array(data),
         id: { $0[keyPath: id] },
         children: { $0[keyPath: children] ?? [] },
         rowContent: { element in
-          AnyView(rowContent(element))
+          scopedAnyView(authoringScope: authoringScope) {
+            rowContent(element)
+          }
         }
       )
-    )
+    }
   }
 
   public init<RowContent: View>(
@@ -40,16 +43,19 @@ where Data: RandomAccessCollection, ID: Hashable {
     children: KeyPath<Data.Element, [Data.Element]>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   ) {
-    rootView = AnyView(
+    let authoringScope = currentDynamicPropertyScope()
+    rootView = scopedAnyView(authoringScope: authoringScope) {
       OutlineTree(
         elements: Array(data),
         id: { $0[keyPath: id] },
         children: { $0[keyPath: children] },
         rowContent: { element in
-          AnyView(rowContent(element))
+          scopedAnyView(authoringScope: authoringScope) {
+            rowContent(element)
+          }
         }
       )
-    )
+    }
   }
 
   public var body: some View {
@@ -65,19 +71,22 @@ extension List {
     children: KeyPath<Data.Element, [Data.Element]?>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   ) where Data: RandomAccessCollection {
+    let authoringScope = currentDynamicPropertyScope()
     self.init(
       selection: selection,
       contentViews: [
-        AnyView(
+        scopedAnyView(authoringScope: authoringScope) {
           OutlineTree(
             elements: Array(data),
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] ?? [] },
             rowContent: { element in
-              AnyView(rowContent(element).tag(element[keyPath: id]))
+              scopedAnyView(authoringScope: authoringScope) {
+                rowContent(element).tag(element[keyPath: id])
+              }
             }
           )
-        )
+        }
       ]
     )
   }
@@ -89,19 +98,22 @@ extension List {
     children: KeyPath<Data.Element, [Data.Element]>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   ) where Data: RandomAccessCollection {
+    let authoringScope = currentDynamicPropertyScope()
     self.init(
       selection: selection,
       contentViews: [
-        AnyView(
+        scopedAnyView(authoringScope: authoringScope) {
           OutlineTree(
             elements: Array(data),
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] },
             rowContent: { element in
-              AnyView(rowContent(element).tag(element[keyPath: id]))
+              scopedAnyView(authoringScope: authoringScope) {
+                rowContent(element).tag(element[keyPath: id])
+              }
             }
           )
-        )
+        }
       ]
     )
   }
@@ -113,19 +125,22 @@ extension List {
     children: KeyPath<Data.Element, [Data.Element]?>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   ) where Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID? {
+    let authoringScope = currentDynamicPropertyScope()
     self.init(
       selection: selection,
       contentViews: [
-        AnyView(
+        scopedAnyView(authoringScope: authoringScope) {
           OutlineTree(
             elements: Array(data),
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] ?? [] },
             rowContent: { element in
-              AnyView(rowContent(element).tag(element[keyPath: id]))
+              scopedAnyView(authoringScope: authoringScope) {
+                rowContent(element).tag(element[keyPath: id])
+              }
             }
           )
-        )
+        }
       ]
     )
   }
@@ -137,19 +152,22 @@ extension List {
     children: KeyPath<Data.Element, [Data.Element]>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   ) where Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID? {
+    let authoringScope = currentDynamicPropertyScope()
     self.init(
       selection: selection,
       contentViews: [
-        AnyView(
+        scopedAnyView(authoringScope: authoringScope) {
           OutlineTree(
             elements: Array(data),
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] },
             rowContent: { element in
-              AnyView(rowContent(element).tag(element[keyPath: id]))
+              scopedAnyView(authoringScope: authoringScope) {
+                rowContent(element).tag(element[keyPath: id])
+              }
             }
           )
-        )
+        }
       ]
     )
   }

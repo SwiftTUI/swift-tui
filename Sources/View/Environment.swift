@@ -454,6 +454,7 @@ package final class ResolveReuseSession: @unchecked Sendable {
           identity,
           inSubtreeOf: invalidatedIdentity
         )
+          || identity.isDescendant(of: invalidatedIdentity)
       }
     }
 
@@ -588,8 +589,11 @@ public struct EnvironmentReader<Value>: View, ResolvableView {
     @ViewBuilder content: @escaping (Value) -> Content
   ) {
     self.keyPath = keyPath
+    let authoringScope = currentDynamicPropertyScope()
     self.content = { value in
-      AnyView(content(value))
+      scopedAnyView(authoringScope: authoringScope) {
+        content(value)
+      }
     }
   }
 

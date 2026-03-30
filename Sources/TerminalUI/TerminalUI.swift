@@ -144,6 +144,7 @@ public struct DefaultRenderer {
     resolveContext.resolveReuseSession = retainedFrames.resolveSession(
       invalidatedIdentities: context.invalidatedIdentities
     )
+    resolveContext.observationBridge?.beginTrackingPass()
 
     let (resolved, resolveDuration) = measurePhase {
       resolver.resolve(root, in: resolveContext)

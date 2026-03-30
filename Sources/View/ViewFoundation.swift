@@ -220,7 +220,9 @@ public enum ViewBuilder {
   public static func buildLimitedAvailability<Content: View>(
     _ component: Content
   ) -> AnyView {
-    AnyView(component)
+    scopedAnyView {
+      component
+    }
   }
 }
 
@@ -231,9 +233,41 @@ public enum ViewBuilder {
 public struct AnyView: View, ResolvableView {
   private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
 
+  private static func resolveWithAuthoringScope(
+    _ authoringScope: DynamicPropertyScope?,
+    _ apply: @escaping @MainActor (ResolveContext) -> [ResolvedNode]
+  ) -> @MainActor (ResolveContext) -> [ResolvedNode] {
+    guard let authoringScope else {
+      return apply
+    }
+
+    return { context in
+      withDynamicPropertyScope(authoringScope) {
+        apply(context)
+      }
+    }
+  }
+
   package init<V: View & ResolvableView>(resolving view: V) {
     resolveElementsClosure = { context in
       view.resolveElements(in: context)
+    }
+  }
+
+  package init<V: View>(
+    scoped view: V,
+    authoringScope: DynamicPropertyScope?
+  ) {
+    let erased: Any = view
+    if let resolvable = erased as? any ResolvableView {
+      resolveElementsClosure = Self.resolveWithAuthoringScope(authoringScope) { context in
+        resolvable.resolveElements(in: context)
+      }
+      return
+    }
+
+    resolveElementsClosure = Self.resolveWithAuthoringScope(authoringScope) { context in
+      resolveViewElements(view, in: context)
     }
   }
 
@@ -298,7 +332,7 @@ package func declaredBuilderChildren<V: View>(
   if let composite = erased as? any BuilderCompositeView {
     return composite.builderChildren
   }
-  return [AnyView(view)]
+  return [scopedAnyView { view }]
 }
 
 @MainActor
@@ -306,6 +340,19 @@ package func declaredBuilderChildren<V: View & BuilderCompositeView>(
   from view: V
 ) -> [AnyView] {
   view.builderChildren
+}
+
+@MainActor
+package func scopedAnyView<V: View>(
+  authoringScope: DynamicPropertyScope? = currentDynamicPropertyScope(),
+  _ build: () -> V
+) -> AnyView {
+  withDynamicPropertyScope(authoringScope) {
+    AnyView(
+      scoped: build(),
+      authoringScope: authoringScope
+    )
+  }
 }
 
 @MainActor

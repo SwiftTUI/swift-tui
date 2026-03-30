@@ -225,9 +225,14 @@ public struct NavigationSplitView<Sidebar: View, Content: View, Detail: View>: V
     @ViewBuilder sidebar: () -> Sidebar,
     @ViewBuilder detail: () -> Detail
   ) where Content == EmptyView {
-    sidebarView = AnyView(sidebar())
+    let authoringScope = currentDynamicPropertyScope()
+    sidebarView = scopedAnyView(authoringScope: authoringScope) {
+      sidebar()
+    }
     contentView = nil
-    detailView = AnyView(detail())
+    detailView = scopedAnyView(authoringScope: authoringScope) {
+      detail()
+    }
   }
 
   public init(
@@ -235,9 +240,16 @@ public struct NavigationSplitView<Sidebar: View, Content: View, Detail: View>: V
     @ViewBuilder content: () -> Content,
     @ViewBuilder detail: () -> Detail
   ) {
-    sidebarView = AnyView(sidebar())
-    contentView = AnyView(content())
-    detailView = AnyView(detail())
+    let authoringScope = currentDynamicPropertyScope()
+    sidebarView = scopedAnyView(authoringScope: authoringScope) {
+      sidebar()
+    }
+    contentView = scopedAnyView(authoringScope: authoringScope) {
+      content()
+    }
+    detailView = scopedAnyView(authoringScope: authoringScope) {
+      detail()
+    }
   }
 
   package func resolveElements(

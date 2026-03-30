@@ -88,11 +88,13 @@ extension Picker {
           return false
         }
 
-        return stepBoundSelection(
-          binding,
-          orderedTags: options.map(\.tag),
-          delta: delta
-        )
+        return withDynamicPropertyScope(dynamicPropertyScope) {
+          stepBoundSelection(
+            binding,
+            orderedTags: options.map(\.tag),
+            delta: delta
+          )
+        }
       }
 
       let rootRouteID = primaryRouteID(for: context.identity)

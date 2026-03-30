@@ -228,11 +228,13 @@ extension List {
           return false
         }
 
-        return stepBoundSelection(
-          binding,
-          orderedTags: rows.map(\.tag),
-          delta: delta
-        )
+        return withDynamicPropertyScope(dynamicPropertyScope) {
+          stepBoundSelection(
+            binding,
+            orderedTags: rows.map(\.tag),
+            delta: delta
+          )
+        }
       }
 
       let rootRouteID = primaryRouteID(for: context.identity)
@@ -505,11 +507,13 @@ extension Table {
           return false
         }
 
-        return stepBoundSelection(
-          binding,
-          orderedTags: selectableTags,
-          delta: delta
-        )
+        return withDynamicPropertyScope(dynamicPropertyScope) {
+          stepBoundSelection(
+            binding,
+            orderedTags: selectableTags,
+            delta: delta
+          )
+        }
       }
 
       let rootRouteID = primaryRouteID(for: context.identity)

@@ -91,11 +91,13 @@ extension Stepper {
           return false
         }
 
-        return updateBoundIntControlValue(
-          binding,
-          delta: delta,
-          bounds: bounds
-        )
+        return withDynamicPropertyScope(dynamicPropertyScope) {
+          updateBoundIntControlValue(
+            binding,
+            delta: delta,
+            bounds: bounds
+          )
+        }
       }
 
       let rootRouteID = primaryRouteID(for: context.identity)
@@ -336,11 +338,13 @@ extension Slider {
           return false
         }
 
-        return updateBoundIntControlValue(
-          binding,
-          delta: delta,
-          bounds: bounds
-        )
+        return withDynamicPropertyScope(dynamicPropertyScope) {
+          updateBoundIntControlValue(
+            binding,
+            delta: delta,
+            bounds: bounds
+          )
+        }
       }
 
       let rootRouteID = primaryRouteID(for: context.identity)

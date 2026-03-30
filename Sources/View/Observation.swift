@@ -3,7 +3,8 @@ import Observation
 
 @MainActor
 package final class ObservationBridge: Equatable {
-  private var generations: [Identity: UInt64] = [:]
+  private var currentPass: UInt64 = 0
+  private var observedPasses: [Identity: UInt64] = [:]
   private weak var invalidator: (any Invalidating)?
 
   package init() {}
@@ -21,51 +22,55 @@ package final class ObservationBridge: Equatable {
     self.invalidator = invalidator
   }
 
+  package func beginTrackingPass() {
+    currentPass &+= 1
+  }
+
   package func track<T>(
     identity: Identity,
     _ apply: () -> T
   ) -> T {
-    let generation = (generations[identity] ?? 0) &+ 1
-    generations[identity] = generation
+    let pass = currentPass
+    observedPasses[identity] = pass
 
     return withObservationTracking {
       apply()
     } onChange: {
       MainActor.assumeIsolated {
-        self.recordChange(identity: identity, generation: generation)
+        self.recordChange(identity: identity, pass: pass)
       }
     }
   }
 
   package func prune(keeping identities: Set<Identity>) {
-    guard !generations.isEmpty else {
+    guard !observedPasses.isEmpty else {
       return
     }
 
-    let staleIdentities = generations.keys.filter { !identities.contains($0) }
+    let staleIdentities = observedPasses.keys.filter { !identities.contains($0) }
     for identity in staleIdentities {
-      generations.removeValue(forKey: identity)
+      observedPasses.removeValue(forKey: identity)
     }
   }
 
   package func prune(
     keeping index: ResolvedTreeIndex
   ) {
-    guard !generations.isEmpty else {
+    guard !observedPasses.isEmpty else {
       return
     }
 
-    let staleIdentities = generations.keys.filter { !index.contains($0) }
+    let staleIdentities = observedPasses.keys.filter { !index.contains($0) }
     for identity in staleIdentities {
-      generations.removeValue(forKey: identity)
+      observedPasses.removeValue(forKey: identity)
     }
   }
 
   private func recordChange(
     identity: Identity,
-    generation: UInt64
+    pass: UInt64
   ) {
-    guard generations[identity] == generation else {
+    guard observedPasses[identity] == pass else {
       return
     }
     invalidator?.requestInvalidation(of: [identity])

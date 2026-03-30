@@ -33,8 +33,11 @@ where Data: RandomAccessCollection, ID: Hashable {
   ) {
     self.data = data
     self.id = id
+    let authoringScope = currentDynamicPropertyScope()
     self.content = { element in
-      AnyView(content(element))
+      scopedAnyView(authoringScope: authoringScope) {
+        content(element)
+      }
     }
   }
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -389,12 +392,14 @@ public struct ScrollView<Content: View>: View, ResolvableView {
       let dynamicPropertyScope = currentDynamicPropertyScope()
       let registerKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = { identity, targetAxis in
         context.localKeyHandlerRegistry?.register(identity: identity) { event in
-          var next = binding.wrappedValue
-          guard applyScrollKey(event, to: &next, targetAxis: targetAxis) else {
-            return false
+          withDynamicPropertyScope(dynamicPropertyScope) {
+            var next = binding.wrappedValue
+            guard applyScrollKey(event, to: &next, targetAxis: targetAxis) else {
+              return false
+            }
+            binding.wrappedValue = next
+            return true
           }
-          binding.wrappedValue = next
-          return true
         }
       }
       registerKeyHandler(context.identity, nil)
