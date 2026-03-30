@@ -406,9 +406,9 @@ Make the examples prove the new philosophy.
 
 - [TodoistViewsSurfaceTests.swift](../Examples/todoist/Tests/TodoistDemoTests/TodoistViewsSurfaceTests.swift)
 - [GallerySurfaceTests.swift](../Examples/gallery/Tests/GalleryDemoTests/GallerySurfaceTests.swift)
-- `swift test`
-- `swift test --package-path Examples/todoist`
-- `swift test --package-path Examples/gallery`
+- `swiftly run swift test`
+- `swiftly run swift test --package-path Examples/todoist`
+- `swiftly run swift test --package-path Examples/gallery`
 
 ## Phase 6: Documentation And Public Positioning
 

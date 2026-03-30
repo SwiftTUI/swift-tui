@@ -52,6 +52,9 @@ The runtime-facing public surface is also canonical:
 The optional multi-scene runtime surface is also supported:
 
 - `MultiSceneLauncher`
+- `TerminalUISceneDescriptor`
+- `TerminalUISceneManifest`
+- `HostedSceneSession`
 - the separate `TerminalUIScenes` library product for multi-scene apps
 
 ### `Core`

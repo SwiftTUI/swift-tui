@@ -95,16 +95,30 @@ Prototype and showcase code still lives in this repository, but it is intentiona
 
 ## Requirements
 
-- macOS 15+
-- An Apple Swift 6.3 toolchain is currently recommended for local builds and documentation generation
+- macOS 15+ for local package development on Apple platforms
+- Swift 6.3.0 managed through `swiftly`
 
-If multiple Swift toolchains are installed, prefer `xcrun swift ...` so builds and DocC generation use the Xcode-selected toolchain consistently.
+This repo pins Swift `6.3.0` in [`.swift-version`](/Users/adamz/Developer/repos/swift-terminal-ui/.swift-version).
+Use `swiftly` by default for repo-local SwiftPM work.
+
+Verify before building:
+
+```bash
+swiftly run swift --version
+```
+
+The shorter `swift ...` form is also fine when your shell already resolves
+`swift` through the `swiftly`-managed Swift 6.3.0 toolchain. Native-only builds
+should also work fine in Xcode, but the default documented path in this repo is
+still `swiftly`.
+
+Use [docs/TOOLCHAINS.md](/Users/adamz/Developer/repos/swift-terminal-ui/docs/TOOLCHAINS.md) as the source of truth for native, wasm, Bun, Xcode, and Android toolchain expectations.
 
 ## Build And Test
 
 ```bash
-xcrun swift build
-xcrun swift test
+swiftly run swift build
+swiftly run swift test
 ```
 
 ## Documentation
@@ -112,8 +126,15 @@ xcrun swift test
 Generate per-module DocC archives with:
 
 ```bash
-xcrun swift package generate-documentation --target TerminalUI
+swiftly run swift package generate-documentation --target TerminalUI
 ```
+
+## GUI Wrapper Packages
+
+Peer GUI packaging lives outside the root package products:
+
+- `GUI/SwiftUITUIGUI`: SwiftUI wrapper package for macOS and iOS, built on `HostedSceneSession`
+- `GUI/WebTUIGUI`: Bun-based web wrapper package that builds a TerminalUI wasm app bundle and hosts it in the browser
 
 ## Current Constraints
 

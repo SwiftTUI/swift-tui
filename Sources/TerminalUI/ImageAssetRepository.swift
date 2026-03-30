@@ -1,5 +1,8 @@
 import Core
-import PNG
+
+#if canImport(PNG)
+  import PNG
+#endif
 
 #if canImport(Darwin)
   import Darwin
@@ -29,6 +32,7 @@ struct RGBAImagePixel: Equatable, Hashable, Sendable {
     self.alpha = min(255, max(0, alpha))
   }
 
+#if canImport(PNG)
   init(
     _ pixel: PNG.RGBA<UInt8>
   ) {
@@ -39,6 +43,7 @@ struct RGBAImagePixel: Equatable, Hashable, Sendable {
       alpha: Int(pixel.a)
     )
   }
+#endif
 }
 
 struct DecodedPNGImage: Sendable {
@@ -69,7 +74,8 @@ extension ImageLookupKey: Hashable {
   }
 }
 
-private struct InMemoryPNGSource: PNG.BytestreamSource {
+#if canImport(PNG)
+  private struct InMemoryPNGSource: PNG.BytestreamSource {
   private let buffer: [UInt8]
   private var index = 0
 
@@ -90,6 +96,7 @@ private struct InMemoryPNGSource: PNG.BytestreamSource {
     return chunk
   }
 }
+#endif
 
 final class ImageAssetRepository: @unchecked Sendable {
   private struct Storage {
@@ -188,6 +195,7 @@ final class ImageAssetRepository: @unchecked Sendable {
   private func loadDecodedImage(
     for reference: ImageAssetReference
   ) -> DecodedPNGImage? {
+#if canImport(PNG)
     switch reference {
     case .namedResource:
       return nil
@@ -215,6 +223,10 @@ final class ImageAssetRepository: @unchecked Sendable {
         pixels: image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
       )
     }
+#else
+    _ = reference
+    return nil
+#endif
   }
 
   private func intrinsicCellSize(

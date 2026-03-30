@@ -19,6 +19,10 @@ public enum MultiSceneLauncher {
   @MainActor
   public static func run<A: App>(_ app: A) async throws {
     let configurations = collectWindowSceneConfigurations(from: app.body)
+    if requestedManifestMode() {
+      print(TerminalUIScenes.sceneManifest(from: configurations).jsonString)
+      return
+    }
     guard !configurations.isEmpty else {
       throw AppLaunchError.noScenes
     }
@@ -45,11 +49,46 @@ public enum MultiSceneLauncher {
       case .listInstances:
         listInstances(appName: appName)
       case .listScenes(let selector):
-        try listScenes(appName: appName, selector: selector)
+      try listScenes(appName: appName, selector: selector)
       case .attach(let sceneID, let selector):
         try await attach(appName: appName, sceneID: sceneID, selector: selector)
       }
     #endif
+  }
+
+  @MainActor
+  public static func sceneManifest<A: App>(
+    for app: A
+  ) -> TerminalUISceneManifest {
+    TerminalUIScenes.sceneManifest(
+      from: collectWindowSceneConfigurations(from: app.body)
+    )
+  }
+
+  @MainActor
+  public static func makeHostedSceneSession<A: App>(
+    for app: A,
+    sceneID: WindowIdentifier,
+    initialSize: Size,
+    appearance: TerminalAppearance,
+    capabilityProfile: TerminalCapabilityProfile = .trueColor,
+    onOutput: @escaping @Sendable (String) -> Void
+  ) throws -> HostedSceneSession {
+    let configurations = collectWindowSceneConfigurations(from: app.body)
+    guard let configuration = configurations.first(where: { $0.identifier == sceneID }) else {
+      throw HostedSceneSessionError.sceneNotFound(sceneID)
+    }
+
+    let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
+    return HostedSceneSession(
+      configuration: configuration,
+      isDefault: configuration.identifier == configurations.first?.identifier,
+      sessionName: sessionName,
+      initialSize: initialSize,
+      appearance: appearance,
+      capabilityProfile: capabilityProfile,
+      onOutput: onOutput
+    )
   }
 
   @MainActor
@@ -349,6 +388,10 @@ public enum MultiSceneLauncher {
     }
 
     private static func wasiSceneSelector() -> String? {
+      if let selector = environmentValue(named: "TUIGUI_SCENE"), !selector.isEmpty {
+        return selector
+      }
+
       if let selector = environmentValue(named: "WEBAPP_SCENE"), !selector.isEmpty {
         return selector
       }
@@ -360,12 +403,14 @@ public enum MultiSceneLauncher {
       let width = max(
         40,
         integerEnvironmentValue(named: "COLUMNS")
+          ?? integerEnvironmentValue(named: "TUIGUI_COLUMNS")
           ?? integerEnvironmentValue(named: "WEBAPP_COLUMNS")
           ?? 120
       )
       let height = max(
         20,
         integerEnvironmentValue(named: "LINES")
+          ?? integerEnvironmentValue(named: "TUIGUI_ROWS")
           ?? integerEnvironmentValue(named: "WEBAPP_ROWS")
           ?? 36
       )
@@ -373,25 +418,6 @@ public enum MultiSceneLauncher {
       return .init(width: width, height: height)
     }
 
-    private static func integerEnvironmentValue(
-      named name: String
-    ) -> Int? {
-      guard let value = environmentValue(named: name) else {
-        return nil
-      }
-      return Int(value)
-    }
-
-    private static func environmentValue(
-      named name: String
-    ) -> String? {
-      name.withCString { cName in
-        guard let rawValue = getenv(cName) else {
-          return nil
-        }
-        return String(cString: rawValue)
-      }
-    }
   #endif
 
   #if !canImport(WASILibc)
@@ -544,6 +570,30 @@ public enum MultiSceneLauncher {
       return scenes
     }
   #endif
+}
+
+private func requestedManifestMode() -> Bool {
+  environmentValue(named: "TUIGUI_MODE") == "manifest"
+}
+
+private func integerEnvironmentValue(
+  named name: String
+) -> Int? {
+  guard let value = environmentValue(named: name) else {
+    return nil
+  }
+  return Int(value)
+}
+
+private func environmentValue(
+  named name: String
+) -> String? {
+  name.withCString { cName in
+    guard let rawValue = getenv(cName) else {
+      return nil
+    }
+    return String(cString: rawValue)
+  }
 }
 
 private final class KeyboardOnlyInputAdapter: TerminalInputReading {

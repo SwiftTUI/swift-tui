@@ -3,6 +3,14 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "build:manifest": "bun run index.ts build:manifest",
+    "build:wasm": "bun run index.ts build:wasm",
+    "build:web": "bun run index.ts build:web",
+    "build": "bun run index.ts build",
+    "dev": "bun run index.ts dev",
+    "test": "bun test"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

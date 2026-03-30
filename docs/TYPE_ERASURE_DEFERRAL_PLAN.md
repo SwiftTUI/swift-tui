@@ -42,7 +42,8 @@ Recommendation:
 
 ### Toolchain And Language Feasibility
 
-Local checks in this repository's environment show:
+Local checks in this repository's environment show, using the repo-default
+`swiftly`-managed Swift 6.3.0 toolchain:
 
 - `swift --version` reports Apple Swift 6.3.
 - Variadic generic types compile in scratch experiments.
@@ -508,7 +509,7 @@ Everything else should be treated as removable unless a concrete counterexample 
 For each migration batch:
 
 1. Run focused suites for the touched area.
-2. Run the full `swift test` suite before considering the batch complete.
+2. Run the full `swiftly run swift test` suite before considering the batch complete.
 3. Compare diagnostics and reuse behavior in:
    - `Tests/TerminalUITests/DiagnosticsAndCacheTests.swift`
    - `Tests/TerminalUITests/ResolveReuseIndexingTests.swift`
@@ -520,7 +521,7 @@ For each migration batch:
 Repository-required final verification command:
 
 ```bash
-swift test
+swiftly run swift test
 ```
 
 ## Recommended First Implementation Slice

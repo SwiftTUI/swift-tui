@@ -4,24 +4,39 @@
 import PackageDescription
 
 let package = Package(
-    name: "SwiftUITUIGUI",
-    products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
-        .library(
-            name: "SwiftUITUIGUI",
-            targets: ["SwiftUITUIGUI"]
-        ),
-    ],
-    targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
-        .target(
-            name: "SwiftUITUIGUI"
-        ),
-        .testTarget(
-            name: "SwiftUITUIGUITests",
-            dependencies: ["SwiftUITUIGUI"]
-        ),
-    ],
-    swiftLanguageModes: [.v6]
+  name: "SwiftUITUIGUI",
+  platforms: [
+    .macOS(.v15),
+    .iOS(.v18),
+  ],
+  products: [
+    .library(
+      name: "SwiftUITUIGUI",
+      targets: ["SwiftUITUIGUI"]
+    ),
+  ],
+  dependencies: [
+    .package(path: "../.."),
+    .package(url: "https://github.com/Lakr233/libghostty-spm.git", from: "1.0.1773686495"),
+  ],
+  targets: [
+    .target(
+      name: "SwiftUITUIGUI",
+      dependencies: [
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
+        .product(name: "GhosttyTerminal", package: "libghostty-spm"),
+      ]
+    ),
+    .testTarget(
+      name: "SwiftUITUIGUITests",
+      dependencies: [
+        "SwiftUITUIGUI",
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
+        .product(name: "GhosttyTerminal", package: "libghostty-spm"),
+      ]
+    ),
+  ],
+  swiftLanguageModes: [.v6]
 )

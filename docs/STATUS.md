@@ -44,6 +44,8 @@ pages.
 
 - `@MainActor` `App`, `Scene`, `SceneBuilder`, `WindowIdentifier`, and `WindowGroup` declarations in `TerminalUI`
 - `MultiSceneLauncher` in `TerminalUIScenes` for public scene launch, including the single-window case today
+- `TerminalUISceneDescriptor`, `TerminalUISceneManifest`, and `MultiSceneLauncher.sceneManifest(...)` for wrapper tooling and non-terminal packaging
+- `HostedSceneSession` for embedding a retained `WindowGroup` runtime inside non-terminal hosts
 - Pty-backed secondary scenes, Unix-domain-socket discovery, scene attachment, and lazy rendering of unattached secondary scenes
 - `TabView` and `NavigationSplitView` for terminal-native shell composition
 - terminal-native `alert` and `confirmationDialog` presentation in the canonical `View` surface
@@ -56,8 +58,10 @@ pages.
 
 - The core `TerminalUI` runtime remains single-host and single-scene. The multi-scene story lives in the separate `TerminalUIScenes` product.
 - The public scene launch path currently goes through `TerminalUIScenes.MultiSceneLauncher`, even when an app only has one `WindowGroup`.
+- Embedded GUI wrappers can now host retained scene runtimes through `HostedSceneSession`, and the repository now includes peer wrapper packages at `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`. Those packages still own their own platform shell integration, scene switching chrome, and style surfaces.
 - The runtime is keyboard-first, but mouse input is supported where the terminal advertises reporting. Pointer interaction should be treated as additive rather than as the primary design center.
 - Image decoding and terminal presentation are PNG-only in the current runtime. Broader media formats and animation remain deferred.
+- WASI support now works with the `swiftly`-managed Swift 6.3.0 toolchain and `swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm ...` for the wrapper-facing `Core` and `TerminalUIScenes` targets. The shorter `swift ...` form is fine from a shell where `swift` already resolves through `swiftly`. `xcrun swift` may still resolve to an incompatible Xcode toolchain.
 - Some focus surfaces are still missing:
   - namespace-scoped default-focus APIs such as `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus`
   - object-focused wrappers such as `@FocusedObject`

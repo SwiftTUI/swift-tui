@@ -9,6 +9,7 @@ This directory holds the project-internal reference set: architecture notes, run
 - [STATUS.md](STATUS.md): the current shipped surface, known constraints, and short-term gaps
 - [ARCHITECTURE.md](ARCHITECTURE.md): package boundaries and the end-to-end frame pipeline
 - [RUNTIME.md](RUNTIME.md): runtime, lifecycle, state, observation, and incremental-present behavior
+- [TOOLCHAINS.md](TOOLCHAINS.md): the supported Swift, wasm, Bun, Xcode, and Android toolchain story
 
 ## Public Documentation Surfaces
 
@@ -19,13 +20,16 @@ This directory holds the project-internal reference set: architecture notes, run
 - `Sources/TerminalUIScenes/TerminalUIScenes.docc`: public module overview for `TerminalUIScenes`
 - `Sources/TerminalUICharts/TerminalUICharts.docc`: public module overview for `TerminalUICharts`
 
-Generate DocC archives with the Xcode-selected toolchain:
+Generate DocC archives with the repo-default `swiftly` toolchain:
 
 ```bash
-xcrun swift package generate-documentation --target TerminalUI
+swiftly run swift package generate-documentation --target TerminalUI
 ```
 
-When multiple Swift toolchains are installed, prefer `xcrun swift` over a bare `swift` invocation so parsing and symbol-graph generation stay aligned with the Xcode-selected compiler.
+The shorter `swift package generate-documentation ...` form is also fine from a
+shell where `swift` already resolves to the `swiftly`-managed Swift 6.3.0
+toolchain. Xcode should still work for native-only workflows, but the repo's
+default package-development documentation uses `swiftly`.
 
 ## Runtime And Implementation References
 

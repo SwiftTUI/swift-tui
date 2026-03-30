@@ -1,4 +1,4 @@
-# TUIGUI Plan
+# TUIGUI Design And Implementation
 
 Last updated: March 30, 2026
 
@@ -9,12 +9,28 @@ Make TerminalUI apps shippable outside a local terminal in two peer packages:
 - `GUI/SwiftUITUIGUI`: an SPM package that lets an Xcode app host a TerminalUI app inside a SwiftUI view on macOS and iOS.
 - `GUI/WebTUIGUI`: a Bun-based package that lets a TerminalUI app ship as a browser app backed by `ghostty-web`.
 
+All Swift build commands in this document use the repo-default `swiftly`
+toolchain story. Use `swiftly run swift ...` directly, or the shorter `swift`
+form only from a shell where `swift` already resolves to the `swiftly`-managed
+Swift 6.3.0 toolchain. Native Apple builds should also work in Xcode, but
+`swiftly` is the default package-development path.
+
 The canonical authoring story must stay the same:
 
 - app authors continue to write `App`, `Scene`, and `WindowGroup` in the main package
 - GUI wrappers own only terminal-surface hosting, scene selection, and terminal-style configuration
 - scene state must survive scene switches
 - resize must always update the runtime as if `SIGWINCH` fired, even where POSIX signals do not exist
+
+## Implementation Status
+
+- Project 0 is landed in the root package:
+  - `TerminalUIScenes` now exposes `TerminalUISceneManifest`, `TerminalUISceneDescriptor`, and `HostedSceneSession`
+  - shared control-message parsing lives in `Sources/TerminalUI/TerminalControlMessages.swift`
+  - embedded hosts use `InjectedTerminalInputReader` and `StreamingTerminalHost`
+- Project 1 is landed at `GUI/SwiftUITUIGUI` as a standalone SPM package.
+- Project 2 is landed at `GUI/WebTUIGUI` as a Bun package with manifest, wasm, and web bundle steps.
+- The wasm-facing root checkpoints now pass when the repo is built with the `swiftly`-managed Swift 6.3.0 toolchain. The same commands may still fail through `xcrun swift` if Xcode selects an older or incompatible toolchain.
 
 ## Inputs Studied
 
@@ -44,7 +60,8 @@ Reference conclusions:
 
 ## Current Repo Findings
 
-- `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI` already exist, but both are stubs.
+- `GUI/SwiftUITUIGUI` now contains the SwiftUI wrapper runtime, style surface, and retention/resize tests.
+- `GUI/WebTUIGUI` now contains the Bun build pipeline, browser controller surface, manifest helpers, wasm resolver, and tests.
 - `TerminalUIScenes.MultiSceneLauncher` already supports multiple collected scenes on native platforms.
 - the WASI path already has the right resize behavior shape:
   - `Sources/TerminalUI/InputReader.swift` supports control messages with `0x1Eresize:<cols>:<rows>\n`
@@ -53,21 +70,16 @@ Reference conclusions:
 - the current WASI scene path is still single-scene only:
   - `Sources/TerminalUIScenes/SceneRuntime.swift` rejects secondary scenes on WASI
   - `Sources/TerminalUIScenes/MultiSceneLauncher.swift` picks one scene by environment/argv
-- the root package is not yet selectable under the installed wasm SDK.
+- the root package is now selectable for the wrapper-facing wasm targets when built with `swiftly` and Swift 6.3.0.
 
-Observed on March 30, 2026:
+Verified on March 30, 2026:
 
 ```bash
-xcrun swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core
+TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core
+TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes
 ```
 
-This currently fails with:
-
-```text
-unable to create target: 'No available targets are compatible with triple "wasm32-unknown-wasip1"'
-```
-
-Project 0 is therefore mandatory.
+Both commands now succeed.
 
 ## Non-Negotiable Decisions
 
@@ -191,12 +203,12 @@ Manifest JSON shape:
 
 Checkpoint P0.1:
 
-- `xcrun swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core` succeeds
-- `xcrun swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes` succeeds
+- `TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core` succeeds
+- `TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes` succeeds
 
 Checkpoint P0.2:
 
-- `xcrun swift test --filter TerminalUITests.InputReaderControlMessageTests` still passes
+- `swiftly run swift test --filter TerminalUITests.InputReaderControlMessageTests` still passes
 - new `InjectedTerminalInputReaderTests` prove pushed resize control messages do not leak into key input
 
 Checkpoint P0.3:
@@ -224,7 +236,6 @@ The package should stay library-only. It should not create an app target.
 
 - `GUI/SwiftUITUIGUI/Package.swift`
 - `GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUIGUI.swift`
-- `GUI/SwiftUITUIGUI/Tests/SwiftUITUIGUITests/SwiftUITUIGUITests.swift`
 
 ### Files To Add
 
@@ -303,8 +314,8 @@ Style updates must not recreate scene runtimes. They may recreate Ghostty contro
 
 Checkpoint P1.1:
 
-- `xcrun swift build --package-path GUI/SwiftUITUIGUI`
-- `xcrun swift test --package-path GUI/SwiftUITUIGUI`
+- `swiftly run swift build --package-path GUI/SwiftUITUIGUI`
+- `swiftly run swift test --package-path GUI/SwiftUITUIGUI`
 
 Checkpoint P1.2:
 
@@ -393,8 +404,8 @@ Required build flow:
    - capture stdout JSON
    - write `dist/scene-manifest.json`
 2. `build:wasm`
-   - run `xcrun swift build --swift-sdk swift-6.3-RELEASE_wasm --product <AppProduct> -c release`
-   - locate the produced wasm artifact using `xcrun swift build --show-bin-path --swift-sdk swift-6.3-RELEASE_wasm`
+   - run `swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --product <AppProduct> -c release`
+   - locate the produced wasm artifact using `swiftly run swift build --show-bin-path --swift-sdk swift-6.3-RELEASE_wasm`
    - copy the app wasm to `dist/assets/app.wasm`
 3. `build:web`
    - bundle the HTML/TS entrypoint with `bun build`
@@ -446,7 +457,7 @@ Checkpoint P2.1:
 
 Checkpoint P2.2:
 
-- `cd GUI/WebTUIGUI && bun run build --app <AppProduct>`
+- `cd GUI/WebTUIGUI && bun run build -- --app <AppProduct>`
 - `dist/index.html`
 - `dist/scene-manifest.json`
 - `dist/assets/app.wasm`
@@ -462,14 +473,27 @@ Checkpoint P2.3:
 
 ## Implementation Order
 
-1. Land Project 0 first. Do not start either wrapper package before the root package exposes hosted-session and manifest APIs.
-2. Land `SwiftUITUIGUI` second. It has the cleaner runtime contract and validates the hosted-session API without browser/WASI noise.
-3. Land `WebTUIGUI` third using the now-stable scene manifest and resize control-message contract.
+The implementation order used in this repo was:
+
+1. Land Project 0 first so the root package exposes hosted-session and manifest APIs.
+2. Land `SwiftUITUIGUI` second to validate retained hosted sessions in a native wrapper.
+3. Land `WebTUIGUI` third on top of the now-stable scene manifest and resize control-message contract.
 4. Update docs after both peer packages work:
   - `README.md`
   - `docs/ARCHITECTURE.md`
   - `docs/STATUS.md`
   - `docs/SOURCE_LAYOUT.md`
+
+## Verification Status
+
+Verified on March 30, 2026:
+
+- `swiftly run swift test`
+- `swiftly run swift test --package-path GUI/SwiftUITUIGUI`
+- `cd GUI/WebTUIGUI && bun test`
+- `cd GUI/WebTUIGUI && bun run index.ts build:web --dist /tmp/webtuigui-build`
+- `TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core`
+- `TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes`
 
 ## Done Means
 

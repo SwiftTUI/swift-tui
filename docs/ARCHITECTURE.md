@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: March 26, 2026
+Last updated: March 30, 2026
 
 ## Target Boundaries
 
@@ -26,12 +26,14 @@ Last updated: March 26, 2026
 
 - Re-exports the public package surface that matters for single-session runtime work
 - Adds terminal host integration, alternate-screen ownership, input parsing, signal handling, capability-aware presentation, `RunLoop`, and rendering entry points
+- Hosts wrapper-facing runtime seams such as shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
 
 ### `TerminalUIScenes`
 
 - Builds the optional scene-runtime layer on top of `TerminalUI`
 - Adds pty-backed secondary scene sessions, socket discovery, attachment, and multi-scene orchestration
 - Currently carries the public scene-launch path, including the single-window case
+- Also exposes wrapper-facing scene manifests and hosted-scene sessions so peer GUI packages can embed `WindowGroup` scenes without shell-owned stdio
 
 Detailed per-file ownership lives in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
 
@@ -91,7 +93,9 @@ That ordering is visible in `DefaultRenderer`, `FrameArtifacts`, `Pipeline`, and
 It coordinates:
 
 - `TerminalHost` for raw mode, alternate-screen ownership, surface sizing, and writes
+- `StreamingTerminalHost` for embedded hosts that need the same presentation contract without owning a file descriptor
 - input readers and signal readers for event streams
+- `InjectedTerminalInputReader` for wrapper-managed byte delivery that still shares the terminal control-message contract
 - `FrameScheduler` for invalidations, deadlines, signals, and wakeups
 - `StateContainer` plus dynamic state storage for local state changes
 - focus, action, key, lifecycle, task, pointer, and focused-value registries
@@ -106,6 +110,11 @@ The core runtime is intentionally narrow today:
 - keyboard-first interaction with optional mouse input when the terminal supports reporting
 
 Multi-scene orchestration is packaged separately in `TerminalUIScenes`.
+
+That scene layer now serves two distinct launch modes:
+
+- terminal-owned launch via `MultiSceneLauncher.run(...)`
+- wrapper-owned launch via `MultiSceneLauncher.sceneManifest(...)` and `HostedSceneSession`
 
 ## Important Data Products
 

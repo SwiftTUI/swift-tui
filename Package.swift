@@ -1,6 +1,7 @@
 // swift-tools-version: 6.3
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
+import Foundation
 import PackageDescription
 
 let nativeRuntimePlatforms: [PackageDescription.Platform] = [
@@ -8,6 +9,77 @@ let nativeRuntimePlatforms: [PackageDescription.Platform] = [
   .linux,
   .android,
 ]
+
+let includePNGSupport = ProcessInfo.processInfo.environment["TERMINALUI_ENABLE_WASM"] != "1"
+
+let packagePlatforms: [SupportedPlatform]? = {
+  if !includePNGSupport {
+    return nil
+  }
+
+  return [
+    .macOS(.v15),
+    .iOS(.v18),
+  ]
+}()
+
+let packageDependencies: [Package.Dependency] = {
+  var dependencies: [Package.Dependency] = [
+    .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.6"),
+    .package(
+      url: "https://github.com/apple/swift-collections.git",
+      from: "1.4.1"
+    ),
+    .package(
+      url: "https://github.com/apple/swift-async-algorithms.git",
+      from: "1.1.3"
+    ),
+  ]
+
+  if includePNGSupport {
+    dependencies.append(
+      .package(
+        url: "https://github.com/tayloraswift/swift-png.git",
+        exact: "4.4.9"
+      )
+    )
+  }
+
+  return dependencies
+}()
+
+let terminalUIDependencies: [Target.Dependency] = {
+  var dependencies: [Target.Dependency] = [
+    "Core",
+    "View",
+    .target(
+      name: "UnixSignals",
+      condition: .when(platforms: nativeRuntimePlatforms)
+    ),
+  ]
+
+  if includePNGSupport {
+    dependencies.append(.product(name: "PNG", package: "swift-png"))
+  }
+
+  return dependencies
+}()
+
+let terminalUITestDependencies: [Target.Dependency] = {
+  var dependencies: [Target.Dependency] = [
+    "TerminalUI",
+    "Core",
+    "View",
+    "TerminalUIScenes",
+    "TerminalUICharts",
+  ]
+
+  if includePNGSupport {
+    dependencies.append(.product(name: "PNG", package: "swift-png"))
+  }
+
+  return dependencies
+}()
 
 func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDescription
   .SwiftSetting]
@@ -26,35 +98,14 @@ func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDe
 
 let package = Package(
   name: "swift-terminal-ui",
-  platforms: [
-    .macOS(.v15),
-    .iOS(.v18),
-  ],
+  platforms: packagePlatforms,
   products: [
     .library(name: "View", targets: ["View"]),
     .library(name: "TerminalUICharts", targets: ["TerminalUICharts"]),
     .library(name: "TerminalUI", targets: ["TerminalUI"]),
     .library(name: "TerminalUIScenes", targets: ["TerminalUIScenes"]),
   ],
-  dependencies: [
-    .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.6"),
-    .package(
-      url: "https://github.com/apple/swift-collections.git",
-      from: "1.4.1"
-    ),
-    .package(
-      url: "https://github.com/apple/swift-async-algorithms.git",
-      from: "1.1.3"
-    ),
-    .package(
-      url: "https://github.com/apple/swift-atomics.git",
-      from: "1.3.0"
-    ),
-    .package(
-      url: "https://github.com/tayloraswift/swift-png.git",
-      exact: "4.4.9"
-    ),
-  ],
+  dependencies: packageDependencies,
   targets: [
     .target(
       name: "UnixSignals",
@@ -76,7 +127,6 @@ let package = Package(
     .target(
       name: "Core",
       dependencies: [
-        .product(name: "Atomics", package: "swift-atomics"),
         .product(name: "DequeModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
@@ -104,15 +154,7 @@ let package = Package(
 
     .target(
       name: "TerminalUI",
-      dependencies: [
-        "Core",
-        "View",
-        .target(
-          name: "UnixSignals",
-          condition: .when(platforms: nativeRuntimePlatforms)
-        ),
-        .product(name: "PNG", package: "swift-png"),
-      ],
+      dependencies: terminalUIDependencies,
       resources: [],
       swiftSettings: swiftSettings()
     ),
@@ -153,14 +195,7 @@ let package = Package(
     ),
     .testTarget(
       name: "TerminalUITests",
-      dependencies: [
-        "TerminalUI",
-        "Core",
-        "View",
-        "TerminalUIScenes",
-        "TerminalUICharts",
-        .product(name: "PNG", package: "swift-png"),
-      ],
+      dependencies: terminalUITestDependencies,
       exclude: ["Fixtures"],
       swiftSettings: swiftSettings()
     ),

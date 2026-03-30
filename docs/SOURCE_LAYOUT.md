@@ -1,6 +1,6 @@
 # Source Layout
 
-Last updated: March 29, 2026
+Last updated: March 30, 2026
 
 This is the current ownership map for the codebase. It documents where subsystems live after the source split and should stay aligned with future file moves.
 
@@ -22,12 +22,15 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `LifecycleCoordinator.swift`: post-present lifecycle staging
 - `TaskRunner.swift`: lifecycle-owned task execution and cancellation
 - `TerminalHost.swift`: terminal host integration and presentation commit boundary
+- `StreamingTerminalHost.swift`: wrapper-facing terminal host that emits presentation output to a closure instead of a file descriptor
 - `TerminalGraphicsCapabilities.swift`: Kitty, Sixel, and cell-pixel capability probing helpers
 - `TerminalImageRendering.swift`: image protocol emitters, fallback compositing, and dithering support
-- `ImageAssetRepository.swift`: shared PNG decoding and image metadata cache
+- `ImageAssetRepository.swift`: shared PNG decoding and image metadata cache, with nil-image fallback on builds where PNG support is not linked
 - `TerminalPresentation.swift`: capability-aware text rendering, OSC 8 hyperlink emission, and incremental presentation planning
 - `TerminalAppearanceDetection.swift`: host appearance probing
 - `InputReader.swift`: keyboard and mouse input decoding
+- `InjectedTerminalInputReader.swift`: wrapper-managed input stream source that shares the runtime parser and control-message contract
+- `TerminalControlMessages.swift`: shared terminal control-message parsing used by fd-backed and injected input
 - `LinkOpening.swift`: package-only runtime opener used by focusable links in interactive sessions
 - `TerminalUI.docc/`: module landing page and runtime guides
 
@@ -35,6 +38,8 @@ This is the current ownership map for the codebase. It documents where subsystem
 
 - `TerminalUIScenes.swift`: target re-export surface
 - `MultiSceneLauncher.swift`: public app launch path for scene-based apps today
+- `SceneManifest.swift`: public scene-descriptor and manifest types for wrapper tooling
+- `HostedSceneSession.swift`: public wrapper-facing scene host for embedded GUI shells
 - remaining files: socket discovery, scene lifecycle, pty management, and scene runtime support
 - `TerminalUIScenes.docc/`: module landing page and multi-scene guidance
 

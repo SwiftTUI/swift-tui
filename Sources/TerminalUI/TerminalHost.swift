@@ -878,9 +878,24 @@ extension TerminalHosting {
     public let capabilityProfile: TerminalCapabilityProfile
     public let graphicsCapabilities: TerminalGraphicsCapabilities
 
+    public convenience init(
+      surfaceSize: Size,
+      capabilityProfile: TerminalCapabilityProfile = .trueColor,
+      graphicsCapabilities: TerminalGraphicsCapabilities = .none,
+      environment: [String: String]? = nil
+    ) {
+      self.init(
+        surfaceSize: surfaceSize,
+        outputFileDescriptor: STDOUT_FILENO,
+        capabilityProfile: capabilityProfile,
+        graphicsCapabilities: graphicsCapabilities,
+        environment: environment
+      )
+    }
+
     public init(
       surfaceSize: Size,
-      outputFileDescriptor: Int32 = STDOUT_FILENO,
+      outputFileDescriptor: Int32,
       capabilityProfile: TerminalCapabilityProfile = .trueColor,
       graphicsCapabilities: TerminalGraphicsCapabilities = .none,
       environment: [String: String]? = nil
@@ -1049,7 +1064,7 @@ private func fullRepaintBytesWritten(
     }
 }
 
-private func currentProcessEnvironment() -> [String: String] {
+package func currentProcessEnvironment() -> [String: String] {
   #if canImport(WASILibc)
     var environment: [String: String] = [:]
 
