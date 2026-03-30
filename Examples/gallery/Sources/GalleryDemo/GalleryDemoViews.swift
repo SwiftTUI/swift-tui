@@ -43,13 +43,17 @@ struct GalleryDemoSceneView: View {
       .disabled(model.isPalettePresented)
 
       if model.isPalettePresented {
-        galleryPalette
-          .padding(1)
+            GalleryCommandPalette(
+      query: $model.paletteQuery,
+      commands: paletteCommands,
+      dismiss: dismissPalette,
+      runCommand: runPaletteCommand
+    )
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
       }
     }
     .tint(Color.cyan)
-    .chromePreset(.standard)
+
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
@@ -520,15 +524,6 @@ struct GalleryDemoSceneView: View {
     )
   }
 
-  private var galleryPalette: some View {
-    GalleryCommandPalette(
-      query: $model.paletteQuery,
-      commands: paletteCommands,
-      dismiss: dismissPalette,
-      runCommand: runPaletteCommand
-    )
-  }
-
   private var paletteCommands: [GalleryPaletteCommand] {
     [
       .init(
@@ -721,7 +716,6 @@ private struct GalleryCommandPalette: View {
             }
           }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
         Divider()
 
@@ -744,14 +738,6 @@ private struct GalleryCommandPalette: View {
     .overlay {
       RoundedRectangle(cornerRadius: 1).strokeBorder(.terminalBorder(.accent))
     }
-    .frame(
-      minWidth: .finite(36),
-      idealWidth: .finite(48),
-      maxWidth: .finite(56),
-      minHeight: .finite(10),
-      maxHeight: .finite(16),
-      alignment: .topLeading
-    )
     .focusScope()
   }
 
