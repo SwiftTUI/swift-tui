@@ -94,34 +94,18 @@ struct GalleryDemoSceneView: View {
   }
 
   private var controlsWorkbench: some View {
-    HStack(alignment: .top, spacing: 0) {
-      gallerySidebar(
-        title: "Controls",
-        selection: $model.selectedControlDemo,
-        entries: [
-          ("Buttons", "buttons"),
-          ("Inputs", "inputs"),
-          ("Value Controls", "values"),
-        ]
-      )
-      .frame(
-        minWidth: 18,
-        idealWidth: 18,
-        maxWidth: 18,
-        maxHeight: .infinity,
-        alignment: .topLeading
-      )
-      Divider()
-      previewPanel(
-        title: controlsTitle,
-        subtitle: controlsSubtitle
-      ) {
-        controlsPreview
-      }
-      .layoutPriority(1)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    workbenchSurface(
+      selection: $model.selectedControlDemo,
+      entries: [
+        ("Buttons", "buttons"),
+        ("Inputs", "inputs"),
+        ("Value Controls", "values"),
+      ],
+      title: controlsTitle,
+      subtitle: controlsSubtitle
+    ) {
+      controlsPreview
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private var controlsTitle: String {
@@ -211,34 +195,18 @@ struct GalleryDemoSceneView: View {
   }
 
   private var collectionsWorkbench: some View {
-    HStack(alignment: .top, spacing: 0) {
-      gallerySidebar(
-        title: "Collections",
-        selection: $model.selectedCollectionDemo,
-        entries: [
-          ("Picker", "picker"),
-          ("Browser", "browser"),
-          ("Outline", "outline"),
-        ]
-      )
-      .frame(
-        minWidth: 18,
-        idealWidth: 18,
-        maxWidth: 18,
-        maxHeight: .infinity,
-        alignment: .topLeading
-      )
-      Divider()
-      previewPanel(
-        title: collectionsTitle,
-        subtitle: collectionsSubtitle
-      ) {
-        collectionsPreview
-      }
-      .layoutPriority(1)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    workbenchSurface(
+      selection: $model.selectedCollectionDemo,
+      entries: [
+        ("Picker", "picker"),
+        ("Browser", "browser"),
+        ("Outline", "outline"),
+      ],
+      title: collectionsTitle,
+      subtitle: collectionsSubtitle
+    ) {
+      collectionsPreview
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private var collectionsTitle: String {
@@ -354,34 +322,18 @@ struct GalleryDemoSceneView: View {
   }
 
   private var appearanceWorkbench: some View {
-    HStack(alignment: .top, spacing: 0) {
-      gallerySidebar(
-        title: "Appearance",
-        selection: $model.selectedAppearanceDemo,
-        entries: [
-          ("Light", "light"),
-          ("Dark", "dark"),
-          ("Accent", "accent"),
-        ]
-      )
-      .frame(
-        minWidth: 18,
-        idealWidth: 18,
-        maxWidth: 18,
-        maxHeight: .infinity,
-        alignment: .topLeading
-      )
-      Divider()
-      previewPanel(
-        title: appearanceTitle,
-        subtitle: appearanceSubtitle
-      ) {
-        appearancePreview
-      }
-      .layoutPriority(1)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    workbenchSurface(
+      selection: $model.selectedAppearanceDemo,
+      entries: [
+        ("Light", "light"),
+        ("Dark", "dark"),
+        ("Accent", "accent"),
+      ],
+      title: appearanceTitle,
+      subtitle: appearanceSubtitle
+    ) {
+      appearancePreview
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private var appearanceTitle: String {
@@ -441,34 +393,18 @@ struct GalleryDemoSceneView: View {
   }
 
   private var chartsWorkbench: some View {
-    HStack(alignment: .top, spacing: 0) {
-      gallerySidebar(
-        title: "Charts",
-        selection: $model.selectedChartDemo,
-        entries: [
-          ("Progress", "progress"),
-          ("Usage", "usage"),
-          ("Trend", "trend"),
-        ]
-      )
-      .frame(
-        minWidth: 18,
-        idealWidth: 18,
-        maxWidth: 18,
-        maxHeight: .infinity,
-        alignment: .topLeading
-      )
-      Divider()
-      previewPanel(
-        title: chartsTitle,
-        subtitle: chartsSubtitle
-      ) {
-        chartsPreview
-      }
-      .layoutPriority(1)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    workbenchSurface(
+      selection: $model.selectedChartDemo,
+      entries: [
+        ("Progress", "progress"),
+        ("Usage", "usage"),
+        ("Trend", "trend"),
+      ],
+      title: chartsTitle,
+      subtitle: chartsSubtitle
+    ) {
+      chartsPreview
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private var chartsTitle: String {
@@ -529,23 +465,32 @@ struct GalleryDemoSceneView: View {
     }
   }
 
-  private func gallerySidebar(
-    title: String,
+  private func workbenchSurface<Content: View>(
     selection: Binding<String>,
-    entries: [(String, String)]
+    entries: [(String, String)],
+    title: String,
+    subtitle: String,
+    @ViewBuilder content: () -> Content
   ) -> some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text(title)
-        .foregroundStyle(.separator)
-        .padding(.init(horizontal: 1, vertical: 0))
-      Divider()
-      List(selection: selection) {
+      Picker("", selection: selection) {
         ForEach(entries, id: \.1) { entry in
           Text(entry.0).tag(entry.1)
         }
       }
+      .pickerStyle(.segmented)
+      .padding(.init(horizontal: 1, vertical: 0))
+
+      Divider()
+      previewPanel(
+        title: title,
+        subtitle: subtitle
+      ) {
+        content()
+      }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private func previewPanel<Content: View>(
@@ -554,10 +499,12 @@ struct GalleryDemoSceneView: View {
     @ViewBuilder content: () -> Content
   ) -> some View {
     VStack(alignment: .leading, spacing: 1) {
-      HStack(alignment: .firstTextBaseline, spacing: 1) {
+      VStack(alignment: .leading, spacing: 0) {
         Text(title)
           .bold()
         Text(subtitle)
+          .lineLimit(2)
+          .truncationMode(.tail)
           .foregroundStyle(.separator)
       }
       Divider()
@@ -709,12 +656,13 @@ private struct DemoHelpStrip: View {
           }
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .fixedSize(horizontal: true, vertical: false)
     }
     .frame(
       maxWidth: .infinity,
       minHeight: .finite(1),
       idealHeight: .finite(1),
+      maxHeight: .finite(1),
       alignment: .leading
     )
   }

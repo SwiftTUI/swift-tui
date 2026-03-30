@@ -192,9 +192,13 @@ extension TabView {
       if options.indices.contains(activeIndex) {
         AnyView(
           options[activeIndex].node.erasedToAnyView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         )
       } else {
-        AnyView(EmptyView())
+        AnyView(
+          EmptyView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        )
       }
 
     return AnyView(

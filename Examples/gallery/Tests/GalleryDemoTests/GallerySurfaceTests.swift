@@ -33,6 +33,9 @@ struct GallerySurfaceTests {
     #expect(surface.contains("Gallery"))
     #expect(surface.contains("Controls"))
     #expect(surface.contains("Palette"))
+    #expect(surface.contains("Buttons"))
+    #expect(surface.contains("Inputs"))
+    #expect(surface.contains("Value Controls"))
   }
 
   @Test("Gallery keeps its appearance samples visible in both color schemes")
