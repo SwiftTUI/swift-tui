@@ -54,6 +54,44 @@ struct PresentationSurfaceTests {
     #expect(surface.contains("Cancel"))
   }
 
+  @Test("confirmationDialog hoists above clipped ancestor content")
+  func confirmationDialogHoistsAboveClippedAncestorContent() {
+    let outsideIdentity = testIdentity("OutsideButton")
+    let artifacts = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 1) {
+        Button("Outside") {}
+          .id(outsideIdentity)
+
+        HStack {
+          Text("Attachment")
+            .confirmationDialog(
+              "Archive task",
+              isPresented: .constant(true),
+              actions: {
+                Button("Archive") {}
+              },
+              message: {
+                Text("Move the task out of the active list.")
+              }
+            )
+        }
+        .frame(width: 8, height: 1, alignment: .leading)
+        .clipped()
+      }
+      .frame(width: 32, height: 8, alignment: .topLeading),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 32, height: 8)
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    let focusedPaths = Set(artifacts.semanticSnapshot.focusRegions.map(\.identity.path))
+
+    #expect(surface.contains("Archive task"))
+    #expect(surface.contains("Move the task out"))
+    #expect(surface.contains("Archive"))
+    #expect(!focusedPaths.contains(outsideIdentity.path))
+  }
+
   @Test("alert keeps overflow-prone content inside a short terminal surface")
   func alertKeepsOverflowProneContentInsideShortSurface() {
     let artifacts = DefaultRenderer().render(

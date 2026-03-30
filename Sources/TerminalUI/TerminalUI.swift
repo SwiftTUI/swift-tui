@@ -149,7 +149,10 @@ public struct DefaultRenderer {
     resolveContext.observationBridge?.beginTrackingPass()
 
     let (resolved, resolveDuration) = measurePhase {
-      resolver.resolve(root, in: resolveContext)
+      resolver.resolve(
+        TerminalPresentationHostingRoot(content: root),
+        in: resolveContext
+      )
     }
     let layoutPassContext = LayoutPassContext(
       retainedLayout: retainedFrames.layoutSession(

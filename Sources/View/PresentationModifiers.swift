@@ -1,8 +1,17 @@
-import Core
+package import Core
 
 private enum TerminalPresentationKind: Equatable, Sendable {
   case alert
   case confirmationDialog
+
+  var debugName: String {
+    switch self {
+    case .alert:
+      "alert"
+    case .confirmationDialog:
+      "confirmationDialog"
+    }
+  }
 
   var alignment: Alignment {
     switch self {
@@ -29,6 +38,91 @@ private enum TerminalPresentationKind: Equatable, Sendable {
     case .confirmationDialog:
       "Cancel"
     }
+  }
+}
+
+// AnyView policy: retain heterogeneous action and message content here while
+// modal requests are hoisted through preferences to the root presentation host.
+private struct TerminalPresentationRequest: @unchecked Sendable,
+  CustomStringConvertible,
+  CustomDebugStringConvertible
+{
+  var attachmentIdentity: Identity
+  var title: String
+  var kind: TerminalPresentationKind
+  var actionViews: [AnyView]
+  var messageViews: [AnyView]
+  var dismiss: @MainActor @Sendable () -> Void
+
+  var description: String {
+    debugDescription
+  }
+
+  var debugDescription: String {
+    "TerminalPresentationRequest(identity: \(attachmentIdentity.path), kind: \(kind.debugName), title: \(String(reflecting: title)), actions: \(actionViews.count), messages: \(messageViews.count))"
+  }
+}
+
+private struct TerminalPresentationPreferenceValue: @unchecked Sendable,
+  CustomStringConvertible,
+  CustomDebugStringConvertible
+{
+  var requests: [TerminalPresentationRequest] = []
+
+  var description: String {
+    debugDescription
+  }
+
+  var debugDescription: String {
+    requests.map(\.debugDescription).joined(separator: ", ")
+  }
+}
+
+private enum TerminalPresentationPreferenceKey: PreferenceKey {
+  static let defaultValue = TerminalPresentationPreferenceValue()
+
+  static func reduce(
+    value: inout TerminalPresentationPreferenceValue,
+    nextValue: () -> TerminalPresentationPreferenceValue
+  ) {
+    value.requests.append(contentsOf: nextValue().requests)
+  }
+}
+
+package struct TerminalPresentationHostingRoot<Content: View>: View, ResolvableView {
+  package var content: Content
+
+  package init(content: Content) {
+    self.content = content
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    var baseNode = normalizeResolvedElements(
+      resolveViewElements(content, in: context),
+      in: context
+    )
+    let requests = baseNode.preferenceValues[TerminalPresentationPreferenceKey.self].requests
+    guard !requests.isEmpty else {
+      return [baseNode]
+    }
+
+    baseNode.setEnabledRecursively(false)
+
+    let hostContext = context.child(component: .named("PresentationHost"))
+    let overlayNode = TerminalPresentationOverlayHost(requests: requests).resolve(
+      in: hostContext.child(component: .named("overlay"))
+    )
+
+    return [
+      ResolvedNode(
+        identity: hostContext.identity,
+        kind: .view("PresentationHost"),
+        children: [baseNode, overlayNode],
+        environmentSnapshot: hostContext.environment,
+        transactionSnapshot: hostContext.transaction,
+        layoutBehavior: .overlay(alignment: .topLeading)
+      )
+    ]
   }
 }
 
@@ -106,20 +200,20 @@ private func defaultPresentationActions(
   isPresented: Binding<Bool>
 ) -> [AnyView] {
   [
-    AnyView(
+    scopedAnyView {
       Button(
         kind.defaultDismissTitle,
         action: {
           isPresented.wrappedValue = false
         }
       )
-    )
+    }
   ]
 }
 
 // AnyView policy: retain heterogeneous child storage here for authored message
-// and action content in terminal presentations.
-private struct TerminalPresentationModifier<Content: View>: View {
+// and action content in hoisted terminal presentations.
+private struct TerminalPresentationModifier<Content: View>: View, ResolvableView {
   var content: Content
   var title: String
   var isPresented: Binding<Bool>
@@ -127,36 +221,69 @@ private struct TerminalPresentationModifier<Content: View>: View {
   var actionViews: [AnyView]
   var messageViews: [AnyView]
 
-  var body: some View {
-    Group {
-      if isPresented.wrappedValue {
-        ZStack(alignment: kind.alignment) {
-          content
-            .disabled(true)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    var node = content.resolve(in: context)
+    guard isPresented.wrappedValue else {
+      return [node]
+    }
 
-          TerminalPresentationSurface(
+    node.preferenceValues.merge(
+      TerminalPresentationPreferenceKey.self,
+      value: .init(
+        requests: [
+          .init(
+            attachmentIdentity: node.identity,
             title: title,
             kind: kind,
             actionViews: actionViews,
             messageViews: messageViews,
-            dismiss: { [isPresented] in isPresented.wrappedValue = false }
+            dismiss: { [isPresented] in
+              isPresented.wrappedValue = false
+            }
           )
-          .padding(
-            .init(
-              top: 1,
-              leading: 1,
-              bottom: 1,
-              trailing: 1
-            )
-          )
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: kind.alignment)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      } else {
-        content
+        ]
+      )
+    )
+    return [node]
+  }
+}
+
+private struct TerminalPresentationOverlayHost: View {
+  var requests: [TerminalPresentationRequest]
+
+  var body: some View {
+    ZStack(
+      alignment: .topLeading,
+      children: requests.map { request in
+        AnyView(
+          TerminalHostedPresentation(request: request)
+        )
       }
-    }
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+}
+
+private struct TerminalHostedPresentation: View {
+  var request: TerminalPresentationRequest
+
+  var body: some View {
+    TerminalPresentationSurface(
+      title: request.title,
+      kind: request.kind,
+      actionViews: request.actionViews,
+      messageViews: request.messageViews,
+      dismiss: request.dismiss
+    )
+    .padding(
+      .init(
+        top: 1,
+        leading: 1,
+        bottom: 1,
+        trailing: 1
+      )
+    )
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: request.kind.alignment)
   }
 }
 
@@ -231,5 +358,19 @@ private struct TerminalPresentationSurface: View {
     .fixedSize()
     .padding(.init(horizontal: 1, vertical: 0))
 
+  }
+}
+
+extension ResolvedNode {
+  fileprivate mutating func setEnabledRecursively(
+    _ isEnabled: Bool
+  ) {
+    var style = environmentSnapshot.style
+    style.isEnabled = isEnabled
+    environmentSnapshot.style = style
+
+    for index in children.indices {
+      children[index].setEnabledRecursively(isEnabled)
+    }
   }
 }
