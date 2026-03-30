@@ -7,14 +7,10 @@ Browser wrapper for TerminalUI apps.
 Use Bun for this package, and use the repo-default `swiftly` Swift 6.3.0
 toolchain for every Swift command that the build pipeline triggers.
 
-Before running the Bun scripts here, make sure `swift` in your shell already
-points at the `swiftly`-managed Swift 6.3.0 toolchain. The Bun scripts shell
-out to `swift` directly.
-
 Quick check:
 
 ```bash
-swift --version
+swiftly run swift --version
 ```
 
 Native-only development should also work in Xcode, but the documented package
@@ -22,13 +18,12 @@ and wasm build path for this wrapper uses `swiftly` plus Bun.
 
 ## Ghostty Dependency
 
-This package now consumes [`coder/ghostty-web`](https://github.com/coder/ghostty-web)
-directly through Bun instead of importing from the repository's `reference/`
-directory.
+This package now consumes the published [`ghostty-web`](https://www.npmjs.com/package/ghostty-web)
+npm package through Bun instead of importing from the repository's `reference/`
+directory or from a GitHub source snapshot.
 
-Because GitHub installs provide the upstream source tree rather than the
-published npm `dist/` bundle, this wrapper uses a tiny local shim that re-exports
-the upstream TypeScript sources from `node_modules/ghostty-web/lib/...`.
+That keeps the JavaScript bundle and `ghostty-vt.wasm` asset version-locked and
+avoids the extra Ghostty submodule and Zig bootstrap step during app builds.
 
 ## API
 
@@ -55,9 +50,9 @@ controller.setStyle({ cursorBlink: true });
 
 The build flow is intentionally small:
 
-1. `build:manifest` captures `TUIGUI_MODE=manifest` output from the Swift app by invoking the `swiftly`-managed `swift`.
+1. `build:manifest` captures `TUIGUI_MODE=manifest` output from the Swift app by invoking `swiftly run swift`.
 2. `build:wasm` copies the app's wasm artifact into `dist/assets/app.wasm`.
-3. `build:web` bundles `index.html` and the browser entrypoint with Bun.
+3. `build:web` bundles `index.html` and the browser entrypoint with Bun, then copies `ghostty-web`'s packaged `ghostty-vt.wasm` into `dist/`.
 
 ## Notes
 

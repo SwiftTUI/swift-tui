@@ -5,7 +5,7 @@
     "": {
       "name": "webtuigui",
       "dependencies": {
-        "ghostty-web": "github:coder/ghostty-web",
+        "ghostty-web": "0.4.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -22,7 +22,7 @@
 
     "bun-types": ["bun-types@1.3.11", "", { "dependencies": { "@types/node": "*" } }, "sha512-1KGPpoxQWl9f6wcZh57LvrPIInQMn2TQ7jsgxqpRzg+l0QPOFvJVH7HmvHo/AiPgwXy+/Thf6Ov3EdVn1vOabg=="],
 
-    "ghostty-web": ["ghostty-web@github:coder/ghostty-web#6a1a50d", {}, "coder-ghostty-web-6a1a50d", "sha512-wKF/aiJv6Zlt3qz09NI7wEC/3U9dDOa4456eQuuYYM/2gFwv8Uym8uIgEw3t/1GYTxxw8OtzKzyiFrbUpQZ8/A=="],
+    "ghostty-web": ["ghostty-web@0.4.0", "", {}, "sha512-0puDBik2qapbD/QQBW9o5ZHfXnZBqZWx/ctBiVtKZ6ZLds4NYb+wZuw1cRLXZk9zYovIQ908z3rvFhexAvc5Hg=="],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 

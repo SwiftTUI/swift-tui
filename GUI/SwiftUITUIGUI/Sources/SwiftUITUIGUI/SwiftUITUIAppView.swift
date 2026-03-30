@@ -136,6 +136,10 @@ private struct SceneTerminalSurface: SwiftUI.View {
     Group {
       if let host {
         TerminalSurfaceHost(context: host.viewState)
+          // Force a fresh Ghostty-backed platform view per scene. Reusing the
+          // same TerminalView across scene swaps can leave the previous
+          // in-memory session holding a freed surface pointer.
+          .id(host.descriptor.id)
           .onChange(of: colorScheme, initial: true) { _, newValue in
             host.updateAppearance(newValue)
           }

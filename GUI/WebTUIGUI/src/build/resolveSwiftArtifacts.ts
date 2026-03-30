@@ -1,4 +1,5 @@
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { runCommand } from "./runCommand.ts";
 
 export interface ResolveSwiftArtifactsOptions {
   packagePath: string;
@@ -13,12 +14,15 @@ export interface SwiftArtifactPaths {
 export async function resolveSwiftArtifacts(
   options: ResolveSwiftArtifactsOptions
 ): Promise<SwiftArtifactPaths> {
+  const swiftlyWorkingDirectory = await resolveSwiftlyWorkingDirectory(options.packagePath);
   const environment = {
     ...process.env,
     TERMINALUI_ENABLE_WASM: "1",
   };
 
   await runCommand([
+    "swiftly",
+    "run",
     "swift",
     "build",
     "--package-path",
@@ -29,9 +33,14 @@ export async function resolveSwiftArtifacts(
     options.product,
     "-c",
     "release",
-  ], environment);
+  ], {
+    cwd: swiftlyWorkingDirectory,
+    env: environment,
+  });
 
   const binPath = await runCommand([
+    "swiftly",
+    "run",
     "swift",
     "build",
     "--package-path",
@@ -41,7 +50,10 @@ export async function resolveSwiftArtifacts(
     "-c",
     "release",
     "--show-bin-path",
-  ], environment);
+  ], {
+    cwd: swiftlyWorkingDirectory,
+    env: environment,
+  });
 
   const wasmPath = join(binPath.trim(), `${options.product}.wasm`);
   return {
@@ -50,25 +62,21 @@ export async function resolveSwiftArtifacts(
   };
 }
 
-async function runCommand(
-  cmd: string[],
-  env?: Record<string, string | undefined>
+async function resolveSwiftlyWorkingDirectory(
+  startPath: string
 ): Promise<string> {
-  const proc = Bun.spawn({
-    cmd,
-    env,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
+  let currentPath = resolve(startPath);
 
-  if (exitCode !== 0) {
-    throw new Error([stdout, stderr].filter(Boolean).join("\n").trim() || `command failed: ${cmd.join(" ")}`);
+  while (true) {
+    if (await Bun.file(join(currentPath, ".swift-version")).exists()) {
+      return currentPath;
+    }
+
+    const parentPath = dirname(currentPath);
+    if (parentPath === currentPath) {
+      return resolve(startPath);
+    }
+
+    currentPath = parentPath;
   }
-
-  return stdout;
 }
