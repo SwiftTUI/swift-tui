@@ -25,9 +25,9 @@ struct OutlineSurfaceTests {
   @Test(
     "OutlineGroup renders connector variants through the public outlineStyle environment",
     arguments: [
-      (OutlineStyle.rounded, "╰──"),
-      (OutlineStyle.plain, "└──"),
-      (OutlineStyle.ascii, "|--"),
+      (OutlineStyle.rounded, "╰─"),
+      (OutlineStyle.plain, "└─"),
+      (OutlineStyle.ascii, "`-"),
     ]
   )
   func outlineGroupRendersConnectorVariants(
@@ -103,9 +103,9 @@ struct OutlineSurfaceTests {
     )
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
-    #expect(surface.contains("| Sources"))
-    #expect(surface.contains("  │  ├── App.swift"))
-    #expect(surface.contains("  │  ╰── Tests"))
+    #expect(surface.contains("▌ Sources"))
+    #expect(surface.contains("  │ ├─  App.swift"))
+    #expect(surface.contains("  │ ╰─  Tests"))
     #expect(surface.contains("  Package.swift"))
     #expect(registry.dispatch(identity: testIdentity("OutlineList"), event: .arrowDown))
     #expect(box.value == "app")
@@ -146,6 +146,6 @@ struct OutlineSurfaceTests {
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(surface.contains("  Root"))
-    #expect(surface.contains("| ╰── Leaf"))
+    #expect(surface.contains("▌ ╰─  Leaf"))
   }
 }

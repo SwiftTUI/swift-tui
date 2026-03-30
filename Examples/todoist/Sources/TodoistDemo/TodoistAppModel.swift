@@ -146,7 +146,8 @@ extension TodoistAppModel {
 
     do {
       apply(snapshot: try await repository.sync())
-      statusMessage = "Sync complete. Loaded \(projects.count) projects and \(tasks.count) active tasks."
+      statusMessage =
+        "Sync complete. Loaded \(projects.count) projects and \(tasks.count) active tasks."
     } catch {
       statusMessage = error.localizedDescription
     }
@@ -163,7 +164,9 @@ extension TodoistAppModel {
     defer { isBusy = false }
 
     do {
-      apply(snapshot: try await repository.addTask(content: newTaskText, projectID: selectedProject.projectID))
+      apply(
+        snapshot: try await repository.addTask(
+          content: newTaskText, projectID: selectedProject.projectID))
       newTaskText = ""
       statusMessage = "Task added."
     } catch {

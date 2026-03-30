@@ -78,12 +78,12 @@ package func metricTrackView(
         HStack(alignment: .center, spacing: 1) {
           if !labelViews.isEmpty {
             combinedView(from: labelViews, kindName: "MetricTrackLabel")
-              .foregroundStyle(.muted)
+              .foregroundStyle(.terminalBorder(.accent))
           }
           if !trailingViews.isEmpty {
             Spacer()
             combinedView(from: trailingViews, kindName: "MetricTrackSummary")
-              .foregroundStyle(.muted)
+              .foregroundStyle(.separator)
           }
         }
       }

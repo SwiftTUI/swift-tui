@@ -37,7 +37,7 @@ struct ProjectSummary: Identifiable, Hashable, Sendable {
     let flags = [
       isInboxProject ? "Inbox" : nil,
       isFavorite ? "Favorite" : nil,
-      colorName
+      colorName,
     ].compactMap { $0 }
     return flags.isEmpty ? "Todoist project" : flags.joined(separator: " | ")
   }
@@ -60,7 +60,7 @@ struct TaskSummary: Identifiable, Hashable, Sendable {
     let fields: [String] = [
       priority.map { "P\($0)" },
       dueText,
-      projectName
+      projectName,
     ].compactMap { value in
       guard let value, !value.isEmpty else { return nil }
       return value
@@ -92,7 +92,9 @@ enum TodoistRepositoryError: LocalizedError, Sendable {
 }
 
 @Table("projects")
-struct CachedProject: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Sendable {
+struct CachedProject: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable,
+  Sendable
+{
   static let databaseTableName = "projects"
 
   let id: String
@@ -172,7 +174,8 @@ extension CachedProject {
 }
 
 @Table("tasks")
-struct CachedTask: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Sendable {
+struct CachedTask: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Sendable
+{
   static let databaseTableName = "tasks"
 
   let id: String
@@ -257,7 +260,9 @@ extension CachedTask {
 }
 
 @Table("cache_settings")
-struct CacheSetting: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Sendable {
+struct CacheSetting: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable,
+  Sendable
+{
   static let databaseTableName = "cache_settings"
 
   let key: String

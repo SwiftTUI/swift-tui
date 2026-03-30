@@ -3,5 +3,5 @@ configuration ansi256
 surface 30x2
 capability glyph=unicode color=ansi256 styles=true
 appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
-01│\u{001B}[38;5;145mSeries\u{001B}[0m
-02│\u{001B}[38;5;117m■\u{001B}[0m·\u{001B}[38;5;145mlive\u{001B}[0m·\u{001B}[38;5;114m■\u{001B}[0m·\u{001B}[38;5;145mpreset\u{001B}[0m·\u{001B}[38;5;179m■\u{001B}[0m·\u{001B}[38;5;145mdelta\u{001B}[0m
+01│\u{001B}[38;5;117mSeries\u{001B}[0m
+02│\u{001B}[38;5;117m■\u{001B}[0m·\u{001B}[38;5;231mlive\u{001B}[0m·\u{001B}[38;5;114m■\u{001B}[0m·\u{001B}[38;5;231mpreset\u{001B}[0m·\u{001B}[38;5;179m■\u{001B}[0m·\u{001B}[38;5;231mdelta\u{001B}[0m

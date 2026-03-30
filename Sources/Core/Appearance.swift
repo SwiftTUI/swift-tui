@@ -775,6 +775,369 @@ extension TerminalAppearance {
   }
 }
 
+extension StyleEnvironmentSnapshot {
+  package func controlChrome(
+    isEnabled: Bool,
+    isFocused: Bool,
+    isPressed: Bool = false,
+    isSelected: Bool = false,
+    prominence: ControlProminence = .standard,
+    role: ButtonRole? = nil
+  ) -> ControlChrome {
+    switch chromePreset {
+    case .legacy:
+      return appearance.controlChrome(
+        isEnabled: isEnabled,
+        isFocused: isFocused,
+        isPressed: isPressed,
+        isSelected: isSelected,
+        prominence: prominence,
+        role: role
+      )
+    case .standard:
+      return standardControlChrome(
+        isEnabled: isEnabled,
+        isFocused: isFocused,
+        isPressed: isPressed,
+        isSelected: isSelected,
+        prominence: prominence,
+        role: role
+      )
+    }
+  }
+
+  package func rowChrome(
+    isEnabled: Bool,
+    isFocused: Bool,
+    isPressed: Bool = false,
+    isSelected: Bool = false,
+    role: ButtonRole? = nil
+  ) -> ControlChrome {
+    switch chromePreset {
+    case .legacy:
+      return appearance.rowChrome(
+        isEnabled: isEnabled,
+        isFocused: isFocused,
+        isPressed: isPressed,
+        isSelected: isSelected,
+        role: role
+      )
+    case .standard:
+      return standardRowChrome(
+        isEnabled: isEnabled,
+        isFocused: isFocused,
+        isPressed: isPressed,
+        isSelected: isSelected,
+        role: role
+      )
+    }
+  }
+
+  package func buttonChrome(
+    buttonStyle: ButtonStyle,
+    isEnabled: Bool,
+    isFocused: Bool,
+    isPressed: Bool = false,
+    prominence: ControlProminence = .standard,
+    role: ButtonRole? = nil
+  ) -> ControlChrome {
+    switch chromePreset {
+    case .legacy:
+      return appearance.buttonChrome(
+        buttonStyle: buttonStyle,
+        isEnabled: isEnabled,
+        isFocused: isFocused,
+        isPressed: isPressed,
+        prominence: prominence,
+        role: role
+      )
+    case .standard:
+      return standardButtonChrome(
+        buttonStyle: buttonStyle,
+        isEnabled: isEnabled,
+        isFocused: isFocused,
+        isPressed: isPressed,
+        prominence: prominence,
+        role: role
+      )
+    }
+  }
+
+  package func groupBoxChrome(
+    prominence: ControlProminence = .standard
+  ) -> ContainerChrome {
+    switch chromePreset {
+    case .legacy:
+      return appearance.groupBoxChrome(prominence: prominence)
+    case .standard:
+      return standardGroupBoxChrome(prominence: prominence)
+    }
+  }
+
+  private func standardControlChrome(
+    isEnabled: Bool,
+    isFocused: Bool,
+    isPressed: Bool,
+    isSelected: Bool,
+    prominence: ControlProminence,
+    role: ButtonRole?
+  ) -> ControlChrome {
+    let tone = chromeTone(for: role)
+    let neutralSurface = AnyShapeStyle(.terminalSurface(.neutral))
+    let focusedSurface = AnyShapeStyle(
+      prominence == .increased ? .terminalAccent(tone) : .terminalSurface(tone)
+    )
+    let selectedSurface = AnyShapeStyle(.terminalRow(tone, isSelected: true))
+    let neutralBorder = AnyShapeStyle(.terminalBorder(.neutral))
+    let focusedBorder = AnyShapeStyle(.terminalBorder(tone))
+
+    if !isEnabled {
+      return .init(
+        foregroundStyle: theme.placeholder,
+        contentBackgroundStyle: neutralSurface,
+        borderForegroundStyle: neutralBorder,
+        opacity: 0.6
+      )
+    }
+
+    if prominence == .increased {
+      let idleFillStyle = AnyShapeStyle(.terminalAccent(tone))
+      let focusedFillStyle = AnyShapeStyle(.terminalRow(tone, isSelected: true))
+      let pressedFillStyle = AnyShapeStyle(.terminalSurface(tone))
+      let fillStyle =
+        if isPressed {
+          pressedFillStyle
+        } else if isFocused {
+          focusedFillStyle
+        } else {
+          idleFillStyle
+        }
+
+      return .init(
+        foregroundStyle: contrastingForegroundStyle(on: fillStyle),
+        contentBackgroundStyle: fillStyle,
+        borderForegroundStyle: focusedBorder
+      )
+    }
+
+    if isSelected {
+      return .init(
+        foregroundStyle: theme.foreground,
+        contentBackgroundStyle: selectedSurface,
+        borderForegroundStyle: focusedBorder
+      )
+    }
+
+    if isFocused || isPressed {
+      return .init(
+        foregroundStyle: theme.foreground,
+        contentBackgroundStyle: focusedSurface,
+        borderForegroundStyle: focusedBorder
+      )
+    }
+
+    return .init(
+      foregroundStyle: theme.foreground,
+      contentBackgroundStyle: neutralSurface,
+      borderForegroundStyle: neutralBorder
+    )
+  }
+
+  private func standardRowChrome(
+    isEnabled: Bool,
+    isFocused: Bool,
+    isPressed: Bool,
+    isSelected: Bool,
+    role: ButtonRole?
+  ) -> ControlChrome {
+    let tone = chromeTone(for: role)
+    let idleBackground = AnyShapeStyle(.terminalRow(.neutral))
+    let activeBackground = AnyShapeStyle(.terminalRow(tone, isSelected: true))
+    let activeBorder = AnyShapeStyle(.terminalBorder(tone))
+    let idleBorder = AnyShapeStyle(.terminalBorder(.neutral))
+
+    if !isEnabled {
+      return .init(
+        foregroundStyle: theme.placeholder,
+        contentBackgroundStyle: idleBackground,
+        borderForegroundStyle: idleBorder,
+        opacity: 0.6
+      )
+    }
+
+    if isPressed || isFocused || isSelected {
+      return .init(
+        foregroundStyle: theme.foreground,
+        contentBackgroundStyle: activeBackground,
+        borderForegroundStyle: activeBorder
+      )
+    }
+
+    return .init(
+      foregroundStyle: theme.foreground,
+      contentBackgroundStyle: idleBackground,
+      borderForegroundStyle: idleBorder
+    )
+  }
+
+  private func standardButtonChrome(
+    buttonStyle: ButtonStyle,
+    isEnabled: Bool,
+    isFocused: Bool,
+    isPressed: Bool,
+    prominence: ControlProminence,
+    role: ButtonRole?
+  ) -> ControlChrome {
+    switch buttonStyle {
+    case .plain:
+      return standardPlainButtonChrome(isEnabled: isEnabled, role: role)
+    case .link:
+      return standardLinkButtonChrome(
+        isEnabled: isEnabled,
+        isFocused: isFocused,
+        isPressed: isPressed,
+        role: role
+      )
+    case .bordered:
+      return standardControlChrome(
+        isEnabled: isEnabled,
+        isFocused: isFocused,
+        isPressed: isPressed,
+        isSelected: false,
+        prominence: .standard,
+        role: role
+      )
+    case .automatic, .borderedProminent:
+      return standardControlChrome(
+        isEnabled: isEnabled,
+        isFocused: isFocused,
+        isPressed: isPressed,
+        isSelected: false,
+        prominence: .increased,
+        role: role
+      )
+    }
+  }
+
+  private func standardGroupBoxChrome(
+    prominence: ControlProminence
+  ) -> ContainerChrome {
+    let tone: TerminalTone = prominence == .increased ? .accent : .neutral
+    return .init(
+      foregroundStyle: theme.foreground,
+      backgroundStyle: AnyShapeStyle(
+        prominence == .increased ? .terminalSurface(.accent) : .terminalSurfaceBackground
+      ),
+      borderStyle: AnyShapeStyle(.terminalBorder(tone))
+    )
+  }
+
+  private func standardPlainButtonChrome(
+    isEnabled: Bool,
+    role: ButtonRole?
+  ) -> ControlChrome {
+    guard isEnabled else {
+      return .init(
+        foregroundStyle: theme.placeholder,
+        contentBackgroundStyle: theme.background,
+        borderForegroundStyle: theme.background,
+        opacity: 0.6
+      )
+    }
+
+    return .init(
+      foregroundStyle: plainForegroundStyle(for: role),
+      contentBackgroundStyle: theme.background,
+      borderForegroundStyle: theme.background
+    )
+  }
+
+  private func standardLinkButtonChrome(
+    isEnabled: Bool,
+    isFocused: Bool,
+    isPressed: Bool,
+    role: ButtonRole?
+  ) -> ControlChrome {
+    guard isEnabled else {
+      return .init(
+        foregroundStyle: theme.placeholder,
+        contentBackgroundStyle: theme.background,
+        borderForegroundStyle: theme.background,
+        opacity: 0.6
+      )
+    }
+
+    let tone = chromeTone(for: role)
+    let background =
+      if isFocused || isPressed {
+        AnyShapeStyle(.terminalRow(tone, isSelected: true))
+      } else {
+        theme.background
+      }
+
+    return .init(
+      foregroundStyle: linkForegroundStyle(for: role),
+      contentBackgroundStyle: background,
+      borderForegroundStyle: theme.background
+    )
+  }
+
+  private func plainForegroundStyle(
+    for role: ButtonRole?
+  ) -> AnyShapeStyle {
+    switch role {
+    case .destructive:
+      theme.danger
+    case .cancel, .close:
+      theme.muted
+    case .confirm:
+      theme.tint
+    case nil:
+      theme.foreground
+    }
+  }
+
+  private func linkForegroundStyle(
+    for role: ButtonRole?
+  ) -> AnyShapeStyle {
+    switch role {
+    case .destructive:
+      theme.danger
+    case .cancel, .close:
+      theme.muted
+    case .confirm:
+      theme.tint
+    case nil:
+      theme.link
+    }
+  }
+
+  private func contrastingForegroundStyle(
+    on style: AnyShapeStyle
+  ) -> AnyShapeStyle {
+    guard let backgroundColor = parallelResolveColor(style: style, theme: theme) else {
+      return theme.foreground
+    }
+
+    let whiteContrast = contrastRatio(.white, backgroundColor)
+    let blackContrast = contrastRatio(.black, backgroundColor)
+    return .color(whiteContrast >= blackContrast ? .white : .black)
+  }
+
+  private func chromeTone(
+    for role: ButtonRole?
+  ) -> TerminalTone {
+    switch role {
+    case .destructive:
+      .danger
+    case .cancel, .close:
+      .neutral
+    case .confirm, nil:
+      .accent
+    }
+  }
+}
+
 func mix(
   _ lhs: Color,
   _ rhs: Color,

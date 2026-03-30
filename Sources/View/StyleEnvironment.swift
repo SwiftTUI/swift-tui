@@ -24,6 +24,10 @@ private enum PreferredColorSchemeKey: EnvironmentKey {
   static let defaultValue: ColorScheme? = nil
 }
 
+private enum ChromePresetKey: EnvironmentKey {
+  static let defaultValue = ChromePreset.standard
+}
+
 private enum ControlProminenceKey: EnvironmentKey {
   static let defaultValue = ControlProminence.standard
 }
@@ -106,6 +110,11 @@ extension EnvironmentValues {
   public var preferredColorScheme: ColorScheme? {
     get { self[PreferredColorSchemeKey.self] }
     set { self[PreferredColorSchemeKey.self] = newValue }
+  }
+
+  public var chromePreset: ChromePreset {
+    get { self[ChromePresetKey.self] }
+    set { self[ChromePresetKey.self] = newValue }
   }
 
   public var controlProminence: ControlProminence {
@@ -196,6 +205,18 @@ extension EnvironmentValues {
   package var parallelPickerLineWidth: Int? {
     get { self[PickerLineWidthKey.self] }
     set { self[PickerLineWidthKey.self] = newValue }
+  }
+
+  package var parallelStyleEnvironmentSnapshot: StyleEnvironmentSnapshot {
+    .init(
+      appearance: terminalAppearance,
+      themeOverride: parallelThemeOverride,
+      foregroundStyle: foregroundStyle,
+      tintStyle: tintStyle,
+      preferredColorScheme: preferredColorScheme,
+      chromePreset: chromePreset,
+      isEnabled: isEnabled
+    )
   }
 
 }

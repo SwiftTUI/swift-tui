@@ -36,6 +36,13 @@ let package = Package(
         .product(name: "StructuredQueriesSQLite", package: "swift-structured-queries"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ]
+    ),
+    .testTarget(
+      name: "TodoistDemoTests",
+      dependencies: [
+        "TodoistDemo",
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+      ]
     )
   ]
 )

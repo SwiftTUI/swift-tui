@@ -182,6 +182,7 @@ extension List {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let listStyle =
       context.environmentValues.listStyle == .automatic
       ? ListStyle.insetGrouped
@@ -199,11 +200,11 @@ extension List {
         selection: selection.wrappedValue
       )
     }
-    let chrome = context.environmentValues.terminalAppearance.controlChrome(
+    let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
-    let rowChrome = context.environmentValues.terminalAppearance.rowChrome(
+    let rowChrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
       isSelected: true
@@ -446,14 +447,15 @@ extension Table {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isSelectable = selection != nil
     let tableStyle =
-      context.environmentValues.listStyle == .insetGrouped
-      ? ListStyle.insetGrouped
-      : ListStyle.plain
+      context.environmentValues.listStyle == .plain
+      ? ListStyle.plain
+      : ListStyle.insetGrouped
     let showsIndicators =
       context.environmentValues.scrollIndicatorVisibility != .hidden
     let showsHeaders =
@@ -472,11 +474,11 @@ extension Table {
           return pickerSelectionMatches(tag, selection: selection.wrappedValue)
         }
       } else { nil }
-    let chrome = context.environmentValues.terminalAppearance.controlChrome(
+    let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
-    let rowChrome = context.environmentValues.terminalAppearance.rowChrome(
+    let rowChrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
       isSelected: true

@@ -42,6 +42,7 @@ extension Picker {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let pickerStyle =
       context.environmentValues.pickerStyle == .automatic
       ? PickerStyle.inline
@@ -49,7 +50,6 @@ extension Picker {
     let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let appearance = context.environmentValues.terminalAppearance
     let options = resolvedOptions(in: context.child(component: "PickerOptions"))
     let selectedIndex = options.firstIndex { option in
       pickerSelectionMatches(
@@ -149,7 +149,7 @@ extension Picker {
       isActiveNavigation: isFocused,
       showsFocusEffect: showsFocusEffect,
       isEnabled: isEnabled,
-      appearance: appearance,
+      styleEnvironment: styleEnvironment,
       viewportLineCount: context.environmentValues.parallelPickerViewportLineCount,
       lineWidth: context.environmentValues.parallelPickerLineWidth
     )

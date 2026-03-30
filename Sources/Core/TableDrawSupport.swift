@@ -53,7 +53,8 @@ extension DrawExtractor {
   func overflowIndicatorLine(
     widths: [Int],
     payload: TablePayload,
-    style: ResolvedTableStyle
+    style: ResolvedTableStyle,
+    symbol: String
   ) -> TableDisplayLine {
     let glyphs = tableBorderGlyphs(for: style)
     let borderStyle = TextStyle(
@@ -70,7 +71,7 @@ extension DrawExtractor {
         cells: widths.enumerated().map { index, width in
           TableDisplaySegment(
             content: parallelPaddedTableCell(
-              "…",
+              symbol,
               width: width,
               alignment: payload.columns[index].alignment
             ),

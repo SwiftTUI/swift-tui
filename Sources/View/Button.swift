@@ -61,6 +61,7 @@ extension Button {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
@@ -68,7 +69,7 @@ extension Button {
     let effectiveProminence =
       buttonStyle == .borderedProminent
       ? ControlProminence.increased : context.environmentValues.controlProminence
-    let chrome = context.environmentValues.terminalAppearance.buttonChrome(
+    let chrome = styleEnvironment.buttonChrome(
       buttonStyle: buttonStyle,
       isEnabled: context.environmentValues.isEnabled,
       isFocused: isFocused && showsFocusEffect,
@@ -90,6 +91,7 @@ extension Button {
     let body = buttonBody(
       buttonStyle: buttonStyle,
       chrome: chrome,
+      chromePreset: styleEnvironment.chromePreset,
       prominence: effectiveProminence,
       borderShape: context.environmentValues.buttonBorderShape
     )
@@ -113,6 +115,7 @@ extension Button {
   private func buttonBody(
     buttonStyle: ButtonStyle,
     chrome: ControlChrome,
+    chromePreset: ChromePreset,
     prominence: ControlProminence,
     borderShape: ButtonBorderShape
   ) -> AnyView {
@@ -135,23 +138,37 @@ extension Button {
           }
       )
     case .automatic, .bordered, .borderedProminent:
+      let usesDenseBorderlessChrome =
+        chromePreset == .standard && buttonStyle != .bordered
       label = AnyView(
         baseLabel
-          .padding(.init(all: 1))
+          .padding(
+            .init(
+              horizontal: 1,
+              vertical: chromePreset == .legacy || buttonStyle == .bordered ? 1 : 0
+            )
+          )
           .background {
             buttonBackground(
+              usesDenseBorderlessChrome: usesDenseBorderlessChrome,
               prominence: prominence,
               borderShape: borderShape,
               style: chrome.backgroundStyle
             )
           }
           .overlay {
-            buttonBorder(
-              prominence: prominence,
-              borderShape: borderShape,
-              style: chrome.borderStyle,
-              backgroundStyle: chrome.borderBackgroundStyle
-            )
+            Group {
+              if !usesDenseBorderlessChrome {
+                buttonBorder(
+                  prominence: prominence,
+                  borderShape: borderShape,
+                  style: chrome.borderStyle,
+                  backgroundStyle: chrome.borderBackgroundStyle
+                )
+              } else {
+                EmptyView()
+              }
+            }
           }
       )
     }
@@ -159,11 +176,15 @@ extension Button {
     let protectedLabel =
       switch buttonStyle {
       case .automatic, .bordered, .borderedProminent:
-        AnyView(
-          label.layoutMetadata(
-            .init(minimumHeight: 3)
+        if chromePreset == .standard && buttonStyle != .bordered {
+          label
+        } else {
+          AnyView(
+            label.layoutMetadata(
+              .init(minimumHeight: 3)
+            )
           )
-        )
+        }
       case .plain, .link:
         label
       }
@@ -176,10 +197,24 @@ extension Button {
   }
 
   private func buttonBackground(
+    usesDenseBorderlessChrome: Bool,
     prominence: ControlProminence,
     borderShape: ButtonBorderShape,
     style: AnyShapeStyle
   ) -> AnyView {
+    if usesDenseBorderlessChrome {
+      switch (borderShape, prominence) {
+      case (.roundedRectangle, _), (.automatic, .increased):
+        return AnyView(
+          RoundedRectangle(cornerRadius: 1).fill(style)
+        )
+      default:
+        return AnyView(
+          Rectangle().fill(style)
+        )
+      }
+    }
+
     switch (borderShape, prominence) {
     case (.roundedRectangle, _), (.automatic, .increased):
       return AnyView(

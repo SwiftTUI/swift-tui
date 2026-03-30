@@ -50,12 +50,12 @@ public struct Sparkline: View, ResolvableView {
           HStack(alignment: .center, spacing: 1) {
             if !labelViews.isEmpty {
               combinedView(from: labelViews, kindName: "SparklineLabel")
-                .foregroundStyle(.muted)
+                .foregroundStyle(.terminalBorder(.accent))
             }
             if !trailingViews.isEmpty {
               Spacer()
               combinedView(from: trailingViews, kindName: "SparklineSummary")
-                .foregroundStyle(.muted)
+                .foregroundStyle(.separator)
             }
           }
         }

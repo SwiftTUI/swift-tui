@@ -178,9 +178,14 @@ extension TerminalAppearance {
   ) -> Color {
     switch tone {
     case .accent:
-      return terminalColorForScheme(
-        dark: .init(hex: 0x7D56F4),
-        light: .init(hex: 0x6941C6)
+      return contrastSafe(
+        tintColor,
+        against: backgroundColor,
+        minimumContrast: 3,
+        fallback: terminalColorForScheme(
+          dark: .init(hex: 0x7DE2D1),
+          light: .init(hex: 0x1976D2)
+        )
       )
     case .info:
       return terminalColorForScheme(
@@ -203,9 +208,10 @@ extension TerminalAppearance {
         light: .init(hex: 0xC24141)
       )
     case .neutral:
-      return terminalColorForScheme(
-        dark: .init(hex: 0x98A2B3),
-        light: .init(hex: 0x667085)
+      return mix(
+        backgroundColor,
+        foregroundColor,
+        amount: colorScheme == .dark ? 0.54 : 0.44
       )
     }
   }

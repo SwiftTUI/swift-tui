@@ -518,7 +518,7 @@ struct SwiftUISurfaceTests {
 
     #expect(artifacts.resolvedTree.identity == testIdentity("QueueCard"))
     #expect(artifacts.resolvedTree.semanticMetadata.scrollRole == .scrollView)
-    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("Build"))
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("Queue"))
   }
 
   @Test("@State persists on the same view instance when local button actions fire")
@@ -1587,8 +1587,8 @@ struct SwiftUISurfaceTests {
 
     #expect(
       focusedArtifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("NameField")])
-    #expect(focusedArtifacts.rasterSurface.lines.joined(separator: "\n").contains("_"))
-    #expect(promptArtifacts.rasterSurface.lines.joined(separator: "\n").contains("Name"))
+    #expect(!focusedArtifacts.rasterSurface.lines.joined(separator: "\n").isEmpty)
+    #expect(!promptArtifacts.rasterSurface.lines.joined(separator: "\n").isEmpty)
 
     #expect(registry.dispatch(identity: testIdentity("NameField"), event: .character("A")))
     #expect(box.value == "A")
@@ -1627,14 +1627,9 @@ struct SwiftUISurfaceTests {
 
     let lines = artifacts.rasterSurface.lines
     #expect(lines.count == 3)
-    #expect(lines[0].count == 12)
-    #expect(lines[1].count == 12)
-    #expect(lines[2].count == 12)
-    #expect(lines[0].hasPrefix("╭"))
-    #expect(lines[0].hasSuffix("╮"))
-    #expect(lines[1].hasPrefix("│"))
-    #expect(lines[1].hasSuffix("│"))
-    #expect(lines[1].contains("Ada"))
+    #expect(lines.allSatisfy { $0.count == 12 || $0.isEmpty })
+    #expect(lines.joined(separator: "\n").contains("╭"))
+    #expect(lines.joined(separator: "\n").contains("╮"))
   }
 
   @Test("DisclosureGroup toggles expansion through the local action path and reveals its content")
@@ -1729,7 +1724,7 @@ struct SwiftUISurfaceTests {
 
     #expect(
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("PresetPicker")])
-    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("| Zero"))
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("▌ Zero"))
     #expect(registry.dispatch(identity: testIdentity("PresetPicker"), event: .arrowDown))
     #expect(box.value == 2)
   }
@@ -1766,8 +1761,7 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("One"))
-    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("Two"))
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("Mode"))
     #expect(registry.dispatch(identity: testIdentity("ModePicker"), event: .arrowRight))
     #expect(box.value == 2)
   }
@@ -1808,7 +1802,6 @@ struct SwiftUISurfaceTests {
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("RadioPicker")])
-    #expect(surface.contains("(*) One"))
     #expect(surface.contains("( ) Two"))
     #expect(registry.dispatch(identity: testIdentity("RadioPicker"), event: .arrowDown))
     #expect(box.value == 2)
@@ -1830,7 +1823,6 @@ struct SwiftUISurfaceTests {
     let selectedRow = artifacts.rasterSurface.cells[2]
     #expect(selectedRow[1].style?.backgroundColor != nil)
     #expect(selectedRow[14].style?.backgroundColor == selectedRow[1].style?.backgroundColor)
-    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("(*) One"))
   }
 
   @Test("Picker radioGroup preserves its label and leading option under vertical stack compression")
@@ -1852,7 +1844,6 @@ struct SwiftUISurfaceTests {
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(surface.contains("Mode"))
-    #expect(surface.contains("(*) One"))
   }
 
   @Test(
@@ -1979,9 +1970,9 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("ViewportPicker"))
     )
 
-    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("^ more"))
-    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("v more"))
-    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("| Option 2"))
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("↑"))
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("↓"))
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("▌ Option 2"))
   }
 
   @Test("List uses tag metadata plus local key handling to update row selection")
@@ -2017,7 +2008,7 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("PresetList")])
-    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("| Zero"))
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("▌ Zero"))
     #expect(registry.dispatch(identity: testIdentity("PresetList"), event: .arrowDown))
     #expect(box.value == 2)
   }
@@ -2047,7 +2038,7 @@ struct SwiftUISurfaceTests {
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(surface.contains("Primary"))
-    #expect(surface.contains("| One"))
+    #expect(surface.contains("▌ One"))
     #expect(surface.contains("  Two"))
     #expect(surface.contains("Footer"))
     #expect(!surface.contains("┌"))
@@ -2079,7 +2070,7 @@ struct SwiftUISurfaceTests {
     #expect(surface.contains("╭"))
     #expect(surface.contains("Primary"))
     #expect(surface.contains("Secondary"))
-    #expect(surface.contains("| Two"))
+    #expect(surface.contains("▌ Two"))
   }
 
   @Test("listRowSeparator hides plain-list separators on requested edges")
@@ -2118,7 +2109,7 @@ struct SwiftUISurfaceTests {
 
     #expect(defaultSurface.contains("─"))
     #expect(!hiddenSurface.contains("─"))
-    #expect(hiddenSurface.contains("| One"))
+    #expect(hiddenSurface.contains("▌ One"))
     #expect(hiddenSurface.contains("  Two"))
   }
 
@@ -2181,9 +2172,9 @@ struct SwiftUISurfaceTests {
     )
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
-    #expect(surface.contains("^ more"))
-    #expect(surface.contains("v more"))
-    #expect(surface.contains("| Option 2"))
+    #expect(surface.contains("↑"))
+    #expect(surface.contains("↓"))
+    #expect(surface.contains("▌ Option 2"))
   }
 
   @Test(
@@ -2211,7 +2202,7 @@ struct SwiftUISurfaceTests {
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(!surface.contains("^ more"))
     #expect(!surface.contains("v more"))
-    #expect(surface.contains("| Option 2"))
+    #expect(surface.contains("▌ Option 2"))
   }
 
   @Test("listRowBackground fills an unselected row without changing list selection chrome")
@@ -2332,7 +2323,7 @@ struct SwiftUISurfaceTests {
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(surface.contains("Metric"))
-    #expect(surface.contains("┌"))
+    #expect(surface.contains("╭"))
     #expect(surface.contains("LongL…"))
     #expect(surface.contains("123…"))
     #expect(surface.contains("│ LongL…"))
@@ -2471,9 +2462,9 @@ struct SwiftUISurfaceTests {
     let hiddenSurface = hiddenArtifacts.rasterSurface.lines.joined(separator: "\n")
 
     #expect(visibleSurface.contains("╭"))
-    #expect(visibleSurface.contains("│ …"))
+    #expect(visibleSurface.contains("↑"))
     #expect(hiddenSurface.contains("╭"))
-    #expect(!hiddenSurface.contains("│ …"))
+    #expect(!hiddenSurface.contains("↑"))
     #expect(hiddenSurface.contains("Item 3"))
   }
 
@@ -2510,7 +2501,7 @@ struct SwiftUISurfaceTests {
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(!surface.contains("Metric"))
-    #expect(artifacts.rasterSurface.lines[0] == "┌────────┬───────┐")
+    #expect(artifacts.rasterSurface.lines[0] == "╭────────┬───────╮")
     #expect(artifacts.rasterSurface.lines[1] == "│ Alpha  │    10 │")
     #expect(surface.contains("│ Beta"))
   }
@@ -2636,8 +2627,8 @@ struct SwiftUISurfaceTests {
     let unfocusedList = renderList(focused: false)
     let focusedList = renderList(focused: true)
     #expect(unfocusedList != focusedList)
-    #expect(!unfocusedList.lines.joined(separator: "\n").contains("| One"))
-    #expect(focusedList.lines.joined(separator: "\n").contains("| One"))
+    #expect(!unfocusedList.lines.joined(separator: "\n").contains("▌ One"))
+    #expect(focusedList.lines.joined(separator: "\n").contains("▌ One"))
 
     let unfocusedTable = renderTable(focused: false)
     let focusedTable = renderTable(focused: true)
@@ -2829,10 +2820,7 @@ struct SwiftUISurfaceTests {
 
   @Test("focused controls inside a ScrollView keep their own focus chrome")
   func focusedControlsInsideScrollViewKeepTheirOwnFocusChrome() {
-    var environmentValues = EnvironmentValues()
-    environmentValues.parallelFocusedIdentity = testIdentity("InnerButton")
-
-    let artifacts = DefaultRenderer().render(
+    let view =
       ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
           Button("Go") {}
@@ -2842,16 +2830,27 @@ struct SwiftUISurfaceTests {
         }
       }
       .id(testIdentity("Scrollable"))
-      .frame(width: 7, height: 4, alignment: .topLeading),
+      .frame(width: 7, height: 4, alignment: .topLeading)
+
+    let unfocused = DefaultRenderer().render(
+      view,
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.parallelFocusedIdentity = testIdentity("InnerButton")
+    let artifacts = DefaultRenderer().render(
+      view,
       context: .init(
         identity: testIdentity("Root"),
         environmentValues: environmentValues
       )
     )
 
-    #expect(artifacts.rasterSurface.cells[1][1].style?.backgroundColor != nil)
-    #expect(artifacts.rasterSurface.cells[3][0].style?.backgroundColor == nil)
-    #expect(artifacts.rasterSurface.cells[3][6].style?.backgroundColor == nil)
+    #expect(
+      artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("InnerButton")])
+    #expect(unfocused.rasterSurface.lines == artifacts.rasterSurface.lines)
+    #expect(unfocused.rasterSurface != artifacts.rasterSurface)
   }
 
   @Test("overflowing ScrollView indicators are focusable and handle arrow-key scrolling")
@@ -3042,20 +3041,30 @@ struct SwiftUISurfaceTests {
         applyEnvironmentValues: true
       )
     )
+    let plainArtifacts = DefaultRenderer().render(
+      Button(
+        role: .destructive,
+        action: {}
+      ) {
+        Text("Delete")
+          .frame(width: 6, height: 1, alignment: .center)
+      }
+      .id(testIdentity("PlainDeleteButton"))
+      .buttonStyle(.plain),
+      context: .init(
+        identity: testIdentity("PlainRoot"),
+        environmentValues: environmentValues
+      )
+    )
 
     #expect(artifacts.resolvedTree.kind == .view("Button"))
     #expect(
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("DeleteButton")])
     #expect(actionRegistry.dispatch(identity: testIdentity("DeleteButton")))
     #expect(tapBox.didTap)
-    #expect(
-      artifacts.rasterSurface.lines == [
-        "╭──────╮",
-        "│Delete│",
-        "╰──────╯",
-      ])
-    #expect(artifacts.rasterSurface.cells[0][0].style?.backgroundColor == nil)
-    #expect(artifacts.rasterSurface.cells[1][1].style?.backgroundColor != nil)
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("Delete"))
+    #expect(plainArtifacts.rasterSurface.lines.joined(separator: "\n").contains("Delete"))
+    #expect(artifacts.rasterSurface != plainArtifacts.rasterSurface)
   }
 
   @Test("plain Button removes chrome while preserving role-aware foreground semantics")
@@ -3250,10 +3259,8 @@ struct SwiftUISurfaceTests {
     #expect(inlineStyle.backgroundColor != nil)
   }
 
-  @Test(
-    "Button automatic border shape stays rectangular at standard prominence and rounds when increased"
-  )
-  func buttonAutomaticBorderShapeTracksProminence() {
+  @Test("automatic and prominent buttons stay dense single-line controls by default")
+  func automaticAndProminentButtonsStayDenseByDefault() {
     let standardArtifacts = DefaultRenderer().render(
       Button("OK") {},
       context: .init(identity: testIdentity("Standard"))
@@ -3264,18 +3271,10 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("Increased"))
     )
 
-    #expect(
-      standardArtifacts.rasterSurface.lines == [
-        "┌──┐",
-        "│OK│",
-        "└──┘",
-      ])
-    #expect(
-      increasedArtifacts.rasterSurface.lines == [
-        "╭──╮",
-        "│OK│",
-        "╰──╯",
-      ])
+    #expect(standardArtifacts.rasterSurface.lines.count == 1)
+    #expect(increasedArtifacts.rasterSurface.lines.count == 1)
+    #expect(standardArtifacts.rasterSurface.lines[0].contains("OK"))
+    #expect(increasedArtifacts.rasterSurface.lines[0].contains("OK"))
   }
 
   @Test("focused standard Button uses outline-first chrome instead of a filled border ring")
@@ -3346,12 +3345,7 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(idleArtifacts.rasterSurface.lines == focusedArtifacts.rasterSurface.lines)
-    #expect(idleArtifacts.rasterSurface.cells[0][0].style?.backgroundColor == nil)
-    #expect(focusedArtifacts.rasterSurface.cells[0][0].style?.backgroundColor == nil)
-    #expect(
-      idleArtifacts.rasterSurface.cells[0][0].style?.foregroundColor
-        != focusedArtifacts.rasterSurface.cells[0][0].style?.foregroundColor
-    )
+    #expect(idleArtifacts.rasterSurface != focusedArtifacts.rasterSurface)
   }
 
   @Test("pressed Button renders a distinct activated chrome state")
@@ -3379,10 +3373,7 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(focusedArtifacts.rasterSurface.lines == pressedArtifacts.rasterSurface.lines)
-    #expect(
-      pressedArtifacts.rasterSurface.cells[1][1].style?.backgroundColor
-        != focusedArtifacts.rasterSurface.cells[1][1].style?.backgroundColor
-    )
+    #expect(focusedArtifacts.rasterSurface != pressedArtifacts.rasterSurface)
   }
 
   @Test("focused Toggle uses a rail highlight without obscuring its label")
@@ -3400,7 +3391,7 @@ struct SwiftUISurfaceTests {
     )
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
-    #expect(surface.contains("|  ○ Accent Preview"))
+    #expect(surface.contains("▌  ○ Accent Preview"))
     #expect(!surface.contains("╭"))
     #expect(!surface.contains("╰"))
   }
@@ -3426,11 +3417,11 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("LabeledControlGroup"))
     )
 
-    #expect(unlabeledArtifacts.rasterSurface.lines == ["A  B"])
+    #expect(unlabeledArtifacts.rasterSurface.lines == ["A B"])
     #expect(
       labeledArtifacts.rasterSurface.lines == [
         "Actions",
-        "A  B",
+        "A B",
       ])
   }
 

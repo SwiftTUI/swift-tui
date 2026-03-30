@@ -42,20 +42,20 @@ extension Stepper {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
-    let appearance = context.environmentValues.terminalAppearance
     let currentValue = clampedControlValue(value.wrappedValue, to: bounds)
     let canDecrement = stepperCanAdjust(currentValue, delta: -step, bounds: bounds)
     let canIncrement = stepperCanAdjust(currentValue, delta: step, bounds: bounds)
-    let chrome = appearance.rowChrome(
+    let chrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
       isPressed: isPressed
     )
-    let contentChrome = appearance.controlChrome(
+    let contentChrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
       isPressed: isPressed
@@ -225,7 +225,7 @@ extension Stepper {
       HStack(alignment: .center, spacing: 1) {
         if !labelViews.isEmpty {
           combinedView(from: labelViews, kindName: "StepperLabel")
-            .foregroundStyle(.muted)
+            .foregroundStyle(.terminalBorder(.accent))
         }
         decoratedControls
       }
@@ -289,18 +289,18 @@ extension Slider {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
-    let appearance = context.environmentValues.terminalAppearance
     let currentValue = clampedControlValue(value.wrappedValue, to: bounds)
-    let chrome = appearance.rowChrome(
+    let chrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
       isPressed: isPressed
     )
-    let contentChrome = appearance.controlChrome(
+    let contentChrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
       isPressed: isPressed
@@ -460,7 +460,7 @@ extension Slider {
       HStack(alignment: .center, spacing: 1) {
         if !labelViews.isEmpty {
           combinedView(from: labelViews, kindName: "SliderLabel")
-            .foregroundStyle(.muted)
+            .foregroundStyle(.terminalBorder(.accent))
         }
         decoratedControls
       }

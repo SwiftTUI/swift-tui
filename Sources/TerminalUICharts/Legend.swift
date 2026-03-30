@@ -43,7 +43,7 @@ public struct Legend: View, ResolvableView {
       VStack(alignment: .leading, spacing: 0) {
         if !labelViews.isEmpty {
           combinedView(from: labelViews, kindName: "LegendLabel")
-            .foregroundStyle(.muted)
+            .foregroundStyle(.terminalBorder(.accent))
         }
         HStack(alignment: .center, spacing: itemSpacing) {
           ForEach(items.indices, id: \.self) { index in

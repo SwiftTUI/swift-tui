@@ -173,7 +173,8 @@ extension DrawExtractor {
         overflowIndicatorLine(
           widths: widths,
           payload: payload,
-          style: style
+          style: style,
+          symbol: "↑"
         )
       )
     }
@@ -183,7 +184,8 @@ extension DrawExtractor {
         overflowIndicatorLine(
           widths: widths,
           payload: payload,
-          style: style
+          style: style,
+          symbol: "↓"
         )
       )
     }
@@ -219,7 +221,11 @@ extension DrawExtractor {
     ]
 
     if payload.showsHeaders {
-      var headerStyle = TextStyle(foregroundStyle: .semantic(.muted))
+      var headerStyle = TextStyle(
+        foregroundStyle: style == .insetGrouped
+          ? AnyShapeStyle(.terminalBorder(.accent))
+          : .semantic(.muted)
+      )
       headerStyle.opacity *= payload.opacity
       lines.append(
         .init(
@@ -237,7 +243,9 @@ extension DrawExtractor {
             borderStyle: borderStyle,
             glyphs: glyphs
           ),
-          backgroundStyle: nil,
+          backgroundStyle: style == .insetGrouped
+            ? AnyShapeStyle(.terminalRow(.neutral, isOdd: true))
+            : nil,
           role: .header,
           isSelectedRow: false,
           rowIndex: nil

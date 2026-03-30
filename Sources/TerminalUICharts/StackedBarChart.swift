@@ -59,12 +59,12 @@ public struct StackedBarChart: View, ResolvableView {
           HStack(alignment: .center, spacing: 1) {
             if !labelViews.isEmpty {
               combinedView(from: labelViews, kindName: "StackedBarChartLabel")
-                .foregroundStyle(.muted)
+                .foregroundStyle(.terminalBorder(.accent))
             }
             if !summaryViews.isEmpty {
               Spacer()
               combinedView(from: summaryViews, kindName: "StackedBarChartSummary")
-                .foregroundStyle(.muted)
+                .foregroundStyle(.separator)
             }
           }
         }

@@ -221,7 +221,7 @@ extension DrawExtractor {
       visible.append(
         .init(
           kind: .text(
-            "^ more", .init(foregroundStyle: .semantic(.muted), opacity: payload.opacity)),
+            "↑", .init(foregroundStyle: .semantic(.separator), opacity: payload.opacity)),
           isHeader: true,
           rowIndex: nil
         )
@@ -237,7 +237,7 @@ extension DrawExtractor {
       visible.append(
         .init(
           kind: .text(
-            "v more", .init(foregroundStyle: .semantic(.muted), opacity: payload.opacity)),
+            "↓", .init(foregroundStyle: .semantic(.separator), opacity: payload.opacity)),
           isHeader: true,
           rowIndex: nil
         )
@@ -264,7 +264,20 @@ extension DrawExtractor {
 
     for (index, item) in payload.items.enumerated() {
       switch item.kind {
-      case .header, .footer:
+      case .header:
+        var styleOverride = item.style
+        if styleOverride.foregroundStyle == nil {
+          styleOverride.foregroundStyle = AnyShapeStyle(.terminalBorder(.accent))
+        }
+        styleOverride.opacity *= payload.opacity
+        lines.append(
+          .init(
+            kind: .text(item.text, styleOverride),
+            isHeader: true,
+            rowIndex: nil
+          )
+        )
+      case .footer:
         var styleOverride = item.style
         if styleOverride.foregroundStyle == nil {
           styleOverride.foregroundStyle = .semantic(.muted)
@@ -288,7 +301,7 @@ extension DrawExtractor {
         let isSelected = rowIndex == payload.selectedRowIndex
         let marker =
           payload.showsSelectionMarker
-          ? (isSelected ? "| " : "  ")
+          ? (isSelected ? "▌ " : "  ")
           : ""
         let markerStyle = TextStyle(
           foregroundStyle: isSelected

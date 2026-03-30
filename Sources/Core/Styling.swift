@@ -273,6 +273,7 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
   public var foregroundStyle: AnyShapeStyle?
   public var tintStyle: AnyShapeStyle?
   public var preferredColorScheme: ColorScheme?
+  public var chromePreset: ChromePreset
   public var colorScheme: ColorScheme
   public var colorSchemeContrast: ColorSchemeContrast
   public var isEnabled: Bool
@@ -284,6 +285,7 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
     foregroundStyle: AnyShapeStyle? = nil,
     tintStyle: AnyShapeStyle? = nil,
     preferredColorScheme: ColorScheme? = nil,
+    chromePreset: ChromePreset = .standard,
     colorScheme: ColorScheme? = nil,
     colorSchemeContrast: ColorSchemeContrast? = nil,
     isEnabled: Bool = true
@@ -291,12 +293,20 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
     let effectiveAppearance = appearance.applyingPreferredColorScheme(
       preferredColorScheme
     )
+    var effectiveTheme = (themeOverride ?? theme) ?? effectiveAppearance.semanticTheme()
+    if let foregroundStyle {
+      effectiveTheme.foreground = foregroundStyle
+    }
+    if let tintStyle {
+      effectiveTheme.tint = tintStyle
+    }
     self.appearance = effectiveAppearance
     self.themeOverride = themeOverride ?? theme
-    self.theme = (themeOverride ?? theme) ?? effectiveAppearance.semanticTheme()
+    self.theme = effectiveTheme
     self.foregroundStyle = foregroundStyle
     self.tintStyle = tintStyle
     self.preferredColorScheme = preferredColorScheme
+    self.chromePreset = chromePreset
     self.colorScheme = colorScheme ?? effectiveAppearance.colorScheme
     self.colorSchemeContrast = colorSchemeContrast ?? effectiveAppearance.colorSchemeContrast
     self.isEnabled = isEnabled

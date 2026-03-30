@@ -359,10 +359,10 @@ public struct ScrollView: View, ResolvableView {
     let indicatorVisibility = effectiveIndicatorVisibility(
       environment: context.environmentValues.scrollIndicatorVisibility
     )
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let focusedIdentity = context.environmentValues.parallelFocusedIdentity
     let isFocused = focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
-    let appearance = context.environmentValues.terminalAppearance
     var focusedIndicatorAxes: AxisSet = []
     if indicatorVisibility == .visible {
       if focusedIdentity == parallelVerticalScrollIndicatorIdentity(for: context.identity) {
@@ -372,11 +372,11 @@ public struct ScrollView: View, ResolvableView {
         focusedIndicatorAxes.insert(.horizontal)
       }
     }
-    let containerChrome = appearance.controlChrome(
+    let containerChrome = styleEnvironment.controlChrome(
       isEnabled: context.environmentValues.isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
-    let contentChrome = appearance.rowChrome(
+    let contentChrome = styleEnvironment.rowChrome(
       isEnabled: context.environmentValues.isEnabled,
       isFocused: isFocused && showsFocusEffect,
       isSelected: isFocused && showsFocusEffect
@@ -482,7 +482,7 @@ public struct ScrollView: View, ResolvableView {
     let child = content.resolve(in: context.child(component: "ScrollContent"))
     let indicatorFocusStyle =
       showsFocusEffect && !focusedIndicatorAxes.isEmpty
-      ? appearance.controlChrome(
+      ? styleEnvironment.controlChrome(
         isEnabled: context.environmentValues.isEnabled,
         isFocused: true
       ).borderStyle

@@ -10,7 +10,7 @@ extension Picker {
     isActiveNavigation: Bool,
     showsFocusEffect: Bool,
     isEnabled: Bool,
-    appearance: TerminalAppearance,
+    styleEnvironment: StyleEnvironmentSnapshot,
     viewportLineCount: Int?,
     lineWidth: Int?
   ) -> AnyView {
@@ -24,7 +24,7 @@ extension Picker {
         isActiveNavigation: isActiveNavigation,
         showsFocusEffect: showsFocusEffect,
         isEnabled: isEnabled,
-        appearance: appearance
+        styleEnvironment: styleEnvironment
       )
     case .radioGroup:
       return radioGroupPickerBody(
@@ -35,7 +35,7 @@ extension Picker {
         isActiveNavigation: isActiveNavigation,
         showsFocusEffect: showsFocusEffect,
         isEnabled: isEnabled,
-        appearance: appearance
+        styleEnvironment: styleEnvironment
       )
     case .menu:
       return menuPickerBody(
@@ -46,7 +46,7 @@ extension Picker {
         isActiveNavigation: isActiveNavigation,
         showsFocusEffect: showsFocusEffect,
         isEnabled: isEnabled,
-        appearance: appearance
+        styleEnvironment: styleEnvironment
       )
     case .inline, .automatic:
       return inlinePickerBody(
@@ -57,7 +57,7 @@ extension Picker {
         isActiveNavigation: isActiveNavigation,
         showsFocusEffect: showsFocusEffect,
         isEnabled: isEnabled,
-        appearance: appearance,
+        styleEnvironment: styleEnvironment,
         viewportLineCount: viewportLineCount,
         lineWidth: lineWidth
       )
@@ -72,9 +72,9 @@ extension Picker {
     isActiveNavigation: Bool,
     showsFocusEffect: Bool,
     isEnabled: Bool,
-    appearance: TerminalAppearance
+    styleEnvironment: StyleEnvironmentSnapshot
   ) -> AnyView {
-    let triggerChrome = appearance.rowChrome(
+    let triggerChrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
       isSelected: selectedIndex != nil
@@ -103,7 +103,7 @@ extension Picker {
       VStack(alignment: .leading, spacing: 0) {
         if !labelViews.isEmpty {
           combinedView(from: labelViews, kindName: "PickerLabel")
-            .foregroundStyle(.muted)
+            .foregroundStyle(.terminalBorder(.accent))
         }
         Group {
           if isFocused {
@@ -123,7 +123,7 @@ extension Picker {
                 isSelected: index == selectedIndex,
                 isActiveNavigation: isActiveNavigation && showsFocusEffect,
                 isEnabled: isEnabled,
-                appearance: appearance,
+                styleEnvironment: styleEnvironment,
                 lineWidth: nil,
                 routeIdentity: parallelPickerOptionIdentity(
                   for: controlIdentity,
@@ -132,7 +132,7 @@ extension Picker {
               )
             }
           }
-          .padding(.init(leading: 2))
+          .padding(.init(leading: 1))
         }
       }
       .foregroundStyle(triggerChrome.foregroundStyle)
@@ -155,11 +155,11 @@ extension Picker {
     isActiveNavigation: Bool,
     showsFocusEffect: Bool,
     isEnabled: Bool,
-    appearance: TerminalAppearance,
+    styleEnvironment: StyleEnvironmentSnapshot,
     viewportLineCount: Int?,
     lineWidth: Int?
   ) -> AnyView {
-    let containerChrome = appearance.controlChrome(
+    let containerChrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
@@ -169,7 +169,7 @@ extension Picker {
       selectedIndex: selectedIndex,
       isActiveNavigation: isActiveNavigation && showsFocusEffect,
       isEnabled: isEnabled,
-      appearance: appearance,
+      styleEnvironment: styleEnvironment,
       viewportLineCount: viewportLineCount,
       lineWidth: lineWidth
     )
@@ -178,14 +178,16 @@ extension Picker {
       VStack(alignment: .leading, spacing: 0) {
         if !labelViews.isEmpty {
           combinedView(from: labelViews, kindName: "PickerLabel")
-            .foregroundStyle(.muted)
+            .foregroundStyle(.terminalBorder(.accent))
         }
         VStack(alignment: .leading, spacing: 0) {
           ForEach(0..<contentRows.count) { index in
             contentRows[index]
           }
         }
-        .padding(.init(all: 1))
+        .padding(
+          .init(horizontal: 1, vertical: 1)
+        )
         .background {
           RoundedRectangle(cornerRadius: 1).parallelInteriorFill(containerChrome.backgroundStyle)
         }
@@ -214,7 +216,7 @@ extension Picker {
     selectedIndex: Int?,
     isActiveNavigation: Bool,
     isEnabled: Bool,
-    appearance: TerminalAppearance,
+    styleEnvironment: StyleEnvironmentSnapshot,
     viewportLineCount: Int?,
     lineWidth: Int?
   ) -> [AnyView] {
@@ -235,8 +237,8 @@ extension Picker {
       )
       let end = min(options.count, offset + visibleOptionCount)
       rowOptions = indexedOptions[offset..<end]
-      topMarker = offset > 0 ? "^ more" : nil
-      bottomMarker = end < options.count ? "v more" : nil
+      topMarker = offset > 0 ? "↑" : nil
+      bottomMarker = end < options.count ? "↓" : nil
     } else {
       rowOptions = indexedOptions[indexedOptions.startIndex..<indexedOptions.endIndex]
       topMarker = nil
@@ -256,7 +258,7 @@ extension Picker {
           isSelected: option.offset == selectedIndex,
           isActiveNavigation: isActiveNavigation,
           isEnabled: isEnabled,
-          appearance: appearance,
+          styleEnvironment: styleEnvironment,
           lineWidth: lineWidth,
           routeIdentity: parallelPickerOptionIdentity(
             for: controlIdentity,
@@ -280,7 +282,7 @@ extension Picker {
     AnyView(
       Text(text ?? "")
         .lineLimit(1)
-        .foregroundStyle(.muted)
+        .foregroundStyle(.separator)
         .frame(width: lineWidth, alignment: .leading)
     )
   }
@@ -290,11 +292,11 @@ extension Picker {
     isSelected: Bool,
     isActiveNavigation: Bool,
     isEnabled: Bool,
-    appearance: TerminalAppearance,
+    styleEnvironment: StyleEnvironmentSnapshot,
     lineWidth: Int?,
     routeIdentity: Identity? = nil
   ) -> AnyView {
-    let rowChrome = appearance.rowChrome(
+    let rowChrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isActiveNavigation && isSelected,
       isSelected: isActiveNavigation && isSelected
@@ -312,7 +314,7 @@ extension Picker {
         AnyShapeStyle(.foreground)
       }
     let row = HStack(alignment: .center, spacing: 0) {
-      Text(isSelected ? "| " : "  ")
+      Text(isSelected ? "▌ " : "  ")
         .foregroundStyle(markerStyle)
       Text(label)
         .lineLimit(1)
@@ -353,9 +355,9 @@ extension Picker {
     isActiveNavigation: Bool,
     showsFocusEffect: Bool,
     isEnabled: Bool,
-    appearance: TerminalAppearance
+    styleEnvironment: StyleEnvironmentSnapshot
   ) -> AnyView {
-    let containerChrome = appearance.controlChrome(
+    let containerChrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
@@ -363,12 +365,12 @@ extension Picker {
       VStack(alignment: .leading, spacing: 0) {
         if !labelViews.isEmpty {
           combinedView(from: labelViews, kindName: "PickerLabel")
-            .foregroundStyle(.muted)
+            .foregroundStyle(.terminalBorder(.accent))
         }
         HStack(alignment: .center, spacing: 1) {
           ForEach(0..<options.count) { index in
             let option = options[index]
-            let segmentChrome = appearance.controlChrome(
+            let segmentChrome = styleEnvironment.controlChrome(
               isEnabled: isEnabled,
               isFocused: isActiveNavigation && showsFocusEffect && index == selectedIndex,
               isSelected: index == selectedIndex
@@ -402,7 +404,9 @@ extension Picker {
               .semanticMetadata(.init(participatesInPointerHitTesting: true))
           }
         }
-        .padding(.init(all: 1))
+        .padding(
+          .init(horizontal: 1, vertical: 1)
+        )
         .background {
           RoundedRectangle(cornerRadius: 1).parallelInteriorFill(containerChrome.backgroundStyle)
         }
@@ -428,9 +432,9 @@ extension Picker {
     isActiveNavigation: Bool,
     showsFocusEffect: Bool,
     isEnabled: Bool,
-    appearance: TerminalAppearance
+    styleEnvironment: StyleEnvironmentSnapshot
   ) -> AnyView {
-    let containerChrome = appearance.controlChrome(
+    let containerChrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
@@ -439,7 +443,7 @@ extension Picker {
       VStack(alignment: .leading, spacing: 0) {
         if !labelViews.isEmpty {
           combinedView(from: labelViews, kindName: "PickerLabel")
-            .foregroundStyle(.muted)
+            .foregroundStyle(.terminalBorder(.accent))
         }
         VStack(alignment: .leading, spacing: 0) {
           ForEach(0..<options.count) { index in
@@ -448,7 +452,7 @@ extension Picker {
               isSelected: index == selectedIndex,
               isFocused: isActiveNavigation && showsFocusEffect && index == selectedIndex,
               isEnabled: isEnabled,
-              appearance: appearance,
+              styleEnvironment: styleEnvironment,
               routeIdentity: parallelPickerOptionIdentity(
                 for: controlIdentity,
                 index: index
@@ -456,7 +460,9 @@ extension Picker {
             )
           }
         }
-        .padding(.init(all: 1))
+        .padding(
+          .init(horizontal: 1, vertical: 1)
+        )
         .background {
           RoundedRectangle(cornerRadius: 1).parallelInteriorFill(containerChrome.backgroundStyle)
         }
@@ -485,10 +491,10 @@ extension Picker {
     isSelected: Bool,
     isFocused: Bool,
     isEnabled: Bool,
-    appearance: TerminalAppearance,
+    styleEnvironment: StyleEnvironmentSnapshot,
     routeIdentity: Identity? = nil
   ) -> AnyView {
-    let rowChrome = appearance.rowChrome(
+    let rowChrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused,
       isSelected: isFocused

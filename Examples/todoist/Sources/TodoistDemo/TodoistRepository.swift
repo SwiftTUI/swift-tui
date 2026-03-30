@@ -31,9 +31,11 @@ actor TodoistRepository {
 
   func loadSnapshot() throws -> TodoistSnapshot {
     try dbQueue.read { db in
-      let projectRequest: SQLRequest<CachedProject> = request(for: CachedProject.activeProjectsQuery)
+      let projectRequest: SQLRequest<CachedProject> = request(
+        for: CachedProject.activeProjectsQuery)
       let taskRequest: SQLRequest<CachedTask> = request(for: CachedTask.activeTasksQuery)
-      let lastSyncRequest: SQLRequest<String> = request(for: CacheSetting.valueQuery(for: "last_sync_at"))
+      let lastSyncRequest: SQLRequest<String> = request(
+        for: CacheSetting.valueQuery(for: "last_sync_at"))
 
       let projects = try CachedProject.fetchAll(db, projectRequest)
       let tasks = try CachedTask.fetchAll(db, taskRequest)

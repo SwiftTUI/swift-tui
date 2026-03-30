@@ -37,11 +37,12 @@ extension Menu {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
-    let chrome = context.environmentValues.terminalAppearance.controlChrome(
+    let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
       isPressed: isPressed

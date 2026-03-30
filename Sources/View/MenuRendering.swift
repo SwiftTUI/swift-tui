@@ -28,17 +28,31 @@ extension Menu {
         triggerRow
       }
 
+    let expandedContent = AnyView(
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<contentViews.count) { index in
+          MenuNonFocusableContent(content: contentViews[index])
+        }
+      }
+      .padding(.init(horizontal: 1, vertical: 1))
+      .background {
+        RoundedRectangle(cornerRadius: 1).parallelInteriorFill(chrome.backgroundStyle)
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: 1).parallelStrokeBorder(
+          chrome.borderStyle,
+          backgroundStyle: chrome.borderBackgroundStyle
+        )
+      }
+    )
+
     return AnyView(
       VStack(alignment: .leading, spacing: 0) {
         highlightedTrigger
 
         if isExpanded {
-          VStack(alignment: .leading, spacing: 0) {
-            ForEach(0..<contentViews.count) { index in
-              MenuNonFocusableContent(content: contentViews[index])
-            }
-          }
-          .padding(.init(top: 0, leading: 2, bottom: 0, trailing: 0))
+          expandedContent
+            .padding(.init(top: 0, leading: 1, bottom: 0, trailing: 0))
         }
       }
       .foregroundStyle(chrome.foregroundStyle)

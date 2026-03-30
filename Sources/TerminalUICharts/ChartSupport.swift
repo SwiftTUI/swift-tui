@@ -21,7 +21,7 @@ func timelineEntryView(
           Text(entry.title)
             .lineLimit(1)
           Text(detail)
-            .foregroundStyle(.muted)
+            .foregroundStyle(.separator)
             .lineLimit(1)
         }
       }
@@ -52,7 +52,7 @@ func legendItemView(
       Text("■")
         .foregroundStyle(accentStyle)
       Text(item.label)
-        .foregroundStyle(.muted)
+        .foregroundStyle(.foreground)
     }
   )
 }
@@ -203,7 +203,7 @@ func comparisonChartRow(
       Text(entry.label)
         .lineLimit(1)
         .truncationMode(.tail)
-        .foregroundStyle(.muted)
+        .foregroundStyle(.foreground)
         .frame(width: max(1, labelWidth), height: 1, alignment: .leading)
       comparisonTrackView(
         current: entry.current,
@@ -213,7 +213,7 @@ func comparisonChartRow(
         tone: tone
       )
       Text("\(metricValueString(entry.current))/\(metricValueString(entry.baseline))")
-        .foregroundStyle(.muted)
+        .foregroundStyle(.separator)
     }
   )
 }
@@ -469,7 +469,7 @@ func columnChartBody(
         ForEach(entries.indices, id: \.self) { index in
           Text(String(entries[index].label.prefix(effectiveWidth)))
             .lineLimit(1)
-            .foregroundStyle(.muted)
+            .foregroundStyle(.foreground)
             .frame(width: effectiveWidth, height: 1, alignment: .center)
         }
       }
@@ -530,7 +530,7 @@ func heatStripBody(
         ForEach(entries.indices, id: \.self) { index in
           Text(String(entries[index].label.prefix(effectiveWidth)))
             .lineLimit(1)
-            .foregroundStyle(.muted)
+            .foregroundStyle(.foreground)
             .frame(width: effectiveWidth, height: 1, alignment: .center)
         }
       }
@@ -559,7 +559,7 @@ func barChartRow(
       Text(entry.label)
         .lineLimit(1)
         .truncationMode(.tail)
-        .foregroundStyle(.muted)
+        .foregroundStyle(.foreground)
         .frame(width: max(1, labelWidth), height: 1, alignment: .leading)
       HStack(alignment: .center, spacing: 0) {
         Text(track.filled)
@@ -568,7 +568,7 @@ func barChartRow(
           .foregroundStyle(.separator)
       }
       Text(metricValueString(entry.value))
-        .foregroundStyle(.muted)
+        .foregroundStyle(.separator)
     }
   )
 }

@@ -32,12 +32,13 @@ extension Toggle {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let isSelected = isOn.wrappedValue
-    let chrome = context.environmentValues.terminalAppearance.rowChrome(
+    let chrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
       isPressed: isPressed,
@@ -95,7 +96,7 @@ extension Toggle {
     let rowContent = AnyView(
       HStack(alignment: .center, spacing: 1) {
         if isFocused {
-          Text("| ")
+          Text("▌ ")
             .foregroundStyle(markerStyle)
         }
         Text(isOn ? "◉" : "○")
@@ -194,10 +195,11 @@ package func textEntryFieldBody(
   labelViews: [AnyView],
   style: TextFieldStyle,
   chrome: ControlChrome,
-  appearance: TerminalAppearance
+  placeholderStyle: AnyShapeStyle,
+  chromePreset: ChromePreset
 ) -> AnyView {
   let textStyle =
-    isShowingPrompt ? appearance.semanticTheme().placeholder : chrome.foregroundStyle
+    isShowingPrompt ? placeholderStyle : chrome.foregroundStyle
   let baseField = AnyView(
     Text(displayText)
       .fixedSize(horizontal: true, vertical: false)
@@ -218,7 +220,7 @@ package func textEntryFieldBody(
     case .roundedBorder, .automatic:
       AnyView(
         stretchedField
-          .padding(.init(all: 1))
+          .padding(.init(horizontal: 1, vertical: 1))
           .background {
             RoundedRectangle(cornerRadius: 1).parallelInteriorFill(chrome.backgroundStyle)
           }
@@ -238,7 +240,7 @@ package func textEntryFieldBody(
       AnyView(
         VStack(alignment: .leading, spacing: 0) {
           combinedView(from: labelViews, kindName: "TextFieldLabel")
-            .foregroundStyle(.muted)
+            .foregroundStyle(.terminalBorder(.accent))
           fieldContent
         }
       )
@@ -296,6 +298,7 @@ extension TextField {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
@@ -304,7 +307,7 @@ extension TextField {
       context.environmentValues.textFieldStyle == .automatic
       ? TextFieldStyle.roundedBorder
       : context.environmentValues.textFieldStyle
-    let chrome = context.environmentValues.terminalAppearance.controlChrome(
+    let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
@@ -322,7 +325,8 @@ extension TextField {
       labelViews: labelViews,
       style: effectiveStyle,
       chrome: chrome,
-      appearance: context.environmentValues.terminalAppearance
+      placeholderStyle: styleEnvironment.theme.placeholder,
+      chromePreset: styleEnvironment.chromePreset
     ).resolve(
       in: context.child(component: "TextFieldBody")
     )
@@ -378,12 +382,13 @@ extension DisclosureGroup {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isPressed = context.environmentValues.parallelPressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let expanded = isExpanded.wrappedValue
-    let chrome = context.environmentValues.terminalAppearance.rowChrome(
+    let chrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
       isPressed: isPressed
@@ -462,7 +467,7 @@ extension DisclosureGroup {
         highlightedLabel
         if isExpanded {
           combinedView(from: contentViews, kindName: "DisclosureContent")
-            .padding(.init(top: 0, leading: 2, bottom: 0, trailing: 0))
+            .padding(.init(top: 0, leading: 1, bottom: 0, trailing: 0))
         }
       }
     )

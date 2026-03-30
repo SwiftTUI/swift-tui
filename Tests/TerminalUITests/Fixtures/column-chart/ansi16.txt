@@ -3,9 +3,9 @@ configuration ansi16
 surface 24x6
 capability glyph=unicode color=ansi16 styles=true
 appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
-01│\u{001B}[90mLoad\u{001B}[0m··············\u{001B}[90mmax·18\u{001B}[0m
+01│\u{001B}[96mLoad\u{001B}[0m··············\u{001B}[90mmax·18\u{001B}[0m
 02│\u{001B}[96m██\u{001B}[0m·\u{001B}[92m··\u{001B}[0m·\u{001B}[93m··\u{001B}[0m
 03│\u{001B}[96m██\u{001B}[0m·\u{001B}[92m██\u{001B}[0m·\u{001B}[93m··\u{001B}[0m
 04│\u{001B}[96m██\u{001B}[0m·\u{001B}[92m██\u{001B}[0m·\u{001B}[93m██\u{001B}[0m
 05│\u{001B}[96m██\u{001B}[0m·\u{001B}[92m██\u{001B}[0m·\u{001B}[93m██\u{001B}[0m
-06│\u{001B}[90msy\u{001B}[0m·\u{001B}[90map\u{001B}[0m·\u{001B}[90mjo\u{001B}[0m
+06│sy·ap·jo

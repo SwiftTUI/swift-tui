@@ -68,7 +68,7 @@ public struct LabeledContent: View, ResolvableView {
     AnyView(
       HStack(alignment: .firstTextBaseline, spacing: 1) {
         combinedView(from: labelViews, kindName: "LabeledContentLabel")
-          .foregroundStyle(.muted)
+          .foregroundStyle(.terminalBorder(.accent))
         Spacer()
         combinedView(from: contentViews, kindName: "LabeledContentValue")
       }
@@ -116,7 +116,7 @@ public struct ControlGroup: View, ResolvableView {
         if !labelViews.isEmpty {
           composedLabel()
         }
-        HStack(spacing: 2) {
+        HStack(spacing: 1) {
           ForEach(contentViews.indices, id: \.self) { index in
             contentViews[index]
           }
@@ -128,7 +128,7 @@ public struct ControlGroup: View, ResolvableView {
   private func composedLabel() -> AnyView {
     AnyView(
       combinedView(from: labelViews, kindName: "ControlGroupLabel")
-        .foregroundStyle(.muted)
+        .foregroundStyle(.terminalBorder(.accent))
     )
   }
 }
@@ -169,11 +169,11 @@ public struct GroupBox: View, ResolvableView {
 
   private func composedView() -> AnyView {
     AnyView(
-      EnvironmentReader(\.terminalAppearance) { appearance in
+      EnvironmentReader(\.parallelStyleEnvironmentSnapshot) { styleEnvironment in
         EnvironmentReader(\.controlProminence) { prominence in
-          let chrome = appearance.groupBoxChrome(prominence: prominence)
+          let chrome = styleEnvironment.groupBoxChrome(prominence: prominence)
           let content = groupBoxContent()
-            .padding(.init(all: 1))
+            .padding(.init(horizontal: 1, vertical: 1))
             .background {
               RoundedRectangle(cornerRadius: 1).parallelInteriorFill(chrome.backgroundStyle)
             }
@@ -218,7 +218,7 @@ public struct GroupBox: View, ResolvableView {
   private func groupBoxLabel() -> AnyView {
     AnyView(
       combinedView(from: labelViews, kindName: "GroupBoxLabel")
-        .foregroundStyle(.muted)
+        .foregroundStyle(.terminalBorder(.accent))
     )
   }
 }

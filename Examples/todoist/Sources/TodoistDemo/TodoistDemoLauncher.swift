@@ -17,7 +17,8 @@ enum TodoistDemoConfiguration {
         create: true
       )
 
-    let directoryURL = appSupport
+    let directoryURL =
+      appSupport
       .appendingPathComponent("swift-terminal-ui")
       .appendingPathComponent("todoist-demo")
 
@@ -116,7 +117,8 @@ final class TodoistDemoLauncher: @unchecked Sendable {
       model = nil
       apiTokenInput = ""
       phase = .setup
-      setupStatusMessage = "Enter your Todoist API token to initialize the database and start syncing."
+      setupStatusMessage =
+        "Enter your Todoist API token to initialize the database and start syncing."
     }
   }
 
@@ -141,7 +143,8 @@ extension TodoistDemoLauncher {
     let trimmedToken = apiTokenInput.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedToken.isEmpty else {
       phase = .setup
-      setupStatusMessage = "A Todoist API token is required before the demo can initialize its database."
+      setupStatusMessage =
+        "A Todoist API token is required before the demo can initialize its database."
       return
     }
 

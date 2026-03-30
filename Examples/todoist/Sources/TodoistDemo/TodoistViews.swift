@@ -5,14 +5,43 @@ struct TodoistDemoSceneView: View {
   @Bindable var launcher: TodoistDemoLauncher
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      if let model = launcher.model {
-        TodoistDemoRootView(model: model)
-      } else {
-        TodoistSetupView(launcher: launcher)
+    ScrollView {
+      VStack(alignment: .leading, spacing: 1) {
+        header
+
+        if let model = launcher.model {
+          TodoistDemoRootView(model: model)
+        } else {
+          TodoistSetupView(launcher: launcher)
+        }
       }
+      .padding(1)
     }
     .tint(Color.red)
+    .chromePreset(.standard)
+  }
+
+  private var header: some View {
+    GroupBox("Todoist Terminal Demo") {
+      VStack(alignment: .leading, spacing: 1) {
+        HStack(alignment: .firstTextBaseline, spacing: 1) {
+          Text(launcher.model == nil ? "Setup" : "Live")
+            .foregroundStyle(launcher.model == nil ? .separator : .info)
+          Text(
+            launcher.model == nil
+              ? "Initialize the local cache, then sync tasks."
+              : "Dense, scroll-safe Todoist surface with live data."
+          )
+          .lineLimit(1)
+          .truncationMode(.tail)
+        }
+
+        ScrollView(.horizontal) {
+          Text(launcher.databasePath)
+            .fixedSize(horizontal: true, vertical: false)
+        }
+      }
+    }
   }
 }
 
@@ -21,43 +50,46 @@ struct TodoistSetupView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      Text("Todoist Terminal Demo")
-        .bold()
-        .foregroundStyle(Color.red)
-
-      Text("A Todoist API token is required before the demo can sync and initialize its local SQLite cache.")
-        .foregroundStyle(.muted)
-
-      GroupBox("Setup") {
+      GroupBox("Access") {
         VStack(alignment: .leading, spacing: 1) {
-          SecureField("Todoist API token", text: $launcher.apiTokenInput)
-            .frame(width: 44, alignment: .leading)
+          Text(
+            "A Todoist API token is required before the demo can initialize its local cache."
+          )
+          .lineLimit(2)
+          .truncationMode(.tail)
 
-          Text("The demo stores the token locally unless TODOIST_API_TOKEN is already set in the environment.")
-            .foregroundStyle(.muted)
+          HStack(alignment: .center, spacing: 1) {
+            SecureField("Todoist API token", text: $launcher.apiTokenInput)
+              .frame(width: 42, alignment: .leading)
 
-          Button("Initialize Database", action: launcher.requestInitialize)
-            .buttonStyle(.borderedProminent)
-            .disabled(!launcher.canInitialize)
+            Button("Initialize Database", action: launcher.requestInitialize)
+              .controlProminence(.increased)
+              .disabled(!launcher.canInitialize)
+          }
         }
       }
 
       GroupBox("Local Cache") {
         VStack(alignment: .leading, spacing: 1) {
           Text("Database")
-            .bold()
-          Text(launcher.databasePath)
-            .foregroundStyle(.muted)
+          ScrollView(.horizontal) {
+            Text(launcher.databasePath)
+              .fixedSize(horizontal: true, vertical: false)
+          }
         }
       }
 
-      Text(launcher.setupStatusMessage)
-        .foregroundStyle(launcher.isInitializing ? .foreground : .muted)
-
-      Text("Tab moves focus, enter activates controls, and q exits.")
-        .foregroundStyle(.muted)
+      GroupBox("Status") {
+        VStack(alignment: .leading, spacing: 1) {
+          Text(launcher.setupStatusMessage)
+            .lineLimit(2)
+            .truncationMode(.tail)
+          Text("Tab moves focus, enter activates controls, and q exits.")
+            .lineLimit(2)
+            .truncationMode(.tail)
+        }
+      }
     }
-    .padding(1)
   }
 }
 
@@ -66,45 +98,64 @@ struct TodoistDemoRootView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      header
+      GroupBox("Overview") {
+        VStack(alignment: .leading, spacing: 1) {
+          HStack(alignment: .firstTextBaseline, spacing: 1) {
+            Text("Todoist Terminal Demo")
+              .bold()
+            Text(model.subtitleText)
+              .lineLimit(1)
+              .truncationMode(.tail)
+          }
+
+          ScrollView(.horizontal) {
+            HStack(alignment: .center, spacing: 1) {
+              Text(model.isAuthenticated ? "Live" : "Offline")
+                .foregroundStyle(model.isAuthenticated ? .info : .separator)
+              Text(model.isBusy ? "Syncing" : "Idle")
+              Text(model.selectedTask?.titleText ?? "No task selected")
+                .lineLimit(1)
+                .truncationMode(.tail)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+          }
+        }
+      }
+
       content
       actions
-      Text(model.statusMessage)
-        .foregroundStyle(.muted)
+
+      GroupBox("Status") {
+        VStack(alignment: .leading, spacing: 1) {
+          Text(model.statusMessage)
+            .lineLimit(2)
+            .truncationMode(.tail)
+
+          ScrollView(.horizontal) {
+            Text(model.databasePath)
+              .fixedSize(horizontal: true, vertical: false)
+          }
+        }
+      }
     }
-    .padding(1)
     .task { [model] in
       await model.start()
     }
   }
 
-  private var header: some View {
-    HStack(alignment: .top, spacing: 1) {
-      VStack(alignment: .leading, spacing: 0) {
-        Text("Todoist Terminal Demo")
-          .bold()
-          .foregroundStyle(Color.red)
-        Text(model.subtitleText)
-          .foregroundStyle(.muted)
-      }
-      Spacer()
-      Text(model.isAuthenticated ? "Online" : "Offline")
-        .foregroundStyle(model.isAuthenticated ? .foreground : .muted)
-    }
-  }
-
   private var content: some View {
-    HStack(alignment: .top, spacing: 1) {
-      projectsPane
-        .frame(width: 30, height: 20, alignment: .topLeading)
-      tasksPane
-        .frame(
-          minWidth: .finite(36),
-          maxWidth: .infinity,
-          minHeight: .finite(20),
-          maxHeight: .finite(20),
-          alignment: .topLeading
-        )
+    ViewThatFits {
+      HStack(alignment: .top, spacing: 1) {
+        projectsPane
+          .frame(width: 30, alignment: .topLeading)
+        tasksPane
+          .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+
+      VStack(alignment: .leading, spacing: 1) {
+        projectsPane
+        tasksPane
+      }
     }
   }
 
@@ -125,8 +176,7 @@ struct TodoistDemoRootView: View {
           )
         }
       }
-      .listStyle(.plain)
-      .frame(width: 28, height: 18, alignment: .topLeading)
+      .frame(height: 14, alignment: .topLeading)
     }
   }
 
@@ -137,8 +187,11 @@ struct TodoistDemoRootView: View {
   ) -> some View {
     VStack(alignment: .leading, spacing: 0) {
       Text(title)
+        .bold()
       Text(detail)
-        .foregroundStyle(.muted)
+        .lineLimit(1)
+        .truncationMode(.tail)
+        .foregroundStyle(.separator)
     }
     .tag(tag)
   }
@@ -147,28 +200,31 @@ struct TodoistDemoRootView: View {
     GroupBox(model.title(for: model.selectedProject)) {
       VStack(alignment: .leading, spacing: 1) {
         TextField("Filter visible tasks", text: $model.searchText)
-          .frame(width: 40, alignment: .leading)
+          .frame(width: 36, alignment: .leading)
 
         if model.visibleTasks.isEmpty {
           Text("No tasks match the current filter.")
-            .foregroundStyle(.muted)
+            .lineLimit(2)
+            .truncationMode(.tail)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
           List(selection: $model.selectedTaskID) {
             ForEach(model.visibleTasks) { task in
               VStack(alignment: .leading, spacing: 0) {
                 Text(task.titleText)
+                  .bold()
                 Text(task.detailText)
-                  .foregroundStyle(.muted)
+                  .lineLimit(1)
+                  .truncationMode(.tail)
+                  .foregroundStyle(.separator)
               }
               .tag(task.id)
             }
           }
-          .listStyle(.plain)
           .frame(
             maxWidth: .infinity,
-            minHeight: .finite(16),
-            maxHeight: .finite(16),
+            minHeight: .finite(14),
+            maxHeight: .finite(14),
             alignment: .topLeading
           )
         }
@@ -179,27 +235,32 @@ struct TodoistDemoRootView: View {
   private var actions: some View {
     GroupBox("Actions") {
       VStack(alignment: .leading, spacing: 1) {
-        HStack(spacing: 1) {
+        HStack(alignment: .center, spacing: 1) {
           Button("Refresh", action: model.requestRefresh)
-            .buttonStyle(.borderedProminent)
+            .controlProminence(.increased)
             .disabled(!model.isAuthenticated || model.isBusy)
 
           Button("Close Selected", action: model.requestCloseSelectedTask)
             .disabled(!model.canCloseTask)
 
-          Text(model.selectedTask?.titleText ?? "No task selected")
-            .foregroundStyle(.muted)
+          ScrollView(.horizontal) {
+            Text(model.selectedTask?.titleText ?? "No task selected")
+              .fixedSize(horizontal: true, vertical: false)
+          }
         }
 
-        HStack(spacing: 1) {
+        HStack(alignment: .center, spacing: 1) {
           TextField("Add a task to the selected project or inbox", text: $model.newTaskText)
-            .frame(width: 40, alignment: .leading)
+            .frame(width: 38, alignment: .leading)
+
           Button("Add Task", action: model.requestAddTask)
+            .controlProminence(.increased)
             .disabled(!model.canAddTask)
         }
 
         Text("Tab moves focus, arrows move through lists, enter activates controls, and q exits.")
-          .foregroundStyle(.muted)
+          .lineLimit(2)
+          .truncationMode(.tail)
       }
     }
   }
@@ -209,14 +270,15 @@ struct TodoistLaunchErrorView: View {
   let message: String
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
-      Text("Todoist demo failed to launch")
-        .bold()
-        .foregroundStyle(Color.red)
-      Text(message)
-      Text("Check the example package dependencies and local database path, then try again.")
-        .foregroundStyle(.muted)
+    GroupBox("Launch Error") {
+      VStack(alignment: .leading, spacing: 1) {
+        Text(message)
+          .lineLimit(3)
+          .truncationMode(.tail)
+        Text("Check the example package dependencies and local database path, then try again.")
+          .lineLimit(2)
+          .truncationMode(.tail)
+      }
     }
-    .padding(1)
   }
 }

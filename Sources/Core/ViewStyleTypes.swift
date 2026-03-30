@@ -1,3 +1,9 @@
+/// Shared chrome family used by automatic component styling.
+public enum ChromePreset: Hashable, Sendable {
+  case standard
+  case legacy
+}
+
 /// A style that controls how text fields are rendered.
 public enum TextFieldStyle: Hashable, Sendable {
   case automatic

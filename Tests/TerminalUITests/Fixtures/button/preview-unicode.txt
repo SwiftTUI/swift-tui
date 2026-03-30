@@ -3,6 +3,6 @@ configuration preview-unicode
 surface 18x3
 capability glyph=unicode color=none styles=false
 appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
-01│╭──────╮
-02││Deploy│
-03│╰──────╯
+01│·Deploy·
+02│
+03│

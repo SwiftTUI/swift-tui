@@ -36,6 +36,7 @@ extension SecureField {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
     let isFocused = context.environmentValues.parallelFocusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
@@ -44,7 +45,7 @@ extension SecureField {
       context.environmentValues.textFieldStyle == .automatic
       ? TextFieldStyle.roundedBorder
       : context.environmentValues.textFieldStyle
-    let chrome = context.environmentValues.terminalAppearance.controlChrome(
+    let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
@@ -62,7 +63,8 @@ extension SecureField {
       labelViews: labelViews,
       style: effectiveStyle,
       chrome: chrome,
-      appearance: context.environmentValues.terminalAppearance
+      placeholderStyle: styleEnvironment.theme.placeholder,
+      chromePreset: styleEnvironment.chromePreset
     ).resolve(
       in: context.child(component: "SecureFieldBody")
     )

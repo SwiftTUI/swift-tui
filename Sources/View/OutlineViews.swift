@@ -323,11 +323,11 @@ private struct OutlineRow: View {
       AnyView(content)
     } else {
       AnyView(
-        HStack(alignment: .firstTextBaseline, spacing: 1) {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
           Text(prefix)
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
-            .foregroundStyle(.muted)
+            .foregroundStyle(.terminalBorder(.neutral))
           content
         }
       )
@@ -367,11 +367,11 @@ private func outlineConnector(
 ) -> String {
   switch style {
   case .plain:
-    return isLast ? "└──" : "├──"
+    return isLast ? "└─ " : "├─ "
   case .ascii:
-    return "|--"
+    return isLast ? "`- " : "|- "
   default:
-    return isLast ? "╰──" : "├──"
+    return isLast ? "╰─ " : "├─ "
   }
 }
 
@@ -381,8 +381,8 @@ private func outlineIndenter(
 ) -> String {
   switch style {
   case .ascii:
-    return showsContinuation ? "|  " : "   "
+    return showsContinuation ? "| " : "  "
   default:
-    return showsContinuation ? "│  " : "   "
+    return showsContinuation ? "│ " : "  "
   }
 }

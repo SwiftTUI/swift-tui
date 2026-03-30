@@ -242,10 +242,11 @@ private func parallelLinkTextStyle(
   for identity: Identity,
   in context: ResolveContext
 ) -> TextStyle {
+  let styleEnvironment = context.environmentValues.parallelStyleEnvironmentSnapshot
   let isFocused = context.environmentValues.parallelFocusedIdentity == identity
   let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
   let isPressed = context.environmentValues.parallelPressedIdentity == identity
-  let chrome = context.environmentValues.terminalAppearance.buttonChrome(
+  let chrome = styleEnvironment.buttonChrome(
     buttonStyle: .link,
     isEnabled: context.environmentValues.isEnabled,
     isFocused: isFocused && showsFocusEffect,
