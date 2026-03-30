@@ -1,63 +1,61 @@
 package import Core
 
-// AnyView policy: retain heterogeneous child storage here for authored labels
-// and current-value content.
 /// A compact progress bar with optional label and current-value content.
-public struct ProgressView: View, ResolvableView {
+public struct ProgressView<Label: View, CurrentValueLabel: View>: View, ResolvableView {
   public var value: Double
   public var total: Double
   public var barWidth: Int
   public private(set) var isIndeterminate: Bool
-  private var labelViews: [AnyView]
-  private var currentValueViews: [AnyView]
+  private var label: Label
+  private var currentValueLabel: CurrentValueLabel
 
   /// Creates an indeterminate progress view with no label.
-  public init(barWidth: Int = 12) {
+  public init(barWidth: Int = 12) where Label == EmptyView, CurrentValueLabel == EmptyView {
     value = 0
     total = 0
     self.barWidth = barWidth
     isIndeterminate = true
-    labelViews = []
-    currentValueViews = []
+    label = EmptyView()
+    currentValueLabel = EmptyView()
   }
 
   /// Creates an indeterminate progress view with a label.
   public init<S: StringProtocol>(
     _ title: S,
     barWidth: Int = 12
-  ) {
+  ) where Label == Text, CurrentValueLabel == EmptyView {
     value = 0
     total = 0
     self.barWidth = barWidth
     isIndeterminate = true
-    labelViews = [AnyView(Text(String(title)))]
-    currentValueViews = []
+    label = Text(String(title))
+    currentValueLabel = EmptyView()
   }
 
   /// Creates an indeterminate progress view with a custom label.
-  public init<Label: View>(
+  public init(
     barWidth: Int = 12,
     @ViewBuilder label: () -> Label
-  ) {
+  ) where CurrentValueLabel == EmptyView {
     value = 0
     total = 0
     self.barWidth = barWidth
     isIndeterminate = true
-    labelViews = declaredBuilderChildren(from: label())
-    currentValueViews = []
+    self.label = label()
+    currentValueLabel = EmptyView()
   }
 
   public init(
     value: Double,
     total: Double = 1,
     barWidth: Int = 12
-  ) {
+  ) where Label == EmptyView, CurrentValueLabel == Text {
     self.value = value
     self.total = total
     self.barWidth = barWidth
     isIndeterminate = false
-    labelViews = []
-    currentValueViews = [AnyView(Text(progressSummaryText(value: value, total: total)))]
+    label = EmptyView()
+    currentValueLabel = Text(progressSummaryText(value: value, total: total))
   }
 
   public init<S: StringProtocol>(
@@ -65,16 +63,16 @@ public struct ProgressView: View, ResolvableView {
     value: Double,
     total: Double = 1,
     barWidth: Int = 12
-  ) {
+  ) where Label == Text, CurrentValueLabel == Text {
     self.value = value
     self.total = total
     self.barWidth = barWidth
     isIndeterminate = false
-    labelViews = [AnyView(Text(String(title)))]
-    currentValueViews = [AnyView(Text(progressSummaryText(value: value, total: total)))]
+    label = Text(String(title))
+    currentValueLabel = Text(progressSummaryText(value: value, total: total))
   }
 
-  public init<Label: View, CurrentValueLabel: View>(
+  public init(
     value: Double,
     total: Double = 1,
     barWidth: Int = 12,
@@ -85,60 +83,55 @@ public struct ProgressView: View, ResolvableView {
     self.total = total
     self.barWidth = barWidth
     isIndeterminate = false
-    labelViews = declaredBuilderChildren(from: label())
-    currentValueViews = declaredBuilderChildren(from: currentValueLabel())
+    self.label = label()
+    self.currentValueLabel = currentValueLabel()
   }
 
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    AnyView(
-      isIndeterminate
-        ? indeterminateProgressView(
-          labelViews: labelViews,
-          barWidth: barWidth,
-          phaseSeed: context.transaction.debugSignature,
-          accentStyle: AnyShapeStyle(.tint)
-        )
-        : metricTrackView(
-          labelViews: labelViews,
-          trailingViews: currentValueViews,
-          fraction: progressFraction(value: value, total: total),
-          barWidth: barWidth,
-          accentStyle: AnyShapeStyle(.tint)
-        )
+    if isIndeterminate {
+      return indeterminateProgressView(
+        label: label,
+        barWidth: barWidth,
+        phaseSeed: context.transaction.debugSignature,
+        accentStyle: AnyShapeStyle(.tint)
+      ).resolveElements(in: context)
+    }
+
+    return metricTrackView(
+      label: label,
+      trailing: currentValueLabel,
+      fraction: progressFraction(value: value, total: total),
+      barWidth: barWidth,
+      accentStyle: AnyShapeStyle(.tint)
     ).resolveElements(in: context)
   }
 }
 
 @MainActor
-private func indeterminateProgressView(
-  labelViews: [AnyView],
+private func indeterminateProgressView<Label: View>(
+  label: Label,
   barWidth: Int,
   phaseSeed: String,
   accentStyle: AnyShapeStyle
-) -> AnyView {
+) -> some View {
   let track = indeterminateProgressTrack(
     barWidth: barWidth,
     phaseSeed: phaseSeed
   )
 
-  return AnyView(
-    VStack(alignment: .leading, spacing: 0) {
-      if !labelViews.isEmpty {
-        combinedView(from: labelViews, kindName: "ProgressTrackLabel")
-          .foregroundStyle(.terminalBorder(.accent))
-      }
-      HStack(alignment: .center, spacing: 0) {
-        Text(track.leading)
-          .foregroundStyle(.separator)
-        Text(track.band)
-          .foregroundStyle(accentStyle)
-        Text(track.trailing)
-          .foregroundStyle(.separator)
-      }
+  return VStack(alignment: .leading, spacing: 0) {
+    metricChartHeader(label: label, summary: EmptyView())
+    HStack(alignment: .center, spacing: 0) {
+      Text(track.leading)
+        .foregroundStyle(.separator)
+      Text(track.band)
+        .foregroundStyle(accentStyle)
+      Text(track.trailing)
+        .foregroundStyle(.separator)
     }
-  )
+  }
 }
 
 private func indeterminateProgressTrack(

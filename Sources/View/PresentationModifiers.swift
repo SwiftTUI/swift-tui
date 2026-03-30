@@ -136,11 +136,11 @@ extension View {
       title: String(title),
       isPresented: isPresented,
       kind: .alert,
-      actionViews: defaultPresentationActions(
+      actions: defaultPresentationActions(
         kind: .alert,
         isPresented: isPresented
       ),
-      messageViews: []
+      message: EmptyView()
     )
   }
 
@@ -155,8 +155,8 @@ extension View {
       title: String(title),
       isPresented: isPresented,
       kind: .alert,
-      actionViews: declaredBuilderChildren(from: actions()),
-      messageViews: declaredBuilderChildren(from: message())
+      actions: actions(),
+      message: message()
     )
   }
 
@@ -169,11 +169,11 @@ extension View {
       title: String(title),
       isPresented: isPresented,
       kind: .confirmationDialog,
-      actionViews: defaultPresentationActions(
+      actions: defaultPresentationActions(
         kind: .confirmationDialog,
         isPresented: isPresented
       ),
-      messageViews: []
+      message: EmptyView()
     )
   }
 
@@ -188,8 +188,8 @@ extension View {
       title: String(title),
       isPresented: isPresented,
       kind: .confirmationDialog,
-      actionViews: declaredBuilderChildren(from: actions()),
-      messageViews: declaredBuilderChildren(from: message())
+      actions: actions(),
+      message: message()
     )
   }
 }
@@ -198,28 +198,26 @@ extension View {
 private func defaultPresentationActions(
   kind: TerminalPresentationKind,
   isPresented: Binding<Bool>
-) -> [AnyView] {
-  [
-    scopedAnyView {
-      Button(
-        kind.defaultDismissTitle,
-        action: {
-          isPresented.wrappedValue = false
-        }
-      )
+) -> Button<Text> {
+  Button(
+    kind.defaultDismissTitle,
+    action: {
+      isPresented.wrappedValue = false
     }
-  ]
+  )
 }
 
 // AnyView policy: retain heterogeneous child storage here for authored message
 // and action content in hoisted terminal presentations.
-private struct TerminalPresentationModifier<Content: View>: View, ResolvableView {
+private struct TerminalPresentationModifier<Content: View, Actions: View,
+  Message: View>: View, ResolvableView
+{
   var content: Content
   var title: String
   var isPresented: Binding<Bool>
   var kind: TerminalPresentationKind
-  var actionViews: [AnyView]
-  var messageViews: [AnyView]
+  var actions: Actions
+  var message: Message
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var node = content.resolve(in: context)
@@ -235,8 +233,8 @@ private struct TerminalPresentationModifier<Content: View>: View, ResolvableView
             attachmentIdentity: node.identity,
             title: title,
             kind: kind,
-            actionViews: actionViews,
-            messageViews: messageViews,
+            actionViews: declaredBuilderChildren(from: actions),
+            messageViews: declaredBuilderChildren(from: message),
             dismiss: { [isPresented] in
               isPresented.wrappedValue = false
             }
@@ -252,14 +250,11 @@ private struct TerminalPresentationOverlayHost: View {
   var requests: [TerminalPresentationRequest]
 
   var body: some View {
-    ZStack(
-      alignment: .topLeading,
-      children: requests.map { request in
-        AnyView(
-          TerminalHostedPresentation(request: request)
-        )
+    ZStack(alignment: .topLeading) {
+      ForEach(requests.indices, id: \.self) { index in
+        TerminalHostedPresentation(request: requests[index])
       }
-    )
+    }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }

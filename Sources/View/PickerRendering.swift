@@ -1,8 +1,12 @@
 import Core
 
-// AnyView policy: retain local branch unification here while picker rendering
-// composes style-specific bodies and row collections.
 extension Picker {
+  private enum InlinePickerRow {
+    case marker(String?)
+    case option(index: Int, label: String, isSelected: Bool)
+  }
+
+  @ViewBuilder
   func pickerBody(
     controlIdentity: Identity,
     options: [Option],
@@ -15,10 +19,10 @@ extension Picker {
     styleEnvironment: StyleEnvironmentSnapshot,
     viewportLineCount: Int?,
     lineWidth: Int?
-  ) -> AnyView {
+  ) -> some View {
     switch pickerStyle {
     case .segmented:
-      return segmentedPickerBody(
+      segmentedPickerBody(
         controlIdentity: controlIdentity,
         options: options,
         selectedIndex: selectedIndex,
@@ -29,7 +33,7 @@ extension Picker {
         styleEnvironment: styleEnvironment
       )
     case .radioGroup:
-      return radioGroupPickerBody(
+      radioGroupPickerBody(
         controlIdentity: controlIdentity,
         options: options,
         selectedIndex: selectedIndex,
@@ -40,7 +44,7 @@ extension Picker {
         styleEnvironment: styleEnvironment
       )
     case .menu:
-      return menuPickerBody(
+      menuPickerBody(
         controlIdentity: controlIdentity,
         options: options,
         selectedIndex: selectedIndex,
@@ -51,7 +55,7 @@ extension Picker {
         styleEnvironment: styleEnvironment
       )
     case .inline, .automatic:
-      return inlinePickerBody(
+      inlinePickerBody(
         controlIdentity: controlIdentity,
         options: options,
         selectedIndex: selectedIndex,
@@ -66,6 +70,7 @@ extension Picker {
     }
   }
 
+  @ViewBuilder
   private func menuPickerBody(
     controlIdentity: Identity,
     options: [Option],
@@ -75,7 +80,7 @@ extension Picker {
     showsFocusEffect: Bool,
     isEnabled: Bool,
     styleEnvironment: StyleEnvironmentSnapshot
-  ) -> AnyView {
+  ) -> some View {
     let triggerChrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
@@ -87,68 +92,59 @@ extension Picker {
       } else {
         "Select"
       }
+    let triggerRow = HStack(alignment: .center, spacing: 1) {
+      Text(selectedLabel)
+        .lineLimit(1)
+      Spacer()
+      Text(isActiveNavigation ? "▴" : "▾")
+    }
+    .foregroundStyle(triggerChrome.foregroundStyle)
+    .drawMetadata(.init(opacity: triggerChrome.opacity))
+    .id(pickerTriggerIdentity(for: controlIdentity))
+    .semanticMetadata(.init(participatesInPointerHitTesting: true))
 
-    let triggerRow = AnyView(
-      HStack(alignment: .center, spacing: 1) {
-        Text(selectedLabel)
-          .lineLimit(1)
-        Spacer()
-        Text(isActiveNavigation ? "▴" : "▾")
-      }
-      .foregroundStyle(triggerChrome.foregroundStyle)
-      .drawMetadata(.init(opacity: triggerChrome.opacity))
-      .id(pickerTriggerIdentity(for: controlIdentity))
-      .semanticMetadata(.init(participatesInPointerHitTesting: true))
-    )
-
-    let content = AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        if !labelViews.isEmpty {
-          combinedView(from: labelViews, kindName: "PickerLabel")
-            .foregroundStyle(.terminalBorder(.accent))
-        }
-        Group {
-          if isFocused {
-            triggerRow.background {
-              Rectangle().fill(triggerChrome.backgroundStyle)
-            }
-          } else {
-            triggerRow
+    VStack(alignment: .leading, spacing: 0) {
+      label
+        .foregroundStyle(.terminalBorder(.accent))
+      if isFocused {
+        triggerRow
+          .background {
+            Rectangle().fill(triggerChrome.backgroundStyle)
           }
-        }
+      } else {
+        triggerRow
+      }
 
-        if isActiveNavigation {
-          VStack(alignment: .leading, spacing: 0) {
-            ForEach(0..<options.count) { index in
-              pickerRow(
-                label: options[index].label,
-                isSelected: index == selectedIndex,
-                isActiveNavigation: isActiveNavigation && showsFocusEffect,
-                isEnabled: isEnabled,
-                styleEnvironment: styleEnvironment,
-                lineWidth: nil,
-                routeIdentity: pickerOptionIdentity(
-                  for: controlIdentity,
-                  index: index
-                )
+      if isActiveNavigation {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<options.count) { index in
+            pickerRow(
+              label: options[index].label,
+              isSelected: index == selectedIndex,
+              isActiveNavigation: isActiveNavigation && showsFocusEffect,
+              isEnabled: isEnabled,
+              styleEnvironment: styleEnvironment,
+              lineWidth: nil,
+              routeIdentity: pickerOptionIdentity(
+                for: controlIdentity,
+                index: index
               )
-            }
+            )
           }
-          .padding(.init(leading: 1))
         }
+        .padding(.init(leading: 1))
       }
-      .foregroundStyle(triggerChrome.foregroundStyle)
-      .drawMetadata(.init(opacity: triggerChrome.opacity))
-      .layoutMetadata(
-        .init(
-          minimumHeight: (labelViews.isEmpty ? 0 : 1) + 1 + (isActiveNavigation ? options.count : 0)
-        )
+    }
+    .foregroundStyle(triggerChrome.foregroundStyle)
+    .drawMetadata(.init(opacity: triggerChrome.opacity))
+    .layoutMetadata(
+      .init(
+        minimumHeight: 1 + 1 + (isActiveNavigation ? options.count : 0)
       )
     )
-
-    return content
   }
 
+  @ViewBuilder
   private func inlinePickerBody(
     controlIdentity: Identity,
     options: [Option],
@@ -160,12 +156,12 @@ extension Picker {
     styleEnvironment: StyleEnvironmentSnapshot,
     viewportLineCount: Int?,
     lineWidth: Int?
-  ) -> AnyView {
+  ) -> some View {
     let containerChrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
-    let contentRows = inlineRows(
+    let rows = inlineRows(
       controlIdentity: controlIdentity,
       options: options,
       selectedIndex: selectedIndex,
@@ -176,40 +172,39 @@ extension Picker {
       lineWidth: lineWidth
     )
 
-    let content = AnyView(
+    VStack(alignment: .leading, spacing: 0) {
+      label
+        .foregroundStyle(.terminalBorder(.accent))
       VStack(alignment: .leading, spacing: 0) {
-        if !labelViews.isEmpty {
-          combinedView(from: labelViews, kindName: "PickerLabel")
-            .foregroundStyle(.terminalBorder(.accent))
-        }
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(0..<contentRows.count) { index in
-            contentRows[index]
-          }
-        }
-        .padding(
-          .init(horizontal: 1, vertical: 1)
-        )
-        .background {
-          RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
-        }
-        .overlay {
-          RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-            containerChrome.borderStyle,
-            backgroundStyle: containerChrome.borderBackgroundStyle
+        ForEach(0..<rows.count) { index in
+          inlineRowView(
+            rows[index],
+            controlIdentity: controlIdentity,
+            isActiveNavigation: isActiveNavigation && showsFocusEffect,
+            isEnabled: isEnabled,
+            styleEnvironment: styleEnvironment,
+            lineWidth: lineWidth
           )
         }
       }
-      .foregroundStyle(containerChrome.foregroundStyle)
-      .drawMetadata(.init(opacity: containerChrome.opacity))
-      .layoutMetadata(
-        .init(
-          minimumHeight: (labelViews.isEmpty ? 0 : 1) + contentRows.count + 2
+      .padding(.init(horizontal: 1, vertical: 1))
+      .background {
+        RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+          containerChrome.borderStyle,
+          backgroundStyle: containerChrome.borderBackgroundStyle
         )
+      }
+    }
+    .foregroundStyle(containerChrome.foregroundStyle)
+    .drawMetadata(.init(opacity: containerChrome.opacity))
+    .layoutMetadata(
+      .init(
+        minimumHeight: 1 + rows.count + 2
       )
     )
-
-    return content
   }
 
   private func inlineRows(
@@ -221,7 +216,7 @@ extension Picker {
     styleEnvironment: StyleEnvironmentSnapshot,
     viewportLineCount: Int?,
     lineWidth: Int?
-  ) -> [AnyView] {
+  ) -> [InlinePickerRow] {
     let indexedOptions = Array(options.enumerated())
     let rowOptions: ArraySlice<(offset: Int, element: Option)>
     let topMarker: String?
@@ -247,48 +242,68 @@ extension Picker {
       bottomMarker = nil
     }
 
-    var rows: [AnyView] = []
+    var rows: [InlinePickerRow] = []
 
     if viewportLineCount != nil {
-      rows.append(pickerMarkerLine(topMarker, lineWidth: lineWidth))
+      rows.append(.marker(topMarker))
     }
 
     for option in rowOptions {
       rows.append(
-        pickerRow(
+        .option(
+          index: option.offset,
           label: option.element.label,
-          isSelected: option.offset == selectedIndex,
-          isActiveNavigation: isActiveNavigation,
-          isEnabled: isEnabled,
-          styleEnvironment: styleEnvironment,
-          lineWidth: lineWidth,
-          routeIdentity: pickerOptionIdentity(
-            for: controlIdentity,
-            index: option.offset
-          )
+          isSelected: option.offset == selectedIndex
         )
       )
     }
 
     if viewportLineCount != nil {
-      rows.append(pickerMarkerLine(bottomMarker, lineWidth: lineWidth))
+      rows.append(.marker(bottomMarker))
     }
 
     return rows
   }
 
+  @ViewBuilder
+  private func inlineRowView(
+    _ row: InlinePickerRow,
+    controlIdentity: Identity,
+    isActiveNavigation: Bool,
+    isEnabled: Bool,
+    styleEnvironment: StyleEnvironmentSnapshot,
+    lineWidth: Int?
+  ) -> some View {
+    switch row {
+    case .marker(let text):
+      pickerMarkerLine(text, lineWidth: lineWidth)
+    case .option(let index, let label, let isSelected):
+      pickerRow(
+        label: label,
+        isSelected: isSelected,
+        isActiveNavigation: isActiveNavigation,
+        isEnabled: isEnabled,
+        styleEnvironment: styleEnvironment,
+        lineWidth: lineWidth,
+        routeIdentity: pickerOptionIdentity(
+          for: controlIdentity,
+          index: index
+        )
+      )
+    }
+  }
+
   private func pickerMarkerLine(
     _ text: String?,
     lineWidth: Int?
-  ) -> AnyView {
-    AnyView(
-      Text(text ?? "")
-        .lineLimit(1)
-        .foregroundStyle(.separator)
-        .frame(width: lineWidth, alignment: .leading)
-    )
+  ) -> some View {
+    Text(text ?? "")
+      .lineLimit(1)
+      .foregroundStyle(.separator)
+      .frame(width: lineWidth, alignment: .leading)
   }
 
+  @ViewBuilder
   private func pickerRow(
     label: String,
     isSelected: Bool,
@@ -297,7 +312,7 @@ extension Picker {
     styleEnvironment: StyleEnvironmentSnapshot,
     lineWidth: Int?,
     routeIdentity: Identity? = nil
-  ) -> AnyView {
+  ) -> some View {
     let rowChrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isActiveNavigation && isSelected,
@@ -324,31 +339,23 @@ extension Picker {
     }
     .drawMetadata(.init(opacity: rowChrome.opacity))
     .frame(width: lineWidth, alignment: .leading)
-
-    let content = AnyView(
-      Group {
-        if isSelected && isActiveNavigation {
-          row.background {
-            Rectangle().fill(rowChrome.backgroundStyle)
-          }
-        } else {
-          row
-        }
-      }
+    let content = highlightedRow(
+      row,
+      isHighlighted: isSelected && isActiveNavigation,
+      backgroundStyle: rowChrome.backgroundStyle
     )
 
-    guard let routeIdentity else {
-      return content
-    }
-
-    return AnyView(
+    if let routeIdentity {
       PointerRouteView(
         identity: routeIdentity,
         content: content
       )
-    )
+    } else {
+      content
+    }
   }
 
+  @ViewBuilder
   private func segmentedPickerBody(
     controlIdentity: Identity,
     options: [Option],
@@ -358,74 +365,68 @@ extension Picker {
     showsFocusEffect: Bool,
     isEnabled: Bool,
     styleEnvironment: StyleEnvironmentSnapshot
-  ) -> AnyView {
+  ) -> some View {
     let containerChrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
-    let content = AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        if !labelViews.isEmpty {
-          combinedView(from: labelViews, kindName: "PickerLabel")
-            .foregroundStyle(.terminalBorder(.accent))
-        }
-        HStack(alignment: .center, spacing: 1) {
-          ForEach(0..<options.count) { index in
-            let option = options[index]
-            let segmentChrome = styleEnvironment.controlChrome(
-              isEnabled: isEnabled,
-              isFocused: isActiveNavigation && showsFocusEffect && index == selectedIndex,
-              isSelected: index == selectedIndex
-            )
-            let isSelected = index == selectedIndex
-            Text(isSelected ? "[\(option.label)]" : option.label)
-              .lineLimit(1)
-              .padding(
-                .init(
-                  top: 0,
-                  leading: isSelected && isActiveNavigation ? 1 : 0,
-                  bottom: 0,
-                  trailing: isSelected && isActiveNavigation ? 1 : 0
-                )
-              )
-              .background {
-                if isSelected && isActiveNavigation && showsFocusEffect {
-                  RoundedRectangle(cornerRadius: 1).chromeFill(
-                    segmentChrome.backgroundStyle
-                  )
-                }
-              }
-              .foregroundStyle(segmentChrome.foregroundStyle)
-              .drawMetadata(.init(opacity: segmentChrome.opacity))
-              .id(
-                pickerOptionIdentity(
-                  for: controlIdentity,
-                  index: index
-                )
-              )
-              .semanticMetadata(.init(participatesInPointerHitTesting: true))
-          }
-        }
-        .padding(
-          .init(horizontal: 1, vertical: 1)
-        )
-        .background {
-          RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
-        }
-        .overlay {
-          RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-            containerChrome.borderStyle,
-            backgroundStyle: containerChrome.borderBackgroundStyle
+
+    VStack(alignment: .leading, spacing: 0) {
+      label
+        .foregroundStyle(.terminalBorder(.accent))
+      HStack(alignment: .center, spacing: 1) {
+        ForEach(0..<options.count) { index in
+          let option = options[index]
+          let segmentChrome = styleEnvironment.controlChrome(
+            isEnabled: isEnabled,
+            isFocused: isActiveNavigation && showsFocusEffect && index == selectedIndex,
+            isSelected: index == selectedIndex
           )
+          let isSelected = index == selectedIndex
+          Text(isSelected ? "[\(option.label)]" : option.label)
+            .lineLimit(1)
+            .padding(
+              .init(
+                top: 0,
+                leading: isSelected && isActiveNavigation ? 1 : 0,
+                bottom: 0,
+                trailing: isSelected && isActiveNavigation ? 1 : 0
+              )
+            )
+            .background {
+              if isSelected && isActiveNavigation && showsFocusEffect {
+                RoundedRectangle(cornerRadius: 1).chromeFill(
+                  segmentChrome.backgroundStyle
+                )
+              }
+            }
+            .foregroundStyle(segmentChrome.foregroundStyle)
+            .drawMetadata(.init(opacity: segmentChrome.opacity))
+            .id(
+              pickerOptionIdentity(
+                for: controlIdentity,
+                index: index
+              )
+            )
+            .semanticMetadata(.init(participatesInPointerHitTesting: true))
         }
       }
-      .foregroundStyle(containerChrome.foregroundStyle)
-      .drawMetadata(.init(opacity: containerChrome.opacity))
-    )
-
-    return content
+      .padding(.init(horizontal: 1, vertical: 1))
+      .background {
+        RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+          containerChrome.borderStyle,
+          backgroundStyle: containerChrome.borderBackgroundStyle
+        )
+      }
+    }
+    .foregroundStyle(containerChrome.foregroundStyle)
+    .drawMetadata(.init(opacity: containerChrome.opacity))
   }
 
+  @ViewBuilder
   private func radioGroupPickerBody(
     controlIdentity: Identity,
     options: [Option],
@@ -435,59 +436,52 @@ extension Picker {
     showsFocusEffect: Bool,
     isEnabled: Bool,
     styleEnvironment: StyleEnvironmentSnapshot
-  ) -> AnyView {
+  ) -> some View {
     let containerChrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
 
-    let content = AnyView(
+    VStack(alignment: .leading, spacing: 0) {
+      label
+        .foregroundStyle(.terminalBorder(.accent))
       VStack(alignment: .leading, spacing: 0) {
-        if !labelViews.isEmpty {
-          combinedView(from: labelViews, kindName: "PickerLabel")
-            .foregroundStyle(.terminalBorder(.accent))
-        }
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(0..<options.count) { index in
-            radioGroupRow(
-              label: options[index].label,
-              isSelected: index == selectedIndex,
-              isFocused: isActiveNavigation && showsFocusEffect && index == selectedIndex,
-              isEnabled: isEnabled,
-              styleEnvironment: styleEnvironment,
-              routeIdentity: pickerOptionIdentity(
-                for: controlIdentity,
-                index: index
-              )
+        ForEach(0..<options.count) { index in
+          radioGroupRow(
+            label: options[index].label,
+            isSelected: index == selectedIndex,
+            isFocused: isActiveNavigation && showsFocusEffect && index == selectedIndex,
+            isEnabled: isEnabled,
+            styleEnvironment: styleEnvironment,
+            routeIdentity: pickerOptionIdentity(
+              for: controlIdentity,
+              index: index
             )
-          }
-        }
-        .padding(
-          .init(horizontal: 1, vertical: 1)
-        )
-        .background {
-          RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
-        }
-        .overlay {
-          RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-            containerChrome.borderStyle,
-            backgroundStyle: containerChrome.borderBackgroundStyle
           )
         }
       }
-      .foregroundStyle(containerChrome.foregroundStyle)
-      .drawMetadata(.init(opacity: containerChrome.opacity))
-      .fixedSize(horizontal: false, vertical: true)
-      .layoutMetadata(
-        .init(
-          minimumHeight: (labelViews.isEmpty ? 0 : 1) + options.count + 2
+      .padding(.init(horizontal: 1, vertical: 1))
+      .background {
+        RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
+      }
+      .overlay {
+        RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+          containerChrome.borderStyle,
+          backgroundStyle: containerChrome.borderBackgroundStyle
         )
+      }
+    }
+    .foregroundStyle(containerChrome.foregroundStyle)
+    .drawMetadata(.init(opacity: containerChrome.opacity))
+    .fixedSize(horizontal: false, vertical: true)
+    .layoutMetadata(
+      .init(
+        minimumHeight: 1 + options.count + 2
       )
     )
-
-    return content
   }
 
+  @ViewBuilder
   private func radioGroupRow(
     label: String,
     isSelected: Bool,
@@ -495,51 +489,56 @@ extension Picker {
     isEnabled: Bool,
     styleEnvironment: StyleEnvironmentSnapshot,
     routeIdentity: Identity? = nil
-  ) -> AnyView {
+  ) -> some View {
     let rowChrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused,
       isSelected: isFocused
     )
-
-    let content = AnyView(
-      Group {
-        let row = HStack(alignment: .center, spacing: 1) {
-          Text(isSelected ? "(*)" : "( )")
-            .foregroundStyle(
-              isSelected
-                ? (isFocused ? rowChrome.borderStyle : AnyShapeStyle(.separator))
-                : AnyShapeStyle(.separator)
-            )
-          Text(label)
-            .foregroundStyle(
-              isSelected
-                ? (isFocused ? rowChrome.foregroundStyle : AnyShapeStyle(.foreground))
-                : AnyShapeStyle(.foreground)
-            )
-          Spacer(minLength: 0)
-        }
-        .drawMetadata(.init(opacity: rowChrome.opacity))
-
-        if isSelected && isFocused {
-          row.background {
-            Rectangle().fill(rowChrome.backgroundStyle)
-          }
-        } else {
-          row
-        }
-      }
+    let row = HStack(alignment: .center, spacing: 1) {
+      Text(isSelected ? "(*)" : "( )")
+        .foregroundStyle(
+          isSelected
+            ? (isFocused ? rowChrome.borderStyle : AnyShapeStyle(.separator))
+            : AnyShapeStyle(.separator)
+        )
+      Text(label)
+        .foregroundStyle(
+          isSelected
+            ? (isFocused ? rowChrome.foregroundStyle : AnyShapeStyle(.foreground))
+            : AnyShapeStyle(.foreground)
+        )
+      Spacer(minLength: 0)
+    }
+    .drawMetadata(.init(opacity: rowChrome.opacity))
+    let content = highlightedRow(
+      row,
+      isHighlighted: isSelected && isFocused,
+      backgroundStyle: rowChrome.backgroundStyle
     )
 
-    guard let routeIdentity else {
-      return content
-    }
-
-    return AnyView(
+    if let routeIdentity {
       PointerRouteView(
         identity: routeIdentity,
         content: content
       )
-    )
+    } else {
+      content
+    }
+  }
+
+  @ViewBuilder
+  private func highlightedRow<Row: View>(
+    _ row: Row,
+    isHighlighted: Bool,
+    backgroundStyle: AnyShapeStyle
+  ) -> some View {
+    if isHighlighted {
+      row.background {
+        Rectangle().fill(backgroundStyle)
+      }
+    } else {
+      row
+    }
   }
 }

@@ -1,42 +1,15 @@
 import Core
 import View
 
-// AnyView policy: retain heterogeneous child storage here for authored label
-// and summary content.
 /// A chart that shows current values against baselines.
-public struct ComparisonChart: View, ResolvableView {
+public struct ComparisonChart<Label: View, Summary: View>: View, ResolvableView {
   public var entries: [ComparisonEntry]
   public var barWidth: Int
   public var labelWidth: Int
-  private var labelViews: [AnyView]
-  private var summaryViews: [AnyView]
+  private let label: Label
+  private let summary: Summary
 
   public init(
-    entries: [ComparisonEntry],
-    barWidth: Int = 12,
-    labelWidth: Int = 8
-  ) {
-    self.entries = entries
-    self.barWidth = barWidth
-    self.labelWidth = labelWidth
-    labelViews = []
-    summaryViews = [AnyView(Text(comparisonChartSummaryText(entries)))]
-  }
-
-  public init<S: StringProtocol>(
-    _ title: S,
-    entries: [ComparisonEntry],
-    barWidth: Int = 12,
-    labelWidth: Int = 8
-  ) {
-    self.entries = entries
-    self.barWidth = barWidth
-    self.labelWidth = labelWidth
-    labelViews = [AnyView(Text(String(title)))]
-    summaryViews = [AnyView(Text(comparisonChartSummaryText(entries)))]
-  }
-
-  public init<Label: View, Summary: View>(
     entries: [ComparisonEntry],
     barWidth: Int = 12,
     labelWidth: Int = 8,
@@ -46,8 +19,8 @@ public struct ComparisonChart: View, ResolvableView {
     self.entries = entries
     self.barWidth = barWidth
     self.labelWidth = labelWidth
-    labelViews = declaredBuilderChildren(from: label())
-    summaryViews = declaredBuilderChildren(from: summary())
+    self.label = label()
+    self.summary = summary()
   }
 
   package func resolveElements(
@@ -55,30 +28,54 @@ public struct ComparisonChart: View, ResolvableView {
   ) -> [ResolvedNode] {
     let maximumValue = comparisonChartMaximumValue(entries)
 
-    return AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        if !labelViews.isEmpty || !summaryViews.isEmpty {
-          HStack(alignment: .center, spacing: 1) {
-            if !labelViews.isEmpty {
-              combinedView(from: labelViews, kindName: "ComparisonChartLabel")
-                .foregroundStyle(.terminalBorder(.accent))
-            }
-            if !summaryViews.isEmpty {
-              Spacer()
-              combinedView(from: summaryViews, kindName: "ComparisonChartSummary")
-                .foregroundStyle(.separator)
-            }
+    return [
+      resolveView(
+        VStack(alignment: .leading, spacing: 0) {
+          chartHeader(label: label, summary: summary)
+          ForEach(entries.indices, id: \.self) { index in
+            comparisonChartRow(
+              entries[index],
+              maximumValue: maximumValue,
+              barWidth: barWidth,
+              labelWidth: labelWidth
+            )
           }
-        }
-        ForEach(entries.indices, id: \.self) { index in
-          comparisonChartRow(
-            entries[index],
-            maximumValue: maximumValue,
-            barWidth: barWidth,
-            labelWidth: labelWidth
-          )
-        }
-      }
-    ).resolveElements(in: context)
+        },
+        in: context
+      )
+    ]
+  }
+}
+
+extension ComparisonChart where Label == EmptyView, Summary == Text {
+  public init(
+    entries: [ComparisonEntry],
+    barWidth: Int = 12,
+    labelWidth: Int = 8
+  ) {
+    self.init(
+      entries: entries,
+      barWidth: barWidth,
+      labelWidth: labelWidth,
+      label: { EmptyView() },
+      summary: { Text(comparisonChartSummaryText(entries)) }
+    )
+  }
+}
+
+extension ComparisonChart where Label == Text, Summary == Text {
+  public init<S: StringProtocol>(
+    _ title: S,
+    entries: [ComparisonEntry],
+    barWidth: Int = 12,
+    labelWidth: Int = 8
+  ) {
+    self.init(
+      entries: entries,
+      barWidth: barWidth,
+      labelWidth: labelWidth,
+      label: { Text(String(title)) },
+      summary: { Text(comparisonChartSummaryText(entries)) }
+    )
   }
 }

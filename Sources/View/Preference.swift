@@ -40,7 +40,7 @@ extension View {
     alignment: Alignment = .center,
     @ViewBuilder _ transform: @escaping (Key.Value) -> Content
   ) -> some View {
-    PreferenceBackgroundValueModifier<Self, Key>(
+    PreferenceBackgroundValueModifier<Self, Key, Content>(
       base: self,
       alignment: alignment,
       transform: transform
@@ -53,7 +53,7 @@ extension View {
     alignment: Alignment = .center,
     @ViewBuilder _ transform: @escaping (Key.Value) -> Content
   ) -> some View {
-    PreferenceOverlayValueModifier<Self, Key>(
+    PreferenceOverlayValueModifier<Self, Key, Content>(
       base: self,
       alignment: alignment,
       transform: transform
@@ -108,34 +108,31 @@ where Key.Value: Equatable {
   }
 }
 
-// AnyView policy: preference reader modifiers store transformed authored content
-// as scoped type erasure so later resolve passes keep the original property scope.
-private struct PreferenceOverlayValueModifier<Base: View, Key: PreferenceKey>: View,
+private struct PreferenceOverlayValueModifier<Base: View, Key: PreferenceKey, Overlay: View>: View,
   ResolvableView
 {
   var base: Base
   var alignment: Alignment
-  private let transform: (Key.Value) -> AnyView
+  private let transform: (Key.Value) -> Overlay
+  private let authoringScope: DynamicPropertyScope?
 
-  init<Overlay: View>(
+  init(
     base: Base,
     alignment: Alignment,
     @ViewBuilder transform: @escaping (Key.Value) -> Overlay
   ) {
     self.base = base
     self.alignment = alignment
-    let authoringScope = currentDynamicPropertyScope()
-    self.transform = { value in
-      scopedAnyView(authoringScope: authoringScope) {
-        transform(value)
-      }
-    }
+    self.transform = transform
+    authoringScope = currentDynamicPropertyScope()
   }
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let baseNode = base.resolve(in: context.child(component: .named("base")))
-    let overlayView = context.trackingObservableAccess {
-      transform(baseNode.preferenceValues[Key.self])
+    let overlayView = withDynamicPropertyScope(authoringScope) {
+      context.trackingObservableAccess {
+        transform(baseNode.preferenceValues[Key.self])
+      }
     }
     let overlayNode = overlayView.resolve(in: context.child(component: .named("overlay")))
     return [
@@ -151,34 +148,32 @@ private struct PreferenceOverlayValueModifier<Base: View, Key: PreferenceKey>: V
   }
 }
 
-// AnyView policy: preference reader modifiers store transformed authored content
-// as scoped type erasure so later resolve passes keep the original property scope.
-private struct PreferenceBackgroundValueModifier<Base: View, Key: PreferenceKey>: View,
-  ResolvableView
-{
+private struct PreferenceBackgroundValueModifier<
+  Base: View, Key: PreferenceKey,
+  Background: View
+>: View, ResolvableView {
   var base: Base
   var alignment: Alignment
-  private let transform: (Key.Value) -> AnyView
+  private let transform: (Key.Value) -> Background
+  private let authoringScope: DynamicPropertyScope?
 
-  init<Background: View>(
+  init(
     base: Base,
     alignment: Alignment,
     @ViewBuilder transform: @escaping (Key.Value) -> Background
   ) {
     self.base = base
     self.alignment = alignment
-    let authoringScope = currentDynamicPropertyScope()
-    self.transform = { value in
-      scopedAnyView(authoringScope: authoringScope) {
-        transform(value)
-      }
-    }
+    self.transform = transform
+    authoringScope = currentDynamicPropertyScope()
   }
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let baseNode = base.resolve(in: context.child(component: .named("base")))
-    let backgroundView = context.trackingObservableAccess {
-      transform(baseNode.preferenceValues[Key.self])
+    let backgroundView = withDynamicPropertyScope(authoringScope) {
+      context.trackingObservableAccess {
+        transform(baseNode.preferenceValues[Key.self])
+      }
     }
     let backgroundNode = backgroundView.resolve(
       in: context.child(component: .named("background"))

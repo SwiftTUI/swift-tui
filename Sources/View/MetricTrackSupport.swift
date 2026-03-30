@@ -63,36 +63,52 @@ package func metricTrackString(
 }
 
 @MainActor
-package func metricTrackView(
-  labelViews: [AnyView],
-  trailingViews: [AnyView],
-  fraction: Double,
-  barWidth: Int,
-  accentStyle: AnyShapeStyle
-) -> AnyView {
-  let track = metricTrackString(fraction: fraction, barWidth: barWidth)
+package func isEmptyView<V: View>(
+  _ view: V
+) -> Bool {
+  let erased: Any = view
+  return erased is EmptyView
+}
 
-  return AnyView(
-    VStack(alignment: .leading, spacing: 0) {
-      if !labelViews.isEmpty || !trailingViews.isEmpty {
-        HStack(alignment: .center, spacing: 1) {
-          if !labelViews.isEmpty {
-            combinedView(from: labelViews, kindName: "MetricTrackLabel")
-              .foregroundStyle(.terminalBorder(.accent))
-          }
-          if !trailingViews.isEmpty {
-            Spacer()
-            combinedView(from: trailingViews, kindName: "MetricTrackSummary")
-              .foregroundStyle(.separator)
-          }
-        }
+@MainActor
+@ViewBuilder
+package func metricChartHeader<Label: View, Summary: View>(
+  label: Label,
+  summary: Summary
+) -> some View {
+  if !isEmptyView(label) || !isEmptyView(summary) {
+    HStack(alignment: .center, spacing: 1) {
+      if !isEmptyView(label) {
+        label
+          .foregroundStyle(.terminalBorder(.accent))
       }
-      HStack(alignment: .center, spacing: 0) {
-        Text(track.filled)
-          .foregroundStyle(accentStyle)
-        Text(track.empty)
+      if !isEmptyView(summary) {
+        Spacer()
+        summary
           .foregroundStyle(.separator)
       }
     }
-  )
+  }
+}
+
+@MainActor
+@ViewBuilder
+package func metricTrackView<Label: View, Trailing: View>(
+  label: Label,
+  trailing: Trailing,
+  fraction: Double,
+  barWidth: Int,
+  accentStyle: AnyShapeStyle
+) -> some View {
+  let track = metricTrackString(fraction: fraction, barWidth: barWidth)
+
+  VStack(alignment: .leading, spacing: 0) {
+    metricChartHeader(label: label, summary: trailing)
+    HStack(alignment: .center, spacing: 0) {
+      Text(track.filled)
+        .foregroundStyle(accentStyle)
+      Text(track.empty)
+        .foregroundStyle(.separator)
+    }
+  }
 }

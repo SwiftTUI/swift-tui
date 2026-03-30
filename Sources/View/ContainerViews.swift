@@ -1,21 +1,22 @@
 public import Core
 
-// AnyView policy: retain typed builder plumbing and deferred authored-content
-// capture here for structural container views.
 /// A transparent structural container that groups child views.
-public struct Group: View, ResolvableView {
-  package var children: [AnyView]
-  public init<Content: View>(
+public struct Group<Content: View>: View, ResolvableView {
+  package var content: Content
+
+  public init(
     @ViewBuilder content: () -> Content
   ) {
-    children = declaredBuilderChildren(from: content())
+    self.content = content()
   }
-  package init(children: [AnyView]) {
-    self.children = children
+
+  package init(children: [AnyView]) where Content == VariadicView<AnyView> {
+    content = VariadicView(children)
   }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     resolveDeclaredChildren(
-      children,
+      content,
       in: context,
       kindName: "Group"
     )
@@ -23,25 +24,22 @@ public struct Group: View, ResolvableView {
 }
 
 /// Generates repeated content from a random-access collection.
-public struct ForEach<Data, ID>: View, ResolvableView
-where Data: RandomAccessCollection, ID: Hashable {
+public struct ForEach<Data, ID, Content>: View, ResolvableView
+where Data: RandomAccessCollection, ID: Hashable, Content: View {
   public var data: Data
   public var id: KeyPath<Data.Element, ID>
-  private let content: (Data.Element) -> AnyView
-  public init<Content: View>(
+  private let content: (Data.Element) -> Content
+
+  public init(
     _ data: Data,
     id: KeyPath<Data.Element, ID>,
     @ViewBuilder content: @escaping (Data.Element) -> Content
   ) {
     self.data = data
     self.id = id
-    let authoringScope = currentDynamicPropertyScope()
-    self.content = { element in
-      scopedAnyView(authoringScope: authoringScope) {
-        content(element)
-      }
-    }
+    self.content = content
   }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var resolved: [ResolvedNode] = []
     for element in data {
@@ -58,7 +56,7 @@ where Data: RandomAccessCollection, ID: Hashable {
 }
 
 extension ForEach where Data.Element: Identifiable, ID == Data.Element.ID {
-  public init<Content: View>(
+  public init(
     _ data: Data,
     @ViewBuilder content: @escaping (Data.Element) -> Content
   ) {
@@ -67,7 +65,7 @@ extension ForEach where Data.Element: Identifiable, ID == Data.Element.ID {
 }
 
 extension ForEach where Data == Range<Int>, ID == Int {
-  public init<Content: View>(
+  public init(
     _ data: Range<Int>,
     @ViewBuilder content: @escaping (Int) -> Content
   ) {
@@ -76,18 +74,32 @@ extension ForEach where Data == Range<Int>, ID == Int {
 }
 
 /// Chooses the first child whose layout fits the proposed space.
-public struct ViewThatFits: View, ResolvableView {
+public struct ViewThatFits<Content: View>: View, ResolvableView {
   public var axes: Axis.Set
-  package var children: [AnyView]
-  public init<Content: View>(
+  package var content: Content
+
+  public init(
     in axes: Axis.Set = [.horizontal, .vertical],
     @ViewBuilder content: () -> Content
   ) {
     self.axes = axes
-    children = declaredBuilderChildren(from: content())
+    self.content = content()
   }
+
+  package init(
+    in axes: Axis.Set = [.horizontal, .vertical],
+    children: [AnyView]
+  ) where Content == VariadicView<AnyView> {
+    self.axes = axes
+    content = VariadicView(children)
+  }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let resolvedChildren = resolveDeclaredChildren(children, in: context, kindName: "ViewThatFits")
+    let resolvedChildren = resolveDeclaredChildren(
+      content,
+      in: context,
+      kindName: "ViewThatFits"
+    )
     return [
       ResolvedNode(
         identity: context.identity,
@@ -531,30 +543,37 @@ public struct ScrollView<Content: View>: View, ResolvableView {
 }
 
 /// Arranges children vertically using stack layout rules.
-public struct VStack: View, ResolvableView {
+public struct VStack<Content: View>: View, ResolvableView {
   public var alignment: HorizontalAlignment
   public var spacing: Int?
-  package var children: [AnyView]
-  public init<Content: View>(
+  package var content: Content
+
+  public init(
     alignment: HorizontalAlignment = .center,
     spacing: Int? = nil,
     @ViewBuilder content: () -> Content
   ) {
     self.alignment = alignment
     self.spacing = spacing
-    children = declaredBuilderChildren(from: content())
+    self.content = content()
   }
+
   package init(
     alignment: HorizontalAlignment = .center,
     spacing: Int? = nil,
     children: [AnyView]
-  ) {
+  ) where Content == VariadicView<AnyView> {
     self.alignment = alignment
     self.spacing = spacing
-    self.children = children
+    content = VariadicView(children)
   }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let resolvedChildren = resolveDeclaredChildren(children, in: context, kindName: "VStack")
+    let resolvedChildren = resolveDeclaredChildren(
+      content,
+      in: context,
+      kindName: "VStack"
+    )
     return [
       ResolvedNode(
         identity: context.identity,
@@ -574,30 +593,37 @@ public struct VStack: View, ResolvableView {
 }
 
 /// Arranges children horizontally using stack layout rules.
-public struct HStack: View, ResolvableView {
+public struct HStack<Content: View>: View, ResolvableView {
   public var alignment: VerticalAlignment
   public var spacing: Int?
-  package var children: [AnyView]
-  public init<Content: View>(
+  package var content: Content
+
+  public init(
     alignment: VerticalAlignment = .center,
     spacing: Int? = nil,
     @ViewBuilder content: () -> Content
   ) {
     self.alignment = alignment
     self.spacing = spacing
-    children = declaredBuilderChildren(from: content())
+    self.content = content()
   }
+
   package init(
     alignment: VerticalAlignment = .center,
     spacing: Int? = nil,
     children: [AnyView]
-  ) {
+  ) where Content == VariadicView<AnyView> {
     self.alignment = alignment
     self.spacing = spacing
-    self.children = children
+    content = VariadicView(children)
   }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let resolvedChildren = resolveDeclaredChildren(children, in: context, kindName: "HStack")
+    let resolvedChildren = resolveDeclaredChildren(
+      content,
+      in: context,
+      kindName: "HStack"
+    )
     return [
       ResolvedNode(
         identity: context.identity,
@@ -617,25 +643,32 @@ public struct HStack: View, ResolvableView {
 }
 
 /// Overlays children along the z axis using alignment rules.
-public struct ZStack: View, ResolvableView {
+public struct ZStack<Content: View>: View, ResolvableView {
   public var alignment: Alignment
-  package var children: [AnyView]
-  public init<Content: View>(
+  package var content: Content
+
+  public init(
     alignment: Alignment = .center,
     @ViewBuilder content: () -> Content
   ) {
     self.alignment = alignment
-    children = declaredBuilderChildren(from: content())
+    self.content = content()
   }
+
   package init(
     alignment: Alignment = .center,
     children: [AnyView]
-  ) {
+  ) where Content == VariadicView<AnyView> {
     self.alignment = alignment
-    self.children = children
+    content = VariadicView(children)
   }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let resolvedChildren = resolveDeclaredChildren(children, in: context, kindName: "ZStack")
+    let resolvedChildren = resolveDeclaredChildren(
+      content,
+      in: context,
+      kindName: "ZStack"
+    )
     return [
       ResolvedNode(
         identity: context.identity,
@@ -647,27 +680,6 @@ public struct ZStack: View, ResolvableView {
       )
     ]
   }
-}
-@MainActor
-func resolveDeclaredChildren(
-  _ children: [AnyView],
-  in context: ResolveContext,
-  kindName: String
-) -> [ResolvedNode] {
-  var resolved: [ResolvedNode] = []
-  resolved.reserveCapacity(children.count)
-  for (index, child) in children.enumerated() {
-    let childContext = context.indexedChild(kind: .init(rawValue: kindName), index: index)
-    if let reused = childContext.reusedResolvedSubtreeIfAvailable() {
-      resolved.append(reused)
-      continue
-    }
-
-    let elements = child.resolveElements(in: childContext)
-    childContext.recordResolvedComputation(count: elements.count)
-    resolved.append(contentsOf: elements)
-  }
-  return resolved
 }
 
 @MainActor

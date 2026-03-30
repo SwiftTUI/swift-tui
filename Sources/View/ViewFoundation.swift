@@ -33,41 +33,78 @@ package protocol ResolvableView {
 }
 
 @MainActor
+package protocol DeclaredChildrenView {
+  func appendDeclaredChildren(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    into resolved: inout [ResolvedNode]
+  )
+}
+
+@MainActor
 package protocol BuilderCompositeView {
   var builderChildren: [AnyView] { get }
 }
 
 /// The builder artifact produced when a ``ViewBuilder`` contains multiple child
 /// expressions in sequence.
-public struct TupleView<Content>: View, ResolvableView, BuilderCompositeView {
-  package let value: Content
-  package let builderChildren: [AnyView]
+public struct TupleView<each Content: View>: View, ResolvableView, BuilderCompositeView,
+  DeclaredChildrenView
+{
+  package let value: (repeat each Content)
 
   package init(
-    _ value: Content,
-    children: [AnyView]
+    _ value: (repeat each Content)
   ) {
     self.value = value
-    self.builderChildren = children
   }
 
   public var body: Never {
     fatalError("TupleView is a builder composition artifact.")
   }
 
+  package var builderChildren: [AnyView] {
+    var children: [AnyView] = []
+    for child in repeat each value {
+      appendDeclaredBuilderChildren(
+        from: child,
+        into: &children
+      )
+    }
+    return children
+  }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     resolveDeclaredChildren(
-      builderChildren,
+      self,
       in: context,
       kindName: "Group"
     )
+  }
+
+  package func appendDeclaredChildren(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    into resolved: inout [ResolvedNode]
+  ) {
+    for child in repeat each value {
+      appendDeclaredChildNodes(
+        child,
+        in: context,
+        kindName: kindName,
+        nextIndex: &nextIndex,
+        into: &resolved
+      )
+    }
   }
 }
 
 /// The builder artifact produced by conditional branches inside a
 /// ``ViewBuilder``.
 public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
-  ResolvableView, BuilderCompositeView
+  ResolvableView, BuilderCompositeView, DeclaredChildrenView
 {
   /// The currently active conditional branch.
   public enum Storage {
@@ -102,6 +139,35 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
     }
   }
 
+  package func appendDeclaredChildren(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    into resolved: inout [ResolvedNode]
+  ) {
+    switch storage {
+    case .trueContent(let content):
+      appendDeclaredChildNodes(
+        content,
+        in: context,
+        kindName: kindName,
+        nextIndex: &nextIndex,
+        into: &resolved
+      )
+    case .falseContent(let content):
+      if collapsesImplicitEmptyFalseBranch, content is EmptyView {
+        return
+      }
+      appendDeclaredChildNodes(
+        content,
+        in: context,
+        kindName: kindName,
+        nextIndex: &nextIndex,
+        into: &resolved
+      )
+    }
+  }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     switch storage {
     case .trueContent(let content):
@@ -114,28 +180,48 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
 
 /// The builder artifact produced by array-like view composition such as
 /// `ForEach` expansion or `buildArray` support.
-public struct VariadicView<Content: View>: View, ResolvableView, BuilderCompositeView {
+public struct VariadicView<Content: View>: View, ResolvableView, BuilderCompositeView,
+  DeclaredChildrenView
+{
   package let content: [Content]
-  package let builderChildren: [AnyView]
 
   package init(
-    _ content: [Content],
-    children: [AnyView]
+    _ content: [Content]
   ) {
     self.content = content
-    self.builderChildren = children
   }
 
   public var body: Never {
     fatalError("VariadicView is a builder composition artifact.")
   }
 
+  package var builderChildren: [AnyView] {
+    content.flatMap { declaredBuilderChildren(from: $0) }
+  }
+
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     resolveDeclaredChildren(
-      builderChildren,
+      self,
       in: context,
       kindName: "Group"
     )
+  }
+
+  package func appendDeclaredChildren(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    into resolved: inout [ResolvedNode]
+  ) {
+    for element in content {
+      appendDeclaredChildNodes(
+        element,
+        in: context,
+        kindName: kindName,
+        nextIndex: &nextIndex,
+        into: &resolved
+      )
+    }
   }
 }
 
@@ -167,12 +253,8 @@ public enum ViewBuilder {
   public static func buildPartialBlock<Accumulated: View, Next: View>(
     accumulated: Accumulated,
     next: Next
-  ) -> TupleView<(Accumulated, Next)> {
-    TupleView(
-      (accumulated, next),
-      children: declaredBuilderChildren(from: accumulated)
-        + declaredBuilderChildren(from: next)
-    )
+  ) -> TupleView<Accumulated, Next> {
+    TupleView((accumulated, next))
   }
 
   public static func buildOptional<Content: View>(
@@ -211,10 +293,7 @@ public enum ViewBuilder {
   public static func buildArray<Content: View>(
     _ components: [Content]
   ) -> VariadicView<Content> {
-    VariadicView(
-      components,
-      children: components.flatMap { declaredBuilderChildren(from: $0) }
-    )
+    VariadicView(components)
   }
 
   public static func buildLimitedAvailability<Content: View>(
@@ -331,24 +410,6 @@ public struct Resolver {
 }
 
 @MainActor
-package func declaredBuilderChildren<V: View>(
-  from view: V
-) -> [AnyView] {
-  let erased: Any = view
-  if let composite = erased as? any BuilderCompositeView {
-    return composite.builderChildren
-  }
-  return [scopedAnyView { view }]
-}
-
-@MainActor
-package func declaredBuilderChildren<V: View & BuilderCompositeView>(
-  from view: V
-) -> [AnyView] {
-  view.builderChildren
-}
-
-@MainActor
 package func scopedAnyView<V: View>(
   authoringScope: DynamicPropertyScope? = currentDynamicPropertyScope(),
   _ build: () -> V
@@ -361,6 +422,83 @@ package func scopedAnyView<V: View>(
       authoringScope: authoringScope
     )
   }
+}
+
+@MainActor
+package func appendDeclaredChildNodes<V: View>(
+  _ view: V,
+  in context: ResolveContext,
+  kindName: String,
+  nextIndex: inout Int,
+  into resolved: inout [ResolvedNode]
+) {
+  let erased: Any = view
+  if let structural = erased as? any DeclaredChildrenView {
+    structural.appendDeclaredChildren(
+      in: context,
+      kindName: kindName,
+      nextIndex: &nextIndex,
+      into: &resolved
+    )
+    return
+  }
+
+  let childContext = context.indexedChild(
+    kind: .init(rawValue: kindName),
+    index: nextIndex
+  )
+  nextIndex += 1
+  if let reused = childContext.reusedResolvedSubtreeIfAvailable() {
+    resolved.append(reused)
+    return
+  }
+
+  let elements = resolveViewElements(view, in: childContext)
+  childContext.recordResolvedComputation(count: elements.count)
+  resolved.append(contentsOf: elements)
+}
+
+@MainActor
+package func resolveDeclaredChildren<V: View>(
+  _ view: V,
+  in context: ResolveContext,
+  kindName: String
+) -> [ResolvedNode] {
+  var resolved: [ResolvedNode] = []
+  var nextIndex = 0
+  appendDeclaredChildNodes(
+    view,
+    in: context,
+    kindName: kindName,
+    nextIndex: &nextIndex,
+    into: &resolved
+  )
+  return resolved
+}
+
+@MainActor
+package func appendDeclaredBuilderChildren<V: View>(
+  from view: V,
+  into children: inout [AnyView]
+) {
+  let erased: Any = view
+  if let composite = erased as? any BuilderCompositeView {
+    children.append(contentsOf: composite.builderChildren)
+    return
+  }
+  children.append(scopedAnyView { view })
+}
+
+@MainActor
+package func declaredBuilderChildren<V: View>(
+  from view: V
+) -> [AnyView] {
+  var children: [AnyView] = []
+  appendDeclaredBuilderChildren(
+    from: view,
+    into: &children
+  )
+  return children
 }
 
 @MainActor

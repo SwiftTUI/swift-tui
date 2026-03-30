@@ -598,29 +598,26 @@ package final class ResolveReuseSession: @unchecked Sendable {
     )
   }
 }
-// AnyView policy: retain deferred authored-content capture here so
-// EnvironmentReader closures keep their original dynamic-property scope.
 /// Reads an environment value and maps it into authored content.
-public struct EnvironmentReader<Value>: View, ResolvableView {
+public struct EnvironmentReader<Value, Content: View>: View, ResolvableView {
   private let keyPath: KeyPath<EnvironmentValues, Value>
-  private let content: (Value) -> AnyView
+  private let content: (Value) -> Content
+  private let authoringScope: DynamicPropertyScope?
 
-  public init<Content: View>(
+  public init(
     _ keyPath: KeyPath<EnvironmentValues, Value>,
     @ViewBuilder content: @escaping (Value) -> Content
   ) {
     self.keyPath = keyPath
-    let authoringScope = currentDynamicPropertyScope()
-    self.content = { value in
-      scopedAnyView(authoringScope: authoringScope) {
-        content(value)
-      }
-    }
+    self.content = content
+    authoringScope = currentDynamicPropertyScope()
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let view = context.trackingObservableAccess {
-      content(context.environmentValues[keyPath: keyPath])
+    let view = withDynamicPropertyScope(authoringScope) {
+      context.trackingObservableAccess {
+        content(context.environmentValues[keyPath: keyPath])
+      }
     }
     return view.resolveElements(in: context)
   }

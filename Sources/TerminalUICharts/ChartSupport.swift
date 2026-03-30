@@ -2,6 +2,35 @@ import Core
 import View
 
 @MainActor
+func isEmptyView<V: View>(
+  _ view: V
+) -> Bool {
+  let erased: Any = view
+  return erased is EmptyView
+}
+
+@MainActor
+@ViewBuilder
+func chartHeader<Label: View, Summary: View>(
+  label: Label,
+  summary: Summary
+) -> some View {
+  if !isEmptyView(label) || !isEmptyView(summary) {
+    HStack(alignment: .center, spacing: 1) {
+      if !isEmptyView(label) {
+        label
+          .foregroundStyle(.terminalBorder(.accent))
+      }
+      if !isEmptyView(summary) {
+        Spacer()
+        summary
+          .foregroundStyle(.separator)
+      }
+    }
+  }
+}
+
+@MainActor
 @ViewBuilder
 func timelineEntryView(
   _ entry: TimelineEntry,
@@ -10,21 +39,21 @@ func timelineEntryView(
   let accentStyle = metricAccentStyle(for: entry.tone)
 
   if let detail = entry.detail {
-      HStack(alignment: .top, spacing: 1) {
-        VStack(alignment: .leading, spacing: 0) {
-          Text(isLast ? "╰" : "├")
-            .foregroundStyle(accentStyle)
-          Text(isLast ? " " : "│")
-            .foregroundStyle(.separator)
-        }
-        VStack(alignment: .leading, spacing: 0) {
-          Text(entry.title)
-            .lineLimit(1)
-          Text(detail)
-            .foregroundStyle(.separator)
-            .lineLimit(1)
-        }
+    HStack(alignment: .top, spacing: 1) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text(isLast ? "╰" : "├")
+          .foregroundStyle(accentStyle)
+        Text(isLast ? " " : "│")
+          .foregroundStyle(.separator)
       }
+      VStack(alignment: .leading, spacing: 0) {
+        Text(entry.title)
+          .lineLimit(1)
+        Text(detail)
+          .foregroundStyle(.separator)
+          .lineLimit(1)
+      }
+    }
   } else {
     HStack(alignment: .top, spacing: 1) {
       Text(isLast ? "╰" : "├")
@@ -45,12 +74,12 @@ func legendItemView(
     ? AnyShapeStyle(.tint)
     : metricAccentStyle(for: item.tone)
 
-    HStack(alignment: .center, spacing: 1) {
-      Text("■")
-        .foregroundStyle(accentStyle)
-      Text(item.label)
-        .foregroundStyle(.foreground)
-    }
+  HStack(alignment: .center, spacing: 1) {
+    Text("■")
+      .foregroundStyle(accentStyle)
+    Text(item.label)
+      .foregroundStyle(.foreground)
+  }
 }
 
 func bulletChartSummaryText(
@@ -60,13 +89,14 @@ func bulletChartSummaryText(
 }
 
 @MainActor
+@ViewBuilder
 func bulletChartTrackView(
   value: Double,
   target: Double,
   total: Double,
   barWidth: Int,
   accentStyle: AnyShapeStyle
-) -> AnyView {
+) -> some View {
   let segmentCount = max(1, barWidth)
   let filledCount = min(
     segmentCount,
@@ -82,22 +112,20 @@ func bulletChartTrackView(
     )
   )
 
-  return AnyView(
-    HStack(alignment: .center, spacing: 0) {
-      ForEach(0..<segmentCount, id: \.self) { index in
-        if index == targetIndex {
-          Text(index < filledCount ? "◆" : "◇")
-            .foregroundStyle(.warning)
-        } else if index < filledCount {
-          Text("█")
-            .foregroundStyle(accentStyle)
-        } else {
-          Text("─")
-            .foregroundStyle(.separator)
-        }
+  HStack(alignment: .center, spacing: 0) {
+    ForEach(0..<segmentCount, id: \.self) { index in
+      if index == targetIndex {
+        Text(index < filledCount ? "◆" : "◇")
+          .foregroundStyle(.warning)
+      } else if index < filledCount {
+        Text("█")
+          .foregroundStyle(accentStyle)
+      } else {
+        Text("─")
+          .foregroundStyle(.separator)
       }
     }
-  )
+  }
 }
 
 func barChartSummaryText(
@@ -138,13 +166,14 @@ func comparisonEntryTone(
 }
 
 @MainActor
+@ViewBuilder
 func comparisonTrackView(
   current: Double,
   baseline: Double,
   total: Double,
   barWidth: Int,
   tone: BannerTone
-) -> AnyView {
+) -> some View {
   let segmentCount = max(1, barWidth)
   let effectiveTotal = max(1, total)
   let currentCount = min(
@@ -166,52 +195,49 @@ func comparisonTrackView(
   )
   let accentStyle = metricAccentStyle(for: tone)
 
-  return AnyView(
-    HStack(alignment: .center, spacing: 0) {
-      ForEach(0..<segmentCount, id: \.self) { index in
-        if index == baselineIndex {
-          Text(index < currentCount ? "◆" : "◇")
-            .foregroundStyle(.info)
-        } else if index < currentCount {
-          Text("█")
-            .foregroundStyle(accentStyle)
-        } else {
-          Text("─")
-            .foregroundStyle(.separator)
-        }
+  HStack(alignment: .center, spacing: 0) {
+    ForEach(0..<segmentCount, id: \.self) { index in
+      if index == baselineIndex {
+        Text(index < currentCount ? "◆" : "◇")
+          .foregroundStyle(.info)
+      } else if index < currentCount {
+        Text("█")
+          .foregroundStyle(accentStyle)
+      } else {
+        Text("─")
+          .foregroundStyle(.separator)
       }
     }
-  )
+  }
 }
 
 @MainActor
+@ViewBuilder
 func comparisonChartRow(
   _ entry: ComparisonEntry,
   maximumValue: Double,
   barWidth: Int,
   labelWidth: Int
-) -> AnyView {
+) -> some View {
   let effectiveTotal = max(1, entry.total ?? maximumValue)
   let tone = comparisonEntryTone(entry)
 
-  return AnyView(
-    HStack(alignment: .center, spacing: 1) {
-      Text(entry.label)
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .foregroundStyle(.foreground)
-        .frame(width: max(1, labelWidth), height: 1, alignment: .leading)
-      comparisonTrackView(
-        current: entry.current,
-        baseline: entry.baseline,
-        total: effectiveTotal,
-        barWidth: barWidth,
-        tone: tone
-      )
-      Text("\(metricValueString(entry.current))/\(metricValueString(entry.baseline))")
-        .foregroundStyle(.separator)
-    }
-  )
+  HStack(alignment: .center, spacing: 1) {
+    Text(entry.label)
+      .lineLimit(1)
+      .truncationMode(.tail)
+      .foregroundStyle(.foreground)
+      .frame(width: max(1, labelWidth), height: 1, alignment: .leading)
+    comparisonTrackView(
+      current: entry.current,
+      baseline: entry.baseline,
+      total: effectiveTotal,
+      barWidth: barWidth,
+      tone: tone
+    )
+    Text("\(metricValueString(entry.current))/\(metricValueString(entry.baseline))")
+      .foregroundStyle(.separator)
+  }
 }
 
 func stackedBarEffectiveTotal(
@@ -283,11 +309,12 @@ func stackedBarWidths(
 }
 
 @MainActor
+@ViewBuilder
 func stackedBarTrackView(
   _ entries: [BarChartEntry],
   total: Double,
   barWidth: Int
-) -> AnyView {
+) -> some View {
   let effectiveBarWidth = max(1, barWidth)
   let widths = stackedBarWidths(
     entries: entries,
@@ -296,25 +323,23 @@ func stackedBarTrackView(
   )
   let assignedWidth = widths.reduce(0, +)
 
-  return AnyView(
-    HStack(alignment: .center, spacing: 0) {
-      ForEach(entries.indices, id: \.self) { index in
-        let accentStyle =
-          entries[index].tone == .automatic
-          ? AnyShapeStyle(.tint)
-          : metricAccentStyle(for: entries[index].tone)
+  HStack(alignment: .center, spacing: 0) {
+    ForEach(entries.indices, id: \.self) { index in
+      let accentStyle =
+        entries[index].tone == .automatic
+        ? AnyShapeStyle(.tint)
+        : metricAccentStyle(for: entries[index].tone)
 
-        if widths[index] > 0 {
-          Text(String(repeating: "█", count: widths[index]))
-            .foregroundStyle(accentStyle)
-        }
-      }
-      if assignedWidth < effectiveBarWidth {
-        Text(String(repeating: "─", count: effectiveBarWidth - assignedWidth))
-          .foregroundStyle(.separator)
+      if widths[index] > 0 {
+        Text(String(repeating: "█", count: widths[index]))
+          .foregroundStyle(accentStyle)
       }
     }
-  )
+    if assignedWidth < effectiveBarWidth {
+      Text(String(repeating: "─", count: effectiveBarWidth - assignedWidth))
+        .foregroundStyle(.separator)
+    }
+  }
 }
 
 func columnChartSummaryText(
@@ -355,12 +380,13 @@ func thresholdBandTone(
 }
 
 @MainActor
+@ViewBuilder
 func thresholdGaugeTrackView(
   value: Double,
   total: Double,
   bands: [ThresholdBand],
   barWidth: Int
-) -> AnyView {
+) -> some View {
   let segmentCount = max(1, barWidth)
   let effectiveTotal = max(1, total)
   let markerIndex = min(
@@ -373,30 +399,28 @@ func thresholdGaugeTrackView(
     )
   )
 
-  return AnyView(
-    HStack(alignment: .center, spacing: 0) {
-      ForEach(0..<segmentCount, id: \.self) { index in
-        let segmentValue = ((Double(index) + 0.5) / Double(segmentCount)) * effectiveTotal
-        let tone = thresholdBandTone(
-          for: segmentValue,
-          total: effectiveTotal,
-          bands: bands
-        )
-        let accentStyle =
-          tone == .automatic
-          ? AnyShapeStyle(.tint)
-          : metricAccentStyle(for: tone)
+  HStack(alignment: .center, spacing: 0) {
+    ForEach(0..<segmentCount, id: \.self) { index in
+      let segmentValue = ((Double(index) + 0.5) / Double(segmentCount)) * effectiveTotal
+      let tone = thresholdBandTone(
+        for: segmentValue,
+        total: effectiveTotal,
+        bands: bands
+      )
+      let accentStyle =
+        tone == .automatic
+        ? AnyShapeStyle(.tint)
+        : metricAccentStyle(for: tone)
 
-        if index == markerIndex {
-          Text("◆")
-            .foregroundStyle(accentStyle)
-        } else {
-          Text("━")
-            .foregroundStyle(accentStyle)
-        }
+      if index == markerIndex {
+        Text("◆")
+          .foregroundStyle(accentStyle)
+      } else {
+        Text("━")
+          .foregroundStyle(accentStyle)
       }
     }
-  )
+  }
 }
 
 func heatStripSummaryText(
@@ -427,50 +451,49 @@ func columnChartFilledHeight(
 }
 
 @MainActor
+@ViewBuilder
 func columnChartBody(
   entries: [BarChartEntry],
   maximumValue: Double,
   chartHeight: Int,
   columnWidth: Int
-) -> AnyView {
+) -> some View {
   let effectiveHeight = max(1, chartHeight)
   let effectiveWidth = max(1, columnWidth)
 
-  return AnyView(
-    VStack(alignment: .leading, spacing: 0) {
-      ForEach((0..<effectiveHeight).reversed(), id: \.self) { row in
-        HStack(alignment: .center, spacing: 1) {
-          ForEach(entries.indices, id: \.self) { index in
-            let accentStyle =
-              entries[index].tone == .automatic
-              ? AnyShapeStyle(.tint)
-              : metricAccentStyle(for: entries[index].tone)
-            let filledHeight = columnChartFilledHeight(
-              value: entries[index].value,
-              maximumValue: maximumValue,
-              chartHeight: effectiveHeight
-            )
-
-            Text(
-              row < filledHeight
-                ? String(repeating: "█", count: effectiveWidth)
-                : String(repeating: " ", count: effectiveWidth)
-            )
-            .foregroundStyle(accentStyle)
-            .frame(width: effectiveWidth, height: 1, alignment: .center)
-          }
-        }
-      }
+  VStack(alignment: .leading, spacing: 0) {
+    ForEach((0..<effectiveHeight).reversed(), id: \.self) { row in
       HStack(alignment: .center, spacing: 1) {
         ForEach(entries.indices, id: \.self) { index in
-          Text(String(entries[index].label.prefix(effectiveWidth)))
-            .lineLimit(1)
-            .foregroundStyle(.foreground)
-            .frame(width: effectiveWidth, height: 1, alignment: .center)
+          let accentStyle =
+            entries[index].tone == .automatic
+            ? AnyShapeStyle(.tint)
+            : metricAccentStyle(for: entries[index].tone)
+          let filledHeight = columnChartFilledHeight(
+            value: entries[index].value,
+            maximumValue: maximumValue,
+            chartHeight: effectiveHeight
+          )
+
+          Text(
+            row < filledHeight
+              ? String(repeating: "█", count: effectiveWidth)
+              : String(repeating: " ", count: effectiveWidth)
+          )
+          .foregroundStyle(accentStyle)
+          .frame(width: effectiveWidth, height: 1, alignment: .center)
         }
       }
     }
-  )
+    HStack(alignment: .center, spacing: 1) {
+      ForEach(entries.indices, id: \.self) { index in
+        Text(String(entries[index].label.prefix(effectiveWidth)))
+          .lineLimit(1)
+          .foregroundStyle(.foreground)
+          .frame(width: effectiveWidth, height: 1, alignment: .center)
+      }
+    }
+  }
 }
 
 func heatStripGlyph(
@@ -497,50 +520,50 @@ func heatStripGlyph(
 }
 
 @MainActor
+@ViewBuilder
 func heatStripBody(
   entries: [BarChartEntry],
   maximumValue: Double,
   cellWidth: Int
-) -> AnyView {
+) -> some View {
   let effectiveWidth = max(1, cellWidth)
 
-  return AnyView(
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(alignment: .center, spacing: 1) {
-        ForEach(entries.indices, id: \.self) { index in
-          let accentStyle =
-            entries[index].tone == .automatic
-            ? AnyShapeStyle(.tint)
-            : metricAccentStyle(for: entries[index].tone)
-          let glyph = heatStripGlyph(
-            value: entries[index].value,
-            maximumValue: maximumValue
-          )
+  VStack(alignment: .leading, spacing: 0) {
+    HStack(alignment: .center, spacing: 1) {
+      ForEach(entries.indices, id: \.self) { index in
+        let accentStyle =
+          entries[index].tone == .automatic
+          ? AnyShapeStyle(.tint)
+          : metricAccentStyle(for: entries[index].tone)
+        let glyph = heatStripGlyph(
+          value: entries[index].value,
+          maximumValue: maximumValue
+        )
 
-          Text(String(repeating: glyph, count: effectiveWidth))
-            .foregroundStyle(accentStyle)
-            .frame(width: effectiveWidth, height: 1, alignment: .center)
-        }
-      }
-      HStack(alignment: .center, spacing: 1) {
-        ForEach(entries.indices, id: \.self) { index in
-          Text(String(entries[index].label.prefix(effectiveWidth)))
-            .lineLimit(1)
-            .foregroundStyle(.foreground)
-            .frame(width: effectiveWidth, height: 1, alignment: .center)
-        }
+        Text(String(repeating: glyph, count: effectiveWidth))
+          .foregroundStyle(accentStyle)
+          .frame(width: effectiveWidth, height: 1, alignment: .center)
       }
     }
-  )
+    HStack(alignment: .center, spacing: 1) {
+      ForEach(entries.indices, id: \.self) { index in
+        Text(String(entries[index].label.prefix(effectiveWidth)))
+          .lineLimit(1)
+          .foregroundStyle(.foreground)
+          .frame(width: effectiveWidth, height: 1, alignment: .center)
+      }
+    }
+  }
 }
 
 @MainActor
+@ViewBuilder
 func barChartRow(
   _ entry: BarChartEntry,
   maximumValue: Double,
   barWidth: Int,
   labelWidth: Int
-) -> AnyView {
+) -> some View {
   let track = metricTrackString(
     fraction: maximumValue > 0 ? min(max(abs(entry.value) / maximumValue, 0), 1) : 0,
     barWidth: barWidth
@@ -550,21 +573,19 @@ func barChartRow(
     ? AnyShapeStyle(.tint)
     : metricAccentStyle(for: entry.tone)
 
-  return AnyView(
-    HStack(alignment: .center, spacing: 1) {
-      Text(entry.label)
-        .lineLimit(1)
-        .truncationMode(.tail)
-        .foregroundStyle(.foreground)
-        .frame(width: max(1, labelWidth), height: 1, alignment: .leading)
-      HStack(alignment: .center, spacing: 0) {
-        Text(track.filled)
-          .foregroundStyle(accentStyle)
-        Text(track.empty)
-          .foregroundStyle(.separator)
-      }
-      Text(metricValueString(entry.value))
+  HStack(alignment: .center, spacing: 1) {
+    Text(entry.label)
+      .lineLimit(1)
+      .truncationMode(.tail)
+      .foregroundStyle(.foreground)
+      .frame(width: max(1, labelWidth), height: 1, alignment: .leading)
+    HStack(alignment: .center, spacing: 0) {
+      Text(track.filled)
+        .foregroundStyle(accentStyle)
+      Text(track.empty)
         .foregroundStyle(.separator)
     }
-  )
+    Text(metricValueString(entry.value))
+      .foregroundStyle(.separator)
+  }
 }

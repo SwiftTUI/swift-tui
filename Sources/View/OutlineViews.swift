@@ -14,54 +14,48 @@ extension EnvironmentValues {
 // AnyView policy: retain deferred authored-content capture here so outline row
 // builders keep their original dynamic-property scope.
 /// Presents hierarchical collection data as an outline.
-public struct OutlineGroup<Data, ID>: View
-where Data: RandomAccessCollection, ID: Hashable {
-  private let rootView: AnyView
+public struct OutlineGroup<Data, ID, RowContent>: View
+where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
+  private let elements: [Data.Element]
+  private let id: (Data.Element) -> ID
+  private let children: (Data.Element) -> [Data.Element]
+  private let rowContent: (Data.Element) -> RowContent
+  private let authoringScope: DynamicPropertyScope?
 
-  public init<RowContent: View>(
+  public init(
     _ data: Data,
     id: KeyPath<Data.Element, ID>,
     children: KeyPath<Data.Element, [Data.Element]?>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   ) {
-    let authoringScope = currentDynamicPropertyScope()
-    rootView = scopedAnyView(authoringScope: authoringScope) {
-      OutlineTree(
-        elements: Array(data),
-        id: { $0[keyPath: id] },
-        children: { $0[keyPath: children] ?? [] },
-        rowContent: { element in
-          scopedAnyView(authoringScope: authoringScope) {
-            rowContent(element)
-          }
-        }
-      )
-    }
+    elements = Array(data)
+    self.id = { $0[keyPath: id] }
+    self.children = { $0[keyPath: children] ?? [] }
+    self.rowContent = rowContent
+    authoringScope = currentDynamicPropertyScope()
   }
 
-  public init<RowContent: View>(
+  public init(
     _ data: Data,
     id: KeyPath<Data.Element, ID>,
     children: KeyPath<Data.Element, [Data.Element]>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   ) {
-    let authoringScope = currentDynamicPropertyScope()
-    rootView = scopedAnyView(authoringScope: authoringScope) {
-      OutlineTree(
-        elements: Array(data),
-        id: { $0[keyPath: id] },
-        children: { $0[keyPath: children] },
-        rowContent: { element in
-          scopedAnyView(authoringScope: authoringScope) {
-            rowContent(element)
-          }
-        }
-      )
-    }
+    elements = Array(data)
+    self.id = { $0[keyPath: id] }
+    self.children = { $0[keyPath: children] }
+    self.rowContent = rowContent
+    authoringScope = currentDynamicPropertyScope()
   }
 
   public var body: some View {
-    rootView
+    OutlineTree(
+      elements: elements,
+      id: id,
+      children: children,
+      rowContent: rowContent,
+      authoringScope: authoringScope
+    )
   }
 }
 
@@ -72,7 +66,7 @@ extension List {
     selection: Binding<SelectionValue>,
     children: KeyPath<Data.Element, [Data.Element]?>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
-  ) where Data: RandomAccessCollection {
+  ) where Data: RandomAccessCollection, Content == VariadicView<AnyView> {
     let authoringScope = currentDynamicPropertyScope()
     self.init(
       selection: selection,
@@ -83,10 +77,11 @@ extension List {
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] ?? [] },
             rowContent: { element in
-              scopedAnyView(authoringScope: authoringScope) {
+              withDynamicPropertyScope(authoringScope) {
                 rowContent(element).tag(element[keyPath: id])
               }
-            }
+            },
+            authoringScope: authoringScope
           )
         }
       ]
@@ -99,7 +94,7 @@ extension List {
     selection: Binding<SelectionValue>,
     children: KeyPath<Data.Element, [Data.Element]>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
-  ) where Data: RandomAccessCollection {
+  ) where Data: RandomAccessCollection, Content == VariadicView<AnyView> {
     let authoringScope = currentDynamicPropertyScope()
     self.init(
       selection: selection,
@@ -110,10 +105,11 @@ extension List {
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] },
             rowContent: { element in
-              scopedAnyView(authoringScope: authoringScope) {
+              withDynamicPropertyScope(authoringScope) {
                 rowContent(element).tag(element[keyPath: id])
               }
-            }
+            },
+            authoringScope: authoringScope
           )
         }
       ]
@@ -126,7 +122,11 @@ extension List {
     selection: Binding<ID?>,
     children: KeyPath<Data.Element, [Data.Element]?>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
-  ) where Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID? {
+  )
+  where
+    Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID?,
+    Content == VariadicView<AnyView>
+  {
     let authoringScope = currentDynamicPropertyScope()
     self.init(
       selection: selection,
@@ -137,10 +137,11 @@ extension List {
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] ?? [] },
             rowContent: { element in
-              scopedAnyView(authoringScope: authoringScope) {
+              withDynamicPropertyScope(authoringScope) {
                 rowContent(element).tag(element[keyPath: id])
               }
-            }
+            },
+            authoringScope: authoringScope
           )
         }
       ]
@@ -153,7 +154,11 @@ extension List {
     selection: Binding<ID?>,
     children: KeyPath<Data.Element, [Data.Element]>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
-  ) where Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID? {
+  )
+  where
+    Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID?,
+    Content == VariadicView<AnyView>
+  {
     let authoringScope = currentDynamicPropertyScope()
     self.init(
       selection: selection,
@@ -164,10 +169,11 @@ extension List {
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] },
             rowContent: { element in
-              scopedAnyView(authoringScope: authoringScope) {
+              withDynamicPropertyScope(authoringScope) {
                 rowContent(element).tag(element[keyPath: id])
               }
-            }
+            },
+            authoringScope: authoringScope
           )
         }
       ]
@@ -184,7 +190,8 @@ extension List where SelectionValue: Hashable {
   )
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
-    SelectionValue == Data.Element.ID
+    SelectionValue == Data.Element.ID,
+    Content == VariadicView<AnyView>
   {
     self.init(
       data,
@@ -203,7 +210,8 @@ extension List where SelectionValue: Hashable {
   )
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
-    SelectionValue == Data.Element.ID
+    SelectionValue == Data.Element.ID,
+    Content == VariadicView<AnyView>
   {
     self.init(
       data,
@@ -222,7 +230,8 @@ extension List where SelectionValue: Hashable {
   )
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
-    SelectionValue == Data.Element.ID?
+    SelectionValue == Data.Element.ID?,
+    Content == VariadicView<AnyView>
   {
     self.init(
       data,
@@ -241,7 +250,8 @@ extension List where SelectionValue: Hashable {
   )
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
-    SelectionValue == Data.Element.ID?
+    SelectionValue == Data.Element.ID?,
+    Content == VariadicView<AnyView>
   {
     self.init(
       data,
@@ -254,7 +264,7 @@ extension List where SelectionValue: Hashable {
 }
 
 extension OutlineGroup where Data.Element: Identifiable, ID == Data.Element.ID {
-  public init<RowContent: View>(
+  public init(
     _ data: Data,
     children: KeyPath<Data.Element, [Data.Element]?>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
@@ -267,7 +277,7 @@ extension OutlineGroup where Data.Element: Identifiable, ID == Data.Element.ID {
     )
   }
 
-  public init<RowContent: View>(
+  public init(
     _ data: Data,
     children: KeyPath<Data.Element, [Data.Element]>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
@@ -281,11 +291,13 @@ extension OutlineGroup where Data.Element: Identifiable, ID == Data.Element.ID {
   }
 }
 
-package struct OutlineTree<Element, ID>: View where ID: Hashable {
+package struct OutlineTree<Element, ID, RowContent>: View
+where ID: Hashable, RowContent: View {
   package var elements: [Element]
   package var id: (Element) -> ID
   package var children: (Element) -> [Element]
-  package var rowContent: (Element) -> AnyView
+  package var rowContent: (Element) -> RowContent
+  package var authoringScope: DynamicPropertyScope?
   package var ancestry: [Bool] = []
 
   public var body: some View {
@@ -298,7 +310,8 @@ package struct OutlineTree<Element, ID>: View where ID: Hashable {
               isLast: entry.isLast,
               style: outlineStyle
             ),
-            content: rowContent(entry.element)
+            content: rowView(for: entry.element),
+            authoringScope: authoringScope
           )
 
           if !entry.children.isEmpty {
@@ -307,11 +320,18 @@ package struct OutlineTree<Element, ID>: View where ID: Hashable {
               id: id,
               children: children,
               rowContent: rowContent,
+              authoringScope: authoringScope,
               ancestry: ancestry + [!entry.isLast]
             )
           }
         }
       }
+    }
+  }
+
+  private func rowView(for element: Element) -> RowContent {
+    withDynamicPropertyScope(authoringScope) {
+      rowContent(element)
     }
   }
 
@@ -334,23 +354,42 @@ private struct OutlineEntry<Element, ID: Hashable>: Identifiable {
   let isLast: Bool
 }
 
-private struct OutlineRow: View {
+private struct OutlineRow<Content: View>: View {
   let prefix: String
-  let content: AnyView
+  let content: Content
+  let authoringScope: DynamicPropertyScope?
 
+  @ViewBuilder
   var body: some View {
     if prefix.isEmpty {
-      AnyView(content)
-    } else {
-      AnyView(
-        HStack(alignment: .firstTextBaseline, spacing: 0) {
-          Text(prefix)
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
-            .foregroundStyle(.terminalBorder(.neutral))
-          content
-        }
+      ScopedOutlineRowContent(
+        authoringScope: authoringScope,
+        content: content
       )
+    } else {
+      HStack(alignment: .firstTextBaseline, spacing: 0) {
+        Text(prefix)
+          .lineLimit(1)
+          .fixedSize(horizontal: true, vertical: false)
+          .foregroundStyle(.terminalBorder(.neutral))
+        ScopedOutlineRowContent(
+          authoringScope: authoringScope,
+          content: content
+        )
+      }
+    }
+  }
+}
+
+private struct ScopedOutlineRowContent<Content: View>: View, ResolvableView {
+  let authoringScope: DynamicPropertyScope?
+  let content: Content
+
+  func resolveElements(
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    withDynamicPropertyScope(authoringScope) {
+      content.resolveElements(in: context)
     }
   }
 }

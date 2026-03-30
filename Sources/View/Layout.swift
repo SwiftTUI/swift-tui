@@ -134,7 +134,7 @@ extension Layout {
   ) -> some View {
     LayoutContainer(
       layout: AnyLayout(self),
-      children: declaredBuilderChildren(from: content())
+      content: content()
     )
   }
 }
@@ -323,7 +323,7 @@ extension AnyLayout {
   ) -> some View {
     LayoutContainer(
       layout: self,
-      children: declaredBuilderChildren(from: content())
+      content: content()
     )
   }
 }
@@ -481,15 +481,13 @@ public struct ZStackLayout: Layout, BuiltinLayoutBehaviorProviding {
   }
 }
 
-// AnyView policy: retain typed builder plumbing here while layout containers
-// store heterogeneous authored children.
-private struct LayoutContainer: View, ResolvableView {
+private struct LayoutContainer<Content: View>: View, ResolvableView {
   var layout: AnyLayout
-  var children: [AnyView]
+  var content: Content
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let resolvedChildren = resolveDeclaredChildren(
-      children,
+      content,
       in: context,
       kindName: "Layout"
     )

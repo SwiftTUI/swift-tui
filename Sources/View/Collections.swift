@@ -1,39 +1,49 @@
 package import Core
 
-// AnyView policy: retain heterogeneous child storage here for authored
-// collection header, footer, and row content.
+// AnyView policy: keep the collection surface typed and only erase at the
+// resolve boundary where heterogeneous children are flattened for extraction.
 /// Groups related collection content with optional header and footer content.
-public struct Section: View, ResolvableView {
-  private var headerViews: [AnyView]
-  private var footerViews: [AnyView]
-  private var contentViews: [AnyView]
+public struct Section<Content: View, Header: View, Footer: View>: View,
+  ResolvableView
+{
+  private var showsHeader: Bool
+  private var showsFooter: Bool
+  private var header: Header
+  private var footer: Footer
+  private var content: Content
 
-  public init<Content: View, Header: View, Footer: View>(
+  public init(
     @ViewBuilder content: () -> Content,
     @ViewBuilder header: () -> Header,
     @ViewBuilder footer: () -> Footer
   ) {
-    headerViews = declaredBuilderChildren(from: header())
-    footerViews = declaredBuilderChildren(from: footer())
-    contentViews = declaredBuilderChildren(from: content())
+    showsHeader = true
+    showsFooter = true
+    self.header = header()
+    self.footer = footer()
+    self.content = content()
   }
 
-  public init<Content: View, Header: View>(
+  public init(
     @ViewBuilder content: () -> Content,
     @ViewBuilder header: () -> Header
-  ) {
-    headerViews = declaredBuilderChildren(from: header())
-    footerViews = []
-    contentViews = declaredBuilderChildren(from: content())
+  ) where Footer == EmptyView {
+    showsHeader = true
+    showsFooter = false
+    self.header = header()
+    footer = EmptyView()
+    self.content = content()
   }
 
-  public init<S: StringProtocol, Content: View>(
+  public init<S: StringProtocol>(
     _ title: S,
     @ViewBuilder content: () -> Content
-  ) {
-    headerViews = [AnyView(Text(String(title)))]
-    footerViews = []
-    contentViews = declaredBuilderChildren(from: content())
+  ) where Header == Text, Footer == EmptyView {
+    showsHeader = true
+    showsFooter = false
+    header = Text(String(title))
+    footer = EmptyView()
+    self.content = content()
   }
 
   package func resolveElements(
@@ -49,13 +59,13 @@ extension Section {
   ) -> ResolvedNode {
     var children: [ResolvedNode] = []
 
-    if !headerViews.isEmpty {
+    if showsHeader {
       children.append(
         sectionChild(
           in: context,
           component: .named("Header"),
           role: .header,
-          views: headerViews
+          view: header
         )
       )
     }
@@ -65,17 +75,17 @@ extension Section {
         in: context,
         component: .named("Content"),
         role: .content,
-        views: contentViews
+        view: content
       )
     )
 
-    if !footerViews.isEmpty {
+    if showsFooter {
       children.append(
         sectionChild(
           in: context,
           component: .named("Footer"),
           role: .footer,
-          views: footerViews
+          view: footer
         )
       )
     }
@@ -93,18 +103,21 @@ extension Section {
     )
   }
 
-  private func sectionChild(
+  private func sectionChild<ViewContent: View>(
     in context: ResolveContext,
     component: IdentityComponent,
     role: SectionRole,
-    views: [AnyView]
+    view: ViewContent
   ) -> ResolvedNode {
     let childContext = context.child(component: component)
     return ResolvedNode(
       identity: childContext.identity,
       kind: .view("Section\(component.rawValue)"),
-      children: combinedView(from: views, kindName: "Section\(component.rawValue)")
-        .resolveElements(in: childContext.child(component: .named("Views"))),
+      children: resolveDeclaredChildren(
+        view,
+        in: childContext.child(component: .named("Views")),
+        kindName: "Section\(component.rawValue)"
+      ),
       environmentSnapshot: childContext.environment,
       transactionSnapshot: childContext.transaction,
       semanticMetadata: .init(sectionRole: role)
@@ -113,24 +126,24 @@ extension Section {
 }
 
 /// Presents selectable rows in a vertically scrollable list.
-public struct List<SelectionValue: Hashable>: View, ResolvableView {
+public struct List<SelectionValue: Hashable, Content: View>: View, ResolvableView {
   public var selection: Binding<SelectionValue>
-  private var contentViews: [AnyView]
+  private var content: Content
 
-  public init<Content: View>(
+  public init(
     selection: Binding<SelectionValue>,
     @ViewBuilder content: () -> Content
   ) {
     self.selection = selection
-    contentViews = declaredBuilderChildren(from: content())
+    self.content = content()
   }
 
   package init(
     selection: Binding<SelectionValue>,
     contentViews: [AnyView]
-  ) {
+  ) where Content == VariadicView<AnyView> {
     self.selection = selection
-    self.contentViews = contentViews
+    content = VariadicView(contentViews)
   }
 
   package func resolveElements(
@@ -141,13 +154,13 @@ public struct List<SelectionValue: Hashable>: View, ResolvableView {
 }
 
 /// Declares the cell content for a row in a ``Table``.
-public struct TableRow: View, ResolvableView {
-  private var contentViews: [AnyView]
+public struct TableRow<Content: View>: View, ResolvableView {
+  private var content: Content
 
-  public init<Content: View>(
+  public init(
     @ViewBuilder content: () -> Content
   ) {
-    contentViews = declaredBuilderChildren(from: content())
+    self.content = content()
   }
 
   package func resolveElements(
@@ -164,11 +177,11 @@ extension TableRow {
     return ResolvedNode(
       identity: context.identity,
       kind: .view("TableRow"),
-      children: contentViews.enumerated().flatMap { index, view in
-        view.resolveElements(
-          in: context.indexedChild(kind: .named("Cell"), index: index)
-        )
-      },
+      children: resolveDeclaredChildren(
+        content,
+        in: context,
+        kindName: "Cell"
+      ),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
       semanticMetadata: .init(presentationRole: .tableRow)
@@ -307,8 +320,11 @@ extension List {
   private func resolvedItems(
     in context: ResolveContext
   ) -> (items: [ListItemPayload], rows: [RowSelection]) {
-    let nodes = combinedView(from: contentViews, kindName: "ListContent")
-      .resolveElements(in: context)
+    let nodes = resolveDeclaredChildren(
+      content,
+      in: context,
+      kindName: "ListContent"
+    )
 
     var items: [ListItemPayload] = []
     var rows: [RowSelection] = []
@@ -416,28 +432,28 @@ extension List {
 }
 
 /// Presents row and column data in a terminal table.
-public struct Table<SelectionValue: Hashable>: View, ResolvableView {
+public struct Table<SelectionValue: Hashable, Rows: View>: View, ResolvableView {
   public var columns: [TableColumn]
   private var selection: Binding<SelectionValue>?
-  private var rowViews: [AnyView]
+  private var rows: Rows
 
-  public init<Rows: View>(
+  public init(
     selection: Binding<SelectionValue>,
     columns: [TableColumn],
     @ViewBuilder rows: () -> Rows
   ) {
     self.columns = columns
     self.selection = selection
-    rowViews = declaredBuilderChildren(from: rows())
+    self.rows = rows()
   }
 
-  public init<Rows: View>(
+  public init(
     columns: [TableColumn],
     @ViewBuilder rows: () -> Rows
   ) where SelectionValue == Never {
     self.columns = columns
     selection = nil
-    rowViews = declaredBuilderChildren(from: rows())
+    self.rows = rows()
   }
 
   package func resolveElements(
@@ -593,8 +609,11 @@ extension Table {
   private func resolvedRows(
     in context: ResolveContext
   ) -> [TableRowPayload] {
-    let nodes = combinedView(from: rowViews, kindName: "TableContent")
-      .resolveElements(in: context)
+    let nodes = resolveDeclaredChildren(
+      rows,
+      in: context,
+      kindName: "TableContent"
+    )
     var rows: [TableRowPayload] = []
     collectTableRows(from: nodes, into: &rows)
     return rows

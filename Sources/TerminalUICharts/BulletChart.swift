@@ -1,36 +1,17 @@
 import Core
 import View
 
-// AnyView policy: retain heterogeneous child storage here for authored label
-// and summary content.
 /// A bullet chart that compares a current value against a target or range.
-public struct BulletChart: View, ResolvableView {
+public struct BulletChart<Label: View, Summary: View>: View, ResolvableView {
   public var value: Double
   public var target: Double
   public var total: Double
   public var tone: BannerTone
   public var barWidth: Int
-  private var labelViews: [AnyView]
-  private var summaryViews: [AnyView]
+  private let label: Label
+  private let summary: Summary
 
-  public init<S: StringProtocol>(
-    _ title: S,
-    value: Double,
-    target: Double,
-    total: Double = 1,
-    tone: BannerTone = .automatic,
-    barWidth: Int = 12
-  ) {
-    self.value = value
-    self.target = target
-    self.total = total
-    self.tone = tone
-    self.barWidth = barWidth
-    labelViews = [AnyView(Text(String(title)))]
-    summaryViews = [AnyView(Text(bulletChartSummaryText(target: target)))]
-  }
-
-  public init<Label: View, Summary: View>(
+  public init(
     value: Double,
     target: Double,
     total: Double = 1,
@@ -44,8 +25,8 @@ public struct BulletChart: View, ResolvableView {
     self.total = total
     self.tone = tone
     self.barWidth = barWidth
-    labelViews = declaredBuilderChildren(from: label())
-    summaryViews = declaredBuilderChildren(from: summary())
+    self.label = label()
+    self.summary = summary()
   }
 
   package func resolveElements(
@@ -53,29 +34,61 @@ public struct BulletChart: View, ResolvableView {
   ) -> [ResolvedNode] {
     let accentStyle = metricAccentStyle(for: tone)
 
-    return AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        if !labelViews.isEmpty || !summaryViews.isEmpty {
-          HStack(alignment: .center, spacing: 1) {
-            if !labelViews.isEmpty {
-              combinedView(from: labelViews, kindName: "BulletChartLabel")
-                .foregroundStyle(.terminalBorder(.accent))
-            }
-            if !summaryViews.isEmpty {
-              Spacer()
-              combinedView(from: summaryViews, kindName: "BulletChartSummary")
-                .foregroundStyle(.separator)
-            }
-          }
-        }
-        bulletChartTrackView(
-          value: value,
-          target: target,
-          total: total,
-          barWidth: barWidth,
-          accentStyle: accentStyle
-        )
-      }
-    ).resolveElements(in: context)
+    return [
+      resolveView(
+        VStack(alignment: .leading, spacing: 0) {
+          chartHeader(label: label, summary: summary)
+          bulletChartTrackView(
+            value: value,
+            target: target,
+            total: total,
+            barWidth: barWidth,
+            accentStyle: accentStyle
+          )
+        },
+        in: context
+      )
+    ]
+  }
+}
+
+extension BulletChart where Label == EmptyView, Summary == Text {
+  public init(
+    value: Double,
+    target: Double,
+    total: Double = 1,
+    tone: BannerTone = .automatic,
+    barWidth: Int = 12
+  ) {
+    self.init(
+      value: value,
+      target: target,
+      total: total,
+      tone: tone,
+      barWidth: barWidth,
+      label: { EmptyView() },
+      summary: { Text(bulletChartSummaryText(target: target)) }
+    )
+  }
+}
+
+extension BulletChart where Label == Text, Summary == Text {
+  public init<S: StringProtocol>(
+    _ title: S,
+    value: Double,
+    target: Double,
+    total: Double = 1,
+    tone: BannerTone = .automatic,
+    barWidth: Int = 12
+  ) {
+    self.init(
+      value: value,
+      target: target,
+      total: total,
+      tone: tone,
+      barWidth: barWidth,
+      label: { Text(String(title)) },
+      summary: { Text(bulletChartSummaryText(target: target)) }
+    )
   }
 }

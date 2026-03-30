@@ -1,31 +1,31 @@
 package import Core
 
-// AnyView policy: retain heterogeneous child storage here for authored labels
-// and picker option content.
 /// Selects one value from a set of tagged options.
-public struct Picker<SelectionValue: Hashable>: View, ResolvableView {
+public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: View,
+  ResolvableView
+{
   public var selection: Binding<SelectionValue>
-  var labelViews: [AnyView]
-  var contentViews: [AnyView]
+  package var label: Label
+  package var content: Content
 
-  public init<S: StringProtocol, Content: View>(
+  public init<S: StringProtocol>(
     _ title: S,
     selection: Binding<SelectionValue>,
     @ViewBuilder content: () -> Content
-  ) {
+  ) where Label == Text {
     self.selection = selection
-    labelViews = [AnyView(Text(String(title)))]
-    contentViews = declaredBuilderChildren(from: content())
+    label = Text(String(title))
+    self.content = content()
   }
 
-  public init<Content: View, Label: View>(
+  public init(
     selection: Binding<SelectionValue>,
     @ViewBuilder content: () -> Content,
     @ViewBuilder label: () -> Label
   ) {
     self.selection = selection
-    labelViews = declaredBuilderChildren(from: label())
-    contentViews = declaredBuilderChildren(from: content())
+    self.label = label()
+    self.content = content()
   }
 
   package func resolveElements(
@@ -177,8 +177,7 @@ extension Picker {
   private func resolvedOptions(
     in context: ResolveContext
   ) -> [Option] {
-    let nodes = combinedView(from: contentViews, kindName: "PickerContent")
-      .resolveElements(in: context)
+    let nodes = content.resolveElements(in: context)
 
     var options: [Option] = []
     collectOptions(from: nodes, into: &options)

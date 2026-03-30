@@ -1,109 +1,125 @@
 package import Core
 
-// AnyView policy: retain heterogeneous child storage here for authored label,
-// title, icon, and value content.
 /// Displays a title paired with an icon or glyph view.
-public struct Label: View, ResolvableView {
-  private var titleViews: [AnyView]
-  private var iconViews: [AnyView]
+public struct Label<Title: View, Icon: View>: View, ResolvableView {
+  private var title: Title
+  private var icon: Icon
 
-  public init<Title: View, Icon: View>(
+  public init(
     @ViewBuilder title: () -> Title,
     @ViewBuilder icon: () -> Icon
   ) {
-    titleViews = declaredBuilderChildren(from: title())
-    iconViews = declaredBuilderChildren(from: icon())
+    self.title = title()
+    self.icon = icon()
   }
 
-  public init<S: StringProtocol, Icon: View>(
+  public init<S: StringProtocol>(
     _ title: S,
     @ViewBuilder icon: () -> Icon
-  ) {
-    titleViews = [AnyView(Text(String(title)))]
-    iconViews = declaredBuilderChildren(from: icon())
+  ) where Title == Text {
+    self.title = Text(String(title))
+    self.icon = icon()
   }
 
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    AnyView(
-      HStack(alignment: .center, spacing: 1) {
-        combinedView(from: iconViews, kindName: "LabelIcon")
-        combinedView(from: titleViews, kindName: "LabelTitle")
-      }
-    ).resolveElements(in: context)
+    [resolvedNode(in: context)]
+  }
+}
+
+extension Label {
+  private func resolvedNode(
+    in context: ResolveContext
+  ) -> ResolvedNode {
+    HStack(alignment: .center, spacing: 1) {
+      icon
+      title
+    }
+    .resolve(in: context)
   }
 }
 
 /// Displays a leading label paired with trailing content or a value.
-public struct LabeledContent: View, ResolvableView {
-  private var labelViews: [AnyView]
-  private var contentViews: [AnyView]
+public struct LabeledContent<Label: View, Content: View>: View, ResolvableView {
+  private var label: Label
+  private var content: Content
 
-  public init<Content: View, Label: View>(
+  public init(
     @ViewBuilder content: () -> Content,
     @ViewBuilder label: () -> Label
   ) {
-    labelViews = declaredBuilderChildren(from: label())
-    contentViews = declaredBuilderChildren(from: content())
+    self.label = label()
+    self.content = content()
   }
 
-  public init<S: StringProtocol, Content: View>(
+  public init<S: StringProtocol>(
     _ title: S,
     @ViewBuilder content: () -> Content
-  ) {
-    labelViews = [AnyView(Text(String(title)))]
-    contentViews = declaredBuilderChildren(from: content())
+  ) where Label == Text {
+    label = Text(String(title))
+    self.content = content()
   }
 
   public init<S1: StringProtocol, S2: StringProtocol>(
     _ title: S1,
     value: S2
-  ) {
-    labelViews = [AnyView(Text(String(title)))]
-    contentViews = [AnyView(Text(String(value)))]
+  ) where Label == Text, Content == Text {
+    label = Text(String(title))
+    content = Text(String(value))
   }
 
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    AnyView(
-      HStack(alignment: .firstTextBaseline, spacing: 1) {
-        combinedView(from: labelViews, kindName: "LabeledContentLabel")
-          .foregroundStyle(.separator)
-        Spacer()
-        combinedView(from: contentViews, kindName: "LabeledContentValue")
-      }
-    ).resolveElements(in: context)
+    [resolvedNode(in: context)]
+  }
+}
+
+extension LabeledContent {
+  private func resolvedNode(
+    in context: ResolveContext
+  ) -> ResolvedNode {
+    HStack(alignment: .firstTextBaseline, spacing: 1) {
+      label
+        .foregroundStyle(.separator)
+      Spacer()
+      content
+    }
+    .resolve(in: context)
   }
 }
 
 /// Groups related controls into a compact row or stack.
-public struct ControlGroup: View, ResolvableView {
-  private var labelViews: [AnyView]
-  private var contentViews: [AnyView]
+public struct ControlGroup<Label: View, Content: View>: View, ResolvableView {
+  private var showsLabel: Bool
+  private var label: Label
+  private var content: Content
 
-  public init<Content: View>(
+  public init(
     @ViewBuilder content: () -> Content
-  ) {
-    labelViews = []
-    contentViews = declaredBuilderChildren(from: content())
+  ) where Label == EmptyView {
+    showsLabel = false
+    label = EmptyView()
+    self.content = content()
   }
 
-  public init<S: StringProtocol, Content: View>(
+  public init<S: StringProtocol>(
     _ title: S,
     @ViewBuilder content: () -> Content
-  ) {
-    labelViews = [AnyView(Text(String(title)))]
-    contentViews = declaredBuilderChildren(from: content())
+  ) where Label == Text {
+    showsLabel = true
+    label = Text(String(title))
+    self.content = content()
   }
 
-  public init<Content: View, Label: View>(
+  public init(
     @ViewBuilder content: () -> Content,
     @ViewBuilder label: () -> Label
   ) {
-    labelViews = declaredBuilderChildren(from: label())
-    contentViews = declaredBuilderChildren(from: content())
+    showsLabel = true
+    self.label = label()
+    self.content = content()
   }
 
   package func resolveElements(
@@ -112,55 +128,49 @@ public struct ControlGroup: View, ResolvableView {
     composedView().resolveElements(in: context)
   }
 
-  private func composedView() -> AnyView {
-    AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        if !labelViews.isEmpty {
-          composedLabel()
-        }
-        HStack(spacing: 1) {
-          ForEach(contentViews.indices, id: \.self) { index in
-            contentViews[index]
-          }
-        }
+  @ViewBuilder
+  private func composedView() -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if showsLabel {
+        label.foregroundStyle(.separator)
       }
-    )
-  }
-
-  private func composedLabel() -> AnyView {
-    AnyView(
-      combinedView(from: labelViews, kindName: "ControlGroupLabel")
-        .foregroundStyle(.separator)
-    )
+      HStack(spacing: 1) {
+        content
+      }
+    }
   }
 }
 
 /// Frames related content with optional label chrome.
-public struct GroupBox: View, ResolvableView {
-  private var labelViews: [AnyView]
-  private var contentViews: [AnyView]
+public struct GroupBox<Label: View, Content: View>: View, ResolvableView {
+  private var showsLabel: Bool
+  private var label: Label
+  private var content: Content
 
-  public init<Content: View>(
+  public init(
     @ViewBuilder content: () -> Content
-  ) {
-    labelViews = []
-    contentViews = declaredBuilderChildren(from: content())
+  ) where Label == EmptyView {
+    showsLabel = false
+    label = EmptyView()
+    self.content = content()
   }
 
-  public init<S: StringProtocol, Content: View>(
+  public init<S: StringProtocol>(
     _ title: S,
     @ViewBuilder content: () -> Content
-  ) {
-    labelViews = [AnyView(Text(String(title)))]
-    contentViews = declaredBuilderChildren(from: content())
+  ) where Label == Text {
+    showsLabel = true
+    label = Text(String(title))
+    self.content = content()
   }
 
-  public init<Content: View, Label: View>(
+  public init(
     @ViewBuilder content: () -> Content,
     @ViewBuilder label: () -> Label
   ) {
-    labelViews = declaredBuilderChildren(from: label())
-    contentViews = declaredBuilderChildren(from: content())
+    showsLabel = true
+    self.label = label()
+    self.content = content()
   }
 
   package func resolveElements(
@@ -169,12 +179,16 @@ public struct GroupBox: View, ResolvableView {
     composedView().resolveElements(in: context)
   }
 
-  private func composedView() -> AnyView {
-    AnyView(
-      EnvironmentReader(\.styleEnvironmentSnapshot) { styleEnvironment in
-        EnvironmentReader(\.controlProminence) { prominence in
-          let chrome = styleEnvironment.groupBoxChrome(prominence: prominence)
-          let content = groupBoxContent()
+  @ViewBuilder
+  private func composedView() -> some View {
+    EnvironmentReader(\.styleEnvironmentSnapshot) { styleEnvironment in
+      EnvironmentReader(\.controlProminence) { prominence in
+        let chrome = styleEnvironment.groupBoxChrome(prominence: prominence)
+        VStack(alignment: .leading, spacing: 0) {
+          if showsLabel {
+            label.foregroundStyle(.separator)
+          }
+          groupBoxContent()
             .padding(.init(horizontal: 1, vertical: 1))
             .background {
               RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
@@ -183,44 +197,20 @@ public struct GroupBox: View, ResolvableView {
               RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(chrome.borderStyle)
             }
             .foregroundStyle(chrome.foregroundStyle)
-
-          VStack(alignment: .leading, spacing: 0) {
-            if !labelViews.isEmpty {
-              groupBoxLabel()
-            }
-            content
-          }
-          .layoutMetadata(
-            .init(
-              minimumHeight: (labelViews.isEmpty ? 0 : 1) + 3
-            )
+        }
+        .layoutMetadata(
+          .init(
+            minimumHeight: (showsLabel ? 1 : 0) + 3
           )
-        }
+        )
       }
-    )
-  }
-
-  private func groupBoxContent() -> AnyView {
-    switch contentViews.count {
-    case 0:
-      return AnyView(EmptyView())
-    case 1:
-      return contentViews[0]
-    default:
-      return AnyView(
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(contentViews.indices, id: \.self) { index in
-            contentViews[index]
-          }
-        }
-      )
     }
   }
 
-  private func groupBoxLabel() -> AnyView {
-    AnyView(
-      combinedView(from: labelViews, kindName: "GroupBoxLabel")
-        .foregroundStyle(.separator)
-    )
+  @ViewBuilder
+  private func groupBoxContent() -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      content
+    }
   }
 }

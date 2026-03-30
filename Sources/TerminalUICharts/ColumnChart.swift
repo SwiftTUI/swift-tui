@@ -1,42 +1,15 @@
 import Core
 import View
 
-// AnyView policy: retain heterogeneous child storage here for authored label
-// and summary content.
 /// A vertical column chart for comparing labeled values.
-public struct ColumnChart: View, ResolvableView {
+public struct ColumnChart<Label: View, Summary: View>: View, ResolvableView {
   public var entries: [BarChartEntry]
   public var chartHeight: Int
   public var columnWidth: Int
-  private var labelViews: [AnyView]
-  private var summaryViews: [AnyView]
+  private let label: Label
+  private let summary: Summary
 
   public init(
-    entries: [BarChartEntry],
-    chartHeight: Int = 4,
-    columnWidth: Int = 2
-  ) {
-    self.entries = entries
-    self.chartHeight = chartHeight
-    self.columnWidth = columnWidth
-    labelViews = []
-    summaryViews = [AnyView(Text(columnChartSummaryText(entries)))]
-  }
-
-  public init<S: StringProtocol>(
-    _ title: S,
-    entries: [BarChartEntry],
-    chartHeight: Int = 4,
-    columnWidth: Int = 2
-  ) {
-    self.entries = entries
-    self.chartHeight = chartHeight
-    self.columnWidth = columnWidth
-    labelViews = [AnyView(Text(String(title)))]
-    summaryViews = [AnyView(Text(columnChartSummaryText(entries)))]
-  }
-
-  public init<Label: View, Summary: View>(
     entries: [BarChartEntry],
     chartHeight: Int = 4,
     columnWidth: Int = 2,
@@ -46,8 +19,8 @@ public struct ColumnChart: View, ResolvableView {
     self.entries = entries
     self.chartHeight = chartHeight
     self.columnWidth = columnWidth
-    labelViews = declaredBuilderChildren(from: label())
-    summaryViews = declaredBuilderChildren(from: summary())
+    self.label = label()
+    self.summary = summary()
   }
 
   package func resolveElements(
@@ -55,28 +28,52 @@ public struct ColumnChart: View, ResolvableView {
   ) -> [ResolvedNode] {
     let maximumValue = max(1, entries.map { abs($0.value) }.max() ?? 1)
 
-    return AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        if !labelViews.isEmpty || !summaryViews.isEmpty {
-          HStack(alignment: .center, spacing: 1) {
-            if !labelViews.isEmpty {
-              combinedView(from: labelViews, kindName: "ColumnChartLabel")
-                .foregroundStyle(.terminalBorder(.accent))
-            }
-            if !summaryViews.isEmpty {
-              Spacer()
-              combinedView(from: summaryViews, kindName: "ColumnChartSummary")
-                .foregroundStyle(.separator)
-            }
-          }
-        }
-        columnChartBody(
-          entries: entries,
-          maximumValue: maximumValue,
-          chartHeight: chartHeight,
-          columnWidth: columnWidth
-        )
-      }
-    ).resolveElements(in: context)
+    return [
+      resolveView(
+        VStack(alignment: .leading, spacing: 0) {
+          chartHeader(label: label, summary: summary)
+          columnChartBody(
+            entries: entries,
+            maximumValue: maximumValue,
+            chartHeight: chartHeight,
+            columnWidth: columnWidth
+          )
+        },
+        in: context
+      )
+    ]
+  }
+}
+
+extension ColumnChart where Label == EmptyView, Summary == Text {
+  public init(
+    entries: [BarChartEntry],
+    chartHeight: Int = 4,
+    columnWidth: Int = 2
+  ) {
+    self.init(
+      entries: entries,
+      chartHeight: chartHeight,
+      columnWidth: columnWidth,
+      label: { EmptyView() },
+      summary: { Text(columnChartSummaryText(entries)) }
+    )
+  }
+}
+
+extension ColumnChart where Label == Text, Summary == Text {
+  public init<S: StringProtocol>(
+    _ title: S,
+    entries: [BarChartEntry],
+    chartHeight: Int = 4,
+    columnWidth: Int = 2
+  ) {
+    self.init(
+      entries: entries,
+      chartHeight: chartHeight,
+      columnWidth: columnWidth,
+      label: { Text(String(title)) },
+      summary: { Text(columnChartSummaryText(entries)) }
+    )
   }
 }

@@ -1,37 +1,14 @@
 import Core
 import View
 
-// AnyView policy: retain heterogeneous child storage here for authored label
-// and trailing content.
 /// A compact trend line rendered in terminal cells.
-public struct Sparkline: View, ResolvableView {
+public struct Sparkline<Label: View, Summary: View>: View, ResolvableView {
   public var tone: BannerTone
   public var values: [Double]
-  private var labelViews: [AnyView]
-  private var trailingViews: [AnyView]
+  private let label: Label
+  private let trailing: Summary
 
   public init(
-    values: [Double],
-    tone: BannerTone = .automatic
-  ) {
-    self.tone = tone
-    self.values = values
-    labelViews = []
-    trailingViews = [AnyView(Text(sparklineSummaryText(values)))]
-  }
-
-  public init<S: StringProtocol>(
-    _ title: S,
-    values: [Double],
-    tone: BannerTone = .automatic
-  ) {
-    self.tone = tone
-    self.values = values
-    labelViews = [AnyView(Text(String(title)))]
-    trailingViews = [AnyView(Text(sparklineSummaryText(values)))]
-  }
-
-  public init<Label: View, Summary: View>(
     values: [Double],
     tone: BannerTone = .automatic,
     @ViewBuilder label: () -> Label,
@@ -39,31 +16,51 @@ public struct Sparkline: View, ResolvableView {
   ) {
     self.tone = tone
     self.values = values
-    labelViews = declaredBuilderChildren(from: label())
-    trailingViews = declaredBuilderChildren(from: summary())
+    self.label = label()
+    self.trailing = summary()
   }
 
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        if !labelViews.isEmpty || !trailingViews.isEmpty {
-          HStack(alignment: .center, spacing: 1) {
-            if !labelViews.isEmpty {
-              combinedView(from: labelViews, kindName: "SparklineLabel")
-                .foregroundStyle(.terminalBorder(.accent))
-            }
-            if !trailingViews.isEmpty {
-              Spacer()
-              combinedView(from: trailingViews, kindName: "SparklineSummary")
-                .foregroundStyle(.separator)
-            }
-          }
-        }
-        Text(sparklineGlyphString(values))
-          .foregroundStyle(metricAccentStyle(for: tone))
-      }
-    ).resolveElements(in: context)
+    return [
+      resolveView(
+        VStack(alignment: .leading, spacing: 0) {
+          chartHeader(label: label, summary: trailing)
+          Text(sparklineGlyphString(values))
+            .foregroundStyle(metricAccentStyle(for: tone))
+        },
+        in: context
+      )
+    ]
+  }
+}
+
+extension Sparkline where Label == EmptyView, Summary == Text {
+  public init(
+    values: [Double],
+    tone: BannerTone = .automatic
+  ) {
+    self.init(
+      values: values,
+      tone: tone,
+      label: { EmptyView() },
+      summary: { Text(sparklineSummaryText(values)) }
+    )
+  }
+}
+
+extension Sparkline where Label == Text, Summary == Text {
+  public init<S: StringProtocol>(
+    _ title: S,
+    values: [Double],
+    tone: BannerTone = .automatic
+  ) {
+    self.init(
+      values: values,
+      tone: tone,
+      label: { Text(String(title)) },
+      summary: { Text(sparklineSummaryText(values)) }
+    )
   }
 }

@@ -25,18 +25,17 @@ public struct TileBackground: View, ResolvableView {
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        ForEach(0..<height) { row in
-          Text(tiledLine(for: row))
-            .foregroundStyle(style)
-            .drawMetadata(.init(opacity: opacity))
-            .lineLimit(1)
-            .frame(width: width, alignment: .leading)
-        }
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(0..<height) { row in
+        Text(tiledLine(for: row))
+          .foregroundStyle(style)
+          .drawMetadata(.init(opacity: opacity))
+          .lineLimit(1)
+          .frame(width: width, alignment: .leading)
       }
-      .frame(width: width, height: height, alignment: .topLeading)
-    ).resolveElements(in: context)
+    }
+    .frame(width: width, height: height, alignment: .topLeading)
+    .resolveElements(in: context)
   }
 
   private func tiledLine(

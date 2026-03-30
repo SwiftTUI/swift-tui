@@ -278,28 +278,26 @@ package func textEditorBody(
   displayText: String,
   chrome: ControlChrome,
   scrollPosition: Binding<ScrollPosition>
-) -> AnyView {
-  AnyView(
-    ScrollView(.vertical, showsIndicators: true, position: scrollPosition) {
-      VStack(alignment: .leading, spacing: 0) {
-        Text(displayText)
-          .fixedSize(horizontal: false, vertical: true)
-          .foregroundStyle(chrome.foregroundStyle)
-          .drawMetadata(.init(opacity: chrome.opacity))
-      }
-      .padding(.init(horizontal: 1, vertical: 1))
+) -> some View {
+  ScrollView(.vertical, showsIndicators: true, position: scrollPosition) {
+    VStack(alignment: .leading, spacing: 0) {
+      Text(displayText)
+        .fixedSize(horizontal: false, vertical: true)
+        .foregroundStyle(chrome.foregroundStyle)
+        .drawMetadata(.init(opacity: chrome.opacity))
     }
-    .background {
-      RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-        chrome.borderStyle,
-        backgroundStyle: chrome.borderBackgroundStyle
-      )
-    }
-    .layoutMetadata(.init(minimumHeight: 3))
-  )
+    .padding(.init(horizontal: 1, vertical: 1))
+  }
+  .background {
+    RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
+  }
+  .overlay {
+    RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+      chrome.borderStyle,
+      backgroundStyle: chrome.borderBackgroundStyle
+    )
+  }
+  .layoutMetadata(.init(minimumHeight: 3))
 }
 
 struct PointerRouteView<Content: View>: View, ResolvableView {

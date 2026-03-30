@@ -1,33 +1,16 @@
 import Core
 import View
 
-// AnyView policy: retain heterogeneous child storage here for authored label
-// and current-value content.
 /// A compact meter for displaying a single fractional value.
-public struct Meter: View, ResolvableView {
+public struct Meter<Label: View, CurrentValueLabel: View>: View, ResolvableView {
   public var tone: BannerTone
   public var value: Double
   public var total: Double
   public var barWidth: Int
-  private var labelViews: [AnyView]
-  private var currentValueViews: [AnyView]
+  private let label: Label
+  private let currentValueLabel: CurrentValueLabel
 
-  public init<S: StringProtocol>(
-    _ title: S,
-    value: Double,
-    total: Double = 1,
-    tone: BannerTone = .automatic,
-    barWidth: Int = 12
-  ) {
-    self.tone = tone
-    self.value = value
-    self.total = total
-    self.barWidth = barWidth
-    labelViews = [AnyView(Text(String(title)))]
-    currentValueViews = [AnyView(Text(meterSummaryText(value: value, total: total)))]
-  }
-
-  public init<Label: View, CurrentValueLabel: View>(
+  public init(
     value: Double,
     total: Double = 1,
     tone: BannerTone = .automatic,
@@ -39,21 +22,68 @@ public struct Meter: View, ResolvableView {
     self.value = value
     self.total = total
     self.barWidth = barWidth
-    labelViews = declaredBuilderChildren(from: label())
-    currentValueViews = declaredBuilderChildren(from: currentValueLabel())
+    self.label = label()
+    self.currentValueLabel = currentValueLabel()
   }
 
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    AnyView(
-      metricTrackView(
-        labelViews: labelViews,
-        trailingViews: currentValueViews,
-        fraction: progressFraction(value: value, total: total),
-        barWidth: barWidth,
-        accentStyle: metricAccentStyle(for: tone)
+    let track = metricTrackString(
+      fraction: progressFraction(value: value, total: total),
+      barWidth: barWidth
+    )
+
+    return [
+      resolveView(
+        VStack(alignment: .leading, spacing: 0) {
+          chartHeader(label: label, summary: currentValueLabel)
+          HStack(alignment: .center, spacing: 0) {
+            Text(track.filled)
+              .foregroundStyle(metricAccentStyle(for: tone))
+            Text(track.empty)
+              .foregroundStyle(.separator)
+          }
+        },
+        in: context
       )
-    ).resolveElements(in: context)
+    ]
+  }
+}
+
+extension Meter where Label == EmptyView, CurrentValueLabel == Text {
+  public init(
+    value: Double,
+    total: Double = 1,
+    tone: BannerTone = .automatic,
+    barWidth: Int = 12
+  ) {
+    self.init(
+      value: value,
+      total: total,
+      tone: tone,
+      barWidth: barWidth,
+      label: { EmptyView() },
+      currentValueLabel: { Text(meterSummaryText(value: value, total: total)) }
+    )
+  }
+}
+
+extension Meter where Label == Text, CurrentValueLabel == Text {
+  public init<S: StringProtocol>(
+    _ title: S,
+    value: Double,
+    total: Double = 1,
+    tone: BannerTone = .automatic,
+    barWidth: Int = 12
+  ) {
+    self.init(
+      value: value,
+      total: total,
+      tone: tone,
+      barWidth: barWidth,
+      label: { Text(String(title)) },
+      currentValueLabel: { Text(meterSummaryText(value: value, total: total)) }
+    )
   }
 }

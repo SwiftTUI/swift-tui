@@ -1,19 +1,17 @@
 public import Core
 
-// AnyView policy: retain heterogeneous child storage and deferred
-// authored-content capture here for navigation containers.
 /// Selects one child view from a tagged set and renders a terminal-native tab
 /// strip above the active content.
-public struct TabView<SelectionValue: Hashable>: View, ResolvableView {
+public struct TabView<SelectionValue: Hashable, Content: View>: View, ResolvableView {
   public var selection: Binding<SelectionValue>
-  private var contentViews: [AnyView]
+  private var content: Content
 
-  public init<Content: View>(
+  public init(
     selection: Binding<SelectionValue>,
     @ViewBuilder content: () -> Content
   ) {
     self.selection = selection
-    contentViews = declaredBuilderChildren(from: content())
+    self.content = content()
   }
 
   package func resolveElements(
@@ -119,10 +117,13 @@ extension TabView {
   private func resolvedOptions(
     in context: ResolveContext
   ) -> [TabOption] {
-    contentViews.enumerated().compactMap { index, view in
-      let node = view.resolve(
-        in: context.child(component: .indexed("Tab", index: index))
-      )
+    resolveDeclaredChildren(
+      content,
+      in: context.child(component: .named("TabOptions")),
+      kindName: "Tab"
+    )
+    .enumerated()
+    .compactMap { index, node in
       guard let tag = tabSelectionTag(in: node) else {
         return nil
       }
@@ -134,6 +135,7 @@ extension TabView {
     }
   }
 
+  @ViewBuilder
   private func tabBody(
     controlIdentity: Identity,
     options: [TabOption],
@@ -141,11 +143,11 @@ extension TabView {
     isFocused: Bool,
     showsFocusEffect: Bool,
     styleEnvironment: StyleEnvironmentSnapshot
-  ) -> AnyView {
+  ) -> some View {
     let activeIndex = selectedIndex ?? 0
     let activeTone: TerminalTone = .accent
 
-    let tabStrip = AnyView(
+    VStack(alignment: .leading, spacing: 0) {
       HStack(alignment: .center, spacing: 1) {
         ForEach(options.indices, id: \.self) { index in
           let option = options[index]
@@ -182,35 +184,22 @@ extension TabView {
               for: controlIdentity,
               index: index
             ),
-            content: AnyView(tabLabel)
+            content: tabLabel
           )
         }
         Spacer(minLength: 0)
       }
       .frame(height: 1, alignment: .leading)
-    )
-
-    let content =
+      Divider()
       if options.indices.contains(activeIndex) {
-        AnyView(
-          options[activeIndex].node.erasedToAnyView()
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        )
+        ResolvedContentView(node: options[activeIndex].node)
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       } else {
-        AnyView(
-          EmptyView()
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        )
+        EmptyView()
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
-
-    return AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        tabStrip
-        Divider()
-        content
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    )
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 
@@ -219,22 +208,19 @@ extension TabView {
 public struct NavigationSplitView<Sidebar: View, Content: View, Detail: View>: View,
   ResolvableView
 {
-  private var sidebarView: AnyView
-  private var contentView: AnyView?
-  private var detailView: AnyView
+  private var sidebarView: Sidebar
+  private var showsContent: Bool
+  private var contentView: Content
+  private var detailView: Detail
 
   public init(
     @ViewBuilder sidebar: () -> Sidebar,
     @ViewBuilder detail: () -> Detail
   ) where Content == EmptyView {
-    let authoringScope = currentDynamicPropertyScope()
-    sidebarView = scopedAnyView(authoringScope: authoringScope) {
-      sidebar()
-    }
-    contentView = nil
-    detailView = scopedAnyView(authoringScope: authoringScope) {
-      detail()
-    }
+    sidebarView = sidebar()
+    showsContent = false
+    contentView = EmptyView()
+    detailView = detail()
   }
 
   public init(
@@ -242,16 +228,10 @@ public struct NavigationSplitView<Sidebar: View, Content: View, Detail: View>: V
     @ViewBuilder content: () -> Content,
     @ViewBuilder detail: () -> Detail
   ) {
-    let authoringScope = currentDynamicPropertyScope()
-    sidebarView = scopedAnyView(authoringScope: authoringScope) {
-      sidebar()
-    }
-    contentView = scopedAnyView(authoringScope: authoringScope) {
-      content()
-    }
-    detailView = scopedAnyView(authoringScope: authoringScope) {
-      detail()
-    }
+    sidebarView = sidebar()
+    showsContent = true
+    contentView = content()
+    detailView = detail()
   }
 
   package func resolveElements(
@@ -260,27 +240,26 @@ public struct NavigationSplitView<Sidebar: View, Content: View, Detail: View>: V
     composedView().resolveElements(in: context)
   }
 
-  private func composedView() -> AnyView {
-    AnyView(
-      HStack(alignment: .top, spacing: 0) {
-        sidebarView
-          .frame(maxHeight: .infinity, alignment: .topLeading)
-          .clipped()
-        Divider()
+  @ViewBuilder
+  private func composedView() -> some View {
+    HStack(alignment: .top, spacing: 0) {
+      sidebarView
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .clipped()
+      Divider()
 
-        if let contentView {
-          contentView
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .clipped()
-          Divider()
-        }
-
-        detailView
+      if showsContent {
+        contentView
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
           .clipped()
+        Divider()
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    )
+
+      detailView
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .clipped()
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 
@@ -333,13 +312,6 @@ private func tabItemLabel(
     }
   }
   return nil
-}
-
-extension ResolvedNode {
-  @MainActor
-  fileprivate func erasedToAnyView() -> AnyView {
-    AnyView(ResolvedContentView(node: self))
-  }
 }
 
 private struct ResolvedContentView: View, ResolvableView {

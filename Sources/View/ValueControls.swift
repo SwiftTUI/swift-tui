@@ -1,26 +1,24 @@
 package import Core
 
-// AnyView policy: retain heterogeneous child storage here for authored labels
-// and local branch unification in value-control rendering.
 /// Toggles a boolean binding on or off.
-public struct Toggle: View, ResolvableView {
+public struct Toggle<Label: View>: View, ResolvableView {
   public var isOn: Binding<Bool>
-  private var labelViews: [AnyView]
+  private var label: Label
 
-  public init<Label: View>(
+  public init(
     isOn: Binding<Bool>,
     @ViewBuilder label: () -> Label
   ) {
     self.isOn = isOn
-    labelViews = declaredBuilderChildren(from: label())
+    self.label = label()
   }
 
   public init<S: StringProtocol>(
     _ title: S,
     isOn: Binding<Bool>
-  ) {
+  ) where Label == Text {
     self.isOn = isOn
-    labelViews = [AnyView(Text(String(title)))]
+    label = Text(String(title))
   }
 
   package func resolveElements(
@@ -84,12 +82,13 @@ extension Toggle {
     )
   }
 
+  @ViewBuilder
   private func toggleBody(
     isOn: Bool,
     isFocused: Bool,
     isPressed: Bool,
     chrome: ControlChrome
-  ) -> AnyView {
+  ) -> some View {
     let indicatorStyle =
       isOn
       ? chrome.borderStyle
@@ -99,33 +98,26 @@ extension Toggle {
       ? chrome.borderStyle
       : AnyShapeStyle(.background)
 
-    let rowContent = AnyView(
-      HStack(alignment: .center, spacing: 1) {
-        if isFocused {
-          Text("▌ ")
-            .foregroundStyle(markerStyle)
+    let rowContent = HStack(alignment: .center, spacing: 1) {
+      if isFocused {
+        Text("▌ ")
+          .foregroundStyle(markerStyle)
+      }
+      Text(isOn ? "◉" : "○")
+        .foregroundStyle(indicatorStyle)
+      label
+    }
+    .foregroundStyle(chrome.foregroundStyle)
+    .drawMetadata(.init(opacity: chrome.opacity))
+
+    if isFocused || isPressed {
+      rowContent
+        .background {
+          Rectangle().fill(chrome.backgroundStyle)
         }
-        Text(isOn ? "◉" : "○")
-          .foregroundStyle(indicatorStyle)
-        combinedView(from: labelViews, kindName: "ToggleLabel")
-      }
-      .foregroundStyle(chrome.foregroundStyle)
-      .drawMetadata(.init(opacity: chrome.opacity))
-    )
-
-    let body =
-      if isFocused || isPressed {
-        AnyView(
-          rowContent
-            .background {
-              Rectangle().fill(chrome.backgroundStyle)
-            }
-        )
-      } else {
-        rowContent
-      }
-
-    return body
+    } else {
+      rowContent
+    }
   }
 }
 
@@ -179,102 +171,104 @@ package func textEntryDisplayText(
 }
 
 @MainActor
-package func textEntryFieldBody(
+package func textEntryFieldBody<Label: View>(
   displayText: String,
   isShowingPrompt: Bool,
-  labelViews: [AnyView],
+  label: Label,
+  showsLabel: Bool,
   style: TextFieldStyle,
   chrome: ControlChrome,
   placeholderStyle: AnyShapeStyle,
   chromePreset: ChromePreset
-) -> AnyView {
+) -> some View {
   let textStyle =
     isShowingPrompt ? placeholderStyle : chrome.foregroundStyle
-  let baseField = AnyView(
+  let baseField =
     Text(displayText)
-      .fixedSize(horizontal: true, vertical: false)
-      .foregroundStyle(textStyle)
-      .drawMetadata(.init(opacity: chrome.opacity))
-  )
-  let stretchedField = AnyView(
+    .fixedSize(horizontal: true, vertical: false)
+    .foregroundStyle(textStyle)
+    .drawMetadata(.init(opacity: chrome.opacity))
+  let stretchedField =
     HStack(alignment: .center, spacing: 0) {
       baseField
       Spacer(minLength: 0)
     }
-  )
 
-  let fieldContent =
+  @ViewBuilder
+  func fieldContent() -> some View {
     switch style {
     case .plain:
-      AnyView(baseField)
+      baseField
     case .roundedBorder, .automatic:
-      AnyView(
-        stretchedField
-          .padding(.init(horizontal: 1, vertical: 1))
-          .background {
-            RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
-          }
-          .overlay {
-            RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-              chrome.borderStyle,
-              backgroundStyle: chrome.borderBackgroundStyle
-            )
-          }
-      )
-    }
-
-  let body =
-    if labelViews.isEmpty {
-      fieldContent
-    } else {
-      AnyView(
-        VStack(alignment: .leading, spacing: 0) {
-          combinedView(from: labelViews, kindName: "TextFieldLabel")
-            .foregroundStyle(.terminalBorder(.accent))
-          fieldContent
+      stretchedField
+        .padding(.init(horizontal: 1, vertical: 1))
+        .background {
+          RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
         }
-      )
+        .overlay {
+          RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+            chrome.borderStyle,
+            backgroundStyle: chrome.borderBackgroundStyle
+          )
+        }
     }
+  }
 
-  let protectedBody =
+  @ViewBuilder
+  func labeledField() -> some View {
+    if showsLabel {
+      VStack(alignment: .leading, spacing: 0) {
+        label
+          .foregroundStyle(.terminalBorder(.accent))
+        fieldContent()
+      }
+    } else {
+      fieldContent()
+    }
+  }
+
+  @ViewBuilder
+  func bodyView() -> some View {
     switch style {
     case .roundedBorder, .automatic:
-      AnyView(
-        body.layoutMetadata(
-          .init(
-            minimumHeight: (labelViews.isEmpty ? 0 : 1) + 3
-          )
+      labeledField().layoutMetadata(
+        .init(
+          minimumHeight: (showsLabel ? 1 : 0) + 3
         )
       )
     default:
-      body
+      labeledField()
     }
+  }
 
-  return protectedBody
+  return bodyView()
 }
 
-public struct TextField: View, ResolvableView {
+public struct TextField<Label: View>: View, ResolvableView {
   public var text: Binding<String>
   public var prompt: Text?
-  private var labelViews: [AnyView]
+  private var label: Label
+  private var showsLabel: Bool
 
   public init<S: StringProtocol>(
     _ title: S,
     text: Binding<String>
-  ) {
+  ) where Label == EmptyView {
     self.text = text
     prompt = Text(String(title))
-    labelViews = []
+    label = EmptyView()
+    showsLabel = false
   }
 
-  public init<Label: View>(
+  public init(
     text: Binding<String>,
     prompt: Text? = nil,
     @ViewBuilder label: () -> Label
   ) {
     self.text = text
     self.prompt = prompt
-    labelViews = declaredBuilderChildren(from: label())
+    self.label = label()
+    showsLabel = true
   }
 
   package func resolveElements(
@@ -312,7 +306,8 @@ extension TextField {
     let child = textEntryFieldBody(
       displayText: entryText.displayText,
       isShowingPrompt: entryText.isShowingPrompt,
-      labelViews: labelViews,
+      label: label,
+      showsLabel: showsLabel,
       style: effectiveStyle,
       chrome: chrome,
       placeholderStyle: styleEnvironment.theme.placeholder,
@@ -336,29 +331,29 @@ extension TextField {
 }
 
 /// Reveals or hides nested content behind an expansion control.
-public struct DisclosureGroup: View, ResolvableView {
+public struct DisclosureGroup<Label: View, Content: View>: View, ResolvableView {
   public var isExpanded: Binding<Bool>
-  private var labelViews: [AnyView]
-  private var contentViews: [AnyView]
+  private var label: Label
+  private var content: Content
 
-  public init<Content: View, Label: View>(
+  public init(
     isExpanded: Binding<Bool>,
     @ViewBuilder content: @escaping () -> Content,
     @ViewBuilder label: () -> Label
   ) {
     self.isExpanded = isExpanded
-    labelViews = declaredBuilderChildren(from: label())
-    contentViews = declaredBuilderChildren(from: content())
+    self.label = label()
+    self.content = content()
   }
 
-  public init<S: StringProtocol, Content: View>(
+  public init<S: StringProtocol>(
     _ title: S,
     isExpanded: Binding<Bool>,
     @ViewBuilder content: @escaping () -> Content
-  ) {
+  ) where Label == Text {
     self.isExpanded = isExpanded
-    labelViews = [AnyView(Text(String(title)))]
-    contentViews = declaredBuilderChildren(from: content())
+    label = Text(String(title))
+    self.content = content()
   }
 
   package func resolveElements(
@@ -421,51 +416,41 @@ extension DisclosureGroup {
     )
   }
 
+  @ViewBuilder
   private func disclosureBody(
     isExpanded: Bool,
     isFocused: Bool,
     isPressed: Bool,
     chrome: ControlChrome
-  ) -> AnyView {
+  ) -> some View {
     let indicatorStyle =
       isExpanded
       ? AnyShapeStyle(.tint)
       : AnyShapeStyle(.separator)
-    let labelRow = AnyView(
-      HStack(alignment: .center, spacing: 1) {
-        if isFocused {
-          Text("| ")
-            .foregroundStyle(chrome.borderStyle)
-        }
-        Text(isExpanded ? "▾" : "▸")
-          .foregroundStyle(indicatorStyle)
-        combinedView(from: labelViews, kindName: "DisclosureLabel")
+    let labelRow = HStack(alignment: .center, spacing: 1) {
+      if isFocused {
+        Text("| ")
+          .foregroundStyle(chrome.borderStyle)
       }
-      .foregroundStyle(chrome.foregroundStyle)
-      .drawMetadata(.init(opacity: chrome.opacity))
-    )
-    let highlightedLabel =
+      Text(isExpanded ? "▾" : "▸")
+        .foregroundStyle(indicatorStyle)
+      label
+    }
+    .foregroundStyle(chrome.foregroundStyle)
+    .drawMetadata(.init(opacity: chrome.opacity))
+    VStack(alignment: .leading, spacing: 0) {
       if isFocused || isPressed {
-        AnyView(
-          labelRow
-            .background {
-              Rectangle().fill(chrome.backgroundStyle)
-            }
-        )
+        labelRow
+          .background {
+            Rectangle().fill(chrome.backgroundStyle)
+          }
       } else {
         labelRow
       }
-
-    let body = AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        highlightedLabel
-        if isExpanded {
-          combinedView(from: contentViews, kindName: "DisclosureContent")
-            .padding(.init(top: 0, leading: 1, bottom: 0, trailing: 0))
-        }
+      if isExpanded {
+        content
+          .padding(.init(top: 0, leading: 1, bottom: 0, trailing: 0))
       }
-    )
-
-    return body
+    }
   }
 }

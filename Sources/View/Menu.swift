@@ -1,27 +1,25 @@
 package import Core
 
-// AnyView policy: retain heterogeneous child storage here for authored labels
-// and menu content.
 /// A focusable command menu that expands inline when activated.
-public struct Menu: View, ResolvableView {
+public struct Menu<Label: View, Content: View>: View, ResolvableView {
   @State private var isExpanded = false
-  package var labelViews: [AnyView]
-  package var contentViews: [AnyView]
+  package var label: Label
+  package var content: Content
 
-  public init<S: StringProtocol, Content: View>(
+  public init<S: StringProtocol>(
     _ title: S,
     @ViewBuilder content: () -> Content
-  ) {
-    labelViews = [AnyView(Text(String(title)))]
-    contentViews = declaredBuilderChildren(from: content())
+  ) where Label == Text {
+    label = Text(String(title))
+    self.content = content()
   }
 
-  public init<Label: View, Content: View>(
+  public init(
     @ViewBuilder label: () -> Label,
     @ViewBuilder content: () -> Content
   ) {
-    labelViews = declaredBuilderChildren(from: label())
-    contentViews = declaredBuilderChildren(from: content())
+    self.label = label()
+    self.content = content()
   }
 
   package func resolveElements(

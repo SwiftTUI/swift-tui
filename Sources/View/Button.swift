@@ -1,49 +1,47 @@
 public import Core
 
-// AnyView policy: retain heterogeneous child storage here for authored labels
-// and local branch unification in button rendering.
 /// A focusable control that triggers an action when activated.
-public struct Button: View, ResolvableView {
+public struct Button<Label: View>: View, ResolvableView {
   public var role: ButtonRole?
   private var action: (@MainActor @Sendable () -> Void)?
-  private var labelViews: [AnyView]
+  private var label: Label
 
   public init(
     _ title: String,
     role: ButtonRole? = nil
-  ) {
+  ) where Label == Text {
     self.role = role
     action = nil
-    labelViews = [AnyView(Text(title))]
+    label = Text(title)
   }
 
-  public init<Label: View>(
+  public init(
     role: ButtonRole? = nil,
     @ViewBuilder label: () -> Label
   ) {
     self.role = role
     action = nil
-    labelViews = declaredBuilderChildren(from: label())
+    self.label = label()
   }
 
   public init(
     _ title: String,
     role: ButtonRole? = nil,
     action: @escaping @MainActor @Sendable () -> Void
-  ) {
+  ) where Label == Text {
     self.role = role
     self.action = action
-    labelViews = [AnyView(Text(title))]
+    label = Text(title)
   }
 
-  public init<Label: View>(
+  public init(
     role: ButtonRole? = nil,
     action: @escaping @MainActor @Sendable () -> Void,
     @ViewBuilder label: () -> Label
   ) {
     self.role = role
     self.action = action
-    labelViews = declaredBuilderChildren(from: label())
+    self.label = label()
   }
 
   package func resolveElements(
@@ -118,141 +116,106 @@ extension Button {
     )
   }
 
+  @ViewBuilder
   private func buttonBody(
     buttonStyle: ButtonStyle,
     chrome: ControlChrome,
     chromePreset: ChromePreset,
     prominence: ControlProminence,
     borderShape: ButtonBorderShape
-  ) -> AnyView {
-    let baseLabel = AnyView(
-      composedLabelView()
-        .foregroundStyle(chrome.foregroundStyle)
-        .drawMetadata(.init(opacity: chrome.opacity))
-    )
+  ) -> some View {
+    let baseLabel =
+      label
+      .foregroundStyle(chrome.foregroundStyle)
+      .drawMetadata(.init(opacity: chrome.opacity))
 
-    let label: AnyView
     switch buttonStyle {
     case .plain:
-      label = baseLabel
+      baseLabel
     case .link:
-      label = AnyView(
-        baseLabel
-          .underline()
-          .background {
-            Rectangle().fill(chrome.backgroundStyle)
-          }
-      )
+      baseLabel
+        .underline()
+        .background {
+          Rectangle().fill(chrome.backgroundStyle)
+        }
     case .automatic, .bordered, .borderedProminent:
       let usesDenseBorderlessChrome =
         chromePreset == .standard && buttonStyle != .bordered
-      label = AnyView(
+      let styledLabel =
         baseLabel
-          .padding(
-            .init(
-              horizontal: 1,
-              vertical: chromePreset == .legacy || buttonStyle == .bordered ? 1 : 0
-            )
+        .padding(
+          .init(
+            horizontal: 1,
+            vertical: chromePreset == .legacy || buttonStyle == .bordered ? 1 : 0
           )
-          .background {
-            buttonBackground(
-              usesDenseBorderlessChrome: usesDenseBorderlessChrome,
-              prominence: prominence,
-              borderShape: borderShape,
-              style: chrome.backgroundStyle
-            )
-          }
-          .overlay {
-            Group {
-              if !usesDenseBorderlessChrome {
-                buttonBorder(
-                  prominence: prominence,
-                  borderShape: borderShape,
-                  style: chrome.borderStyle,
-                  backgroundStyle: chrome.borderBackgroundStyle
-                )
-              } else {
-                EmptyView()
-              }
-            }
-          }
-      )
-    }
-
-    let protectedLabel =
-      switch buttonStyle {
-      case .automatic, .bordered, .borderedProminent:
-        if chromePreset == .standard && buttonStyle != .bordered {
-          label
-        } else {
-          AnyView(
-            label.layoutMetadata(
-              .init(minimumHeight: 3)
-            )
+        )
+        .background {
+          buttonBackground(
+            usesDenseBorderlessChrome: usesDenseBorderlessChrome,
+            prominence: prominence,
+            borderShape: borderShape,
+            style: chrome.backgroundStyle
           )
         }
-      case .plain, .link:
-        label
+        .overlay {
+          if !usesDenseBorderlessChrome {
+            buttonBorder(
+              prominence: prominence,
+              borderShape: borderShape,
+              style: chrome.borderStyle,
+              backgroundStyle: chrome.borderBackgroundStyle
+            )
+          }
+        }
+
+      if chromePreset == .standard && buttonStyle != .bordered {
+        styledLabel
+      } else {
+        styledLabel.layoutMetadata(.init(minimumHeight: 3))
       }
-
-    return protectedLabel
+    }
   }
 
-  private func composedLabelView() -> AnyView {
-    combinedView(from: labelViews, kindName: "ButtonLabel")
-  }
-
+  @ViewBuilder
   private func buttonBackground(
     usesDenseBorderlessChrome: Bool,
     prominence: ControlProminence,
     borderShape: ButtonBorderShape,
     style: AnyShapeStyle
-  ) -> AnyView {
-    if usesDenseBorderlessChrome {
-      switch (borderShape, prominence) {
-      case (.roundedRectangle, _), (.automatic, .increased):
-        return AnyView(
-          RoundedRectangle(cornerRadius: 1).fill(style)
-        )
-      default:
-        return AnyView(
-          Rectangle().fill(style)
-        )
-      }
-    }
-
+  ) -> some View {
     switch (borderShape, prominence) {
     case (.roundedRectangle, _), (.automatic, .increased):
-      return AnyView(
+      if usesDenseBorderlessChrome {
+        RoundedRectangle(cornerRadius: 1).fill(style)
+      } else {
         RoundedRectangle(cornerRadius: 1).chromeFill(style)
-      )
+      }
     default:
-      return AnyView(
+      if usesDenseBorderlessChrome {
+        Rectangle().fill(style)
+      } else {
         Rectangle().chromeFill(style)
-      )
+      }
     }
   }
 
+  @ViewBuilder
   private func buttonBorder(
     prominence: ControlProminence,
     borderShape: ButtonBorderShape,
     style: AnyShapeStyle,
     backgroundStyle: AnyShapeStyle?
-  ) -> AnyView {
+  ) -> some View {
     switch (borderShape, prominence) {
     case (.roundedRectangle, _), (.automatic, .increased):
-      return AnyView(
-        RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-          style,
-          backgroundStyle: backgroundStyle
-        )
+      RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+        style,
+        backgroundStyle: backgroundStyle
       )
     default:
-      return AnyView(
-        Rectangle().chromeStrokeBorder(
-          style,
-          backgroundStyle: backgroundStyle
-        )
+      Rectangle().chromeStrokeBorder(
+        style,
+        backgroundStyle: backgroundStyle
       )
     }
   }

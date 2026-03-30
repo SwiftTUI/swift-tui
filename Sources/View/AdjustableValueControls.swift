@@ -1,27 +1,25 @@
 package import Core
 
-// AnyView policy: retain heterogeneous child storage here for authored labels
-// and control branches.
 /// Increments or decrements an integer binding.
-public struct Stepper: View, ResolvableView {
+public struct Stepper<Label: View>: View, ResolvableView {
   public var value: Binding<Int>
   public var bounds: ClosedRange<Int>?
   public var step: Int
-  private var labelViews: [AnyView]
+  private var label: Label
 
   public init<S: StringProtocol>(
     _ title: S,
     value: Binding<Int>,
     in bounds: ClosedRange<Int>? = nil,
     step: Int = 1
-  ) {
+  ) where Label == Text {
     self.value = value
     self.bounds = bounds
     self.step = max(1, step)
-    labelViews = [AnyView(Text(String(title)))]
+    label = Text(String(title))
   }
 
-  public init<Label: View>(
+  public init(
     value: Binding<Int>,
     in bounds: ClosedRange<Int>? = nil,
     step: Int = 1,
@@ -30,7 +28,7 @@ public struct Stepper: View, ResolvableView {
     self.value = value
     self.bounds = bounds
     self.step = max(1, step)
-    labelViews = declaredBuilderChildren(from: label())
+    self.label = label()
   }
 
   package func resolveElements(
@@ -183,6 +181,7 @@ extension Stepper {
     )
   }
 
+  @ViewBuilder
   private func stepperBody(
     controlIdentity: Identity,
     value: Int,
@@ -192,7 +191,7 @@ extension Stepper {
     isActiveNavigation: Bool,
     chrome: ControlChrome,
     contentChrome: ControlChrome
-  ) -> AnyView {
+  ) -> some View {
     let inactiveStyle = AnyShapeStyle(.placeholder)
     let controlForeground =
       isActiveNavigation
@@ -210,71 +209,56 @@ extension Stepper {
       .foregroundStyle(canIncrement ? controlAccent : inactiveStyle)
       .id(stepperIncrementIdentity(for: controlIdentity))
       .semanticMetadata(.init(participatesInPointerHitTesting: true))
-    let controls = AnyView(
-      HStack(alignment: .center, spacing: 1) {
-        decrementControl
-        Text("\(value)")
-          .foregroundStyle(controlForeground)
-        incrementControl
-      }
-      .drawMetadata(.init(opacity: contentChrome.opacity))
-    )
-    let decoratedControls =
+    let controls = HStack(alignment: .center, spacing: 1) {
+      decrementControl
+      Text("\(value)")
+        .foregroundStyle(controlForeground)
+      incrementControl
+    }
+    .drawMetadata(.init(opacity: contentChrome.opacity))
+    let row = HStack(alignment: .center, spacing: 1) {
+      label
+        .foregroundStyle(.terminalBorder(.accent))
       if isActiveNavigation {
-        AnyView(
-          controls.background {
-            Rectangle().fill(contentChrome.backgroundStyle)
-          }
-        )
+        controls.background {
+          Rectangle().fill(contentChrome.backgroundStyle)
+        }
       } else {
         controls
       }
-    let row = AnyView(
-      HStack(alignment: .center, spacing: 1) {
-        if !labelViews.isEmpty {
-          combinedView(from: labelViews, kindName: "StepperLabel")
-            .foregroundStyle(.terminalBorder(.accent))
-        }
-        decoratedControls
-      }
-      .drawMetadata(.init(opacity: chrome.opacity))
-    )
+    }
+    .drawMetadata(.init(opacity: chrome.opacity))
 
-    let body =
-      if isFocused {
-        AnyView(
-          row.background {
-            Rectangle().fill(chrome.backgroundStyle)
-          }
-        )
-      } else {
-        row
+    if isFocused {
+      row.background {
+        Rectangle().fill(chrome.backgroundStyle)
       }
-
-    return body
+    } else {
+      row
+    }
   }
 }
 
 /// Adjusts an integer binding along a bounded linear range.
-public struct Slider: View, ResolvableView {
+public struct Slider<Label: View>: View, ResolvableView {
   public var value: Binding<Int>
   public var bounds: ClosedRange<Int>
   public var step: Int
-  private var labelViews: [AnyView]
+  private var label: Label
 
   public init<S: StringProtocol>(
     _ title: S,
     value: Binding<Int>,
     in bounds: ClosedRange<Int>,
     step: Int = 1
-  ) {
+  ) where Label == Text {
     self.value = value
     self.bounds = bounds
     self.step = max(1, step)
-    labelViews = [AnyView(Text(String(title)))]
+    label = Text(String(title))
   }
 
-  public init<Label: View>(
+  public init(
     value: Binding<Int>,
     in bounds: ClosedRange<Int>,
     step: Int = 1,
@@ -283,7 +267,7 @@ public struct Slider: View, ResolvableView {
     self.value = value
     self.bounds = bounds
     self.step = max(1, step)
-    labelViews = declaredBuilderChildren(from: label())
+    self.label = label()
   }
 
   package func resolveElements(
@@ -431,6 +415,7 @@ extension Slider {
     )
   }
 
+  @ViewBuilder
   private func sliderBody(
     controlIdentity: Identity,
     value: Int,
@@ -438,7 +423,7 @@ extension Slider {
     isActiveNavigation: Bool,
     chrome: ControlChrome,
     contentChrome: ControlChrome
-  ) -> AnyView {
+  ) -> some View {
     let track = sliderTrack(value: value, bounds: bounds)
     let trackStyle =
       isActiveNavigation
@@ -452,47 +437,32 @@ extension Slider {
       .foregroundStyle(trackStyle)
       .id(sliderTrackIdentity(for: controlIdentity))
       .semanticMetadata(.init(participatesInPointerHitTesting: true))
-    let controls = AnyView(
-      HStack(alignment: .center, spacing: 1) {
-        trackView
-        Text("\(value)")
-          .foregroundStyle(valueStyle)
-      }
-      .drawMetadata(.init(opacity: contentChrome.opacity))
-    )
-    let decoratedControls =
+    let controls = HStack(alignment: .center, spacing: 1) {
+      trackView
+      Text("\(value)")
+        .foregroundStyle(valueStyle)
+    }
+    .drawMetadata(.init(opacity: contentChrome.opacity))
+    let row = HStack(alignment: .center, spacing: 1) {
+      label
+        .foregroundStyle(.terminalBorder(.accent))
       if isActiveNavigation {
-        AnyView(
-          controls.background {
-            Rectangle().fill(contentChrome.backgroundStyle)
-          }
-        )
+        controls.background {
+          Rectangle().fill(contentChrome.backgroundStyle)
+        }
       } else {
         controls
       }
-    let row = AnyView(
-      HStack(alignment: .center, spacing: 1) {
-        if !labelViews.isEmpty {
-          combinedView(from: labelViews, kindName: "SliderLabel")
-            .foregroundStyle(.terminalBorder(.accent))
-        }
-        decoratedControls
-      }
-      .drawMetadata(.init(opacity: chrome.opacity))
-    )
+    }
+    .drawMetadata(.init(opacity: chrome.opacity))
 
-    let body =
-      if isFocused {
-        AnyView(
-          row.background {
-            Rectangle().fill(chrome.backgroundStyle)
-          }
-        )
-      } else {
-        row
+    if isFocused {
+      row.background {
+        Rectangle().fill(chrome.backgroundStyle)
       }
-
-    return body
+    } else {
+      row
+    }
   }
 
   private func sliderTrack(

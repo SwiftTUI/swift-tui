@@ -12,12 +12,15 @@ public struct Timeline: View, ResolvableView {
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        ForEach(entries.indices, id: \.self) { index in
-          timelineEntryView(entries[index], isLast: index == entries.count - 1)
-        }
-      }
-    ).resolveElements(in: context)
+    return [
+      resolveView(
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(entries.indices, id: \.self) { index in
+            timelineEntryView(entries[index], isLast: index == entries.count - 1)
+          }
+        },
+        in: context
+      )
+    ]
   }
 }

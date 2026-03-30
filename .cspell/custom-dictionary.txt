@@ -1,4 +1,5 @@
 # Custom Dictionary Words
+genericize
 Pressable
 subview
 subviews

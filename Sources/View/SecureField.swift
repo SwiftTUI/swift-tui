@@ -1,30 +1,31 @@
 package import Core
 
-// AnyView policy: retain heterogeneous child storage here for authored labels
-// around secure-field rendering.
 /// Edits a string binding using keyboard input while masking the rendered value.
-public struct SecureField: View, ResolvableView {
+public struct SecureField<Label: View>: View, ResolvableView {
   public var text: Binding<String>
   public var prompt: Text?
-  private var labelViews: [AnyView]
+  private var label: Label
+  private var showsLabel: Bool
 
   public init<S: StringProtocol>(
     _ title: S,
     text: Binding<String>
-  ) {
+  ) where Label == EmptyView {
     self.text = text
     prompt = Text(String(title))
-    labelViews = []
+    label = EmptyView()
+    showsLabel = false
   }
 
-  public init<Label: View>(
+  public init(
     text: Binding<String>,
     prompt: Text? = nil,
     @ViewBuilder label: () -> Label
   ) {
     self.text = text
     self.prompt = prompt
-    labelViews = declaredBuilderChildren(from: label())
+    self.label = label()
+    showsLabel = true
   }
 
   package func resolveElements(
@@ -62,7 +63,8 @@ extension SecureField {
     let child = textEntryFieldBody(
       displayText: entryText.displayText,
       isShowingPrompt: entryText.isShowingPrompt,
-      labelViews: labelViews,
+      label: label,
+      showsLabel: showsLabel,
       style: effectiveStyle,
       chrome: chrome,
       placeholderStyle: styleEnvironment.theme.placeholder,

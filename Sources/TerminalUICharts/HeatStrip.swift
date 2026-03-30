@@ -1,37 +1,14 @@
 import Core
 import View
 
-// AnyView policy: retain heterogeneous child storage here for authored label
-// and summary content.
 /// A compact strip of heat-style cells for relative intensity data.
-public struct HeatStrip: View, ResolvableView {
+public struct HeatStrip<Label: View, Summary: View>: View, ResolvableView {
   public var entries: [BarChartEntry]
   public var cellWidth: Int
-  private var labelViews: [AnyView]
-  private var summaryViews: [AnyView]
+  private let label: Label
+  private let summary: Summary
 
   public init(
-    entries: [BarChartEntry],
-    cellWidth: Int = 2
-  ) {
-    self.entries = entries
-    self.cellWidth = cellWidth
-    labelViews = []
-    summaryViews = [AnyView(Text(heatStripSummaryText(entries)))]
-  }
-
-  public init<S: StringProtocol>(
-    _ title: S,
-    entries: [BarChartEntry],
-    cellWidth: Int = 2
-  ) {
-    self.entries = entries
-    self.cellWidth = cellWidth
-    labelViews = [AnyView(Text(String(title)))]
-    summaryViews = [AnyView(Text(heatStripSummaryText(entries)))]
-  }
-
-  public init<Label: View, Summary: View>(
     entries: [BarChartEntry],
     cellWidth: Int = 2,
     @ViewBuilder label: () -> Label,
@@ -39,8 +16,8 @@ public struct HeatStrip: View, ResolvableView {
   ) {
     self.entries = entries
     self.cellWidth = cellWidth
-    labelViews = declaredBuilderChildren(from: label())
-    summaryViews = declaredBuilderChildren(from: summary())
+    self.label = label()
+    self.summary = summary()
   }
 
   package func resolveElements(
@@ -48,27 +25,47 @@ public struct HeatStrip: View, ResolvableView {
   ) -> [ResolvedNode] {
     let maximumValue = max(1, entries.map { abs($0.value) }.max() ?? 1)
 
-    return AnyView(
-      VStack(alignment: .leading, spacing: 0) {
-        if !labelViews.isEmpty || !summaryViews.isEmpty {
-          HStack(alignment: .center, spacing: 1) {
-            if !labelViews.isEmpty {
-              combinedView(from: labelViews, kindName: "HeatStripLabel")
-                .foregroundStyle(.terminalBorder(.accent))
-            }
-            if !summaryViews.isEmpty {
-              Spacer()
-              combinedView(from: summaryViews, kindName: "HeatStripSummary")
-                .foregroundStyle(.separator)
-            }
-          }
-        }
-        heatStripBody(
-          entries: entries,
-          maximumValue: maximumValue,
-          cellWidth: cellWidth
-        )
-      }
-    ).resolveElements(in: context)
+    return [
+      resolveView(
+        VStack(alignment: .leading, spacing: 0) {
+          chartHeader(label: label, summary: summary)
+          heatStripBody(
+            entries: entries,
+            maximumValue: maximumValue,
+            cellWidth: cellWidth
+          )
+        },
+        in: context
+      )
+    ]
+  }
+}
+
+extension HeatStrip where Label == EmptyView, Summary == Text {
+  public init(
+    entries: [BarChartEntry],
+    cellWidth: Int = 2
+  ) {
+    self.init(
+      entries: entries,
+      cellWidth: cellWidth,
+      label: { EmptyView() },
+      summary: { Text(heatStripSummaryText(entries)) }
+    )
+  }
+}
+
+extension HeatStrip where Label == Text, Summary == Text {
+  public init<S: StringProtocol>(
+    _ title: S,
+    entries: [BarChartEntry],
+    cellWidth: Int = 2
+  ) {
+    self.init(
+      entries: entries,
+      cellWidth: cellWidth,
+      label: { Text(String(title)) },
+      summary: { Text(heatStripSummaryText(entries)) }
+    )
   }
 }
