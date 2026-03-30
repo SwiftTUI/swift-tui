@@ -36,7 +36,9 @@ public enum SectionRole: Hashable, Sendable, CustomStringConvertible {
 }
 
 public enum PresentationRole: Hashable, Sendable, CustomStringConvertible {
+  case alert
   case button
+  case confirmationDialog
   case disclosureGroup
   case link
   case list
@@ -50,13 +52,18 @@ public enum PresentationRole: Hashable, Sendable, CustomStringConvertible {
   case table
   case tableRow
   case tabView
+  case textEditor
   case textField
   case toggle
 
   public var description: String {
     switch self {
+    case .alert:
+      "alert"
     case .button:
       "button"
+    case .confirmationDialog:
+      "confirmationDialog"
     case .disclosureGroup:
       "disclosureGroup"
     case .link:
@@ -83,6 +90,8 @@ public enum PresentationRole: Hashable, Sendable, CustomStringConvertible {
       "tableRow"
     case .tabView:
       "tabView"
+    case .textEditor:
+      "textEditor"
     case .textField:
       "textField"
     case .toggle:

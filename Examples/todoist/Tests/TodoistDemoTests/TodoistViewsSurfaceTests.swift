@@ -61,6 +61,24 @@ struct TodoistViewsSurfaceTests {
     #expect(dark.contains("Ship dense chrome refresh"))
   }
 
+  @Test("Todoist workspace shows sync progress while busy")
+  func workspaceShowsSyncProgressWhenBusy() throws {
+    let launcher = try TodoistDemoLauncher()
+    let model = sampleModel()
+    model.isBusy = true
+    launcher.model = model
+
+    let surface = renderText(
+      TodoistDemoSceneView(launcher: launcher)
+        .preferredColorScheme(.dark),
+      width: 88,
+      height: 40
+    )
+
+    #expect(surface.contains("Syncing"))
+    #expect(surface.contains("Close Selected"))
+  }
+
   @Test("Filled and plain controls render different default chrome")
   func filledControlsRenderDifferentChrome() {
     let plainText = renderText(

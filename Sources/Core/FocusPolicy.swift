@@ -16,6 +16,7 @@ package enum AutomaticFocusPolicy {
     .stepper,
     .table,
     .tabView,
+    .textEditor,
     .textField,
     .toggle,
   ]
@@ -34,7 +35,7 @@ package enum AutomaticFocusPolicy {
 
     switch name {
     case "Button", "DisclosureGroup", "Link", "List", "Picker", "Slider", "Stepper",
-      "Table", "TextField", "Toggle", "Menu":
+      "Table", "TextEditor", "TextField", "Toggle", "Menu":
       return true
     default:
       return false

@@ -20,6 +20,25 @@ detail. From this point forward, default behavior should optimize for
 terminal-native navigation, layout, and ergonomics even when that means
 reinterpreting SwiftUI concepts instead of copying desktop assumptions.
 
+## Implementation Status
+
+As of March 29, 2026, the roadmap’s primary execution phases are landed:
+
+- Phase 0: governance and public-surface positioning updated across the docs
+- Phase 1: automatic chrome reset shipped across the default component set
+- Phase 2: `TabView`, `NavigationSplitView`, `alert`, and
+  `confirmationDialog` are canonical public surface
+- Phase 3: `TextEditor`, indeterminate `ProgressView`, and prototype help or
+  command surfaces are in place
+- Phase 4: collection defaults and pane-local examples have been reworked
+- Phase 5: Gallery and Todoist now teach full-screen terminal workspaces
+- Phase 6: README, status docs, module docs, and example READMEs have been
+  updated to describe the terminal-native direction
+
+What remains intentionally open is not the roadmap itself, but the next layer
+of refinement: richer editor behaviors, deeper scroll control, and the eventual
+graduation or replacement of the prototype help and command surfaces.
+
 ## Problem Frame
 
 The core pipeline is already implemented and well-tested. The current gap is no
@@ -290,8 +309,9 @@ Cover the workflow surfaces that modern terminal apps rely on for real work.
   spinner-first public API
 - help and command surfaces should start in `PrototypeUIComponents` until the
   terminal-native authoring shape proves stable in real apps
-- the prototype surfaces should be exercised in demos immediately so they are
-  validated by use, not by theory
+- while `PrototypeUIComponents` remains target-only, the examples should mirror
+  the same help and command patterns through local composition rather than by
+  importing the prototype target directly
 
 ### Verification
 
@@ -359,8 +379,8 @@ Make the examples prove the new philosophy.
 
 - rework Todoist into a full-screen, pane-oriented task app
 - rework Gallery into a component workbench instead of a scrolled component page
-- ensure both examples exercise the prototype help and command surfaces if they
-  exist by then
+- ensure both examples exercise canonical workflow surfaces directly and mirror
+  prototype help or command patterns while those remain target-only
 
 ### Primary files
 
@@ -379,6 +399,8 @@ Make the examples prove the new philosophy.
 - the gallery should function as a component workbench with navigation, focus,
   and preview, not as a static catalog
 - the Todoist example should feel like a real TUI app, not a decorated demo
+- examples should adopt prototype workflow surfaces directly only after those
+  surfaces graduate from the target-only staging area
 
 ### Verification
 

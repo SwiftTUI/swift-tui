@@ -32,7 +32,7 @@ What that means in practice:
 - Layout primitives come first: stacks, frames, padding, overlays, scrolling, and custom layouts
 - State and environment come next: `@State`, `@Binding`, `@Observable`, focused values, and focus bindings
 - Runtime correctness comes next: lifecycle ownership, task staging, and incremental terminal presentation
-- Navigation, modal presentation, and other broader orchestration APIs arrive only after the foundation is firm
+- Broader orchestration APIs such as stack navigation, toolbars, sheets, and popovers arrive only after the foundation is firm
 - Terminal-only chrome that would bend the public authoring story away from SwiftUI does not belong in the core library
 
 ### Deviations From SwiftUI
@@ -75,8 +75,12 @@ Deferred items:
 
 - `NavigationStack`
 - `Toolbar` and `ToolbarItem`
-- alerts and confirmation dialogs
 - sheets and popovers
+
+Prototype-first items:
+
+- terminal-native help and keybinding surfaces
+- command palettes and launcher-style action pickers
 
 These should not be implemented just because terminal frameworks often have
 analogous surfaces. They should land only once the terminal-specific interaction

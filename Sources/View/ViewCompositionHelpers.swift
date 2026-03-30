@@ -26,8 +26,8 @@ private func resolveGroupElements(
   children: [AnyView],
   layoutBehavior: LayoutBehavior = .intrinsic,
   layoutMetadata: LayoutMetadata = .init(),
-  drawMetadata: DrawMetadata = .init(),
-  semanticMetadata: SemanticMetadata = .init(),
+  drawMetadata: DrawMetadata = DrawMetadata(),
+  semanticMetadata: SemanticMetadata = SemanticMetadata(),
   in context: ResolveContext
 ) -> ResolvedNode {
   if let reused = context.reusedResolvedSubtreeIfAvailable() {

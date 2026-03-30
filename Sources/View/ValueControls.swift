@@ -136,28 +136,12 @@ package func registerTextEntryBinding(
   let dynamicPropertyScope = currentDynamicPropertyScope()
   context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
     withDynamicPropertyScope(dynamicPropertyScope) {
-      switch event {
-      case .character(let character):
-        var candidate = binding.wrappedValue
-        candidate.append(character)
-        binding.wrappedValue = candidate
-        return true
-      case .space:
-        var candidate = binding.wrappedValue
-        candidate.append(" ")
-        binding.wrappedValue = candidate
-        return true
-      case .backspace:
-        var candidate = binding.wrappedValue
-        guard !candidate.isEmpty else {
-          return false
-        }
-        candidate.removeLast()
-        binding.wrappedValue = candidate
-        return true
-      default:
-        return false
-      }
+      mutateTextEntryBinding(
+        binding,
+        event: event,
+        allowsNewlines: false,
+        scrollPosition: nil
+      )
     }
   }
 }

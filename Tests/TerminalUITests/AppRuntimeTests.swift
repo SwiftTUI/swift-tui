@@ -145,6 +145,64 @@ struct AppRuntimeTests {
   }
 
   @MainActor
+  @Test("App launcher preserves multiline TextEditor bindings across runtime frames")
+  func appLauncherPersistsStatefulTextEditorBindings() async throws {
+    let terminal = RecordingTerminalHost()
+
+    let result = try await MultiSceneLauncher.run(
+      scene: WindowGroup("Editor Window") {
+        StatefulTextEditorWindow()
+      },
+      sessionName: "AppRuntimeTests.StatefulTextEditorWindow",
+      terminalHost: terminal,
+      inputReader: ScriptedInputReader(
+        events: [
+          .character("H"),
+          .character("i"),
+          .enter,
+          .character("!"),
+          .ctrlC,
+        ]
+      ),
+      signalReader: EmptySignalReader()
+    )
+
+    #expect(result.exitReason == .ctrlC)
+
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(lastFrame.contains("Hi"))
+    #expect(lastFrame.contains("!_"))
+    #expect(lastFrame.contains("Lines: 2"))
+    #expect(lastFrame.contains("Preview: Hi | !"))
+  }
+
+  @MainActor
+  @Test("App launcher dismisses alert overlays and returns the workspace surface")
+  func appLauncherDismissesAlertOverlays() async throws {
+    let terminal = RecordingTerminalHost()
+
+    let result = try await MultiSceneLauncher.run(
+      scene: WindowGroup("Alert Window") {
+        AlertWindow()
+      },
+      sessionName: "AppRuntimeTests.AlertWindow",
+      terminalHost: terminal,
+      inputReader: ScriptedInputReader(events: [.enter, .character("q")]),
+      signalReader: EmptySignalReader()
+    )
+
+    #expect(result.exitReason == .quitKey)
+    #expect(result.renderedFrames >= 2)
+
+    let firstFrame = try #require(terminal.frames.first)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(firstFrame.contains("Archive task"))
+    #expect(firstFrame.contains("Dismiss"))
+    #expect(!lastFrame.contains("Archive task"))
+    #expect(lastFrame.contains("Background"))
+  }
+
+  @MainActor
   @Test("runtime focus movement writes back into the rendered focus identity")
   func runtimeFocusMovementWritesBackIntoRenderedFocusIdentity() async throws {
     let terminal = RecordingTerminalHost()
@@ -479,6 +537,32 @@ private struct StatefulFormWindow: View {
       Text("Name: \(name) | ctrl-c exits")
         .foregroundStyle(.muted)
     }
+  }
+}
+
+private struct StatefulTextEditorWindow: View {
+  @State private var notes = ""
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Editor")
+        .bold()
+      TextEditor(text: $notes)
+        .frame(width: 18, height: 5, alignment: .topLeading)
+      Text("Lines: \(notes.split(separator: "\n", omittingEmptySubsequences: false).count)")
+      Text("Preview: \(notes.replacingOccurrences(of: "\n", with: " | "))")
+        .foregroundStyle(.muted)
+    }
+  }
+}
+
+private struct AlertWindow: View {
+  @State private var isAlertPresented = true
+
+  var body: some View {
+    Button("Background") {}
+      .id(testIdentity("AlertWindow", "Background"))
+      .alert("Archive task", isPresented: $isAlertPresented)
   }
 }
 

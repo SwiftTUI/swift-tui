@@ -105,12 +105,14 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `NavigationViews.swift`: terminal-native `TabView`, `NavigationSplitView`, and related shell composition support
 - `OutlineViews.swift`: outline and hierarchical collection views
 - `ViewModifiers.swift`: public modifiers and package-only wrapper views such as padding, frame, overlay, and background
+- `PresentationModifiers.swift`: terminal-native `alert` and `confirmationDialog` presentation
 - `StylePrimitives.swift`: style enums and primitive style values
 - `StyleEnvironment.swift`: style-related environment keys and accessors
 - `StyleModifiers.swift`: `foregroundStyle`, `tint`, `disabled`, and row-styling helpers
 - `LabeledContainers.swift`: `Label`, `LabeledContent`, `ControlGroup`, and `GroupBox`
-- `ProgressView.swift`: core progress-bar surface
+- `ProgressView.swift`: determinate and indeterminate progress-bar surface
 - `ValueControls.swift`: `Toggle`, `TextField`, and `DisclosureGroup`
+- `TextEditor.swift`: multiline text editing surface
 - `SecureField.swift`: masked string-entry control built on the text-entry helpers
 - `AdjustableValueControls.swift`: `Stepper` and `Slider`
 - `Collections.swift`: `Section`, `List`, `TableRow`, and `Table`
@@ -128,6 +130,11 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `SelectionAndValueSupport.swift`: selection helpers and pointer interaction support
 - `TileBackground.swift`: tiled background-pattern view
 - `View.docc/`: module landing page and authoring guides
+
+## `PrototypeUIComponents`
+
+- `PrototypeModels.swift`: key-binding groups, command models, and search helpers for experimental terminal-native workflow surfaces
+- `PrototypeSurfaces.swift`: repo-local help-strip and command-palette views used for exploration and regression coverage
 
 ## `TerminalUICharts`
 

@@ -22,18 +22,15 @@ import TerminalUI
 
 struct BuildSummary: View {
   var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: 0) {
       Text("Deploy Queue")
         .bold()
+      Divider()
       ProgressView("Release", value: 18, total: 24)
       LabeledContent("Window", value: "staging")
       LabeledContent("Owner", value: "infra")
     }
-    .padding(1)
-    .background {
-      RoundedRectangle(cornerRadius: 1)
-        .fill(.windowBackground)
-    }
+    .padding(.init(horizontal: 1, vertical: 0))
   }
 }
 
@@ -79,7 +76,7 @@ App and scene construction follow the same main-actor model as SwiftUI, so const
 
 - Layout and containers: `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `ViewThatFits`, and custom `Layout`
 - State and focus: `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, focused values, focus effect controls, and default-focus modifiers
-- Controls and content: `Text`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `DisclosureGroup`, `Picker`, `Label`, `GroupBox`, `ControlGroup`, and more
+- Controls and content: `Text`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `GroupBox`, `ControlGroup`, `TabView`, `NavigationSplitView`, and terminal-native alert or confirmation presentation
 - Runtime integration: `Resolver`, `DefaultRenderer`, `RunLoop`, terminal input parsing, signal handling, alternate-screen ownership, capability-aware presentation, and lifecycle or task staging
 - Multi-scene orchestration: optional `TerminalUIScenes` support for pty-backed secondary scenes, scene discovery, and attachment
 - Compact metrics and charts: `ProgressView`, `BarChart`, `ColumnChart`, `ComparisonChart`, `Sparkline`, `Timeline`, `ThresholdGauge`, and related support types in `TerminalUICharts`
@@ -122,11 +119,12 @@ xcrun swift package generate-documentation --target TerminalUI
 
 - The core `TerminalUI` runtime is still intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
 - The scene-based public launch path currently lives in `TerminalUIScenes.MultiSceneLauncher`, including the single-scene case.
-- Navigation and modal surfaces are still deferred while the project continues to harden the layout, focus, and runtime foundations.
+- Terminal-native help strips and command palettes are still experimental. They currently live in the repo-local `PrototypeUIComponents` target rather than in the supported package product surface, though the gallery and Todoist examples now mirror those patterns through local composition.
 
 ## Upcoming Work
 
-- Navigation and modal surfaces such as `NavigationStack`, `Toolbar`, alerts, confirmations, and sheet-style presentation
+- `NavigationStack`, `Toolbar`, and sheet or popover-style presentation
+- richer focus ergonomics, scroll control, and settled terminal-native help or command surfaces
 
 ## Documentation
 

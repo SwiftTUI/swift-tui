@@ -180,8 +180,8 @@ public struct ResolvedNode: Equatable, Sendable {
     transactionSnapshot: TransactionSnapshot = .init(),
     layoutBehavior: LayoutBehavior = .intrinsic,
     layoutMetadata: LayoutMetadata = .init(),
-    drawMetadata: DrawMetadata = .init(),
-    semanticMetadata: SemanticMetadata = .init(),
+    drawMetadata: DrawMetadata = DrawMetadata(),
+    semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
     intrinsicSize: Size? = nil
@@ -332,8 +332,8 @@ public struct PlacedNode: Equatable, Sendable {
     children: [PlacedNode] = [],
     semanticRole: SemanticRole = .generic,
     layoutMetadata: LayoutMetadata = .init(),
-    drawMetadata: DrawMetadata = .init(),
-    semanticMetadata: SemanticMetadata = .init(),
+    drawMetadata: DrawMetadata = DrawMetadata(),
+    semanticMetadata: SemanticMetadata = SemanticMetadata(),
     drawPayload: DrawPayload = .none
   ) {
     self.identity = identity

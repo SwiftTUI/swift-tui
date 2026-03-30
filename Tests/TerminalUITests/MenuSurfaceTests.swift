@@ -22,6 +22,22 @@ extension ResolvedNode {
 
 @MainActor
 struct MenuSurfaceTests {
+  @Test("Plain Text stays non-focusable by default")
+  func plainTextStaysNonFocusableByDefault() {
+    let text = Text("Hello")
+    let explicitText = Text("Hello", semanticMetadata: SemanticMetadata())
+    #expect(SemanticMetadata().presentationRole == nil)
+    #expect(text.semanticMetadata.presentationRole == nil)
+    #expect(explicitText.semanticMetadata.presentationRole == nil)
+    let artifacts = DefaultRenderer().render(
+      text,
+      context: .init(identity: testIdentity("TextRoot"))
+    )
+
+    #expect(artifacts.resolvedTree.semanticMetadata.presentationRole == nil)
+    #expect(artifacts.semanticSnapshot.focusRegions.isEmpty)
+  }
+
   @Test("Menu is focusable and starts collapsed")
   func menuIsFocusableAndStartsCollapsed() {
     let artifacts = DefaultRenderer().render(

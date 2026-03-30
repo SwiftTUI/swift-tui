@@ -14,7 +14,7 @@ It provides:
 - environment and focused-value access through ``EnvironmentValues``, ``EnvironmentReader``, ``GeometryReader``, ``FocusedValue``, and ``FocusedBinding``
 - focus coordination through ``FocusState``
 - layout composition through ``Layout``, ``AnyLayout``, and the built-in stack layouts
-- the controls, containers, metrics, and modifiers that make up most authored terminal interfaces, including text entry and secure text entry
+- the controls, containers, metrics, and modifiers that make up most authored terminal interfaces, including single-line and multiline text entry, split navigation, tab shells, and terminal-native alert or confirmation presentation
 
 `View` is intentionally close to SwiftUI in shape. The goal is not to expose a terminal-specific DSL. The goal is to preserve the parts of SwiftUI that make large UI codebases composable and predictable while still targeting cell-based rendering.
 

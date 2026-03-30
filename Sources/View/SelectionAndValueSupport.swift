@@ -204,6 +204,104 @@ func stepBoundSelection<SelectionValue: Hashable>(
   )
 }
 
+@MainActor
+func registerMultilineTextEntryBinding(
+  _ binding: Binding<String>,
+  scrollPosition: Binding<ScrollPosition>,
+  in context: ResolveContext
+) {
+  guard context.environmentValues.isEnabled else {
+    return
+  }
+
+  let dynamicPropertyScope = currentDynamicPropertyScope()
+  context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
+    withDynamicPropertyScope(dynamicPropertyScope) {
+      mutateTextEntryBinding(
+        binding,
+        event: event,
+        allowsNewlines: true,
+        scrollPosition: scrollPosition
+      )
+    }
+  }
+}
+
+@MainActor
+package func mutateTextEntryBinding(
+  _ binding: Binding<String>,
+  event: LocalKeyEvent,
+  allowsNewlines: Bool,
+  scrollPosition: Binding<ScrollPosition>?
+) -> Bool {
+  switch event {
+  case .character(let character):
+    binding.wrappedValue.append(character)
+    return true
+  case .space:
+    binding.wrappedValue.append(" ")
+    return true
+  case .enter where allowsNewlines:
+    binding.wrappedValue.append("\n")
+    return true
+  case .backspace:
+    guard !binding.wrappedValue.isEmpty else {
+      return false
+    }
+    binding.wrappedValue.removeLast()
+    return true
+  case .arrowUp:
+    guard let scrollPosition else {
+      return true
+    }
+    var next = scrollPosition.wrappedValue
+    next.scrollBy(y: -1)
+    scrollPosition.wrappedValue = next
+    return true
+  case .arrowDown:
+    guard let scrollPosition else {
+      return true
+    }
+    var next = scrollPosition.wrappedValue
+    next.scrollBy(y: 1)
+    scrollPosition.wrappedValue = next
+    return true
+  case .arrowLeft, .arrowRight:
+    return true
+  default:
+    return false
+  }
+}
+
+@MainActor
+package func textEditorBody(
+  displayText: String,
+  chrome: ControlChrome,
+  scrollPosition: Binding<ScrollPosition>
+) -> AnyView {
+  AnyView(
+    ScrollView(.vertical, showsIndicators: true, position: scrollPosition) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text(displayText)
+          .fixedSize(horizontal: false, vertical: true)
+          .foregroundStyle(chrome.foregroundStyle)
+          .drawMetadata(.init(opacity: chrome.opacity))
+      }
+      .padding(.init(horizontal: 1, vertical: 1))
+    }
+    .background {
+      RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
+    }
+    .overlay {
+      RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+        chrome.borderStyle,
+        backgroundStyle: chrome.borderBackgroundStyle
+      )
+    }
+    .layoutMetadata(.init(minimumHeight: 3))
+  )
+}
+
 struct PointerRouteView<Content: View>: View, ResolvableView {
   var identity: Identity
   var content: Content

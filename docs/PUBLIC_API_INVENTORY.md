@@ -21,11 +21,11 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `GeometryReader`
 - `TabItemLabel`, `TabView`, `NavigationSplitView`
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
-- `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`
+- `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`
 - `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `FocusInteractions`, `LinkDestination`, `OpenLinkAction`
 - image-source environment configuration such as `EnvironmentValues.imageResourceRoots`
 - `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, repo-owned `@Bindable`, `@SceneBuilder`, `@main`
-- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.background(...)`, `.overlay(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`
+- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.background(...)`, `.overlay(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.alert(...)`, and `.confirmationDialog(...)`
 - `Resolver` and the public `ResolveContext` configuration surface for low-level rendering entry points
 
 Important public-surface rules after the lowering migration:
@@ -116,6 +116,7 @@ Prototype and showcase code may still live in the repository as sibling example 
 Current rule:
 
 - `PrototypeUIComponents` is a package target used by experiments and tests, not a library product that downstream packages should import as a supported API surface
+- the current prototype target hosts help-strip and command-palette exploration such as `PrototypeHelpSurface` and `PrototypeCommandPalette`
 - prototype widgets are allowed to inform future canonical APIs, but they should not be documented as the framework's primary authoring model
 - README and architecture-facing docs should describe prototype code as exploratory or showcase-only when it appears at all
 - terminal-native interaction surfaces that are still being shaped, such as help

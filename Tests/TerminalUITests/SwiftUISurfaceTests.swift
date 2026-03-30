@@ -3527,6 +3527,90 @@ struct SwiftUISurfaceTests {
     #expect(sparklineSurface.contains("▁"))
   }
 
+  @Test("TextEditor renders multiline entry with focused terminal-native chrome")
+  func textEditorRendersMultilineEntryWithFocusedChrome() {
+    let editorIdentity = testIdentity("TextEditorSurface")
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = editorIdentity
+
+    let artifacts = DefaultRenderer().render(
+      TextEditor(text: .constant("Line 1\nLine 2"))
+        .id(editorIdentity)
+        .frame(width: 16, height: 5, alignment: .topLeading),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        applyEnvironmentValues: true
+      )
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(surface.contains("Line 1"))
+    #expect(surface.contains("Line 2"))
+    #expect(surface.contains("_"))
+    #expect(artifacts.semanticSnapshot.focusRegions.map(\.identity).contains(editorIdentity))
+  }
+
+  @Test("indeterminate ProgressView renders a compact loading track without a summary")
+  func indeterminateProgressViewRendersCompactLoadingTrack() {
+    let artifacts = DefaultRenderer().render(
+      ProgressView("Syncing", barWidth: 8),
+      context: .init(identity: testIdentity("IndeterminateProgress"))
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(surface.contains("Syncing"))
+    #expect(surface.contains("█"))
+    #expect(surface.contains("─"))
+    #expect(!surface.contains("/"))
+  }
+
+  @Test("alert and confirmationDialog render terminal-native presentation surfaces")
+  func presentationModifiersRenderTerminalNativePrompts() {
+    let alertSurface = DefaultRenderer().render(
+      Text("Workspace")
+        .alert(
+          "Delete project",
+          isPresented: .constant(true),
+          actions: {
+            Button("Delete") {}
+            Button("Cancel") {}
+          },
+          message: {
+            Text("This cannot be undone.")
+          }
+        )
+        .frame(width: 32, height: 8, alignment: .topLeading),
+      context: .init(identity: testIdentity("AlertRoot")),
+      proposal: .init(width: 32, height: 8)
+    ).rasterSurface.lines.joined(separator: "\n")
+
+    let confirmationSurface = DefaultRenderer().render(
+      Text("Workspace")
+        .confirmationDialog(
+          "Archive task",
+          isPresented: .constant(true),
+          actions: {
+            Button("Archive") {}
+          },
+          message: {
+            Text("Move the task out of the active list.")
+          }
+        )
+        .frame(width: 32, height: 8, alignment: .topLeading),
+      context: .init(identity: testIdentity("ConfirmationRoot")),
+      proposal: .init(width: 32, height: 8)
+    ).rasterSurface.lines.joined(separator: "\n")
+
+    #expect(alertSurface.contains("Delete project"))
+    #expect(alertSurface.contains("This cannot be undone."))
+    #expect(alertSurface.contains("Delete"))
+    #expect(confirmationSurface.contains("Archive task"))
+    #expect(confirmationSurface.contains("Archive"))
+  }
+
   @Test("Timeline renders a compact sequence of entries")
   func timelineRendersEntryList() {
     let timelineArtifacts = DefaultRenderer().render(

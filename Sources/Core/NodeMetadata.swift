@@ -31,7 +31,7 @@ public struct NodeDrawInfo: Equatable, Sendable {
   public var drawPayload: DrawPayload
 
   public init(
-    drawMetadata: DrawMetadata = .init(),
+    drawMetadata: DrawMetadata = DrawMetadata(),
     drawPayload: DrawPayload = .none
   ) {
     self.drawMetadata = drawMetadata
@@ -44,7 +44,7 @@ public struct NodeSemanticInfo: Equatable, Sendable {
   public var semanticMetadata: SemanticMetadata
 
   public init(
-    semanticMetadata: SemanticMetadata = .init()
+    semanticMetadata: SemanticMetadata = SemanticMetadata()
   ) {
     self.semanticMetadata = semanticMetadata
   }

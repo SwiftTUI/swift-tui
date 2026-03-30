@@ -14,13 +14,20 @@ The package is already usable for real terminal interfaces. The main gaps are
 not around the fundamental pipeline anymore; they are around breadth of surface
 area, app-shell ergonomics, and a few still-conservative runtime paths.
 
+The terminal-native roadmap work described in
+[TERMINAL_NATIVE_ROADMAP.md](TERMINAL_NATIVE_ROADMAP.md) is now substantially
+landed: automatic chrome has been reset, shell navigation primitives are
+canonical, multiline editing and indeterminate loading are public, and the
+example apps now teach pane-oriented workspaces instead of scrolled component
+pages.
+
 ## Shipped Surface
 
 ### Authoring surface
 
 - SwiftUI-shaped `@MainActor`-isolated `View` authoring with body-only `View`, `@ViewBuilder`, `TupleView`, `ConditionalContent`, `AnyView`, and `Resolver`
 - Layout and containers including `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `ViewThatFits`, `GeometryReader`, and custom `Layout`
-- Controls and primitives including `Text`, rich `Text` interpolation, `Link`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `Spacer`, `Divider`, and shapes
+- Controls and primitives including `Text`, rich `Text` interpolation, `Link`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, determinate and indeterminate `ProgressView`, `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `Spacer`, `Divider`, and shapes
 - PNG-backed `Image` with named-resource, local-file-URL, and embedded-byte sources plus `.resizable()`, `.scaledToFit()`, and `.scaledToFill()`
 - Environment, observation, and focus including `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`, `@FocusedValue`, `@FocusedBinding`, `OpenLinkAction`, actor-context-aware `.task(...)`, and default-focus modifiers
 
@@ -39,6 +46,7 @@ area, app-shell ergonomics, and a few still-conservative runtime paths.
 - `MultiSceneLauncher` in `TerminalUIScenes` for public scene launch, including the single-window case today
 - Pty-backed secondary scenes, Unix-domain-socket discovery, scene attachment, and lazy rendering of unattached secondary scenes
 - `TabView` and `NavigationSplitView` for terminal-native shell composition
+- terminal-native `alert` and `confirmationDialog` presentation in the canonical `View` surface
 
 ### Charts
 
@@ -53,10 +61,13 @@ area, app-shell ergonomics, and a few still-conservative runtime paths.
 - Some focus surfaces are still missing:
   - namespace-scoped default-focus APIs such as `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus`
   - object-focused wrappers such as `@FocusedObject`
-- Some higher-level workflow surfaces are still missing:
-  - `TextEditor`
-  - indeterminate `ProgressView`
-  - settled help/keybinding and command-palette surfaces
+- Some higher-level workflow surfaces are still unsettled:
+  - settled help/keybinding and command-palette surfaces on the canonical public surface
+  - richer multiline editing behaviors beyond the current `TextEditor`
+
+Prototype help-strip and command-palette surfaces now exist in the repo-local
+`PrototypeUIComponents` target, and the example apps mirror those patterns
+through local composition without importing that target as supported API.
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
   - `ResolvableView`
@@ -72,8 +83,8 @@ See [VISION.md](VISION.md) for the rationale and the intended ordering.
 
 The project now treats terminal-native reinterpretation as a first-class design
 rule. The remaining gaps are therefore prioritized around terminal workspaces:
-split navigation, tabs, multiline editing, visible help surfaces, and
-terminal-native confirmation or workflow affordances.
+visible help surfaces, richer command workflows, deeper scroll control, and
+navigation surfaces that still need a stronger hypothesis before they graduate.
 
 ## Documentation Status
 

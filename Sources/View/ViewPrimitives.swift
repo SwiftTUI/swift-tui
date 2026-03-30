@@ -32,8 +32,8 @@ public struct Text: View, ResolvableView {
   @_disfavoredOverload
   public init(
     _ content: String,
-    drawMetadata: DrawMetadata = .init(),
-    semanticMetadata: SemanticMetadata = .init()
+    drawMetadata: DrawMetadata = DrawMetadata(),
+    semanticMetadata: SemanticMetadata = SemanticMetadata()
   ) {
     storage = .plain(content)
     self.drawMetadata = drawMetadata
@@ -42,8 +42,8 @@ public struct Text: View, ResolvableView {
 
   public init(
     _ content: RichContent,
-    drawMetadata: DrawMetadata = .init(),
-    semanticMetadata: SemanticMetadata = .init()
+    drawMetadata: DrawMetadata = DrawMetadata(),
+    semanticMetadata: SemanticMetadata = SemanticMetadata()
   ) {
     if let plainText = content.plainText {
       storage = .plain(plainText)
@@ -221,7 +221,7 @@ public struct Spacer: View, ResolvableView {
 public struct Divider: View, ResolvableView {
   public var drawMetadata: DrawMetadata
 
-  public init(drawMetadata: DrawMetadata = .init()) {
+  public init(drawMetadata: DrawMetadata = DrawMetadata()) {
     self.drawMetadata = drawMetadata
   }
 
@@ -247,8 +247,8 @@ func resolveLeafNode(
   intrinsicSize: Size? = nil,
   layoutBehavior: LayoutBehavior = .intrinsic,
   layoutMetadata: LayoutMetadata = .init(),
-  drawMetadata: DrawMetadata = .init(),
-  semanticMetadata: SemanticMetadata = .init(),
+  drawMetadata: DrawMetadata = DrawMetadata(),
+  semanticMetadata: SemanticMetadata = SemanticMetadata(),
   drawPayload: DrawPayload = .none,
   in context: ResolveContext
 ) -> ResolvedNode {

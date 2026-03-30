@@ -3,6 +3,12 @@
 A small demo app that connects the local `TerminalUI` framework to Todoist, with
 GRDB-backed caching and `swift-structured-queries` powered SQLite reads.
 
+The example is intentionally pane-oriented: a project browser, task list, and
+inspector share the full terminal canvas, and the workspace exercises canonical
+confirmation flows and indeterminate sync feedback without falling back to
+page-like scrolling. Its shell footer also mirrors the prototype help-strip
+pattern through local example composition.
+
 ## Run
 
 Run the executable package:
