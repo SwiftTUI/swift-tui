@@ -775,7 +775,6 @@ struct Phase4ObservationAndEnvironmentTests {
   func runtimeRerendersGalleryLikeObservableButtonTapsImmediately() async throws {
     let model = Phase4GalleryLikeModel()
     let terminal = Phase4RecordingTerminalHost()
-    let scheduler = Phase4RecordingFrameScheduler()
     let rootIdentity = testIdentity("GalleryLikeRoot")
     let terminalSize = terminal.surfaceSize
     let view = GalleryLikeObservableSceneView(model: model)
@@ -792,7 +791,6 @@ struct Phase4ObservationAndEnvironmentTests {
     let result = try await runObservableRuntimeHarness(
       rootIdentity: rootIdentity,
       terminal: terminal,
-      scheduler: scheduler,
       events: [
         .mouse(.init(kind: .down(.primary), location: centerPoint(of: primaryRect))),
         .mouse(.init(kind: .up(.primary), location: centerPoint(of: primaryRect))),
@@ -803,85 +801,6 @@ struct Phase4ObservationAndEnvironmentTests {
       }
     )
 
-    print("recorded invalidations", scheduler.invalidations)
-    print("recorded consumed frames", scheduler.consumedFrames)
-    if scheduler.invalidations.count >= 2 {
-      let replayModel = Phase4GalleryLikeModel()
-      var replayEnvironmentValues = EnvironmentValues()
-      replayEnvironmentValues.terminalSize = terminalSize
-      let replayActionRegistry = LocalActionRegistry()
-      let replayPointerRegistry = LocalPointerHandlerRegistry()
-      let replayFocusBindingRegistry = LocalFocusBindingRegistry()
-      let replayFocusedValuesRegistry = LocalFocusedValuesRegistry()
-      let replayKeyRegistry = LocalKeyHandlerRegistry()
-      let replayLifecycleRegistry = LocalLifecycleRegistry()
-      let replayTaskRegistry = LocalTaskRegistry()
-      let replayDynamicStateStore = DynamicStateStore(invalidationIdentities: [rootIdentity])
-      let replayObservationBridge = ObservationBridge()
-      let replayRenderer = DefaultRenderer()
-      var replayInitialContext = ResolveContext(
-        identity: rootIdentity,
-        environmentValues: replayEnvironmentValues,
-        localActionRegistry: replayActionRegistry,
-        localKeyHandlerRegistry: replayKeyRegistry,
-        localLifecycleRegistry: replayLifecycleRegistry,
-        localTaskRegistry: replayTaskRegistry,
-        applyEnvironmentValues: true
-      )
-      replayInitialContext.localPointerHandlerRegistry = replayPointerRegistry
-      replayInitialContext.localFocusBindingRegistry = replayFocusBindingRegistry
-      replayInitialContext.localFocusedValuesRegistry = replayFocusedValuesRegistry
-      replayInitialContext.dynamicStateStore = replayDynamicStateStore
-      replayInitialContext.observationBridge = replayObservationBridge
-      _ = replayRenderer.render(
-        AnyView(GalleryLikeObservableSceneView(model: replayModel)),
-        context: replayInitialContext,
-        proposal: .init(width: terminalSize.width, height: terminalSize.height)
-      )
-      let activeButtonIdentity = scheduler.invalidations[1].first {
-        $0.lastComponent == "HStack[0]"
-      }
-      if let activeButtonIdentity {
-        _ = replayActionRegistry.dispatch(identity: activeButtonIdentity)
-      }
-      var replayInteractiveEnvironmentValues = replayEnvironmentValues
-      replayInteractiveEnvironmentValues.focusedIdentity = activeButtonIdentity
-      replayInteractiveEnvironmentValues.pressedIdentity = activeButtonIdentity
-      var replayUpdatedContext = ResolveContext(
-        identity: rootIdentity,
-        environmentValues: replayInteractiveEnvironmentValues,
-        invalidatedIdentities: scheduler.invalidations[1],
-        localActionRegistry: replayActionRegistry,
-        localKeyHandlerRegistry: replayKeyRegistry,
-        localLifecycleRegistry: replayLifecycleRegistry,
-        localTaskRegistry: replayTaskRegistry,
-        applyEnvironmentValues: true
-      )
-      replayUpdatedContext.localPointerHandlerRegistry = replayPointerRegistry
-      replayUpdatedContext.localFocusBindingRegistry = replayFocusBindingRegistry
-      replayUpdatedContext.localFocusedValuesRegistry = replayFocusedValuesRegistry
-      replayUpdatedContext.dynamicStateStore = replayDynamicStateStore
-      replayUpdatedContext.observationBridge = replayObservationBridge
-      let replayArtifacts = replayRenderer.render(
-        AnyView(GalleryLikeObservableSceneView(model: replayModel)),
-        context: replayUpdatedContext,
-        proposal: .init(width: terminalSize.width, height: terminalSize.height)
-      )
-      if let updatedNode = replayArtifacts.resolvedTree.descendant(withText: "Pressed 1 times") {
-        print("updated resolved identity", updatedNode.identity)
-        print(
-          "updated identity descends from observed invalidation",
-          updatedNode.identity.isDescendant(of: scheduler.invalidations[1].first { $0.lastComponent == "content" } ?? rootIdentity)
-        )
-        if let placedNode = replayArtifacts.placedTree.descendant(withIdentity: updatedNode.identity) {
-          print("placed node payload", placedNode.drawPayload)
-        }
-      }
-      print("replay resolved has updated text", replayArtifacts.resolvedTree.descendant(withText: "Pressed 1 times") != nil)
-      print("replay raster has updated text", replayArtifacts.rasterSurface.lines.contains("Pressed 1 times"))
-      print("replay pressed lines", replayArtifacts.rasterSurface.lines.filter { $0.contains("Pressed") })
-      print(SnapshotRenderer().frameDiagnostics(replayArtifacts.diagnostics))
-    }
     #expect(result.exitReason == .quitKey)
     #expect(model.primaryCount == 1)
     #expect(terminal.frames.contains(where: { $0.contains("Pressed 1 times") }))
@@ -1602,58 +1521,10 @@ private final class Phase4EmptySignalReader: SignalReading {
   }
 }
 
-private final class Phase4RecordingFrameScheduler: FrameScheduling {
-  private let base = FrameScheduler()
-  var invalidations: [Set<Identity>] = []
-  var consumedFrames: [ScheduledFrame] = []
-
-  func requestInput() {
-    base.requestInput()
-  }
-
-  func requestInvalidation(of identities: Set<Identity>) {
-    invalidations.append(identities)
-    base.requestInvalidation(of: identities)
-  }
-
-  func requestSignal(named name: String) {
-    base.requestSignal(named: name)
-  }
-
-  func requestExternalWake(reason: String) {
-    base.requestExternalWake(reason: reason)
-  }
-
-  func requestDeadline(_ deadline: MonotonicInstant) {
-    base.requestDeadline(deadline)
-  }
-
-  func hasPendingFrame(at now: MonotonicInstant) -> Bool {
-    base.hasPendingFrame(at: now)
-  }
-
-  func nextWakeInstant(after now: MonotonicInstant) -> MonotonicInstant? {
-    base.nextWakeInstant(after: now)
-  }
-
-  func consumeReadyFrame(at now: MonotonicInstant) -> ScheduledFrame? {
-    let frame = base.consumeReadyFrame(at: now)
-    if let frame {
-      consumedFrames.append(frame)
-    }
-    return frame
-  }
-
-  func reset() {
-    base.reset()
-  }
-}
-
 @MainActor
 private func runObservableRuntimeHarness<V: View>(
   rootIdentity: Identity,
   terminal: Phase4RecordingTerminalHost,
-  scheduler: any FrameScheduling = FrameScheduler(),
   events: [InputEvent],
   viewBuilder: @escaping () -> V
 ) async throws -> RunLoopResult<Int> {
@@ -1666,7 +1537,7 @@ private func runObservableRuntimeHarness<V: View>(
     terminalHost: terminal,
     terminalInputReader: Phase4ScriptedTerminalInputReader(events: events),
     signalReader: Phase4EmptySignalReader(),
-    scheduler: scheduler,
+    scheduler: FrameScheduler(),
     stateContainer: StateContainer(
       initialState: 0,
       invalidationIdentities: [rootIdentity]
@@ -1714,9 +1585,10 @@ private func interactionRect<V: View>(
 
   var candidate: Identity? = textNode.identity
   while let identity = candidate {
-    if let rect = artifacts.semanticSnapshot.interactionRegions.first(where: { $0.identity == identity })?
-      .rect
-    {
+    if let rect = artifacts.semanticSnapshot.interactionRegions.first(where: {
+      $0.identity == identity
+    })?
+    .rect {
       return rect
     }
     candidate = identity.parent
@@ -1750,22 +1622,6 @@ extension ResolvedNode {
   }
 
   fileprivate func descendant(withIdentity identity: Identity) -> ResolvedNode? {
-    if self.identity == identity {
-      return self
-    }
-
-    for child in children {
-      if let match = child.descendant(withIdentity: identity) {
-        return match
-      }
-    }
-
-    return nil
-  }
-}
-
-extension PlacedNode {
-  fileprivate func descendant(withIdentity identity: Identity) -> PlacedNode? {
     if self.identity == identity {
       return self
     }

@@ -51,12 +51,16 @@ extension Menu {
     if isEnabled {
       let binding = expansionBinding
       let dynamicPropertyScope = currentDynamicPropertyScope()
-      context.localActionRegistry?.register(identity: context.identity) {
-        withDynamicPropertyScope(dynamicPropertyScope) {
-          binding.wrappedValue.toggle()
-          return true
-        }
-      }
+      context.localActionRegistry?.register(
+        identity: context.identity,
+        handler: {
+          withDynamicPropertyScope(dynamicPropertyScope) {
+            binding.wrappedValue.toggle()
+            return true
+          }
+        },
+        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+      )
     }
 
     let child = menuBody(

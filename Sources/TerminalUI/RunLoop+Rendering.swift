@@ -31,25 +31,6 @@ extension RunLoop {
           currentFocusedValues = resolvedFocusedValues
         }
 
-        if rootIdentity.path == "GalleryLikeRoot" {
-          let pressedLines = artifacts.rasterSurface.lines.filter { $0.contains("Pressed") }
-          let resolvedPressedOne = SnapshotRenderer().resolvedTree(artifacts.resolvedTree)
-            .contains("Pressed 1 times")
-          print(
-            "render loop",
-            scheduledFrame.causes,
-            scheduledFrame.invalidatedIdentities,
-            "resolvedPressedOne=\(resolvedPressedOne)",
-            "resolvedComputed=\(artifacts.diagnostics.resolvedNodesComputed)",
-            "resolvedReused=\(artifacts.diagnostics.resolvedNodesReused)",
-            "focusChanged=\(focusChanged)",
-            "appliedFocusRequest=\(appliedFocusRequest)",
-            "focusStateChanged=\(focusStateChanged)",
-            "focusedValuesChanged=\(focusedValuesChanged)",
-            pressedLines
-          )
-        }
-
         if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged {
           continue
         }
@@ -60,6 +41,10 @@ extension RunLoop {
           currentLifecycleRegistry: localLifecycleRegistry,
           currentTaskRegistry: localTaskRegistry
         )
+        if !postActionInvalidationIdentities.isEmpty {
+          scheduler.requestInvalidation(of: postActionInvalidationIdentities)
+          postActionInvalidationIdentities.removeAll(keepingCapacity: true)
+        }
         if let resolvedTreeIndex = renderer.latestResolvedTreeIndex() {
           observationBridge.prune(keeping: resolvedTreeIndex)
         }

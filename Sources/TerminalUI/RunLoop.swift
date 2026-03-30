@@ -114,6 +114,7 @@ public final class RunLoop<State: Equatable & Sendable> {
   package var transientPressedIdentity: Identity?
   package var armedPointerRouteID: RouteID?
   package var capturedPointerRouteID: RouteID?
+  package var postActionInvalidationIdentities: Set<Identity> = []
 
   /// Creates a run loop from a view builder that already returns `AnyView`.
   public init(

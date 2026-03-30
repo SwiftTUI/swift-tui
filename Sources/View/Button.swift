@@ -80,12 +80,16 @@ extension Button {
 
     if context.environmentValues.isEnabled, let action {
       let dynamicPropertyScope = currentDynamicPropertyScope()
-      context.localActionRegistry?.register(identity: context.identity) {
-        withDynamicPropertyScope(dynamicPropertyScope) {
-          action()
-          return true
-        }
-      }
+      context.localActionRegistry?.register(
+        identity: context.identity,
+        handler: {
+          withDynamicPropertyScope(dynamicPropertyScope) {
+            action()
+            return true
+          }
+        },
+        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+      )
     }
 
     let body = buttonBody(

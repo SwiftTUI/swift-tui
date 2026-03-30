@@ -48,12 +48,16 @@ extension Toggle {
     if isEnabled {
       let binding = isOn
       let dynamicPropertyScope = currentDynamicPropertyScope()
-      context.localActionRegistry?.register(identity: context.identity) {
-        withDynamicPropertyScope(dynamicPropertyScope) {
-          binding.wrappedValue.toggle()
-          return true
-        }
-      }
+      context.localActionRegistry?.register(
+        identity: context.identity,
+        handler: {
+          withDynamicPropertyScope(dynamicPropertyScope) {
+            binding.wrappedValue.toggle()
+            return true
+          }
+        },
+        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+      )
     }
 
     let child = toggleBody(
@@ -381,12 +385,16 @@ extension DisclosureGroup {
     if isEnabled {
       let binding = isExpanded
       let dynamicPropertyScope = currentDynamicPropertyScope()
-      context.localActionRegistry?.register(identity: context.identity) {
-        withDynamicPropertyScope(dynamicPropertyScope) {
-          binding.wrappedValue.toggle()
-          return true
-        }
-      }
+      context.localActionRegistry?.register(
+        identity: context.identity,
+        handler: {
+          withDynamicPropertyScope(dynamicPropertyScope) {
+            binding.wrappedValue.toggle()
+            return true
+          }
+        },
+        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+      )
     }
 
     let child = disclosureBody(

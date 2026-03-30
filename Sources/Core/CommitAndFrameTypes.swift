@@ -238,7 +238,7 @@ package struct ResolvedTreeIndex: Sendable {
 package final class RetainedResolveFrame: @unchecked Sendable {
   package var resolvedTree: ResolvedNode
   package let resolvedTreeIndex: ResolvedTreeIndex
-  package var actionHandlers: [Identity: LocalActionRegistry.Handler]
+  package var actionHandlers: [Identity: LocalActionRegistry.Registration]
   package var pointerHandlers: [RouteID: LocalPointerHandlerRegistry.Handler]
   package var focusBindings: [FocusBindingRegistrationSnapshot]
   package var focusedValues: [FocusedValuesRegistrationSnapshot]
@@ -248,7 +248,7 @@ package final class RetainedResolveFrame: @unchecked Sendable {
 
   package init(
     resolvedTree: ResolvedNode,
-    actionHandlers: [Identity: LocalActionRegistry.Handler] = [:],
+    actionHandlers: [Identity: LocalActionRegistry.Registration] = [:],
     pointerHandlers: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
     focusBindings: [FocusBindingRegistrationSnapshot] = [],
     focusedValues: [FocusedValuesRegistrationSnapshot] = [],
@@ -332,6 +332,17 @@ package struct RetainedLayoutSession: Sendable {
     _ identity: Identity
   ) -> Bool {
     invalidatedIdentities.contains(identity)
+  }
+
+  package func hasSyntheticInvalidatedAncestor(
+    _ identity: Identity
+  ) -> Bool {
+    invalidatedIdentities.contains { invalidatedIdentity in
+      guard resolvedNodes[invalidatedIdentity] == nil else {
+        return false
+      }
+      return identity.isDescendant(of: invalidatedIdentity)
+    }
   }
 
   package func containsInvalidatedDescendant(

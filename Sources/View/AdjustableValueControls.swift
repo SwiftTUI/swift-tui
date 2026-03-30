@@ -66,20 +66,24 @@ extension Stepper {
       let bounds = bounds
       let step = step
       let dynamicPropertyScope = currentDynamicPropertyScope()
-      context.localActionRegistry?.register(identity: context.identity) {
-        withDynamicPropertyScope(dynamicPropertyScope) {
-          let next = steppedControlValue(
-            from: binding.wrappedValue,
-            delta: step,
-            bounds: bounds
-          )
-          guard next != binding.wrappedValue else {
-            return false
+      context.localActionRegistry?.register(
+        identity: context.identity,
+        handler: {
+          withDynamicPropertyScope(dynamicPropertyScope) {
+            let next = steppedControlValue(
+              from: binding.wrappedValue,
+              delta: step,
+              bounds: bounds
+            )
+            guard next != binding.wrappedValue else {
+              return false
+            }
+            binding.wrappedValue = next
+            return true
           }
-          binding.wrappedValue = next
-          return true
-        }
-      }
+        },
+        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+      )
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
         let delta: Int
         switch event {
@@ -313,20 +317,24 @@ extension Slider {
       let bounds = bounds
       let step = step
       let dynamicPropertyScope = currentDynamicPropertyScope()
-      context.localActionRegistry?.register(identity: context.identity) {
-        withDynamicPropertyScope(dynamicPropertyScope) {
-          let next = steppedControlValue(
-            from: binding.wrappedValue,
-            delta: step,
-            bounds: bounds
-          )
-          guard next != binding.wrappedValue else {
-            return false
+      context.localActionRegistry?.register(
+        identity: context.identity,
+        handler: {
+          withDynamicPropertyScope(dynamicPropertyScope) {
+            let next = steppedControlValue(
+              from: binding.wrappedValue,
+              delta: step,
+              bounds: bounds
+            )
+            guard next != binding.wrappedValue else {
+              return false
+            }
+            binding.wrappedValue = next
+            return true
           }
-          binding.wrappedValue = next
-          return true
-        }
-      }
+        },
+        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+      )
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
         let delta: Int
         switch event {

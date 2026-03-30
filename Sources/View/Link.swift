@@ -281,9 +281,13 @@ private func registerOpenLinkAction(
 
   let openLinkAction = context.environmentValues.openLinkAction
   let dynamicPropertyScope = currentDynamicPropertyScope()
-  localActionRegistry.register(identity: identity) {
-    withDynamicPropertyScope(dynamicPropertyScope) {
-      openLinkAction(destination)
-    }
-  }
+  localActionRegistry.register(
+    identity: identity,
+    handler: {
+      withDynamicPropertyScope(dynamicPropertyScope) {
+        openLinkAction(destination)
+      }
+    },
+    followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+  )
 }

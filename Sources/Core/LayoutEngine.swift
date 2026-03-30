@@ -755,7 +755,9 @@ public struct LayoutEngine {
     retainedLayout: RetainedLayoutSession?
   ) -> MeasuredNode? {
     guard let retainedLayout,
-      !retainedLayout.invalidationAffectsSubtree(at: resolved.identity),
+      !retainedLayout.isDirectlyInvalidated(resolved.identity),
+      !retainedLayout.hasSyntheticInvalidatedAncestor(resolved.identity),
+      !retainedLayout.containsInvalidatedDescendant(of: resolved.identity),
       supportsRetainedLayoutReuse(for: resolved),
       let previousResolved = retainedLayout.resolvedNode(for: resolved.identity),
       let previousMeasured = retainedLayout.measuredNode(for: resolved.identity),
@@ -775,7 +777,9 @@ public struct LayoutEngine {
     retainedLayout: RetainedLayoutSession?
   ) -> PlacedNode? {
     guard let retainedLayout,
-      !retainedLayout.invalidationAffectsSubtree(at: resolved.identity),
+      !retainedLayout.isDirectlyInvalidated(resolved.identity),
+      !retainedLayout.hasSyntheticInvalidatedAncestor(resolved.identity),
+      !retainedLayout.containsInvalidatedDescendant(of: resolved.identity),
       supportsRetainedLayoutReuse(for: resolved),
       let previousResolved = retainedLayout.resolvedNode(for: resolved.identity),
       let previousMeasured = retainedLayout.measuredNode(for: resolved.identity),

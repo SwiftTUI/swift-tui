@@ -108,7 +108,12 @@ extension RunLoop {
     case .enter, .space:
       setPressedIdentity(focusedIdentity, transient: true)
       if let focusedIdentity {
-        _ = localActionRegistry.dispatch(identity: focusedIdentity)
+        let handled = localActionRegistry.dispatch(identity: focusedIdentity)
+        if handled,
+          let identity = localActionRegistry.followUpInvalidationIdentity(for: focusedIdentity)
+        {
+          postActionInvalidationIdentities.insert(identity)
+        }
       }
       return nil
     case .ctrlC:

@@ -498,9 +498,13 @@ package final class ResolveReuseSession: @unchecked Sendable {
 
     for identity in subtreeIdentities {
       if let actionRegistry = context.localActionRegistry,
-        let handler = previousFrame.actionHandlers[identity]
+        let registration = previousFrame.actionHandlers[identity]
       {
-        actionRegistry.register(identity: identity, handler: handler)
+        actionRegistry.register(
+          identity: identity,
+          handler: registration.handler,
+          followUpInvalidationIdentity: registration.followUpInvalidationIdentity
+        )
       }
       if let keyHandlerRegistry = context.localKeyHandlerRegistry,
         let handler = previousFrame.keyHandlers[identity]

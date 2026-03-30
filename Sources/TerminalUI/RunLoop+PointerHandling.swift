@@ -135,7 +135,12 @@ extension RunLoop {
       ?? interactionRegion(routeID: armedPointerRouteID).flatMap { focusIdentity(for: $0.identity) }
 
     if let focusedIdentity {
-      _ = localActionRegistry.dispatch(identity: focusedIdentity)
+      let handled = localActionRegistry.dispatch(identity: focusedIdentity)
+      if handled,
+        let identity = localActionRegistry.followUpInvalidationIdentity(for: focusedIdentity)
+      {
+        postActionInvalidationIdentities.insert(identity)
+      }
     }
   }
 
