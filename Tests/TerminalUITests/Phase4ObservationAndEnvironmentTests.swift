@@ -771,6 +771,125 @@ struct Phase4ObservationAndEnvironmentTests {
   }
 
   @MainActor
+  @Test("runtime rerenders gallery-like observable button taps immediately")
+  func runtimeRerendersGalleryLikeObservableButtonTapsImmediately() async throws {
+    let model = Phase4GalleryLikeModel()
+    let terminal = Phase4RecordingTerminalHost()
+    let scheduler = Phase4RecordingFrameScheduler()
+    let rootIdentity = testIdentity("GalleryLikeRoot")
+    let terminalSize = terminal.surfaceSize
+    let view = GalleryLikeObservableSceneView(model: model)
+
+    let primaryRect = try #require(
+      interactionRect(
+        containingText: "Primary",
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runObservableRuntimeHarness(
+      rootIdentity: rootIdentity,
+      terminal: terminal,
+      scheduler: scheduler,
+      events: [
+        .mouse(.init(kind: .down(.primary), location: centerPoint(of: primaryRect))),
+        .mouse(.init(kind: .up(.primary), location: centerPoint(of: primaryRect))),
+        .key(.character("q")),
+      ],
+      viewBuilder: {
+        GalleryLikeObservableSceneView(model: model)
+      }
+    )
+
+    print("recorded invalidations", scheduler.invalidations)
+    print("recorded consumed frames", scheduler.consumedFrames)
+    if scheduler.invalidations.count >= 2 {
+      let replayModel = Phase4GalleryLikeModel()
+      var replayEnvironmentValues = EnvironmentValues()
+      replayEnvironmentValues.terminalSize = terminalSize
+      let replayActionRegistry = LocalActionRegistry()
+      let replayPointerRegistry = LocalPointerHandlerRegistry()
+      let replayFocusBindingRegistry = LocalFocusBindingRegistry()
+      let replayFocusedValuesRegistry = LocalFocusedValuesRegistry()
+      let replayKeyRegistry = LocalKeyHandlerRegistry()
+      let replayLifecycleRegistry = LocalLifecycleRegistry()
+      let replayTaskRegistry = LocalTaskRegistry()
+      let replayDynamicStateStore = DynamicStateStore(invalidationIdentities: [rootIdentity])
+      let replayObservationBridge = ObservationBridge()
+      let replayRenderer = DefaultRenderer()
+      var replayInitialContext = ResolveContext(
+        identity: rootIdentity,
+        environmentValues: replayEnvironmentValues,
+        localActionRegistry: replayActionRegistry,
+        localKeyHandlerRegistry: replayKeyRegistry,
+        localLifecycleRegistry: replayLifecycleRegistry,
+        localTaskRegistry: replayTaskRegistry,
+        applyEnvironmentValues: true
+      )
+      replayInitialContext.localPointerHandlerRegistry = replayPointerRegistry
+      replayInitialContext.localFocusBindingRegistry = replayFocusBindingRegistry
+      replayInitialContext.localFocusedValuesRegistry = replayFocusedValuesRegistry
+      replayInitialContext.dynamicStateStore = replayDynamicStateStore
+      replayInitialContext.observationBridge = replayObservationBridge
+      _ = replayRenderer.render(
+        AnyView(GalleryLikeObservableSceneView(model: replayModel)),
+        context: replayInitialContext,
+        proposal: .init(width: terminalSize.width, height: terminalSize.height)
+      )
+      let activeButtonIdentity = scheduler.invalidations[1].first {
+        $0.lastComponent == "HStack[0]"
+      }
+      if let activeButtonIdentity {
+        _ = replayActionRegistry.dispatch(identity: activeButtonIdentity)
+      }
+      var replayInteractiveEnvironmentValues = replayEnvironmentValues
+      replayInteractiveEnvironmentValues.focusedIdentity = activeButtonIdentity
+      replayInteractiveEnvironmentValues.pressedIdentity = activeButtonIdentity
+      var replayUpdatedContext = ResolveContext(
+        identity: rootIdentity,
+        environmentValues: replayInteractiveEnvironmentValues,
+        invalidatedIdentities: scheduler.invalidations[1],
+        localActionRegistry: replayActionRegistry,
+        localKeyHandlerRegistry: replayKeyRegistry,
+        localLifecycleRegistry: replayLifecycleRegistry,
+        localTaskRegistry: replayTaskRegistry,
+        applyEnvironmentValues: true
+      )
+      replayUpdatedContext.localPointerHandlerRegistry = replayPointerRegistry
+      replayUpdatedContext.localFocusBindingRegistry = replayFocusBindingRegistry
+      replayUpdatedContext.localFocusedValuesRegistry = replayFocusedValuesRegistry
+      replayUpdatedContext.dynamicStateStore = replayDynamicStateStore
+      replayUpdatedContext.observationBridge = replayObservationBridge
+      let replayArtifacts = replayRenderer.render(
+        AnyView(GalleryLikeObservableSceneView(model: replayModel)),
+        context: replayUpdatedContext,
+        proposal: .init(width: terminalSize.width, height: terminalSize.height)
+      )
+      if let updatedNode = replayArtifacts.resolvedTree.descendant(withText: "Pressed 1 times") {
+        print("updated resolved identity", updatedNode.identity)
+        print(
+          "updated identity descends from observed invalidation",
+          updatedNode.identity.isDescendant(of: scheduler.invalidations[1].first { $0.lastComponent == "content" } ?? rootIdentity)
+        )
+        if let placedNode = replayArtifacts.placedTree.descendant(withIdentity: updatedNode.identity) {
+          print("placed node payload", placedNode.drawPayload)
+        }
+      }
+      print("replay resolved has updated text", replayArtifacts.resolvedTree.descendant(withText: "Pressed 1 times") != nil)
+      print("replay raster has updated text", replayArtifacts.rasterSurface.lines.contains("Pressed 1 times"))
+      print("replay pressed lines", replayArtifacts.rasterSurface.lines.filter { $0.contains("Pressed") })
+      print(SnapshotRenderer().frameDiagnostics(replayArtifacts.diagnostics))
+    }
+    #expect(result.exitReason == .quitKey)
+    #expect(model.primaryCount == 1)
+    #expect(terminal.frames.contains(where: { $0.contains("Pressed 1 times") }))
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(lastFrame.contains("Pressed 1 times"))
+  }
+
+  @MainActor
   @Test("runtime refreshes environment readers when terminal appearance changes")
   func runtimeRefreshesEnvironmentReadersWhenTerminalAppearanceChanges() async throws {
     let darkAppearance = TerminalAppearance.fallback
@@ -1093,6 +1212,169 @@ private struct StatefulStepperCounterView: View {
   }
 }
 
+@Observable
+private final class Phase4GalleryLikeModel: @unchecked Sendable {
+  var activeTab = "controls"
+  var selectedControlDemo = "buttons"
+  var primaryCount = 0
+
+  func increment() {
+    primaryCount += 1
+  }
+
+  func reset() {
+    activeTab = "controls"
+    selectedControlDemo = "buttons"
+    primaryCount = 0
+  }
+}
+
+private struct GalleryLikeObservableSceneView: View {
+  @Bindable var model: Phase4GalleryLikeModel
+  @State private var isResetAlertPresented = false
+
+  init(model: Phase4GalleryLikeModel) {
+    _model = Bindable(model)
+  }
+
+  var body: some View {
+    GeometryReader { geometry in
+      shell(contentHeight: max(0, geometry.size.height - 4))
+    }
+  }
+
+  private func shell(contentHeight: Int) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Gallery")
+        .bold()
+        .padding(.init(horizontal: 1, vertical: 0))
+      Divider()
+      TabView(selection: $model.activeTab) {
+        workbenchSurface(
+          selection: $model.selectedControlDemo,
+          entries: [
+            ("Buttons", "buttons"),
+            ("Inputs", "inputs"),
+            ("Value Controls", "values"),
+          ],
+          title: "Buttons",
+          subtitle: "Filled primary actions with plain secondary actions."
+        ) {
+          controlsPreview
+        }
+        .tabItem("Controls")
+        .tag("controls")
+      }
+      .frame(
+        maxWidth: .infinity,
+        minHeight: .finite(contentHeight),
+        idealHeight: .finite(contentHeight),
+        maxHeight: .finite(contentHeight),
+        alignment: .topLeading
+      )
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .alert(
+      "Reset gallery state?",
+      isPresented: $isResetAlertPresented,
+      actions: {
+        Button("Reset", role: .destructive) {
+          model.reset()
+        }
+        Button("Cancel", role: .cancel) {
+          isResetAlertPresented = false
+        }
+      },
+      message: {
+        Text("Clears the interactive control and appearance samples?")
+      }
+    )
+  }
+
+  @ViewBuilder
+  private var controlsPreview: some View {
+    switch model.selectedControlDemo {
+    case "inputs":
+      Text("Inputs")
+    case "values":
+      Text("Values")
+    default:
+      VStack(alignment: .leading, spacing: 1) {
+        HStack(alignment: .center, spacing: 1) {
+          Button("Primary") {
+            model.increment()
+          }
+          Button("Reset", role: .destructive) {
+            isResetAlertPresented = true
+          }
+          Button("Plain") {
+            model.increment()
+            model.increment()
+          }
+          .buttonStyle(.plain)
+        }
+        Text("Pressed \(model.primaryCount) times")
+          .foregroundStyle(.separator)
+      }
+    }
+  }
+
+  private func workbenchSurface<Content: View>(
+    selection: Binding<String>,
+    entries: [(String, String)],
+    title: String,
+    subtitle: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Picker("", selection: selection) {
+        ForEach(entries, id: \.1) { entry in
+          Text(entry.0).tag(entry.1)
+        }
+      }
+      .pickerStyle(.segmented)
+      .padding(.init(horizontal: 1, vertical: 0))
+
+      Divider()
+      previewPanel(
+        title: title,
+        subtitle: subtitle
+      ) {
+        content()
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  private func previewPanel<Content: View>(
+    title: String,
+    subtitle: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 1) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text(title)
+          .bold()
+        Text(subtitle)
+          .lineLimit(2)
+          .truncationMode(.tail)
+          .foregroundStyle(.separator)
+      }
+      Divider()
+      content()
+      Spacer(minLength: 0)
+    }
+    .padding(1)
+    .frame(
+      minWidth: .finite(24),
+      maxWidth: .infinity,
+      maxHeight: .infinity,
+      alignment: .topLeading
+    )
+  }
+}
+
 private struct AppearanceProbeView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
@@ -1295,12 +1577,161 @@ private final class Phase4ScriptedInputReader: InputReading {
   }
 }
 
+private final class Phase4ScriptedTerminalInputReader: TerminalInputReading {
+  private let scriptedEvents: [InputEvent]
+
+  init(events: [InputEvent]) {
+    scriptedEvents = events
+  }
+
+  func inputEvents() -> AsyncStream<InputEvent> {
+    AsyncStream { continuation in
+      for event in scriptedEvents {
+        continuation.yield(event)
+      }
+      continuation.finish()
+    }
+  }
+}
+
 private final class Phase4EmptySignalReader: SignalReading {
   func events() -> AsyncStream<String> {
     AsyncStream { continuation in
       continuation.finish()
     }
   }
+}
+
+private final class Phase4RecordingFrameScheduler: FrameScheduling {
+  private let base = FrameScheduler()
+  var invalidations: [Set<Identity>] = []
+  var consumedFrames: [ScheduledFrame] = []
+
+  func requestInput() {
+    base.requestInput()
+  }
+
+  func requestInvalidation(of identities: Set<Identity>) {
+    invalidations.append(identities)
+    base.requestInvalidation(of: identities)
+  }
+
+  func requestSignal(named name: String) {
+    base.requestSignal(named: name)
+  }
+
+  func requestExternalWake(reason: String) {
+    base.requestExternalWake(reason: reason)
+  }
+
+  func requestDeadline(_ deadline: MonotonicInstant) {
+    base.requestDeadline(deadline)
+  }
+
+  func hasPendingFrame(at now: MonotonicInstant) -> Bool {
+    base.hasPendingFrame(at: now)
+  }
+
+  func nextWakeInstant(after now: MonotonicInstant) -> MonotonicInstant? {
+    base.nextWakeInstant(after: now)
+  }
+
+  func consumeReadyFrame(at now: MonotonicInstant) -> ScheduledFrame? {
+    let frame = base.consumeReadyFrame(at: now)
+    if let frame {
+      consumedFrames.append(frame)
+    }
+    return frame
+  }
+
+  func reset() {
+    base.reset()
+  }
+}
+
+@MainActor
+private func runObservableRuntimeHarness<V: View>(
+  rootIdentity: Identity,
+  terminal: Phase4RecordingTerminalHost,
+  scheduler: any FrameScheduling = FrameScheduler(),
+  events: [InputEvent],
+  viewBuilder: @escaping () -> V
+) async throws -> RunLoopResult<Int> {
+  var environmentValues = EnvironmentValues()
+  environmentValues.terminalAppearance = terminal.appearance
+  environmentValues.terminalSize = terminal.surfaceSize
+
+  let runLoop = RunLoop(
+    rootIdentity: rootIdentity,
+    terminalHost: terminal,
+    terminalInputReader: Phase4ScriptedTerminalInputReader(events: events),
+    signalReader: Phase4EmptySignalReader(),
+    scheduler: scheduler,
+    stateContainer: StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    ),
+    focusTracker: FocusTracker(
+      invalidationIdentities: [rootIdentity]
+    ),
+    environmentValues: environmentValues,
+    proposal: .init(width: terminal.surfaceSize.width, height: terminal.surfaceSize.height),
+    viewBuilder: { _, _ in
+      viewBuilder()
+    }
+  )
+
+  runLoop.attachDynamicStateStore(
+    DynamicStateStore(invalidationIdentities: [rootIdentity])
+  )
+
+  return try await runLoop.run()
+}
+
+@MainActor
+private func interactionRect<V: View>(
+  containingText text: String,
+  in view: V,
+  rootIdentity: Identity,
+  terminalSize: Size
+) -> Rect? {
+  var environmentValues = EnvironmentValues()
+  environmentValues.terminalSize = terminalSize
+
+  let artifacts = DefaultRenderer().render(
+    view,
+    context: .init(
+      identity: rootIdentity,
+      environmentValues: environmentValues,
+      applyEnvironmentValues: true
+    ),
+    proposal: .init(width: terminalSize.width, height: terminalSize.height)
+  )
+
+  guard let textNode = artifacts.resolvedTree.descendant(withText: text) else {
+    return nil
+  }
+
+  var candidate: Identity? = textNode.identity
+  while let identity = candidate {
+    if let rect = artifacts.semanticSnapshot.interactionRegions.first(where: { $0.identity == identity })?
+      .rect
+    {
+      return rect
+    }
+    candidate = identity.parent
+  }
+
+  return nil
+}
+
+private func centerPoint(
+  of rect: Rect
+) -> Point {
+  Point(
+    x: rect.origin.x + max(0, rect.size.width - 1) / 2,
+    y: rect.origin.y + max(0, rect.size.height - 1) / 2
+  )
 }
 
 extension ResolvedNode {
@@ -1319,6 +1750,22 @@ extension ResolvedNode {
   }
 
   fileprivate func descendant(withIdentity identity: Identity) -> ResolvedNode? {
+    if self.identity == identity {
+      return self
+    }
+
+    for child in children {
+      if let match = child.descendant(withIdentity: identity) {
+        return match
+      }
+    }
+
+    return nil
+  }
+}
+
+extension PlacedNode {
+  fileprivate func descendant(withIdentity identity: Identity) -> PlacedNode? {
     if self.identity == identity {
       return self
     }

@@ -13,6 +13,11 @@ extension View {
     resolveView(self, in: context)
   }
 
+  /// Erases `self` for local branch unification or interoperability.
+  ///
+  /// Prefer typed `@ViewBuilder` composition and generic storage when possible.
+  /// If authored content will be stored for later evaluation, prefer
+  /// `scopedAnyView(...)` over storing this result directly.
   public var erasedToAnyView: AnyView {
     AnyView(self)
   }

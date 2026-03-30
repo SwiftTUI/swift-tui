@@ -229,7 +229,9 @@ public enum ViewBuilder {
 /// A type-erased terminal view.
 ///
 /// Use `AnyView` when a call site must store heterogeneous view values while
-/// still participating in the normal authored `View` surface.
+/// still participating in the normal authored `View` surface. Prefer typed
+/// `@ViewBuilder` composition and generic `Content: View` storage when those
+/// are practical.
 public struct AnyView: View, ResolvableView {
   private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
 
@@ -272,6 +274,10 @@ public struct AnyView: View, ResolvableView {
   }
 
   /// Erases the concrete type of `view`.
+  ///
+  /// Prefer `scopedAnyView(...)` when authored content will be stored for later
+  /// evaluation, because that helper also restores the original
+  /// dynamic-property scope.
   public init<V: View>(_ view: V) {
     let erased: Any = view
     if let resolvable = erased as? any ResolvableView {
@@ -347,6 +353,8 @@ package func scopedAnyView<V: View>(
   authoringScope: DynamicPropertyScope? = currentDynamicPropertyScope(),
   _ build: () -> V
 ) -> AnyView {
+  // AnyView policy: use this helper instead of plain AnyView(...) when stored
+  // authored content must preserve its original dynamic-property scope.
   withDynamicPropertyScope(authoringScope) {
     AnyView(
       scoped: build(),

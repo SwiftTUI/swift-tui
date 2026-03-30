@@ -10,13 +10,20 @@ swift test                   # Run all tests
 swift test --filter TerminalUITests.SwiftUISurfaceTests  # Run a single test suite
 swift test --filter TerminalUITests.SwiftUISurfaceTests/testName  # Run a single test
 swift format format -i --configuration .swift-format.json Sources/ Tests/  # Format all code
-
+```
 
 ## Development Guidelines
 
 - When implementing a new feature that replaces or extends an existing constraint (e.g., single-scene → multi-scene), search for and remove ALL old guards/assertions that enforce the previous constraint.
-```
 - When working with this Swift TUI framework, always run the full test suite (`swift test`) after making changes and confirm all tests pass before considering work complete.
+
+## AnyView Policy
+
+- Prefer typed `@ViewBuilder` closures and generic `Content: View` storage.
+- Treat `AnyView` as an escape hatch, not as a default container type.
+- Do not introduce public APIs that expose `[AnyView]`, builder closures returning `AnyView`, or node-erasure seams.
+- If authored content is stored for later evaluation, capture it with `scopedAnyView(...)`, not plain `AnyView(...)`.
+- Add a nearby `AnyView policy:` comment when introducing new stored `AnyView`, `[AnyView]`, or closure-returning-`AnyView` members.
 
 ## Pre-commit Hooks (prek)
 
@@ -96,5 +103,6 @@ Detailed design docs live in `/docs/`:
 - `RUNTIME.md` -- lifecycle, task semantics, incremental rendering model
 - `SOURCE_LAYOUT.md` -- per-file ownership map
 - `PUBLIC_API_INVENTORY.md` -- public surface classification
+- `PUBLIC_SURFACE_POLICY.md` -- public API governance rules, including `AnyView` and type-erasure policy
 - `FOCUS.md` -- focus system design
 - `VISION.md` -- project philosophy and scope

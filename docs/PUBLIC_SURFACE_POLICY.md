@@ -1,6 +1,6 @@
 # Public Surface Policy
 
-Last updated: March 24, 2026
+Last updated: March 30, 2026
 
 This note defines how the package should think about its public API shape after the public-surface consolidation.
 
@@ -73,6 +73,18 @@ Compatibility factories such as the old `Package` helpers do not qualify as cano
 - Public builder-taking APIs should accept typed `@ViewBuilder` closures, not `[AnyView]`.
 - Internal lowering protocols such as `ResolvableView` must stay package-only.
 - There is no public replacement for direct primitive lowering in this release.
+
+## AnyView Policy
+
+`AnyView` remains part of the supported surface as a narrow type-erasure escape hatch,
+but it is not the default authoring model for this package.
+
+- Prefer typed `@ViewBuilder` closures and generic `Content: View` storage.
+- Do not add public APIs that expose `[AnyView]`, builder closures returning `AnyView`, or direct node-erasure construction seams.
+- Internal `AnyView` storage is acceptable only for heterogeneous child storage, deferred authored-content capture, or local branch unification when concrete view types genuinely diverge.
+- If authored content is stored for later evaluation, capture it with `scopedAnyView(...)`, not plain `AnyView(...)`, so dynamic-property scope and identity-bound state continue to behave correctly.
+- New stored `AnyView`, `[AnyView]`, or closure-returning-`AnyView` members should carry a nearby `AnyView policy:` comment explaining why typed storage is not practical in that file.
+- Reviewers should treat new erasure sites as design decisions, not as convenience refactors.
 
 ## Review Checklist
 

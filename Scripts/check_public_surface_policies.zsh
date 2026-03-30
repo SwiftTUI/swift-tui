@@ -12,6 +12,18 @@ fail() {
   failures=1
 }
 
+contains_file() {
+  local target="$1"
+  shift
+  local candidate
+  for candidate in "$@"; do
+    if [[ "$candidate" == "$target" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 public_behavior_suite_files=(
   "Tests/TerminalUITests/AppRuntimeTests.swift"
   "Tests/TerminalUITests/CollectionSupportTests.swift"
@@ -151,7 +163,7 @@ then
   fail "Button public actions must stay @MainActor @Sendable."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'private let handler: @MainActor @Sendable (String) -> Bool' \
+if ! rg -n --fixed-strings --quiet -- 'private let handler: @MainActor @Sendable (LinkDestination) -> Bool' \
   Sources/View/Environment.swift
 then
   fail "OpenLinkAction must stay main-actor-aware."
@@ -172,6 +184,25 @@ for doc_file in "${actor_isolation_docs[@]}"; do
   fi
 done
 
+anyview_policy_docs=(
+  "AGENTS.md"
+  "docs/PUBLIC_SURFACE_POLICY.md"
+)
+
+for doc_file in "${anyview_policy_docs[@]}"; do
+  if ! rg -n --fixed-strings --quiet -- '## AnyView Policy' "$doc_file"; then
+    fail "$doc_file should contain the AnyView policy heading."
+  fi
+
+  if ! rg -n --fixed-strings --quiet -- 'typed `@ViewBuilder` closures and generic `Content: View` storage' "$doc_file"; then
+    fail "$doc_file should describe the typed @ViewBuilder and generic Content storage preference."
+  fi
+
+  if ! rg -n --fixed-strings --quiet -- 'scopedAnyView' "$doc_file"; then
+    fail "$doc_file should mention scopedAnyView for deferred authored content."
+  fi
+done
+
 if [[ ! -f Tests/ViewTests/ActorIsolationSurfaceTests.swift ]]; then
   fail "Tests/ViewTests/ActorIsolationSurfaceTests.swift should exist to pin the actor-isolated surface."
 fi
@@ -179,7 +210,9 @@ fi
 public_surface_patterns=(
   '@ViewBuilder\s+[A-Za-z_]+\s*:\s*\(\)\s*->\s*\[AnyView\]'
   'public\s+(var|let)\s+[A-Za-z_]+\s*:\s*\[AnyView\]'
+  'public\s+(var|let)\s+[A-Za-z_]+\s*:\s*\([^)]*\)\s*->\s*AnyView'
   'public\s+init\s*\([^)]*\[AnyView\]'
+  'public\s+init\s*\([^)]*@ViewBuilder[^)]*->\s*AnyView'
   'public\s+init\s*\(\s*erasing:'
   'public\s+init\s*\([^)]*localActionRegistry:'
   'public\s+init\s*\([^)]*localKeyHandlerRegistry:'
@@ -197,6 +230,65 @@ for pattern in "${public_surface_patterns[@]}"; do
     fail "Unexpected public AnyView-array or node-erasure surface matched $pattern."
   fi
 done
+
+stored_anyview_allowlist=(
+  "Sources/TerminalUI/App.swift"
+  "Sources/TerminalUICharts/BarChart.swift"
+  "Sources/TerminalUICharts/BulletChart.swift"
+  "Sources/TerminalUICharts/ColumnChart.swift"
+  "Sources/TerminalUICharts/ComparisonChart.swift"
+  "Sources/TerminalUICharts/HeatStrip.swift"
+  "Sources/TerminalUICharts/Legend.swift"
+  "Sources/TerminalUICharts/Meter.swift"
+  "Sources/TerminalUICharts/Sparkline.swift"
+  "Sources/TerminalUICharts/StackedBarChart.swift"
+  "Sources/TerminalUICharts/ThresholdGauge.swift"
+  "Sources/View/AdjustableValueControls.swift"
+  "Sources/View/Button.swift"
+  "Sources/View/Collections.swift"
+  "Sources/View/ContainerViews.swift"
+  "Sources/View/Environment.swift"
+  "Sources/View/LabeledContainers.swift"
+  "Sources/View/Layout.swift"
+  "Sources/View/Menu.swift"
+  "Sources/View/NavigationViews.swift"
+  "Sources/View/OutlineViews.swift"
+  "Sources/View/Picker.swift"
+  "Sources/View/PickerRendering.swift"
+  "Sources/View/PresentationModifiers.swift"
+  "Sources/View/ProgressView.swift"
+  "Sources/View/SecureField.swift"
+  "Sources/View/ValueControls.swift"
+  "Sources/View/ViewCompositionHelpers.swift"
+  "Sources/View/ViewFoundation.swift"
+  "Tests/TerminalUITests/NonAggregatingViewFixtureTests.swift"
+)
+
+stored_anyview_matches="$(
+  rg -n -P \
+    --glob '*.swift' \
+    --glob '!Sources/Vendor/**' \
+    -- '^\s*(public|internal|package|private|fileprivate)?\s*(var|let)\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*(\[\s*AnyView\s*\]|AnyView\??|\([^)]*\)\s*->\s*AnyView)\s*(=\s*.+)?$' \
+    Sources Tests || true
+)"
+
+if [[ -n "$stored_anyview_matches" ]]; then
+  match_files=("${(@f)stored_anyview_matches}")
+  match_line=""
+  file=""
+  for match_line in "${match_files[@]}"; do
+    file="${match_line%%:*}"
+    if contains_file "$file" "${stored_anyview_allowlist[@]}"; then
+      continue
+    fi
+
+    if rg -n --fixed-strings --quiet -- 'AnyView policy:' "$file"; then
+      continue
+    fi
+
+    fail "$file introduces stored AnyView erasure without an allowlist entry or nearby 'AnyView policy:' comment."
+  done
+fi
 
 non_public_seam_declarations=(
   'public enum Package'
