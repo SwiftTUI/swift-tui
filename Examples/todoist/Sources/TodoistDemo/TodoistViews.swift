@@ -176,6 +176,22 @@ struct TodoistDemoRootView: View {
           .foregroundStyle(.separator)
       }
   }
+  .confirmationDialog(
+          "Close selected task?",
+          isPresented: $isCloseConfirmationPresented,
+          actions: {
+            Button("Close") {
+              isCloseConfirmationPresented = false
+              model.requestCloseSelectedTask()
+            }
+            Button("Cancel") {
+              isCloseConfirmationPresented = false
+            }
+          },
+          message: {
+            Text("This completes the task in Todoist and removes it from the active task list.")
+          }
+        )
     .task { [model] in
       await model.start()
     }
@@ -345,22 +361,6 @@ struct TodoistDemoRootView: View {
           isCloseConfirmationPresented = true
         }
         .disabled(!model.canCloseTask)
-        .confirmationDialog(
-          "Close selected task?",
-          isPresented: $isCloseConfirmationPresented,
-          actions: {
-            Button("Close") {
-              isCloseConfirmationPresented = false
-              model.requestCloseSelectedTask()
-            }
-            Button("Cancel") {
-              isCloseConfirmationPresented = false
-            }
-          },
-          message: {
-            Text("This completes the task in Todoist and removes it from the active task list.")
-          }
-        )
         Divider()
         LabeledContent("Project", value: task.projectName ?? "Inbox")
         LabeledContent("Due", value: task.dueText ?? "None")
