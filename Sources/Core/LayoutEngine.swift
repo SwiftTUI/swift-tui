@@ -290,15 +290,19 @@ public struct LayoutEngine {
         measure(child, proposal: childProposal, passContext: passContext)
       }
     case .flexibleFrame(let minW, let idealW, let maxW, let minH, let idealH, let maxH, _):
-      let resolvedWidth = resolveFlexibleDimension(
-        proposal: parentProposal.width, min: minW, ideal: idealW, max: maxW
-      )
-      let resolvedHeight = resolveFlexibleDimension(
-        proposal: parentProposal.height, min: minH, ideal: idealH, max: maxH
-      )
       let childProposal = ProposedSize(
-        width: .finite(resolvedWidth),
-        height: .finite(resolvedHeight)
+        width: flexibleFrameChildProposalDimension(
+          proposal: parentProposal.width,
+          min: minW,
+          ideal: idealW,
+          max: maxW
+        ),
+        height: flexibleFrameChildProposalDimension(
+          proposal: parentProposal.height,
+          min: minH,
+          ideal: idealH,
+          max: maxH
+        )
       )
       return resolved.children.map { child in
         measure(child, proposal: childProposal, passContext: passContext)
@@ -461,12 +465,21 @@ public struct LayoutEngine {
         height: height ?? contentSize.height
       )
     case .flexibleFrame(let minW, let idealW, let maxW, let minH, let idealH, let maxH, _):
+      let contentSize = childMeasurements.first?.measuredSize ?? .zero
       return Size(
-        width: resolveFlexibleDimension(
-          proposal: proposal.width, min: minW, ideal: idealW, max: maxW
+        width: flexibleFrameMeasuredDimension(
+          proposal: proposal.width,
+          child: contentSize.width,
+          min: minW,
+          ideal: idealW,
+          max: maxW
         ),
-        height: resolveFlexibleDimension(
-          proposal: proposal.height, min: minH, ideal: idealH, max: maxH
+        height: flexibleFrameMeasuredDimension(
+          proposal: proposal.height,
+          child: contentSize.height,
+          min: minH,
+          ideal: idealH,
+          max: maxH
         )
       )
     case .decoration(let primaryIndex, _):
@@ -498,6 +511,53 @@ public struct LayoutEngine {
   private func finiteValue(_ dim: ProposedDimension?) -> Int? {
     guard case .finite(let v) = dim else { return nil }
     return v
+  }
+
+  private func hasFlexibleConstraint(
+    min: ProposedDimension?,
+    ideal: ProposedDimension?,
+    max: ProposedDimension?
+  ) -> Bool {
+    min != nil || ideal != nil || max != nil
+  }
+
+  private func flexibleFrameChildProposalDimension(
+    proposal: ProposedDimension,
+    min: ProposedDimension?,
+    ideal: ProposedDimension?,
+    max: ProposedDimension?
+  ) -> ProposedDimension {
+    guard hasFlexibleConstraint(min: min, ideal: ideal, max: max) else {
+      return proposal
+    }
+
+    return .finite(
+      resolveFlexibleDimension(
+        proposal: proposal,
+        min: min,
+        ideal: ideal,
+        max: max
+      )
+    )
+  }
+
+  private func flexibleFrameMeasuredDimension(
+    proposal: ProposedDimension,
+    child: Int,
+    min: ProposedDimension?,
+    ideal: ProposedDimension?,
+    max: ProposedDimension?
+  ) -> Int {
+    guard hasFlexibleConstraint(min: min, ideal: ideal, max: max) else {
+      return child
+    }
+
+    return resolveFlexibleDimension(
+      proposal: proposal,
+      min: min,
+      ideal: ideal,
+      max: max
+    )
   }
 
   private func resolveFlexibleDimension(

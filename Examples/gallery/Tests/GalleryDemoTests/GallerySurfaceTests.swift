@@ -88,4 +88,21 @@ struct GallerySurfaceTests {
     #expect(surface.contains("Show Charts"))
     #expect(!surface.contains("Show Controls"))
   }
+
+  @Test("Gallery palette preserves command details when filtered to one result")
+  func galleryPalettePreservesCommandDetailsWhenFiltered() {
+    let model = GalleryDemoModel()
+    model.isPalettePresented = true
+    model.paletteQuery = "reset"
+
+    let artifacts = DefaultRenderer().render(
+      GalleryDemoSceneView(model: model)
+        .frame(width: 96, height: 24, alignment: .topLeading),
+      context: .init(identity: testIdentity("GalleryPaletteFilteredRoot"))
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(surface.contains("Reset Interactive Samples"))
+    #expect(surface.contains("Restore the default gallery state"))
+  }
 }
