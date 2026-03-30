@@ -647,7 +647,7 @@ struct TerminalPresentationTests {
   @Test("POSIX terminal controller retries writes after nonblocking backpressure")
   func posixTerminalControllerRetriesWritesAfterBackpressure() throws {
     var descriptors: [Int32] = [0, 0]
-    #expect(pipe(&descriptors) == 0)
+    #expect(unsafe pipe(&descriptors) == 0)
 
     let readDescriptor = descriptors[0]
     let writeDescriptor = descriptors[1]
@@ -678,7 +678,7 @@ struct TerminalPresentationTests {
       drainStarted.signal()
       usleep(20_000)
       var buffer = Array(repeating: UInt8(0), count: 8192)
-      _ = Darwin.read(readDescriptor, &buffer, buffer.count)
+      _ = unsafe Darwin.read(readDescriptor, &buffer, buffer.count)
       drainFinished.signal()
     }
 
@@ -823,13 +823,13 @@ private func fillPipeUntilWouldBlock(
   writeDescriptor: Int32,
   chunk: [UInt8]
 ) throws {
-  try chunk.withUnsafeBytes { rawBuffer in
+  try unsafe chunk.withUnsafeBytes { rawBuffer in
     guard let baseAddress = rawBuffer.baseAddress else {
       return
     }
 
     while true {
-      let result = Darwin.write(writeDescriptor, baseAddress, chunk.count)
+      let result = unsafe Darwin.write(writeDescriptor, baseAddress, chunk.count)
       if result > 0 {
         continue
       }
@@ -851,7 +851,7 @@ private func readAllBytes(
 
   while true {
     var buffer = Array(repeating: UInt8(0), count: 4096)
-    let bytesRead = Darwin.read(fileDescriptor, &buffer, buffer.count)
+    let bytesRead = unsafe Darwin.read(fileDescriptor, &buffer, buffer.count)
     if bytesRead > 0 {
       collected.append(contentsOf: buffer.prefix(Int(bytesRead)))
       continue

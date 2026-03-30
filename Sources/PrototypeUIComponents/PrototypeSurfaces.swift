@@ -1,4 +1,4 @@
-public import Core
+import Core
 public import View
 
 /// A compact, horizontally scrollable help strip for terminal-native apps.

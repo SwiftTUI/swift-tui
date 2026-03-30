@@ -126,13 +126,13 @@ struct SceneInfo: Sendable {
     var description: String {
       switch self {
       case .failedToCreateSocket(let errno):
-        "Failed to create discovery socket: \(String(cString: strerror(errno)))"
+        "Failed to create discovery socket: \(unsafe String(cString: strerror(errno)))"
       case .identifierAlreadyInUse(let path):
         "A running instance is already using discovery socket \(path)."
       case .failedToBind(let path, let errno):
-        "Failed to bind discovery socket \(path): \(String(cString: strerror(errno)))"
+        "Failed to bind discovery socket \(path): \(unsafe String(cString: strerror(errno)))"
       case .failedToListen(let errno):
-        "Failed to listen on discovery socket: \(String(cString: strerror(errno)))"
+        "Failed to listen on discovery socket: \(unsafe String(cString: strerror(errno)))"
       }
     }
   }
@@ -173,7 +173,7 @@ struct SceneInfo: Sendable {
         if isSocketLive(socketPath) {
           throw SceneDiscoveryServerError.identifierAlreadyInUse(path: socketPath)
         }
-        _ = Darwin.unlink(socketPath)
+        _ = unsafe Darwin.unlink(socketPath)
       }
 
       let serverFD = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
@@ -185,7 +185,7 @@ struct SceneInfo: Sendable {
       defer {
         Darwin.close(serverFD)
         if shouldCleanupSocketPath {
-          _ = Darwin.unlink(socketPath)
+          _ = unsafe Darwin.unlink(socketPath)
         }
       }
 
@@ -193,20 +193,20 @@ struct SceneInfo: Sendable {
       var addr = sockaddr_un()
       addr.sun_family = sa_family_t(AF_UNIX)
       let sunPathSize = MemoryLayout.size(ofValue: addr.sun_path)
-      withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
-        socketPath.withCString { cstr in
-          _ = Darwin.strncpy(
-            UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
+      unsafe withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
+        unsafe socketPath.withCString { cstr in
+          _ = unsafe Darwin.strncpy(
+            unsafe UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
             cstr,
             sunPathSize - 1
           )
         }
       }
 
-      let bindResult = withUnsafePointer(to: &addr) {
-        Darwin.bind(
+      let bindResult = unsafe withUnsafePointer(to: &addr) {
+        unsafe Darwin.bind(
           serverFD,
-          UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
+          unsafe UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
           socklen_t(MemoryLayout<sockaddr_un>.size))
       }
       guard bindResult == 0 else {
@@ -228,7 +228,7 @@ struct SceneInfo: Sendable {
       // Accept loop — poll with a timeout so we check for cancellation periodically.
       while !Task.isCancelled {
         var pfd = pollfd(fd: serverFD, events: Int16(POLLIN), revents: 0)
-        let ready = poll(&pfd, 1, 200)  // 200 ms timeout
+        let ready = unsafe poll(&pfd, 1, 200)  // 200 ms timeout
         guard ready > 0 else {
           await Task.yield()
           continue
@@ -253,12 +253,14 @@ struct SceneInfo: Sendable {
       var current = ""
       for component in components {
         current += "/\(component)"
-        _ = mkdir(current, 0o755)
+        _ = unsafe mkdir(current, 0o755)
       }
     }
 
     private func pathExists(_ path: String) -> Bool {
-      path.withCString { Darwin.access($0, F_OK) == 0 }
+      unsafe path.withCString { cPath in
+        unsafe Darwin.access(cPath, F_OK) == 0
+      }
     }
 
     private func isSocketLive(_ path: String) -> Bool {
@@ -269,20 +271,20 @@ struct SceneInfo: Sendable {
       var addr = sockaddr_un()
       addr.sun_family = sa_family_t(AF_UNIX)
       let sunPathSize = MemoryLayout.size(ofValue: addr.sun_path)
-      withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
-        path.withCString { cstr in
-          _ = Darwin.strncpy(
-            UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
+      unsafe withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
+        unsafe path.withCString { cstr in
+          _ = unsafe Darwin.strncpy(
+            unsafe UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
             cstr,
             sunPathSize - 1
           )
         }
       }
 
-      let result = withUnsafePointer(to: &addr) {
-        Darwin.connect(
+      let result = unsafe withUnsafePointer(to: &addr) {
+        unsafe Darwin.connect(
           fd,
-          UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
+          unsafe UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
           socklen_t(MemoryLayout<sockaddr_un>.size))
       }
       return result == 0
@@ -297,7 +299,7 @@ struct SceneInfo: Sendable {
       defer { Darwin.close(fd) }
 
       var buffer = [UInt8](repeating: 0, count: 4096)
-      let bytesRead = Darwin.read(fd, &buffer, buffer.count)
+      let bytesRead = unsafe Darwin.read(fd, &buffer, buffer.count)
       guard bytesRead > 0 else { return }
       let raw = String(decoding: buffer.prefix(bytesRead), as: UTF8.self)
 
@@ -321,8 +323,9 @@ struct SceneInfo: Sendable {
         encoded = "ERR \(error)\n"
       }
 
-      encoded.withCString { cstr in
-        _ = Darwin.write(fd, cstr, strlen(cstr))
+      unsafe encoded.withCString { cstr in
+        let byteCount = unsafe strlen(cstr)
+        _ = unsafe Darwin.write(fd, cstr, byteCount)
       }
     }
   }

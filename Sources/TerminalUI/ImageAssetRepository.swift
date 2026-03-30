@@ -276,7 +276,7 @@ private func readFileBytes(
   var buffer = Array(repeating: UInt8(0), count: 4096)
 
   while true {
-    let bytesRead = readFileChunk(fileDescriptor, &buffer, buffer.count)
+    let bytesRead = unsafe readFileChunk(fileDescriptor, &buffer, buffer.count)
     if bytesRead > 0 {
       bytes.append(contentsOf: buffer.prefix(bytesRead))
       continue
@@ -360,9 +360,9 @@ private func hexNibble(
 private func openReadOnlyFile(
   _ path: String
 ) -> Int32 {
-  path.withCString { cPath in
+  unsafe path.withCString { cPath in
     #if canImport(Darwin)
-      Darwin.open(cPath, O_RDONLY)
+      unsafe Darwin.open(cPath, O_RDONLY)
     #elseif canImport(Glibc)
       Glibc.open(cPath, O_RDONLY)
     #elseif canImport(Android)
@@ -393,7 +393,7 @@ private func readFileChunk(
   _ count: Int
 ) -> Int {
   #if canImport(Darwin)
-    Darwin.read(fileDescriptor, buffer, count)
+    unsafe Darwin.read(fileDescriptor, buffer, count)
   #elseif canImport(Glibc)
     Glibc.read(fileDescriptor, buffer, count)
   #elseif canImport(Android)

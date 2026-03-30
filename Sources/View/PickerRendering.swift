@@ -1,4 +1,4 @@
-package import Core
+import Core
 
 extension Picker {
   func pickerBody(

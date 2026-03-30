@@ -36,8 +36,8 @@ public struct Binding<Value> {
     // Binding dereferences remain @MainActor in this package's authoring model.
     // The public initializer still matches SwiftUI-style actor-inheriting closure
     // signatures so call sites compose naturally from authored view contexts.
-    self.getter = unsafeBitCast(get, to: (@MainActor () -> Value).self)
-    self.setter = unsafeBitCast(set, to: (@MainActor (Value) -> Void).self)
+    self.getter = unsafe unsafeBitCast(get, to: (@MainActor () -> Value).self)
+    self.setter = unsafe unsafeBitCast(set, to: (@MainActor (Value) -> Void).self)
   }
 
   @MainActor

@@ -14,7 +14,7 @@
     var description: String {
       switch self {
       case .allocationFailed(let errno):
-        "Failed to allocate pty: \(String(cString: strerror(errno)))"
+        "Failed to allocate pty: \(unsafe String(cString: strerror(errno)))"
       case .slavePathUnavailable:
         "Could not determine slave pty path"
       }
@@ -34,8 +34,8 @@
       guard fd >= 0 else { return false }
 
       var byte: UInt8 = 0
-      let result = withUnsafePointer(to: &byte) { ptr in
-        Darwin.write(fd, ptr, 0)
+      let result = unsafe withUnsafePointer(to: &byte) { ptr in
+        unsafe Darwin.write(fd, ptr, 0)
       }
       return result == 0
     }
@@ -44,19 +44,19 @@
       var masterFD: Int32 = -1
       var slaveFD: Int32 = -1
 
-      guard openpty(&masterFD, &slaveFD, nil, nil, nil) == 0 else {
+      guard unsafe openpty(&masterFD, &slaveFD, nil, nil, nil) == 0 else {
         throw .allocationFailed(errno: errno)
       }
 
       // We only need the slave path, not the slave fd — clients open it themselves.
       // Read the path before closing the slave fd.
       let pathBuffer = UnsafeMutablePointer<CChar>.allocate(capacity: 1024)
-      defer { pathBuffer.deallocate() }
+      defer { unsafe pathBuffer.deallocate() }
 
       #if canImport(Darwin)
-        let pathResult = ptsname_r(masterFD, pathBuffer, 1024)
+        let pathResult = unsafe ptsname_r(masterFD, pathBuffer, 1024)
       #elseif canImport(Glibc)
-        let pathResult = ptsname_r(masterFD, pathBuffer, 1024)
+        let pathResult = unsafe ptsname_r(masterFD, pathBuffer, 1024)
       #endif
 
       guard pathResult == 0 else {
@@ -65,7 +65,7 @@
         throw .slavePathUnavailable
       }
 
-      let slavePath = String(cString: pathBuffer)
+      let slavePath = unsafe String(cString: pathBuffer)
 
       // Close the slave fd — clients will open the slave path themselves.
       Darwin.close(slaveFD)

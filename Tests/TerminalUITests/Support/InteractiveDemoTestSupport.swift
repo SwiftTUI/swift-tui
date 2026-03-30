@@ -1,4 +1,4 @@
-public import TerminalUI
+package import TerminalUI
 
 package enum InteractiveDemoSelectionMode: String, CaseIterable, Equatable, Sendable {
   case inspect

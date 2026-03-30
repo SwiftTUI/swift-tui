@@ -76,7 +76,7 @@ struct SceneRuntimeTests {
     }
     #expect(runtime.lifecycle.state == .created)
 
-    var firstClientFD = Darwin.open(slavePath, O_RDWR | O_NOCTTY)
+    var firstClientFD = unsafe Darwin.open(slavePath, O_RDWR | O_NOCTTY)
     #expect(firstClientFD >= 0)
 
     try await waitUntil("first attach") {
@@ -94,7 +94,7 @@ struct SceneRuntimeTests {
       runtime.lifecycle.state == .suspended
     }
 
-    var secondClientFD = Darwin.open(slavePath, O_RDWR | O_NOCTTY)
+    var secondClientFD = unsafe Darwin.open(slavePath, O_RDWR | O_NOCTTY)
     #expect(secondClientFD >= 0)
 
     try await waitUntil("second attach") {

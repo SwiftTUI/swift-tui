@@ -15,7 +15,7 @@ struct InputReaderControlMessageTests {
   @Test("input reader routes resize control messages without leaking them as key input")
   func inputReaderRoutesResizeControlMessages() async throws {
     var descriptors: [Int32] = [0, 0]
-    #expect(pipe(&descriptors) == 0)
+    #expect(unsafe pipe(&descriptors) == 0)
 
     let readDescriptor = descriptors[0]
     let writeDescriptor = descriptors[1]
@@ -73,20 +73,21 @@ private func writeAllBytes(
 ) throws {
   var bytesWritten = 0
   while bytesWritten < bytes.count {
-    let written = bytes.withUnsafeBytes { buffer -> Int in
+    let written = unsafe bytes.withUnsafeBytes { buffer -> Int in
       guard let baseAddress = buffer.baseAddress else {
         return 0
       }
+      let nextAddress = unsafe baseAddress.advanced(by: bytesWritten)
       #if canImport(Darwin)
-        return Darwin.write(
+        return unsafe Darwin.write(
           fileDescriptor,
-          baseAddress.advanced(by: bytesWritten),
+          nextAddress,
           bytes.count - bytesWritten
         )
       #elseif canImport(Glibc)
-        return Glibc.write(
+        return unsafe Glibc.write(
           fileDescriptor,
-          baseAddress.advanced(by: bytesWritten),
+          nextAddress,
           bytes.count - bytesWritten
         )
       #endif

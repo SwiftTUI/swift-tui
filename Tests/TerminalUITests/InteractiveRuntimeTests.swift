@@ -418,7 +418,7 @@ struct InteractiveRuntimeTests {
   @Test("input reader drains nonblocking pointer bursts across multiple reads")
   func inputReaderDrainsPointerBurstsAcrossMultipleReads() async throws {
     var descriptors: [Int32] = [0, 0]
-    #expect(pipe(&descriptors) == 0)
+    #expect(unsafe pipe(&descriptors) == 0)
 
     let readDescriptor = descriptors[0]
     let writeDescriptor = descriptors[1]
@@ -475,7 +475,7 @@ struct InteractiveRuntimeTests {
   @Test("input reader coalesces staggered pointer bursts before yielding")
   func inputReaderCoalescesStaggeredPointerBursts() async throws {
     var descriptors: [Int32] = [0, 0]
-    #expect(pipe(&descriptors) == 0)
+    #expect(unsafe pipe(&descriptors) == 0)
 
     let readDescriptor = descriptors[0]
     let writeDescriptor = descriptors[1]
@@ -1956,15 +1956,15 @@ private func writeAllBytes(
 ) throws {
   var totalBytesWritten = 0
 
-  try bytes.withUnsafeBytes { rawBuffer in
+  try unsafe bytes.withUnsafeBytes { rawBuffer in
     guard let baseAddress = rawBuffer.baseAddress else {
       return
     }
 
     while totalBytesWritten < bytes.count {
-      let nextAddress = baseAddress.advanced(by: totalBytesWritten)
+      let nextAddress = unsafe baseAddress.advanced(by: totalBytesWritten)
       let bytesRemaining = bytes.count - totalBytesWritten
-      let bytesWritten = Darwin.write(fileDescriptor, nextAddress, bytesRemaining)
+      let bytesWritten = unsafe Darwin.write(fileDescriptor, nextAddress, bytesRemaining)
       guard bytesWritten >= 0 else {
         throw TerminalHostError.failedToWrite(errno: errno)
       }
@@ -2595,9 +2595,9 @@ private func scopeSectionFixture() -> some View {
 }
 
 private func termiosEqual(_ lhs: termios, _ rhs: termios) -> Bool {
-  withUnsafeBytes(of: lhs) { lhsBytes in
-    withUnsafeBytes(of: rhs) { rhsBytes in
-      lhsBytes.elementsEqual(rhsBytes)
+  unsafe withUnsafeBytes(of: lhs) { lhsBytes in
+    unsafe withUnsafeBytes(of: rhs) { rhsBytes in
+      unsafe lhsBytes.elementsEqual(rhsBytes)
     }
   }
 }

@@ -47,42 +47,48 @@ package func openLinkInSystem(
     searchPath: Bool
   ) -> Bool {
     var pid = pid_t()
-    var cArguments: [UnsafeMutablePointer<CChar>?] = arguments.map { argument in
-      argument.withCString { cString in
-        strdup(cString)
+    var cArguments: [UnsafeMutablePointer<CChar>?] = unsafe arguments.map { argument in
+      unsafe argument.withCString { cString in
+        unsafe strdup(cString)
       }
     }
-    cArguments.append(nil)
+    unsafe cArguments.append(nil)
     defer {
-      for case let pointer? in cArguments {
-        free(pointer)
+      let argumentCount = unsafe cArguments.count
+      var index = 0
+      while index < argumentCount {
+        if let pointer = unsafe cArguments[index] {
+          unsafe free(pointer)
+        }
+        index += 1
       }
     }
 
-    let spawnResult: Int32 = cArguments.withUnsafeMutableBufferPointer { buffer in
+    let environment = unsafe environ
+    let spawnResult: Int32 = unsafe cArguments.withUnsafeMutableBufferPointer { buffer in
       guard let baseAddress = buffer.baseAddress else {
         return ENOENT
       }
 
       if searchPath {
-        return posix_spawnp(
+        return unsafe posix_spawnp(
           &pid,
           baseAddress[0],
           nil,
           nil,
           baseAddress,
-          environ
+          environment
         )
       }
 
-      return command.withCString { commandCString in
-        posix_spawn(
+      return unsafe command.withCString { commandCString in
+        unsafe posix_spawn(
           &pid,
           commandCString,
           nil,
           nil,
           baseAddress,
-          environ
+          environment
         )
       }
     }

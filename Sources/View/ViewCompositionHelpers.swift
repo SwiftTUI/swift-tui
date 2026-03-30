@@ -1,4 +1,4 @@
-package import Core
+import Core
 
 @MainActor
 package func combinedView(

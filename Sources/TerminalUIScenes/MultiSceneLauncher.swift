@@ -127,7 +127,7 @@ public enum MultiSceneLauncher {
         }
       )
 
-      var sceneTasks: [Task<RunLoopResult<MultiSceneRuntimeState>, Error>] = []
+      var sceneTasks: [Task<RunLoopResult<MultiSceneRuntimeState>, any Error>] = []
       for runtime in sceneRuntimes {
         let sceneID = runtime.configuration.identifier.rawValue
         let task = Task { @MainActor in

@@ -230,7 +230,7 @@ extension TerminalHosting {
 
     func getAttributes(from fileDescriptor: Int32) throws -> termios {
       var attributes = termios()
-      guard tcgetattr(fileDescriptor, &attributes) == 0 else {
+      guard unsafe tcgetattr(fileDescriptor, &attributes) == 0 else {
         throw TerminalHostError.failedToReadAttributes(errno: errno)
       }
       return attributes
@@ -238,14 +238,14 @@ extension TerminalHosting {
 
     func setAttributes(_ attributes: termios, on fileDescriptor: Int32) throws {
       var attributes = attributes
-      guard tcsetattr(fileDescriptor, TCSAFLUSH, &attributes) == 0 else {
+      guard unsafe tcsetattr(fileDescriptor, TCSAFLUSH, &attributes) == 0 else {
         throw TerminalHostError.failedToSetAttributes(errno: errno)
       }
     }
 
     func windowSize(of fileDescriptor: Int32) throws -> Size {
       var windowSize = winsize()
-      guard ioctl(fileDescriptor, UInt(TIOCGWINSZ), &windowSize) == 0 else {
+      guard unsafe ioctl(fileDescriptor, UInt(TIOCGWINSZ), &windowSize) == 0 else {
         throw TerminalHostError.failedToReadWindowSize(errno: errno)
       }
 
@@ -257,7 +257,7 @@ extension TerminalHosting {
 
     func cellPixelSize(of fileDescriptor: Int32) throws -> Size? {
       var windowSize = winsize()
-      guard ioctl(fileDescriptor, UInt(TIOCGWINSZ), &windowSize) == 0 else {
+      guard unsafe ioctl(fileDescriptor, UInt(TIOCGWINSZ), &windowSize) == 0 else {
         throw TerminalHostError.failedToReadWindowSize(errno: errno)
       }
       guard
@@ -293,15 +293,15 @@ extension TerminalHosting {
       let bytes = Array(output.utf8)
       let totalBytes = bytes.count
 
-      try bytes.withUnsafeBytes { rawBuffer in
+      try unsafe bytes.withUnsafeBytes { rawBuffer in
         guard let baseAddress = rawBuffer.baseAddress else {
           return
         }
 
         var bytesWritten = 0
         while bytesWritten < totalBytes {
-          let pointer = baseAddress.advanced(by: bytesWritten)
-          let result = platformWrite(
+          let pointer = unsafe baseAddress.advanced(by: bytesWritten)
+          let result = unsafe platformWrite(
             fileDescriptor,
             pointer,
             totalBytes - bytesWritten
@@ -342,7 +342,7 @@ extension TerminalHosting {
         events: Int16(POLLIN),
         revents: 0
       )
-      let ready = platformPoll(
+      let ready = unsafe platformPoll(
         &descriptor,
         1,
         Int32(timeoutMilliseconds)
@@ -353,7 +353,7 @@ extension TerminalHosting {
       }
 
       var buffer = Array(repeating: UInt8(0), count: maxBytes)
-      let bytesRead = platformRead(fileDescriptor, &buffer, maxBytes)
+      let bytesRead = unsafe platformRead(fileDescriptor, &buffer, maxBytes)
       guard bytesRead > 0 else {
         return []
       }
@@ -373,7 +373,7 @@ extension TerminalHosting {
       )
 
       while true {
-        let ready = platformPoll(&descriptor, 1, -1)
+        let ready = unsafe platformPoll(&descriptor, 1, -1)
         if ready > 0 {
           return
         }
@@ -466,7 +466,7 @@ extension TerminalHosting {
 
       let currentAttributes = try controller.getAttributes(from: inputFileDescriptor)
       var rawAttributes = currentAttributes
-      cfmakeraw(&rawAttributes)
+      unsafe cfmakeraw(&rawAttributes)
       rawAttributes.c_cc.16 = 1
       rawAttributes.c_cc.17 = 0
 
@@ -1068,13 +1068,13 @@ private func currentProcessEnvironment() -> [String: String] {
     [:]
   #else
     var environment: [String: String] = [:]
-    let processEnvironment = environ
+    let processEnvironment = unsafe environ
     var index = 0
 
-    while let entry = processEnvironment[index] {
+    while let entry = unsafe processEnvironment[index] {
       defer { index += 1 }
 
-      guard let assignment = String(validatingCString: entry),
+      guard let assignment = unsafe String(validatingCString: entry),
         let separator = assignment.firstIndex(of: "=")
       else {
         continue

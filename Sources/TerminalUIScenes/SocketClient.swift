@@ -53,13 +53,15 @@
     /// Scans the socket directory for live instances, removes stale sockets.
     static func discoverInstances(appName: String) -> [InstanceInfo] {
       let dir = "/tmp/terminalui/\(appName)"
-      guard let dp = Darwin.opendir(dir) else { return [] }
-      defer { Darwin.closedir(dp) }
+      guard let dp = unsafe Darwin.opendir(dir) else { return [] }
+      defer { unsafe Darwin.closedir(dp) }
 
       var instances: [DiscoveredInstance] = []
-      while let entry = Darwin.readdir(dp) {
-        let entryName = withUnsafePointer(to: entry.pointee.d_name) { ptr in
-          String(cString: UnsafeRawPointer(ptr).assumingMemoryBound(to: CChar.self))
+      while let entry = unsafe Darwin.readdir(dp) {
+        let entryName = unsafe withUnsafePointer(to: entry.pointee.d_name) { ptr in
+          unsafe String(
+            cString: unsafe UnsafeRawPointer(ptr).assumingMemoryBound(to: CChar.self)
+          )
         }
         guard entryName.hasSuffix(".sock") else { continue }
         let identifier = String(entryName.dropLast(5))  // strip ".sock"
@@ -82,7 +84,7 @@
           )
         } else {
           // Remove stale socket
-          _ = Darwin.unlink(socketPath)
+          _ = unsafe Darwin.unlink(socketPath)
         }
       }
       return
@@ -128,33 +130,34 @@
       var addr = sockaddr_un()
       addr.sun_family = sa_family_t(AF_UNIX)
       let sunPathSize = MemoryLayout.size(ofValue: addr.sun_path)
-      withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
-        socketPath.withCString { cstr in
-          _ = Darwin.strncpy(
-            UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
+      unsafe withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
+        unsafe socketPath.withCString { cstr in
+          _ = unsafe Darwin.strncpy(
+            unsafe UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
             cstr,
             sunPathSize - 1
           )
         }
       }
 
-      let connectResult = withUnsafePointer(to: &addr) {
-        Darwin.connect(
+      let connectResult = unsafe withUnsafePointer(to: &addr) {
+        unsafe Darwin.connect(
           fd,
-          UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
+          unsafe UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
           socklen_t(MemoryLayout<sockaddr_un>.size))
       }
       guard connectResult == 0 else { throw .connectionFailed(errno) }
 
       // Send request
-      let sent = request.withCString { ptr in
-        Darwin.write(fd, ptr, strlen(ptr))
+      let sent = unsafe request.withCString { ptr in
+        let byteCount = unsafe strlen(ptr)
+        return unsafe Darwin.write(fd, ptr, byteCount)
       }
       guard sent > 0 else { throw .sendFailed(errno) }
 
       // Read response (up to 64 KB)
       var buffer = [UInt8](repeating: 0, count: 65536)
-      let bytesRead = Darwin.read(fd, &buffer, 65536)
+      let bytesRead = unsafe Darwin.read(fd, &buffer, 65536)
       guard bytesRead > 0 else { throw .readFailed(errno) }
       return String(decoding: buffer.prefix(bytesRead), as: UTF8.self)
     }
@@ -169,20 +172,20 @@
       var addr = sockaddr_un()
       addr.sun_family = sa_family_t(AF_UNIX)
       let sunPathSize = MemoryLayout.size(ofValue: addr.sun_path)
-      withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
-        path.withCString { cstr in
-          _ = Darwin.strncpy(
-            UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
+      unsafe withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
+        unsafe path.withCString { cstr in
+          _ = unsafe Darwin.strncpy(
+            unsafe UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
             cstr,
             sunPathSize - 1
           )
         }
       }
 
-      let result = withUnsafePointer(to: &addr) {
-        Darwin.connect(
+      let result = unsafe withUnsafePointer(to: &addr) {
+        unsafe Darwin.connect(
           fd,
-          UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
+          unsafe UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
           socklen_t(MemoryLayout<sockaddr_un>.size))
       }
       return result == 0
@@ -190,8 +193,8 @@
 
     private static func sortKey(for path: String, identifier: String) -> InstanceSortKey {
       var fileStatus = stat()
-      let result = path.withCString {
-        lstat($0, &fileStatus)
+      let result = unsafe path.withCString { cPath in
+        unsafe lstat(cPath, &fileStatus)
       }
       guard result == 0 else {
         return InstanceSortKey(seconds: 0, nanoseconds: 0, identifier: identifier)

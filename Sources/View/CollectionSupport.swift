@@ -1,4 +1,4 @@
-package import Core
+import Core
 
 func resolvedNodeLabelText(
   from node: ResolvedNode

@@ -68,20 +68,20 @@ struct SocketDiscoveryTests {
     var addr = sockaddr_un()
     addr.sun_family = sa_family_t(AF_UNIX)
     let sunPathSize = MemoryLayout.size(ofValue: addr.sun_path)
-    withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
-      server.socketPath.withCString { cstr in
-        _ = Darwin.strncpy(
-          UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
+    unsafe withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
+      unsafe server.socketPath.withCString { cstr in
+        _ = unsafe Darwin.strncpy(
+          unsafe UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
           cstr,
           sunPathSize - 1
         )
       }
     }
 
-    let bindResult = withUnsafePointer(to: &addr) {
-      Darwin.bind(
+    let bindResult = unsafe withUnsafePointer(to: &addr) {
+      unsafe Darwin.bind(
         staleFD,
-        UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
+        unsafe UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
         socklen_t(MemoryLayout<sockaddr_un>.size)
       )
     }
@@ -218,7 +218,7 @@ private func waitUntilSocketCondition(
 }
 
 private func value<Success>(
-  of task: Task<Success, Error>,
+  of task: Task<Success, any Error>,
   timeoutNanoseconds: UInt64
 ) async throws -> Success {
   try await withThrowingTaskGroup(of: Success.self) { group in

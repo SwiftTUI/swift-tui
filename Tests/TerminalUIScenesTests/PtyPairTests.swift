@@ -23,7 +23,7 @@ struct PtyPairTests {
     let fd = pty.masterFD
     pty.close()
     // Writing to a closed fd should fail
-    let result = Darwin.write(fd, "x", 1)
+    let result = unsafe Darwin.write(fd, "x", 1)
     #expect(result == -1)
   }
 
@@ -42,7 +42,7 @@ struct PtyPairTests {
     let pty = try PtyPair()
     #expect(!pty.hasAttachedClient())
 
-    let slaveFD = Darwin.open(pty.slavePath, O_RDWR | O_NOCTTY)
+    let slaveFD = unsafe Darwin.open(pty.slavePath, O_RDWR | O_NOCTTY)
     #expect(slaveFD >= 0)
     #expect(pty.hasAttachedClient())
 

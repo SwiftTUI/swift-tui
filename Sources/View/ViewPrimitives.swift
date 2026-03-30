@@ -121,6 +121,7 @@ extension Text {
       return literal
     }
 
+    @MainActor
     package var visibleText: String {
       fragments.map {
         switch $0 {

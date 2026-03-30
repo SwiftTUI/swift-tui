@@ -1,4 +1,4 @@
-package import Core
+import Core
 
 extension ScrollView {
   func effectiveIndicatorVisibility(

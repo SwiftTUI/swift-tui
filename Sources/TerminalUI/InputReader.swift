@@ -1,7 +1,7 @@
 import Core
 
 #if canImport(Dispatch)
-  @preconcurrency import Dispatch
+  @unsafe @preconcurrency import Dispatch
 #endif
 
 #if canImport(Darwin)
@@ -20,7 +20,7 @@ import Core
     _ buffer: UnsafeMutableRawPointer?,
     _ count: Int
   ) -> Int {
-    Darwin.read(fileDescriptor, buffer, count)
+    unsafe Darwin.read(fileDescriptor, buffer, count)
   }
 #elseif canImport(Glibc)
   private func platformRead(
@@ -560,7 +560,7 @@ extension InputReader {
 
           while !Task.isCancelled {
             var buffer = Array(repeating: UInt8(0), count: 512)
-            let bytesRead = platformRead(fileDescriptor, &buffer, buffer.count)
+            let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
 
             if bytesRead > 0 {
               let chunk = Array(buffer.prefix(Int(bytesRead)))
@@ -631,7 +631,7 @@ extension InputReader {
 
           while true {
             var buffer = Array(repeating: UInt8(0), count: 256)
-            let bytesRead = platformRead(fileDescriptor, &buffer, buffer.count)
+            let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
 
             if bytesRead > 0 {
               input.append(contentsOf: buffer.prefix(Int(bytesRead)))
@@ -710,7 +710,7 @@ extension InputReader {
 
           while true {
             var buffer = Array(repeating: UInt8(0), count: 256)
-            let bytesRead = platformRead(fileDescriptor, &buffer, buffer.count)
+            let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
 
             if bytesRead > 0 {
               input.append(contentsOf: buffer.prefix(Int(bytesRead)))

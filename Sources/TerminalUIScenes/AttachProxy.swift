@@ -14,9 +14,9 @@
     var description: String {
       switch self {
       case .failedToOpenSlave(let path, let errno):
-        "Failed to open pty slave \(path): \(String(cString: strerror(errno)))"
+        "Failed to open pty slave \(path): \(unsafe String(cString: strerror(errno)))"
       case .failedToSetRawMode(let errno):
-        "Failed to set raw mode: \(String(cString: strerror(errno)))"
+        "Failed to set raw mode: \(unsafe String(cString: strerror(errno)))"
       }
     }
   }
@@ -28,7 +28,7 @@
     /// forwards slave output to stdout, and relays SIGWINCH.
     /// Returns when the slave closes or the task is cancelled.
     static func run(slavePath: String) async throws {
-      let slaveFD = Darwin.open(slavePath, O_RDWR | O_NOCTTY)
+      let slaveFD = unsafe Darwin.open(slavePath, O_RDWR | O_NOCTTY)
       guard slaveFD >= 0 else {
         throw AttachProxyError.failedToOpenSlave(
           path: slavePath,
@@ -42,19 +42,19 @@
 
       // Save current terminal attributes and enter raw mode
       var savedAttrs = termios()
-      guard tcgetattr(STDIN_FILENO, &savedAttrs) == 0 else {
+      guard unsafe tcgetattr(STDIN_FILENO, &savedAttrs) == 0 else {
         throw AttachProxyError.failedToSetRawMode(errno: errno)
       }
 
       var rawAttrs = savedAttrs
-      cfmakeraw(&rawAttrs)
-      guard tcsetattr(STDIN_FILENO, TCSAFLUSH, &rawAttrs) == 0 else {
+      unsafe cfmakeraw(&rawAttrs)
+      guard unsafe tcsetattr(STDIN_FILENO, TCSAFLUSH, &rawAttrs) == 0 else {
         throw AttachProxyError.failedToSetRawMode(errno: errno)
       }
 
       defer {
         var attrs = savedAttrs
-        tcsetattr(STDIN_FILENO, TCSAFLUSH, &attrs)
+        unsafe tcsetattr(STDIN_FILENO, TCSAFLUSH, &attrs)
       }
 
       // Forward data bidirectionally using poll
@@ -64,13 +64,13 @@
           var buffer = [UInt8](repeating: 0, count: 4096)
           while !Task.isCancelled {
             var pfd = pollfd(fd: STDIN_FILENO, events: Int16(POLLIN), revents: 0)
-            let ready = poll(&pfd, 1, 100)
+            let ready = unsafe poll(&pfd, 1, 100)
             guard ready > 0 else { continue }
 
-            let n = Darwin.read(STDIN_FILENO, &buffer, buffer.count)
+            let n = unsafe Darwin.read(STDIN_FILENO, &buffer, buffer.count)
             if n <= 0 { break }
-            _ = buffer.withUnsafeBufferPointer { buf in
-              Darwin.write(slaveFD, buf.baseAddress!, n)
+            _ = unsafe buffer.withUnsafeBufferPointer { buf in
+              unsafe Darwin.write(slaveFD, buf.baseAddress!, n)
             }
           }
         }
@@ -80,13 +80,13 @@
           var buffer = [UInt8](repeating: 0, count: 4096)
           while !Task.isCancelled {
             var pfd = pollfd(fd: slaveFD, events: Int16(POLLIN), revents: 0)
-            let ready = poll(&pfd, 1, 100)
+            let ready = unsafe poll(&pfd, 1, 100)
             guard ready > 0 else { continue }
 
-            let n = Darwin.read(slaveFD, &buffer, buffer.count)
+            let n = unsafe Darwin.read(slaveFD, &buffer, buffer.count)
             if n <= 0 { break }
-            _ = buffer.withUnsafeBufferPointer { buf in
-              Darwin.write(STDOUT_FILENO, buf.baseAddress!, n)
+            _ = unsafe buffer.withUnsafeBufferPointer { buf in
+              unsafe Darwin.write(STDOUT_FILENO, buf.baseAddress!, n)
             }
           }
         }
@@ -111,10 +111,10 @@
       to targetFD: Int32
     ) {
       var ws = winsize()
-      guard ioctl(sourceFD, UInt(TIOCGWINSZ), &ws) == 0 else {
+      guard unsafe ioctl(sourceFD, UInt(TIOCGWINSZ), &ws) == 0 else {
         return
       }
-      _ = ioctl(targetFD, UInt(TIOCSWINSZ), &ws)
+      _ = unsafe ioctl(targetFD, UInt(TIOCSWINSZ), &ws)
     }
   }
 #endif

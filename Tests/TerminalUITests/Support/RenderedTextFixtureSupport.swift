@@ -268,7 +268,7 @@ private func serializeRenderedSnapshot(
   ]
 
   let body = renderedLines.enumerated().map { index, line in
-    "\(String(format: "%0*d", lineNumberWidth, index + 1))│\(displayLine(line))"
+    "\(unsafe String(format: "%0*d", lineNumberWidth, index + 1))│\(displayLine(line))"
   }
 
   return (header + body).joined(separator: "\n") + "\n"
@@ -385,7 +385,7 @@ private func displayLine(
       rendered.append("\\u{001B}")
     default:
       if CharacterSet.controlCharacters.contains(scalar) {
-        rendered += String(format: "\\u{%04X}", scalar.value)
+        rendered += unsafe String(format: "\\u{%04X}", scalar.value)
       } else {
         rendered.unicodeScalars.append(scalar)
       }
@@ -398,7 +398,7 @@ private func displayLine(
 private func hexString(
   _ color: Color
 ) -> String {
-  String(
+  unsafe String(
     format: "#%02X%02X%02X",
     color.red,
     color.green,
@@ -416,6 +416,7 @@ private func sanitizePathComponent(
   return parts.isEmpty ? "unnamed" : parts.joined(separator: "-")
 }
 
+@MainActor
 private func composedFixtureRoot(
   from children: [AnyView]
 ) -> AnyView {

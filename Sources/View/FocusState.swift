@@ -1,4 +1,4 @@
-package import Core
+import Core
 
 private struct FocusStateSnapshot<Value: Equatable> {
   var value: Value

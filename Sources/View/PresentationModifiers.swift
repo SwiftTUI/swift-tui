@@ -1,4 +1,4 @@
-package import Core
+import Core
 
 private enum TerminalPresentationKind: Equatable, Sendable {
   case alert
