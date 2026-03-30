@@ -11,6 +11,9 @@
     "dev": "bun run index.ts dev",
     "test": "bun test"
   },
+  "dependencies": {
+    "ghostty-web": "github:coder/ghostty-web"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

@@ -20,6 +20,16 @@ swift --version
 Native-only development should also work in Xcode, but the documented package
 and wasm build path for this wrapper uses `swiftly` plus Bun.
 
+## Ghostty Dependency
+
+This package now consumes [`coder/ghostty-web`](https://github.com/coder/ghostty-web)
+directly through Bun instead of importing from the repository's `reference/`
+directory.
+
+Because GitHub installs provide the upstream source tree rather than the
+published npm `dist/` bundle, this wrapper uses a tiny local shim that re-exports
+the upstream TypeScript sources from `node_modules/ghostty-web/lib/...`.
+
 ## API
 
 ```ts
