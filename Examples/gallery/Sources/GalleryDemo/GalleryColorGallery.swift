@@ -2,18 +2,16 @@ import TerminalUI
 
 struct GalleryColorGallery: View {
   var body: some View {
-    EnvironmentReader(\.terminalAppearance) { appearance in
+    ScrollView {
+      EnvironmentReader(\.terminalAppearance) { appearance in
       VStack(alignment: .leading, spacing: 1) {
-        HStack(alignment: .top, spacing: 1) {
-          namedColorsSection
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-          semanticRolesSection
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-
         terminalPaletteSection(palette: appearance.palette)
+        HStack(alignment: .top, spacing: 1) {
+            namedColorsSection
+            semanticRolesSection
+        }
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      }
     }
   }
 
@@ -27,7 +25,6 @@ struct GalleryColorGallery: View {
                 title: namedColor.name,
                 style: AnyShapeStyle(namedColor.color)
               )
-              .frame(maxWidth: .infinity, alignment: .leading)
             }
           }
         }
@@ -45,7 +42,6 @@ struct GalleryColorGallery: View {
                 title: role.label,
                 style: role.style
               )
-              .frame(maxWidth: .infinity, alignment: .leading)
             }
           }
         }
@@ -58,11 +54,11 @@ struct GalleryColorGallery: View {
   ) -> some View {
     GroupBox("Terminal palette") {
       VStack(alignment: .leading, spacing: 0) {
-        ForEach([Array(0...7), Array(8...15)], id: \.self) { row in
+        ForEach([Array(0...4), Array(5...9), Array(10...14), Array(15...15)], id: \.self) { row in
           HStack(alignment: .center, spacing: 1) {
             ForEach(row, id: \.self) { index in
-              GalleryPaletteChip(
-                index: index,
+              GalleryColorTile(
+                title: "\(index)",
                 style: AnyShapeStyle(
                   palette[index] ?? TerminalAppearance.defaultPalette[index] ?? .black
                 )
@@ -133,45 +129,32 @@ private struct GalleryColorTile: View {
   let style: AnyShapeStyle
 
   var body: some View {
-    HStack(alignment: .center, spacing: 1) {
-      GalleryColorSwatch(style: style, width: 4)
+    VStack(alignment: .center, spacing: 0) {
+      GalleryColorSwatch(style: style)
+      .frame(width: 8, height: 4, alignment: .leading)
       Text(title)
-    }
-  }
-}
-
-private struct GalleryPaletteChip: View {
-  let index: Int
-  let style: AnyShapeStyle
-
-  var body: some View {
-    HStack(alignment: .center, spacing: 1) {
-      GalleryColorSwatch(style: style, width: 3)
-      Text("\(index)")
-        .foregroundStyle(.separator)
+        .frame(width: 8, height: 1, alignment: .leading)
+        .background{TileBackground.init(width: 8, height: 1, tiles: ["_"], style: .separator, opacity: 0.3)}
     }
   }
 }
 
 private struct GalleryColorSwatch: View {
   let style: AnyShapeStyle
-  let width: Int
 
   init(
     style: AnyShapeStyle,
-    width: Int = 8
   ) {
     self.style = style
-    self.width = width
   }
 
   var body: some View {
-    RoundedRectangle(cornerRadius: 1)
+    Rectangle()
       .fill(style)
+      .padding(1)
       .overlay {
         RoundedRectangle(cornerRadius: 1)
           .strokeBorder(.terminalBorder(.neutral))
       }
-      .frame(width: width, height: 1, alignment: .leading)
   }
 }

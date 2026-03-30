@@ -4,7 +4,7 @@ import TerminalUICharts
 struct GalleryDemoSceneView: View {
   @Bindable var model: GalleryDemoModel
   @State private var isResetAlertPresented = false
-
+  @State var pickerScratch: String = "one"
   var body: some View {
     GeometryReader { geometry in
       shell(contentHeight: max(0, geometry.size.height - 4))
@@ -52,7 +52,6 @@ struct GalleryDemoSceneView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
       }
     }
-    .tint(Color.cyan)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .alert(
       "Reset gallery state?",
@@ -75,15 +74,15 @@ struct GalleryDemoSceneView: View {
     HStack(alignment: .firstTextBaseline, spacing: 1) {
       Text("Gallery")
         .bold()
-      Text("Workbench")
+      Text("—")
         .foregroundStyle(.separator)
+      Text(model.activeTab.capitalized)
+        .foregroundStyle(.info)
       Spacer()
-      Button("Palette") {
+      Button("Control Panel") {
         model.isPalettePresented = true
       }
       .buttonStyle(.plain)
-      Text(model.activeTab.capitalized)
-        .foregroundStyle(.info)
     }
     .padding(.init(horizontal: 1, vertical: 0))
     .background(.terminalRow(.accent, isSelected: true))
@@ -115,9 +114,9 @@ struct GalleryDemoSceneView: View {
     workbenchSurface(
       selection: $model.selectedControlDemo,
       entries: [
-        ("Buttons", "buttons"),
-        ("Inputs", "inputs"),
-        ("Value Controls", "values"),
+        "buttons",
+        "inputs",
+        "values",
       ],
       title: controlsTitle,
       subtitle: controlsSubtitle
@@ -204,9 +203,9 @@ struct GalleryDemoSceneView: View {
     workbenchSurface(
       selection: $model.selectedCollectionDemo,
       entries: [
-        ("Picker", "picker"),
-        ("Browser", "browser"),
-        ("Outline", "outline"),
+        "picker",
+        "browser",
+        "outline",
       ],
       title: collectionsTitle,
       subtitle: collectionsSubtitle
@@ -309,21 +308,46 @@ struct GalleryDemoSceneView: View {
       .outlineStyle(.rounded)
       .frame(maxWidth: .infinity, alignment: .topLeading)
     default:
-      VStack(alignment: .leading, spacing: 1) {
-        Picker("Mode", selection: $model.pickerSelection) {
-          Text("Inline").tag("inline")
-          Text("Segmented").tag("segmented")
-          Text("Menu").tag("menu")
+    VStack(alignment: .leading) {
+        TabView(selection: $model.pickerSelection) {
+        Picker("Selection Type", selection: $pickerScratch) {
+          Text("One").tag("one")
+          Text("Two").tag("two")
+          Text("Three").tag("three")
         }
         .pickerStyle(.segmented)
+        .tabItem("segmented")
+        .tag("segmented")
 
-        Menu("Commands") {
-          Button("Open") {}
-          Divider()
-          Button("Duplicate") {}
-          Button("Archive") {}
+        Picker("Selection Type", selection: $pickerScratch) {
+          Text("One").tag("one")
+          Text("Two").tag("two")
+          Text("Three").tag("three")
         }
-      }
+        .pickerStyle(.inline)
+        .tabItem("inline")
+        .tag("inline")
+
+        Picker("Radio Group", selection: $pickerScratch) {
+          Text("One").tag("one")
+          Text("Two").tag("two")
+          Text("Three").tag("three")
+        }
+        .pickerStyle(.radioGroup)
+        .tabItem("radioGroup")
+        .tag("radioGroup")
+
+        Picker("Menu", selection: $pickerScratch) {
+          Text("One").tag("one")
+          Text("Two").tag("two")
+          Text("Three").tag("three")
+        }
+        .pickerStyle(.menu)
+        .tabItem("menu")
+        .tag("menu")
+        }
+        Text("(selection: \(pickerScratch))")
+    }
     }
   }
 
@@ -331,10 +355,10 @@ struct GalleryDemoSceneView: View {
     workbenchSurface(
       selection: $model.selectedAppearanceDemo,
       entries: [
-        ("Light", "light"),
-        ("Dark", "dark"),
-        ("Accent", "accent"),
-        ("Colors", "colors"),
+        "light",
+         "dark",
+        "accent",
+        "colors",
       ],
       title: appearanceTitle,
       subtitle: appearanceSubtitle
@@ -413,9 +437,9 @@ struct GalleryDemoSceneView: View {
     workbenchSurface(
       selection: $model.selectedChartDemo,
       entries: [
-        ("Progress", "progress"),
-        ("Usage", "usage"),
-        ("Trend", "trend"),
+        "progress",
+        "usage",
+        "trend",
       ],
       title: chartsTitle,
       subtitle: chartsSubtitle
@@ -484,15 +508,15 @@ struct GalleryDemoSceneView: View {
 
   private func workbenchSurface<Content: View>(
     selection: Binding<String>,
-    entries: [(String, String)],
+    entries: [String],
     title: String,
     subtitle: String,
     @ViewBuilder content: () -> Content
   ) -> some View {
     VStack(alignment: .leading, spacing: 0) {
       Picker("", selection: selection) {
-        ForEach(entries, id: \.1) { entry in
-          Text(entry.0).tag(entry.1)
+        ForEach(entries, id: \.self) { entry in
+          Text(entry).tag(entry)
         }
       }
       .pickerStyle(.segmented)

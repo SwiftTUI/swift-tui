@@ -93,10 +93,10 @@ extension Picker {
         "Select"
       }
     let triggerRow = HStack(alignment: .center, spacing: 1) {
+      Text(isActiveNavigation ? "▴" : "▾")
       Text(selectedLabel)
         .lineLimit(1)
       Spacer()
-      Text(isActiveNavigation ? "▴" : "▾")
     }
     .foregroundStyle(triggerChrome.foregroundStyle)
     .drawMetadata(.init(opacity: triggerChrome.opacity))
@@ -383,24 +383,18 @@ extension Picker {
             isSelected: index == selectedIndex
           )
           let isSelected = index == selectedIndex
-          Text(isSelected ? "[\(option.label)]" : option.label)
+          Text(option.label)
             .lineLimit(1)
-            .padding(
-              .init(
-                top: 0,
-                leading: isSelected && isActiveNavigation ? 1 : 0,
-                bottom: 0,
-                trailing: isSelected && isActiveNavigation ? 1 : 0
-              )
-            )
             .background {
-              if isSelected && isActiveNavigation && showsFocusEffect {
-                RoundedRectangle(cornerRadius: 1).chromeFill(
+              if isSelected {
+                Rectangle().fill(.tint)
+              } else if isActiveNavigation && showsFocusEffect {
+                Rectangle().chromeFill(
                   segmentChrome.backgroundStyle
                 )
               }
             }
-            .foregroundStyle(segmentChrome.foregroundStyle)
+            .foregroundStyle(isSelected ? segmentChrome.contentBackgroundStyle : segmentChrome.foregroundStyle)
             .drawMetadata(.init(opacity: segmentChrome.opacity))
             .id(
               pickerOptionIdentity(
@@ -409,6 +403,9 @@ extension Picker {
               )
             )
             .semanticMetadata(.init(participatesInPointerHitTesting: true))
+            if index < options.count-1 {
+              Divider()
+            }
         }
       }
       .padding(.init(horizontal: 1, vertical: 1))
