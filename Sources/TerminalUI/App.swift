@@ -18,11 +18,11 @@ public enum AppLaunchError: Error, Equatable, Sendable, CustomStringConvertible 
 }
 
 /// A scene declaration for terminal applications.
-@preconcurrency @MainActor
+@MainActor
 public protocol Scene {
   associatedtype Body: Scene
 
-  @MainActor @preconcurrency
+  @MainActor
   var body: Body { get }
 }
 
