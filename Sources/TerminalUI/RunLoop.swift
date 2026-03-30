@@ -103,6 +103,7 @@ public final class RunLoop<State: Equatable & Sendable> {
   package let localPointerHandlerRegistry = LocalPointerHandlerRegistry()
   package let localFocusBindingRegistry = LocalFocusBindingRegistry()
   package let localFocusedValuesRegistry = LocalFocusedValuesRegistry()
+  package let localPreferenceObservationRegistry = LocalPreferenceObservationRegistry()
   package let localKeyHandlerRegistry = LocalKeyHandlerRegistry()
   package let localLifecycleRegistry = LocalLifecycleRegistry()
   package let localTaskRegistry = LocalTaskRegistry()
@@ -111,6 +112,7 @@ public final class RunLoop<State: Equatable & Sendable> {
 
   package var latestSemanticSnapshot = SemanticSnapshot()
   package var currentFocusedValues = FocusedValues()
+  package var previousPreferenceObservations: [PreferenceObservationRegistrationSnapshot] = []
   package var pressedIdentity: Identity?
   package var transientPressedIdentity: Identity?
   package var armedPointerRouteID: RouteID?

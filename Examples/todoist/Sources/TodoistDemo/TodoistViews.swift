@@ -133,6 +133,7 @@ struct TodoistDemoRootView: View {
   @State private var isCloseConfirmationPresented = false
 
   var body: some View {
+    VStack {
     HStack(alignment: .top, spacing: 0) {
       projectsPane
         .frame(
@@ -162,6 +163,19 @@ struct TodoistDemoRootView: View {
         )
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    if let lastErrorDetails = model.lastErrorDetails {
+        Divider()
+        Text("Last Error")
+          .bold()
+          .foregroundStyle(.warning)
+          .fixedSize()
+          .frame(maxWidth: .infinity, alignment: .leading)
+        Text(lastErrorDetails)
+          .lineLimit(nil)
+          .truncationMode(.tail)
+          .foregroundStyle(.separator)
+      }
+  }
     .task { [model] in
       await model.start()
     }
@@ -317,16 +331,6 @@ struct TodoistDemoRootView: View {
       Text(model.statusMessage)
         .foregroundStyle(.separator)
 
-      if let lastErrorDetails = model.lastErrorDetails {
-        Divider()
-        Text("Last Error")
-          .bold()
-          .foregroundStyle(.warning)
-        Text(lastErrorDetails)
-          .lineLimit(6)
-          .truncationMode(.tail)
-          .foregroundStyle(.separator)
-      }
 
       Divider()
 

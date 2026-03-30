@@ -43,6 +43,7 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `GeometryTypes.swift`: geometry, identity, proposal, spacing, and alignment primitives
 - `EnvironmentAndNodeTypes.swift`: environment snapshots, node kinds, axis, visibility, and placement allocations
 - `FocusedValues.swift`: focused-value transport types
+- `PreferenceValues.swift`: preference-key protocol and reduced subtree preference storage
 - `FocusPolicy.swift`: centralized focus participation defaults and focus-routing helpers
 - `FocusTracker.swift`: focus ownership and traversal state
 - `LayoutTypes.swift`: layout behavior, layout metadata, measured and placed node infrastructure, and custom layout handles
@@ -72,6 +73,7 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `LocalActionRegistry.swift`: package-only local action registry
 - `LocalFocusBindingRegistry.swift`: focus binding registry
 - `LocalFocusedValuesRegistry.swift`: focused-value registry
+- `LocalPreferenceObservationRegistry.swift`: package-only preference change observer registry
 - `LocalKeyHandlerRegistry.swift`: package-only local key-handler registry
 - `LocalLifecycleRegistry.swift`: package-only lifecycle-handler registry
 - `LocalTaskRegistry.swift`: package-only task registry
@@ -96,6 +98,7 @@ This is the current ownership map for the codebase. It documents where subsystem
 - `Environment.swift`: environment keys, typed `OpenLinkAction`, public `ResolveContext` configuration, and package-only runtime plumbing
 - `ImageEnvironment.swift`: image resource-root and terminal cell-pixel environment values
 - `FocusedValue.swift`: focused-value property wrappers and modifiers
+- `Preference.swift`: `PreferenceKey`-driven modifiers, subtree readers, and preference change observers
 - `FocusState.swift`: `@FocusState` and focus-binding surface
 - `Layout.swift`: `Layout` protocol support, layout modifiers, stack layouts, and alignment helpers
 - `ViewPrimitives.swift`: `EmptyView`, rich-interpolated `Text`, `Spacer`, and `Divider`

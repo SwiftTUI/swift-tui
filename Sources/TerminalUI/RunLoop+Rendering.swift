@@ -41,6 +41,10 @@ extension RunLoop {
           currentLifecycleRegistry: localLifecycleRegistry,
           currentTaskRegistry: localTaskRegistry
         )
+        _ = localPreferenceObservationRegistry.applyChanges(
+          since: previousPreferenceObservations
+        )
+        previousPreferenceObservations = localPreferenceObservationRegistry.snapshot()
         if !postActionInvalidationIdentities.isEmpty {
           scheduler.requestInvalidation(of: postActionInvalidationIdentities)
           postActionInvalidationIdentities.removeAll(keepingCapacity: true)
@@ -97,6 +101,7 @@ extension RunLoop {
     localPointerHandlerRegistry.reset()
     localFocusBindingRegistry.reset()
     localFocusedValuesRegistry.reset()
+    localPreferenceObservationRegistry.reset()
     localKeyHandlerRegistry.reset()
     localLifecycleRegistry.reset()
     localTaskRegistry.reset()
@@ -116,6 +121,7 @@ extension RunLoop {
     context.localPointerHandlerRegistry = localPointerHandlerRegistry
     context.localFocusBindingRegistry = localFocusBindingRegistry
     context.localFocusedValuesRegistry = localFocusedValuesRegistry
+    context.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     context.dynamicStateStore = dynamicStateStore
     context.observationBridge = observationBridge
     return context

@@ -242,6 +242,7 @@ package final class RetainedResolveFrame: @unchecked Sendable {
   package var pointerHandlers: [RouteID: LocalPointerHandlerRegistry.Handler]
   package var focusBindings: [FocusBindingRegistrationSnapshot]
   package var focusedValues: [FocusedValuesRegistrationSnapshot]
+  package var preferenceObservations: [PreferenceObservationRegistrationSnapshot]
   package var keyHandlers: [Identity: LocalKeyHandlerRegistry.Handler]
   package var lifecycleHandlers: LifecycleHandlerSnapshot
   package var taskRegistrations: [Identity: TaskRegistration]
@@ -252,6 +253,7 @@ package final class RetainedResolveFrame: @unchecked Sendable {
     pointerHandlers: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
     focusBindings: [FocusBindingRegistrationSnapshot] = [],
     focusedValues: [FocusedValuesRegistrationSnapshot] = [],
+    preferenceObservations: [PreferenceObservationRegistrationSnapshot] = [],
     keyHandlers: [Identity: LocalKeyHandlerRegistry.Handler] = [:],
     lifecycleHandlers: LifecycleHandlerSnapshot = .init(),
     taskRegistrations: [Identity: TaskRegistration] = [:]
@@ -262,6 +264,7 @@ package final class RetainedResolveFrame: @unchecked Sendable {
     self.pointerHandlers = pointerHandlers
     self.focusBindings = focusBindings
     self.focusedValues = focusedValues
+    self.preferenceObservations = preferenceObservations
     self.keyHandlers = keyHandlers
     self.lifecycleHandlers = lifecycleHandlers
     self.taskRegistrations = taskRegistrations

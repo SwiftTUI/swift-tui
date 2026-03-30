@@ -155,6 +155,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var localPointerHandlerRegistry: LocalPointerHandlerRegistry?
   package var localFocusBindingRegistry: LocalFocusBindingRegistry?
   package var localFocusedValuesRegistry: LocalFocusedValuesRegistry?
+  package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry?
   package var localKeyHandlerRegistry: LocalKeyHandlerRegistry?
   package var localLifecycleRegistry: LocalLifecycleRegistry?
   package var localTaskRegistry: LocalTaskRegistry?
@@ -200,6 +201,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.localPointerHandlerRegistry = localPointerHandlerRegistry
     childContext.localFocusBindingRegistry = localFocusBindingRegistry
     childContext.localFocusedValuesRegistry = localFocusedValuesRegistry
+    childContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     childContext.dynamicStateStore = dynamicStateStore
     childContext.observationBridge = observationBridge
     childContext.resolveReuseSession = resolveReuseSession
@@ -232,6 +234,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.localPointerHandlerRegistry = localPointerHandlerRegistry
     replacedContext.localFocusBindingRegistry = localFocusBindingRegistry
     replacedContext.localFocusedValuesRegistry = localFocusedValuesRegistry
+    replacedContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     replacedContext.dynamicStateStore = dynamicStateStore
     replacedContext.observationBridge = observationBridge
     replacedContext.resolveReuseSession = resolveReuseSession
@@ -351,6 +354,7 @@ extension ResolveContext {
     self.localPointerHandlerRegistry = nil
     self.localFocusBindingRegistry = nil
     self.localFocusedValuesRegistry = localFocusedValuesRegistry
+    localPreferenceObservationRegistry = nil
     self.localKeyHandlerRegistry = localKeyHandlerRegistry
     self.localLifecycleRegistry = localLifecycleRegistry
     self.localTaskRegistry = localTaskRegistry
@@ -380,6 +384,7 @@ extension ResolveContext {
       && lhs.localActionRegistry == rhs.localActionRegistry
       && lhs.localFocusBindingRegistry == rhs.localFocusBindingRegistry
       && lhs.localFocusedValuesRegistry == rhs.localFocusedValuesRegistry
+      && lhs.localPreferenceObservationRegistry == rhs.localPreferenceObservationRegistry
       && lhs.localKeyHandlerRegistry == rhs.localKeyHandlerRegistry
       && lhs.localLifecycleRegistry == rhs.localLifecycleRegistry
       && lhs.localTaskRegistry == rhs.localTaskRegistry
@@ -541,6 +546,16 @@ package final class ResolveReuseSession: @unchecked Sendable {
     if let focusedValuesRegistry = context.localFocusedValuesRegistry {
       focusedValuesRegistry.restore(
         previousFrame.focusedValues.filter { snapshot in
+          previousFrame.resolvedTreeIndex.contains(
+            snapshot.identity,
+            inSubtreeOf: subtreeIdentity
+          )
+        }
+      )
+    }
+    if let preferenceObservationRegistry = context.localPreferenceObservationRegistry {
+      preferenceObservationRegistry.restore(
+        previousFrame.preferenceObservations.filter { snapshot in
           previousFrame.resolvedTreeIndex.contains(
             snapshot.identity,
             inSubtreeOf: subtreeIdentity

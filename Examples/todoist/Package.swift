@@ -42,6 +42,7 @@ let package = Package(
       dependencies: [
         "TodoistDemo",
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "GRDB", package: "GRDB.swift"),
       ]
     )
   ]

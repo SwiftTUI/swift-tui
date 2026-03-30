@@ -142,6 +142,18 @@ struct CachedProject: Codable, FetchableRecord, PersistableRecord, TableRecord, 
       updatedAt: project.updatedAt
     )
   }
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case name
+    case isFavorite = "is_favorite"
+    case isInboxProject = "is_inbox_project"
+    case isArchived = "is_archived"
+    case isDeleted = "is_deleted"
+    case childOrder = "child_order"
+    case colorName = "color_name"
+    case updatedAt = "updated_at"
+  }
 }
 
 extension CachedProject {
@@ -238,6 +250,19 @@ struct CachedTask: Codable, FetchableRecord, PersistableRecord, TableRecord, Ide
       priority: priority,
       dueText: dueText
     )
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case projectID = "project_id"
+    case content
+    case detailsText = "details_text"
+    case priority
+    case checked
+    case isDeleted = "is_deleted"
+    case childOrder = "child_order"
+    case dueText = "due_text"
+    case updatedAt = "updated_at"
   }
 }
 

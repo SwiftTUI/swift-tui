@@ -163,6 +163,7 @@ public struct ResolvedNode: Equatable, Sendable {
   public var kind: NodeKind
   public var children: [ResolvedNode] {
     didSet {
+      recomputePreferenceValues()
       recomputeSupportsRetainedReuse()
     }
   }
@@ -179,6 +180,7 @@ public struct ResolvedNode: Equatable, Sendable {
   public var lifecycleMetadata: LifecycleMetadata
   public var drawPayload: DrawPayload
   public var intrinsicSize: Size?
+  package var preferenceValues: PreferenceValues
   public var supportsRetainedReuse: Bool
 
   public init(
@@ -207,8 +209,13 @@ public struct ResolvedNode: Equatable, Sendable {
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
     self.intrinsicSize = intrinsicSize
+    preferenceValues = Self.combinedPreferenceValues(for: children)
     self.supportsRetainedReuse = true
     recomputeSupportsRetainedReuse()
+  }
+
+  private mutating func recomputePreferenceValues() {
+    preferenceValues = Self.combinedPreferenceValues(for: children)
   }
 
   private mutating func recomputeSupportsRetainedReuse() {
@@ -216,6 +223,16 @@ public struct ResolvedNode: Equatable, Sendable {
       layoutBehavior: layoutBehavior,
       children: children
     )
+  }
+
+  private static func combinedPreferenceValues(
+    for children: [ResolvedNode]
+  ) -> PreferenceValues {
+    var combined = PreferenceValues()
+    for child in children {
+      combined.merge(child.preferenceValues)
+    }
+    return combined
   }
 
   private static func computeSupportsRetainedReuse(

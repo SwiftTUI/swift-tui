@@ -30,6 +30,7 @@ private final class RetainedFrameStore {
     pointerHandlerRegistry: LocalPointerHandlerRegistry?,
     focusBindingRegistry: LocalFocusBindingRegistry?,
     focusedValuesRegistry: LocalFocusedValuesRegistry?,
+    preferenceObservationRegistry: LocalPreferenceObservationRegistry?,
     keyHandlerRegistry: LocalKeyHandlerRegistry?,
     lifecycleRegistry: LocalLifecycleRegistry?,
     taskRegistry: LocalTaskRegistry?
@@ -41,6 +42,7 @@ private final class RetainedFrameStore {
       pointerHandlers: pointerHandlerRegistry?.snapshot() ?? [:],
       focusBindings: focusBindingRegistry?.snapshot() ?? [],
       focusedValues: focusedValuesRegistry?.snapshot() ?? [],
+      preferenceObservations: preferenceObservationRegistry?.snapshot() ?? [],
       keyHandlers: keyHandlerRegistry?.snapshot() ?? [:],
       lifecycleHandlers: lifecycleRegistry?.snapshot() ?? .init(),
       taskRegistrations: taskRegistry?.snapshot() ?? [:]
@@ -229,6 +231,7 @@ public struct DefaultRenderer {
       pointerHandlerRegistry: resolveContext.localPointerHandlerRegistry,
       focusBindingRegistry: resolveContext.localFocusBindingRegistry,
       focusedValuesRegistry: resolveContext.localFocusedValuesRegistry,
+      preferenceObservationRegistry: resolveContext.localPreferenceObservationRegistry,
       keyHandlerRegistry: resolveContext.localKeyHandlerRegistry,
       lifecycleRegistry: resolveContext.localLifecycleRegistry,
       taskRegistry: resolveContext.localTaskRegistry
