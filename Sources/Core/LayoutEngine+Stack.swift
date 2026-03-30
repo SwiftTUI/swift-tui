@@ -139,14 +139,21 @@ extension LayoutEngine {
     }
 
     let baseShare = extraSpace / spacerIndices.count
-    var remainder = extraSpace % spacerIndices.count
+    let remainder = extraSpace % spacerIndices.count
 
     for index in spacerIndices {
       allocatedMainSizes[index] += baseShare
-      if remainder > 0 {
-        allocatedMainSizes[index] += 1
-        remainder -= 1
-      }
+    }
+
+    guard remainder > 0 else {
+      return
+    }
+
+    for offset in evenlyDistributedOffsets(
+      count: spacerIndices.count,
+      picks: remainder
+    ) {
+      allocatedMainSizes[spacerIndices[offset]] += 1
     }
   }
 
@@ -193,13 +200,17 @@ extension LayoutEngine {
         distributed += reduction
       }
 
-      var remainder = remainingOverflow - distributed
-      for offset in indices.indices where remainder > 0 {
-        guard reductions[offset] < compressibles[offset] else {
-          continue
+      let remainder = remainingOverflow - distributed
+      if remainder > 0 {
+        let eligibleOffsets = indices.indices.filter {
+          reductions[$0] < compressibles[$0]
         }
-        reductions[offset] += 1
-        remainder -= 1
+        for offset in evenlyDistributedOffsets(
+          count: eligibleOffsets.count,
+          picks: min(remainder, eligibleOffsets.count)
+        ) {
+          reductions[eligibleOffsets[offset]] += 1
+        }
       }
 
       for (offset, index) in indices.enumerated() {
@@ -212,6 +223,19 @@ extension LayoutEngine {
       remainingOverflow = 0
     }
 
+  }
+
+  package func evenlyDistributedOffsets(
+    count: Int,
+    picks: Int
+  ) -> [Int] {
+    guard count > 0, picks > 0 else {
+      return []
+    }
+
+    return (0..<picks).map { pick in
+      ((pick * 2 + 1) * count) / (picks * 2)
+    }
   }
 
   package func minimumMainSize(

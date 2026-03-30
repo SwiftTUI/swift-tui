@@ -161,16 +161,25 @@ public struct LifecycleMetadata: Equatable, Sendable {
 public struct ResolvedNode: Equatable, Sendable {
   public var identity: Identity
   public var kind: NodeKind
-  public var children: [ResolvedNode]
+  public var children: [ResolvedNode] {
+    didSet {
+      recomputeSupportsRetainedReuse()
+    }
+  }
   public var environmentSnapshot: EnvironmentSnapshot
   public var transactionSnapshot: TransactionSnapshot
-  public var layoutBehavior: LayoutBehavior
+  public var layoutBehavior: LayoutBehavior {
+    didSet {
+      recomputeSupportsRetainedReuse()
+    }
+  }
   public var layoutMetadata: LayoutMetadata
   public var drawMetadata: DrawMetadata
   public var semanticMetadata: SemanticMetadata
   public var lifecycleMetadata: LifecycleMetadata
   public var drawPayload: DrawPayload
   public var intrinsicSize: Size?
+  public var supportsRetainedReuse: Bool
 
   public init(
     identity: Identity,
@@ -198,6 +207,27 @@ public struct ResolvedNode: Equatable, Sendable {
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
     self.intrinsicSize = intrinsicSize
+    self.supportsRetainedReuse = true
+    recomputeSupportsRetainedReuse()
+  }
+
+  private mutating func recomputeSupportsRetainedReuse() {
+    supportsRetainedReuse = Self.computeSupportsRetainedReuse(
+      layoutBehavior: layoutBehavior,
+      children: children
+    )
+  }
+
+  private static func computeSupportsRetainedReuse(
+    layoutBehavior: LayoutBehavior,
+    children: [ResolvedNode]
+  ) -> Bool {
+    switch layoutBehavior {
+    case .viewThatFits, .custom:
+      false
+    default:
+      children.allSatisfy(\.supportsRetainedReuse)
+    }
   }
 
   package func descendant(

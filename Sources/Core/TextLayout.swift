@@ -567,12 +567,15 @@ private func wrapWordLikeClusters(
   }
 
   var remaining = clusters[...]
+  var remainingCellWidth = sliceCellWidth(remaining)
   var lines: [TextLayoutLine] = []
 
   while !remaining.isEmpty {
     if lines.isEmpty {
-      let content = Array(remaining.prefix(firstLineContentWidth))
+      let content = prefixByCellWidth(remaining, maxWidth: firstLineContentWidth)
+      let contentCellWidth = sliceCellWidth(content[...])
       remaining = remaining.dropFirst(content.count)
+      remainingCellWidth -= contentCellWidth
       guard !remaining.isEmpty else {
         lines.append(.init(clusters: content))
         break
@@ -583,16 +586,19 @@ private func wrapWordLikeClusters(
       continue
     }
 
-    if remaining.count + continuationMarker.cellWidth <= width {
+    if remainingCellWidth + continuationMarker.cellWidth <= width {
       lines.append(
         .init(clusters: [continuationMarker] + Array(remaining))
       )
       remaining = []
+      remainingCellWidth = 0
       continue
     }
 
-    let content = Array(remaining.prefix(middleLineContentWidth))
+    let content = prefixByCellWidth(remaining, maxWidth: middleLineContentWidth)
+    let contentCellWidth = sliceCellWidth(content[...])
     remaining = remaining.dropFirst(content.count)
+    remainingCellWidth -= contentCellWidth
     guard !content.isEmpty else {
       return clusterWrappedLines(for: clusters, width: width)
     }
@@ -602,6 +608,41 @@ private func wrapWordLikeClusters(
   }
 
   return lines
+}
+
+func wrapWordLikeClustersForTesting(
+  _ clusters: [TextCluster],
+  width: Int
+) -> [TextLayoutLine] {
+  wrapWordLikeClusters(clusters, width: width)
+}
+
+private func prefixByCellWidth(
+  _ clusters: ArraySlice<TextCluster>,
+  maxWidth: Int
+) -> [TextCluster] {
+  guard maxWidth > 0 else {
+    return []
+  }
+
+  var result: [TextCluster] = []
+  var usedWidth = 0
+
+  for cluster in clusters {
+    guard usedWidth + cluster.cellWidth <= maxWidth else {
+      break
+    }
+    result.append(cluster)
+    usedWidth += cluster.cellWidth
+  }
+
+  return result
+}
+
+private func sliceCellWidth(
+  _ clusters: ArraySlice<TextCluster>
+) -> Int {
+  clusters.reduce(0) { $0 + $1.cellWidth }
 }
 
 private func clusterWrappedLines(
@@ -757,7 +798,7 @@ private func isWordLikeToken(_ clusters: [TextCluster]) -> Bool {
 
   var containsNonApostrophe = false
   for cluster in clusters {
-    guard cluster.cellWidth == 1 else {
+    guard cluster.cellWidth > 0 else {
       return false
     }
 
@@ -817,6 +858,11 @@ private func cellWidth(of character: Character) -> Int {
       $0.properties.isEmoji
     }
   if containsEmojiPresentation || containsEmojiCluster {
+    return 2
+  }
+
+  let containsVS16 = scalars.contains { $0.value == 0xFE0F }
+  if containsVS16 && scalars.contains(where: { $0.properties.isEmoji }) {
     return 2
   }
 

@@ -557,7 +557,13 @@ package struct VerticalAlignmentGuideModifier<Content: View>: View, ResolvableVi
 // The underlying concrete types are value-type layout implementations that are effectively immutable
 // after construction. Only accessed during the layout phase on a single thread.
 private final class LayoutProxyBox: CustomLayoutProxy, @unchecked Sendable {
+  private struct CacheKey: Hashable {
+    var identity: Identity
+    var proposal: ProposedSize
+  }
+
   let box: any AnyLayoutBox
+  private var cachedStates: [CacheKey: Any] = [:]
 
   init(box: any AnyLayoutBox) {
     self.box = box
@@ -565,6 +571,31 @@ private final class LayoutProxyBox: CustomLayoutProxy, @unchecked Sendable {
 
   var debugName: String {
     box.debugName
+  }
+
+  private func ensureCache(
+    for node: ResolvedNode,
+    proposal: ProposedSize,
+    subviews: [LayoutSubview]
+  ) -> Any {
+    let key = CacheKey(identity: node.identity, proposal: proposal)
+
+    if var existing = cachedStates[key] {
+      box.updateCache(&existing, subviews: subviews)
+      cachedStates[key] = existing
+      return existing
+    }
+
+    var fresh = box.makeCache(subviews: subviews)
+    box.updateCache(&fresh, subviews: subviews)
+    cachedStates[key] = fresh
+    return fresh
+  }
+
+  private func discardCachedStates(
+    for identity: Identity
+  ) {
+    cachedStates = cachedStates.filter { $0.key.identity != identity }
   }
 
   func measureContainer(
@@ -575,13 +606,18 @@ private final class LayoutProxyBox: CustomLayoutProxy, @unchecked Sendable {
     let subviews = node.children.map { child in
       LayoutSubview(child: child, engine: engine)
     }
-    var cache = box.makeCache(subviews: subviews)
-    box.updateCache(&cache, subviews: subviews)
-    return box.sizeThatFits(
+    var cache = ensureCache(
+      for: node,
+      proposal: proposal,
+      subviews: subviews
+    )
+    let result = box.sizeThatFits(
       proposal: proposal,
       subviews: subviews,
       cache: &cache
     )
+    cachedStates[CacheKey(identity: node.identity, proposal: proposal)] = cache
+    return result
   }
 
   func placeSubviews(
@@ -598,14 +634,20 @@ private final class LayoutProxyBox: CustomLayoutProxy, @unchecked Sendable {
         placementRecorder: placementRecorder
       )
     }
-    var cache = box.makeCache(subviews: subviews)
-    box.updateCache(&cache, subviews: subviews)
+    let cacheKey = CacheKey(identity: node.identity, proposal: measured.proposal)
+    var cache = ensureCache(
+      for: node,
+      proposal: measured.proposal,
+      subviews: subviews
+    )
     box.placeSubviews(
       in: bounds,
       proposal: measured.proposal,
       subviews: subviews,
       cache: &cache
     )
+    cachedStates[cacheKey] = cache
+    discardCachedStates(for: node.identity)
 
     return node.children.map { child in
       let placement =

@@ -763,12 +763,7 @@ public struct LayoutEngine {
   private func supportsRetainedLayoutReuse(
     for resolved: ResolvedNode
   ) -> Bool {
-    switch resolved.layoutBehavior {
-    case .viewThatFits, .custom:
-      return false
-    default:
-      return resolved.children.allSatisfy { supportsRetainedLayoutReuse(for: $0) }
-    }
+    resolved.supportsRetainedReuse
   }
 
   private func countMeasuredNodes(

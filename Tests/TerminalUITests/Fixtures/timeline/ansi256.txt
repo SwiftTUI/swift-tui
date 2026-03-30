@@ -7,5 +7,5 @@ appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased sou
 02│\u{001B}[38;5;66m│\u{001B}[0m·\u{001B}[38;5;66mDeploy·added·to·wave·3\u{001B}[0m
 03│\u{001B}[38;5;179m├\u{001B}[0m·\u{001B}[38;5;231mCanary\u{001B}[0m
 04│\u{001B}[38;5;66m│\u{001B}[0m·\u{001B}[38;5;66m4/10·hosts·healthy\u{001B}[0m
-05│·\u{001B}[38;5;231mComplete\u{001B}[0m
-06│·\u{001B}[38;5;66mWaiting·for·regional…\u{001B}[0m
+05│\u{001B}[38;5;114m╰\u{001B}[0m·\u{001B}[38;5;231mComplete\u{001B}[0m
+06│\u{001B}[38;5;66m·\u{001B}[0m·\u{001B}[38;5;66mWaiting·for·regional…\u{001B}[0m

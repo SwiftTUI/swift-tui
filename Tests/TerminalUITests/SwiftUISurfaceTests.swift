@@ -143,6 +143,100 @@ private struct RaisedGuideReadingLayout: Layout {
   }
 }
 
+private final class LayoutCacheCounter: @unchecked Sendable {
+  var makeCalls = 0
+  var lastMeasuredCache = 0
+  var lastPlacedCache = 0
+}
+
+private struct CacheTrackingLayout: Layout {
+  let counter: LayoutCacheCounter
+
+  func makeCache(subviews _: LayoutSubviews) -> Int {
+    counter.makeCalls += 1
+    return counter.makeCalls
+  }
+
+  func updateCache(
+    _ cache: inout Int,
+    subviews _: LayoutSubviews
+  ) {}
+
+  func sizeThatFits(
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Int
+  ) -> LayoutSize {
+    counter.lastMeasuredCache = cache
+    return subviews.first?.sizeThatFits(.unspecified) ?? .zero
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Int
+  ) {
+    counter.lastPlacedCache = cache
+    guard let subview = subviews.first else {
+      return
+    }
+
+    let size = subview.sizeThatFits(.unspecified)
+    subview.place(
+      at: bounds.origin,
+      anchor: .topLeading,
+      proposal: .init(width: size.width, height: size.height)
+    )
+  }
+}
+
+private final class SharedLayoutCacheRecorder: @unchecked Sendable {
+  var placedValues: [Int] = []
+}
+
+private struct WidthStampingLayout: Layout {
+  let recorder: SharedLayoutCacheRecorder
+
+  func makeCache(subviews _: LayoutSubviews) -> Int {
+    0
+  }
+
+  func updateCache(
+    _ cache: inout Int,
+    subviews _: LayoutSubviews
+  ) {}
+
+  func sizeThatFits(
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Int
+  ) -> LayoutSize {
+    let size = subviews.first?.sizeThatFits(.unspecified) ?? .zero
+    cache = size.width
+    return size
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Int
+  ) {
+    recorder.placedValues.append(cache)
+    guard let subview = subviews.first else {
+      return
+    }
+
+    let size = subview.sizeThatFits(.unspecified)
+    subview.place(
+      at: bounds.origin,
+      anchor: .topLeading,
+      proposal: .init(width: size.width, height: size.height)
+    )
+  }
+}
+
 private struct BodyBasedBadge: View {
   let title: String
 
@@ -4901,6 +4995,43 @@ struct SwiftUISurfaceTests {
         .init(x: 3, y: 0),
       ])
     #expect(artifacts.rasterSurface.lines == ["A  B"])
+  }
+
+  @Test("custom Layout reuses cache between measurement and placement")
+  func customLayoutReusesCacheBetweenMeasurementAndPlacement() {
+    let counter = LayoutCacheCounter()
+
+    let artifacts = DefaultRenderer().render(
+      CacheTrackingLayout(counter: counter) {
+        Text("A")
+      },
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    #expect(artifacts.measuredTree.measuredSize == .init(width: 1, height: 1))
+    #expect(counter.makeCalls == 1)
+    #expect(counter.lastMeasuredCache == 1)
+    #expect(counter.lastPlacedCache == 1)
+  }
+
+  @Test("shared AnyLayout instances keep cache scoped to each container")
+  func sharedAnyLayoutInstancesKeepCacheScopedPerContainer() {
+    let recorder = SharedLayoutCacheRecorder()
+    let sharedLayout = AnyLayout(WidthStampingLayout(recorder: recorder))
+
+    _ = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        sharedLayout {
+          Text("A")
+        }
+        sharedLayout {
+          Text("BBBB")
+        }
+      },
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    #expect(recorder.placedValues == [1, 4])
   }
 }
 

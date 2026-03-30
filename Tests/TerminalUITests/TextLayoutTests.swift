@@ -61,6 +61,34 @@ struct TextLayoutTests {
     #expect(layout.lines.map(\.text) == ["界", "界", "界"])
   }
 
+  @Test("wide word-like runs wrap by cell width when continuation markers are used")
+  func wideWordLikeRunsWrapByCellWidth() {
+    let lines = wrapWordLikeClustersForTesting(
+      [
+        .init(character: "界", cellWidth: 2),
+        .init(character: "界", cellWidth: 2),
+        .init(character: "界", cellWidth: 2),
+        .init(character: "界", cellWidth: 2),
+        .init(character: "界", cellWidth: 2),
+      ],
+      width: 8
+    )
+
+    #expect(lines.map(\.text) == ["界界界–", "–界界"])
+    #expect(lines.map(\.cellWidth) == [7, 5])
+  }
+
+  @Test("variation selector 16 keeps emoji presentation wide")
+  func variationSelector16KeepsEmojiPresentationWide() {
+    let layout = layoutText(
+      for: "1️⃣2",
+      width: 2
+    )
+
+    #expect(layout.lines.map(\.text) == ["1️⃣", "2"])
+    #expect(layout.size == .init(width: 2, height: 2))
+  }
+
   @Test("line limits truncate after the word-boundary wrap pass")
   func lineLimitTruncatesAfterWordBoundaryWrapping() {
     let layout = layoutText(

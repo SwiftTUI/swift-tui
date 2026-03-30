@@ -7,47 +7,28 @@ struct LayoutEngineTests {
   @Test("measure leaf node with intrinsic size")
   func measureLeafWithIntrinsicSize() {
     let engine = LayoutEngine()
-    let resolved = ResolvedNode(
-      identity: testIdentity("leaf"),
-      kind: .view("Test"),
-      environmentSnapshot: .init(),
-      transactionSnapshot: .init(),
-      intrinsicSize: Size(width: 10, height: 3)
-    )
+    let resolved = leaf("leaf", size: .init(width: 10, height: 3))
 
     let measured = engine.measure(resolved, proposal: .unspecified)
-    #expect(measured.measuredSize == Size(width: 10, height: 3))
+    #expect(measured.measuredSize == .init(width: 10, height: 3))
   }
 
   @Test("measure with explicit proposal clamps size")
   func measureWithExplicitProposal() {
     let engine = LayoutEngine()
-    let resolved = ResolvedNode(
-      identity: testIdentity("leaf"),
-      kind: .view("Test"),
-      environmentSnapshot: .init(),
-      transactionSnapshot: .init(),
-      intrinsicSize: Size(width: 100, height: 50)
-    )
+    let resolved = leaf("leaf", size: .init(width: 100, height: 50))
 
     let measured = engine.measure(
       resolved,
-      proposal: ProposedSize(width: 20, height: 10)
+      proposal: .init(width: 20, height: 10)
     )
-    #expect(measured.measuredSize.width <= 20)
-    #expect(measured.measuredSize.height <= 10)
+    #expect(measured.measuredSize == .init(width: 20, height: 10))
   }
 
   @Test("place node at origin")
   func placeNodeAtOrigin() {
     let engine = LayoutEngine()
-    let resolved = ResolvedNode(
-      identity: testIdentity("leaf"),
-      kind: .view("Test"),
-      environmentSnapshot: .init(),
-      transactionSnapshot: .init(),
-      intrinsicSize: Size(width: 10, height: 3)
-    )
+    let resolved = leaf("leaf", size: .init(width: 10, height: 3))
 
     let measured = engine.measure(resolved)
     let placed = engine.place(resolved, measured: measured, origin: .zero)
@@ -59,13 +40,7 @@ struct LayoutEngineTests {
   func measurementCacheHit() {
     let cache = MeasurementCache()
     let engine = LayoutEngine(cache: cache)
-    let resolved = ResolvedNode(
-      identity: testIdentity("cached"),
-      kind: .view("Test"),
-      environmentSnapshot: .init(),
-      transactionSnapshot: .init(),
-      intrinsicSize: Size(width: 5, height: 2)
-    )
+    let resolved = leaf("cached", size: .init(width: 5, height: 2))
 
     _ = engine.measure(resolved)
     let metrics1 = cache.metrics
@@ -73,5 +48,293 @@ struct LayoutEngineTests {
     let metrics2 = cache.metrics
 
     #expect(metrics2.hits == metrics1.hits + 1)
+  }
+
+  @Test("stack with spacers spreads remainder across the range")
+  func stackWithSpacersSpreadsRemainderAcrossRange() {
+    let engine = LayoutEngine()
+    let resolved = stack(
+      "stack",
+      axis: .horizontal,
+      children: [
+        spacer("leading"),
+        leaf("first", size: .init(width: 1, height: 1)),
+        spacer("middle"),
+        leaf("second", size: .init(width: 1, height: 1)),
+        spacer("trailing"),
+      ]
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 10, height: 1)
+    )
+
+    #expect(measured.measuredSize == .init(width: 10, height: 1))
+    #expect(measured.childMeasurements.map(\.measuredSize.width) == [3, 1, 2, 1, 3])
+  }
+
+  @Test("stack compression honors layout priority before reducing higher-priority children")
+  func stackCompressionHonorsLayoutPriority() {
+    let engine = LayoutEngine()
+    let resolved = stack(
+      "compression",
+      axis: .horizontal,
+      children: [
+        leaf("low", size: .init(width: 4, height: 1)),
+        leaf(
+          "high",
+          size: .init(width: 4, height: 1),
+          layoutMetadata: .init(layoutPriority: 1)
+        ),
+      ]
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 6, height: 1)
+    )
+    let placed = engine.place(resolved, measured: measured, origin: .zero)
+
+    #expect(measured.measuredSize == .init(width: 6, height: 1))
+    #expect(measured.childMeasurements.map(\.measuredSize.width) == [2, 4])
+    #expect(placed.children.map(\.bounds.origin.x) == [0, 2])
+  }
+
+  @Test("flexible frame resolves unspecified finite and infinite proposals")
+  func flexibleFrameResolvesProposalKinds() {
+    let engine = LayoutEngine()
+    let resolved = ResolvedNode(
+      identity: testIdentity("frame"),
+      kind: .view("FlexibleFrame"),
+      children: [leaf("content", size: .init(width: 4, height: 1))],
+      layoutBehavior: .flexibleFrame(
+        minWidth: 2,
+        idealWidth: 6,
+        maxWidth: 8,
+        minHeight: nil,
+        idealHeight: nil,
+        maxHeight: nil,
+        alignment: .topLeading
+      )
+    )
+
+    let unspecified = engine.measure(resolved, proposal: .unspecified)
+    let clampedFinite = engine.measure(
+      resolved,
+      proposal: .init(width: 10, height: 1)
+    )
+    let minimumFinite = engine.measure(
+      resolved,
+      proposal: .init(width: 1, height: 1)
+    )
+    let infinite = engine.measure(
+      resolved,
+      proposal: .init(width: .infinity, height: 1)
+    )
+
+    #expect(unspecified.measuredSize == .init(width: 6, height: 1))
+    #expect(clampedFinite.measuredSize == .init(width: 8, height: 1))
+    #expect(minimumFinite.measuredSize == .init(width: 2, height: 1))
+    #expect(infinite.measuredSize == .init(width: 8, height: 1))
+  }
+
+  @Test("overlay sizing uses the alignment-projected union of children")
+  func overlaySizingUsesAlignmentProjectedUnion() {
+    let engine = LayoutEngine()
+    let centered = leaf("centered", size: .init(width: 2, height: 1))
+    let leadingAligned = leaf(
+      "leadingAligned",
+      size: .init(width: 4, height: 1),
+      layoutMetadata: LayoutMetadata().settingHorizontalAlignmentGuide(
+        .center,
+        debugName: HorizontalAlignment.center.debugName,
+        computeValue: { _ in 0 }
+      )
+    )
+    let resolved = ResolvedNode(
+      identity: testIdentity("overlay"),
+      kind: .view("Overlay"),
+      children: [centered, leadingAligned],
+      layoutBehavior: .overlay(alignment: .center)
+    )
+
+    let measured = engine.measure(resolved)
+    let placed = engine.place(resolved, measured: measured, origin: .zero)
+
+    #expect(measured.measuredSize == .init(width: 5, height: 1))
+    #expect(placed.children.map(\.bounds.origin.x) == [0, 1])
+  }
+
+  @Test("ViewThatFits selects the first child that fits the proposal")
+  func viewThatFitsSelectsFirstFittingChild() {
+    let engine = LayoutEngine()
+    let resolved = ResolvedNode(
+      identity: testIdentity("viewThatFits"),
+      kind: .view("ViewThatFits"),
+      children: [
+        leaf("wide", size: .init(width: 7, height: 1)),
+        leaf("fit", size: .init(width: 5, height: 1)),
+        leaf("small", size: .init(width: 1, height: 1)),
+      ],
+      layoutBehavior: .viewThatFits(.horizontal)
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 5, height: 1)
+    )
+    let placed = engine.place(resolved, measured: measured, origin: .zero)
+
+    #expect(measured.measuredSize == .init(width: 5, height: 1))
+    #expect(measured.containerAllocationSnapshot?.selectedChildIndex == 1)
+    #expect(placed.children.map(\.identity) == [testIdentity("fit")])
+  }
+
+  @Test("padding reduces the child proposal and places the child at the inset origin")
+  func paddingReducesProposalAndOffsetsPlacement() throws {
+    let engine = LayoutEngine()
+    let resolved = ResolvedNode(
+      identity: testIdentity("padding"),
+      kind: .view("Padding"),
+      children: [leaf("content", size: .init(width: 20, height: 10))],
+      layoutBehavior: .padding(.init(top: 1, leading: 2, bottom: 1, trailing: 2))
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 9, height: 5)
+    )
+    let placed = engine.place(resolved, measured: measured, origin: .zero)
+    let child = try #require(placed.children.first)
+
+    #expect(measured.measuredSize == .init(width: 9, height: 5))
+    #expect(measured.childMeasurements.first?.measuredSize == .init(width: 5, height: 3))
+    #expect(child.bounds.origin == .init(x: 2, y: 1))
+    #expect(child.bounds.size == .init(width: 5, height: 3))
+  }
+
+  @Test("wide-character word wrapping measures by cell width instead of cluster count")
+  func wideCharacterWordWrappingUsesCellWidth() {
+    let engine = LayoutEngine()
+    let resolved = ResolvedNode(
+      identity: testIdentity("text"),
+      kind: .view("Text"),
+      layoutMetadata: .init(textWrappingStrategy: .wordBoundary),
+      drawPayload: .text("界界界界界")
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 8, height: .unspecified)
+    )
+
+    #expect(measured.measuredSize == .init(width: 7, height: 2))
+  }
+
+  @Test("zero and negative proposals clamp measured sizes to zero")
+  func zeroAndNegativeProposalsClampToZero() {
+    let engine = LayoutEngine()
+    let resolved = leaf("leaf", size: .init(width: 4, height: 2))
+
+    let zero = engine.measure(
+      resolved,
+      proposal: .init(width: 0, height: 0)
+    )
+    let negative = engine.measure(
+      resolved,
+      proposal: .init(width: -3, height: -1)
+    )
+
+    #expect(zero.measuredSize == .zero)
+    #expect(negative.measuredSize == .zero)
+  }
+
+  @Test("retained reuse support updates when layout behavior or children change")
+  func supportsRetainedReuseTracksResolvedMutations() {
+    var parent = ResolvedNode(
+      identity: testIdentity("parent"),
+      kind: .view("Container"),
+      children: [leaf("child", size: .init(width: 1, height: 1))]
+    )
+
+    #expect(parent.supportsRetainedReuse)
+
+    parent.layoutBehavior = .viewThatFits(.horizontal)
+    #expect(!parent.supportsRetainedReuse)
+
+    parent.layoutBehavior = .intrinsic
+    parent.children = [
+      ResolvedNode(
+        identity: testIdentity("custom"),
+        kind: .view("Custom"),
+        layoutBehavior: .custom(CustomLayoutHandle(NoOpCustomLayoutProxy()))
+      )
+    ]
+    #expect(!parent.supportsRetainedReuse)
+  }
+}
+
+private func leaf(
+  _ name: String,
+  size: Size,
+  layoutMetadata: LayoutMetadata = .init(),
+  drawPayload: DrawPayload = .none
+) -> ResolvedNode {
+  ResolvedNode(
+    identity: testIdentity(name),
+    kind: .view("Test"),
+    layoutMetadata: layoutMetadata,
+    drawPayload: drawPayload,
+    intrinsicSize: size
+  )
+}
+
+private func spacer(_ name: String) -> ResolvedNode {
+  ResolvedNode(
+    identity: testIdentity(name),
+    kind: .view("Spacer"),
+    intrinsicSize: .zero
+  )
+}
+
+private func stack(
+  _ name: String,
+  axis: Axis,
+  children: [ResolvedNode]
+) -> ResolvedNode {
+  ResolvedNode(
+    identity: testIdentity(name),
+    kind: .view(axis == .horizontal ? "HStack" : "VStack"),
+    children: children,
+    layoutBehavior: .stack(
+      axis: axis,
+      spacing: 0,
+      horizontalAlignment: .leading,
+      verticalAlignment: .top
+    )
+  )
+}
+
+private final class NoOpCustomLayoutProxy: CustomLayoutProxy, @unchecked Sendable {
+  var debugName: String {
+    "NoOpCustomLayoutProxy"
+  }
+
+  func measureContainer(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    proposal _: ProposedSize
+  ) -> Size {
+    .zero
+  }
+
+  func placeSubviews(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    measured _: MeasuredNode,
+    in _: Rect
+  ) -> [PlacedNode] {
+    []
   }
 }
