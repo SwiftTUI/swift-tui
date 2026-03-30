@@ -9,10 +9,15 @@ import {
   terminalAppManifestPath,
   terminalAppWasmPath,
 } from "./app-data.ts";
-import { createWasmSceneRuntimeFactory } from "./scene-runtime.ts";
+import {
+  createWasmSceneRuntimeFactory,
+  type WasmSceneResizeEvent,
+} from "./scene-runtime.ts";
 
 const terminalAppManifestUrl = new URL(terminalAppManifestPath, location.href);
 const terminalAppWasmUrl = new URL(terminalAppWasmPath, location.href);
+const minimumFrameWidth = 320;
+const minimumFrameHeight = 240;
 
 await bootstrap();
 
@@ -26,32 +31,68 @@ async function bootstrap(): Promise<void> {
     <main>
       <div class="tabs" data-scenes></div>
       <p data-status>Booting WebExampleApp…</p>
-      <p>Drag the lower-right corner of the terminal box to resize it.</p>
-      <div class="terminal-frame">
-        <div class="terminal-host" data-terminal-host></div>
+      <p>Drag the resize handle under the terminal to change its size.</p>
+      <div class="terminal-shell">
+        <div class="terminal-frame" data-terminal-frame>
+          <div class="terminal-host" data-terminal-host></div>
+        </div>
+        <div class="terminal-resize-bar">
+          <button type="button" class="terminal-resize-handle" data-resize-handle>Resize</button>
+        </div>
       </div>
     </main>
   `;
 
   const status = root.querySelector<HTMLElement>("[data-status]");
   const scenes = root.querySelector<HTMLElement>("[data-scenes]");
+  const terminalFrame = root.querySelector<HTMLElement>("[data-terminal-frame]");
   const terminalHost = root.querySelector<HTMLElement>("[data-terminal-host]");
+  const resizeHandle = root.querySelector<HTMLButtonElement>("[data-resize-handle]");
 
-  if (!status || !scenes || !terminalHost) {
+  if (!status || !scenes || !terminalFrame || !terminalHost || !resizeHandle) {
     throw new Error("failed to mount WebExample");
   }
 
-  const { controller, manifestSource } = await createController(terminalHost);
+  installResizeHandle(terminalFrame, resizeHandle);
+
+  const sceneSizes = new Map<string, string>();
+  let controller: WebTUIAppController | undefined;
+  let manifestSource = "";
+  const renderStatus = () => {
+    if (!controller) {
+      return;
+    }
+
+    const activeScene = controller.scenes.find((scene) => scene.id === controller?.selectedSceneId);
+    const activeLabel = activeScene?.title ?? activeScene?.id ?? controller.selectedSceneId;
+    const sizeLabel = sceneSizes.get(controller.selectedSceneId);
+    terminalHost.dataset.sceneId = controller.selectedSceneId;
+    terminalHost.dataset.size = sizeLabel ?? "";
+    status.textContent = sizeLabel
+      ? `Loaded ${activeLabel} from ${manifestSource} at ${sizeLabel}.`
+      : `Loaded ${activeLabel} from ${manifestSource}.`;
+  };
+
+  ({ controller, manifestSource } = await createController(terminalHost, (event) => {
+    sceneSizes.set(event.sceneId, `${event.columns}x${event.rows}`);
+    renderStatus();
+  }));
   const defaultScene = controller.scenes.find((scene) => scene.isDefault)?.id ?? controller.selectedSceneId;
   await controller.switchScene(defaultScene);
-  renderSceneButtons(controller, scenes, status, manifestSource);
-  status.textContent = controller.scenes.length > 0
-    ? `Loaded ${controller.scenes.length} scene${controller.scenes.length === 1 ? "" : "s"} from ${manifestSource}.`
-    : "Loaded terminal host.";
+  renderSceneButtons(controller, scenes, () => {
+    renderStatus();
+  });
+
+  if (controller.scenes.length > 0) {
+    renderStatus();
+  } else {
+    status.textContent = "Loaded terminal host.";
+  }
 }
 
 async function createController(
-  mount: HTMLElement
+  mount: HTMLElement,
+  onSceneResize: (event: WasmSceneResizeEvent) => void
 ): Promise<{ controller: WebTUIAppController; manifestSource: string }> {
   try {
     return {
@@ -63,7 +104,9 @@ async function createController(
         environment: {
           TUIGUI_APP_NAME: "Examples/WebExample",
         },
-        sceneRuntimeFactory: createWasmSceneRuntimeFactory(terminalAppWasmUrl),
+        sceneRuntimeFactory: createWasmSceneRuntimeFactory(terminalAppWasmUrl, {
+          onSceneResize,
+        }),
       }),
       manifestSource: "TerminalApp",
     };
@@ -84,8 +127,7 @@ async function createController(
 function renderSceneButtons(
   controller: WebTUIAppController,
   container: HTMLElement,
-  status: HTMLElement,
-  manifestSource: string
+  onSelectionChanged: () => void
 ): void {
   container.replaceChildren();
 
@@ -97,8 +139,7 @@ function renderSceneButtons(
     button.addEventListener("click", async () => {
       await controller.switchScene(scene.id);
       updateSceneSelection(controller, container);
-      const label = scene.title ?? scene.id;
-      status.textContent = `Loaded ${label} from ${manifestSource}.`;
+      onSelectionChanged();
     });
     container.append(button);
   }
@@ -115,4 +156,76 @@ function updateSceneSelection(
     button.disabled = isActive;
     button.setAttribute("aria-pressed", String(isActive));
   }
+}
+
+function installResizeHandle(
+  frame: HTMLElement,
+  handle: HTMLButtonElement
+): void {
+  let drag:
+    | {
+        pointerId: number;
+        startX: number;
+        startY: number;
+        startWidth: number;
+        startHeight: number;
+      }
+    | undefined;
+
+  const stopDrag = (pointerId?: number) => {
+    if (!drag || (pointerId !== undefined && drag.pointerId !== pointerId)) {
+      return;
+    }
+
+    drag = undefined;
+    document.body.classList.remove("is-resizing-terminal");
+  };
+
+  const resizeToPointer = (event: PointerEvent) => {
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const width = Math.max(
+      minimumFrameWidth,
+      Math.round(drag.startWidth + event.clientX - drag.startX)
+    );
+    const height = Math.max(
+      minimumFrameHeight,
+      Math.round(drag.startHeight + event.clientY - drag.startY)
+    );
+
+    frame.style.width = `${width}px`;
+    frame.style.height = `${height}px`;
+  };
+
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    const rect = frame.getBoundingClientRect();
+    drag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth: rect.width,
+      startHeight: rect.height,
+    };
+    document.body.classList.add("is-resizing-terminal");
+    handle.setPointerCapture(event.pointerId);
+  });
+
+  handle.addEventListener("pointermove", resizeToPointer);
+  handle.addEventListener("pointerup", (event) => {
+    resizeToPointer(event);
+    stopDrag(event.pointerId);
+  });
+  handle.addEventListener("pointercancel", (event) => {
+    stopDrag(event.pointerId);
+  });
+  window.addEventListener("blur", () => {
+    stopDrag();
+  });
 }

@@ -21,6 +21,7 @@ export class BrowserWASIBridge {
 
   private detachStdout?: () => void;
   private detachStderr?: () => void;
+  private readonly resizeListeners = new Set<(columns: number, rows: number) => void>();
 
   constructor(options: BrowserWASIBridgeOptions) {
     this.environment = {
@@ -49,9 +50,14 @@ export class BrowserWASIBridge {
     columns: number,
     rows: number
   ): void {
-    this.environment.TUIGUI_COLUMNS = String(Math.max(1, columns));
-    this.environment.TUIGUI_ROWS = String(Math.max(1, rows));
+    const normalizedColumns = Math.max(1, columns);
+    const normalizedRows = Math.max(1, rows);
+    this.environment.TUIGUI_COLUMNS = String(normalizedColumns);
+    this.environment.TUIGUI_ROWS = String(normalizedRows);
     this.stdin.write(encodeResizeControlMessage(columns, rows));
+    for (const listener of this.resizeListeners) {
+      listener(normalizedColumns, normalizedRows);
+    }
   }
 
   sendInput(
@@ -60,9 +66,19 @@ export class BrowserWASIBridge {
     this.stdin.write(chunk);
   }
 
+  subscribeResize(
+    listener: (columns: number, rows: number) => void
+  ): () => void {
+    this.resizeListeners.add(listener);
+    return () => {
+      this.resizeListeners.delete(listener);
+    };
+  }
+
   dispose(): void {
     this.detachStdout?.();
     this.detachStderr?.();
+    this.resizeListeners.clear();
     this.stdin.close();
     this.stdout.close();
     this.stderr.close();

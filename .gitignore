@@ -69,3 +69,4 @@ xcuserdata/
 .swiftpm
 .worktrees
 reference
+.playwright-cli

@@ -65,10 +65,6 @@ export class WebTUISceneRuntime {
     this.terminal = new Terminal(options);
     this.fitAddon = new FitAddon();
     this.terminal.loadAddon(this.fitAddon);
-    this.terminal.open(this.terminalMount);
-    this.fitAddon.fit();
-    this.fitAddon.observeResize();
-    this.applyStyle(this.currentStyle);
 
     this.terminal.onData((data) => {
       this.onInput(this.inputEncoder.encode(data));
@@ -89,6 +85,11 @@ export class WebTUISceneRuntime {
         this.terminal?.resize(columns, rows);
       },
     });
+
+    this.terminal.open(this.terminalMount);
+    this.applyStyle(this.currentStyle);
+    this.fitAddon.fit();
+    this.fitAddon.observeResize();
   }
 
   setVisible(
