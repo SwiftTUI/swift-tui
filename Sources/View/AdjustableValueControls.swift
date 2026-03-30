@@ -194,11 +194,11 @@ extension Stepper {
       isActiveNavigation
       ? contentChrome.borderStyle
       : AnyShapeStyle(.separator)
-    let decrementControl = Text(canDecrement ? "[-]" : "[ ]")
+    let decrementControl = Text(canDecrement ? "◀" : "◁")
       .foregroundStyle(canDecrement ? controlAccent : inactiveStyle)
       .id(stepperDecrementIdentity(for: controlIdentity))
       .semanticMetadata(.init(participatesInPointerHitTesting: true))
-    let incrementControl = Text(canIncrement ? "[+]" : "[ ]")
+    let incrementControl = Text(canIncrement ? "▶" : "▷")
       .foregroundStyle(canIncrement ? controlAccent : inactiveStyle)
       .id(stepperIncrementIdentity(for: controlIdentity))
       .semanticMetadata(.init(participatesInPointerHitTesting: true))
@@ -493,12 +493,12 @@ extension Slider {
       segmentCount - 1
     )
 
-    var characters = Array(repeating: Character("-"), count: segmentCount)
+    var characters = Array(repeating: Character("─"), count: segmentCount)
     for index in 0..<position {
-      characters[index] = Character("=")
+      characters[index] = Character("━")
     }
-    characters[position] = Character("|")
-    return "[\(String(characters))]"
+    characters[position] = Character("●")
+    return String(characters)
   }
 }
 

@@ -53,8 +53,22 @@ struct GalleryDemoSceneView: View {
       }
     }
     .tint(Color.cyan)
-
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .alert(
+      "Reset gallery state?",
+      isPresented: $isResetAlertPresented,
+      actions: {
+        Button("Reset") {
+          model.reset()
+        }
+        Button("Cancel") {
+          isResetAlertPresented = false
+        }
+      },
+      message: {
+        Text("This clears the interactive control and appearance samples.")
+      }
+    )
   }
 
   private var headerBar: some View {
@@ -174,27 +188,15 @@ struct GalleryDemoSceneView: View {
           Button("Reset") {
             isResetAlertPresented = true
           }
-          Button("Plain") {}
+          Button("Plain") {
+            model.increment()
+            model.increment()
+          }
             .buttonStyle(.plain)
         }
         Text("Pressed \(model.primaryCount) times")
           .foregroundStyle(.separator)
       }
-      .alert(
-        "Reset gallery state?",
-        isPresented: $isResetAlertPresented,
-        actions: {
-          Button("Reset") {
-            model.reset()
-          }
-          Button("Cancel") {
-            isResetAlertPresented = false
-          }
-        },
-        message: {
-          Text("This clears the interactive control and appearance samples.")
-        }
-      )
     }
   }
 

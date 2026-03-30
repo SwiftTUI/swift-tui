@@ -1601,8 +1601,7 @@ struct SwiftUISurfaceTests {
     #expect(
       artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("ValueSlider")])
     #expect(surface.contains("Value"))
-    #expect(surface.contains("["))
-    #expect(surface.contains("|"))
+    #expect(surface.contains("●"))
     #expect(keyRegistry.dispatch(identity: testIdentity("ValueSlider"), event: .arrowRight))
     #expect(box.value == 2)
     #expect(keyRegistry.dispatch(identity: testIdentity("ValueSlider"), event: .arrowLeft))
@@ -2796,8 +2795,8 @@ struct SwiftUISurfaceTests {
 
     #expect(visibleArtifacts.resolvedTree.semanticMetadata.presentationRole == nil)
     #expect(visibleArtifacts.semanticSnapshot.scrollRoutes.count == 1)
-    #expect(visibleArtifacts.rasterSurface.lines[1].hasSuffix("v"))
-    #expect(!hiddenArtifacts.rasterSurface.lines[1].hasSuffix("v"))
+    #expect(visibleArtifacts.rasterSurface.lines[1].hasSuffix("▼"))
+    #expect(!hiddenArtifacts.rasterSurface.lines[1].hasSuffix("▼"))
     #expect(hiddenArtifacts.rasterSurface.lines.prefix(2) == ["One ", "Two "])
   }
 
@@ -2843,8 +2842,8 @@ struct SwiftUISurfaceTests {
       row[7].character
     }
 
-    #expect(topThumbColumn == [" ", "█", "█", "│", "v"])
-    #expect(bottomThumbColumn == ["^", "│", "█", "█", " "])
+    #expect(topThumbColumn == [" ", "█", "█", "│", "▼"])
+    #expect(bottomThumbColumn == ["▲", "│", "█", "█", " "])
   }
 
   @Test("ScrollView indicator keeps a usable thumb size for large content")
@@ -2869,7 +2868,7 @@ struct SwiftUISurfaceTests {
       row[7].character
     }
 
-    #expect(thumbColumn == [" ", "█", "█", "│", "│", "v"])
+    #expect(thumbColumn == [" ", "█", "█", "│", "│", "▼"])
   }
 
   @Test("ScrollView indicator focus highlights only the indicator")

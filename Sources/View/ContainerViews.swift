@@ -328,16 +328,16 @@ extension ScrollViewLayout: MeasurementLayoutReuseProviding {
 }
 
 /// Presents scrollable content along one or both axes.
-public struct ScrollView: View, ResolvableView {
+public struct ScrollView<Content: View>: View, ResolvableView {
   public var axes: Axis.Set
   public var showsIndicators: Bool
   @State private var internalPosition = ScrollPosition.zero
   private var explicitPosition: Binding<ScrollPosition>?
-  private var content: AnyView
+  private var content: Content
   public var position: Binding<ScrollPosition> {
     explicitPosition ?? $internalPosition
   }
-  public init<Content: View>(
+  public init(
     _ axes: Axis.Set = .vertical,
     showsIndicators: Bool = true,
     @ViewBuilder content: () -> Content
@@ -345,9 +345,9 @@ public struct ScrollView: View, ResolvableView {
     self.axes = axes
     self.showsIndicators = showsIndicators
     explicitPosition = nil
-    self.content = AnyView(content())
+    self.content = content()
   }
-  public init<Content: View>(
+  public init(
     _ axes: Axis.Set = .vertical,
     showsIndicators: Bool = true,
     position: Binding<ScrollPosition>,
@@ -356,7 +356,7 @@ public struct ScrollView: View, ResolvableView {
     self.axes = axes
     self.showsIndicators = showsIndicators
     explicitPosition = position
-    self.content = AnyView(content())
+    self.content = content()
   }
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let indicatorVisibility = effectiveIndicatorVisibility(

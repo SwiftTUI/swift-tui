@@ -1,7 +1,13 @@
 version: "0.2"
 ignorePaths: []
-dictionaryDefinitions: []
-dictionaries: []
-words: []
+dictionaryDefinitions:
+  - name: custom-dictionary
+    path: ./.cspell/custom-dictionary.txt
+    addWords: true
+dictionaries:
+  - custom-dictionary
+words:
+  - Sparkline
+  - Sparklines
 ignoreWords: []
 import: []

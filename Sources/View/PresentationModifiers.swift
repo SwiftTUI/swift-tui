@@ -137,7 +137,8 @@ private struct TerminalPresentationModifier<Content: View>: View {
             title: title,
             kind: kind,
             actionViews: actionViews,
-            messageViews: messageViews
+            messageViews: messageViews,
+            dismiss: { [isPresented] in isPresented.wrappedValue = false }
           )
           .padding(
             .init(
@@ -162,6 +163,7 @@ private struct TerminalPresentationSurface: View {
   var kind: TerminalPresentationKind
   var actionViews: [AnyView]
   var messageViews: [AnyView]
+  var dismiss: @MainActor @Sendable () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -169,11 +171,12 @@ private struct TerminalPresentationSurface: View {
         Text(title)
           .bold()
         Spacer(minLength: 0)
-        Text(kind == .alert ? "!" : "›")
+        Button("×", action: dismiss)
+          .buttonStyle(.borderedProminent)
       }
       .frame(height: 1, alignment: .leading)
       .padding(.init(horizontal: 1, vertical: 0))
-      .background(.terminalRow(.accent, isSelected: true))
+      .background(.terminalRow(kind == .alert ? .neutral : .accent, isSelected: true))
 
       Divider()
 

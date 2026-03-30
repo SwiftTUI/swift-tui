@@ -739,6 +739,18 @@ extension TerminalSurfaceRenderer {
       return "#"
     case "•":
       return "*"
+    case "◀", "◁":
+      return "<"
+    case "▶", "▷":
+      return ">"
+    case "▼", "▽":
+      return "v"
+    case "▲", "△":
+      return "^"
+    case "×":
+      return "x"
+    case "●", "○":
+      return "o"
     case "←":
       return "<"
     case "→":

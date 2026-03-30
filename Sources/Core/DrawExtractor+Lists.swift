@@ -466,8 +466,8 @@ extension DrawExtractor {
       let glyph = compactIndicatorGlyph(
         offset: offset,
         maxOffset: maxOffset,
-        backward: "^",
-        forward: "v"
+        backward: "▲",
+        forward: "▼"
       )
       return singleCellIndicatorCommand(x: x, y: bounds.origin.y, glyph: glyph, style: style)
     }
@@ -475,14 +475,14 @@ extension DrawExtractor {
     var commands = singleCellIndicatorCommand(
       x: x,
       y: bounds.origin.y,
-      glyph: offset > 0 ? "^" : " ",
+      glyph: offset > 0 ? "▲" : " ",
       style: style
     )
     commands.append(
       contentsOf: singleCellIndicatorCommand(
         x: x,
         y: bounds.origin.y + bounds.size.height - 1,
-        glyph: offset < maxOffset ? "v" : " ",
+        glyph: offset < maxOffset ? "▼" : " ",
         style: style
       )
     )
