@@ -176,7 +176,12 @@ private struct ScrollViewLayout: Layout {
         y: viewportBounds.origin.y - clampedOffset.y
       ),
       anchor: .topLeading,
-      proposal: .init(width: childSize.width, height: childSize.height)
+      proposal: .init(width: childSize.width, height: childSize.height),
+      viewportContext: .init(
+        axes: axes,
+        viewportRect: viewportBounds,
+        contentOffset: .init(x: clampedOffset.x, y: clampedOffset.y)
+      )
     )
   }
 
@@ -540,6 +545,106 @@ public struct ScrollView<Content: View>: View, ResolvableView {
     ]
   }
 
+}
+
+/// Arranges children vertically using lazy stack layout rules.
+public struct LazyVStack<Content: View>: View, ResolvableView {
+  public var alignment: HorizontalAlignment
+  public var spacing: Int?
+  package var content: Content
+
+  public init(
+    alignment: HorizontalAlignment = .center,
+    spacing: Int? = nil,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.alignment = alignment
+    self.spacing = spacing
+    self.content = content()
+  }
+
+  package init(
+    alignment: HorizontalAlignment = .center,
+    spacing: Int? = nil,
+    children: [AnyView]
+  ) where Content == VariadicView<AnyView> {
+    self.alignment = alignment
+    self.spacing = spacing
+    content = VariadicView(children)
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let resolvedChildren = resolveDeclaredChildren(
+      content,
+      in: context,
+      kindName: "LazyVStack"
+    )
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("LazyVStack"),
+        children: resolvedChildren,
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        layoutBehavior: .lazyStack(
+          axis: .vertical,
+          spacing: spacing,
+          horizontalAlignment: alignment,
+          verticalAlignment: .center
+        )
+      )
+    ]
+  }
+}
+
+/// Arranges children horizontally using lazy stack layout rules.
+public struct LazyHStack<Content: View>: View, ResolvableView {
+  public var alignment: VerticalAlignment
+  public var spacing: Int?
+  package var content: Content
+
+  public init(
+    alignment: VerticalAlignment = .center,
+    spacing: Int? = nil,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.alignment = alignment
+    self.spacing = spacing
+    self.content = content()
+  }
+
+  package init(
+    alignment: VerticalAlignment = .center,
+    spacing: Int? = nil,
+    children: [AnyView]
+  ) where Content == VariadicView<AnyView> {
+    self.alignment = alignment
+    self.spacing = spacing
+    content = VariadicView(children)
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let resolvedChildren = resolveDeclaredChildren(
+      content,
+      in: context,
+      kindName: "LazyHStack"
+    )
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("LazyHStack"),
+        children: resolvedChildren,
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        layoutBehavior: .lazyStack(
+          axis: .horizontal,
+          spacing: spacing,
+          horizontalAlignment: .center,
+          verticalAlignment: alignment
+        )
+      )
+    ]
+  }
 }
 
 /// Arranges children vertically using stack layout rules.

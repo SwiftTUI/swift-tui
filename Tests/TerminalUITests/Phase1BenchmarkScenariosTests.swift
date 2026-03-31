@@ -137,6 +137,51 @@ struct Phase1BenchmarkScenariosTests {
     #expect(second.diagnostics.measuredNodesReused == second.diagnostics.measuredNodeCount)
     #expect(second.diagnostics.placedNodesReused == 0)
   }
+
+  @Test("lazy scroll movement reduces placement work on viewport shifts")
+  @MainActor
+  func lazyScrollMovementScenario() throws {
+    let eagerHarness = BenchmarkHarness()
+    let lazyHarness = BenchmarkHarness()
+    let eagerPosition = ScrollBox()
+    let lazyPosition = ScrollBox()
+
+    _ = try eagerHarness.render(
+      ScrollBenchmarkView(position: eagerPosition),
+      context: benchmarkContext(
+        focusedIdentity: Phase1BenchmarkIdentity.scrollRegion
+      )
+    )
+    _ = try lazyHarness.render(
+      LazyScrollBenchmarkView(position: lazyPosition),
+      context: benchmarkContext(
+        focusedIdentity: Phase1BenchmarkIdentity.scrollRegion
+      )
+    )
+
+    eagerPosition.position.scrollBy(y: 1)
+    lazyPosition.position.scrollBy(y: 1)
+
+    let eagerSecond = try eagerHarness.render(
+      ScrollBenchmarkView(position: eagerPosition),
+      context: benchmarkContext(
+        focusedIdentity: Phase1BenchmarkIdentity.scrollRegion
+      )
+    )
+    let lazySecond = try lazyHarness.render(
+      LazyScrollBenchmarkView(position: lazyPosition),
+      context: benchmarkContext(
+        focusedIdentity: Phase1BenchmarkIdentity.scrollRegion
+      )
+    )
+
+    #expect(eagerSecond.presentation.strategy == .fullRepaint)
+    #expect(lazySecond.presentation.strategy == .incremental)
+    #expect(lazySecond.diagnostics.measuredNodesComputed == 0)
+    #expect(lazySecond.diagnostics.measuredNodesReused == lazySecond.diagnostics.measuredNodeCount)
+    #expect(lazySecond.diagnostics.placedNodeCount < eagerSecond.diagnostics.placedNodeCount)
+    #expect(lazySecond.presentation.bytesWritten < eagerSecond.presentation.bytesWritten)
+  }
 }
 
 private struct BenchmarkFrame {
@@ -282,6 +327,37 @@ private struct ScrollBenchmarkView: View {
         Text("Row 2")
         Text("Row 3")
         Text("Row 4")
+        Text("Row 5")
+        Text("Row 6")
+        Text("Row 7")
+      }
+    }
+    .id(Phase1BenchmarkIdentity.scrollRegion)
+    .frame(width: 12, height: 3, alignment: .topLeading)
+  }
+}
+
+private struct LazyScrollBenchmarkView: View {
+  let position: ScrollBox
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      showsIndicators: true,
+      position: Binding(
+        get: { position.position },
+        set: { position.position = $0 }
+      )
+    ) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        Text("Row 0")
+        Text("Row 1")
+        Text("Row 2")
+        Text("Row 3")
+        Text("Row 4")
+        Text("Row 5")
+        Text("Row 6")
+        Text("Row 7")
       }
     }
     .id(Phase1BenchmarkIdentity.scrollRegion)

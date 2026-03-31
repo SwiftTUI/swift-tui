@@ -2757,6 +2757,146 @@ struct SwiftUISurfaceTests {
     #expect(route.contentBounds.size == .init(width: 5, height: 3))
   }
 
+  @Test("Lazy stacks outside ScrollView match their eager counterparts")
+  func lazyStacksOutsideScrollViewMatchTheirEagerCounterparts() {
+    let eagerVertical = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("One")
+        Text("Two")
+      },
+      context: .init(identity: testIdentity("EagerVertical"))
+    ).rasterSurface
+
+    let lazyVertical = DefaultRenderer().render(
+      LazyVStack(alignment: .leading, spacing: 0) {
+        Text("One")
+        Text("Two")
+      },
+      context: .init(identity: testIdentity("LazyVertical"))
+    ).rasterSurface
+
+    let eagerHorizontal = DefaultRenderer().render(
+      HStack(alignment: .center, spacing: 1) {
+        Text("A")
+        Text("B")
+      },
+      context: .init(identity: testIdentity("EagerHorizontal"))
+    ).rasterSurface
+
+    let lazyHorizontal = DefaultRenderer().render(
+      LazyHStack(alignment: .center, spacing: 1) {
+        Text("A")
+        Text("B")
+      },
+      context: .init(identity: testIdentity("LazyHorizontal"))
+    ).rasterSurface
+
+    #expect(lazyVertical == eagerVertical)
+    #expect(lazyHorizontal == eagerHorizontal)
+  }
+
+  @Test("LazyVStack clips overflow to its viewport and reports larger semantic content bounds")
+  func lazyVerticalStackClipsAndReportsContentBounds() throws {
+    let artifacts = DefaultRenderer().render(
+      ScrollView(.vertical, showsIndicators: false) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          Text("One  ")
+          Text("Two  ")
+          Text("Three")
+        }
+      }
+      .frame(width: 5, height: 2, alignment: .topLeading),
+      context: .init(identity: testIdentity("LazyScrollViewport"))
+    )
+
+    let route = try #require(artifacts.semanticSnapshot.scrollRoutes.first)
+
+    #expect(
+      artifacts.rasterSurface.lines.prefix(2) == [
+        "One  ",
+        "Two  ",
+      ])
+    #expect(artifacts.rasterSurface.lines.dropFirst(2).allSatisfy { $0.isEmpty })
+    #expect(route.viewportRect.size == .init(width: 5, height: 2))
+    #expect(route.contentBounds.size == .init(width: 5, height: 3))
+  }
+
+  @Test("scroll position changes do not emit lifecycle deltas for lazy stacks")
+  func lazyStackScrollPositionChangesDoNotEmitLifecycleDeltas() {
+    final class ScrollBox {
+      var position = ScrollPosition.zero
+    }
+
+    let box = ScrollBox()
+    let view = ScrollView(
+      .vertical,
+      showsIndicators: false,
+      position: Binding(
+        get: { box.position },
+        set: { box.position = $0 }
+      )
+    ) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        Text("Row 0")
+        Text("Row 1")
+        Text("Row 2")
+          .onAppear {}
+          .onDisappear {}
+          .task(id: "row-2") {}
+      }
+    }
+    .frame(width: 5, height: 2, alignment: .topLeading)
+
+    let initialArtifacts = DefaultRenderer().render(
+      view,
+      context: .init(identity: testIdentity("LazyScrollRoot"))
+    )
+
+    box.position.scrollBy(y: 1)
+
+    let scrolledArtifacts = DefaultRenderer().render(
+      view,
+      context: .init(identity: testIdentity("LazyScrollRoot")),
+      previousLifecycleState: initialArtifacts.commitPlan.nextLifecycleState
+    )
+
+    #expect(scrolledArtifacts.rasterSurface.lines.prefix(2) == ["Row 1", "Row 2"])
+    #expect(scrolledArtifacts.commitPlan.lifecycle.isEmpty)
+  }
+
+  @Test("lazy stacks scope focus and interaction to the visible viewport")
+  func lazyStacksScopeFocusAndInteractionToViewport() {
+    let visibleIdentity = testIdentity("VisibleButton")
+    let hiddenIdentity = testIdentity("HiddenButton")
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = visibleIdentity
+
+    let artifacts = DefaultRenderer().render(
+      ScrollView(.vertical, showsIndicators: false) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          Button("Visible") {}
+            .id(visibleIdentity)
+          Text("Spacer 1")
+          Text("Spacer 2")
+          Button("Hidden") {}
+            .id(hiddenIdentity)
+          Text("Tail")
+        }
+      }
+      .frame(width: 12, height: 1, alignment: .topLeading),
+      context: .init(
+        identity: testIdentity("ViewportScope"),
+        environmentValues: environmentValues
+      )
+    )
+
+    #expect(artifacts.rasterSurface.lines.first?.contains("Visible") == true)
+    #expect(artifacts.semanticSnapshot.focusRegions.map(\.identity).contains(visibleIdentity))
+    #expect(!artifacts.semanticSnapshot.focusRegions.map(\.identity).contains(hiddenIdentity))
+    #expect(artifacts.semanticSnapshot.interactionRegions.map(\.identity).contains(visibleIdentity))
+    #expect(!artifacts.semanticSnapshot.interactionRegions.map(\.identity).contains(hiddenIdentity))
+  }
+
   @Test("ScrollPosition helper APIs support incremental and absolute updates")
   func scrollPositionHelpersApplyDirectionalChanges() {
     var position = ScrollPosition.zero

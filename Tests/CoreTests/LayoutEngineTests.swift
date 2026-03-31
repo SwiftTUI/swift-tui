@@ -101,6 +101,181 @@ struct LayoutEngineTests {
     #expect(placed.children.map(\.bounds.origin.x) == [0, 2])
   }
 
+  @Test("lazy stack measurement matches eager stack measurement")
+  func lazyStackMeasurementMatchesEagerStackMeasurement() {
+    let engine = LayoutEngine()
+    let eager = stack(
+      "eager",
+      axis: .vertical,
+      children: [
+        leaf("row-0", size: .init(width: 2, height: 1)),
+        leaf("row-1", size: .init(width: 3, height: 1)),
+        leaf("row-2", size: .init(width: 1, height: 1)),
+      ]
+    )
+    let lazy = lazyStack(
+      "lazy",
+      axis: .vertical,
+      children: eager.children,
+      spacing: 0,
+      horizontalAlignment: .leading,
+      verticalAlignment: .top
+    )
+
+    let eagerMeasured = engine.measure(eager, proposal: .init(width: 8, height: 4))
+    let lazyMeasured = engine.measure(lazy, proposal: .init(width: 8, height: 4))
+
+    #expect(lazyMeasured.measuredSize == eagerMeasured.measuredSize)
+    #expect(
+      lazyMeasured.childMeasurements.map(\.measuredSize)
+        == eagerMeasured.childMeasurements.map(\.measuredSize))
+  }
+
+  @Test("lazy stack placement falls back without viewport context")
+  func lazyStackPlacementFallsBackWithoutViewportContext() {
+    let engine = LayoutEngine()
+    let lazy = lazyStack(
+      "lazy",
+      axis: .vertical,
+      children: [
+        leaf("row-0", size: .init(width: 2, height: 1)),
+        leaf("row-1", size: .init(width: 3, height: 1)),
+        leaf("row-2", size: .init(width: 1, height: 1)),
+      ],
+      spacing: 0,
+      horizontalAlignment: .leading,
+      verticalAlignment: .top
+    )
+
+    let measured = engine.measure(lazy, proposal: .init(width: 8, height: 4))
+    let placed = engine.place(lazy, measured: measured, origin: .zero)
+
+    #expect(placed.children.count == 3)
+    #expect(placed.children.map(\.bounds.origin.y) == [0, 1, 2])
+  }
+
+  @Test("lazy stack ignores viewport context on the wrong axis")
+  func lazyStackIgnoresViewportContextOnWrongAxis() {
+    let engine = LayoutEngine()
+    let lazy = lazyStack(
+      "lazy",
+      axis: .vertical,
+      children: [
+        leaf("row-0", size: .init(width: 2, height: 1)),
+        leaf("row-1", size: .init(width: 3, height: 1)),
+        leaf("row-2", size: .init(width: 1, height: 1)),
+      ],
+      spacing: 0,
+      horizontalAlignment: .leading,
+      verticalAlignment: .top
+    )
+
+    let measured = engine.measure(lazy, proposal: .init(width: 8, height: 4))
+    let passContext = LayoutPassContext(
+      retainedLayout: nil,
+      scrollViewportContext: .init(
+        axes: [.horizontal],
+        viewportRect: .init(origin: .zero, size: .init(width: 1, height: 4)),
+        contentOffset: .init(x: 1, y: 0)
+      )
+    )
+    let placed = engine.place(
+      lazy,
+      measured: measured,
+      in: .init(origin: .zero, size: measured.measuredSize),
+      passContext: passContext
+    )
+
+    #expect(placed.children.count == 3)
+    #expect(placed.children.map(\.bounds.origin.y) == [0, 1, 2])
+  }
+
+  @Test("lazy vertical stack places only the visible viewport range")
+  func lazyVerticalStackPlacesVisibleViewportRange() {
+    let engine = LayoutEngine()
+    let lazy = lazyStack(
+      "lazy",
+      axis: .vertical,
+      children: [
+        leaf("row-0", size: .init(width: 2, height: 1)),
+        leaf("row-1", size: .init(width: 3, height: 1)),
+        leaf("row-2", size: .init(width: 1, height: 1)),
+        leaf("row-3", size: .init(width: 4, height: 1)),
+        leaf("row-4", size: .init(width: 2, height: 1)),
+      ],
+      spacing: 0,
+      horizontalAlignment: .leading,
+      verticalAlignment: .top
+    )
+
+    let measured = engine.measure(lazy, proposal: .init(width: 8, height: 4))
+    let passContext = LayoutPassContext(
+      retainedLayout: nil,
+      scrollViewportContext: .init(
+        axes: [.vertical],
+        viewportRect: .init(origin: .zero, size: .init(width: 8, height: 1)),
+        contentOffset: .init(x: 0, y: 1)
+      )
+    )
+    let placed = engine.place(
+      lazy,
+      measured: measured,
+      in: .init(origin: .zero, size: measured.measuredSize),
+      passContext: passContext
+    )
+
+    #expect(
+      placed.children.map(\.identity) == [
+        testIdentity("row-0"),
+        testIdentity("row-1"),
+        testIdentity("row-2"),
+      ])
+    #expect(placed.children.map(\.bounds.origin.y) == [0, 1, 2])
+  }
+
+  @Test("lazy horizontal stack places only the visible viewport range")
+  func lazyHorizontalStackPlacesVisibleViewportRange() {
+    let engine = LayoutEngine()
+    let lazy = lazyStack(
+      "lazy",
+      axis: .horizontal,
+      children: [
+        leaf("column-0", size: .init(width: 1, height: 2)),
+        leaf("column-1", size: .init(width: 1, height: 3)),
+        leaf("column-2", size: .init(width: 1, height: 1)),
+        leaf("column-3", size: .init(width: 1, height: 4)),
+        leaf("column-4", size: .init(width: 1, height: 2)),
+      ],
+      spacing: 0,
+      horizontalAlignment: .leading,
+      verticalAlignment: .top
+    )
+
+    let measured = engine.measure(lazy, proposal: .init(width: 4, height: 8))
+    let passContext = LayoutPassContext(
+      retainedLayout: nil,
+      scrollViewportContext: .init(
+        axes: [.horizontal],
+        viewportRect: .init(origin: .zero, size: .init(width: 1, height: 8)),
+        contentOffset: .init(x: 1, y: 0)
+      )
+    )
+    let placed = engine.place(
+      lazy,
+      measured: measured,
+      in: .init(origin: .zero, size: measured.measuredSize),
+      passContext: passContext
+    )
+
+    #expect(
+      placed.children.map(\.identity) == [
+        testIdentity("column-0"),
+        testIdentity("column-1"),
+        testIdentity("column-2"),
+      ])
+    #expect(placed.children.map(\.bounds.origin.x) == [0, 1, 2])
+  }
+
   @Test("flexible frame resolves unspecified finite and infinite proposals")
   func flexibleFrameResolvesProposalKinds() {
     let engine = LayoutEngine()
@@ -287,6 +462,27 @@ private func leaf(
     layoutMetadata: layoutMetadata,
     drawPayload: drawPayload,
     intrinsicSize: size
+  )
+}
+
+private func lazyStack(
+  _ name: String,
+  axis: Axis,
+  children: [ResolvedNode],
+  spacing: Int?,
+  horizontalAlignment: HorizontalAlignment,
+  verticalAlignment: VerticalAlignment
+) -> ResolvedNode {
+  ResolvedNode(
+    identity: testIdentity(name),
+    kind: .view(axis == .horizontal ? "LazyHStack" : "LazyVStack"),
+    children: children,
+    layoutBehavior: .lazyStack(
+      axis: axis,
+      spacing: spacing,
+      horizontalAlignment: horizontalAlignment,
+      verticalAlignment: verticalAlignment
+    )
   )
 }
 

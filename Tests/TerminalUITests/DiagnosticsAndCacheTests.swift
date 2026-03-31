@@ -366,6 +366,9 @@ struct DiagnosticsAndCacheTests {
           Text("Row 2")
           Text("Row 3")
           Text("Row 4")
+          Text("Row 5")
+          Text("Row 6")
+          Text("Row 7")
         }
       }
       .frame(width: 12, height: 3, alignment: .topLeading)
@@ -387,6 +390,92 @@ struct DiagnosticsAndCacheTests {
     #expect(second.diagnostics.measuredNodesReused == second.diagnostics.measuredNodeCount)
     #expect(second.diagnostics.placedNodesComputed == first.diagnostics.placedNodesComputed)
     #expect(second.diagnostics.placedNodesReused == 0)
+  }
+
+  @Test("lazy stacks reduce placement work across scroll position changes")
+  func lazyStacksReducePlacementWorkAcrossScrollPositionChanges() {
+    final class ScrollPositionBox: @unchecked Sendable {
+      var position = ScrollPosition.zero
+    }
+
+    let eagerRenderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    let lazyRenderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    let eagerBox = ScrollPositionBox()
+    let lazyBox = ScrollPositionBox()
+
+    func makeEagerView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(
+          get: { eagerBox.position },
+          set: { eagerBox.position = $0 }
+        )
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Row 0")
+          Text("Row 1")
+          Text("Row 2")
+          Text("Row 3")
+          Text("Row 4")
+          Text("Row 5")
+          Text("Row 6")
+          Text("Row 7")
+        }
+      }
+      .frame(width: 12, height: 3, alignment: .topLeading)
+    }
+
+    func makeLazyView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(
+          get: { lazyBox.position },
+          set: { lazyBox.position = $0 }
+        )
+      ) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          Text("Row 0")
+          Text("Row 1")
+          Text("Row 2")
+          Text("Row 3")
+          Text("Row 4")
+          Text("Row 5")
+          Text("Row 6")
+          Text("Row 7")
+        }
+      }
+      .frame(width: 12, height: 3, alignment: .topLeading)
+    }
+
+    _ = eagerRenderer.render(
+      makeEagerView(),
+      context: .init(identity: testIdentity("EagerRoot"))
+    )
+    _ = lazyRenderer.render(
+      makeLazyView(),
+      context: .init(identity: testIdentity("LazyRoot"))
+    )
+
+    eagerBox.position.scrollBy(y: 1)
+    lazyBox.position.scrollBy(y: 1)
+
+    let eagerSecond = eagerRenderer.render(
+      makeEagerView(),
+      context: .init(identity: testIdentity("EagerRoot"))
+    )
+    let lazySecond = lazyRenderer.render(
+      makeLazyView(),
+      context: .init(identity: testIdentity("LazyRoot"))
+    )
+
+    #expect(eagerSecond.diagnostics.measuredNodesComputed == 0)
+    #expect(lazySecond.diagnostics.measuredNodesComputed == 0)
+    #expect(lazySecond.diagnostics.measuredNodesReused == lazySecond.diagnostics.measuredNodeCount)
+    #expect(lazySecond.diagnostics.placedNodeCount < eagerSecond.diagnostics.placedNodeCount)
   }
 
   @Test("default renderer invalidates changed subtrees even when identities stay stable")

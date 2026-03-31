@@ -160,6 +160,22 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
   }
 }
 
+package struct ScrollViewportContext: Equatable, Sendable {
+  package var axes: AxisSet
+  package var viewportRect: Rect
+  package var contentOffset: Point
+
+  package init(
+    axes: AxisSet,
+    viewportRect: Rect,
+    contentOffset: Point
+  ) {
+    self.axes = axes
+    self.viewportRect = viewportRect
+    self.contentOffset = contentOffset
+  }
+}
+
 package struct ResolvedTreeIndex: Sendable {
   package let nodesByIdentity: [Identity: ResolvedNode]
 
@@ -392,10 +408,15 @@ package struct RetainedLayoutSession: Sendable {
 // because the class has mutable stored properties without synchronization.
 package final class LayoutPassContext: @unchecked Sendable {
   package let retainedLayout: RetainedLayoutSession?
+  package var scrollViewportContext: ScrollViewportContext?
   package var workMetrics: LayoutWorkMetrics
 
-  package init(retainedLayout: RetainedLayoutSession? = nil) {
+  package init(
+    retainedLayout: RetainedLayoutSession? = nil,
+    scrollViewportContext: ScrollViewportContext? = nil
+  ) {
     self.retainedLayout = retainedLayout
+    self.scrollViewportContext = scrollViewportContext
     workMetrics = .init()
   }
 }

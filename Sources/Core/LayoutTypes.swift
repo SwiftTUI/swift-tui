@@ -7,6 +7,12 @@ public enum LayoutBehavior: Sendable {
     horizontalAlignment: HorizontalAlignment,
     verticalAlignment: VerticalAlignment
   )
+  case lazyStack(
+    axis: Axis,
+    spacing: Int?,
+    horizontalAlignment: HorizontalAlignment,
+    verticalAlignment: VerticalAlignment
+  )
   case overlay(alignment: Alignment)
   case padding(EdgeInsets)
   case frame(width: Int?, height: Int?, alignment: Alignment)
@@ -30,6 +36,14 @@ extension LayoutBehavior: Equatable {
     case (
       .stack(let lhsAxis, let lhsSpacing, let lhsHorizontalAlignment, let lhsVerticalAlignment),
       .stack(let rhsAxis, let rhsSpacing, let rhsHorizontalAlignment, let rhsVerticalAlignment)
+    ):
+      return lhsAxis == rhsAxis
+        && lhsSpacing == rhsSpacing
+        && lhsHorizontalAlignment == rhsHorizontalAlignment
+        && lhsVerticalAlignment == rhsVerticalAlignment
+    case (
+      .lazyStack(let lhsAxis, let lhsSpacing, let lhsHorizontalAlignment, let lhsVerticalAlignment),
+      .lazyStack(let rhsAxis, let rhsSpacing, let rhsHorizontalAlignment, let rhsVerticalAlignment)
     ):
       return lhsAxis == rhsAxis
         && lhsSpacing == rhsSpacing
@@ -261,15 +275,41 @@ public struct ChildAllocation: Equatable, Sendable {
 public struct ContainerAllocationSnapshot: Equatable, Sendable {
   public var childSizes: [ChildAllocation]
   public var selectedChildIndex: Int?
+  public var lazyStack: LazyStackAllocationSnapshot?
 
   public init(
     childSizes: [ChildAllocation] = [],
-    selectedChildIndex: Int? = nil
+    selectedChildIndex: Int? = nil,
+    lazyStack: LazyStackAllocationSnapshot? = nil
   ) {
     self.childSizes = childSizes
     self.selectedChildIndex = selectedChildIndex
+    self.lazyStack = lazyStack
   }
 }
+
+/// Allocation state captured for lazy stacks.
+public struct LazyStackAllocationSnapshot: Equatable, Sendable {
+  public var axis: Axis
+  public var childMainOffsets: [Int]
+  public var childMainLengths: [Int]
+  public var contentMainLength: Int
+
+  public init(
+    axis: Axis,
+    childMainOffsets: [Int] = [],
+    childMainLengths: [Int] = [],
+    contentMainLength: Int = 0
+  ) {
+    self.axis = axis
+    self.childMainOffsets = childMainOffsets
+    self.childMainLengths = childMainLengths
+    self.contentMainLength = contentMainLength
+  }
+}
+
+/// Viewport information used by lazy stack placement helpers.
+package typealias LazyStackViewportContext = ScrollViewportContext
 
 /// A resolved node after the measure phase has chosen concrete sizes.
 public struct MeasuredNode: Equatable, Sendable {

@@ -224,6 +224,21 @@ extension SnapshotRenderer {
       }
       let spacingDescription = spacing.map { String($0) } ?? "default"
       return "stack(\(axis.rawValue),\(spacingDescription),\(alignmentDescription))"
+    case .lazyStack(
+      let axis, let spacing, let horizontalAlignment, let verticalAlignment
+    ):
+      let alignmentDescription =
+        switch axis {
+        case .horizontal:
+          verticalAlignment.debugName
+        case .vertical:
+          horizontalAlignment.debugName
+        }
+      if let spacing, alignmentDescription == "center" {
+        return "lazyStack(\(axis.rawValue),\(spacing))"
+      }
+      let spacingDescription = spacing.map { String($0) } ?? "default"
+      return "lazyStack(\(axis.rawValue),\(spacingDescription),\(alignmentDescription))"
     case .padding(let insets):
       return "padding(\(insets.top),\(insets.leading),\(insets.bottom),\(insets.trailing))"
     case .frame(let width, let height, let alignment):

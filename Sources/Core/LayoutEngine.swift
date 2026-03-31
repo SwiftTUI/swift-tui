@@ -200,6 +200,7 @@ public struct LayoutEngine {
       resolved,
       measured: measured,
       in: Rect(origin: origin, size: measured.measuredSize),
+      viewportContext: passContext?.scrollViewportContext,
       passContext: passContext
     )
   }
@@ -210,10 +211,27 @@ public struct LayoutEngine {
     in bounds: Rect,
     passContext: LayoutPassContext?
   ) -> PlacedNode {
+    place(
+      resolved,
+      measured: measured,
+      in: bounds,
+      viewportContext: passContext?.scrollViewportContext,
+      passContext: passContext
+    )
+  }
+
+  package func place(
+    _ resolved: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: Rect,
+    viewportContext: LazyStackViewportContext?,
+    passContext: LayoutPassContext? = nil
+  ) -> PlacedNode {
     if let retained = retainedPlacement(
       for: resolved,
       measured: measured,
       bounds: bounds,
+      viewportContext: viewportContext,
       retainedLayout: passContext?.retainedLayout
     ) {
       passContext?.workMetrics.placedNodesReused += countPlacedNodes(retained)
@@ -234,6 +252,7 @@ public struct LayoutEngine {
       for: resolved,
       measured: measured,
       in: bounds,
+      viewportContext: viewportContext,
       passContext: passContext
     )
 
@@ -265,6 +284,18 @@ public struct LayoutEngine {
         measure(child, proposal: parentProposal, passContext: passContext)
       }
     case .stack(
+      let axis, let spacing,
+      horizontalAlignment: _,
+      verticalAlignment: _
+    ):
+      return measureStackChildren(
+        for: resolved,
+        parentProposal: parentProposal,
+        axis: axis,
+        spacing: spacing,
+        passContext: passContext
+      )
+    case .lazyStack(
       let axis, let spacing,
       horizontalAlignment: _,
       verticalAlignment: _
@@ -430,7 +461,51 @@ public struct LayoutEngine {
         width: crossMetrics.leading + crossMetrics.trailing,
         height: contentHeight + totalSpacing
       )
+    case .lazyStack(
+      axis: .vertical, let spacing, let horizontalAlignment,
+      verticalAlignment: _
+    ):
+      let stackSpacings = resolvedStackSpacings(
+        for: resolved.children,
+        axis: .vertical,
+        spacingOverride: spacing
+      )
+      let crossMetrics = stackCrossMetrics(
+        for: resolved.children,
+        childMeasurements: childMeasurements,
+        axis: .vertical,
+        horizontalAlignment: horizontalAlignment,
+        verticalAlignment: .center
+      )
+      let contentHeight = childMeasurements.reduce(0) { $0 + $1.measuredSize.height }
+      let totalSpacing = stackSpacings.reduce(0, +)
+      return Size(
+        width: crossMetrics.leading + crossMetrics.trailing,
+        height: contentHeight + totalSpacing
+      )
     case .stack(
+      axis: .horizontal, let spacing,
+      horizontalAlignment: _, let verticalAlignment
+    ):
+      let stackSpacings = resolvedStackSpacings(
+        for: resolved.children,
+        axis: .horizontal,
+        spacingOverride: spacing
+      )
+      let crossMetrics = stackCrossMetrics(
+        for: resolved.children,
+        childMeasurements: childMeasurements,
+        axis: .horizontal,
+        horizontalAlignment: .center,
+        verticalAlignment: verticalAlignment
+      )
+      let totalWidth = childMeasurements.reduce(0) { $0 + $1.measuredSize.width }
+      let totalSpacing = stackSpacings.reduce(0, +)
+      return Size(
+        width: totalWidth + totalSpacing,
+        height: crossMetrics.leading + crossMetrics.trailing
+      )
+    case .lazyStack(
       axis: .horizontal, let spacing,
       horizontalAlignment: _, let verticalAlignment
     ):
@@ -774,8 +849,13 @@ public struct LayoutEngine {
     for resolved: ResolvedNode,
     measured: MeasuredNode,
     bounds: Rect,
+    viewportContext: LazyStackViewportContext?,
     retainedLayout: RetainedLayoutSession?
   ) -> PlacedNode? {
+    if viewportContext != nil, case .lazyStack = resolved.layoutBehavior {
+      return nil
+    }
+
     guard let retainedLayout,
       !retainedLayout.isDirectlyInvalidated(resolved.identity),
       !retainedLayout.hasSyntheticInvalidatedAncestor(resolved.identity),

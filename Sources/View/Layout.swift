@@ -10,6 +10,7 @@ private struct LayoutSubviewPlacementRecord {
   var position: LayoutPoint
   var anchor: UnitPoint
   var proposal: ProposedViewSize
+  var viewportContext: ScrollViewportContext?
 }
 
 private final class LayoutSubviewPlacementRecorder {
@@ -86,9 +87,28 @@ public struct LayoutSubview {
     anchor: UnitPoint = .topLeading,
     proposal: ProposedViewSize
   ) {
+    place(
+      at: position,
+      anchor: anchor,
+      proposal: proposal,
+      viewportContext: nil
+    )
+  }
+
+  package func place(
+    at position: LayoutPoint,
+    anchor: UnitPoint = .topLeading,
+    proposal: ProposedViewSize,
+    viewportContext: ScrollViewportContext?
+  ) {
     placementRecorder?.record(
       identity: child.identity,
-      placement: .init(position: position, anchor: anchor, proposal: proposal)
+      placement: .init(
+        position: position,
+        anchor: anchor,
+        proposal: proposal,
+        viewportContext: viewportContext
+      )
     )
   }
 }
@@ -664,7 +684,8 @@ private final class LayoutProxyBox: CustomLayoutProxy, @unchecked Sendable {
             anchor: placement.anchor
           ),
           size: childMeasurement.measuredSize
-        )
+        ),
+        viewportContext: placement.viewportContext
       )
     }
   }

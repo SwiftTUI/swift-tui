@@ -13,7 +13,8 @@ It provides:
 - state and data flow through ``State``, ``Binding``, and ``Bindable``
 - environment and focused-value access through ``EnvironmentValues``, ``EnvironmentReader``, ``GeometryReader``, ``FocusedValue``, and ``FocusedBinding``
 - focus coordination through ``FocusState``
-- layout composition through ``Layout``, ``AnyLayout``, and the built-in stack layouts
+- layout composition through ``Layout``, ``AnyLayout``, the built-in stack layouts,
+  and viewport-lazy containers such as ``LazyVStack`` and ``LazyHStack``
 - the controls, containers, metrics, and modifiers that make up most authored terminal interfaces, including single-line and multiline text entry, split navigation, tab shells, and terminal-native alert or confirmation presentation
 
 `View` is intentionally close to SwiftUI in shape. The goal is not to expose a terminal-specific DSL. The goal is to preserve the parts of SwiftUI that make large UI codebases composable and predictable while still targeting cell-based rendering.
@@ -60,6 +61,8 @@ The public surface ends at authored views, layouts, and environment-driven modif
 - ``AnyLayout``
 - ``HStackLayout``
 - ``VStackLayout``
+- ``LazyVStack``
+- ``LazyHStack``
 - ``ZStackLayout``
 
 ### Guides

@@ -49,7 +49,7 @@ extension LayoutEngine {
         return .unspecified
       }
       return effectiveProposal
-    case .stack, .overlay, .padding, .decoration, .viewThatFits, .custom:
+    case .stack, .lazyStack, .overlay, .padding, .decoration, .viewThatFits, .custom:
       return .unspecified
     case .frame(let width, let height, _):
       return ProposedSize(
@@ -150,11 +150,25 @@ extension LayoutEngine {
       chosenChildIndex = nil
     }
 
+    let lazyStackSnapshot: LazyStackAllocationSnapshot?
+    switch resolved.layoutBehavior {
+    case .lazyStack(let axis, let spacing, _, _):
+      lazyStackSnapshot = lazyStackAllocationSnapshot(
+        for: resolved,
+        childMeasurements: childMeasurements,
+        axis: axis,
+        spacingOverride: spacing
+      )
+    default:
+      lazyStackSnapshot = nil
+    }
+
     return ContainerAllocationSnapshot(
       childSizes: childMeasurements.map {
         ChildAllocation(identity: $0.identity, size: $0.measuredSize)
       },
-      selectedChildIndex: chosenChildIndex
+      selectedChildIndex: chosenChildIndex,
+      lazyStack: lazyStackSnapshot
     )
   }
 }

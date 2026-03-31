@@ -1660,6 +1660,65 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("ScrollView without an explicit position binding manages pointer scrolling with LazyVStack")
+  func scrollViewWithoutExplicitPositionHandlesPointerScrollingWithLazyVStack() async throws {
+    let terminalSize = Size(width: 20, height: 8)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("ImplicitPointerLazyScrollFixture")
+    let view =
+      ScrollView(.vertical) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<10) { index in
+            Text("Mouse \(index)")
+          }
+        }
+      }
+      .id(testIdentity("ImplicitPointerLazyScrollFixture", "Scroll"))
+      .frame(width: 10, height: 5, alignment: .topLeading)
+
+    let scrollRect = try #require(
+      renderedInteractionRect(
+        for: primaryRouteID(for: testIdentity("ImplicitPointerLazyScrollFixture", "Scroll")),
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+    let indicatorRect = try #require(
+      renderedInteractionRect(
+        for: primaryRouteID(
+          for: verticalScrollIndicatorIdentity(
+            for: testIdentity("ImplicitPointerLazyScrollFixture", "Scroll")
+          )
+        ),
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: centerPoint(of: scrollRect))),
+        .mouse(.init(kind: .down(.primary), location: bottomPoint(of: indicatorRect))),
+        .mouse(.init(kind: .up(.primary), location: bottomPoint(of: indicatorRect))),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    let firstFrame = try #require(terminal.frames.first)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(firstFrame.contains("Mouse 0"))
+    #expect(!lastFrame.contains("Mouse 0"))
+    #expect(lastFrame.contains("Mouse 5"))
+    #expect(lastFrame.contains("Mouse 9"))
+  }
+
+  @MainActor
   @Test("button drag-out cancel prevents activation")
   func mouseDragOutCancelsButtonActivation() async throws {
     let box = MouseControlBox()
@@ -1771,6 +1830,71 @@ struct InteractiveRuntimeTests {
         )
       ) {
         VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<30) { index in
+            Text("Burst \(index)")
+          }
+        }
+      }
+      .id(scrollIdentity)
+      .frame(width: 12, height: 4, alignment: .topLeading)
+
+    let scrollRect = try #require(
+      renderedInteractionRect(
+        for: primaryRouteID(for: scrollIdentity),
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let events = (0..<20).map { _ in
+      InputEvent.mouse(
+        .init(
+          kind: .scrolled(deltaX: 0, deltaY: 1),
+          location: centerPoint(of: scrollRect)
+        )
+      )
+    }
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: events,
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(result.renderedFrames <= 6)
+    #expect(box.position.y == 20)
+  }
+
+  @MainActor
+  @Test("run loop collapses queued scroll bursts through LazyVStack content")
+  func runLoopBatchesQueuedScrollBurstsWithLazyStacks() async throws {
+    final class ScrollPositionBox: @unchecked Sendable {
+      var position = ScrollPosition.zero
+    }
+
+    let box = ScrollPositionBox()
+    let terminalSize = Size(width: 24, height: 10)
+    let terminal = RecordingTerminalHost(
+      surfaceSizeProvider: { terminalSize },
+      presentObserver: {
+        usleep(5_000)
+      }
+    )
+    let rootIdentity = testIdentity("BurstLazyScrollFixture")
+    let scrollIdentity = testIdentity("BurstLazyScrollFixture", "Scroll")
+    let view =
+      ScrollView(
+        .vertical,
+        position: Binding(
+          get: { box.position },
+          set: { box.position = $0 }
+        )
+      ) {
+        LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(0..<30) { index in
             Text("Burst \(index)")
           }
