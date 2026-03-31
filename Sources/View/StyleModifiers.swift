@@ -74,11 +74,19 @@ extension View {
   }
 
   public func foregroundStyle<S: ShapeStyle>(_ style: S) -> some View {
-    environment(\.foregroundStyle, AnyShapeStyle(style))
+    EnvironmentWritingModifier(
+      content: self,
+      keyPath: \.foregroundStyle,
+      value: AnyShapeStyle(style)
+    )
   }
 
   public func tint<S: ShapeStyle>(_ style: S) -> some View {
-    environment(\.tintStyle, AnyShapeStyle(style))
+    EnvironmentWritingModifier(
+      content: self,
+      keyPath: \.tintStyle,
+      value: AnyShapeStyle(style)
+    )
   }
 
   public func tint<S: ShapeStyle>(_ style: S?) -> some View {

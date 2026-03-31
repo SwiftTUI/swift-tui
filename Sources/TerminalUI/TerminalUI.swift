@@ -154,6 +154,9 @@ public struct DefaultRenderer {
         in: resolveContext
       )
     }
+    #if canImport(WASILibc)
+      print("[render] resolved")
+    #endif
     let layoutPassContext = LayoutPassContext(
       retainedLayout: retainedFrames.layoutSession(
         invalidatedIdentities: context.invalidatedIdentities
@@ -173,6 +176,9 @@ public struct DefaultRenderer {
         passContext: layoutPassContext
       )
     }
+    #if canImport(WASILibc)
+      print("[render] measured")
+    #endif
     let (placed, placeDuration) = measurePhase {
       layoutEngine.place(
         resolved,
@@ -180,15 +186,27 @@ public struct DefaultRenderer {
         passContext: layoutPassContext
       )
     }
+    #if canImport(WASILibc)
+      print("[render] placed")
+    #endif
     let (semantics, semanticsDuration) = measurePhase {
       semanticExtractor.extract(from: placed)
     }
+    #if canImport(WASILibc)
+      print("[render] semantics")
+    #endif
     let (draw, drawDuration) = measurePhase {
       drawExtractor.extract(from: placed)
     }
+    #if canImport(WASILibc)
+      print("[render] draw")
+    #endif
     let (raster, rasterDuration) = measurePhase {
       rasterizer.rasterize(draw)
     }
+    #if canImport(WASILibc)
+      print("[render] raster")
+    #endif
     let (commit, commitDuration) = measurePhase {
       commitPlanner.plan(
         resolved: resolved,
@@ -198,6 +216,9 @@ public struct DefaultRenderer {
         previousLifecycleState: frameContext.previousLifecycleState
       )
     }
+    #if canImport(WASILibc)
+      print("[render] commit")
+    #endif
     let phaseTimings = FramePhaseTimings(
       resolve: resolveDuration,
       measure: measureDuration,

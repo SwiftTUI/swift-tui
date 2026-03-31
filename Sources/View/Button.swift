@@ -92,16 +92,47 @@ extension Button {
       )
     }
 
-    let body = buttonBody(
-      buttonStyle: buttonStyle,
-      chrome: chrome,
-      chromePreset: styleEnvironment.chromePreset,
-      prominence: effectiveProminence,
-      borderShape: context.environmentValues.buttonBorderShape
-    )
-    let child = body.resolve(
-      in: context.child(component: .named("ButtonBody"))
-    )
+    #if canImport(WASILibc)
+      print("[button] style=\(buttonStyle)")
+    #endif
+    let childContext = context.child(component: .named("ButtonBody"))
+    let child: ResolvedNode
+    switch buttonStyle {
+    case .plain:
+      #if canImport(WASILibc)
+        print("[button] resolving plain body")
+      #endif
+      child = ButtonPlainBody(
+        label: label,
+        chrome: chrome
+      )
+      .resolve(in: childContext)
+    case .link:
+      #if canImport(WASILibc)
+        print("[button] resolving link body")
+      #endif
+      child = ButtonLinkBody(
+        label: label,
+        chrome: chrome
+      )
+      .resolve(in: childContext)
+    case .automatic, .bordered, .borderedProminent:
+      #if canImport(WASILibc)
+        print("[button] resolving chrome body")
+      #endif
+      child = ButtonChromeBody(
+        label: label,
+        chrome: chrome,
+        buttonStyle: buttonStyle,
+        chromePreset: styleEnvironment.chromePreset,
+        prominence: effectiveProminence,
+        borderShape: context.environmentValues.buttonBorderShape
+      )
+      .resolve(in: childContext)
+    }
+    #if canImport(WASILibc)
+      print("[button] child resolved")
+    #endif
 
     return ResolvedNode(
       identity: context.identity,
@@ -115,107 +146,135 @@ extension Button {
       )
     )
   }
+}
 
-  @ViewBuilder
-  private func buttonBody(
-    buttonStyle: ButtonStyle,
-    chrome: ControlChrome,
-    chromePreset: ChromePreset,
-    prominence: ControlProminence,
-    borderShape: ButtonBorderShape
-  ) -> some View {
-    let baseLabel =
-      label
+private struct ButtonPlainBody<Label: View>: View {
+  var label: Label
+  var chrome: ControlChrome
+
+  var body: some View {
+    label
       .foregroundStyle(chrome.foregroundStyle)
       .drawMetadata(.init(opacity: chrome.opacity))
+  }
+}
 
-    switch buttonStyle {
-    case .plain:
-      baseLabel
-    case .link:
-      baseLabel
-        .underline()
-        .background {
-          Rectangle().fill(chrome.backgroundStyle)
-        }
-    case .automatic, .bordered, .borderedProminent:
-      let usesDenseBorderlessChrome =
-        chromePreset == .standard && buttonStyle != .bordered
-      let styledLabel =
-        baseLabel
-        .padding(
-          .init(
-            horizontal: 1,
-            vertical: chromePreset == .legacy || buttonStyle == .bordered ? 1 : 0
-          )
-        )
-        .background {
-          buttonBackground(
-            usesDenseBorderlessChrome: usesDenseBorderlessChrome,
-            prominence: prominence,
-            borderShape: borderShape,
-            style: chrome.backgroundStyle
-          )
-        }
-        .overlay {
-          if !usesDenseBorderlessChrome {
-            buttonBorder(
-              prominence: prominence,
-              borderShape: borderShape,
-              style: chrome.borderStyle,
-              backgroundStyle: chrome.borderBackgroundStyle
-            )
-          }
-        }
+private struct ButtonLinkBody<Label: View>: View {
+  var label: Label
+  var chrome: ControlChrome
 
-      if chromePreset == .standard && buttonStyle != .bordered {
-        styledLabel
-      } else {
-        styledLabel.layoutMetadata(.init(minimumHeight: 3))
-      }
+  var body: some View {
+    ButtonPlainBody(
+      label: label,
+      chrome: chrome
+    )
+    .underline()
+    .background {
+      Rectangle().fill(.tint)
     }
   }
+}
+
+private struct ButtonChromeBody<Label: View>: View {
+  var label: Label
+  var chrome: ControlChrome
+  var buttonStyle: ButtonStyle
+  var chromePreset: ChromePreset
+  var prominence: ControlProminence
+  var borderShape: ButtonBorderShape
+
+  private var usesDenseBorderlessChrome: Bool {
+    chromePreset == .standard && buttonStyle != .bordered
+  }
+
+  private var verticalPadding: Int {
+    chromePreset == .legacy || buttonStyle == .bordered ? 1 : 0
+  }
+
+  private var needsMinimumHeight: Bool {
+    chromePreset != .standard || buttonStyle == .bordered
+  }
+
+  var body: some View {
+    let styledLabel =
+      ButtonPlainBody(
+        label: label,
+        chrome: chrome
+      )
+      .padding(
+        .init(
+          horizontal: 1,
+          vertical: verticalPadding
+        )
+      )
+      .background {
+        ButtonChromeBackground(
+          chrome: chrome,
+          usesDenseBorderlessChrome: usesDenseBorderlessChrome,
+          prominence: prominence,
+          borderShape: borderShape
+        )
+      }
+      .overlay {
+        if !usesDenseBorderlessChrome {
+          ButtonChromeBorder(
+            chrome: chrome,
+            prominence: prominence,
+            borderShape: borderShape
+          )
+        }
+      }
+
+    if needsMinimumHeight {
+      styledLabel.layoutMetadata(.init(minimumHeight: 3))
+    } else {
+      styledLabel
+    }
+  }
+}
+
+private struct ButtonChromeBackground: View {
+  var chrome: ControlChrome
+  var usesDenseBorderlessChrome: Bool
+  var prominence: ControlProminence
+  var borderShape: ButtonBorderShape
 
   @ViewBuilder
-  private func buttonBackground(
-    usesDenseBorderlessChrome: Bool,
-    prominence: ControlProminence,
-    borderShape: ButtonBorderShape,
-    style: AnyShapeStyle
-  ) -> some View {
+  var body: some View {
     switch (borderShape, prominence) {
     case (.roundedRectangle, _), (.automatic, .increased):
       if usesDenseBorderlessChrome {
-        RoundedRectangle(cornerRadius: 1).fill(style)
+        RoundedRectangle(cornerRadius: 1).fill(chrome.backgroundStyle)
       } else {
-        RoundedRectangle(cornerRadius: 1).chromeFill(style)
+        RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
       }
     default:
       if usesDenseBorderlessChrome {
-        Rectangle().fill(style)
+        Rectangle().fill(chrome.backgroundStyle)
       } else {
-        Rectangle().chromeFill(style)
+        Rectangle().chromeFill(chrome.backgroundStyle)
       }
     }
   }
+}
+
+private struct ButtonChromeBorder: View {
+  var chrome: ControlChrome
+  var prominence: ControlProminence
+  var borderShape: ButtonBorderShape
 
   @ViewBuilder
-  private func buttonBorder(
-    prominence: ControlProminence,
-    borderShape: ButtonBorderShape,
-    style: AnyShapeStyle,
-    backgroundStyle: AnyShapeStyle?
-  ) -> some View {
+  var body: some View {
     switch (borderShape, prominence) {
     case (.roundedRectangle, _), (.automatic, .increased):
       RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-        style,
-        backgroundStyle: backgroundStyle
+        chrome.borderStyle,
+        backgroundStyle: chrome.borderBackgroundStyle
       )
     default:
       Rectangle().chromeStrokeBorder(
-        style,
-        backgroundStyle: backgroundStyle
+        chrome.borderStyle,
+        backgroundStyle: chrome.borderBackgroundStyle
       )
     }
   }

@@ -662,28 +662,7 @@ private func resolveWrapperContent<Content: View>(
   _ content: Content,
   in context: ResolveContext
 ) -> ResolvedNode {
-  let resolvedElements = content.resolveElements(in: context)
-
-  switch resolvedElements.count {
-  case 0:
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("EmptyView"),
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      intrinsicSize: .zero
-    )
-  case 1:
-    return resolvedElements[0]
-  default:
-    return ResolvedNode(
-      identity: context.identity,
-      kind: .view("Group"),
-      children: resolvedElements,
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction
-    )
-  }
+  resolveView(content, in: context)
 }
 
 package struct BackgroundView<Base: View, BackgroundContent: View>: View, ResolvableView {

@@ -1,6 +1,27 @@
 import TerminalUI
 import TerminalUICharts
 
+private struct StyledLabel<Content: View>: View {
+  var content: Content
+
+  var body: some View {
+    let style = AnyShapeStyle(.foreground)
+    content
+      .foregroundStyle(style)
+  }
+}
+
+private struct DecoratedLabel<Content: View>: View {
+  var content: Content
+
+  var body: some View {
+    StyledLabel(content: content)
+      .background {
+        Rectangle().fill(.tint)
+      }
+  }
+}
+
 struct GalleryDemoSceneView: View {
   @Bindable var model: GalleryDemoModel
   @State var pickerScratch: String = "one"
@@ -11,6 +32,17 @@ struct GalleryDemoSceneView: View {
       Text("Active tab: \(model.activeTab.capitalized)")
       Text("The full interactive gallery remains available in the native example target.")
         .foregroundStyle(.separator)
+      Text("Pseudo button")
+        .padding(.init(horizontal: 1, vertical: 0))
+        .background {
+          Rectangle().fill(.tint)
+        }
+        .overlay {
+          if false {
+            Rectangle().fill(Color.red)
+          }
+        }
+      Button("Default button")
     }
     .padding(1)
   }
