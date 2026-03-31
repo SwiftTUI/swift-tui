@@ -5,11 +5,15 @@ public struct CommitPlanner {
   /// Plans lifecycle and handler-installation work for a frame.
   public func plan(
     resolved: ResolvedNode,
+    placed: PlacedNode? = nil,
     semantics: SemanticSnapshot,
     transaction: TransactionSnapshot = .init(),
     previousLifecycleState: CommittedLifecycleState? = nil
   ) -> CommitPlan {
-    let nextLifecycleState = lifecycleState(from: resolved)
+    let nextLifecycleState = lifecycleState(
+      from: resolved,
+      placed: placed
+    )
     let lifecycle = lifecycleDiff(
       previous: previousLifecycleState ?? .init(),
       next: nextLifecycleState
@@ -27,11 +31,50 @@ public struct CommitPlanner {
   }
 
   private func lifecycleState(
-    from resolved: ResolvedNode
+    from resolved: ResolvedNode,
+    placed: PlacedNode?
   ) -> CommittedLifecycleState {
     var nodes: [CommittedLifecycleNode] = []
-    resolved.collectLifecycleNodes(into: &nodes)
+    collectLifecycleNodes(
+      from: resolved,
+      placed: placed,
+      into: &nodes
+    )
     return .init(nodes: nodes)
+  }
+
+  private func collectLifecycleNodes(
+    from resolved: ResolvedNode,
+    placed: PlacedNode?,
+    into nodes: inout [CommittedLifecycleNode]
+  ) {
+    if resolved.usesIndexedChildSource,
+      let placed
+    {
+      placed.collectLifecycleNodes(into: &nodes)
+      return
+    }
+
+    if !resolved.lifecycleMetadata.isEmpty {
+      nodes.append(
+        CommittedLifecycleNode(
+          identity: resolved.identity,
+          appearHandlerIDs: resolved.lifecycleMetadata.appearHandlerIDs,
+          disappearHandlerIDs: resolved.lifecycleMetadata.disappearHandlerIDs,
+          task: resolved.lifecycleMetadata.task
+        )
+      )
+    }
+
+    for (index, child) in resolved.children.enumerated() {
+      collectLifecycleNodes(
+        from: child,
+        placed: placed?.children.indices.contains(index) == true
+          ? placed?.children[index]
+          : nil,
+        into: &nodes
+      )
+    }
   }
 
   private func lifecycleDiff(

@@ -28,12 +28,12 @@ public struct ForEach<Data, ID, Content>: View, ResolvableView
 where Data: RandomAccessCollection, ID: Hashable, Content: View {
   public var data: Data
   public var id: KeyPath<Data.Element, ID>
-  private let content: (Data.Element) -> Content
+  package let content: @MainActor (Data.Element) -> Content
 
   public init(
     _ data: Data,
     id: KeyPath<Data.Element, ID>,
-    @ViewBuilder content: @escaping (Data.Element) -> Content
+    @ViewBuilder content: @escaping @MainActor (Data.Element) -> Content
   ) {
     self.data = data
     self.id = id
@@ -58,7 +58,7 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
 extension ForEach where Data.Element: Identifiable, ID == Data.Element.ID {
   public init(
     _ data: Data,
-    @ViewBuilder content: @escaping (Data.Element) -> Content
+    @ViewBuilder content: @escaping @MainActor (Data.Element) -> Content
   ) {
     self.init(data, id: \.id, content: content)
   }
@@ -67,7 +67,7 @@ extension ForEach where Data.Element: Identifiable, ID == Data.Element.ID {
 extension ForEach where Data == Range<Int>, ID == Int {
   public init(
     _ data: Range<Int>,
-    @ViewBuilder content: @escaping (Int) -> Content
+    @ViewBuilder content: @escaping @MainActor (Int) -> Content
   ) {
     self.init(data, id: \.self, content: content)
   }
@@ -574,6 +574,32 @@ public struct LazyVStack<Content: View>: View, ResolvableView {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let childContext = context.indexedChild(
+      kind: .init(rawValue: "LazyVStack"),
+      index: 0
+    )
+    if let source = makeIndexedChildSource(
+      from: content,
+      in: childContext
+    ) {
+      context.recordResolvedComputation()
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("LazyVStack"),
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .lazyStack(
+            axis: .vertical,
+            spacing: spacing,
+            horizontalAlignment: alignment,
+            verticalAlignment: .center
+          ),
+          indexedChildSource: source
+        )
+      ]
+    }
+
     let resolvedChildren = resolveDeclaredChildren(
       content,
       in: context,
@@ -624,6 +650,32 @@ public struct LazyHStack<Content: View>: View, ResolvableView {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let childContext = context.indexedChild(
+      kind: .init(rawValue: "LazyHStack"),
+      index: 0
+    )
+    if let source = makeIndexedChildSource(
+      from: content,
+      in: childContext
+    ) {
+      context.recordResolvedComputation()
+      return [
+        ResolvedNode(
+          identity: context.identity,
+          kind: .view("LazyHStack"),
+          environmentSnapshot: context.environment,
+          transactionSnapshot: context.transaction,
+          layoutBehavior: .lazyStack(
+            axis: .horizontal,
+            spacing: spacing,
+            horizontalAlignment: .center,
+            verticalAlignment: alignment
+          ),
+          indexedChildSource: source
+        )
+      ]
+    }
+
     let resolvedChildren = resolveDeclaredChildren(
       content,
       in: context,

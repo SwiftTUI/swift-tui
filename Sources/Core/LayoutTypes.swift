@@ -294,17 +294,23 @@ public struct LazyStackAllocationSnapshot: Equatable, Sendable {
   public var childMainOffsets: [Int]
   public var childMainLengths: [Int]
   public var contentMainLength: Int
+  public var crossLeading: Int
+  public var crossTrailing: Int
 
   public init(
     axis: Axis,
     childMainOffsets: [Int] = [],
     childMainLengths: [Int] = [],
-    contentMainLength: Int = 0
+    contentMainLength: Int = 0,
+    crossLeading: Int = 0,
+    crossTrailing: Int = 0
   ) {
     self.axis = axis
     self.childMainOffsets = childMainOffsets
     self.childMainLengths = childMainLengths
     self.contentMainLength = contentMainLength
+    self.crossLeading = crossLeading
+    self.crossTrailing = crossTrailing
   }
 }
 

@@ -236,13 +236,14 @@ extension LayoutEngine {
     verticalAlignment: VerticalAlignment,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
+    let stackChildren = stackChildren(for: resolved)
     let stackSpacings = resolvedStackSpacings(
-      for: resolved.children,
+      for: stackChildren,
       axis: axis,
       spacingOverride: spacing
     )
     let crossMetrics = stackCrossMetrics(
-      for: resolved.children,
+      for: stackChildren,
       childMeasurements: measured.childMeasurements,
       axis: axis,
       horizontalAlignment: horizontalAlignment,
@@ -260,11 +261,11 @@ extension LayoutEngine {
           }
         }
         let dimensions = viewDimensions(
-          for: resolved.children[index],
+          for: stackChildren[index],
           measured: childMeasurement
         )
         return place(
-          resolved.children[index],
+          stackChildren[index],
           measured: childMeasurement,
           in: Rect(
             origin: Point(
@@ -287,11 +288,11 @@ extension LayoutEngine {
           }
         }
         let dimensions = viewDimensions(
-          for: resolved.children[index],
+          for: stackChildren[index],
           measured: childMeasurement
         )
         return place(
-          resolved.children[index],
+          stackChildren[index],
           measured: childMeasurement,
           in: Rect(
             origin: Point(
@@ -318,6 +319,35 @@ extension LayoutEngine {
     viewportContext: LazyStackViewportContext?,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
+    if let source = resolved.indexedChildSource,
+      let allocation = measured.containerAllocationSnapshot,
+      let snapshot = allocation.lazyStack,
+      allocation.childSizes.count == source.count
+    {
+      let visibleRange =
+        viewportContext.flatMap {
+          lazyStackVisibleChildRange(
+            for: snapshot,
+            viewportContext: $0,
+            overscan: 0
+          )
+        } ?? (0..<source.count)
+
+      return placeIndexedLazyStackChildren(
+        source: source,
+        childSizes: allocation.childSizes,
+        measured: measured,
+        in: bounds,
+        axis: axis,
+        horizontalAlignment: horizontalAlignment,
+        verticalAlignment: verticalAlignment,
+        snapshot: snapshot,
+        visibleRange: visibleRange,
+        passContext: passContext
+      )
+    }
+
+    let stackChildren = stackChildren(for: resolved)
     guard let viewportContext else {
       return placeStackChildren(
         for: resolved,
@@ -363,7 +393,7 @@ extension LayoutEngine {
     }
 
     let crossMetrics = stackCrossMetrics(
-      for: resolved.children,
+      for: stackChildren,
       childMeasurements: measured.childMeasurements,
       axis: axis,
       horizontalAlignment: horizontalAlignment,
@@ -375,13 +405,13 @@ extension LayoutEngine {
       return visibleRange.map { index in
         let childMeasurement = measured.childMeasurements[index]
         let dimensions = viewDimensions(
-          for: resolved.children[index],
+          for: stackChildren[index],
           measured: childMeasurement
         )
         let childOriginY =
           bounds.origin.y + snapshot.childMainOffsets[index]
         return place(
-          resolved.children[index],
+          stackChildren[index],
           measured: childMeasurement,
           in: Rect(
             origin: Point(
@@ -397,13 +427,13 @@ extension LayoutEngine {
       return visibleRange.map { index in
         let childMeasurement = measured.childMeasurements[index]
         let dimensions = viewDimensions(
-          for: resolved.children[index],
+          for: stackChildren[index],
           measured: childMeasurement
         )
         let childOriginX =
           bounds.origin.x + snapshot.childMainOffsets[index]
         return place(
-          resolved.children[index],
+          stackChildren[index],
           measured: childMeasurement,
           in: Rect(
             origin: Point(
@@ -418,14 +448,78 @@ extension LayoutEngine {
     }
   }
 
+  private func placeIndexedLazyStackChildren(
+    source: any IndexedChildSource,
+    childSizes: [ChildAllocation],
+    measured: MeasuredNode,
+    in bounds: Rect,
+    axis: Axis,
+    horizontalAlignment: HorizontalAlignment,
+    verticalAlignment: VerticalAlignment,
+    snapshot: LazyStackAllocationSnapshot,
+    visibleRange: Range<Int>,
+    passContext: LayoutPassContext?
+  ) -> [PlacedNode] {
+    visibleRange.map { index in
+      let child = source.child(at: index)
+      let childSize = childSizes[index].size
+      var childMeasurement = measure(
+        child,
+        proposal: stackProposal(
+          axis: axis,
+          main: .finite(mainDimension(of: childSize, for: axis)),
+          cross: crossDimension(of: measured.proposal, for: axis)
+        ),
+        passContext: passContext
+      )
+      if isSpacer(child) {
+        childMeasurement.measuredSize = settingMainDimension(
+          of: childMeasurement.measuredSize,
+          for: axis,
+          to: mainDimension(of: childSize, for: axis)
+        )
+      }
+      let dimensions = viewDimensions(
+        for: child,
+        measured: childMeasurement
+      )
+
+      let origin: Point =
+        switch axis {
+        case .vertical:
+          .init(
+            x: bounds.origin.x + snapshot.crossLeading - dimensions[horizontalAlignment],
+            y: bounds.origin.y + snapshot.childMainOffsets[index]
+          )
+        case .horizontal:
+          .init(
+            x: bounds.origin.x + snapshot.childMainOffsets[index],
+            y: bounds.origin.y + snapshot.crossLeading - dimensions[verticalAlignment]
+          )
+        }
+
+      return place(
+        child,
+        measured: childMeasurement,
+        in: Rect(
+          origin: origin,
+          size: childMeasurement.measuredSize
+        ),
+        passContext: passContext
+      )
+    }
+  }
+
   package func placedNode(
     from resolved: ResolvedNode,
     bounds: Rect,
+    measured: MeasuredNode,
     children: [PlacedNode]
   ) -> PlacedNode {
     let contentBounds = resolvedContentBounds(
       for: resolved,
       bounds: bounds,
+      measured: measured,
       children: children
     )
 
@@ -440,6 +534,7 @@ extension LayoutEngine {
       layoutMetadata: resolved.layoutMetadata,
       drawMetadata: resolved.drawMetadata,
       semanticMetadata: resolved.semanticMetadata,
+      lifecycleMetadata: resolved.lifecycleMetadata,
       drawPayload: resolved.drawPayload
     )
   }
@@ -471,6 +566,7 @@ extension LayoutEngine {
   package func resolvedContentBounds(
     for resolved: ResolvedNode,
     bounds: Rect,
+    measured: MeasuredNode,
     children: [PlacedNode]
   ) -> Rect {
     let childContentBounds = combinedContentBounds(
@@ -504,8 +600,29 @@ extension LayoutEngine {
     }
 
     switch resolved.layoutBehavior {
-    case .lazyStack:
-      return union(childContentBounds, bounds)
+    case .lazyStack(let axis, _, _, _):
+      guard
+        let snapshot = measured.containerAllocationSnapshot?.lazyStack,
+        snapshot.contentMainLength > 0
+      else {
+        return union(childContentBounds, bounds)
+      }
+
+      let contentSize: Size =
+        switch axis {
+        case .vertical:
+          .init(
+            width: snapshot.crossLeading + snapshot.crossTrailing,
+            height: snapshot.contentMainLength
+          )
+        case .horizontal:
+          .init(
+            width: snapshot.contentMainLength,
+            height: snapshot.crossLeading + snapshot.crossTrailing
+          )
+        }
+      let contentBounds = Rect(origin: bounds.origin, size: contentSize)
+      return union(childContentBounds, contentBounds)
     default:
       return childContentBounds
     }

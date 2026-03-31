@@ -1933,6 +1933,58 @@ struct InteractiveRuntimeTests {
     #expect(result.renderedFrames <= 6)
     #expect(box.position.y == 20)
   }
+
+  @MainActor
+  @Test("run loop emits viewport lifecycle transitions for full-lazy ForEach rows")
+  func runLoopEmitsViewportLifecycleTransitionsForFullLazyRows() async throws {
+    let recorder = RuntimeLifecycleRecorder()
+    let terminalSize = Size(width: 24, height: 8)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("LazyForEachLifecycleRuntime")
+    let scrollIdentity = testIdentity("LazyForEachLifecycleRuntime", "Scroll")
+    let view =
+      ScrollView(.vertical, showsIndicators: false) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<4) { index in
+            ScrollLifecycleRuntimeProbe(
+              label: "row-\(index)",
+              text: "Row \(index)",
+              recorder: recorder
+            )
+          }
+        }
+      }
+      .id(scrollIdentity)
+      .frame(width: 12, height: 2, alignment: .topLeading)
+
+    let scrollRect = try #require(
+      renderedInteractionRect(
+        for: primaryRouteID(for: scrollIdentity),
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: centerPoint(of: scrollRect)))
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(await recorder.waitForEvent("appear:row-0"))
+    #expect(await recorder.waitForEvent("appear:row-1"))
+    #expect(await recorder.waitForEvent("appear:row-2"))
+    #expect(await recorder.waitForEvent("disappear:row-0"))
+    #expect(await recorder.waitForEvent("taskStart:row-2"))
+    #expect(await recorder.waitForEvent("taskCancel:row-0"))
+    #expect(!recorder.events(matchingPrefix: "appear:").contains("appear:row-3"))
+  }
 }
 
 private final class RecordingInvalidator: Invalidating {
@@ -2471,6 +2523,16 @@ private final class RuntimeLifecycleRecorder: @unchecked Sendable {
     record("taskCancel:\(identity)")
   }
 
+  func runUntilCancelled(
+    label: String
+  ) async {
+    record("taskStart:\(label)")
+    while !Task.isCancelled {
+      try? await Task.sleep(nanoseconds: 10_000_000)
+    }
+    record("taskCancel:\(label)")
+  }
+
   private func contains(_ event: String) -> Bool {
     lock.lock()
     defer { lock.unlock() }
@@ -2517,6 +2579,45 @@ private struct LifecycleRuntimeProbe: View, ResolvableView {
         .init(isFocusable: true)
       )
     }
+    return [node]
+  }
+}
+
+private struct ScrollLifecycleRuntimeProbe: View, ResolvableView {
+  let label: String
+  let text: String
+  let recorder: RuntimeLifecycleRecorder
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let appearHandlerID = "\(context.identity)/appear"
+    let disappearHandlerID = "\(context.identity)/disappear"
+    let descriptor = TaskDescriptor(
+      id: "\(context.identity)/task",
+      priority: .medium
+    )
+
+    context.localLifecycleRegistry?.registerAppear(handlerID: appearHandlerID) {
+      recorder.record("appear:\(label)")
+    }
+    context.localLifecycleRegistry?.registerDisappear(handlerID: disappearHandlerID) {
+      recorder.record("disappear:\(label)")
+    }
+    context.localTaskRegistry?.register(
+      identity: context.identity,
+      registration: TaskRegistration(
+        descriptor: descriptor,
+        operation: {
+          await recorder.runUntilCancelled(label: label)
+        }
+      )
+    )
+
+    var node = interactiveProbeTextNode(text, in: context)
+    node.lifecycleMetadata = .init(
+      appearHandlerIDs: [appearHandlerID],
+      disappearHandlerIDs: [disappearHandlerID],
+      task: descriptor
+    )
     return [node]
   }
 }

@@ -157,6 +157,15 @@ public struct LifecycleMetadata: Equatable, Sendable {
   }
 }
 
+/// Indexed child access for data-backed lazy containers.
+package protocol IndexedChildSource: Sendable {
+  var count: Int { get }
+  var identityRoot: Identity { get }
+  var measurementSignature: String { get }
+
+  func child(at index: Int) -> ResolvedNode
+}
+
 /// A node produced by the resolve phase before measurement.
 public struct ResolvedNode: Equatable, Sendable {
   public var identity: Identity
@@ -180,6 +189,11 @@ public struct ResolvedNode: Equatable, Sendable {
   public var lifecycleMetadata: LifecycleMetadata
   public var drawPayload: DrawPayload
   public var intrinsicSize: Size?
+  package var indexedChildSource: (any IndexedChildSource)? {
+    didSet {
+      recomputeSupportsRetainedReuse()
+    }
+  }
   package var preferenceValues: PreferenceValues
   public var supportsRetainedReuse: Bool
 
@@ -209,6 +223,40 @@ public struct ResolvedNode: Equatable, Sendable {
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
     self.intrinsicSize = intrinsicSize
+    self.indexedChildSource = nil
+    preferenceValues = Self.combinedPreferenceValues(for: children)
+    self.supportsRetainedReuse = true
+    recomputeSupportsRetainedReuse()
+  }
+
+  package init(
+    identity: Identity,
+    kind: NodeKind,
+    children: [ResolvedNode] = [],
+    environmentSnapshot: EnvironmentSnapshot = .init(),
+    transactionSnapshot: TransactionSnapshot = .init(),
+    layoutBehavior: LayoutBehavior = .intrinsic,
+    layoutMetadata: LayoutMetadata = .init(),
+    drawMetadata: DrawMetadata = DrawMetadata(),
+    semanticMetadata: SemanticMetadata = SemanticMetadata(),
+    lifecycleMetadata: LifecycleMetadata = .init(),
+    drawPayload: DrawPayload = .none,
+    intrinsicSize: Size? = nil,
+    indexedChildSource: (any IndexedChildSource)? = nil
+  ) {
+    self.identity = identity
+    self.kind = kind
+    self.children = children
+    self.environmentSnapshot = environmentSnapshot
+    self.transactionSnapshot = transactionSnapshot
+    self.layoutBehavior = layoutBehavior
+    self.layoutMetadata = layoutMetadata
+    self.drawMetadata = drawMetadata
+    self.semanticMetadata = semanticMetadata
+    self.lifecycleMetadata = lifecycleMetadata
+    self.drawPayload = drawPayload
+    self.intrinsicSize = intrinsicSize
+    self.indexedChildSource = indexedChildSource
     preferenceValues = Self.combinedPreferenceValues(for: children)
     self.supportsRetainedReuse = true
     recomputeSupportsRetainedReuse()
@@ -221,7 +269,8 @@ public struct ResolvedNode: Equatable, Sendable {
   private mutating func recomputeSupportsRetainedReuse() {
     supportsRetainedReuse = Self.computeSupportsRetainedReuse(
       layoutBehavior: layoutBehavior,
-      children: children
+      children: children,
+      indexedChildSource: indexedChildSource
     )
   }
 
@@ -237,14 +286,23 @@ public struct ResolvedNode: Equatable, Sendable {
 
   private static func computeSupportsRetainedReuse(
     layoutBehavior: LayoutBehavior,
-    children: [ResolvedNode]
+    children: [ResolvedNode],
+    indexedChildSource: (any IndexedChildSource)?
   ) -> Bool {
+    if indexedChildSource != nil {
+      return false
+    }
+
     switch layoutBehavior {
     case .viewThatFits, .custom:
-      false
+      return false
     default:
-      children.allSatisfy(\.supportsRetainedReuse)
+      return children.allSatisfy(\.supportsRetainedReuse)
     }
+  }
+
+  package var usesIndexedChildSource: Bool {
+    indexedChildSource != nil
   }
 
   package func descendant(
@@ -336,10 +394,32 @@ public struct ResolvedNode: Equatable, Sendable {
       && layoutMetadata == other.layoutMetadata
       && drawPayload.isEquivalentForMeasurement(to: other.drawPayload)
       && intrinsicSize == other.intrinsicSize
+      && indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature
       && children.count == other.children.count
       && zip(children, other.children).allSatisfy { lhsChild, rhsChild in
         lhsChild.isEquivalentForMeasurement(to: rhsChild)
       }
+  }
+}
+
+extension ResolvedNode {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.identity == rhs.identity
+      && lhs.kind == rhs.kind
+      && lhs.children == rhs.children
+      && lhs.environmentSnapshot == rhs.environmentSnapshot
+      && lhs.transactionSnapshot == rhs.transactionSnapshot
+      && lhs.layoutBehavior == rhs.layoutBehavior
+      && lhs.layoutMetadata == rhs.layoutMetadata
+      && lhs.drawMetadata == rhs.drawMetadata
+      && lhs.semanticMetadata == rhs.semanticMetadata
+      && lhs.lifecycleMetadata == rhs.lifecycleMetadata
+      && lhs.drawPayload == rhs.drawPayload
+      && lhs.intrinsicSize == rhs.intrinsicSize
+      && lhs.indexedChildSource?.measurementSignature
+        == rhs.indexedChildSource?.measurementSignature
+      && lhs.preferenceValues == rhs.preferenceValues
+      && lhs.supportsRetainedReuse == rhs.supportsRetainedReuse
   }
 }
 
@@ -366,6 +446,7 @@ public struct PlacedNode: Equatable, Sendable {
   public var layoutMetadata: LayoutMetadata
   public var drawMetadata: DrawMetadata
   public var semanticMetadata: SemanticMetadata
+  public var lifecycleMetadata: LifecycleMetadata
   public var drawPayload: DrawPayload
 
   public init(
@@ -381,6 +462,7 @@ public struct PlacedNode: Equatable, Sendable {
     layoutMetadata: LayoutMetadata = .init(),
     drawMetadata: DrawMetadata = DrawMetadata(),
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
+    lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none
   ) {
     self.identity = identity
@@ -395,7 +477,27 @@ public struct PlacedNode: Equatable, Sendable {
     self.layoutMetadata = layoutMetadata
     self.drawMetadata = drawMetadata
     self.semanticMetadata = semanticMetadata
+    self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
+  }
+
+  package func collectLifecycleNodes(
+    into nodes: inout [CommittedLifecycleNode]
+  ) {
+    if !lifecycleMetadata.isEmpty {
+      nodes.append(
+        CommittedLifecycleNode(
+          identity: identity,
+          appearHandlerIDs: lifecycleMetadata.appearHandlerIDs,
+          disappearHandlerIDs: lifecycleMetadata.disappearHandlerIDs,
+          task: lifecycleMetadata.task
+        )
+      )
+    }
+
+    for child in children {
+      child.collectLifecycleNodes(into: &nodes)
+    }
   }
 }
 

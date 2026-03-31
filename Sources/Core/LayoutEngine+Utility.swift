@@ -150,14 +150,18 @@ extension LayoutEngine {
       chosenChildIndex = nil
     }
 
+    let stackChildren = stackChildren(for: resolved)
+
     let lazyStackSnapshot: LazyStackAllocationSnapshot?
     switch resolved.layoutBehavior {
-    case .lazyStack(let axis, let spacing, _, _):
+    case .lazyStack(let axis, let spacing, let horizontalAlignment, let verticalAlignment):
       lazyStackSnapshot = lazyStackAllocationSnapshot(
-        for: resolved,
+        for: stackChildren,
         childMeasurements: childMeasurements,
         axis: axis,
-        spacingOverride: spacing
+        spacingOverride: spacing,
+        horizontalAlignment: horizontalAlignment,
+        verticalAlignment: verticalAlignment
       )
     default:
       lazyStackSnapshot = nil

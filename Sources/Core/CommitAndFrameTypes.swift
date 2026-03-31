@@ -408,14 +408,17 @@ package struct RetainedLayoutSession: Sendable {
 // because the class has mutable stored properties without synchronization.
 package final class LayoutPassContext: @unchecked Sendable {
   package let retainedLayout: RetainedLayoutSession?
+  package let invalidatedIdentities: Set<Identity>
   package var scrollViewportContext: ScrollViewportContext?
   package var workMetrics: LayoutWorkMetrics
 
   package init(
     retainedLayout: RetainedLayoutSession? = nil,
+    invalidatedIdentities: Set<Identity> = [],
     scrollViewportContext: ScrollViewportContext? = nil
   ) {
     self.retainedLayout = retainedLayout
+    self.invalidatedIdentities = invalidatedIdentities
     self.scrollViewportContext = scrollViewportContext
     workMetrics = .init()
   }

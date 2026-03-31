@@ -244,6 +244,73 @@ struct Phase2CommitPlannerTests {
 
     #expect(next.lifecycle.isEmpty)
   }
+
+  @Test("indexed lazy-stack lifecycle is derived from placed visible children")
+  func indexedLazyStackLifecycleUsesPlacedChildren() {
+    let planner = CommitPlanner()
+    let task = TaskDescriptor(id: "row-1", priority: .medium)
+    let resolved = ResolvedNode(
+      identity: testIdentity("Root"),
+      kind: .root,
+      children: [
+        ResolvedNode(
+          identity: testIdentity("Root", "LazyVStack"),
+          kind: .view("LazyVStack"),
+          layoutBehavior: .lazyStack(
+            axis: .vertical,
+            spacing: 0,
+            horizontalAlignment: .leading,
+            verticalAlignment: .center
+          ),
+          indexedChildSource: EmptyIndexedChildSource()
+        )
+      ]
+    )
+    let placed = PlacedNode(
+      identity: testIdentity("Root"),
+      kind: .root,
+      bounds: .init(origin: .zero, size: .zero),
+      children: [
+        PlacedNode(
+          identity: testIdentity("Root", "LazyVStack"),
+          kind: .view("LazyVStack"),
+          bounds: .init(origin: .zero, size: .zero),
+          children: [
+            PlacedNode(
+              identity: testIdentity("Root", "LazyVStack", "ID[1]"),
+              kind: .view("LifecycleProbe"),
+              bounds: .init(origin: .zero, size: .zero),
+              semanticRole: .generic,
+              lifecycleMetadata: .init(
+                appearHandlerIDs: ["appear"],
+                disappearHandlerIDs: ["disappear"],
+                task: task
+              )
+            )
+          ],
+          semanticRole: .container
+        )
+      ],
+      semanticRole: .container
+    )
+
+    let plan = planner.plan(
+      resolved: resolved,
+      placed: placed,
+      semantics: .init()
+    )
+
+    #expect(
+      plan.nextLifecycleState.nodes == [
+        CommittedLifecycleNode(
+          identity: testIdentity("Root", "LazyVStack", "ID[1]"),
+          appearHandlerIDs: ["appear"],
+          disappearHandlerIDs: ["disappear"],
+          task: task
+        )
+      ]
+    )
+  }
 }
 
 private func lifecycleTree(
@@ -273,4 +340,14 @@ private func lifecycleNode(
       task: task
     )
   )
+}
+
+private struct EmptyIndexedChildSource: IndexedChildSource {
+  let count = 0
+  let identityRoot = testIdentity("Root", "LazyVStack")
+  let measurementSignature = "empty"
+
+  func child(at _: Int) -> ResolvedNode {
+    preconditionFailure("No indexed children should be materialized in this test.")
+  }
 }

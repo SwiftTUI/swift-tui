@@ -86,4 +86,69 @@ struct ViewResolutionTests {
         )
     )
   }
+
+  @Test("LazyVStack with a single ForEach defers eager child resolution")
+  func lazyVStackWithSingleForEachDefersChildResolution() {
+    let counter = ResolveInvocationCounter()
+    let resolver = Resolver()
+    let view = LazyVStack(alignment: .leading, spacing: 1) {
+      Group {
+        ForEach(0..<3) { index in
+          counter.count += 1
+          Text("Row \(index)")
+        }
+      }
+    }
+
+    let resolved = resolver.resolve(
+      AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+
+    #expect(resolved.kind == .view("LazyVStack"))
+    #expect(counter.count == 0)
+  }
+
+  @Test("LazyHStack with a single ForEach defers eager child resolution")
+  func lazyHStackWithSingleForEachDefersChildResolution() {
+    let counter = ResolveInvocationCounter()
+    let resolver = Resolver()
+    let view = LazyHStack(alignment: .center, spacing: 1) {
+      ForEach(0..<3) { index in
+        counter.count += 1
+        Text("Column \(index)")
+      }
+    }
+
+    let resolved = resolver.resolve(
+      AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+
+    #expect(resolved.kind == .view("LazyHStack"))
+    #expect(counter.count == 0)
+  }
+
+  @Test("LazyVStack with mixed static siblings still resolves ForEach eagerly")
+  func lazyVStackWithMixedStaticSiblingsResolvesForEachEagerly() {
+    let counter = ResolveInvocationCounter()
+    let resolver = Resolver()
+    let view = LazyVStack(alignment: .leading, spacing: 1) {
+      Text("Header")
+      Group {
+        ForEach(0..<3) { index in
+          counter.count += 1
+          Text("Row \(index)")
+        }
+      }
+      Text("Footer")
+    }
+
+    let resolved = resolver.resolve(
+      AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+
+    #expect(resolved.kind == .view("LazyVStack"))
+    #expect(resolved.children.count == 5)
+    #expect(counter.count == 3)
+  }
+}
+
+private final class ResolveInvocationCounter: @unchecked Sendable {
+  var count = 0
 }

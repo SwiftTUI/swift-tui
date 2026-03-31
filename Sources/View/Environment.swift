@@ -437,6 +437,9 @@ package final class ResolveReuseSession: @unchecked Sendable {
     guard !invalidatedIdentities.isEmpty else {
       return false
     }
+    guard node.supportsRetainedReuse else {
+      return false
+    }
     guard !hasInvalidatedSelfOrAncestor(context.identity) else {
       return false
     }

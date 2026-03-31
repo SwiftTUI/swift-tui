@@ -18,7 +18,7 @@ The canonical authoring surface is the SwiftUI-shaped one:
 
 - `View`, `ViewBuilder`, `AnyView`, `TupleView`, `ConditionalContent`, `VariadicView`, `EmptyView`, `Text`, `Link`, `Image`, `Spacer`, `Divider`, `Group`
 - text layout enums and interpolation support exposed through `Text`, including `Text.TruncationMode`, `Text.WrappingStrategy`, and rich interpolation of embedded `Text` and `Link` segments
-- `VStack`, `HStack`, `LazyVStack`, `LazyHStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `GeometryReader`
+- `VStack`, `HStack`, `LazyVStack`, `LazyHStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `GeometryReader` (`LazyVStack` and `LazyHStack` support viewport-lazy placement and single-`ForEach` full-lazy rows)
 - `TabItemLabel`, `TabView`, `NavigationSplitView`
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`

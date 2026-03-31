@@ -478,6 +478,85 @@ struct DiagnosticsAndCacheTests {
     #expect(lazySecond.diagnostics.placedNodeCount < eagerSecond.diagnostics.placedNodeCount)
   }
 
+  @Test("single-ForEach lazy stacks lower off-screen resolution and measurement work on scroll")
+  func singleForEachLazyStacksLowerOffScreenWorkOnScroll() {
+    final class ScrollPositionBox: @unchecked Sendable {
+      var position = ScrollPosition.zero
+    }
+
+    let stableRenderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    let lazyRenderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    let stableBox = ScrollPositionBox()
+    let lazyBox = ScrollPositionBox()
+
+    func makeStableView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(
+          get: { stableBox.position },
+          set: { stableBox.position = $0 }
+        )
+      ) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          Text("Row 0")
+          Text("Row 1")
+          Text("Row 2")
+          Text("Row 3")
+          Text("Row 4")
+          Text("Row 5")
+          Text("Row 6")
+          Text("Row 7")
+        }
+      }
+      .frame(width: 12, height: 3, alignment: .topLeading)
+    }
+
+    func makeLazyView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(
+          get: { lazyBox.position },
+          set: { lazyBox.position = $0 }
+        )
+      ) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<8) { index in
+            Text("Row \(index)")
+          }
+        }
+      }
+      .frame(width: 12, height: 3, alignment: .topLeading)
+    }
+
+    _ = stableRenderer.render(
+      makeStableView(),
+      context: .init(identity: testIdentity("StableRoot"))
+    )
+    _ = lazyRenderer.render(
+      makeLazyView(),
+      context: .init(identity: testIdentity("LazyRoot"))
+    )
+
+    stableBox.position.scrollBy(y: 1)
+    lazyBox.position.scrollBy(y: 1)
+
+    let stableSecond = stableRenderer.render(
+      makeStableView(),
+      context: .init(identity: testIdentity("StableRoot"))
+    )
+    let lazySecond = lazyRenderer.render(
+      makeLazyView(),
+      context: .init(identity: testIdentity("LazyRoot"))
+    )
+
+    #expect(lazySecond.diagnostics.resolvedNodeCount < stableSecond.diagnostics.resolvedNodeCount)
+    #expect(lazySecond.diagnostics.measuredNodeCount < stableSecond.diagnostics.measuredNodeCount)
+  }
+
   @Test("default renderer invalidates changed subtrees even when identities stay stable")
   func defaultRendererInvalidatesChangedSubtrees() throws {
     let renderer = DefaultRenderer(

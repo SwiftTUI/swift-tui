@@ -109,16 +109,24 @@ public struct LayoutEngine {
     proposal: ProposedSize = .unspecified,
     passContext: LayoutPassContext?
   ) -> MeasuredNode {
+    let hasInvalidatedIndexedDescendant = hasInvalidatedIndexedDescendant(
+      for: resolved,
+      passContext: passContext
+    )
+
     if let retained = retainedMeasurement(
       for: resolved,
       proposal: proposal,
-      retainedLayout: passContext?.retainedLayout
+      retainedLayout: passContext?.retainedLayout,
+      hasInvalidatedIndexedDescendant: hasInvalidatedIndexedDescendant
     ) {
       passContext?.workMetrics.measuredNodesReused += countMeasuredNodes(retained)
       return retained
     }
 
-    if let cached = cache?.lookup(resolved: resolved, proposal: proposal) {
+    if !hasInvalidatedIndexedDescendant,
+      let cached = cache?.lookup(resolved: resolved, proposal: proposal)
+    {
       passContext?.workMetrics.measuredNodesReused += countMeasuredNodes(cached)
       return cached
     }
@@ -133,6 +141,10 @@ public struct LayoutEngine {
       for: resolved,
       parentProposal: effectiveProposal,
       passContext: passContext
+    )
+    let storedChildMeasurements = storedChildMeasurements(
+      for: resolved,
+      measuredChildren: childMeasurements
     )
     let clampingProposal = clampingProposal(
       for: resolved,
@@ -150,7 +162,7 @@ public struct LayoutEngine {
         ),
         proposal: clampingProposal
       ),
-      childMeasurements: childMeasurements,
+      childMeasurements: storedChildMeasurements,
       containerAllocationSnapshot: containerAllocationSnapshot(
         for: resolved,
         childMeasurements: childMeasurements,
@@ -240,10 +252,18 @@ public struct LayoutEngine {
 
     passContext?.workMetrics.placedNodesComputed += 1
 
-    if resolved.children.isEmpty {
+    let hasChildren =
+      if let source = resolved.indexedChildSource {
+        source.count > 0
+      } else {
+        !resolved.children.isEmpty
+      }
+
+    if !hasChildren {
       return placedNode(
         from: resolved,
         bounds: bounds,
+        measured: measured,
         children: []
       )
     }
@@ -259,6 +279,7 @@ public struct LayoutEngine {
     return placedNode(
       from: resolved,
       bounds: bounds,
+      measured: measured,
       children: placedChildren
     )
   }
@@ -289,7 +310,7 @@ public struct LayoutEngine {
       verticalAlignment: _
     ):
       return measureStackChildren(
-        for: resolved,
+        for: stackChildren(for: resolved),
         parentProposal: parentProposal,
         axis: axis,
         spacing: spacing,
@@ -301,7 +322,7 @@ public struct LayoutEngine {
       verticalAlignment: _
     ):
       return measureStackChildren(
-        for: resolved,
+        for: stackChildren(for: resolved),
         parentProposal: parentProposal,
         axis: axis,
         spacing: spacing,
@@ -443,13 +464,14 @@ public struct LayoutEngine {
       axis: .vertical, let spacing, let horizontalAlignment,
       verticalAlignment: _
     ):
+      let stackChildren = stackChildren(for: resolved)
       let stackSpacings = resolvedStackSpacings(
-        for: resolved.children,
+        for: stackChildren,
         axis: .vertical,
         spacingOverride: spacing
       )
       let crossMetrics = stackCrossMetrics(
-        for: resolved.children,
+        for: stackChildren,
         childMeasurements: childMeasurements,
         axis: .vertical,
         horizontalAlignment: horizontalAlignment,
@@ -465,13 +487,14 @@ public struct LayoutEngine {
       axis: .vertical, let spacing, let horizontalAlignment,
       verticalAlignment: _
     ):
+      let stackChildren = stackChildren(for: resolved)
       let stackSpacings = resolvedStackSpacings(
-        for: resolved.children,
+        for: stackChildren,
         axis: .vertical,
         spacingOverride: spacing
       )
       let crossMetrics = stackCrossMetrics(
-        for: resolved.children,
+        for: stackChildren,
         childMeasurements: childMeasurements,
         axis: .vertical,
         horizontalAlignment: horizontalAlignment,
@@ -487,13 +510,14 @@ public struct LayoutEngine {
       axis: .horizontal, let spacing,
       horizontalAlignment: _, let verticalAlignment
     ):
+      let stackChildren = stackChildren(for: resolved)
       let stackSpacings = resolvedStackSpacings(
-        for: resolved.children,
+        for: stackChildren,
         axis: .horizontal,
         spacingOverride: spacing
       )
       let crossMetrics = stackCrossMetrics(
-        for: resolved.children,
+        for: stackChildren,
         childMeasurements: childMeasurements,
         axis: .horizontal,
         horizontalAlignment: .center,
@@ -509,13 +533,14 @@ public struct LayoutEngine {
       axis: .horizontal, let spacing,
       horizontalAlignment: _, let verticalAlignment
     ):
+      let stackChildren = stackChildren(for: resolved)
       let stackSpacings = resolvedStackSpacings(
-        for: resolved.children,
+        for: stackChildren,
         axis: .horizontal,
         spacingOverride: spacing
       )
       let crossMetrics = stackCrossMetrics(
-        for: resolved.children,
+        for: stackChildren,
         childMeasurements: childMeasurements,
         axis: .horizontal,
         horizontalAlignment: .center,
@@ -827,9 +852,11 @@ public struct LayoutEngine {
   private func retainedMeasurement(
     for resolved: ResolvedNode,
     proposal: ProposedSize,
-    retainedLayout: RetainedLayoutSession?
+    retainedLayout: RetainedLayoutSession?,
+    hasInvalidatedIndexedDescendant: Bool
   ) -> MeasuredNode? {
     guard let retainedLayout,
+      !hasInvalidatedIndexedDescendant,
       !retainedLayout.isDirectlyInvalidated(resolved.identity),
       !retainedLayout.hasSyntheticInvalidatedAncestor(resolved.identity),
       !retainedLayout.containsInvalidatedDescendant(of: resolved.identity),
@@ -874,6 +901,20 @@ public struct LayoutEngine {
     return previousPlaced
   }
 
+  private func hasInvalidatedIndexedDescendant(
+    for resolved: ResolvedNode,
+    passContext: LayoutPassContext?
+  ) -> Bool {
+    guard let source = resolved.indexedChildSource else {
+      return false
+    }
+
+    return passContext?.invalidatedIdentities.contains { invalidatedIdentity in
+      invalidatedIdentity.isDescendant(of: source.identityRoot)
+        || source.identityRoot.isDescendant(of: invalidatedIdentity)
+    } ?? false
+  }
+
   private func supportsRetainedLayoutReuse(
     for resolved: ResolvedNode
   ) -> Bool {
@@ -884,6 +925,17 @@ public struct LayoutEngine {
     _ node: MeasuredNode
   ) -> Int {
     1 + node.childMeasurements.reduce(0) { $0 + countMeasuredNodes($1) }
+  }
+
+  private func storedChildMeasurements(
+    for resolved: ResolvedNode,
+    measuredChildren: [MeasuredNode]
+  ) -> [MeasuredNode] {
+    guard resolved.usesIndexedChildSource, case .lazyStack = resolved.layoutBehavior else {
+      return measuredChildren
+    }
+
+    return []
   }
 
   private func countPlacedNodes(

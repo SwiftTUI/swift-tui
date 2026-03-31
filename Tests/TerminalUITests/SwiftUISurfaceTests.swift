@@ -2897,6 +2897,107 @@ struct SwiftUISurfaceTests {
     #expect(!artifacts.semanticSnapshot.interactionRegions.map(\.identity).contains(hiddenIdentity))
   }
 
+  @Test("single-ForEach lazy stacks emit viewport lifecycle transitions as rows enter and leave")
+  func lazyForEachRowsEmitViewportLifecycleTransitions() {
+    final class ScrollBox {
+      var position = ScrollPosition.zero
+    }
+
+    let box = ScrollBox()
+    let rows = (0..<4).map {
+      PaletteRow(id: "row-\($0)", label: "Row \($0)")
+    }
+    let view = ScrollView(
+      .vertical,
+      showsIndicators: false,
+      position: Binding(
+        get: { box.position },
+        set: { box.position = $0 }
+      )
+    ) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        Group {
+          ForEach(rows) { row in
+            Text(row.label)
+              .onAppear {}
+              .onDisappear {}
+              .task(id: row.id) {}
+          }
+        }
+      }
+    }
+    .frame(width: 5, height: 2, alignment: .topLeading)
+
+    let initialArtifacts = DefaultRenderer().render(
+      view,
+      context: .init(identity: testIdentity("LazyForEachScrollRoot"))
+    )
+
+    #expect(initialArtifacts.rasterSurface.lines.prefix(2) == ["Row 0", "Row 1"])
+
+    box.position.scrollBy(y: 1)
+
+    let scrolledArtifacts = DefaultRenderer().render(
+      view,
+      context: .init(identity: testIdentity("LazyForEachScrollRoot")),
+      previousLifecycleState: initialArtifacts.commitPlan.nextLifecycleState
+    )
+
+    let operations = scrolledArtifacts.commitPlan.lifecycle.map(\.operation)
+
+    #expect(scrolledArtifacts.rasterSurface.lines.prefix(2) == ["Row 1", "Row 2"])
+    #expect(operations.count == 4)
+    #expect(isTaskCancel(operations[0]))
+    #expect(isDisappear(operations[1]))
+    #expect(isAppear(operations[2]))
+    #expect(isTaskStart(operations[3]))
+  }
+
+  @Test("mixed static siblings keep LazyVStack on the stable lifecycle path")
+  func lazyVStackWithMixedStaticSiblingsKeepsStableLifecycleDuringScroll() {
+    final class ScrollBox {
+      var position = ScrollPosition.zero
+    }
+
+    let box = ScrollBox()
+    let view = ScrollView(
+      .vertical,
+      showsIndicators: false,
+      position: Binding(
+        get: { box.position },
+        set: { box.position = $0 }
+      )
+    ) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        Text("Top")
+        ForEach(0..<3) { index in
+          Text("Row \(index)")
+            .onAppear {}
+            .onDisappear {}
+            .task(id: "row-\(index)") {}
+        }
+        Text("End")
+      }
+    }
+    .frame(width: 5, height: 2, alignment: .topLeading)
+
+    let initialArtifacts = DefaultRenderer().render(
+      view,
+      context: .init(identity: testIdentity("MixedLazyStackRoot"))
+    )
+
+    box.position.scrollBy(y: 1)
+
+    let scrolledArtifacts = DefaultRenderer().render(
+      view,
+      context: .init(identity: testIdentity("MixedLazyStackRoot")),
+      previousLifecycleState: initialArtifacts.commitPlan.nextLifecycleState
+    )
+
+    #expect(scrolledArtifacts.rasterSurface.lines.prefix(2) == ["Row 0", "Row 1"])
+    #expect(scrolledArtifacts.commitPlan.lifecycle.isEmpty)
+  }
+
   @Test("ScrollPosition helper APIs support incremental and absolute updates")
   func scrollPositionHelpersApplyDirectionalChanges() {
     var position = ScrollPosition.zero
@@ -5197,6 +5298,34 @@ struct SwiftUISurfaceTests {
 
     #expect(recorder.placedValues == [1, 4])
   }
+}
+
+private func isAppear(_ operation: LifecycleCommitOperation) -> Bool {
+  if case .appear = operation {
+    return true
+  }
+  return false
+}
+
+private func isDisappear(_ operation: LifecycleCommitOperation) -> Bool {
+  if case .disappear = operation {
+    return true
+  }
+  return false
+}
+
+private func isTaskStart(_ operation: LifecycleCommitOperation) -> Bool {
+  if case .taskStart = operation {
+    return true
+  }
+  return false
+}
+
+private func isTaskCancel(_ operation: LifecycleCommitOperation) -> Bool {
+  if case .taskCancel = operation {
+    return true
+  }
+  return false
 }
 
 extension ResolvedNode {

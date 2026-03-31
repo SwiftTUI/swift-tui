@@ -276,6 +276,67 @@ struct LayoutEngineTests {
     #expect(placed.children.map(\.bounds.origin.x) == [0, 1, 2])
   }
 
+  @Test("indexed lazy stacks retain sizing metadata without storing off-screen child measurements")
+  func indexedLazyStacksRetainSizingMetadataWithoutChildMeasurements() throws {
+    let engine = LayoutEngine()
+    let lazy = indexedLazyStack(
+      "lazy",
+      axis: .vertical,
+      children: [
+        leaf("row-0", size: .init(width: 2, height: 1)),
+        leaf("row-1", size: .init(width: 3, height: 1)),
+        leaf("row-2", size: .init(width: 1, height: 1)),
+        leaf("row-3", size: .init(width: 4, height: 1)),
+      ]
+    )
+
+    let measured = engine.measure(lazy, proposal: .init(width: 8, height: 4))
+    let snapshot = try #require(measured.containerAllocationSnapshot?.lazyStack)
+
+    #expect(measured.childMeasurements.isEmpty)
+    #expect(snapshot.contentMainLength == 4)
+    #expect(snapshot.childMainOffsets == [0, 1, 2, 3])
+    #expect(measured.containerAllocationSnapshot?.childSizes.map(\.size.height) == [1, 1, 1, 1])
+  }
+
+  @Test("indexed lazy stacks materialize only the visible placement range")
+  func indexedLazyStacksPlaceOnlyVisibleRange() {
+    let engine = LayoutEngine()
+    let lazy = indexedLazyStack(
+      "lazy",
+      axis: .vertical,
+      children: [
+        leaf("row-0", size: .init(width: 2, height: 1)),
+        leaf("row-1", size: .init(width: 3, height: 1)),
+        leaf("row-2", size: .init(width: 1, height: 1)),
+        leaf("row-3", size: .init(width: 4, height: 1)),
+        leaf("row-4", size: .init(width: 2, height: 1)),
+      ]
+    )
+
+    let measured = engine.measure(lazy, proposal: .init(width: 8, height: 4))
+    let passContext = LayoutPassContext(
+      retainedLayout: nil,
+      scrollViewportContext: .init(
+        axes: [.vertical],
+        viewportRect: .init(origin: .zero, size: .init(width: 8, height: 1)),
+        contentOffset: .init(x: 0, y: 1)
+      )
+    )
+    let placed = engine.place(
+      lazy,
+      measured: measured,
+      in: .init(origin: .zero, size: .init(width: 8, height: 4)),
+      passContext: passContext
+    )
+
+    #expect(
+      placed.children.map(\.identity) == [
+        testIdentity("row-1")
+      ])
+    #expect(placed.children.map(\.bounds.origin.y) == [1])
+  }
+
   @Test("flexible frame resolves unspecified finite and infinite proposals")
   func flexibleFrameResolvesProposalKinds() {
     let engine = LayoutEngine()
@@ -486,6 +547,27 @@ private func lazyStack(
   )
 }
 
+private func indexedLazyStack(
+  _ name: String,
+  axis: Axis,
+  children: [ResolvedNode]
+) -> ResolvedNode {
+  ResolvedNode(
+    identity: testIdentity(name),
+    kind: .view(axis == .horizontal ? "LazyHStack" : "LazyVStack"),
+    layoutBehavior: .lazyStack(
+      axis: axis,
+      spacing: 0,
+      horizontalAlignment: .leading,
+      verticalAlignment: .top
+    ),
+    indexedChildSource: TestIndexedChildSource(
+      identityRoot: testIdentity(name),
+      children: children
+    )
+  )
+}
+
 private func spacer(_ name: String) -> ResolvedNode {
   ResolvedNode(
     identity: testIdentity(name),
@@ -532,5 +614,28 @@ private final class NoOpCustomLayoutProxy: CustomLayoutProxy, @unchecked Sendabl
     in _: Rect
   ) -> [PlacedNode] {
     []
+  }
+}
+
+private struct TestIndexedChildSource: IndexedChildSource {
+  let identityRoot: Identity
+  let measurementSignature: String
+  private let children: [ResolvedNode]
+
+  init(
+    identityRoot: Identity,
+    children: [ResolvedNode]
+  ) {
+    self.identityRoot = identityRoot
+    self.children = children
+    measurementSignature = children.map(\.identity.path).joined(separator: "|")
+  }
+
+  var count: Int {
+    children.count
+  }
+
+  func child(at index: Int) -> ResolvedNode {
+    children[index]
   }
 }

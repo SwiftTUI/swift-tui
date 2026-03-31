@@ -182,6 +182,48 @@ struct Phase1BenchmarkScenariosTests {
     #expect(lazySecond.diagnostics.placedNodeCount < eagerSecond.diagnostics.placedNodeCount)
     #expect(lazySecond.presentation.bytesWritten < eagerSecond.presentation.bytesWritten)
   }
+
+  @Test("lazy ForEach scroll movement reduces off-screen tree work on viewport shifts")
+  @MainActor
+  func lazyForEachScrollMovementScenario() throws {
+    let stableHarness = BenchmarkHarness()
+    let lazyHarness = BenchmarkHarness()
+    let stablePosition = ScrollBox()
+    let lazyPosition = ScrollBox()
+
+    _ = try stableHarness.render(
+      LazyScrollBenchmarkView(position: stablePosition),
+      context: benchmarkContext(
+        focusedIdentity: Phase1BenchmarkIdentity.scrollRegion
+      )
+    )
+    _ = try lazyHarness.render(
+      LazyForEachScrollBenchmarkView(position: lazyPosition),
+      context: benchmarkContext(
+        focusedIdentity: Phase1BenchmarkIdentity.scrollRegion
+      )
+    )
+
+    stablePosition.position.scrollBy(y: 1)
+    lazyPosition.position.scrollBy(y: 1)
+
+    let stableSecond = try stableHarness.render(
+      LazyScrollBenchmarkView(position: stablePosition),
+      context: benchmarkContext(
+        focusedIdentity: Phase1BenchmarkIdentity.scrollRegion
+      )
+    )
+    let lazySecond = try lazyHarness.render(
+      LazyForEachScrollBenchmarkView(position: lazyPosition),
+      context: benchmarkContext(
+        focusedIdentity: Phase1BenchmarkIdentity.scrollRegion
+      )
+    )
+
+    #expect(lazySecond.presentation.strategy == .incremental)
+    #expect(lazySecond.diagnostics.resolvedNodeCount < stableSecond.diagnostics.resolvedNodeCount)
+    #expect(lazySecond.diagnostics.measuredNodeCount < stableSecond.diagnostics.measuredNodeCount)
+  }
 }
 
 private struct BenchmarkFrame {
@@ -358,6 +400,29 @@ private struct LazyScrollBenchmarkView: View {
         Text("Row 5")
         Text("Row 6")
         Text("Row 7")
+      }
+    }
+    .id(Phase1BenchmarkIdentity.scrollRegion)
+    .frame(width: 12, height: 3, alignment: .topLeading)
+  }
+}
+
+private struct LazyForEachScrollBenchmarkView: View {
+  let position: ScrollBox
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      showsIndicators: true,
+      position: Binding(
+        get: { position.position },
+        set: { position.position = $0 }
+      )
+    ) {
+      LazyVStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<5) { index in
+          Text("Row \(index)")
+        }
       }
     }
     .id(Phase1BenchmarkIdentity.scrollRegion)

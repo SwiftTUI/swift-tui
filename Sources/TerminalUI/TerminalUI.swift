@@ -157,7 +157,8 @@ public struct DefaultRenderer {
     let layoutPassContext = LayoutPassContext(
       retainedLayout: retainedFrames.layoutSession(
         invalidatedIdentities: context.invalidatedIdentities
-      )
+      ),
+      invalidatedIdentities: context.invalidatedIdentities
     )
     let frameContext = FrameContext(
       environment: context.environment,
@@ -191,6 +192,7 @@ public struct DefaultRenderer {
     let (commit, commitDuration) = measurePhase {
       commitPlanner.plan(
         resolved: resolved,
+        placed: placed,
         semantics: semantics,
         transaction: frameContext.transaction,
         previousLifecycleState: frameContext.previousLifecycleState

@@ -6,12 +6,28 @@ extension LayoutEngine {
     spacing: Int?,
     passContext: LayoutPassContext?
   ) -> [MeasuredNode] {
+    measureStackChildren(
+      for: stackChildren(for: resolved),
+      parentProposal: parentProposal,
+      axis: axis,
+      spacing: spacing,
+      passContext: passContext
+    )
+  }
+
+  package func measureStackChildren(
+    for children: [ResolvedNode],
+    parentProposal: ProposedSize,
+    axis: Axis,
+    spacing: Int?,
+    passContext: LayoutPassContext?
+  ) -> [MeasuredNode] {
     let idealProposal = stackProposal(
       axis: axis,
       main: .unspecified,
       cross: crossDimension(of: parentProposal, for: axis)
     )
-    let idealMeasurements = resolved.children.map { child in
+    let idealMeasurements = children.map { child in
       measure(child, proposal: idealProposal, passContext: passContext)
     }
 
@@ -20,7 +36,7 @@ extension LayoutEngine {
     }
 
     let spacingBudget = resolvedStackSpacings(
-      for: resolved.children,
+      for: children,
       axis: axis,
       spacingOverride: spacing
     ).reduce(0, +)
@@ -31,13 +47,13 @@ extension LayoutEngine {
 
     if idealMainTotal < availableMain {
       distributeExtraSpaceToSpacers(
-        resolved.children,
+        children,
         into: &allocatedMainSizes,
         extraSpace: availableMain - idealMainTotal
       )
     } else if idealMainTotal > availableMain {
       compressStackChildren(
-        resolved.children,
+        children,
         idealMeasurements: idealMeasurements,
         axis: axis,
         allocatedMainSizes: &allocatedMainSizes,
@@ -45,7 +61,7 @@ extension LayoutEngine {
       )
     }
 
-    return resolved.children.enumerated().map { index, child in
+    return children.enumerated().map { index, child in
       var measurement = measure(
         child,
         proposal: stackProposal(
@@ -66,16 +82,39 @@ extension LayoutEngine {
     }
   }
 
+  package func stackChildren(
+    for resolved: ResolvedNode
+  ) -> [ResolvedNode] {
+    guard let source = resolved.indexedChildSource else {
+      return resolved.children
+    }
+
+    if resolved.children.count == source.count {
+      return resolved.children
+    }
+
+    return (0..<source.count).map { source.child(at: $0) }
+  }
+
   package func lazyStackAllocationSnapshot(
-    for resolved: ResolvedNode,
+    for children: [ResolvedNode],
     childMeasurements: [MeasuredNode],
     axis: Axis,
-    spacingOverride: Int?
+    spacingOverride: Int?,
+    horizontalAlignment: HorizontalAlignment,
+    verticalAlignment: VerticalAlignment
   ) -> LazyStackAllocationSnapshot {
     let stackSpacings = resolvedStackSpacings(
-      for: resolved.children,
+      for: children,
       axis: axis,
       spacingOverride: spacingOverride
+    )
+    let crossMetrics = stackCrossMetrics(
+      for: children,
+      childMeasurements: childMeasurements,
+      axis: axis,
+      horizontalAlignment: horizontalAlignment,
+      verticalAlignment: verticalAlignment
     )
 
     var childMainOffsets: [Int] = []
@@ -98,7 +137,9 @@ extension LayoutEngine {
       axis: axis,
       childMainOffsets: childMainOffsets,
       childMainLengths: childMainLengths,
-      contentMainLength: nextOffset
+      contentMainLength: nextOffset,
+      crossLeading: crossMetrics.leading,
+      crossTrailing: crossMetrics.trailing
     )
   }
 
@@ -505,7 +546,8 @@ extension LayoutEngine {
       return mainDimension(of: idealMeasurement.measuredSize, for: axis)
     }
 
-    let childMinimums = zip(node.children, idealMeasurement.childMeasurements).map {
+    let stackChildren = stackChildren(for: node)
+    let childMinimums = zip(stackChildren, idealMeasurement.childMeasurements).map {
       child, measurement in
       minimumMainSize(
         for: child,
@@ -538,7 +580,7 @@ extension LayoutEngine {
     ):
       if stackAxis == axis {
         let spacingBudget = resolvedStackSpacings(
-          for: node.children,
+          for: stackChildren,
           axis: axis,
           spacingOverride: spacing
         ).reduce(0, +)
@@ -552,7 +594,7 @@ extension LayoutEngine {
     ):
       if stackAxis == axis {
         let spacingBudget = resolvedStackSpacings(
-          for: node.children,
+          for: stackChildren,
           axis: axis,
           spacingOverride: spacing
         ).reduce(0, +)
