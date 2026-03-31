@@ -37,8 +37,10 @@ export async function resolveSwiftArtifacts(
     "--initial-memory=536870912",
     "-Xlinker",
     "--max-memory=4294967296",
-    "-Xlinker",
-    "--stack-size=1048576"
+     "-Xlinker",
+     "-z",
+     "-Xlinker",
+    "stack-size=1048576",
   ], {
     cwd: swiftlyWorkingDirectory,
     env: environment,
@@ -60,7 +62,9 @@ export async function resolveSwiftArtifacts(
     "-Xlinker",
     "--max-memory=4294967296",
      "-Xlinker",
-    "--stack-size=1048576",
+     "-z",
+     "-Xlinker",
+    "stack-size=1048576",
     "--show-bin-path",
   ], {
     cwd: swiftlyWorkingDirectory,
