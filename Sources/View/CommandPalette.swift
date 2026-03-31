@@ -1,4 +1,4 @@
-public import Core
+import Core
 
 // MARK: - Model
 
