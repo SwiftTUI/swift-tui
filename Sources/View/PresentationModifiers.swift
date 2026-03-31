@@ -3,6 +3,7 @@ package import Core
 private enum TerminalPresentationKind: Equatable, Sendable {
   case alert
   case confirmationDialog
+  case sheet
 
   var debugName: String {
     switch self {
@@ -10,6 +11,8 @@ private enum TerminalPresentationKind: Equatable, Sendable {
       "alert"
     case .confirmationDialog:
       "confirmationDialog"
+    case .sheet:
+      "sheet"
     }
   }
 
@@ -19,6 +22,8 @@ private enum TerminalPresentationKind: Equatable, Sendable {
       .center
     case .confirmationDialog:
       .bottomLeading
+    case .sheet:
+      .center
     }
   }
 
@@ -28,6 +33,8 @@ private enum TerminalPresentationKind: Equatable, Sendable {
       .alert
     case .confirmationDialog:
       .confirmationDialog
+    case .sheet:
+      .sheet
     }
   }
 
@@ -37,6 +44,17 @@ private enum TerminalPresentationKind: Equatable, Sendable {
       "Dismiss"
     case .confirmationDialog:
       "Cancel"
+    case .sheet:
+      "Close"
+    }
+  }
+
+  var usesContentPresentation: Bool {
+    switch self {
+    case .alert, .confirmationDialog:
+      false
+    case .sheet:
+      true
     }
   }
 }
@@ -52,6 +70,8 @@ private struct TerminalPresentationRequest: @unchecked Sendable,
   var kind: TerminalPresentationKind
   var actionViews: [AnyView]
   var messageViews: [AnyView]
+  /// Arbitrary content for sheet presentations (used instead of actionViews/messageViews).
+  var contentViews: [AnyView]
   var dismiss: @MainActor @Sendable () -> Void
 
   var description: String {
@@ -59,7 +79,7 @@ private struct TerminalPresentationRequest: @unchecked Sendable,
   }
 
   var debugDescription: String {
-    "TerminalPresentationRequest(identity: \(attachmentIdentity.path), kind: \(kind.debugName), title: \(String(reflecting: title)), actions: \(actionViews.count), messages: \(messageViews.count))"
+    "TerminalPresentationRequest(identity: \(attachmentIdentity.path), kind: \(kind.debugName), title: \(String(reflecting: title)), actions: \(actionViews.count), messages: \(messageViews.count), content: \(contentViews.count))"
   }
 }
 
@@ -192,6 +212,31 @@ extension View {
       message: message()
     )
   }
+
+  public func sheet<SheetContent: View>(
+    isPresented: Binding<Bool>,
+    @ViewBuilder content sheetContent: () -> SheetContent
+  ) -> some View {
+    TerminalSheetModifier(
+      content: self,
+      title: "",
+      isPresented: isPresented,
+      sheetContent: sheetContent()
+    )
+  }
+
+  public func sheet<S: StringProtocol, SheetContent: View>(
+    _ title: S,
+    isPresented: Binding<Bool>,
+    @ViewBuilder content sheetContent: () -> SheetContent
+  ) -> some View {
+    TerminalSheetModifier(
+      content: self,
+      title: String(title),
+      isPresented: isPresented,
+      sheetContent: sheetContent()
+    )
+  }
 }
 
 @MainActor
@@ -235,6 +280,45 @@ private struct TerminalPresentationModifier<Content: View, Actions: View,
             kind: kind,
             actionViews: declaredBuilderChildren(from: actions),
             messageViews: declaredBuilderChildren(from: message),
+            contentViews: [],
+            dismiss: { [isPresented] in
+              isPresented.wrappedValue = false
+            }
+          )
+        ]
+      )
+    )
+    return [node]
+  }
+}
+
+// AnyView policy: retain heterogeneous sheet content while hoisting through
+// preferences to the root presentation host.
+private struct TerminalSheetModifier<Content: View, SheetContent: View>: View,
+  ResolvableView
+{
+  var content: Content
+  var title: String
+  var isPresented: Binding<Bool>
+  var sheetContent: SheetContent
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    var node = content.resolve(in: context)
+    guard isPresented.wrappedValue else {
+      return [node]
+    }
+
+    node.preferenceValues.merge(
+      TerminalPresentationPreferenceKey.self,
+      value: .init(
+        requests: [
+          .init(
+            attachmentIdentity: node.identity,
+            title: title,
+            kind: .sheet,
+            actionViews: [],
+            messageViews: [],
+            contentViews: declaredBuilderChildren(from: sheetContent),
             dismiss: { [isPresented] in
               isPresented.wrappedValue = false
             }
@@ -268,6 +352,7 @@ private struct TerminalHostedPresentation: View {
       kind: request.kind,
       actionViews: request.actionViews,
       messageViews: request.messageViews,
+      contentViews: request.contentViews,
       dismiss: request.dismiss
     )
     .padding(
@@ -282,44 +367,35 @@ private struct TerminalHostedPresentation: View {
   }
 }
 
-private struct TerminalPresentationSurface: View {
+private struct TerminalPresentationSurface: View, ResolvableView {
   var title: String
   var kind: TerminalPresentationKind
   var actionViews: [AnyView]
   var messageViews: [AnyView]
+  var contentViews: [AnyView]
   var dismiss: @MainActor @Sendable () -> Void
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    // Register escape-to-dismiss key handler on the presentation surface.
+    context.localKeyHandlerRegistry?.register(identity: context.identity) {
+      [dismiss] event in
+      guard event == .escape else {
+        return false
+      }
+      dismiss()
+      return true
+    }
+    return resolveViewElements(body, in: context)
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      HStack(alignment: .center, spacing: 1) {
-        Text(title)
-          .bold()
-        Spacer(minLength: 0)
-        Button("×", role: .close, action: dismiss)
-          .buttonStyle(.borderedProminent)
+      presentationHeader
+      if kind.usesContentPresentation {
+        sheetBody
+      } else {
+        alertDialogBody
       }
-      .frame(height: 1, alignment: .leading)
-      .padding(.init(horizontal: 1, vertical: 0))
-      .background(.terminalRow(kind == .alert ? .neutral : .accent, isSelected: true))
-
-      ScrollView(.vertical) {
-        VStack(alignment: .leading, spacing: 0) {
-          if !messageViews.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-              combinedView(from: messageViews, kindName: "PresentationMessage")
-            }
-            .padding(.init(horizontal: 1, vertical: 1))
-          }
-        }
-      }
-      .frame(
-        maxWidth: .infinity,
-        minHeight: .finite(kind == .alert ? 2 : 3),
-        idealHeight: .finite(kind == .alert ? 6 : 4),
-        maxHeight: .finite(kind == .alert ? 10 : 6),
-        alignment: .topLeading
-      )
-      presentationActions
     }
     .padding(.init(horizontal: 1, vertical: 1))
     .background {
@@ -340,6 +416,60 @@ private struct TerminalPresentationSurface: View {
       .init(
         presentationRole: kind.presentationRole
       )
+    )
+  }
+
+  private var presentationHeader: some View {
+    HStack(alignment: .center, spacing: 1) {
+      if !title.isEmpty {
+        Text(title)
+          .bold()
+      }
+      Spacer(minLength: 0)
+      Button("×", role: .close, action: dismiss)
+        .buttonStyle(.borderedProminent)
+    }
+    .frame(height: 1, alignment: .leading)
+    .padding(.init(horizontal: 1, vertical: 0))
+    .background(.terminalRow(kind == .alert ? .neutral : .accent, isSelected: true))
+  }
+
+  private var alertDialogBody: some View {
+    Group {
+      ScrollView(.vertical) {
+        VStack(alignment: .leading, spacing: 0) {
+          if !messageViews.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+              combinedView(from: messageViews, kindName: "PresentationMessage")
+            }
+            .padding(.init(horizontal: 1, vertical: 1))
+          }
+        }
+      }
+      .frame(
+        maxWidth: .infinity,
+        minHeight: .finite(kind == .alert ? 2 : 3),
+        idealHeight: .finite(kind == .alert ? 6 : 4),
+        maxHeight: .finite(kind == .alert ? 10 : 6),
+        alignment: .topLeading
+      )
+      presentationActions
+    }
+  }
+
+  private var sheetBody: some View {
+    ScrollView(.vertical) {
+      VStack(alignment: .leading, spacing: 0) {
+        combinedView(from: contentViews, kindName: "SheetContent")
+      }
+      .padding(.init(horizontal: 1, vertical: 1))
+    }
+    .frame(
+      maxWidth: .infinity,
+      minHeight: .finite(4),
+      idealHeight: .finite(12),
+      maxHeight: .finite(20),
+      alignment: .topLeading
     )
   }
 

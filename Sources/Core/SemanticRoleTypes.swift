@@ -47,6 +47,7 @@ public enum PresentationRole: Hashable, Sendable, CustomStringConvertible {
   case scrollView
   case scrollViewWithIndicators
   case section
+  case sheet
   case slider
   case stepper
   case table
@@ -80,6 +81,8 @@ public enum PresentationRole: Hashable, Sendable, CustomStringConvertible {
       "scrollViewWithIndicators"
     case .section:
       "section"
+    case .sheet:
+      "sheet"
     case .slider:
       "slider"
     case .stepper:

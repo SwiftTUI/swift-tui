@@ -1,3 +1,19 @@
 [tools]
 bun = "latest"
 prek = "latest"
+swift = "latest"
+
+[tasks.release_core]
+description = "Build core for release"
+run = [
+  "cd $MISE_PROJECT_ROOT",
+  "swift build -c release"
+]
+
+[tasks.release_ex_web]
+description = "Build web for release"
+run = [
+  "swift build -c release --package-path GUI/WebTUIGUI",
+  "bun run build GUI/WebTUIGUI"
+]
+depends = ['release_core']

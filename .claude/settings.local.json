@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pm2 --version)"
+      "Bash(pm2 --version)",
+      "Bash(swift build:*)",
+      "Bash(swift test:*)"
     ]
   }
 }
