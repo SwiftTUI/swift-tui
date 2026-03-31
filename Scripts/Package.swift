@@ -25,8 +25,6 @@ let package = Package(
       name: "WebExampleScenes",
       dependencies: [
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
-        .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
       ],
       path: "Sources/WebExampleScenes"
     ),

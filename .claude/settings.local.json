@@ -3,7 +3,10 @@
     "allow": [
       "Bash(pm2 --version)",
       "Bash(swift build:*)",
-      "Bash(swift test:*)"
+      "Bash(swift test:*)",
+      "Bash(grep -n \"focusableControlMetadata\" /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/*.swift)",
+      "Bash(grep:*)",
+      "Bash(ls /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/*.swift)"
     ]
   }
 }
