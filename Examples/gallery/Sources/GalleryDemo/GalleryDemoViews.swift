@@ -12,47 +12,76 @@ struct GalleryDemoSceneView: View {
   }
 
   private func shell(contentHeight: Int) -> some View {
-    ZStack(alignment: .center) {
-      VStack(alignment: .leading, spacing: 0) {
-        headerBar
-        Divider()
-        TabView(selection: $model.activeTab) {
-          controlsWorkbench
-            .tabItem("Controls")
-            .tag("controls")
-          collectionsWorkbench
-            .tabItem("Collections")
-            .tag("collections")
-          appearanceWorkbench
-            .tabItem("Appearance")
-            .tag("appearance")
-          chartsWorkbench
-            .tabItem("Charts")
-            .tag("charts")
-        }
-        .frame(
-          maxWidth: .infinity,
-          minHeight: .finite(contentHeight),
-          idealHeight: .finite(contentHeight),
-          maxHeight: .finite(contentHeight),
-          alignment: .topLeading
-        )
-        Divider()
-        footerBar
+    VStack(alignment: .leading, spacing: 0) {
+      headerBar
+      Divider()
+      TabView(selection: $model.activeTab) {
+        controlsWorkbench
+          .tabItem("Controls")
+          .tag("controls")
+          .command(
+            id: "controls",
+            title: "Show Controls",
+            detail: "Open the controls workbench",
+            keywords: ["buttons", "inputs", "values", "forms"],
+            kind: .navigation
+          )
+        collectionsWorkbench
+          .tabItem("Collections")
+          .tag("collections")
+          .command(
+            id: "collections",
+            title: "Show Collections",
+            detail: "Browse list, picker, outline, and table samples",
+            keywords: ["list", "table", "picker", "outline", "browser"],
+            kind: .navigation
+          )
+        appearanceWorkbench
+          .tabItem("Appearance")
+          .tag("appearance")
+          .command(
+            id: "appearance",
+            title: "Show Appearance",
+            detail: "Compare light, dark, accent propagation, and available colors",
+            keywords: ["theme", "light", "dark", "accent", "colors", "palette"],
+            kind: .navigation
+          )
+        chartsWorkbench
+          .tabItem("Charts")
+          .tag("charts")
+          .command(
+            id: "charts",
+            title: "Show Charts",
+            detail: "Inspect progress, usage, and trend metrics",
+            keywords: ["progress", "usage", "trend", "sparkline"],
+            kind: .navigation
+          )
       }
-      .disabled(model.isPalettePresented)
-
-      if model.isPalettePresented {
-        GalleryCommandPalette(
-          query: $model.paletteQuery,
-          commands: paletteCommands,
-          dismiss: dismissPalette,
-          runCommand: runPaletteCommand
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-      }
+      .command(
+        id: "reset",
+        title: "Reset Interactive Samples",
+        detail: "Restore the default gallery state",
+        keywords: ["reset", "restore", "defaults"],
+        kind: .destructive
+      )
+      .frame(
+        maxWidth: .infinity,
+        minHeight: .finite(contentHeight),
+        idealHeight: .finite(contentHeight),
+        maxHeight: .finite(contentHeight),
+        alignment: .topLeading
+      )
+      .keyboardShortcut("tab", label: "move focus", group: "Navigate")
+      .keyboardShortcut("arrows", label: "move selection", group: "Navigate")
+      .keyboardShortcut("enter", label: "activate", group: "Act")
+      .keyboardShortcut("q", label: "quit", group: "Act")
+      Divider()
     }
+    .keyboardShortcutHelp(alignment: .bottomLeading)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .commandPalette(isPresented: $model.isPalettePresented) { command in
+      runPaletteCommand(command)
+    }
     .alert(
       "Reset gallery state?",
       isPresented: $isResetAlertPresented,
@@ -86,28 +115,6 @@ struct GalleryDemoSceneView: View {
     }
     .padding(.init(horizontal: 1, vertical: 0))
     .background(.terminalRow(.accent, isSelected: true))
-  }
-
-  private var footerBar: some View {
-    DemoHelpStrip(
-      groups: [
-        .init(
-          title: "Navigate",
-          bindings: [
-            .init("tab", "move focus"),
-            .init("arrows", "move selection"),
-          ]
-        ),
-        .init(
-          title: "Act",
-          bindings: [
-            .init("enter", "activate"),
-            .init("q", "quit"),
-          ]
-        ),
-      ]
-    )
-    .padding(.init(horizontal: 1, vertical: 0))
   }
 
   private var controlsWorkbench: some View {
@@ -561,47 +568,7 @@ struct GalleryDemoSceneView: View {
     )
   }
 
-  private var paletteCommands: [GalleryPaletteCommand] {
-    [
-      .init(
-        id: "controls",
-        title: "Show Controls",
-        detail: "Open the controls workbench",
-        keywords: ["buttons", "inputs", "values", "forms"]
-      ),
-      .init(
-        id: "collections",
-        title: "Show Collections",
-        detail: "Browse list, picker, outline, and table samples",
-        keywords: ["list", "table", "picker", "outline", "browser"]
-      ),
-      .init(
-        id: "appearance",
-        title: "Show Appearance",
-        detail: "Compare light, dark, accent propagation, and available colors",
-        keywords: ["theme", "light", "dark", "accent", "colors", "palette"]
-      ),
-      .init(
-        id: "charts",
-        title: "Show Charts",
-        detail: "Inspect progress, usage, and trend metrics",
-        keywords: ["progress", "usage", "trend", "sparkline"]
-      ),
-      .init(
-        id: "reset",
-        title: "Reset Interactive Samples",
-        detail: "Restore the default gallery state",
-        keywords: ["reset", "restore", "defaults"]
-      ),
-    ]
-  }
-
-  private func dismissPalette() {
-    model.isPalettePresented = false
-    model.paletteQuery = ""
-  }
-
-  private func runPaletteCommand(_ command: GalleryPaletteCommand) {
+  private func runPaletteCommand(_ command: Command) {
     switch command.id {
     case "controls":
       model.activeTab = "controls"
@@ -613,12 +580,9 @@ struct GalleryDemoSceneView: View {
       model.activeTab = "charts"
     case "reset":
       model.reset()
-      return
     default:
       break
     }
-
-    dismissPalette()
   }
 }
 
@@ -637,159 +601,3 @@ private struct GalleryOutlineNode: Identifiable {
   }
 }
 
-private struct DemoHelpBinding: Identifiable {
-  let key: String
-  let label: String
-
-  var id: String {
-    key + "\u{001F}" + label
-  }
-
-  init(_ key: String, _ label: String) {
-    self.key = key
-    self.label = label
-  }
-}
-
-private struct DemoHelpGroup: Identifiable {
-  let title: String?
-  let bindings: [DemoHelpBinding]
-
-  var id: String {
-    (title ?? "") + "\u{001F}" + bindings.map(\.id).joined(separator: "|")
-  }
-
-  init(title: String? = nil, bindings: [DemoHelpBinding]) {
-    self.title = title
-    self.bindings = bindings
-  }
-}
-
-private struct DemoHelpStrip: View {
-  let groups: [DemoHelpGroup]
-
-  var body: some View {
-    ScrollView(.horizontal) {
-      HStack(alignment: .center, spacing: 2) {
-        ForEach(groups) { group in
-          HStack(alignment: .center, spacing: 1) {
-            if let title = group.title {
-              Text(title)
-                .foregroundStyle(.separator)
-            }
-
-            ForEach(group.bindings) { binding in
-              HStack(alignment: .center, spacing: 1) {
-                Text("[\(binding.key)]")
-                  .bold()
-                Text(binding.label)
-              }
-            }
-          }
-        }
-      }
-      .fixedSize(horizontal: true, vertical: false)
-    }
-    .frame(
-      maxWidth: .infinity,
-      minHeight: .finite(1),
-      idealHeight: .finite(1),
-      maxHeight: .finite(1),
-      alignment: .leading
-    )
-  }
-}
-
-private struct GalleryPaletteCommand: Identifiable {
-  let id: String
-  let title: String
-  let detail: String
-  let keywords: [String]
-}
-
-private struct GalleryCommandPalette: View {
-  @Binding var query: String
-  let commands: [GalleryPaletteCommand]
-  let dismiss: () -> Void
-  let runCommand: (GalleryPaletteCommand) -> Void
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      VStack(alignment: .leading, spacing: 0) {
-        Text("Command Palette")
-          .bold()
-        Text("Search demos")
-          .foregroundStyle(.separator)
-      }
-      .padding(1)
-
-      Divider()
-
-      VStack(alignment: .leading, spacing: 1) {
-        TextField("Search commands", text: $query)
-          .frame(maxWidth: .infinity, alignment: .leading)
-
-        Divider()
-
-        VStack(alignment: .leading, spacing: 0) {
-          if filteredCommands.isEmpty {
-            Text("No matching commands")
-              .foregroundStyle(.separator)
-          } else {
-            ForEach(filteredCommands) { command in
-              Button(
-                action: {
-                  runCommand(command)
-                }
-              ) {
-                VStack(alignment: .leading, spacing: 0) {
-                  Text(command.title)
-                  Text(command.detail)
-                    .foregroundStyle(.separator)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-              }
-              .buttonStyle(.plain)
-            }
-          }
-        }
-
-        Divider()
-
-        HStack(alignment: .center, spacing: 1) {
-          Text("[enter]")
-            .bold()
-          Text("run")
-          Spacer(minLength: 0)
-          Button("Close") {
-            dismiss()
-          }
-          .buttonStyle(.plain)
-        }
-      }
-      .padding(1)
-    }
-    .background {
-      RoundedRectangle(cornerRadius: 1).fill(.terminalSurfaceBackground)
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: 1).strokeBorder(.terminalBorder(.accent))
-    }
-    .focusScope()
-  }
-
-  private var filteredCommands: [GalleryPaletteCommand] {
-    let needle = query.lowercased().split(whereSeparator: { $0.isWhitespace }).map {
-      String($0)
-    }.joined(separator: " ")
-    guard !needle.isEmpty else {
-      return commands
-    }
-
-    return commands.filter { command in
-      command.title.lowercased().contains(needle)
-        || command.detail.lowercased().contains(needle)
-        || command.keywords.contains(where: { $0.lowercased().contains(needle) })
-    }
-  }
-}

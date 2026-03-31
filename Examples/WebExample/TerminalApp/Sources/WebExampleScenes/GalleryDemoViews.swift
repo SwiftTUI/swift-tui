@@ -3,111 +3,16 @@ import TerminalUICharts
 
 struct GalleryDemoSceneView: View {
   @Bindable var model: GalleryDemoModel
-  @State private var isResetAlertPresented = false
   @State var pickerScratch: String = "one"
+
   var body: some View {
-    GeometryReader { geometry in
-      shell(contentHeight: max(0, geometry.size.height - 4))
-    }
-  }
-
-  private func shell(contentHeight: Int) -> some View {
-    ZStack(alignment: .center) {
-      VStack(alignment: .leading, spacing: 0) {
-        headerBar
-        Divider()
-        TabView(selection: $model.activeTab) {
-          controlsWorkbench
-            .tabItem("Controls")
-            .tag("controls")
-          collectionsWorkbench
-            .tabItem("Collections")
-            .tag("collections")
-          appearanceWorkbench
-            .tabItem("Appearance")
-            .tag("appearance")
-          chartsWorkbench
-            .tabItem("Charts")
-            .tag("charts")
-        }
-        .frame(
-          maxWidth: .infinity,
-          minHeight: .finite(contentHeight),
-          idealHeight: .finite(contentHeight),
-          maxHeight: .finite(contentHeight),
-          alignment: .topLeading
-        )
-        Divider()
-        footerBar
-      }
-      .disabled(model.isPalettePresented)
-
-      if model.isPalettePresented {
-        GalleryCommandPalette(
-          query: $model.paletteQuery,
-          commands: paletteCommands,
-          dismiss: dismissPalette,
-          runCommand: runPaletteCommand
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-      }
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .alert(
-      "Reset gallery state?",
-      isPresented: $isResetAlertPresented,
-      actions: {
-        Button("Reset", role: .destructive) {
-          model.reset()
-        }
-        Button("Cancel", role: .cancel) {
-          isResetAlertPresented = false
-        }
-      },
-      message: {
-        Text("Clears the interactive control and appearance samples?")
-      }
-    )
-  }
-
-  private var headerBar: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 1) {
-      Text("Gallery")
-        .bold()
-      Text("—")
+    VStack(alignment: .leading, spacing: 1) {
+      Text("WebExample component preview")
+      Text("Active tab: \(model.activeTab.capitalized)")
+      Text("The full interactive gallery remains available in the native example target.")
         .foregroundStyle(.separator)
-      Text(model.activeTab.capitalized)
-        .foregroundStyle(.info)
-      Spacer()
-      Button("Control Panel") {
-        model.isPalettePresented = true
-      }
-      .buttonStyle(.plain)
     }
-    .padding(.init(horizontal: 1, vertical: 0))
-    .background(.terminalRow(.accent, isSelected: true))
-  }
-
-  private var footerBar: some View {
-    DemoHelpStrip(
-      groups: [
-        .init(
-          title: "Navigate",
-          bindings: [
-            .init("tab", "move focus"),
-            .init("arrows", "move selection"),
-          ]
-        ),
-        .init(
-          title: "Act",
-          bindings: [
-            .init("enter", "activate"),
-            .init("q", "quit"),
-          ]
-        ),
-      ]
-    )
-    .padding(.init(horizontal: 1, vertical: 0))
+    .padding(1)
   }
 
   private var controlsWorkbench: some View {
@@ -185,7 +90,7 @@ struct GalleryDemoSceneView: View {
             model.increment()
           }
           Button("Reset", role: .destructive) {
-            isResetAlertPresented = true
+            model.reset()
           }
           Button("Plain") {
             model.increment()
@@ -308,46 +213,46 @@ struct GalleryDemoSceneView: View {
       .outlineStyle(.rounded)
       .frame(maxWidth: .infinity, alignment: .topLeading)
     default:
-    VStack(alignment: .leading) {
+      VStack(alignment: .leading) {
         TabView(selection: $model.pickerSelection) {
-        Picker("Selection Type", selection: $pickerScratch) {
-          Text("One").tag("one")
-          Text("Two").tag("two")
-          Text("Three").tag("three")
-        }
-        .pickerStyle(.segmented)
-        .tabItem("segmented")
-        .tag("segmented")
+          Picker("Selection Type", selection: $pickerScratch) {
+            Text("One").tag("one")
+            Text("Two").tag("two")
+            Text("Three").tag("three")
+          }
+          .pickerStyle(.segmented)
+          .tabItem("segmented")
+          .tag("segmented")
 
-        Picker("Selection Type", selection: $pickerScratch) {
-          Text("One").tag("one")
-          Text("Two").tag("two")
-          Text("Three").tag("three")
-        }
-        .pickerStyle(.inline)
-        .tabItem("inline")
-        .tag("inline")
+          Picker("Selection Type", selection: $pickerScratch) {
+            Text("One").tag("one")
+            Text("Two").tag("two")
+            Text("Three").tag("three")
+          }
+          .pickerStyle(.inline)
+          .tabItem("inline")
+          .tag("inline")
 
-        Picker("Radio Group", selection: $pickerScratch) {
-          Text("One").tag("one")
-          Text("Two").tag("two")
-          Text("Three").tag("three")
-        }
-        .pickerStyle(.radioGroup)
-        .tabItem("radioGroup")
-        .tag("radioGroup")
+          Picker("Radio Group", selection: $pickerScratch) {
+            Text("One").tag("one")
+            Text("Two").tag("two")
+            Text("Three").tag("three")
+          }
+          .pickerStyle(.radioGroup)
+          .tabItem("radioGroup")
+          .tag("radioGroup")
 
-        Picker("Menu", selection: $pickerScratch) {
-          Text("One").tag("one")
-          Text("Two").tag("two")
-          Text("Three").tag("three")
-        }
-        .pickerStyle(.menu)
-        .tabItem("menu")
-        .tag("menu")
+          Picker("Menu", selection: $pickerScratch) {
+            Text("One").tag("one")
+            Text("Two").tag("two")
+            Text("Three").tag("three")
+          }
+          .pickerStyle(.menu)
+          .tabItem("menu")
+          .tag("menu")
         }
         Text("(selection: \(pickerScratch))")
-    }
+      }
     }
   }
 
@@ -356,7 +261,7 @@ struct GalleryDemoSceneView: View {
       selection: $model.selectedAppearanceDemo,
       entries: [
         "light",
-         "dark",
+        "dark",
         "accent",
         "colors",
       ],
@@ -561,65 +466,6 @@ struct GalleryDemoSceneView: View {
     )
   }
 
-  private var paletteCommands: [GalleryPaletteCommand] {
-    [
-      .init(
-        id: "controls",
-        title: "Show Controls",
-        detail: "Open the controls workbench",
-        keywords: ["buttons", "inputs", "values", "forms"]
-      ),
-      .init(
-        id: "collections",
-        title: "Show Collections",
-        detail: "Browse list, picker, outline, and table samples",
-        keywords: ["list", "table", "picker", "outline", "browser"]
-      ),
-      .init(
-        id: "appearance",
-        title: "Show Appearance",
-        detail: "Compare light, dark, accent propagation, and available colors",
-        keywords: ["theme", "light", "dark", "accent", "colors", "palette"]
-      ),
-      .init(
-        id: "charts",
-        title: "Show Charts",
-        detail: "Inspect progress, usage, and trend metrics",
-        keywords: ["progress", "usage", "trend", "sparkline"]
-      ),
-      .init(
-        id: "reset",
-        title: "Reset Interactive Samples",
-        detail: "Restore the default gallery state",
-        keywords: ["reset", "restore", "defaults"]
-      ),
-    ]
-  }
-
-  private func dismissPalette() {
-    model.isPalettePresented = false
-    model.paletteQuery = ""
-  }
-
-  private func runPaletteCommand(_ command: GalleryPaletteCommand) {
-    switch command.id {
-    case "controls":
-      model.activeTab = "controls"
-    case "collections":
-      model.activeTab = "collections"
-    case "appearance":
-      model.activeTab = "appearance"
-    case "charts":
-      model.activeTab = "charts"
-    case "reset":
-      model.reset()
-      return
-    default:
-      break
-    }
-
-    dismissPalette()
-  }
 }
 
 private struct GalleryOutlineNode: Identifiable {
@@ -634,162 +480,5 @@ private struct GalleryOutlineNode: Identifiable {
     id = title
     self.title = title
     self.children = children
-  }
-}
-
-private struct DemoHelpBinding: Identifiable {
-  let key: String
-  let label: String
-
-  var id: String {
-    key + "\u{001F}" + label
-  }
-
-  init(_ key: String, _ label: String) {
-    self.key = key
-    self.label = label
-  }
-}
-
-private struct DemoHelpGroup: Identifiable {
-  let title: String?
-  let bindings: [DemoHelpBinding]
-
-  var id: String {
-    (title ?? "") + "\u{001F}" + bindings.map(\.id).joined(separator: "|")
-  }
-
-  init(title: String? = nil, bindings: [DemoHelpBinding]) {
-    self.title = title
-    self.bindings = bindings
-  }
-}
-
-private struct DemoHelpStrip: View {
-  let groups: [DemoHelpGroup]
-
-  var body: some View {
-    ScrollView(.horizontal) {
-      HStack(alignment: .center, spacing: 2) {
-        ForEach(groups) { group in
-          HStack(alignment: .center, spacing: 1) {
-            if let title = group.title {
-              Text(title)
-                .foregroundStyle(.separator)
-            }
-
-            ForEach(group.bindings) { binding in
-              HStack(alignment: .center, spacing: 1) {
-                Text("[\(binding.key)]")
-                  .bold()
-                Text(binding.label)
-              }
-            }
-          }
-        }
-      }
-      .fixedSize(horizontal: true, vertical: false)
-    }
-    .frame(
-      maxWidth: .infinity,
-      minHeight: .finite(1),
-      idealHeight: .finite(1),
-      maxHeight: .finite(1),
-      alignment: .leading
-    )
-  }
-}
-
-private struct GalleryPaletteCommand: Identifiable {
-  let id: String
-  let title: String
-  let detail: String
-  let keywords: [String]
-}
-
-private struct GalleryCommandPalette: View {
-  @Binding var query: String
-  let commands: [GalleryPaletteCommand]
-  let dismiss: () -> Void
-  let runCommand: (GalleryPaletteCommand) -> Void
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      VStack(alignment: .leading, spacing: 0) {
-        Text("Command Palette")
-          .bold()
-        Text("Search demos")
-          .foregroundStyle(.separator)
-      }
-      .padding(1)
-
-      Divider()
-
-      VStack(alignment: .leading, spacing: 1) {
-        TextField("Search commands", text: $query)
-          .frame(maxWidth: .infinity, alignment: .leading)
-
-        Divider()
-
-        VStack(alignment: .leading, spacing: 0) {
-          if filteredCommands.isEmpty {
-            Text("No matching commands")
-              .foregroundStyle(.separator)
-          } else {
-            ForEach(filteredCommands) { command in
-              Button(
-                action: {
-                  runCommand(command)
-                }
-              ) {
-                VStack(alignment: .leading, spacing: 0) {
-                  Text(command.title)
-                  Text(command.detail)
-                    .foregroundStyle(.separator)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-              }
-              .buttonStyle(.plain)
-            }
-          }
-        }
-
-        Divider()
-
-        HStack(alignment: .center, spacing: 1) {
-          Text("[enter]")
-            .bold()
-          Text("run")
-          Spacer(minLength: 0)
-          Button("Close") {
-            dismiss()
-          }
-          .buttonStyle(.plain)
-        }
-      }
-      .padding(1)
-    }
-    .background {
-      RoundedRectangle(cornerRadius: 1).fill(.terminalSurfaceBackground)
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: 1).strokeBorder(.terminalBorder(.accent))
-    }
-    .focusScope()
-  }
-
-  private var filteredCommands: [GalleryPaletteCommand] {
-    let needle = query.lowercased().split(whereSeparator: { $0.isWhitespace }).map {
-      String($0)
-    }.joined(separator: " ")
-    guard !needle.isEmpty else {
-      return commands
-    }
-
-    return commands.filter { command in
-      command.title.lowercased().contains(needle)
-        || command.detail.lowercased().contains(needle)
-        || command.keywords.contains(where: { $0.lowercased().contains(needle) })
-    }
   }
 }

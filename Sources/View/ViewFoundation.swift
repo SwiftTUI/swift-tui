@@ -173,6 +173,9 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
     case .trueContent(let content):
       return resolveViewElements(content, in: context)
     case .falseContent(let content):
+      if collapsesImplicitEmptyFalseBranch, content is EmptyView {
+        return []
+      }
       return resolveViewElements(content, in: context)
     }
   }

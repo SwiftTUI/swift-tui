@@ -4,7 +4,6 @@ import Observation
 final class GalleryDemoModel: @unchecked Sendable {
   var activeTab = "controls"
   var isPalettePresented = false
-  var paletteQuery = ""
   var selectedControlDemo = "buttons"
   var selectedCollectionDemo = "picker"
   var selectedAppearanceDemo = "light"
@@ -27,7 +26,6 @@ final class GalleryDemoModel: @unchecked Sendable {
   func reset() {
     activeTab = "controls"
     isPalettePresented = false
-    paletteQuery = ""
     selectedControlDemo = "buttons"
     selectedCollectionDemo = "picker"
     selectedAppearanceDemo = "light"

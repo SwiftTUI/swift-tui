@@ -147,6 +147,31 @@ struct ViewResolutionTests {
     #expect(resolved.children.count == 5)
     #expect(counter.count == 3)
   }
+
+  @Test("overlay and background builders tolerate implicit EmptyView branches")
+  func overlayAndBackgroundImplicitEmptyBranchesResolve() {
+    let resolver = Resolver()
+    let view = Text("Hello")
+      .background {
+        if false {
+          Text("Background")
+        }
+      }
+      .overlay {
+        if false {
+          Text("Overlay")
+        }
+      }
+
+    let resolved = resolver.resolve(
+      AnyView(view), in: ResolveContext(identity: testIdentity("root")))
+
+    #expect(resolved.identity == testIdentity("root"))
+    #expect(resolved.kind == .view("Overlay"))
+    #expect(resolved.children.count == 2)
+    #expect(resolved.children[0].kind == .view("Background"))
+    #expect(resolved.children[1].kind == .view("EmptyView"))
+  }
 }
 
 private final class ResolveInvocationCounter: @unchecked Sendable {

@@ -635,8 +635,14 @@ package struct OverlayView<Base: View, OverlayContent: View>: View, ResolvableVi
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let baseNode = base.resolve(in: context.child(component: .named("base")))
-    let overlayNode = overlay.resolve(in: context.child(component: .named("overlay")))
+    let baseNode = resolveWrapperContent(
+      base,
+      in: context.child(component: .named("base"))
+    )
+    let overlayNode = resolveWrapperContent(
+      overlay,
+      in: context.child(component: .named("overlay"))
+    )
     return [
       ResolvedNode(
         identity: context.identity,
@@ -692,8 +698,14 @@ package struct BackgroundView<Base: View, BackgroundContent: View>: View, Resolv
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let backgroundNode = background.resolve(in: context.child(component: .named("background")))
-    let baseNode = base.resolve(in: context.child(component: .named("base")))
+    let backgroundNode = resolveWrapperContent(
+      background,
+      in: context.child(component: .named("background"))
+    )
+    let baseNode = resolveWrapperContent(
+      base,
+      in: context.child(component: .named("base"))
+    )
     return [
       ResolvedNode(
         identity: context.identity,
