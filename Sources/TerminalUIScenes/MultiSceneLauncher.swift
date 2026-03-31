@@ -599,11 +599,11 @@ private func integerEnvironmentValue(
 private func environmentValue(
   named name: String
 ) -> String? {
-  name.withCString { cName in
-    guard let rawValue = getenv(cName) else {
+  unsafe name.withCString { cName in
+    guard let rawValue = unsafe getenv(cName) else {
       return nil
     }
-    return String(cString: rawValue)
+    return unsafe String(cString: rawValue)
   }
 }
 

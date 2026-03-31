@@ -11,9 +11,8 @@ Structural guardrails that do not need to execute the runtime live in `prek`
 hooks instead of the Swift test suite:
 
 - `swift-format`: formats staged Swift files
-- `no-foundation-in-library-products`: inline `prek.toml` check that forbids `Foundation` imports in library-product sources
+- `no-foundation-in-library-products`: inline `prek.toml` check that forbids `Foundation` imports in the pure `Core` and `View` layers
 - `Scripts/check_public_surface_policies.zsh`: enforces public-surface guardrails, actor-isolation documentation, and related docs
-- `Scripts/check_rendered_text_fixture_matrix.zsh`: enforces that every committed rendered-text fixture directory contains the full supported terminal configuration matrix
 
 Keep runtime, integration, and behavioral guarantees in tests. Move pure
 repository-shape or text-pattern checks into hooks when they can fail earlier
@@ -22,6 +21,10 @@ and more locally.
 There is not currently a dedicated checked-in source-layout hook. The source
 map in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) is therefore kept in sync through
 review, docs maintenance, and the broader public-surface policy checks.
+
+Rendered-text fixture matrix completeness is currently enforced by
+`RenderedTextFixtureSupportTests` and the fixture-verification helpers in the
+test suite, not by a separate pre-commit hook.
 
 ## Test Topology
 

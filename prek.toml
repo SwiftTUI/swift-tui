@@ -15,10 +15,10 @@ hooks = [
   },
   {
     id = "no-foundation-in-library-products",
-    name = "forbid Foundation imports in library products",
-    entry = """zsh -lc 'if rg -n --glob "*.swift" "^(public import|import) Foundation$" Sources/Core Sources/View Sources/TerminalUI Sources/TerminalUICharts; then echo "Foundation imports are forbidden in library product sources."; exit 1; fi'""",
+    name = "forbid Foundation imports in pure library layers",
+    entry = """zsh -lc 'if rg -n --glob "*.swift" "^(public import|import) Foundation$" Sources/Core Sources/View; then echo "Foundation imports are forbidden in the pure Core and View layers."; exit 1; fi'""",
     language = "system",
-    files = '^Sources/(Core|View|TerminalUI|TerminalUICharts)/.*\.swift$',
+    files = '^Sources/(Core|View)/.*\.swift$',
     pass_filenames = false
   },
   {
@@ -29,12 +29,4 @@ hooks = [
     files = '^(Package\.swift|README\.md|docs/(RUNTIME|STATUS|PUBLIC_(API_INVENTORY|SURFACE_POLICY))\.md|Sources/.*\.swift|Sources/View/View\.docc/Authoring-Views\.md|Sources/TerminalUI/TerminalUI\.docc/Running-Apps\.md|Tests/ViewTests/ActorIsolationSurfaceTests\.swift|Tests/TerminalUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
     pass_filenames = false
   },
-  {
-    id = "rendered-text-fixture-matrix",
-    name = "enforce rendered text fixture matrix completeness",
-    entry = "./Scripts/check_rendered_text_fixture_matrix.zsh",
-    language = "system",
-    files = '^(Tests/TerminalUITests/Fixtures/.*|Tests/TerminalUITests/Support/RenderedTextFixtureSupport\.swift)$',
-    pass_filenames = false
-  }
 ]

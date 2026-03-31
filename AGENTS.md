@@ -28,9 +28,8 @@ swift format format -i --configuration .swift-format.json Sources/ Tests/  # For
 ## Pre-commit Hooks (prek)
 
 - **swift-format**: Auto-formats staged `.swift` files on commit.
-- **no-foundation-in-library-products**: Blocks commits that add `import Foundation` or `public import Foundation` in `Sources/Core`, `Sources/View`, `Sources/TerminalUI`, or `Sources/TerminalUICharts`. Foundation is forbidden in all library product sources.
+- **no-foundation-in-library-products**: Blocks commits that add `import Foundation` or `public import Foundation` in the pure `Sources/Core` and `Sources/View` layers.
 - **public-surface-policies**: Enforces public surface guardrails, prototype target packaging rules, and the docs that describe that policy.
-- **rendered-text-fixture-matrix**: Ensures every committed rendered-text fixture case contains the full supported terminal configuration matrix.
 
 There is not currently a separate checked-in source-layout hook. Keep
 `docs/SOURCE_LAYOUT.md` aligned with file moves in ordinary review.
@@ -98,6 +97,9 @@ Tests are now split by layer:
 
 Repository-shape and policy regressions that do not require execution are enforced in `prek`
 hooks under `Scripts/`.
+
+Rendered-text fixture matrix completeness is currently verified in the Swift
+test suite rather than through a separate pre-commit hook.
 
 Fixture updates require explanation when they cross unrelated subsystems or alter previously-stable scenarios. See `docs/TESTING_AND_FIXTURE_POLICY.md`.
 

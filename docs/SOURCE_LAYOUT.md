@@ -124,4 +124,4 @@ library product. Downstream package consumers reach those types through
 - New files should belong to one subsystem only.
 - Shared helpers should move into support files before they are duplicated across features.
 - Source-map changes should be updated here alongside any relevant changes to [ARCHITECTURE.md](ARCHITECTURE.md), [STATUS.md](STATUS.md), and [TESTING_AND_FIXTURE_POLICY.md](TESTING_AND_FIXTURE_POLICY.md).
-- The repo currently enforces public-surface and fixture guardrails through `Scripts/check_public_surface_policies.zsh` and `Scripts/check_rendered_text_fixture_matrix.zsh`. There is not a separate checked-in source-layout hook today, so file-map drift must be caught through review and this document.
+- The repo currently enforces public-surface guardrails through `Scripts/check_public_surface_policies.zsh`. There is not a separate checked-in source-layout hook today, so file-map drift must be caught through review and this document.

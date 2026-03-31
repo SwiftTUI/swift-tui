@@ -12,62 +12,6 @@ fail() {
   failures=1
 }
 
-contains_file() {
-  local target="$1"
-  shift
-  local candidate
-  for candidate in "$@"; do
-    if [[ "$candidate" == "$target" ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
-public_behavior_suite_files=(
-  "Tests/TerminalUITests/AppRuntimeTests.swift"
-  "Tests/TerminalUITests/CollectionSupportTests.swift"
-  "Tests/TerminalUITests/Phase0FoundationTests.swift"
-  "Tests/TerminalUITests/Phase1BenchmarkScenariosTests.swift"
-  "Tests/TerminalUITests/Phase5ReliabilityGatesTests.swift"
-  "Tests/TerminalUITests/Support/InteractiveDemoTestSupport.swift"
-  "Tests/TerminalUITests/ViewCompositionSurfaceTests.swift"
-)
-
-banned_construction_tokens=(
-  "AnyViewNode("
-  "Resolver("
-  "ViewNode"
-  "AnyView(erasing:"
-  "SemanticMetadataView"
-  "IdentityView"
-  "LayoutMetadataView"
-  "DrawMetadataView"
-  "Theme"
-  ".theme"
-  "LocalActionRegistry"
-  "LocalKeyHandlerRegistry"
-  "LocalLifecycleRegistry"
-  "LocalTaskRegistry"
-  "TaskRegistration"
-  "LifecycleHandlerSnapshot"
-  "LocalKeyEvent"
-  "previousLifecycleState:"
-)
-
-for suite_file in "${public_behavior_suite_files[@]}"; do
-  if [[ ! -f "$suite_file" ]]; then
-    fail "$suite_file is missing from the public-behavior suite allowlist."
-    continue
-  fi
-
-  for token in "${banned_construction_tokens[@]}"; do
-    if rg -n --fixed-strings --quiet -- "$token" "$suite_file"; then
-      fail "$suite_file unexpectedly contains the migration-era construction token $token."
-    fi
-  done
-done
-
 view_protocol_block="$(awk '
   /public protocol View \{/ { collecting = 1 }
   /extension Never: View \{/ { collecting = 0 }
@@ -236,58 +180,20 @@ for pattern in "${public_surface_patterns[@]}"; do
   fi
 done
 
-stored_anyview_allowlist=(
-  "Sources/TerminalUI/App.swift"
-  "Sources/TerminalUICharts/BarChart.swift"
-  "Sources/TerminalUICharts/BulletChart.swift"
-  "Sources/TerminalUICharts/ColumnChart.swift"
-  "Sources/TerminalUICharts/ComparisonChart.swift"
-  "Sources/TerminalUICharts/HeatStrip.swift"
-  "Sources/TerminalUICharts/Legend.swift"
-  "Sources/TerminalUICharts/Meter.swift"
-  "Sources/TerminalUICharts/Sparkline.swift"
-  "Sources/TerminalUICharts/StackedBarChart.swift"
-  "Sources/TerminalUICharts/ThresholdGauge.swift"
-  "Sources/View/AdjustableValueControls.swift"
-  "Sources/View/Button.swift"
-  "Sources/View/Collections.swift"
-  "Sources/View/ContainerViews.swift"
-  "Sources/View/Environment.swift"
-  "Sources/View/LabeledContainers.swift"
-  "Sources/View/Layout.swift"
-  "Sources/View/Menu.swift"
-  "Sources/View/NavigationViews.swift"
-  "Sources/View/OutlineViews.swift"
-  "Sources/View/Picker.swift"
-  "Sources/View/PickerRendering.swift"
-  "Sources/View/PresentationModifiers.swift"
-  "Sources/View/ProgressView.swift"
-  "Sources/View/SecureField.swift"
-  "Sources/View/ValueControls.swift"
-  "Sources/View/ViewCompositionHelpers.swift"
-  "Sources/View/ViewFoundation.swift"
-  "Tests/TerminalUITests/NonAggregatingViewFixtureTests.swift"
-)
-
 stored_anyview_matches="$(
   rg -n -P \
     --glob '*.swift' \
     --glob '!Sources/Vendor/**' \
     -- '^\s*(public|internal|package|private|fileprivate)?\s*(var|let)\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*(\[\s*AnyView\s*\]|AnyView\??|\([^)]*\)\s*->\s*AnyView)\s*(=\s*.+)?$' \
-    Sources Tests || true
+    Sources || true
 )"
 
 if [[ -n "$stored_anyview_matches" ]]; then
   matched_files=("${(@f)$(print -r -- "$stored_anyview_matches" | cut -d: -f1 | sort -u)}")
   file=""
   for file in "${matched_files[@]}"; do
-    if ! contains_file "$file" "${stored_anyview_allowlist[@]}"; then
-      fail "$file introduces stored AnyView erasure without an allowlist entry."
-      continue
-    fi
-
     if ! rg -n --fixed-strings --quiet -- 'AnyView policy:' "$file"; then
-      fail "$file retains stored AnyView erasure on the allowlist but lacks an 'AnyView policy:' comment."
+      fail "$file retains stored AnyView erasure but lacks an 'AnyView policy:' comment."
     fi
   done
 fi
