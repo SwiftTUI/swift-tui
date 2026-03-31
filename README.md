@@ -57,10 +57,6 @@ import TerminalUIScenes
 
 @main
 struct DemoApp: App {
-  static func main() async throws {
-    try await MultiSceneLauncher.run(Self())
-  }
-
   var body: some Scene {
     WindowGroup("Deploy Dashboard") {
       BuildSummary()
@@ -69,8 +65,17 @@ struct DemoApp: App {
 }
 ```
 
-`MultiSceneLauncher` gracefully falls back to the single-scene runtime when the app only declares one `WindowGroup`, so the same launch path works for single-window and multi-window apps today.
-App and scene construction follow the same main-actor model as SwiftUI, so construct app values on the main actor before launching when you are outside an already main-actor-isolated entry point.
+`TerminalUIScenes` now provides a default `App.main()` that launches terminal-native
+apps through `MultiSceneLauncher`. When you want an explicit launcher instead of
+`@main`, the preferred one-line entry point is:
+
+```swift
+try await MultiSceneLauncher.run(DemoApp.self)
+```
+
+`MultiSceneLauncher` gracefully falls back to the single-scene runtime when the
+app only declares one `WindowGroup`, so the same launch path works for
+single-window and multi-window apps today.
 
 ## What Ships Today
 
@@ -83,15 +88,20 @@ App and scene construction follow the same main-actor model as SwiftUI, so const
 
 ## Package Products
 
-| Product | Role |
+| Library Product | Role |
 | --- | --- |
-| `View` | SwiftUI-shaped view authoring surface: `View`, builders, property wrappers, environment, focus, layouts, containers, and controls. |
-| `Core` | Pure frame-pipeline types and algorithms: geometry, styling, layout, semantics, draw extraction, rasterization, diagnostics, and commit planning. No terminal I/O. |
-| `TerminalUI` | Runtime integration for terminals: `Resolver`, `DefaultRenderer`, `RunLoop`, terminal host I/O, input parsing, signal handling, and presentation planning. |
-| `TerminalUIScenes` | Optional scene-runtime layer for multi-window apps, scene discovery, pty-backed secondary scenes, and attachment flows. |
-| `TerminalUICharts` | Compact chart and metric views built on `View` and `Core`. Useful for dashboards and operational surfaces without changing the core architecture story. |
+| `View` | SwiftUI-shaped authoring surface: `View`, builders, property wrappers, environment, focus, layouts, containers, and controls. |
+| `TerminalUI` | Terminal runtime integration plus low-level rendering entry points. This product re-exports the `View` and `Core` layers used by the runtime. |
+| `TerminalUIScenes` | Optional scene-runtime layer for multi-window apps, public scene launch, scene manifests, hosted sessions, and attachment flows. This product re-exports `TerminalUI`. |
+| `TerminalUICharts` | Compact chart and metric views built on `View` and the shared pipeline types re-exported through `TerminalUI`. |
 
-Prototype and showcase code still lives in this repository, but it is intentionally not part of the supported package product surface. In particular, `PrototypeUIComponents` remains a repo-local target for experiments and regression coverage rather than a downstream import.
+`Core` remains the shared pipeline and data-model target that powers these
+products, but it is not shipped as a separate library product today.
+
+Prototype and showcase code still lives in this repository, but it is
+intentionally not part of the supported package product surface. In
+particular, `PrototypeUIComponents` remains a repo-local target for experiments
+and regression coverage rather than a downstream import.
 
 ## Requirements
 

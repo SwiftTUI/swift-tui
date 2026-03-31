@@ -15,6 +15,16 @@ import View
 /// This is currently the public launch entry point for scene-based TerminalUI
 /// apps, including the single-window case.
 public enum MultiSceneLauncher {
+  /// Constructs an app on the main actor and runs it through the terminal
+  /// launcher flow.
+  ///
+  /// This is the recommended API to call from a standalone `main.swift` or a
+  /// custom `static main()` implementation.
+  @MainActor
+  public static func run<A: App>(_ appType: A.Type) async throws {
+    try await run(appType.init())
+  }
+
   /// Runs a scene-based app. Call this from your app type's `main()`.
   @MainActor
   public static func run<A: App>(_ app: A) async throws {
@@ -49,7 +59,7 @@ public enum MultiSceneLauncher {
       case .listInstances:
         listInstances(appName: appName)
       case .listScenes(let selector):
-      try listScenes(appName: appName, selector: selector)
+        try listScenes(appName: appName, selector: selector)
       case .attach(let sceneID, let selector):
         try await attach(appName: appName, sceneID: sceneID, selector: selector)
       }
@@ -364,7 +374,8 @@ public enum MultiSceneLauncher {
         return configurations[0]
       }
 
-      return configurations.first(where: { $0.identifier.rawValue == selector }) ?? configurations[0]
+      return configurations.first(where: { $0.identifier.rawValue == selector })
+        ?? configurations[0]
     }
 
     @MainActor
@@ -593,6 +604,17 @@ private func environmentValue(
       return nil
     }
     return String(cString: rawValue)
+  }
+}
+
+extension App {
+  /// Default entry point for terminal-native `TerminalUI` apps.
+  ///
+  /// Mark a terminal-only app with `@main` to use this automatically, or call
+  /// `MultiSceneLauncher.run(Self.self)` from a custom launcher when you need
+  /// explicit error handling.
+  public static func main() async throws {
+    try await MultiSceneLauncher.run(Self.self)
   }
 }
 

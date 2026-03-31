@@ -1,8 +1,11 @@
 # Documentation
 
-Last updated: March 26, 2026
+Last updated: March 30, 2026
 
-This directory holds the project-internal reference set: architecture notes, runtime rules, source ownership, and API governance. Public-facing module documentation now also lives in per-target `*.docc` catalogs under `Sources/`.
+This directory holds the project-internal reference set: architecture notes,
+runtime rules, planning status, source ownership, and API governance.
+Public-facing module documentation also lives in per-target `*.docc` catalogs
+under `Sources/`.
 
 ## Read This First
 
@@ -14,11 +17,11 @@ This directory holds the project-internal reference set: architecture notes, run
 ## Public Documentation Surfaces
 
 - [../README.md](../README.md): public landing page for the repository
-- `Sources/Core/Core.docc`: public module overview for `Core`
 - `Sources/View/View.docc`: public module overview for `View`
 - `Sources/TerminalUI/TerminalUI.docc`: public module overview for `TerminalUI`
 - `Sources/TerminalUIScenes/TerminalUIScenes.docc`: public module overview for `TerminalUIScenes`
 - `Sources/TerminalUICharts/TerminalUICharts.docc`: public module overview for `TerminalUICharts`
+- `Sources/Core/Core.docc`: target-level reference for the shared pipeline types re-exported through `TerminalUI`
 
 Generate DocC archives with the repo-default `swiftly` toolchain:
 
@@ -33,10 +36,19 @@ default package-development documentation uses `swiftly`.
 
 ## Runtime And Implementation References
 
-- [RUNTIME.md](RUNTIME.md): lifecycle or task semantics, state rules, environment rules, and incremental rendering behavior
+- [RUNTIME.md](RUNTIME.md): lifecycle and task semantics, state rules, environment rules, and incremental rendering behavior
 - [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md): ownership map across targets, key files, and support directories
-- [TESTING_AND_FIXTURE_POLICY.md](TESTING_AND_FIXTURE_POLICY.md): fixture, determinism, and regression-policy rules
+- [TESTING_AND_FIXTURE_POLICY.md](TESTING_AND_FIXTURE_POLICY.md): fixture, determinism, regression-policy, and test-topology rules
 - [FOCUS.md](FOCUS.md): focus traversal, focused values, and default-focus behavior
+
+## Planning And Audit Docs
+
+- [ARCHITECTURE_AUDIT.md](ARCHITECTURE_AUDIT.md): refreshed architecture audit that distinguishes landed work from remaining debt
+- [REFACTOR_PLAN.md](REFACTOR_PLAN.md): current follow-up plan after the March 2026 architecture audit
+- [../TUIGUI.md](../TUIGUI.md): wrapper-package architecture and current status for `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`
+- [TERMINAL_NATIVE_ROADMAP.md](TERMINAL_NATIVE_ROADMAP.md): terminal-native product direction and the phases that already landed
+- [TYPE_ERASURE_DEFERRAL_PLAN.md](TYPE_ERASURE_DEFERRAL_PLAN.md): status of deferred `AnyView` cleanup work
+- [COLOR_ANIMATION_IMPLEMENTATION_PLAN.md](COLOR_ANIMATION_IMPLEMENTATION_PLAN.md): scoped visual-work plan that still stands apart from the core runtime roadmap
 
 ## Product Direction And Scope
 

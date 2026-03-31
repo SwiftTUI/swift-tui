@@ -87,46 +87,46 @@ else
     || fail "The public View protocol block must not expose resolveElements."
 fi
 
-if ! rg -U -n -P --quiet -- '@preconcurrency @MainActor\s+public protocol View \{' \
+if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol View \{' \
   Sources/View/ViewFoundation.swift
 then
   fail "The public View protocol must stay @MainActor-annotated."
 fi
 
-if ! rg -U -n -P --quiet -- '@ViewBuilder @MainActor @preconcurrency\s+var body: Body \{ get \}' \
+if ! rg -U -n -P --quiet -- '@ViewBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
   Sources/View/ViewFoundation.swift
 then
-  fail "View.body must stay @ViewBuilder @MainActor @preconcurrency."
+  fail "View.body must stay @ViewBuilder and @MainActor-annotated."
 fi
 
-if ! rg -U -n -P --quiet -- '@preconcurrency @MainActor\s+public protocol Scene \{' \
+if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol Scene \{' \
   Sources/TerminalUI/App.swift
 then
   fail "The public Scene protocol must stay @MainActor-annotated."
 fi
 
-if ! rg -U -n -P --quiet -- '@MainActor @preconcurrency\s+var body: Body \{ get \}' \
+if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
   Sources/TerminalUI/App.swift
 then
-  fail "Scene.body must stay @MainActor @preconcurrency."
+  fail "Scene.body must stay @MainActor-annotated."
 fi
 
-if ! rg -U -n -P --quiet -- '@preconcurrency @MainActor\s+public protocol App \{' \
+if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol App \{' \
   Sources/TerminalUI/App.swift
 then
   fail "The public App protocol must stay @MainActor-annotated."
 fi
 
-if ! rg -U -n -P --quiet -- '@MainActor @preconcurrency\s+init\(\)' \
+if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+init\(\)' \
   Sources/TerminalUI/App.swift
 then
-  fail "App.init must stay @MainActor @preconcurrency."
+  fail "App.init must stay @MainActor-annotated."
 fi
 
-if ! rg -U -n -P --quiet -- '@SceneBuilder @MainActor @preconcurrency\s+var body: Body \{ get \}' \
+if ! rg -U -n -P --quiet -- '@SceneBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
   Sources/TerminalUI/App.swift
 then
-  fail "App.body must stay @SceneBuilder @MainActor @preconcurrency."
+  fail "App.body must stay @SceneBuilder and @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '@MainActor\s+public func resolve<' \
@@ -141,7 +141,7 @@ then
   fail "DefaultRenderer.render must stay @MainActor."
 fi
 
-if ! rg -U -n -P --quiet -- '@preconcurrency\s+public init\s*\(\s*@_inheritActorContext get: @escaping @isolated\(any\) @Sendable \(\) -> Value,\s*@_inheritActorContext set: @escaping @isolated\(any\) @Sendable \(Value\) -> Void' \
+if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?public init\s*\(\s*@_inheritActorContext get: @escaping @isolated\(any\) @Sendable \(\) -> Value,\s*@_inheritActorContext set: @escaping @isolated\(any\) @Sendable \(Value\) -> Void' \
   Sources/View/ViewBaseTypes.swift
 then
   fail "Binding.init(get:set:) must keep its actor-inheriting SwiftUI-style signature."
@@ -194,8 +194,12 @@ for doc_file in "${anyview_policy_docs[@]}"; do
     fail "$doc_file should contain the AnyView policy heading."
   fi
 
-  if ! rg -n --fixed-strings --quiet -- 'typed `@ViewBuilder` closures and generic `Content: View` storage' "$doc_file"; then
-    fail "$doc_file should describe the typed @ViewBuilder and generic Content storage preference."
+  if ! rg -n --fixed-strings --quiet -- '@ViewBuilder' "$doc_file"; then
+    fail "$doc_file should mention @ViewBuilder in the AnyView policy."
+  fi
+
+  if ! rg -n --fixed-strings --quiet -- 'Content: View' "$doc_file"; then
+    fail "$doc_file should mention generic Content: View storage in the AnyView policy."
   fi
 
   if ! rg -n --fixed-strings --quiet -- 'scopedAnyView' "$doc_file"; then

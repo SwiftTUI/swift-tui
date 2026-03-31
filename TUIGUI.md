@@ -1,4 +1,4 @@
-# TUIGUI Design And Implementation
+# TUIGUI Design And Status
 
 Last updated: March 30, 2026
 
@@ -6,502 +6,129 @@ Last updated: March 30, 2026
 
 Make TerminalUI apps shippable outside a local terminal in two peer packages:
 
-- `GUI/SwiftUITUIGUI`: an SPM package that lets an Xcode app host a TerminalUI app inside a SwiftUI view on macOS and iOS.
-- `GUI/WebTUIGUI`: a Bun-based package that lets a TerminalUI app ship as a browser app backed by `ghostty-web`.
+- `GUI/SwiftUITUIGUI`: an SPM package that lets a macOS or iOS app host a TerminalUI scene inside SwiftUI
+- `GUI/WebTUIGUI`: a Bun-based package that lets a TerminalUI app ship in the browser on top of `ghostty-web`
 
-All Swift build commands in this document use the repo-default `swiftly`
+The authoring story stays the same:
+
+- app authors continue to write `App`, `Scene`, and `WindowGroup` in the root package
+- wrapper packages own terminal-surface hosting, scene selection chrome, and wrapper-local style surfaces
+- scene state must survive wrapper-driven scene switches
+- resize and appearance changes must continue to flow through the same runtime invalidation path as terminal `SIGWINCH`
+
+All Swift build commands in this document assume the repo-default `swiftly`
 toolchain story. Use `swiftly run swift ...` directly, or the shorter `swift`
 form only from a shell where `swift` already resolves to the `swiftly`-managed
-Swift 6.3.0 toolchain. Native Apple builds should also work in Xcode, but
-`swiftly` is the default package-development path.
+Swift 6.3.0 toolchain.
 
-The canonical authoring story must stay the same:
+## Shipped Architecture
 
-- app authors continue to write `App`, `Scene`, and `WindowGroup` in the main package
-- GUI wrappers own only terminal-surface hosting, scene selection, and terminal-style configuration
-- scene state must survive scene switches
-- resize must always update the runtime as if `SIGWINCH` fired, even where POSIX signals do not exist
+### Root package support
 
-## Implementation Status
+The wrapper-facing root work is landed:
 
-- Project 0 is landed in the root package:
-  - `TerminalUIScenes` now exposes `TerminalUISceneManifest`, `TerminalUISceneDescriptor`, and `HostedSceneSession`
-  - shared control-message parsing lives in `Sources/TerminalUI/TerminalControlMessages.swift`
-  - embedded hosts use `InjectedTerminalInputReader` and `StreamingTerminalHost`
-- Project 1 is landed at `GUI/SwiftUITUIGUI` as a standalone SPM package.
-- Project 2 is landed at `GUI/WebTUIGUI` as a Bun package with manifest, wasm, and web bundle steps.
-- The wasm-facing root checkpoints now pass when the repo is built with the `swiftly`-managed Swift 6.3.0 toolchain. The same commands may still fail through `xcrun swift` if Xcode selects an older or incompatible toolchain.
+- `TerminalUIScenes` exposes `TerminalUISceneDescriptor`,
+  `TerminalUISceneManifest`, and `HostedSceneSession`
+- `MultiSceneLauncher` exposes:
+  - public app launch for scene-based apps
+  - manifest-only mode through `TUIGUI_MODE=manifest`
+  - hosted-session creation through `makeHostedSceneSession(...)`
+- shared control-message parsing lives in
+  `Sources/TerminalUI/TerminalControlMessages.swift`
+- embedded hosts use `InjectedTerminalInputReader` and
+  `StreamingTerminalHost`
+- `TerminalUIScenes` now provides the default `App.main()` implementation that
+  launches through `MultiSceneLauncher`
 
-## Inputs Studied
+### `GUI/SwiftUITUIGUI`
 
-These references are the basis for this plan:
+The SwiftUI wrapper package is landed as a standalone SPM package:
 
-- `reference/libghostty-spm/Sources/GhosttyTerminal/InMemory/InMemoryTerminalSession.swift`
-- `reference/libghostty-spm/Sources/GhosttyTerminal/Surface/TerminalSurfaceView.swift`
-- `reference/libghostty-spm/Sources/GhosttyTerminal/State/TerminalViewState.swift`
-- `reference/libghostty-spm/Sources/GhosttyTerminal/Surface/TerminalSurfaceCoordinator.swift`
-- `reference/libghostty-spm/Example/GhosttyTerminalApp/ViewController.swift`
-- `reference/libghostty-spm/Example/MobileGhosttyApp/ViewController.swift`
-- `reference/ghostling/main.c`
-- `reference/ghostling/README.md`
-- `reference/ghostty-web/lib/index.ts`
-- `reference/ghostty-web/lib/terminal.ts`
-- `reference/ghostty-web/lib/addons/fit.ts`
-- `reference/ghostty-web/scripts/build-wasm.sh`
-- `reference/ghostty-web/demo/index.html`
-- `reference/ghostty/example/wasm-vt/README.md`
+- package root: `GUI/SwiftUITUIGUI`
+- dependencies:
+  - local path dependency on the root package
+  - published `libghostty-spm`
+- key runtime files:
+  - `SwiftUITUIAppState.swift`
+  - `SwiftUITUIAppView.swift`
+  - `SwiftUITUISceneHost.swift`
+  - `GhosttySceneBridge.swift`
+  - `SwiftUITUITerminalStyle.swift`
+- verification:
+  - `SceneRetentionTests.swift`
+  - `ResizeBridgeTests.swift`
+  - `StyleMappingTests.swift`
 
-Reference conclusions:
+### `GUI/WebTUIGUI`
 
-- `libghostty-spm` proves the right Apple embedding model: host-managed I/O, `InMemoryTerminalSession`, resize callbacks, and a SwiftUI-facing observable view state.
-- `ghostling` proves libghostty is only the terminal core. Windowing, scene chrome, resize ownership, and input routing belong in the embedding layer.
-- `ghostty-web` proves the right browser terminal model: one terminal instance per hosted session, `FitAddon` for resize, and a JS-side control plane that forwards input and resize separately.
-- the Ghostty `wasm-vt` example proves the browser path should treat Ghostty as an embeddable wasm/lib terminal surface, not as a full app shell.
+The web wrapper package is also landed:
 
-## Current Repo Findings
+- package root: `GUI/WebTUIGUI`
+- build stack: Bun plus the repo-managed Swift 6.3.0 toolchain
+- published dependency: npm `ghostty-web`
+- key runtime and build files:
+  - `src/WebTUIApp.ts`
+  - `src/WebTUISceneRuntime.ts`
+  - `src/WebTUISceneManifest.ts`
+  - `src/build/buildAppWasm.ts`
+  - `src/build/generateSceneManifest.ts`
+- the Bun pipeline now builds manifest, wasm, and browser assets without
+  depending on repo-local Ghostty source snapshots
 
-- `GUI/SwiftUITUIGUI` now contains the SwiftUI wrapper runtime, style surface, and retention/resize tests.
-- `GUI/WebTUIGUI` now contains the Bun build pipeline, browser controller surface, manifest helpers, wasm resolver, and tests.
-- `TerminalUIScenes.MultiSceneLauncher` already supports multiple collected scenes on native platforms.
-- the WASI path already has the right resize behavior shape:
-  - `Sources/TerminalUI/InputReader.swift` supports control messages with `0x1Eresize:<cols>:<rows>\n`
-  - `Sources/TerminalUIScenes/MultiSceneLauncher.swift` maps that resize control message to `WebTerminalHost.updateSurfaceSize(...)` plus `SIGWINCH`
-  - `Sources/TerminalUI/RunLoop+EventDispatch.swift` already treats `SIGWINCH` as “continue and rerender”
-- the current WASI scene path is still single-scene only:
-  - `Sources/TerminalUIScenes/SceneRuntime.swift` rejects secondary scenes on WASI
-  - `Sources/TerminalUIScenes/MultiSceneLauncher.swift` picks one scene by environment/argv
-- the root package is now selectable for the wrapper-facing wasm targets when built with `swiftly` and Swift 6.3.0.
+## Responsibilities Split
+
+The current boundary is:
+
+- root package:
+  - app authoring
+  - scene collection
+  - retained hosted runtime sessions
+  - manifest generation
+  - control-message and resize contract
+- wrapper packages:
+  - window or browser shell integration
+  - terminal widget embedding
+  - scene tabs, pickers, or other wrapper-local chrome
+  - wrapper-specific style mapping
+
+This is intentional. Wrapper packages are peer packages, not new products in
+the root package.
+
+## Current Constraints
+
+- The native multi-scene terminal story is ahead of the WASI story:
+  - `SceneRuntime.swift` still rejects secondary scenes on WASI
+  - `MultiSceneLauncher.swift` still selects a single scene for the current WASI process
+- Wrapper packages still own scene switching UI and style surfaces. The root package exposes scene manifests and hosted sessions, not a full cross-platform app shell.
+- `GUI/WebTUIGUI` build scripts shell out to `swift`, so Bun-driven builds still require a shell where `swift` resolves to the `swiftly`-managed Swift 6.3.0 toolchain.
+- Wrapper packages are intentionally outside the root package products. Consumers opt into them separately.
+
+## Non-Negotiable Decisions
+
+1. GUI wrappers are peer packages, not new top-level products in the root package.
+2. The root package exposes first-class scene manifest and hosted-session APIs so peer packages do not rely on package-only internals.
+3. Each scene gets its own retained runtime session. Switching scenes changes which hosted session is visible; it does not rebuild the app body from scratch.
+4. Scene switching is wrapper-managed. It is not a new terminal escape-sequence protocol.
+5. Terminal style is wrapper-owned. The Swift package and the Bun package expose mirrored style concepts, not a shared cross-language source file.
+6. The web package keeps one wasm module instance per scene and one `ghostty-web` terminal per scene so scene state survives switches without a more complex protocol.
+7. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior.
+
+## Verification
 
 Verified on March 30, 2026:
 
 ```bash
 TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core
 TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes
+swiftly run swift test --filter TerminalUIScenesTests.SceneManifestTests
+swiftly run swift test --filter TerminalUIScenesTests.HostedSceneSessionTests
 ```
 
-Both commands now succeed.
+The two wasm build commands succeed on the repo-default Swift 6.3.0 toolchain.
 
-## Non-Negotiable Decisions
-
-1. GUI wrappers are peer packages, not new top-level products in the root package.
-2. The root package must expose a first-class scene manifest and a first-class hosted-session API so peer packages do not rely on package-only internals.
-3. Each scene gets its own retained runtime session. Switching scenes changes which hosted session is visible; it does not rebuild the app body from scratch.
-4. Scene switching is wrapper-managed. It is not a new terminal escape-sequence protocol.
-5. Terminal style is wrapper-owned. The Swift package and the Bun package will expose mirrored style concepts, but not a shared cross-language source file.
-6. The web package will keep one wasm module instance per scene and one `ghostty-web` terminal per scene. This preserves state while keeping the runtime contract simple.
-7. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior.
-
-## Out of Scope
+## Out Of Scope
 
 - generating an Xcode project
-- building custom desktop/mobile chrome beyond a terminal surface and scene/style control APIs
+- building custom desktop or mobile chrome beyond a terminal surface and scene/style control APIs
 - replacing `ghostty-web` or `libghostty-spm` with a custom terminal implementation
-- adding tabs, split panes, or session persistence beyond scene retention in memory
-
-## Project 0: Prepare TerminalUI
-
-### Deliverables
-
-- make the root package selectable for `swift-6.3-RELEASE_wasm`
-- expose a public scene manifest API
-- expose a public hosted-session API for non-terminal hosts
-- extract shared terminal control-message parsing so fd-backed and in-memory inputs use the same contract
-- add a streaming terminal host for wrapper-driven output sinks
-- add manifest mode for wrapper build tooling
-
-### Files To Change
-
-- `Package.swift`
-- `Sources/TerminalUI/InputReader.swift`
-- `Sources/TerminalUI/TerminalHost.swift`
-- `Sources/TerminalUIScenes/MultiSceneLauncher.swift`
-- `docs/ARCHITECTURE.md`
-- `docs/STATUS.md`
-- `docs/SOURCE_LAYOUT.md`
-- `README.md`
-
-### Files To Add
-
-- `Sources/TerminalUI/TerminalControlMessages.swift`
-- `Sources/TerminalUI/InjectedTerminalInputReader.swift`
-- `Sources/TerminalUI/StreamingTerminalHost.swift`
-- `Sources/TerminalUIScenes/SceneManifest.swift`
-- `Sources/TerminalUIScenes/HostedSceneSession.swift`
-- `Tests/TerminalUITests/InjectedTerminalInputReaderTests.swift`
-- `Tests/TerminalUITests/StreamingTerminalHostTests.swift`
-- `Tests/TerminalUIScenesTests/SceneManifestTests.swift`
-- `Tests/TerminalUIScenesTests/HostedSceneSessionTests.swift`
-
-### Public API To Add
-
-Add these in `TerminalUIScenes`:
-
-- `public struct TerminalUISceneDescriptor: Codable, Hashable, Sendable`
-  - `id: WindowIdentifier`
-  - `title: String?`
-  - `isDefault: Bool`
-- `public struct TerminalUISceneManifest: Codable, Sendable`
-  - `defaultSceneID: WindowIdentifier`
-  - `scenes: [TerminalUISceneDescriptor]`
-- `@MainActor public static func sceneManifest<A: App>(for app: A) -> TerminalUISceneManifest`
-- `@MainActor public static func makeHostedSceneSession<A: App>(for app: A, sceneID: WindowIdentifier, initialSize: Size, appearance: TerminalAppearance, capabilityProfile: TerminalCapabilityProfile = .trueColor, onOutput: @escaping @Sendable (String) -> Void) throws -> HostedSceneSession`
-- `@MainActor public final class HostedSceneSession`
-  - `descriptor: TerminalUISceneDescriptor`
-  - `start() async throws -> RunLoopExitReason`
-  - `sendInput(_ bytes: [UInt8])`
-  - `resize(to size: Size)`
-  - `updateAppearance(_ appearance: TerminalAppearance)`
-  - `stop()`
-
-### Runtime Design
-
-- `HostedSceneSession` wraps one collected `WindowSceneConfiguration`.
-- It owns:
-  - one `StreamingTerminalHost`
-  - one `InjectedTerminalInputReader`
-  - one `InProcessSignalReader`
-  - one `RunLoop<MultiSceneRuntimeState>`
-- `StreamingTerminalHost` mirrors the mutable parts of `WebTerminalHost` but writes terminal output to a closure instead of an fd.
-- `InjectedTerminalInputReader` accepts pushed byte chunks and runs the same parser/control-message logic that `InputReader` uses today.
-- `resize(to:)` must:
-  - update host surface size
-  - emit `SIGWINCH` through the in-process signal reader
-- `updateAppearance(_:)` must:
-  - update the host’s `TerminalAppearance`
-  - schedule a new frame through the same synthetic `SIGWINCH` path
-
-### Manifest Mode
-
-`MultiSceneLauncher.run(Self())` must gain a manifest-only mode that prints JSON and exits before launching any runtime.
-
-Use these environment variables:
-
-- `TUIGUI_MODE=manifest`
-- `TUIGUI_SCENE=<scene-id>`
-- `TUIGUI_COLUMNS=<cols>`
-- `TUIGUI_ROWS=<rows>`
-
-Keep these current names as backward-compatible aliases for one landing cycle:
-
-- `WEBAPP_SCENE`
-- `WEBAPP_COLUMNS`
-- `WEBAPP_ROWS`
-
-Manifest JSON shape:
-
-```json
-{
-  "defaultSceneID": "dashboard",
-  "scenes": [
-    { "id": "dashboard", "title": "Dashboard", "isDefault": true },
-    { "id": "controls", "title": "Controls", "isDefault": false }
-  ]
-}
-```
-
-### Verification Checkpoints
-
-Checkpoint P0.1:
-
-- `TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core` succeeds
-- `TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes` succeeds
-
-Checkpoint P0.2:
-
-- `swiftly run swift test --filter TerminalUITests.InputReaderControlMessageTests` still passes
-- new `InjectedTerminalInputReaderTests` prove pushed resize control messages do not leak into key input
-
-Checkpoint P0.3:
-
-- new `SceneManifestTests` prove multi-scene apps emit stable manifest JSON
-- new `HostedSceneSessionTests` prove:
-  - output reaches the supplied closure
-  - resize triggers rerender without exiting
-  - appearance updates cause a fresh frame
-
-## Project 1: `GUI/SwiftUITUIGUI`
-
-### Package Shape
-
-Keep it as a standalone SPM package at `GUI/SwiftUITUIGUI`.
-
-Dependencies:
-
-- local path dependency on the root package at `../..`
-- local path dependency on `../../reference/libghostty-spm`
-
-The package should stay library-only. It should not create an app target.
-
-### Files To Change
-
-- `GUI/SwiftUITUIGUI/Package.swift`
-- `GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUIGUI.swift`
-
-### Files To Add
-
-- `GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUIAppState.swift`
-- `GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUIAppView.swift`
-- `GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUISceneHost.swift`
-- `GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/GhosttySceneBridge.swift`
-- `GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUITerminalStyle.swift`
-- `GUI/SwiftUITUIGUI/Tests/SwiftUITUIGUITests/SceneRetentionTests.swift`
-- `GUI/SwiftUITUIGUI/Tests/SwiftUITUIGUITests/StyleMappingTests.swift`
-- `GUI/SwiftUITUIGUI/Tests/SwiftUITUIGUITests/ResizeBridgeTests.swift`
-
-### Public API
-
-Add these wrapper-facing types:
-
-- `public struct SwiftUITUITerminalStyle: Equatable, Sendable`
-  - `fontSize: Float?`
-  - `fontFamily: String?`
-  - `cursorStyle: block | bar | underline`
-  - `cursorBlink: Bool`
-  - `backgroundOpacity: Float`
-  - `lightPalette`
-  - `darkPalette`
-- `public struct SwiftUITUISceneDescriptor: Identifiable, Hashable, Sendable`
-  - mirrors `TerminalUISceneDescriptor`
-- `@MainActor @Observable public final class SwiftUITUIAppState<A: TerminalUI.App>`
-  - `scenes: [SwiftUITUISceneDescriptor]`
-  - `selectedSceneID: WindowIdentifier`
-  - `style: SwiftUITUITerminalStyle`
-  - `isRunning: Bool`
-- `@MainActor public struct SwiftUITUIAppView<A: TerminalUI.App>: SwiftUI.View`
-  - `init(state: SwiftUITUIAppState<A>)`
-
-### Hosting Design
-
-- `SwiftUITUIAppState` builds the root `TerminalUISceneManifest` once from the supplied `App`.
-- It lazily creates one `SwiftUITUISceneHost` per scene id.
-- Each `SwiftUITUISceneHost` owns:
-  - one `HostedSceneSession` from the root package
-  - one `InMemoryTerminalSession` from `GhosttyTerminal`
-  - one `GhosttyTerminal.TerminalViewState`
-- Output flow:
-  - `HostedSceneSession` output closure emits ANSI text
-  - bridge converts `String` to UTF-8 `Data`
-  - `InMemoryTerminalSession.receive(...)` feeds Ghostty
-- Input flow:
-  - Ghostty `write:` callback provides bytes from keyboard/paste/input
-  - bridge forwards those bytes to `HostedSceneSession.sendInput(...)`
-- Resize flow:
-  - Ghostty `resize:` callback yields grid metrics
-  - bridge forwards `columns` and `rows` to `HostedSceneSession.resize(...)`
-
-### Scene Switching Contract
-
-- The wrapper does not impose its own scene switcher UI.
-- Host apps read `state.scenes` and bind their own tabs/sidebar/segmented control to `state.selectedSceneID`.
-- Switching the selected scene only changes which retained `TerminalSurfaceView` is visible.
-- Hidden scenes remain alive and keep their TerminalUI state.
-- The first selected scene is `manifest.defaultSceneID`.
-
-### Style Contract
-
-`SwiftUITUITerminalStyle` is the only public style surface for this package.
-
-It maps to Ghostty as follows:
-
-- `fontSize` and `fontFamily` map to Ghostty surface options/configuration
-- `cursorStyle` and `cursorBlink` map to Ghostty terminal configuration
-- `lightPalette` and `darkPalette` map to Ghostty light/dark theme configuration
-- `backgroundOpacity` maps to Ghostty background opacity
-
-Style updates must not recreate scene runtimes. They may recreate Ghostty controller/config state only when required by the underlying API.
-
-### Verification Checkpoints
-
-Checkpoint P1.1:
-
-- `swiftly run swift build --package-path GUI/SwiftUITUIGUI`
-- `swiftly run swift test --package-path GUI/SwiftUITUIGUI`
-
-Checkpoint P1.2:
-
-- `SceneRetentionTests` prove scene-local `@State` survives `selectedSceneID` changes
-- `ResizeBridgeTests` prove Ghostty resize triggers a second frame in the hosted session
-
-Checkpoint P1.3:
-
-- `StyleMappingTests` prove changing `SwiftUITUITerminalStyle` updates Ghostty config without destroying scene state
-
-## Project 2: `GUI/WebTUIGUI`
-
-### Package Shape
-
-Keep it as a Bun package at `GUI/WebTUIGUI`.
-
-Use Bun-native tooling only:
-
-- `bun install`
-- `bun run`
-- `bun build`
-- `bun test`
-- `bunx` only where browser automation is necessary
-
-Do not use Vite in this package.
-
-### Files To Change
-
-- `GUI/WebTUIGUI/package.json`
-- `GUI/WebTUIGUI/index.ts`
-- `GUI/WebTUIGUI/README.md`
-- `GUI/WebTUIGUI/tsconfig.json`
-
-### Files To Add
-
-- `GUI/WebTUIGUI/index.html`
-- `GUI/WebTUIGUI/src/WebTUIApp.ts`
-- `GUI/WebTUIGUI/src/WebTUISceneRuntime.ts`
-- `GUI/WebTUIGUI/src/WebTUITerminalStyle.ts`
-- `GUI/WebTUIGUI/src/WebTUISceneManifest.ts`
-- `GUI/WebTUIGUI/src/wasi/BrowserWASIBridge.ts`
-- `GUI/WebTUIGUI/src/wasi/StdIOPipe.ts`
-- `GUI/WebTUIGUI/src/build/buildAppWasm.ts`
-- `GUI/WebTUIGUI/src/build/generateSceneManifest.ts`
-- `GUI/WebTUIGUI/src/build/resolveSwiftArtifacts.ts`
-- `GUI/WebTUIGUI/src/WebTUIApp.test.ts`
-- `GUI/WebTUIGUI/src/WebTUITerminalStyle.test.ts`
-- `GUI/WebTUIGUI/src/WebTUISceneManifest.test.ts`
-
-### Public API
-
-Expose one minimal controller surface:
-
-- `createWebTUIApp(options): Promise<WebTUIAppController>`
-- `WebTUIAppController`
-  - `scenes: WebTUISceneDescriptor[]`
-  - `selectedSceneId: string`
-  - `switchScene(id: string): Promise<void>`
-  - `setStyle(style: WebTUITerminalStyle): void`
-  - `dispose(): Promise<void>`
-
-`WebTUITerminalStyle` mirrors the Swift package concept:
-
-- `fontSize?: number`
-- `fontFamily?: string`
-- `cursorStyle?: 'block' | 'bar' | 'underline'`
-- `cursorBlink?: boolean`
-- `lightPalette`
-- `darkPalette`
-
-### Build Pipeline
-
-`package.json` scripts must include:
-
-- `build:manifest`
-- `build:wasm`
-- `build:web`
-- `build`
-- `dev`
-- `test`
-
-Required build flow:
-
-1. `build:manifest`
-   - run the app product natively with `TUIGUI_MODE=manifest`
-   - capture stdout JSON
-   - write `dist/scene-manifest.json`
-2. `build:wasm`
-   - run `swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --product <AppProduct> -c release`
-   - locate the produced wasm artifact using `swiftly run swift build --show-bin-path --swift-sdk swift-6.3-RELEASE_wasm`
-   - copy the app wasm to `dist/assets/app.wasm`
-3. `build:web`
-   - bundle the HTML/TS entrypoint with `bun build`
-   - emit the terminal frame assets to `dist/`
-
-Expected outputs:
-
-- `dist/index.html`
-- `dist/scene-manifest.json`
-- `dist/assets/app.wasm`
-- bundled JS/CSS assets
-
-### Runtime Design
-
-- Parse `scene-manifest.json` on startup.
-- Create scene runtimes lazily. Each runtime owns:
-  - one `ghostty-web` `Terminal`
-  - one `FitAddon`
-  - one browser WASI instance of the Swift app module
-  - one stdin pipe
-  - one stdout/stderr consumer
-- Keep scene runtimes in `Map<string, WebTUISceneRuntime>`.
-- `switchScene(id)` hides the current scene container and shows the selected scene container.
-- Already-created scenes stay alive and preserve state.
-
-### Browser I/O Contract
-
-- User input:
-  - `terminal.onData(...)` writes bytes to the scene stdin pipe
-- Resize:
-  - `FitAddon.fit()` computes cols/rows
-  - `terminal.onResize(...)` writes `0x1Eresize:<cols>:<rows>\n` to stdin
-- Output:
-  - stdout bytes are decoded as UTF-8 and sent to `terminal.write(...)`
-- Initial size:
-  - pass `TUIGUI_SCENE`, `TUIGUI_COLUMNS`, and `TUIGUI_ROWS` into the WASI environment for the initial boot
-
-### HTML And Visual Scope
-
-- The default rendered artifact is only a terminal frame mount.
-- No built-in app sidebar or navigation shell belongs in this package.
-- Consumers can build their own scene chooser around the returned controller.
-
-### Verification Checkpoints
-
-Checkpoint P2.1:
-
-- `cd GUI/WebTUIGUI && bun test`
-
-Checkpoint P2.2:
-
-- `cd GUI/WebTUIGUI && bun run build -- --app <AppProduct>`
-- `dist/index.html`
-- `dist/scene-manifest.json`
-- `dist/assets/app.wasm`
-  all exist after the build
-
-Checkpoint P2.3:
-
-- manual browser smoke:
-  - initial scene renders
-  - switching scenes preserves prior scene output/state
-  - resizing the browser container changes TerminalUI layout
-  - calling `setStyle(...)` updates the active terminal surface
-
-## Implementation Order
-
-The implementation order used in this repo was:
-
-1. Land Project 0 first so the root package exposes hosted-session and manifest APIs.
-2. Land `SwiftUITUIGUI` second to validate retained hosted sessions in a native wrapper.
-3. Land `WebTUIGUI` third on top of the now-stable scene manifest and resize control-message contract.
-4. Update docs after both peer packages work:
-  - `README.md`
-  - `docs/ARCHITECTURE.md`
-  - `docs/STATUS.md`
-  - `docs/SOURCE_LAYOUT.md`
-
-## Verification Status
-
-Verified on March 30, 2026:
-
-- `swiftly run swift test`
-- `swiftly run swift test --package-path GUI/SwiftUITUIGUI`
-- `cd GUI/WebTUIGUI && bun test`
-- `cd GUI/WebTUIGUI && bun run index.ts build:web --dist /tmp/webtuigui-build`
-- `TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core`
-- `TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes`
-
-## Done Means
-
-This work is done only when all of the following are true:
-
-- the root package exposes a public, documented scene-manifest and hosted-session story
-- the root package resolves under `swift-6.3-RELEASE_wasm`
-- `GUI/SwiftUITUIGUI` can host a TerminalUI app in a SwiftUI view and preserve per-scene state across scene switches
-- `GUI/WebTUIGUI` can build a browser bundle, host one retained wasm runtime per scene, and resize via the existing synthetic-`SIGWINCH` path
-- both peer packages expose explicit APIs for scene switching and terminal styles
-- all checkpoints above are passing or manually verified where marked as browser smoke
+- adding tabs, split panes, or session persistence beyond in-memory retained scene sessions

@@ -8,6 +8,10 @@ let package = Package(
     .macOS(.v15),
   ],
   products: [
+    .library(
+      name: "WebExampleScenes",
+      targets: ["WebExampleScenes"]
+    ),
     .executable(
       name: "WebExampleApp",
       targets: ["WebExampleApp"]
@@ -17,10 +21,17 @@ let package = Package(
     .package(path: "../../.."),
   ],
   targets: [
+    .target(
+      name: "WebExampleScenes",
+      dependencies: [
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+      ],
+      path: "Sources/WebExampleScenes"
+    ),
     .executableTarget(
       name: "WebExampleApp",
       dependencies: [
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        "WebExampleScenes",
         .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
       ],
       path: "Sources/TerminalApp"

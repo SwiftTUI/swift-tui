@@ -2,157 +2,126 @@
 
 Last updated: March 30, 2026
 
-This is the current ownership map for the codebase. It documents where subsystems live after the source split and should stay aligned with future file moves.
+This is the current ownership map for the codebase. It documents where
+subsystems live after the March 2026 source split and should stay aligned with
+future file moves.
 
-## Targets
+## Package Surface
 
-- `TerminalUI`: terminal runtime integration, rendering, host I/O, scheduling, lifecycle staging, and single-session runtime entry points
-- `TerminalUIScenes`: optional multi-scene runtime integration on top of `TerminalUI`
-- `View`: SwiftUI-shaped authoring surface, property wrappers, environment plumbing, layouts, and controls
-- `Core`: shared geometry, layout, semantics, draw, raster, diagnostics, and commit data types
-- `TerminalUICharts`: compact chart and metric views built on top of `View`
-- `PrototypeUIComponents`: repo-local prototype components and exploratory UI surfaces
+- Library products:
+  - `View`
+  - `TerminalUI`
+  - `TerminalUIScenes`
+  - `TerminalUICharts`
+- Internal support targets:
+  - `Core`
+  - `PrototypeUIComponents`
+  - `UnixSignals`
 
+`Core` remains the shared pipeline target, but it is not exposed as a separate
+library product. Downstream package consumers reach those types through
+`TerminalUI` re-exports.
 
 ## `TerminalUI`
 
-- `TerminalUI.swift`: default renderer and runtime-facing surface exports
-- `App.swift`: app and scene declarations plus internal scene launch plumbing
-- `RunLoop.swift`: runtime orchestration
+- `TerminalUI.swift`: `DefaultRenderer` plus retained-frame and resolve-reuse plumbing
+- `App.swift`: `App`, `Scene`, `SceneBuilder`, `WindowGroup`, and scene collection helpers
+- `RunLoop.swift`: runtime coordinator and shared runtime state
+- `RunLoop+EventDispatch.swift`: keyboard, signal, focus, action, and scroll dispatch
+- `RunLoop+PointerHandling.swift`: pointer routing, activation, capture, and scroll-wheel handling
+- `RunLoop+EventPump.swift`: event buffering and coalescing
+- `RunLoop+Rendering.swift`: render scheduling, resolve-context assembly, and focus application
 - `LifecycleCoordinator.swift`: post-present lifecycle staging
 - `TaskRunner.swift`: lifecycle-owned task execution and cancellation
-- `TerminalHost.swift`: terminal host integration and presentation commit boundary
-- `StreamingTerminalHost.swift`: wrapper-facing terminal host that emits presentation output to a closure instead of a file descriptor
-- `TerminalGraphicsCapabilities.swift`: Kitty, Sixel, and cell-pixel capability probing helpers
-- `TerminalImageRendering.swift`: image protocol emitters, fallback compositing, and dithering support
-- `ImageAssetRepository.swift`: shared PNG decoding and image metadata cache, with nil-image fallback on builds where PNG support is not linked
-- `TerminalPresentation.swift`: capability-aware text rendering, OSC 8 hyperlink emission, and incremental presentation planning
-- `TerminalAppearanceDetection.swift`: host appearance probing
+- `TerminalHost.swift`: fd-backed terminal host plus the WASI-facing `WebTerminalHost`
+- `StreamingTerminalHost.swift`: wrapper-facing terminal host that emits presentation output through a closure
+- `TerminalPresentation.swift`: capability-aware surface diffing and text presentation
+- `TerminalAppearanceDetection.swift`: appearance probing
+- `TerminalGraphicsCapabilities.swift`: Kitty, Sixel, and cell-pixel capability detection
+- `TerminalImageRendering.swift`: image protocol emitters and cell fallback rendering
+- `ImageAssetRepository.swift`: shared PNG decode and metadata cache
 - `InputReader.swift`: keyboard and mouse input decoding
-- `InjectedTerminalInputReader.swift`: wrapper-managed input stream source that shares the runtime parser and control-message contract
-- `TerminalControlMessages.swift`: shared terminal control-message parsing used by fd-backed and injected input
-- `LinkOpening.swift`: package-only runtime opener used by focusable links in interactive sessions
+- `InjectedTerminalInputReader.swift`: wrapper-managed input stream source that shares control-message parsing
+- `SignalReader.swift`: native and in-process signal readers
+- `TerminalControlMessages.swift`: shared resize/control-message parsing
+- `LinkOpening.swift`: runtime link opener
 - `TerminalUI.docc/`: module landing page and runtime guides
 
 ## `TerminalUIScenes`
 
-- `TerminalUIScenes.swift`: target re-export surface
-- `MultiSceneLauncher.swift`: public app launch path for scene-based apps today
-- `SceneManifest.swift`: public scene-descriptor and manifest types for wrapper tooling
-- `HostedSceneSession.swift`: public wrapper-facing scene host for embedded GUI shells
-- remaining files: socket discovery, scene lifecycle, pty management, and scene runtime support
+- `TerminalUIScenes.swift`: product re-export surface
+- `MultiSceneLauncher.swift`: public app launch path, manifest mode, hosted-session factory, and CLI routing
+- `SceneManifest.swift`: `TerminalUISceneDescriptor` and `TerminalUISceneManifest`
+- `HostedSceneSession.swift`: retained hosted scene runtime for GUI wrappers
+- `SceneSession.swift`: shared scene-runtime bootstrap
+- `SceneRuntime.swift`: per-scene runtime orchestration for multi-scene terminal apps
+- `SceneLifecycle.swift`: scene session coordination
+- `CLIMode.swift`: attach/list CLI argument parsing
+- `SceneInfoRegistry.swift`: scene discovery snapshots for running instances
+- `SocketServer.swift` and `SocketClient.swift`: Unix-domain-socket discovery and attach plumbing
+- `AttachProxy.swift`: terminal attach forwarding
+- `PtyPair.swift`: native pty support
 - `TerminalUIScenes.docc/`: module landing page and multi-scene guidance
 
 ## `Core`
 
-- `GeometryTypes.swift`: geometry, identity, proposal, spacing, and alignment primitives
-- `EnvironmentAndNodeTypes.swift`: environment snapshots, node kinds, axis, visibility, and placement allocations
-- `FocusedValues.swift`: focused-value transport types
-- `PreferenceValues.swift`: preference-key protocol and reduced subtree preference storage
-- `FocusPolicy.swift`: centralized focus participation defaults and focus-routing helpers
-- `FocusTracker.swift`: focus ownership and traversal state
-- `LayoutTypes.swift`: layout behavior, layout metadata, measured and placed node infrastructure, and custom layout handles
-- `LayoutEngine.swift`: measurement and placement engine
-- `RenderMetadataTypes.swift`: text style, base style, draw metadata, and collection payloads
-- `RichText.swift`: rich-text runs, `LinkDestination`, payloads, and inline-link identity helpers
-- `ImageTypes.swift`: image-source, resolved-image, and raster-image-attachment data types
-- `RenderTreeAndSemanticsTypes.swift`: semantic metadata, lifecycle metadata, resolved tree, semantic snapshot, and draw-tree types
-- `Semantics.swift`: semantic extraction and routing
-- `DrawExtractor.swift`: generic draw extraction
-- `DrawExtractor+Lists.swift`: list rendering and scroll-indicator helpers
-- `DrawExtractor+Tables.swift`: table-specific draw extraction
-- `TableSupport.swift`: table layout and formatting support
-- `TableDrawSupport.swift`: shared table draw helpers
-- `TextLayout.swift`: text measurement and wrapping
-- `RasterTypes.swift`: raster cells, style runs, and raster surfaces
-- `Rasterizer.swift`: draw-to-raster lowering
-- `CommitAndFrameTypes.swift`: commit plans, lifecycle state, diagnostics, frame context, and frame artifacts
-- `CommitPlanner.swift`: lifecycle diffing and commit planning
-- `Pipeline.swift`: snapshot pipeline orchestration
-- `Snapshots.swift`: pipeline snapshots and render helpers
+- `GeometryTypes.swift`, `EnvironmentAndNodeTypes.swift`, and `LayoutTypes.swift`: geometry, proposals, placement, layout metadata, and node infrastructure
+- `RenderTreeAndSemanticsTypes.swift`: resolved-tree, semantic snapshot, and draw-tree data types
+- `CommitAndFrameTypes.swift`: commit plans, diagnostics, retained resolve frames, and frame artifacts
+- `NodeMetadata.swift`: grouped node metadata used by measurement and refactor follow-up work
+- `LayoutEngine.swift` plus `LayoutEngine+Alignment.swift`, `LayoutEngine+List.swift`, `LayoutEngine+Placement.swift`, `LayoutEngine+Stack.swift`, `LayoutEngine+Table.swift`, and `LayoutEngine+Utility.swift`: decomposed measurement and placement engine
+- `Semantics.swift`: semantic extraction and route generation
+- `DrawExtractor.swift`, `DrawExtractor+Lists.swift`, and `DrawExtractor+Tables.swift`: draw extraction
+- `Rasterizer.swift` and `Rasterizer+CellSampling.swift`: raster lowering
+- `Pipeline.swift` and `Snapshots.swift`: snapshot pipeline orchestration
+- `CommitPlanner.swift`: lifecycle diffing and commit packaging
 - `Scheduler.swift`: invalidation and wake scheduling
 - `StateContainer.swift`: runtime-owned state storage
-- `SemanticRoleTypes.swift`: closed semantic roles and structured route identifiers
-- `Appearance.swift`: appearance and capability-facing styling support
-- `Styling.swift`: style resolution support
-- `LocalActionRegistry.swift`: package-only local action registry
-- `LocalFocusBindingRegistry.swift`: focus binding registry
-- `LocalFocusedValuesRegistry.swift`: focused-value registry
-- `LocalPreferenceObservationRegistry.swift`: package-only preference change observer registry
-- `LocalKeyHandlerRegistry.swift`: package-only local key-handler registry
-- `LocalLifecycleRegistry.swift`: package-only lifecycle-handler registry
-- `LocalTaskRegistry.swift`: package-only task registry
-- `LocalPointerHandlerRegistry.swift`: pointer event types, buttons, and scroll context for pointer input handling
-- `BuiltinPointerRoutes.swift`: route component identifiers for pointer interactions with controls
-- `FocusInteractionTypes.swift`: `FocusInteractions` behavior modes
-- `MonotonicInstant.swift`: monotonic timestamp type for elapsed-time measurement
-- `PlatformMath.swift`: platform-independent math wrappers
-- `Rasterizer+CellSampling.swift`: background-color sampling for border styling
-- `ScrollIndicatorSupport.swift`: scroll indicator configuration types
-- `SemanticMetadataCompatibility.swift`: compatibility helpers for `SemanticMetadata`
-- `StringUtilities.swift`: focused string helpers used by the runtime
-- `TerminalChromeStyle.swift`: semantic chrome kinds and terminal styling support
-- `Core.docc/`: module landing page and frame-pipeline guides
+- `FocusTracker.swift`, `FocusPolicy.swift`, `FocusInteractionTypes.swift`, and `FocusedValues.swift`: focus state and focus-value transport
+- `PreferenceValues.swift`: preference storage
+- `SemanticRoleTypes.swift` and `BuiltinPointerRoutes.swift`: closed semantic roles and structured pointer routes
+- `Appearance.swift`, `Styling.swift`, `TerminalChromeStyle.swift`, and `ViewStyleTypes.swift`: styling and appearance support
+- `TextLayout.swift`, `RichText.swift`, `ImageTypes.swift`, `RasterTypes.swift`, `ScrollIndicatorSupport.swift`, `TableSupport.swift`, and `TableDrawSupport.swift`: supporting model types
+- `LocalActionRegistry.swift`, `LocalFocusBindingRegistry.swift`, `LocalFocusedValuesRegistry.swift`, `LocalKeyHandlerRegistry.swift`, `LocalLifecycleRegistry.swift`, `LocalPointerHandlerRegistry.swift`, `LocalPreferenceObservationRegistry.swift`, and `LocalTaskRegistry.swift`: package-only runtime registries
+- `MonotonicInstant.swift`, `PlatformLock.swift`, `PlatformMath.swift`, and `StringUtilities.swift`: low-level support helpers
+- `Core.docc/`: target-level pipeline guides
 
 ## `View`
 
-- `ViewBaseTypes.swift`: shared public base types such as `Binding`, `Bindable`, `Axis`, `ScrollPosition`, and `ViewSpacing`
-- `ViewFoundation.swift`: `View`, `ViewBuilder`, `AnyView`, resolver entry points, and typed builder plumbing
-- `State.swift`: `@State` and binding-facing state support
-- `Observation.swift`: observable bridging and repo-owned `@Bindable`
-- `Environment.swift`: environment keys, typed `OpenLinkAction`, public `ResolveContext` configuration, and package-only runtime plumbing
-- `ImageEnvironment.swift`: image resource-root and terminal cell-pixel environment values
-- `FocusedValue.swift`: focused-value property wrappers and modifiers
-- `Preference.swift`: `PreferenceKey`-driven modifiers, subtree readers, and preference change observers
-- `FocusState.swift`: `@FocusState` and focus-binding surface
-- `Layout.swift`: `Layout` protocol support, layout modifiers, stack layouts, and alignment helpers
-- `ViewPrimitives.swift`: `EmptyView`, rich-interpolated `Text`, `Spacer`, and `Divider`
+- `ViewFoundation.swift`, `ViewBaseTypes.swift`, and `ViewCompositionHelpers.swift`: `View`, `ViewBuilder`, `AnyView`, base public types, and internal composition helpers
+- `State.swift` and `Observation.swift`: `@State`, repo-owned `@Bindable`, and observation plumbing
+- `Environment.swift`, `ImageEnvironment.swift`, `Preference.swift`, `FocusedValue.swift`, `FocusState.swift`, and `DefaultFocus.swift`: environment, preferences, focused values, and focus bindings
+- `Layout.swift`, `ContainerViews.swift`, `GeometryReader.swift`, `ScrollViewSupport.swift`, `Collections.swift`, `CollectionSupport.swift`, `OutlineViews.swift`, and `NavigationViews.swift`: layout, collection, scroll, tab, and split-navigation surfaces
+- `ViewPrimitives.swift`, `TextStyles.swift`, `StylePrimitives.swift`, `StyleEnvironment.swift`, `StyleModifiers.swift`, `ShapeStyles.swift`, `Rectangle.swift`, `RoundedRectangle.swift`, and `TileBackground.swift`: primitives, styling, and shape support
 - `Image.swift`: SwiftUI-shaped PNG image surface
-- `GeometryReader.swift`: terminal-surface geometry proxy and reader
-- `ContainerViews.swift`: `Group`, `ForEach`, `ViewThatFits`, `ScrollView`, `VStack`, `HStack`, and `ZStack`
-- `NavigationViews.swift`: terminal-native `TabView`, `NavigationSplitView`, and related shell composition support
-- `OutlineViews.swift`: outline and hierarchical collection views
-- `ViewModifiers.swift`: public modifiers and package-only wrapper views such as padding, frame, overlay, and background
-- `PresentationModifiers.swift`: terminal-native `alert` and `confirmationDialog` presentation
-- `StylePrimitives.swift`: style enums and primitive style values
-- `StyleEnvironment.swift`: style-related environment keys and accessors
-- `StyleModifiers.swift`: `foregroundStyle`, `tint`, `disabled`, and row-styling helpers
-- `LabeledContainers.swift`: `Label`, `LabeledContent`, `ControlGroup`, and `GroupBox`
-- `ProgressView.swift`: determinate and indeterminate progress-bar surface
-- `ValueControls.swift`: `Toggle`, `TextField`, and `DisclosureGroup`
-- `TextEditor.swift`: multiline text editing surface
-- `SecureField.swift`: masked string-entry control built on the text-entry helpers
-- `AdjustableValueControls.swift`: `Stepper` and `Slider`
-- `Collections.swift`: `Section`, `List`, `TableRow`, and `Table`
-- `CollectionSupport.swift`: shared selection, table-formatting, and collection-text helpers
-- `Picker.swift`: `Picker` and picker body builders
-- `Menu.swift` and `MenuRendering.swift`: standalone menu control and inline expansion rendering
-- `Button.swift`: `Button` and button chrome helpers
-- `Link.swift`: text-backed `Link` plus rich-text lowering helpers for inline hyperlinks
-- `MetricTrackSupport.swift`: shared compact metric-track helpers used by core progress surfaces and charts
-- `ViewCompositionHelpers.swift`: shared group composition helpers and internal lowering support
-- `ShapesAndTextStyle.swift`: shapes plus `Text` styling extensions
-- `DefaultFocus.swift`: default-focus modifiers using `FocusState` bindings
-- `PickerRendering.swift`: rendering logic for picker styles
-- `ScrollViewSupport.swift`: scroll key handling and indicator visibility logic
-- `SelectionAndValueSupport.swift`: selection helpers and pointer interaction support
-- `TileBackground.swift`: tiled background-pattern view
+- `Button.swift`, `ValueControls.swift`, `TextEditor.swift`, `SecureField.swift`, `AdjustableValueControls.swift`, `Picker.swift`, `PickerRendering.swift`, `Menu.swift`, `MenuRendering.swift`, `LabeledContainers.swift`, `PresentationModifiers.swift`, `ProgressView.swift`, `Link.swift`, `MetricTrackSupport.swift`, and `SelectionAndValueSupport.swift`: controls and interaction surfaces
+- `ViewModifiers.swift`: public modifiers and package-only wrapper views
 - `View.docc/`: module landing page and authoring guides
 
 ## `PrototypeUIComponents`
 
-- `PrototypeModels.swift`: key-binding groups, command models, and search helpers for experimental terminal-native workflow surfaces
+- `PrototypeModels.swift`: keybinding groups, command models, and search helpers for experimental terminal-native workflow surfaces
 - `PrototypeSurfaces.swift`: repo-local help-strip and command-palette views used for exploration and regression coverage
 
 ## `TerminalUICharts`
 
-- chart files such as `BarChart.swift`, `Sparkline.swift`, and `Timeline.swift`: compact chart and metric views
+- chart files such as `BarChart.swift`, `BulletChart.swift`, `ColumnChart.swift`, `ComparisonChart.swift`, `HeatStrip.swift`, `Legend.swift`, `Meter.swift`, `Sparkline.swift`, `StackedBarChart.swift`, `ThresholdGauge.swift`, and `Timeline.swift`: compact chart and metric views
 - `ChartModels.swift`: shared data models for chart families
 - `ChartSupport.swift` and `ChartChromeSupport.swift`: shared chart rendering helpers
+- `Exports.swift`: product-facing export glue
 - `TerminalUICharts.docc/`: module landing page and charting guide
+
+## Tests
+
+- `Tests/CoreTests`: pipeline, layout, raster, and focus infrastructure tests
+- `Tests/ViewTests`: authoring-layer and environment-level tests
+- `Tests/TerminalUITests`: runtime, rendering, fixture, and end-to-end behavioral tests
+- `Tests/TerminalUIScenesTests`: scene launcher, hosted session, attach, pty, and manifest tests
+- `Tests/PrototypeUIComponentsTests`: prototype-surface regression coverage
 
 ## Reliability Rules
 
-- New files should belong to one subsystem only
-- Shared helpers should move into support files before they are duplicated across features
-- Source-map changes should be updated here alongside any relevant changes to [ARCHITECTURE.md](ARCHITECTURE.md), [STATUS.md](STATUS.md), and [TESTING_AND_FIXTURE_POLICY.md](TESTING_AND_FIXTURE_POLICY.md)
+- New files should belong to one subsystem only.
+- Shared helpers should move into support files before they are duplicated across features.
+- Source-map changes should be updated here alongside any relevant changes to [ARCHITECTURE.md](ARCHITECTURE.md), [STATUS.md](STATUS.md), and [TESTING_AND_FIXTURE_POLICY.md](TESTING_AND_FIXTURE_POLICY.md).
+- The repo currently enforces public-surface and fixture guardrails through `Scripts/check_public_surface_policies.zsh` and `Scripts/check_rendered_text_fixture_matrix.zsh`. There is not a separate checked-in source-layout hook today, so file-map drift must be caught through review and this document.

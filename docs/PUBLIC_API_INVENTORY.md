@@ -24,7 +24,7 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`
 - `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `FocusInteractions`, `LinkDestination`, `OpenLinkAction`
 - image-source environment configuration such as `EnvironmentValues.imageResourceRoots`
-- `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, repo-owned `@Bindable`, `@SceneBuilder`, `@main`
+- `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and repo-owned `@Bindable`
 - canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.alert(...)`, and `.confirmationDialog(...)`
 - `Resolver` and the public `ResolveContext` configuration surface for low-level rendering entry points
 
@@ -45,7 +45,7 @@ The runtime-facing public surface is also canonical:
 - `RunLoop`
 - `ResolveContext` as external renderer or resolver configuration only
 - terminal host, graphics-capability, and input or signal integration types that support the runtime
-- app and scene entry points
+- app and scene entry points, including `App`, `Scene`, `SceneBuilder`, `WindowGroup`, and `WindowIdentifier`
 
 ### `TerminalUIScenes`
 
@@ -65,6 +65,9 @@ The core data model and pipeline types are canonical:
 - image payload, resolved-asset, and raster-image-attachment data types used by the rendering pipeline
 - the layout engine, rasterizer, scheduler, semantic extractor, draw extractor, snapshot renderer, and commit planner
 - the incremental presentation and retained-frame machinery that the runtime depends on
+
+`Core` is currently target-level infrastructure re-exported through
+`TerminalUI`, not a separate library product.
 
 ## Removed From The Public Surface
 

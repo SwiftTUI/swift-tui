@@ -1,23 +1,39 @@
 # Testing And Fixture Policy
 
-Last updated: March 26, 2026
+Last updated: March 30, 2026
 
-This policy keeps reliability work predictable in the current decomposed codebase.
+This policy keeps reliability work predictable in the current decomposed
+codebase.
 
 ## Policy Hooks
 
-Structural repository guardrails that do not exercise runtime behavior now live in `prek`
-hooks instead of the test suite:
+Structural guardrails that do not need to execute the runtime live in `prek`
+hooks instead of the Swift test suite:
 
-- `Scripts/check_phase5_source_layout.zsh` enforces the standing Core and View source map,
-  retired monolith removals, and line budgets.
-- `Scripts/check_public_surface_policies.zsh` enforces public-surface guardrails, package
-  product policy, and the docs that describe that policy.
-- `Scripts/check_rendered_text_fixture_matrix.zsh` enforces that every committed rendered-text
-  fixture directory contains the full supported terminal configuration matrix.
+- `swift-format`: formats staged Swift files
+- `no-foundation-in-library-products`: inline `prek.toml` check that forbids `Foundation` imports in library-product sources
+- `Scripts/check_public_surface_policies.zsh`: enforces public-surface guardrails, actor-isolation documentation, and related docs
+- `Scripts/check_rendered_text_fixture_matrix.zsh`: enforces that every committed rendered-text fixture directory contains the full supported terminal configuration matrix
 
-Keep runtime, integration, and behavioral guarantees in tests. Move pure repository-shape or
-text-pattern checks into hooks when they can fail earlier and more locally.
+Keep runtime, integration, and behavioral guarantees in tests. Move pure
+repository-shape or text-pattern checks into hooks when they can fail earlier
+and more locally.
+
+There is not currently a dedicated checked-in source-layout hook. The source
+map in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) is therefore kept in sync through
+review, docs maintenance, and the broader public-surface policy checks.
+
+## Test Topology
+
+- `Tests/CoreTests`: pipeline, layout, raster, and low-level infrastructure
+- `Tests/ViewTests`: authoring-surface, environment, and actor-isolation behavior
+- `Tests/TerminalUITests`: runtime, rendering, fixture, and benchmark scenarios
+- `Tests/TerminalUIScenesTests`: scene launcher, hosted session, attach, socket, and pty behavior
+- `Tests/PrototypeUIComponentsTests`: prototype-surface regression coverage
+
+Prefer the smallest target that can prove the behavior under test. Keep
+cross-layer coverage in `TerminalUITests` and `TerminalUIScenesTests`, not as
+the default place for every new assertion.
 
 ## Principles
 
@@ -58,8 +74,8 @@ When updating fixtures:
 
 - Do not let a single file accumulate multiple unrelated subsystem responsibilities again.
 - If a new file becomes a catch-all, split it or document why the exception is temporary.
-- The source map in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) is the current ownership reference; keep it in sync with any future file moves.
-- The standing enforcement lives in `Scripts/check_phase5_source_layout.zsh` via `prek`.
+- Keep the source map in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md) aligned with file moves and target-boundary changes.
+- When a new repository-shape rule becomes important enough to enforce mechanically, add the actual hook and document it here in the same change.
 
 ## Review Checklist
 

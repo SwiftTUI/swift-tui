@@ -1,6 +1,7 @@
 import TerminalUI
 import TerminalUIScenes
 
+@main
 struct TodoistDemoApp: App {
   private let launcher: TodoistDemoLauncher?
   private let launchError: String?
@@ -27,7 +28,3 @@ struct TodoistDemoApp: App {
     }
   }
 }
-
-// SwiftUI-style app authoring is main-actor isolated, so construct the app there.
-let app = await MainActor.run { TodoistDemoApp() }
-try await MultiSceneLauncher.run(app)

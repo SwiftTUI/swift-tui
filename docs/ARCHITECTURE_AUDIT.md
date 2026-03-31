@@ -1,80 +1,128 @@
 # Architecture Audit
 
-**Date:** 2026-03-26
-**Scope:** Full framework audit — Core, View, TerminalUI, TerminalUIScenes
+**Date:** 2026-03-30
+**Scope:** Current working tree, including `Core`, `View`, `TerminalUI`, `TerminalUIScenes`, wrapper packages, and the top-level docs that describe them
 
-## Codebase Summary
+## Executive Summary
 
-| Module | Lines | Files | Purpose |
-|--------|-------|-------|---------|
-| Core | 13,509 | 35 | Rendering pipeline, layout, semantics |
-| View | 8,816 | 28 | SwiftUI-shaped view authoring surface |
-| TerminalUI | 4,076 | 9 | Terminal host integration, app entry |
-| TerminalUIScenes | — | — | Multi-scene runtime layer |
-| TerminalUICharts | — | — | Chart/metric components |
+The March 26 architecture audit is no longer accurate as a future-looking
+punch list. The codebase has since landed most of the structural work that
+audit called for:
 
-## Strengths
+- `LayoutEngine` is decomposed into focused extension files
+- `RunLoop` is split across event-dispatch, pointer, event-pump, and rendering
+  files
+- typed semantic roles and structured route identifiers replaced the old
+  string-token model
+- test coverage is now split across `CoreTests`, `ViewTests`,
+  `TerminalUITests`, `TerminalUIScenesTests`, and
+  `PrototypeUIComponentsTests`
+- retained resolve reuse is present and wired into `DefaultRenderer`
 
-### 1. Pipeline Design
-The 7-phase rendering pipeline (Resolve → Measure → Place → Semantics → Draw → Raster → Commit) in `Core/Pipeline.swift` is clean, composable, and testable. Each phase has a single responsibility with well-defined input/output types. The generic `Renderer<Root>` with closure-based phases allows the pipeline to be assembled differently for testing vs production.
+The remaining debt is narrower. It is now mostly about concurrency annotation
+cleanup, deciding how far to push the `ResolvedNode` metadata split, and
+keeping docs and guardrails aligned with the file map that already shipped.
 
-### 2. Immutable Intermediate Trees
-`ResolvedNode`, `MeasuredNode`, `PlacedNode`, and `DrawNode` are all value types (`Equatable, Sendable`). This makes the pipeline inherently safe for concurrency and easy to reason about — each phase produces a fresh tree from the previous.
+This refreshed audit intentionally avoids hard-coded line counts and file-count
+tables. Those numbers drift too quickly to stay useful.
 
-### 3. Identity-Based Invalidation
-The `Identity`-keyed invalidation system (`StateContainer.invalidationIdentities`, `FrameContext.invalidatedIdentities`) enables incremental rendering without a full virtual-DOM diff. Combined with `MeasurementCache`, this is a smart performance strategy for terminal UIs where layout is simpler but redraw latency matters.
+## What Landed Since The Original Audit
 
-### 4. Separation of View Authoring from Rendering
-The `View` module knows nothing about terminals. It defines the declarative API and resolution to `ResolvedNode`. The `TerminalUI` module handles terminal I/O. This separation means the core View DSL could target other backends.
+### `LayoutEngine` decomposition
 
-### 5. Swift 6 Concurrency
-`.swiftLanguageMode(.v6)`, `.strictMemorySafety()`, `Sendable` throughout. The `StateContainer` uses `Mutex` from `Synchronization` correctly — copy-on-read, compare-before-write. Well ahead of most Swift projects.
+The old monolithic `LayoutEngine.swift` has been split into:
 
-## Issues Found
+- `LayoutEngine+Alignment.swift`
+- `LayoutEngine+List.swift`
+- `LayoutEngine+Placement.swift`
+- `LayoutEngine+Stack.swift`
+- `LayoutEngine+Table.swift`
+- `LayoutEngine+Utility.swift`
 
-### HIGH Priority
+That keeps the main file focused on the public engine surface while moving
+algorithm groups into targeted extensions.
 
-#### H1: `LayoutEngine.swift` at 1,922 Lines
-Handles measurement for every `LayoutBehavior` variant — stacks, overlays, padding, frames, decorations, `viewThatFits`, and custom layouts — all in one file. Hardest file to modify safely.
+### `RunLoop` decomposition
 
-**Fix:** Extract measurement strategies into separate files by layout kind (e.g., `StackMeasurement.swift`, `FrameMeasurement.swift`). The `LayoutBehavior` enum provides natural seams.
+The runtime coordinator still centers on `RunLoop.swift`, but the heavy logic
+is now split into:
 
-#### H2: `RunLoop.swift` Mixes Too Many Concerns (1,136 Lines)
-Handles event polling, signal handling, state mutation, frame scheduling, focus management, key dispatch, pointer dispatch, scroll handling, action dispatch, and lifecycle coordination.
+- `RunLoop+EventDispatch.swift`
+- `RunLoop+PointerHandling.swift`
+- `RunLoop+EventPump.swift`
+- `RunLoop+Rendering.swift`
 
-**Fix:** Extract `EventDispatcher` (takes `InputEvent` + `SemanticSnapshot` + `FocusTracker`, returns mutations) and `FrameScheduler` (decides when to render). RunLoop becomes a thin coordinator.
+The final shape differs slightly from the original proposed filenames, but the
+structural goal is clearly landed.
 
-#### H3: String-Typed Semantic Roles
-The old semantic/token layer used open-ended strings for roles and routes. That made routing and styling fragile and forced extra compatibility code.
+### Typed semantic roles and routes
 
-**Fix:** Keep semantic roles and routes closed-typed: enums for roles, structured `RouteID`, typed identities for built-in child routes, and no string-token fallback layer.
+`Sources/Core/SemanticRoleTypes.swift` now carries the closed semantic-role and
+route model. The old string-style compatibility layer described in the March 26
+audit is no longer the active architecture story.
 
-### MEDIUM Priority
+### Test-target split
 
-#### M1: `ResolvedNode` is a God Struct (12 Fields)
-Carries identity, layout, drawing, semantics, lifecycle, and environment. Every phase reads different subsets but receives everything. Changes to any metadata type force recompilation of all phases. Also degrades `MeasurementCache` — the cache compares *all* fields when only layout-relevant fields matter.
+The repo no longer relies on a single `TerminalUITests` bucket for everything.
+`CoreTests`, `ViewTests`, and `TerminalUIScenesTests` now exist and materially
+improve subsystem-local verification.
 
-**Fix:** Split into composable metadata bags (`NodeLayout`, `NodeDraw`, `NodeSemantics`, `NodeLifecycle`) alongside a slimmed `ResolvedNode`.
+### Incremental resolve
 
-#### M2: `@unchecked Sendable` Proliferation (24 Instances)
-Heaviest concentration in local registries (`LocalActionRegistry`, `LocalKeyHandlerRegistry`, `LocalFocusBindingRegistry`, etc.). Each is a potential soundness hole. Several store closures capturing mutable state.
+Incremental resolve reuse is present through `ResolveReuseSession` and retained
+resolve frames. That part of the original audit already resolved itself during
+the first pass and remains landed.
 
-**Fix:** Audit each instance. Replace with `Mutex`-protected struct or actor where possible. Add `// SAFETY:` comments documenting thread-access invariants where `@unchecked` must remain.
+## Still Open Or Partial
 
-#### M3: Single Test Target for Core + View + TerminalUI
-All ~37 test files are in `TerminalUITests`. No dedicated `CoreTests` or `ViewTests`. Can't run layout engine tests without compiling the terminal host. Test failures don't localize to a module.
+### 1. `@unchecked Sendable` still needs a deliberate sweep
 
-**Fix:** Add `CoreTests` and `ViewTests` test targets to `Package.swift`.
+This remains the highest-value follow-up. A current search shows 52
+`@unchecked Sendable` sites across `Sources/` and `Tests/`.
 
-#### ~~M4: No Incremental Resolve Phase~~ (ALREADY IMPLEMENTED)
-Upon closer inspection, incremental resolve already exists via `ResolveReuseSession` (`View/Environment.swift:308`). It stores the previous frame's resolved tree and reuses subtrees when:
-- The subtree's identity is not in `invalidatedIdentities`
-- No descendant identities are invalidated
-- The environment and transaction snapshots match
-Handler registrations are replayed from the retained frame for reused subtrees. Fully wired in `TerminalUI.swift:125`.
+Some are expected because the repo stores closures or bridges mutable host
+state, but the remaining sites still deserve one of two outcomes:
 
-### LOW Priority (Not Addressed in This Refactor)
+- replace with stronger isolation or synchronization where practical
+- keep them, but add explicit `// SAFETY:` invariants so future changes do not
+  silently widen the unsoundness boundary
 
-- **L1:** Full-surface rasterization (allocates entire `[[RasterCell]]` every frame)
-- **L2:** Module naming (`TerminalUI` is opaque, `View` collides with `SwiftUI.View`)
-- **L3:** No accessibility / screen reader story (OSC escape sequences)
+The local registries, host bridges, and retained replay structures remain the
+best places to start.
+
+### 2. `ResolvedNode` splitting is only partially landed
+
+`Sources/Core/NodeMetadata.swift` now provides grouped metadata views such as
+`NodeLayoutInfo`, `NodeDrawInfo`, `NodeSemanticInfo`, and `NodeLifecycleInfo`.
+That improves measurement comparisons and lowers some coupling.
+
+But the physical `ResolvedNode` storage in
+`Sources/Core/RenderTreeAndSemanticsTypes.swift` is still mostly flat. The repo
+should make an explicit choice:
+
+- finish the deeper storage split, or
+- decide the grouped accessors are sufficient and stop treating a full split as
+  pending work
+
+Leaving this in an implied half-state is harder to reason about than either
+clear direction.
+
+### 3. Docs and guardrails had drifted behind the shipped file map
+
+This audit pass found doc drift in:
+
+- `docs/SOURCE_LAYOUT.md`
+- `docs/TESTING_AND_FIXTURE_POLICY.md`
+- `README.md`
+- `TUIGUI.md`
+- `docs/REFACTOR_PLAN.md`
+
+Those docs were describing nonexistent files, missing products, or future work
+that has already shipped. They should now be treated as part of the same
+reliability surface as the code split itself.
+
+## Recommended Near-Term Plan
+
+1. Run a focused `@unchecked Sendable` audit, starting with runtime registries and host bridges.
+2. Decide whether `ResolvedNode` should be physically split further or formally left as grouped-accessor storage.
+3. If the repo wants source-layout rules enforced mechanically again, add a real checked-in hook and document that hook in the same change.

@@ -29,9 +29,11 @@ swift format format -i --configuration .swift-format.json Sources/ Tests/  # For
 
 - **swift-format**: Auto-formats staged `.swift` files on commit.
 - **no-foundation-in-library-products**: Blocks commits that add `import Foundation` or `public import Foundation` in `Sources/Core`, `Sources/View`, `Sources/TerminalUI`, or `Sources/TerminalUICharts`. Foundation is forbidden in all library product sources.
-- **phase5-source-layout-guardrails**: Enforces the standing `Sources/Core` and `Sources/View` file map, retired monolith removals, and per-file line budgets.
 - **public-surface-policies**: Enforces public surface guardrails, prototype target packaging rules, and the docs that describe that policy.
 - **rendered-text-fixture-matrix**: Ensures every committed rendered-text fixture case contains the full supported terminal configuration matrix.
+
+There is not currently a separate checked-in source-layout hook. Keep
+`docs/SOURCE_LAYOUT.md` aligned with file moves in ordinary review.
 
 ## Code Style
 
@@ -86,10 +88,13 @@ resolve -> measure -> place -> semantics -> draw -> raster -> commit
 
 ## Test Organization
 
-All tests live in `Tests/TerminalUITests/`. Tests are phase-oriented:
-- `Phase0FoundationTests` through `Phase5ReliabilityGatesTests` -- progressive pipeline and runtime coverage
-- `SwiftUISurfaceTests` -- public API surface coverage (largest suite)
-- `InteractiveRuntimeTests` -- interactive session behavior
+Tests are now split by layer:
+
+- `Tests/CoreTests/` -- pipeline, layout, raster, and focus infrastructure
+- `Tests/ViewTests/` -- authoring-surface, environment, and actor-isolation behavior
+- `Tests/TerminalUITests/` -- runtime, rendering, fixtures, and end-to-end behavioral coverage
+- `Tests/TerminalUIScenesTests/` -- scene launcher, hosted session, socket, and pty behavior
+- `Tests/PrototypeUIComponentsTests/` -- prototype-surface regression coverage
 
 Repository-shape and policy regressions that do not require execution are enforced in `prek`
 hooks under `Scripts/`.

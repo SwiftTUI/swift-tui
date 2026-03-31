@@ -1,6 +1,6 @@
 # Terminal Native Roadmap
 
-**Date:** March 29, 2026  
+**Date:** March 30, 2026  
 **Depth:** Deep  
 **Primary references:** [VISION.md](VISION.md), [STATUS.md](STATUS.md),
 [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md),
@@ -248,8 +248,7 @@ instead of scrolled forms.
 
 ### Primary files
 
-- New [TabView.swift](../Sources/View/TabView.swift)
-- New [NavigationViews.swift](../Sources/View/NavigationViews.swift)
+- [NavigationViews.swift](../Sources/View/NavigationViews.swift) (hosts both `TabView` and `NavigationSplitView`)
 - New [PresentationModifiers.swift](../Sources/View/PresentationModifiers.swift)
 - [Environment.swift](../Sources/View/Environment.swift)
 - [StyleEnvironment.swift](../Sources/View/StyleEnvironment.swift)

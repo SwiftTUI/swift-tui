@@ -113,7 +113,8 @@ Multi-scene orchestration is packaged separately in `TerminalUIScenes`.
 
 That scene layer now serves two distinct launch modes:
 
-- terminal-owned launch via `MultiSceneLauncher.run(...)`
+- terminal-owned launch via `MultiSceneLauncher.run(MyApp.self)` or the default
+  `App.main()` provided by `TerminalUIScenes`
 - wrapper-owned launch via `MultiSceneLauncher.sceneManifest(...)` and `HostedSceneSession`
 
 ## Important Data Products

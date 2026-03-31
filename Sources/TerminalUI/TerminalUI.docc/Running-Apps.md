@@ -40,6 +40,16 @@ Use it when your app wants explicit control over state containers, focus tracker
 
 ## Scene-Based Apps
 
-The public scene declarations are in `TerminalUI`, but the current public launch helper lives in `TerminalUIScenes` as `MultiSceneLauncher`.
+The public scene declarations live in `TerminalUI`, but the default `@main`
+launch path currently comes from `TerminalUIScenes`.
 
-That launcher also supports the single-window case today, so scene-based apps can start on that path without committing to a multi-window design.
+Import `TerminalUIScenes` and mark your app type with `@main` to use the
+default `App.main()` that forwards to `MultiSceneLauncher`. When you need an
+explicit launcher instead, call:
+
+```swift
+try await MultiSceneLauncher.run(MyApp.self)
+```
+
+That launcher also supports the single-window case today, so scene-based apps
+can start on that path without committing to a multi-window design.
