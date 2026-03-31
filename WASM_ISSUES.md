@@ -161,6 +161,51 @@ That did not fix the button, but it changed the failure mode:
 That is a strong signal that nested child identity/context handling is part of
 the wasm failure, even if it is not the whole story.
 
+### 6. Flattening the button root removes one real failure mode
+
+A later experiment stopped returning an extra intrinsic `ResolvedNode(kind:
+.view("Button"))` wrapper and instead:
+
+- resolved the decorated button body directly
+- rewrote that resolved root's `identity`
+- rewrote that resolved root's `kind` to `.view("Button")`
+- merged button semantics onto that root
+
+That change was enough to make a lone default button boot successfully in the
+wasm harness.
+
+So the extra wrapper node is not incidental. It is one real part of the crash.
+
+### 7. The wrapper fix is not sufficient on its own
+
+Even with that flattened-root experiment in place, the button could still fail
+once the surrounding stack content was restored.
+
+What we observed in the clean harness:
+
+- `Button("Default button")` alone: safe
+- one plain `Text` sibling before the button: safe
+- two plain `Text` siblings before the button: safe
+- one `.foregroundStyle(.separator)` `Text` sibling before the button: safe
+- the fuller preview stack from the web example (two plain texts plus the
+  separator-styled explanatory text): crash
+
+This means the remaining failure is not just "button chrome by itself". There
+is still an interaction with surrounding sibling content in a stack.
+
+### 8. Clean runs point to allocator blow-up during resolve
+
+After removing the extra resolved-tree and measurement dumps, the failing runs
+produced a clearer wasm-side message:
+
+- `Fatal error: failed to allocate 3073 bytes of memory with alignment 4`
+
+That happened while the button was on the `"[button] resolving chrome body"`
+path, before `"[button] child resolved"` in some configurations.
+
+So at least one remaining failure mode is a resolve-time allocation explosion,
+not just a later measurement trap.
+
 ## Current Working Hypothesis
 
 The remaining crash is probably an interaction between:
@@ -169,9 +214,11 @@ The remaining crash is probably an interaction between:
 - nested wrapper modifiers like `background` / `overlay`
 - child identity/context derivation
 - generic view wrappers or erased modifier paths
+- stack sibling interactions involving environment-driven text styling
 
 In short: decorated control bodies are surviving native builds but producing a
-bad wasm path once they are resolved as nested child subtrees.
+bad wasm path once they are resolved as nested child subtrees, and flattening
+the outer button node only removes one layer of that problem.
 
 ## Suggested Next Steps
 
@@ -194,6 +241,9 @@ bad wasm path once they are resolved as nested child subtrees.
    participating in wrapper modifiers.
 5. If this remains hard to isolate in the app, add a tiny wasm-specific harness
    that renders a single authored view instead of booting the whole web example.
+6. Compare the full preview stack against the reduced safe cases by adding
+   siblings back one at a time, especially styled `Text` rows, to determine
+   what additional state tips the flattened-button experiment back into failure.
 
 ## Practical Takeaway
 
