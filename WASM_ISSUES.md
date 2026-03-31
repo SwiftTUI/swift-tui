@@ -245,6 +245,101 @@ the outer button node only removes one layer of that problem.
    siblings back one at a time, especially styled `Text` rows, to determine
    what additional state tips the flattened-button experiment back into failure.
 
+## Session 2: Heap Pressure Analysis and AnyView Audit (2026-03-31)
+
+### 9. Multiple modifier methods wrapped in unnecessary `AnyView`
+
+An audit of modifier methods found six that wrapped their return value in
+`AnyView(resolving:)` despite their underlying modifier structs already
+conforming to `View & ResolvableView`:
+
+- `drawMetadata(_:)` — used in every `ButtonPlainBody`
+- `semanticMetadata(_:)` — used by `.tag()`
+- `layoutMetadata(_:)` — used in `ButtonChromeBody` for `needsMinimumHeight`
+- `id(_:)` — used for explicit identity assignment
+- `environment(_:_:)` — used by `.buttonStyle()`, `.pickerStyle()`, etc.
+- `transformEnvironment(_:transform:)` — used by `.disabled()`
+
+Each `AnyView(resolving:)` allocates a closure on the heap. For a single
+default button, `drawMetadata` alone creates 2 closures (opacity in
+`ButtonPlainBody`, underline in `ButtonLinkBody`). With `environment()`
+closures from `.buttonStyle(.link)` etc., a single button easily creates 4+
+`AnyView` closure allocations.
+
+**Fix applied:** all six methods now return their modifier struct directly as
+`some View`, matching the pattern already used by `foregroundStyle`.
+
+### 10. `settingEnvironment` redundantly recomputes `isFocused`
+
+Both `settingEnvironment` and `transformingEnvironment` called
+`contextualEnvironmentValues()` on every invocation. This method recomputes
+`isFocused` by checking the identity against the focused identity. But these
+methods don't change the identity or the focused identity — they only change
+style/layout values like `foregroundStyle`, `tintStyle`, `isEnabled`, etc.
+
+The recomputation was producing the same result every time. It also triggered an
+extra copy of `EnvironmentValues` (a struct with a `[ObjectIdentifier: any
+EnvironmentValueBox]` dictionary).
+
+**Fix applied:** removed the `contextualEnvironmentValues` call from both
+methods. The `isFocused` value is established in the `ResolveContext.init`
+(which uses `applyEnvironmentValues: true`) and flows unchanged through
+`child()` and `settingEnvironment` calls.
+
+### 11. `applying(to:)` created two `EnvironmentSnapshotStorage` objects
+
+`EnvironmentValues.applying(to:)` used property setters on `EnvironmentSnapshot`
+that each allocated a new `EnvironmentSnapshotStorage` class instance:
+
+```swift
+var merged = snapshot
+merged.values.merge(snapshotValues) { _, new in new }  // new storage #1
+merged.style = StyleEnvironmentSnapshot(...)             // new storage #2
+```
+
+**Fix applied:** refactored to compute both fields first, then construct a
+single `EnvironmentSnapshot` via init. Also added an early check for empty
+`snapshotValues` to skip the merge entirely in the common case.
+
+### 12. Per-button allocation map
+
+With all three fixes applied, the allocation profile for a single default
+button resolve (ButtonChromeBody path) is:
+
+| Before | After | Source |
+|--------|-------|--------|
+| ~4 AnyView closures | 0 | drawMetadata, layoutMetadata, environment |
+| 2 EnvironmentValues copies | 0 | contextualEnvironmentValues in settingEnvironment |
+| 2 EnvironmentSnapshotStorage | 1 | applying(to:) double-setter |
+| 7 Identity arrays | 7 | context.child() — unchanged |
+
+Estimated reduction per button: ~6 heap allocations eliminated, 1 halved.
+
+### 13. Areas investigated but not changed
+
+**PaddingView / FrameView / FlexibleFrameView child contexts:** These single-
+child layout wrappers create child contexts (`context.child(.named("content"))`)
+for identity disambiguation. Removing the child context would save 1 Identity
+array allocation per wrapper, but risks cache collisions in the resolve reuse
+session during incremental updates. Left unchanged pending wasm-specific testing.
+
+**BackgroundView / OverlayView dual child contexts:** Both create two child
+contexts (base + decoration). These are needed for identity disambiguation when
+both sides contain stateful or handler-registering views. Cannot be safely
+removed.
+
+**Identity representation:** Each `Identity.child()` allocates a new `[String]`
+array via `components + [component.rawValue]`. A single-string path
+representation would reduce allocations but is a larger refactor.
+
+### Pre-existing test failure
+
+The test "link Button lowers to link-colored underlined text without border
+chrome" was already failing before this session. The expected background color
+is `.white` but the actual is the tint color (blue) from `.background {
+Rectangle().fill(.tint) }` in `ButtonLinkBody`. This appears to be a test
+expectation that hasn't been updated to match the current rendering behavior.
+
 ## Practical Takeaway
 
 If the immediate goal is "keep the web example booting", the safest short-term
@@ -252,4 +347,21 @@ approach is still to avoid default decorated controls in the default wasm scene.
 
 If the goal is "fix button chrome in wasm", the most promising direction is to
 treat this as a shared decorated-control resolution bug, not as a button-only
-feature bug.
+feature bug. The fixes in session 2 reduce per-button heap pressure
+significantly but may not fully eliminate the allocator blow-up on their own —
+they need to be tested against the actual wasm build.
+
+## Remaining Next Steps
+
+1. **Test the session 2 fixes in the actual wasm build.** The AnyView removal
+   and allocation reductions should meaningfully reduce heap pressure but need
+   validation against the real allocator failure.
+2. Re-run the control matrix from the original suggested steps.
+3. If the crash persists, investigate:
+   - Increasing the wasm default memory (linker flags or wasm-ld options)
+   - Further reducing `Identity.child()` array allocations (compact path repr)
+   - Adding `@inline(never)` to more resolve methods to reduce code size
+   - Flattening the button root (Finding #6) combined with session 2 fixes
+4. Consider whether the `EnvironmentValues.storage` dictionary (existential
+   `any EnvironmentValueBox` values) contributes significant per-value heap
+   pressure and whether a flat struct could replace it for common keys.

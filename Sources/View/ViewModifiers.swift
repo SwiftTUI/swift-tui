@@ -23,11 +23,11 @@ extension View {
   }
 
   public func id(_ identity: Identity) -> some View {
-    AnyView(resolving: IDView(identity: identity, content: self))
+    IDView(identity: identity, content: self)
   }
 
   public func layoutMetadata(_ metadata: LayoutMetadata) -> some View {
-    AnyView(resolving: LayoutMetadataModifier(content: self, metadata: metadata))
+    LayoutMetadataModifier(content: self, metadata: metadata)
   }
 
   public func layoutValue<Key: LayoutValueKey>(
@@ -60,11 +60,11 @@ extension View {
   }
 
   public func drawMetadata(_ metadata: DrawMetadata) -> some View {
-    AnyView(resolving: DrawMetadataModifier(content: self, metadata: metadata))
+    DrawMetadataModifier(content: self, metadata: metadata)
   }
 
   public func semanticMetadata(_ metadata: SemanticMetadata) -> some View {
-    AnyView(resolving: SemanticMetadataModifier(content: self, metadata: metadata))
+    SemanticMetadataModifier(content: self, metadata: metadata)
   }
 
   public func onAppear(
@@ -241,12 +241,10 @@ extension View {
     _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
     _ value: Value
   ) -> some View {
-    AnyView(
-      resolving: EnvironmentWritingModifier(
-        content: self,
-        keyPath: keyPath,
-        value: value
-      )
+    EnvironmentWritingModifier(
+      content: self,
+      keyPath: keyPath,
+      value: value
     )
   }
 
@@ -254,12 +252,10 @@ extension View {
     _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
     transform: @escaping (inout Value) -> Void
   ) -> some View {
-    AnyView(
-      resolving: EnvironmentTransformModifier(
-        content: self,
-        keyPath: keyPath,
-        transform: transform
-      )
+    EnvironmentTransformModifier(
+      content: self,
+      keyPath: keyPath,
+      transform: transform
     )
   }
 }

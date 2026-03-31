@@ -119,18 +119,23 @@ public struct EnvironmentValues: Equatable, Sendable {
   fileprivate func applying(
     to snapshot: EnvironmentSnapshot
   ) -> EnvironmentSnapshot {
-    var merged = snapshot
-    merged.values.merge(snapshotValues) { _, new in new }
-    merged.style = StyleEnvironmentSnapshot(
-      appearance: terminalAppearance,
-      themeOverride: themeOverride,
-      foregroundStyle: foregroundStyle,
-      tintStyle: tintStyle,
-      preferredColorScheme: preferredColorScheme,
-      chromePreset: chromePreset,
-      isEnabled: isEnabled
+    var mergedValues = snapshot.values
+    if !snapshotValues.isEmpty {
+      mergedValues.merge(snapshotValues) { _, new in new }
+    }
+    return EnvironmentSnapshot(
+      debugSignature: snapshot.debugSignature,
+      values: mergedValues,
+      style: StyleEnvironmentSnapshot(
+        appearance: terminalAppearance,
+        themeOverride: themeOverride,
+        foregroundStyle: foregroundStyle,
+        tintStyle: tintStyle,
+        preferredColorScheme: preferredColorScheme,
+        chromePreset: chromePreset,
+        isEnabled: isEnabled
+      )
     )
-    return merged
   }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -249,10 +254,6 @@ public struct ResolveContext: Equatable, Sendable {
   ) -> Self {
     var copy = self
     copy.environmentValues[keyPath: keyPath] = value
-    copy.environmentValues = Self.contextualEnvironmentValues(
-      copy.environmentValues,
-      for: copy.identity
-    )
     copy.environment = copy.environmentValues.applying(to: copy.environment)
     return copy
   }
@@ -263,10 +264,6 @@ public struct ResolveContext: Equatable, Sendable {
   ) -> Self {
     var copy = self
     transform(&copy.environmentValues[keyPath: keyPath])
-    copy.environmentValues = Self.contextualEnvironmentValues(
-      copy.environmentValues,
-      for: copy.identity
-    )
     copy.environment = copy.environmentValues.applying(to: copy.environment)
     return copy
   }
