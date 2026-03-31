@@ -50,17 +50,27 @@ not match the repo's pinned Swift 6.3.0 environment.
 
 The wasm-facing package work also uses the same `swiftly`-managed Swift 6.3.0
 toolchain, but with the wasm SDK selected through `--swift-sdk`.
+Wasm builds of TerminalUI apps will often require a stack size larger than the default.
+Their starting and max memory can also be bumped - although no yet-known failures have been attributed to this.
 
 Examples:
 
 ```bash
-TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core
-TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes
+swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core
+swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes
+swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm -c release -Xlinker --initial-memory=536870912 -Xlinker --max-memory=4294967296 -Xlinker -z -Xlinker "stack-size=1048576"
 ```
 
-`GUI/WebTUIGUI` build scripts shell out to `swift` directly, so those scripts
-also require a shell where `swift` already points at the `swiftly`-managed
-Swift 6.3.0 toolchain. Run `swiftly use 6.3.0` before invoking Bun if needed.
+`GUI/WebTUIGUI` build scripts use `swiftly` directly, so require a 
+swiftly-managed Swift 6.3.0 toolchain.
+Install Swiftly before invoking `bun` if required.
+
+```
+curl -L https://download.swift.org/swiftly/darwin/swiftly.pkg > swiftly.pkg
+installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+~/.swiftly/bin/swiftly init
+swiftly install --use 6.3
+```
 
 ## Bun
 

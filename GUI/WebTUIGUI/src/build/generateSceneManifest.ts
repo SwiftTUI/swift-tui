@@ -23,6 +23,8 @@ async function runManifestCommand(
 ): Promise<string> {
   const proc = Bun.spawn({
     cmd: [
+      "swiftly",
+      "run",
       "swift",
       "run",
       "--package-path",

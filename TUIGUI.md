@@ -118,8 +118,8 @@ the root package.
 Verified on March 30, 2026:
 
 ```bash
-TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core
-TERMINALUI_ENABLE_WASM=1 swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes
+swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core
+swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes
 swiftly run swift test --filter TerminalUIScenesTests.SceneManifestTests
 swiftly run swift test --filter TerminalUIScenesTests.HostedSceneSessionTests
 ```

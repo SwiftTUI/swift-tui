@@ -16,8 +16,7 @@ export async function resolveSwiftArtifacts(
 ): Promise<SwiftArtifactPaths> {
   const swiftlyWorkingDirectory = await resolveSwiftlyWorkingDirectory(options.packagePath);
   const environment = {
-    ...process.env,
-    TERMINALUI_ENABLE_WASM: "1",
+    ...process.env
   };
 
   await runCommand([

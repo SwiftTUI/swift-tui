@@ -1,5 +1,12 @@
 # Custom Dictionary Words
+bjorn
+codegen
 genericize
 Pressable
 subview
 subviews
+SwiftUITUIGUI
+TUIGUI
+wasi
+xcrun
+Xlinker

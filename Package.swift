@@ -10,10 +10,10 @@ let nativeRuntimePlatforms: [PackageDescription.Platform] = [
   .android,
 ]
 
-let includePNGSupport = ProcessInfo.processInfo.environment["TERMINALUI_ENABLE_WASM"] != "1"
+let explicitPlatforms = ProcessInfo.processInfo.environment["DISABLE_EXPLICIT_PLATFORMS"] != "1"
 
 let packagePlatforms: [SupportedPlatform]? = {
-  if !includePNGSupport {
+  if !explicitPlatforms {
     return nil
   }
 
@@ -23,8 +23,7 @@ let packagePlatforms: [SupportedPlatform]? = {
   ]
 }()
 
-let packageDependencies: [Package.Dependency] = {
-  var dependencies: [Package.Dependency] = [
+let packageDependencies: [Package.Dependency] = [
     .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.6"),
     .package(
       url: "https://github.com/apple/swift-collections.git",
@@ -34,52 +33,38 @@ let packageDependencies: [Package.Dependency] = {
       url: "https://github.com/apple/swift-async-algorithms.git",
       from: "1.1.3"
     ),
-  ]
-
-  if includePNGSupport {
-    dependencies.append(
-      .package(
+    .package(
         url: "https://github.com/tayloraswift/swift-png.git",
         exact: "4.4.9"
       )
-    )
-  }
+  ]
 
-  return dependencies
-}()
-
-let terminalUIDependencies: [Target.Dependency] = {
-  var dependencies: [Target.Dependency] = [
+let terminalUIDependencies: [Target.Dependency] = [
     "Core",
     "View",
     .target(
       name: "UnixSignals",
-      condition: .when(platforms: nativeRuntimePlatforms)
+      condition: .when(platforms: nativeRuntimePlatforms),
     ),
+    .product(
+      name: "PNG",
+      package: "swift-png",
+      condition: .when(platforms: nativeRuntimePlatforms),
+    )
   ]
 
-  if includePNGSupport {
-    dependencies.append(.product(name: "PNG", package: "swift-png"))
-  }
-
-  return dependencies
-}()
-
-let terminalUITestDependencies: [Target.Dependency] = {
-  var dependencies: [Target.Dependency] = [
+let terminalUITestDependencies: [Target.Dependency] = [
     "TerminalUI",
     "Core",
     "View",
     "TerminalUIScenes",
     "TerminalUICharts",
+    .product(
+      name: "PNG",
+      package: "swift-png",
+      condition: .when(platforms: nativeRuntimePlatforms),
+    )
   ]
-
-  if includePNGSupport {
-    dependencies.append(.product(name: "PNG", package: "swift-png"))
-  }
-
-  return dependencies
-}()
 
 func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDescription
   .SwiftSetting]

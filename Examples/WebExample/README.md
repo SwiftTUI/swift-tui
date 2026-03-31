@@ -5,14 +5,21 @@ Minimal Bun web app that embeds a Swift `TerminalUI` executable through
 
 The example has two parts:
 
-- `TerminalApp/`: a tiny Swift package with a reusable `WebExampleScenes`
+- `TerminalApp/`: a Swift package with a reusable `WebExampleScenes`
   library target plus a thin `WebExampleApp` executable launcher
 - `src/`: the Bun host that builds the manifest and wasm assets, serves them, and mounts `WebTUIGUI`
 
 ## Toolchains
 
-- Use `swiftly` and Swift 6.3.0 for the Swift build path
-- Use Bun for the web app
+- Swift
+  - Use `swiftly` to run Swift 6.3
+  - configure the Swift SDK `swift-6.3-RELEASE_wasm` for the Swift build
+  - The Swift Wasm build for a non-trivial TerminalUI program must configure the stack-size avoid runtime crashes. Stack and heap size may similarly require configuration.
+  - An overkill example which does a required stack size bump, but also configures maximal upfront memory is:
+    - `swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm -c release -Xlinker --initial-memory=536870912 -Xlinker --max-memory=4294967296 -Xlinker -z -Xlinker "stack-size=1048576"`
+  - See build.sh and run.sh in TerminalUI
+- Use Bun for the web app.
+- (Bun is currently configured to build the Swift Wasm targets with overkill memory settings.)
 
 ## Setup
 
@@ -33,8 +40,8 @@ bun dev
 ## Production Build
 
 ```bash
-bun build
-bun start
+bun run build
+bun run start
 ```
 
 ## Notes

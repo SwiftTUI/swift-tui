@@ -1,5 +1,9 @@
 # WASM Issues
 
+## Resolved
+
+The crashes observed when running wasm builds were mitigated by increasing stack size with `-Xlinker -z -Xlinker "stack-size=1048576"`
+
 ## Context
 
 These notes capture what we learned while investigating the web example crash:
@@ -359,9 +363,10 @@ they need to be tested against the actual wasm build.
 2. Re-run the control matrix from the original suggested steps.
 3. If the crash persists, investigate:
    - Increasing the wasm default memory (linker flags or wasm-ld options)
-   - Further reducing `Identity.child()` array allocations (compact path repr)
+   - Further reducing `Identity.child()` array allocations (compact path representation)
    - Adding `@inline(never)` to more resolve methods to reduce code size
    - Flattening the button root (Finding #6) combined with session 2 fixes
 4. Consider whether the `EnvironmentValues.storage` dictionary (existential
    `any EnvironmentValueBox` values) contributes significant per-value heap
    pressure and whether a flat struct could replace it for common keys.
+
