@@ -39,7 +39,6 @@ struct TodoistDemoSceneView: View {
       footerBar
     }
     .tint(Color.red)
-    .chromePreset(.standard)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 

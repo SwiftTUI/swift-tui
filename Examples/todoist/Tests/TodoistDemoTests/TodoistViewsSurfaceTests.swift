@@ -170,7 +170,6 @@ private struct ChromeProbeView: View {
       TextField("Filter", text: .constant(""))
         .id(testIdentity("FocusProbe", "Filter"))
     }
-    .chromePreset(.standard)
     .tint(Color.red)
   }
 }

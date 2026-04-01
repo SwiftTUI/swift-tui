@@ -36,6 +36,19 @@ public struct Command: Hashable, Sendable, Identifiable {
         -1
       }
     }
+
+    fileprivate var focusStyle: SemanticStyleRole {
+      switch self {
+      case .action:
+         .tint
+      case .destructive: 
+        .danger
+      case .navigation: 
+        .link
+      case .toggle: 
+        .selection
+      }
+    }
   }
 
   public var id: String
@@ -318,14 +331,10 @@ public struct CommandPalette: View {
               .foregroundStyle(.separator)
           } else {
             ForEach(matches) { command in
-              Button(
-                role: command.kind == .destructive ? .destructive : nil,
-                action: {
-                  onExecute(command)
-                }
-              ) {
+              Button(action: {onExecute(command)}) {
                 CommandPaletteRow(command: command)
               }
+              .buttonStyle(.plain)
               .disabled(command.isDisabled)
             }
           }
@@ -359,7 +368,7 @@ private struct CommandPaletteRow: View {
         }
       }
     }
-    .drawMetadata(.init(opacity: command.isDisabled ? 0.6 : 1))
+    .opacity(command.isDisabled ? 0.6 : 1)
   }
 }
 
@@ -378,7 +387,7 @@ extension View {
   public func commandPalette(
     isPresented: Binding<Bool>,
     placeholder: String = "Search commands…",
-    onExecute: @escaping @MainActor @Sendable (Command) -> Void = { _ in }
+    onExecute: @escaping @MainActor @Sendable (Command) -> Void
   ) -> some View {
     CommandPaletteModifier(
       content: self,
@@ -404,7 +413,13 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
   var body: some View {
     content
       .overlayPreferenceValue(CommandPreferenceKey.self) { preference in
-        EmptyView()
+        Group {
+          if isPresented.wrappedValue {
+            Rectangle().fill(.background)
+          } else {
+            EmptyView()
+          }
+        }
           .sheet("Command Palette", isPresented: isPresented) {
             CommandPalette(
               query: Binding(

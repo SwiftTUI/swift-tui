@@ -7,12 +7,6 @@ extension View {
     environment(\.preferredColorScheme, colorScheme)
   }
 
-  public func chromePreset(
-    _ preset: ChromePreset
-  ) -> some View {
-    environment(\.chromePreset, preset)
-  }
-
   public func controlProminence(
     _ prominence: ControlProminence
   ) -> some View {

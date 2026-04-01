@@ -59,8 +59,12 @@ extension View {
     )
   }
 
-  public func drawMetadata(_ metadata: DrawMetadata) -> some View {
+  package func drawMetadata(_ metadata: DrawMetadata) -> some View {
     DrawMetadataModifier(content: self, metadata: metadata)
+  }
+
+  public func opacity(_ opacity: Double) -> some View {
+    self.drawMetadata(.init(opacity: opacity))
   }
 
   public func semanticMetadata(_ metadata: SemanticMetadata) -> some View {

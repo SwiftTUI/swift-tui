@@ -124,7 +124,6 @@ extension Button {
         label: label,
         chrome: chrome,
         buttonStyle: buttonStyle,
-        chromePreset: styleEnvironment.chromePreset,
         prominence: effectiveProminence,
         borderShape: context.environmentValues.buttonBorderShape
       )
@@ -179,20 +178,19 @@ private struct ButtonChromeBody<Label: View>: View {
   var label: Label
   var chrome: ControlChrome
   var buttonStyle: ButtonStyle
-  var chromePreset: ChromePreset
   var prominence: ControlProminence
   var borderShape: ButtonBorderShape
 
   private var usesDenseBorderlessChrome: Bool {
-    chromePreset == .standard && buttonStyle != .bordered
+    buttonStyle != .bordered
   }
 
   private var verticalPadding: Int {
-    chromePreset == .legacy || buttonStyle == .bordered ? 1 : 0
+    buttonStyle == .bordered ? 1 : 0
   }
 
   private var needsMinimumHeight: Bool {
-    chromePreset != .standard || buttonStyle == .bordered
+    buttonStyle == .bordered
   }
 
   var body: some View {

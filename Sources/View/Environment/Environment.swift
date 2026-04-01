@@ -132,7 +132,6 @@ public struct EnvironmentValues: Equatable, Sendable {
         foregroundStyle: foregroundStyle,
         tintStyle: tintStyle,
         preferredColorScheme: preferredColorScheme,
-        chromePreset: chromePreset,
         isEnabled: isEnabled
       )
     )

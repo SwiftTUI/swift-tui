@@ -256,310 +256,6 @@ public struct TerminalAppearance: Equatable, Sendable {
     )
   }
 
-  public func controlChrome(
-    isEnabled: Bool,
-    isFocused: Bool,
-    isPressed: Bool = false,
-    isSelected: Bool = false,
-    prominence: ControlProminence = .standard,
-    role: ButtonRole? = nil
-  ) -> ControlChrome {
-    let theme = semanticTheme()
-    let accentStyle = buttonAccentStyle(theme: theme, role: role)
-    let accentColor = resolveStyleColor(style: accentStyle, theme: theme) ?? tintColor
-    let standardForegroundStyle = buttonForegroundStyle(theme: theme, role: role)
-    let standardBorderColor =
-      resolveStyleColor(style: buttonBorderStyle(theme: theme, role: role), theme: theme)
-      ?? foregroundColor
-    let standardBorderStyle = gleamBorderStyle(base: standardBorderColor)
-    let idleSurfaceStyle = gleamSurfaceStyle(
-      base: resolveStyleColor(style: theme.fill, theme: theme)
-        ?? elevatedSurface(from: backgroundColor, scheme: colorScheme, amount: 0.08)
-    )
-    let focusedSurfaceStyle = gleamSurfaceStyle(
-      base: mix(
-        resolveStyleColor(style: theme.fill, theme: theme)
-          ?? elevatedSurface(from: backgroundColor, scheme: colorScheme, amount: 0.08),
-        accentColor,
-        amount: colorScheme == .dark ? 0.08 : 0.05
-      )
-    )
-    let selectedSurfaceStyle = gleamSurfaceStyle(
-      base: mix(
-        backgroundColor,
-        accentColor,
-        amount: colorScheme == .dark ? 0.16 : 0.11
-      )
-    )
-    let accentFillStyle = gleamAccentStyle(base: accentColor)
-    let accentBorderStyle = gleamBorderStyle(
-      base: accentColor,
-      highlightAmount: colorScheme == .dark ? 0.2 : 0.14,
-      shadowAmount: colorScheme == .dark ? 0.1 : 0.06
-    )
-
-    if !isEnabled {
-      return .init(
-        foregroundStyle: theme.placeholder,
-        contentBackgroundStyle: gleamSurfaceStyle(
-          base: resolveStyleColor(style: theme.windowBackground, theme: theme)
-            ?? elevatedSurface(
-              from: backgroundColor, scheme: colorScheme, amount: 0.04, invert: true)
-        ),
-        borderForegroundStyle: gleamBorderStyle(
-          base: resolveStyleColor(style: theme.separator, theme: theme)
-            ?? mix(backgroundColor, foregroundColor, amount: separatorMixAmount)
-        ),
-        opacity: 0.65
-      )
-    }
-
-    if prominence == .increased {
-      let pressedAccentFillStyle =
-        isPressed
-        ? gleamAccentStyle(
-          base: elevatedSurface(
-            from: accentColor,
-            scheme: colorScheme,
-            amount: colorScheme == .dark ? 0.12 : 0.08,
-            invert: true
-          )
-        )
-        : accentFillStyle
-      let legibleForeground = legibleForegroundColor(on: accentColor)
-      let contrastingForegroundStyle: AnyShapeStyle = .color(legibleForeground)
-      let focusedProminentBorderColor = contrastSafe(
-        colorScheme == .dark ? backgroundColor : foregroundColor,
-        against: accentColor,
-        minimumContrast: 3,
-        fallback: legibleForeground
-      )
-      return .init(
-        foregroundStyle: contrastingForegroundStyle,
-        contentBackgroundStyle: pressedAccentFillStyle,
-        borderForegroundStyle: gleamBorderStyle(
-          base: isFocused ? focusedProminentBorderColor : legibleForeground
-        )
-      )
-    }
-
-    if isSelected {
-      let selectedBackground =
-        isPressed
-        ? gleamSurfaceStyle(
-          base: mix(
-            backgroundColor,
-            accentColor,
-            amount: colorScheme == .dark ? 0.22 : 0.17
-          )
-        )
-        : selectedSurfaceStyle
-      return .init(
-        foregroundStyle: theme.foreground,
-        contentBackgroundStyle: selectedBackground,
-        borderForegroundStyle: accentBorderStyle
-      )
-    }
-
-    if isPressed {
-      return .init(
-        foregroundStyle: standardForegroundStyle,
-        contentBackgroundStyle: gleamSurfaceStyle(
-          base: mix(
-            resolveStyleColor(style: theme.fill, theme: theme)
-              ?? elevatedSurface(from: backgroundColor, scheme: colorScheme, amount: 0.08),
-            accentColor,
-            amount: colorScheme == .dark ? 0.14 : 0.1
-          )
-        ),
-        borderForegroundStyle: gleamBorderStyle(base: accentColor)
-      )
-    }
-
-    if isFocused {
-      return .init(
-        foregroundStyle: standardForegroundStyle,
-        contentBackgroundStyle: focusedSurfaceStyle,
-        borderForegroundStyle: accentBorderStyle
-      )
-    }
-
-    return .init(
-      foregroundStyle: standardForegroundStyle,
-      contentBackgroundStyle: idleSurfaceStyle,
-      borderForegroundStyle: standardBorderStyle
-    )
-  }
-
-  public func rowChrome(
-    isEnabled: Bool,
-    isFocused: Bool,
-    isPressed: Bool = false,
-    isSelected: Bool = false,
-    role: ButtonRole? = nil
-  ) -> ControlChrome {
-    let theme = semanticTheme()
-    let accentStyle = buttonAccentStyle(theme: theme, role: role)
-    let accentColor = resolveStyleColor(style: accentStyle, theme: theme) ?? tintColor
-    let neutralRowBase = mix(
-      backgroundColor,
-      foregroundColor,
-      amount: colorScheme == .dark ? 0.02 : 0.015
-    )
-    let highlight = AnyShapeStyle.color(
-      mix(
-        backgroundColor,
-        accentColor,
-        amount: colorScheme == .dark ? 0.12 : 0.08
-      )
-    )
-
-    if !isEnabled {
-      return .init(
-        foregroundStyle: theme.placeholder,
-        contentBackgroundStyle: .color(backgroundColor),
-        borderForegroundStyle: theme.separator,
-        opacity: 0.65
-      )
-    }
-
-    if isPressed {
-      return .init(
-        foregroundStyle: theme.foreground,
-        contentBackgroundStyle: .color(
-          mix(
-            backgroundColor,
-            accentColor,
-            amount: colorScheme == .dark ? 0.18 : 0.13
-          )
-        ),
-        borderForegroundStyle: accentStyle
-      )
-    }
-
-    if isFocused || isSelected {
-      return .init(
-        foregroundStyle: theme.foreground,
-        contentBackgroundStyle: highlight,
-        borderForegroundStyle: accentStyle
-      )
-    }
-
-    return .init(
-      foregroundStyle: theme.foreground,
-      contentBackgroundStyle: .color(neutralRowBase),
-      borderForegroundStyle: gleamBorderStyle(
-        base: resolveStyleColor(style: theme.separator, theme: theme)
-          ?? mix(backgroundColor, foregroundColor, amount: separatorMixAmount)
-      )
-    )
-  }
-
-  public func buttonChrome(
-    buttonStyle: ButtonStyle,
-    isEnabled: Bool,
-    isFocused: Bool,
-    isPressed: Bool = false,
-    prominence: ControlProminence = .standard,
-    role: ButtonRole? = nil
-  ) -> ControlChrome {
-    let theme = semanticTheme()
-    let effectiveProminence: ControlProminence =
-      buttonStyle == .borderedProminent ? .increased : prominence
-
-    switch buttonStyle {
-    case .plain:
-      if !isEnabled {
-        return .init(
-          foregroundStyle: theme.placeholder,
-          contentBackgroundStyle: .color(backgroundColor),
-          borderForegroundStyle: .color(backgroundColor),
-          opacity: 0.65
-        )
-      }
-
-      let foregroundStyle = buttonForegroundStyle(theme: theme, role: role)
-      return .init(
-        foregroundStyle: foregroundStyle,
-        contentBackgroundStyle: .color(backgroundColor),
-        borderForegroundStyle: .color(backgroundColor)
-      )
-
-    case .link:
-      let foregroundStyle = buttonLinkForegroundStyle(theme: theme, role: role)
-      let linkColor =
-        resolveStyleColor(style: foregroundStyle, theme: theme)
-        ?? resolveStyleColor(style: theme.link, theme: theme)
-        ?? tintColor
-
-      if !isEnabled {
-        return .init(
-          foregroundStyle: theme.placeholder,
-          contentBackgroundStyle: .color(backgroundColor),
-          borderForegroundStyle: .color(backgroundColor),
-          opacity: 0.65
-        )
-      }
-
-      let focusedBackgroundStyle: AnyShapeStyle =
-        isFocused || isPressed
-        ? .color(
-          mix(
-            backgroundColor,
-            linkColor,
-            amount: colorScheme == .dark ? 0.12 : 0.08
-          )
-        )
-        : .color(backgroundColor)
-
-      return .init(
-        foregroundStyle: foregroundStyle,
-        contentBackgroundStyle: focusedBackgroundStyle,
-        borderForegroundStyle: .color(backgroundColor)
-      )
-
-    case .automatic, .bordered, .borderedProminent:
-      return controlChrome(
-        isEnabled: isEnabled,
-        isFocused: isFocused,
-        isPressed: isPressed,
-        prominence: effectiveProminence,
-        role: role
-      )
-    }
-  }
-
-  public func groupBoxChrome(
-    prominence: ControlProminence = .standard
-  ) -> ContainerChrome {
-    let theme = semanticTheme()
-    let backgroundBase =
-      resolveStyleColor(style: theme.windowBackground, theme: theme)
-      ?? elevatedSurface(from: backgroundColor, scheme: colorScheme, amount: 0.04, invert: true)
-    let fillBase =
-      resolveStyleColor(style: theme.fill, theme: theme)
-      ?? elevatedSurface(from: backgroundColor, scheme: colorScheme, amount: 0.08)
-
-    switch prominence {
-    case .increased:
-      return .init(
-        foregroundStyle: theme.foreground,
-        backgroundStyle: gleamSurfaceStyle(
-          base: mix(fillBase, tintColor, amount: colorScheme == .dark ? 0.1 : 0.07)
-        ),
-        borderStyle: gleamBorderStyle(base: tintColor)
-      )
-    default:
-      return .init(
-        foregroundStyle: theme.foreground,
-        backgroundStyle: gleamSurfaceStyle(base: backgroundBase),
-        borderStyle: gleamBorderStyle(
-          base: resolveStyleColor(style: theme.separator, theme: theme)
-            ?? mix(backgroundColor, foregroundColor, amount: separatorMixAmount)
-        )
-      )
-    }
-  }
 }
 
 extension TerminalAppearance {
@@ -578,84 +274,6 @@ extension TerminalAppearance {
 }
 
 extension TerminalAppearance {
-  private func buttonAccentStyle(
-    theme: Theme,
-    role: ButtonRole?
-  ) -> AnyShapeStyle {
-    switch role {
-    case let role? where role == .destructive:
-      return theme.danger
-    case let role? where role == .cancel || role == .close:
-      return theme.muted
-    case let role? where role == .confirm:
-      return theme.tint
-    case nil:
-      return theme.tint
-    default:
-      return theme.tint
-    }
-  }
-
-  private func buttonForegroundStyle(
-    theme: Theme,
-    role: ButtonRole?
-  ) -> AnyShapeStyle {
-    switch role {
-    case let role? where role == .destructive:
-      return theme.danger
-    case let role? where role == .cancel || role == .close:
-      return theme.muted
-    case let role? where role == .confirm:
-      return theme.tint
-    case nil:
-      return theme.foreground
-    default:
-      return theme.foreground
-    }
-  }
-
-  private func buttonLinkForegroundStyle(
-    theme: Theme,
-    role: ButtonRole?
-  ) -> AnyShapeStyle {
-    switch role {
-    case let role? where role == .destructive:
-      return theme.danger
-    case let role? where role == .cancel || role == .close:
-      return theme.muted
-    case let role? where role == .confirm:
-      return theme.tint
-    case nil:
-      return theme.link
-    default:
-      return theme.link
-    }
-  }
-
-  private func buttonBorderStyle(
-    theme: Theme,
-    role: ButtonRole?
-  ) -> AnyShapeStyle {
-    switch role {
-    case let role? where role == .destructive || role == .confirm:
-      return buttonAccentStyle(theme: theme, role: role)
-    case let role? where role == .cancel || role == .close:
-      return theme.separator
-    case nil:
-      return theme.separator
-    default:
-      return theme.separator
-    }
-  }
-
-  private func legibleForegroundColor(
-    on backgroundColor: Color
-  ) -> Color {
-    let whiteContrast = contrastRatio(.white, backgroundColor)
-    let blackContrast = contrastRatio(.black, backgroundColor)
-    return whiteContrast >= blackContrast ? .white : .black
-  }
-
   private var separatorMixAmount: Double {
     colorScheme == .dark ? 0.22 : 0.28
   }
@@ -702,77 +320,6 @@ extension TerminalAppearance {
     }
   }
 
-  private func gleamSurfaceStyle(
-    base: Color,
-    highlightAmount: Double? = nil,
-    shadowAmount: Double? = nil
-  ) -> AnyShapeStyle {
-    let lifted = elevatedSurface(
-      from: base,
-      scheme: colorScheme,
-      amount: highlightAmount ?? (colorScheme == .dark ? 0.12 : 0.06)
-    )
-    let grounded = elevatedSurface(
-      from: base,
-      scheme: colorScheme,
-      amount: shadowAmount ?? (colorScheme == .dark ? 0.08 : 0.04),
-      invert: true
-    )
-    return .linearGradient(
-      .init(
-        gradient: .init(
-          stops: [
-            .init(color: lifted, location: 0),
-            .init(color: base, location: 0.45),
-            .init(color: grounded, location: 1),
-          ]
-        ),
-        startPoint: .top,
-        endPoint: .bottom
-      )
-    )
-  }
-
-  private func gleamAccentStyle(
-    base: Color
-  ) -> AnyShapeStyle {
-    gleamSurfaceStyle(
-      base: base,
-      highlightAmount: colorScheme == .dark ? 0.2 : 0.14,
-      shadowAmount: colorScheme == .dark ? 0.12 : 0.08
-    )
-  }
-
-  private func gleamBorderStyle(
-    base: Color,
-    highlightAmount: Double? = nil,
-    shadowAmount: Double? = nil
-  ) -> AnyShapeStyle {
-    let lifted = elevatedSurface(
-      from: base,
-      scheme: colorScheme,
-      amount: highlightAmount ?? (colorScheme == .dark ? 0.16 : 0.1)
-    )
-    let grounded = elevatedSurface(
-      from: base,
-      scheme: colorScheme,
-      amount: shadowAmount ?? (colorScheme == .dark ? 0.08 : 0.05),
-      invert: true
-    )
-    return .linearGradient(
-      .init(
-        gradient: .init(
-          stops: [
-            .init(color: lifted, location: 0),
-            .init(color: base, location: 0.4),
-            .init(color: grounded, location: 1),
-          ]
-        ),
-        startPoint: .top,
-        endPoint: .bottom
-      )
-    )
-  }
 }
 
 extension StyleEnvironmentSnapshot {
@@ -783,104 +330,6 @@ extension StyleEnvironmentSnapshot {
     isSelected: Bool = false,
     prominence: ControlProminence = .standard,
     role: ButtonRole? = nil
-  ) -> ControlChrome {
-    switch chromePreset {
-    case .legacy:
-      return appearance.controlChrome(
-        isEnabled: isEnabled,
-        isFocused: isFocused,
-        isPressed: isPressed,
-        isSelected: isSelected,
-        prominence: prominence,
-        role: role
-      )
-    case .standard:
-      return standardControlChrome(
-        isEnabled: isEnabled,
-        isFocused: isFocused,
-        isPressed: isPressed,
-        isSelected: isSelected,
-        prominence: prominence,
-        role: role
-      )
-    }
-  }
-
-  package func rowChrome(
-    isEnabled: Bool,
-    isFocused: Bool,
-    isPressed: Bool = false,
-    isSelected: Bool = false,
-    role: ButtonRole? = nil
-  ) -> ControlChrome {
-    switch chromePreset {
-    case .legacy:
-      return appearance.rowChrome(
-        isEnabled: isEnabled,
-        isFocused: isFocused,
-        isPressed: isPressed,
-        isSelected: isSelected,
-        role: role
-      )
-    case .standard:
-      return standardRowChrome(
-        isEnabled: isEnabled,
-        isFocused: isFocused,
-        isPressed: isPressed,
-        isSelected: isSelected,
-        role: role
-      )
-    }
-  }
-
-  package func buttonChrome(
-    buttonStyle: ButtonStyle,
-    isEnabled: Bool,
-    isFocused: Bool,
-    isPressed: Bool = false,
-    prominence: ControlProminence = .standard,
-    role: ButtonRole? = nil
-  ) -> ControlChrome {
-    switch chromePreset {
-    case .legacy:
-      return appearance.buttonChrome(
-        buttonStyle: buttonStyle,
-        isEnabled: isEnabled,
-        isFocused: isFocused,
-        isPressed: isPressed,
-        prominence: prominence,
-        role: role
-      )
-    case .standard:
-      return standardButtonChrome(
-        buttonStyle: buttonStyle,
-        isEnabled: isEnabled,
-        isFocused: isFocused,
-        isPressed: isPressed,
-        prominence: prominence,
-        role: role
-      )
-    }
-  }
-
-  package func groupBoxChrome(
-    prominence: ControlProminence = .standard
-  ) -> ContainerChrome {
-    switch chromePreset {
-    case .legacy:
-      return appearance.groupBoxChrome(prominence: prominence)
-    case .standard:
-      return standardGroupBoxChrome(prominence: prominence)
-    }
-  }
-
-  private func standardControlChrome(
-    isEnabled: Bool,
-    isFocused: Bool,
-    isPressed: Bool,
-    isSelected: Bool,
-    prominence: ControlProminence,
-    role: ButtonRole?
   ) -> ControlChrome {
     let tone = chromeTone(for: role)
     let neutralSurface = theme.background
@@ -943,12 +392,12 @@ extension StyleEnvironmentSnapshot {
     )
   }
 
-  private func standardRowChrome(
+  package func rowChrome(
     isEnabled: Bool,
     isFocused: Bool,
-    isPressed: Bool,
-    isSelected: Bool,
-    role: ButtonRole?
+    isPressed: Bool = false,
+    isSelected: Bool = false,
+    role: ButtonRole? = nil
   ) -> ControlChrome {
     let tone = chromeTone(for: role)
     let idleBackground = theme.background
@@ -980,13 +429,13 @@ extension StyleEnvironmentSnapshot {
     )
   }
 
-  private func standardButtonChrome(
+  package func buttonChrome(
     buttonStyle: ButtonStyle,
     isEnabled: Bool,
     isFocused: Bool,
-    isPressed: Bool,
-    prominence: ControlProminence,
-    role: ButtonRole?
+    isPressed: Bool = false,
+    prominence: ControlProminence = .standard,
+    role: ButtonRole? = nil
   ) -> ControlChrome {
     switch buttonStyle {
     case .plain:
@@ -999,7 +448,7 @@ extension StyleEnvironmentSnapshot {
         role: role
       )
     case .bordered:
-      return standardControlChrome(
+      return controlChrome(
         isEnabled: isEnabled,
         isFocused: isFocused,
         isPressed: isPressed,
@@ -1008,7 +457,7 @@ extension StyleEnvironmentSnapshot {
         role: role
       )
     case .automatic, .borderedProminent:
-      return standardControlChrome(
+      return controlChrome(
         isEnabled: isEnabled,
         isFocused: isFocused,
         isPressed: isPressed,
@@ -1019,8 +468,8 @@ extension StyleEnvironmentSnapshot {
     }
   }
 
-  private func standardGroupBoxChrome(
-    prominence: ControlProminence
+  package func groupBoxChrome(
+    prominence: ControlProminence = .standard
   ) -> ContainerChrome {
     let tone: TerminalTone = prominence == .increased ? .accent : .neutral
     return .init(

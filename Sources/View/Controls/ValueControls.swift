@@ -178,8 +178,7 @@ package func textEntryFieldBody<Label: View>(
   showsLabel: Bool,
   style: TextFieldStyle,
   chrome: ControlChrome,
-  placeholderStyle: AnyShapeStyle,
-  chromePreset: ChromePreset
+  placeholderStyle: AnyShapeStyle
 ) -> some View {
   let textStyle =
     isShowingPrompt ? placeholderStyle : chrome.foregroundStyle
@@ -310,8 +309,7 @@ extension TextField {
       showsLabel: showsLabel,
       style: effectiveStyle,
       chrome: chrome,
-      placeholderStyle: styleEnvironment.theme.placeholder,
-      chromePreset: styleEnvironment.chromePreset
+      placeholderStyle: styleEnvironment.theme.placeholder
     ).resolve(
       in: context.child(component: .named("TextFieldBody"))
     )

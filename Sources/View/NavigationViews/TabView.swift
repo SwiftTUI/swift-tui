@@ -152,8 +152,9 @@ extension TabView {
     let activeTone: TerminalTone = .accent
     let focusActive = isFocused && showsFocusEffect
 
+    let hasRule = tabStyle != .powerline
     VStack(alignment: .leading, spacing: 0) {
-      HStack(alignment: .center, spacing: 0) {
+      HStack(alignment: .top, spacing: 0) {
         ForEach(options.indices, id: \.self) { index in
           let option = options[index]
           let isSelected = index == activeIndex
@@ -163,27 +164,29 @@ extension TabView {
               for: controlIdentity,
               index: index
             ),
-            content: tabItemView(
-              label: option.label.displayText,
-              isSelected: isSelected,
-              isFocused: focusActive,
-              tone: activeTone,
-              style: tabStyle,
-              styleEnvironment: styleEnvironment
-            )
+            content: VStack(spacing: 0) {
+              tabItemView(
+                label: option.label.displayText,
+                isSelected: isSelected,
+                isFocused: focusActive,
+                tone: activeTone,
+                style: tabStyle,
+                styleEnvironment: styleEnvironment
+              )
+              if hasRule {
+                tabItemRuleSegment(
+                  label: option.label.displayText,
+                  isSelected: isSelected,
+                  isFocused: focusActive,
+                  style: tabStyle
+                )
+              }
+            }
           )
         }
         Spacer(minLength: 0)
       }
-      .frame(height: 1, alignment: .leading)
-      if tabStyle != .powerline {
-        tabBarRule(
-          options: options,
-          activeIndex: activeIndex,
-          isFocused: focusActive,
-          style: tabStyle
-        )
-      }
+      .frame(height: hasRule ? 2 : 1, alignment: .leading)
       if options.indices.contains(activeIndex) {
         ResolvedContentView(node: options[activeIndex].node)
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -254,63 +257,54 @@ extension TabView {
   }
 
   @ViewBuilder
-  private func tabBarRule(
-    options: [TabOption],
-    activeIndex: Int,
+  private func tabItemRuleSegment(
+    label: String,
+    isSelected: Bool,
     isFocused: Bool,
     style: TabViewStyle
   ) -> some View {
     let resolvedStyle = style == .automatic ? TabViewStyle.underline : style
     switch resolvedStyle {
     case .automatic, .underline:
-      underlineTabBarRule(
-        options: options,
-        activeIndex: activeIndex,
+      underlineRuleSegment(
+        label: label,
+        isSelected: isSelected,
         isFocused: isFocused
       )
     case .rounded:
-      roundedTabBarRule(
-        options: options,
-        activeIndex: activeIndex,
+      roundedRuleSegment(
+        label: label,
+        isSelected: isSelected,
         isFocused: isFocused
       )
     case .powerline:
-      Divider()
+      EmptyView()
     }
   }
 
-  private func underlineTabBarRule(
-    options: [TabOption],
-    activeIndex: Int,
+  private func underlineRuleSegment(
+    label: String,
+    isSelected: Bool,
     isFocused: Bool
   ) -> some View {
-    let segments: [Text] = options.enumerated().map { index, option -> Text in
-      let width = option.label.displayText.count
-      let isSelected = index == activeIndex
-      if isSelected {
-        return Text(" \(String(repeating: "━", count: width)) ")
-          .foregroundStyle(
-          isFocused
-            ? AnyShapeStyle(.terminalAccent(.accent))
-            : .semantic(.separator)
-        )
-      } else if isFocused {
-        return Text(" \(String(repeating: "─", count: width)) ")
-          .foregroundStyle(
-          isFocused
-            ? AnyShapeStyle(.terminalAccent(.neutral))
-            : .semantic(.separator)
-        )
-      } else {
-        return Text(" \(String(repeating: "─", count: width)) ")
-          .foregroundStyle(AnyShapeStyle.semantic(.separator))
-      }
+    let width = label.count
+    let text: String
+    let foreground: AnyShapeStyle
+    if isSelected {
+      text = " \(String(repeating: "━", count: width)) "
+      foreground = isFocused
+        ? AnyShapeStyle(.terminalAccent(.accent))
+        : .semantic(.separator)
+    } else if isFocused {
+      text = " \(String(repeating: "─", count: width)) "
+      foreground = AnyShapeStyle(.terminalAccent(.neutral))
+    } else {
+      text = " \(String(repeating: "─", count: width)) "
+      foreground = .semantic(.separator)
     }
-    let full = segments.reduce(Text(""), { curr, acc in
-      Text("\(curr)\(acc)")
-    })
-    return full
+    return Text(text)
       .lineLimit(1)
+      .foregroundStyle(foreground)
       .frame(height: 1, alignment: .leading)
   }
 
@@ -341,22 +335,17 @@ extension TabView {
       }
   }
 
-  private func roundedTabBarRule(
-    options: [TabOption],
-    activeIndex: Int,
+  private func roundedRuleSegment(
+    label: String,
+    isSelected: Bool,
     isFocused: Bool
   ) -> some View {
-    let segments = options.enumerated().map { index, option -> String in
-      let width = option.label.displayText.count
-      let isSelected = index == activeIndex
-      if isSelected {
-        return "╰" + String(repeating: "─", count: width) + "╯"
-      } else {
-        return " " + String(repeating: "─", count: width) + " "
-      }
-    }
-    let full = segments.joined()
-    return Text(full)
+    let width = label.count
+    let text =
+      isSelected
+      ? "╰" + String(repeating: "─", count: width) + "╯"
+      : " " + String(repeating: "─", count: width) + " "
+    return Text(text)
       .lineLimit(1)
       .foregroundStyle(
         isFocused

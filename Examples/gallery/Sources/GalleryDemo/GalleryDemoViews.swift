@@ -71,9 +71,7 @@ struct GalleryDemoSceneView: View {
     }
     .keyboardShortcutHelp(position: .bottomLeading)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .commandPalette(isPresented: $model.isPalettePresented) { command in
-      runPaletteCommand(command)
-    }
+    .commandPalette(isPresented: $model.isPalettePresented, onExecute: runPaletteCommand)
     .toast("Action performed", isPresented: $isToastPresented, style: .success)
     .alert(
       "Reset gallery state?",
