@@ -69,8 +69,8 @@ struct GalleryDemoSceneView: View {
       .keyboardShortcut("q", label: "quit", group: "Act")
       Divider()
     }
-    .keyboardShortcutHelp(position: .bottomLeading)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .keyboardShortcutHelp(position: .bottomLeading)
     .commandPalette(isPresented: $model.isPalettePresented, onExecute: runPaletteCommand)
     .toast("Action performed", isPresented: $isToastPresented, style: .success)
     .alert(

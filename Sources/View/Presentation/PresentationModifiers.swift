@@ -706,7 +706,7 @@ private struct ToastSurface: View {
         Text(request.message)
       }
     }
-    .padding(.init(horizontal: 1, vertical: 0))
+    .padding(1)
     .background {
       Rectangle().chromeFill(.terminalSurfaceBackground)
     }
@@ -718,9 +718,9 @@ private struct ToastSurface: View {
     .frame(
       minWidth: .finite(10),
       maxWidth: .finite(60),
-      minHeight: .finite(1),
-      idealHeight: .finite(1),
-      maxHeight: .finite(3),
+      minHeight: .finite(3),
+      idealHeight: .finite(3),
+      maxHeight: .finite(5),
       alignment: .leading
     )
   }
