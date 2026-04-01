@@ -53,22 +53,43 @@ extension ShapeStyle where Self == SemanticShapeStyle {
 
 /// An RGB color expressed in 8-bit components.
 public struct Color: ShapeStyle, Hashable, Sendable {
+  public enum ColorSpace: Hashable, Sendable {
+    case sRGB
+  }
+
   public var red: Int
   public var green: Int
   public var blue: Int
+  public var alpha: Double
+  public var colorSpace: ColorSpace
 
-  public init(red: Int, green: Int, blue: Int) {
+  public init(
+    red: Int,
+    green: Int,
+    blue: Int,
+    alpha: Double = 1,
+    colorSpace: ColorSpace = .sRGB
+  ) {
     self.red = Self.clamp(red)
     self.green = Self.clamp(green)
     self.blue = Self.clamp(blue)
+    self.alpha = min(1, max(0, alpha))
+    self.colorSpace = colorSpace
   }
 
-  public init(hex: Int) {
+  public init(hex: Int, alpha: Double = 1) {
     self.init(
       red: (hex >> 16) & 0xFF,
       green: (hex >> 8) & 0xFF,
-      blue: hex & 0xFF
+      blue: hex & 0xFF,
+      alpha: alpha
     )
+  }
+
+  public func opacity(_ opacity: Double) -> Color {
+    var copy = self
+    copy.alpha = self.alpha * min(1, max(0, opacity))
+    return copy
   }
 
   public func eraseToAnyShapeStyle() -> AnyShapeStyle {
@@ -168,6 +189,7 @@ public enum AnyShapeStyle: Equatable, Sendable {
   case color(Color)
   case linearGradient(LinearGradient)
   case terminalChrome(TerminalChromeStyle)
+  indirect case opacity(AnyShapeStyle, Double)
 
   public init(_ style: some ShapeStyle) {
     self = style.eraseToAnyShapeStyle()
@@ -177,6 +199,29 @@ public enum AnyShapeStyle: Equatable, Sendable {
 extension AnyShapeStyle: ShapeStyle {
   public func eraseToAnyShapeStyle() -> AnyShapeStyle {
     self
+  }
+}
+
+extension ShapeStyle {
+  public func opacity(_ opacity: Double) -> AnyShapeStyle {
+    let clamped = min(1, max(0, opacity))
+    switch eraseToAnyShapeStyle() {
+    case .color(let color):
+      return .color(color.opacity(clamped))
+    case .linearGradient(let gradient):
+      let fadedStops = gradient.gradient.stops.map {
+        Gradient.Stop(color: $0.color.opacity(clamped), location: $0.location)
+      }
+      return .linearGradient(.init(
+        gradient: .init(stops: fadedStops),
+        startPoint: gradient.startPoint,
+        endPoint: gradient.endPoint
+      ))
+    case let style:
+      // Semantic/chrome styles can't carry alpha until resolved —
+      // wrap for deferred resolution in the rasterizer.
+      return .opacity(style, clamped)
+    }
   }
 }
 
@@ -567,9 +612,42 @@ extension ResolvedTextStyle {
       return self
     }
 
+    let blendedBackground: Color? =
+      switch (backgroundColor, underlay.backgroundColor) {
+      case (let overlay?, let under?) where overlay.alpha < 1:
+        mix(
+          under,
+          Color(red: overlay.red, green: overlay.green, blue: overlay.blue),
+          amount: overlay.alpha
+        )
+      case (let overlay?, _):
+        overlay
+      case (nil, let under?):
+        under
+      case (nil, nil):
+        Color?.none
+      }
+
     return .init(
-      foregroundColor: foregroundColor,
-      backgroundColor: backgroundColor ?? underlay.backgroundColor,
+      foregroundColor: foregroundColor ?? underlay.foregroundColor,
+      backgroundColor: blendedBackground,
+      emphasis: emphasis,
+      underlineStyle: underlineStyle,
+      strikethroughStyle: strikethroughStyle,
+      opacity: opacity
+    )
+  }
+
+  public func tinted(with overlay: Color) -> ResolvedTextStyle {
+    let amount = overlay.alpha
+    let opaque = Color(red: overlay.red, green: overlay.green, blue: overlay.blue)
+    return .init(
+      foregroundColor: foregroundColor.map { mix($0, opaque, amount: amount) },
+      backgroundColor: mix(
+        backgroundColor ?? Color(hex: 0x000000),
+        opaque,
+        amount: amount
+      ),
       emphasis: emphasis,
       underlineStyle: underlineStyle,
       strikethroughStyle: strikethroughStyle,
@@ -663,6 +741,13 @@ private func resolveStyleColorResult(
   case .semantic(let role):
     return resolveStyleColorResult(
       style: theme.style(for: role),
+      theme: theme,
+      depth: depth + 1,
+      depthLimit: depthLimit
+    )
+  case .opacity(let inner, _):
+    return resolveStyleColorResult(
+      style: inner,
       theme: theme,
       depth: depth + 1,
       depthLimit: depthLimit

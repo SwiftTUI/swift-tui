@@ -594,7 +594,8 @@ func mix(
   return .init(
     red: interpolatedComponent(lhs.red, rhs.red, amount: clampedAmount),
     green: interpolatedComponent(lhs.green, rhs.green, amount: clampedAmount),
-    blue: interpolatedComponent(lhs.blue, rhs.blue, amount: clampedAmount)
+    blue: interpolatedComponent(lhs.blue, rhs.blue, amount: clampedAmount),
+    alpha: lhs.alpha + (rhs.alpha - lhs.alpha) * clampedAmount
   )
 }
 

@@ -321,8 +321,7 @@ public struct CommandPalette: View {
       query.wrappedValue,
       limit: maximumResults
     )
-
-    return VStack(alignment: .leading, spacing: 1) {
+    VStack(alignment: .leading, spacing: 1) {
       TextField(placeholder, text: query)
       ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
@@ -340,7 +339,7 @@ public struct CommandPalette: View {
           }
         }
       }
-    }
+    }.background(.background)
   }
 }
 
@@ -413,13 +412,7 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
   var body: some View {
     content
       .overlayPreferenceValue(CommandPreferenceKey.self) { preference in
-        Group {
-          if isPresented.wrappedValue {
-            Rectangle().fill(.background)
-          } else {
-            EmptyView()
-          }
-        }
+        Rectangle().fill(.background.opacity(isPresented.wrappedValue ? 0.7 : 0.0))
           .sheet("Command Palette", isPresented: isPresented) {
             CommandPalette(
               query: Binding(

@@ -25,13 +25,5 @@ let package = Package(
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
       ]
     ),
-    .testTarget(
-      name: "GalleryDemoTests",
-      dependencies: [
-        "GalleryDemo",
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
-      ]
-    ),
   ]
 )

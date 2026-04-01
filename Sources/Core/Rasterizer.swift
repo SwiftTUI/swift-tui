@@ -283,13 +283,23 @@ extension Rasterizer {
       from: style,
       environment: environment
     )
-    let constantStyle: ResolvedTextStyle?
+
+    // A nil constant color means the fill is fully transparent — skip painting.
+    if case .constant(nil) = colorMode {
+      return
+    }
+
+    // Detect whether this fill carries alpha for the tint path.
+    let constantColor: Color?
+    let isTranslucent: Bool
     switch colorMode {
-    case .constant(let backgroundColor):
-      let resolvedStyle = ResolvedTextStyle(backgroundColor: backgroundColor)
-      constantStyle = resolvedStyle.isDefault ? nil : resolvedStyle
+    case .constant(let color):
+      constantColor = color
+      isTranslucent = (color?.alpha ?? 0) < 1
     case .sampled:
-      constantStyle = nil
+      constantColor = nil
+      // Sampled (gradient) fills may have per-stop alpha.
+      isTranslucent = false
     }
 
     for y in bounds.origin.y..<(bounds.origin.y + bounds.size.height) {
@@ -306,22 +316,77 @@ extension Rasterizer {
           continue
         }
 
-        write(
-          " ",
-          style: constantStyle
-            ?? resolvedBackgroundTextStyle(
-              colorMode: colorMode,
-              bounds: bounds,
-              x: x,
-              y: y
-            ),
-          atX: x,
-          y: y,
-          cells: &cells,
-          clip: clip
-        )
+        if isTranslucent {
+          // Translucent constant fill: tint existing cell in-place.
+          if let color = constantColor, color.alpha > 0 {
+            tintCell(atX: x, y: y, with: color, cells: &cells, clip: clip)
+          }
+        } else if let constantColor {
+          // Opaque constant fill: overwrite cell.
+          let resolvedStyle = ResolvedTextStyle(backgroundColor: constantColor)
+          write(
+            " ",
+            style: resolvedStyle.isDefault ? nil : resolvedStyle,
+            atX: x,
+            y: y,
+            cells: &cells,
+            clip: clip
+          )
+        } else {
+          // Sampled (gradient) fill: resolve per-cell.
+          let fillColor = resolveColor(
+            from: colorMode,
+            bounds: bounds,
+            sampleX: x,
+            sampleY: y
+          )
+          if let fillColor, fillColor.alpha < 1 {
+            if fillColor.alpha > 0 {
+              tintCell(atX: x, y: y, with: fillColor, cells: &cells, clip: clip)
+            }
+          } else {
+            write(
+              " ",
+              style: resolvedBackgroundTextStyle(
+                colorMode: colorMode,
+                bounds: bounds,
+                x: x,
+                y: y
+              ),
+              atX: x,
+              y: y,
+              cells: &cells,
+              clip: clip
+            )
+          }
+        }
       }
     }
+  }
+
+  private func tintCell(
+    atX x: Int,
+    y: Int,
+    with overlay: Color,
+    cells: inout [[RasterCell]],
+    clip: Rect?
+  ) {
+    if let clip {
+      guard
+        x >= clip.origin.x,
+        x < clip.origin.x + clip.size.width,
+        y >= clip.origin.y,
+        y < clip.origin.y + clip.size.height
+      else {
+        return
+      }
+    }
+    guard y >= 0, y < cells.count, x >= 0, x < cells[y].count else {
+      return
+    }
+    var cell = cells[y][x]
+    cell.style = (cell.style ?? .init()).tinted(with: overlay)
+    cells[y][x] = cell
   }
 
   private func paintStroke(
@@ -760,6 +825,29 @@ extension Rasterizer {
         environment: environment,
         depth: depth + 1
       )
+    case .opacity(let inner, let amount):
+      guard amount > 0 else {
+        return .constant(nil)
+      }
+      let innerMode = resolvedColorMode(
+        from: inner,
+        environment: environment,
+        depth: depth + 1
+      )
+      switch innerMode {
+      case .constant(let color):
+        guard let color else { return .constant(nil) }
+        return .constant(color.opacity(amount))
+      case .sampled(let gradient):
+        let faded = LinearGradient(
+          gradient: Gradient(stops: gradient.gradient.stops.map {
+            .init(color: $0.color.opacity(amount), location: $0.location)
+          }),
+          startPoint: gradient.startPoint,
+          endPoint: gradient.endPoint
+        )
+        return .sampled(faded)
+      }
     }
   }
 
@@ -928,7 +1016,8 @@ extension Rasterizer {
     Color(
       red: interpolatedComponent(from: lhs.red, to: rhs.red, t: t),
       green: interpolatedComponent(from: lhs.green, to: rhs.green, t: t),
-      blue: interpolatedComponent(from: lhs.blue, to: rhs.blue, t: t)
+      blue: interpolatedComponent(from: lhs.blue, to: rhs.blue, t: t),
+      alpha: lhs.alpha + (rhs.alpha - lhs.alpha) * t
     )
   }
 

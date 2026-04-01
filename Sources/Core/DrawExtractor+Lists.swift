@@ -475,14 +475,14 @@ extension DrawExtractor {
     var commands = singleCellIndicatorCommand(
       x: x,
       y: bounds.origin.y,
-      glyph: offset > 0 ? "▲" : " ",
+      glyph: offset > 0 ? "▲" : "█",
       style: style
     )
     commands.append(
       contentsOf: singleCellIndicatorCommand(
         x: x,
         y: bounds.origin.y + bounds.size.height - 1,
-        glyph: offset < maxOffset ? "▼" : " ",
+        glyph: offset < maxOffset ? "▼" : "█",
         style: style
       )
     )
@@ -500,7 +500,7 @@ extension DrawExtractor {
         contentsOf: singleCellIndicatorCommand(
           x: x,
           y: y,
-          glyph: thumbRange?.contains(y) == true ? "█" : "│",
+          glyph: thumbRange?.contains(y) == true ? "█" : "┃",
           style: style
         )
       )
@@ -525,8 +525,8 @@ extension DrawExtractor {
       let glyph = compactIndicatorGlyph(
         offset: offset,
         maxOffset: maxOffset,
-        backward: "<",
-        forward: ">"
+        backward: "◀",
+        forward: "▶"
       )
       return singleCellIndicatorCommand(x: bounds.origin.x, y: y, glyph: glyph, style: style)
     }
@@ -534,14 +534,14 @@ extension DrawExtractor {
     var commands = singleCellIndicatorCommand(
       x: bounds.origin.x,
       y: y,
-      glyph: offset > 0 ? "<" : " ",
+      glyph: offset > 0 ? "◀" : "█",
       style: style
     )
     commands.append(
       contentsOf: singleCellIndicatorCommand(
         x: bounds.origin.x + trackWidth - 1,
         y: y,
-        glyph: offset < maxOffset ? ">" : " ",
+        glyph: offset < maxOffset ? "▶" : "█",
         style: style
       )
     )
@@ -559,7 +559,7 @@ extension DrawExtractor {
         contentsOf: singleCellIndicatorCommand(
           x: x,
           y: y,
-          glyph: thumbRange?.contains(x) == true ? "█" : "─",
+          glyph: thumbRange?.contains(x) == true ? "█" : "━",
           style: style
         )
       )

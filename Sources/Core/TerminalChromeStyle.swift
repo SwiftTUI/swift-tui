@@ -334,5 +334,13 @@ private func synthesizedAppearanceColor(
     return gradient.gradient.stops.first?.color ?? fallback
   case .terminalChrome:
     return fallback
+  case .opacity(let inner, let amount):
+    let resolved = synthesizedAppearanceColor(
+      from: inner,
+      theme: theme,
+      fallback: fallback,
+      depth: depth + 1
+    )
+    return resolved.opacity(amount)
   }
 }

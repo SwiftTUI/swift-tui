@@ -1427,25 +1427,26 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.semanticSnapshot.selectionRoutes.isEmpty)
   }
 
-  @Test("terminal appearance derives control chrome for idle, focused, and disabled states")
-  func terminalAppearanceDerivesControlChromeStates() {
+  @Test("style environment snapshot derives control chrome for idle, focused, and disabled states")
+  func styleEnvironmentSnapshotDerivesControlChromeStates() {
     let appearance = TerminalAppearance(
       foregroundColor: .black,
       backgroundColor: .white,
       tintColor: .blue,
       source: .override
     )
-    let semanticTheme = appearance.semanticTheme()
+    let snapshot = StyleEnvironmentSnapshot(appearance: appearance)
+    let semanticTheme = snapshot.theme
 
-    let idle = appearance.controlChrome(
+    let idle = snapshot.controlChrome(
       isEnabled: true,
       isFocused: false
     )
-    let focused = appearance.controlChrome(
+    let focused = snapshot.controlChrome(
       isEnabled: true,
       isFocused: true
     )
-    let disabled = appearance.controlChrome(
+    let disabled = snapshot.controlChrome(
       isEnabled: false,
       isFocused: false
     )
@@ -1463,7 +1464,7 @@ struct SwiftUISurfaceTests {
     #expect(disabled.foregroundStyle == semanticTheme.placeholder)
     #expect(resolveStyleColor(style: disabled.backgroundStyle, theme: semanticTheme) != nil)
     #expect(resolveStyleColor(style: disabled.borderStyle, theme: semanticTheme) != nil)
-    #expect(disabled.opacity == 0.65)
+    #expect(disabled.opacity == 0.6)
   }
 
   @Test("Label composes icon and title with SwiftUI-shaped builder semantics")

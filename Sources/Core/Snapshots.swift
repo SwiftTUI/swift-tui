@@ -501,6 +501,8 @@ extension SnapshotRenderer {
       return "linearGradient(\(describe(gradient)))"
     case .terminalChrome(let chromeStyle):
       return describe(chromeStyle)
+    case .opacity(let inner, let amount):
+      return "\(describe(inner)).opacity(\(amount))"
     }
   }
 
@@ -528,10 +530,15 @@ extension SnapshotRenderer {
   }
 
   private func describe(_ color: Color) -> String {
-    "#"
+    let hex = "#"
       + hexadecimal(color.red)
       + hexadecimal(color.green)
       + hexadecimal(color.blue)
+    if color.alpha < 1 {
+      let alphaPercent = Int((color.alpha * 100).rounded())
+      return "\(hex)@\(alphaPercent)%"
+    }
+    return hex
   }
 
   private func describe(_ gradient: LinearGradient) -> String {

@@ -5,6 +5,8 @@ codegen
 genericize
 powerline
 Pressable
+Rasterizer
+Rasterizes
 subview
 subviews
 SwiftUITUIGUI
