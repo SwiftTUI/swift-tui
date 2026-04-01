@@ -1,50 +1,118 @@
+import Foundation
 import TerminalUI
 import TerminalUICharts
 
-private struct StyledLabel<Content: View>: View {
-  var content: Content
-
-  var body: some View {
-    let style = AnyShapeStyle(.foreground)
-    content
-      .foregroundStyle(style)
-  }
-}
-
-private struct DecoratedLabel<Content: View>: View {
-  var content: Content
-
-  var body: some View {
-    StyledLabel(content: content)
-      .background {
-        Rectangle().fill(.tint)
-      }
-  }
-}
-
-struct GalleryDemoSceneView: View {
-  @Bindable var model: GalleryDemoModel
+public struct GalleryDemoSceneView: View {
+  @Bindable public var model: GalleryDemoModel
+  @State private var isResetAlertPresented = false
+  @State private var isToastPresented = false
   @State var pickerScratch: String = "one"
 
-  var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
-      Text("WebExample component preview")
-      Text("Active tab: \(model.activeTab.capitalized)")
-      Text("The full interactive gallery remains available in the native example target.")
-        .foregroundStyle(.separator)
-      Text("Pseudo button")
-        .padding(.init(horizontal: 1, vertical: 0))
-        .background {
-          Rectangle().fill(.tint)
-        }
-        .overlay {
-          if false {
-            Rectangle().fill(Color.red)
-          }
-        }
-      Button("Default button")
+  public init(model: GalleryDemoModel) {
+    self.model = model
+  }
+
+  public var body: some View {
+    shell()
+  }
+
+  private func shell() -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      headerBar
+      Divider()
+      TabView(selection: $model.activeTab) {
+        controlsWorkbench
+          .tabItem("Controls")
+          .tag("controls")
+          .command(
+            id: "controls",
+            title: "Show Controls",
+            detail: "Open the controls workbench",
+            keywords: ["buttons", "inputs", "values", "forms"],
+            kind: .navigation
+          )
+        collectionsWorkbench
+          .tabItem("Collections")
+          .tag("collections")
+          .command(
+            id: "collections",
+            title: "Show Collections",
+            detail: "Browse list, picker, outline, and table samples",
+            keywords: ["list", "table", "picker", "outline", "browser"],
+            kind: .navigation
+          )
+        appearanceWorkbench
+          .tabItem("Appearance")
+          .tag("appearance")
+          .command(
+            id: "appearance",
+            title: "Show Appearance",
+            detail: "Compare light, dark, accent propagation, and available colors",
+            keywords: ["theme", "light", "dark", "accent", "colors", "palette"],
+            kind: .navigation
+          )
+        chartsWorkbench
+          .tabItem("Charts")
+          .tag("charts")
+          .command(
+            id: "charts",
+            title: "Show Charts",
+            detail: "Inspect progress, usage, and trend metrics",
+            keywords: ["progress", "usage", "trend", "sparkline"],
+            kind: .navigation
+          )
+      }
+      .command(
+        id: "reset",
+        title: "Reset Interactive Samples",
+        detail: "Restore the default gallery state",
+        keywords: ["reset", "restore", "defaults"],
+        kind: .destructive
+      )
+      .keyboardShortcut("tab", label: "move focus", group: "Navigate")
+      .keyboardShortcut("arrows", label: "move selection", group: "Navigate")
+      .keyboardShortcut("enter", label: "activate", group: "Act")
+      .keyboardShortcut("q", label: "quit", group: "Act")
+      Divider()
     }
-    .padding(1)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .keyboardShortcutHelp(position: .bottomLeading)
+    .commandPalette(isPresented: $model.isPalettePresented, onExecute: runPaletteCommand)
+    .toast("Action performed", isPresented: $isToastPresented, style: .success)
+    .alert(
+      "Reset gallery state?",
+      isPresented: $isResetAlertPresented,
+      actions: {
+        Button("Reset", role: .destructive) {
+          model.reset()
+          isResetAlertPresented = false
+        }
+        Button("Cancel", role: .cancel) {
+          isResetAlertPresented = false
+        }
+      },
+      message: {
+        Text("Clears the interactive control and appearance samples?")
+      }
+    )
+  }
+
+  private var headerBar: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 1) {
+      Text("Gallery")
+        .bold()
+      Text("—")
+        .foregroundStyle(.separator)
+      Text(model.activeTab.capitalized)
+        .foregroundStyle(.info)
+      Spacer()
+      Button("Control Panel") {
+        model.isPalettePresented = true
+      }
+      .buttonStyle(.plain)
+    }
+    .padding(.init(horizontal: 1, vertical: 0))
+    .background(.terminalRow(.accent, isSelected: true))
   }
 
   private var controlsWorkbench: some View {
@@ -120,9 +188,10 @@ struct GalleryDemoSceneView: View {
         HStack(alignment: .center, spacing: 1) {
           Button("Primary") {
             model.increment()
+            isToastPresented = true
           }
           Button("Reset", role: .destructive) {
-            model.reset()
+            isResetAlertPresented = true
           }
           Button("Plain") {
             model.increment()
@@ -245,46 +314,46 @@ struct GalleryDemoSceneView: View {
       .outlineStyle(.rounded)
       .frame(maxWidth: .infinity, alignment: .topLeading)
     default:
-      VStack(alignment: .leading) {
+    VStack(alignment: .leading) {
         TabView(selection: $model.pickerSelection) {
-          Picker("Selection Type", selection: $pickerScratch) {
-            Text("One").tag("one")
-            Text("Two").tag("two")
-            Text("Three").tag("three")
-          }
-          .pickerStyle(.segmented)
-          .tabItem("segmented")
-          .tag("segmented")
+        Picker("Selection Type", selection: $pickerScratch) {
+          Text("One").tag("one")
+          Text("Two").tag("two")
+          Text("Three").tag("three")
+        }
+        .pickerStyle(.segmented)
+        .tabItem("segmented")
+        .tag("segmented")
 
-          Picker("Selection Type", selection: $pickerScratch) {
-            Text("One").tag("one")
-            Text("Two").tag("two")
-            Text("Three").tag("three")
-          }
-          .pickerStyle(.inline)
-          .tabItem("inline")
-          .tag("inline")
+        Picker("Selection Type", selection: $pickerScratch) {
+          Text("One").tag("one")
+          Text("Two").tag("two")
+          Text("Three").tag("three")
+        }
+        .pickerStyle(.inline)
+        .tabItem("inline")
+        .tag("inline")
 
-          Picker("Radio Group", selection: $pickerScratch) {
-            Text("One").tag("one")
-            Text("Two").tag("two")
-            Text("Three").tag("three")
-          }
-          .pickerStyle(.radioGroup)
-          .tabItem("radioGroup")
-          .tag("radioGroup")
+        Picker("Radio Group", selection: $pickerScratch) {
+          Text("One").tag("one")
+          Text("Two").tag("two")
+          Text("Three").tag("three")
+        }
+        .pickerStyle(.radioGroup)
+        .tabItem("radioGroup")
+        .tag("radioGroup")
 
-          Picker("Menu", selection: $pickerScratch) {
-            Text("One").tag("one")
-            Text("Two").tag("two")
-            Text("Three").tag("three")
-          }
-          .pickerStyle(.menu)
-          .tabItem("menu")
-          .tag("menu")
+        Picker("Menu", selection: $pickerScratch) {
+          Text("One").tag("one")
+          Text("Two").tag("two")
+          Text("Three").tag("three")
+        }
+        .pickerStyle(.menu)
+        .tabItem("menu")
+        .tag("menu")
         }
         Text("(selection: \(pickerScratch))")
-      }
+    }
     }
   }
 
@@ -293,7 +362,7 @@ struct GalleryDemoSceneView: View {
       selection: $model.selectedAppearanceDemo,
       entries: [
         "light",
-        "dark",
+         "dark",
         "accent",
         "colors",
       ],
@@ -498,6 +567,23 @@ struct GalleryDemoSceneView: View {
     )
   }
 
+  private func runPaletteCommand(_ command: Command) {
+    switch command.id {
+    case "controls":
+      model.activeTab = "controls"
+    case "collections":
+      model.activeTab = "collections"
+    case "appearance":
+      model.activeTab = "appearance"
+    case "charts":
+      model.activeTab = "charts"
+    case "reset":
+      model.reset()
+      isResetAlertPresented = false
+    default:
+      break
+    }
+  }
 }
 
 private struct GalleryOutlineNode: Identifiable {
@@ -514,3 +600,4 @@ private struct GalleryOutlineNode: Identifiable {
     self.children = children
   }
 }
+

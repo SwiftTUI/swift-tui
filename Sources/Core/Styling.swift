@@ -51,66 +51,16 @@ extension ShapeStyle where Self == SemanticShapeStyle {
   public static var muted: Self { .init(.muted) }
 }
 
-/// An RGB color expressed in 8-bit components.
-public struct Color: ShapeStyle, Hashable, Sendable {
-  public enum ColorSpace: Hashable, Sendable {
-    case sRGB
-  }
-
-  public var red: Int
-  public var green: Int
-  public var blue: Int
-  public var alpha: Double
-  public var colorSpace: ColorSpace
-
-  public init(
-    red: Int,
-    green: Int,
-    blue: Int,
-    alpha: Double = 1,
-    colorSpace: ColorSpace = .sRGB
-  ) {
-    self.red = Self.clamp(red)
-    self.green = Self.clamp(green)
-    self.blue = Self.clamp(blue)
-    self.alpha = min(1, max(0, alpha))
-    self.colorSpace = colorSpace
-  }
-
-  public init(hex: Int, alpha: Double = 1) {
-    self.init(
-      red: (hex >> 16) & 0xFF,
-      green: (hex >> 8) & 0xFF,
-      blue: hex & 0xFF,
-      alpha: alpha
-    )
-  }
-
-  public func opacity(_ opacity: Double) -> Color {
-    var copy = self
-    copy.alpha = self.alpha * min(1, max(0, opacity))
-    return copy
-  }
-
+extension Color: ShapeStyle {
   public func eraseToAnyShapeStyle() -> AnyShapeStyle {
     .color(self)
   }
 
-  private static func clamp(_ component: Int) -> Int {
-    min(255, max(0, component))
+   public func opacity(_ opacity: Double) -> Color {
+    var copy = self
+    copy.alpha = self.alpha * min(1, max(0, opacity))
+    return copy
   }
-}
-
-extension Color {
-  public static let black = Self(hex: 0x000000)
-  public static let white = Self(hex: 0xFFFFFF)
-  public static let red = Self(hex: 0xE05757)
-  public static let green = Self(hex: 0x61C67B)
-  public static let yellow = Self(hex: 0xEBB33C)
-  public static let blue = Self(hex: 0x5BA3FF)
-  public static let magenta = Self(hex: 0xB46EFF)
-  public static let cyan = Self(hex: 0x56B6C2)
-  public static let gray = Self(hex: 0x8C92AC)
 }
 
 /// A gradient defined by color stops.
@@ -243,15 +193,15 @@ public struct Theme: Equatable, Sendable {
   public var muted: AnyShapeStyle
 
   public init(
-    foreground: AnyShapeStyle = .color(.init(hex: 0xECEFF4)),
-    background: AnyShapeStyle = .color(.init(hex: 0x1E222A)),
+    foreground: AnyShapeStyle = .color(try! .init(hex: "#ECEFF4")),
+    background: AnyShapeStyle = .color(try! .init(hex: "#1E222A")),
     tint: AnyShapeStyle = .color(.cyan),
-    separator: AnyShapeStyle = .color(.init(hex: 0x4C566A)),
-    selection: AnyShapeStyle = .color(.init(hex: 0x2E3440)),
+    separator: AnyShapeStyle = .color(try! .init(hex: "#4C566A")),
+    selection: AnyShapeStyle = .color(try! .init(hex: "#2E3440")),
     placeholder: AnyShapeStyle = .color(.gray),
     link: AnyShapeStyle = .color(.blue),
-    fill: AnyShapeStyle = .color(.init(hex: 0x2B303B)),
-    windowBackground: AnyShapeStyle = .color(.init(hex: 0x15181E)),
+    fill: AnyShapeStyle = .color(try! .init(hex: "#2B303B")),
+    windowBackground: AnyShapeStyle = .color(try! .init(hex: "#15181E")),
     success: AnyShapeStyle = .color(.green),
     warning: AnyShapeStyle = .color(.yellow),
     danger: AnyShapeStyle = .color(.red),
@@ -615,11 +565,7 @@ extension ResolvedTextStyle {
     let blendedBackground: Color? =
       switch (backgroundColor, underlay.backgroundColor) {
       case (let overlay?, let under?) where overlay.alpha < 1:
-        mix(
-          under,
-          Color(red: overlay.red, green: overlay.green, blue: overlay.blue),
-          amount: overlay.alpha
-        )
+          under.mixed(with: Color(red: overlay.red, green: overlay.green, blue: overlay.blue), amount: overlay.alpha)
       case (let overlay?, _):
         overlay
       case (nil, let under?):
@@ -642,12 +588,9 @@ extension ResolvedTextStyle {
     let amount = overlay.alpha
     let opaque = Color(red: overlay.red, green: overlay.green, blue: overlay.blue)
     return .init(
-      foregroundColor: foregroundColor.map { mix($0, opaque, amount: amount) },
-      backgroundColor: mix(
-        backgroundColor ?? Color(hex: 0x000000),
-        opaque,
-        amount: amount
-      ),
+      foregroundColor: foregroundColor.map { $0.mixed(with: opaque, amount: amount) },
+      backgroundColor: 
+        (backgroundColor ?? Color.black).mixed(with: opaque, amount: amount),
       emphasis: emphasis,
       underlineStyle: underlineStyle,
       strikethroughStyle: strikethroughStyle,

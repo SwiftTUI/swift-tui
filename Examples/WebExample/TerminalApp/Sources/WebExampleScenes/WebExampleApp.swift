@@ -1,3 +1,4 @@
+import GalleryDemoViews
 import TerminalUI
 
 public struct WebExampleApp: App {

@@ -130,28 +130,28 @@ public struct TerminalAppearance: Equatable, Sendable {
   }
 
   public static let fallback = Self(
-    foregroundColor: .init(hex: 0xECEFF4),
-    backgroundColor: .init(hex: 0x1E222A),
+    foregroundColor: try! .init(hex: "#ECEFF4"),
+    backgroundColor: try! .init(hex: "#1E222A"),
     tintColor: .cyan,
     source: .fallback
   )
 
   public static let defaultPalette: [Int: Color] = [
-    0: .init(hex: 0x20242C),
-    1: .init(hex: 0xE05757),
-    2: .init(hex: 0x61C67B),
-    3: .init(hex: 0xEBB33C),
-    4: .init(hex: 0x5BA3FF),
-    5: .init(hex: 0xB46EFF),
-    6: .init(hex: 0x56B6C2),
-    7: .init(hex: 0xECEFF4),
-    8: .init(hex: 0x8C92AC),
-    9: .init(hex: 0xFF7B72),
-    10: .init(hex: 0x7EE787),
-    11: .init(hex: 0xF2CC60),
-    12: .init(hex: 0x79C0FF),
-    13: .init(hex: 0xD2A8FF),
-    14: .init(hex: 0x7DE2D1),
+    0: try! .init(hex: "#20242C"),
+    1: try! .init(hex: "#E05757"),
+    2: try! .init(hex: "#61C67B"),
+    3: try! .init(hex: "#EBB33C"),
+    4: try! .init(hex: "#5BA3FF"),
+    5: try! .init(hex: "#B46EFF"),
+    6: try! .init(hex: "#56B6C2"),
+    7: try! .init(hex: "#ECEFF4"),
+    8: try! .init(hex: "#8C92AC"),
+    9: try! .init(hex: "#FF7B72"),
+    10: try! .init(hex: "#7EE787"),
+    11: try! .init(hex: "#F2CC60"),
+    12: try! .init(hex: "#79C0FF"),
+    13: try! .init(hex: "#D2A8FF"),
+    14: try! .init(hex: "#7DE2D1"),
     15: .white,
   ]
 
@@ -167,17 +167,17 @@ public struct TerminalAppearance: Equatable, Sendable {
     let overrideBackground: Color =
       switch preferredColorScheme {
       case .dark:
-        .init(hex: 0x15181E)
+        try! .init(hex: "#15181E")
       case .light:
-        .init(hex: 0xF6F7F9)
+        try! .init(hex: "#F6F7F9")
       }
 
     let overrideForeground: Color =
       switch preferredColorScheme {
       case .dark:
-        .init(hex: 0xECEFF4)
+        try! .init(hex: "#ECEFF4")
       case .light:
-        .init(hex: 0x161A20)
+        try! .init(hex: "#161A20")
       }
 
     return .init(
@@ -196,7 +196,7 @@ public struct TerminalAppearance: Equatable, Sendable {
 
   /// Derives the semantic theme exposed to higher-level styling APIs.
   public func semanticTheme() -> Theme {
-    let separator = mix(backgroundColor, foregroundColor, amount: separatorMixAmount)
+    let separator = backgroundColor.mixed(with: foregroundColor, amount: separatorMixAmount)
     let fill = elevatedSurface(
       from: backgroundColor,
       scheme: colorScheme,
@@ -208,8 +208,8 @@ public struct TerminalAppearance: Equatable, Sendable {
       amount: 0.04,
       invert: true
     )
-    let muted = mix(backgroundColor, foregroundColor, amount: mutedMixAmount)
-    let placeholder = mix(backgroundColor, foregroundColor, amount: placeholderMixAmount)
+    let muted = backgroundColor.mixed(with: foregroundColor, amount: mutedMixAmount)
+    let placeholder = backgroundColor.mixed(with: foregroundColor, amount: placeholderMixAmount)
     let safeTint = contrastSafe(
       tintColor,
       against: backgroundColor,
@@ -217,7 +217,7 @@ public struct TerminalAppearance: Equatable, Sendable {
       fallback: fallbackTint
     )
     let selection = contrastSafe(
-      mix(backgroundColor, safeTint, amount: selectionMixAmount),
+      backgroundColor.mixed(with: safeTint, amount: selectionMixAmount),
       against: backgroundColor,
       minimumContrast: 1.35,
       fallback: elevatedSurface(from: backgroundColor, scheme: colorScheme, amount: 0.14)
@@ -262,14 +262,14 @@ extension TerminalAppearance {
   public static func derivedColorScheme(
     backgroundColor: Color
   ) -> ColorScheme {
-    relativeLuminance(backgroundColor) < 0.5 ? .dark : .light
+    backgroundColor.relativeLuminance < 0.5 ? .dark : .light
   }
 
   public static func derivedColorSchemeContrast(
     foregroundColor: Color,
     backgroundColor: Color
   ) -> ColorSchemeContrast {
-    contrastRatio(foregroundColor, backgroundColor) >= 7 ? .increased : .standard
+    foregroundColor.contrastRatio(to: backgroundColor) >= 7 ? .increased : .standard
   }
 }
 
@@ -314,9 +314,9 @@ extension TerminalAppearance {
   ) -> Color {
     switch (scheme, invert) {
     case (.dark, false), (.light, true):
-      return mix(base, .white, amount: amount)
+      return base.mixed(with: .white, amount: amount)
     case (.dark, true), (.light, false):
-      return mix(base, .black, amount: amount)
+      return base.mixed(with: .black, amount: amount)
     }
   }
 
@@ -566,8 +566,8 @@ extension StyleEnvironmentSnapshot {
       return theme.foreground
     }
 
-    let whiteContrast = contrastRatio(.white, backgroundColor)
-    let blackContrast = contrastRatio(.black, backgroundColor)
+    let whiteContrast = Color.white.contrastRatio(to: backgroundColor)
+    let blackContrast = Color.black.contrastRatio(to: backgroundColor)
     return .color(whiteContrast >= blackContrast ? .white : .black)
   }
 
@@ -585,57 +585,11 @@ extension StyleEnvironmentSnapshot {
   }
 }
 
-func mix(
-  _ lhs: Color,
-  _ rhs: Color,
-  amount: Double
-) -> Color {
-  let clampedAmount = min(1, max(0, amount))
-  return .init(
-    red: interpolatedComponent(lhs.red, rhs.red, amount: clampedAmount),
-    green: interpolatedComponent(lhs.green, rhs.green, amount: clampedAmount),
-    blue: interpolatedComponent(lhs.blue, rhs.blue, amount: clampedAmount),
-    alpha: lhs.alpha + (rhs.alpha - lhs.alpha) * clampedAmount
-  )
-}
-
 func contrastSafe(
   _ color: Color,
   against background: Color,
   minimumContrast: Double,
   fallback: Color
 ) -> Color {
-  contrastRatio(color, background) >= minimumContrast ? color : fallback
-}
-
-func relativeLuminance(_ color: Color) -> Double {
-  let red = linearComponent(color.red)
-  let green = linearComponent(color.green)
-  let blue = linearComponent(color.blue)
-  return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
-}
-
-func contrastRatio(
-  _ lhs: Color,
-  _ rhs: Color
-) -> Double {
-  let lighter = max(relativeLuminance(lhs), relativeLuminance(rhs))
-  let darker = min(relativeLuminance(lhs), relativeLuminance(rhs))
-  return (lighter + 0.05) / (darker + 0.05)
-}
-
-private func linearComponent(_ value: Int) -> Double {
-  let normalized = Double(value) / 255
-  if normalized <= 0.04045 {
-    return normalized / 12.92
-  }
-  return powDouble((normalized + 0.055) / 1.055, 2.4)
-}
-
-private func interpolatedComponent(
-  _ lhs: Int,
-  _ rhs: Int,
-  amount: Double
-) -> Int {
-  Int((Double(lhs) + ((Double(rhs) - Double(lhs)) * amount)).rounded())
+  color.contrastRatio(to: background) >= minimumContrast ? color : fallback
 }

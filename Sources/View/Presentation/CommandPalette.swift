@@ -414,21 +414,71 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
   var body: some View {
     content
       .overlayPreferenceValue(CommandPreferenceKey.self) { preference in
-        Rectangle().fill(.background.opacity(isPresented.wrappedValue ? 0.7 : 0.0))
-          .sheet("Command Palette", isPresented: isPresented) {
-            CommandPalette(
-              query: Binding(
-                get: { query },
-                set: { query = $0 }
-              ),
-              commands: preference.commands,
-              placeholder: placeholder
-            ) { [isPresented, onExecute] command in
-              isPresented.wrappedValue = false
-              query = ""
-              onExecute(command)
+        CommandShortcutDispatcher(
+          commands: preference.commands,
+          onExecute: onExecute
+        ) {
+          Rectangle().fill(.background.opacity(isPresented.wrappedValue ? 0.7 : 0.0))
+            .sheet("Command Palette", isPresented: isPresented) {
+              CommandPalette(
+                query: Binding(
+                  get: { query },
+                  set: { query = $0 }
+                ),
+                commands: preference.commands,
+                placeholder: placeholder
+              ) { [isPresented, onExecute] command in
+                isPresented.wrappedValue = false
+                query = ""
+                onExecute(command)
+              }
             }
-          }
+        }
       }
+  }
+}
+
+/// Registers hotkeys for commands that have shortcut strings.
+private struct CommandShortcutDispatcher<Content: View>: View, ResolvableView {
+  var commands: [Command]
+  var onExecute: @MainActor @Sendable (Command) -> Void
+  var content: Content
+
+  init(
+    commands: [Command],
+    onExecute: @escaping @MainActor @Sendable (Command) -> Void,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.commands = commands
+    self.onExecute = onExecute
+    self.content = content()
+  }
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let dynamicPropertyScope = currentDynamicPropertyScope()
+
+    for command in commands where command.shortcut != nil && !command.isDisabled {
+      if let parsed = parseShortcutKey(command.shortcut!) {
+        let executeAction = onExecute
+        let capturedCommand = command
+        let binding = HotkeyBinding(
+          key: parsed,
+          label: command.title,
+          commandID: command.id
+        )
+        context.hotkeyRegistry?.register(binding: binding) { _ in
+          if let dynamicPropertyScope {
+            withDynamicPropertyScope(dynamicPropertyScope) {
+              executeAction(capturedCommand)
+            }
+          } else {
+            executeAction(capturedCommand)
+          }
+          return true
+        }
+      }
+    }
+
+    return [content.resolve(in: context)]
   }
 }

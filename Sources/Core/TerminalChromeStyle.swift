@@ -107,8 +107,7 @@ extension TerminalAppearance {
       return terminalBorderStyle(tone: tone)
     case .tile(let tone):
       return .color(
-        mix(
-          backgroundColor,
+        backgroundColor.mixed(with:
           terminalToneColor(for: tone),
           amount: colorScheme == .dark ? 0.18 : 0.1
         )
@@ -124,16 +123,14 @@ extension TerminalAppearance {
         return .color(terminalToneColor(for: tone))
       }
       return .color(
-        mix(
-          backgroundColor,
+        backgroundColor.mixed(with:
           terminalToneColor(for: tone),
           amount: colorScheme == .dark ? 0.16 : 0.08
         )
       )
     case .keycap(let tone):
       return .color(
-        mix(
-          backgroundColor,
+        backgroundColor.mixed(with:
           terminalToneColor(for: tone),
           amount: colorScheme == .dark ? 0.1 : 0.05
         )
@@ -141,16 +138,14 @@ extension TerminalAppearance {
     case .tab(let tone, let isSelected):
       if isSelected {
         return .color(
-          mix(
-            backgroundColor,
+          backgroundColor.mixed(with:
             terminalToneColor(for: tone),
             amount: colorScheme == .dark ? 0.22 : 0.14
           )
         )
       }
       return .color(
-        mix(
-          backgroundColor,
+        backgroundColor.mixed(with:
           terminalToneColor(for: tone),
           amount: colorScheme == .dark ? 0.06 : 0.03
         )
@@ -160,15 +155,15 @@ extension TerminalAppearance {
 
   private var terminalSurfaceBase: Color {
     terminalColorForScheme(
-      dark: .init(hex: 0x1F2330),
-      light: .init(hex: 0xF8F7FC)
+      dark: try! Color(hex:"#1F2330"),
+      light: try! Color(hex:"#F8F7FC")
     )
   }
 
   private var terminalTabBase: Color {
     terminalColorForScheme(
-      dark: .init(hex: 0x1A1F2B),
-      light: .init(hex: 0xF2F4F7)
+      dark: try! Color(hex:"#1A1F2B"),
+      light: try! Color(hex:"#F2F4F7")
     )
   }
 
@@ -189,33 +184,32 @@ extension TerminalAppearance {
         against: backgroundColor,
         minimumContrast: 3,
         fallback: terminalColorForScheme(
-          dark: .init(hex: 0x7DE2D1),
-          light: .init(hex: 0x1976D2)
+          dark: try! Color(hex:"#7DE2D1"),
+          light: try! Color(hex:"#1976D2")
         )
       )
     case .info:
       return terminalColorForScheme(
-        dark: .init(hex: 0x4CC9F0),
-        light: .init(hex: 0x1976D2)
+        dark: try! Color(hex:"#4CC9F0"),
+        light: try! Color(hex:"#1976D2")
       )
     case .success:
       return terminalColorForScheme(
-        dark: .init(hex: 0x04B575),
-        light: .init(hex: 0x0F8B63)
+        dark: try! Color(hex:"#04B575"),
+        light: try! Color(hex:"#0F8B63")
       )
     case .warning:
       return terminalColorForScheme(
-        dark: .init(hex: 0xF2B94B),
-        light: .init(hex: 0xB7791F)
+        dark: try! Color(hex:"#F2B94B"),
+        light: try! Color(hex:"#B7791F")
       )
     case .danger:
       return terminalColorForScheme(
-        dark: .init(hex: 0xF76E6E),
-        light: .init(hex: 0xC24141)
+        dark: try! Color(hex:"#F76E6E"),
+        light: try! Color(hex:"#C24141")
       )
     case .neutral:
-      return mix(
-        backgroundColor,
+      return backgroundColor.mixed(with:
         foregroundColor,
         amount: colorScheme == .dark ? 0.54 : 0.44
       )
@@ -226,8 +220,7 @@ extension TerminalAppearance {
     tone: TerminalTone
   ) -> AnyShapeStyle {
     .color(
-      mix(
-        backgroundColor,
+      backgroundColor.mixed(with:
         terminalToneColor(for: tone),
         amount: colorScheme == .dark ? 0.1 : 0.05
       )
@@ -238,8 +231,7 @@ extension TerminalAppearance {
     tone: TerminalTone
   ) -> AnyShapeStyle {
     .color(
-      mix(
-        backgroundColor,
+      backgroundColor.mixed(with:
         terminalToneColor(for: tone),
         amount:
           tone == .neutral
@@ -258,8 +250,7 @@ extension TerminalAppearance {
 
     if isSelected {
       return .color(
-        mix(
-          neutralBase,
+        neutralBase.mixed(with:
           terminalToneColor(for: tone),
           amount: colorScheme == .dark ? 0.18 : 0.11
         )
@@ -272,8 +263,7 @@ extension TerminalAppearance {
       : (colorScheme == .dark ? 0.03 : 0.01)
 
     return .color(
-      mix(
-        neutralBase,
+      neutralBase.mixed(with:
         foregroundColor,
         amount: overlayStrength
       )

@@ -103,6 +103,7 @@ extension RunLoop {
     localFocusedValuesRegistry.reset()
     localPreferenceObservationRegistry.reset()
     localKeyHandlerRegistry.reset()
+    hotkeyRegistry.reset()
     localLifecycleRegistry.reset()
     localTaskRegistry.reset()
 
@@ -122,6 +123,7 @@ extension RunLoop {
     context.localFocusBindingRegistry = localFocusBindingRegistry
     context.localFocusedValuesRegistry = localFocusedValuesRegistry
     context.localPreferenceObservationRegistry = localPreferenceObservationRegistry
+    context.hotkeyRegistry = hotkeyRegistry
     context.dynamicStateStore = dynamicStateStore
     context.observationBridge = observationBridge
     return context

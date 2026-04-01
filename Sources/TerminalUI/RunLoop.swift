@@ -105,6 +105,7 @@ public final class RunLoop<State: Equatable & Sendable> {
   package let localFocusedValuesRegistry = LocalFocusedValuesRegistry()
   package let localPreferenceObservationRegistry = LocalPreferenceObservationRegistry()
   package let localKeyHandlerRegistry = LocalKeyHandlerRegistry()
+  package let hotkeyRegistry = HotkeyRegistry()
   package let localLifecycleRegistry = LocalLifecycleRegistry()
   package let localTaskRegistry = LocalTaskRegistry()
   package let lifecycleCoordinator = LifecycleCoordinator()
@@ -323,7 +324,7 @@ private final class KeyboardInputAdapter: TerminalInputReading {
       let keyEvents = self.inputReader.events()
       let task = Task {
         for await event in keyEvents {
-          continuation.yield(.key(event))
+          continuation.yield(.key(KeyPress(event)))
         }
         continuation.finish()
       }

@@ -19,11 +19,13 @@ let package = Package(
   ],
   dependencies: [
     .package(path: "../../.."),
+    .package(path: "../../gallery"),
   ],
   targets: [
     .target(
       name: "WebExampleScenes",
       dependencies: [
+        .product(name: "GalleryDemoViews", package: "gallery"),
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
         .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),

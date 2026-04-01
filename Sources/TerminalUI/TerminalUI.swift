@@ -44,6 +44,7 @@ private final class RetainedFrameStore {
       focusedValues: focusedValuesRegistry?.snapshot() ?? [],
       preferenceObservations: preferenceObservationRegistry?.snapshot() ?? [],
       keyHandlers: keyHandlerRegistry?.snapshot() ?? [:],
+      keyPressHandlers: keyHandlerRegistry?.snapshotKeyPressHandlers() ?? [:],
       lifecycleHandlers: lifecycleRegistry?.snapshot() ?? .init(),
       taskRegistrations: taskRegistry?.snapshot() ?? [:]
     )

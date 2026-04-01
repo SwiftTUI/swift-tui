@@ -20,6 +20,10 @@ struct RGBAImagePixel: Equatable, Hashable, Sendable {
   var blue: Int
   var alpha: Int
 
+  var color: Color {
+    Color(red: Double(red)/255.0, green: Double(green)/255.0, blue: Double(blue)/255.0, alpha: Double(alpha)/255.0)
+  }
+
   init(
     red: Int,
     green: Int,

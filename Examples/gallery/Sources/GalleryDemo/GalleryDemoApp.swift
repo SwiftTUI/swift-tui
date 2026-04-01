@@ -1,4 +1,4 @@
-import Foundation
+import GalleryDemoViews
 import Observation
 import TerminalUI
 import TerminalUICharts
@@ -15,15 +15,7 @@ struct GalleryDemoApp: App {
   }
 
   static func main() async {
-    do {
-      try await MultiSceneLauncher.run(Self.self)
-    } catch let error as TerminalHostError {
-      FileHandle.standardError.write(Data(galleryLaunchFailureMessage(for: error).utf8))
-      Foundation.exit(1)
-    } catch {
-      FileHandle.standardError.write(Data("Gallery demo failed to launch: \(error)\n".utf8))
-      Foundation.exit(1)
-    }
+    try! await MultiSceneLauncher.run(Self.self)
   }
 
   private static func galleryLaunchFailureMessage(

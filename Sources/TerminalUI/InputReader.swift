@@ -49,7 +49,7 @@ import Core
 #endif
 
 /// A normalized keyboard event emitted by the terminal input parser.
-public enum KeyEvent: Equatable, Sendable {
+public enum KeyEvent: Equatable, Hashable, Sendable {
   case character(Character)
   case enter
   case space
@@ -64,6 +64,17 @@ public enum KeyEvent: Equatable, Sendable {
   case ctrlC
 }
 
+/// A keyboard event paired with modifier flags.
+public struct KeyPress: Equatable, Hashable, Sendable {
+  public var key: KeyEvent
+  public var modifiers: EventModifiers
+
+  public init(_ key: KeyEvent, modifiers: EventModifiers = []) {
+    self.key = key
+    self.modifiers = modifiers
+  }
+}
+
 /// A mouse button recognized by the input parser.
 public enum MouseButton: Equatable, Sendable {
   case primary
@@ -74,17 +85,7 @@ public enum MouseButton: Equatable, Sendable {
 /// A normalized mouse event emitted by the terminal input parser.
 public struct MouseEvent: Equatable, Sendable {
   /// Keyboard modifiers that accompanied the mouse event.
-  public struct Modifiers: OptionSet, Equatable, Sendable {
-    public let rawValue: UInt8
-
-    public init(rawValue: UInt8) {
-      self.rawValue = rawValue
-    }
-
-    public static let shift = Self(rawValue: 1 << 0)
-    public static let option = Self(rawValue: 1 << 1)
-    public static let control = Self(rawValue: 1 << 2)
-  }
+  public typealias Modifiers = EventModifiers
 
   /// The action represented by the mouse event.
   public enum Kind: Equatable, Sendable {
@@ -112,8 +113,13 @@ public struct MouseEvent: Equatable, Sendable {
 
 /// A normalized terminal input event.
 public enum InputEvent: Equatable, Sendable {
-  case key(KeyEvent)
+  case key(KeyPress)
   case mouse(MouseEvent)
+
+  /// Convenience for creating a key event without modifiers.
+  public static func key(_ keyEvent: KeyEvent) -> Self {
+    .key(KeyPress(keyEvent))
+  }
 }
 
 func coalescedInputEvents(
@@ -204,10 +210,10 @@ public struct KeyParser: Sendable {
   /// Feeds raw bytes into the parser and returns only keyboard events.
   public mutating func feed(_ bytes: [UInt8]) -> [KeyEvent] {
     parser.feed(bytes).compactMap {
-      guard case .key(let keyEvent) = $0 else {
+      guard case .key(let keyPress) = $0 else {
         return nil
       }
-      return keyEvent
+      return keyPress.key
     }
   }
 }
@@ -219,27 +225,32 @@ extension TerminalInputParser {
     }
 
     switch firstByte {
+    case 0x01...0x02, 0x04...0x08, 0x0B...0x0C, 0x0E...0x1A:
+      // Ctrl+A through Ctrl+Z (excluding 0x03=ctrlC, 0x09=tab, 0x0A/0x0D=enter)
+      bufferedBytes.removeFirst()
+      let letter = Character(UnicodeScalar(Int(firstByte) + 0x60)!)
+      return .key(KeyPress(.character(letter), modifiers: .control))
     case 0x03:
       bufferedBytes.removeFirst()
-      return .key(.ctrlC)
+      return .key(KeyPress(.ctrlC, modifiers: .control))
     case 0x08, 0x7F:
       bufferedBytes.removeFirst()
-      return .key(.backspace)
+      return .key(KeyPress(.backspace))
     case 0x09:
       bufferedBytes.removeFirst()
-      return .key(.tab)
+      return .key(KeyPress(.tab))
     case 0x0A, 0x0D:
       bufferedBytes.removeFirst()
-      return .key(.enter)
+      return .key(KeyPress(.enter))
     case 0x1B:
       return parseEscapeSequence()
     case 0x20:
       bufferedBytes.removeFirst()
-      return .key(.space)
+      return .key(KeyPress(.space))
     case 0x21...0x7E:
       bufferedBytes.removeFirst()
       let scalar = UnicodeScalar(Int(firstByte))!
-      return .key(.character(Character(scalar)))
+      return .key(KeyPress(.character(Character(scalar))))
     default:
       bufferedBytes.removeFirst()
       return nil
@@ -252,8 +263,22 @@ extension TerminalInputParser {
     }
 
     guard bufferedBytes[1] == 0x5B else {
+      // Alt+key: ESC followed by a printable byte
+      if (0x20...0x7E).contains(bufferedBytes[1]) {
+        let byte = bufferedBytes[1]
+        bufferedBytes.removeFirst(2)
+        let character = Character(UnicodeScalar(Int(byte))!)
+        let key: KeyEvent
+        switch byte {
+        case 0x20:
+          key = .space
+        default:
+          key = .character(character)
+        }
+        return .key(KeyPress(key, modifiers: .option))
+      }
       bufferedBytes.removeFirst()
-      return .key(.escape)
+      return .key(KeyPress(.escape))
     }
 
     guard bufferedBytes.count > 2 else {
@@ -264,25 +289,98 @@ extension TerminalInputParser {
       return parseSGRMouseSequence()
     }
 
+    // CSI sequences with modifier parameters: ESC[1;{mod}{key}
+    if bufferedBytes[2] == 0x31 {
+      return parseCSIModifierSequence()
+    }
+
     switch bufferedBytes[2] {
     case 0x41:
       bufferedBytes.removeFirst(3)
-      return .key(.arrowUp)
+      return .key(KeyPress(.arrowUp))
     case 0x42:
       bufferedBytes.removeFirst(3)
-      return .key(.arrowDown)
+      return .key(KeyPress(.arrowDown))
     case 0x43:
       bufferedBytes.removeFirst(3)
-      return .key(.arrowRight)
+      return .key(KeyPress(.arrowRight))
     case 0x44:
       bufferedBytes.removeFirst(3)
-      return .key(.arrowLeft)
+      return .key(KeyPress(.arrowLeft))
     case 0x5A:
       bufferedBytes.removeFirst(3)
-      return .key(.shiftTab)
+      return .key(KeyPress(.shiftTab, modifiers: .shift))
     default:
       bufferedBytes.removeFirst(3)
-      return .key(.escape)
+      return .key(KeyPress(.escape))
+    }
+  }
+
+  /// Parses CSI sequences with modifier parameters: `ESC[1;{mod}{key}`
+  ///
+  /// The xterm modifier parameter convention is: value = 1 + bitmask
+  /// where shift=1, alt=2, ctrl=4.
+  private mutating func parseCSIModifierSequence() -> InputEvent? {
+    // Expect at least ESC [ 1 ; {mod} {key} = 6 bytes minimum
+    guard bufferedBytes.count >= 6,
+      bufferedBytes[3] == 0x3B  // semicolon
+    else {
+      // Not a modifier sequence — fall through to consume as unknown
+      bufferedBytes.removeFirst(3)
+      return .key(KeyPress(.escape))
+    }
+
+    // Find the terminal byte (an uppercase letter)
+    var index = 4
+    while index < bufferedBytes.count, (0x30...0x39).contains(bufferedBytes[index]) {
+      index += 1
+    }
+
+    guard index < bufferedBytes.count else {
+      return nil  // incomplete sequence, wait for more bytes
+    }
+
+    let terminalByte = bufferedBytes[index]
+    let modifierBytes = Array(bufferedBytes[4..<index])
+    bufferedBytes.removeFirst(index + 1)
+
+    let modifiers = csiModifiers(from: modifierBytes)
+
+    guard let key = csiTerminalKey(from: terminalByte) else {
+      return .key(KeyPress(.escape, modifiers: modifiers))
+    }
+
+    return .key(KeyPress(key, modifiers: modifiers))
+  }
+
+  private func csiModifiers(from bytes: [UInt8]) -> EventModifiers {
+    guard let value = asciiInteger(from: ArraySlice(bytes)) else {
+      return []
+    }
+    // xterm convention: modifier = 1 + bitmask (shift=1, alt=2, ctrl=4)
+    let bitmask = value - 1
+    var modifiers: EventModifiers = []
+    if (bitmask & 1) != 0 {
+      modifiers.insert(.shift)
+    }
+    if (bitmask & 2) != 0 {
+      modifiers.insert(.option)
+    }
+    if (bitmask & 4) != 0 {
+      modifiers.insert(.control)
+    }
+    return modifiers
+  }
+
+  private func csiTerminalKey(from byte: UInt8) -> KeyEvent? {
+    switch byte {
+    case 0x41: return .arrowUp
+    case 0x42: return .arrowDown
+    case 0x43: return .arrowRight
+    case 0x44: return .arrowLeft
+    case 0x48: return .enter  // Home key mapped to enter
+    case 0x46: return .escape  // End key mapped to escape
+    default: return nil
     }
   }
 
@@ -463,10 +561,10 @@ public final class InputReader: InputReading, TerminalInputReading {
   public func events() -> AsyncStream<KeyEvent> {
     makeEventStream { parser, input in
       parser.feed(input).compactMap {
-        guard case .key(let keyEvent) = $0 else {
+        guard case .key(let keyPress) = $0 else {
           return nil
         }
-        return keyEvent
+        return keyPress.key
       }
     }
   }

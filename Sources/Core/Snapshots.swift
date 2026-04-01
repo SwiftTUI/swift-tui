@@ -471,10 +471,10 @@ extension SnapshotRenderer {
   private func describe(_ style: ResolvedTextStyle) -> String {
     var parts: [String] = []
     if let foregroundColor = style.foregroundColor {
-      parts.append("fg=\(describe(foregroundColor))")
+      parts.append("fg=\(foregroundColor.hexString(format: .rrggbbaa))")
     }
     if let backgroundColor = style.backgroundColor {
-      parts.append("bg=\(describe(backgroundColor))")
+      parts.append("bg=\(backgroundColor.hexString(format: .rrggbbaa))")
     }
     if !style.emphasis.isEmpty {
       parts.append("emphasis=\(style.emphasis.debugNames.joined(separator: "+"))")
@@ -496,7 +496,7 @@ extension SnapshotRenderer {
     case .semantic(let role):
       return role.rawValue
     case .color(let color):
-      return describe(color)
+      return color.hexString(format: .rrggbbaa)
     case .linearGradient(let gradient):
       return "linearGradient(\(describe(gradient)))"
     case .terminalChrome(let chromeStyle):
@@ -528,29 +528,16 @@ extension SnapshotRenderer {
       return "terminalTab(\(tone.rawValue),selected:\(isSelected))"
     }
   }
-
-  private func describe(_ color: Color) -> String {
-    let hex = "#"
-      + hexadecimal(color.red)
-      + hexadecimal(color.green)
-      + hexadecimal(color.blue)
-    if color.alpha < 1 {
-      let alphaPercent = Int((color.alpha * 100).rounded())
-      return "\(hex)@\(alphaPercent)%"
-    }
-    return hex
-  }
-
   private func describe(_ gradient: LinearGradient) -> String {
     let stops = gradient.gradient.stops.map { stop in
-      "\(describe(stop.color))@\(stop.location)"
+      "\(stop.color.hexString(format: .rrggbbaa))@\(stop.location)"
     }.joined(separator: ",")
     return "\(gradient.startPoint.rawValue)->\(gradient.endPoint.rawValue):[\(stops)]"
   }
 
   private func describe(_ lineStyle: TextLineStyle) -> String {
     if let color = lineStyle.color {
-      return "\(lineStyle.pattern.rawValue):\(describe(color))"
+      return "\(lineStyle.pattern.rawValue):\(color.hexString(format: .rrggbbaa))"
     }
     return lineStyle.pattern.rawValue
   }

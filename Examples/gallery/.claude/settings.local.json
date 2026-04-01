@@ -3,7 +3,10 @@
     "allow": [
       "Bash(swift build:*)",
       "Bash(find:*)",
-      "Bash(grep -E \"\\\\.swift$\")"
+      "Bash(grep -E \"\\\\.swift$\")",
+      "Bash(swift test:*)",
+      "Bash(ls:*)",
+      "Bash(wait)"
     ]
   }
 }

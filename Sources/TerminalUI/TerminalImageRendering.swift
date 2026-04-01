@@ -421,7 +421,7 @@ private func directColorOverlay(
     outputSize: .init(width: cellSize.width, height: cellSize.height * 2)
   )
   return halfBlockOverlay(
-    colors: samples.map { $0.map(color(from:)) },
+    colors: samples.map { $0.map(\.color) },
     cellSize: cellSize
   )
 }
@@ -793,9 +793,9 @@ private func floydSteinbergQuantizedIndices(
     return []
   }
 
-  var red = pixels.map { Double($0?.red ?? 0) }
-  var green = pixels.map { Double($0?.green ?? 0) }
-  var blue = pixels.map { Double($0?.blue ?? 0) }
+  var red = pixels.map { Double($0?.red ?? 0) / 255.0 }
+  var green = pixels.map { Double($0?.green ?? 0) / 255.0 }
+  var blue = pixels.map { Double($0?.blue ?? 0) / 255.0 }
   var quantized: [Int?] = Array(repeating: nil, count: pixels.count)
 
   for y in 0..<size.height {
@@ -817,9 +817,9 @@ private func floydSteinbergQuantizedIndices(
       let target = palette[paletteIndex]
       quantized[index] = paletteIndex
 
-      let errorRed = red[index] - Double(target.red)
-      let errorGreen = green[index] - Double(target.green)
-      let errorBlue = blue[index] - Double(target.blue)
+      let errorRed = red[index] - target.red
+      let errorGreen = green[index] - target.green
+      let errorBlue = blue[index] - target.blue
 
       diffuseError(
         red: errorRed,
@@ -906,9 +906,9 @@ private func diffuseError(
     return
   }
 
-  redBuffer[index] = clampedColorDouble(redBuffer[index] + (errorRed * factor))
-  greenBuffer[index] = clampedColorDouble(greenBuffer[index] + (errorGreen * factor))
-  blueBuffer[index] = clampedColorDouble(blueBuffer[index] + (errorBlue * factor))
+  redBuffer[index] = clampColorComponent(redBuffer[index] + (errorRed * factor))
+  greenBuffer[index] = clampColorComponent(greenBuffer[index] + (errorGreen * factor))
+  blueBuffer[index] = clampColorComponent(blueBuffer[index] + (errorBlue * factor))
 }
 
 private func closestPaletteIndex(
@@ -938,11 +938,11 @@ private func closestPaletteIndex(
 private func squaredDistance(
   from lhs: Color,
   to rhs: Color
-) -> Int {
-  let red = lhs.red - rhs.red
-  let green = lhs.green - rhs.green
-  let blue = lhs.blue - rhs.blue
-  return (red * red) + (green * green) + (blue * blue)
+) -> Double {
+  let dr = lhs.red - rhs.red
+  let dg = lhs.green - rhs.green
+  let db = lhs.blue - rhs.blue
+  return (dr * dr) + (dg * dg) + (db * db)
 }
 
 private func adaptivePalette(
@@ -955,9 +955,9 @@ private func adaptivePalette(
 
   struct Bucket {
     var count = 0
-    var red = 0
-    var green = 0
-    var blue = 0
+    var red = 0.0
+    var green = 0.0
+    var blue = 0.0
   }
 
   var buckets: [Int: Bucket] = [:]
@@ -973,9 +973,9 @@ private func adaptivePalette(
       | (pixel.blue / 16)
     var bucket = buckets[bucketKey] ?? Bucket()
     bucket.count += 1
-    bucket.red += pixel.red
-    bucket.green += pixel.green
-    bucket.blue += pixel.blue
+    bucket.red += Double(pixel.red) / 255.0
+    bucket.green += Double(pixel.green) / 255.0
+    bucket.blue += Double(pixel.blue) / 255.0
     buckets[bucketKey] = bucket
   }
 
@@ -985,10 +985,11 @@ private func adaptivePalette(
     }
     .prefix(maxColors)
     .map { bucket in
-      Color(
-        red: bucket.red / max(1, bucket.count),
-        green: bucket.green / max(1, bucket.count),
-        blue: bucket.blue / max(1, bucket.count)
+      let divisor = Double(max(1, bucket.count))
+      return Color(
+        red: bucket.red / divisor,
+        green: bucket.green / divisor,
+        blue: bucket.blue / divisor
       )
     }
 
@@ -1004,7 +1005,7 @@ private func ansi16Palette() -> [Color] {
 
 private func ansi256Palette() -> [Color] {
   var palette = ansi16Palette()
-  let cubeComponents = [0, 95, 135, 175, 215, 255]
+  let cubeComponents: [Double] = [0, 95, 135, 175, 215, 255].map { $0 / 255.0 }
 
   for red in cubeComponents {
     for green in cubeComponents {
@@ -1021,7 +1022,7 @@ private func ansi256Palette() -> [Color] {
   }
 
   for index in 0..<24 {
-    let component = 8 + (index * 10)
+    let component = Double(8 + (index * 10)) / 255.0
     palette.append(
       .init(
         red: component,
@@ -1313,30 +1314,14 @@ private func base64Encoded(
   return result
 }
 
-private func color(
-  from pixel: RGBAImagePixel
-) -> Color {
-  Color(
-    red: pixel.red,
-    green: pixel.green,
-    blue: pixel.blue
-  )
-}
-
 private func clampColorComponent(
   _ value: Double
-) -> Int {
-  max(0, min(255, Int(value.rounded())))
-}
-
-private func clampedColorDouble(
-  _ value: Double
 ) -> Double {
-  max(0, min(255, value))
+  max(0.0, min(1.0, value))
 }
 
 private func sixelPercent(
-  _ component: Int
+  _ component: Double
 ) -> Int {
-  Int((Double(component) / 255 * 100).rounded())
+  Int((component * 100).rounded())
 }

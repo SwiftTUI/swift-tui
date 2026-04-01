@@ -260,6 +260,7 @@ package final class RetainedResolveFrame: @unchecked Sendable {
   package var focusedValues: [FocusedValuesRegistrationSnapshot]
   package var preferenceObservations: [PreferenceObservationRegistrationSnapshot]
   package var keyHandlers: [Identity: LocalKeyHandlerRegistry.Handler]
+  package var keyPressHandlers: [Identity: LocalKeyHandlerRegistry.KeyPressHandler]
   package var lifecycleHandlers: LifecycleHandlerSnapshot
   package var taskRegistrations: [Identity: TaskRegistration]
 
@@ -271,6 +272,7 @@ package final class RetainedResolveFrame: @unchecked Sendable {
     focusedValues: [FocusedValuesRegistrationSnapshot] = [],
     preferenceObservations: [PreferenceObservationRegistrationSnapshot] = [],
     keyHandlers: [Identity: LocalKeyHandlerRegistry.Handler] = [:],
+    keyPressHandlers: [Identity: LocalKeyHandlerRegistry.KeyPressHandler] = [:],
     lifecycleHandlers: LifecycleHandlerSnapshot = .init(),
     taskRegistrations: [Identity: TaskRegistration] = [:]
   ) {
@@ -282,6 +284,7 @@ package final class RetainedResolveFrame: @unchecked Sendable {
     self.focusedValues = focusedValues
     self.preferenceObservations = preferenceObservations
     self.keyHandlers = keyHandlers
+    self.keyPressHandlers = keyPressHandlers
     self.lifecycleHandlers = lifecycleHandlers
     self.taskRegistrations = taskRegistrations
   }

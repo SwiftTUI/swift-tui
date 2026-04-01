@@ -630,7 +630,7 @@ private final class KeyboardOnlyInputAdapter: TerminalInputReading {
       let keyEvents = inputReader.events()
       let task = Task {
         for await keyEvent in keyEvents {
-          continuation.yield(.key(keyEvent))
+          continuation.yield(.key(KeyPress(keyEvent)))
         }
         continuation.finish()
       }

@@ -145,7 +145,7 @@ private func parseRGBSpec(
     return nil
   }
 
-  let values = components.compactMap(parseHexComponent)
+  let values = components.compactMap(parseHexComponentNormalized)
   guard values.count == 3 else {
     return nil
   }
@@ -156,21 +156,12 @@ private func parseRGBSpec(
 private func parseHexSpec(
   _ spec: String
 ) -> Color? {
-  let normalized = spec.hasPrefix("#") ? String(spec.dropFirst()) : spec
-  guard normalized.count == 6, let value = Int(normalized, radix: 16) else {
-    return nil
-  }
-
-  return .init(
-    red: (value >> 16) & 0xFF,
-    green: (value >> 8) & 0xFF,
-    blue: value & 0xFF
-  )
+  try? Color(hex: spec)
 }
 
-private func parseHexComponent(
+private func parseHexComponentNormalized(
   _ raw: Substring
-) -> Int? {
+) -> Double? {
   let text = String(raw)
   guard let value = Int(text, radix: 16) else {
     return nil
@@ -181,7 +172,7 @@ private func parseHexComponent(
     return nil
   }
 
-  return Int((Double(value) / Double(maxValue) * 255).rounded())
+  return Double(value) / Double(maxValue)
 }
 
 private func strictUTF8String(

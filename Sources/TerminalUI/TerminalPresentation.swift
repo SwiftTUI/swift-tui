@@ -706,9 +706,9 @@ extension TerminalSurfaceRenderer {
       return [
         isBackground ? 48 : 38,
         2,
-        color.red,
-        color.green,
-        color.blue,
+        Int(color.red * 255),
+        Int(color.green * 255),
+        Int(color.blue * 255),
       ]
     }
   }
@@ -802,19 +802,19 @@ extension TerminalSurfaceRenderer {
     for color: Color
   ) -> Int {
     let palette: [(Int, Color)] = [
-      (30, .init(red: 0, green: 0, blue: 0)),
-      (91, .init(red: 255, green: 85, blue: 85)),
-      (92, .init(red: 80, green: 200, blue: 120)),
-      (93, .init(red: 255, green: 215, blue: 0)),
-      (94, .init(red: 100, green: 149, blue: 237)),
-      (95, .init(red: 218, green: 112, blue: 214)),
-      (96, .init(red: 64, green: 224, blue: 208)),
-      (97, .init(red: 245, green: 245, blue: 245)),
-      (90, .init(red: 128, green: 128, blue: 128)),
+      (30, .init(hexRGB: 0x000000)),
+      (91, .init(hexRGB: 0xFF5555)),
+      (92, .init(hexRGB: 0x50C878)),
+      (93, .init(hexRGB: 0xFFD700)),
+      (94, .init(hexRGB: 0x6495ED)),
+      (95, .init(hexRGB: 0xDA70D6)),
+      (96, .init(hexRGB: 0x40E0D0)),
+      (97, .init(hexRGB: 0xF5F5F5)),
+      (90, .init(hexRGB: 0x808080)),
     ]
 
     return palette.min {
-      squaredDistance(from: color, to: $0.1) < squaredDistance(from: color, to: $1.1)
+      color.deltaE(to: $0.1) < color.deltaE(to: $1.1)
     }?.0 ?? 97
   }
 
@@ -844,19 +844,10 @@ extension TerminalSurfaceRenderer {
       break
     }
 
-    let red = Int((Double(color.red) / 255 * 5).rounded())
-    let green = Int((Double(color.green) / 255 * 5).rounded())
-    let blue = Int((Double(color.blue) / 255 * 5).rounded())
+    let red = Int((color.red * 5).rounded())
+    let green = Int((color.green * 5).rounded())
+    let blue = Int((color.blue * 5).rounded())
     return 16 + (36 * red) + (6 * green) + blue
   }
 
-  private func squaredDistance(
-    from lhs: Color,
-    to rhs: Color
-  ) -> Int {
-    let red = lhs.red - rhs.red
-    let green = lhs.green - rhs.green
-    let blue = lhs.blue - rhs.blue
-    return (red * red) + (green * green) + (blue * blue)
-  }
 }

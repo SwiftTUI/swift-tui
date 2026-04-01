@@ -529,7 +529,6 @@ public enum ToastStyle: Equatable, Sendable {
 }
 
 private struct ToastRequest: @unchecked Sendable {
-  var message: String
   var contentViews: [AnyView]
   var style: ToastStyle
   var duration: Double?
@@ -561,11 +560,10 @@ extension View {
   ) -> some View {
     ToastModifier(
       content: self,
-      message: String(message),
       isPresented: isPresented,
       style: style,
       duration: duration,
-      toastContent: EmptyView()
+      toastContent: Text(String(message))
     )
   }
 
@@ -578,7 +576,6 @@ extension View {
   ) -> some View {
     ToastModifier(
       content: self,
-      message: "",
       isPresented: isPresented,
       style: style,
       duration: duration,
@@ -591,7 +588,6 @@ private struct ToastModifier<Content: View, ToastContent: View>: View,
   ResolvableView
 {
   var content: Content
-  var message: String
   var isPresented: Binding<Bool>
   var style: ToastStyle
   var duration: Double?
@@ -609,7 +605,6 @@ private struct ToastModifier<Content: View, ToastContent: View>: View,
       value: .init(
         requests: [
           .init(
-            message: message,
             contentViews: contentViews,
             style: style,
             duration: duration,
@@ -678,32 +673,24 @@ private struct ToastOverlayHost: View {
 private struct ToastSurface: View {
   var request: ToastRequest
 
-  @State private var dismissed = false
-
   var body: some View {
-    if !dismissed {
-      toastContent
-        .task {
-          guard let duration = request.duration, duration > 0 else {
-            return
-          }
-          try? await Task.sleep(for: .seconds(duration))
-          dismissed = true
-          request.dismiss()
+    toastContent
+      .task {
+        guard let duration = request.duration, duration > 0 else {
+          return
         }
-    }
+        try? await Task.sleep(for: .seconds(duration))
+        request.dismiss()
+      }
   }
 
   @ViewBuilder
   private var toastContent: some View {
-    let hasCustomContent = !request.contentViews.isEmpty
     HStack(alignment: .center, spacing: 1) {
       Text(request.style.icon)
         .foregroundStyle(.terminalAccent(request.style.tone))
-      if hasCustomContent {
+      VStack {
         combinedView(from: request.contentViews, kindName: "ToastContent")
-      } else {
-        Text(request.message)
       }
     }
     .padding(1)

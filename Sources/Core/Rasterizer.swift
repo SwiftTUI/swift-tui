@@ -972,7 +972,7 @@ extension Rasterizer {
 
       let range = max(0.0001, upper.location - lower.location)
       let localT = (t - lower.location) / range
-      return interpolate(from: lower.color, to: upper.color, t: localT)
+      return lower.color.interpolated(to: upper.color, progress: localT)
     }
 
     return stops.last?.color
@@ -1006,27 +1006,6 @@ extension Rasterizer {
       }
 
     return (x, y)
-  }
-
-  private func interpolate(
-    from lhs: Color,
-    to rhs: Color,
-    t: Double
-  ) -> Color {
-    Color(
-      red: interpolatedComponent(from: lhs.red, to: rhs.red, t: t),
-      green: interpolatedComponent(from: lhs.green, to: rhs.green, t: t),
-      blue: interpolatedComponent(from: lhs.blue, to: rhs.blue, t: t),
-      alpha: lhs.alpha + (rhs.alpha - lhs.alpha) * t
-    )
-  }
-
-  private func interpolatedComponent(
-    from lhs: Int,
-    to rhs: Int,
-    t: Double
-  ) -> Int {
-    Int((Double(lhs) + ((Double(rhs) - Double(lhs)) * t)).rounded())
   }
 
   private func intersect(

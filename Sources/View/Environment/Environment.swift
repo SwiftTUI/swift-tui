@@ -161,6 +161,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var localFocusedValuesRegistry: LocalFocusedValuesRegistry?
   package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry?
   package var localKeyHandlerRegistry: LocalKeyHandlerRegistry?
+  package var hotkeyRegistry: HotkeyRegistry?
   package var localLifecycleRegistry: LocalLifecycleRegistry?
   package var localTaskRegistry: LocalTaskRegistry?
   package var dynamicStateStore: DynamicStateStore?
@@ -206,6 +207,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.localFocusBindingRegistry = localFocusBindingRegistry
     childContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     childContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
+    childContext.hotkeyRegistry = hotkeyRegistry
     childContext.dynamicStateStore = dynamicStateStore
     childContext.observationBridge = observationBridge
     childContext.resolveReuseSession = resolveReuseSession
@@ -239,6 +241,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.localFocusBindingRegistry = localFocusBindingRegistry
     replacedContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     replacedContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
+    replacedContext.hotkeyRegistry = hotkeyRegistry
     replacedContext.dynamicStateStore = dynamicStateStore
     replacedContext.observationBridge = observationBridge
     replacedContext.resolveReuseSession = resolveReuseSession
@@ -382,6 +385,7 @@ extension ResolveContext {
       && lhs.localFocusedValuesRegistry == rhs.localFocusedValuesRegistry
       && lhs.localPreferenceObservationRegistry == rhs.localPreferenceObservationRegistry
       && lhs.localKeyHandlerRegistry == rhs.localKeyHandlerRegistry
+      && lhs.hotkeyRegistry == rhs.hotkeyRegistry
       && lhs.localLifecycleRegistry == rhs.localLifecycleRegistry
       && lhs.localTaskRegistry == rhs.localTaskRegistry
       && lhs.dynamicStateStore == rhs.dynamicStateStore
@@ -514,6 +518,11 @@ package final class ResolveReuseSession: @unchecked Sendable {
         let handler = previousFrame.keyHandlers[identity]
       {
         keyHandlerRegistry.register(identity: identity, handler: handler)
+      }
+      if let keyHandlerRegistry = context.localKeyHandlerRegistry,
+        let handler = previousFrame.keyPressHandlers[identity]
+      {
+        keyHandlerRegistry.register(identity: identity, keyPressHandler: handler)
       }
       if let taskRegistry = context.localTaskRegistry,
         let registration = previousFrame.taskRegistrations[identity]

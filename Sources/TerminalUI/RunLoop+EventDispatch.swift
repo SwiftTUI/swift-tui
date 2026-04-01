@@ -19,9 +19,9 @@ extension RunLoop {
       }
     case .input(let inputEvent):
       switch inputEvent {
-      case .key(let keyEvent):
+      case .key(let keyPress):
         scheduler.requestInput()
-        return handleKeyEvent(keyEvent)
+        return handleKeyPress(keyPress)
       case .mouse(let mouseEvent):
         if shouldScheduleFrame(for: mouseEvent) {
           scheduler.requestInput()
@@ -32,11 +32,20 @@ extension RunLoop {
     }
   }
 
-  package func handleKeyEvent(
-    _ keyEvent: KeyEvent
+  package func handleKeyPress(
+    _ keyPress: KeyPress
   ) -> RunLoopExitReason? {
+    let keyEvent = keyPress.key
+    let localPress = localKeyPress(for: keyPress)
+
+    // Focus-independent hotkeys fire first, allowing apps to override quit.
+    if hotkeyRegistry.dispatch(localPress) {
+      return nil
+    }
+
+    // Default quit behavior — overridable by registering a hotkey for the same key.
     switch keyEvent {
-    case .character("q"):
+    case .character("q") where keyPress.modifiers.isEmpty:
       return .quitKey
     case .ctrlC:
       return .ctrlC
@@ -53,7 +62,7 @@ extension RunLoop {
     if let focusedIdentity {
       if localKeyHandlerRegistry.dispatch(
         identity: focusedIdentity,
-        event: localKeyEvent(for: keyEvent)
+        keyPress: localPress
       ) {
         return nil
       }
@@ -130,6 +139,12 @@ extension RunLoop {
     default:
       return .exit(.signal(name))
     }
+  }
+
+  package func localKeyPress(
+    for keyPress: KeyPress
+  ) -> LocalKeyPress {
+    LocalKeyPress(localKeyEvent(for: keyPress.key), modifiers: keyPress.modifiers)
   }
 
   package func localKeyEvent(
