@@ -150,7 +150,9 @@ public struct DefaultRenderer {
 
     let (resolved, resolveDuration) = measurePhase {
       resolver.resolve(
-        TerminalPresentationHostingRoot(content: root),
+        ToastHostingRoot(
+          content: TerminalPresentationHostingRoot(content: root)
+        ),
         in: resolveContext
       )
     }

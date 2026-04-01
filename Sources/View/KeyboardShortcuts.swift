@@ -143,6 +143,13 @@ public struct KeyboardShortcutHelpView: View {
         }
       }
     }
+    .frame(
+      maxWidth: .infinity,
+      minHeight: .finite(1),
+      idealHeight: .finite(1),
+      maxHeight: .finite(1),
+      alignment: .leading
+    )
   }
 }
 
@@ -196,12 +203,12 @@ private func groupedShortcuts(
 // MARK: - Convenience Modifier
 
 extension View {
-  /// Attaches a keyboard shortcut help strip at the bottom of this view,
+  /// Attaches a keyboard shortcut help strip to this view,
   /// auto-populated from all `.keyboardShortcut()` registrations in the subtree.
   public func keyboardShortcutHelp(
-    alignment: Alignment = .bottom
+    position: Alignment = .bottomLeading
   ) -> some View {
-    overlayPreferenceValue(KeyboardShortcutPreferenceKey.self, alignment: alignment) {
+    overlayPreferenceValue(KeyboardShortcutPreferenceKey.self, alignment: position) {
       preference in
       if !preference.shortcuts.isEmpty {
         KeyboardShortcutHelpView(shortcuts: preference.shortcuts)

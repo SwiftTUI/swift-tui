@@ -4,6 +4,7 @@ import TerminalUICharts
 struct GalleryDemoSceneView: View {
   @Bindable var model: GalleryDemoModel
   @State private var isResetAlertPresented = false
+  @State private var isToastPresented = false
   @State var pickerScratch: String = "one"
   var body: some View {
     GeometryReader { geometry in
@@ -77,11 +78,12 @@ struct GalleryDemoSceneView: View {
       .keyboardShortcut("q", label: "quit", group: "Act")
       Divider()
     }
-    .keyboardShortcutHelp(alignment: .bottomLeading)
+    .keyboardShortcutHelp(position: .bottomLeading)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .commandPalette(isPresented: $model.isPalettePresented) { command in
       runPaletteCommand(command)
     }
+    .toast("Action performed", isPresented: $isToastPresented, style: .success)
     .alert(
       "Reset gallery state?",
       isPresented: $isResetAlertPresented,
@@ -190,6 +192,7 @@ struct GalleryDemoSceneView: View {
         HStack(alignment: .center, spacing: 1) {
           Button("Primary") {
             model.increment()
+            isToastPresented = true
           }
           Button("Reset", role: .destructive) {
             isResetAlertPresented = true

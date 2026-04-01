@@ -56,6 +56,18 @@ public enum ScrollIndicatorVisibility: Hashable, Sendable {
   case hidden
 }
 
+/// A style that controls how tab views render their tab bar.
+public enum TabViewStyle: Hashable, Sendable {
+  /// Default underline-based tab indicator.
+  case automatic
+  /// Differently weighted underlines to indicate selection and focus.
+  case underline
+  /// Unicode box-drawing tab shapes.
+  case rounded
+  /// Powerline-inspired background fills with angled separators.
+  case powerline
+}
+
 /// Controls the border geometry used for bordered buttons.
 public enum ButtonBorderShape: Hashable, Sendable {
   case automatic

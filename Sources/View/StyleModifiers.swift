@@ -49,6 +49,12 @@ extension View {
     environment(\.listStyle, style)
   }
 
+  public func tabViewStyle(
+    _ style: TabViewStyle
+  ) -> some View {
+    environment(\.tabViewStyle, style)
+  }
+
   public func outlineStyle(
     _ style: OutlineStyle
   ) -> some View {

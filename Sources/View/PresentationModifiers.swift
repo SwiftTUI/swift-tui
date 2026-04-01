@@ -499,3 +499,228 @@ extension ResolvedNode {
     }
   }
 }
+
+// MARK: - Toast / Transient Notification System
+
+/// Visual style for toast notifications.
+public enum ToastStyle: Equatable, Sendable {
+  case info
+  case success
+  case warning
+  case danger
+
+  var tone: TerminalTone {
+    switch self {
+    case .info: .info
+    case .success: .success
+    case .warning: .warning
+    case .danger: .danger
+    }
+  }
+
+  var icon: String {
+    switch self {
+    case .info: "ℹ"
+    case .success: "✓"
+    case .warning: "⚠"
+    case .danger: "✗"
+    }
+  }
+}
+
+private struct ToastRequest: @unchecked Sendable {
+  var message: String
+  var contentViews: [AnyView]
+  var style: ToastStyle
+  var duration: Double?
+  var dismiss: @MainActor @Sendable () -> Void
+}
+
+private struct ToastPreferenceValue: Sendable {
+  var requests: [ToastRequest] = []
+}
+
+private enum ToastPreferenceKey: PreferenceKey {
+  static let defaultValue = ToastPreferenceValue()
+
+  static func reduce(
+    value: inout ToastPreferenceValue,
+    nextValue: () -> ToastPreferenceValue
+  ) {
+    value.requests.append(contentsOf: nextValue().requests)
+  }
+}
+
+extension View {
+  /// Displays a transient notification bar that auto-dismisses.
+  public func toast<S: StringProtocol>(
+    _ message: S,
+    isPresented: Binding<Bool>,
+    style: ToastStyle = .info,
+    duration: Double? = 3.0
+  ) -> some View {
+    ToastModifier(
+      content: self,
+      message: String(message),
+      isPresented: isPresented,
+      style: style,
+      duration: duration,
+      toastContent: EmptyView()
+    )
+  }
+
+  /// Displays a transient notification with custom content that auto-dismisses.
+  public func toast<ToastContent: View>(
+    isPresented: Binding<Bool>,
+    style: ToastStyle = .info,
+    duration: Double? = 3.0,
+    @ViewBuilder content toastContent: () -> ToastContent
+  ) -> some View {
+    ToastModifier(
+      content: self,
+      message: "",
+      isPresented: isPresented,
+      style: style,
+      duration: duration,
+      toastContent: toastContent()
+    )
+  }
+}
+
+private struct ToastModifier<Content: View, ToastContent: View>: View,
+  ResolvableView
+{
+  var content: Content
+  var message: String
+  var isPresented: Binding<Bool>
+  var style: ToastStyle
+  var duration: Double?
+  var toastContent: ToastContent
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    var node = content.resolve(in: context)
+    guard isPresented.wrappedValue else {
+      return [node]
+    }
+
+    let contentViews = declaredBuilderChildren(from: toastContent)
+    node.preferenceValues.merge(
+      ToastPreferenceKey.self,
+      value: .init(
+        requests: [
+          .init(
+            message: message,
+            contentViews: contentViews,
+            style: style,
+            duration: duration,
+            dismiss: { [isPresented] in
+              isPresented.wrappedValue = false
+            }
+          )
+        ]
+      )
+    )
+    return [node]
+  }
+}
+
+package struct ToastHostingRoot<Content: View>: View, ResolvableView {
+  package var content: Content
+
+  package init(content: Content) {
+    self.content = content
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    var baseNode = normalizeResolvedElements(
+      resolveViewElements(content, in: context),
+      in: context
+    )
+    let requests = baseNode.preferenceValues[ToastPreferenceKey.self].requests
+    guard !requests.isEmpty else {
+      return [baseNode]
+    }
+
+    let hostContext = context.child(component: .named("ToastHost"))
+    let overlayNode = ToastOverlayHost(requests: requests).resolve(
+      in: hostContext.child(component: .named("overlay"))
+    )
+
+    return [
+      ResolvedNode(
+        identity: hostContext.identity,
+        kind: .view("ToastHost"),
+        children: [baseNode, overlayNode],
+        environmentSnapshot: hostContext.environment,
+        transactionSnapshot: hostContext.transaction,
+        layoutBehavior: .overlay(alignment: .topLeading)
+      )
+    ]
+  }
+}
+
+private struct ToastOverlayHost: View {
+  var requests: [ToastRequest]
+
+  var body: some View {
+    VStack(alignment: .trailing, spacing: 0) {
+      Spacer(minLength: 0)
+      ForEach(requests.indices, id: \.self) { index in
+        ToastSurface(request: requests[index])
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+    .allowsHitTesting(false)
+  }
+}
+
+private struct ToastSurface: View {
+  var request: ToastRequest
+
+  @State private var dismissed = false
+
+  var body: some View {
+    if !dismissed {
+      toastContent
+        .task {
+          guard let duration = request.duration, duration > 0 else {
+            return
+          }
+          try? await Task.sleep(for: .seconds(duration))
+          dismissed = true
+          request.dismiss()
+        }
+    }
+  }
+
+  @ViewBuilder
+  private var toastContent: some View {
+    let hasCustomContent = !request.contentViews.isEmpty
+    HStack(alignment: .center, spacing: 1) {
+      Text(request.style.icon)
+        .foregroundStyle(.terminalAccent(request.style.tone))
+      if hasCustomContent {
+        combinedView(from: request.contentViews, kindName: "ToastContent")
+      } else {
+        Text(request.message)
+      }
+    }
+    .padding(.init(horizontal: 1, vertical: 0))
+    .background {
+      Rectangle().chromeFill(.terminalSurfaceBackground)
+    }
+    .overlay {
+      Rectangle().chromeStrokeBorder(
+        .terminalBorder(request.style.tone)
+      )
+    }
+    .frame(
+      minWidth: .finite(10),
+      maxWidth: .finite(60),
+      minHeight: .finite(1),
+      idealHeight: .finite(1),
+      maxHeight: .finite(3),
+      alignment: .leading
+    )
+  }
+}
