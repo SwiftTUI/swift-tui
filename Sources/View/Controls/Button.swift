@@ -92,34 +92,22 @@ extension Button {
       )
     }
 
-    #if canImport(WASILibc)
-      print("[button] style=\(buttonStyle)")
-    #endif
     let childContext = context.child(component: .named("ButtonBody"))
     let child: ResolvedNode
     switch buttonStyle {
     case .plain:
-      #if canImport(WASILibc)
-        print("[button] resolving plain body")
-      #endif
       child = ButtonPlainBody(
         label: label,
         chrome: chrome
       )
       .resolve(in: childContext)
     case .link:
-      #if canImport(WASILibc)
-        print("[button] resolving link body")
-      #endif
       child = ButtonLinkBody(
         label: label,
         chrome: chrome
       )
       .resolve(in: childContext)
     case .automatic, .bordered, .borderedProminent:
-      #if canImport(WASILibc)
-        print("[button] resolving chrome body")
-      #endif
       child = ButtonChromeBody(
         label: label,
         chrome: chrome,
@@ -129,9 +117,6 @@ extension Button {
       )
       .resolve(in: childContext)
     }
-    #if canImport(WASILibc)
-      print("[button] child resolved")
-    #endif
 
     return ResolvedNode(
       identity: context.identity,

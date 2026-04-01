@@ -32,9 +32,11 @@ export class WebTUISceneRuntime {
   private readonly onInput: (chunk: Uint8Array) => void;
   private currentStyle: WebTUITerminalStyle;
   private readonly inputEncoder = new TextEncoder();
-  private readonly inputDecoder = new TextDecoder();
-  private detachMouseTrackingFallback?: () => void;
+  private detachPointerTrackingFallback?: () => void;
   private mouseButtonsPressed = 0;
+  private activePointerId?: number;
+  private activePointerButton?: number;
+  private activePointerLocation?: { col: number; row: number };
 
   constructor(options: WebTUISceneRuntimeOptions) {
     this.descriptor = options.descriptor;
@@ -92,7 +94,7 @@ export class WebTUISceneRuntime {
     this.applyStyle(this.currentStyle);
     this.fitAddon.fit();
     this.fitAddon.observeResize();
-    this.installMouseTrackingFallback();
+    this.installPointerTrackingFallback();
   }
 
   setVisible(
@@ -141,7 +143,7 @@ export class WebTUISceneRuntime {
   }
 
   dispose(): void {
-    this.detachMouseTrackingFallback?.();
+    this.detachPointerTrackingFallback?.();
     this.fitAddon?.dispose();
     this.terminal?.dispose();
     this.element.remove();
@@ -174,44 +176,59 @@ export class WebTUISceneRuntime {
     this.element.style.gridTemplateRows = "auto 1fr";
   }
 
-  private installMouseTrackingFallback(): void {
-    this.detachMouseTrackingFallback?.();
+  private installPointerTrackingFallback(): void {
+    this.detachPointerTrackingFallback?.();
 
     const captureOptions = { capture: true } as const;
     const wheelOptions = { capture: true, passive: false } as const;
 
-    const handleMouseDown = (event: MouseEvent) => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const button = this.pointerButton(event);
       const tracking = this.mouseTrackingState();
       const cell = tracking && this.mouseCellLocation(event, tracking);
-      if (!tracking || !cell) {
+      if (!tracking || !cell || button === undefined) {
         return;
       }
 
-      this.mouseButtonsPressed |= 1 << event.button;
+      this.mouseButtonsPressed |= 1 << button;
+      this.activePointerId = event.pointerId;
+      this.activePointerButton = button;
+      this.activePointerLocation = cell;
+      this.setPointerCapture(event);
       this.terminal?.focus();
-      this.forwardMouseEvent(event.button, cell, false, event, tracking.useSGR);
+      this.forwardMouseEvent(button, cell, false, event, tracking.useSGR);
       event.preventDefault();
       event.stopImmediatePropagation();
     };
 
-    const handleMouseUp = (event: MouseEvent) => {
+    const handlePointerUp = (event: PointerEvent) => {
       const tracking = this.mouseTrackingState();
-      const cell = tracking && this.mouseCellLocation(event, tracking);
-      this.mouseButtonsPressed &= ~(1 << event.button);
-      if (!tracking || !cell) {
+      const button =
+        this.activePointerId === event.pointerId
+          ? this.activePointerButton
+          : this.pointerButton(event);
+      const cell = tracking && (this.mouseCellLocation(event, tracking) ?? this.activePointerLocation);
+      if (button !== undefined) {
+        this.mouseButtonsPressed &= ~(1 << button);
+      }
+      this.releasePointerCapture(event);
+      this.clearActivePointer(event.pointerId);
+      if (!tracking || !cell || button === undefined) {
         return;
       }
 
-      this.forwardMouseEvent(event.button, cell, true, event, tracking.useSGR);
+      this.forwardMouseEvent(button, cell, true, event, tracking.useSGR);
       event.preventDefault();
       event.stopImmediatePropagation();
     };
 
-    const handleMouseMove = (event: MouseEvent) => {
+    const handlePointerMove = (event: PointerEvent) => {
       const tracking = this.mouseTrackingState();
       if (!tracking) {
         return;
       }
+
+      this.mouseButtonsPressed = this.pointerButtons(event);
 
       if (!tracking.buttonMotion && !tracking.anyMotion) {
         return;
@@ -225,6 +242,9 @@ export class WebTUISceneRuntime {
       if (!cell) {
         return;
       }
+      if (this.activePointerId === event.pointerId) {
+        this.activePointerLocation = cell;
+      }
 
       let button = 32;
       if (this.mouseButtonsPressed & 1) {
@@ -236,6 +256,20 @@ export class WebTUISceneRuntime {
       }
 
       this.forwardMouseEvent(button, cell, false, event, tracking.useSGR);
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+
+    const handlePointerCancel = (event: PointerEvent) => {
+      const tracking = this.mouseTrackingState();
+      const button = this.activePointerId === event.pointerId ? this.activePointerButton : undefined;
+      const cell = tracking && (this.mouseCellLocation(event, tracking) ?? this.activePointerLocation);
+      if (button !== undefined && tracking && cell) {
+        this.forwardMouseEvent(button, cell, true, event, tracking.useSGR);
+      }
+      this.mouseButtonsPressed = 0;
+      this.releasePointerCapture(event);
+      this.clearActivePointer(event.pointerId);
       event.preventDefault();
       event.stopImmediatePropagation();
     };
@@ -253,17 +287,92 @@ export class WebTUISceneRuntime {
       event.stopImmediatePropagation();
     };
 
-    this.terminalMount.addEventListener("mousedown", handleMouseDown, captureOptions);
-    this.terminalMount.addEventListener("mouseup", handleMouseUp, captureOptions);
-    this.terminalMount.addEventListener("mousemove", handleMouseMove, captureOptions);
+    this.terminalMount.addEventListener("pointerdown", handlePointerDown, captureOptions);
+    this.terminalMount.addEventListener("pointerup", handlePointerUp, captureOptions);
+    this.terminalMount.addEventListener("pointermove", handlePointerMove, captureOptions);
+    this.terminalMount.addEventListener("pointercancel", handlePointerCancel, captureOptions);
     this.terminalMount.addEventListener("wheel", handleWheel, wheelOptions);
 
-    this.detachMouseTrackingFallback = () => {
-      this.terminalMount.removeEventListener("mousedown", handleMouseDown, captureOptions);
-      this.terminalMount.removeEventListener("mouseup", handleMouseUp, captureOptions);
-      this.terminalMount.removeEventListener("mousemove", handleMouseMove, captureOptions);
+    this.detachPointerTrackingFallback = () => {
+      this.terminalMount.removeEventListener("pointerdown", handlePointerDown, captureOptions);
+      this.terminalMount.removeEventListener("pointerup", handlePointerUp, captureOptions);
+      this.terminalMount.removeEventListener("pointermove", handlePointerMove, captureOptions);
+      this.terminalMount.removeEventListener("pointercancel", handlePointerCancel, captureOptions);
       this.terminalMount.removeEventListener("wheel", handleWheel, wheelOptions);
     };
+  }
+
+  private pointerButton(
+    event: PointerEvent
+  ): number | undefined {
+    switch (event.button) {
+    case 0:
+      return 0
+    case 1:
+      return 1
+    case 2:
+      return 2
+    default:
+      return undefined
+    }
+  }
+
+  private pointerButtons(
+    event: PointerEvent
+  ): number {
+    let buttons = 0;
+    if ((event.buttons & 1) !== 0) {
+      buttons |= 1;
+    }
+    if ((event.buttons & 4) !== 0) {
+      buttons |= 2;
+    }
+    if ((event.buttons & 2) !== 0) {
+      buttons |= 4;
+    }
+    return buttons;
+  }
+
+  private setPointerCapture(
+    event: PointerEvent
+  ): void {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    try {
+      target.setPointerCapture(event.pointerId);
+    } catch {
+      // Ignore pointer-capture failures and continue with best-effort forwarding.
+    }
+  }
+
+  private releasePointerCapture(
+    event: PointerEvent
+  ): void {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    if (!target.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    try {
+      target.releasePointerCapture(event.pointerId);
+    } catch {
+      // Ignore pointer-capture failures and continue cleaning up local state.
+    }
+  }
+
+  private clearActivePointer(
+    pointerId: number
+  ): void {
+    if (this.activePointerId !== pointerId) {
+      return;
+    }
+    this.activePointerId = undefined;
+    this.activePointerButton = undefined;
+    this.activePointerLocation = undefined;
   }
 
   private mouseTrackingState():

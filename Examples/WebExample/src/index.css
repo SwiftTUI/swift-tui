@@ -89,6 +89,13 @@ body.is-resizing-terminal * {
   width: 100%;
   height: 100%;
   min-height: 100% !important;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.terminal-host .webtuigui-scene__terminal canvas {
+  touch-action: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

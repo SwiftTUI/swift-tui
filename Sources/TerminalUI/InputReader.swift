@@ -578,8 +578,71 @@ public final class InputReader: InputReading, TerminalInputReading {
 extension InputReader {
   #if canImport(WASILibc)
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
-      makeEventStream { parser, input in
-        parser.feed(input)
+      AsyncStream { continuation in
+        let fileDescriptor = self.fileDescriptor
+        let controlHandler = self.controlHandler
+        let task = Task.detached {
+          var parser = TerminalInputParser()
+          var controlParser = ControlMessageParser()
+          var pendingMouseEvents: [InputEvent] = []
+
+          func flushPendingMouseEvents() {
+            guard !pendingMouseEvents.isEmpty else {
+              return
+            }
+
+            let flushedEvents = coalescedInputEvents(pendingMouseEvents)
+            pendingMouseEvents.removeAll(keepingCapacity: true)
+            for event in flushedEvents {
+              continuation.yield(event)
+            }
+          }
+
+          while !Task.isCancelled {
+            var buffer = Array(repeating: UInt8(0), count: 512)
+            let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
+
+            if bytesRead > 0 {
+              let chunk = Array(buffer.prefix(Int(bytesRead)))
+              let filtered = controlParser.feed(chunk)
+
+              for message in filtered.messages {
+                flushPendingMouseEvents()
+                controlHandler(message)
+              }
+
+              for event in parser.feed(filtered.payload) {
+                switch event {
+                case .mouse(let mouseEvent) where mouseEvent.isCoalescible:
+                  pendingMouseEvents.append(.mouse(mouseEvent))
+                default:
+                  flushPendingMouseEvents()
+                  continuation.yield(event)
+                }
+              }
+              continue
+            }
+
+            if bytesRead < 0, errno == EAGAIN || errno == EWOULDBLOCK {
+              if !pendingMouseEvents.isEmpty {
+                flushPendingMouseEvents()
+              }
+              try? await Task.sleep(nanoseconds: 1_000_000)
+              continue
+            }
+
+            flushPendingMouseEvents()
+            continuation.finish()
+            return
+          }
+
+          flushPendingMouseEvents()
+          continuation.finish()
+        }
+
+        continuation.onTermination = { _ in
+          task.cancel()
+        }
       }
     }
 
@@ -612,7 +675,7 @@ extension InputReader {
               continue
             }
 
-            if bytesRead < 0, (errno == EAGAIN || errno == EWOULDBLOCK) {
+            if bytesRead < 0, errno == EAGAIN || errno == EWOULDBLOCK {
               try? await Task.sleep(nanoseconds: 1_000_000)
               continue
             }
