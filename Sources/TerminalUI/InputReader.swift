@@ -612,6 +612,11 @@ extension InputReader {
               continue
             }
 
+            if bytesRead < 0, (errno == EAGAIN || errno == EWOULDBLOCK) {
+              try? await Task.sleep(nanoseconds: 1_000_000)
+              continue
+            }
+
             continuation.finish()
             return
           }

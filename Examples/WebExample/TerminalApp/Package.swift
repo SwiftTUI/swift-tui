@@ -10,12 +10,12 @@ let package = Package(
   ],
   products: [
     .library(
-      name: "ExampleScenes",
-      targets: ["ExampleScenes"]
+      name: "WebExampleScenes",
+      targets: ["WebExampleScenes"]
     ),
     .executable(
-      name: "ExampleApp",
-      targets: ["ExampleApp"]
+      name: "WebExampleApp",
+      targets: ["WebExampleApp"]
     ),
   ],
   dependencies: [
@@ -24,19 +24,19 @@ let package = Package(
   ],
   targets: [
     .target(
-      name: "ExampleScenes",
+      name: "WebExampleScenes",
       dependencies: [
         .product(name: "GalleryDemoViews", package: "gallery"),
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
         .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
       ],
-      path: "Sources/ExampleScenes"
+      path: "Sources/WebExampleScenes"
     ),
     .executableTarget(
-      name: "ExampleApp",
+      name: "WebExampleApp",
       dependencies: [
-        "ExampleScenes",
+        "WebExampleScenes",
         .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
       ],
       path: "Sources/TerminalApp"

@@ -121,7 +121,6 @@ extension RunLoop {
         for await event in inputEvents {
           if buffer.enqueue(.input(event)) {
             continuation.yield()
-            await Task.yield()
           }
         }
         completion.streamFinished(continuation)
@@ -131,7 +130,6 @@ extension RunLoop {
         for await signalName in signalEvents {
           if buffer.enqueue(.signal(signalName)) {
             continuation.yield()
-            await Task.yield()
           }
         }
         completion.streamFinished(continuation)

@@ -70,3 +70,4 @@ xcuserdata/
 .worktrees
 reference
 .playwright-cli
+output
