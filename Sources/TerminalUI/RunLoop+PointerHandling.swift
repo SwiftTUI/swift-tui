@@ -191,7 +191,7 @@ extension RunLoop {
       _ = focusTracker.setFocus(to: focusIdentity)
     }
 
-    if let scrollRoute = scrollTarget(at: location) {
+    if let scrollRoute = scrollTarget(at: location, deltaX: deltaX, deltaY: deltaY) {
       let routeID = primaryRouteID(for: scrollRoute.identity)
       _ = dispatchPointerEvent(
         preferredRouteID: routeID,
@@ -221,10 +221,21 @@ extension RunLoop {
   }
 
   package func scrollTarget(
-    at point: Point
+    at point: Point,
+    deltaX: Int = 0,
+    deltaY: Int = 0
   ) -> ScrollRoute? {
     latestSemanticSnapshot.scrollRoutes
-      .filter { $0.viewportRect.contains(point) }
+      .filter { route in
+        guard route.viewportRect.contains(point) else {
+          return false
+        }
+        let scrollsHorizontally = route.contentBounds.size.width > route.viewportRect.size.width
+        let scrollsVertically = route.contentBounds.size.height > route.viewportRect.size.height
+        if deltaX != 0, !scrollsHorizontally { return false }
+        if deltaY != 0, !scrollsVertically { return false }
+        return scrollsHorizontally || scrollsVertically
+      }
       .last
   }
 

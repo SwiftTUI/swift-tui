@@ -448,6 +448,14 @@ public struct ScrollView<Content: View>: View, ResolvableView {
           guard changed else {
             return false
           }
+
+          if let ctx = event.scrollContext {
+            let maxX = max(0, ctx.contentBounds.size.width - ctx.viewportRect.size.width)
+            let maxY = max(0, ctx.contentBounds.size.height - ctx.viewportRect.size.height)
+            next.x = min(max(0, next.x), maxX)
+            next.y = min(max(0, next.y), maxY)
+          }
+
           binding.wrappedValue = next
           return true
         }
