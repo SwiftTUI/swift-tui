@@ -632,7 +632,7 @@ package struct ToastHostingRoot<Content: View>: View, ResolvableView {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    var baseNode = normalizeResolvedElements(
+    let baseNode = normalizeResolvedElements(
       resolveViewElements(content, in: context),
       in: context
     )

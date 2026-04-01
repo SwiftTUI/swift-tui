@@ -7,12 +7,10 @@ struct GalleryDemoSceneView: View {
   @State private var isToastPresented = false
   @State var pickerScratch: String = "one"
   var body: some View {
-    GeometryReader { geometry in
-      shell(contentHeight: max(0, geometry.size.height - 4))
-    }
+    shell()
   }
 
-  private func shell(contentHeight: Int) -> some View {
+  private func shell() -> some View {
     VStack(alignment: .leading, spacing: 0) {
       headerBar
       Divider()
@@ -64,13 +62,6 @@ struct GalleryDemoSceneView: View {
         detail: "Restore the default gallery state",
         keywords: ["reset", "restore", "defaults"],
         kind: .destructive
-      )
-      .frame(
-        maxWidth: .infinity,
-        minHeight: .finite(contentHeight),
-        idealHeight: .finite(contentHeight),
-        maxHeight: .finite(contentHeight),
-        alignment: .topLeading
       )
       .keyboardShortcut("tab", label: "move focus", group: "Navigate")
       .keyboardShortcut("arrows", label: "move selection", group: "Navigate")
