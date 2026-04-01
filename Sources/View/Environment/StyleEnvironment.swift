@@ -100,11 +100,11 @@ extension EnvironmentValues {
   }
 
   public var colorScheme: ColorScheme {
-    terminalAppearance.applyingPreferredColorScheme(preferredColorScheme).colorScheme
+    preferredColorScheme ?? terminalAppearance.colorScheme
   }
 
   public var colorSchemeContrast: ColorSchemeContrast {
-    terminalAppearance.applyingPreferredColorScheme(preferredColorScheme).colorSchemeContrast
+    terminalAppearance.colorSchemeContrast
   }
 
   public var preferredColorScheme: ColorScheme? {
@@ -157,7 +157,7 @@ extension EnvironmentValues {
     set { self[TableHeaderVisibilityKey.self] = newValue }
   }
 
-  var themeOverride: Theme? {
+  package var themeOverride: Theme? {
     get { self[ThemeOverrideKey.self] }
     set { self[ThemeOverrideKey.self] = newValue }
   }

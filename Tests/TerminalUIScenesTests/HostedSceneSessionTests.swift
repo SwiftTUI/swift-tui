@@ -95,6 +95,66 @@ struct HostedSceneSessionTests {
     #expect(exitReason == .quitKey)
   }
 
+  @Test("hosted scene session schedules a new frame on style update")
+  func hostedSceneSessionRerendersOnStyleUpdate() async throws {
+    let recorder = OutputRecorder()
+    let session = try MultiSceneLauncher.makeHostedSceneSession(
+      for: HostedApp(),
+      sceneID: WindowIdentifier("primary"),
+      initialSize: .init(width: 24, height: 6),
+      appearance: .fallback,
+      onOutput: { output in
+        Task {
+          await recorder.record(output)
+        }
+      }
+    )
+
+    let task = Task {
+      try await session.start()
+    }
+
+    try await waitUntil("first frame") {
+      await recorder.frameCount >= 1
+    }
+
+    session.updateStyle(
+      .init(
+        appearance: .init(
+          foregroundColor: .black,
+          backgroundColor: .white,
+          tintColor: .blue,
+          source: .override
+        ),
+        theme: .init(
+          foreground: .hex("#0F172A"),
+          background: .hex("#F8FAFC"),
+          tint: .hex("#2563EB"),
+          separator: .hex("#CBD5E1"),
+          selection: .hex("#DBEAFE"),
+          placeholder: .hex("#94A3B8"),
+          link: .hex("#2563EB"),
+          fill: .hex("#F1F5F9"),
+          windowBackground: .hex("#E2E8F0"),
+          success: .hex("#16A34A"),
+          warning: .hex("#D97706"),
+          danger: .hex("#DC2626"),
+          info: .hex("#0284C7"),
+          muted: .hex("#64748B")
+        )
+      )
+    )
+
+    try await waitUntil("second frame") {
+      await recorder.frameCount >= 2
+    }
+
+    session.sendInput(Array("q".utf8))
+    let exitReason = try await task.value
+
+    #expect(exitReason == .quitKey)
+  }
+
   @Test("hosted scene session throws when the requested scene does not exist")
   func hostedSceneSessionThrowsForUnknownScene() throws {
     do {

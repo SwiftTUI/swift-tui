@@ -81,6 +81,7 @@ public enum MultiSceneLauncher {
     sceneID: WindowIdentifier,
     initialSize: Size,
     appearance: TerminalAppearance,
+    theme: ThemeColors? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
     onOutput: @escaping @Sendable (String) -> Void
   ) throws -> HostedSceneSession {
@@ -96,6 +97,7 @@ public enum MultiSceneLauncher {
       sessionName: sessionName,
       initialSize: initialSize,
       appearance: appearance,
+      theme: theme,
       capabilityProfile: capabilityProfile,
       onOutput: onOutput
     )
@@ -381,11 +383,21 @@ public enum MultiSceneLauncher {
     @MainActor
     private static func wasiSceneResources() -> SceneSessionResources {
       let signalReader = InProcessSignalReader()
-      let host = WebTerminalHost(surfaceSize: wasiSurfaceSize())
+      let initialStyle = wasiRenderStyle()
+      let host = WebTerminalHost(
+        surfaceSize: wasiSurfaceSize(),
+        theme: initialStyle?.theme
+      )
+      if let initialStyle {
+        host.updateStyle(initialStyle)
+      }
       let inputReader = InputReader { message in
         switch message {
         case .resize(let size):
           host.updateSurfaceSize(size)
+          signalReader.send("SIGWINCH")
+        case .style(let style):
+          host.updateStyle(style)
           signalReader.send("SIGWINCH")
         }
       }
@@ -396,6 +408,16 @@ public enum MultiSceneLauncher {
         signalReader: signalReader,
         surfaceName: "ghostty-web"
       )
+    }
+
+    private static func wasiRenderStyle() -> TerminalRenderStyle? {
+      guard let encoded = environmentValue(named: "TUIGUI_RENDER_STYLE"),
+        !encoded.isEmpty
+      else {
+        return nil
+      }
+
+      return TerminalRenderStyleCodec.decodeBase64(encoded)
     }
 
     private static func wasiSceneSelector() -> String? {

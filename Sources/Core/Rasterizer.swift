@@ -803,7 +803,7 @@ extension Rasterizer {
       return .sampled(gradient)
     case .terminalChrome(let chromeStyle):
       return resolvedColorMode(
-        from: environment.appearance.resolvedStyle(for: chromeStyle),
+        from: environment.theme.resolvedStyle(for: chromeStyle),
         environment: environment,
         depth: depth + 1
       )

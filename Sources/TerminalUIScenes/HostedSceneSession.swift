@@ -32,6 +32,7 @@ public final class HostedSceneSession {
     sessionName: String,
     initialSize: Size,
     appearance: TerminalAppearance,
+    theme: ThemeColors? = nil,
     capabilityProfile: TerminalCapabilityProfile,
     onOutput: @escaping @Sendable (String) -> Void
   ) {
@@ -46,6 +47,7 @@ public final class HostedSceneSession {
     host = StreamingTerminalHost(
       surfaceSize: initialSize,
       appearance: appearance,
+      theme: theme,
       capabilityProfile: capabilityProfile,
       outputHandler: onOutput
     )
@@ -53,6 +55,9 @@ public final class HostedSceneSession {
       switch message {
       case .resize(let size):
         host.updateSurfaceSize(size)
+        signalReader.send("SIGWINCH")
+      case .style(let style):
+        host.updateStyle(style)
         signalReader.send("SIGWINCH")
       }
     }
@@ -123,6 +128,20 @@ public final class HostedSceneSession {
     _ appearance: TerminalAppearance
   ) {
     host.updateAppearance(appearance)
+    signalReader.send("SIGWINCH")
+  }
+
+  public func updateTheme(
+    _ theme: ThemeColors?
+  ) {
+    host.updateTheme(theme)
+    signalReader.send("SIGWINCH")
+  }
+
+  public func updateStyle(
+    _ style: TerminalRenderStyle
+  ) {
+    host.updateStyle(style)
     signalReader.send("SIGWINCH")
   }
 

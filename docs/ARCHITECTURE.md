@@ -130,8 +130,13 @@ That scene layer now serves two distinct launch modes:
 
 ## Styling And Presentation
 
-- The public styling story is semantic and appearance-derived first, not token-theme first
-- Terminal appearance can be inferred heuristically or queried actively from the host
+- The public styling story is semantic-token-first: TUI views author against
+  `.foreground`, `.background`, `.warning`, `.tint`, and related roles
+- Hosts and wrapper packages choose the active theme; the inner TUI app does not
+  branch on light/dark or inspect theme choice directly
+- Terminal appearance can be inferred heuristically or queried actively from the
+  host and can synthesize the default semantic theme when no explicit host theme
+  is provided
 - Presentation lowers raster surfaces into ASCII, ANSI16, ANSI256, or true-color output
 - Terminal capability affects presentation, not layout semantics
 

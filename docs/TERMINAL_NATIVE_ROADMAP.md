@@ -189,8 +189,8 @@ Make `.automatic` read as terminal-native by default.
 - remove page-like and card-like default styling
 - make focus, selection, and accent more important than background fill
 - make light and dark mode foregrounds explicitly legible
-- propagate `.tint(...)` and `.preferredColorScheme(...)` through automatic
-  chrome consistently
+- propagate `.tint(...)` and host-owned theme variants through automatic chrome
+  consistently
 
 ### Primary files
 

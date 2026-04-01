@@ -33,6 +33,23 @@ import { createWebTUIApp } from "./index.ts";
 const controller = await createWebTUIApp({
   mount: document.getElementById("app")!,
   manifestUrl: new URL("./scene-manifest.json", import.meta.url),
+  style: {
+    colorSchemeMode: "system",
+    dark: {
+      theme: {
+        foreground: "#eceff4",
+        background: "#1e222a",
+        tint: "#56b6c2",
+      },
+    },
+    light: {
+      theme: {
+        foreground: "#1f2328",
+        background: "#ffffff",
+        tint: "#0969da",
+      },
+    },
+  },
 });
 
 await controller.switchScene("dashboard");
@@ -57,5 +74,6 @@ The build flow is intentionally small:
 ## Notes
 
 - Scene switching is controller-managed and retains existing scene runtimes.
-- Terminal styling is exposed through `WebTUITerminalStyle`.
+- Terminal styling is host-owned through `WebTUITerminalStyle`, which now carries
+  explicit light and dark theme variants plus a semantic runtime payload.
 - `BrowserWASIBridge` and `StdIOPipe` are the internal glue for future WASI-backed integration.

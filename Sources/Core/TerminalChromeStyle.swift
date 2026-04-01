@@ -92,151 +92,123 @@ extension ShapeStyle where Self == TerminalChromeStyle {
   }
 }
 
-extension TerminalAppearance {
+extension Theme {
   package func resolvedStyle(
     for chromeStyle: TerminalChromeStyle
   ) -> AnyShapeStyle {
+    let appearance = synthesizedAppearance(for: self)
+
     switch chromeStyle.kind {
     case .accent(let tone):
-      return .color(terminalToneColor(for: tone))
+      return .color(terminalToneColor(for: tone, appearance: appearance))
     case .surface(let tone):
-      return terminalSurfaceStyle(tone: tone)
+      return terminalSurfaceStyle(tone: tone, appearance: appearance)
     case .surfaceBackground:
-      return .color(backgroundColor)
+      return background
     case .border(let tone):
-      return terminalBorderStyle(tone: tone)
+      return terminalBorderStyle(tone: tone, appearance: appearance)
     case .tile(let tone):
       return .color(
-        backgroundColor.mixed(with:
-          terminalToneColor(for: tone),
-          amount: colorScheme == .dark ? 0.18 : 0.1
+        appearance.backgroundColor.mixed(with:
+          terminalToneColor(for: tone, appearance: appearance),
+          amount: appearance.colorScheme == .dark ? 0.18 : 0.1
         )
       )
     case .row(let tone, let isSelected, let isOdd):
       return terminalRowStyle(
         tone: tone,
         isSelected: isSelected,
-        isOdd: isOdd
+        isOdd: isOdd,
+        appearance: appearance
       )
     case .badge(let tone, let emphasized):
       if emphasized {
-        return .color(terminalToneColor(for: tone))
+        return .color(terminalToneColor(for: tone, appearance: appearance))
       }
       return .color(
-        backgroundColor.mixed(with:
-          terminalToneColor(for: tone),
-          amount: colorScheme == .dark ? 0.16 : 0.08
+        appearance.backgroundColor.mixed(with:
+          terminalToneColor(for: tone, appearance: appearance),
+          amount: appearance.colorScheme == .dark ? 0.16 : 0.08
         )
       )
     case .keycap(let tone):
       return .color(
-        backgroundColor.mixed(with:
-          terminalToneColor(for: tone),
-          amount: colorScheme == .dark ? 0.1 : 0.05
+        appearance.backgroundColor.mixed(with:
+          terminalToneColor(for: tone, appearance: appearance),
+          amount: appearance.colorScheme == .dark ? 0.1 : 0.05
         )
       )
     case .tab(let tone, let isSelected):
       if isSelected {
         return .color(
-          backgroundColor.mixed(with:
-            terminalToneColor(for: tone),
-            amount: colorScheme == .dark ? 0.22 : 0.14
+          appearance.backgroundColor.mixed(with:
+            terminalToneColor(for: tone, appearance: appearance),
+            amount: appearance.colorScheme == .dark ? 0.22 : 0.14
           )
         )
       }
       return .color(
-        backgroundColor.mixed(with:
-          terminalToneColor(for: tone),
-          amount: colorScheme == .dark ? 0.06 : 0.03
+        appearance.backgroundColor.mixed(with:
+          terminalToneColor(for: tone, appearance: appearance),
+          amount: appearance.colorScheme == .dark ? 0.06 : 0.03
         )
       )
     }
   }
 
-  private var terminalSurfaceBase: Color {
-    terminalColorForScheme(
-      dark: try! Color(hex:"#1F2330"),
-      light: try! Color(hex:"#F8F7FC")
-    )
-  }
-
-  private var terminalTabBase: Color {
-    terminalColorForScheme(
-      dark: try! Color(hex:"#1A1F2B"),
-      light: try! Color(hex:"#F2F4F7")
-    )
-  }
-
-  private func terminalColorForScheme(
-    dark: Color,
-    light: Color
+  private func resolvedThemeColor(
+    _ style: AnyShapeStyle,
+    fallback: Color
   ) -> Color {
-    colorScheme == .dark ? dark : light
+    resolveStyleColor(style: style, theme: self) ?? fallback
   }
 
   private func terminalToneColor(
-    for tone: TerminalTone
+    for tone: TerminalTone,
+    appearance: TerminalAppearance
   ) -> Color {
     switch tone {
     case .accent:
-      return contrastSafe(
-        tintColor,
-        against: backgroundColor,
-        minimumContrast: 3,
-        fallback: terminalColorForScheme(
-          dark: try! Color(hex:"#7DE2D1"),
-          light: try! Color(hex:"#1976D2")
-        )
-      )
+      return resolvedThemeColor(tint, fallback: appearance.tintColor)
     case .info:
-      return terminalColorForScheme(
-        dark: try! Color(hex:"#4CC9F0"),
-        light: try! Color(hex:"#1976D2")
-      )
+      return resolvedThemeColor(info, fallback: .hex("#4CC9F0"))
     case .success:
-      return terminalColorForScheme(
-        dark: try! Color(hex:"#04B575"),
-        light: try! Color(hex:"#0F8B63")
-      )
+      return resolvedThemeColor(success, fallback: .hex("#04B575"))
     case .warning:
-      return terminalColorForScheme(
-        dark: try! Color(hex:"#F2B94B"),
-        light: try! Color(hex:"#B7791F")
-      )
+      return resolvedThemeColor(warning, fallback: .hex("#F2B94B"))
     case .danger:
-      return terminalColorForScheme(
-        dark: try! Color(hex:"#F76E6E"),
-        light: try! Color(hex:"#C24141")
-      )
+      return resolvedThemeColor(danger, fallback: .hex("#F76E6E"))
     case .neutral:
-      return backgroundColor.mixed(with:
-        foregroundColor,
-        amount: colorScheme == .dark ? 0.54 : 0.44
+      return appearance.backgroundColor.mixed(with:
+        appearance.foregroundColor,
+        amount: appearance.colorScheme == .dark ? 0.54 : 0.44
       )
     }
   }
 
   private func terminalSurfaceStyle(
-    tone: TerminalTone
+    tone: TerminalTone,
+    appearance: TerminalAppearance
   ) -> AnyShapeStyle {
     .color(
-      backgroundColor.mixed(with:
-        terminalToneColor(for: tone),
-        amount: colorScheme == .dark ? 0.1 : 0.05
+      appearance.backgroundColor.mixed(with:
+        terminalToneColor(for: tone, appearance: appearance),
+        amount: appearance.colorScheme == .dark ? 0.1 : 0.05
       )
     )
   }
 
   private func terminalBorderStyle(
-    tone: TerminalTone
+    tone: TerminalTone,
+    appearance: TerminalAppearance
   ) -> AnyShapeStyle {
     .color(
-      backgroundColor.mixed(with:
-        terminalToneColor(for: tone),
+      appearance.backgroundColor.mixed(with:
+        terminalToneColor(for: tone, appearance: appearance),
         amount:
           tone == .neutral
-          ? (colorScheme == .dark ? 0.24 : 0.18)
-          : (colorScheme == .dark ? 0.52 : 0.36)
+          ? (appearance.colorScheme == .dark ? 0.24 : 0.18)
+          : (appearance.colorScheme == .dark ? 0.52 : 0.36)
       )
     )
   }
@@ -244,27 +216,28 @@ extension TerminalAppearance {
   private func terminalRowStyle(
     tone: TerminalTone,
     isSelected: Bool,
-    isOdd: Bool
+    isOdd: Bool,
+    appearance: TerminalAppearance
   ) -> AnyShapeStyle {
-    let neutralBase = backgroundColor
+    let neutralBase = appearance.backgroundColor
 
     if isSelected {
       return .color(
         neutralBase.mixed(with:
-          terminalToneColor(for: tone),
-          amount: colorScheme == .dark ? 0.18 : 0.11
+          terminalToneColor(for: tone, appearance: appearance),
+          amount: appearance.colorScheme == .dark ? 0.18 : 0.11
         )
       )
     }
 
     let overlayStrength =
       isOdd
-      ? (colorScheme == .dark ? 0.04 : 0.02)
-      : (colorScheme == .dark ? 0.03 : 0.01)
+      ? (appearance.colorScheme == .dark ? 0.04 : 0.02)
+      : (appearance.colorScheme == .dark ? 0.03 : 0.01)
 
     return .color(
       neutralBase.mixed(with:
-        foregroundColor,
+        appearance.foregroundColor,
         amount: overlayStrength
       )
     )

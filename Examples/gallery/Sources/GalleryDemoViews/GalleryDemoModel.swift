@@ -6,7 +6,7 @@ public final class GalleryDemoModel: @unchecked Sendable {
   public var isPalettePresented = false
   public var selectedControlDemo = "buttons"
   public var selectedCollectionDemo = "picker"
-  public var selectedAppearanceDemo = "light"
+  public var selectedAppearanceDemo = "tokens"
   public var selectedChartDemo = "progress"
   public var primaryCount = 0
   public var toggleEnabled = true
@@ -30,7 +30,7 @@ public final class GalleryDemoModel: @unchecked Sendable {
     isPalettePresented = false
     selectedControlDemo = "buttons"
     selectedCollectionDemo = "picker"
-    selectedAppearanceDemo = "light"
+    selectedAppearanceDemo = "tokens"
     selectedChartDemo = "progress"
     primaryCount = 0
     toggleEnabled = true

@@ -1,17 +1,17 @@
 /// The effective light or dark appearance category of the terminal.
-public enum ColorScheme: String, Equatable, Sendable {
+public enum ColorScheme: String, Equatable, Sendable, Codable {
   case light
   case dark
 }
 
 /// The effective contrast level of the terminal appearance.
-public enum ColorSchemeContrast: String, Equatable, Sendable {
+public enum ColorSchemeContrast: String, Equatable, Sendable, Codable {
   case standard
   case increased
 }
 
 /// How a terminal appearance value was determined.
-public enum AppearanceSource: String, Equatable, Sendable {
+public enum AppearanceSource: String, Equatable, Sendable, Codable {
   case activeQuery
   case environmentHeuristics
   case fallback
@@ -90,7 +90,7 @@ public struct ContainerChrome: Equatable, Sendable {
 }
 
 /// The resolved visual appearance of the current terminal session.
-public struct TerminalAppearance: Equatable, Sendable {
+public struct TerminalAppearance: Equatable, Sendable, Codable {
   public var foregroundColor: Color
   public var backgroundColor: Color
   public var tintColor: Color
@@ -256,6 +256,67 @@ public struct TerminalAppearance: Equatable, Sendable {
     )
   }
 
+  private enum CodingKeys: String, CodingKey {
+    case foregroundColor
+    case backgroundColor
+    case tintColor
+    case palette
+    case colorScheme
+    case colorSchemeContrast
+    case source
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let foregroundHex = try container.decode(String.self, forKey: .foregroundColor)
+    let backgroundHex = try container.decode(String.self, forKey: .backgroundColor)
+    let tintHex = try container.decode(String.self, forKey: .tintColor)
+    let paletteHex = try container.decodeIfPresent([String: String].self, forKey: .palette) ?? [:]
+
+    let palette = try Dictionary(
+      uniqueKeysWithValues: paletteHex.map { key, value in
+        guard let index = Int(key) else {
+          throw DecodingError.dataCorruptedError(
+            forKey: .palette,
+            in: container,
+            debugDescription: "Palette keys must be integers."
+          )
+        }
+        return (index, try Color(hex: value))
+      }
+    )
+
+    self.init(
+      foregroundColor: try Color(hex: foregroundHex),
+      backgroundColor: try Color(hex: backgroundHex),
+      tintColor: try Color(hex: tintHex),
+      palette: palette,
+      colorScheme: try container.decode(ColorScheme.self, forKey: .colorScheme),
+      colorSchemeContrast: try container.decode(
+        ColorSchemeContrast.self,
+        forKey: .colorSchemeContrast
+      ),
+      source: try container.decode(AppearanceSource.self, forKey: .source)
+    )
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(foregroundColor.hexString(), forKey: .foregroundColor)
+    try container.encode(backgroundColor.hexString(), forKey: .backgroundColor)
+    try container.encode(tintColor.hexString(), forKey: .tintColor)
+    try container.encode(
+      Dictionary(
+        uniqueKeysWithValues: palette.map { index, color in
+          (String(index), color.hexString())
+        }
+      ),
+      forKey: .palette
+    )
+    try container.encode(colorScheme, forKey: .colorScheme)
+    try container.encode(colorSchemeContrast, forKey: .colorSchemeContrast)
+    try container.encode(source, forKey: .source)
+  }
 }
 
 extension TerminalAppearance {

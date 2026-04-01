@@ -4,13 +4,13 @@ struct GalleryColorGallery: View {
   var body: some View {
     ScrollView {
       EnvironmentReader(\.terminalAppearance) { appearance in
-      VStack(alignment: .leading, spacing: 1) {
-        terminalPaletteSection(palette: appearance.palette)
-        HStack(alignment: .top, spacing: 1) {
+        VStack(alignment: .leading, spacing: 1) {
+          terminalPaletteSection(palette: appearance.palette)
+          HStack(alignment: .top, spacing: 1) {
             namedColorsSection
             semanticRolesSection
+          }
         }
-      }
       }
     }
   }
@@ -52,7 +52,7 @@ struct GalleryColorGallery: View {
   private func terminalPaletteSection(
     palette: [Int: Color]
   ) -> some View {
-    GroupBox("Terminal palette") {
+    GroupBox("Terminal palette (host)") {
       VStack(alignment: .leading, spacing: 0) {
         ForEach([Array(0...4), Array(5...9), Array(10...14), Array(15...15)], id: \.self) { row in
           HStack(alignment: .center, spacing: 1) {

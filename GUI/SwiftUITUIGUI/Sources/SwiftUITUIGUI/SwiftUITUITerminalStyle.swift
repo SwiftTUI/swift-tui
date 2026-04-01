@@ -71,7 +71,8 @@ public struct SwiftUITUITerminalPalette: Equatable, Sendable {
 
   fileprivate func terminalConfiguration() -> TerminalConfiguration {
     var configuration = TerminalConfiguration()
-    configuration = configuration
+    configuration =
+      configuration
       .background(background)
       .foreground(foreground)
       .cursorColor(cursor)
@@ -85,7 +86,7 @@ public struct SwiftUITUITerminalPalette: Equatable, Sendable {
     return configuration
   }
 
-  func terminalAppearance(
+  fileprivate func terminalAppearance(
     colorScheme: TerminalUI.ColorScheme
   ) -> TerminalAppearance {
     let foregroundColor = (try? TerminalUI.Color(hex: foreground)) ?? .white
@@ -117,8 +118,58 @@ public struct SwiftUITUITerminalPalette: Equatable, Sendable {
   private var paletteDictionary: [Int: TerminalUI.Color] {
     Dictionary(
       uniqueKeysWithValues: normalizedANSIColors.enumerated().map { index, value in
-          (index, (try? TerminalUI.Color(hex: value)) ?? .white)
+        (index, (try? TerminalUI.Color(hex: value)) ?? .white)
       }
+    )
+  }
+}
+
+public struct SwiftUITUITerminalThemeVariant: Equatable, Sendable {
+  public var palette: SwiftUITUITerminalPalette
+  public var theme: ThemeColors
+
+  public init(
+    palette: SwiftUITUITerminalPalette,
+    theme: ThemeColors
+  ) {
+    self.palette = palette
+    self.theme = theme
+  }
+
+  public static let defaultLight = Self(
+    palette: SwiftUITUITerminalPalette.defaultLight,
+    theme: .init(
+      appearance: SwiftUITUITerminalPalette.defaultLight.terminalAppearance(
+        colorScheme: TerminalUI.ColorScheme.light
+      )
+    )
+  )
+
+  public static let defaultDark = Self(
+    palette: SwiftUITUITerminalPalette.defaultDark,
+    theme: .init(
+      appearance: SwiftUITUITerminalPalette.defaultDark.terminalAppearance(
+        colorScheme: TerminalUI.ColorScheme.dark
+      )
+    )
+  )
+
+  fileprivate func terminalConfiguration() -> TerminalConfiguration {
+    palette.terminalConfiguration()
+  }
+
+  fileprivate func terminalAppearance(
+    colorScheme: TerminalUI.ColorScheme
+  ) -> TerminalAppearance {
+    palette.terminalAppearance(colorScheme: colorScheme)
+  }
+
+  fileprivate func renderStyle(
+    colorScheme: TerminalUI.ColorScheme
+  ) -> TerminalRenderStyle {
+    .init(
+      appearance: terminalAppearance(colorScheme: colorScheme),
+      theme: theme
     )
   }
 }
@@ -129,8 +180,26 @@ public struct SwiftUITUITerminalStyle: Equatable, Sendable {
   public var cursorStyle: SwiftUITUICursorStyle
   public var cursorBlink: Bool
   public var backgroundOpacity: Float
-  public var lightPalette: SwiftUITUITerminalPalette
-  public var darkPalette: SwiftUITUITerminalPalette
+  public var lightVariant: SwiftUITUITerminalThemeVariant
+  public var darkVariant: SwiftUITUITerminalThemeVariant
+
+  public init(
+    fontSize: Float? = nil,
+    fontFamily: String? = nil,
+    cursorStyle: SwiftUITUICursorStyle = .block,
+    cursorBlink: Bool = true,
+    backgroundOpacity: Float = 1,
+    lightVariant: SwiftUITUITerminalThemeVariant = .defaultLight,
+    darkVariant: SwiftUITUITerminalThemeVariant = .defaultDark
+  ) {
+    self.fontSize = fontSize
+    self.fontFamily = fontFamily
+    self.cursorStyle = cursorStyle
+    self.cursorBlink = cursorBlink
+    self.backgroundOpacity = backgroundOpacity
+    self.lightVariant = lightVariant
+    self.darkVariant = darkVariant
+  }
 
   public init(
     fontSize: Float? = nil,
@@ -141,16 +210,32 @@ public struct SwiftUITUITerminalStyle: Equatable, Sendable {
     lightPalette: SwiftUITUITerminalPalette = .defaultLight,
     darkPalette: SwiftUITUITerminalPalette = .defaultDark
   ) {
-    self.fontSize = fontSize
-    self.fontFamily = fontFamily
-    self.cursorStyle = cursorStyle
-    self.cursorBlink = cursorBlink
-    self.backgroundOpacity = backgroundOpacity
-    self.lightPalette = lightPalette
-    self.darkPalette = darkPalette
+    self.init(
+      fontSize: fontSize,
+      fontFamily: fontFamily,
+      cursorStyle: cursorStyle,
+      cursorBlink: cursorBlink,
+      backgroundOpacity: backgroundOpacity,
+      lightVariant: .init(
+        palette: lightPalette,
+        theme: .init(appearance: lightPalette.terminalAppearance(colorScheme: .light))
+      ),
+      darkVariant: .init(
+        palette: darkPalette,
+        theme: .init(appearance: darkPalette.terminalAppearance(colorScheme: .dark))
+      )
+    )
   }
 
-  public static let `default` = Self()
+  public static let `default` = Self(
+    fontSize: nil,
+    fontFamily: nil,
+    cursorStyle: .block,
+    cursorBlink: true,
+    backgroundOpacity: 1,
+    lightVariant: SwiftUITUITerminalThemeVariant.defaultLight,
+    darkVariant: SwiftUITUITerminalThemeVariant.defaultDark
+  )
 
   public var terminalConfiguration: TerminalConfiguration {
     var configuration = TerminalConfiguration()
@@ -162,7 +247,8 @@ public struct SwiftUITUITerminalStyle: Equatable, Sendable {
       configuration = configuration.fontSize(fontSize)
     }
 
-    configuration = configuration
+    configuration =
+      configuration
       .cursorStyle(cursorStyle.terminalCursorStyle)
       .cursorStyleBlink(cursorBlink)
       .backgroundOpacity(Double(backgroundOpacity))
@@ -172,25 +258,141 @@ public struct SwiftUITUITerminalStyle: Equatable, Sendable {
 
   public var terminalTheme: TerminalTheme {
     TerminalTheme(
-      light: lightPalette.terminalConfiguration(),
-      dark: darkPalette.terminalConfiguration()
+      light: lightVariant.terminalConfiguration(),
+      dark: darkVariant.terminalConfiguration()
     )
   }
 
-  func terminalAppearance(
+  public func renderStyle(
+    for colorScheme: TerminalUI.ColorScheme
+  ) -> TerminalRenderStyle {
+    variant(for: colorScheme).renderStyle(colorScheme: colorScheme)
+  }
+
+  public func terminalAppearance(
     for colorScheme: TerminalUI.ColorScheme
   ) -> TerminalAppearance {
+    renderStyle(for: colorScheme).appearance
+  }
+
+  public func theme(
+    for colorScheme: TerminalUI.ColorScheme
+  ) -> ThemeColors {
+    variant(for: colorScheme).theme
+  }
+
+  fileprivate func variant(
+    for colorScheme: TerminalUI.ColorScheme
+  ) -> SwiftUITUITerminalThemeVariant {
     switch colorScheme {
     case .light:
-      lightPalette.terminalAppearance(colorScheme: .light)
+      lightVariant
     case .dark:
-      darkPalette.terminalAppearance(colorScheme: .dark)
+      darkVariant
     }
   }
 }
 
-private extension SwiftUITUICursorStyle {
-  var terminalCursorStyle: TerminalCursorStyle {
+extension ThemeColors {
+  public init(
+    appearance: TerminalAppearance
+  ) {
+    self.init(theme: appearance.semanticTheme())
+  }
+
+  public init(
+    theme: Theme
+  ) {
+    self.init(
+      foreground: resolvedColor(
+        theme.style(for: .foreground),
+        theme: theme,
+        fallback: TerminalUI.Color.hex("#ECEFF4")
+      ),
+      background: resolvedColor(
+        theme.style(for: .background),
+        theme: theme,
+        fallback: TerminalUI.Color.hex("#1E222A")
+      ),
+      tint: resolvedColor(
+        theme.style(for: .tint),
+        theme: theme,
+        fallback: TerminalUI.Color.cyan
+      ),
+      separator: resolvedColor(
+        theme.style(for: .separator),
+        theme: theme,
+        fallback: TerminalUI.Color.hex("#4C566A")
+      ),
+      selection: resolvedColor(
+        theme.style(for: .selection),
+        theme: theme,
+        fallback: TerminalUI.Color.hex("#2E3440")
+      ),
+      placeholder: resolvedColor(
+        theme.style(for: .placeholder),
+        theme: theme,
+        fallback: TerminalUI.Color.gray
+      ),
+      link: resolvedColor(
+        theme.style(for: .link),
+        theme: theme,
+        fallback: TerminalUI.Color.blue
+      ),
+      fill: resolvedColor(
+        theme.style(for: .fill),
+        theme: theme,
+        fallback: TerminalUI.Color.hex("#2B303B")
+      ),
+      windowBackground: resolvedColor(
+        theme.style(for: .windowBackground),
+        theme: theme,
+        fallback: TerminalUI.Color.hex("#15181E")
+      ),
+      success: resolvedColor(
+        theme.style(for: .success),
+        theme: theme,
+        fallback: TerminalUI.Color.green
+      ),
+      warning: resolvedColor(
+        theme.style(for: .warning),
+        theme: theme,
+        fallback: TerminalUI.Color.yellow
+      ),
+      danger: resolvedColor(
+        theme.style(for: .danger),
+        theme: theme,
+        fallback: TerminalUI.Color.red
+      ),
+      info: resolvedColor(
+        theme.style(for: .info),
+        theme: theme,
+        fallback: TerminalUI.Color.cyan
+      ),
+      muted: resolvedColor(
+        theme.style(for: .muted),
+        theme: theme,
+        fallback: TerminalUI.Color.gray
+      )
+    )
+  }
+}
+
+private func resolvedColor(
+  _ style: TerminalUI.AnyShapeStyle,
+  theme: Theme,
+  fallback: TerminalUI.Color
+) -> TerminalUI.Color {
+  switch resolveStyleColorResult(style: style, theme: theme) {
+  case .success(let color):
+    return color
+  case .failure:
+    return fallback
+  }
+}
+
+extension SwiftUITUICursorStyle {
+  fileprivate var terminalCursorStyle: TerminalCursorStyle {
     switch self {
     case .block:
       return .block
@@ -201,4 +403,3 @@ private extension SwiftUITUICursorStyle {
     }
   }
 }
-

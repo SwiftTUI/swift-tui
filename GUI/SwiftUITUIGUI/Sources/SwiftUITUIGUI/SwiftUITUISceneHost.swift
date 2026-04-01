@@ -1,8 +1,8 @@
-import Observation
 import GhosttyTerminal
+import Observation
+import SwiftUI
 import TerminalUI
 import TerminalUIScenes
-import SwiftUI
 
 @MainActor
 @Observable
@@ -24,6 +24,7 @@ public final class SwiftUITUISceneHost {
     style: SwiftUITUITerminalStyle
   ) throws {
     self.descriptor = descriptor
+    let initialRenderStyle = style.renderStyle(for: TerminalUI.ColorScheme.light)
     bridge = GhosttySceneBridge(
       descriptor: descriptor,
       style: style
@@ -33,7 +34,8 @@ public final class SwiftUITUISceneHost {
       for: app,
       sceneID: descriptor.id,
       initialSize: .init(width: 80, height: 24),
-      appearance: style.terminalAppearance(for: TerminalUI.ColorScheme.light),
+      appearance: initialRenderStyle.appearance,
+      theme: initialRenderStyle.theme,
       onOutput: { [weak bridge] output in
         Task { @MainActor [weak bridge] in
           bridge?.receiveOutput(output)

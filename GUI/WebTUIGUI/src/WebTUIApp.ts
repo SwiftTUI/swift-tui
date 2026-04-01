@@ -9,6 +9,9 @@ import {
 import {
   mergeWebTUITerminalStyle,
   normalizeWebTUITerminalStyle,
+  resolveWebTUIColorScheme,
+  type ResolvedWebTUITerminalStyle,
+  type WebTUIColorScheme,
   type WebTUITerminalStyle,
 } from "./WebTUITerminalStyle.ts";
 import { WebTUISceneRuntime, type WebTUISceneRuntimeOptions } from "./WebTUISceneRuntime.ts";
@@ -57,11 +60,24 @@ class InternalWebTUIAppController implements WebTUIAppController {
 
   private readonly mount: HTMLElement;
   private readonly sceneRoot: HTMLElement;
-  private readonly style: WebTUITerminalStyle;
+  private style: ResolvedWebTUITerminalStyle;
   private readonly environment?: Record<string, string>;
   private readonly sceneRuntimeFactory: RuntimeFactory;
   private readonly runtimes = new Map<string, WebTUISceneRuntime>();
   private readonly bridges = new Map<string, BrowserWASIBridge>();
+  private currentColorScheme: WebTUIColorScheme;
+  private colorSchemeMediaQuery?: MediaQueryList;
+  private readonly colorSchemeListener = () => {
+    const nextScheme = this.resolveActiveColorScheme();
+    if (nextScheme === this.currentColorScheme) {
+      return;
+    }
+
+    this.currentColorScheme = nextScheme;
+    for (const runtime of this.runtimes.values()) {
+      runtime.setStyleAndScheme(this.style, this.currentColorScheme);
+    }
+  };
 
   constructor(options: {
     mount: HTMLElement;
@@ -83,6 +99,7 @@ class InternalWebTUIAppController implements WebTUIAppController {
         ? options.initialSceneId
         : options.manifest.scenes.find((scene) => scene.id === options.manifest.defaultSceneId)?.id ??
           options.manifest.defaultSceneId;
+    this.currentColorScheme = this.resolveActiveColorScheme();
 
     this.sceneRoot = (options.createElement ?? defaultCreateElement)("div");
     this.sceneRoot.className = "webtuigui-scene-root";
@@ -91,6 +108,7 @@ class InternalWebTUIAppController implements WebTUIAppController {
   }
 
   async initialize(): Promise<void> {
+    this.bindColorSchemeListener();
     await this.ensureRuntime(this.selectedSceneId);
     await this.switchScene(this.selectedSceneId);
   }
@@ -116,16 +134,12 @@ class InternalWebTUIAppController implements WebTUIAppController {
     style: WebTUITerminalStyle
   ): void {
     const merged = mergeWebTUITerminalStyle(this.style, style);
-    this.style.fontSize = merged.fontSize;
-    this.style.fontFamily = merged.fontFamily;
-    this.style.cursorStyle = merged.cursorStyle;
-    this.style.cursorBlink = merged.cursorBlink;
-    this.style.backgroundOpacity = merged.backgroundOpacity;
-    this.style.lightPalette = merged.lightPalette;
-    this.style.darkPalette = merged.darkPalette;
+    this.style = merged;
+    this.currentColorScheme = this.resolveActiveColorScheme();
+    this.bindColorSchemeListener();
 
     for (const runtime of this.runtimes.values()) {
-      runtime.setStyle(this.style);
+      runtime.setStyleAndScheme(this.style, this.currentColorScheme);
     }
     this.applyHostFrameStyle();
   }
@@ -160,11 +174,14 @@ class InternalWebTUIAppController implements WebTUIAppController {
       columns: 80,
       rows: 24,
       environment: this.environment,
+      renderStyle: this.style,
+      colorScheme: this.currentColorScheme,
     });
     const runtime = this.sceneRuntimeFactory({
       mount: this.sceneRoot,
       descriptor,
       style: this.style,
+      colorScheme: this.currentColorScheme,
       bridge,
       onInput: (chunk) => bridge.sendInput(chunk),
     });
@@ -172,9 +189,44 @@ class InternalWebTUIAppController implements WebTUIAppController {
     this.bridges.set(id, bridge);
     this.runtimes.set(id, runtime);
     await runtime.mount();
-    runtime.setStyle(this.style);
     runtime.setVisible(id === this.selectedSceneId);
     return runtime;
+  }
+
+  private resolveActiveColorScheme(): WebTUIColorScheme {
+    return resolveWebTUIColorScheme(this.style, this.detectSystemColorScheme());
+  }
+
+  private detectSystemColorScheme(): WebTUIColorScheme {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return "dark";
+    }
+
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+
+  private bindColorSchemeListener(): void {
+    this.unbindColorSchemeListener();
+
+    if (this.style.colorSchemeMode !== "system") {
+      return;
+    }
+
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+
+    this.colorSchemeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    this.colorSchemeMediaQuery.addEventListener("change", this.colorSchemeListener);
+  }
+
+  private unbindColorSchemeListener(): void {
+    if (!this.colorSchemeMediaQuery) {
+      return;
+    }
+
+    this.colorSchemeMediaQuery.removeEventListener("change", this.colorSchemeListener);
+    this.colorSchemeMediaQuery = undefined;
   }
 
   private applyHostFrameStyle(): void {

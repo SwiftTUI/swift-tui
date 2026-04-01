@@ -88,6 +88,7 @@ extension RunLoop {
       .joined(separator: "+")
     var effectiveEnvironmentValues = environmentValues
     effectiveEnvironmentValues.terminalAppearance = terminalHost.appearance
+    effectiveEnvironmentValues.themeOverride = terminalHost.theme
     effectiveEnvironmentValues.terminalSize = terminalHost.surfaceSize
     effectiveEnvironmentValues.terminalCellPixelSize =
       terminalHost.graphicsCapabilities.cellPixelSize ?? .init(width: 8, height: 16)

@@ -1,8 +1,8 @@
 import Foundation
 import GhosttyTerminal
+import SwiftUI
 import TerminalUI
 import TerminalUIScenes
-import SwiftUI
 
 @MainActor
 final class GhosttySceneBridge {
@@ -78,6 +78,7 @@ final class GhosttySceneBridge {
 
   func attach(session: any HostedSceneSessionHandling) {
     self.session = session
+    syncSessionStyle()
   }
 
   func startSession() async throws -> RunLoopExitReason {
@@ -104,17 +105,12 @@ final class GhosttySceneBridge {
       fontSize: style.fontSize,
       context: .window
     )
-    updateAppearance(currentColorScheme)
+    syncSessionStyle()
   }
 
   func updateAppearance(_ colorScheme: SwiftUI.ColorScheme) {
     currentColorScheme = colorScheme
-    guard let session else {
-      return
-    }
-    session.updateAppearance(
-      style.terminalAppearance(for: colorScheme.terminalUIScheme)
-    )
+    syncSessionStyle()
   }
 
   func receiveOutput(_ output: String) {
@@ -147,6 +143,14 @@ final class GhosttySceneBridge {
       terminalSession.receive(chunk)
     }
   }
+
+  private func syncSessionStyle() {
+    guard let session else {
+      return
+    }
+
+    session.updateStyle(style.renderStyle(for: currentColorScheme.terminalUIScheme))
+  }
 }
 
 @MainActor
@@ -154,14 +158,14 @@ protocol HostedSceneSessionHandling: AnyObject {
   func start() async throws -> RunLoopExitReason
   func sendInput(_ bytes: [UInt8])
   func resize(to size: Size)
-  func updateAppearance(_ appearance: TerminalAppearance)
+  func updateStyle(_ style: TerminalRenderStyle)
   func stop()
 }
 
 extension HostedSceneSession: HostedSceneSessionHandling {}
 
-private extension SwiftUI.ColorScheme {
-  var terminalUIScheme: TerminalUI.ColorScheme {
+extension SwiftUI.ColorScheme {
+  fileprivate var terminalUIScheme: TerminalUI.ColorScheme {
     switch self {
     case .light:
       return .light

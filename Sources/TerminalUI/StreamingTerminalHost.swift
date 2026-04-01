@@ -3,7 +3,7 @@ import Synchronization
 package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable {
   private struct State {
     var surfaceSize: Size
-    var appearance: TerminalAppearance
+    var renderStyle: TerminalRenderStyle
   }
 
   private let state: Mutex<State>
@@ -16,6 +16,7 @@ package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable 
   package init(
     surfaceSize: Size,
     appearance: TerminalAppearance? = nil,
+    theme: ThemeColors? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
     graphicsCapabilities: TerminalGraphicsCapabilities = .none,
     environment: [String: String]? = nil,
@@ -35,7 +36,10 @@ package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable 
     state = Mutex(
       State(
         surfaceSize: surfaceSize,
-        appearance: resolvedAppearance
+        renderStyle: .init(
+          appearance: resolvedAppearance,
+          theme: theme
+        )
       )
     )
   }
@@ -45,7 +49,11 @@ package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable 
   }
 
   package var appearance: TerminalAppearance {
-    state.withLock(\.appearance)
+    state.withLock(\.renderStyle.appearance)
+  }
+
+  package var theme: Theme? {
+    state.withLock { $0.renderStyle.theme?.theme }
   }
 
   package func updateSurfaceSize(
@@ -60,7 +68,23 @@ package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable 
     _ appearance: TerminalAppearance
   ) {
     state.withLock { state in
-      state.appearance = appearance
+      state.renderStyle.appearance = appearance
+    }
+  }
+
+  package func updateTheme(
+    _ theme: ThemeColors?
+  ) {
+    state.withLock { state in
+      state.renderStyle.theme = theme
+    }
+  }
+
+  package func updateStyle(
+    _ style: TerminalRenderStyle
+  ) {
+    state.withLock { state in
+      state.renderStyle = style
     }
   }
 

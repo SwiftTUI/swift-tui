@@ -157,6 +157,7 @@ public protocol TerminalHosting: AnyObject {
   var surfaceSize: Size { get }
   var capabilityProfile: TerminalCapabilityProfile { get }
   var appearance: TerminalAppearance { get }
+  var theme: Theme? { get }
   var graphicsCapabilities: TerminalGraphicsCapabilities { get }
 
   func enableRawMode() throws
@@ -169,6 +170,10 @@ public protocol TerminalHosting: AnyObject {
 }
 
 extension TerminalHosting {
+  public var theme: Theme? {
+    nil
+  }
+
   public var graphicsCapabilities: TerminalGraphicsCapabilities {
     .none
   }
@@ -392,6 +397,7 @@ extension TerminalHosting {
     }
     public let capabilityProfile: TerminalCapabilityProfile
     public private(set) var appearance: TerminalAppearance
+    public var theme: Theme? { nil }
     public var graphicsCapabilities: TerminalGraphicsCapabilities {
       resolvedGraphicsCapabilities(probingProtocols: false)
     }
@@ -868,7 +874,7 @@ extension TerminalHosting {
   public final class WebTerminalHost: TerminalHosting, @unchecked Sendable {
     private struct State {
       var surfaceSize: Size
-      var appearance: TerminalAppearance
+      var renderStyle: TerminalRenderStyle
     }
 
     private let state: Mutex<State>
@@ -880,6 +886,7 @@ extension TerminalHosting {
 
     public convenience init(
       surfaceSize: Size,
+      theme: ThemeColors? = nil,
       capabilityProfile: TerminalCapabilityProfile = .trueColor,
       graphicsCapabilities: TerminalGraphicsCapabilities = .none,
       environment: [String: String]? = nil
@@ -887,6 +894,7 @@ extension TerminalHosting {
       self.init(
         surfaceSize: surfaceSize,
         outputFileDescriptor: STDOUT_FILENO,
+        theme: theme,
         capabilityProfile: capabilityProfile,
         graphicsCapabilities: graphicsCapabilities,
         environment: environment
@@ -896,6 +904,7 @@ extension TerminalHosting {
     public init(
       surfaceSize: Size,
       outputFileDescriptor: Int32,
+      theme: ThemeColors? = nil,
       capabilityProfile: TerminalCapabilityProfile = .trueColor,
       graphicsCapabilities: TerminalGraphicsCapabilities = .none,
       environment: [String: String]? = nil
@@ -910,7 +919,10 @@ extension TerminalHosting {
       state = Mutex(
         State(
           surfaceSize: surfaceSize,
-          appearance: appearance
+          renderStyle: .init(
+            appearance: appearance,
+            theme: theme
+          )
         )
       )
     }
@@ -920,12 +932,32 @@ extension TerminalHosting {
     }
 
     public var appearance: TerminalAppearance {
-      state.withLock(\.appearance)
+      state.withLock(\.renderStyle.appearance)
+    }
+
+    public var theme: Theme? {
+      state.withLock { $0.renderStyle.theme?.theme }
     }
 
     public func updateSurfaceSize(_ surfaceSize: Size) {
       state.withLock { state in
         state.surfaceSize = surfaceSize
+      }
+    }
+
+    public func updateTheme(
+      _ theme: ThemeColors?
+    ) {
+      state.withLock { state in
+        state.renderStyle.theme = theme
+      }
+    }
+
+    public func updateStyle(
+      _ style: TerminalRenderStyle
+    ) {
+      state.withLock { state in
+        state.renderStyle = style
       }
     }
 

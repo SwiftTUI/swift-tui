@@ -1,10 +1,17 @@
 import { StdIOPipe } from "./StdIOPipe.ts";
+import {
+  encodeWebTUITerminalRenderStyleBase64,
+  type WebTUIColorScheme,
+  type WebTUITerminalStyle,
+} from "../WebTUITerminalStyle.ts";
 
 export interface BrowserWASIBridgeOptions {
   sceneId: string;
   columns: number;
   rows: number;
   environment?: Record<string, string>;
+  renderStyle?: WebTUITerminalStyle;
+  colorScheme?: WebTUIColorScheme;
 }
 
 export interface BrowserWASIOutputSink {
@@ -30,6 +37,14 @@ export class BrowserWASIBridge {
       TUIGUI_COLUMNS: String(Math.max(1, options.columns)),
       TUIGUI_ROWS: String(Math.max(1, options.rows)),
       ...options.environment,
+      ...(options.renderStyle
+        ? {
+            TUIGUI_RENDER_STYLE: encodeWebTUITerminalRenderStyleBase64(
+              options.renderStyle,
+              options.colorScheme ?? "dark"
+            ),
+          }
+        : {}),
     };
   }
 
@@ -58,6 +73,17 @@ export class BrowserWASIBridge {
     for (const listener of this.resizeListeners) {
       listener(normalizedColumns, normalizedRows);
     }
+  }
+
+  updateRenderStyle(
+    style: WebTUITerminalStyle,
+    colorScheme: WebTUIColorScheme = "dark"
+  ): void {
+    this.environment.TUIGUI_RENDER_STYLE = encodeWebTUITerminalRenderStyleBase64(
+      style,
+      colorScheme
+    );
+    this.stdin.write(encodeRenderStyleControlMessage(style, colorScheme));
   }
 
   sendInput(
@@ -90,4 +116,12 @@ export function encodeResizeControlMessage(
   rows: number
 ): Uint8Array {
   return new TextEncoder().encode(`\u001Eresize:${Math.max(1, columns)}:${Math.max(1, rows)}\n`);
+}
+
+export function encodeRenderStyleControlMessage(
+  style: WebTUITerminalStyle,
+  colorScheme: WebTUIColorScheme = "dark"
+): Uint8Array {
+  const encoded = encodeWebTUITerminalRenderStyleBase64(style, colorScheme);
+  return new TextEncoder().encode(`\u001Estyle:${encoded}\n`);
 }

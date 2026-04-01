@@ -56,7 +56,14 @@ extension Color: ShapeStyle {
     .color(self)
   }
 
-   public func opacity(_ opacity: Double) -> Color {
+  public static func hex(
+    _ hex: String,
+    profile: RGBColorProfile = .sRGB
+  ) -> Self {
+    try! .init(hex: hex, profile: profile)
+  }
+
+  public func opacity(_ opacity: Double) -> Color {
     var copy = self
     copy.alpha = self.alpha * min(1, max(0, opacity))
     return copy
@@ -193,15 +200,15 @@ public struct Theme: Equatable, Sendable {
   public var muted: AnyShapeStyle
 
   public init(
-    foreground: AnyShapeStyle = .color(try! .init(hex: "#ECEFF4")),
+    foreground: AnyShapeStyle = .color(.hex("#ECEFF4")),
     background: AnyShapeStyle = .color(try! .init(hex: "#1E222A")),
     tint: AnyShapeStyle = .color(.cyan),
-    separator: AnyShapeStyle = .color(try! .init(hex: "#4C566A")),
-    selection: AnyShapeStyle = .color(try! .init(hex: "#2E3440")),
+    separator: AnyShapeStyle = .color(.hex("#4C566A")),
+    selection: AnyShapeStyle = .color(.hex("#2E3440")),
     placeholder: AnyShapeStyle = .color(.gray),
     link: AnyShapeStyle = .color(.blue),
-    fill: AnyShapeStyle = .color(try! .init(hex: "#2B303B")),
-    windowBackground: AnyShapeStyle = .color(try! .init(hex: "#15181E")),
+    fill: AnyShapeStyle = .color(.hex("#2B303B")),
+    windowBackground: AnyShapeStyle = .color(.hex("#15181E")),
     success: AnyShapeStyle = .color(.green),
     warning: AnyShapeStyle = .color(.yellow),
     danger: AnyShapeStyle = .color(.red),
@@ -224,7 +231,28 @@ public struct Theme: Equatable, Sendable {
     self.muted = muted
   }
 
-  public static let `default` = Self()
+  public init(
+    colors: ThemeColors
+  ) {
+    self.init(
+      foreground: .color(colors.foreground),
+      background: .color(colors.background),
+      tint: .color(colors.tint),
+      separator: .color(colors.separator),
+      selection: .color(colors.selection),
+      placeholder: .color(colors.placeholder),
+      link: .color(colors.link),
+      fill: .color(colors.fill),
+      windowBackground: .color(colors.windowBackground),
+      success: .color(colors.success),
+      warning: .color(colors.warning),
+      danger: .color(colors.danger),
+      info: .color(colors.info),
+      muted: .color(colors.muted)
+    )
+  }
+
+  public static let `default` = Self(colors: .default)
 
   public func style(for role: SemanticStyleRole) -> AnyShapeStyle {
     switch role {
@@ -260,6 +288,151 @@ public struct Theme: Equatable, Sendable {
   }
 }
 
+/// Concrete semantic token colors suitable for host-supplied themes and wrapper
+/// transport.
+public struct ThemeColors: Equatable, Sendable, Codable {
+  public var foreground: Color
+  public var background: Color
+  public var tint: Color
+  public var separator: Color
+  public var selection: Color
+  public var placeholder: Color
+  public var link: Color
+  public var fill: Color
+  public var windowBackground: Color
+  public var success: Color
+  public var warning: Color
+  public var danger: Color
+  public var info: Color
+  public var muted: Color
+
+  public init(
+    foreground: Color = .hex("#ECEFF4"),
+    background: Color = .hex("#1E222A"),
+    tint: Color = .cyan,
+    separator: Color = .hex("#4C566A"),
+    selection: Color = .hex("#2E3440"),
+    placeholder: Color = .gray,
+    link: Color = .blue,
+    fill: Color = .hex("#2B303B"),
+    windowBackground: Color = .hex("#15181E"),
+    success: Color = .green,
+    warning: Color = .yellow,
+    danger: Color = .red,
+    info: Color = .cyan,
+    muted: Color = .gray
+  ) {
+    self.foreground = foreground
+    self.background = background
+    self.tint = tint
+    self.separator = separator
+    self.selection = selection
+    self.placeholder = placeholder
+    self.link = link
+    self.fill = fill
+    self.windowBackground = windowBackground
+    self.success = success
+    self.warning = warning
+    self.danger = danger
+    self.info = info
+    self.muted = muted
+  }
+
+  public static let `default` = Self()
+
+  public var theme: Theme {
+    Theme(colors: self)
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case foreground
+    case background
+    case tint
+    case separator
+    case selection
+    case placeholder
+    case link
+    case fill
+    case windowBackground
+    case success
+    case warning
+    case danger
+    case info
+    case muted
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    foreground = try Self.decodeColor(for: .foreground, from: container)
+    background = try Self.decodeColor(for: .background, from: container)
+    tint = try Self.decodeColor(for: .tint, from: container)
+    separator = try Self.decodeColor(for: .separator, from: container)
+    selection = try Self.decodeColor(for: .selection, from: container)
+    placeholder = try Self.decodeColor(for: .placeholder, from: container)
+    link = try Self.decodeColor(for: .link, from: container)
+    fill = try Self.decodeColor(for: .fill, from: container)
+    windowBackground = try Self.decodeColor(for: .windowBackground, from: container)
+    success = try Self.decodeColor(for: .success, from: container)
+    warning = try Self.decodeColor(for: .warning, from: container)
+    danger = try Self.decodeColor(for: .danger, from: container)
+    info = try Self.decodeColor(for: .info, from: container)
+    muted = try Self.decodeColor(for: .muted, from: container)
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try Self.encodeColor(foreground, for: .foreground, into: &container)
+    try Self.encodeColor(background, for: .background, into: &container)
+    try Self.encodeColor(tint, for: .tint, into: &container)
+    try Self.encodeColor(separator, for: .separator, into: &container)
+    try Self.encodeColor(selection, for: .selection, into: &container)
+    try Self.encodeColor(placeholder, for: .placeholder, into: &container)
+    try Self.encodeColor(link, for: .link, into: &container)
+    try Self.encodeColor(fill, for: .fill, into: &container)
+    try Self.encodeColor(windowBackground, for: .windowBackground, into: &container)
+    try Self.encodeColor(success, for: .success, into: &container)
+    try Self.encodeColor(warning, for: .warning, into: &container)
+    try Self.encodeColor(danger, for: .danger, into: &container)
+    try Self.encodeColor(info, for: .info, into: &container)
+    try Self.encodeColor(muted, for: .muted, into: &container)
+  }
+
+  private static func decodeColor(
+    for key: CodingKeys,
+    from container: KeyedDecodingContainer<CodingKeys>
+  ) throws -> Color {
+    let value = try container.decode(String.self, forKey: key)
+    return try Color(hex: value)
+  }
+
+  private static func encodeColor(
+    _ color: Color,
+    for key: CodingKeys,
+    into container: inout KeyedEncodingContainer<CodingKeys>
+  ) throws {
+    try container.encode(color.hexString(), forKey: key)
+  }
+}
+
+/// The host-owned styling payload that pairs terminal appearance metadata with
+/// an optional semantic theme override.
+public struct TerminalRenderStyle: Equatable, Sendable, Codable {
+  public var appearance: TerminalAppearance
+  public var theme: ThemeColors?
+
+  public init(
+    appearance: TerminalAppearance,
+    theme: ThemeColors? = nil
+  ) {
+    self.appearance = appearance
+    self.theme = theme
+  }
+
+  public var resolvedTheme: Theme {
+    theme?.theme ?? appearance.semanticTheme()
+  }
+}
+
 /// Styling state captured from the environment during resolve.
 public struct StyleEnvironmentSnapshot: Equatable, Sendable {
   public var appearance: TerminalAppearance
@@ -283,24 +456,26 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
     colorSchemeContrast: ColorSchemeContrast? = nil,
     isEnabled: Bool = true
   ) {
-    let effectiveAppearance = appearance.applyingPreferredColorScheme(
-      preferredColorScheme
-    )
-    var effectiveTheme = (themeOverride ?? theme) ?? effectiveAppearance.semanticTheme()
-    if let foregroundStyle {
+    let explicitTheme = themeOverride ?? theme
+    var effectiveTheme = explicitTheme ?? appearance.semanticTheme()
+    if let foregroundStyle,
+      foregroundStyle != .semantic(.foreground)
+    {
       effectiveTheme.foreground = foregroundStyle
     }
-    if let tintStyle {
+    if let tintStyle,
+      tintStyle != .semantic(.tint)
+    {
       effectiveTheme.tint = tintStyle
     }
-    self.appearance = effectiveAppearance
-    self.themeOverride = themeOverride ?? theme
+    self.appearance = appearance
+    self.themeOverride = explicitTheme
     self.theme = effectiveTheme
     self.foregroundStyle = foregroundStyle
     self.tintStyle = tintStyle
     self.preferredColorScheme = preferredColorScheme
-    self.colorScheme = colorScheme ?? effectiveAppearance.colorScheme
-    self.colorSchemeContrast = colorSchemeContrast ?? effectiveAppearance.colorSchemeContrast
+    self.colorScheme = colorScheme ?? preferredColorScheme ?? appearance.colorScheme
+    self.colorSchemeContrast = colorSchemeContrast ?? appearance.colorSchemeContrast
     self.isEnabled = isEnabled
   }
 }
@@ -674,9 +849,8 @@ private func resolveStyleColorResult(
     }
     return .success(firstColor)
   case .terminalChrome(let chromeStyle):
-    let appearance = synthesizedAppearance(for: theme)
     return resolveStyleColorResult(
-      style: appearance.resolvedStyle(for: chromeStyle),
+      style: theme.resolvedStyle(for: chromeStyle),
       theme: theme,
       depth: depth + 1,
       depthLimit: depthLimit

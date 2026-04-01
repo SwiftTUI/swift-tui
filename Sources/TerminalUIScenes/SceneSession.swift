@@ -37,6 +37,7 @@ package enum SceneSession {
   ) async throws -> RunLoopResult<MultiSceneRuntimeState> {
     var environmentValues = EnvironmentValues()
     environmentValues.terminalAppearance = resources.terminalHost.appearance
+    environmentValues.themeOverride = resources.terminalHost.theme
 
     var environmentSnapshot = EnvironmentSnapshot(
       debugSignature: sessionName,

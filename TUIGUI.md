@@ -1,6 +1,6 @@
 # TUIGUI Design And Status
 
-Last updated: March 30, 2026
+Last updated: April 1, 2026
 
 ## Goal
 
@@ -14,7 +14,7 @@ The authoring story stays the same:
 - app authors continue to write `App`, `Scene`, and `WindowGroup` in the root package
 - wrapper packages own terminal-surface hosting, scene selection chrome, and wrapper-local style surfaces
 - scene state must survive wrapper-driven scene switches
-- resize and appearance changes must continue to flow through the same runtime invalidation path as terminal `SIGWINCH`
+- resize and host style changes must continue to flow through the same runtime invalidation path as terminal `SIGWINCH`
 
 All Swift build commands in this document assume the repo-default `swiftly`
 toolchain story. Use `swiftly run swift ...` directly, or the shorter `swift`
@@ -37,6 +37,8 @@ The wrapper-facing root work is landed:
   `Sources/TerminalUI/TerminalControlMessages.swift`
 - embedded hosts use `InjectedTerminalInputReader` and
   `StreamingTerminalHost`
+- hosted sessions now accept paired render-style updates so terminal appearance
+  and semantic theme move together at runtime
 - `TerminalUIScenes` now provides the default `App.main()` implementation that
   launches through `MultiSceneLauncher`
 
@@ -54,6 +56,8 @@ The SwiftUI wrapper package is landed as a standalone SPM package:
   - `SwiftUITUISceneHost.swift`
   - `GhosttySceneBridge.swift`
   - `SwiftUITUITerminalStyle.swift`
+- SwiftUI styles now expose explicit light and dark theme variants, each pairing
+  Ghostty palette state with TerminalUI semantic theme tokens
 - verification:
   - `SceneRetentionTests.swift`
   - `ResizeBridgeTests.swift`
@@ -72,6 +76,9 @@ The web wrapper package is also landed:
   - `src/WebTUISceneManifest.ts`
   - `src/build/buildAppWasm.ts`
   - `src/build/generateSceneManifest.ts`
+- web styles now expose explicit light and dark theme variants and can bind
+  them to the host color scheme before pushing a full render-style payload into
+  the WASI runtime
 - the Bun pipeline now builds manifest, wasm, and browser assets without
   depending on repo-local Ghostty source snapshots
 
@@ -84,12 +91,12 @@ The current boundary is:
   - scene collection
   - retained hosted runtime sessions
   - manifest generation
-  - control-message and resize contract
+  - control-message contract for resize and render-style updates
 - wrapper packages:
   - window or browser shell integration
   - terminal widget embedding
   - scene tabs, pickers, or other wrapper-local chrome
-  - wrapper-specific style mapping
+  - wrapper-specific style mapping and host light/dark-to-theme binding
 
 This is intentional. Wrapper packages are peer packages, not new products in
 the root package.
@@ -109,9 +116,9 @@ the root package.
 2. The root package exposes first-class scene manifest and hosted-session APIs so peer packages do not rely on package-only internals.
 3. Each scene gets its own retained runtime session. Switching scenes changes which hosted session is visible; it does not rebuild the app body from scratch.
 4. Scene switching is wrapper-managed. It is not a new terminal escape-sequence protocol.
-5. Terminal style is wrapper-owned. The Swift package and the Bun package expose mirrored style concepts, not a shared cross-language source file.
+5. Terminal style is wrapper-owned. The Swift package and the Bun package expose mirrored style concepts, not a shared cross-language source file, and wrappers choose the active theme variant.
 6. The web package keeps one wasm module instance per scene and one `ghostty-web` terminal per scene so scene state survives switches without a more complex protocol.
-7. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior.
+7. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior and is now extended with paired render-style updates.
 
 ## Verification
 

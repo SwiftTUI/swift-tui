@@ -1376,6 +1376,55 @@ struct SwiftUISurfaceTests {
     #expect(accent != surface)
   }
 
+  @Test("explicit theme overrides appearance-derived semantic and chrome colors")
+  func explicitThemeOverridesAppearanceDerivedSemanticAndChromeColors() {
+    let appearance = TerminalAppearance(
+      foregroundColor: .black,
+      backgroundColor: .white,
+      tintColor: .blue,
+      source: .override
+    )
+    let themeColors = ThemeColors(
+      foreground: .hex("#111827"),
+      background: .hex("#F8FAFC"),
+      tint: .hex("#2563EB"),
+      separator: .hex("#CBD5E1"),
+      selection: .hex("#DBEAFE"),
+      placeholder: .hex("#94A3B8"),
+      link: .hex("#2563EB"),
+      fill: .hex("#F1F5F9"),
+      windowBackground: .hex("#E2E8F0"),
+      success: .hex("#16A34A"),
+      warning: .hex("#D97706"),
+      danger: .hex("#DC2626"),
+      info: .hex("#0284C7"),
+      muted: .hex("#64748B")
+    )
+    let snapshot = StyleEnvironmentSnapshot(
+      appearance: appearance,
+      theme: themeColors.theme
+    )
+
+    #expect(
+      resolveStyleColor(
+        style: .semantic(.warning),
+        theme: snapshot.theme
+      ) == themeColors.warning
+    )
+    #expect(
+      resolveStyleColor(
+        style: AnyShapeStyle(.terminalAccent(.warning)),
+        theme: snapshot.theme
+      ) == themeColors.warning
+    )
+    #expect(
+      resolveStyleColor(
+        style: AnyShapeStyle(.terminalAccent(.success)),
+        theme: snapshot.theme
+      ) == themeColors.success
+    )
+  }
+
   @Test(
     "disabled writes isEnabled into environment and outer disabled overrides inner enabled requests"
   )

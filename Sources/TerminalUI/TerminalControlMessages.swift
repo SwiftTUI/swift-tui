@@ -1,5 +1,8 @@
+import Foundation
+
 public enum TerminalControlMessage: Equatable, Sendable {
   case resize(Size)
+  case style(TerminalRenderStyle)
 }
 
 package struct ControlMessageParser {
@@ -45,6 +48,20 @@ package struct ControlMessageParser {
     }
 
     let text = String(decoding: bufferedCommand, as: UTF8.self)
+    if let message = parseResizeCommand(text) {
+      return message
+    }
+
+    if let message = parseStyleCommand(text) {
+      return message
+    }
+
+    return nil
+  }
+
+  private func parseResizeCommand(
+    _ text: String
+  ) -> TerminalControlMessage? {
     let components = text.split(separator: ":")
     guard components.count == 3, components[0] == "resize",
       let width = Int(components[1]),
@@ -59,5 +76,45 @@ package struct ControlMessageParser {
         height: max(1, height)
       )
     )
+  }
+
+  private func parseStyleCommand(
+    _ text: String
+  ) -> TerminalControlMessage? {
+    let prefix = "style:"
+    guard text.hasPrefix(prefix) else {
+      return nil
+    }
+
+    let encoded = String(text.dropFirst(prefix.count))
+    guard let style = TerminalRenderStyleCodec.decodeBase64(encoded) else {
+      return nil
+    }
+    return .style(style)
+  }
+}
+
+package enum TerminalRenderStyleCodec {
+  private static let decoder = JSONDecoder()
+  private static let encoder = JSONEncoder()
+
+  package static func decodeBase64(
+    _ encoded: String
+  ) -> TerminalRenderStyle? {
+    guard let data = Data(base64Encoded: encoded) else {
+      return nil
+    }
+
+    return try? decoder.decode(TerminalRenderStyle.self, from: data)
+  }
+
+  package static func encodeBase64(
+    _ style: TerminalRenderStyle
+  ) -> String? {
+    guard let data = try? encoder.encode(style) else {
+      return nil
+    }
+
+    return data.base64EncodedString()
   }
 }

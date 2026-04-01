@@ -47,8 +47,8 @@ public struct GalleryDemoSceneView: View {
           .command(
             id: "appearance",
             title: "Show Appearance",
-            detail: "Compare light, dark, accent propagation, and available colors",
-            keywords: ["theme", "light", "dark", "accent", "colors", "palette"],
+            detail: "Inspect semantic tokens, tint propagation, hex styling, and available colors",
+            keywords: ["theme", "tokens", "hex", "accent", "colors", "palette"],
             kind: .navigation
           )
         chartsWorkbench
@@ -361,9 +361,9 @@ public struct GalleryDemoSceneView: View {
     workbenchSurface(
       selection: $model.selectedAppearanceDemo,
       entries: [
-        "light",
-         "dark",
-        "accent",
+        "tokens",
+        "tint",
+        "hex",
         "colors",
       ],
       title: appearanceTitle,
@@ -375,27 +375,27 @@ public struct GalleryDemoSceneView: View {
 
   private var appearanceTitle: String {
     switch model.selectedAppearanceDemo {
-    case "dark":
-      "Dark Mode"
-    case "accent":
-      "Accent Propagation"
+    case "tint":
+      "Tint Propagation"
+    case "hex":
+      "Hex Colors"
     case "colors":
       "Color Gallery"
     default:
-      "Light Mode"
+      "Semantic Tokens"
     }
   }
 
   private var appearanceSubtitle: String {
     switch model.selectedAppearanceDemo {
-    case "dark":
-      "Foreground contrast must stay explicit and legible in dark terminals."
-    case "accent":
+    case "tint":
       "Tint should affect selection, borders, and highlights coherently."
+    case "hex":
+      "Hex colors should be direct authoring tools, not wrapper-only escape hatches."
     case "colors":
-      "Named colors, semantic roles, and palette slots available to the demo."
+      "Named colors, semantic roles, and host palette slots available to the demo."
     default:
-      "Light terminals need explicit dark foregrounds by default."
+      "Views should render semantic roles without knowing which host theme is active."
     }
   }
 
@@ -404,19 +404,57 @@ public struct GalleryDemoSceneView: View {
     switch model.selectedAppearanceDemo {
     case "colors":
       GalleryColorGallery()
-    default:
+    case "tint":
       HStack(alignment: .top, spacing: 1) {
         appearanceSample(
-          title: "Preferred light mode",
-          scheme: model.selectedAppearanceDemo == "dark" ? .dark : .light,
-          tint: model.selectedAppearanceDemo == "accent" ? Color.green : Color.blue
+          title: "Blue Accent",
+          note: "The view stays token-based while the host swaps accent tone.",
+          tint: .blue,
+          emphasis: .hex("#2563EB")
         )
         .frame(width: 28, alignment: .topLeading)
 
         appearanceSample(
-          title: "Preferred dark mode",
-          scheme: .dark,
-          tint: model.selectedAppearanceDemo == "accent" ? Color.green : Color.blue
+          title: "Green Accent",
+          note: "Borders, progress, and selection all follow the new tint.",
+          tint: .green,
+          emphasis: .hex("#16A34A")
+        )
+        .frame(width: 28, alignment: .topLeading)
+      }
+    case "hex":
+      HStack(alignment: .top, spacing: 1) {
+        appearanceSample(
+          title: "Hex Tint",
+          note: "Accent and emphasis colors can come straight from hex values.",
+          tint: .hex("#F97316"),
+          emphasis: .hex("#F97316")
+        )
+        .frame(width: 28, alignment: .topLeading)
+
+        appearanceSample(
+          title: "Hex Contrast",
+          note: "Direct hex colors work alongside semantic warning and success roles.",
+          tint: .hex("#7C3AED"),
+          emphasis: .hex("#06B6D4")
+        )
+        .frame(width: 28, alignment: .topLeading)
+      }
+    default:
+      HStack(alignment: .top, spacing: 1) {
+        appearanceSample(
+          title: "Host Defaults",
+          note: "Semantic roles resolve through the active host theme.",
+          tint: .blue,
+          emphasis: .hex("#7C3AED")
+        )
+        .frame(width: 28, alignment: .topLeading)
+
+        appearanceSample(
+          title: "Same View, New Accent",
+          note: "The app still authors `.warning`, `.success`, and `.tint`.",
+          tint: .green,
+          emphasis: .hex("#F97316")
         )
         .frame(width: 28, alignment: .topLeading)
       }
@@ -425,17 +463,27 @@ public struct GalleryDemoSceneView: View {
 
   private func appearanceSample(
     title: String,
-    scheme: ColorScheme,
-    tint: Color
+    note: String,
+    tint: Color,
+    emphasis: Color
   ) -> some View {
     VStack(alignment: .leading, spacing: 1) {
       Text(title)
         .foregroundStyle(.separator)
+      Text(note)
+        .foregroundStyle(.muted)
       Button("Accent") {}
       ProgressView("Load", value: 3, total: 5, barWidth: 12)
       Toggle("Flag", isOn: .constant(true))
+      HStack(alignment: .center, spacing: 1) {
+        Text("warning")
+          .foregroundStyle(.warning)
+        Text("success")
+          .foregroundStyle(.success)
+        Text("#hex")
+          .foregroundStyle(emphasis)
+      }
     }
-    .preferredColorScheme(scheme)
     .tint(tint)
   }
 
@@ -472,7 +520,7 @@ public struct GalleryDemoSceneView: View {
     case "trend":
       "Sparklines and deltas belong in dense terminal workspaces."
     default:
-      "Progress should read clearly in both color schemes."
+      "Progress should stay legible regardless of which host theme is active."
     }
   }
 
@@ -600,4 +648,3 @@ private struct GalleryOutlineNode: Identifiable {
     self.children = children
   }
 }
-
