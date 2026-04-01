@@ -346,7 +346,11 @@ struct TerminalGraphicsProtocolTests {
     // Build a surface where image area cells have background colors,
     // mimicking ZStack { RoundedRectangle.fill(); Image() }
     let bgStyle = ResolvedTextStyle(
-      backgroundColor: .init(red: 40, green: 40, blue: 40)
+      backgroundColor: .init(
+        red: 40.0 / 255.0,
+        green: 40.0 / 255.0,
+        blue: 40.0 / 255.0
+      )
     )
     var cells: [[RasterCell]] = []
     for _ in 0..<3 {

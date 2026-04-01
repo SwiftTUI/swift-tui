@@ -149,19 +149,19 @@ struct TerminalPresentationTests {
     ) { query in
       switch query {
       case .foreground:
-        .init(hex: 0x111213)
+        hexColor("#111213")
       case .background:
-        .init(hex: 0xF8F7F6)
+        hexColor("#F8F7F6")
       case .palette(let index):
-        index == 4 ? .magenta : nil
+        index == 4 ? Color.magenta : nil
       }
     }
 
-    #expect(appearance.foregroundColor == .init(hex: 0x111213))
-    #expect(appearance.backgroundColor == .init(hex: 0xF8F7F6))
-    #expect(appearance.tintColor == .magenta)
-    #expect(appearance.colorScheme == .light)
-    #expect(appearance.source == .activeQuery)
+    #expect(appearance.foregroundColor == hexColor("#111213"))
+    #expect(appearance.backgroundColor == hexColor("#F8F7F6"))
+    #expect(appearance.tintColor == Color.magenta)
+    #expect(appearance.colorScheme == ColorScheme.light)
+    #expect(appearance.source == AppearanceSource.activeQuery)
   }
 
   @Test("appearance query ignores invalid UTF-8 responses")
@@ -213,7 +213,7 @@ struct TerminalPresentationTests {
             length: 2,
             style: ResolvedTextStyle(
               foregroundColor: .cyan,
-              backgroundColor: .init(hex: 0x112233)
+              backgroundColor: hexColor("#112233")
             )
           )
         ]

@@ -398,12 +398,7 @@ private func displayLine(
 private func hexString(
   _ color: Color
 ) -> String {
-  unsafe String(
-    format: "#%02X%02X%02X",
-    color.red,
-    color.green,
-    color.blue
-  )
+  color.hexString()
 }
 
 private func sanitizePathComponent(

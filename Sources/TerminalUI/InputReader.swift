@@ -608,6 +608,7 @@ extension InputReader {
               for event in transform(&parser, filtered.payload) {
                 continuation.yield(event)
               }
+              await Task.yield()
               continue
             }
 

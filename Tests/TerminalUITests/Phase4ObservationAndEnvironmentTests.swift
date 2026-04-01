@@ -852,8 +852,8 @@ struct Phase4ObservationAndEnvironmentTests {
   func runtimeRefreshesEnvironmentReadersWhenTerminalAppearanceChanges() async throws {
     let darkAppearance = TerminalAppearance.fallback
     let lightAppearance = TerminalAppearance(
-      foregroundColor: .init(hex: 0x161A20),
-      backgroundColor: .init(hex: 0xF6F7F9),
+      foregroundColor: hexColor("#161A20"),
+      backgroundColor: hexColor("#F6F7F9"),
       tintColor: .blue,
       colorScheme: .light,
       source: .fallback

@@ -679,9 +679,9 @@ extension TerminalSurfaceRenderer {
       return [
         "58",
         "2",
-        String(color.red),
-        String(color.green),
-        String(color.blue),
+        String(Int(color.red * 255)),
+        String(Int(color.green * 255)),
+        String(Int(color.blue * 255)),
       ]
     }
   }

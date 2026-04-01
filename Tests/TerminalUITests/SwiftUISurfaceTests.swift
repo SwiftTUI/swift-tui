@@ -987,7 +987,7 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.terminalAppearance = .init(
       foregroundColor: .yellow,
-      backgroundColor: .init(hex: 0x112233),
+      backgroundColor: hexColor("#112233"),
       tintColor: .cyan,
       source: .override
     )
@@ -1007,13 +1007,13 @@ struct SwiftUISurfaceTests {
       artifacts.rasterSurface.cells[0][0].style
         == .init(
           foregroundColor: .yellow,
-          backgroundColor: .init(hex: 0x112233)
+          backgroundColor: hexColor("#112233")
         ))
     #expect(
       artifacts.rasterSurface.cells[0][1].style
         == .init(
           foregroundColor: .yellow,
-          backgroundColor: .init(hex: 0x112233)
+          backgroundColor: hexColor("#112233")
         ))
   }
 
@@ -1023,7 +1023,7 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     environmentValues.terminalAppearance = .init(
       foregroundColor: .yellow,
-      backgroundColor: .init(hex: 0x112233),
+      backgroundColor: hexColor("#112233"),
       tintColor: .cyan,
       source: .override
     )
@@ -1053,7 +1053,7 @@ struct SwiftUISurfaceTests {
     #expect(
       artifacts.rasterSurface.cells[1][1].style
         == ResolvedTextStyle(
-          backgroundColor: .init(hex: 0x112233)
+          backgroundColor: hexColor("#112233")
         ))
   }
 
@@ -3650,8 +3650,8 @@ struct SwiftUISurfaceTests {
     var environmentValues = EnvironmentValues()
     let appearance = TerminalAppearance(
       foregroundColor: .white,
-      backgroundColor: .init(hex: 0x2D2A2E),
-      tintColor: .init(hex: 0xFC9867),
+      backgroundColor: hexColor("#2D2A2E"),
+      tintColor: hexColor("#FC9867"),
       source: .override
     )
     environmentValues.terminalAppearance = appearance
@@ -4765,7 +4765,7 @@ struct SwiftUISurfaceTests {
           y: 0,
           length: 2,
           style: ResolvedTextStyle(
-            foregroundColor: .init(hex: 0xECEFF4),
+            foregroundColor: hexColor("#ECEFF4"),
             backgroundColor: nil,
             emphasis: [],
             underlineStyle: .init(pattern: .dashDot, color: .yellow),
