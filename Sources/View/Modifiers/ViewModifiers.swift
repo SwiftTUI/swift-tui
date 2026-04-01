@@ -189,6 +189,18 @@ extension View {
     PaddingView(content: erasedToAnyView, insets: insets)
   }
 
+  public func padding(_ edges: Edge.Set, _ amount: Int = 1) -> some View {
+    PaddingView(
+      content: erasedToAnyView,
+      insets: EdgeInsets(
+        top: edges.contains(.top) ? amount : 0,
+        leading: edges.contains(.leading) ? amount : 0,
+        bottom: edges.contains(.bottom) ? amount : 0,
+        trailing: edges.contains(.trailing) ? amount : 0
+      )
+    )
+  }
+
   public func frame(
     width: Int? = nil,
     height: Int? = nil,

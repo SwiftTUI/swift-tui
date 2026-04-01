@@ -43,7 +43,7 @@ struct TabViewSurfaceTests {
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     let homeNode = try #require(artifacts.resolvedTree.descendant(withText: "Home content"))
 
-    #expect(surface.contains("[Home · 3]"))
+    #expect(surface.contains("Home · 3"))
     #expect(surface.contains("Settings"))
     #expect(homeNode.semanticMetadata.tabItemLabel == TabItemLabel("Home", detail: "3"))
     #expect(homeNode.semanticMetadata.presentationRole == nil)

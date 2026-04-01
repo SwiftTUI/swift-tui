@@ -324,7 +324,7 @@ public struct CommandPalette: View {
     VStack(alignment: .leading, spacing: 1) {
       TextField(placeholder, text: query)
       ScrollView(.vertical) {
-        VStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 0) {
           if matches.isEmpty {
             Text(emptyState)
               .foregroundStyle(.separator)
@@ -334,11 +334,13 @@ public struct CommandPalette: View {
                 CommandPaletteRow(command: command)
               }
               .buttonStyle(.plain)
+              .focusable(!command.isDisabled, interactions: .activate)
               .disabled(command.isDisabled)
             }
           }
         }
       }
+      .focusScope()
     }.background(.background)
   }
 }

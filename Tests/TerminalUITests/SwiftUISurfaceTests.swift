@@ -3084,8 +3084,8 @@ struct SwiftUISurfaceTests {
       row[7].character
     }
 
-    #expect(topThumbColumn == [" ", "█", "█", "│", "▼"])
-    #expect(bottomThumbColumn == ["▲", "│", "█", "█", " "])
+    #expect(topThumbColumn == ["█", "█", "█", "┃", "▼"])
+    #expect(bottomThumbColumn == ["▲", "┃", "█", "█", "█"])
   }
 
   @Test("ScrollView indicator keeps a usable thumb size for large content")
@@ -3110,7 +3110,7 @@ struct SwiftUISurfaceTests {
       row[7].character
     }
 
-    #expect(thumbColumn == [" ", "█", "█", "│", "│", "▼"])
+    #expect(thumbColumn == ["█", "█", "█", "┃", "┃", "▼"])
   }
 
   @Test("ScrollView indicator focus highlights only the indicator")

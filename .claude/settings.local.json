@@ -6,7 +6,9 @@
       "Bash(swift test:*)",
       "Bash(grep -n \"focusableControlMetadata\" /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/*.swift)",
       "Bash(grep:*)",
-      "Bash(ls /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/*.swift)"
+      "Bash(ls /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/*.swift)",
+      "Read(//tmp/**)",
+      "Bash(find:*)"
     ]
   }
 }

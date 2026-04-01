@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(swift build:*)",
+      "Bash(find:*)",
+      "Bash(grep -E \"\\\\.swift$\")"
+    ]
+  }
+}

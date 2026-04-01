@@ -669,6 +669,7 @@ private struct ToastOverlayHost: View {
         ToastSurface(request: requests[index])
       }
     }
+    .padding(.bottom, 1)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     .allowsHitTesting(false)
   }
