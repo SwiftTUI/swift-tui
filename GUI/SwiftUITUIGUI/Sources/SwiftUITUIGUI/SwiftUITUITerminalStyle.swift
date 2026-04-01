@@ -88,9 +88,9 @@ public struct SwiftUITUITerminalPalette: Equatable, Sendable {
   func terminalAppearance(
     colorScheme: TerminalUI.ColorScheme
   ) -> TerminalAppearance {
-    let foregroundColor = color(from: foreground) ?? .white
-    let backgroundColor = color(from: background) ?? .black
-    let tintColor = color(from: cursor) ?? foregroundColor
+    let foregroundColor = (try? TerminalUI.Color(hex: foreground)) ?? .white
+    let backgroundColor = (try? TerminalUI.Color(hex: background)) ?? .black
+    let tintColor = (try? TerminalUI.Color(hex: cursor)) ?? foregroundColor
 
     return TerminalAppearance(
       foregroundColor: foregroundColor,
@@ -117,7 +117,7 @@ public struct SwiftUITUITerminalPalette: Equatable, Sendable {
   private var paletteDictionary: [Int: TerminalUI.Color] {
     Dictionary(
       uniqueKeysWithValues: normalizedANSIColors.enumerated().map { index, value in
-        (index, color(from: value) ?? .white)
+          (index, (try? TerminalUI.Color(hex: value)) ?? .white)
       }
     )
   }
@@ -202,13 +202,3 @@ private extension SwiftUITUICursorStyle {
   }
 }
 
-private func color(
-  from hex: String
-) -> TerminalUI.Color? {
-  let trimmed = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-  let valueString = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
-  guard valueString.count == 6, let value = Int(valueString, radix: 16) else {
-    return nil
-  }
-  return TerminalUI.Color(hex: value)
-}

@@ -1,8 +1,9 @@
 import SwiftUI
+import ExampleScenes
 import SwiftUITUIGUI
 
 struct ContentView: SwiftUI::View {
-    @SwiftUI::State var tuiState: SwiftUITUIAppState<TUIApp>?
+    @SwiftUI::State var tuiState: SwiftUITUIAppState<ExampleApp>?
     @SwiftUI::State var error: (any Error)?
     var body: some SwiftUI::View {
         if let tuiState {
@@ -27,7 +28,7 @@ struct ContentView: SwiftUI::View {
             ProgressView("Starting TUI")
                 .onAppear {
                     do {
-                        self.tuiState = try .init(app: TUIApp())
+                        self.tuiState = try .init(app: ExampleApp())
                     } catch {
                         self.error = error
                     }

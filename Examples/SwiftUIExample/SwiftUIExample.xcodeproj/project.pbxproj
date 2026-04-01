@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F79998F32F7D41B30067E544 /* ExampleScenes in Frameworks */ = {isa = PBXBuildFile; productRef = F79998F22F7D41B30067E544 /* ExampleScenes */; };
 		F7FC7A8A2F7B19DE00737CB1 /* SwiftUITUIGUI in Frameworks */ = {isa = PBXBuildFile; productRef = F7FC7A892F7B19DE00737CB1 /* SwiftUITUIGUI */; };
 /* End PBXBuildFile section */
 
@@ -27,6 +28,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F79998F32F7D41B30067E544 /* ExampleScenes in Frameworks */,
 				F7FC7A8A2F7B19DE00737CB1 /* SwiftUITUIGUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -71,6 +73,7 @@
 			name = SwiftUIExample;
 			packageProductDependencies = (
 				F7FC7A892F7B19DE00737CB1 /* SwiftUITUIGUI */,
+				F79998F22F7D41B30067E544 /* ExampleScenes */,
 			);
 			productName = SwiftUIExample;
 			productReference = F7FC7A7A2F7B19A400737CB1 /* SwiftUIExample.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F7FC7A882F7B19DE00737CB1 /* XCLocalSwiftPackageReference "../../GUI/SwiftUITUIGUI" */,
+				F79998F12F7D41B30067E544 /* XCLocalSwiftPackageReference "TerminalApp" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F7FC7A7B2F7B19A400737CB1 /* Products */;
@@ -273,11 +277,11 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = llc.goodhats.SwiftUIExample;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -318,11 +322,11 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.4;
-				MARKETING_VERSION = 1.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = llc.goodhats.SwiftUIExample;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -364,6 +368,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		F79998F12F7D41B30067E544 /* XCLocalSwiftPackageReference "TerminalApp" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = TerminalApp;
+		};
 		F7FC7A882F7B19DE00737CB1 /* XCLocalSwiftPackageReference "../../GUI/SwiftUITUIGUI" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../GUI/SwiftUITUIGUI;
@@ -371,6 +379,10 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		F79998F22F7D41B30067E544 /* ExampleScenes */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ExampleScenes;
+		};
 		F7FC7A892F7B19DE00737CB1 /* SwiftUITUIGUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SwiftUITUIGUI;

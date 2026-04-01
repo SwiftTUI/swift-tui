@@ -8,6 +8,7 @@ let nativeRuntimePlatforms: [PackageDescription.Platform] = [
   .macOS,
   .linux,
   .android,
+  .iOS
 ]
 
 let explicitPlatforms = ProcessInfo.processInfo.environment["DISABLE_EXPLICIT_PLATFORMS"] != "1"

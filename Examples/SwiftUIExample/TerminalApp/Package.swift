@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-  name: "TerminalApp",
+  name: "ExampleApp",
   platforms: [
     .macOS(.v15),
     .iOS(.v18),
@@ -12,10 +12,6 @@ let package = Package(
     .library(
       name: "ExampleScenes",
       targets: ["ExampleScenes"]
-    ),
-    .executable(
-      name: "ExampleApp",
-      targets: ["ExampleApp"]
     ),
   ],
   dependencies: [
@@ -32,15 +28,7 @@ let package = Package(
         .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
       ],
       path: "Sources/ExampleScenes"
-    ),
-    .executableTarget(
-      name: "ExampleApp",
-      dependencies: [
-        "ExampleScenes",
-        .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
-      ],
-      path: "Sources/TerminalApp"
-    ),
+    )
   ],
   swiftLanguageModes: [.v6]
 )
