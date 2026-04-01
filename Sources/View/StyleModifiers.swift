@@ -49,6 +49,7 @@ extension View {
     environment(\.listStyle, style)
   }
 
+  /// Control how tab views render their tab bar.
   public func tabViewStyle(
     _ style: TabViewStyle
   ) -> some View {
