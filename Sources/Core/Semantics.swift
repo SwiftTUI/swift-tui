@@ -23,11 +23,12 @@ public struct SemanticExtractor {
         nextHitTestOrder
         in
         let isEnabled = node.environmentSnapshot.style.isEnabled
+        let hitsAllowed = node.semanticMetadata.allowsHitTesting
         let routeID = primaryRouteID(for: node.identity)
 
         let participatesInTopLevelFocus = node.participatesInTopLevelFocus
 
-        if participatesInTopLevelFocus, isEnabled {
+        if participatesInTopLevelFocus, isEnabled, hitsAllowed {
           focusRegions.append(
             FocusRegion(
               identity: node.identity,
@@ -40,6 +41,7 @@ public struct SemanticExtractor {
         }
 
         if isEnabled
+          && hitsAllowed
           && (participatesInTopLevelFocus
             || node.semanticMetadata.participatesInPointerHitTesting)
           && interactionRect(

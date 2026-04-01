@@ -37,6 +37,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   package var focusSectionBoundary: Bool
   public var focusInteractions: FocusInteractions
   public var participatesInPointerHitTesting: Bool
+  public var allowsHitTesting: Bool
   public var scrollRole: ScrollRole?
   public var sectionRole: SectionRole?
   public var presentationRole: PresentationRole?
@@ -63,6 +64,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     isFocusable: Bool? = nil,
     focusInteractions: FocusInteractions = .automatic,
     participatesInPointerHitTesting: Bool = false,
+    allowsHitTesting: Bool = true,
     scrollRole: ScrollRole? = nil,
     sectionRole: SectionRole? = nil,
     presentationRole: PresentationRole? = nil,
@@ -75,6 +77,7 @@ public struct SemanticMetadata: Equatable, Sendable {
       focusSectionBoundary: false,
       focusInteractions: focusInteractions,
       participatesInPointerHitTesting: participatesInPointerHitTesting,
+      allowsHitTesting: allowsHitTesting,
       scrollRole: scrollRole,
       sectionRole: sectionRole,
       presentationRole: presentationRole,
@@ -89,6 +92,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     focusSectionBoundary: Bool = false,
     focusInteractions: FocusInteractions = .automatic,
     participatesInPointerHitTesting: Bool = false,
+    allowsHitTesting: Bool = true,
     scrollRole: ScrollRole? = nil,
     sectionRole: SectionRole? = nil,
     presentationRole: PresentationRole? = nil,
@@ -100,6 +104,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.focusSectionBoundary = focusSectionBoundary
     self.focusInteractions = focusInteractions
     self.participatesInPointerHitTesting = participatesInPointerHitTesting
+    self.allowsHitTesting = allowsHitTesting
     self.scrollRole = scrollRole
     self.sectionRole = sectionRole
     self.presentationRole = presentationRole
@@ -117,6 +122,7 @@ public struct SemanticMetadata: Equatable, Sendable {
         : other.focusInteractions,
       participatesInPointerHitTesting: other.participatesInPointerHitTesting
         || participatesInPointerHitTesting,
+      allowsHitTesting: other.allowsHitTesting && allowsHitTesting,
       scrollRole: other.scrollRole ?? scrollRole,
       sectionRole: other.sectionRole ?? sectionRole,
       presentationRole: other.presentationRole ?? presentationRole,

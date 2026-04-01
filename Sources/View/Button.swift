@@ -170,7 +170,7 @@ private struct ButtonLinkBody<Label: View>: View {
     )
     .underline()
     .background {
-      Rectangle().fill(.tint)
+      Rectangle().fill(chrome.backgroundStyle)
     }
   }
 }

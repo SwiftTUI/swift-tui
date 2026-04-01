@@ -155,6 +155,10 @@ extension View {
     )
   }
 
+  public func allowsHitTesting(_ allowed: Bool) -> some View {
+    semanticMetadata(.init(allowsHitTesting: allowed))
+  }
+
   public func focusEffectDisabled(
     _ disabled: Bool = true
   ) -> some View {
@@ -280,7 +284,6 @@ package func scrollViewMetadata(
 ) -> SemanticMetadata {
   .init(
     focusInteractions: .edit,
-    participatesInPointerHitTesting: true,
     scrollRole: .scrollView,
     presentationRole: presentationRole
   )

@@ -1398,8 +1398,8 @@ struct InteractiveRuntimeTests {
       )
     )
     let scrollRect = try #require(
-      renderedInteractionRect(
-        for: primaryRouteID(for: testIdentity("MouseFixture", "Scroll")),
+      renderedScrollViewportRect(
+        for: testIdentity("MouseFixture", "Scroll"),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1618,8 +1618,8 @@ struct InteractiveRuntimeTests {
       .frame(width: 10, height: 5, alignment: .topLeading)
 
     let scrollRect = try #require(
-      renderedInteractionRect(
-        for: primaryRouteID(for: testIdentity("ImplicitPointerScrollFixture", "Scroll")),
+      renderedScrollViewportRect(
+        for: testIdentity("ImplicitPointerScrollFixture", "Scroll"),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1677,8 +1677,8 @@ struct InteractiveRuntimeTests {
       .frame(width: 10, height: 5, alignment: .topLeading)
 
     let scrollRect = try #require(
-      renderedInteractionRect(
-        for: primaryRouteID(for: testIdentity("ImplicitPointerLazyScrollFixture", "Scroll")),
+      renderedScrollViewportRect(
+        for: testIdentity("ImplicitPointerLazyScrollFixture", "Scroll"),
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1839,8 +1839,8 @@ struct InteractiveRuntimeTests {
       .frame(width: 12, height: 4, alignment: .topLeading)
 
     let scrollRect = try #require(
-      renderedInteractionRect(
-        for: primaryRouteID(for: scrollIdentity),
+      renderedScrollViewportRect(
+        for: scrollIdentity,
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1904,8 +1904,8 @@ struct InteractiveRuntimeTests {
       .frame(width: 12, height: 4, alignment: .topLeading)
 
     let scrollRect = try #require(
-      renderedInteractionRect(
-        for: primaryRouteID(for: scrollIdentity),
+      renderedScrollViewportRect(
+        for: scrollIdentity,
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -1958,8 +1958,8 @@ struct InteractiveRuntimeTests {
       .frame(width: 12, height: 2, alignment: .topLeading)
 
     let scrollRect = try #require(
-      renderedInteractionRect(
-        for: primaryRouteID(for: scrollIdentity),
+      renderedScrollViewportRect(
+        for: scrollIdentity,
         in: view,
         rootIdentity: rootIdentity,
         terminalSize: terminalSize
@@ -2888,6 +2888,30 @@ private func renderedInteractionRect<V: View>(
   return artifacts.semanticSnapshot.interactionRegions.first { region in
     region.routeID == routeID
   }?.rect
+}
+
+@MainActor
+private func renderedScrollViewportRect<V: View>(
+  for identity: Identity,
+  in view: V,
+  rootIdentity: Identity,
+  terminalSize: Size
+) -> Rect? {
+  var environmentValues = EnvironmentValues()
+  environmentValues.terminalSize = terminalSize
+
+  let artifacts = DefaultRenderer().render(
+    view,
+    context: .init(
+      identity: rootIdentity,
+      environmentValues: environmentValues
+    ),
+    proposal: .init(width: terminalSize.width, height: terminalSize.height)
+  )
+
+  return artifacts.semanticSnapshot.scrollRoutes.first { route in
+    route.identity == identity
+  }?.viewportRect
 }
 
 private func centerPoint(

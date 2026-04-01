@@ -185,24 +185,47 @@ extension RunLoop {
     deltaY: Int,
     location: Point
   ) {
-    guard let hitTarget = hitTarget(at: location) else {
-      return
-    }
+    let hitTarget = hitTarget(at: location)
 
-    if let focusIdentity = hitTarget.focusIdentity {
+    if let focusIdentity = hitTarget?.focusIdentity {
       _ = focusTracker.setFocus(to: focusIdentity)
     }
 
-    _ = dispatchPointerEvent(
-      preferredRouteID: hitTarget.region.routeID,
-      identity: hitTarget.region.identity,
-      event: .init(
-        kind: .scrolled(deltaX: deltaX, deltaY: deltaY),
-        location: location,
-        targetRect: hitTarget.region.rect,
-        scrollContext: scrollContext(for: hitTarget.region.identity)
+    if let scrollRoute = scrollTarget(at: location) {
+      let routeID = primaryRouteID(for: scrollRoute.identity)
+      _ = dispatchPointerEvent(
+        preferredRouteID: routeID,
+        identity: scrollRoute.identity,
+        event: .init(
+          kind: .scrolled(deltaX: deltaX, deltaY: deltaY),
+          location: location,
+          targetRect: scrollRoute.viewportRect,
+          scrollContext: .init(
+            viewportRect: scrollRoute.viewportRect,
+            contentBounds: scrollRoute.contentBounds
+          )
+        )
       )
-    )
+    } else if let hitTarget {
+      _ = dispatchPointerEvent(
+        preferredRouteID: hitTarget.region.routeID,
+        identity: hitTarget.region.identity,
+        event: .init(
+          kind: .scrolled(deltaX: deltaX, deltaY: deltaY),
+          location: location,
+          targetRect: hitTarget.region.rect,
+          scrollContext: scrollContext(for: hitTarget.region.identity)
+        )
+      )
+    }
+  }
+
+  package func scrollTarget(
+    at point: Point
+  ) -> ScrollRoute? {
+    latestSemanticSnapshot.scrollRoutes
+      .filter { $0.viewportRect.contains(point) }
+      .last
   }
 
   package func hitTarget(
