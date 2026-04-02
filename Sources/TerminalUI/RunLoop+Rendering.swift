@@ -3,6 +3,9 @@ import View
 
 extension RunLoop {
   package func renderPendingFrames(renderedFrames: inout Int) throws {
+    dynamicStateStore?.invalidator = scheduler
+    observationBridge.attachInvalidator(scheduler)
+
     while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
       while true {
         let artifacts = renderer.render(

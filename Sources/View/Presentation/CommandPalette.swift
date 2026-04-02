@@ -40,13 +40,26 @@ public struct Command: Hashable, Sendable, Identifiable {
     fileprivate var focusStyle: SemanticStyleRole {
       switch self {
       case .action:
-         .tint
-      case .destructive: 
+        .tint
+      case .destructive:
         .danger
-      case .navigation: 
+      case .navigation:
         .link
-      case .toggle: 
+      case .toggle:
         .selection
+      }
+    }
+
+    fileprivate var focusTone: TerminalTone {
+      switch self {
+      case .action:
+        .accent
+      case .destructive:
+        .danger
+      case .navigation:
+        .info
+      case .toggle:
+        .warning
       }
     }
   }
@@ -298,7 +311,9 @@ public struct CommandPalette: View {
   private let placeholder: String
   private let emptyState: String
   private let maximumResults: Int?
+  private let onDismiss: @MainActor @Sendable () -> Void
   private let onExecute: @MainActor @Sendable (Command) -> Void
+  @State private var selectedCommandID: String?
 
   public init(
     query: Binding<String>,
@@ -306,47 +321,208 @@ public struct CommandPalette: View {
     placeholder: String = "Search commands…",
     emptyState: String = "No matching commands",
     maximumResults: Int? = 8,
+    onDismiss: @escaping @MainActor @Sendable () -> Void = {},
     onExecute: @escaping @MainActor @Sendable (Command) -> Void = { _ in }
   ) {
+    let authoringScope = currentDynamicPropertyScope()
     self.query = query
     self.commands = commands
     self.placeholder = placeholder
     self.emptyState = emptyState
     self.maximumResults = maximumResults
-    self.onExecute = onExecute
+    self.onDismiss = {
+      if let authoringScope {
+        withDynamicPropertyScope(authoringScope) {
+          onDismiss()
+        }
+      } else {
+        onDismiss()
+      }
+    }
+    self.onExecute = { command in
+      if let authoringScope {
+        withDynamicPropertyScope(authoringScope) {
+          onExecute(command)
+        }
+      } else {
+        onExecute(command)
+      }
+    }
   }
 
   public var body: some View {
-    let matches = CommandCatalog(commands).matching(
-      query.wrappedValue,
-      limit: maximumResults
-    )
+    let matches = matchingCommands(for: query.wrappedValue)
+    let highlightedCommandID = preferredSelectedCommandID(in: matches)
     VStack(alignment: .leading, spacing: 1) {
       TextField(placeholder, text: query)
+        .focusable(false)
       ScrollView(.vertical) {
-        LazyVStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
           if matches.isEmpty {
             Text(emptyState)
               .foregroundStyle(.separator)
           } else {
             ForEach(matches) { command in
-              Button(action: {onExecute(command)}) {
-                CommandPaletteRow(command: command)
+              Button(action: {
+                activate(command)
+              }) {
+                CommandPaletteRow(
+                  command: command,
+                  isSelected: highlightedCommandID == command.id
+                )
               }
               .buttonStyle(.plain)
-              .focusable(!command.isDisabled, interactions: .activate)
+              .focusable(false)
               .disabled(command.isDisabled)
             }
           }
         }
       }
       .focusScope()
-    }.background(.background)
+    }
+    .background(.background)
+    .onKeyPress { keyPress in
+      handleKeyPress(keyPress, matches: matches)
+    }
+  }
+
+  @MainActor
+  private func matchingCommands(
+    for query: String
+  ) -> [Command] {
+    CommandCatalog(commands).matching(
+      query,
+      limit: maximumResults
+    )
+  }
+
+  @MainActor
+  private func activate(
+    _ command: Command
+  ) {
+    guard !command.isDisabled else {
+      return
+    }
+    onDismiss()
+    onExecute(command)
+  }
+
+  @MainActor
+  private func handleKeyPress(
+    _ keyPress: LocalKeyPress,
+    matches: [Command]
+  ) -> KeyPressResult {
+    switch keyPress.key {
+    case .escape where keyPress.modifiers.isEmpty:
+      onDismiss()
+      return .handled
+    case .enter where keyPress.modifiers.isEmpty:
+      if let command = selectedCommand(in: matches) {
+        activate(command)
+      }
+      return .handled
+    case .arrowDown where keyPress.modifiers.isEmpty:
+      moveSelection(in: matches, direction: .down)
+      return .handled
+    case .arrowUp where keyPress.modifiers.isEmpty:
+      moveSelection(in: matches, direction: .up)
+      return .handled
+    case .character, .space,
+      .backspace where allowsPaletteTextEntry(keyPress):
+      _ = mutateTextEntryBinding(
+        query,
+        event: keyPress.key,
+        allowsNewlines: false,
+        scrollPosition: nil
+      )
+      syncSelection(
+        in: matchingCommands(for: query.wrappedValue)
+      )
+      return .handled
+    default:
+      return .ignored
+    }
+  }
+
+  @MainActor
+  private func moveSelection(
+    in matches: [Command],
+    direction: SelectionDirection
+  ) {
+    let enabledMatches = matches.filter { !$0.isDisabled }
+    guard !enabledMatches.isEmpty else {
+      selectedCommandID = nil
+      return
+    }
+
+    guard let currentSelectionID = preferredSelectedCommandID(in: matches),
+      let currentIndex = enabledMatches.firstIndex(where: { $0.id == currentSelectionID })
+    else {
+      selectedCommandID = enabledMatches.first?.id
+      return
+    }
+
+    let nextIndex: Int
+    switch direction {
+    case .down:
+      nextIndex = min(currentIndex + 1, enabledMatches.count - 1)
+    case .up:
+      nextIndex = max(currentIndex - 1, 0)
+    }
+    selectedCommandID = enabledMatches[nextIndex].id
+  }
+
+  @MainActor
+  private func syncSelection(
+    in matches: [Command]
+  ) {
+    let preferredCommandID = preferredSelectedCommandID(in: matches)
+    guard selectedCommandID != preferredCommandID else {
+      return
+    }
+    selectedCommandID = preferredCommandID
+  }
+
+  @MainActor
+  private func selectedCommand(
+    in matches: [Command]
+  ) -> Command? {
+    guard let selectedCommandID = preferredSelectedCommandID(in: matches) else {
+      return nil
+    }
+    return matches.first(where: { $0.id == selectedCommandID })
+  }
+
+  @MainActor
+  private func preferredSelectedCommandID(
+    in matches: [Command]
+  ) -> String? {
+    let enabledMatches = matches.filter { !$0.isDisabled }
+    if let selectedCommandID,
+      enabledMatches.contains(where: { $0.id == selectedCommandID })
+    {
+      return selectedCommandID
+    }
+    return enabledMatches.first?.id
+  }
+
+  private func allowsPaletteTextEntry(
+    _ keyPress: LocalKeyPress
+  ) -> Bool {
+    switch keyPress.key {
+    case .character:
+      return keyPress.modifiers.isEmpty || keyPress.modifiers == .shift
+    case .space, .backspace:
+      return keyPress.modifiers.isEmpty
+    default:
+      return false
+    }
   }
 }
 
 private struct CommandPaletteRow: View {
   let command: Command
+  let isSelected: Bool
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: 1) {
@@ -369,8 +545,23 @@ private struct CommandPaletteRow: View {
         }
       }
     }
+    .padding(.init(horizontal: 1, vertical: 0))
+    .background {
+      if isSelected {
+        Rectangle().fill(
+          AnyShapeStyle(
+            .terminalRow(command.kind.focusTone, isSelected: true)
+          )
+        )
+      }
+    }
     .opacity(command.isDisabled ? 0.6 : 1)
   }
+}
+
+private enum SelectionDirection {
+  case up
+  case down
 }
 
 // MARK: - Convenience Modifier
@@ -414,25 +605,38 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
   var body: some View {
     content
       .overlayPreferenceValue(CommandPreferenceKey.self) { preference in
-        CommandShortcutDispatcher(
-          commands: preference.commands,
-          onExecute: onExecute
-        ) {
-          Rectangle().fill(.background.opacity(isPresented.wrappedValue ? 0.7 : 0.0))
-            .sheet("Command Palette", isPresented: isPresented) {
-              CommandPalette(
-                query: Binding(
-                  get: { query },
-                  set: { query = $0 }
-                ),
-                commands: preference.commands,
-                placeholder: placeholder
-              ) { [isPresented, onExecute] command in
-                isPresented.wrappedValue = false
-                query = ""
-                onExecute(command)
-              }
-            }
+        if isPresented.wrappedValue {
+          paletteOverlay(for: preference.commands)
+        } else {
+          CommandShortcutDispatcher(
+            commands: preference.commands,
+            onExecute: onExecute
+          ) {
+            paletteOverlay(for: preference.commands)
+          }
+        }
+      }
+  }
+
+  @ViewBuilder
+  private func paletteOverlay(
+    for commands: [Command]
+  ) -> some View {
+    Rectangle().fill(.background.opacity(isPresented.wrappedValue ? 0.7 : 0.0))
+      .sheet("Command Palette", isPresented: isPresented) {
+        CommandPalette(
+          query: Binding(
+            get: { query },
+            set: { query = $0 }
+          ),
+          commands: commands,
+          placeholder: placeholder,
+          onDismiss: { [isPresented] in
+            isPresented.wrappedValue = false
+            query = ""
+          }
+        ) { command in
+          onExecute(command)
         }
       }
   }

@@ -87,6 +87,95 @@ struct InteractiveRuntimeTests {
     #expect(invalidator.requests.count == 4)
   }
 
+  @MainActor
+  @Test("generic onKeyPress registers a focus-independent hotkey handler")
+  func genericOnKeyPressRegistersHotkeyHandler() {
+    let recorder = KeyPressRecorder()
+    let hotkeyRegistry = HotkeyRegistry()
+    var context = ResolveContext(
+      identity: testIdentity("OnKeyPressProbe"),
+      applyEnvironmentValues: true
+    )
+    context.hotkeyRegistry = hotkeyRegistry
+
+    _ = Text("Probe")
+      .onKeyPress { keyPress in
+        recorder.presses.append(keyPress)
+        return .handled
+      }
+      .resolve(in: context)
+
+    #expect(hotkeyRegistry.registeredBindings().count == 1)
+    #expect(hotkeyRegistry.dispatch(LocalKeyPress(.character("x"))))
+    #expect(recorder.presses == [LocalKeyPress(.character("x"))])
+  }
+
+  @MainActor
+  @Test("generic onKeyPress handles runtime key input across frames")
+  func genericOnKeyPressHandlesRuntimeKeyInputAcrossFrames() async throws {
+    let terminalSize = Size(width: 24, height: 4)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [.key(.character("o")), .key(.escape)],
+      rootIdentity: testIdentity("OnKeyPressRuntimeProbe"),
+      terminalSize: terminalSize
+    ) {
+      OnKeyPressRuntimeProbe()
+    }
+
+    #expect(result.exitReason == .inputEnded)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(lastFrame.contains("Text: o"))
+    #expect(lastFrame.contains("State: closed"))
+  }
+
+  @MainActor
+  @Test("run loop retains generic onKeyPress handlers after initial render")
+  func runLoopRetainsGenericOnKeyPressHandlersAfterInitialRender() throws {
+    let terminalSize = Size(width: 24, height: 4)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("OnKeyPressRuntimeProbe")
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: ScriptedTerminalInputReader(events: []),
+      signalReader: EmptySignalReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = terminalSize
+        return values
+      }(),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        OnKeyPressRuntimeProbe()
+      }
+    )
+
+    runLoop.attachDynamicStateStore(
+      DynamicStateStore(invalidationIdentities: [rootIdentity])
+    )
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    #expect(runLoop.hotkeyRegistry.registeredBindings().count == 1)
+    #expect(runLoop.hotkeyRegistry.dispatch(LocalKeyPress(.character("o"))))
+
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(lastFrame.contains("Text: o"))
+  }
+
   @Test(
     "focus tracker falls back to the first remaining region when the focused identity disappears")
   func focusTrackerFallsBackWhenFocusedRegionDisappears() {
@@ -897,6 +986,52 @@ struct InteractiveRuntimeTests {
     #expect(lastFrame.contains("-12_"))
     #expect(firstMetrics.usedFullRepaint)
     #expect(firstMetrics.cellsChanged == firstSurfaceSize.width * firstSurfaceSize.height)
+  }
+
+  @MainActor
+  @Test("command palette rows take focus, typing filters, and return activates the selected item")
+  func commandPaletteRowsTakeFocusAndActivate() async throws {
+    let terminalSize = Size(width: 40, height: 12)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [.key(.arrowDown), .key(.character("o")), .key(.enter)],
+      rootIdentity: testIdentity("CommandPaletteHarness"),
+      terminalSize: terminalSize
+    ) {
+      CommandPaletteHarnessView(terminalSize: terminalSize)
+    }
+
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+    #expect(
+      terminal.frames.contains(where: {
+        $0.contains("Open File") && $0.contains("Open Folder")
+      }))
+    #expect(terminal.frames.contains(where: { $0.contains("Query: o") }))
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(lastFrame.contains("History: open-folder"))
+    #expect(lastFrame.contains("Palette: closed"))
+    #expect(!lastFrame.contains("History: open-file,open-folder"))
+  }
+
+  @MainActor
+  @Test("command palette escape closes without executing the focused row")
+  func commandPaletteEscapeClosesWithoutExecuting() async throws {
+    let terminalSize = Size(width: 40, height: 12)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [.key(.escape)],
+      rootIdentity: testIdentity("CommandPaletteHarness"),
+      terminalSize: terminalSize
+    ) {
+      CommandPaletteHarnessView(terminalSize: terminalSize)
+    }
+
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(lastFrame.contains("History: none"))
+    #expect(lastFrame.contains("Palette: closed"))
   }
 
   @MainActor
@@ -2819,6 +2954,110 @@ private func scopeSectionFixture() -> some View {
   }
 }
 
+private struct CommandPaletteHarnessView: View {
+  let terminalSize: Size
+
+  @State private var isPalettePresented = true
+  @State private var executionHistory: [String] = []
+  @State private var query = ""
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("History: \(executionHistoryText)")
+      Text("Palette: \(isPalettePresented ? "open" : "closed")")
+      Text("Query: \(queryText)")
+      if isPalettePresented {
+        VStack(alignment: .leading, spacing: 1) {
+          Text("Command Palette")
+          CommandPalette(
+            query: $query,
+            commands: paletteCommands,
+            onDismiss: {
+              isPalettePresented = false
+              query = ""
+            }
+          ) { command in
+            executionHistory.append(command.id)
+          }
+          .frame(
+            width: terminalSize.width,
+            height: 7,
+            alignment: .topLeading
+          )
+        }
+      } else {
+        Text("Workspace")
+      }
+    }
+    .frame(
+      width: terminalSize.width,
+      height: terminalSize.height,
+      alignment: .topLeading
+    )
+  }
+
+  private var executionHistoryText: String {
+    executionHistory.isEmpty ? "none" : executionHistory.joined(separator: ",")
+  }
+
+  private var queryText: String {
+    query.isEmpty ? "<empty>" : query
+  }
+
+  private var paletteCommands: [Command] {
+    [
+      Command(
+        id: "open-file",
+        title: "Open File",
+        keywords: ["file"]
+      ),
+      Command(
+        id: "open-folder",
+        title: "Open Folder",
+        keywords: ["folder"]
+      ),
+      Command(
+        id: "quit",
+        title: "Quit",
+        keywords: ["exit"]
+      ),
+    ]
+  }
+}
+
+private final class KeyPressRecorder {
+  var presses: [LocalKeyPress] = []
+}
+
+private struct OnKeyPressRuntimeProbe: View {
+  @State private var text = ""
+  @State private var isClosed = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Text: \(text.isEmpty ? "<empty>" : text)")
+      Text("State: \(isClosed ? "closed" : "open")")
+    }
+    .onKeyPress { keyPress in
+      switch keyPress.key {
+      case .escape:
+        isClosed = true
+        return .handled
+      case .character, .space, .backspace:
+        _ = mutateTextEntryBinding(
+          $text,
+          event: keyPress.key,
+          allowsNewlines: false,
+          scrollPosition: nil
+        )
+        return .handled
+      default:
+        return .ignored
+      }
+    }
+  }
+}
+
 private func termiosEqual(_ lhs: termios, _ rhs: termios) -> Bool {
   unsafe withUnsafeBytes(of: lhs) { lhsBytes in
     unsafe withUnsafeBytes(of: rhs) { rhsBytes in
@@ -2861,6 +3100,9 @@ private func runTerminalInputHarness<V: View>(
     }
   )
 
+  runLoop.attachDynamicStateStore(
+    DynamicStateStore(invalidationIdentities: [rootIdentity])
+  )
   return try await runLoop.run()
 }
 

@@ -63,11 +63,24 @@ private struct OnKeyPressModifier<Content: View>: View, ResolvableView {
   var expectedKey: LocalKeyEvent?
   var expectedModifiers: EventModifiers
   let action: @MainActor @Sendable (LocalKeyPress) -> KeyPressResult
+  private let authoringScope: DynamicPropertyScope?
+
+  init(
+    content: Content,
+    expectedKey: LocalKeyEvent?,
+    expectedModifiers: EventModifiers,
+    action: @escaping @MainActor @Sendable (LocalKeyPress) -> KeyPressResult
+  ) {
+    self.content = content
+    self.expectedKey = expectedKey
+    self.expectedModifiers = expectedModifiers
+    self.action = action
+    authoringScope = currentDynamicPropertyScope()
+  }
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let node = content.resolve(in: context)
 
-    let dynamicPropertyScope = currentDynamicPropertyScope()
     let onKeyAction = action
     let matchKey = expectedKey
     let matchModifiers = expectedModifiers
@@ -84,8 +97,8 @@ private struct OnKeyPressModifier<Content: View>: View, ResolvableView {
       }
 
       let result: KeyPressResult
-      if let dynamicPropertyScope {
-        result = withDynamicPropertyScope(dynamicPropertyScope) {
+      if let authoringScope {
+        result = withDynamicPropertyScope(authoringScope) {
           onKeyAction(localKeyPress)
         }
       } else {

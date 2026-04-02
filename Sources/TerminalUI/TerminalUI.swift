@@ -27,6 +27,7 @@ private final class RetainedFrameStore {
   func store(
     _ artifacts: FrameArtifacts,
     actionRegistry: LocalActionRegistry?,
+    hotkeyRegistry: HotkeyRegistry?,
     pointerHandlerRegistry: LocalPointerHandlerRegistry?,
     focusBindingRegistry: LocalFocusBindingRegistry?,
     focusedValuesRegistry: LocalFocusedValuesRegistry?,
@@ -39,6 +40,7 @@ private final class RetainedFrameStore {
     previousResolveFrame = RetainedResolveFrame(
       resolvedTree: artifacts.resolvedTree,
       actionHandlers: actionRegistry?.snapshot() ?? [:],
+      hotkeyHandlers: hotkeyRegistry?.snapshot() ?? [],
       pointerHandlers: pointerHandlerRegistry?.snapshot() ?? [:],
       focusBindings: focusBindingRegistry?.snapshot() ?? [],
       focusedValues: focusedValuesRegistry?.snapshot() ?? [],
@@ -236,6 +238,7 @@ public struct DefaultRenderer {
     retainedFrames.store(
       artifacts,
       actionRegistry: resolveContext.localActionRegistry,
+      hotkeyRegistry: resolveContext.hotkeyRegistry,
       pointerHandlerRegistry: resolveContext.localPointerHandlerRegistry,
       focusBindingRegistry: resolveContext.localFocusBindingRegistry,
       focusedValuesRegistry: resolveContext.localFocusedValuesRegistry,

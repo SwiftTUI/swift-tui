@@ -531,6 +531,10 @@ package final class ResolveReuseSession: @unchecked Sendable {
       }
     }
 
+    if let hotkeyRegistry = context.hotkeyRegistry {
+      hotkeyRegistry.restore(previousFrame.hotkeyHandlers)
+    }
+
     if let pointerHandlerRegistry = context.localPointerHandlerRegistry {
       for (routeID, handler) in previousFrame.pointerHandlers
       where previousFrame.resolvedTreeIndex.contains(
