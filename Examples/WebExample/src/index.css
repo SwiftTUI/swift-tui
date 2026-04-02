@@ -72,10 +72,10 @@ body.is-resizing-terminal div.terminal-frame {
 .status-item {
   display: block;
   float: left;
-  font-size: 14;
+  font-size: 0.5rem;
     position: relative;
   left: 0rem;
-  top: -1rem;
+  top: -0.5rem;
 }
 
 .terminal-resize-handle {
