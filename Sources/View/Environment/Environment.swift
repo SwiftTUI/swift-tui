@@ -532,7 +532,14 @@ package final class ResolveReuseSession: @unchecked Sendable {
     }
 
     if let hotkeyRegistry = context.hotkeyRegistry {
-      hotkeyRegistry.restore(previousFrame.hotkeyHandlers)
+      hotkeyRegistry.restore(
+        previousFrame.hotkeyHandlers.filter { snapshot in
+          previousFrame.resolvedTreeIndex.contains(
+            snapshot.identity,
+            inSubtreeOf: subtreeIdentity
+          )
+        }
+      )
     }
 
     if let pointerHandlerRegistry = context.localPointerHandlerRegistry {

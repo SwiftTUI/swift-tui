@@ -18,6 +18,25 @@ package struct HotkeyBinding: Equatable, Sendable {
   }
 }
 
+package typealias HotkeyHandler = @MainActor (LocalKeyPress) -> Bool
+
+/// A retained hotkey registration tied to the subtree that authored it.
+package struct HotkeyRegistrationSnapshot {
+  package var identity: Identity
+  package var binding: HotkeyBinding
+  package var handler: HotkeyHandler
+
+  package init(
+    identity: Identity,
+    binding: HotkeyBinding,
+    handler: @escaping HotkeyHandler
+  ) {
+    self.identity = identity
+    self.binding = binding
+    self.handler = handler
+  }
+}
+
 /// A focus-independent registry of hotkey bindings that dispatches key
 /// combinations regardless of which view is focused.
 ///
@@ -26,9 +45,9 @@ package struct HotkeyBinding: Equatable, Sendable {
 /// handler wins.
 @MainActor
 package final class HotkeyRegistry: Equatable {
-  package typealias Handler = @MainActor (LocalKeyPress) -> Bool
+  package typealias Handler = HotkeyHandler
 
-  private var entries: [(binding: HotkeyBinding, handler: Handler)] = []
+  private var entries: [HotkeyRegistrationSnapshot] = []
 
   package init() {}
 
@@ -37,10 +56,17 @@ package final class HotkeyRegistry: Equatable {
   }
 
   package func register(
+    identity: Identity = .init(components: [] as [IdentityComponent]),
     binding: HotkeyBinding,
     handler: @escaping Handler
   ) {
-    entries.append((binding: binding, handler: handler))
+    entries.append(
+      .init(
+        identity: identity,
+        binding: binding,
+        handler: handler
+      )
+    )
   }
 
   /// Dispatches a key press to all registered handlers. Returns `true` if
@@ -64,11 +90,11 @@ package final class HotkeyRegistry: Equatable {
     entries.removeAll(keepingCapacity: true)
   }
 
-  package func snapshot() -> [(binding: HotkeyBinding, handler: Handler)] {
+  package func snapshot() -> [HotkeyRegistrationSnapshot] {
     entries
   }
 
-  package func restore(_ snapshot: [(binding: HotkeyBinding, handler: Handler)]) {
+  package func restore(_ snapshot: [HotkeyRegistrationSnapshot]) {
     guard !snapshot.isEmpty else {
       return
     }

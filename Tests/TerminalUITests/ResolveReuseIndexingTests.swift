@@ -115,4 +115,66 @@ struct ResolveReuseIndexingTests {
     #expect(keyRegistry.dispatch(identity: targetIdentity, event: .arrowRight))
     #expect(box.value == 2)
   }
+
+  @Test("resolve reuse replays hotkeys only for the reused subtrees that own them")
+  func resolveReuseReplaysHotkeysWithoutDuplication() {
+    final class CounterBox {
+      var alpha = 0
+      var beta = 0
+    }
+
+    let box = CounterBox()
+    let hotkeyRegistry = HotkeyRegistry()
+    let renderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+
+    func makeRoot(secondLine: String) -> some View {
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Alpha")
+          .onKeyPress(.character("a")) {
+            box.alpha += 1
+            return .handled
+          }
+        Text("Beta")
+          .onKeyPress(.character("b")) {
+            box.beta += 1
+            return .handled
+          }
+        Text(secondLine)
+      }
+    }
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      applyEnvironmentValues: true
+    )
+    initialContext.hotkeyRegistry = hotkeyRegistry
+
+    _ = renderer.render(
+      makeRoot(secondLine: "World"),
+      context: initialContext
+    )
+
+    hotkeyRegistry.reset()
+
+    var updatedContext = ResolveContext(
+      identity: testIdentity("Root"),
+      invalidatedIdentities: [testIdentity("Root", "VStack[2]")],
+      applyEnvironmentValues: true
+    )
+    updatedContext.hotkeyRegistry = hotkeyRegistry
+
+    let updated = renderer.render(
+      makeRoot(secondLine: "Planet!"),
+      context: updatedContext
+    )
+
+    #expect(updated.diagnostics.resolvedNodesReused > 0)
+    #expect(hotkeyRegistry.registeredBindings().count == 2)
+    #expect(hotkeyRegistry.dispatch(LocalKeyPress(.character("a"))))
+    #expect(hotkeyRegistry.dispatch(LocalKeyPress(.character("b"))))
+    #expect(box.alpha == 1)
+    #expect(box.beta == 1)
+  }
 }

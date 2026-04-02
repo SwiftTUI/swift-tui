@@ -192,7 +192,7 @@ private struct KeyboardShortcutModifier<Content: View>: View, ResolvableView {
         label: shortcut.label,
         group: shortcut.group
       )
-      context.hotkeyRegistry?.register(binding: binding) { _ in
+      context.hotkeyRegistry?.register(identity: context.identity, binding: binding) { _ in
         if let dynamicPropertyScope {
           withDynamicPropertyScope(dynamicPropertyScope) {
             action()

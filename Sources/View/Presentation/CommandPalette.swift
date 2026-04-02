@@ -670,7 +670,7 @@ private struct CommandShortcutDispatcher<Content: View>: View, ResolvableView {
           label: command.title,
           commandID: command.id
         )
-        context.hotkeyRegistry?.register(binding: binding) { _ in
+        context.hotkeyRegistry?.register(identity: context.identity, binding: binding) { _ in
           if let dynamicPropertyScope {
             withDynamicPropertyScope(dynamicPropertyScope) {
               executeAction(capturedCommand)

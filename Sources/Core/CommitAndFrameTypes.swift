@@ -255,7 +255,7 @@ package final class RetainedResolveFrame: @unchecked Sendable {
   package var resolvedTree: ResolvedNode
   package let resolvedTreeIndex: ResolvedTreeIndex
   package var actionHandlers: [Identity: LocalActionRegistry.Registration]
-  package var hotkeyHandlers: [(binding: HotkeyBinding, handler: HotkeyRegistry.Handler)]
+  package var hotkeyHandlers: [HotkeyRegistrationSnapshot]
   package var pointerHandlers: [RouteID: LocalPointerHandlerRegistry.Handler]
   package var focusBindings: [FocusBindingRegistrationSnapshot]
   package var focusedValues: [FocusedValuesRegistrationSnapshot]
@@ -268,7 +268,7 @@ package final class RetainedResolveFrame: @unchecked Sendable {
   package init(
     resolvedTree: ResolvedNode,
     actionHandlers: [Identity: LocalActionRegistry.Registration] = [:],
-    hotkeyHandlers: [(binding: HotkeyBinding, handler: HotkeyRegistry.Handler)] = [],
+    hotkeyHandlers: [HotkeyRegistrationSnapshot] = [],
     pointerHandlers: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
     focusBindings: [FocusBindingRegistrationSnapshot] = [],
     focusedValues: [FocusedValuesRegistrationSnapshot] = [],
