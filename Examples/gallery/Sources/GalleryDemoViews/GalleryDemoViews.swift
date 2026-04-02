@@ -6,7 +6,6 @@ public struct GalleryDemoSceneView: View {
   @Bindable public var model: GalleryDemoModel
   @State private var isResetAlertPresented = false
   @State private var isToastPresented = false
-  @State var pickerScratch: String = "one"
 
   public init(model: GalleryDemoModel) {
     self.model = model
@@ -37,8 +36,18 @@ public struct GalleryDemoSceneView: View {
           .command(
             id: "collections",
             title: "Show Collections",
-            detail: "Browse list, picker, outline, and table samples",
-            keywords: ["list", "table", "picker", "outline", "browser"],
+            detail: "Browse pickers, grouped lists, split panes, and outline samples",
+            keywords: ["list", "table", "picker", "outline", "browser", "split"],
+            kind: .navigation
+          )
+        layoutWorkbench
+          .tabItem("Layout")
+          .tag("layout")
+          .command(
+            id: "layout",
+            title: "Show Layout",
+            detail: "Inspect container, adaptive, and geometry-driven samples",
+            keywords: ["layout", "groupbox", "geometry", "adaptive", "containers"],
             kind: .navigation
           )
         appearanceWorkbench
@@ -57,8 +66,8 @@ public struct GalleryDemoSceneView: View {
           .command(
             id: "charts",
             title: "Show Charts",
-            detail: "Inspect progress, usage, and trend metrics",
-            keywords: ["progress", "usage", "trend", "sparkline"],
+            detail: "Inspect gauges, comparisons, dashboard, and timeline metrics",
+            keywords: ["progress", "gauge", "dashboard", "timeline", "sparkline"],
             kind: .navigation
           )
       }
@@ -84,17 +93,22 @@ public struct GalleryDemoSceneView: View {
       isPresented: $isResetAlertPresented,
       actions: {
         Button("Reset", role: .destructive) {
-          model.reset()
-          isResetAlertPresented = false
+          resetInteractiveState()
         }
         Button("Cancel", role: .cancel) {
           isResetAlertPresented = false
         }
       },
       message: {
-        Text("Clears the interactive control and appearance samples?")
+        Text("Clears the interactive controls, selection demos, and gallery workbench state?")
       }
     )
+  }
+
+  private func resetInteractiveState() {
+    model.reset()
+    isResetAlertPresented = false
+    isToastPresented = false
   }
 
   private var headerBar: some View {
@@ -122,6 +136,7 @@ public struct GalleryDemoSceneView: View {
         "buttons",
         "inputs",
         "values",
+        "actions",
       ],
       title: controlsTitle,
       subtitle: controlsSubtitle
@@ -134,6 +149,8 @@ public struct GalleryDemoSceneView: View {
     switch model.selectedControlDemo {
     case "inputs":
       "Inputs"
+    case "actions":
+      "Actions + Links"
     case "values":
       "Value Controls"
     default:
@@ -145,6 +162,8 @@ public struct GalleryDemoSceneView: View {
     switch model.selectedControlDemo {
     case "inputs":
       "Text entry and toggles with restrained default chrome."
+    case "actions":
+      "Menus, disclosure, and inline links stay compact and keyboard-friendly."
     case "values":
       "Dense steppers, sliders, and progress surfaces."
     default:
@@ -183,6 +202,54 @@ public struct GalleryDemoSceneView: View {
           barWidth: 20
         )
       }
+    case "actions":
+      VStack(alignment: .leading, spacing: 1) {
+        ControlGroup("Session") {
+          Button("Apply") {
+            model.advance()
+            isToastPresented = true
+          }
+          Button("Reset") {
+            isResetAlertPresented = true
+          }
+          .buttonStyle(.plain)
+          Menu("More") {
+            Button("Advance") {
+              model.advance()
+              isToastPresented = true
+            }
+            Divider()
+            Button("Show Palette") {
+              model.isPalettePresented = true
+            }
+          }
+        }
+
+        DisclosureGroup(
+          "Advanced",
+          isExpanded: $model.isActionDisclosureExpanded
+        ) {
+          VStack(alignment: .leading, spacing: 0) {
+            Toggle("Live Preview", isOn: $model.toggleEnabled)
+            Text(
+              "Read \(Link("Docs", destination: "https://swiftterminalui.dev/docs")) or \(Link("API", destination: "https://swiftterminalui.dev/api"))"
+            )
+          }
+        }
+        .openLinkAction(
+          OpenLinkAction { destination in
+            model.lastOpenedLink = destination.rawValue
+            isToastPresented = true
+            return true
+          }
+        )
+
+        LabeledContent("Last link", value: model.lastOpenedLink)
+          .frame(width: 42, alignment: .leading)
+
+        Text("Menus expand inline while links remain part of the same rich text flow.")
+          .foregroundStyle(.separator)
+      }
     default:
       VStack(alignment: .leading, spacing: 1) {
         HStack(alignment: .center, spacing: 1) {
@@ -212,6 +279,8 @@ public struct GalleryDemoSceneView: View {
         "picker",
         "browser",
         "outline",
+        "sections",
+        "split",
       ],
       title: collectionsTitle,
       subtitle: collectionsSubtitle
@@ -226,6 +295,10 @@ public struct GalleryDemoSceneView: View {
       "List + Table"
     case "outline":
       "Outline"
+    case "sections":
+      "Sectioned List"
+    case "split":
+      "Navigation Split View"
     default:
       "Picker + Menu"
     }
@@ -237,6 +310,10 @@ public struct GalleryDemoSceneView: View {
       "Pane-local browsing with active selection and compact metrics."
     case "outline":
       "Hierarchy should read like a terminal tree, not a nested card."
+    case "sections":
+      "List sections provide structure without giving up terminal density."
+    case "split":
+      "Sidebar, content, and inspector panes can stay composed in one terminal scene."
     default:
       "Selection surfaces should be self-explanatory from the keyboard."
     }
@@ -313,47 +390,241 @@ public struct GalleryDemoSceneView: View {
       }
       .outlineStyle(.rounded)
       .frame(maxWidth: .infinity, alignment: .topLeading)
+    case "sections":
+      HStack(alignment: .top, spacing: 1) {
+        List(selection: $model.sectionListSelection) {
+          Section("Framework") {
+            Label("TerminalUI") {
+              Text("◫")
+            }
+            .tag("terminal")
+
+            Label("View") {
+              Text("◎")
+            }
+            .tag("view")
+          }
+
+          Section("Add-ons") {
+            Label("Charts") {
+              Text("▥")
+            }
+            .tag("charts")
+
+            Label("Scenes") {
+              Text("◩")
+            }
+            .tag("scenes")
+          }
+        }
+        .listStyle(.insetGrouped)
+        .frame(width: 24, height: 10, alignment: .topLeading)
+
+        GroupBox("Inspector") {
+          VStack(alignment: .leading, spacing: 0) {
+            Label(selectedSectionSummary.title) {
+              Text(selectedSectionSummary.icon)
+            }
+            Text(selectedSectionSummary.note)
+              .foregroundStyle(.separator)
+            Divider()
+            LabeledContent("Selection", value: selectedSectionSummary.title)
+            LabeledContent("List style", value: "insetGrouped")
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+    case "split":
+      NavigationSplitView {
+        List(selection: $model.navigationSidebarSelection) {
+          Text("Examples").tag("examples")
+          Text("Docs").tag("docs")
+          Text("Runtime").tag("runtime")
+        }
+        .listStyle(.insetGrouped)
+        .frame(
+          minWidth: 16, idealWidth: 16, maxWidth: 16, maxHeight: .infinity, alignment: .topLeading)
+      } content: {
+        List(selection: $model.navigationContentSelection) {
+          ForEach(navigationItems) { item in
+            Text(item.title)
+              .tag(item.id)
+          }
+        }
+        .listStyle(.plain)
+        .frame(
+          minWidth: 20, idealWidth: 20, maxWidth: 20, maxHeight: .infinity, alignment: .topLeading)
+      } detail: {
+        GroupBox("Inspector") {
+          VStack(alignment: .leading, spacing: 0) {
+            Label(selectedNavigationItem.title) {
+              Text(selectedNavigationItem.icon)
+            }
+            Text(selectedNavigationItem.note)
+              .foregroundStyle(.separator)
+            Divider()
+            LabeledContent("Sidebar", value: model.navigationSidebarSelection.capitalized)
+            LabeledContent("Item", value: selectedNavigationItem.title)
+          }
+        }
+        .padding(1)
+      }
+      .frame(
+        maxWidth: .infinity,
+        minHeight: 11,
+        idealHeight: 11,
+        maxHeight: 11,
+        alignment: .topLeading
+      )
     default:
-    VStack(alignment: .leading) {
+      VStack(alignment: .leading, spacing: 1) {
         TabView(selection: $model.pickerSelection) {
-        Picker("Selection Type", selection: $pickerScratch) {
-          Text("One").tag("one")
-          Text("Two").tag("two")
-          Text("Three").tag("three")
-        }
-        .pickerStyle(.segmented)
-        .tabItem("segmented")
-        .tag("segmented")
+          Picker("Selection Type", selection: $model.pickerOptionSelection) {
+            Text("One").tag("one")
+            Text("Two").tag("two")
+            Text("Three").tag("three")
+          }
+          .pickerStyle(.segmented)
+          .tabItem("segmented")
+          .tag("segmented")
 
-        Picker("Selection Type", selection: $pickerScratch) {
-          Text("One").tag("one")
-          Text("Two").tag("two")
-          Text("Three").tag("three")
-        }
-        .pickerStyle(.inline)
-        .tabItem("inline")
-        .tag("inline")
+          Picker("Selection Type", selection: $model.pickerOptionSelection) {
+            Text("One").tag("one")
+            Text("Two").tag("two")
+            Text("Three").tag("three")
+          }
+          .pickerStyle(.inline)
+          .tabItem("inline")
+          .tag("inline")
 
-        Picker("Radio Group", selection: $pickerScratch) {
-          Text("One").tag("one")
-          Text("Two").tag("two")
-          Text("Three").tag("three")
-        }
-        .pickerStyle(.radioGroup)
-        .tabItem("radioGroup")
-        .tag("radioGroup")
+          Picker("Radio Group", selection: $model.pickerOptionSelection) {
+            Text("One").tag("one")
+            Text("Two").tag("two")
+            Text("Three").tag("three")
+          }
+          .pickerStyle(.radioGroup)
+          .tabItem("radioGroup")
+          .tag("radioGroup")
 
-        Picker("Menu", selection: $pickerScratch) {
-          Text("One").tag("one")
-          Text("Two").tag("two")
-          Text("Three").tag("three")
+          Picker("Menu", selection: $model.pickerOptionSelection) {
+            Text("One").tag("one")
+            Text("Two").tag("two")
+            Text("Three").tag("three")
+          }
+          .pickerStyle(.menu)
+          .tabItem("menu")
+          .tag("menu")
         }
-        .pickerStyle(.menu)
-        .tabItem("menu")
-        .tag("menu")
-        }
-        Text("(selection: \(pickerScratch))")
+        Text("(selection: \(model.pickerOptionSelection))")
+          .foregroundStyle(.separator)
+      }
     }
+  }
+
+  private var layoutWorkbench: some View {
+    workbenchSurface(
+      selection: $model.selectedLayoutDemo,
+      entries: [
+        "containers",
+        "adaptive",
+        "geometry",
+      ],
+      title: layoutTitle,
+      subtitle: layoutSubtitle
+    ) {
+      layoutPreview
+    }
+  }
+
+  private var layoutTitle: String {
+    switch model.selectedLayoutDemo {
+    case "adaptive":
+      "ViewThatFits"
+    case "geometry":
+      "Geometry Reader"
+    default:
+      "Labeled Containers"
+    }
+  }
+
+  private var layoutSubtitle: String {
+    switch model.selectedLayoutDemo {
+    case "adaptive":
+      "Adaptive surfaces should degrade cleanly instead of clipping valuable context."
+    case "geometry":
+      "Geometry-driven views can react to the terminal surface without leaving the DSL."
+    default:
+      "GroupBox, Label, LabeledContent, and ControlGroup keep dense views readable."
+    }
+  }
+
+  @ViewBuilder
+  private var layoutPreview: some View {
+    switch model.selectedLayoutDemo {
+    case "adaptive":
+      VStack(alignment: .leading, spacing: 1) {
+        Text("ViewThatFits chooses the first layout that survives the available width.")
+          .foregroundStyle(.separator)
+        HStack(alignment: .top, spacing: 1) {
+          adaptiveWidthSample(title: "Width 18", width: 18)
+          adaptiveWidthSample(title: "Width 30", width: 30)
+        }
+      }
+    case "geometry":
+      GeometryReader { proxy in
+        GroupBox("Terminal Surface") {
+          VStack(alignment: .leading, spacing: 0) {
+            LabeledContent("Width", value: "\(proxy.size.width)")
+            LabeledContent("Height", value: "\(proxy.size.height)")
+            Divider()
+            LabeledContent("Mode", value: geometryMode(for: proxy.size))
+            Text(geometryNote(for: proxy.size))
+              .foregroundStyle(.separator)
+              .lineLimit(2)
+              .truncationMode(.tail)
+          }
+        }
+      }
+    default:
+      HStack(alignment: .top, spacing: 1) {
+        GroupBox("Inspector") {
+          VStack(alignment: .leading, spacing: 0) {
+            Label("Workspace") {
+              Text("◧")
+            }
+            LabeledContent("Tab", value: model.activeTab.capitalized)
+            LabeledContent("Count", value: "\(model.primaryCount)")
+            Divider()
+            ControlGroup("Quick Actions") {
+              Button("+1") {
+                model.increment()
+                isToastPresented = true
+              }
+              .buttonStyle(.plain)
+              Button("Advance") {
+                model.advance()
+                isToastPresented = true
+              }
+              .buttonStyle(.plain)
+            }
+          }
+        }
+        .frame(width: 30, alignment: .topLeading)
+
+        GroupBox("Notes") {
+          VStack(alignment: .leading, spacing: 0) {
+            Text(
+              "Dense terminal surfaces benefit from labeled primitives instead of custom one-off chrome."
+            )
+            .foregroundStyle(.separator)
+            Text(
+              "These containers are the pieces you reuse for inspectors, summaries, and command rows."
+            )
+            .foregroundStyle(.separator)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
     }
   }
 
@@ -492,8 +763,9 @@ public struct GalleryDemoSceneView: View {
       selection: $model.selectedChartDemo,
       entries: [
         "progress",
-        "usage",
-        "trend",
+        "compare",
+        "dashboard",
+        "timeline",
       ],
       title: chartsTitle,
       subtitle: chartsSubtitle
@@ -504,30 +776,34 @@ public struct GalleryDemoSceneView: View {
 
   private var chartsTitle: String {
     switch model.selectedChartDemo {
-    case "usage":
-      "Usage"
-    case "trend":
-      "Trend"
+    case "compare":
+      "Comparisons"
+    case "dashboard":
+      "Dashboard"
+    case "timeline":
+      "Trend + Timeline"
     default:
-      "Progress"
+      "Progress + Gauges"
     }
   }
 
   private var chartsSubtitle: String {
     switch model.selectedChartDemo {
-    case "usage":
-      "Compact metrics should stay legible without dashboard overkill."
-    case "trend":
-      "Sparklines and deltas belong in dense terminal workspaces."
+    case "compare":
+      "Bar, comparison, and bullet charts answer different operational questions."
+    case "dashboard":
+      "Column, stacked, and heat-strip views compose into compact dashboards."
+    case "timeline":
+      "Sparklines summarize direction while timelines explain the story behind it."
     default:
-      "Progress should stay legible regardless of which host theme is active."
+      "Progress meters and threshold gauges cover both raw completion and health state."
     }
   }
 
   @ViewBuilder
   private var chartsPreview: some View {
     switch model.selectedChartDemo {
-    case "usage":
+    case "compare":
       VStack(alignment: .leading, spacing: 1) {
         BarChart(
           "Usage",
@@ -548,15 +824,262 @@ public struct GalleryDemoSceneView: View {
           barWidth: 10,
           labelWidth: 6
         )
+        BulletChart(
+          "Release",
+          value: 7,
+          target: 8,
+          total: 10,
+          tone: .warning,
+          barWidth: 20
+        )
       }
-    case "trend":
-      Sparkline(
-        "Trend",
-        values: [1, 2, 3, 5, 4, 6, 7],
-        tone: .info
+    case "dashboard":
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .top, spacing: 2) {
+          VStack(alignment: .leading, spacing: 1) {
+            ColumnChart(
+              "Signals",
+              entries: [
+                .init("cpu", value: 4, tone: .warning),
+                .init("io", value: 6, tone: .info),
+                .init("net", value: 3, tone: .success),
+              ],
+              chartHeight: 4,
+              columnWidth: 2
+            )
+            HeatStrip(
+              "Heat",
+              entries: [
+                .init("0", value: 2, tone: .info),
+                .init("1", value: 3, tone: .success),
+                .init("2", value: 6, tone: .warning),
+                .init("3", value: 4, tone: .info),
+                .init("4", value: 5, tone: .success),
+              ],
+              cellWidth: 2
+            )
+          }
+
+          VStack(alignment: .leading, spacing: 1) {
+            StackedBarChart(
+              "Composition",
+              entries: [
+                .init("docs", value: 3, tone: .info),
+                .init("forms", value: 5, tone: .success),
+                .init("charts", value: 2, tone: .warning),
+              ],
+              total: 10,
+              barWidth: 18
+            )
+            Legend(
+              "Legend",
+              items: [
+                .init("info", tone: .info),
+                .init("success", tone: .success),
+                .init("warning", tone: .warning),
+              ]
+            )
+          }
+        }
+
+        VStack(alignment: .leading, spacing: 1) {
+          ColumnChart(
+            "Signals",
+            entries: [
+              .init("cpu", value: 4, tone: .warning),
+              .init("io", value: 6, tone: .info),
+              .init("net", value: 3, tone: .success),
+            ],
+            chartHeight: 4,
+            columnWidth: 2
+          )
+          StackedBarChart(
+            "Composition",
+            entries: [
+              .init("docs", value: 3, tone: .info),
+              .init("forms", value: 5, tone: .success),
+              .init("charts", value: 2, tone: .warning),
+            ],
+            total: 10,
+            barWidth: 18
+          )
+          HeatStrip(
+            "Heat",
+            entries: [
+              .init("0", value: 2, tone: .info),
+              .init("1", value: 3, tone: .success),
+              .init("2", value: 6, tone: .warning),
+              .init("3", value: 4, tone: .info),
+              .init("4", value: 5, tone: .success),
+            ],
+            cellWidth: 2
+          )
+          Legend(
+            "Legend",
+            items: [
+              .init("info", tone: .info),
+              .init("success", tone: .success),
+              .init("warning", tone: .warning),
+            ]
+          )
+        }
+      }
+    case "timeline":
+      VStack(alignment: .leading, spacing: 1) {
+        Sparkline(
+          "Trend",
+          values: [1, 2, 3, 5, 4, 6, 7],
+          tone: .info
+        )
+        Timeline([
+          .init("Compose shell", detail: "tabs, palette, shortcuts", tone: .info),
+          .init("Show collections", detail: "lists, sections, split panes", tone: .success),
+          .init("Add metrics", detail: "gauges and timelines", tone: .warning),
+        ])
+      }
+    default:
+      VStack(alignment: .leading, spacing: 1) {
+        ProgressView("Adoption", value: 7, total: 10, barWidth: 20)
+        Meter(
+          "Focus",
+          value: Double(model.stepperValue),
+          total: 10,
+          tone: .info,
+          barWidth: 20
+        )
+        ThresholdGauge(
+          "Health",
+          value: Double(model.sliderValue),
+          total: 10,
+          bands: [
+            .init(upTo: 4, tone: .success),
+            .init(upTo: 7, tone: .info),
+            .init(upTo: 10, tone: .warning),
+          ],
+          barWidth: 20
+        )
+      }
+    }
+  }
+
+  private var selectedSectionSummary: GallerySelectionSummary {
+    switch model.sectionListSelection {
+    case "view":
+      .init(
+        title: "View",
+        note: "Authoring primitives, controls, collections, and styling live here.",
+        icon: "◎"
+      )
+    case "charts":
+      .init(
+        title: "Charts",
+        note: "Terminal-native metric views stay compact enough for dashboards.",
+        icon: "▥"
+      )
+    case "scenes":
+      .init(
+        title: "Scenes",
+        note: "Multi-scene launch support keeps apps closer to desktop terminal workflows.",
+        icon: "◩"
       )
     default:
-      ProgressView("Adoption", value: 7, total: 10, barWidth: 20)
+      .init(
+        title: "TerminalUI",
+        note: "The runtime bundles host integration, input handling, and rendering output.",
+        icon: "◫"
+      )
+    }
+  }
+
+  private var navigationItems: [GalleryNavigationItem] {
+    switch model.navigationSidebarSelection {
+    case "docs":
+      [
+        .init(
+          id: "architecture", title: "Architecture",
+          note: "Pipeline, target boundaries, and design rules.", icon: "▤"),
+        .init(
+          id: "focus", title: "Focus", note: "Focus scopes, sections, and keyboard traversal.",
+          icon: "◎"),
+        .init(
+          id: "testing", title: "Testing",
+          note: "Fixture and regression policy for rendered surfaces.", icon: "✓"),
+      ]
+    case "runtime":
+      [
+        .init(
+          id: "host", title: "Terminal Host",
+          note: "Configures raw mode, sizing, and lifecycle coordination.", icon: "⌁"),
+        .init(
+          id: "signals", title: "Signals",
+          note: "Bridges terminal signals into scene-safe runtime behavior.", icon: "⚑"),
+        .init(
+          id: "launcher", title: "Launcher",
+          note: "Multi-scene entry points wire windows into one app.", icon: "⇱"),
+      ]
+    default:
+      [
+        .init(
+          id: "gallery", title: "Gallery",
+          note: "A full-screen workbench for public TerminalUI surfaces.", icon: "◫"),
+        .init(
+          id: "todoist", title: "Todoist",
+          note: "A richer app that exercises panes, inspectors, and workflows.", icon: "☑"),
+        .init(
+          id: "web", title: "WebExample",
+          note: "A browser-hosted runtime explores the same rendering pipeline.", icon: "⌘"),
+      ]
+    }
+  }
+
+  private var selectedNavigationItem: GalleryNavigationItem {
+    navigationItems.first { $0.id == model.navigationContentSelection } ?? navigationItems[0]
+  }
+
+  private func adaptiveWidthSample(
+    title: String,
+    width: Int
+  ) -> some View {
+    GroupBox(title) {
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .center, spacing: 1) {
+          Label("Wide Mode") {
+            Text("◫")
+          }
+          Text(model.selectedChartDemo.capitalized)
+        }
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Compact")
+          Text(model.selectedChartDemo.capitalized)
+            .foregroundStyle(.separator)
+        }
+      }
+      .frame(width: width, alignment: .leading)
+    }
+  }
+
+  private func geometryMode(
+    for size: Size
+  ) -> String {
+    if size.width >= 110 {
+      return "wide"
+    }
+    if size.width >= 80 {
+      return "balanced"
+    }
+    return "compact"
+  }
+
+  private func geometryNote(
+    for size: Size
+  ) -> String {
+    switch geometryMode(for: size) {
+    case "wide":
+      "The terminal has room for side-by-side panes and richer dashboards."
+    case "balanced":
+      "A medium surface can hold split panes while keeping controls readable."
+    default:
+      "Compact terminals benefit from adaptive fallbacks and stacked layouts."
     }
   }
 
@@ -621,13 +1144,14 @@ public struct GalleryDemoSceneView: View {
       model.activeTab = "controls"
     case "collections":
       model.activeTab = "collections"
+    case "layout":
+      model.activeTab = "layout"
     case "appearance":
       model.activeTab = "appearance"
     case "charts":
       model.activeTab = "charts"
     case "reset":
-      model.reset()
-      isResetAlertPresented = false
+      resetInteractiveState()
     default:
       break
     }
@@ -647,4 +1171,17 @@ private struct GalleryOutlineNode: Identifiable {
     self.title = title
     self.children = children
   }
+}
+
+private struct GallerySelectionSummary {
+  let title: String
+  let note: String
+  let icon: String
+}
+
+private struct GalleryNavigationItem: Identifiable {
+  let id: String
+  let title: String
+  let note: String
+  let icon: String
 }

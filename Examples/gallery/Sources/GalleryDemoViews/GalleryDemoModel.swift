@@ -6,6 +6,7 @@ public final class GalleryDemoModel: @unchecked Sendable {
   public var isPalettePresented = false
   public var selectedControlDemo = "buttons"
   public var selectedCollectionDemo = "picker"
+  public var selectedLayoutDemo = "containers"
   public var selectedAppearanceDemo = "tokens"
   public var selectedChartDemo = "progress"
   public var primaryCount = 0
@@ -20,8 +21,14 @@ public final class GalleryDemoModel: @unchecked Sendable {
     to the terminal.
     """
   public var pickerSelection = "inline"
+  public var pickerOptionSelection = "one"
   public var listSelection = "beta"
   public var tableSelection = "latency"
+  public var isActionDisclosureExpanded = true
+  public var lastOpenedLink = "none"
+  public var sectionListSelection = "terminal"
+  public var navigationSidebarSelection = "examples"
+  public var navigationContentSelection = "gallery"
 
   public init() {}
 
@@ -30,6 +37,7 @@ public final class GalleryDemoModel: @unchecked Sendable {
     isPalettePresented = false
     selectedControlDemo = "buttons"
     selectedCollectionDemo = "picker"
+    selectedLayoutDemo = "containers"
     selectedAppearanceDemo = "tokens"
     selectedChartDemo = "progress"
     primaryCount = 0
@@ -44,8 +52,14 @@ public final class GalleryDemoModel: @unchecked Sendable {
       to the terminal.
       """
     pickerSelection = "inline"
+    pickerOptionSelection = "one"
     listSelection = "beta"
     tableSelection = "latency"
+    isActionDisclosureExpanded = true
+    lastOpenedLink = "none"
+    sectionListSelection = "terminal"
+    navigationSidebarSelection = "examples"
+    navigationContentSelection = "gallery"
   }
 
   public func increment() {

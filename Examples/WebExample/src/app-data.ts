@@ -18,11 +18,11 @@ export const fallbackManifest: WebTUISceneManifest = {
 };
 
 export const defaultStyle: WebTUITerminalStyle = {
-  fontSize: 15,
+  fontSize: 13,
   fontFamily:
-    '"SFMono-Regular", "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono", monospace',
+    '"BerkleyMono Nerd Font", "Berkley Mono", "SFMono-Regular", "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono", monospace',
   cursorBlink: false,
-  backgroundOpacity: 0.94,
+  backgroundOpacity: 1.0,
 };
 
 export const terminalAppManifestPath = "/TerminalApp/dist/scene-manifest.json";

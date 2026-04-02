@@ -37,6 +37,10 @@ bun dev
 `TerminalApp/dist/assets/app.wasm`, copies the packaged `ghostty-web`
 `ghostty-vt.wasm` into `dist/`, then starts the Bun server.
 
+The dev server runs Bun's HTML-import bundler behind a small proxy that adds
+the COOP/COEP headers required for `SharedArrayBuffer`-backed stdin. Hot module
+reloading is disabled in this mode, so refresh the page after frontend edits.
+
 ## Production Build
 
 ```bash

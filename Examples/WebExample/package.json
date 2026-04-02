@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build:terminal": "bun run src/build-terminal.ts",
-    "dev": "bun run build:terminal && bun --hot src/index.ts",
+    "dev": "bun run build:terminal && bun --watch src/index.ts",
     "build": "bun run build:terminal && bun build ./src/index.html --outdir=dist --sourcemap --target=browser --minify && bun build ./src/wasm-scene-worker.ts --outfile=dist/wasm-scene-worker.js --target=browser --format=esm --minify",
     "start": "bun src/start.ts",
     "test": "bun test"

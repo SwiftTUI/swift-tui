@@ -30,14 +30,13 @@ async function bootstrap(): Promise<void> {
   root.innerHTML = `
     <main>
       <div class="tabs" data-scenes></div>
-      <p data-status>Booting WebExampleApp…</p>
-      <p>Drag the resize handle under the terminal to change its size.</p>
       <div class="terminal-shell">
         <div class="terminal-frame" data-terminal-frame>
           <div class="terminal-host" data-terminal-host></div>
         </div>
         <div class="terminal-resize-bar">
-          <button type="button" class="terminal-resize-handle" data-resize-handle>Resize</button>
+          <div data-status class="status-item">Booting ExampleApp…</div>
+          <div class="terminal-resize-handle" data-resize-handle></div>
         </div>
       </div>
     </main>
@@ -69,7 +68,7 @@ async function bootstrap(): Promise<void> {
     terminalHost.dataset.sceneId = controller.selectedSceneId;
     terminalHost.dataset.size = sizeLabel ?? "";
     status.textContent = sizeLabel
-      ? `Loaded ${activeLabel} from ${manifestSource} at ${sizeLabel}.`
+      ? `${sizeLabel}`
       : `Loaded ${activeLabel} from ${manifestSource}.`;
   };
 

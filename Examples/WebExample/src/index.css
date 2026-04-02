@@ -9,6 +9,8 @@ body {
 
 #root {
   height: 100%;
+  background-color: black;
+color: #efefef;
 }
 
 main {
@@ -34,19 +36,61 @@ main {
   min-width: 320px;
   min-height: 240px;
   overflow: hidden;
-  border: 1px solid;
   box-sizing: border-box;
 }
 
+div.terminal-frame {
+  border: 1px dotted #666;
+  background: #111;
+}
+body.is-resizing-terminal div.terminal-frame {
+  border: 1px dashed #efefef;
+}
+
+.tabs > button {
+  display: inline-block;
+  background: #222;
+  border: 1px dotted #666;
+  border-bottom: 0;
+  color: #ccc;
+  margin-bottom: 0;
+}
+.tabs > button:disabled {
+  display: inline-block;
+  background: #333;
+  border: 1px dotted #efefef;
+  border-bottom: 0;
+  color: white;
+}
+
 .terminal-resize-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 4px;
+  display: block;
+  margin-top: 0;
+  font-family: "BerkleyMono Nerd Font", "Berkley Mono", "SFMono-Regular", "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono", monospace;
+}
+
+.status-item {
+  display: block;
+  float: left;
+  font-size: 14;
+    position: relative;
+  left: 0rem;
+  top: -1rem;
 }
 
 .terminal-resize-handle {
   cursor: nwse-resize;
   touch-action: none;
+    display: block;
+  float: right;
+  font-size: 30;
+  position: relative;
+  left: 0rem;
+  top: -1rem;
+  box-sizing: border-box;
+  border-color: transparent transparent #48abe0 transparent;
+  border-width: 0 0 1rem 1rem;
+  border-style: solid;
 }
 
 body.is-resizing-terminal,
@@ -54,7 +98,9 @@ body.is-resizing-terminal * {
   cursor: nwse-resize !important;
   user-select: none !important;
 }
-
+.tabs {
+  margin: 0;
+}
 .terminal-host {
   width: 100%;
   height: 100%;
@@ -62,6 +108,7 @@ body.is-resizing-terminal * {
   padding: 0 !important;
   min-height: 100% !important;
   display: block !important;
+  border-top: 0;
 }
 
 .terminal-host > .webtuigui-scene-root {
