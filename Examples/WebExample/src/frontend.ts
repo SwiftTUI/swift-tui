@@ -11,6 +11,7 @@ import {
 } from "./app-data.ts";
 import {
   createWasmSceneRuntimeFactory,
+  type WasmSceneRuntimeHandle,
   type WasmSceneResizeEvent,
 } from "./scene-runtime.ts";
 
@@ -18,6 +19,7 @@ const terminalAppManifestUrl = new URL(terminalAppManifestPath, location.href);
 const terminalAppWasmUrl = new URL(terminalAppWasmPath, location.href);
 const minimumFrameWidth = 320;
 const minimumFrameHeight = 240;
+const backtabSequence = new TextEncoder().encode("\u001B[Z");
 
 await bootstrap();
 
@@ -55,6 +57,7 @@ async function bootstrap(): Promise<void> {
   installResizeHandle(terminalFrame, resizeHandle);
 
   const sceneSizes = new Map<string, string>();
+  const sceneRuntimes = new Map<string, WasmSceneRuntimeHandle>();
   let controller: WebTUIAppController | undefined;
   let manifestSource = "";
   const renderStatus = () => {
@@ -75,7 +78,10 @@ async function bootstrap(): Promise<void> {
   ({ controller, manifestSource } = await createController(terminalHost, (event) => {
     sceneSizes.set(event.sceneId, `${event.columns}x${event.rows}`);
     renderStatus();
+  }, (runtime) => {
+    sceneRuntimes.set(runtime.descriptor.id, runtime);
   }));
+  installShiftTabPassthrough(terminalHost, () => controller, sceneRuntimes);
   const defaultScene = controller.scenes.find((scene) => scene.isDefault)?.id ?? controller.selectedSceneId;
   await controller.switchScene(defaultScene);
   renderSceneButtons(controller, scenes, () => {
@@ -91,7 +97,8 @@ async function bootstrap(): Promise<void> {
 
 async function createController(
   mount: HTMLElement,
-  onSceneResize: (event: WasmSceneResizeEvent) => void
+  onSceneResize: (event: WasmSceneResizeEvent) => void,
+  onRuntimeCreated: (runtime: WasmSceneRuntimeHandle) => void
 ): Promise<{ controller: WebTUIAppController; manifestSource: string }> {
   try {
     return {
@@ -105,6 +112,7 @@ async function createController(
         },
         sceneRuntimeFactory: createWasmSceneRuntimeFactory(terminalAppWasmUrl, {
           onSceneResize,
+          onRuntimeCreated,
         }),
       }),
       manifestSource: "TerminalApp",
@@ -121,6 +129,49 @@ async function createController(
       manifestSource: "fallback preview",
     };
   }
+}
+
+function installShiftTabPassthrough(
+  terminalHost: HTMLElement,
+  getController: () => WebTUIAppController | undefined,
+  sceneRuntimes: ReadonlyMap<string, WasmSceneRuntimeHandle>
+): void {
+  const eventOptions = { capture: true } as const;
+
+  terminalHost.addEventListener("keydown", (event) => {
+    if (
+      event.key !== "Tab" ||
+      !event.shiftKey ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.defaultPrevented
+    ) {
+      return;
+    }
+
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    const eventOriginatedInTerminal =
+      path.includes(terminalHost) ||
+      (event.target instanceof Node && terminalHost.contains(event.target));
+    if (!eventOriginatedInTerminal) {
+      return;
+    }
+
+    const controller = getController();
+    if (!controller) {
+      return;
+    }
+
+    const runtime = sceneRuntimes.get(controller.selectedSceneId);
+    if (!runtime) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    runtime.sendInput(backtabSequence);
+  }, eventOptions);
 }
 
 function renderSceneButtons(

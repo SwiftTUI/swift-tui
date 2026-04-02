@@ -45,15 +45,25 @@ export interface WasmSceneResizeEvent {
   rows: number;
 }
 
+export interface WasmSceneRuntimeHandle {
+  readonly descriptor: WebTUISceneRuntime["descriptor"];
+  sendInput(chunk: Uint8Array): void;
+}
+
 export interface WasmSceneRuntimeFactoryOptions {
   onSceneResize?(event: WasmSceneResizeEvent): void;
+  onRuntimeCreated?(runtime: WasmSceneRuntimeHandle): void;
 }
 
 export function createWasmSceneRuntimeFactory(
   wasmURL: URL,
   factoryOptions: WasmSceneRuntimeFactoryOptions = {}
 ): (options: WebTUISceneRuntimeOptions) => WebTUISceneRuntime {
-  return (options) => new WasmSceneRuntime(options, wasmURL, factoryOptions);
+  return (options) => {
+    const runtime = new WasmSceneRuntime(options, wasmURL, factoryOptions);
+    factoryOptions.onRuntimeCreated?.(runtime);
+    return runtime;
+  };
 }
 
 class WasmSceneRuntime extends WebTUISceneRuntime {

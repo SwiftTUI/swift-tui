@@ -40,7 +40,7 @@ main {
 }
 
 div.terminal-frame {
-  border: 1px dotted #666;
+  border: 1px solid #666;
   background: #111;
 }
 body.is-resizing-terminal div.terminal-frame {
@@ -50,7 +50,7 @@ body.is-resizing-terminal div.terminal-frame {
 .tabs > button {
   display: inline-block;
   background: #222;
-  border: 1px dotted #666;
+  border: 1px solid #66666633;
   border-bottom: 0;
   color: #ccc;
   margin-bottom: 0;
@@ -58,7 +58,7 @@ body.is-resizing-terminal div.terminal-frame {
 .tabs > button:disabled {
   display: inline-block;
   background: #333;
-  border: 1px dotted #efefef;
+  border: 1px solid #efefef;
   border-bottom: 0;
   color: white;
 }
@@ -109,6 +109,7 @@ body.is-resizing-terminal * {
   min-height: 100% !important;
   display: block !important;
   border-top: 0;
+  cursor: default !important;
 }
 
 .terminal-host > .webtuigui-scene-root {
@@ -139,10 +140,12 @@ body.is-resizing-terminal * {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+  cursor: default !important;
 }
 
 .terminal-host .webtuigui-scene__terminal canvas {
   touch-action: none;
+  cursor: default !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
