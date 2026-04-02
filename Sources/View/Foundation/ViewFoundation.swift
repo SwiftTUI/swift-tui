@@ -252,8 +252,10 @@ package func resolveView<V: View>(
     identity: context.identity,
     invalidator: context.invalidationProxy?.invalidator
   )
-  context.viewGraph?.setEvaluator(for: context.identity) {
-    _ = resolveView(view, in: context)
+  if let graphNode, graphNode.isAtOutermostEvaluationDepth {
+    context.viewGraph?.setEvaluator(for: context.identity) {
+      _ = resolveView(view, in: context)
+    }
   }
   context.recordResolvedComputation()
   let erased: Any = view

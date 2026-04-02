@@ -4,6 +4,7 @@ package final class ViewNode {
   package weak var invalidator: (any Invalidating)?
   package weak var ownerGraph: ViewGraph?
   package weak var parent: ViewNode?
+  package private(set) var resolvedIdentity: Identity
 
   package private(set) var children: [ViewNode]
   package private(set) var stateSlots: [AnyStateSlot]
@@ -42,6 +43,7 @@ package final class ViewNode {
 
   package init(identity: Identity) {
     self.identity = identity
+    resolvedIdentity = identity
     children = []
     stateSlots = []
     dependencies = .init()
@@ -172,6 +174,10 @@ package final class ViewNode {
     evaluator != nil
   }
 
+  package var isAtOutermostEvaluationDepth: Bool {
+    evaluationDepth == 1
+  }
+
   package func recordEnvironmentRead(
     _ key: ObjectIdentifier
   ) {
@@ -205,6 +211,7 @@ package final class ViewNode {
       child.parent = nil
     }
 
+    resolvedIdentity = resolved.identity
     kind = resolved.kind
     environmentSnapshot = resolved.environmentSnapshot
     transactionSnapshot = resolved.transactionSnapshot
@@ -505,8 +512,8 @@ package final class ViewNode {
       return cachedResolvedNode
     }
 
-    var snapshot = ResolvedNode(
-      identity: identity,
+    return ResolvedNode(
+      identity: resolvedIdentity,
       kind: kind,
       children: children.map { $0.snapshot() },
       environmentSnapshot: environmentSnapshot,
@@ -520,9 +527,6 @@ package final class ViewNode {
       intrinsicSize: intrinsicSize,
       indexedChildSource: indexedChildSource
     )
-    snapshot.preferenceValues = preferenceValues
-    snapshot.supportsRetainedReuse = supportsRetainedReuse
-    return snapshot
   }
 
   private func invalidateCachedSnapshotUpward() {

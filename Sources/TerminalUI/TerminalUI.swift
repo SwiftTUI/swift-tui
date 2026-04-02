@@ -103,15 +103,16 @@ public struct DefaultRenderer {
     resolveContext.viewGraph = viewGraph
     resolveContext.observationBridge?.attachViewGraph(viewGraph)
     resolveContext.observationBridge?.beginTrackingPass()
-    viewGraph.setRootEvaluator(rootIdentity: resolveContext.identity) {
-      _ = resolver.resolve(
-        ToastHostingRoot(
-          content: TerminalPresentationHostingRoot(
-            content: ToolbarHostingRoot(content: root)
-          )
-        ),
-        in: resolveContext
+    let wrappedRoot = ToastHostingRoot(
+      content: TerminalPresentationHostingRoot(
+        content: ToolbarHostingRoot(content: root)
       )
+    )
+    viewGraph.setRootEvaluator(rootIdentity: resolveContext.identity) {
+      _ = resolver.resolve(wrappedRoot, in: resolveContext)
+    }
+    viewGraph.setEvaluator(for: resolveContext.identity) {
+      _ = resolver.resolve(wrappedRoot, in: resolveContext)
     }
 
     let (usedSelectiveDirtyEvaluation, resolveDuration) = measurePhase {

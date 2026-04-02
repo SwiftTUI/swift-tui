@@ -8,7 +8,7 @@ structural diffing, ordinal state keying, and lifecycle-as-structure.
 breaking changes are acceptable. The goal is SwiftUI-equivalent semantics.
 
 **Status (2026-04-02):** Completed. The persistent-graph migration is now the
-live runtime path and the full suite is green (`575 tests / 72 suites`).
+live runtime path and the full suite is green (`579 tests / 72 suites`).
 
 - `DefaultRenderer` now drives resolve through `ViewGraph.evaluateDirtyNodes()`
   and snapshots the retained graph before measure/place/semantics/draw/raster.
@@ -28,16 +28,17 @@ live runtime path and the full suite is green (`575 tests / 72 suites`).
 1. **Dirty reevaluation is graph-localized**
    `ViewGraph.evaluateDirtyNodes()` remains the authoritative renderer entry
    point. Graph-owned state and observation invalidations now queue a retained
-   dirty frontier, and the renderer reevaluates those node-local evaluators
-   instead of replaying the entire root authoring pass. External/manual
-   invalidation sets still fall back to the root evaluator, because the latest
-   authored input values only arrive at the root render boundary.
+   dirty frontier, and the renderer reevaluates those node-local evaluators,
+   including the retained root node when it is itself dirty, instead of
+   replaying the entire root authoring pass. External/manual invalidation sets
+   still fall back to the root evaluator, because the latest authored input
+   values only arrive at the root render boundary.
 2. **Lifecycle emission is graph-structural**
    Structural appear, disappear, task-cancel, and task-start events now come
    directly from retained-node insertion, structural child removal, and task
-   replacement in `ViewGraph`. Viewport lifecycle diffs remain only for
-   indexed/lazy visible children, which is the intentional placed-visible
-   exception.
+   replacement in `ViewGraph`. Indexed/lazy visible children now use retained
+   visibility bookkeeping in `ViewGraph` as well, so lifecycle emission no
+   longer depends on building and diffing `LifecycleStateSnapshot` snapshots.
 
 ---
 

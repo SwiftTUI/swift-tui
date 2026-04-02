@@ -451,7 +451,7 @@ private struct TaskLifecycleModifier<Content: View>: View, ResolvableView {
     var node = content.resolve(in: context)
     let dynamicPropertyScope = currentAuthoringContext()
     let taskAction = action
-    let lifecycleIdentity = ViewNodeContext.current?.identity ?? context.identity
+    let lifecycleIdentity = ViewNodeContext.current?.identity ?? node.identity
     let descriptor = TaskDescriptor(
       id: descriptorID.map { "\(lifecycleIdentity)#task[\($0)]" } ?? "\(lifecycleIdentity)#task",
       priority: priority

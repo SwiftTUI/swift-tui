@@ -119,4 +119,33 @@ struct ViewGraphTests {
     #expect(rootEvaluations == 0)
     #expect(leafEvaluations == 1)
   }
+
+  @Test("graph-local root dirtiness still reevaluates through the root node evaluator")
+  func graphLocalRootDirtyEvaluationUsesRootNodeEvaluator() {
+    let graph = ViewGraph()
+    let snapshot = ResolvedNode(
+      identity: testIdentity("Root"),
+      kind: .root
+    )
+    _ = graph.applySnapshot(snapshot)
+
+    var rootEvaluatorCalls = 0
+    var rootNodeEvaluatorCalls = 0
+
+    graph.setRootEvaluator(rootIdentity: testIdentity("Root")) {
+      rootEvaluatorCalls += 1
+    }
+    graph.setEvaluator(for: testIdentity("Root")) {
+      rootNodeEvaluatorCalls += 1
+    }
+
+    graph.beginFrame()
+    graph.queueDirty([testIdentity("Root")])
+    graph.invalidate([testIdentity("Root")])
+    let usedDirtyFrontier = graph.evaluateDirtyNodes()
+
+    #expect(usedDirtyFrontier)
+    #expect(rootEvaluatorCalls == 0)
+    #expect(rootNodeEvaluatorCalls == 1)
+  }
 }
