@@ -164,7 +164,7 @@ extension TabView {
               for: controlIdentity,
               index: index
             ),
-            content: VStack(spacing: 0) {
+            content: VStack(alignment: .leading, spacing: 0) {
               tabItemView(
                 label: option.label.displayText,
                 isSelected: isSelected,
@@ -185,10 +185,10 @@ extension TabView {
         Spacer(minLength: 0)
       }
       .frame(height: hasRule ? 2 : 1, alignment: .leading)
-      .overlay {
+      .background {
         if focusActive {
           Rectangle()
-            .fill(AnyShapeStyle(.terminalAccent(activeTone)).opacity(0.1))
+            .fill(AnyShapeStyle(.terminalSurface(activeTone)))
         }
       }
       if options.indices.contains(activeIndex) {
@@ -215,15 +215,13 @@ extension TabView {
       underlineTabItem(
         label: label,
         isSelected: isSelected,
-        tone: tone,
-        styleEnvironment: styleEnvironment
+        tone: tone
       )
     case .rounded:
       roundedTabItem(
         label: label,
         isSelected: isSelected,
-        tone: tone,
-        styleEnvironment: styleEnvironment
+        tone: tone
       )
     case .powerline:
       powerlineTabItem(
@@ -240,8 +238,7 @@ extension TabView {
   private func underlineTabItem(
     label: String,
     isSelected: Bool,
-    tone: TerminalTone,
-    styleEnvironment: StyleEnvironmentSnapshot
+    tone: TerminalTone
   ) -> some View {
     let foreground: AnyShapeStyle =
       isSelected
@@ -280,16 +277,16 @@ extension TabView {
     label: String,
     isSelected: Bool
   ) -> some View {
-    let width = label.count
+    let width = tabLabelCellWidth(label)
     let text =
       if isSelected {
-        " \(String(repeating: "━", count: width)) "
+        "\(String(repeating: "━", count: width)) "
       } else {
-        " \(String(repeating: "─", count: width)) "
+        "\(String(repeating: "─", count: width)) "
       }
     return Text(text)
       .lineLimit(1)
-      .foregroundStyle(.semantic(.separator))
+      .foregroundStyle(.separator)
       .frame(height: 1, alignment: .leading)
   }
 
@@ -298,8 +295,7 @@ extension TabView {
   private func roundedTabItem(
     label: String,
     isSelected: Bool,
-    tone: TerminalTone,
-    styleEnvironment: StyleEnvironmentSnapshot
+    tone: TerminalTone
   ) -> some View {
     let prefix = isSelected ? "╭" : " "
     let suffix = isSelected ? "╮" : " "
@@ -321,7 +317,7 @@ extension TabView {
     label: String,
     isSelected: Bool
   ) -> some View {
-    let width = label.count + 1
+    let width = tabLabelCellWidth(label)
     let text =
       if isSelected {
         "╰" + String(repeating: "─", count: width) + "╯"
@@ -330,7 +326,7 @@ extension TabView {
       }
     return Text(text)
       .lineLimit(1)
-      .foregroundStyle(.semantic(.separator))
+      .foregroundStyle(.separator)
       .frame(height: 1, alignment: .leading)
   }
 
@@ -356,6 +352,12 @@ extension TabView {
       }
       .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.6))
   }
+}
+
+private func tabLabelCellWidth(
+  _ label: String
+) -> Int {
+  layoutText(for: label, width: nil).size.width
 }
 
 extension View {

@@ -13,6 +13,7 @@ struct GalleryColorGallery: View {
         }
       }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
   private var namedColorsSection: some View {
@@ -131,10 +132,12 @@ private struct GalleryColorTile: View {
   var body: some View {
     VStack(alignment: .center, spacing: 0) {
       GalleryColorSwatch(style: style)
-      .frame(width: 8, height: 4, alignment: .leading)
+        .frame(width: 8, height: 4, alignment: .leading)
       Text(title)
         .frame(width: 8, height: 1, alignment: .leading)
-        .background{TileBackground.init(width: 8, height: 1, tiles: ["_"], style: .separator, opacity: 0.3)}
+        .background {
+          TileBackground.init(width: 8, height: 1, tiles: ["_"], style: .separator, opacity: 0.3)
+        }
     }
   }
 }

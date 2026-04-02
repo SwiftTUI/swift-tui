@@ -2924,6 +2924,32 @@ struct SwiftUISurfaceTests {
     #expect(route.contentBounds.size == .init(width: 5, height: 3))
   }
 
+  @Test("framed ScrollView fills the remaining preview panel height")
+  func framedScrollViewFillsTheRemainingPreviewPanelHeight() throws {
+    let artifacts = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Title")
+        Divider()
+        ScrollView(.vertical, showsIndicators: false) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<8, id: \.self) { index in
+              Text("Row \(index)")
+            }
+          }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        Spacer(minLength: 0)
+      }
+      .frame(width: 8, height: 8, alignment: .topLeading),
+      context: .init(identity: testIdentity("ScrollFillPanel"))
+    )
+
+    let route = try #require(artifacts.semanticSnapshot.scrollRoutes.first)
+
+    #expect(route.viewportRect.size == .init(width: 8, height: 6))
+    #expect(route.contentBounds.size.height == 8)
+  }
+
   @Test("Lazy stacks outside ScrollView match their eager counterparts")
   func lazyStacksOutsideScrollViewMatchTheirEagerCounterparts() {
     let eagerVertical = DefaultRenderer().render(
