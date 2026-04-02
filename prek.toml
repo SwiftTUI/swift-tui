@@ -15,10 +15,10 @@ hooks = [
   },
   {
     id = "no-foundation-in-library-products",
-    name = "forbid Foundation imports in pure library layers",
-    entry = """zsh -lc 'if rg -n --glob "*.swift" "^(public import|import) Foundation$" Sources/Core Sources/View; then echo "Foundation imports are forbidden in the pure Core and View layers."; exit 1; fi'""",
+    name = "forbid Foundation imports in library layers",
+    entry = """zsh -lc 'if rg -n --glob "*.swift" "^(public import|import) Foundation$" Sources/Core Sources/View Sources/TerminalUI; then echo "Foundation imports are forbidden in the Core, View, and TerminalUI library layers."; exit 1; fi'""",
     language = "system",
-    files = '^Sources/(Core|View)/.*\.swift$',
+    files = '^Sources/(Core|View|TerminalUI)/.*\.swift$',
     pass_filenames = false
   },
   {

@@ -11,7 +11,7 @@ Structural guardrails that do not need to execute the runtime live in `prek`
 hooks instead of the Swift test suite:
 
 - `swift-format`: formats staged Swift files
-- `no-foundation-in-library-products`: inline `prek.toml` check that forbids `Foundation` imports in the pure `Core` and `View` layers
+- `no-foundation-in-library-products`: inline `prek.toml` check that forbids `Foundation` imports in the Foundation-free `Core`, `View`, and `TerminalUI` library layers
 - `Scripts/check_public_surface_policies.zsh`: enforces public-surface guardrails, actor-isolation documentation, and related docs
 
 Keep runtime, integration, and behavioral guarantees in tests. Move pure
