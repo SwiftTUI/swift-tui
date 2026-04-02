@@ -30,18 +30,251 @@ async function bootstrap(): Promise<void> {
   }
 
   root.innerHTML = `
-    <main>
-      <div class="tabs" data-scenes></div>
-      <div class="terminal-shell">
-        <div class="terminal-frame" data-terminal-frame>
-          <div class="terminal-host" data-terminal-host></div>
-        </div>
-        <div class="terminal-resize-bar">
-          <div data-status class="status-item">Booting ExampleApp…</div>
-          <div class="terminal-resize-handle" data-resize-handle></div>
-        </div>
-      </div>
-    </main>
+    <div class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="#top" aria-label="TerminalUI home">
+          <span class="brand-mark">TUI</span>
+          <span class="brand-copy">
+            <strong>TerminalUI</strong>
+            <span>SwiftUI-shaped terminal software</span>
+          </span>
+        </a>
+        <nav class="site-nav" aria-label="Page">
+          <a href="#live-terminal">Live terminal</a>
+          <a href="#technical">Architecture</a>
+          <a href="#capabilities">Capabilities</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="hero" id="top">
+          <div class="hero-copy" data-reveal>
+            <p class="eyebrow">Terminal software with real UI discipline</p>
+            <h1>Build terminal apps like product software, not a pile of escape codes.</h1>
+            <p class="hero-lede">
+              TerminalUI brings SwiftUI-shaped authoring, a strict rendering pipeline, and
+              terminal-native runtime behavior to serious interactive apps. The terminal in
+              this hero is live, running inside the browser, and backed by the same scene
+              system the framework ships for the web.
+            </p>
+
+            <div class="hero-actions">
+              <a class="button button-primary" href="#technical">Read the architecture</a>
+              <a class="button button-secondary" href="#live-terminal">Inspect the live app</a>
+            </div>
+
+            <div class="hero-highlights" aria-label="Project highlights">
+              <div class="highlight-chip">SwiftUI-shaped View, State, Binding, Focus, Scene</div>
+              <div class="highlight-chip">resolve → measure → place → semantics → draw → raster → commit</div>
+              <div class="highlight-chip">Capability-aware output for preview, snapshot, and live terminals</div>
+            </div>
+          </div>
+
+          <div class="hero-stage" data-hero-stage>
+            <div class="hero-stage__grid" aria-hidden="true"></div>
+            <div class="hero-stage__halo" aria-hidden="true"></div>
+
+            <div class="terminal-shell" id="live-terminal" data-reveal>
+              <div class="terminal-shell__shadow" aria-hidden="true"></div>
+              <div class="terminal-shell__surface">
+                <div class="terminal-chrome">
+                  <div class="terminal-lights" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <div class="terminal-chrome__title">WebExample / live terminal runtime</div>
+                  <div class="terminal-chrome__meta">Swift Wasm + WebTUIGUI</div>
+                </div>
+
+                <div class="terminal-toolbar">
+                  <div class="tabs" data-scenes></div>
+                  <div class="terminal-toolbar__badge">Interactive scene host</div>
+                </div>
+
+                <div class="terminal-frame" data-terminal-frame>
+                  <div class="terminal-host" data-terminal-host></div>
+                </div>
+
+                <div class="terminal-resize-bar">
+                  <div class="status-cluster">
+                    <div class="status-label">Active runtime</div>
+                    <div data-status class="status-item" aria-live="polite">Booting ExampleApp…</div>
+                  </div>
+                  <button
+                    type="button"
+                    class="terminal-resize-handle"
+                    data-resize-handle
+                    aria-label="Resize terminal"
+                  ></button>
+                </div>
+              </div>
+            </div>
+
+            <a class="scroll-prompt" href="#technical">Scroll for the technical breakdown</a>
+          </div>
+        </section>
+
+        <section class="content-section content-section--intro" id="technical">
+          <div class="section-heading" data-reveal>
+            <p class="eyebrow">Technical description</p>
+            <h2>A layered Swift package with a real frame pipeline behind every screen.</h2>
+          </div>
+
+          <div class="overview-grid">
+            <article class="overview-copy" data-reveal>
+              <p>
+                TerminalUI is structured as layered products instead of one monolith.
+                <strong>View</strong> handles SwiftUI-shaped authoring. <strong>Core</strong>
+                keeps layout, semantics, draw extraction, rasterization, and commit planning pure.
+                <strong>TerminalUI</strong> owns runtime coordination, terminal input, signal handling,
+                focus routing, lifecycle staging, and incremental presentation.
+              </p>
+              <p>
+                That separation lets the same authored interface move through a predictable
+                resolve → measure → place → semantics → draw → raster → commit pipeline,
+                then render for previews, tests, or live terminal sessions without collapsing
+                everything into terminal-specific shortcuts.
+              </p>
+            </article>
+
+            <div class="stat-stack">
+              <article class="stat-card" data-reveal>
+                <span class="stat-card__value">7 phases</span>
+                <p>Strict frame pipeline with separate layout, semantics, draw, raster, and commit work.</p>
+              </article>
+              <article class="stat-card" data-reveal>
+                <span class="stat-card__value">1 authoring story</span>
+                <p>SwiftUI-shaped views, state, bindings, focus, layouts, environment, and scenes.</p>
+              </article>
+              <article class="stat-card" data-reveal>
+                <span class="stat-card__value">Multiple hosts</span>
+                <p>Preview text, snapshot tests, live terminals, and web-hosted scene wrappers all share the same artifacts.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-section">
+          <div class="section-heading" data-reveal>
+            <p class="eyebrow">How the frame moves</p>
+            <h2>Every render takes the same path from authored view tree to terminal cells.</h2>
+          </div>
+
+          <ol class="pipeline-grid" aria-label="Frame pipeline">
+            <li class="pipeline-card" data-reveal>
+              <span class="pipeline-card__step">01</span>
+              <h3>Resolve</h3>
+              <p>Lower authored views into a resolved tree with merged environment and structural expansion.</p>
+            </li>
+            <li class="pipeline-card" data-reveal>
+              <span class="pipeline-card__step">02</span>
+              <h3>Measure</h3>
+              <p>Probe nodes under proposals so layout stays recursive, cacheable, and SwiftUI-faithful.</p>
+            </li>
+            <li class="pipeline-card" data-reveal>
+              <span class="pipeline-card__step">03</span>
+              <h3>Place</h3>
+              <p>Commit final geometry for interaction regions, scroll extents, and later composition work.</p>
+            </li>
+            <li class="pipeline-card" data-reveal>
+              <span class="pipeline-card__step">04</span>
+              <h3>Semantics</h3>
+              <p>Extract focus, action, selection, and scroll routes from the placed tree.</p>
+            </li>
+            <li class="pipeline-card" data-reveal>
+              <span class="pipeline-card__step">05</span>
+              <h3>Draw</h3>
+              <p>Translate placed nodes into text, shape, rule, styling, and collection draw commands.</p>
+            </li>
+            <li class="pipeline-card" data-reveal>
+              <span class="pipeline-card__step">06</span>
+              <h3>Raster</h3>
+              <p>Convert draw commands into a styled cell surface that stays separate from presentation decisions.</p>
+            </li>
+            <li class="pipeline-card" data-reveal>
+              <span class="pipeline-card__step">07</span>
+              <h3>Commit</h3>
+              <p>Diff lifecycle and task work, then package the runtime-facing handlers after the frame is ready.</p>
+            </li>
+          </ol>
+        </section>
+
+        <section class="content-section" id="capabilities">
+          <div class="section-heading" data-reveal>
+            <p class="eyebrow">What it can do today</p>
+            <h2>The current surface covers real application work, not just demos.</h2>
+          </div>
+
+          <div class="capability-grid">
+            <article class="capability-card" data-reveal>
+              <h3>Author with familiar SwiftUI patterns</h3>
+              <p>
+                Build body-only <code>View</code> types with <code>@State</code>, <code>@Binding</code>,
+                <code>@FocusState</code>, custom <code>Layout</code>, environment modifiers,
+                <code>WindowGroup</code>, and scene declarations.
+              </p>
+            </article>
+            <article class="capability-card" data-reveal>
+              <h3>Ship real interactive controls</h3>
+              <p>
+                Compose text, buttons, toggles, steppers, sliders, fields, disclosure groups,
+                menus, tab views, list structures, tables, navigation splits, and progress or charting views.
+              </p>
+            </article>
+            <article class="capability-card" data-reveal>
+              <h3>Keep runtime behavior terminal-native</h3>
+              <p>
+                Alternate-screen ownership, keyboard and mouse input, signal handling, focus routing,
+                lifecycle staging, task start or cancellation, and incremental presentation stay in the runtime layer.
+              </p>
+            </article>
+            <article class="capability-card" data-reveal>
+              <h3>Render for the host you have</h3>
+              <p>
+                Present the same frame artifacts as preview text, ASCII, ANSI16, ANSI256, true color,
+                or wrapper-hosted web scenes without rewriting the authored interface.
+              </p>
+            </article>
+            <article class="capability-card" data-reveal>
+              <h3>Scale into multiple scenes</h3>
+              <p>
+                Use <code>TerminalUIScenes</code> for multi-scene orchestration, pty-backed sessions,
+                discovery, attachment, and the public launch story for scene-based apps.
+              </p>
+            </article>
+            <article class="capability-card" data-reveal>
+              <h3>Build dashboards and operational surfaces</h3>
+              <p>
+                The separate <code>TerminalUICharts</code> track adds compact charts and metrics
+                without distorting the core framework surface.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="content-section content-section--code">
+          <div class="code-callout" data-reveal>
+            <div class="section-heading">
+              <p class="eyebrow">Swift entry point</p>
+              <h2>From a scene declaration to a live terminal session.</h2>
+            </div>
+
+            <pre class="code-example"><code>import TerminalUI
+import TerminalUIScenes
+
+@main
+struct DemoApp: App {
+  var body: some Scene {
+    WindowGroup("Deploy Dashboard") {
+      BuildSummary()
+    }
+  }
+}</code></pre>
+          </div>
+        </section>
+      </main>
+    </div>
   `;
 
   const status = root.querySelector<HTMLElement>("[data-status]");
@@ -49,11 +282,14 @@ async function bootstrap(): Promise<void> {
   const terminalFrame = root.querySelector<HTMLElement>("[data-terminal-frame]");
   const terminalHost = root.querySelector<HTMLElement>("[data-terminal-host]");
   const resizeHandle = root.querySelector<HTMLButtonElement>("[data-resize-handle]");
+  const heroStage = root.querySelector<HTMLElement>("[data-hero-stage]");
 
-  if (!status || !scenes || !terminalFrame || !terminalHost || !resizeHandle) {
+  if (!status || !scenes || !terminalFrame || !terminalHost || !resizeHandle || !heroStage) {
     throw new Error("failed to mount WebExample");
   }
 
+  installHeroTilt(heroStage);
+  installRevealAnimations(root);
   installResizeHandle(terminalFrame, resizeHandle);
 
   const sceneSizes = new Map<string, string>();
@@ -71,8 +307,8 @@ async function bootstrap(): Promise<void> {
     terminalHost.dataset.sceneId = controller.selectedSceneId;
     terminalHost.dataset.size = sizeLabel ?? "";
     status.textContent = sizeLabel
-      ? `${sizeLabel}`
-      : `Loaded ${activeLabel} from ${manifestSource}.`;
+      ? `${activeLabel} · ${sizeLabel} · ${manifestSource}`
+      : `Loading ${activeLabel} · ${manifestSource}`;
   };
 
   ({ controller, manifestSource } = await createController(terminalHost, (event) => {
@@ -278,4 +514,72 @@ function installResizeHandle(
   window.addEventListener("blur", () => {
     stopDrag();
   });
+}
+
+function installHeroTilt(stage: HTMLElement): void {
+  const supportsMotion =
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  if (!supportsMotion) {
+    return;
+  }
+
+  const reset = () => {
+    stage.style.setProperty("--hero-tilt-x", "12deg");
+    stage.style.setProperty("--hero-tilt-y", "-16deg");
+    stage.style.setProperty("--hero-glow-x", "52%");
+    stage.style.setProperty("--hero-glow-y", "38%");
+  };
+
+  reset();
+
+  stage.addEventListener("pointermove", (event) => {
+    const rect = stage.getBoundingClientRect();
+    const offsetX = (event.clientX - rect.left) / rect.width - 0.5;
+    const offsetY = (event.clientY - rect.top) / rect.height - 0.5;
+    const tiltX = 12 - offsetY * 14;
+    const tiltY = -16 + offsetX * 18;
+
+    stage.style.setProperty("--hero-tilt-x", `${tiltX.toFixed(2)}deg`);
+    stage.style.setProperty("--hero-tilt-y", `${tiltY.toFixed(2)}deg`);
+    stage.style.setProperty("--hero-glow-x", `${(event.clientX - rect.left) / rect.width * 100}%`);
+    stage.style.setProperty("--hero-glow-y", `${(event.clientY - rect.top) / rect.height * 100}%`);
+  });
+
+  stage.addEventListener("pointerleave", reset);
+}
+
+function installRevealAnimations(scope: ParentNode): void {
+  const elements = Array.from(scope.querySelectorAll<HTMLElement>("[data-reveal]"));
+  if (elements.length === 0) {
+    return;
+  }
+
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (prefersReducedMotion || typeof IntersectionObserver === "undefined") {
+    for (const element of elements) {
+      element.classList.add("is-visible");
+    }
+    return;
+  }
+
+  document.documentElement.classList.add("has-reveal-animations");
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) {
+        continue;
+      }
+
+      entry.target.classList.add("is-visible");
+      observer.unobserve(entry.target);
+    }
+  }, {
+    threshold: 0.16,
+    rootMargin: "0px 0px -8% 0px",
+  });
+
+  for (const element of elements) {
+    observer.observe(element);
+  }
 }

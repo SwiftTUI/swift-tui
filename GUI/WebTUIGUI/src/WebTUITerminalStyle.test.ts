@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import {
   decodeWebTUITerminalRenderStyleBase64,
@@ -131,3 +132,42 @@ test("terminal style maps to ghostty theme and translucent background", () => {
     "#000000"
   );
 });
+
+test("shared default transport fixtures stay in sync with WebTUI encoding", () => {
+  const darkFixture = transportFixture("terminal-render-style-default-dark");
+  const lightFixture = transportFixture("terminal-render-style-default-light");
+
+  expect(JSON.stringify(resolveWebTUITerminalRenderStyle({}, "dark"))).toBe(
+    darkFixture.json
+  );
+  expect(JSON.stringify(resolveWebTUITerminalRenderStyle({}, "light"))).toBe(
+    lightFixture.json
+  );
+
+  expect(encodeWebTUITerminalRenderStyleBase64({}, "dark")).toBe(darkFixture.base64);
+  expect(encodeWebTUITerminalRenderStyleBase64({}, "light")).toBe(lightFixture.base64);
+
+  expect(
+    JSON.stringify(decodeWebTUITerminalRenderStyleBase64(darkFixture.base64))
+  ).toBe(darkFixture.json);
+  expect(
+    JSON.stringify(decodeWebTUITerminalRenderStyleBase64(lightFixture.base64))
+  ).toBe(lightFixture.json);
+});
+
+function transportFixture(
+  basename: string
+): { json: string; base64: string } {
+  const json = readTransportFixture(`${basename}.json`);
+  const base64 = readTransportFixture(`${basename}.base64.txt`);
+  return { json, base64 };
+}
+
+function readTransportFixture(
+  name: string
+): string {
+  return readFileSync(
+    new URL(`../../../Fixtures/Transport/${name}`, import.meta.url),
+    "utf8"
+  ).trim();
+}

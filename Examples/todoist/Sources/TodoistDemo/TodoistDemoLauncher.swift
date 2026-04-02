@@ -76,8 +76,9 @@ enum TodoistDemoPhase: Sendable {
   case ready
 }
 
+@MainActor
 @Observable
-final class TodoistDemoLauncher: @unchecked Sendable {
+final class TodoistDemoLauncher: Sendable {
   @ObservationIgnored private let environmentToken: String?
 
   var phase: TodoistDemoPhase
@@ -138,7 +139,6 @@ final class TodoistDemoLauncher: @unchecked Sendable {
 }
 
 extension TodoistDemoLauncher {
-  @MainActor
   private func initialize(persistToken: Bool) async {
     let trimmedToken = apiTokenInput.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmedToken.isEmpty else {

@@ -332,7 +332,9 @@ package enum TerminalRenderStyleCodec {
   private static func encodeColor(
     _ color: Color
   ) -> String {
-    styleTransportJSONStringLiteral(color.hexString())
+    styleTransportJSONStringLiteral(
+      color.hexString(letterCase: .lowercase)
+    )
   }
 }
 
