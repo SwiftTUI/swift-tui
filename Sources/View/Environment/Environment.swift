@@ -80,6 +80,10 @@ private enum OpenLinkActionKey: EnvironmentKey {
   static let defaultValue = OpenLinkAction.placeholder
 }
 
+private enum StackAxisKey: EnvironmentKey {
+  static let defaultValue: Core.Axis? = nil
+}
+
 /// The inherited environment available while resolving a view subtree.
 public struct EnvironmentValues: Equatable, Sendable {
   private var storage: [ObjectIdentifier: any EnvironmentValueBox]
@@ -139,6 +143,13 @@ public struct EnvironmentValues: Equatable, Sendable {
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.snapshotValues == rhs.snapshotValues
+  }
+}
+
+extension EnvironmentValues {
+  package var stackAxis: Core.Axis? {
+    get { self[StackAxisKey.self] }
+    set { self[StackAxisKey.self] = newValue }
   }
 }
 

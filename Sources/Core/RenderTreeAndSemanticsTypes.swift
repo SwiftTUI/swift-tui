@@ -642,7 +642,7 @@ public indirect enum DrawCommand: Equatable, Sendable {
     strokeBorder: Bool,
     backgroundStyle: BorderBackgroundStyle? = nil
   )
-  case rule(bounds: Rect, style: AnyShapeStyle, strokeStyle: StrokeStyle)
+  case rule(bounds: Rect, style: AnyShapeStyle, strokeStyle: StrokeStyle, stackAxis: Axis?)
   case clip(bounds: Rect, child: DrawCommand)
 }
 

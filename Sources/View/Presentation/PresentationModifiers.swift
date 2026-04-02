@@ -1,6 +1,6 @@
 package import Core
 
-private enum TerminalPresentationKind: Equatable, Sendable {
+package enum TerminalPresentationKind: Equatable, Sendable {
   case alert
   case confirmationDialog
   case sheet
@@ -61,47 +61,48 @@ private enum TerminalPresentationKind: Equatable, Sendable {
 
 // AnyView policy: retain heterogeneous action and message content here while
 // modal requests are hoisted through preferences to the root presentation host.
-private struct TerminalPresentationRequest: @unchecked Sendable,
+package struct TerminalPresentationRequest: @unchecked Sendable,
   CustomStringConvertible,
   CustomDebugStringConvertible
 {
   var attachmentIdentity: Identity
   var title: String
   var kind: TerminalPresentationKind
+  var backdropOpacity: Double
   var actionViews: [AnyView]
   var messageViews: [AnyView]
   /// Arbitrary content for sheet presentations (used instead of actionViews/messageViews).
   var contentViews: [AnyView]
   var dismiss: @MainActor @Sendable () -> Void
 
-  var description: String {
+  package var description: String {
     debugDescription
   }
 
-  var debugDescription: String {
+  package var debugDescription: String {
     "TerminalPresentationRequest(identity: \(attachmentIdentity.path), kind: \(kind.debugName), title: \(String(reflecting: title)), actions: \(actionViews.count), messages: \(messageViews.count), content: \(contentViews.count))"
   }
 }
 
-private struct TerminalPresentationPreferenceValue: @unchecked Sendable,
+package struct TerminalPresentationPreferenceValue: @unchecked Sendable,
   CustomStringConvertible,
   CustomDebugStringConvertible
 {
   var requests: [TerminalPresentationRequest] = []
 
-  var description: String {
+  package var description: String {
     debugDescription
   }
 
-  var debugDescription: String {
+  package var debugDescription: String {
     requests.map(\.debugDescription).joined(separator: ", ")
   }
 }
 
-private enum TerminalPresentationPreferenceKey: PreferenceKey {
-  static let defaultValue = TerminalPresentationPreferenceValue()
+package enum TerminalPresentationPreferenceKey: PreferenceKey {
+  package static let defaultValue = TerminalPresentationPreferenceValue()
 
-  static func reduce(
+  package static func reduce(
     value: inout TerminalPresentationPreferenceValue,
     nextValue: () -> TerminalPresentationPreferenceValue
   ) {
@@ -254,9 +255,10 @@ private func defaultPresentationActions(
 
 // AnyView policy: retain heterogeneous child storage here for authored message
 // and action content in hoisted terminal presentations.
-private struct TerminalPresentationModifier<Content: View, Actions: View,
-  Message: View>: View, ResolvableView
-{
+private struct TerminalPresentationModifier<
+  Content: View, Actions: View,
+  Message: View
+>: View, ResolvableView {
   var content: Content
   var title: String
   var isPresented: Binding<Bool>
@@ -278,6 +280,7 @@ private struct TerminalPresentationModifier<Content: View, Actions: View,
             attachmentIdentity: node.identity,
             title: title,
             kind: kind,
+            backdropOpacity: 0,
             actionViews: declaredBuilderChildren(from: actions),
             messageViews: declaredBuilderChildren(from: message),
             contentViews: [],
@@ -316,6 +319,7 @@ private struct TerminalSheetModifier<Content: View, SheetContent: View>: View,
             attachmentIdentity: node.identity,
             title: title,
             kind: .sheet,
+            backdropOpacity: 0,
             actionViews: [],
             messageViews: [],
             contentViews: declaredBuilderChildren(from: sheetContent),
@@ -347,23 +351,32 @@ private struct TerminalHostedPresentation: View {
   var request: TerminalPresentationRequest
 
   var body: some View {
-    TerminalPresentationSurface(
-      title: request.title,
-      kind: request.kind,
-      actionViews: request.actionViews,
-      messageViews: request.messageViews,
-      contentViews: request.contentViews,
-      dismiss: request.dismiss
-    )
-    .padding(
-      .init(
-        top: 1,
-        leading: 1,
-        bottom: 1,
-        trailing: 1
+    ZStack(alignment: .topLeading) {
+      if request.backdropOpacity > 0 {
+        Rectangle()
+          .fill(.background.opacity(request.backdropOpacity))
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      }
+
+      TerminalPresentationSurface(
+        title: request.title,
+        kind: request.kind,
+        actionViews: request.actionViews,
+        messageViews: request.messageViews,
+        contentViews: request.contentViews,
+        dismiss: request.dismiss
       )
-    )
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: request.kind.alignment)
+      .padding(
+        .init(
+          top: 1,
+          leading: 1,
+          bottom: 1,
+          trailing: 1
+        )
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: request.kind.alignment)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 

@@ -256,11 +256,12 @@ extension Rasterizer {
         cells: &cells,
         clip: clip
       )
-    case .rule(let bounds, let style, let strokeStyle):
+    case .rule(let bounds, let style, let strokeStyle, let stackAxis):
       paintRule(
         in: bounds,
         style: style,
         strokeStyle: strokeStyle,
+        stackAxis: stackAxis,
         environment: environment,
         cells: &cells,
         clip: clip
@@ -556,6 +557,7 @@ extension Rasterizer {
     in bounds: Rect,
     style: AnyShapeStyle,
     strokeStyle: StrokeStyle,
+    stackAxis: Axis?,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     clip: Rect?
@@ -569,7 +571,16 @@ extension Rasterizer {
       environment: environment
     )
     let glyphs = borderGlyphs(for: .rectangle, variant: strokeStyle.lineVariant)
-    if bounds.size.width >= bounds.size.height {
+    let drawsHorizontal =
+      switch stackAxis {
+      case .vertical?:
+        true
+      case .horizontal?:
+        false
+      case nil:
+        bounds.size.width >= bounds.size.height
+      }
+    if drawsHorizontal {
       let y = bounds.origin.y + (bounds.size.height / 2)
       for x in bounds.origin.x..<(bounds.origin.x + bounds.size.width) {
         writeStrokeGlyph(

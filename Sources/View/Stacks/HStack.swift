@@ -1,4 +1,3 @@
-
 public import Core
 
 /// Arranges children horizontally using stack layout rules.
@@ -28,9 +27,10 @@ public struct HStack<Content: View>: View, ResolvableView {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let stackContext = context.settingEnvironment(\.stackAxis, to: .horizontal)
     let resolvedChildren = resolveDeclaredChildren(
       content,
-      in: context,
+      in: stackContext,
       kindName: "HStack"
     )
     return [

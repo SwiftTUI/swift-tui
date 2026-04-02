@@ -670,54 +670,72 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
   @State private var query = ""
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    resolveViewElements(body, in: context)
-  }
-
-  @ViewBuilder
-  var body: some View {
-    let paletteHost =
-      content
-      .overlayPreferenceValue(CommandPreferenceKey.self) { preference in
-        if isPresented.wrappedValue {
-          paletteOverlay(for: preference.registrations)
-        }
-      }
+    var node = content.resolve(in: context)
 
     if let shortcut, !isPresented.wrappedValue {
-      paletteHost.onKeyPress(
-        shortcut,
-        modifiers: shortcutModifiers
-      ) {
+      let binding = HotkeyBinding(
+        key: KeyPress(shortcut, modifiers: shortcutModifiers)
+      )
+      context.hotkeyRegistry?.register(identity: context.identity, binding: binding) {
+        localKeyPress in
+        guard
+          localKeyPress.key == shortcut,
+          localKeyPress.modifiers == shortcutModifiers
+        else {
+          return false
+        }
         isPresented.wrappedValue = true
-        return .handled
+        return true
       }
-    } else {
-      paletteHost
     }
+
+    guard isPresented.wrappedValue else {
+      return [node]
+    }
+
+    let registrations = node.preferenceValues[CommandPreferenceKey.self].registrations
+    node.preferenceValues.merge(
+      TerminalPresentationPreferenceKey.self,
+      value: .init(
+        requests: [
+          .init(
+            attachmentIdentity: node.identity,
+            title: "Command Palette",
+            kind: .sheet,
+            backdropOpacity: 0.7,
+            actionViews: [],
+            messageViews: [],
+            contentViews: declaredBuilderChildren(from: paletteSheet(for: registrations)),
+            dismiss: { [isPresented] in
+              isPresented.wrappedValue = false
+              query = ""
+            }
+          )
+        ]
+      )
+    )
+
+    return [node]
   }
 
-  @ViewBuilder
-  private func paletteOverlay(
+  private func paletteSheet(
     for registrations: [CommandRegistration]
   ) -> some View {
     let commands = registrations.map(\.command)
-    Rectangle().fill(.background.opacity(isPresented.wrappedValue ? 0.7 : 0.0))
-      .sheet("Command Palette", isPresented: isPresented) {
-        CommandPalette(
-          query: Binding(
-            get: { query },
-            set: { query = $0 }
-          ),
-          commands: commands,
-          placeholder: placeholder,
-          onDismiss: { [isPresented] in
-            isPresented.wrappedValue = false
-            query = ""
-          }
-        ) { command in
-          execute(command, using: registrations)
-        }
+    return CommandPalette(
+      query: Binding(
+        get: { query },
+        set: { query = $0 }
+      ),
+      commands: commands,
+      placeholder: placeholder,
+      onDismiss: { [isPresented] in
+        isPresented.wrappedValue = false
+        query = ""
       }
+    ) { command in
+      execute(command, using: registrations)
+    }
   }
 
   @MainActor

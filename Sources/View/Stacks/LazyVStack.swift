@@ -27,7 +27,8 @@ public struct LazyVStack<Content: View>: View, ResolvableView {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let childContext = context.indexedChild(
+    let stackContext = context.settingEnvironment(\.stackAxis, to: .vertical)
+    let childContext = stackContext.indexedChild(
       kind: .init(rawValue: "LazyVStack"),
       index: 0
     )
@@ -55,7 +56,7 @@ public struct LazyVStack<Content: View>: View, ResolvableView {
 
     let resolvedChildren = resolveDeclaredChildren(
       content,
-      in: context,
+      in: stackContext,
       kindName: "LazyVStack"
     )
     return [

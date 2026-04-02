@@ -400,8 +400,9 @@ extension SnapshotRenderer {
       let bounds, let geometry, let style, let strokeStyle, let strokeBorder, let backgroundStyle):
       return
         "stroke[\(describe(bounds)) \(describe(geometry)) \(describe(strokeStyle)) border=\(strokeBorder) style=\(describe(style)) bg=\(backgroundStyle.map(describe) ?? "nil")]"
-    case .rule(let bounds, let style, let strokeStyle):
-      return "rule[\(describe(bounds)) \(describe(strokeStyle)) style=\(describe(style))]"
+    case .rule(let bounds, let style, let strokeStyle, let stackAxis):
+      return
+        "rule[\(describe(bounds)) \(describe(strokeStyle)) style=\(describe(style)) stackAxis=\(stackAxis?.rawValue ?? "nil")]"
     case .clip(let bounds, _):
       return "clip[\(describe(bounds))]"
     }

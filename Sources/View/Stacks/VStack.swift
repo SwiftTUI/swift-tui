@@ -27,9 +27,10 @@ public struct VStack<Content: View>: View, ResolvableView {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let stackContext = context.settingEnvironment(\.stackAxis, to: .vertical)
     let resolvedChildren = resolveDeclaredChildren(
       content,
-      in: context,
+      in: stackContext,
       kindName: "VStack"
     )
     return [
@@ -49,4 +50,3 @@ public struct VStack<Content: View>: View, ResolvableView {
     ]
   }
 }
-

@@ -4606,6 +4606,53 @@ struct SwiftUISurfaceTests {
     #expect(horizontalArtifacts.rasterSurface.lines == ["A│B", " │", " │"])
   }
 
+  @Test("Divider keeps the enclosing stack direction when framed")
+  func dividerKeepsStackDrivenOrientationWhenFramed() {
+    let verticalArtifacts = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("A")
+        Divider().frame(width: 3, height: 4)
+        Text("B")
+      },
+      context: .init(identity: testIdentity("VerticalFramed"))
+    )
+    let horizontalArtifacts = DefaultRenderer().render(
+      HStack(alignment: .top, spacing: 0) {
+        Text("A")
+        Divider().frame(width: 4, height: 3)
+        Text("B")
+      },
+      context: .init(identity: testIdentity("HorizontalFramed"))
+    )
+
+    #expect(verticalArtifacts.measuredTree.measuredSize == .init(width: 3, height: 6))
+    #expect(verticalArtifacts.rasterSurface.lines == ["A", "", "───", "", "", "B"])
+
+    #expect(horizontalArtifacts.measuredTree.measuredSize == .init(width: 6, height: 3))
+    #expect(horizontalArtifacts.rasterSurface.lines == ["A │  B", "  │", "  │"])
+  }
+
+  @Test("Divider inherits stack direction through lazy indexed child sources")
+  func dividerInLazyIndexedChildSourceUsesStackDirection() {
+    let artifacts = DefaultRenderer().render(
+      LazyHStack(alignment: .top, spacing: 0) {
+        ForEach([0, 1, 2], id: \.self) { index in
+          if index == 0 {
+            Text("A")
+          } else if index == 1 {
+            Divider().frame(width: 4, height: 3)
+          } else {
+            Text("B")
+          }
+        }
+      },
+      context: .init(identity: testIdentity("LazyHorizontalFramed"))
+    )
+
+    #expect(artifacts.measuredTree.measuredSize == .init(width: 6, height: 3))
+    #expect(artifacts.rasterSurface.lines == ["A │  B", "  │", "  │"])
+  }
+
   @Test("border and divider styles lower through richer raster families")
   func borderAndRuleStylesLowerThroughRasterFamilies() {
     let borderArtifacts = DefaultRenderer().render(

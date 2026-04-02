@@ -218,11 +218,13 @@ public struct Divider: View, ResolvableView {
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    [
+    var resolvedDrawMetadata = drawMetadata
+    resolvedDrawMetadata.ruleStackAxis = context.environmentValues.stackAxis
+    return [
       resolveLeafNode(
         kindName: "Divider",
         intrinsicSize: .init(width: 1, height: 1),
-        drawMetadata: drawMetadata,
+        drawMetadata: resolvedDrawMetadata,
         drawPayload: .rule(nil),
         in: context
       )

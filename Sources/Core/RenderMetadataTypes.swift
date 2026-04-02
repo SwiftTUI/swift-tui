@@ -235,6 +235,7 @@ public struct DrawMetadata: Equatable, Sendable {
   public var clipIdentifier: String?
   public var compositingHint: String?
   public var imagePreference: String?
+  package var ruleStackAxis: Axis?
 
   public init(
     foregroundStyle: AnyShapeStyle? = nil,
@@ -297,6 +298,7 @@ public struct DrawMetadata: Equatable, Sendable {
     self.clipIdentifier = clipIdentifier
     self.compositingHint = compositingHint
     self.imagePreference = imagePreference
+    ruleStackAxis = nil
   }
 
   public var foregroundStyle: AnyShapeStyle? {
@@ -413,6 +415,7 @@ public struct DrawMetadata: Equatable, Sendable {
     merged.clipIdentifier = other.clipIdentifier ?? clipIdentifier
     merged.compositingHint = other.compositingHint ?? compositingHint
     merged.imagePreference = other.imagePreference ?? imagePreference
+    merged.ruleStackAxis = other.ruleStackAxis ?? ruleStackAxis
     return merged
   }
 }

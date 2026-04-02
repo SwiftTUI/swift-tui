@@ -442,7 +442,10 @@ public struct LayoutEngine {
       case .shape:
         return measuredShapeSize(for: proposal)
       case .rule:
-        return measuredRuleSize(for: proposal)
+        return measuredRuleSize(
+          for: proposal,
+          stackAxis: resolved.drawMetadata.ruleStackAxis
+        )
       case .none:
         break
       }
@@ -749,10 +752,22 @@ public struct LayoutEngine {
   }
 
   private func measuredRuleSize(
-    for proposal: ProposedSize
+    for proposal: ProposedSize,
+    stackAxis: Axis?
   ) -> Size {
     let proposedWidth = finiteDimension(of: proposal.width)
     let proposedHeight = finiteDimension(of: proposal.height)
+
+    if let stackAxis {
+      switch stackAxis {
+      case .vertical:
+        let width = max(0, proposedWidth ?? 1)
+        return Size(width: width, height: width > 0 ? 1 : 0)
+      case .horizontal:
+        let height = max(0, proposedHeight ?? 1)
+        return Size(width: height > 0 ? 1 : 0, height: height)
+      }
+    }
 
     switch (proposedWidth, proposedHeight) {
     case (let width?, nil):

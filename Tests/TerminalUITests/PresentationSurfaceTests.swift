@@ -1,11 +1,34 @@
 import Testing
 
+@testable import Core
 @testable import TerminalUI
 @testable import View
 
 @MainActor
 @Suite
 struct PresentationSurfaceTests {
+  @Test("command palette backdrop spans the full terminal canvas")
+  func commandPaletteBackdropSpansTheFullTerminalCanvas() {
+    let proposal = Size(width: 40, height: 10)
+    let artifacts = DefaultRenderer().render(
+      Text("Workspace")
+        .command(
+          id: "open-file",
+          title: "Open File"
+        )
+        .frame(width: 12, height: 1, alignment: .leading)
+        .commandPalette(isPresented: .constant(true)),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: proposal.width, height: proposal.height)
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    let expectedBounds = Rect(origin: .zero, size: proposal)
+
+    #expect(surface.contains("Command Palette"))
+    #expect(hasFillCommand(in: artifacts.drawTree, bounds: expectedBounds))
+  }
+
   @Test("alert renders an overlay surface and suppresses background focus")
   func alertRendersAndSuppressesBackgroundFocus() throws {
     let artifacts = DefaultRenderer().render(
@@ -148,5 +171,32 @@ struct PresentationSurfaceTests {
 
     #expect(messageIndex >= 3)
     #expect(messageLine.first != " ")
+  }
+}
+
+private func hasFillCommand(
+  in node: DrawNode,
+  bounds: Rect
+) -> Bool {
+  if node.commands.contains(where: { hasFillCommand($0, bounds: bounds) }) {
+    return true
+  }
+
+  return node.children.contains(where: { hasFillCommand(in: $0, bounds: bounds) })
+}
+
+private func hasFillCommand(
+  _ command: DrawCommand,
+  bounds: Rect
+) -> Bool {
+  switch command {
+  case .group(_, let children):
+    return children.contains(where: { hasFillCommand($0, bounds: bounds) })
+  case .fill(let commandBounds, _, _, _):
+    return commandBounds == bounds
+  case .clip(_, let child):
+    return hasFillCommand(child, bounds: bounds)
+  default:
+    return false
   }
 }

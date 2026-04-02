@@ -114,7 +114,8 @@ extension DrawExtractor {
           .rule(
             bounds: lineBounds,
             style: style,
-            strokeStyle: .init(lineVariant: .single)
+            strokeStyle: .init(lineVariant: .single),
+            stackAxis: nil
           )
         )
       }

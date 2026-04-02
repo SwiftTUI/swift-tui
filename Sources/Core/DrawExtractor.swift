@@ -163,7 +163,8 @@ extension DrawExtractor {
           style: drawMetadata.borderShapeStyle
             ?? drawMetadata.foregroundStyle
             ?? .semantic(.separator),
-          strokeStyle: strokeStyle ?? drawMetadata.borderStrokeStyle ?? .init()
+          strokeStyle: strokeStyle ?? drawMetadata.borderStrokeStyle ?? .init(),
+          stackAxis: drawMetadata.ruleStackAxis
         )
       )
     }
