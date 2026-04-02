@@ -127,9 +127,13 @@ package struct TerminalPresentationHostingRoot<Content: View>: View, ResolvableV
       return [baseNode]
     }
 
-    baseNode.setEnabledRecursively(false)
-
     let hostContext = context.child(component: .named("PresentationHost"))
+    let baseContext = hostContext.child(component: .named("base"))
+    baseNode = normalizeResolvedElements(
+      resolveViewElements(content, in: baseContext),
+      in: baseContext
+    )
+    baseNode.setEnabledRecursively(false)
     let overlayNode = TerminalPresentationOverlayHost(requests: requests).resolve(
       in: hostContext.child(component: .named("overlay"))
     )
@@ -650,6 +654,11 @@ package struct ToastHostingRoot<Content: View>: View, ResolvableView {
     }
 
     let hostContext = context.child(component: .named("ToastHost"))
+    let baseContext = hostContext.child(component: .named("base"))
+    let hostedBaseNode = normalizeResolvedElements(
+      resolveViewElements(content, in: baseContext),
+      in: baseContext
+    )
     let overlayNode = ToastOverlayHost(requests: requests).resolve(
       in: hostContext.child(component: .named("overlay"))
     )
@@ -658,7 +667,7 @@ package struct ToastHostingRoot<Content: View>: View, ResolvableView {
       ResolvedNode(
         identity: hostContext.identity,
         kind: .view("ToastHost"),
-        children: [baseNode, overlayNode],
+        children: [hostedBaseNode, overlayNode],
         environmentSnapshot: hostContext.environment,
         transactionSnapshot: hostContext.transaction,
         layoutBehavior: .overlay(alignment: .topLeading)

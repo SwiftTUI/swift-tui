@@ -274,6 +274,10 @@ public final class RunLoop<State: Equatable & Sendable> {
       eventPump.cancel()
     }
 
+    if scheduler.hasPendingFrame(at: .now()) {
+      try renderPendingFrames(renderedFrames: &renderedFrames)
+    }
+
     var iterator = eventPump.stream.makeAsyncIterator()
     while await iterator.next() != nil {
       let pendingEvents = await drainPendingEvents(from: eventPump)

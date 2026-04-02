@@ -6,6 +6,7 @@ package final class ObservationBridge: Equatable {
   private var currentPass: UInt64 = 0
   private var observedPasses: [Identity: UInt64] = [:]
   private weak var invalidator: (any Invalidating)?
+  private weak var viewGraph: ViewGraph?
 
   package init() {}
 
@@ -20,6 +21,12 @@ package final class ObservationBridge: Equatable {
     _ invalidator: (any Invalidating)?
   ) {
     self.invalidator = invalidator
+  }
+
+  package func attachViewGraph(
+    _ viewGraph: ViewGraph?
+  ) {
+    self.viewGraph = viewGraph
   }
 
   package func beginTrackingPass() {
@@ -60,6 +67,7 @@ package final class ObservationBridge: Equatable {
     guard observedPasses[identity] == pass else {
       return
     }
+    viewGraph?.queueDirty([identity])
     invalidator?.requestInvalidation(of: [identity])
   }
 }

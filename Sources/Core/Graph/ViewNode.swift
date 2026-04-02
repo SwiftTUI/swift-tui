@@ -2,6 +2,8 @@
 package final class ViewNode {
   package let identity: Identity
   package weak var invalidator: (any Invalidating)?
+  package weak var ownerGraph: ViewGraph?
+  package weak var parent: ViewNode?
 
   package private(set) var children: [ViewNode]
   package private(set) var stateSlots: [AnyStateSlot]
@@ -34,6 +36,9 @@ package final class ViewNode {
 
   private let dependencyTracker: DependencyTracker
   private var cachedResolvedNode: ResolvedNode?
+  private var registrationCaptureDepth: Int
+  private var evaluationDepth: Int
+  private var evaluator: (@MainActor () -> Void)?
 
   package init(identity: Identity) {
     self.identity = identity
@@ -64,6 +69,9 @@ package final class ViewNode {
     bodyStateSlotCount = nil
     currentBodyStateSlotCount = 0
     dependencyTracker = .init()
+    registrationCaptureDepth = 0
+    evaluationDepth = 0
+    evaluator = nil
   }
 
   package func prepareForFrame() {
@@ -77,19 +85,35 @@ package final class ViewNode {
   package func beginEvaluation(
     invalidator: (any Invalidating)?
   ) {
+    if evaluationDepth == 0 {
+      self.invalidator = invalidator
+      wasVisitedThisFrame = true
+      isDirty = false
+      currentBodyStateSlotCount = 0
+      _ = dependencyTracker.reset()
+    }
+    evaluationDepth += 1
+  }
+
+  package func beginReuse(
+    invalidator: (any Invalidating)?
+  ) {
     self.invalidator = invalidator
     wasVisitedThisFrame = true
     isDirty = false
-    currentBodyStateSlotCount = 0
-    _ = dependencyTracker.reset()
   }
 
   package func finishEvaluation(
     accessedStateSlots: Int
-  ) {
+  ) -> Bool {
     bodyStateSlotCount = max(bodyStateSlotCount ?? 0, accessedStateSlots)
+    evaluationDepth = max(0, evaluationDepth - 1)
+    guard evaluationDepth == 0 else {
+      return false
+    }
 
     dependencies = dependencyTracker.reset()
+    return true
   }
 
   package func stateSlot<Value>(
@@ -126,6 +150,28 @@ package final class ViewNode {
     }
   }
 
+  package func markDirty() {
+    let wasDirty = isDirty
+    isDirty = true
+    if !wasDirty {
+      invalidateCachedSnapshotUpward()
+    }
+  }
+
+  package func setEvaluator(
+    _ evaluator: @escaping @MainActor () -> Void
+  ) {
+    self.evaluator = evaluator
+  }
+
+  package func evaluate() {
+    evaluator?()
+  }
+
+  package var hasEvaluator: Bool {
+    evaluator != nil
+  }
+
   package func recordEnvironmentRead(
     _ key: ObjectIdentifier
   ) {
@@ -139,6 +185,7 @@ package final class ViewNode {
   }
 
   package func requestInvalidation() {
+    ownerGraph?.queueDirty([identity])
     invalidator?.requestInvalidation(of: [identity])
   }
 
@@ -152,6 +199,12 @@ package final class ViewNode {
     resolved: ResolvedNode,
     children: [ViewNode]
   ) {
+    let newChildrenByIdentity = Set(children.map(\.identity))
+    for child in self.children
+    where !newChildrenByIdentity.contains(child.identity) && child.parent === self {
+      child.parent = nil
+    }
+
     kind = resolved.kind
     environmentSnapshot = resolved.environmentSnapshot
     transactionSnapshot = resolved.transactionSnapshot
@@ -167,11 +220,56 @@ package final class ViewNode {
     supportsRetainedReuse = resolved.supportsRetainedReuse
     childDescriptors = resolved.children.map(ChildDescriptor.init)
     self.children = children
+    for child in children {
+      guard child !== self else {
+        continue
+      }
+      child.parent = self
+    }
     cachedResolvedNode = resolved
+    invalidateAncestorCachedSnapshots()
+  }
+
+  package func canReuse(
+    environment: EnvironmentSnapshot,
+    transaction: TransactionSnapshot
+  ) -> Bool {
+    wasPresentAtFrameStart
+      && !wasVisitedThisFrame
+      && !isDirty
+      && supportsRetainedReuse
+      && cachedResolvedNode != nil
+      && environmentSnapshot == environment
+      && transactionSnapshot == transaction
+  }
+
+  package var hasDirtyAncestor: Bool {
+    var current = parent
+    var visited: Set<ObjectIdentifier> = []
+
+    while let node = current {
+      let nodeID = ObjectIdentifier(node)
+      guard visited.insert(nodeID).inserted else {
+        return false
+      }
+      if node.isDirty {
+        return true
+      }
+      current = node.parent
+    }
+
+    return false
   }
 
   package func beginRegistrationCapture() {
-    registeredHandlers.reset()
+    if registrationCaptureDepth == 0 {
+      registeredHandlers.reset()
+    }
+    registrationCaptureDepth += 1
+  }
+
+  package func endRegistrationCapture() {
+    registrationCaptureDepth = max(0, registrationCaptureDepth - 1)
   }
 
   package func recordActionRegistration(
@@ -281,6 +379,32 @@ package final class ViewNode {
     taskRegistry: LocalTaskRegistry? = nil,
     preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
   ) {
+    var traversedNodes: Set<ObjectIdentifier> = []
+    restoreRuntimeRegistrations(
+      into: actionRegistry,
+      keyHandlerRegistry: keyHandlerRegistry,
+      pointerHandlerRegistry: pointerHandlerRegistry,
+      focusBindingRegistry: focusBindingRegistry,
+      focusedValuesRegistry: focusedValuesRegistry,
+      hotkeyRegistry: hotkeyRegistry,
+      lifecycleRegistry: lifecycleRegistry,
+      taskRegistry: taskRegistry,
+      preferenceObservationRegistry: preferenceObservationRegistry,
+      traversedNodes: &traversedNodes
+    )
+  }
+
+  package func restoreOwnRuntimeRegistrations(
+    into actionRegistry: LocalActionRegistry? = nil,
+    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
+    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
+    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
+    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
+    hotkeyRegistry: HotkeyRegistry? = nil,
+    lifecycleRegistry: LocalLifecycleRegistry? = nil,
+    taskRegistry: LocalTaskRegistry? = nil,
+    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
+  ) {
     actionRegistry?.restore(registeredHandlers.actionRegistrations)
     keyHandlerRegistry?.restore(registeredHandlers.keyHandlerRegistrations)
     keyHandlerRegistry?.restoreKeyPressHandlers(
@@ -295,6 +419,36 @@ package final class ViewNode {
     preferenceObservationRegistry?.restore(
       registeredHandlers.preferenceObservationRegistrations
     )
+  }
+
+  private func restoreRuntimeRegistrations(
+    into actionRegistry: LocalActionRegistry? = nil,
+    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
+    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
+    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
+    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
+    hotkeyRegistry: HotkeyRegistry? = nil,
+    lifecycleRegistry: LocalLifecycleRegistry? = nil,
+    taskRegistry: LocalTaskRegistry? = nil,
+    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil,
+    traversedNodes: inout Set<ObjectIdentifier>
+  ) {
+    let nodeID = ObjectIdentifier(self)
+    guard traversedNodes.insert(nodeID).inserted else {
+      return
+    }
+
+    restoreOwnRuntimeRegistrations(
+      into: actionRegistry,
+      keyHandlerRegistry: keyHandlerRegistry,
+      pointerHandlerRegistry: pointerHandlerRegistry,
+      focusBindingRegistry: focusBindingRegistry,
+      focusedValuesRegistry: focusedValuesRegistry,
+      hotkeyRegistry: hotkeyRegistry,
+      lifecycleRegistry: lifecycleRegistry,
+      taskRegistry: taskRegistry,
+      preferenceObservationRegistry: preferenceObservationRegistry
+    )
 
     for child in children {
       child.restoreRuntimeRegistrations(
@@ -306,7 +460,8 @@ package final class ViewNode {
         hotkeyRegistry: hotkeyRegistry,
         lifecycleRegistry: lifecycleRegistry,
         taskRegistry: taskRegistry,
-        preferenceObservationRegistry: preferenceObservationRegistry
+        preferenceObservationRegistry: preferenceObservationRegistry,
+        traversedNodes: &traversedNodes
       )
     }
   }
@@ -368,5 +523,64 @@ package final class ViewNode {
     snapshot.preferenceValues = preferenceValues
     snapshot.supportsRetainedReuse = supportsRetainedReuse
     return snapshot
+  }
+
+  private func invalidateCachedSnapshotUpward() {
+    var current: ViewNode? = self
+    var visited: Set<ObjectIdentifier> = []
+
+    while let node = current {
+      let nodeID = ObjectIdentifier(node)
+      guard visited.insert(nodeID).inserted else {
+        return
+      }
+      node.cachedResolvedNode = nil
+      current = node.parent
+    }
+  }
+
+  private func invalidateAncestorCachedSnapshots() {
+    var current = parent
+    var visited: Set<ObjectIdentifier> = []
+
+    while let node = current {
+      let nodeID = ObjectIdentifier(node)
+      guard visited.insert(nodeID).inserted else {
+        return
+      }
+      node.cachedResolvedNode = nil
+      current = node.parent
+    }
+  }
+
+  package var participatesInStructuralLifecycle: Bool {
+    var ancestor = parent
+    while let current = ancestor {
+      if current.indexedChildSource != nil {
+        return false
+      }
+      ancestor = current.parent
+    }
+    return true
+  }
+
+  package func isDescendant(
+    of ancestor: ViewNode
+  ) -> Bool {
+    var current = parent
+    var visited: Set<ObjectIdentifier> = []
+
+    while let node = current {
+      let nodeID = ObjectIdentifier(node)
+      guard visited.insert(nodeID).inserted else {
+        return false
+      }
+      if node === ancestor {
+        return true
+      }
+      current = node.parent
+    }
+
+    return false
   }
 }

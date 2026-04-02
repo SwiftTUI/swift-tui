@@ -84,4 +84,39 @@ struct ViewGraphTests {
       ]
     )
   }
+
+  @Test("graph-local dirty evaluation prefers node evaluators over the root evaluator")
+  func graphLocalDirtyEvaluationUsesNodeFrontier() {
+    let graph = ViewGraph()
+    let snapshot = ResolvedNode(
+      identity: testIdentity("Root"),
+      kind: .root,
+      children: [
+        ResolvedNode(
+          identity: testIdentity("Root", "Leaf"),
+          kind: .view("Leaf")
+        )
+      ]
+    )
+    _ = graph.applySnapshot(snapshot)
+
+    var rootEvaluations = 0
+    var leafEvaluations = 0
+
+    graph.setRootEvaluator(rootIdentity: testIdentity("Root")) {
+      rootEvaluations += 1
+    }
+    graph.setEvaluator(for: testIdentity("Root", "Leaf")) {
+      leafEvaluations += 1
+    }
+
+    graph.beginFrame()
+    graph.queueDirty([testIdentity("Root", "Leaf")])
+    graph.invalidate([testIdentity("Root", "Leaf")])
+    let usedDirtyFrontier = graph.evaluateDirtyNodes()
+
+    #expect(usedDirtyFrontier)
+    #expect(rootEvaluations == 0)
+    #expect(leafEvaluations == 1)
+  }
 }

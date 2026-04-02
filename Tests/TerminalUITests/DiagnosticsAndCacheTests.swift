@@ -580,8 +580,8 @@ struct DiagnosticsAndCacheTests {
     #expect(secondMetrics.misses == 5)
     #expect(secondMetrics.stores == 5)
     #expect(second.diagnostics.invalidatedIdentities == [testIdentity("Root", "VStack[1]")])
-    #expect(second.diagnostics.resolvedNodesComputed == 3)
-    #expect(second.diagnostics.resolvedNodesReused == 0)
+    #expect(second.diagnostics.resolvedNodesComputed == 2)
+    #expect(second.diagnostics.resolvedNodesReused == 1)
     #expect(second.diagnostics.measuredNodesComputed == 2)
     #expect(second.diagnostics.measuredNodesReused == 1)
     #expect(second.diagnostics.placedNodesComputed == 2)
@@ -615,8 +615,8 @@ struct DiagnosticsAndCacheTests {
 
     #expect(updated.measuredTree.childMeasurements[0].measuredSize == .init(width: 6, height: 1))
     #expect(updated.measuredTree.childMeasurements[1].measuredSize == .init(width: 7, height: 1))
-    #expect(updated.diagnostics.resolvedNodesComputed == 3)
-    #expect(updated.diagnostics.resolvedNodesReused == 0)
+    #expect(updated.diagnostics.resolvedNodesComputed == 2)
+    #expect(updated.diagnostics.resolvedNodesReused == 1)
     #expect(updated.diagnostics.measuredNodesComputed == 2)
     #expect(updated.diagnostics.measuredNodesReused == 1)
     #expect(updated.diagnostics.placedNodesComputed == 2)
@@ -793,12 +793,11 @@ struct DiagnosticsAndCacheTests {
 
     #expect(
       recorder.identities == [
-        testIdentity("Root", "Branches[0]"),
         testIdentity("Root", "Branches[1]"),
       ]
     )
-    #expect(updated.diagnostics.resolvedNodesComputed == 6)
-    #expect(updated.diagnostics.resolvedNodesReused == 0)
+    #expect(updated.diagnostics.resolvedNodesComputed == 4)
+    #expect(updated.diagnostics.resolvedNodesReused == 1)
   }
 
   @Test("draw-only style changes reuse measurement and placement work")

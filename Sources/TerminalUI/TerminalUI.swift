@@ -89,9 +89,19 @@ public struct DefaultRenderer {
 
     var resolveContext = context
     resolveContext.imageAssetResolver = imageRepository.resolver()
+    resolveContext.localActionRegistry?.reset()
+    resolveContext.localKeyHandlerRegistry?.reset()
+    resolveContext.localPointerHandlerRegistry?.reset()
+    resolveContext.localFocusBindingRegistry?.reset()
+    resolveContext.localFocusedValuesRegistry?.reset()
+    resolveContext.localPreferenceObservationRegistry?.reset()
+    resolveContext.hotkeyRegistry?.reset()
+    resolveContext.localLifecycleRegistry?.reset()
+    resolveContext.localTaskRegistry?.reset()
     viewGraph.beginFrame()
     viewGraph.invalidate(context.invalidatedIdentities)
     resolveContext.viewGraph = viewGraph
+    resolveContext.observationBridge?.attachViewGraph(viewGraph)
     resolveContext.observationBridge?.beginTrackingPass()
     viewGraph.setRootEvaluator(rootIdentity: resolveContext.identity) {
       _ = resolver.resolve(
@@ -104,10 +114,33 @@ public struct DefaultRenderer {
       )
     }
 
-    let (_, resolveDuration) = measurePhase {
+    let (usedSelectiveDirtyEvaluation, resolveDuration) = measurePhase {
       viewGraph.evaluateDirtyNodes()
     }
     let resolved = viewGraph.snapshot()
+    if usedSelectiveDirtyEvaluation {
+      resolveContext.localActionRegistry?.reset()
+      resolveContext.localKeyHandlerRegistry?.reset()
+      resolveContext.localPointerHandlerRegistry?.reset()
+      resolveContext.localFocusBindingRegistry?.reset()
+      resolveContext.localFocusedValuesRegistry?.reset()
+      resolveContext.localPreferenceObservationRegistry?.reset()
+      resolveContext.hotkeyRegistry?.reset()
+      resolveContext.localLifecycleRegistry?.reset()
+      resolveContext.localTaskRegistry?.reset()
+      viewGraph.restoreRuntimeRegistrations(
+        for: resolved,
+        into: resolveContext.localActionRegistry,
+        keyHandlerRegistry: resolveContext.localKeyHandlerRegistry,
+        pointerHandlerRegistry: resolveContext.localPointerHandlerRegistry,
+        focusBindingRegistry: resolveContext.localFocusBindingRegistry,
+        focusedValuesRegistry: resolveContext.localFocusedValuesRegistry,
+        hotkeyRegistry: resolveContext.hotkeyRegistry,
+        lifecycleRegistry: resolveContext.localLifecycleRegistry,
+        taskRegistry: resolveContext.localTaskRegistry,
+        preferenceObservationRegistry: resolveContext.localPreferenceObservationRegistry
+      )
+    }
     let layoutPassContext = LayoutPassContext(
       retainedLayout: retainedFrames.layoutSession(
         invalidatedIdentities: context.invalidatedIdentities

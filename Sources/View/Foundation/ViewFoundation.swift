@@ -99,6 +99,28 @@ package func appendDeclaredChildNodes<V: View>(
     index: nextIndex
   )
   nextIndex += 1
+
+  if context.viewGraph != nil {
+    let resolvedNode = resolveView(view, in: childContext)
+    context.viewGraph?.recordRegistrationAlias(
+      from: childContext.identity,
+      to: resolvedNode.identity
+    )
+    if resolvedNode.identity == childContext.identity,
+      resolvedNode.kind == .view("EmptyView")
+    {
+      return
+    }
+    if resolvedNode.identity == childContext.identity,
+      resolvedNode.kind == .view("Group")
+    {
+      resolved.append(contentsOf: resolvedNode.children)
+      return
+    }
+    resolved.append(resolvedNode)
+    return
+  }
+
   let elements = resolveViewElements(view, in: childContext)
   childContext.recordResolvedComputation(count: elements.count)
   resolved.append(contentsOf: elements)
@@ -201,10 +223,38 @@ package func resolveView<V: View>(
   _ view: V,
   in context: ResolveContext
 ) -> ResolvedNode {
+  if let reused = context.viewGraph?.reusableSnapshot(
+    for: context.identity,
+    invalidatedIdentities: context.invalidatedIdentities,
+    environment: context.environment,
+    transaction: context.transaction,
+    invalidator: context.invalidationProxy?.invalidator
+  ) {
+    context.viewGraph?.restoreRuntimeRegistrations(
+      for: reused,
+      into: context.localActionRegistry,
+      keyHandlerRegistry: context.localKeyHandlerRegistry,
+      pointerHandlerRegistry: context.localPointerHandlerRegistry,
+      focusBindingRegistry: context.localFocusBindingRegistry,
+      focusedValuesRegistry: context.localFocusedValuesRegistry,
+      hotkeyRegistry: context.hotkeyRegistry,
+      lifecycleRegistry: context.localLifecycleRegistry,
+      taskRegistry: context.localTaskRegistry,
+      preferenceObservationRegistry: context.localPreferenceObservationRegistry
+    )
+    context.recordResolvedReuse(
+      count: resolvedNodeCount(in: reused)
+    )
+    return reused
+  }
+
   let graphNode = context.viewGraph?.beginEvaluation(
     identity: context.identity,
     invalidator: context.invalidationProxy?.invalidator
   )
+  context.viewGraph?.setEvaluator(for: context.identity) {
+    _ = resolveView(view, in: context)
+  }
   context.recordResolvedComputation()
   let erased: Any = view
   var accessedStateSlots = 0
@@ -237,4 +287,13 @@ package func resolveView<V: View>(
     )
   }
   return resolved
+}
+
+@MainActor
+private func resolvedNodeCount(
+  in node: ResolvedNode
+) -> Int {
+  1 + node.children.reduce(into: 0) { partialResult, child in
+    partialResult += resolvedNodeCount(in: child)
+  }
 }

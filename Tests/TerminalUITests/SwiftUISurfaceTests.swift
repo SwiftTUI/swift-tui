@@ -4139,6 +4139,55 @@ struct SwiftUISurfaceTests {
     #expect(confirmationSurface.contains("Archive"))
   }
 
+  @Test("toast auto-dismiss registers a lifecycle task on first render")
+  func toastAutoDismissRegistersLifecycleTask() {
+    struct ToastTaskProbe: View {
+      let terminalSize: Size
+      @State private var isPresented = true
+
+      var body: some View {
+        Text("Workspace")
+          .frame(
+            width: terminalSize.width,
+            height: terminalSize.height,
+            alignment: .topLeading
+          )
+          .toast(
+            "Action performed",
+            isPresented: $isPresented,
+            style: .success,
+            duration: 0.01
+          )
+      }
+    }
+
+    let terminalSize = Size(width: 20, height: 8)
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalSize = terminalSize
+    let taskRegistry = LocalTaskRegistry()
+
+    let artifacts = DefaultRenderer().render(
+      ToastTaskProbe(terminalSize: terminalSize),
+      context: .init(
+        identity: testIdentity("ToastTaskProbe"),
+        environmentValues: environmentValues,
+        localTaskRegistry: taskRegistry,
+        applyEnvironmentValues: true
+      ),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+
+    #expect(
+      artifacts.commitPlan.lifecycle.contains(where: { entry in
+        guard case .taskStart(let descriptor) = entry.operation else {
+          return false
+        }
+        return taskRegistry.registration(for: entry.identity)?.descriptor == descriptor
+      })
+    )
+    #expect(!taskRegistry.snapshot().isEmpty)
+  }
+
   @Test("Timeline renders a compact sequence of entries")
   func timelineRendersEntryList() {
     let timelineArtifacts = DefaultRenderer().render(

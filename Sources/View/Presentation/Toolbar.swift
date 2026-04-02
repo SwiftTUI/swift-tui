@@ -238,6 +238,11 @@ package struct ToolbarHostingRoot<Content: View>: View, ResolvableView {
     }
 
     let hostContext = context.child(component: .named("ToolbarHost"))
+    let baseContext = hostContext.child(component: .named("base"))
+    let hostedBaseNode = normalizeResolvedElements(
+      resolveViewElements(content, in: baseContext),
+      in: baseContext
+    )
     var children: [ResolvedNode] = []
     children.reserveCapacity(4)
 
@@ -258,7 +263,7 @@ package struct ToolbarHostingRoot<Content: View>: View, ResolvableView {
       )
     }
 
-    children.append(baseNode)
+    children.append(hostedBaseNode)
 
     if hasBottomToolbar {
       children.append(

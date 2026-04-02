@@ -7,12 +7,12 @@ struct StructuralDiffTests {
   @Test("reorder with stable descriptors matches without inserts or removals")
   func reorderMatchesStableDescriptors() {
     let old: [ChildDescriptor] = [
-      .init(typeIdentity: "view:Row", explicitID: "ID[0]"),
-      .init(typeIdentity: "view:Row", explicitID: "ID[1]"),
+      .init(identity: testIdentity("Root", "ID[0]"), typeIdentity: "view:Row", explicitID: "ID[0]"),
+      .init(identity: testIdentity("Root", "ID[1]"), typeIdentity: "view:Row", explicitID: "ID[1]"),
     ]
     let new: [ChildDescriptor] = [
-      .init(typeIdentity: "view:Row", explicitID: "ID[1]"),
-      .init(typeIdentity: "view:Row", explicitID: "ID[0]"),
+      .init(identity: testIdentity("Root", "ID[1]"), typeIdentity: "view:Row", explicitID: "ID[1]"),
+      .init(identity: testIdentity("Root", "ID[0]"), typeIdentity: "view:Row", explicitID: "ID[0]"),
     ]
 
     let operations = diffChildren(old: old, new: new)
@@ -28,12 +28,12 @@ struct StructuralDiffTests {
   @Test("insertions and removals are emitted for unmatched descriptors")
   func insertionsAndRemovalsAreEmitted() {
     let old: [ChildDescriptor] = [
-      .init(typeIdentity: "view:Row", explicitID: "ID[0]"),
-      .init(typeIdentity: "view:Row", explicitID: "ID[1]"),
+      .init(identity: testIdentity("Root", "ID[0]"), typeIdentity: "view:Row", explicitID: "ID[0]"),
+      .init(identity: testIdentity("Root", "ID[1]"), typeIdentity: "view:Row", explicitID: "ID[1]"),
     ]
     let new: [ChildDescriptor] = [
-      .init(typeIdentity: "view:Row", explicitID: "ID[1]"),
-      .init(typeIdentity: "view:Row", explicitID: "ID[2]"),
+      .init(identity: testIdentity("Root", "ID[1]"), typeIdentity: "view:Row", explicitID: "ID[1]"),
+      .init(identity: testIdentity("Root", "ID[2]"), typeIdentity: "view:Row", explicitID: "ID[2]"),
     ]
 
     let operations = diffChildren(old: old, new: new)

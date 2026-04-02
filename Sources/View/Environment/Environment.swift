@@ -309,6 +309,13 @@ public struct ResolveContext: Equatable, Sendable {
   }
 
   @MainActor
+  package func recordResolvedReuse(
+    count: Int = 1
+  ) {
+    resolveWorkTracker?.workMetrics.resolvedNodesReused += max(0, count)
+  }
+
+  @MainActor
   package func trackingObservableAccess<T>(
     _ apply: () -> T
   ) -> T {

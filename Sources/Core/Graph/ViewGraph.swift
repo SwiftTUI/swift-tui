@@ -20,31 +20,50 @@ package final class ViewGraph {
   private var nodesByIdentity: [Identity: ViewNode]
   private var rootEvaluator: (@MainActor () -> Void)?
   private var evaluationRootIdentity: Identity?
-  private var committedLifecycleState: LifecycleStateSnapshot
+  private var committedViewportLifecycleState: LifecycleStateSnapshot
   private var frameOrder: [Identity]
   private var stableTaskCancelEvents: [LifecycleEvent]
   private var stableTaskStartIdentities: [Identity]
+  private var structuralAppearEvents: [LifecycleEvent]
+  private var structuralTaskCancelEvents: [LifecycleEvent]
+  private var structuralDisappearEvents: [LifecycleEvent]
   private var invalidatedIdentities: Set<Identity>
-  private var previousRootIdentity: Identity?
+  private var graphLocalDirtyIdentities: Set<Identity>
   private var latestLifecycleEvents: [LifecycleEvent]
+  private var registrationAliasesByIdentity: [Identity: Set<Identity>]
+  private var registrationAliasTargets: [Identity: Identity]
 
   package init() {
     nodesByIdentity = [:]
     rootEvaluator = nil
     evaluationRootIdentity = nil
-    committedLifecycleState = .init()
+    committedViewportLifecycleState = .init()
     frameOrder = []
     stableTaskCancelEvents = []
     stableTaskStartIdentities = []
+    structuralAppearEvents = []
+    structuralTaskCancelEvents = []
+    structuralDisappearEvents = []
     invalidatedIdentities = []
-    previousRootIdentity = nil
+    graphLocalDirtyIdentities = []
     latestLifecycleEvents = []
+    registrationAliasesByIdentity = [:]
+    registrationAliasTargets = [:]
   }
 
   package func invalidate(_ identities: Set<Identity>) {
     invalidatedIdentities.formUnion(identities)
     for identity in identities {
-      nodesByIdentity[identity]?.isDirty = true
+      nodesByIdentity[identity]?.markDirty()
+    }
+  }
+
+  package func queueDirty(
+    _ identities: Set<Identity>
+  ) {
+    graphLocalDirtyIdentities.formUnion(identities)
+    for identity in identities {
+      nodesByIdentity[identity]?.markDirty()
     }
   }
 
@@ -56,18 +75,99 @@ package final class ViewGraph {
     rootEvaluator = evaluate
   }
 
-  package func evaluateDirtyNodes() {
-    rootEvaluator?()
+  package func setEvaluator(
+    for identity: Identity,
+    _ evaluate: @escaping @MainActor () -> Void
+  ) {
+    nodeForIdentity(for: identity).setEvaluator(evaluate)
+  }
+
+  package func recordRegistrationAlias(
+    from aliasIdentity: Identity,
+    to identity: Identity
+  ) {
+    if let previousTarget = registrationAliasTargets[aliasIdentity],
+      previousTarget != identity
+    {
+      registrationAliasesByIdentity[previousTarget]?.remove(aliasIdentity)
+      if registrationAliasesByIdentity[previousTarget]?.isEmpty == true {
+        registrationAliasesByIdentity.removeValue(forKey: previousTarget)
+      }
+    }
+
+    if aliasIdentity == identity {
+      registrationAliasTargets.removeValue(forKey: aliasIdentity)
+      registrationAliasesByIdentity[identity]?.remove(aliasIdentity)
+      if registrationAliasesByIdentity[identity]?.isEmpty == true {
+        registrationAliasesByIdentity.removeValue(forKey: identity)
+      }
+      return
+    }
+
+    registrationAliasTargets[aliasIdentity] = identity
+    registrationAliasesByIdentity[identity, default: []].insert(aliasIdentity)
+  }
+
+  package func evaluateDirtyNodes() -> Bool {
+    let canEvaluateDirtyFrontier =
+      !graphLocalDirtyIdentities.isEmpty
+      && !invalidatedIdentities.isEmpty
+      && invalidatedIdentities.isSubset(of: graphLocalDirtyIdentities)
+
+    if root == nil || !canEvaluateDirtyFrontier {
+      rootEvaluator?()
+      if let evaluationRootIdentity {
+        root = nodesByIdentity[evaluationRootIdentity]
+      }
+      return false
+    }
+
+    let dirtyFrontier = nodesByIdentity.values
+      .filter { $0.isDirty && !$0.hasDirtyAncestor }
+      .sorted { lhs, rhs in
+        if lhs.identity.components.count == rhs.identity.components.count {
+          return lhs.identity < rhs.identity
+        }
+        return lhs.identity.components.count < rhs.identity.components.count
+      }
+
+    if dirtyFrontier.isEmpty {
+      if let evaluationRootIdentity {
+        root = nodesByIdentity[evaluationRootIdentity]
+      }
+      return false
+    }
+
+    let reevaluationPlan = selectiveReevaluationPlan(
+      for: dirtyFrontier
+    )
+
+    let reevaluatesRootDirectly = dirtyFrontier.contains { $0.identity == evaluationRootIdentity }
+
+    if reevaluationPlan == nil || reevaluatesRootDirectly {
+      rootEvaluator?()
+      if let evaluationRootIdentity {
+        root = nodesByIdentity[evaluationRootIdentity]
+      }
+      return false
+    } else {
+      for node in reevaluationPlan ?? [] {
+        node.evaluate()
+      }
+    }
     if let evaluationRootIdentity {
       root = nodesByIdentity[evaluationRootIdentity]
     }
+    return true
   }
 
   package func beginFrame() {
-    previousRootIdentity = root?.identity
     frameOrder.removeAll(keepingCapacity: true)
     stableTaskCancelEvents.removeAll(keepingCapacity: true)
     stableTaskStartIdentities.removeAll(keepingCapacity: true)
+    structuralAppearEvents.removeAll(keepingCapacity: true)
+    structuralTaskCancelEvents.removeAll(keepingCapacity: true)
+    structuralDisappearEvents.removeAll(keepingCapacity: true)
     latestLifecycleEvents.removeAll(keepingCapacity: true)
 
     for node in nodesByIdentity.values {
@@ -92,11 +192,17 @@ package final class ViewGraph {
     resolved: ResolvedNode,
     accessedStateSlots: Int
   ) {
-    node.finishEvaluation(accessedStateSlots: accessedStateSlots)
+    guard node.finishEvaluation(accessedStateSlots: accessedStateSlots) else {
+      return
+    }
 
     let childNodes = resolved.children.map { child in
       nodeForIdentity(for: child.identity)
     }
+    applyStructuralChildDiff(
+      for: node,
+      resolved: resolved
+    )
     node.apply(
       resolved: resolved,
       children: childNodes
@@ -104,7 +210,8 @@ package final class ViewGraph {
 
     if node.wasPresentAtFrameStart {
       if let previousTask = node.previousLifecycleMetadata.task,
-        previousTask != node.lifecycleMetadata.task
+        previousTask != node.lifecycleMetadata.task,
+        node.participatesInStructuralLifecycle
       {
         stableTaskCancelEvents.append(
           .init(
@@ -114,12 +221,28 @@ package final class ViewGraph {
         )
       }
       if let currentTask = node.lifecycleMetadata.task,
-        currentTask != node.previousLifecycleMetadata.task
+        currentTask != node.previousLifecycleMetadata.task,
+        node.participatesInStructuralLifecycle
       {
         stableTaskStartIdentities.append(node.identity)
       }
       node.setLifecycleState(.alive)
     } else {
+      if node.participatesInStructuralLifecycle,
+        !node.lifecycleMetadata.appearHandlerIDs.isEmpty
+      {
+        structuralAppearEvents.append(
+          .init(
+            identity: node.identity,
+            operation: .appear(handlerIDs: node.lifecycleMetadata.appearHandlerIDs)
+          )
+        )
+      }
+      if node.participatesInStructuralLifecycle,
+        node.lifecycleMetadata.task != nil
+      {
+        stableTaskStartIdentities.append(node.identity)
+      }
       node.setLifecycleState(.appearing)
     }
   }
@@ -128,10 +251,11 @@ package final class ViewGraph {
     _ subtree: ResolvedNode,
     invalidator: (any Invalidating)?
   ) {
-    let node = beginEvaluation(
-      identity: subtree.identity,
-      invalidator: invalidator
-    )
+    let node = nodeForIdentity(for: subtree.identity)
+    if !node.wasVisitedThisFrame {
+      frameOrder.append(subtree.identity)
+    }
+    node.beginReuse(invalidator: invalidator)
     let childNodes = subtree.children.map { child -> ViewNode in
       recordReusedSubtree(
         child,
@@ -139,15 +263,112 @@ package final class ViewGraph {
       )
       return nodeForIdentity(for: child.identity)
     }
+    applyStructuralChildDiff(
+      for: node,
+      resolved: subtree
+    )
     node.apply(
       resolved: subtree,
       children: childNodes
     )
     if !node.wasPresentAtFrameStart {
+      if node.participatesInStructuralLifecycle,
+        !node.lifecycleMetadata.appearHandlerIDs.isEmpty
+      {
+        structuralAppearEvents.append(
+          .init(
+            identity: node.identity,
+            operation: .appear(handlerIDs: node.lifecycleMetadata.appearHandlerIDs)
+          )
+        )
+      }
+      if node.participatesInStructuralLifecycle,
+        node.lifecycleMetadata.task != nil
+      {
+        stableTaskStartIdentities.append(node.identity)
+      }
       node.setLifecycleState(.appearing)
     } else {
+      if let previousTask = node.previousLifecycleMetadata.task,
+        previousTask != node.lifecycleMetadata.task,
+        node.participatesInStructuralLifecycle
+      {
+        stableTaskCancelEvents.append(
+          .init(
+            identity: node.identity,
+            operation: .taskCancel(previousTask)
+          )
+        )
+      }
+      if let currentTask = node.lifecycleMetadata.task,
+        currentTask != node.previousLifecycleMetadata.task,
+        node.participatesInStructuralLifecycle
+      {
+        stableTaskStartIdentities.append(node.identity)
+      }
       node.setLifecycleState(.alive)
     }
+  }
+
+  package func reusableSnapshot(
+    for identity: Identity,
+    invalidatedIdentities: Set<Identity>,
+    environment: EnvironmentSnapshot,
+    transaction: TransactionSnapshot,
+    invalidator: (any Invalidating)?
+  ) -> ResolvedNode? {
+    guard let node = nodesByIdentity[identity] else {
+      return nil
+    }
+    guard !invalidatedIdentities.isEmpty else {
+      return nil
+    }
+
+    let snapshot = node.snapshot()
+    let conflictsWithInvalidation = invalidatedIdentities.contains { invalidatedIdentity in
+      if invalidatedIdentity == identity {
+        return true
+      }
+      if subtree(snapshot, contains: invalidatedIdentity) {
+        return true
+      }
+      let invalidatedSubtreeContainsIdentity =
+        nodesByIdentity[invalidatedIdentity].map { invalidatedNode in
+          subtree(invalidatedNode.snapshot(), contains: identity)
+        } ?? false
+      return invalidatedSubtreeContainsIdentity
+        || invalidatedIdentity.isDescendant(of: identity)
+        || identity.isDescendant(of: invalidatedIdentity)
+    }
+    guard !conflictsWithInvalidation else {
+      return nil
+    }
+    guard node.canReuse(
+      environment: environment,
+      transaction: transaction
+    ) else {
+      return nil
+    }
+    recordReusedSubtree(
+      snapshot,
+      invalidator: invalidator
+    )
+    return snapshot
+  }
+
+  private func subtree(
+    _ node: ResolvedNode,
+    contains identity: Identity
+  ) -> Bool {
+    if node.identity == identity {
+      return true
+    }
+
+    for child in node.children where subtree(child, contains: identity) {
+      return true
+    }
+
+    return false
   }
 
   @discardableResult
@@ -198,20 +419,6 @@ package final class ViewGraph {
   ) -> [LifecycleEvent] {
     root = nodesByIdentity[rootIdentity]
 
-    var removedIdentities: Set<Identity> = []
-    var traversedIdentities: Set<Identity> = []
-    if let previousRootIdentity {
-      collectRemovedIdentities(
-        from: previousRootIdentity,
-        removedIdentities: &removedIdentities,
-        traversedIdentities: &traversedIdentities
-      )
-    }
-
-    for identity in removedIdentities {
-      nodesByIdentity.removeValue(forKey: identity)
-    }
-
     for identity in frameOrder {
       guard let node = nodesByIdentity[identity], !node.wasPresentAtFrameStart else {
         continue
@@ -219,17 +426,35 @@ package final class ViewGraph {
       node.setLifecycleState(.alive)
     }
 
-    let nextLifecycleState = lifecycleState(
+    let viewportLifecycleEvents = viewportLifecycleEvents(
       from: resolved,
       placed: placed
     )
-    latestLifecycleEvents = lifecycleDiff(
-      previous: committedLifecycleState,
-      next: nextLifecycleState
-    )
-    committedLifecycleState = nextLifecycleState
+    let (viewportTaskCancels, viewportDisappears, viewportAppears, viewportTaskStarts) =
+      partitionLifecycleEvents(viewportLifecycleEvents)
+    let structuralTaskStarts = stableTaskStartIdentities.compactMap { identity -> LifecycleEvent? in
+      guard let task = nodesByIdentity[identity]?.lifecycleMetadata.task else {
+        return nil
+      }
+      return .init(
+        identity: identity,
+        operation: .taskStart(task)
+      )
+    }
+
+    latestLifecycleEvents =
+      stableTaskCancelEvents
+      + structuralTaskCancelEvents
+      + viewportTaskCancels
+      + structuralDisappearEvents
+      + viewportDisappears
+      + structuralAppearEvents
+      + viewportAppears
+      + structuralTaskStarts
+      + viewportTaskStarts
 
     invalidatedIdentities.removeAll(keepingCapacity: true)
+    graphLocalDirtyIdentities.removeAll(keepingCapacity: true)
     return latestLifecycleEvents
   }
 
@@ -250,33 +475,83 @@ package final class ViewGraph {
     return root.snapshot()
   }
 
-  private func collectRemovedIdentities(
-    from identity: Identity,
-    removedIdentities: inout Set<Identity>,
-    traversedIdentities: inout Set<Identity>
+  package func restoreRuntimeRegistrations(
+    for resolved: ResolvedNode,
+    into actionRegistry: LocalActionRegistry? = nil,
+    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
+    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
+    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
+    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
+    hotkeyRegistry: HotkeyRegistry? = nil,
+    lifecycleRegistry: LocalLifecycleRegistry? = nil,
+    taskRegistry: LocalTaskRegistry? = nil,
+    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
   ) {
-    guard traversedIdentities.insert(identity).inserted else {
-      return
-    }
+    restoreRuntimeRegistrations(
+      for: resolved,
+      actionRegistry: actionRegistry,
+      keyHandlerRegistry: keyHandlerRegistry,
+      pointerHandlerRegistry: pointerHandlerRegistry,
+      focusBindingRegistry: focusBindingRegistry,
+      focusedValuesRegistry: focusedValuesRegistry,
+      hotkeyRegistry: hotkeyRegistry,
+      lifecycleRegistry: lifecycleRegistry,
+      taskRegistry: taskRegistry,
+      preferenceObservationRegistry: preferenceObservationRegistry
+    )
+  }
 
-    guard let node = nodesByIdentity[identity], node.wasPresentAtFrameStart else {
-      return
-    }
-
-    for childIdentity in node.previousChildrenIdentities {
-      collectRemovedIdentities(
-        from: childIdentity,
-        removedIdentities: &removedIdentities,
-        traversedIdentities: &traversedIdentities
+  private func restoreRuntimeRegistrations(
+    for resolved: ResolvedNode,
+    actionRegistry: LocalActionRegistry? = nil,
+    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
+    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
+    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
+    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
+    hotkeyRegistry: HotkeyRegistry? = nil,
+    lifecycleRegistry: LocalLifecycleRegistry? = nil,
+    taskRegistry: LocalTaskRegistry? = nil,
+    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
+  ) {
+    nodesByIdentity[resolved.identity]?.restoreOwnRuntimeRegistrations(
+      into: actionRegistry,
+      keyHandlerRegistry: keyHandlerRegistry,
+      pointerHandlerRegistry: pointerHandlerRegistry,
+      focusBindingRegistry: focusBindingRegistry,
+      focusedValuesRegistry: focusedValuesRegistry,
+      hotkeyRegistry: hotkeyRegistry,
+      lifecycleRegistry: lifecycleRegistry,
+      taskRegistry: taskRegistry,
+      preferenceObservationRegistry: preferenceObservationRegistry
+    )
+    for aliasIdentity in registrationAliasesByIdentity[resolved.identity] ?? [] {
+      nodesByIdentity[aliasIdentity]?.restoreOwnRuntimeRegistrations(
+        into: actionRegistry,
+        keyHandlerRegistry: keyHandlerRegistry,
+        pointerHandlerRegistry: pointerHandlerRegistry,
+        focusBindingRegistry: focusBindingRegistry,
+        focusedValuesRegistry: focusedValuesRegistry,
+        hotkeyRegistry: hotkeyRegistry,
+        lifecycleRegistry: lifecycleRegistry,
+        taskRegistry: taskRegistry,
+        preferenceObservationRegistry: preferenceObservationRegistry
       )
     }
 
-    guard !node.wasVisitedThisFrame else {
-      return
+    for child in resolved.children {
+      restoreRuntimeRegistrations(
+        for: child,
+        actionRegistry: actionRegistry,
+        keyHandlerRegistry: keyHandlerRegistry,
+        pointerHandlerRegistry: pointerHandlerRegistry,
+        focusBindingRegistry: focusBindingRegistry,
+        focusedValuesRegistry: focusedValuesRegistry,
+        hotkeyRegistry: hotkeyRegistry,
+        lifecycleRegistry: lifecycleRegistry,
+        taskRegistry: taskRegistry,
+        preferenceObservationRegistry: preferenceObservationRegistry
+      )
     }
-
-    node.setLifecycleState(.disappearing)
-    removedIdentities.insert(identity)
   }
 
   private func nodeForIdentity(
@@ -287,16 +562,139 @@ package final class ViewGraph {
     }
 
     let node = ViewNode(identity: identity)
+    node.ownerGraph = self
     nodesByIdentity[identity] = node
     return node
   }
 
-  private func lifecycleState(
+  private func selectiveReevaluationPlan(
+    for dirtyFrontier: [ViewNode]
+  ) -> [ViewNode]? {
+    var plannedNodes: [ViewNode] = []
+    var plannedNodeIDs: Set<ObjectIdentifier> = []
+
+    for node in dirtyFrontier {
+      guard let chain = evaluationChain(for: node) else {
+        return nil
+      }
+
+      for chainedNode in chain {
+        let nodeID = ObjectIdentifier(chainedNode)
+        guard plannedNodeIDs.insert(nodeID).inserted else {
+          continue
+        }
+        plannedNodes.append(chainedNode)
+      }
+    }
+
+    return plannedNodes.sorted { lhs, rhs in
+      let lhsDepth = lhs.identity.components.count
+      let rhsDepth = rhs.identity.components.count
+      if lhsDepth == rhsDepth {
+        return lhs.identity < rhs.identity
+      }
+      return lhsDepth > rhsDepth
+    }
+  }
+
+  private func evaluationChain(
+    for node: ViewNode
+  ) -> [ViewNode]? {
+    var chain: [ViewNode] = []
+    var current: ViewNode? = node
+    var visited: Set<ObjectIdentifier> = []
+
+    while let currentNode = current {
+      let nodeID = ObjectIdentifier(currentNode)
+      guard visited.insert(nodeID).inserted else {
+        return nil
+      }
+      guard currentNode.hasEvaluator else {
+        return nil
+      }
+
+      chain.append(currentNode)
+      if currentNode.identity == evaluationRootIdentity {
+        return chain
+      }
+
+      current = currentNode.parent
+    }
+
+    return nil
+  }
+
+  private func applyStructuralChildDiff(
+    for node: ViewNode,
+    resolved: ResolvedNode
+  ) {
+    let operations = diffChildren(
+      old: node.childDescriptors,
+      new: resolved.children.map(ChildDescriptor.init)
+    )
+
+    for operation in operations {
+      guard case .removed(let oldIndex) = operation,
+        node.children.indices.contains(oldIndex)
+      else {
+        continue
+      }
+
+      removeSubtree(
+        rootedAt: node.children[oldIndex]
+      )
+    }
+  }
+
+  private func removeSubtree(
+    rootedAt node: ViewNode
+  ) {
+    for child in node.children {
+      removeSubtree(rootedAt: child)
+    }
+
+    if node.participatesInStructuralLifecycle,
+      let task = node.previousLifecycleMetadata.task
+    {
+      structuralTaskCancelEvents.append(
+        .init(
+          identity: node.identity,
+          operation: .taskCancel(task)
+        )
+      )
+    }
+    if node.participatesInStructuralLifecycle,
+      !node.previousLifecycleMetadata.disappearHandlerIDs.isEmpty
+    {
+      structuralDisappearEvents.append(
+        .init(
+          identity: node.identity,
+          operation: .disappear(
+            handlerIDs: node.previousLifecycleMetadata.disappearHandlerIDs
+          )
+        )
+      )
+    }
+
+    node.setLifecycleState(.disappearing)
+    node.parent = nil
+
+    if let target = registrationAliasTargets.removeValue(forKey: node.identity) {
+      registrationAliasesByIdentity[target]?.remove(node.identity)
+      if registrationAliasesByIdentity[target]?.isEmpty == true {
+        registrationAliasesByIdentity.removeValue(forKey: target)
+      }
+    }
+    registrationAliasesByIdentity.removeValue(forKey: node.identity)
+    nodesByIdentity.removeValue(forKey: node.identity)
+  }
+
+  private func viewportLifecycleState(
     from resolved: ResolvedNode,
     placed: PlacedNode?
   ) -> LifecycleStateSnapshot {
     var nodes: [LifecycleStateNode] = []
-    collectLifecycleNodes(
+    collectViewportLifecycleNodes(
       from: resolved,
       placed: placed,
       into: &nodes
@@ -304,7 +702,7 @@ package final class ViewGraph {
     return .init(nodes: nodes)
   }
 
-  private func collectLifecycleNodes(
+  private func collectViewportLifecycleNodes(
     from resolved: ResolvedNode,
     placed: PlacedNode?,
     into nodes: inout [LifecycleStateNode]
@@ -316,19 +714,8 @@ package final class ViewGraph {
       return
     }
 
-    if !resolved.lifecycleMetadata.isEmpty {
-      nodes.append(
-        LifecycleStateNode(
-          identity: resolved.identity,
-          appearHandlerIDs: resolved.lifecycleMetadata.appearHandlerIDs,
-          disappearHandlerIDs: resolved.lifecycleMetadata.disappearHandlerIDs,
-          task: resolved.lifecycleMetadata.task
-        )
-      )
-    }
-
     for (index, child) in resolved.children.enumerated() {
-      collectLifecycleNodes(
+      collectViewportLifecycleNodes(
         from: child,
         placed: placed?.children.indices.contains(index) == true
           ? placed?.children[index]
@@ -336,6 +723,56 @@ package final class ViewGraph {
         into: &nodes
       )
     }
+  }
+
+  private func viewportLifecycleEvents(
+    from resolved: ResolvedNode,
+    placed: PlacedNode?
+  ) -> [LifecycleEvent] {
+    let nextLifecycleState = viewportLifecycleState(
+      from: resolved,
+      placed: placed
+    )
+    let events = lifecycleDiff(
+      previous: committedViewportLifecycleState,
+      next: nextLifecycleState
+    )
+    committedViewportLifecycleState = nextLifecycleState
+    return events
+  }
+
+  private func partitionLifecycleEvents(
+    _ events: [LifecycleEvent]
+  ) -> (
+    taskCancels: [LifecycleEvent],
+    disappears: [LifecycleEvent],
+    appears: [LifecycleEvent],
+    taskStarts: [LifecycleEvent]
+  ) {
+    var taskCancels: [LifecycleEvent] = []
+    var disappears: [LifecycleEvent] = []
+    var appears: [LifecycleEvent] = []
+    var taskStarts: [LifecycleEvent] = []
+
+    for event in events {
+      switch event.operation {
+      case .taskCancel:
+        taskCancels.append(event)
+      case .disappear:
+        disappears.append(event)
+      case .appear:
+        appears.append(event)
+      case .taskStart:
+        taskStarts.append(event)
+      }
+    }
+
+    return (
+      taskCancels,
+      disappears,
+      appears,
+      taskStarts
+    )
   }
 
   private func lifecycleDiff(

@@ -451,13 +451,14 @@ private struct TaskLifecycleModifier<Content: View>: View, ResolvableView {
     var node = content.resolve(in: context)
     let dynamicPropertyScope = currentAuthoringContext()
     let taskAction = action
+    let lifecycleIdentity = ViewNodeContext.current?.identity ?? context.identity
     let descriptor = TaskDescriptor(
-      id: descriptorID.map { "\(node.identity)#task[\($0)]" } ?? "\(node.identity)#task",
+      id: descriptorID.map { "\(lifecycleIdentity)#task[\($0)]" } ?? "\(lifecycleIdentity)#task",
       priority: priority
     )
     if let taskRegistry = context.localTaskRegistry {
       taskRegistry.register(
-        identity: node.identity,
+        identity: lifecycleIdentity,
         registration: .init(
           descriptor: descriptor,
           operation: {

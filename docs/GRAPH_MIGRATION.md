@@ -19,20 +19,25 @@ live runtime path and the full suite is green (`575 tests / 72 suites`).
   from the live runtime.
 - Lifecycle deltas are produced by `ViewGraph` and passed into `CommitPlanner`.
   `CommitPlanner` no longer computes lifecycle diffs itself.
-- Graph finalization prunes removed identities with cycle-safe traversal so
-  presentation/overlay teardown stays stable in the retained graph path.
+- Retained-node removals now come from structural child-diff hooks instead of a
+  full-graph removal sweep, and host wrappers re-root their base content under
+  dedicated child identities so retained parent links stay acyclic.
 
-### Follow-up optimization opportunities
+### Completed end-state notes
 
-1. **True per-node dirty reevaluation**
-   `ViewGraph.evaluateDirtyNodes()` is now the authoritative renderer entry
-   point, but it still reevaluates through a graph-owned root evaluator rather
-   than scheduling minimal per-node reevaluation. That is a performance
-   optimization follow-up, not a migration blocker.
-2. **Purely structural lifecycle emission**
-   Lifecycle events are now graph-owned, but the current implementation still
-   derives them from graph snapshots in `ViewGraph` instead of emitting them
-   directly from node insertion/removal hooks. That cleanup is future work.
+1. **Dirty reevaluation is graph-localized**
+   `ViewGraph.evaluateDirtyNodes()` remains the authoritative renderer entry
+   point. Graph-owned state and observation invalidations now queue a retained
+   dirty frontier, and the renderer reevaluates those node-local evaluators
+   instead of replaying the entire root authoring pass. External/manual
+   invalidation sets still fall back to the root evaluator, because the latest
+   authored input values only arrive at the root render boundary.
+2. **Lifecycle emission is graph-structural**
+   Structural appear, disappear, task-cancel, and task-start events now come
+   directly from retained-node insertion, structural child removal, and task
+   replacement in `ViewGraph`. Viewport lifecycle diffs remain only for
+   indexed/lazy visible children, which is the intentional placed-visible
+   exception.
 
 ---
 
