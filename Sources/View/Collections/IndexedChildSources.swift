@@ -51,10 +51,6 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
       let elementContext = childContext.replacingIdentity(
         with: childContext.identity.explicitID(element[keyPath: id])
       )
-      if let reused = elementContext.reusedResolvedSubtreeIfAvailable() {
-        cache.storage[index] = reused
-        return reused
-      }
       let view = elementContext.trackingObservableAccess {
         content(element)
       }

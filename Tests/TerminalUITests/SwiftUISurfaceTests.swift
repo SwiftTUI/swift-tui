@@ -448,24 +448,23 @@ struct SwiftUISurfaceTests {
       }
     }
 
-    let hiddenArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+
+    _ = renderer.render(
       makeConditionalRoot(showRow: false),
       context: .init(identity: testIdentity("Root"))
     )
-    let shownArtifacts = DefaultRenderer().render(
+    let shownArtifacts = renderer.render(
       makeConditionalRoot(showRow: true),
-      context: .init(identity: testIdentity("Root")),
-      previousLifecycleState: hiddenArtifacts.commitPlan.nextLifecycleState
+      context: .init(identity: testIdentity("Root"))
     )
-    let updatedTaskArtifacts = DefaultRenderer().render(
+    let updatedTaskArtifacts = renderer.render(
       makeConditionalRoot(showRow: true, taskID: "refresh"),
-      context: .init(identity: testIdentity("Root")),
-      previousLifecycleState: shownArtifacts.commitPlan.nextLifecycleState
+      context: .init(identity: testIdentity("Root"))
     )
-    let removedArtifacts = DefaultRenderer().render(
+    let removedArtifacts = renderer.render(
       makeConditionalRoot(showRow: false),
-      context: .init(identity: testIdentity("Root")),
-      previousLifecycleState: updatedTaskArtifacts.commitPlan.nextLifecycleState
+      context: .init(identity: testIdentity("Root"))
     )
 
     #expect(
@@ -521,20 +520,21 @@ struct SwiftUISurfaceTests {
       .onDisappear {}
       .task(id: "stable") {}
 
-    let firstArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+
+    _ = renderer.render(
       view,
       context: .init(
         identity: testIdentity("Root"),
         environmentValues: unfocusedEnvironment
       )
     )
-    let focusedArtifacts = DefaultRenderer().render(
+    let focusedArtifacts = renderer.render(
       view,
       context: .init(
         identity: testIdentity("Root"),
         environmentValues: focusedEnvironment
-      ),
-      previousLifecycleState: firstArtifacts.commitPlan.nextLifecycleState
+      )
     )
 
     #expect(focusedArtifacts.commitPlan.lifecycle.isEmpty)
@@ -566,17 +566,18 @@ struct SwiftUISurfaceTests {
     }
     .frame(width: 5, height: 2, alignment: .topLeading)
 
-    let initialArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+
+    _ = renderer.render(
       view,
       context: .init(identity: testIdentity("Root"))
     )
 
     box.position.scrollBy(y: 1)
 
-    let scrolledArtifacts = DefaultRenderer().render(
+    let scrolledArtifacts = renderer.render(
       view,
-      context: .init(identity: testIdentity("Root")),
-      previousLifecycleState: initialArtifacts.commitPlan.nextLifecycleState
+      context: .init(identity: testIdentity("Root"))
     )
 
     #expect(scrolledArtifacts.rasterSurface.lines.prefix(2) == ["Row 1", "Row 2"])
@@ -3040,17 +3041,18 @@ struct SwiftUISurfaceTests {
     }
     .frame(width: 5, height: 2, alignment: .topLeading)
 
-    let initialArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+
+    _ = renderer.render(
       view,
       context: .init(identity: testIdentity("LazyScrollRoot"))
     )
 
     box.position.scrollBy(y: 1)
 
-    let scrolledArtifacts = DefaultRenderer().render(
+    let scrolledArtifacts = renderer.render(
       view,
-      context: .init(identity: testIdentity("LazyScrollRoot")),
-      previousLifecycleState: initialArtifacts.commitPlan.nextLifecycleState
+      context: .init(identity: testIdentity("LazyScrollRoot"))
     )
 
     #expect(scrolledArtifacts.rasterSurface.lines.prefix(2) == ["Row 1", "Row 2"])
@@ -3121,7 +3123,9 @@ struct SwiftUISurfaceTests {
     }
     .frame(width: 5, height: 2, alignment: .topLeading)
 
-    let initialArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+
+    let initialArtifacts = renderer.render(
       view,
       context: .init(identity: testIdentity("LazyForEachScrollRoot"))
     )
@@ -3130,10 +3134,9 @@ struct SwiftUISurfaceTests {
 
     box.position.scrollBy(y: 1)
 
-    let scrolledArtifacts = DefaultRenderer().render(
+    let scrolledArtifacts = renderer.render(
       view,
-      context: .init(identity: testIdentity("LazyForEachScrollRoot")),
-      previousLifecycleState: initialArtifacts.commitPlan.nextLifecycleState
+      context: .init(identity: testIdentity("LazyForEachScrollRoot"))
     )
 
     let operations = scrolledArtifacts.commitPlan.lifecycle.map(\.operation)
@@ -3174,17 +3177,18 @@ struct SwiftUISurfaceTests {
     }
     .frame(width: 5, height: 2, alignment: .topLeading)
 
-    let initialArtifacts = DefaultRenderer().render(
+    let renderer = DefaultRenderer()
+
+    _ = renderer.render(
       view,
       context: .init(identity: testIdentity("MixedLazyStackRoot"))
     )
 
     box.position.scrollBy(y: 1)
 
-    let scrolledArtifacts = DefaultRenderer().render(
+    let scrolledArtifacts = renderer.render(
       view,
-      context: .init(identity: testIdentity("MixedLazyStackRoot")),
-      previousLifecycleState: initialArtifacts.commitPlan.nextLifecycleState
+      context: .init(identity: testIdentity("MixedLazyStackRoot"))
     )
 
     #expect(scrolledArtifacts.rasterSurface.lines.prefix(2) == ["Row 0", "Row 1"])

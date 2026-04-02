@@ -4,9 +4,9 @@ package enum FocusBindingRequest: Equatable, Sendable {
   case focus(Identity)
 }
 
-// SAFETY: Contains a non-Sendable closure `applyRuntimeFocus: (Bool) -> Bool`. This closure
-// captures @MainActor state and is only invoked on @MainActor during the focus sync phase.
-// Only transferred between the registry and RetainedResolveFrame on the same actor.
+// SAFETY: Contains a non-Sendable closure `applyRuntimeFocus: (Bool) -> Bool`.
+// This closure captures @MainActor state and is only invoked on @MainActor
+// during the focus sync phase.
 package struct FocusBindingRegistrationSnapshot: @unchecked Sendable {
   package var identity: Identity
   package var bindingID: String

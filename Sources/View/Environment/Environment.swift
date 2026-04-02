@@ -165,7 +165,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var focusedValues: FocusedValues
   public var transaction: TransactionSnapshot
   public var invalidatedIdentities: Set<Identity>
-  package var resolveReuseSession: ResolveReuseSession?
+  package var resolveWorkTracker: ResolveWorkTracker?
   package var localActionRegistry: LocalActionRegistry?
   package var localPointerHandlerRegistry: LocalPointerHandlerRegistry?
   package var localFocusBindingRegistry: LocalFocusBindingRegistry?
@@ -223,7 +223,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.dynamicStateStore = dynamicStateStore
     childContext.observationBridge = observationBridge
     childContext.viewGraph = viewGraph
-    childContext.resolveReuseSession = resolveReuseSession
+    childContext.resolveWorkTracker = resolveWorkTracker
     childContext.focusedValues = focusedValues
     childContext.imageAssetResolver = imageAssetResolver
     return childContext
@@ -258,7 +258,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.dynamicStateStore = dynamicStateStore
     replacedContext.observationBridge = observationBridge
     replacedContext.viewGraph = viewGraph
-    replacedContext.resolveReuseSession = resolveReuseSession
+    replacedContext.resolveWorkTracker = resolveWorkTracker
     replacedContext.focusedValues = focusedValues
     replacedContext.imageAssetResolver = imageAssetResolver
     return replacedContext
@@ -302,22 +302,10 @@ public struct ResolveContext: Equatable, Sendable {
   }
 
   @MainActor
-  package func reusedResolvedSubtreeIfAvailable() -> ResolvedNode? {
-    guard let reused = resolveReuseSession?.reusedResolvedSubtree(for: self) else {
-      return nil
-    }
-    viewGraph?.recordReusedSubtree(
-      reused,
-      invalidator: dynamicStateStore?.invalidator
-    )
-    return reused
-  }
-
-  @MainActor
   package func recordResolvedComputation(
     count: Int = 1
   ) {
-    resolveReuseSession?.workMetrics.resolvedNodesComputed += max(0, count)
+    resolveWorkTracker?.workMetrics.resolvedNodesComputed += max(0, count)
   }
 
   @MainActor
@@ -369,7 +357,7 @@ extension ResolveContext {
       : environment
     self.transaction = transaction
     self.invalidatedIdentities = invalidatedIdentities
-    resolveReuseSession = nil
+    resolveWorkTracker = .init()
     self.localActionRegistry = localActionRegistry
     self.localPointerHandlerRegistry = nil
     self.localFocusBindingRegistry = nil
@@ -415,230 +403,16 @@ extension ResolveContext {
   }
 }
 
-// SAFETY: Created per-frame and exclusively accessed on @MainActor during the resolve phase.
-// Contains RetainedResolveFrame (non-Sendable due to closure storage) and mutable workMetrics.
-// Never shared across isolation domains.
-@MainActor
-package final class ResolveReuseSession: @unchecked Sendable {
-  package let invalidatedIdentities: Set<Identity>
-  private let previousFrame: RetainedResolveFrame?
-  package var workMetrics = ResolveWorkMetrics()
+package final class ResolveWorkTracker: @unchecked Sendable {
+  package var workMetrics: ResolveWorkMetrics
 
   package init(
-    previousFrame: RetainedResolveFrame?,
-    invalidatedIdentities: Set<Identity>
+    workMetrics: ResolveWorkMetrics = .init()
   ) {
-    self.previousFrame = previousFrame
-    self.invalidatedIdentities = invalidatedIdentities
-  }
-
-  package func reusedResolvedSubtree(
-    for context: ResolveContext
-  ) -> ResolvedNode? {
-    guard let previousFrame,
-      let candidate = previousFrame.resolvedTreeIndex.resolvedNode(
-        for: context.identity
-      ),
-      canReuse(candidate, for: context)
-    else {
-      return nil
-    }
-
-    workMetrics.resolvedNodesReused +=
-      previousFrame.resolvedTreeIndex.subtreeNodeCount(
-        for: context.identity
-      ) ?? candidate.subtreeNodeCount
-    replayRegistrations(for: context.identity, into: context)
-    return candidate
-  }
-
-  private func canReuse(
-    _ node: ResolvedNode,
-    for context: ResolveContext
-  ) -> Bool {
-    guard !invalidatedIdentities.isEmpty else {
-      return false
-    }
-    guard node.supportsRetainedReuse else {
-      return false
-    }
-    guard !hasInvalidatedSelfOrAncestor(context.identity) else {
-      return false
-    }
-    guard !invalidatedIdentities.contains(context.identity) else {
-      return false
-    }
-    guard !subtreeContainsInvalidatedIdentity(context.identity) else {
-      return false
-    }
-    return node.environmentSnapshot == context.environment
-      && node.transactionSnapshot == context.transaction
-  }
-
-  private func hasInvalidatedSelfOrAncestor(
-    _ identity: Identity
-  ) -> Bool {
-    if let previousFrame {
-      return invalidatedIdentities.contains { invalidatedIdentity in
-        previousFrame.resolvedTreeIndex.contains(
-          identity,
-          inSubtreeOf: invalidatedIdentity
-        )
-          || identity.isDescendant(of: invalidatedIdentity)
-      }
-    }
-
-    return invalidatedIdentities.contains { invalidatedIdentity in
-      identity.isDescendant(of: invalidatedIdentity)
-    }
-  }
-
-  private func subtreeContainsInvalidatedIdentity(
-    _ subtreeIdentity: Identity
-  ) -> Bool {
-    if let previousFrame {
-      return invalidatedIdentities.contains { invalidatedIdentity in
-        previousFrame.resolvedTreeIndex.contains(
-          invalidatedIdentity,
-          inSubtreeOf: subtreeIdentity
-        ) || invalidatedIdentity.isDescendant(of: subtreeIdentity)
-      }
-    }
-
-    return invalidatedIdentities.contains { invalidatedIdentity in
-      invalidatedIdentity.isDescendant(of: subtreeIdentity)
-    }
-  }
-
-  private func replayRegistrations(
-    for subtreeIdentity: Identity,
-    into context: ResolveContext
-  ) {
-    guard let previousFrame else {
-      return
-    }
-
-    guard
-      let subtreeIdentities = previousFrame.resolvedTreeIndex.subtreeIdentities(
-        for: subtreeIdentity
-      )
-    else {
-      return
-    }
-
-    for identity in subtreeIdentities {
-      if let actionRegistry = context.localActionRegistry,
-        let registration = previousFrame.actionHandlers[identity]
-      {
-        actionRegistry.register(
-          identity: identity,
-          handler: registration.handler,
-          followUpInvalidationIdentity: registration.followUpInvalidationIdentity
-        )
-      }
-      if let keyHandlerRegistry = context.localKeyHandlerRegistry,
-        let handler = previousFrame.keyHandlers[identity]
-      {
-        keyHandlerRegistry.register(identity: identity, handler: handler)
-      }
-      if let keyHandlerRegistry = context.localKeyHandlerRegistry,
-        let handler = previousFrame.keyPressHandlers[identity]
-      {
-        keyHandlerRegistry.register(identity: identity, keyPressHandler: handler)
-      }
-      if let taskRegistry = context.localTaskRegistry,
-        let registration = previousFrame.taskRegistrations[identity]
-      {
-        taskRegistry.register(identity: identity, registration: registration)
-      }
-    }
-
-    if let hotkeyRegistry = context.hotkeyRegistry {
-      hotkeyRegistry.restore(
-        previousFrame.hotkeyHandlers.filter { snapshot in
-          previousFrame.resolvedTreeIndex.contains(
-            snapshot.identity,
-            inSubtreeOf: subtreeIdentity
-          )
-        }
-      )
-    }
-
-    if let pointerHandlerRegistry = context.localPointerHandlerRegistry {
-      for (routeID, handler) in previousFrame.pointerHandlers
-      where previousFrame.resolvedTreeIndex.contains(
-        routeID.identity,
-        inSubtreeOf: subtreeIdentity
-      ) {
-        pointerHandlerRegistry.register(routeID: routeID, handler: handler)
-      }
-    }
-
-    if let focusBindingRegistry = context.localFocusBindingRegistry {
-      focusBindingRegistry.restore(
-        previousFrame.focusBindings.filter { snapshot in
-          previousFrame.resolvedTreeIndex.contains(
-            snapshot.identity,
-            inSubtreeOf: subtreeIdentity
-          )
-        }
-      )
-    }
-    if let focusedValuesRegistry = context.localFocusedValuesRegistry {
-      focusedValuesRegistry.restore(
-        previousFrame.focusedValues.filter { snapshot in
-          previousFrame.resolvedTreeIndex.contains(
-            snapshot.identity,
-            inSubtreeOf: subtreeIdentity
-          )
-        }
-      )
-    }
-    if let preferenceObservationRegistry = context.localPreferenceObservationRegistry {
-      preferenceObservationRegistry.restore(
-        previousFrame.preferenceObservations.filter { snapshot in
-          previousFrame.resolvedTreeIndex.contains(
-            snapshot.identity,
-            inSubtreeOf: subtreeIdentity
-          )
-        }
-      )
-    }
-
-    guard let lifecycleRegistry = context.localLifecycleRegistry else {
-      return
-    }
-
-    var appearIDs: [String] = []
-    var disappearIDs: [String] = []
-    for identity in subtreeIdentities {
-      guard
-        let lifecycleMetadata = previousFrame.resolvedTreeIndex.resolvedNode(
-          for: identity
-        )?.lifecycleMetadata
-      else {
-        continue
-      }
-      appearIDs.append(contentsOf: lifecycleMetadata.appearHandlerIDs)
-      disappearIDs.append(contentsOf: lifecycleMetadata.disappearHandlerIDs)
-    }
-
-    lifecycleRegistry.restore(
-      .init(
-        appearHandlers: Dictionary(
-          uniqueKeysWithValues: appearIDs.compactMap { handlerID in
-            previousFrame.lifecycleHandlers.appearHandlers[handlerID].map { (handlerID, $0) }
-          }
-        ),
-        disappearHandlers: Dictionary(
-          uniqueKeysWithValues: disappearIDs.compactMap { handlerID in
-            previousFrame.lifecycleHandlers.disappearHandlers[handlerID].map { (handlerID, $0) }
-          }
-        )
-      )
-    )
+    self.workMetrics = workMetrics
   }
 }
+
 /// Reads an environment value and maps it into authored content.
 public struct EnvironmentReader<Value, Content: View>: View, ResolvableView {
   private let keyPath: KeyPath<EnvironmentValues, Value>

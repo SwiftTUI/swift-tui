@@ -36,7 +36,9 @@ Lifecycle is identity-driven.
 - Reordering, layout movement, focus changes, clipping changes, or scroll-position changes do not count as lifecycle transitions if identity is preserved
 - Off-screen or clipped nodes that remain in the tree do not disappear
 
-`CommitPlanner` flattens lifecycle metadata from the resolved tree into `CommittedLifecycleState`, diffs that state against the previous committed frame, and emits explicit lifecycle work in `CommitPlan.lifecycle`.
+`ViewGraph` finalizes each frame into explicit lifecycle events. `CommitPlanner`
+only packages those events into `CommitPlan.lifecycle` alongside semantic
+handler-installation work.
 
 ### Ordering Rules
 

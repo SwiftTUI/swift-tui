@@ -288,8 +288,17 @@ public final class RunLoop<State: Equatable & Sendable> {
 
       var handledNonExitEvent = false
       for event in pendingEvents {
+        let hadReadyFrameBeforeEvent = scheduler.hasPendingFrame(at: .now())
         if let exitReason = handle(event) {
-          if handledNonExitEvent {
+          let shouldFlushBeforeExit =
+            handledNonExitEvent
+            || (hadReadyFrameBeforeEvent && {
+              if case .signal = exitReason {
+                return true
+              }
+              return false
+            }())
+          if shouldFlushBeforeExit {
             try renderPendingFrames(renderedFrames: &renderedFrames)
           }
           return RunLoopResult(

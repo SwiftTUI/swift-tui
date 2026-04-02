@@ -83,7 +83,7 @@ That ordering is visible in `DefaultRenderer`, `FrameArtifacts`, `Pipeline`, and
 ### Commit
 
 - `CommitPlanner` packages semantic, lifecycle, and handler-installation work into `CommitPlan`
-- Lifecycle ownership is flattened into `CommittedLifecycleState`, diffed against the previous committed frame, and emitted as explicit appear, disappear, task-start, and task-cancel operations
+- `ViewGraph` owns lifecycle state and emits explicit appear, disappear, task-start, and task-cancel operations during frame finalization
 - Public `.onAppear`, `.onDisappear`, and `.task` hooks lower into this phase rather than firing during resolve
 
 ## Runtime Model

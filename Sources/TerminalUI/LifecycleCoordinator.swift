@@ -3,7 +3,6 @@ import Core
 @MainActor
 package final class LifecycleCoordinator {
   private let taskRunner: TaskRunner
-  private(set) var previousLifecycleState: CommittedLifecycleState?
   private(set) var previousLifecycleHandlers = LifecycleHandlerSnapshot()
 
   init(taskRunner: TaskRunner = .init()) {
@@ -23,13 +22,11 @@ package final class LifecycleCoordinator {
       )
     }
 
-    previousLifecycleState = plan.nextLifecycleState
     previousLifecycleHandlers = currentLifecycleRegistry.snapshot()
   }
 
   func shutdown() {
     taskRunner.cancelAll()
-    previousLifecycleState = nil
     previousLifecycleHandlers = .init()
   }
 

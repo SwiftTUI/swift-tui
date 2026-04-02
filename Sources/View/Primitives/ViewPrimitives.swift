@@ -246,9 +246,6 @@ func resolveLeafNode(
   drawPayload: DrawPayload = .none,
   in context: ResolveContext
 ) -> ResolvedNode {
-  if let reused = context.reusedResolvedSubtreeIfAvailable() {
-    return reused
-  }
   context.recordResolvedComputation()
   return ResolvedNode(
     identity: context.identity,

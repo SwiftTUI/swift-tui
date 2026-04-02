@@ -2,6 +2,7 @@ import Testing
 
 @testable import Core
 
+@MainActor
 struct LifecycleDiffFixture: Sendable {
   var previous: ResolvedNode
   var next: ResolvedNode
@@ -23,16 +24,15 @@ struct LifecycleDiffFixture: Sendable {
   func commitPlan(
     planner: CommitPlanner = .init()
   ) -> CommitPlan {
-    let previousPlan = planner.plan(
-      resolved: previous,
-      semantics: semantics,
-      transaction: transaction
-    )
+    let graph = ViewGraph()
+    _ = graph.applySnapshot(previous)
+    let lifecycleEvents = graph.applySnapshot(next)
+
     return planner.plan(
       resolved: next,
       semantics: semantics,
       transaction: transaction,
-      previousLifecycleState: previousPlan.nextLifecycleState
+      lifecycleEvents: lifecycleEvents
     )
   }
 }
@@ -68,11 +68,11 @@ func lifecycleNode(
   )
 }
 
+@MainActor
 func assertLifecycleDiff(
   previous: ResolvedNode,
   next: ResolvedNode,
   expectedLifecycle: [LifecycleCommitEntry],
-  expectedNextLifecycleState: CommittedLifecycleState? = nil,
   semantics: SemanticSnapshot = .init(),
   transaction: TransactionSnapshot = .init(),
   planner: CommitPlanner = .init()
@@ -85,8 +85,4 @@ func assertLifecycleDiff(
   ).commitPlan(planner: planner)
 
   #expect(plan.lifecycle == expectedLifecycle)
-
-  if let expectedNextLifecycleState {
-    #expect(plan.nextLifecycleState == expectedNextLifecycleState)
-  }
 }

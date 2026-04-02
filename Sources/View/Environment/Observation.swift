@@ -53,19 +53,6 @@ package final class ObservationBridge: Equatable {
     }
   }
 
-  package func prune(
-    keeping index: ResolvedTreeIndex
-  ) {
-    guard !observedPasses.isEmpty else {
-      return
-    }
-
-    let staleIdentities = observedPasses.keys.filter { !index.contains($0) }
-    for identity in staleIdentities {
-      observedPasses.removeValue(forKey: identity)
-    }
-  }
-
   private func recordChange(
     identity: Identity,
     pass: UInt64

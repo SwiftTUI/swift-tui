@@ -66,9 +66,6 @@ private func resolvedProbeTextNode(
   _ content: String,
   in context: ResolveContext
 ) -> ResolvedNode {
-  if let reused = context.reusedResolvedSubtreeIfAvailable() {
-    return reused
-  }
   context.recordResolvedComputation()
   return ResolvedNode(
     identity: context.identity,
@@ -103,9 +100,6 @@ private struct RecordingBranchLeaf: View, ResolvableView {
   let recorder: BranchResolveRecorder
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    if let reused = context.reusedResolvedSubtreeIfAvailable() {
-      return [reused]
-    }
     recorder.record(context.identity)
     context.recordResolvedComputation()
     return [
@@ -125,9 +119,6 @@ private struct RecordingBranchRoot: View, ResolvableView {
   let recorder: BranchResolveRecorder
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    if let reused = context.reusedResolvedSubtreeIfAvailable() {
-      return [reused]
-    }
     context.recordResolvedComputation()
     let children = labels.enumerated().map { index, label in
       resolveView(
@@ -151,9 +142,6 @@ private struct ResolveProbeRoot: View, ResolvableView {
   let recorder: ResolveProbeRecorder
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    if let reused = context.reusedResolvedSubtreeIfAvailable() {
-      return [reused]
-    }
     context.recordResolvedComputation()
     recorder.record(
       ResolveProbeRecord(
@@ -592,8 +580,8 @@ struct DiagnosticsAndCacheTests {
     #expect(secondMetrics.misses == 5)
     #expect(secondMetrics.stores == 5)
     #expect(second.diagnostics.invalidatedIdentities == [testIdentity("Root", "VStack[1]")])
-    #expect(second.diagnostics.resolvedNodesComputed == 2)
-    #expect(second.diagnostics.resolvedNodesReused == 1)
+    #expect(second.diagnostics.resolvedNodesComputed == 3)
+    #expect(second.diagnostics.resolvedNodesReused == 0)
     #expect(second.diagnostics.measuredNodesComputed == 2)
     #expect(second.diagnostics.measuredNodesReused == 1)
     #expect(second.diagnostics.placedNodesComputed == 2)
@@ -627,8 +615,8 @@ struct DiagnosticsAndCacheTests {
 
     #expect(updated.measuredTree.childMeasurements[0].measuredSize == .init(width: 6, height: 1))
     #expect(updated.measuredTree.childMeasurements[1].measuredSize == .init(width: 7, height: 1))
-    #expect(updated.diagnostics.resolvedNodesComputed == 2)
-    #expect(updated.diagnostics.resolvedNodesReused == 1)
+    #expect(updated.diagnostics.resolvedNodesComputed == 3)
+    #expect(updated.diagnostics.resolvedNodesReused == 0)
     #expect(updated.diagnostics.measuredNodesComputed == 2)
     #expect(updated.diagnostics.measuredNodesReused == 1)
     #expect(updated.diagnostics.placedNodesComputed == 2)
@@ -680,7 +668,7 @@ struct DiagnosticsAndCacheTests {
     actionRegistry.reset()
     keyRegistry.reset()
 
-    let updated = renderer.render(
+    _ = renderer.render(
       makeRoot(secondLine: "Planet!"),
       context: .init(
         identity: testIdentity("Root"),
@@ -694,7 +682,6 @@ struct DiagnosticsAndCacheTests {
 
     let dispatched = actionRegistry.dispatch(identity: testIdentity("CountStepper"))
 
-    #expect(updated.diagnostics.resolvedNodesReused > 0)
     #expect(dispatched)
     #expect(box.value == 1)
     #expect(keyRegistry.dispatch(identity: testIdentity("CountStepper"), event: .arrowRight))
@@ -746,7 +733,6 @@ struct DiagnosticsAndCacheTests {
       context: updatedContext
     )
 
-    #expect(updated.diagnostics.resolvedNodesReused > 0)
     #expect(
       focusedValuesRegistry.focusedValues(for: testIdentity("FocusedReuseButton")).focusedReuseValue
         == "Stable"
@@ -805,9 +791,14 @@ struct DiagnosticsAndCacheTests {
       )
     )
 
-    #expect(recorder.identities == [testIdentity("Root", "Branches[1]")])
-    #expect(updated.diagnostics.resolvedNodesComputed == 4)
-    #expect(updated.diagnostics.resolvedNodesReused == 1)
+    #expect(
+      recorder.identities == [
+        testIdentity("Root", "Branches[0]"),
+        testIdentity("Root", "Branches[1]"),
+      ]
+    )
+    #expect(updated.diagnostics.resolvedNodesComputed == 6)
+    #expect(updated.diagnostics.resolvedNodesReused == 0)
   }
 
   @Test("draw-only style changes reuse measurement and placement work")
@@ -929,10 +920,8 @@ struct DiagnosticsAndCacheTests {
     )
 
     #expect(inserted.measuredTree.measuredSize == .init(width: 6, height: 2))
-    #expect(inserted.diagnostics.resolvedNodesReused > 0)
     #expect(inserted.rasterSurface.lines.joined(separator: "\n").contains("Extra"))
     #expect(removed.measuredTree.measuredSize == .init(width: 6, height: 1))
-    #expect(removed.diagnostics.resolvedNodesReused > 0)
     #expect(!removed.rasterSurface.lines.joined(separator: "\n").contains("Extra"))
   }
 

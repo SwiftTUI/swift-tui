@@ -7,11 +7,10 @@ import Testing
 struct Phase2CommitPlannerTests {
   @Test("new lifecycle owner emits appear and task start deltas")
   func newLifecycleOwnerEmitsAppearAndTaskStart() {
-    let planner = CommitPlanner()
     let task = TaskDescriptor(id: "load", priority: .medium)
-
-    let plan = planner.plan(
-      resolved: lifecycleTree(
+    let plan = planTransition(
+      from: lifecycleTree(children: []),
+      to: lifecycleTree(
         children: [
           lifecycleNode(
             testIdentity("Root", "Leaf"),
@@ -20,29 +19,25 @@ struct Phase2CommitPlannerTests {
             task: task
           )
         ]
-      ),
-      semantics: .init()
+      )
     )
 
     #expect(
       plan.lifecycle == [
-        .init(identity: testIdentity("Root", "Leaf"), operation: .appear(handlerIDs: ["appear"])),
-        .init(identity: testIdentity("Root", "Leaf"), operation: .taskStart(task)),
-      ])
-    #expect(
-      plan.nextLifecycleState.nodes == [
-        .init(
+        LifecycleCommitEntry(
           identity: testIdentity("Root", "Leaf"),
-          appearHandlerIDs: ["appear"],
-          disappearHandlerIDs: ["disappear"],
-          task: task
-        )
-      ])
+          operation: .appear(handlerIDs: ["appear"])
+        ),
+        LifecycleCommitEntry(
+          identity: testIdentity("Root", "Leaf"),
+          operation: .taskStart(task)
+        ),
+      ]
+    )
   }
 
   @Test("stable repeats do not emit duplicate lifecycle deltas")
   func stableRepeatEmitsNoLifecycleDeltas() {
-    let planner = CommitPlanner()
     let task = TaskDescriptor(id: "load", priority: .medium)
     let tree = lifecycleTree(
       children: [
@@ -54,25 +49,23 @@ struct Phase2CommitPlannerTests {
         )
       ]
     )
-
-    let first = planner.plan(resolved: tree, semantics: .init())
-    let second = planner.plan(
+    let graph = ViewGraph()
+    _ = graph.applySnapshot(tree)
+    let lifecycleEvents = graph.applySnapshot(tree)
+    let plan = CommitPlanner().plan(
       resolved: tree,
       semantics: .init(),
-      previousLifecycleState: first.nextLifecycleState
+      lifecycleEvents: lifecycleEvents
     )
 
-    #expect(second.lifecycle.isEmpty)
-    #expect(second.nextLifecycleState == first.nextLifecycleState)
+    #expect(plan.lifecycle.isEmpty)
   }
 
   @Test("stable identity gaining a task emits task start without lifecycle transitions")
   func stableIdentityGainingTaskEmitsTaskStartOnly() {
-    let planner = CommitPlanner()
     let task = TaskDescriptor(id: "load", priority: .medium)
-
-    let previous = planner.plan(
-      resolved: lifecycleTree(
+    let plan = planTransition(
+      from: lifecycleTree(
         children: [
           lifecycleNode(
             testIdentity("Root", "Leaf"),
@@ -81,11 +74,7 @@ struct Phase2CommitPlannerTests {
           )
         ]
       ),
-      semantics: .init()
-    )
-
-    let next = planner.plan(
-      resolved: lifecycleTree(
+      to: lifecycleTree(
         children: [
           lifecycleNode(
             testIdentity("Root", "Leaf"),
@@ -94,24 +83,24 @@ struct Phase2CommitPlannerTests {
             task: task
           )
         ]
-      ),
-      semantics: .init(),
-      previousLifecycleState: previous.nextLifecycleState
+      )
     )
 
     #expect(
-      next.lifecycle == [
-        .init(identity: testIdentity("Root", "Leaf"), operation: .taskStart(task))
-      ])
+      plan.lifecycle == [
+        LifecycleCommitEntry(
+          identity: testIdentity("Root", "Leaf"),
+          operation: .taskStart(task)
+        )
+      ]
+    )
   }
 
   @Test("stable identity losing a task emits task cancel without lifecycle transitions")
   func stableIdentityLosingTaskEmitsTaskCancelOnly() {
-    let planner = CommitPlanner()
     let task = TaskDescriptor(id: "load", priority: .medium)
-
-    let previous = planner.plan(
-      resolved: lifecycleTree(
+    let plan = planTransition(
+      from: lifecycleTree(
         children: [
           lifecycleNode(
             testIdentity("Root", "Leaf"),
@@ -121,11 +110,7 @@ struct Phase2CommitPlannerTests {
           )
         ]
       ),
-      semantics: .init()
-    )
-
-    let next = planner.plan(
-      resolved: lifecycleTree(
+      to: lifecycleTree(
         children: [
           lifecycleNode(
             testIdentity("Root", "Leaf"),
@@ -133,23 +118,24 @@ struct Phase2CommitPlannerTests {
             disappear: ["disappear"]
           )
         ]
-      ),
-      semantics: .init(),
-      previousLifecycleState: previous.nextLifecycleState
+      )
     )
 
     #expect(
-      next.lifecycle == [
-        .init(identity: testIdentity("Root", "Leaf"), operation: .taskCancel(task))
-      ])
+      plan.lifecycle == [
+        LifecycleCommitEntry(
+          identity: testIdentity("Root", "Leaf"),
+          operation: .taskCancel(task)
+        )
+      ]
+    )
   }
 
   @Test("removal cancels task before disappear")
   func removalCancelsTaskBeforeDisappear() {
-    let planner = CommitPlanner()
     let task = TaskDescriptor(id: "load", priority: .medium)
-    let previous = planner.plan(
-      resolved: lifecycleTree(
+    let plan = planTransition(
+      from: lifecycleTree(
         children: [
           lifecycleNode(
             testIdentity("Root", "Leaf"),
@@ -159,32 +145,29 @@ struct Phase2CommitPlannerTests {
           )
         ]
       ),
-      semantics: .init()
-    )
-
-    let next = planner.plan(
-      resolved: lifecycleTree(children: []),
-      semantics: .init(),
-      previousLifecycleState: previous.nextLifecycleState
+      to: lifecycleTree(children: [])
     )
 
     #expect(
-      next.lifecycle == [
-        .init(identity: testIdentity("Root", "Leaf"), operation: .taskCancel(task)),
-        .init(
-          identity: testIdentity("Root", "Leaf"), operation: .disappear(handlerIDs: ["disappear"])),
-      ])
-    #expect(next.nextLifecycleState.nodes.isEmpty)
+      plan.lifecycle == [
+        LifecycleCommitEntry(
+          identity: testIdentity("Root", "Leaf"),
+          operation: .taskCancel(task)
+        ),
+        LifecycleCommitEntry(
+          identity: testIdentity("Root", "Leaf"),
+          operation: .disappear(handlerIDs: ["disappear"])
+        ),
+      ]
+    )
   }
 
   @Test("task identity replacement cancels and restarts without lifecycle transitions")
   func taskIdentityReplacementCancelsAndRestartsWithoutLifecycleTransitions() {
-    let planner = CommitPlanner()
     let firstTask = TaskDescriptor(id: "load-A", priority: .medium)
     let secondTask = TaskDescriptor(id: "load-B", priority: .medium)
-
-    let previous = planner.plan(
-      resolved: lifecycleTree(
+    let plan = planTransition(
+      from: lifecycleTree(
         children: [
           lifecycleNode(
             testIdentity("Root", "Leaf"),
@@ -194,11 +177,7 @@ struct Phase2CommitPlannerTests {
           )
         ]
       ),
-      semantics: .init()
-    )
-
-    let next = planner.plan(
-      resolved: lifecycleTree(
+      to: lifecycleTree(
         children: [
           lifecycleNode(
             testIdentity("Root", "Leaf"),
@@ -207,47 +186,61 @@ struct Phase2CommitPlannerTests {
             task: secondTask
           )
         ]
-      ),
-      semantics: .init(),
-      previousLifecycleState: previous.nextLifecycleState
+      )
     )
 
     #expect(
-      next.lifecycle == [
-        .init(identity: testIdentity("Root", "Leaf"), operation: .taskCancel(firstTask)),
-        .init(identity: testIdentity("Root", "Leaf"), operation: .taskStart(secondTask)),
-      ])
+      plan.lifecycle == [
+        LifecycleCommitEntry(
+          identity: testIdentity("Root", "Leaf"),
+          operation: .taskCancel(firstTask)
+        ),
+        LifecycleCommitEntry(
+          identity: testIdentity("Root", "Leaf"),
+          operation: .taskStart(secondTask)
+        ),
+      ]
+    )
   }
 
   @Test("stable identity reorder does not emit lifecycle deltas")
   func stableIdentityReorderDoesNotEmitLifecycleDeltas() {
-    let planner = CommitPlanner()
-    let previousTree = lifecycleTree(
-      children: [
-        lifecycleNode(testIdentity("Root", "A"), appear: ["appear-A"], disappear: ["disappear-A"]),
-        lifecycleNode(testIdentity("Root", "B"), appear: ["appear-B"], disappear: ["disappear-B"]),
-      ]
-    )
-    let nextTree = lifecycleTree(
-      children: [
-        lifecycleNode(testIdentity("Root", "B"), appear: ["appear-B"], disappear: ["disappear-B"]),
-        lifecycleNode(testIdentity("Root", "A"), appear: ["appear-A"], disappear: ["disappear-A"]),
-      ]
+    let plan = planTransition(
+      from: lifecycleTree(
+        children: [
+          lifecycleNode(
+            testIdentity("Root", "A"),
+            appear: ["appear-A"],
+            disappear: ["disappear-A"]
+          ),
+          lifecycleNode(
+            testIdentity("Root", "B"),
+            appear: ["appear-B"],
+            disappear: ["disappear-B"]
+          ),
+        ]
+      ),
+      to: lifecycleTree(
+        children: [
+          lifecycleNode(
+            testIdentity("Root", "B"),
+            appear: ["appear-B"],
+            disappear: ["disappear-B"]
+          ),
+          lifecycleNode(
+            testIdentity("Root", "A"),
+            appear: ["appear-A"],
+            disappear: ["disappear-A"]
+          ),
+        ]
+      )
     )
 
-    let previous = planner.plan(resolved: previousTree, semantics: .init())
-    let next = planner.plan(
-      resolved: nextTree,
-      semantics: .init(),
-      previousLifecycleState: previous.nextLifecycleState
-    )
-
-    #expect(next.lifecycle.isEmpty)
+    #expect(plan.lifecycle.isEmpty)
   }
 
   @Test("indexed lazy-stack lifecycle is derived from placed visible children")
   func indexedLazyStackLifecycleUsesPlacedChildren() {
-    let planner = CommitPlanner()
     let task = TaskDescriptor(id: "row-1", priority: .medium)
     let resolved = ResolvedNode(
       identity: testIdentity("Root"),
@@ -294,21 +287,48 @@ struct Phase2CommitPlannerTests {
       semanticRole: .container
     )
 
-    let plan = planner.plan(
+    let graph = ViewGraph()
+    let lifecycleEvents = graph.applySnapshot(
+      resolved,
+      placed: placed
+    )
+    let plan = CommitPlanner().plan(
       resolved: resolved,
       placed: placed,
-      semantics: .init()
+      semantics: .init(),
+      lifecycleEvents: lifecycleEvents
     )
 
     #expect(
-      plan.nextLifecycleState.nodes == [
-        CommittedLifecycleNode(
+      plan.lifecycle == [
+        LifecycleCommitEntry(
           identity: testIdentity("Root", "LazyVStack", "ID[1]"),
-          appearHandlerIDs: ["appear"],
-          disappearHandlerIDs: ["disappear"],
-          task: task
-        )
+          operation: .appear(handlerIDs: ["appear"])
+        ),
+        LifecycleCommitEntry(
+          identity: testIdentity("Root", "LazyVStack", "ID[1]"),
+          operation: .taskStart(task)
+        ),
       ]
+    )
+  }
+
+  private func planTransition(
+    from previous: ResolvedNode,
+    to next: ResolvedNode,
+    placed: PlacedNode? = nil
+  ) -> CommitPlan {
+    let graph = ViewGraph()
+    _ = graph.applySnapshot(previous)
+    let lifecycleEvents = graph.applySnapshot(
+      next,
+      placed: placed
+    )
+    return CommitPlanner().plan(
+      resolved: next,
+      placed: placed,
+      semantics: .init(),
+      lifecycleEvents: lifecycleEvents
     )
   }
 }

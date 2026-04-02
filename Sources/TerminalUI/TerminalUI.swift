@@ -4,7 +4,6 @@
 @MainActor
 private final class RetainedFrameStore {
   private var previousFrame: FrameArtifacts?
-  private var previousResolveFrame: RetainedResolveFrame?
 
   func layoutSession(
     invalidatedIdentities: Set<Identity>
@@ -15,45 +14,8 @@ private final class RetainedFrameStore {
     )
   }
 
-  func resolveSession(
-    invalidatedIdentities: Set<Identity>
-  ) -> ResolveReuseSession {
-    ResolveReuseSession(
-      previousFrame: previousResolveFrame,
-      invalidatedIdentities: invalidatedIdentities
-    )
-  }
-
-  func store(
-    _ artifacts: FrameArtifacts,
-    actionRegistry: LocalActionRegistry?,
-    hotkeyRegistry: HotkeyRegistry?,
-    pointerHandlerRegistry: LocalPointerHandlerRegistry?,
-    focusBindingRegistry: LocalFocusBindingRegistry?,
-    focusedValuesRegistry: LocalFocusedValuesRegistry?,
-    preferenceObservationRegistry: LocalPreferenceObservationRegistry?,
-    keyHandlerRegistry: LocalKeyHandlerRegistry?,
-    lifecycleRegistry: LocalLifecycleRegistry?,
-    taskRegistry: LocalTaskRegistry?
-  ) {
+  func store(_ artifacts: FrameArtifacts) {
     previousFrame = artifacts
-    previousResolveFrame = RetainedResolveFrame(
-      resolvedTree: artifacts.resolvedTree,
-      actionHandlers: actionRegistry?.snapshot() ?? [:],
-      hotkeyHandlers: hotkeyRegistry?.snapshot() ?? [],
-      pointerHandlers: pointerHandlerRegistry?.snapshot() ?? [:],
-      focusBindings: focusBindingRegistry?.snapshot() ?? [],
-      focusedValues: focusedValuesRegistry?.snapshot() ?? [],
-      preferenceObservations: preferenceObservationRegistry?.snapshot() ?? [],
-      keyHandlers: keyHandlerRegistry?.snapshot() ?? [:],
-      keyPressHandlers: keyHandlerRegistry?.snapshotKeyPressHandlers() ?? [:],
-      lifecycleHandlers: lifecycleRegistry?.snapshot() ?? .init(),
-      taskRegistrations: taskRegistry?.snapshot() ?? [:]
-    )
-  }
-
-  func latestResolvedTreeIndex() -> ResolvedTreeIndex? {
-    previousResolveFrame?.resolvedTreeIndex
   }
 }
 
@@ -102,40 +64,18 @@ public struct DefaultRenderer {
     context: ResolveContext = .init(),
     proposal: ProposedSize = .unspecified
   ) -> FrameArtifacts {
-    render(
-      root,
-      context: context,
-      proposal: proposal,
-      previousLifecycleState: nil
-    )
-  }
-
-  @MainActor
-  package func render<V: View>(
-    _ root: V,
-    context: ResolveContext = .init(),
-    proposal: ProposedSize = .unspecified,
-    previousLifecycleState: CommittedLifecycleState?
-  ) -> FrameArtifacts {
     renderView(
       root,
       context: context,
-      proposal: proposal,
-      previousLifecycleState: previousLifecycleState
+      proposal: proposal
     )
-  }
-
-  @MainActor
-  package func latestResolvedTreeIndex() -> ResolvedTreeIndex? {
-    retainedFrames.latestResolvedTreeIndex()
   }
 
   @MainActor
   private func renderView<V: View>(
     _ root: V,
     context: ResolveContext,
-    proposal: ProposedSize,
-    previousLifecycleState: CommittedLifecycleState?
+    proposal: ProposedSize
   ) -> FrameArtifacts {
     let clock = ContinuousClock()
 
@@ -152,9 +92,6 @@ public struct DefaultRenderer {
     viewGraph.beginFrame()
     viewGraph.invalidate(context.invalidatedIdentities)
     resolveContext.viewGraph = viewGraph
-    resolveContext.resolveReuseSession = retainedFrames.resolveSession(
-      invalidatedIdentities: context.invalidatedIdentities
-    )
     resolveContext.observationBridge?.beginTrackingPass()
 
     let (resolved, resolveDuration) = measurePhase {
@@ -176,8 +113,7 @@ public struct DefaultRenderer {
     let frameContext = FrameContext(
       environment: context.environment,
       transaction: context.transaction,
-      invalidatedIdentities: context.invalidatedIdentities,
-      previousLifecycleState: previousLifecycleState
+      invalidatedIdentities: context.invalidatedIdentities
     )
     let (measured, measureDuration) = measurePhase {
       layoutEngine.measure(
@@ -206,13 +142,16 @@ public struct DefaultRenderer {
       )
     }
     let (commit, commitDuration) = measurePhase {
-      _ = viewGraph.finalizeFrame(rootIdentity: resolved.identity)
+      let lifecycleEvents = viewGraph.finalizeFrame(
+        resolved: resolved,
+        placed: placed
+      )
       return commitPlanner.plan(
         resolved: resolved,
         placed: placed,
         semantics: semantics,
         transaction: frameContext.transaction,
-        previousLifecycleState: frameContext.previousLifecycleState
+        lifecycleEvents: lifecycleEvents
       )
     }
     let phaseTimings = FramePhaseTimings(
@@ -231,7 +170,7 @@ public struct DefaultRenderer {
       semantics: semantics,
       draw: draw,
       invalidatedIdentities: frameContext.invalidatedIdentities,
-      resolveWork: resolveContext.resolveReuseSession?.workMetrics,
+      resolveWork: resolveContext.resolveWorkTracker?.workMetrics,
       layoutWork: layoutPassContext.workMetrics,
       phaseTimings: phaseTimings,
       measurementCache: layoutEngine.cache?.metrics
@@ -247,18 +186,7 @@ public struct DefaultRenderer {
       diagnostics: diagnostics
     )
 
-    retainedFrames.store(
-      artifacts,
-      actionRegistry: resolveContext.localActionRegistry,
-      hotkeyRegistry: resolveContext.hotkeyRegistry,
-      pointerHandlerRegistry: resolveContext.localPointerHandlerRegistry,
-      focusBindingRegistry: resolveContext.localFocusBindingRegistry,
-      focusedValuesRegistry: resolveContext.localFocusedValuesRegistry,
-      preferenceObservationRegistry: resolveContext.localPreferenceObservationRegistry,
-      keyHandlerRegistry: resolveContext.localKeyHandlerRegistry,
-      lifecycleRegistry: resolveContext.localLifecycleRegistry,
-      taskRegistry: resolveContext.localTaskRegistry
-    )
+    retainedFrames.store(artifacts)
     return artifacts
   }
 

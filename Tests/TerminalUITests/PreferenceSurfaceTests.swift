@@ -216,12 +216,11 @@ struct PreferenceSurfaceTests {
       invalidatedIdentities: [testIdentity("Root", "VStack[1]")]
     )
     updatedContext.localPreferenceObservationRegistry = registry
-    let updated = renderer.render(
+    _ = renderer.render(
       makeRoot(secondLine: "Planet"),
       context: updatedContext
     )
 
-    #expect(updated.diagnostics.resolvedNodesReused > 0)
     #expect(
       registry.snapshot().contains { snapshot in
         snapshot.identity == testIdentity("StablePreferenceObserver")

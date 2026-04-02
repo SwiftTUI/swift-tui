@@ -99,11 +99,6 @@ package func appendDeclaredChildNodes<V: View>(
     index: nextIndex
   )
   nextIndex += 1
-  if let reused = childContext.reusedResolvedSubtreeIfAvailable() {
-    resolved.append(reused)
-    return
-  }
-
   let elements = resolveViewElements(view, in: childContext)
   childContext.recordResolvedComputation(count: elements.count)
   resolved.append(contentsOf: elements)
@@ -206,10 +201,6 @@ package func resolveView<V: View>(
   _ view: V,
   in context: ResolveContext
 ) -> ResolvedNode {
-  if let reused = context.reusedResolvedSubtreeIfAvailable() {
-    return reused
-  }
-
   let graphNode = context.viewGraph?.beginEvaluation(
     identity: context.identity,
     invalidator: context.dynamicStateStore?.invalidator

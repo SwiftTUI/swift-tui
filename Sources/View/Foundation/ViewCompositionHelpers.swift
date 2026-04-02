@@ -32,9 +32,6 @@ private func resolveGroupElements(
   semanticMetadata: SemanticMetadata = SemanticMetadata(),
   in context: ResolveContext
 ) -> ResolvedNode {
-  if let reused = context.reusedResolvedSubtreeIfAvailable() {
-    return reused
-  }
   context.recordResolvedComputation()
   let resolvedChildren = children.enumerated().map { index, child in
     child.resolve(in: context.indexedChild(kind: .init(rawValue: kindName), index: index))

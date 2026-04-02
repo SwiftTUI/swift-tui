@@ -357,11 +357,11 @@ public struct ResolvedNode: Equatable, Sendable {
   }
 
   package func collectLifecycleNodes(
-    into nodes: inout [CommittedLifecycleNode]
+    into nodes: inout [LifecycleStateNode]
   ) {
     if !lifecycleMetadata.isEmpty {
       nodes.append(
-        CommittedLifecycleNode(
+        LifecycleStateNode(
           identity: identity,
           appearHandlerIDs: lifecycleMetadata.appearHandlerIDs,
           disappearHandlerIDs: lifecycleMetadata.disappearHandlerIDs,
@@ -488,11 +488,11 @@ public struct PlacedNode: Equatable, Sendable {
   }
 
   package func collectLifecycleNodes(
-    into nodes: inout [CommittedLifecycleNode]
+    into nodes: inout [LifecycleStateNode]
   ) {
     if !lifecycleMetadata.isEmpty {
       nodes.append(
-        CommittedLifecycleNode(
+        LifecycleStateNode(
           identity: identity,
           appearHandlerIDs: lifecycleMetadata.appearHandlerIDs,
           disappearHandlerIDs: lifecycleMetadata.disappearHandlerIDs,

@@ -1,15 +1,13 @@
-import Foundation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
 @testable import View
 
 @MainActor
 @Suite
 struct ResolveReuseIndexingTests {
-  @Test("retained resolve frame indexes resolved subtrees by identity")
-  func retainedResolveFrameIndexesResolvedSubtreesByIdentity() {
+  @Test("resolved trees expose nested subtree identities without retained frame indexes")
+  func resolvedTreeCollectsNestedSubtreeIdentities() throws {
     let rootIdentity = testIdentity("Root")
     let nestedIdentity = testIdentity("Root", "VStack[1]")
     let nestedLeafIdentity = testIdentity("Root", "VStack[1]", "VStack[1]")
@@ -23,158 +21,14 @@ struct ResolveReuseIndexingTests {
     }
     .resolve(in: .init(identity: rootIdentity))
 
-    let retainedFrame = RetainedResolveFrame(resolvedTree: resolvedTree)
-
-    #expect(
-      retainedFrame.resolvedTreeIndex.resolvedNode(for: nestedIdentity)?.kind
-        == .view("VStack")
+    let nestedTree = try #require(
+      resolvedTree.children.first(where: { $0.identity == nestedIdentity })
     )
+    let subtreeIdentities = nestedTree.collectIdentities()
 
-    let subtreeIdentities = Array(
-      retainedFrame.resolvedTreeIndex.subtreeIdentities(for: nestedIdentity) ?? []
-    )
     #expect(subtreeIdentities.first == nestedIdentity)
     #expect(subtreeIdentities.contains(nestedLeafIdentity))
-    #expect(
-      retainedFrame.resolvedTreeIndex.contains(
-        nestedLeafIdentity,
-        inSubtreeOf: nestedIdentity
-      )
-    )
-    #expect(
-      !retainedFrame.resolvedTreeIndex.contains(
-        testIdentity("Root", "VStack[0]"),
-        inSubtreeOf: nestedIdentity
-      )
-    )
-  }
-
-  @Test("resolve reuse replays handlers for indexed subtrees")
-  func resolveReuseReplaysHandlersForIndexedSubtrees() {
-    final class CounterBox {
-      var value = 0
-    }
-
-    let box = CounterBox()
-    let actionRegistry = LocalActionRegistry()
-    let keyRegistry = LocalKeyHandlerRegistry()
-    let renderer = DefaultRenderer(
-      layoutEngine: .init(cache: MeasurementCache())
-    )
-    let targetIdentity = testIdentity("Root", "VStack[0]", "HStack[0]", "CountStepper")
-
-    func makeRoot(secondLine: String) -> some View {
-      VStack(alignment: .leading, spacing: 1) {
-        HStack(spacing: 1) {
-          Stepper(
-            "Count",
-            value: Binding(
-              get: { box.value },
-              set: { box.value = $0 }
-            ),
-            in: 0...3
-          )
-          .id(targetIdentity)
-        }
-        Text(secondLine)
-      }
-    }
-
-    var environmentValues = EnvironmentValues()
-    environmentValues.focusedIdentity = targetIdentity
-
-    _ = renderer.render(
-      makeRoot(secondLine: "World"),
-      context: .init(
-        identity: testIdentity("Root"),
-        environmentValues: environmentValues,
-        localActionRegistry: actionRegistry,
-        localKeyHandlerRegistry: keyRegistry,
-        applyEnvironmentValues: true
-      )
-    )
-
-    actionRegistry.reset()
-    keyRegistry.reset()
-
-    let updated = renderer.render(
-      makeRoot(secondLine: "Planet!"),
-      context: .init(
-        identity: testIdentity("Root"),
-        environmentValues: environmentValues,
-        invalidatedIdentities: [testIdentity("Root", "VStack[1]")],
-        localActionRegistry: actionRegistry,
-        localKeyHandlerRegistry: keyRegistry,
-        applyEnvironmentValues: true
-      )
-    )
-
-    #expect(updated.diagnostics.resolvedNodesReused > 0)
-    #expect(actionRegistry.dispatch(identity: targetIdentity))
-    #expect(box.value == 1)
-    #expect(keyRegistry.dispatch(identity: targetIdentity, event: .arrowRight))
-    #expect(box.value == 2)
-  }
-
-  @Test("resolve reuse replays hotkeys only for the reused subtrees that own them")
-  func resolveReuseReplaysHotkeysWithoutDuplication() {
-    final class CounterBox {
-      var alpha = 0
-      var beta = 0
-    }
-
-    let box = CounterBox()
-    let hotkeyRegistry = HotkeyRegistry()
-    let renderer = DefaultRenderer(
-      layoutEngine: .init(cache: MeasurementCache())
-    )
-
-    func makeRoot(secondLine: String) -> some View {
-      VStack(alignment: .leading, spacing: 1) {
-        Text("Alpha")
-          .onKeyPress(.character("a")) {
-            box.alpha += 1
-            return .handled
-          }
-        Text("Beta")
-          .onKeyPress(.character("b")) {
-            box.beta += 1
-            return .handled
-          }
-        Text(secondLine)
-      }
-    }
-
-    var initialContext = ResolveContext(
-      identity: testIdentity("Root"),
-      applyEnvironmentValues: true
-    )
-    initialContext.hotkeyRegistry = hotkeyRegistry
-
-    _ = renderer.render(
-      makeRoot(secondLine: "World"),
-      context: initialContext
-    )
-
-    hotkeyRegistry.reset()
-
-    var updatedContext = ResolveContext(
-      identity: testIdentity("Root"),
-      invalidatedIdentities: [testIdentity("Root", "VStack[2]")],
-      applyEnvironmentValues: true
-    )
-    updatedContext.hotkeyRegistry = hotkeyRegistry
-
-    let updated = renderer.render(
-      makeRoot(secondLine: "Planet!"),
-      context: updatedContext
-    )
-
-    #expect(updated.diagnostics.resolvedNodesReused > 0)
-    #expect(hotkeyRegistry.registeredBindings().count == 2)
-    #expect(hotkeyRegistry.dispatch(KeyPress(.character("a"))))
-    #expect(hotkeyRegistry.dispatch(KeyPress(.character("b"))))
-    #expect(box.alpha == 1)
-    #expect(box.beta == 1)
+    #expect(!subtreeIdentities.contains(testIdentity("Root", "VStack[0]")))
+    #expect(resolvedTree.path(to: nestedLeafIdentity) == [rootIdentity, nestedIdentity, nestedLeafIdentity])
   }
 }

@@ -1,5 +1,5 @@
-// SAFETY: Contains non-Sendable closures (@MainActor Handler). Only transferred between
-// the registry and RetainedResolveFrame, both of which are exclusively accessed on @MainActor.
+// SAFETY: Contains non-Sendable closures (@MainActor Handler). Access is
+// confined to @MainActor.
 package struct LifecycleHandlerSnapshot: @unchecked Sendable {
   package var appearHandlers: [String: LocalLifecycleRegistry.Handler]
   package var disappearHandlers: [String: LocalLifecycleRegistry.Handler]

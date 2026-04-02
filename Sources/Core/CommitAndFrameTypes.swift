@@ -19,35 +19,6 @@ public struct TaskDescriptor: Equatable, Sendable {
   }
 }
 
-/// The committed lifecycle metadata for one identity in the rendered tree.
-public struct CommittedLifecycleNode: Equatable, Sendable {
-  public var identity: Identity
-  public var appearHandlerIDs: [String]
-  public var disappearHandlerIDs: [String]
-  public var task: TaskDescriptor?
-
-  public init(
-    identity: Identity,
-    appearHandlerIDs: [String] = [],
-    disappearHandlerIDs: [String] = [],
-    task: TaskDescriptor? = nil
-  ) {
-    self.identity = identity
-    self.appearHandlerIDs = appearHandlerIDs
-    self.disappearHandlerIDs = disappearHandlerIDs
-    self.task = task
-  }
-}
-
-/// The flattened lifecycle state of a committed frame.
-public struct CommittedLifecycleState: Equatable, Sendable {
-  public var nodes: [CommittedLifecycleNode]
-
-  public init(nodes: [CommittedLifecycleNode] = []) {
-    self.nodes = nodes
-  }
-}
-
 /// A lifecycle operation emitted during commit planning.
 public enum LifecycleCommitOperation: Equatable, Sendable {
   case appear(handlerIDs: [String])
@@ -84,20 +55,17 @@ public struct CommitPlan: Equatable, Sendable {
   public var transaction: TransactionSnapshot
   public var semanticSnapshot: SemanticSnapshot
   public var lifecycle: [LifecycleCommitEntry]
-  public var nextLifecycleState: CommittedLifecycleState
   public var handlerInstallations: [HandlerInstallation]
 
   public init(
     transaction: TransactionSnapshot = .init(),
     semanticSnapshot: SemanticSnapshot = .init(),
     lifecycle: [LifecycleCommitEntry] = [],
-    nextLifecycleState: CommittedLifecycleState = .init(),
     handlerInstallations: [HandlerInstallation] = []
   ) {
     self.transaction = transaction
     self.semanticSnapshot = semanticSnapshot
     self.lifecycle = lifecycle
-    self.nextLifecycleState = nextLifecycleState
     self.handlerInstallations = handlerInstallations
   }
 }
@@ -173,123 +141,6 @@ package struct ScrollViewportContext: Equatable, Sendable {
     self.axes = axes
     self.viewportRect = viewportRect
     self.contentOffset = contentOffset
-  }
-}
-
-package struct ResolvedTreeIndex: Sendable {
-  package let nodesByIdentity: [Identity: ResolvedNode]
-
-  private let preorderIdentities: [Identity]
-  private let subtreeRanges: [Identity: Range<Int>]
-  private let identityPositions: [Identity: Int]
-
-  package init(resolvedTree: ResolvedNode) {
-    var nodesByIdentity: [Identity: ResolvedNode] = [:]
-    var preorderIdentities: [Identity] = []
-    var subtreeRanges: [Identity: Range<Int>] = [:]
-    var identityPositions: [Identity: Int] = [:]
-
-    func index(_ node: ResolvedNode) {
-      let start = preorderIdentities.count
-      nodesByIdentity[node.identity] = node
-      identityPositions[node.identity] = start
-      preorderIdentities.append(node.identity)
-      for child in node.children {
-        index(child)
-      }
-      subtreeRanges[node.identity] = start..<preorderIdentities.count
-    }
-
-    index(resolvedTree)
-    self.nodesByIdentity = nodesByIdentity
-    self.preorderIdentities = preorderIdentities
-    self.subtreeRanges = subtreeRanges
-    self.identityPositions = identityPositions
-  }
-
-  package func resolvedNode(
-    for identity: Identity
-  ) -> ResolvedNode? {
-    nodesByIdentity[identity]
-  }
-
-  package func subtreeIdentities(
-    for identity: Identity
-  ) -> ArraySlice<Identity>? {
-    guard let range = subtreeRanges[identity] else {
-      return nil
-    }
-    return preorderIdentities[range]
-  }
-
-  package func subtreeNodeCount(
-    for identity: Identity
-  ) -> Int? {
-    subtreeRanges[identity]?.count
-  }
-
-  package func contains(
-    _ identity: Identity
-  ) -> Bool {
-    identityPositions[identity] != nil
-  }
-
-  package func contains(
-    _ identity: Identity,
-    inSubtreeOf subtreeIdentity: Identity
-  ) -> Bool {
-    guard let subtreeRange = subtreeRanges[subtreeIdentity],
-      let position = identityPositions[identity]
-    else {
-      return false
-    }
-    return subtreeRange.contains(position)
-  }
-}
-
-// SAFETY: Created on @MainActor at end of resolve phase, retained for next frame's reuse session.
-// Contains non-Sendable closures (action/key/pointer/lifecycle handlers) and closure-bearing
-// snapshots (FocusBindingRegistrationSnapshot, TaskRegistration). All access is on @MainActor.
-@MainActor
-package final class RetainedResolveFrame: @unchecked Sendable {
-  package var resolvedTree: ResolvedNode
-  package let resolvedTreeIndex: ResolvedTreeIndex
-  package var actionHandlers: [Identity: LocalActionRegistry.Registration]
-  package var hotkeyHandlers: [HotkeyRegistrationSnapshot]
-  package var pointerHandlers: [RouteID: LocalPointerHandlerRegistry.Handler]
-  package var focusBindings: [FocusBindingRegistrationSnapshot]
-  package var focusedValues: [FocusedValuesRegistrationSnapshot]
-  package var preferenceObservations: [PreferenceObservationRegistrationSnapshot]
-  package var keyHandlers: [Identity: LocalKeyHandlerRegistry.Handler]
-  package var keyPressHandlers: [Identity: LocalKeyHandlerRegistry.KeyPressHandler]
-  package var lifecycleHandlers: LifecycleHandlerSnapshot
-  package var taskRegistrations: [Identity: TaskRegistration]
-
-  package init(
-    resolvedTree: ResolvedNode,
-    actionHandlers: [Identity: LocalActionRegistry.Registration] = [:],
-    hotkeyHandlers: [HotkeyRegistrationSnapshot] = [],
-    pointerHandlers: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
-    focusBindings: [FocusBindingRegistrationSnapshot] = [],
-    focusedValues: [FocusedValuesRegistrationSnapshot] = [],
-    preferenceObservations: [PreferenceObservationRegistrationSnapshot] = [],
-    keyHandlers: [Identity: LocalKeyHandlerRegistry.Handler] = [:],
-    keyPressHandlers: [Identity: LocalKeyHandlerRegistry.KeyPressHandler] = [:],
-    lifecycleHandlers: LifecycleHandlerSnapshot = .init(),
-    taskRegistrations: [Identity: TaskRegistration] = [:]
-  ) {
-    self.resolvedTree = resolvedTree
-    resolvedTreeIndex = ResolvedTreeIndex(resolvedTree: resolvedTree)
-    self.actionHandlers = actionHandlers
-    self.hotkeyHandlers = hotkeyHandlers
-    self.pointerHandlers = pointerHandlers
-    self.focusBindings = focusBindings
-    self.focusedValues = focusedValues
-    self.preferenceObservations = preferenceObservations
-    self.keyHandlers = keyHandlers
-    self.keyPressHandlers = keyPressHandlers
-    self.lifecycleHandlers = lifecycleHandlers
-    self.taskRegistrations = taskRegistrations
   }
 }
 
@@ -536,7 +387,6 @@ public struct FrameContext: Equatable, Sendable {
   public var environment: EnvironmentSnapshot
   public var transaction: TransactionSnapshot
   public var invalidatedIdentities: Set<Identity>
-  public var previousLifecycleState: CommittedLifecycleState?
   public var timestamp: MonotonicInstant
 
   /// Creates a frame context.
@@ -544,13 +394,11 @@ public struct FrameContext: Equatable, Sendable {
     environment: EnvironmentSnapshot = .init(),
     transaction: TransactionSnapshot = .init(),
     invalidatedIdentities: Set<Identity> = [],
-    previousLifecycleState: CommittedLifecycleState? = nil,
     timestamp: MonotonicInstant = .now()
   ) {
     self.environment = environment
     self.transaction = transaction
     self.invalidatedIdentities = invalidatedIdentities
-    self.previousLifecycleState = previousLifecycleState
     self.timestamp = timestamp
   }
 

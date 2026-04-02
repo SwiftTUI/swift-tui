@@ -1327,7 +1327,7 @@ struct InteractiveRuntimeTests {
     actionRegistry.reset()
     keyRegistry.reset()
 
-    let updated = renderer.render(
+    _ = renderer.render(
       ReusedHandlerRoot(recorder: recorder, dirtyLabel: "Dirty 1"),
       context: .init(
         identity: testIdentity("Root"),
@@ -1338,7 +1338,6 @@ struct InteractiveRuntimeTests {
       )
     )
 
-    #expect(updated.diagnostics.resolvedNodesReused > 0)
     #expect(actionRegistry.dispatch(identity: testIdentity("Root", "Harness[0]")))
     #expect(keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), event: .space))
     #expect(recorder.actionCount == 2)
@@ -2417,9 +2416,6 @@ private func interactiveProbeTextNode(
   _ content: String,
   in context: ResolveContext
 ) -> ResolvedNode {
-  if let reused = context.reusedResolvedSubtreeIfAvailable() {
-    return reused
-  }
   context.recordResolvedComputation()
   return ResolvedNode(
     identity: context.identity,
@@ -2453,9 +2449,6 @@ private struct RunLoopInvalidationProbeRoot: View, ResolvableView {
   let recorder: RunLoopInvalidationRecorder
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    if let reused = context.reusedResolvedSubtreeIfAvailable() {
-      return [reused]
-    }
     context.recordResolvedComputation()
     recorder.record(
       RunLoopInvalidationRecord(
@@ -2525,9 +2518,6 @@ private struct ReusedHandlerRoot: View, ResolvableView {
   let dirtyLabel: String
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    if let reused = context.reusedResolvedSubtreeIfAvailable() {
-      return [reused]
-    }
     context.recordResolvedComputation()
     let interactiveChild = resolveView(
       ReusedHandlerProbe(recorder: recorder),
@@ -2894,9 +2884,6 @@ private struct LifecycleRuntimeRoot: View, ResolvableView {
   let focusable: Bool
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    if let reused = context.reusedResolvedSubtreeIfAvailable() {
-      return [reused]
-    }
     context.recordResolvedComputation()
     let children =
       state.showChild

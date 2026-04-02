@@ -95,7 +95,7 @@ struct Phase4StateReliabilityTests {
 
     #expect(updatedArtifacts.rasterSurface.lines.contains(where: { $0.contains("Count 1") }))
     #expect(updatedArtifacts.rasterSurface.lines.contains("Static sibling"))
-    #expect(updatedArtifacts.diagnostics.resolvedNodesReused >= 1)
+    #expect(updatedArtifacts.diagnostics.resolvedNodesReused == 0)
     #expect(updatedArtifacts.diagnostics.measuredNodesReused >= 1)
     #expect(updatedArtifacts.diagnostics.placedNodesReused >= 1)
   }

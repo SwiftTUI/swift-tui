@@ -11,8 +11,7 @@ extension RunLoop {
         let artifacts = renderer.render(
           viewBuilder(stateContainer.state, focusTracker.currentFocusIdentity),
           context: resolveContext(for: scheduledFrame),
-          proposal: proposal(),
-          previousLifecycleState: lifecycleCoordinator.previousLifecycleState
+          proposal: proposal()
         )
 
         latestSemanticSnapshot = artifacts.semanticSnapshot
@@ -52,9 +51,9 @@ extension RunLoop {
           scheduler.requestInvalidation(of: postActionInvalidationIdentities)
           postActionInvalidationIdentities.removeAll(keepingCapacity: true)
         }
-        if let resolvedTreeIndex = renderer.latestResolvedTreeIndex() {
-          observationBridge.prune(keeping: resolvedTreeIndex)
-        }
+        observationBridge.prune(
+          keeping: Set(artifacts.resolvedTree.collectIdentities())
+        )
         renderedFrames += 1
 
         if let transientPressedIdentity,
