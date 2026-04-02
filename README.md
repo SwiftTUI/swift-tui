@@ -82,6 +82,7 @@ single-window and multi-window apps today.
 - Layout and containers: `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `ViewThatFits`, and custom `Layout`
 - State and focus: `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, focused values, focus effect controls, and default-focus modifiers
 - Controls and content: `Text`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `GroupBox`, `ControlGroup`, `TabView`, `NavigationSplitView`, and terminal-native alert or confirmation presentation
+- Toolbar chrome: `toolbar(...)`, `toolbarItem(...)`, and `toolbarStyle(.default)` for terminal-native top and bottom bars
 - Runtime integration: `Resolver`, `DefaultRenderer`, `RunLoop`, terminal input parsing, signal handling, alternate-screen ownership, capability-aware presentation, and lifecycle or task staging
 - Multi-scene orchestration: optional `TerminalUIScenes` support for pty-backed secondary scenes, scene discovery, and attachment
 - Compact metrics and charts: `ProgressView`, `BarChart`, `ColumnChart`, `ComparisonChart`, `Sparkline`, `Timeline`, `ThresholdGauge`, and related support types in `TerminalUICharts`
@@ -150,12 +151,13 @@ Peer GUI packaging lives outside the root package products:
 
 - The core `TerminalUI` runtime is still intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
 - The scene-based public launch path currently lives in `TerminalUIScenes.MultiSceneLauncher`, including the single-scene case.
-- Terminal-native help strips and command palettes are still experimental. They currently live in the repo-local `PrototypeUIComponents` target rather than in the supported package product surface, though the gallery and Todoist examples now mirror those patterns through local composition.
+- The terminal-native toolbar surface is now supported through `toolbar(...)`, `toolbarItem(...)`, and `toolbarStyle(.default)`. The older keyboard-help APIs are removed, and the gallery now demonstrates the toolbar surface directly.
+- Command palettes remain a terminal-native workflow surface, but the shortcut/help-strip exploration no longer defines the public direction.
 
 ## Upcoming Work
 
-- `NavigationStack`, `Toolbar`, and sheet or popover-style presentation
-- richer focus ergonomics, scroll control, and settled terminal-native help or command surfaces
+- `NavigationStack` and sheet or popover-style presentation
+- richer focus ergonomics and scroll control
 
 ## Documentation
 

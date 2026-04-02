@@ -111,34 +111,6 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
-  @Test("keyboardShortcut actions only handle their declared key press")
-  func keyboardShortcutActionsOnlyHandleDeclaredKeyPress() {
-    final class CounterBox {
-      var count = 0
-    }
-
-    let counter = CounterBox()
-    let hotkeyRegistry = HotkeyRegistry()
-    var context = ResolveContext(
-      identity: testIdentity("KeyboardShortcutProbe"),
-      applyEnvironmentValues: true
-    )
-    context.hotkeyRegistry = hotkeyRegistry
-
-    _ = Text("Probe")
-      .keyboardShortcut(.character("/"), label: "Search") {
-        counter.count += 1
-      }
-      .resolve(in: context)
-
-    #expect(hotkeyRegistry.registeredBindings().count == 1)
-    #expect(!hotkeyRegistry.dispatch(KeyPress(.character("x"))))
-    #expect(counter.count == 0)
-    #expect(hotkeyRegistry.dispatch(KeyPress(.character("/"))))
-    #expect(counter.count == 1)
-  }
-
-  @MainActor
   @Test("generic onKeyPress handles runtime key input across frames")
   func genericOnKeyPressHandlesRuntimeKeyInputAcrossFrames() async throws {
     let terminalSize = Size(width: 24, height: 4)

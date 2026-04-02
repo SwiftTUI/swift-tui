@@ -74,7 +74,6 @@ Some SwiftUI concepts likely belong in TerminalUI eventually, but the package do
 Deferred items:
 
 - `NavigationStack`
-- `Toolbar` and `ToolbarItem`
 - sheets and popovers
 
 Prototype-first items:

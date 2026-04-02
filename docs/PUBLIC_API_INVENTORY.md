@@ -22,10 +22,10 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - `TabItemLabel`, `TabView`, `NavigationSplitView`
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`
-- `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `FocusInteractions`, `LinkDestination`, `OpenLinkAction`
+- `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `FocusInteractions`, `LinkDestination`, `OpenLinkAction`, `ToolbarPlacement`, `ToolbarAlignment`, and `ToolbarStyle`
 - image-source environment configuration such as `EnvironmentValues.imageResourceRoots`
 - `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and repo-owned `@Bindable`
-- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.alert(...)`, and `.confirmationDialog(...)`
+- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.toolbar(...)`, `.toolbarItem(...)`, `.toolbarStyle(...)`, `.alert(...)`, and `.confirmationDialog(...)`
 - `Resolver` and the public `ResolveContext` configuration surface for low-level rendering entry points
 
 Important public-surface rules after the lowering migration:
@@ -86,6 +86,7 @@ These migration-era APIs are no longer public:
 - `DefaultRenderer.render<V: ViewNode>`
 - concrete wrapper-view implementation types such as `IDView`, `LayoutMetadataModifier`, `DrawMetadataModifier`, `SemanticMetadataModifier`, `EnvironmentWritingModifier`, `EnvironmentTransformModifier`, `PaddingView`, `FrameView`, `OverlayView`, and `BackgroundView`
 - runtime registry and replay types such as `LocalActionRegistry`, `LocalKeyHandlerRegistry`, `LocalLifecycleRegistry`, `LocalTaskRegistry`, `TaskRegistration`, `LifecycleHandlerSnapshot`, and `LocalKeyEvent`
+- keyboard-help compatibility APIs such as `KeyboardShortcut`, `KeyboardShortcutGroup`, `KeyboardShortcutHelpView`, `.keyboardShortcut(...)`, and `.keyboardShortcutHelp(...)`
 
 ### Removed Public Styling Compatibility
 
@@ -122,12 +123,10 @@ Prototype and showcase code may still live in the repository as sibling example 
 Current rule:
 
 - `PrototypeUIComponents` is a package target used by experiments and tests, not a library product that downstream packages should import as a supported API surface
-- the current prototype target hosts help-strip and command-palette exploration such as `PrototypeHelpSurface` and `PrototypeCommandPalette`
+- the current prototype target hosts command-palette exploration such as `PrototypeCommandPalette`
 - prototype widgets are allowed to inform future canonical APIs, but they should not be documented as the framework's primary authoring model
 - README and architecture-facing docs should describe prototype code as exploratory or showcase-only when it appears at all
-- terminal-native interaction surfaces that are still being shaped, such as help
-  models, command palettes, or launcher-like flows, should land here first
-  rather than forcing premature API commitments onto `View`
+- terminal-native interaction surfaces that are still being shaped, such as command palettes or launcher-like flows, should land here first rather than forcing premature API commitments onto `View`
 
 ## Policy Summary
 

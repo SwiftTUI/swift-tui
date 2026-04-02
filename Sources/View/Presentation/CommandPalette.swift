@@ -675,7 +675,8 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
 
   @ViewBuilder
   var body: some View {
-    let paletteHost = content
+    let paletteHost =
+      content
       .overlayPreferenceValue(CommandPreferenceKey.self) { preference in
         if isPresented.wrappedValue {
           paletteOverlay(for: preference.registrations)
@@ -683,13 +684,12 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
       }
 
     if let shortcut, !isPresented.wrappedValue {
-      paletteHost.keyboardShortcut(
+      paletteHost.onKeyPress(
         shortcut,
-        modifiers: shortcutModifiers,
-        label: "Search",
-        group: "Palette"
+        modifiers: shortcutModifiers
       ) {
         isPresented.wrappedValue = true
+        return .handled
       }
     } else {
       paletteHost

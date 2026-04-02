@@ -118,7 +118,6 @@ These should become first-class public framework surface:
 ### Keep Deferred Until The Shell Model Is Stable
 
 - `NavigationStack`
-- `Toolbar` and `ToolbarItem`
 - sheets and popovers
 
 ### Incubate In `PrototypeUIComponents` First

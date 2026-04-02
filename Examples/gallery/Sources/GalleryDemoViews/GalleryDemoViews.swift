@@ -78,13 +78,15 @@ public struct GalleryDemoSceneView: View {
         keywords: ["reset", "restore", "defaults"],
         kind: .destructive
       )
-      .keyboardShortcut(.tab, label: "move focus", group: "Navigate")
-      .keyboardShortcut(.return, label: "activate", group: "Act")
-      .keyboardShortcut(.character("q"), label: "quit", group: "Act")
       Divider()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .keyboardShortcutHelp(position: .bottomLeading)
+    .toolbar(placement: .bottom) {
+      Text("[Tab] move focus")
+      Text("[Return] activate")
+    } trailing: {
+      Text("[q] quit")
+    }
     .commandPalette(
       isPresented: $model.isPalettePresented,
       shortcut: .character("/"),

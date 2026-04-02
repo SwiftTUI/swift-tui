@@ -170,7 +170,7 @@ async function bootstrap(): Promise<void> {
                   <span class="terminal-label">WebExample</span>
                   <span class="terminal-caption">TerminalUI running through WebTUIGUI</span>
                 </div>
-                <div class="scene-tabs" data-scenes aria-label="Scenes"></div>
+                <div class="scene-select" data-scenes aria-label="Scene selector"></div>
               </div>
 
               <div class="terminal-frame-shell">
@@ -241,6 +241,11 @@ async function bootstrap(): Promise<void> {
           <div class="parity-grid">
             ${renderParityPoints()}
           </div>
+        </section>
+        <section class="info-block closer" data-reveal>
+          <p>SwiftUI ships on other platforms now.</p>
+          <p>It just happens to be in a terminal.</p>
+          <p class="closer-muted">You're welcome, Apple.</p>
         </section>
       </main>
 
@@ -499,20 +504,68 @@ function renderSceneButtons(
 ): void {
   container.replaceChildren();
 
+  if (controller.scenes.length === 0) {
+    return;
+  }
+
+  const activeLabel = () => {
+    const active = controller.scenes.find((s) => s.id === controller.selectedSceneId);
+    return active?.title ?? active?.id ?? controller.selectedSceneId;
+  };
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "scene-select-trigger";
+  trigger.setAttribute("aria-haspopup", "listbox");
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.innerHTML = `<span class="scene-select-label">Scene:</span> <span data-scene-value>${escapeHtml(activeLabel())}</span> <span class="scene-select-chevron"></span>`;
+
+  const menu = document.createElement("div");
+  menu.className = "scene-select-menu";
+  menu.setAttribute("role", "listbox");
+  menu.dataset.open = "false";
+
   for (const scene of controller.scenes) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "scene-tab";
-    button.dataset.sceneId = scene.id;
-    button.textContent = scene.title ?? scene.id;
-    button.addEventListener("click", async () => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "scene-select-option";
+    option.setAttribute("role", "option");
+    option.dataset.sceneId = scene.id;
+    option.textContent = scene.title ?? scene.id;
+    option.addEventListener("click", async () => {
       await controller.switchScene(scene.id);
       updateSceneSelection(controller, container);
       onSelectionChanged();
+      closeMenu();
     });
-    container.append(button);
+    menu.append(option);
   }
 
+  const closeMenu = () => {
+    trigger.setAttribute("aria-expanded", "false");
+    menu.dataset.open = "false";
+  };
+
+  trigger.addEventListener("click", () => {
+    const isOpen = trigger.getAttribute("aria-expanded") === "true";
+    trigger.setAttribute("aria-expanded", String(!isOpen));
+    menu.dataset.open = String(!isOpen);
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!container.contains(event.target as Node)) {
+      closeMenu();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && menu.dataset.open === "true") {
+      closeMenu();
+      trigger.focus();
+    }
+  });
+
+  container.append(trigger, menu);
   updateSceneSelection(controller, container);
 }
 
@@ -520,10 +573,15 @@ function updateSceneSelection(
   controller: WebTUIAppController,
   container: HTMLElement
 ): void {
-  for (const button of container.querySelectorAll<HTMLButtonElement>("button")) {
-    const isActive = button.dataset.sceneId === controller.selectedSceneId;
-    button.disabled = isActive;
-    button.setAttribute("aria-pressed", String(isActive));
+  const valueEl = container.querySelector<HTMLElement>("[data-scene-value]");
+  if (valueEl) {
+    const active = controller.scenes.find((s) => s.id === controller.selectedSceneId);
+    valueEl.textContent = active?.title ?? active?.id ?? controller.selectedSceneId;
+  }
+
+  for (const option of container.querySelectorAll<HTMLButtonElement>(".scene-select-option")) {
+    const isActive = option.dataset.sceneId === controller.selectedSceneId;
+    option.setAttribute("aria-selected", String(isActive));
   }
 }
 

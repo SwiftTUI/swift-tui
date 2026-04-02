@@ -1,6 +1,6 @@
 # Documentation
 
-Last updated: March 30, 2026
+Last updated: April 2, 2026
 
 This directory holds the project-internal reference set: architecture notes,
 runtime rules, planning status, source ownership, and API governance.
@@ -49,6 +49,7 @@ default package-development documentation uses `swiftly`.
 - [TERMINAL_NATIVE_ROADMAP.md](TERMINAL_NATIVE_ROADMAP.md): terminal-native product direction and the phases that already landed
 - [TYPE_ERASURE_DEFERRAL_PLAN.md](TYPE_ERASURE_DEFERRAL_PLAN.md): status of deferred `AnyView` cleanup work
 - [COLOR_ANIMATION_IMPLEMENTATION_PLAN.md](COLOR_ANIMATION_IMPLEMENTATION_PLAN.md): scoped visual-work plan that still stands apart from the core runtime roadmap
+- [TOOLBAR_IMPLEMENTATION_PLAN.md](TOOLBAR_IMPLEMENTATION_PLAN.md): landed toolbar implementation record covering the new toolbar surface and keyboard-help API removal
 
 ## Product Direction And Scope
 

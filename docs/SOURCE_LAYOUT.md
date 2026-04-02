@@ -94,14 +94,14 @@ library product. Downstream package consumers reach those types through
 - `Layout.swift`, `ContainerViews.swift`, `GeometryReader.swift`, `ScrollViewSupport.swift`, `Collections.swift`, `CollectionSupport.swift`, `OutlineViews.swift`, and `NavigationViews.swift`: layout, collection, scroll, tab, and split-navigation surfaces
 - `ViewPrimitives.swift`, `TextStyles.swift`, `StylePrimitives.swift`, `StyleEnvironment.swift`, `StyleModifiers.swift`, `ShapeStyles.swift`, `Rectangle.swift`, `RoundedRectangle.swift`, and `TileBackground.swift`: primitives, styling, and shape support
 - `Image.swift`: SwiftUI-shaped PNG image surface
-- `Button.swift`, `ValueControls.swift`, `TextEditor.swift`, `SecureField.swift`, `AdjustableValueControls.swift`, `Picker.swift`, `PickerRendering.swift`, `Menu.swift`, `MenuRendering.swift`, `LabeledContainers.swift`, `PresentationModifiers.swift`, `ProgressView.swift`, `Link.swift`, `MetricTrackSupport.swift`, and `SelectionAndValueSupport.swift`: controls and interaction surfaces
+- `Button.swift`, `ValueControls.swift`, `TextEditor.swift`, `SecureField.swift`, `AdjustableValueControls.swift`, `Picker.swift`, `PickerRendering.swift`, `Menu.swift`, `MenuRendering.swift`, `LabeledContainers.swift`, `PresentationModifiers.swift`, `Toolbar.swift`, `ProgressView.swift`, `Link.swift`, `MetricTrackSupport.swift`, and `SelectionAndValueSupport.swift`: controls, toolbar chrome, and interaction surfaces
 - `ViewModifiers.swift`: public modifiers and package-only wrapper views
 - `View.docc/`: module landing page and authoring guides
 
 ## `PrototypeUIComponents`
 
 - `PrototypeModels.swift`: keybinding groups, command models, and search helpers for experimental terminal-native workflow surfaces
-- `PrototypeSurfaces.swift`: repo-local help-strip and command-palette views used for exploration and regression coverage
+- `PrototypeSurfaces.swift`: repo-local command-palette views used for exploration and regression coverage
 
 ## `TerminalUICharts`
 
