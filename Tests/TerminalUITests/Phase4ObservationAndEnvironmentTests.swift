@@ -429,15 +429,14 @@ struct Phase4ObservationAndEnvironmentTests {
     let invalidator = Phase4RecordingInvalidator()
     let actionRegistry = LocalActionRegistry()
     let renderer = DefaultRenderer()
-    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
-    dynamicStateStore.invalidator = invalidator
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
 
     var initialContext = ResolveContext(
       identity: testIdentity("Root"),
       localActionRegistry: actionRegistry,
       applyEnvironmentValues: true
     )
-    initialContext.dynamicStateStore = dynamicStateStore
+    initialContext.invalidationProxy = invalidationProxy
 
     let initialArtifacts = renderer.render(
       PresentedAlertDismissView(),
@@ -520,15 +519,14 @@ struct Phase4ObservationAndEnvironmentTests {
     let invalidator = Phase4RecordingInvalidator()
     let actionRegistry = LocalActionRegistry()
     let renderer = DefaultRenderer()
-    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
-    dynamicStateStore.invalidator = invalidator
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
 
     var initialContext = ResolveContext(
       identity: testIdentity("Root"),
       localActionRegistry: actionRegistry,
       applyEnvironmentValues: true
     )
-    initialContext.dynamicStateStore = dynamicStateStore
+    initialContext.invalidationProxy = invalidationProxy
 
     let initialArtifacts = renderer.render(
       ForEachActionCounterView(),
@@ -556,15 +554,14 @@ struct Phase4ObservationAndEnvironmentTests {
     let invalidator = Phase4RecordingInvalidator()
     let actionRegistry = LocalActionRegistry()
     let renderer = DefaultRenderer()
-    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
-    dynamicStateStore.invalidator = invalidator
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
 
     var initialContext = ResolveContext(
       identity: testIdentity("Root"),
       localActionRegistry: actionRegistry,
       applyEnvironmentValues: true
     )
-    initialContext.dynamicStateStore = dynamicStateStore
+    initialContext.invalidationProxy = invalidationProxy
 
     let initialArtifacts = renderer.render(
       EnvironmentReaderActionCounterView(),
@@ -592,15 +589,14 @@ struct Phase4ObservationAndEnvironmentTests {
     let invalidator = Phase4RecordingInvalidator()
     let actionRegistry = LocalActionRegistry()
     let renderer = DefaultRenderer()
-    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
-    dynamicStateStore.invalidator = invalidator
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
 
     var initialContext = ResolveContext(
       identity: testIdentity("Root"),
       localActionRegistry: actionRegistry,
       applyEnvironmentValues: true
     )
-    initialContext.dynamicStateStore = dynamicStateStore
+    initialContext.invalidationProxy = invalidationProxy
 
     let initialArtifacts = renderer.render(
       NavigationSplitActionCounterView(),
@@ -628,15 +624,14 @@ struct Phase4ObservationAndEnvironmentTests {
     let invalidator = Phase4RecordingInvalidator()
     let actionRegistry = LocalActionRegistry()
     let renderer = DefaultRenderer()
-    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
-    dynamicStateStore.invalidator = invalidator
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
 
     var initialContext = ResolveContext(
       identity: testIdentity("Root"),
       localActionRegistry: actionRegistry,
       applyEnvironmentValues: true
     )
-    initialContext.dynamicStateStore = dynamicStateStore
+    initialContext.invalidationProxy = invalidationProxy
 
     let initialArtifacts = renderer.render(
       OutlineActionCounterView(),
@@ -665,18 +660,16 @@ struct Phase4ObservationAndEnvironmentTests {
     let renderer = DefaultRenderer()
     let scopeIdentity = testIdentity("WindowGroupAuthoring")
     let scopeRecorder = Phase4ScopeRecorder()
-    let authoringScope = DynamicPropertyScope(
+    let authoringScope = AuthoringContext(
       viewIdentity: scopeIdentity,
-      stateStore: nil,
-      environmentValues: EnvironmentValues(),
       focusedValues: FocusedValues()
     )
 
-    let scene = withDynamicPropertyScope(authoringScope) {
+    let scene = withAuthoringContext(authoringScope) {
       WindowGroup("Scoped Window") {
         ForEach([0], id: \.self) { _ in
           Button("Primary") {
-            scopeRecorder.identity = currentDynamicPropertyScope()?.viewIdentity
+            scopeRecorder.identity = currentAuthoringContext()?.viewIdentity
           }
           .id(testIdentity("WindowGroupForEachAction"))
         }
@@ -703,8 +696,7 @@ struct Phase4ObservationAndEnvironmentTests {
     let invalidator = Phase4RecordingInvalidator()
     let keyRegistry = LocalKeyHandlerRegistry()
     let renderer = DefaultRenderer()
-    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
-    dynamicStateStore.invalidator = invalidator
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
 
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("StatefulPicker")
@@ -715,7 +707,7 @@ struct Phase4ObservationAndEnvironmentTests {
       localKeyHandlerRegistry: keyRegistry,
       applyEnvironmentValues: true
     )
-    initialContext.dynamicStateStore = dynamicStateStore
+    initialContext.invalidationProxy = invalidationProxy
 
     let initialArtifacts = renderer.render(
       StatefulPickerCounterView(),
@@ -743,8 +735,7 @@ struct Phase4ObservationAndEnvironmentTests {
     let invalidator = Phase4RecordingInvalidator()
     let keyRegistry = LocalKeyHandlerRegistry()
     let renderer = DefaultRenderer()
-    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
-    dynamicStateStore.invalidator = invalidator
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
 
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("StatefulStepper")
@@ -755,7 +746,7 @@ struct Phase4ObservationAndEnvironmentTests {
       localKeyHandlerRegistry: keyRegistry,
       applyEnvironmentValues: true
     )
-    initialContext.dynamicStateStore = dynamicStateStore
+    initialContext.invalidationProxy = invalidationProxy
 
     let initialArtifacts = renderer.render(
       StatefulStepperCounterView(),
@@ -1596,10 +1587,6 @@ private func runObservableRuntimeHarness<V: View>(
     viewBuilder: { _, _ in
       viewBuilder()
     }
-  )
-
-  runLoop.attachDynamicStateStore(
-    DynamicStateStore(invalidationIdentities: [rootIdentity])
   )
 
   return try await runLoop.run()

@@ -44,7 +44,7 @@ extension TabView {
 
     if isEnabled {
       let binding = selection
-      let dynamicPropertyScope = currentDynamicPropertyScope()
+      let dynamicPropertyScope = currentAuthoringContext()
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
         let delta: Int?
         switch event {
@@ -60,7 +60,7 @@ extension TabView {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           stepBoundSelection(
             binding,
             orderedTags: options.map(\.tag),
@@ -81,7 +81,7 @@ extension TabView {
             return false
           }
 
-          return withDynamicPropertyScope(dynamicPropertyScope) {
+          return withAuthoringContext(dynamicPropertyScope) {
             setBoundSelection(binding, to: options[index].tag)
           }
         }

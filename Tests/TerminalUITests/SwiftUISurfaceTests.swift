@@ -671,19 +671,18 @@ struct SwiftUISurfaceTests {
   }
 
   @Test(
-    "@State reads in body use the dynamic state store when a view is re-rendered through bindings")
-  func stateReadsInBodyUseDynamicStateStore() throws {
+    "@State reads in body use graph-owned slots when a view is re-rendered through bindings")
+  func stateReadsInBodyUseGraphOwnedSlots() throws {
     let localActionRegistry = LocalActionRegistry()
-    let dynamicStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
+    let renderer = DefaultRenderer()
     let view = BodyBasedStatefulCounter()
-    var context = ResolveContext(
+    let context = ResolveContext(
       identity: testIdentity("Root"),
       localActionRegistry: localActionRegistry,
       applyEnvironmentValues: true
     )
-    context.dynamicStateStore = dynamicStateStore
 
-    let initialArtifacts = DefaultRenderer().render(
+    let initialArtifacts = renderer.render(
       view,
       context: context
     )
@@ -694,7 +693,7 @@ struct SwiftUISurfaceTests {
       initialArtifacts.semanticSnapshot.focusRegions.first?.identity)
     #expect(localActionRegistry.dispatch(identity: actionIdentity))
 
-    let updatedArtifacts = DefaultRenderer().render(
+    let updatedArtifacts = renderer.render(
       view,
       context: context
     )
@@ -709,16 +708,15 @@ struct SwiftUISurfaceTests {
     let view = BodyBasedStatefulCounter()
     let firstActionRegistry = LocalActionRegistry()
     let secondActionRegistry = LocalActionRegistry()
-    let firstStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("RootA")])
-    let secondStateStore = DynamicStateStore(invalidationIdentities: [testIdentity("RootB")])
+    let firstRenderer = DefaultRenderer()
+    let secondRenderer = DefaultRenderer()
 
     var firstContext = ResolveContext(
       identity: testIdentity("RootA"),
       localActionRegistry: firstActionRegistry,
       applyEnvironmentValues: true
     )
-    firstContext.dynamicStateStore = firstStateStore
-    let firstArtifacts = DefaultRenderer().render(
+    let firstArtifacts = firstRenderer.render(
       view,
       context: firstContext
     )
@@ -731,8 +729,7 @@ struct SwiftUISurfaceTests {
       localActionRegistry: secondActionRegistry,
       applyEnvironmentValues: true
     )
-    secondContext.dynamicStateStore = secondStateStore
-    let secondArtifacts = DefaultRenderer().render(
+    let secondArtifacts = secondRenderer.render(
       view,
       context: secondContext
     )
@@ -743,11 +740,11 @@ struct SwiftUISurfaceTests {
     #expect(firstActionIdentity != secondActionIdentity)
     #expect(firstActionRegistry.dispatch(identity: firstActionIdentity))
 
-    let updatedFirstArtifacts = DefaultRenderer().render(
+    let updatedFirstArtifacts = firstRenderer.render(
       view,
       context: firstContext
     )
-    let updatedSecondArtifacts = DefaultRenderer().render(
+    let updatedSecondArtifacts = secondRenderer.render(
       view,
       context: secondContext
     )

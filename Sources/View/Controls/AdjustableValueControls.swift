@@ -6,7 +6,7 @@ public struct Stepper<Label: View>: View, ResolvableView {
   public var bounds: ClosedRange<Int>?
   public var step: Int
   private var label: Label
-  private let authoringScope: DynamicPropertyScope?
+  private let authoringScope: AuthoringContext?
 
   public init<S: StringProtocol>(
     _ title: S,
@@ -18,7 +18,7 @@ public struct Stepper<Label: View>: View, ResolvableView {
     self.bounds = bounds
     self.step = max(1, step)
     label = Text(String(title))
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   public init(
@@ -31,7 +31,7 @@ public struct Stepper<Label: View>: View, ResolvableView {
     self.bounds = bounds
     self.step = max(1, step)
     self.label = label()
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   package func resolveElements(
@@ -68,11 +68,11 @@ extension Stepper {
       let binding = value
       let bounds = bounds
       let step = step
-      let dynamicPropertyScope = currentDynamicPropertyScope() ?? authoringScope
+      let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
       context.localActionRegistry?.register(
         identity: context.identity,
         handler: {
-          withDynamicPropertyScope(dynamicPropertyScope) {
+          withAuthoringContext(dynamicPropertyScope) {
             let next = steppedControlValue(
               from: binding.wrappedValue,
               delta: step,
@@ -98,7 +98,7 @@ extension Stepper {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           updateBoundIntControlValue(
             binding,
             delta: delta,
@@ -122,7 +122,7 @@ extension Stepper {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           updateBoundIntControlValue(
             binding,
             delta: wheelDelta * step,
@@ -135,7 +135,7 @@ extension Stepper {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           updateBoundIntControlValue(
             binding,
             delta: -step,
@@ -148,7 +148,7 @@ extension Stepper {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           updateBoundIntControlValue(
             binding,
             delta: step,
@@ -305,11 +305,11 @@ extension Slider {
       let binding = value
       let bounds = bounds
       let step = step
-      let dynamicPropertyScope = currentDynamicPropertyScope()
+      let dynamicPropertyScope = currentAuthoringContext()
       context.localActionRegistry?.register(
         identity: context.identity,
         handler: {
-          withDynamicPropertyScope(dynamicPropertyScope) {
+          withAuthoringContext(dynamicPropertyScope) {
             let next = steppedControlValue(
               from: binding.wrappedValue,
               delta: step,
@@ -335,7 +335,7 @@ extension Slider {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           updateBoundIntControlValue(
             binding,
             delta: delta,
@@ -356,7 +356,7 @@ extension Slider {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           updateBoundIntControlValue(
             binding,
             delta: wheelDelta * step,
@@ -367,7 +367,7 @@ extension Slider {
       context.localPointerHandlerRegistry?.register(routeID: trackRouteID) { event in
         switch event.kind {
         case .down(.primary), .dragged(.primary), .up(.primary):
-          return withDynamicPropertyScope(dynamicPropertyScope) {
+          return withAuthoringContext(dynamicPropertyScope) {
             binding.wrappedValue = sliderValue(
               at: event.location.x,
               in: event.targetRect,
@@ -381,7 +381,7 @@ extension Slider {
             return false
           }
 
-          return withDynamicPropertyScope(dynamicPropertyScope) {
+          return withAuthoringContext(dynamicPropertyScope) {
             updateBoundIntControlValue(
               binding,
               delta: wheelDelta * step,

@@ -7,7 +7,7 @@ public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: View
   public var selection: Binding<SelectionValue>
   package var label: Label
   package var content: Content
-  private let authoringScope: DynamicPropertyScope?
+  private let authoringScope: AuthoringContext?
 
   public init<S: StringProtocol>(
     _ title: S,
@@ -17,7 +17,7 @@ public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: View
     self.selection = selection
     label = Text(String(title))
     self.content = content()
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   public init(
@@ -28,7 +28,7 @@ public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: View
     self.selection = selection
     self.label = label()
     self.content = content()
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   package func resolveElements(
@@ -65,7 +65,7 @@ extension Picker {
 
     if isEnabled {
       let binding = selection
-      let dynamicPropertyScope = currentDynamicPropertyScope() ?? authoringScope
+      let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
         let delta: Int?
         switch pickerStyle {
@@ -93,7 +93,7 @@ extension Picker {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           stepBoundSelection(
             binding,
             orderedTags: options.map(\.tag),
@@ -110,7 +110,7 @@ extension Picker {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           stepBoundSelection(
             binding,
             orderedTags: options.map(\.tag),
@@ -131,7 +131,7 @@ extension Picker {
             return false
           }
 
-          return withDynamicPropertyScope(dynamicPropertyScope) {
+          return withAuthoringContext(dynamicPropertyScope) {
             setBoundSelection(binding, to: option.tag)
           }
         }

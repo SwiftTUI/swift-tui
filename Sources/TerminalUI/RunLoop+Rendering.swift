@@ -3,7 +3,6 @@ import View
 
 extension RunLoop {
   package func renderPendingFrames(renderedFrames: inout Int) throws {
-    dynamicStateStore?.invalidator = scheduler
     observationBridge.attachInvalidator(scheduler)
 
     while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
@@ -127,7 +126,7 @@ extension RunLoop {
     context.localFocusedValuesRegistry = localFocusedValuesRegistry
     context.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     context.hotkeyRegistry = hotkeyRegistry
-    context.dynamicStateStore = dynamicStateStore
+    context.invalidationProxy = .init(invalidator: scheduler)
     context.observationBridge = observationBridge
     return context
   }

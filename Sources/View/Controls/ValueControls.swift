@@ -47,11 +47,11 @@ extension Toggle {
 
     if isEnabled {
       let binding = isOn
-      let dynamicPropertyScope = currentDynamicPropertyScope()
+      let dynamicPropertyScope = currentAuthoringContext()
       context.localActionRegistry?.register(
         identity: context.identity,
         handler: {
-          withDynamicPropertyScope(dynamicPropertyScope) {
+          withAuthoringContext(dynamicPropertyScope) {
             binding.wrappedValue.toggle()
             return true
           }
@@ -120,9 +120,9 @@ package func registerTextEntryBinding(
     return
   }
 
-  let dynamicPropertyScope = currentDynamicPropertyScope()
+  let dynamicPropertyScope = currentAuthoringContext()
   context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
-    withDynamicPropertyScope(dynamicPropertyScope) {
+    withAuthoringContext(dynamicPropertyScope) {
       mutateTextEntryBinding(
         binding,
         event: event,
@@ -368,11 +368,11 @@ extension DisclosureGroup {
 
     if isEnabled {
       let binding = isExpanded
-      let dynamicPropertyScope = currentDynamicPropertyScope()
+      let dynamicPropertyScope = currentAuthoringContext()
       context.localActionRegistry?.register(
         identity: context.identity,
         handler: {
-          withDynamicPropertyScope(dynamicPropertyScope) {
+          withAuthoringContext(dynamicPropertyScope) {
             binding.wrappedValue.toggle()
             return true
           }

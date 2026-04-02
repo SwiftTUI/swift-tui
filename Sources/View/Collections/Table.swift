@@ -112,7 +112,7 @@ extension Table {
 
     if isEnabled, let selection {
       let binding = selection
-      let dynamicPropertyScope = currentDynamicPropertyScope()
+      let dynamicPropertyScope = currentAuthoringContext()
       let selectableTags = selectableRowIndices.compactMap { rowIndex in
         resolvedRows[rowIndex].tag
       }
@@ -131,7 +131,7 @@ extension Table {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           stepBoundSelection(
             binding,
             orderedTags: selectableTags,
@@ -148,7 +148,7 @@ extension Table {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           stepBoundSelection(
             binding,
             orderedTags: selectableTags,
@@ -173,7 +173,7 @@ extension Table {
             return false
           }
 
-          return withDynamicPropertyScope(dynamicPropertyScope) {
+          return withAuthoringContext(dynamicPropertyScope) {
             setBoundSelection(binding, to: tag)
           }
         }

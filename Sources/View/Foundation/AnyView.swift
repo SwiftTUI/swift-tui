@@ -9,16 +9,16 @@ package import Core
 public struct AnyView: View, ResolvableView {
   private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
 
-  private static func resolveWithAuthoringScope(
-    _ authoringScope: DynamicPropertyScope?,
+  private static func resolveWithAuthoringContext(
+    _ authoringContext: AuthoringContext?,
     _ apply: @escaping @MainActor (ResolveContext) -> [ResolvedNode]
   ) -> @MainActor (ResolveContext) -> [ResolvedNode] {
-    guard let authoringScope else {
+    guard let authoringContext else {
       return apply
     }
 
     return { context in
-      withDynamicPropertyScope(authoringScope) {
+      withAuthoringContext(authoringContext) {
         apply(context)
       }
     }
@@ -32,17 +32,17 @@ public struct AnyView: View, ResolvableView {
 
   package init<V: View>(
     scoped view: V,
-    authoringScope: DynamicPropertyScope?
+    authoringContext: AuthoringContext?
   ) {
     let erased: Any = view
     if let resolvable = erased as? any ResolvableView {
-      resolveElementsClosure = Self.resolveWithAuthoringScope(authoringScope) { context in
+      resolveElementsClosure = Self.resolveWithAuthoringContext(authoringContext) { context in
         resolvable.resolveElements(in: context)
       }
       return
     }
 
-    resolveElementsClosure = Self.resolveWithAuthoringScope(authoringScope) { context in
+    resolveElementsClosure = Self.resolveWithAuthoringContext(authoringContext) { context in
       resolveViewElements(view, in: context)
     }
   }

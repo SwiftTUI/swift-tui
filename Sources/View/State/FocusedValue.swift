@@ -25,7 +25,7 @@ public struct FocusedValue<Value: Sendable> {
   }
 
   public var wrappedValue: Value? {
-    currentDynamicPropertyScope()?.focusedValues[keyPath: keyPath]
+    currentAuthoringContext()?.focusedValues[keyPath: keyPath]
   }
 }
 
@@ -43,7 +43,7 @@ public struct FocusedBinding<Value: Sendable> {
   }
 
   private var currentBinding: Binding<Value>? {
-    currentDynamicPropertyScope()?.focusedValues[keyPath: keyPath]
+    currentAuthoringContext()?.focusedValues[keyPath: keyPath]
   }
 
   public var wrappedValue: Value? {

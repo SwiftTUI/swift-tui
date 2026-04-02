@@ -25,8 +25,8 @@ public struct Menu<Label: View, Content: View>: View, ResolvableView {
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let dynamicPropertyScope = makeDynamicPropertyScope(for: context)
-    return withDynamicPropertyScope(dynamicPropertyScope) {
+    let dynamicPropertyScope = makeAuthoringContext(for: context)
+    return withAuthoringContext(dynamicPropertyScope) {
       [resolvedNode(in: context)]
     }
   }
@@ -53,11 +53,11 @@ extension Menu {
 
     if isEnabled {
       let binding = expansionBinding
-      let dynamicPropertyScope = currentDynamicPropertyScope()
+      let dynamicPropertyScope = currentAuthoringContext()
       context.localActionRegistry?.register(
         identity: context.identity,
         handler: {
-          withDynamicPropertyScope(dynamicPropertyScope) {
+          withAuthoringContext(dynamicPropertyScope) {
             binding.wrappedValue.toggle()
             return true
           }

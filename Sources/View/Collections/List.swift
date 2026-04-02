@@ -191,7 +191,7 @@ extension List {
 
     if isEnabled {
       let binding = selection
-      let dynamicPropertyScope = currentDynamicPropertyScope()
+      let dynamicPropertyScope = currentAuthoringContext()
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
         let delta: Int?
         switch event {
@@ -207,7 +207,7 @@ extension List {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           stepBoundSelection(
             binding,
             orderedTags: rows.map(\.tag),
@@ -224,7 +224,7 @@ extension List {
           return false
         }
 
-        return withDynamicPropertyScope(dynamicPropertyScope) {
+        return withAuthoringContext(dynamicPropertyScope) {
           stepBoundSelection(
             binding,
             orderedTags: rows.map(\.tag),
@@ -245,7 +245,7 @@ extension List {
             return false
           }
 
-          return withDynamicPropertyScope(dynamicPropertyScope) {
+          return withAuthoringContext(dynamicPropertyScope) {
             setBoundSelection(binding, to: row.tag)
           }
         }

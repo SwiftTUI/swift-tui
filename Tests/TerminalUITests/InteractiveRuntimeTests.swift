@@ -161,9 +161,6 @@ struct InteractiveRuntimeTests {
       }
     )
 
-    runLoop.attachDynamicStateStore(
-      DynamicStateStore(invalidationIdentities: [rootIdentity])
-    )
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
@@ -374,24 +371,23 @@ struct InteractiveRuntimeTests {
     #expect(value.value == 1)
   }
 
-  @Test("dynamic state store preserves typed values and local invalidation identities")
-  func dynamicStateStorePreservesTypedValues() {
+  @Test("view node state slots preserve typed values and local invalidation identities")
+  func viewNodeStateSlotsPreserveTypedValues() {
     let invalidator = RecordingInvalidator()
-    let store = DynamicStateStore(invalidationIdentities: [testIdentity("RuntimeRoot")])
-    store.invalidator = invalidator
+    let node = ViewNode(identity: testIdentity("RuntimeRoot"))
+    node.beginEvaluation(invalidator: invalidator)
 
-    let key = "RuntimeRoot#State[InteractiveRuntimeTests:1:1]"
-    let initial: Int = store.value(for: key, seedValue: 0)
-    let repeated: Int = store.value(for: key, seedValue: 99)
+    let initial: Int = node.stateSlot(ordinal: 0, seed: 0)
+    let repeated: Int = node.stateSlot(ordinal: 0, seed: 99)
 
     #expect(initial == 0)
     #expect(repeated == 0)
 
-    store.set(3, for: key, invalidationIdentity: testIdentity("RuntimeRoot", "Child"))
+    node.setStateSlot(ordinal: 0, value: 3)
 
-    let updated: Int = store.value(for: key, seedValue: 0)
+    let updated: Int = node.stateSlot(ordinal: 0, seed: 0)
     #expect(updated == 3)
-    #expect(invalidator.requests == [[testIdentity("RuntimeRoot", "Child")]])
+    #expect(invalidator.requests == [[testIdentity("RuntimeRoot")]])
   }
 
   @Test("key parser handles arrows, backspace, and required controls")
@@ -1536,10 +1532,6 @@ struct InteractiveRuntimeTests {
         ToastAutoDismissHarnessView(terminalSize: terminalSize)
       }
     )
-    runLoop.attachDynamicStateStore(
-      DynamicStateStore(invalidationIdentities: [rootIdentity])
-    )
-
     let result = try await runLoop.run()
 
     let firstFrame = try #require(terminal.frames.first)
@@ -3336,9 +3328,6 @@ private func runTerminalInputHarness<V: View>(
     }
   )
 
-  runLoop.attachDynamicStateStore(
-    DynamicStateStore(invalidationIdentities: [rootIdentity])
-  )
   return try await runLoop.run()
 }
 

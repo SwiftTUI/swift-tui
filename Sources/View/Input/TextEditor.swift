@@ -12,8 +12,8 @@ public struct TextEditor: View, ResolvableView {
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let dynamicPropertyScope = makeDynamicPropertyScope(for: context)
-    return withDynamicPropertyScope(dynamicPropertyScope) {
+    let dynamicPropertyScope = makeAuthoringContext(for: context)
+    return withAuthoringContext(dynamicPropertyScope) {
       [resolvedNode(in: context)]
     }
   }

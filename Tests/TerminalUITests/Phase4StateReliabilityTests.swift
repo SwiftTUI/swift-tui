@@ -8,11 +8,12 @@ import Testing
 @Suite(.serialized)
 struct Phase4StateReliabilityTests {
   @Test(
-    "@State button actions stay bound to their original identity when the same view instance is rebound inside one runtime store"
+    "@State button actions stay bound to their original identity when the same view instance is rebound across runtime graphs"
   )
-  func stateButtonActionsStayBoundToOriginalIdentityInOneStore() throws {
+  func stateButtonActionsStayBoundToOriginalIdentityAcrossRuntimeGraphs() throws {
     let view = Phase4StatefulCounterView()
-    let store = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
+    let firstRenderer = DefaultRenderer()
+    let secondRenderer = DefaultRenderer()
     let firstActionRegistry = LocalActionRegistry()
     let secondActionRegistry = LocalActionRegistry()
 
@@ -21,8 +22,7 @@ struct Phase4StateReliabilityTests {
       localActionRegistry: firstActionRegistry,
       applyEnvironmentValues: true
     )
-    firstContext.dynamicStateStore = store
-    let firstArtifacts = DefaultRenderer().render(
+    let firstArtifacts = firstRenderer.render(
       view,
       context: firstContext
     )
@@ -35,8 +35,7 @@ struct Phase4StateReliabilityTests {
       localActionRegistry: secondActionRegistry,
       applyEnvironmentValues: true
     )
-    secondContext.dynamicStateStore = store
-    let secondArtifacts = DefaultRenderer().render(
+    let secondArtifacts = secondRenderer.render(
       view,
       context: secondContext
     )
@@ -47,11 +46,11 @@ struct Phase4StateReliabilityTests {
     #expect(firstActionIdentity != secondActionIdentity)
     #expect(firstActionRegistry.dispatch(identity: firstActionIdentity))
 
-    let updatedFirstArtifacts = DefaultRenderer().render(
+    let updatedFirstArtifacts = firstRenderer.render(
       view,
       context: firstContext
     )
-    let updatedSecondArtifacts = DefaultRenderer().render(
+    let updatedSecondArtifacts = secondRenderer.render(
       view,
       context: secondContext
     )
@@ -63,8 +62,7 @@ struct Phase4StateReliabilityTests {
   @Test("@State button actions invalidate only the owning subtree identity through wrapper views")
   func stateButtonActionsInvalidateOnlyOwningSubtree() throws {
     let invalidator = Phase4StateRecordingInvalidator()
-    let store = DynamicStateStore(invalidationIdentities: [testIdentity("Root")])
-    store.invalidator = invalidator
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
     let actionRegistry = LocalActionRegistry()
     let renderer = DefaultRenderer()
 
@@ -73,7 +71,7 @@ struct Phase4StateReliabilityTests {
       localActionRegistry: actionRegistry,
       applyEnvironmentValues: true
     )
-    initialContext.dynamicStateStore = store
+    initialContext.invalidationProxy = invalidationProxy
 
     let initialArtifacts = renderer.render(
       Phase4NestedStateRoot(),

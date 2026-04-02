@@ -39,7 +39,6 @@ final class SceneRuntime {
   private let resources: SceneSessionResources
   private let stateContainer: StateContainer<MultiSceneRuntimeState>
   private let focusTracker: FocusTracker
-  private let dynamicStateStore: DynamicStateStore
   private let sessionRunner: SessionRunner
 
   init(
@@ -112,9 +111,6 @@ final class SceneRuntime {
     focusTracker = FocusTracker(
       invalidationIdentities: [configuration.rootIdentity]
     )
-    dynamicStateStore = DynamicStateStore(
-      invalidationIdentities: [configuration.rootIdentity]
-    )
     self.sessionRunner =
       sessionRunner ?? { runtime, sessionName in
         try await runtime.runSceneSession(sessionName: sessionName)
@@ -177,7 +173,6 @@ final class SceneRuntime {
       sessionName: sessionName,
       stateContainer: stateContainer,
       focusTracker: focusTracker,
-      dynamicStateStore: dynamicStateStore,
       resources: resources
     )
   }

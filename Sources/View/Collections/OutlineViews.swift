@@ -20,7 +20,7 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
   private let id: (Data.Element) -> ID
   private let children: (Data.Element) -> [Data.Element]
   private let rowContent: (Data.Element) -> RowContent
-  private let authoringScope: DynamicPropertyScope?
+  private let authoringScope: AuthoringContext?
 
   public init(
     _ data: Data,
@@ -32,7 +32,7 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     self.id = { $0[keyPath: id] }
     self.children = { $0[keyPath: children] ?? [] }
     self.rowContent = rowContent
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   public init(
@@ -45,7 +45,7 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     self.id = { $0[keyPath: id] }
     self.children = { $0[keyPath: children] }
     self.rowContent = rowContent
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   public var body: some View {
@@ -67,17 +67,17 @@ extension List {
     children: KeyPath<Data.Element, [Data.Element]?>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   ) where Data: RandomAccessCollection, Content == VariadicView<AnyView> {
-    let authoringScope = currentDynamicPropertyScope()
+    let authoringScope = currentAuthoringContext()
     self.init(
       selection: selection,
       contentViews: [
-        scopedAnyView(authoringScope: authoringScope) {
+        scopedAnyView(authoringContext: authoringScope) {
           OutlineTree(
             elements: Array(data),
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] ?? [] },
             rowContent: { element in
-              withDynamicPropertyScope(authoringScope) {
+              withAuthoringContext(authoringScope) {
                 rowContent(element).tag(element[keyPath: id])
               }
             },
@@ -95,17 +95,17 @@ extension List {
     children: KeyPath<Data.Element, [Data.Element]>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
   ) where Data: RandomAccessCollection, Content == VariadicView<AnyView> {
-    let authoringScope = currentDynamicPropertyScope()
+    let authoringScope = currentAuthoringContext()
     self.init(
       selection: selection,
       contentViews: [
-        scopedAnyView(authoringScope: authoringScope) {
+        scopedAnyView(authoringContext: authoringScope) {
           OutlineTree(
             elements: Array(data),
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] },
             rowContent: { element in
-              withDynamicPropertyScope(authoringScope) {
+              withAuthoringContext(authoringScope) {
                 rowContent(element).tag(element[keyPath: id])
               }
             },
@@ -127,17 +127,17 @@ extension List {
     Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID?,
     Content == VariadicView<AnyView>
   {
-    let authoringScope = currentDynamicPropertyScope()
+    let authoringScope = currentAuthoringContext()
     self.init(
       selection: selection,
       contentViews: [
-        scopedAnyView(authoringScope: authoringScope) {
+        scopedAnyView(authoringContext: authoringScope) {
           OutlineTree(
             elements: Array(data),
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] ?? [] },
             rowContent: { element in
-              withDynamicPropertyScope(authoringScope) {
+              withAuthoringContext(authoringScope) {
                 rowContent(element).tag(element[keyPath: id])
               }
             },
@@ -159,17 +159,17 @@ extension List {
     Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID?,
     Content == VariadicView<AnyView>
   {
-    let authoringScope = currentDynamicPropertyScope()
+    let authoringScope = currentAuthoringContext()
     self.init(
       selection: selection,
       contentViews: [
-        scopedAnyView(authoringScope: authoringScope) {
+        scopedAnyView(authoringContext: authoringScope) {
           OutlineTree(
             elements: Array(data),
             id: { $0[keyPath: id] },
             children: { $0[keyPath: children] },
             rowContent: { element in
-              withDynamicPropertyScope(authoringScope) {
+              withAuthoringContext(authoringScope) {
                 rowContent(element).tag(element[keyPath: id])
               }
             },
@@ -297,7 +297,7 @@ where ID: Hashable, RowContent: View {
   package var id: (Element) -> ID
   package var children: (Element) -> [Element]
   package var rowContent: (Element) -> RowContent
-  package var authoringScope: DynamicPropertyScope?
+  package var authoringScope: AuthoringContext?
   package var ancestry: [Bool] = []
 
   public var body: some View {
@@ -330,7 +330,7 @@ where ID: Hashable, RowContent: View {
   }
 
   private func rowView(for element: Element) -> RowContent {
-    withDynamicPropertyScope(authoringScope) {
+    withAuthoringContext(authoringScope) {
       rowContent(element)
     }
   }
@@ -357,7 +357,7 @@ private struct OutlineEntry<Element, ID: Hashable>: Identifiable {
 private struct OutlineRow<Content: View>: View {
   let prefix: String
   let content: Content
-  let authoringScope: DynamicPropertyScope?
+  let authoringScope: AuthoringContext?
 
   @ViewBuilder
   var body: some View {
@@ -382,13 +382,13 @@ private struct OutlineRow<Content: View>: View {
 }
 
 private struct ScopedOutlineRowContent<Content: View>: View, ResolvableView {
-  let authoringScope: DynamicPropertyScope?
+  let authoringScope: AuthoringContext?
   let content: Content
 
   func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    withDynamicPropertyScope(authoringScope) {
+    withAuthoringContext(authoringScope) {
       content.resolveElements(in: context)
     }
   }

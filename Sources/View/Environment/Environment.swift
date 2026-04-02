@@ -175,7 +175,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var hotkeyRegistry: HotkeyRegistry?
   package var localLifecycleRegistry: LocalLifecycleRegistry?
   package var localTaskRegistry: LocalTaskRegistry?
-  package var dynamicStateStore: DynamicStateStore?
+  package var invalidationProxy: ResolveInvalidationProxy?
   package var observationBridge: ObservationBridge?
   package var viewGraph: ViewGraph?
   package var imageAssetResolver: ImageAssetResolver?
@@ -220,7 +220,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     childContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     childContext.hotkeyRegistry = hotkeyRegistry
-    childContext.dynamicStateStore = dynamicStateStore
+    childContext.invalidationProxy = invalidationProxy
     childContext.observationBridge = observationBridge
     childContext.viewGraph = viewGraph
     childContext.resolveWorkTracker = resolveWorkTracker
@@ -255,7 +255,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     replacedContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     replacedContext.hotkeyRegistry = hotkeyRegistry
-    replacedContext.dynamicStateStore = dynamicStateStore
+    replacedContext.invalidationProxy = invalidationProxy
     replacedContext.observationBridge = observationBridge
     replacedContext.viewGraph = viewGraph
     replacedContext.resolveWorkTracker = resolveWorkTracker
@@ -366,7 +366,7 @@ extension ResolveContext {
     self.localKeyHandlerRegistry = localKeyHandlerRegistry
     self.localLifecycleRegistry = localLifecycleRegistry
     self.localTaskRegistry = localTaskRegistry
-    dynamicStateStore = nil
+    invalidationProxy = nil
     observationBridge = nil
     viewGraph = nil
     imageAssetResolver = nil
@@ -398,7 +398,6 @@ extension ResolveContext {
       && lhs.hotkeyRegistry == rhs.hotkeyRegistry
       && lhs.localLifecycleRegistry == rhs.localLifecycleRegistry
       && lhs.localTaskRegistry == rhs.localTaskRegistry
-      && lhs.dynamicStateStore == rhs.dynamicStateStore
       && lhs.observationBridge == rhs.observationBridge
   }
 }
@@ -413,11 +412,21 @@ package final class ResolveWorkTracker: @unchecked Sendable {
   }
 }
 
+package final class ResolveInvalidationProxy: @unchecked Sendable {
+  package weak var invalidator: (any Invalidating)?
+
+  package init(
+    invalidator: (any Invalidating)? = nil
+  ) {
+    self.invalidator = invalidator
+  }
+}
+
 /// Reads an environment value and maps it into authored content.
 public struct EnvironmentReader<Value, Content: View>: View, ResolvableView {
   private let keyPath: KeyPath<EnvironmentValues, Value>
   private let content: (Value) -> Content
-  private let authoringScope: DynamicPropertyScope?
+  private let authoringContext: AuthoringContext?
 
   public init(
     _ keyPath: KeyPath<EnvironmentValues, Value>,
@@ -425,11 +434,11 @@ public struct EnvironmentReader<Value, Content: View>: View, ResolvableView {
   ) {
     self.keyPath = keyPath
     self.content = content
-    authoringScope = currentDynamicPropertyScope()
+    authoringContext = currentAuthoringContext()
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let view = withDynamicPropertyScope(authoringScope) {
+    let view = withAuthoringContext(authoringContext) {
       context.trackingObservableAccess {
         content(context.environmentValues[keyPath: keyPath])
       }

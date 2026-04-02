@@ -3,31 +3,23 @@ import Core
 extension View {
   public func defaultFocus(
     _ binding: FocusState<Bool>.Binding,
-    _ value: Bool = true,
-    fileID: StaticString = #fileID,
-    line: UInt = #line,
-    column: UInt = #column
+    _ value: Bool = true
   ) -> some View {
     BoolDefaultFocusModifier(
       content: self,
       binding: binding,
-      value: value,
-      sourceLocation: "\(fileID):\(line):\(column)"
+      value: value
     )
   }
 
   public func defaultFocus<Value: Hashable>(
     _ binding: FocusState<Value?>.Binding,
-    _ value: Value,
-    fileID: StaticString = #fileID,
-    line: UInt = #line,
-    column: UInt = #column
+    _ value: Value
   ) -> some View {
     OptionalDefaultFocusModifier(
       content: self,
       binding: binding,
-      value: value,
-      sourceLocation: "\(fileID):\(line):\(column)"
+      value: value
     )
   }
 }
@@ -36,7 +28,6 @@ private struct BoolDefaultFocusModifier<Content: View>: View, ResolvableView {
   var content: Content
   var binding: FocusState<Bool>.Binding
   var value: Bool
-  var sourceLocation: String
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     applyDefaultFocus(in: context)
@@ -61,16 +52,22 @@ private struct BoolDefaultFocusModifier<Content: View>: View, ResolvableView {
   private func consumeDefaultFocusSeed(
     in context: ResolveContext
   ) -> Bool {
-    guard let stateStore = context.dynamicStateStore else {
+    guard
+      let authoringContext = currentAuthoringContext(),
+      let ordinal = authoringContext.ordinalTracker.claimOrdinal() as Int?,
+      let viewNode = authoringContext.viewNode
+    else {
       return true
     }
 
-    let key = "\(context.identity.path)#DefaultFocus[\(sourceLocation)]"
-    let hasSeeded: Bool = stateStore.value(for: key, seedValue: false)
+    let hasSeeded: Bool = viewNode.stateSlot(
+      ordinal: ordinal,
+      seed: false
+    )
     guard !hasSeeded else {
       return false
     }
-    stateStore.set(true, for: key, invalidationIdentity: context.identity)
+    viewNode.setStateSlot(ordinal: ordinal, value: true)
     return true
   }
 }
@@ -81,7 +78,6 @@ private struct OptionalDefaultFocusModifier<Content: View, Value: Hashable>: Vie
   var content: Content
   var binding: FocusState<Value?>.Binding
   var value: Value
-  var sourceLocation: String
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     applyDefaultFocus(in: context)
@@ -103,16 +99,22 @@ private struct OptionalDefaultFocusModifier<Content: View, Value: Hashable>: Vie
   private func consumeDefaultFocusSeed(
     in context: ResolveContext
   ) -> Bool {
-    guard let stateStore = context.dynamicStateStore else {
+    guard
+      let authoringContext = currentAuthoringContext(),
+      let ordinal = authoringContext.ordinalTracker.claimOrdinal() as Int?,
+      let viewNode = authoringContext.viewNode
+    else {
       return true
     }
 
-    let key = "\(context.identity.path)#DefaultFocus[\(sourceLocation)]"
-    let hasSeeded: Bool = stateStore.value(for: key, seedValue: false)
+    let hasSeeded: Bool = viewNode.stateSlot(
+      ordinal: ordinal,
+      seed: false
+    )
     guard !hasSeeded else {
       return false
     }
-    stateStore.set(true, for: key, invalidationIdentity: context.identity)
+    viewNode.setStateSlot(ordinal: ordinal, value: true)
     return true
   }
 }

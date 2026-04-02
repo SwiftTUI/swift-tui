@@ -62,15 +62,15 @@ public struct Resolver {
 
 @MainActor
 package func scopedAnyView<V: View>(
-  authoringScope: DynamicPropertyScope? = currentDynamicPropertyScope(),
+  authoringContext: AuthoringContext? = currentAuthoringContext(),
   _ build: () -> V
 ) -> AnyView {
   // AnyView policy: use this helper instead of plain AnyView(...) when stored
-  // authored content must preserve its original dynamic-property scope.
-  withDynamicPropertyScope(authoringScope) {
+  // authored content must preserve its original authored context.
+  withAuthoringContext(authoringContext) {
     AnyView(
       scoped: build(),
-      authoringScope: authoringScope
+      authoringContext: authoringContext
     )
   }
 }
@@ -203,7 +203,7 @@ package func resolveView<V: View>(
 ) -> ResolvedNode {
   let graphNode = context.viewGraph?.beginEvaluation(
     identity: context.identity,
-    invalidator: context.dynamicStateStore?.invalidator
+    invalidator: context.invalidationProxy?.invalidator
   )
   context.recordResolvedComputation()
   let erased: Any = view
@@ -216,16 +216,16 @@ package func resolveView<V: View>(
       )
     }
 
-    let dynamicPropertyScope = makeDynamicPropertyScope(
+    let authoringContext = makeAuthoringContext(
       for: context,
       viewNode: graphNode
     )
-    return withDynamicPropertyScope(dynamicPropertyScope) {
+    return withAuthoringContext(authoringContext) {
       let resolved = normalizeResolvedElements(
         resolveViewElements(view, in: context),
         in: context
       )
-      accessedStateSlots = dynamicPropertyScope.ordinalTracker.nextOrdinal
+      accessedStateSlots = authoringContext.ordinalTracker.nextOrdinal
       return resolved
     }
   }

@@ -98,7 +98,6 @@ public final class RunLoop<State: Equatable & Sendable> {
   package let environment: EnvironmentSnapshot
   package let environmentValues: EnvironmentValues
   package let proposalOverride: ProposedSize?
-  package var dynamicStateStore: DynamicStateStore?
   package let localActionRegistry = LocalActionRegistry()
   package let localPointerHandlerRegistry = LocalPointerHandlerRegistry()
   package let localFocusBindingRegistry = LocalFocusBindingRegistry()
@@ -257,7 +256,6 @@ public final class RunLoop<State: Equatable & Sendable> {
   public func run() async throws -> RunLoopResult<State> {
     stateContainer.invalidator = scheduler
     focusTracker.invalidator = scheduler
-    dynamicStateStore?.invalidator = scheduler
     observationBridge.attachInvalidator(scheduler)
 
     try terminalHost.enableRawMode()
@@ -317,10 +315,6 @@ public final class RunLoop<State: Equatable & Sendable> {
       renderedFrames: renderedFrames,
       exitReason: .inputEnded
     )
-  }
-
-  package func attachDynamicStateStore(_ dynamicStateStore: DynamicStateStore?) {
-    self.dynamicStateStore = dynamicStateStore
   }
 }
 

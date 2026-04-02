@@ -5,7 +5,7 @@ public struct Button<Label: View>: View, ResolvableView {
   public var role: ButtonRole?
   private var action: (@MainActor @Sendable () -> Void)?
   private var label: Label
-  private let authoringScope: DynamicPropertyScope?
+  private let authoringScope: AuthoringContext?
 
   public init(
     _ title: String,
@@ -14,7 +14,7 @@ public struct Button<Label: View>: View, ResolvableView {
     self.role = role
     action = nil
     label = Text(title)
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   public init(
@@ -24,7 +24,7 @@ public struct Button<Label: View>: View, ResolvableView {
     self.role = role
     action = nil
     self.label = label()
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   public init(
@@ -35,7 +35,7 @@ public struct Button<Label: View>: View, ResolvableView {
     self.role = role
     self.action = action
     label = Text(title)
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   public init(
@@ -46,7 +46,7 @@ public struct Button<Label: View>: View, ResolvableView {
     self.role = role
     self.action = action
     self.label = label()
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   package func resolveElements(
@@ -84,11 +84,11 @@ extension Button {
     )
 
     if context.environmentValues.isEnabled, let action {
-      let dynamicPropertyScope = currentDynamicPropertyScope() ?? authoringScope
+      let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
       context.localActionRegistry?.register(
         identity: context.identity,
         handler: {
-          return withDynamicPropertyScope(dynamicPropertyScope) {
+          return withAuthoringContext(dynamicPropertyScope) {
             action()
             return true
           }

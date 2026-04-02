@@ -267,9 +267,6 @@ public enum MultiSceneLauncher {
     let focusTracker = FocusTracker(
       invalidationIdentities: [configuration.rootIdentity]
     )
-    let dynamicStateStore = DynamicStateStore(
-      invalidationIdentities: [configuration.rootIdentity]
-    )
 
     defer {
       if let inProcessSignalReader = resources.signalReader as? InProcessSignalReader {
@@ -282,7 +279,6 @@ public enum MultiSceneLauncher {
       sessionName: sessionName,
       stateContainer: stateContainer,
       focusTracker: focusTracker,
-      dynamicStateStore: dynamicStateStore,
       resources: resources
     )
   }

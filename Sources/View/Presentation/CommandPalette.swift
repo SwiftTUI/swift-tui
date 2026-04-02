@@ -335,11 +335,11 @@ private struct CommandModifier<Content: View>: View, ResolvableView {
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let dynamicPropertyScope = currentDynamicPropertyScope()
+    let dynamicPropertyScope = currentAuthoringContext()
     let resolvedAction = registration.action.map { action in
       { @MainActor in
         if let dynamicPropertyScope {
-          withDynamicPropertyScope(dynamicPropertyScope) {
+          withAuthoringContext(dynamicPropertyScope) {
             action()
           }
         } else {
@@ -390,7 +390,7 @@ public struct CommandPalette: View {
     onDismiss: @escaping @MainActor @Sendable () -> Void = {},
     onExecute: @escaping @MainActor @Sendable (Command) -> Void = { _ in }
   ) {
-    let authoringScope = currentDynamicPropertyScope()
+    let authoringScope = currentAuthoringContext()
     self.query = query
     self.commands = commands
     self.placeholder = placeholder
@@ -398,7 +398,7 @@ public struct CommandPalette: View {
     self.maximumResults = maximumResults
     self.onDismiss = {
       if let authoringScope {
-        withDynamicPropertyScope(authoringScope) {
+        withAuthoringContext(authoringScope) {
           onDismiss()
         }
       } else {
@@ -407,7 +407,7 @@ public struct CommandPalette: View {
     }
     self.onExecute = { command in
       if let authoringScope {
-        withDynamicPropertyScope(authoringScope) {
+        withAuthoringContext(authoringScope) {
           onExecute(command)
         }
       } else {

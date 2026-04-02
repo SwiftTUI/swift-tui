@@ -32,8 +32,8 @@ public struct ScrollView<Content: View>: View, ResolvableView {
     self.content = content()
   }
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let dynamicPropertyScope = makeDynamicPropertyScope(for: context)
-    return withDynamicPropertyScope(dynamicPropertyScope) {
+    let dynamicPropertyScope = makeAuthoringContext(for: context)
+    return withAuthoringContext(dynamicPropertyScope) {
       let indicatorVisibility = effectiveIndicatorVisibility(
         environment: context.environmentValues.scrollIndicatorVisibility
       )
@@ -61,10 +61,10 @@ public struct ScrollView<Content: View>: View, ResolvableView {
       )
       if context.environmentValues.isEnabled {
         let binding = position
-        let dynamicPropertyScope = currentDynamicPropertyScope()
+        let dynamicPropertyScope = currentAuthoringContext()
         let registerKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = { identity, targetAxis in
           context.localKeyHandlerRegistry?.register(identity: identity) { event in
-            withDynamicPropertyScope(dynamicPropertyScope) {
+            withAuthoringContext(dynamicPropertyScope) {
               var next = binding.wrappedValue
               guard applyScrollKey(event, to: &next, targetAxis: targetAxis) else {
                 return false
@@ -86,7 +86,7 @@ public struct ScrollView<Content: View>: View, ResolvableView {
           guard case .scrolled(let deltaX, let deltaY) = event.kind else {
             return false
           }
-          return withDynamicPropertyScope(dynamicPropertyScope) {
+          return withAuthoringContext(dynamicPropertyScope) {
             var next = binding.wrappedValue
             var changed = false
             if axes.contains(.horizontal), deltaX != 0 {
@@ -131,7 +131,7 @@ public struct ScrollView<Content: View>: View, ResolvableView {
               else {
                 return false
               }
-              return withDynamicPropertyScope(dynamicPropertyScope) {
+              return withAuthoringContext(dynamicPropertyScope) {
                 var next = binding.wrappedValue
                 switch axis {
                 case .horizontal:

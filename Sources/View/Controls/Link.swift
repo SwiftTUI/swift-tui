@@ -280,11 +280,11 @@ private func registerOpenLinkAction(
   }
 
   let openLinkAction = context.environmentValues.openLinkAction
-  let dynamicPropertyScope = currentDynamicPropertyScope()
+  let dynamicPropertyScope = currentAuthoringContext()
   localActionRegistry.register(
     identity: identity,
     handler: {
-      withDynamicPropertyScope(dynamicPropertyScope) {
+      withAuthoringContext(dynamicPropertyScope) {
         openLinkAction(destination)
       }
     },

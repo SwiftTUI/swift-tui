@@ -277,9 +277,9 @@ func registerMultilineTextEntryBinding(
     return
   }
 
-  let dynamicPropertyScope = currentDynamicPropertyScope()
+  let dynamicPropertyScope = currentAuthoringContext()
   context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
-    withDynamicPropertyScope(dynamicPropertyScope) {
+    withAuthoringContext(dynamicPropertyScope) {
       mutateTextEntryBinding(
         binding,
         event: event,

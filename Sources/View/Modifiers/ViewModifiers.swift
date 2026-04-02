@@ -391,7 +391,7 @@ private struct AppearLifecycleModifier<Content: View>: View, ResolvableView {
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let dynamicPropertyScope = currentDynamicPropertyScope()
+    let dynamicPropertyScope = currentAuthoringContext()
     let lifecycleAction = action
     let handlerID = lifecycleHandlerID(
       for: node.identity,
@@ -401,7 +401,7 @@ private struct AppearLifecycleModifier<Content: View>: View, ResolvableView {
     context.localLifecycleRegistry?.registerAppear(
       handlerID: handlerID,
       handler: {
-        withDynamicPropertyScope(dynamicPropertyScope) {
+        withAuthoringContext(dynamicPropertyScope) {
           lifecycleAction()
         }
       }
@@ -419,7 +419,7 @@ private struct DisappearLifecycleModifier<Content: View>: View, ResolvableView {
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let dynamicPropertyScope = currentDynamicPropertyScope()
+    let dynamicPropertyScope = currentAuthoringContext()
     let lifecycleAction = action
     let handlerID = lifecycleHandlerID(
       for: node.identity,
@@ -429,7 +429,7 @@ private struct DisappearLifecycleModifier<Content: View>: View, ResolvableView {
     context.localLifecycleRegistry?.registerDisappear(
       handlerID: handlerID,
       handler: {
-        withDynamicPropertyScope(dynamicPropertyScope) {
+        withAuthoringContext(dynamicPropertyScope) {
           lifecycleAction()
         }
       }
@@ -449,7 +449,7 @@ private struct TaskLifecycleModifier<Content: View>: View, ResolvableView {
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let dynamicPropertyScope = currentDynamicPropertyScope()
+    let dynamicPropertyScope = currentAuthoringContext()
     let taskAction = action
     let descriptor = TaskDescriptor(
       id: descriptorID.map { "\(node.identity)#task[\($0)]" } ?? "\(node.identity)#task",
@@ -461,7 +461,7 @@ private struct TaskLifecycleModifier<Content: View>: View, ResolvableView {
         registration: .init(
           descriptor: descriptor,
           operation: {
-            await withDynamicPropertyScope(dynamicPropertyScope) {
+            await withAuthoringContext(dynamicPropertyScope) {
               await taskAction()
             }
           }

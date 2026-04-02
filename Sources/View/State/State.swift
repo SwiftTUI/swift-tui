@@ -1,127 +1,29 @@
 package import Core
 
 @MainActor
-package final class DynamicStateStore: Equatable {
-  private var entries: [String: any DynamicStateEntryBox] = [:]
-  package weak var invalidator: (any Invalidating)?
-  package let invalidationIdentities: Set<Identity>
-
-  package init(
-    invalidationIdentities: Set<Identity> = [
-      .init(components: [] as [IdentityComponent])
-    ]
-  ) {
-    self.invalidationIdentities = invalidationIdentities
-  }
-
-  nonisolated package static func == (
-    lhs: DynamicStateStore,
-    rhs: DynamicStateStore
-  ) -> Bool {
-    lhs === rhs
-  }
-
-  package func value<Value>(
-    for key: String,
-    seedValue: @autoclosure () -> Value
-  ) -> Value {
-    if let existing = entries[key] {
-      guard let typed: Value = existing.value(as: Value.self) else {
-        fatalError(
-          "State type mismatch for key \(key). Expected \(Value.self), found \(existing.valueType)."
-        )
-      }
-      return typed
-    }
-
-    let initialValue = seedValue()
-    entries[key] = DynamicStateEntry(initialValue)
-    return initialValue
-  }
-
-  package func set<Value>(
-    _ value: Value,
-    for key: String,
-    invalidationIdentity: Identity? = nil
-  ) {
-    if let existing = entries[key] {
-      existing.set(value)
-    } else {
-      entries[key] = DynamicStateEntry(value)
-    }
-    let identities =
-      invalidationIdentity.map { Set([$0]) }
-      ?? invalidationIdentities
-    invalidator?.requestInvalidation(of: identities)
-  }
-}
-
-@MainActor
-private protocol DynamicStateEntryBox: AnyObject {
-  var valueType: Any.Type { get }
-
-  func value<Value>(as type: Value.Type) -> Value?
-  func set<Value>(_ value: Value)
-}
-
-@MainActor
-private final class DynamicStateEntry<StoredValue>: DynamicStateEntryBox {
-  private var storedValue: StoredValue
-  let valueType: Any.Type = StoredValue.self
-
-  init(_ value: StoredValue) {
-    storedValue = value
-  }
-
-  func value<Value>(as type: Value.Type) -> Value? {
-    guard self.valueType == type else {
-      return nil
-    }
-    return storedValue as? Value
-  }
-
-  func set<Value>(_ value: Value) {
-    guard self.valueType == Value.self, let typed = value as? StoredValue else {
-      fatalError(
-        "State type mismatch for entry. Expected \(self.valueType), received \(Value.self)."
-      )
-    }
-    storedValue = typed
-  }
-}
-
-@MainActor
-package struct DynamicPropertyScope {
+package struct AuthoringContext {
   var viewIdentity: Identity
-  var stateStore: DynamicStateStore?
-  var environmentValues: EnvironmentValues?
   var focusedValues: FocusedValues
   var viewNode: Core.ViewNode?
-  var ordinalTracker: DynamicPropertyOrdinalTracker = .init()
-
-  func stateKey(for ordinal: Int) -> String {
-    "\(viewIdentity.path)#State[\(ordinal)]"
-  }
+  var ordinalTracker: AuthoringOrdinalTracker = .init()
 }
 
-package enum DynamicPropertyScopeStorage {
-  @TaskLocal static var current: DynamicPropertyScope?
+package enum AuthoringContextStorage {
+  @TaskLocal static var current: AuthoringContext?
 }
 
 @MainActor
-package func currentDynamicPropertyScope() -> DynamicPropertyScope? {
-  DynamicPropertyScopeStorage.current
+package func currentAuthoringContext() -> AuthoringContext? {
+  AuthoringContextStorage.current
 }
 
 @MainActor
-package func makeDynamicPropertyScope(
+package func makeAuthoringContext(
   for context: ResolveContext,
   viewNode: Core.ViewNode? = ViewNodeContext.current
-) -> DynamicPropertyScope {
-  DynamicPropertyScope(
+) -> AuthoringContext {
+  AuthoringContext(
     viewIdentity: context.identity,
-    stateStore: context.dynamicStateStore,
-    environmentValues: context.environmentValues,
     focusedValues: context.focusedValues,
     viewNode: viewNode,
     ordinalTracker: .init()
@@ -129,27 +31,27 @@ package func makeDynamicPropertyScope(
 }
 
 @MainActor
-package func withDynamicPropertyScope<Result>(
-  _ scope: DynamicPropertyScope?,
+package func withAuthoringContext<Result>(
+  _ context: AuthoringContext?,
   _ apply: () -> Result
 ) -> Result {
-  DynamicPropertyScopeStorage.$current.withValue(scope) {
+  AuthoringContextStorage.$current.withValue(context) {
     apply()
   }
 }
 
 @MainActor
-package func withDynamicPropertyScope<Result>(
-  _ scope: DynamicPropertyScope?,
+package func withAuthoringContext<Result>(
+  _ context: AuthoringContext?,
   _ apply: () async -> Result
 ) async -> Result {
-  await DynamicPropertyScopeStorage.$current.withValue(scope) {
+  await AuthoringContextStorage.$current.withValue(context) {
     await apply()
   }
 }
 
 @MainActor
-package final class DynamicPropertyOrdinalTracker {
+package final class AuthoringOrdinalTracker {
   private(set) var nextOrdinal = 0
 
   package init() {}
@@ -218,15 +120,15 @@ private final class StateBox<Value> {
   }
 
   func currentOrdinal(
-    for scope: DynamicPropertyScope?
+    for context: AuthoringContext?
   ) -> Int? {
     if let ordinal {
       return ordinal
     }
-    guard let scope else {
+    guard let context else {
       return nil
     }
-    let ordinal = scope.ordinalTracker.claimOrdinal()
+    let ordinal = context.ordinalTracker.claimOrdinal()
     self.ordinal = ordinal
     return ordinal
   }
@@ -272,8 +174,8 @@ public struct State<Value> {
   }
 
   private func activeLocation() -> DynamicStateLocation<Value>? {
-    if let scope = DynamicPropertyScopeStorage.current {
-      let location = makeLocation(for: scope)
+    if let context = AuthoringContextStorage.current {
+      let location = makeLocation(for: context)
       box.remember(location)
       _ = location.getValue()
       return location
@@ -283,9 +185,9 @@ public struct State<Value> {
   }
 
   private func makeLocation(
-    for scope: DynamicPropertyScope
+    for context: AuthoringContext
   ) -> DynamicStateLocation<Value> {
-    guard let ordinal = box.currentOrdinal(for: scope) else {
+    guard let ordinal = box.currentOrdinal(for: context) else {
       return DynamicStateLocation(
         getValue: { box.currentSeedValue() },
         setValue: { newValue in
@@ -294,29 +196,9 @@ public struct State<Value> {
       )
     }
 
-    let retainedSeed = box.retainedValue(for: scope.viewIdentity) ?? box.currentSeedValue()
+    let retainedSeed = box.retainedValue(for: context.viewIdentity) ?? box.currentSeedValue()
 
-    if let stateStore = scope.stateStore {
-      let stateKey = scope.stateKey(for: ordinal)
-      return DynamicStateLocation(
-        getValue: {
-          stateStore.value(
-            for: stateKey,
-            seedValue: retainedSeed
-          )
-        },
-        setValue: { newValue in
-          stateStore.set(
-            newValue,
-            for: stateKey,
-            invalidationIdentity: scope.viewIdentity
-          )
-          box.storeRetainedValue(newValue, for: scope.viewIdentity)
-        }
-      )
-    }
-
-    if let viewNode = scope.viewNode {
+    if let viewNode = context.viewNode {
       return DynamicStateLocation(
         getValue: {
           viewNode.stateSlot(
@@ -326,7 +208,7 @@ public struct State<Value> {
         },
         setValue: { newValue in
           viewNode.setStateSlot(ordinal: ordinal, value: newValue)
-          box.storeRetainedValue(newValue, for: scope.viewIdentity)
+          box.storeRetainedValue(newValue, for: context.viewIdentity)
         }
       )
     }
@@ -346,17 +228,17 @@ extension View {
     in context: ResolveContext,
     body makeBody: () -> Body
   ) -> [ResolvedNode] {
-    if let scope = currentDynamicPropertyScope() {
+    if let authoringContext = currentAuthoringContext() {
       let body = context.trackingObservableAccess {
         makeBody()
       }
-      return withDynamicPropertyScope(scope) {
+      return withAuthoringContext(authoringContext) {
         body.resolveElements(in: context)
       }
     }
 
-    let dynamicPropertyScope = makeDynamicPropertyScope(for: context)
-    return withDynamicPropertyScope(dynamicPropertyScope) {
+    let authoringContext = makeAuthoringContext(for: context)
+    return withAuthoringContext(authoringContext) {
       let body = context.trackingObservableAccess {
         makeBody()
       }

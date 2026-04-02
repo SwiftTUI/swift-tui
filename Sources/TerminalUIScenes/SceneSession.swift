@@ -32,7 +32,6 @@ package enum SceneSession {
     sessionName: String,
     stateContainer: StateContainer<MultiSceneRuntimeState>,
     focusTracker: FocusTracker,
-    dynamicStateStore: DynamicStateStore,
     resources: SceneSessionResources
   ) async throws -> RunLoopResult<MultiSceneRuntimeState> {
     var environmentValues = EnvironmentValues()
@@ -64,7 +63,6 @@ package enum SceneSession {
         WindowHostView(content: configuration.makeRootView())
       }
     )
-    runLoop.attachDynamicStateStore(dynamicStateStore)
 
     return try await runLoop.run()
   }

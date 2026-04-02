@@ -94,13 +94,13 @@ where Key.Value: Equatable {
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let node = content.resolve(in: context)
-    let dynamicPropertyScope = currentDynamicPropertyScope()
+    let dynamicPropertyScope = currentAuthoringContext()
     context.localPreferenceObservationRegistry?.register(
       identity: node.identity,
       key: Key.self,
       value: node.preferenceValues[Key.self]
     ) { value in
-      withDynamicPropertyScope(dynamicPropertyScope) {
+      withAuthoringContext(dynamicPropertyScope) {
         action(value)
       }
     }
@@ -114,7 +114,7 @@ private struct PreferenceOverlayValueModifier<Base: View, Key: PreferenceKey, Ov
   var base: Base
   var alignment: Alignment
   private let transform: (Key.Value) -> Overlay
-  private let authoringScope: DynamicPropertyScope?
+  private let authoringScope: AuthoringContext?
 
   init(
     base: Base,
@@ -124,12 +124,12 @@ private struct PreferenceOverlayValueModifier<Base: View, Key: PreferenceKey, Ov
     self.base = base
     self.alignment = alignment
     self.transform = transform
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let baseNode = base.resolve(in: context.child(component: .named("base")))
-    let overlayView = withDynamicPropertyScope(authoringScope) {
+    let overlayView = withAuthoringContext(authoringScope) {
       context.trackingObservableAccess {
         transform(baseNode.preferenceValues[Key.self])
       }
@@ -155,7 +155,7 @@ private struct PreferenceBackgroundValueModifier<
   var base: Base
   var alignment: Alignment
   private let transform: (Key.Value) -> Background
-  private let authoringScope: DynamicPropertyScope?
+  private let authoringScope: AuthoringContext?
 
   init(
     base: Base,
@@ -165,12 +165,12 @@ private struct PreferenceBackgroundValueModifier<
     self.base = base
     self.alignment = alignment
     self.transform = transform
-    authoringScope = currentDynamicPropertyScope()
+    authoringScope = currentAuthoringContext()
   }
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let baseNode = base.resolve(in: context.child(component: .named("base")))
-    let backgroundView = withDynamicPropertyScope(authoringScope) {
+    let backgroundView = withAuthoringContext(authoringScope) {
       context.trackingObservableAccess {
         transform(baseNode.preferenceValues[Key.self])
       }

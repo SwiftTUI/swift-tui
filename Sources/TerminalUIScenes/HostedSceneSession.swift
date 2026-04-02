@@ -23,7 +23,6 @@ public final class HostedSceneSession {
   private let scheduler: any FrameScheduling
   private let stateContainer: StateContainer<MultiSceneRuntimeState>
   private let focusTracker: FocusTracker
-  private let dynamicStateStore: DynamicStateStore
   private var runTask: Task<RunLoopExitReason, any Error>?
 
   package init(
@@ -69,9 +68,6 @@ public final class HostedSceneSession {
     focusTracker = FocusTracker(
       invalidationIdentities: [configuration.rootIdentity]
     )
-    dynamicStateStore = DynamicStateStore(
-      invalidationIdentities: [configuration.rootIdentity]
-    )
   }
 
   public func start() async throws -> RunLoopExitReason {
@@ -87,13 +83,12 @@ public final class HostedSceneSession {
       surfaceName: "hosted-\(configuration.identifier.rawValue)"
     )
 
-    let task = Task { @MainActor [configuration, sessionName, stateContainer, focusTracker, dynamicStateStore, resources] in
+    let task = Task { @MainActor [configuration, sessionName, stateContainer, focusTracker, resources] in
       let result = try await SceneSession.run(
         configuration: configuration,
         sessionName: sessionName,
         stateContainer: stateContainer,
         focusTracker: focusTracker,
-        dynamicStateStore: dynamicStateStore,
         resources: resources
       )
       return result.exitReason

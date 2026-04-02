@@ -234,9 +234,9 @@ public struct WindowGroup: Scene {
   ) {
     self.title = nil
     self.id = id
-    let authoringScope = currentDynamicPropertyScope()
+    let authoringScope = currentAuthoringContext()
     contentBuilder = {
-      scopedAnyView(authoringScope: authoringScope) {
+      scopedAnyView(authoringContext: authoringScope) {
         content()
       }
     }
@@ -252,9 +252,9 @@ public struct WindowGroup: Scene {
     let normalizedTitle = String(title)
     self.title = normalizedTitle
     self.id = id ?? WindowIdentifier(normalizedTitle)
-    let authoringScope = currentDynamicPropertyScope()
+    let authoringScope = currentAuthoringContext()
     contentBuilder = {
-      scopedAnyView(authoringScope: authoringScope) {
+      scopedAnyView(authoringContext: authoringScope) {
         content()
       }
     }

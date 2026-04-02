@@ -110,25 +110,17 @@ private final class FocusStateBox<Value: Equatable> {
   }
 
   func currentOrdinal(
-    for scope: DynamicPropertyScope?
+    for context: AuthoringContext?
   ) -> Int? {
     if let ordinal {
       return ordinal
     }
-    guard let scope else {
+    guard let context else {
       return nil
     }
-    let ordinal = scope.ordinalTracker.claimOrdinal()
+    let ordinal = context.ordinalTracker.claimOrdinal()
     self.ordinal = ordinal
     return ordinal
-  }
-}
-
-extension DynamicPropertyScope {
-  fileprivate func focusStateKey(
-    for ordinal: Int
-  ) -> String {
-    "\(viewIdentity.path)#FocusState[\(ordinal)]"
   }
 }
 
@@ -192,8 +184,8 @@ public struct FocusState<Value: Equatable> {
   }
 
   private func activeLocation() -> FocusStateLocation<Value>? {
-    if let scope = currentDynamicPropertyScope() {
-      let location = makeLocation(for: scope)
+    if let context = currentAuthoringContext() {
+      let location = makeLocation(for: context)
       box.remember(location)
       _ = location.snapshot()
       return location
@@ -203,15 +195,15 @@ public struct FocusState<Value: Equatable> {
   }
 
   private func makeLocation(
-    for scope: DynamicPropertyScope
+    for context: AuthoringContext
   ) -> FocusStateLocation<Value> {
-    guard let ordinal = box.currentOrdinal(for: scope) else {
+    guard let ordinal = box.currentOrdinal(for: context) else {
       return localLocation()
     }
 
     let seedSnapshot = box.currentLocalSnapshot()
 
-    if let viewNode = scope.viewNode {
+    if let viewNode = context.viewNode {
       let bindingID = "\(viewNode.identity.path)#FocusState[\(ordinal)]"
       let storage = viewNode.stateSlot(
         ordinal: ordinal,
@@ -234,43 +226,6 @@ public struct FocusState<Value: Equatable> {
           let didChange = storage.applyRuntimeValue(newValue)
           if didChange {
             viewNode.requestInvalidation()
-          }
-          return didChange
-        }
-      )
-    }
-
-    if let stateStore = scope.stateStore {
-      let stateKey = scope.focusStateKey(for: ordinal)
-      let storage = stateStore.value(
-        for: stateKey,
-        seedValue: FocusStateStorage(
-          value: seedSnapshot.value,
-          hasPendingRequest: seedSnapshot.hasPendingRequest
-        )
-      )
-
-      return FocusStateLocation(
-        bindingID: stateKey,
-        snapshot: {
-          storage.currentSnapshot()
-        },
-        requestValue: { newValue in
-          storage.requestValue(newValue)
-          stateStore.set(
-            storage,
-            for: stateKey,
-            invalidationIdentity: scope.viewIdentity
-          )
-        },
-        applyRuntimeValue: { newValue in
-          let didChange = storage.applyRuntimeValue(newValue)
-          if didChange {
-            stateStore.set(
-              storage,
-              for: stateKey,
-              invalidationIdentity: scope.viewIdentity
-            )
           }
           return didChange
         }
