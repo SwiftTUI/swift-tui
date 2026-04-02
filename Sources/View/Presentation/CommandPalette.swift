@@ -1,4 +1,4 @@
-import Core
+public import Core
 
 // MARK: - Model
 
@@ -68,7 +68,6 @@ public struct Command: Hashable, Sendable, Identifiable {
   public var title: String
   public var detail: String?
   public var keywords: [String]
-  public var shortcut: String?
   public var kind: Kind
   public var isDisabled: Bool
 
@@ -77,7 +76,6 @@ public struct Command: Hashable, Sendable, Identifiable {
     title: String,
     detail: String? = nil,
     keywords: [String] = [],
-    shortcut: String? = nil,
     kind: Kind = .action,
     isDisabled: Bool = false
   ) {
@@ -85,7 +83,6 @@ public struct Command: Hashable, Sendable, Identifiable {
     self.title = title
     self.detail = detail
     self.keywords = keywords
-    self.shortcut = shortcut
     self.kind = kind
     self.isDisabled = isDisabled
   }
@@ -151,13 +148,11 @@ public struct CommandCatalog: Sendable {
   ) -> Int {
     let normalizedTitle = command.title.lowercased()
     let normalizedDetail = command.detail?.lowercased() ?? ""
-    let normalizedShortcut = command.shortcut?.lowercased() ?? ""
     let normalizedKeywords = command.keywords.map { $0.lowercased() }
     let searchable = [
       command.id.lowercased(),
       normalizedTitle,
       normalizedDetail,
-      normalizedShortcut,
       normalizedKeywords.joined(separator: " "),
     ].joined(separator: " ")
 
@@ -175,12 +170,6 @@ public struct CommandCatalog: Sendable {
     }
     if normalizedTitle.contains(query) {
       score += 500
-    }
-    if normalizedShortcut == query {
-      score += 300
-    }
-    if normalizedShortcut.hasPrefix(query) {
-      score += 200
     }
     if normalizedKeywords.contains(where: { $0 == query }) {
       score += 150
@@ -206,9 +195,6 @@ public struct CommandCatalog: Sendable {
       if normalizedDetail.contains(token) {
         score += 6
       }
-      if normalizedShortcut.contains(token) {
-        score += 8
-      }
       if normalizedKeywords.contains(where: { $0.contains(token) }) {
         score += 5
       }
@@ -220,18 +206,42 @@ public struct CommandCatalog: Sendable {
 
 // MARK: - Preference Key
 
-private struct CommandPreferenceValue: Equatable, Sendable,
+private struct CommandRegistration: @unchecked Sendable,
   CustomStringConvertible,
   CustomDebugStringConvertible
 {
-  var commands: [Command] = []
+  var command: Command
+  var action: (@MainActor @Sendable () -> Void)?
+
+  init(
+    command: Command,
+    action: (@MainActor @Sendable () -> Void)? = nil
+  ) {
+    self.command = command
+    self.action = action
+  }
 
   var description: String {
     debugDescription
   }
 
   var debugDescription: String {
-    commands.map(\.title).joined(separator: ", ")
+    "CommandRegistration(id: \(String(reflecting: command.id)), hasAction: \(action != nil))"
+  }
+}
+
+private struct CommandPreferenceValue: @unchecked Sendable,
+  CustomStringConvertible,
+  CustomDebugStringConvertible
+{
+  var registrations: [CommandRegistration] = []
+
+  var description: String {
+    debugDescription
+  }
+
+  var debugDescription: String {
+    registrations.map(\.command.title).joined(separator: ", ")
   }
 }
 
@@ -242,7 +252,7 @@ private enum CommandPreferenceKey: PreferenceKey {
     value: inout CommandPreferenceValue,
     nextValue: () -> CommandPreferenceValue
   ) {
-    value.commands.append(contentsOf: nextValue().commands)
+    value.registrations.append(contentsOf: nextValue().registrations)
   }
 }
 
@@ -256,27 +266,64 @@ extension View {
   ///
   /// ```swift
   /// Button("Save") { save() }
-  ///   .command(id: "save", title: "Save File", shortcut: "Ctrl+S")
+  ///   .command(id: "save", title: "Save File")
   /// ```
   public func command(
     id: String,
     title: String,
     detail: String? = nil,
     keywords: [String] = [],
-    shortcut: String? = nil,
     kind: Command.Kind = .action,
     isDisabled: Bool = false
   ) -> some View {
     CommandModifier(
       content: self,
-      command: Command(
-        id: id,
-        title: title,
-        detail: detail,
-        keywords: keywords,
-        shortcut: shortcut,
-        kind: kind,
-        isDisabled: isDisabled
+      registration: CommandRegistration(
+        command: Command(
+          id: id,
+          title: title,
+          detail: detail,
+          keywords: keywords,
+          kind: kind,
+          isDisabled: isDisabled
+        )
+      )
+    )
+  }
+
+  /// Registers a command with an action closure for discovery and execution in
+  /// the command palette.
+  ///
+  /// Use this when the command does not correspond to a currently rendered
+  /// focusable view, but should still be searchable and invokable.
+  ///
+  /// ```swift
+  /// ContentView()
+  ///   .command(id: "new-window", title: "New Window") {
+  ///     openNewWindow()
+  ///   }
+  /// ```
+  public func command(
+    id: String,
+    title: String,
+    detail: String? = nil,
+    keywords: [String] = [],
+    kind: Command.Kind = .action,
+    isDisabled: Bool = false,
+    action: @escaping @MainActor @Sendable () -> Void
+  ) -> some View {
+    CommandModifier(
+      content: self,
+      registration: CommandRegistration(
+        command: Command(
+          id: id,
+          title: title,
+          detail: detail,
+          keywords: keywords,
+          kind: kind,
+          isDisabled: isDisabled
+        ),
+        action: action
       )
     )
   }
@@ -284,13 +331,32 @@ extension View {
 
 private struct CommandModifier<Content: View>: View, ResolvableView {
   var content: Content
-  var command: Command
+  var registration: CommandRegistration
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var node = content.resolve(in: context)
+    let dynamicPropertyScope = currentDynamicPropertyScope()
+    let resolvedAction = registration.action.map { action in
+      { @MainActor in
+        if let dynamicPropertyScope {
+          withDynamicPropertyScope(dynamicPropertyScope) {
+            action()
+          }
+        } else {
+          action()
+        }
+      }
+    }
     node.preferenceValues.merge(
       CommandPreferenceKey.self,
-      value: .init(commands: [command])
+      value: .init(
+        registrations: [
+          .init(
+            command: registration.command,
+            action: resolvedAction
+          )
+        ]
+      )
     )
     return [node]
   }
@@ -409,14 +475,14 @@ public struct CommandPalette: View {
 
   @MainActor
   private func handleKeyPress(
-    _ keyPress: LocalKeyPress,
+    _ keyPress: KeyPress,
     matches: [Command]
   ) -> KeyPressResult {
     switch keyPress.key {
     case .escape where keyPress.modifiers.isEmpty:
       onDismiss()
       return .handled
-    case .enter where keyPress.modifiers.isEmpty:
+    case .return where keyPress.modifiers.isEmpty:
       if let command = selectedCommand(in: matches) {
         activate(command)
       }
@@ -507,7 +573,7 @@ public struct CommandPalette: View {
   }
 
   private func allowsPaletteTextEntry(
-    _ keyPress: LocalKeyPress
+    _ keyPress: KeyPress
   ) -> Bool {
     switch keyPress.key {
     case .character:
@@ -533,10 +599,6 @@ private struct CommandPaletteRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 1) {
           Text(command.title)
           Spacer()
-          if let shortcut = command.shortcut, !shortcut.isEmpty {
-            Text(shortcut)
-              .foregroundStyle(.separator)
-          }
         }
 
         if let detail = command.detail, !detail.isEmpty {
@@ -572,19 +634,26 @@ extension View {
   ///
   /// ```swift
   /// ContentView()
-  ///   .commandPalette(isPresented: $showPalette) { command in
+  ///   .commandPalette(
+  ///     isPresented: $showPalette,
+  ///     shortcut: .character("/")
+  ///   ) { command in
   ///     handleCommand(command)
   ///   }
   /// ```
   public func commandPalette(
     isPresented: Binding<Bool>,
     placeholder: String = "Search commands…",
-    onExecute: @escaping @MainActor @Sendable (Command) -> Void
+    shortcut: KeyEvent? = nil,
+    shortcutModifiers: EventModifiers = [],
+    onExecute: @escaping @MainActor @Sendable (Command) -> Void = { _ in }
   ) -> some View {
     CommandPaletteModifier(
       content: self,
       isPresented: isPresented,
       placeholder: placeholder,
+      shortcut: shortcut,
+      shortcutModifiers: shortcutModifiers,
       onExecute: onExecute
     )
   }
@@ -594,6 +663,8 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
   var content: Content
   var isPresented: Binding<Bool>
   var placeholder: String
+  var shortcut: KeyEvent?
+  var shortcutModifiers: EventModifiers
   var onExecute: @MainActor @Sendable (Command) -> Void
 
   @State private var query = ""
@@ -602,26 +673,34 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
     resolveViewElements(body, in: context)
   }
 
+  @ViewBuilder
   var body: some View {
-    content
+    let paletteHost = content
       .overlayPreferenceValue(CommandPreferenceKey.self) { preference in
         if isPresented.wrappedValue {
-          paletteOverlay(for: preference.commands)
-        } else {
-          CommandShortcutDispatcher(
-            commands: preference.commands,
-            onExecute: onExecute
-          ) {
-            paletteOverlay(for: preference.commands)
-          }
+          paletteOverlay(for: preference.registrations)
         }
       }
+
+    if let shortcut, !isPresented.wrappedValue {
+      paletteHost.keyboardShortcut(
+        shortcut,
+        modifiers: shortcutModifiers,
+        label: "Search",
+        group: "Palette"
+      ) {
+        isPresented.wrappedValue = true
+      }
+    } else {
+      paletteHost
+    }
   }
 
   @ViewBuilder
   private func paletteOverlay(
-    for commands: [Command]
+    for registrations: [CommandRegistration]
   ) -> some View {
+    let commands = registrations.map(\.command)
     Rectangle().fill(.background.opacity(isPresented.wrappedValue ? 0.7 : 0.0))
       .sheet("Command Palette", isPresented: isPresented) {
         CommandPalette(
@@ -636,53 +715,20 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
             query = ""
           }
         ) { command in
-          onExecute(command)
+          execute(command, using: registrations)
         }
       }
   }
-}
 
-/// Registers hotkeys for commands that have shortcut strings.
-private struct CommandShortcutDispatcher<Content: View>: View, ResolvableView {
-  var commands: [Command]
-  var onExecute: @MainActor @Sendable (Command) -> Void
-  var content: Content
-
-  init(
-    commands: [Command],
-    onExecute: @escaping @MainActor @Sendable (Command) -> Void,
-    @ViewBuilder content: () -> Content
+  @MainActor
+  private func execute(
+    _ command: Command,
+    using registrations: [CommandRegistration]
   ) {
-    self.commands = commands
-    self.onExecute = onExecute
-    self.content = content()
-  }
-
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let dynamicPropertyScope = currentDynamicPropertyScope()
-
-    for command in commands where command.shortcut != nil && !command.isDisabled {
-      if let parsed = parseShortcutKey(command.shortcut!) {
-        let executeAction = onExecute
-        let capturedCommand = command
-        let binding = HotkeyBinding(
-          key: parsed,
-          label: command.title,
-          commandID: command.id
-        )
-        context.hotkeyRegistry?.register(identity: context.identity, binding: binding) { _ in
-          if let dynamicPropertyScope {
-            withDynamicPropertyScope(dynamicPropertyScope) {
-              executeAction(capturedCommand)
-            }
-          } else {
-            executeAction(capturedCommand)
-          }
-          return true
-        }
-      }
+    if let action = registrations.first(where: { $0.command == command })?.action {
+      action()
+      return
     }
-
-    return [content.resolve(in: context)]
+    onExecute(command)
   }
 }

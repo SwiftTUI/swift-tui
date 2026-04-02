@@ -166,14 +166,18 @@ extension EnvironmentValues {
 
 @MainActor
 package func handleFocusedInteractiveDemoInput(
-  keyEvent: KeyEvent,
+  keyPress: KeyPress,
   focusedIdentity: Identity?,
   stateContainer: StateContainer<InteractiveDemoState>
 ) -> KeyHandlingResult {
+  guard keyPress.modifiers.isEmpty else {
+    return .ignored
+  }
+
   switch focusedIdentity {
   case InteractiveDemoIdentity.presetList:
-    switch keyEvent {
-    case .enter, .space:
+    switch keyPress.key {
+    case .return, .space:
       _ = stateContainer.mutate { state in
         state.applySelectedPreset()
       }
@@ -183,8 +187,8 @@ package func handleFocusedInteractiveDemoInput(
     }
 
   case InteractiveDemoIdentity.inputField:
-    switch keyEvent {
-    case .enter:
+    switch keyPress.key {
+    case .return:
       _ = stateContainer.mutate { state in
         _ = state.applyInput()
       }

@@ -230,7 +230,7 @@ func registerMultilineTextEntryBinding(
 @MainActor
 package func mutateTextEntryBinding(
   _ binding: Binding<String>,
-  event: LocalKeyEvent,
+  event: KeyEvent,
   allowsNewlines: Bool,
   scrollPosition: Binding<ScrollPosition>?
 ) -> Bool {
@@ -241,7 +241,7 @@ package func mutateTextEntryBinding(
   case .space:
     binding.wrappedValue.append(" ")
     return true
-  case .enter where allowsNewlines:
+  case .return where allowsNewlines:
     binding.wrappedValue.append("\n")
     return true
   case .backspace:

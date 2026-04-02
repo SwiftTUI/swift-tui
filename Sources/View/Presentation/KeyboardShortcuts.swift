@@ -2,25 +2,33 @@ public import Core
 
 // MARK: - Model
 
-/// A keyboard shortcut registration that pairs a key description with a human-readable label.
+/// A keyboard shortcut registration that pairs a typed key combination with a
+/// human-readable label.
 public struct KeyboardShortcut: Hashable, Sendable, Identifiable {
-  /// Display string for the key (e.g. "q", "Ctrl+S", "Tab", "?").
-  public var key: String
-  /// Human-readable label describing the action (e.g. "Quit", "Save", "Help").
+  public var key: KeyEvent
+  public var modifiers: EventModifiers
   public var label: String
-  /// Optional group name for clustering related shortcuts (e.g. "File", "Navigation").
   public var group: String?
 
   public var id: String {
-    [key, label, group ?? ""].joined(separator: "\u{001F}")
+    [
+      formattedKeyboardShortcutKey(
+        key,
+        modifiers: modifiers
+      ),
+      label,
+      group ?? "",
+    ].joined(separator: "\u{001F}")
   }
 
   public init(
-    _ key: String,
+    _ key: KeyEvent,
+    modifiers: EventModifiers = [],
     label: String,
     group: String? = nil
   ) {
     self.key = key
+    self.modifiers = modifiers
     self.label = label
     self.group = group
   }
@@ -46,6 +54,57 @@ public struct KeyboardShortcutGroup: Hashable, Sendable, Identifiable {
   }
 }
 
+// MARK: - Formatting
+
+package func formattedKeyboardShortcutKey(
+  _ key: KeyEvent,
+  modifiers: EventModifiers = []
+) -> String {
+  var parts: [String] = []
+  if modifiers.contains(.ctrl) {
+    parts.append("Ctrl")
+  }
+  if modifiers.contains(.alt) {
+    parts.append("Alt")
+  }
+  if modifiers.contains(.shift) {
+    parts.append("Shift")
+  }
+  parts.append(formattedKeyboardShortcutBaseKey(key))
+  return parts.joined(separator: "+")
+}
+
+private func formattedKeyboardShortcutBaseKey(
+  _ key: KeyEvent
+) -> String {
+  switch key {
+  case .character(let character):
+    String(character)
+  case .return:
+    "Return"
+  case .space:
+    "Space"
+  case .tab:
+    "Tab"
+  case .arrowLeft:
+    "Left"
+  case .arrowRight:
+    "Right"
+  case .arrowUp:
+    "Up"
+  case .arrowDown:
+    "Down"
+  case .backspace:
+    "Backspace"
+  case .escape:
+    "Escape"
+  case .home:
+    "Home"
+  case .end:
+    "End"
+  }
+}
+
 // MARK: - Preference Key
 
 private struct KeyboardShortcutPreferenceValue: Equatable, Sendable,
@@ -59,7 +118,9 @@ private struct KeyboardShortcutPreferenceValue: Equatable, Sendable,
   }
 
   var debugDescription: String {
-    shortcuts.map { "\($0.key):\($0.label)" }.joined(separator: ", ")
+    shortcuts.map {
+      "\(formattedKeyboardShortcutKey($0.key, modifiers: $0.modifiers)):\($0.label)"
+    }.joined(separator: ", ")
   }
 }
 
@@ -74,76 +135,6 @@ private enum KeyboardShortcutPreferenceKey: PreferenceKey {
   }
 }
 
-// MARK: - Shortcut String Parser
-
-/// Parses a human-readable shortcut string into a ``LocalKeyPress``.
-///
-/// Supported formats: `"Ctrl+S"`, `"Alt+X"`, `"Shift+Tab"`, `"Ctrl+Shift+A"`,
-/// `"q"`, `"?"`, `"Enter"`, `"Escape"`, `"Space"`.
-package func parseShortcutKey(_ description: String) -> LocalKeyPress? {
-  let components = description.split(separator: "+").map { part in
-    String(part.drop(while: \.isWhitespace).reversed().drop(while: \.isWhitespace).reversed())
-  }
-  guard !components.isEmpty else {
-    return nil
-  }
-
-  var modifiers: EventModifiers = []
-  var keyComponent: String?
-
-  for component in components {
-    switch component.lowercased() {
-    case "ctrl", "control":
-      modifiers.insert(.control)
-    case "alt", "option", "opt":
-      modifiers.insert(.option)
-    case "shift":
-      modifiers.insert(.shift)
-    default:
-      keyComponent = component
-    }
-  }
-
-  guard let keyString = keyComponent else {
-    return nil
-  }
-
-  guard let key = parseKeyName(keyString) else {
-    return nil
-  }
-
-  return LocalKeyPress(key, modifiers: modifiers)
-}
-
-private func parseKeyName(_ name: String) -> LocalKeyEvent? {
-  switch name.lowercased() {
-  case "enter", "return":
-    return .enter
-  case "space":
-    return .space
-  case "tab":
-    return .tab
-  case "esc", "escape":
-    return .escape
-  case "backspace", "delete":
-    return .backspace
-  case "up", "arrowup":
-    return .arrowUp
-  case "down", "arrowdown":
-    return .arrowDown
-  case "left", "arrowleft":
-    return .arrowLeft
-  case "right", "arrowright":
-    return .arrowRight
-  default:
-    // Single character
-    if name.count == 1, let character = name.first {
-      return .character(character)
-    }
-    return nil
-  }
-}
-
 // MARK: - View Modifier
 
 extension View {
@@ -155,19 +146,25 @@ extension View {
   ///
   /// ```swift
   /// Button("Save") { save() }
-  ///   .keyboardShortcut("Ctrl+S", label: "Save file") {
+  ///   .keyboardShortcut(.character("s"), modifiers: .ctrl, label: "Save file") {
   ///     save()
   ///   }
   /// ```
   public func keyboardShortcut(
-    _ key: String,
+    _ key: KeyEvent,
+    modifiers: EventModifiers = [],
     label: String,
     group: String? = nil,
     action: (@MainActor @Sendable () -> Void)? = nil
   ) -> some View {
     KeyboardShortcutModifier(
       content: self,
-      shortcut: KeyboardShortcut(key, label: label, group: group),
+      shortcut: KeyboardShortcut(
+        key,
+        modifiers: modifiers,
+        label: label,
+        group: group
+      ),
       action: action
     )
   }
@@ -185,10 +182,13 @@ private struct KeyboardShortcutModifier<Content: View>: View, ResolvableView {
       value: .init(shortcuts: [shortcut])
     )
 
-    if let action, let parsed = parseShortcutKey(shortcut.key) {
+    if let action {
       let dynamicPropertyScope = currentDynamicPropertyScope()
       let binding = HotkeyBinding(
-        key: parsed,
+        key: KeyPress(
+          shortcut.key,
+          modifiers: shortcut.modifiers
+        ),
         label: shortcut.label,
         group: shortcut.group
       )
@@ -269,7 +269,7 @@ private struct KeyboardShortcutHelpToken: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: 1) {
-      Text("[\(shortcut.key)]")
+      Text("[\(formattedKeyboardShortcutKey(shortcut.key, modifiers: shortcut.modifiers))]")
         .bold()
       Text(shortcut.label)
     }

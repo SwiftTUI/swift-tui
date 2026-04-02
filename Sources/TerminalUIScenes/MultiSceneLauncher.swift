@@ -651,8 +651,8 @@ private final class KeyboardOnlyInputAdapter: TerminalInputReading {
     AsyncStream { continuation in
       let keyEvents = inputReader.events()
       let task = Task {
-        for await keyEvent in keyEvents {
-          continuation.yield(.key(KeyPress(keyEvent)))
+        for await keyPress in keyEvents {
+          continuation.yield(.key(keyPress))
         }
         continuation.finish()
       }

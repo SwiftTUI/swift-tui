@@ -11,7 +11,7 @@ extension ScrollView {
   }
 
   func applyScrollKey(
-    _ event: LocalKeyEvent,
+    _ event: KeyEvent,
     to position: inout ScrollPosition,
     targetAxis: ScrollIndicatorAxis?
   ) -> Bool {

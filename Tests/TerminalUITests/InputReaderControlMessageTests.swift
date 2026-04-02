@@ -45,7 +45,7 @@ struct InputReaderControlMessageTests {
     )
 
     let eventsTask = Task {
-      var events: [KeyEvent] = []
+      var events: [KeyPress] = []
       for await event in inputReader.events() {
         events.append(event)
       }
@@ -63,7 +63,7 @@ struct InputReaderControlMessageTests {
     didCloseReadDescriptor = true
 
     #expect(receivedMessages.withLock { $0 } == [.resize(.init(width: 120, height: 40))])
-    #expect(events == [.character("q")])
+    #expect(events == [KeyPress(.character("q"))])
   }
 
   @Test("input reader routes style control messages without leaking them as key input")
@@ -99,7 +99,7 @@ struct InputReaderControlMessageTests {
     )
 
     let eventsTask = Task {
-      var events: [KeyEvent] = []
+      var events: [KeyPress] = []
       for await event in inputReader.events() {
         events.append(event)
       }
@@ -142,7 +142,7 @@ struct InputReaderControlMessageTests {
     didCloseReadDescriptor = true
 
     #expect(receivedMessages.withLock { $0 } == [.style(style)])
-    #expect(events == [.character("q")])
+    #expect(events == [KeyPress(.character("q"))])
   }
 }
 

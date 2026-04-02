@@ -122,10 +122,6 @@ private struct PrototypeCommandRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 1) {
           Text(command.title)
           Spacer()
-          if let shortcut = command.shortcut, !shortcut.isEmpty {
-            Text(shortcut)
-              .foregroundStyle(.separator)
-          }
         }
 
         if let detail = command.detail, !detail.isEmpty {

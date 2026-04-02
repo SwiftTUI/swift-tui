@@ -77,15 +77,13 @@ struct PrototypeUIComponentsTests {
             id: "open-file",
             title: "Open file",
             detail: "Browse local files",
-            keywords: ["files", "picker"],
-            shortcut: "o"
+            keywords: ["files", "picker"]
           ),
           PrototypeCommand(
             id: "quit",
             title: "Quit",
             detail: "Close the app",
-            keywords: ["exit", "close"],
-            shortcut: "q"
+            keywords: ["exit", "close"]
           ),
         ]
       )
@@ -103,8 +101,7 @@ struct PrototypeUIComponentsTests {
             id: "open-file",
             title: "Open file",
             detail: "Browse local files",
-            keywords: ["files", "picker"],
-            shortcut: "o"
+            keywords: ["files", "picker"]
           )
         ],
         emptyState: "No commands found"

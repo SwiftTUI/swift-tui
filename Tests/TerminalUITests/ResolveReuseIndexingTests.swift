@@ -172,8 +172,8 @@ struct ResolveReuseIndexingTests {
 
     #expect(updated.diagnostics.resolvedNodesReused > 0)
     #expect(hotkeyRegistry.registeredBindings().count == 2)
-    #expect(hotkeyRegistry.dispatch(LocalKeyPress(.character("a"))))
-    #expect(hotkeyRegistry.dispatch(LocalKeyPress(.character("b"))))
+    #expect(hotkeyRegistry.dispatch(KeyPress(.character("a"))))
+    #expect(hotkeyRegistry.dispatch(KeyPress(.character("b"))))
     #expect(box.alpha == 1)
     #expect(box.beta == 1)
   }

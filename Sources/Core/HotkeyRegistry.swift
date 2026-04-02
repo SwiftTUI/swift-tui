@@ -1,12 +1,12 @@
 /// A registered hotkey binding with metadata for help display.
 package struct HotkeyBinding: Equatable, Sendable {
-  package var key: LocalKeyPress
+  package var key: KeyPress
   package var label: String
   package var group: String?
   package var commandID: String?
 
   package init(
-    key: LocalKeyPress,
+    key: KeyPress,
     label: String = "",
     group: String? = nil,
     commandID: String? = nil
@@ -18,7 +18,7 @@ package struct HotkeyBinding: Equatable, Sendable {
   }
 }
 
-package typealias HotkeyHandler = @MainActor (LocalKeyPress) -> Bool
+package typealias HotkeyHandler = @MainActor (KeyPress) -> Bool
 
 /// A retained hotkey registration tied to the subtree that authored it.
 package struct HotkeyRegistrationSnapshot {
@@ -72,7 +72,7 @@ package final class HotkeyRegistry: Equatable {
   /// Dispatches a key press to all registered handlers. Returns `true` if
   /// any handler consumed the event.
   @discardableResult
-  package func dispatch(_ keyPress: LocalKeyPress) -> Bool {
+  package func dispatch(_ keyPress: KeyPress) -> Bool {
     for entry in entries {
       if entry.handler(keyPress) {
         return true

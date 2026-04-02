@@ -15,41 +15,40 @@ public struct EventModifiers: OptionSet, Equatable, Hashable, Sendable {
   }
 
   public static let shift = Self(rawValue: 1 << 0)
-  public static let option = Self(rawValue: 1 << 1)
-  public static let control = Self(rawValue: 1 << 2)
+  public static let alt = Self(rawValue: 1 << 1)
+  public static let ctrl = Self(rawValue: 1 << 2)
 }
 
-/// A key identity paired with modifier flags, used internally by the view layer.
 /// A key identity paired with modifier flags.
-public struct LocalKeyPress: Equatable, Hashable, Sendable {
-  public var key: LocalKeyEvent
+public struct KeyPress: Equatable, Hashable, Sendable {
+  public var key: KeyEvent
   public var modifiers: EventModifiers
 
-  public init(_ key: LocalKeyEvent, modifiers: EventModifiers = []) {
+  public init(_ key: KeyEvent, modifiers: EventModifiers = []) {
     self.key = key
     self.modifiers = modifiers
   }
 }
 
-public enum LocalKeyEvent: Equatable, Hashable, Sendable {
+public enum KeyEvent: Equatable, Hashable, Sendable {
   case character(Character)
-  case enter
+  case `return`
   case space
   case tab
-  case shiftTab
   case arrowLeft
   case arrowRight
   case arrowUp
   case arrowDown
   case backspace
   case escape
-  case ctrlC
+  case home
+  case end
 }
 
 @MainActor
 package final class LocalKeyHandlerRegistry: Equatable {
-  package typealias Handler = @MainActor (LocalKeyEvent) -> Bool
-  package typealias KeyPressHandler = @MainActor (LocalKeyPress) -> Bool
+  package typealias Handler = @MainActor (KeyEvent) -> Bool
+  package typealias KeyPressHandler = @MainActor (KeyPress) -> Bool
 
   private var handlers: [Identity: Handler] = [:]
   private var keyPressHandlers: [Identity: KeyPressHandler] = [:]
@@ -79,7 +78,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
   @discardableResult
   package func dispatch(
     identity: Identity,
-    event: LocalKeyEvent
+    event: KeyEvent
   ) -> Bool {
     handlers[identity]?(event) ?? false
   }
@@ -87,7 +86,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
   @discardableResult
   package func dispatch(
     identity: Identity,
-    keyPress: LocalKeyPress
+    keyPress: KeyPress
   ) -> Bool {
     if let handler = keyPressHandlers[identity], handler(keyPress) {
       return true

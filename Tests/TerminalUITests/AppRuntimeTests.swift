@@ -50,7 +50,7 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.ActionWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.enter, .character("q")]),
+      inputReader: ScriptedInputReader(events: [.return, .character("q")]),
       signalReader: EmptySignalReader()
     )
 
@@ -127,10 +127,10 @@ struct AppRuntimeTests {
       terminalHost: terminal,
       inputReader: ScriptedInputReader(
         events: [
-          .enter,
-          .character("H"),
-          .character("i"),
-          .ctrlC,
+          KeyPress(.return),
+          KeyPress(.character("H")),
+          KeyPress(.character("i")),
+          KeyPress(.character("c"), modifiers: .ctrl),
         ]
       ),
       signalReader: EmptySignalReader()
@@ -157,11 +157,11 @@ struct AppRuntimeTests {
       terminalHost: terminal,
       inputReader: ScriptedInputReader(
         events: [
-          .character("H"),
-          .character("i"),
-          .enter,
-          .character("!"),
-          .ctrlC,
+          KeyPress(.character("H")),
+          KeyPress(.character("i")),
+          KeyPress(.return),
+          KeyPress(.character("!")),
+          KeyPress(.character("c"), modifiers: .ctrl),
         ]
       ),
       signalReader: EmptySignalReader()
@@ -187,7 +187,7 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.AlertWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.enter, .character("q")]),
+      inputReader: ScriptedInputReader(events: [.return, .character("q")]),
       signalReader: EmptySignalReader()
     )
 
@@ -239,7 +239,7 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.DisappearingFocusWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.tab, .enter, .character("q")]),
+      inputReader: ScriptedInputReader(events: [.tab, .return, .character("q")]),
       signalReader: EmptySignalReader()
     )
 
@@ -893,13 +893,17 @@ private final class RecordingTerminalHost: TerminalHosting {
 }
 
 private final class ScriptedInputReader: InputReading {
-  private let scriptedEvents: [KeyEvent]
+  private let scriptedEvents: [KeyPress]
 
-  init(events: [KeyEvent]) {
+  init(events: [KeyPress]) {
     scriptedEvents = events
   }
 
-  func events() -> AsyncStream<KeyEvent> {
+  convenience init(events: [KeyEvent]) {
+    self.init(events: events.map { KeyPress($0) })
+  }
+
+  func events() -> AsyncStream<KeyPress> {
     AsyncStream { continuation in
       for event in scriptedEvents {
         continuation.yield(event)

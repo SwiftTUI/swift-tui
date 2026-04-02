@@ -125,4 +125,28 @@ struct PresentationSurfaceTests {
     #expect(surface.contains("Archive"))
     #expect(surface.contains("█") || surface.contains("▼"))
   }
+
+  @Test("toast renders in the bottom-left corner by default")
+  func toastRendersInBottomLeftCorner() {
+    let artifacts = DefaultRenderer().render(
+      Text("Workspace")
+        .toast(
+          "Action performed",
+          isPresented: .constant(true),
+          style: .success
+        )
+        .frame(width: 24, height: 8, alignment: .topLeading),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 24, height: 8)
+    )
+
+    let lines = artifacts.rasterSurface.lines
+    let messageIndex = try! #require(
+      lines.firstIndex(where: { $0.contains("Action performed") })
+    )
+    let messageLine = lines[messageIndex]
+
+    #expect(messageIndex >= 3)
+    #expect(messageLine.first != " ")
+  }
 }

@@ -11,13 +11,13 @@ extension View {
   ///
   /// ```swift
   /// VStack { ... }
-  ///   .onKeyPress(.character("s"), modifiers: .control) {
+  ///   .onKeyPress(.character("s"), modifiers: .ctrl) {
   ///     save()
   ///     return .handled
   ///   }
   /// ```
   public func onKeyPress(
-    _ key: LocalKeyEvent,
+    _ key: KeyEvent,
     modifiers: EventModifiers = [],
     action: @escaping @MainActor @Sendable () -> KeyPressResult
   ) -> some View {
@@ -31,7 +31,7 @@ extension View {
 
   /// Handles any key press event on this view, regardless of focus.
   ///
-  /// The handler receives the full ``LocalKeyPress`` and returns a
+  /// The handler receives the full ``KeyPress`` and returns a
   /// ``KeyPressResult`` to indicate whether the event was consumed.
   ///
   /// ```swift
@@ -45,7 +45,7 @@ extension View {
   ///   }
   /// ```
   public func onKeyPress(
-    action: @escaping @MainActor @Sendable (LocalKeyPress) -> KeyPressResult
+    action: @escaping @MainActor @Sendable (KeyPress) -> KeyPressResult
   ) -> some View {
     OnKeyPressModifier(
       content: self,
@@ -60,16 +60,16 @@ extension View {
 
 private struct OnKeyPressModifier<Content: View>: View, ResolvableView {
   var content: Content
-  var expectedKey: LocalKeyEvent?
+  var expectedKey: KeyEvent?
   var expectedModifiers: EventModifiers
-  let action: @MainActor @Sendable (LocalKeyPress) -> KeyPressResult
+  let action: @MainActor @Sendable (KeyPress) -> KeyPressResult
   private let authoringScope: DynamicPropertyScope?
 
   init(
     content: Content,
-    expectedKey: LocalKeyEvent?,
+    expectedKey: KeyEvent?,
     expectedModifiers: EventModifiers,
-    action: @escaping @MainActor @Sendable (LocalKeyPress) -> KeyPressResult
+    action: @escaping @MainActor @Sendable (KeyPress) -> KeyPressResult
   ) {
     self.content = content
     self.expectedKey = expectedKey
@@ -86,7 +86,7 @@ private struct OnKeyPressModifier<Content: View>: View, ResolvableView {
     let matchModifiers = expectedModifiers
 
     let binding = HotkeyBinding(
-      key: LocalKeyPress(matchKey ?? .escape, modifiers: matchModifiers)
+      key: KeyPress(matchKey ?? .escape, modifiers: matchModifiers)
     )
 
     context.hotkeyRegistry?.register(identity: context.identity, binding: binding) { localKeyPress in

@@ -41,7 +41,7 @@ struct TextEditorSurfaceTests {
     #expect(focusedSurface.contains("Line 2"))
     #expect(focusedSurface.contains("Line 3"))
 
-    #expect(registry.dispatch(identity: identity, event: .enter))
+    #expect(registry.dispatch(identity: identity, event: .return))
     #expect(registry.dispatch(identity: identity, event: .character("A")))
     #expect(registry.dispatch(identity: identity, event: .backspace))
     #expect(box.value == "Line 1\nLine 2\nLine 3\nLine 4\n")

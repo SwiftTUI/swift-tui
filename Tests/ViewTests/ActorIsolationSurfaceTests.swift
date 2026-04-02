@@ -120,7 +120,7 @@ struct ActorIsolationSurfaceTests {
     }
 
     final class SurfaceInputReader: InputReading {
-      func events() -> AsyncStream<KeyEvent> {
+      func events() -> AsyncStream<KeyPress> {
         AsyncStream { continuation in
           continuation.finish()
         }

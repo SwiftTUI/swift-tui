@@ -11,13 +11,13 @@ struct HotkeyRegistryTests {
     var called = false
 
     registry.register(
-      binding: HotkeyBinding(key: LocalKeyPress(.character("s"), modifiers: .control))
+      binding: HotkeyBinding(key: KeyPress(.character("s"), modifiers: .ctrl))
     ) { _ in
       called = true
       return true
     }
 
-    let handled = registry.dispatch(LocalKeyPress(.character("s"), modifiers: .control))
+    let handled = registry.dispatch(KeyPress(.character("s"), modifiers: .ctrl))
     #expect(handled)
     #expect(called)
   }
@@ -27,12 +27,12 @@ struct HotkeyRegistryTests {
     let registry = HotkeyRegistry()
 
     registry.register(
-      binding: HotkeyBinding(key: LocalKeyPress(.character("s"), modifiers: .control))
+      binding: HotkeyBinding(key: KeyPress(.character("s"), modifiers: .ctrl))
     ) { keyPress in
-      keyPress.key == .character("s") && keyPress.modifiers == .control
+      keyPress.key == .character("s") && keyPress.modifiers == .ctrl
     }
 
-    let handled = registry.dispatch(LocalKeyPress(.character("x")))
+    let handled = registry.dispatch(KeyPress(.character("x")))
     #expect(!handled)
   }
 
@@ -43,20 +43,20 @@ struct HotkeyRegistryTests {
     var secondCalled = false
 
     registry.register(
-      binding: HotkeyBinding(key: LocalKeyPress(.character("q")))
+      binding: HotkeyBinding(key: KeyPress(.character("q")))
     ) { _ in
       firstCalled = true
       return true
     }
 
     registry.register(
-      binding: HotkeyBinding(key: LocalKeyPress(.character("q")))
+      binding: HotkeyBinding(key: KeyPress(.character("q")))
     ) { _ in
       secondCalled = true
       return true
     }
 
-    let handled = registry.dispatch(LocalKeyPress(.character("q")))
+    let handled = registry.dispatch(KeyPress(.character("q")))
     #expect(handled)
     #expect(firstCalled)
     #expect(!secondCalled)
@@ -68,19 +68,19 @@ struct HotkeyRegistryTests {
     var secondCalled = false
 
     registry.register(
-      binding: HotkeyBinding(key: LocalKeyPress(.character("q")))
+      binding: HotkeyBinding(key: KeyPress(.character("q")))
     ) { _ in
       false
     }
 
     registry.register(
-      binding: HotkeyBinding(key: LocalKeyPress(.character("q")))
+      binding: HotkeyBinding(key: KeyPress(.character("q")))
     ) { _ in
       secondCalled = true
       return true
     }
 
-    let handled = registry.dispatch(LocalKeyPress(.character("q")))
+    let handled = registry.dispatch(KeyPress(.character("q")))
     #expect(handled)
     #expect(secondCalled)
   }
@@ -90,13 +90,13 @@ struct HotkeyRegistryTests {
     let registry = HotkeyRegistry()
 
     registry.register(
-      binding: HotkeyBinding(key: LocalKeyPress(.character("q")))
+      binding: HotkeyBinding(key: KeyPress(.character("q")))
     ) { _ in
       true
     }
 
     registry.reset()
-    let handled = registry.dispatch(LocalKeyPress(.character("q")))
+    let handled = registry.dispatch(KeyPress(.character("q")))
     #expect(!handled)
   }
 
@@ -105,11 +105,11 @@ struct HotkeyRegistryTests {
     let registry = HotkeyRegistry()
 
     registry.register(
-      binding: HotkeyBinding(key: LocalKeyPress(.character("s"), modifiers: .control), label: "Save")
+      binding: HotkeyBinding(key: KeyPress(.character("s"), modifiers: .ctrl), label: "Save")
     ) { _ in true }
 
     registry.register(
-      binding: HotkeyBinding(key: LocalKeyPress(.character("q")), label: "Quit")
+      binding: HotkeyBinding(key: KeyPress(.character("q")), label: "Quit")
     ) { _ in true }
 
     let bindings = registry.registeredBindings()
@@ -124,7 +124,7 @@ struct HotkeyRegistryTests {
     var called = false
 
     registry.register(
-      binding: HotkeyBinding(key: LocalKeyPress(.character("s"), modifiers: .control))
+      binding: HotkeyBinding(key: KeyPress(.character("s"), modifiers: .ctrl))
     ) { _ in
       called = true
       return true
@@ -132,10 +132,10 @@ struct HotkeyRegistryTests {
 
     let snapshot = registry.snapshot()
     registry.reset()
-    #expect(!registry.dispatch(LocalKeyPress(.character("s"), modifiers: .control)))
+    #expect(!registry.dispatch(KeyPress(.character("s"), modifiers: .ctrl)))
 
     registry.restore(snapshot)
-    let handled = registry.dispatch(LocalKeyPress(.character("s"), modifiers: .control))
+    let handled = registry.dispatch(KeyPress(.character("s"), modifiers: .ctrl))
     #expect(handled)
     #expect(called)
   }

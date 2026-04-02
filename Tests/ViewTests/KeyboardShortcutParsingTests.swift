@@ -1,112 +1,55 @@
 import Testing
 
 @testable import Core
+@testable import TerminalUI
 @testable import View
 
 @MainActor
 @Suite
-struct KeyboardShortcutParsingTests {
-  @Test("parses single character shortcut")
-  func singleCharacter() {
-    let result = parseShortcutKey("q")
-    #expect(result == LocalKeyPress(.character("q")))
+struct KeyboardShortcutFormattingTests {
+  @Test("formats typed shortcut keys canonically")
+  func formatsTypedShortcutKeys() {
+    #expect(formattedKeyboardShortcutKey(.character("q")) == "q")
+    #expect(formattedKeyboardShortcutKey(.character("S"), modifiers: .ctrl) == "Ctrl+S")
+    #expect(formattedKeyboardShortcutKey(.tab, modifiers: .shift) == "Shift+Tab")
+    #expect(formattedKeyboardShortcutKey(.space, modifiers: .alt) == "Alt+Space")
+    #expect(formattedKeyboardShortcutKey(.return) == "Return")
+    #expect(formattedKeyboardShortcutKey(.escape) == "Escape")
+    #expect(formattedKeyboardShortcutKey(.arrowUp, modifiers: [.ctrl, .shift]) == "Ctrl+Shift+Up")
+    #expect(formattedKeyboardShortcutKey(.home) == "Home")
+    #expect(formattedKeyboardShortcutKey(.end) == "End")
   }
 
-  @Test("parses single special character")
-  func specialCharacter() {
-    let result = parseShortcutKey("?")
-    #expect(result == LocalKeyPress(.character("?")))
-  }
+  @Test("help surface renders typed shortcuts")
+  func helpSurfaceRendersTypedShortcuts() {
+    let surface = renderedText(
+      KeyboardShortcutHelpView(
+        shortcuts: [
+          KeyboardShortcut(.character("S"), modifiers: .ctrl, label: "Save", group: "File"),
+          KeyboardShortcut(.return, label: "Open", group: "File"),
+          KeyboardShortcut(.tab, modifiers: .shift, label: "Back", group: "Navigate"),
+        ]
+      )
+    )
 
-  @Test("parses Ctrl+letter")
-  func ctrlLetter() {
-    let result = parseShortcutKey("Ctrl+S")
-    #expect(result == LocalKeyPress(.character("S"), modifiers: .control))
+    #expect(surface.contains("File"))
+    #expect(surface.contains("[Ctrl+S]"))
+    #expect(surface.contains("Save"))
+    #expect(surface.contains("[Return]"))
+    #expect(surface.contains("Open"))
+    #expect(surface.contains("Navigate"))
+    #expect(surface.contains("[Shift+Tab]"))
+    #expect(surface.contains("Back"))
   }
+}
 
-  @Test("parses ctrl+letter case-insensitive modifier")
-  func ctrlLetterLowercase() {
-    let result = parseShortcutKey("ctrl+s")
-    #expect(result == LocalKeyPress(.character("s"), modifiers: .control))
-  }
-
-  @Test("parses Alt+letter")
-  func altLetter() {
-    let result = parseShortcutKey("Alt+X")
-    #expect(result == LocalKeyPress(.character("X"), modifiers: .option))
-  }
-
-  @Test("parses Option+letter")
-  func optionLetter() {
-    let result = parseShortcutKey("Option+X")
-    #expect(result == LocalKeyPress(.character("X"), modifiers: .option))
-  }
-
-  @Test("parses Shift+Tab")
-  func shiftTab() {
-    let result = parseShortcutKey("Shift+Tab")
-    #expect(result == LocalKeyPress(.tab, modifiers: .shift))
-  }
-
-  @Test("parses Ctrl+Shift+A")
-  func ctrlShiftA() {
-    let result = parseShortcutKey("Ctrl+Shift+A")
-    #expect(result == LocalKeyPress(.character("A"), modifiers: [.control, .shift]))
-  }
-
-  @Test("parses Enter key name")
-  func enterKey() {
-    let result = parseShortcutKey("Enter")
-    #expect(result == LocalKeyPress(.enter))
-  }
-
-  @Test("parses Escape key name")
-  func escapeKey() {
-    let result = parseShortcutKey("Escape")
-    #expect(result == LocalKeyPress(.escape))
-  }
-
-  @Test("parses Space key name")
-  func spaceKey() {
-    let result = parseShortcutKey("Space")
-    #expect(result == LocalKeyPress(.space))
-  }
-
-  @Test("parses Backspace key name")
-  func backspaceKey() {
-    let result = parseShortcutKey("Backspace")
-    #expect(result == LocalKeyPress(.backspace))
-  }
-
-  @Test("parses arrow key names")
-  func arrowKeys() {
-    #expect(parseShortcutKey("Up") == LocalKeyPress(.arrowUp))
-    #expect(parseShortcutKey("Down") == LocalKeyPress(.arrowDown))
-    #expect(parseShortcutKey("Left") == LocalKeyPress(.arrowLeft))
-    #expect(parseShortcutKey("Right") == LocalKeyPress(.arrowRight))
-  }
-
-  @Test("parses Ctrl+Up arrow")
-  func ctrlArrow() {
-    let result = parseShortcutKey("Ctrl+Up")
-    #expect(result == LocalKeyPress(.arrowUp, modifiers: .control))
-  }
-
-  @Test("returns nil for empty string")
-  func emptyString() {
-    let result = parseShortcutKey("")
-    #expect(result == nil)
-  }
-
-  @Test("returns nil for modifiers only")
-  func modifiersOnly() {
-    let result = parseShortcutKey("Ctrl+Shift")
-    #expect(result == nil)
-  }
-
-  @Test("returns nil for unknown key name")
-  func unknownKey() {
-    let result = parseShortcutKey("Ctrl+FooBar")
-    #expect(result == nil)
-  }
+@MainActor
+private func renderedText<V: View>(
+  _ view: V
+) -> String {
+  let artifacts = DefaultRenderer().render(
+    view,
+    context: .init(identity: .init(components: ["KeyboardShortcutTests"]))
+  )
+  return artifacts.rasterSurface.lines.joined(separator: "\n")
 }

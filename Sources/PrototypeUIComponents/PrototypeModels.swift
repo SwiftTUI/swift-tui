@@ -78,7 +78,6 @@ public struct PrototypeCommand: Hashable, Sendable, Identifiable {
   public var title: String
   public var detail: String?
   public var keywords: [String]
-  public var shortcut: String?
   public var kind: Kind
   public var isDisabled: Bool
 
@@ -87,7 +86,6 @@ public struct PrototypeCommand: Hashable, Sendable, Identifiable {
     title: String,
     detail: String? = nil,
     keywords: [String] = [],
-    shortcut: String? = nil,
     kind: Kind = .action,
     isDisabled: Bool = false
   ) {
@@ -95,7 +93,6 @@ public struct PrototypeCommand: Hashable, Sendable, Identifiable {
     self.title = title
     self.detail = detail
     self.keywords = keywords
-    self.shortcut = shortcut
     self.kind = kind
     self.isDisabled = isDisabled
   }
@@ -163,13 +160,11 @@ extension PrototypeCommand {
   ) -> Int {
     let normalizedTitle = title.lowercased()
     let normalizedDetail = detail?.lowercased() ?? ""
-    let normalizedShortcut = shortcut?.lowercased() ?? ""
     let normalizedKeywords = keywords.map { $0.lowercased() }
     let searchable = [
       id.lowercased(),
       normalizedTitle,
       normalizedDetail,
-      normalizedShortcut,
       normalizedKeywords.joined(separator: " "),
     ].joined(separator: " ")
 
@@ -187,12 +182,6 @@ extension PrototypeCommand {
     }
     if normalizedTitle.contains(query) {
       score += 500
-    }
-    if normalizedShortcut == query {
-      score += 300
-    }
-    if normalizedShortcut.hasPrefix(query) {
-      score += 200
     }
     if normalizedKeywords.contains(where: { $0 == query }) {
       score += 150
@@ -218,9 +207,6 @@ extension PrototypeCommand {
 
       if normalizedDetail.contains(token) {
         score += 6
-      }
-      if normalizedShortcut.contains(token) {
-        score += 8
       }
       if normalizedKeywords.contains(where: { $0.contains(token) }) {
         score += 5

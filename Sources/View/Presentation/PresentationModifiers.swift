@@ -658,14 +658,14 @@ private struct ToastOverlayHost: View {
   var requests: [ToastRequest]
 
   var body: some View {
-    VStack(alignment: .trailing, spacing: 0) {
+    VStack(alignment: .leading, spacing: 0) {
       Spacer(minLength: 0)
       ForEach(requests.indices, id: \.self) { index in
         ToastSurface(request: requests[index])
       }
     }
     .padding(.bottom, 1)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     .allowsHitTesting(false)
   }
 }

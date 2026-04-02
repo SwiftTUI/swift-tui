@@ -9,7 +9,7 @@ package typealias ErasedStateBodyBuilder<State: Equatable & Sendable> =
 
 /// Handles a key event and may mutate run-loop state.
 public typealias StateKeyHandler<State: Equatable & Sendable> =
-  (_ keyEvent: KeyEvent, _ focusedIdentity: Identity?, _ stateContainer: StateContainer<State>) ->
+  (_ keyPress: KeyPress, _ focusedIdentity: Identity?, _ stateContainer: StateContainer<State>) ->
   KeyHandlingResult
 
 /// The result of low-level key handling inside a ``RunLoop``.
@@ -323,8 +323,8 @@ private final class KeyboardInputAdapter: TerminalInputReading {
     AsyncStream { continuation in
       let keyEvents = self.inputReader.events()
       let task = Task {
-        for await event in keyEvents {
-          continuation.yield(.key(KeyPress(event)))
+        for await keyPress in keyEvents {
+          continuation.yield(.key(keyPress))
         }
         continuation.finish()
       }

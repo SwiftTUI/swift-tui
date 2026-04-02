@@ -794,10 +794,10 @@ struct Phase4ObservationAndEnvironmentTests {
       terminalHost: terminal,
       inputReader: Phase4ScriptedInputReader(
         events: [
-          .enter,
-          .character("H"),
-          .character("i"),
-          .ctrlC,
+          KeyPress(.return),
+          KeyPress(.character("H")),
+          KeyPress(.character("i")),
+          KeyPress(.character("c"), modifiers: .ctrl),
         ]
       ),
       signalReader: Phase4EmptySignalReader()
@@ -872,7 +872,7 @@ struct Phase4ObservationAndEnvironmentTests {
       terminalHost: terminal,
       inputReader: Phase4ScriptedInputReader(
         events: [
-          .enter,
+          .return,
           .character("q"),
         ]
       ),
@@ -1524,13 +1524,17 @@ private final class Phase4MutableAppearanceTerminalHost: TerminalHosting {
 }
 
 private final class Phase4ScriptedInputReader: InputReading {
-  private let scriptedEvents: [KeyEvent]
+  private let scriptedEvents: [KeyPress]
 
-  init(events: [KeyEvent]) {
+  init(events: [KeyPress]) {
     scriptedEvents = events
   }
 
-  func events() -> AsyncStream<KeyEvent> {
+  convenience init(events: [KeyEvent]) {
+    self.init(events: events.map { KeyPress($0) })
+  }
+
+  func events() -> AsyncStream<KeyPress> {
     AsyncStream { continuation in
       for event in scriptedEvents {
         continuation.yield(event)

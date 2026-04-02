@@ -48,33 +48,6 @@ import Core
   }
 #endif
 
-/// A normalized keyboard event emitted by the terminal input parser.
-public enum KeyEvent: Equatable, Hashable, Sendable {
-  case character(Character)
-  case enter
-  case space
-  case tab
-  case shiftTab
-  case arrowLeft
-  case arrowRight
-  case arrowUp
-  case arrowDown
-  case backspace
-  case escape
-  case ctrlC
-}
-
-/// A keyboard event paired with modifier flags.
-public struct KeyPress: Equatable, Hashable, Sendable {
-  public var key: KeyEvent
-  public var modifiers: EventModifiers
-
-  public init(_ key: KeyEvent, modifiers: EventModifiers = []) {
-    self.key = key
-    self.modifiers = modifiers
-  }
-}
-
 /// A mouse button recognized by the input parser.
 public enum MouseButton: Equatable, Sendable {
   case primary
@@ -116,9 +89,12 @@ public enum InputEvent: Equatable, Sendable {
   case key(KeyPress)
   case mouse(MouseEvent)
 
-  /// Convenience for creating a key event without modifiers.
-  public static func key(_ keyEvent: KeyEvent) -> Self {
-    .key(KeyPress(keyEvent))
+  /// Convenience for creating a key event with optional modifiers.
+  public static func key(
+    _ keyEvent: KeyEvent,
+    modifiers: EventModifiers = []
+  ) -> Self {
+    .key(KeyPress(keyEvent, modifiers: modifiers))
   }
 }
 
@@ -174,7 +150,7 @@ enum InputReaderTiming {
 
 /// Produces keyboard events from an input source.
 public protocol InputReading: AnyObject {
-  func events() -> AsyncStream<KeyEvent>
+  func events() -> AsyncStream<KeyPress>
 }
 
 /// Produces keyboard and mouse events from an input source.
@@ -208,12 +184,12 @@ public struct KeyParser: Sendable {
   public init() {}
 
   /// Feeds raw bytes into the parser and returns only keyboard events.
-  public mutating func feed(_ bytes: [UInt8]) -> [KeyEvent] {
+  public mutating func feed(_ bytes: [UInt8]) -> [KeyPress] {
     parser.feed(bytes).compactMap {
       guard case .key(let keyPress) = $0 else {
         return nil
       }
-      return keyPress.key
+      return keyPress
     }
   }
 }
@@ -226,13 +202,13 @@ extension TerminalInputParser {
 
     switch firstByte {
     case 0x01...0x02, 0x04...0x08, 0x0B...0x0C, 0x0E...0x1A:
-      // Ctrl+A through Ctrl+Z (excluding 0x03=ctrlC, 0x09=tab, 0x0A/0x0D=enter)
+      // Ctrl+A through Ctrl+Z (excluding 0x03=Ctrl+C, 0x09=Tab, 0x0A/0x0D=Return)
       bufferedBytes.removeFirst()
       let letter = Character(UnicodeScalar(Int(firstByte) + 0x60)!)
-      return .key(KeyPress(.character(letter), modifiers: .control))
+      return .key(KeyPress(.character(letter), modifiers: .ctrl))
     case 0x03:
       bufferedBytes.removeFirst()
-      return .key(KeyPress(.ctrlC, modifiers: .control))
+      return .key(KeyPress(.character("c"), modifiers: .ctrl))
     case 0x08, 0x7F:
       bufferedBytes.removeFirst()
       return .key(KeyPress(.backspace))
@@ -241,7 +217,7 @@ extension TerminalInputParser {
       return .key(KeyPress(.tab))
     case 0x0A, 0x0D:
       bufferedBytes.removeFirst()
-      return .key(KeyPress(.enter))
+      return .key(KeyPress(.return))
     case 0x1B:
       return parseEscapeSequence()
     case 0x20:
@@ -275,7 +251,7 @@ extension TerminalInputParser {
         default:
           key = .character(character)
         }
-        return .key(KeyPress(key, modifiers: .option))
+        return .key(KeyPress(key, modifiers: .alt))
       }
       bufferedBytes.removeFirst()
       return .key(KeyPress(.escape))
@@ -307,9 +283,15 @@ extension TerminalInputParser {
     case 0x44:
       bufferedBytes.removeFirst(3)
       return .key(KeyPress(.arrowLeft))
+    case 0x48:
+      bufferedBytes.removeFirst(3)
+      return .key(KeyPress(.home))
+    case 0x46:
+      bufferedBytes.removeFirst(3)
+      return .key(KeyPress(.end))
     case 0x5A:
       bufferedBytes.removeFirst(3)
-      return .key(KeyPress(.shiftTab, modifiers: .shift))
+      return .key(KeyPress(.tab, modifiers: .shift))
     default:
       bufferedBytes.removeFirst(3)
       return .key(KeyPress(.escape))
@@ -364,10 +346,10 @@ extension TerminalInputParser {
       modifiers.insert(.shift)
     }
     if (bitmask & 2) != 0 {
-      modifiers.insert(.option)
+      modifiers.insert(.alt)
     }
     if (bitmask & 4) != 0 {
-      modifiers.insert(.control)
+      modifiers.insert(.ctrl)
     }
     return modifiers
   }
@@ -378,8 +360,8 @@ extension TerminalInputParser {
     case 0x42: return .arrowDown
     case 0x43: return .arrowRight
     case 0x44: return .arrowLeft
-    case 0x48: return .enter  // Home key mapped to enter
-    case 0x46: return .escape  // End key mapped to escape
+    case 0x48: return .home
+    case 0x46: return .end
     default: return nil
     }
   }
@@ -534,10 +516,10 @@ extension TerminalInputParser {
       modifiers.insert(.shift)
     }
     if (encodedButton & 8) != 0 {
-      modifiers.insert(.option)
+      modifiers.insert(.alt)
     }
     if (encodedButton & 16) != 0 {
-      modifiers.insert(.control)
+      modifiers.insert(.ctrl)
     }
     return modifiers
   }
@@ -558,13 +540,13 @@ public final class InputReader: InputReading, TerminalInputReading {
   }
 
   /// Reads keyboard-only events.
-  public func events() -> AsyncStream<KeyEvent> {
+  public func events() -> AsyncStream<KeyPress> {
     makeEventStream { parser, input in
       parser.feed(input).compactMap {
         guard case .key(let keyPress) = $0 else {
           return nil
         }
-        return keyPress.key
+        return keyPress
       }
     }
   }

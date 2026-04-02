@@ -78,15 +78,18 @@ public struct GalleryDemoSceneView: View {
         keywords: ["reset", "restore", "defaults"],
         kind: .destructive
       )
-      .keyboardShortcut("tab", label: "move focus", group: "Navigate")
-      .keyboardShortcut("arrows", label: "move selection", group: "Navigate")
-      .keyboardShortcut("enter", label: "activate", group: "Act")
-      .keyboardShortcut("q", label: "quit", group: "Act")
+      .keyboardShortcut(.tab, label: "move focus", group: "Navigate")
+      .keyboardShortcut(.return, label: "activate", group: "Act")
+      .keyboardShortcut(.character("q"), label: "quit", group: "Act")
       Divider()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .keyboardShortcutHelp(position: .bottomLeading)
-    .commandPalette(isPresented: $model.isPalettePresented, onExecute: runPaletteCommand)
+    .commandPalette(
+      isPresented: $model.isPalettePresented,
+      shortcut: .character("/"),
+      onExecute: runPaletteCommand
+    )
     .toast("Action performed", isPresented: $isToastPresented, style: .success)
     .alert(
       "Reset gallery state?",

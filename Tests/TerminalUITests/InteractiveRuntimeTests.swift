@@ -106,8 +106,8 @@ struct InteractiveRuntimeTests {
       .resolve(in: context)
 
     #expect(hotkeyRegistry.registeredBindings().count == 1)
-    #expect(hotkeyRegistry.dispatch(LocalKeyPress(.character("x"))))
-    #expect(recorder.presses == [LocalKeyPress(.character("x"))])
+    #expect(hotkeyRegistry.dispatch(KeyPress(.character("x"))))
+    #expect(recorder.presses == [KeyPress(.character("x"))])
   }
 
   @MainActor
@@ -169,7 +169,7 @@ struct InteractiveRuntimeTests {
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
 
     #expect(runLoop.hotkeyRegistry.registeredBindings().count == 1)
-    #expect(runLoop.hotkeyRegistry.dispatch(LocalKeyPress(.character("o"))))
+    #expect(runLoop.hotkeyRegistry.dispatch(KeyPress(.character("o"))))
 
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     let lastFrame = try #require(terminal.frames.last)
@@ -399,7 +399,7 @@ struct InteractiveRuntimeTests {
     var parser = KeyParser()
 
     #expect(parser.feed([0x1B, 0x5B]).isEmpty)
-    #expect(parser.feed([0x43]) == [.arrowRight])
+    #expect(parser.feed([0x43]) == [KeyPress(.arrowRight)])
 
     let remaining = parser.feed([
       0x1B, 0x5B, 0x41,
@@ -416,16 +416,16 @@ struct InteractiveRuntimeTests {
 
     #expect(
       remaining == [
-        .arrowUp,
-        .arrowDown,
-        .backspace,
-        .enter,
-        .tab,
-        .arrowLeft,
-        .shiftTab,
-        .space,
-        .character("q"),
-        .ctrlC,
+        KeyPress(.arrowUp),
+        KeyPress(.arrowDown),
+        KeyPress(.backspace),
+        KeyPress(.return),
+        KeyPress(.tab),
+        KeyPress(.arrowLeft),
+        KeyPress(.tab, modifiers: .shift),
+        KeyPress(.space),
+        KeyPress(.character("q")),
+        KeyPress(.character("c"), modifiers: .ctrl),
       ])
   }
 
@@ -450,7 +450,7 @@ struct InteractiveRuntimeTests {
           .init(
             kind: .down(.primary),
             location: .init(x: 9, y: 11),
-            modifiers: [.shift, .control]
+            modifiers: [.shift, .ctrl]
           )
         ),
         .key(.character("q")),
@@ -945,7 +945,7 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost()
     let result = try await makeRuntimeHarness(
       terminal: terminal,
-      events: [.tab, .tab, .tab, .tab, .arrowDown, .arrowDown, .arrowUp, .enter, .character("q")]
+      events: [.tab, .tab, .tab, .tab, .arrowDown, .arrowDown, .arrowUp, .return, .character("q")]
     )
 
     #expect(result.exitReason == .quitKey)
@@ -971,7 +971,7 @@ struct InteractiveRuntimeTests {
       terminal: terminal,
       events: [
         .tab, .tab, .tab, .tab, .tab, .backspace, .character("-"), .character("1"), .character("2"),
-        .enter, .character("q"),
+        .return, .character("q"),
       ]
     )
 
@@ -995,7 +995,7 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let result = try await runTerminalInputHarness(
       terminal: terminal,
-      events: [.key(.arrowDown), .key(.character("o")), .key(.enter)],
+      events: [.key(.arrowDown), .key(.character("o")), .key(.return)],
       rootIdentity: testIdentity("CommandPaletteHarness"),
       terminalSize: terminalSize
     ) {
@@ -1035,12 +1035,55 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("command palette executes closure-backed registered commands without visible controls")
+  func commandPaletteExecutesClosureBackedRegisteredCommands() async throws {
+    let terminalSize = Size(width: 40, height: 12)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [.key(.return)],
+      rootIdentity: testIdentity("CommandPaletteActionRegistrationHarness"),
+      terminalSize: terminalSize
+    ) {
+      CommandPaletteActionRegistrationHarnessView(terminalSize: terminalSize)
+    }
+
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(lastFrame.contains("History: background-action"))
+    #expect(lastFrame.contains("Palette: closed"))
+    #expect(lastFrame.contains("Workspace"))
+  }
+
+  @MainActor
+  @Test("command palette shortcut opens the palette and enter executes the selected command")
+  func commandPaletteShortcutOpensAndExecutes() async throws {
+    let terminalSize = Size(width: 40, height: 12)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [.key(.character("/")), .key(.return)],
+      rootIdentity: testIdentity("CommandPaletteShortcutHarness"),
+      terminalSize: terminalSize
+    ) {
+      CommandPaletteShortcutHarnessView(terminalSize: terminalSize)
+    }
+
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+    #expect(terminal.frames.contains(where: { $0.contains("Command Palette") }))
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(lastFrame.contains("History: background-action"))
+    #expect(lastFrame.contains("Palette: closed"))
+    #expect(lastFrame.contains("Workspace"))
+  }
+
+  @MainActor
   @Test("headless run loop toggles accent preview through the local binding action path")
   func headlessRunLoopTogglesAccentPreview() async throws {
     let terminal = RecordingTerminalHost()
     let result = try await makeRuntimeHarness(
       terminal: terminal,
-      events: [.tab, .tab, .enter, .character("q")]
+      events: [.tab, .tab, .return, .character("q")]
     )
 
     #expect(result.exitReason == .quitKey)
@@ -1063,13 +1106,13 @@ struct InteractiveRuntimeTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.enter, .character("q")]),
+      inputReader: ScriptedInputReader(events: [.return, .character("q")]),
       signalReader: EmptySignalReader(),
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
       focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
-      keyHandler: { keyEvent, _, stateContainer in
-        guard keyEvent == .enter else {
+      keyHandler: { keyPress, _, stateContainer in
+        guard keyPress == KeyPress(.return) else {
           return .ignored
         }
         _ = stateContainer.mutate { $0 += 1 }
@@ -1129,7 +1172,7 @@ struct InteractiveRuntimeTests {
     let result = try await runTerminalInputHarness(
       terminal: terminal,
       events: [
-        .key(.enter),
+        .key(.return),
         .key(.character("q")),
       ],
       rootIdentity: testIdentity("StandaloneLinkRuntime"),
@@ -1161,9 +1204,9 @@ struct InteractiveRuntimeTests {
     let result = try await runTerminalInputHarness(
       terminal: terminal,
       events: [
-        .key(.enter),
+        .key(.return),
         .key(.tab),
-        .key(.enter),
+        .key(.return),
         .key(.character("q")),
       ],
       rootIdentity: testIdentity("InlineLinkRuntime"),
@@ -1255,9 +1298,9 @@ struct InteractiveRuntimeTests {
     )
 
     #expect(actionRegistry.dispatch(identity: testIdentity("Root", "Harness[0]")))
-    #expect(keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), event: .enter))
+    #expect(keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), event: .return))
     #expect(recorder.actionCount == 1)
-    #expect(recorder.keyEvents == [.enter])
+    #expect(recorder.keyEvents == [.return])
 
     actionRegistry.reset()
     keyRegistry.reset()
@@ -1277,7 +1320,7 @@ struct InteractiveRuntimeTests {
     #expect(actionRegistry.dispatch(identity: testIdentity("Root", "Harness[0]")))
     #expect(keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), event: .space))
     #expect(recorder.actionCount == 2)
-    #expect(recorder.keyEvents == [.enter, .space])
+    #expect(recorder.keyEvents == [.return, .space])
   }
 
   @MainActor
@@ -1358,7 +1401,7 @@ struct InteractiveRuntimeTests {
       terminal: RecordingTerminalHost(),
       recorder: recorder,
       events: [
-        .init(delayNanoseconds: 50_000_000, value: .ctrlC)
+        .init(delayNanoseconds: 50_000_000, value: KeyPress(.character("c"), modifiers: .ctrl))
       ]
     )
 
@@ -1374,7 +1417,7 @@ struct InteractiveRuntimeTests {
     let result = try await makeLifecycleRuntimeHarness(
       terminal: RecordingTerminalHost(),
       recorder: recorder,
-      events: []
+      events: [] as [TimedRuntimeEvent<KeyPress>]
     )
 
     #expect(result.exitReason == .inputEnded)
@@ -1389,7 +1432,7 @@ struct InteractiveRuntimeTests {
     let result = try await makeLifecycleRuntimeHarness(
       terminal: RecordingTerminalHost(),
       recorder: recorder,
-      events: [],
+      events: [] as [TimedRuntimeEvent<KeyPress>],
       signals: [
         .init(delayNanoseconds: 50_000_000, value: "SIGTERM")
       ]
@@ -2380,7 +2423,7 @@ private struct RunLoopInvalidationProbeRoot: View, ResolvableView {
 private final class ReusedHandlerRecorder: @unchecked Sendable {
   private let lock = NSLock()
   private(set) var actionCount = 0
-  private(set) var keyEvents: [LocalKeyEvent] = []
+  private(set) var keyEvents: [KeyEvent] = []
 
   func recordAction() {
     lock.lock()
@@ -2388,7 +2431,7 @@ private final class ReusedHandlerRecorder: @unchecked Sendable {
     actionCount += 1
   }
 
-  func recordKey(_ event: LocalKeyEvent) {
+  func recordKey(_ event: KeyEvent) {
     lock.lock()
     defer { lock.unlock() }
     keyEvents.append(event)
@@ -2445,13 +2488,17 @@ private final class LinkOpenRecorder: @unchecked Sendable {
 }
 
 private final class ScriptedInputReader: InputReading {
-  private let scriptedEvents: [KeyEvent]
+  private let scriptedEvents: [KeyPress]
 
-  init(events: [KeyEvent]) {
+  init(events: [KeyPress]) {
     scriptedEvents = events
   }
 
-  func events() -> AsyncStream<KeyEvent> {
+  convenience init(events: [KeyEvent]) {
+    self.init(events: events.map { KeyPress($0) })
+  }
+
+  func events() -> AsyncStream<KeyPress> {
     AsyncStream { continuation in
       for event in scriptedEvents {
         continuation.yield(event)
@@ -2525,17 +2572,24 @@ private actor AsyncEventGate {
 
 private final class GateInputReader: InputReading {
   private let gate: AsyncEventGate
-  private let event: KeyEvent
+  private let event: KeyPress
 
   init(
     gate: AsyncEventGate,
-    event: KeyEvent
+    event: KeyPress
   ) {
     self.gate = gate
     self.event = event
   }
 
-  func events() -> AsyncStream<KeyEvent> {
+  convenience init(
+    gate: AsyncEventGate,
+    event: KeyEvent
+  ) {
+    self.init(gate: gate, event: KeyPress(event))
+  }
+
+  func events() -> AsyncStream<KeyPress> {
     AsyncStream { continuation in
       let gate = gate
       let event = event
@@ -2553,13 +2607,24 @@ private final class GateInputReader: InputReading {
 }
 
 private final class TimedInputReader: InputReading {
-  private let scriptedEvents: [TimedRuntimeEvent<KeyEvent>]
+  private let scriptedEvents: [TimedRuntimeEvent<KeyPress>]
 
-  init(events: [TimedRuntimeEvent<KeyEvent>]) {
+  init(events: [TimedRuntimeEvent<KeyPress>]) {
     scriptedEvents = events
   }
 
-  func events() -> AsyncStream<KeyEvent> {
+  convenience init(events: [TimedRuntimeEvent<KeyEvent>]) {
+    self.init(
+      events: events.map { event in
+        .init(
+          delayNanoseconds: event.delayNanoseconds,
+          value: KeyPress(event.value)
+        )
+      }
+    )
+  }
+
+  func events() -> AsyncStream<KeyPress> {
     AsyncStream { continuation in
       let scriptedEvents = scriptedEvents
       let task = Task {
@@ -2832,7 +2897,7 @@ private func modernTextFeatureFixture(
 @MainActor
 private func makeRuntimeHarness(
   terminal: RecordingTerminalHost,
-  events: [KeyEvent]
+  events: [KeyPress]
 ) async throws -> RunLoopResult<InteractiveDemoState> {
   let inputReader = ScriptedInputReader(events: events)
   let signalReader = EmptySignalReader()
@@ -2857,7 +2922,7 @@ private func makeRuntimeHarness(
     stateContainer: stateContainer,
     focusTracker: focusTracker,
     keyHandler: handleFocusedInteractiveDemoInput(
-      keyEvent:focusedIdentity:stateContainer:
+      keyPress:focusedIdentity:stateContainer:
     ),
     environmentValues: environmentValues,
     viewBuilder: { state, focusedIdentity in
@@ -2873,11 +2938,22 @@ private func makeRuntimeHarness(
 }
 
 @MainActor
+private func makeRuntimeHarness(
+  terminal: RecordingTerminalHost,
+  events: [KeyEvent]
+) async throws -> RunLoopResult<InteractiveDemoState> {
+  try await makeRuntimeHarness(
+    terminal: terminal,
+    events: events.map { KeyPress($0) }
+  )
+}
+
+@MainActor
 private func makeLifecycleRuntimeHarness(
   terminal: RecordingTerminalHost,
   recorder: RuntimeLifecycleRecorder,
   focusable: Bool = false,
-  events: [TimedRuntimeEvent<KeyEvent>],
+  events: [TimedRuntimeEvent<KeyPress>],
   signals: [TimedRuntimeEvent<String>] = []
 ) async throws -> RunLoopResult<LifecycleRuntimeState> {
   let runLoop = RunLoop(
@@ -2893,8 +2969,8 @@ private func makeLifecycleRuntimeHarness(
     focusTracker: FocusTracker(
       invalidationIdentities: [testIdentity("LifecycleRuntimeRoot")]
     ),
-    keyHandler: { keyEvent, _, stateContainer in
-      guard keyEvent == .character("t") else {
+    keyHandler: { keyPress, _, stateContainer in
+      guard keyPress == KeyPress(.character("t")) else {
         return .ignored
       }
       _ = stateContainer.mutate { state in
@@ -2912,6 +2988,28 @@ private func makeLifecycleRuntimeHarness(
   )
 
   return try await runLoop.run()
+}
+
+@MainActor
+private func makeLifecycleRuntimeHarness(
+  terminal: RecordingTerminalHost,
+  recorder: RuntimeLifecycleRecorder,
+  focusable: Bool = false,
+  events: [TimedRuntimeEvent<KeyEvent>],
+  signals: [TimedRuntimeEvent<String>] = []
+) async throws -> RunLoopResult<LifecycleRuntimeState> {
+  try await makeLifecycleRuntimeHarness(
+    terminal: terminal,
+    recorder: recorder,
+    focusable: focusable,
+    events: events.map { event in
+      .init(
+        delayNanoseconds: event.delayNanoseconds,
+        value: KeyPress(event.value)
+      )
+    },
+    signals: signals
+  )
 }
 
 private func focusRegion(
@@ -3025,8 +3123,72 @@ private struct CommandPaletteHarnessView: View {
   }
 }
 
+private struct CommandPaletteActionRegistrationHarnessView: View {
+  let terminalSize: Size
+
+  @State private var isPalettePresented = true
+  @State private var executionHistory: [String] = []
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("History: \(executionHistoryText)")
+      Text("Palette: \(isPalettePresented ? "open" : "closed")")
+      Text("Workspace")
+    }
+    .frame(
+      width: terminalSize.width,
+      height: terminalSize.height,
+      alignment: .topLeading
+    )
+    .command(
+      id: "background-action",
+      title: "Background Action",
+      keywords: ["background"]
+    ) {
+      executionHistory.append("background-action")
+    }
+    .commandPalette(isPresented: $isPalettePresented)
+  }
+
+  private var executionHistoryText: String {
+    executionHistory.isEmpty ? "none" : executionHistory.joined(separator: ",")
+  }
+}
+
+private struct CommandPaletteShortcutHarnessView: View {
+  let terminalSize: Size
+
+  @State private var isPalettePresented = false
+  @State private var executionHistory: [String] = []
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("History: \(executionHistoryText)")
+      Text("Palette: \(isPalettePresented ? "open" : "closed")")
+      Text("Workspace")
+    }
+    .frame(
+      width: terminalSize.width,
+      height: terminalSize.height,
+      alignment: .topLeading
+    )
+    .command(
+      id: "background-action",
+      title: "Background Action",
+      keywords: ["background"]
+    ) {
+      executionHistory.append("background-action")
+    }
+    .commandPalette(isPresented: $isPalettePresented, shortcut: .character("/"))
+  }
+
+  private var executionHistoryText: String {
+    executionHistory.isEmpty ? "none" : executionHistory.joined(separator: ",")
+  }
+}
+
 private final class KeyPressRecorder {
-  var presses: [LocalKeyPress] = []
+  var presses: [KeyPress] = []
 }
 
 private struct OnKeyPressRuntimeProbe: View {

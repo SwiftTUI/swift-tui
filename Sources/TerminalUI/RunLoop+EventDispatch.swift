@@ -36,10 +36,9 @@ extension RunLoop {
     _ keyPress: KeyPress
   ) -> RunLoopExitReason? {
     let keyEvent = keyPress.key
-    let localPress = localKeyPress(for: keyPress)
 
     // Focus-independent hotkeys fire first, allowing apps to override quit.
-    if hotkeyRegistry.dispatch(localPress) {
+    if hotkeyRegistry.dispatch(keyPress) {
       return nil
     }
 
@@ -47,7 +46,7 @@ extension RunLoop {
     switch keyEvent {
     case .character("q") where keyPress.modifiers.isEmpty:
       return .quitKey
-    case .ctrlC:
+    case .character("c") where keyPress.modifiers == .ctrl:
       return .ctrlC
     default:
       break
@@ -62,14 +61,14 @@ extension RunLoop {
     if let focusedIdentity {
       if localKeyHandlerRegistry.dispatch(
         identity: focusedIdentity,
-        keyPress: localPress
+        keyPress: keyPress
       ) {
         return nil
       }
     }
 
     if let keyHandler {
-      switch keyHandler(keyEvent, focusedIdentity, stateContainer) {
+      switch keyHandler(keyPress, focusedIdentity, stateContainer) {
       case .ignored:
         break
       case .handled:
@@ -80,41 +79,48 @@ extension RunLoop {
     }
 
     if focusedInteractions == .edit {
-      switch keyEvent {
-      case .tab:
-        focusTracker.focusNext()
-        return nil
-      case .shiftTab:
+      switch keyPress {
+      case KeyPress(.tab, modifiers: .shift):
         focusTracker.focusPrevious()
         return nil
-      case .ctrlC:
+      case KeyPress(.tab, modifiers: []):
+        focusTracker.focusNext()
+        return nil
+      case KeyPress(.character("c"), modifiers: .ctrl):
         return .ctrlC
-      case .arrowLeft, .arrowRight, .arrowUp, .arrowDown, .enter, .space,
-        .character, .escape, .backspace:
+      case let keyPress where keyPress.modifiers.isEmpty:
+        switch keyPress.key {
+        case .arrowLeft, .arrowRight, .arrowUp, .arrowDown, .return, .space,
+          .character, .escape, .backspace, .home, .end:
+          return nil
+        case .tab:
+          return nil
+        }
+      default:
         return nil
       }
     }
 
-    switch keyEvent {
-    case .tab:
-      focusTracker.focusNext()
-      return nil
-    case .shiftTab:
+    switch keyPress {
+    case KeyPress(.tab, modifiers: .shift):
       focusTracker.focusPrevious()
       return nil
-    case .arrowRight:
+    case KeyPress(.tab, modifiers: []):
+      focusTracker.focusNext()
+      return nil
+    case KeyPress(.arrowRight, modifiers: []):
       focusTracker.moveFocus(.right)
       return nil
-    case .arrowDown:
+    case KeyPress(.arrowDown, modifiers: []):
       focusTracker.moveFocus(.down)
       return nil
-    case .arrowLeft:
+    case KeyPress(.arrowLeft, modifiers: []):
       focusTracker.moveFocus(.left)
       return nil
-    case .arrowUp:
+    case KeyPress(.arrowUp, modifiers: []):
       focusTracker.moveFocus(.up)
       return nil
-    case .enter, .space:
+    case KeyPress(.return, modifiers: []), KeyPress(.space, modifiers: []):
       setPressedIdentity(focusedIdentity, transient: true)
       if let focusedIdentity {
         let handled = localActionRegistry.dispatch(identity: focusedIdentity)
@@ -125,9 +131,9 @@ extension RunLoop {
         }
       }
       return nil
-    case .ctrlC:
+    case KeyPress(.character("c"), modifiers: .ctrl):
       return .ctrlC
-    case .character, .escape, .backspace:
+    default:
       return nil
     }
   }
@@ -138,43 +144,6 @@ extension RunLoop {
       return .continueFrame
     default:
       return .exit(.signal(name))
-    }
-  }
-
-  package func localKeyPress(
-    for keyPress: KeyPress
-  ) -> LocalKeyPress {
-    LocalKeyPress(localKeyEvent(for: keyPress.key), modifiers: keyPress.modifiers)
-  }
-
-  package func localKeyEvent(
-    for keyEvent: KeyEvent
-  ) -> LocalKeyEvent {
-    switch keyEvent {
-    case .character(let character):
-      return .character(character)
-    case .enter:
-      return .enter
-    case .space:
-      return .space
-    case .tab:
-      return .tab
-    case .shiftTab:
-      return .shiftTab
-    case .arrowLeft:
-      return .arrowLeft
-    case .arrowRight:
-      return .arrowRight
-    case .arrowUp:
-      return .arrowUp
-    case .arrowDown:
-      return .arrowDown
-    case .backspace:
-      return .backspace
-    case .escape:
-      return .escape
-    case .ctrlC:
-      return .ctrlC
     }
   }
 }
