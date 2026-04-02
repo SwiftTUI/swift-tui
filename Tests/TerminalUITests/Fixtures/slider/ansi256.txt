@@ -3,4 +3,4 @@ configuration ansi256
 surface 26x1
 capability glyph=unicode color=ansi256 styles=true
 appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
-01│\u{001B}[38;5;66mBlend\u{001B}[0m·\u{001B}[38;5;60m━━━●────\u{001B}[0m·\u{001B}[38;5;231m42\u{001B}[0m
+01│\u{001B}[38;5;59m·\u{001B}[0m·\u{001B}[38;5;66mBlend\u{001B}[0m·\u{001B}[38;5;60m━━━●────\u{001B}[0m·\u{001B}[38;5;231m42\u{001B}[0m

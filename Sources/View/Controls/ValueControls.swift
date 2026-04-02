@@ -93,31 +93,20 @@ extension Toggle {
       isOn
       ? chrome.borderStyle
       : AnyShapeStyle(.separator)
-    let markerStyle =
-      isFocused
-      ? chrome.borderStyle
-      : AnyShapeStyle(.background)
-
-    let rowContent = HStack(alignment: .center, spacing: 1) {
-      if isFocused {
-        Text("▌ ")
-          .foregroundStyle(markerStyle)
-      }
+    let rowContent = controlFocusRow(
+      showsRail: isFocused,
+      railStyle: chrome.borderStyle,
+      isHighlighted: isFocused || isPressed,
+      backgroundStyle: chrome.backgroundStyle,
+      reservesRailSpaceWhenHidden: true
+    ) {
       Text(isOn ? "◉" : "○")
         .foregroundStyle(indicatorStyle)
       label
     }
     .foregroundStyle(chrome.foregroundStyle)
     .drawMetadata(.init(opacity: chrome.opacity))
-
-    if isFocused || isPressed {
-      rowContent
-        .background {
-          Rectangle().fill(chrome.backgroundStyle)
-        }
-    } else {
-      rowContent
-    }
+    rowContent
   }
 }
 
@@ -425,11 +414,13 @@ extension DisclosureGroup {
       isExpanded
       ? AnyShapeStyle(.tint)
       : AnyShapeStyle(.separator)
-    let labelRow = HStack(alignment: .center, spacing: 1) {
-      if isFocused {
-        Text("| ")
-          .foregroundStyle(chrome.borderStyle)
-      }
+    let labelRow = controlFocusRow(
+      showsRail: isFocused,
+      railStyle: chrome.borderStyle,
+      isHighlighted: isFocused || isPressed,
+      backgroundStyle: chrome.backgroundStyle,
+      reservesRailSpaceWhenHidden: true
+    ) {
       Text(isExpanded ? "▾" : "▸")
         .foregroundStyle(indicatorStyle)
       label
@@ -437,14 +428,7 @@ extension DisclosureGroup {
     .foregroundStyle(chrome.foregroundStyle)
     .drawMetadata(.init(opacity: chrome.opacity))
     VStack(alignment: .leading, spacing: 0) {
-      if isFocused || isPressed {
-        labelRow
-          .background {
-            Rectangle().fill(chrome.backgroundStyle)
-          }
-      } else {
-        labelRow
-      }
+      labelRow
       if isExpanded {
         content
           .padding(.init(top: 0, leading: 1, bottom: 0, trailing: 0))

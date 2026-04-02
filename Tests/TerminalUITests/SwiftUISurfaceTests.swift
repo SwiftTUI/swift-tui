@@ -1694,6 +1694,66 @@ struct SwiftUISurfaceTests {
     #expect(render(focused: false) != render(focused: true))
   }
 
+  @Test("focused Stepper and Slider share the row-control focus rail")
+  func focusedAdjustableControlsUseSharedFocusRail() {
+    func render<V: View>(
+      id: Identity,
+      _ view: V
+    ) -> String {
+      var environmentValues = EnvironmentValues()
+      environmentValues.focusedIdentity = id
+      return DefaultRenderer().render(
+        view.id(id),
+        context: .init(
+          identity: testIdentity("Root"),
+          environmentValues: environmentValues
+        )
+      ).rasterSurface.lines.joined(separator: "\n")
+    }
+
+    let stepperSurface = render(
+      id: testIdentity("RailStepper"),
+      Stepper("Count", value: .constant(1), in: 0...4)
+    )
+    let sliderSurface = render(
+      id: testIdentity("RailSlider"),
+      Slider("Value", value: .constant(2), in: 0...4)
+    )
+
+    #expect(stepperSurface.contains("▌ Count"))
+    #expect(sliderSurface.contains("▌ Value"))
+  }
+
+  @Test("pressed Stepper and Slider do not introduce the focus rail")
+  func pressedAdjustableControlsDoNotShowFocusRail() {
+    func render<V: View>(
+      id: Identity,
+      _ view: V
+    ) -> String {
+      var environmentValues = EnvironmentValues()
+      environmentValues.pressedIdentity = id
+      return DefaultRenderer().render(
+        view.id(id),
+        context: .init(
+          identity: testIdentity("Root"),
+          environmentValues: environmentValues
+        )
+      ).rasterSurface.lines.joined(separator: "\n")
+    }
+
+    let stepperSurface = render(
+      id: testIdentity("PressedRailStepper"),
+      Stepper("Count", value: .constant(1), in: 0...4)
+    )
+    let sliderSurface = render(
+      id: testIdentity("PressedRailSlider"),
+      Slider("Value", value: .constant(2), in: 0...4)
+    )
+
+    #expect(!stepperSurface.contains("▌ Count"))
+    #expect(!sliderSurface.contains("▌ Value"))
+  }
+
   @Test(
     "TextField shows its prompt when idle, shows a cursor while active, and local key handling mutates the bound string"
   )
@@ -1828,6 +1888,40 @@ struct SwiftUISurfaceTests {
     #expect(dispatched)
     #expect(box.isExpanded)
     #expect(expandedArtifacts.rasterSurface.lines.joined(separator: "\n").contains("Detail"))
+  }
+
+  @Test("focused DisclosureGroup and Menu share the activation-row focus rail")
+  func focusedActivationRowsUseSharedFocusRail() {
+    func render<V: View>(
+      id: Identity,
+      _ view: V
+    ) -> String {
+      var environmentValues = EnvironmentValues()
+      environmentValues.focusedIdentity = id
+      return DefaultRenderer().render(
+        view.id(id),
+        context: .init(
+          identity: testIdentity("Root"),
+          environmentValues: environmentValues
+        )
+      ).rasterSurface.lines.joined(separator: "\n")
+    }
+
+    let disclosureSurface = render(
+      id: testIdentity("RailDisclosure"),
+      DisclosureGroup("Options", isExpanded: .constant(false)) {
+        Text("Detail")
+      }
+    )
+    let menuSurface = render(
+      id: testIdentity("RailMenu"),
+      Menu("Actions") {
+        Button("Open") {}
+      }
+    )
+
+    #expect(disclosureSurface.contains("▌ ▸ Options"))
+    #expect(menuSurface.contains("▌ Actions"))
   }
 
   @Test("Picker uses tag metadata plus local key handling to update inline selection")
@@ -2049,11 +2143,34 @@ struct SwiftUISurfaceTests {
       expandedArtifacts.semanticSnapshot.focusRegions.map(\.identity) == [
         testIdentity("MenuPicker")
       ])
+    #expect(expandedSurface.contains("▌ ▴"))
     #expect(expandedSurface.contains("▴"))
     #expect(expandedSurface.contains("Two"))
     #expect(expandedSurface.contains("Three"))
     #expect(registry.dispatch(identity: testIdentity("MenuPicker"), event: .arrowDown))
     #expect(box.value == 2)
+  }
+
+  @Test("focused radioGroup Picker reuses the shared row-selection rail")
+  func focusedRadioGroupPickerUsesSharedSelectionRail() {
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = testIdentity("RadioRailPicker")
+
+    let surface = DefaultRenderer().render(
+      Picker("Mode", selection: .constant(2)) {
+        Text("One").tag(1)
+        Text("Two").tag(2)
+        Text("Three").tag(3)
+      }
+      .id(testIdentity("RadioRailPicker"))
+      .pickerStyle(.radioGroup),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues
+      )
+    ).rasterSurface.lines.joined(separator: "\n")
+
+    #expect(surface.contains("▌ (*) Two"))
   }
 
   @Test("Picker inline, segmented, and radioGroup styles render editing chrome directly from focus")
@@ -3775,7 +3892,7 @@ struct SwiftUISurfaceTests {
     )
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
-    #expect(surface.contains("▌  ○ Accent Preview"))
+    #expect(surface.contains("▌ ○ Accent Preview"))
     #expect(!surface.contains("╭"))
     #expect(!surface.contains("╰"))
   }

@@ -160,7 +160,8 @@ extension Stepper {
       value: currentValue,
       canDecrement: canDecrement,
       canIncrement: canIncrement,
-      isFocused: (isFocused && showsFocusEffect) || isPressed,
+      showsFocusRail: isFocused && showsFocusEffect,
+      isHighlighted: (isFocused && showsFocusEffect) || isPressed,
       isActiveNavigation: (isFocused && showsFocusEffect) || isPressed,
       chrome: chrome,
       contentChrome: contentChrome
@@ -187,7 +188,8 @@ extension Stepper {
     value: Int,
     canDecrement: Bool,
     canIncrement: Bool,
-    isFocused: Bool,
+    showsFocusRail: Bool,
+    isHighlighted: Bool,
     isActiveNavigation: Bool,
     chrome: ControlChrome,
     contentChrome: ControlChrome
@@ -216,26 +218,24 @@ extension Stepper {
       incrementControl
     }
     .drawMetadata(.init(opacity: contentChrome.opacity))
-    let row = HStack(alignment: .center, spacing: 1) {
+    let controlsView = highlightedControlRow(
+      controls,
+      isHighlighted: isActiveNavigation,
+      backgroundStyle: contentChrome.backgroundStyle
+    )
+    let row = controlFocusRow(
+      showsRail: showsFocusRail,
+      railStyle: chrome.borderStyle,
+      isHighlighted: isHighlighted,
+      backgroundStyle: chrome.backgroundStyle,
+      reservesRailSpaceWhenHidden: true
+    ) {
       label
         .foregroundStyle(.terminalBorder(.accent))
-      if isActiveNavigation {
-        controls.background {
-          Rectangle().fill(contentChrome.backgroundStyle)
-        }
-      } else {
-        controls
-      }
+      controlsView
     }
     .drawMetadata(.init(opacity: chrome.opacity))
-
-    if isFocused {
-      row.background {
-        Rectangle().fill(chrome.backgroundStyle)
-      }
-    } else {
-      row
-    }
+    row
   }
 }
 
@@ -394,7 +394,8 @@ extension Slider {
     let child = sliderBody(
       controlIdentity: context.identity,
       value: currentValue,
-      isFocused: (isFocused && showsFocusEffect) || isPressed,
+      showsFocusRail: isFocused && showsFocusEffect,
+      isHighlighted: (isFocused && showsFocusEffect) || isPressed,
       isActiveNavigation: (isFocused && showsFocusEffect) || isPressed,
       chrome: chrome,
       contentChrome: contentChrome
@@ -419,7 +420,8 @@ extension Slider {
   private func sliderBody(
     controlIdentity: Identity,
     value: Int,
-    isFocused: Bool,
+    showsFocusRail: Bool,
+    isHighlighted: Bool,
     isActiveNavigation: Bool,
     chrome: ControlChrome,
     contentChrome: ControlChrome
@@ -443,26 +445,24 @@ extension Slider {
         .foregroundStyle(valueStyle)
     }
     .drawMetadata(.init(opacity: contentChrome.opacity))
-    let row = HStack(alignment: .center, spacing: 1) {
+    let controlsView = highlightedControlRow(
+      controls,
+      isHighlighted: isActiveNavigation,
+      backgroundStyle: contentChrome.backgroundStyle
+    )
+    let row = controlFocusRow(
+      showsRail: showsFocusRail,
+      railStyle: chrome.borderStyle,
+      isHighlighted: isHighlighted,
+      backgroundStyle: chrome.backgroundStyle,
+      reservesRailSpaceWhenHidden: true
+    ) {
       label
         .foregroundStyle(.terminalBorder(.accent))
-      if isActiveNavigation {
-        controls.background {
-          Rectangle().fill(contentChrome.backgroundStyle)
-        }
-      } else {
-        controls
-      }
+      controlsView
     }
     .drawMetadata(.init(opacity: chrome.opacity))
-
-    if isFocused {
-      row.background {
-        Rectangle().fill(chrome.backgroundStyle)
-      }
-    } else {
-      row
-    }
+    row
   }
 
   private func sliderTrack(

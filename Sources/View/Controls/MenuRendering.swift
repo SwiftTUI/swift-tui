@@ -9,14 +9,12 @@ extension Menu {
     chrome: ControlChrome
   ) -> some View {
     VStack(alignment: .leading, spacing: 0) {
-      if isFocused || isPressed {
-        triggerRow(isExpanded: isExpanded, chrome: chrome)
-          .background {
-            Rectangle().fill(chrome.backgroundStyle)
-          }
-      } else {
-        triggerRow(isExpanded: isExpanded, chrome: chrome)
-      }
+      triggerRow(
+        isExpanded: isExpanded,
+        isFocused: isFocused,
+        isPressed: isPressed,
+        chrome: chrome
+      )
 
       if isExpanded {
         MenuExpandedContent(content: content)
@@ -40,9 +38,17 @@ extension Menu {
   @ViewBuilder
   private func triggerRow(
     isExpanded: Bool,
+    isFocused: Bool,
+    isPressed: Bool,
     chrome: ControlChrome
   ) -> some View {
-    HStack(alignment: .center, spacing: 1) {
+    controlFocusRow(
+      showsRail: isFocused,
+      railStyle: chrome.borderStyle,
+      isHighlighted: isFocused || isPressed,
+      backgroundStyle: chrome.backgroundStyle,
+      reservesRailSpaceWhenHidden: true
+    ) {
       label
       Spacer()
       Text(isExpanded ? "▴" : "▾")

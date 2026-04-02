@@ -92,7 +92,13 @@ extension Picker {
       } else {
         "Select"
       }
-    let triggerRow = HStack(alignment: .center, spacing: 1) {
+    let triggerRow = controlFocusRow(
+      showsRail: isFocused,
+      railStyle: triggerChrome.borderStyle,
+      isHighlighted: isFocused,
+      backgroundStyle: triggerChrome.backgroundStyle,
+      reservesRailSpaceWhenHidden: true
+    ) {
       Text(isActiveNavigation ? "▴" : "▾")
       Text(selectedLabel)
         .lineLimit(1)
@@ -106,14 +112,7 @@ extension Picker {
     VStack(alignment: .leading, spacing: 0) {
       label
         .foregroundStyle(.terminalBorder(.accent))
-      if isFocused {
-        triggerRow
-          .background {
-            Rectangle().fill(triggerChrome.backgroundStyle)
-          }
-      } else {
-        triggerRow
-      }
+      triggerRow
 
       if isActiveNavigation {
         VStack(alignment: .leading, spacing: 0) {
@@ -330,28 +329,28 @@ extension Picker {
       } else {
         AnyShapeStyle(.foreground)
       }
-    let row = HStack(alignment: .center, spacing: 0) {
-      Text(isSelected ? "▌ " : "  ")
-        .foregroundStyle(markerStyle)
+    let row = controlFocusRow(
+      showsRail: isSelected,
+      railStyle: markerStyle,
+      isHighlighted: isSelected && isActiveNavigation,
+      backgroundStyle: rowChrome.backgroundStyle,
+      reservesRailSpaceWhenHidden: true,
+      spacing: 1
+    ) {
       Text(label)
         .lineLimit(1)
         .foregroundStyle(labelStyle)
     }
     .drawMetadata(.init(opacity: rowChrome.opacity))
     .frame(width: lineWidth, alignment: .leading)
-    let content = highlightedRow(
-      row,
-      isHighlighted: isSelected && isActiveNavigation,
-      backgroundStyle: rowChrome.backgroundStyle
-    )
 
     if let routeIdentity {
       PointerRouteView(
         identity: routeIdentity,
-        content: content
+        content: row
       )
     } else {
-      content
+      row
     }
   }
 
@@ -394,7 +393,9 @@ extension Picker {
                 )
               }
             }
-            .foregroundStyle(isSelected ? segmentChrome.contentBackgroundStyle : segmentChrome.foregroundStyle)
+            .foregroundStyle(
+              isSelected ? segmentChrome.contentBackgroundStyle : segmentChrome.foregroundStyle
+            )
             .drawMetadata(.init(opacity: segmentChrome.opacity))
             .id(
               pickerOptionIdentity(
@@ -403,9 +404,9 @@ extension Picker {
               )
             )
             .semanticMetadata(.init(participatesInPointerHitTesting: true))
-            if index < options.count-1 {
-              Divider()
-            }
+          if index < options.count - 1 {
+            Divider()
+          }
         }
       }
       .padding(.init(horizontal: 1, vertical: 1))
@@ -492,7 +493,13 @@ extension Picker {
       isFocused: isFocused,
       isSelected: isFocused
     )
-    let row = HStack(alignment: .center, spacing: 1) {
+    let row = controlFocusRow(
+      showsRail: isSelected,
+      railStyle: isFocused ? rowChrome.borderStyle : AnyShapeStyle(.separator),
+      isHighlighted: isSelected && isFocused,
+      backgroundStyle: rowChrome.backgroundStyle,
+      reservesRailSpaceWhenHidden: true
+    ) {
       Text(isSelected ? "(*)" : "( )")
         .foregroundStyle(
           isSelected
@@ -508,32 +515,12 @@ extension Picker {
       Spacer(minLength: 0)
     }
     .drawMetadata(.init(opacity: rowChrome.opacity))
-    let content = highlightedRow(
-      row,
-      isHighlighted: isSelected && isFocused,
-      backgroundStyle: rowChrome.backgroundStyle
-    )
 
     if let routeIdentity {
       PointerRouteView(
         identity: routeIdentity,
-        content: content
+        content: row
       )
-    } else {
-      content
-    }
-  }
-
-  @ViewBuilder
-  private func highlightedRow<Row: View>(
-    _ row: Row,
-    isHighlighted: Bool,
-    backgroundStyle: AnyShapeStyle
-  ) -> some View {
-    if isHighlighted {
-      row.background {
-        Rectangle().fill(backgroundStyle)
-      }
     } else {
       row
     }
