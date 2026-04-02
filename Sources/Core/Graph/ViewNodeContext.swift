@@ -7,7 +7,8 @@ package enum ViewNodeContext {
     _ node: ViewNode?,
     _ apply: () -> Result
   ) -> Result {
-    $current.withValue(node) {
+    node?.beginRegistrationCapture()
+    return $current.withValue(node) {
       apply()
     }
   }

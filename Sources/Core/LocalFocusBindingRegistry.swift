@@ -49,15 +49,15 @@ package final class LocalFocusBindingRegistry: Equatable {
     isSelected: Bool,
     applyRuntimeFocus: @escaping @MainActor (Bool) -> Bool
   ) {
-    registrations.append(
-      .init(
-        identity: identity,
-        bindingID: bindingID,
-        hasPendingRequest: hasPendingRequest,
-        isSelected: isSelected,
-        applyRuntimeFocus: applyRuntimeFocus
-      )
+    let registration = FocusBindingRegistrationSnapshot(
+      identity: identity,
+      bindingID: bindingID,
+      hasPendingRequest: hasPendingRequest,
+      isSelected: isSelected,
+      applyRuntimeFocus: applyRuntimeFocus
     )
+    registrations.append(registration)
+    ViewNodeContext.current?.recordFocusBindingRegistration(registration)
   }
 
   package func desiredFocusRequest(

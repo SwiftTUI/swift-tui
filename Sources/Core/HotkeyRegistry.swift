@@ -60,13 +60,13 @@ package final class HotkeyRegistry: Equatable {
     binding: HotkeyBinding,
     handler: @escaping Handler
   ) {
-    entries.append(
-      .init(
-        identity: identity,
-        binding: binding,
-        handler: handler
-      )
+    let registration = HotkeyRegistrationSnapshot(
+      identity: identity,
+      binding: binding,
+      handler: handler
     )
+    entries.append(registration)
+    ViewNodeContext.current?.recordHotkeyRegistration(registration)
   }
 
   /// Dispatches a key press to all registered handlers. Returns `true` if

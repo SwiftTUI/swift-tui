@@ -66,6 +66,10 @@ package final class LocalKeyHandlerRegistry: Equatable {
     handler: @escaping Handler
   ) {
     handlers[identity] = handler
+    ViewNodeContext.current?.recordKeyHandlerRegistration(
+      identity: identity,
+      handler: handler
+    )
   }
 
   package func register(
@@ -73,6 +77,10 @@ package final class LocalKeyHandlerRegistry: Equatable {
     keyPressHandler: @escaping KeyPressHandler
   ) {
     keyPressHandlers[identity] = keyPressHandler
+    ViewNodeContext.current?.recordKeyPressHandlerRegistration(
+      identity: identity,
+      handler: keyPressHandler
+    )
   }
 
   @discardableResult

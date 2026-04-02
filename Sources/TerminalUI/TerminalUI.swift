@@ -93,9 +93,8 @@ public struct DefaultRenderer {
     viewGraph.invalidate(context.invalidatedIdentities)
     resolveContext.viewGraph = viewGraph
     resolveContext.observationBridge?.beginTrackingPass()
-
-    let (resolved, resolveDuration) = measurePhase {
-      resolver.resolve(
+    viewGraph.setRootEvaluator(rootIdentity: resolveContext.identity) {
+      _ = resolver.resolve(
         ToastHostingRoot(
           content: TerminalPresentationHostingRoot(
             content: ToolbarHostingRoot(content: root)
@@ -104,6 +103,11 @@ public struct DefaultRenderer {
         in: resolveContext
       )
     }
+
+    let (_, resolveDuration) = measurePhase {
+      viewGraph.evaluateDirtyNodes()
+    }
+    let resolved = viewGraph.snapshot()
     let layoutPassContext = LayoutPassContext(
       retainedLayout: retainedFrames.layoutSession(
         invalidatedIdentities: context.invalidatedIdentities
@@ -143,6 +147,7 @@ public struct DefaultRenderer {
     }
     let (commit, commitDuration) = measurePhase {
       let lifecycleEvents = viewGraph.finalizeFrame(
+        rootIdentity: resolveContext.identity,
         resolved: resolved,
         placed: placed
       )

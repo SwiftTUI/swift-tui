@@ -65,6 +65,10 @@ package final class LocalPointerHandlerRegistry: Equatable {
     handler: @escaping Handler
   ) {
     handlers[routeID] = handler
+    ViewNodeContext.current?.recordPointerHandlerRegistration(
+      routeID: routeID,
+      handler: handler
+    )
   }
 
   package func hasHandler(

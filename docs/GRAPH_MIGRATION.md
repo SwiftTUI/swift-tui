@@ -7,31 +7,32 @@ structural diffing, ordinal state keying, and lifecycle-as-structure.
 **Context:** Pre-production framework with no external consumers. Fully
 breaking changes are acceptable. The goal is SwiftUI-equivalent semantics.
 
-**Status (2026-04-02):** Ordinal state slots, graph-owned lifecycle events,
-and the retained-resolve cleanup described below have landed. The migration
-is not yet complete. The largest remaining gap is still the full
-graph-driven dirty-node reevaluation switchover: `DefaultRenderer` still
-performs a full resolve pass each frame, and `ViewGraph.evaluateDirtyNodes()`
-is not yet the authoritative update path. Two additional live runtime
-blockers remain under that umbrella: the interactive/runtime path still
-threads `DynamicStateStore` as the authoritative `@State`/`@FocusState`
-storage, and deferred builders/actions still depend on `DynamicPropertyScope`
-as the authored read context.
+**Status (2026-04-02):** Completed. The persistent-graph migration is now the
+live runtime path and the full suite is green (`575 tests / 72 suites`).
 
-### Remaining blockers (2026-04-02)
+- `DefaultRenderer` now drives resolve through `ViewGraph.evaluateDirtyNodes()`
+  and snapshots the retained graph before measure/place/semantics/draw/raster.
+- `@State`, `@FocusState`, and `defaultFocus` now persist through node-owned
+  ordinal slots. `DynamicStateStore` is removed from the live runtime.
+- Deferred builders, stored actions, and focused-value reads now flow through
+  `AuthoringContext` plus `ViewNodeContext`. `DynamicPropertyScope` is removed
+  from the live runtime.
+- Lifecycle deltas are produced by `ViewGraph` and passed into `CommitPlanner`.
+  `CommitPlanner` no longer computes lifecycle diffs itself.
+- Graph finalization prunes removed identities with cycle-safe traversal so
+  presentation/overlay teardown stays stable in the retained graph path.
 
-1. **Graph-authoritative update path**
-   `ViewGraph` is still a persistence/lifecycle sidecar. The renderer does
-   not yet update the graph as the source of truth and snapshot from that
-   updated graph.
-2. **Graph-only runtime state/focus/default-focus**
-   The live runtime still injects `DynamicStateStore` into `ResolveContext`,
-   so body-time `@State`, `@FocusState`, and `defaultFocus` behavior are not
-   yet graph-only.
-3. **Authoring-context replacement for deferred closures/builders**
-   `DynamicPropertyScope` still carries more than slot access. Stored
-   builders, deferred actions, and focused-value reads still depend on it,
-   so `ViewNodeContext` alone is not yet a sufficient replacement.
+### Follow-up optimization opportunities
+
+1. **True per-node dirty reevaluation**
+   `ViewGraph.evaluateDirtyNodes()` is now the authoritative renderer entry
+   point, but it still reevaluates through a graph-owned root evaluator rather
+   than scheduling minimal per-node reevaluation. That is a performance
+   optimization follow-up, not a migration blocker.
+2. **Purely structural lifecycle emission**
+   Lifecycle events are now graph-owned, but the current implementation still
+   derives them from graph snapshots in `ViewGraph` instead of emitting them
+   directly from node insertion/removal hooks. That cleanup is future work.
 
 ---
 

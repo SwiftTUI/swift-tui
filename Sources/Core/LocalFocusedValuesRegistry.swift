@@ -50,6 +50,7 @@ package final class LocalFocusedValuesRegistry: Equatable {
     } else {
       registrations.append(registration)
     }
+    ViewNodeContext.current?.recordFocusedValuesRegistration(registration)
   }
 
   package func focusedValues(

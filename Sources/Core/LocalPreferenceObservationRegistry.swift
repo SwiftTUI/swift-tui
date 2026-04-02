@@ -89,13 +89,17 @@ package final class LocalPreferenceObservationRegistry: Equatable {
         && registration.keyDebugName == keyDebugName
     }
     let handlerID = "\(identity)#preference[\(keyDebugName)][\(ordinal)]"
-    registrations[handlerID] = .init(
+    let registration = PreferenceObservationRegistrationSnapshot(
       identity: identity,
       handlerID: handlerID,
       box: TypedPreferenceObservationBox<K>(
         value: value,
         action: action
       )
+    )
+    registrations[handlerID] = registration
+    ViewNodeContext.current?.recordPreferenceObservationRegistration(
+      registration
     )
   }
 

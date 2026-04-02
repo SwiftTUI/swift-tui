@@ -1,27 +1,126 @@
-package struct NodeHandlers: Equatable {
-  package var actionIdentities: [Identity]
-  package var keyHandlerIdentities: [Identity]
-  package var keyPressHandlerIdentities: [Identity]
-  package var pointerRouteIDs: [RouteID]
-  package var hotkeyIdentities: [Identity]
-  package var lifecycleHandlerIDs: [String]
-  package var task: TaskDescriptor?
+package struct NodeHandlers {
+  package var actionRegistrations: [Identity: LocalActionRegistry.Registration]
+  package var keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler]
+  package var keyPressHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.KeyPressHandler]
+  package var pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler]
+  package var focusBindingRegistrations: [FocusBindingRegistrationSnapshot]
+  package var focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot]
+  package var hotkeyRegistrations: [HotkeyRegistrationSnapshot]
+  package var lifecycleRegistrations: LifecycleHandlerSnapshot
+  package var taskRegistrations: [Identity: TaskRegistration]
+  package var preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot]
 
   package init(
-    actionIdentities: [Identity] = [],
-    keyHandlerIdentities: [Identity] = [],
-    keyPressHandlerIdentities: [Identity] = [],
-    pointerRouteIDs: [RouteID] = [],
-    hotkeyIdentities: [Identity] = [],
-    lifecycleHandlerIDs: [String] = [],
-    task: TaskDescriptor? = nil
+    actionRegistrations: [Identity: LocalActionRegistry.Registration] = [:],
+    keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler] = [:],
+    keyPressHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.KeyPressHandler] = [:],
+    pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
+    focusBindingRegistrations: [FocusBindingRegistrationSnapshot] = [],
+    focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot] = [],
+    hotkeyRegistrations: [HotkeyRegistrationSnapshot] = [],
+    lifecycleRegistrations: LifecycleHandlerSnapshot = .init(),
+    taskRegistrations: [Identity: TaskRegistration] = [:],
+    preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot] = []
   ) {
-    self.actionIdentities = actionIdentities
-    self.keyHandlerIdentities = keyHandlerIdentities
-    self.keyPressHandlerIdentities = keyPressHandlerIdentities
-    self.pointerRouteIDs = pointerRouteIDs
-    self.hotkeyIdentities = hotkeyIdentities
-    self.lifecycleHandlerIDs = lifecycleHandlerIDs
-    self.task = task
+    self.actionRegistrations = actionRegistrations
+    self.keyHandlerRegistrations = keyHandlerRegistrations
+    self.keyPressHandlerRegistrations = keyPressHandlerRegistrations
+    self.pointerHandlerRegistrations = pointerHandlerRegistrations
+    self.focusBindingRegistrations = focusBindingRegistrations
+    self.focusedValuesRegistrations = focusedValuesRegistrations
+    self.hotkeyRegistrations = hotkeyRegistrations
+    self.lifecycleRegistrations = lifecycleRegistrations
+    self.taskRegistrations = taskRegistrations
+    self.preferenceObservationRegistrations = preferenceObservationRegistrations
+  }
+
+  package mutating func reset() {
+    self = .init()
+  }
+
+  package mutating func recordAction(
+    identity: Identity,
+    handler: @escaping LocalActionRegistry.Handler,
+    followUpInvalidationIdentity: Identity?
+  ) {
+    actionRegistrations[identity] = .init(
+      handler: handler,
+      followUpInvalidationIdentity: followUpInvalidationIdentity
+    )
+  }
+
+  package mutating func recordKeyHandler(
+    identity: Identity,
+    handler: @escaping LocalKeyHandlerRegistry.Handler
+  ) {
+    keyHandlerRegistrations[identity] = handler
+  }
+
+  package mutating func recordKeyPressHandler(
+    identity: Identity,
+    handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
+  ) {
+    keyPressHandlerRegistrations[identity] = handler
+  }
+
+  package mutating func recordPointerHandler(
+    routeID: RouteID,
+    handler: @escaping LocalPointerHandlerRegistry.Handler
+  ) {
+    pointerHandlerRegistrations[routeID] = handler
+  }
+
+  package mutating func recordFocusBinding(
+    _ registration: FocusBindingRegistrationSnapshot
+  ) {
+    focusBindingRegistrations.append(registration)
+  }
+
+  package mutating func recordFocusedValues(
+    _ registration: FocusedValuesRegistrationSnapshot
+  ) {
+    if let existingIndex = focusedValuesRegistrations.firstIndex(where: {
+      $0.identity == registration.identity
+    }) {
+      focusedValuesRegistrations[existingIndex].descendantIdentities.formUnion(
+        registration.descendantIdentities
+      )
+      focusedValuesRegistrations[existingIndex].values.merge(registration.values)
+    } else {
+      focusedValuesRegistrations.append(registration)
+    }
+  }
+
+  package mutating func recordHotkey(
+    _ registration: HotkeyRegistrationSnapshot
+  ) {
+    hotkeyRegistrations.append(registration)
+  }
+
+  package mutating func recordLifecycleAppear(
+    handlerID: String,
+    handler: @escaping LocalLifecycleRegistry.Handler
+  ) {
+    lifecycleRegistrations.appearHandlers[handlerID] = handler
+  }
+
+  package mutating func recordLifecycleDisappear(
+    handlerID: String,
+    handler: @escaping LocalLifecycleRegistry.Handler
+  ) {
+    lifecycleRegistrations.disappearHandlers[handlerID] = handler
+  }
+
+  package mutating func recordTask(
+    identity: Identity,
+    registration: TaskRegistration
+  ) {
+    taskRegistrations[identity] = registration
+  }
+
+  package mutating func recordPreferenceObservation(
+    _ registration: PreferenceObservationRegistrationSnapshot
+  ) {
+    preferenceObservationRegistrations.append(registration)
   }
 }

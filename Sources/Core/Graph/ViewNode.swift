@@ -168,11 +168,180 @@ package final class ViewNode {
     childDescriptors = resolved.children.map(ChildDescriptor.init)
     self.children = children
     cachedResolvedNode = resolved
-    registeredHandlers = .init(
-      lifecycleHandlerIDs:
-        resolved.lifecycleMetadata.appearHandlerIDs
-        + resolved.lifecycleMetadata.disappearHandlerIDs,
-      task: resolved.lifecycleMetadata.task
+  }
+
+  package func beginRegistrationCapture() {
+    registeredHandlers.reset()
+  }
+
+  package func recordActionRegistration(
+    identity: Identity,
+    handler: @escaping LocalActionRegistry.Handler,
+    followUpInvalidationIdentity: Identity?
+  ) {
+    registeredHandlers.recordAction(
+      identity: identity,
+      handler: handler,
+      followUpInvalidationIdentity: followUpInvalidationIdentity
+    )
+  }
+
+  package func recordKeyHandlerRegistration(
+    identity: Identity,
+    handler: @escaping LocalKeyHandlerRegistry.Handler
+  ) {
+    registeredHandlers.recordKeyHandler(
+      identity: identity,
+      handler: handler
+    )
+  }
+
+  package func recordKeyPressHandlerRegistration(
+    identity: Identity,
+    handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
+  ) {
+    registeredHandlers.recordKeyPressHandler(
+      identity: identity,
+      handler: handler
+    )
+  }
+
+  package func recordPointerHandlerRegistration(
+    routeID: RouteID,
+    handler: @escaping LocalPointerHandlerRegistry.Handler
+  ) {
+    registeredHandlers.recordPointerHandler(
+      routeID: routeID,
+      handler: handler
+    )
+  }
+
+  package func recordFocusBindingRegistration(
+    _ registration: FocusBindingRegistrationSnapshot
+  ) {
+    registeredHandlers.recordFocusBinding(registration)
+  }
+
+  package func recordFocusedValuesRegistration(
+    _ registration: FocusedValuesRegistrationSnapshot
+  ) {
+    registeredHandlers.recordFocusedValues(registration)
+  }
+
+  package func recordHotkeyRegistration(
+    _ registration: HotkeyRegistrationSnapshot
+  ) {
+    registeredHandlers.recordHotkey(registration)
+  }
+
+  package func recordLifecycleAppearRegistration(
+    handlerID: String,
+    handler: @escaping LocalLifecycleRegistry.Handler
+  ) {
+    registeredHandlers.recordLifecycleAppear(
+      handlerID: handlerID,
+      handler: handler
+    )
+  }
+
+  package func recordLifecycleDisappearRegistration(
+    handlerID: String,
+    handler: @escaping LocalLifecycleRegistry.Handler
+  ) {
+    registeredHandlers.recordLifecycleDisappear(
+      handlerID: handlerID,
+      handler: handler
+    )
+  }
+
+  package func recordTaskRegistration(
+    identity: Identity,
+    registration: TaskRegistration
+  ) {
+    registeredHandlers.recordTask(
+      identity: identity,
+      registration: registration
+    )
+  }
+
+  package func recordPreferenceObservationRegistration(
+    _ registration: PreferenceObservationRegistrationSnapshot
+  ) {
+    registeredHandlers.recordPreferenceObservation(registration)
+  }
+
+  package func restoreRuntimeRegistrations(
+    into actionRegistry: LocalActionRegistry? = nil,
+    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
+    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
+    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
+    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
+    hotkeyRegistry: HotkeyRegistry? = nil,
+    lifecycleRegistry: LocalLifecycleRegistry? = nil,
+    taskRegistry: LocalTaskRegistry? = nil,
+    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
+  ) {
+    actionRegistry?.restore(registeredHandlers.actionRegistrations)
+    keyHandlerRegistry?.restore(registeredHandlers.keyHandlerRegistrations)
+    keyHandlerRegistry?.restoreKeyPressHandlers(
+      registeredHandlers.keyPressHandlerRegistrations
+    )
+    pointerHandlerRegistry?.restore(registeredHandlers.pointerHandlerRegistrations)
+    focusBindingRegistry?.restore(registeredHandlers.focusBindingRegistrations)
+    focusedValuesRegistry?.restore(registeredHandlers.focusedValuesRegistrations)
+    hotkeyRegistry?.restore(registeredHandlers.hotkeyRegistrations)
+    lifecycleRegistry?.restore(registeredHandlers.lifecycleRegistrations)
+    taskRegistry?.restore(registeredHandlers.taskRegistrations)
+    preferenceObservationRegistry?.restore(
+      registeredHandlers.preferenceObservationRegistrations
+    )
+
+    for child in children {
+      child.restoreRuntimeRegistrations(
+        into: actionRegistry,
+        keyHandlerRegistry: keyHandlerRegistry,
+        pointerHandlerRegistry: pointerHandlerRegistry,
+        focusBindingRegistry: focusBindingRegistry,
+        focusedValuesRegistry: focusedValuesRegistry,
+        hotkeyRegistry: hotkeyRegistry,
+        lifecycleRegistry: lifecycleRegistry,
+        taskRegistry: taskRegistry,
+        preferenceObservationRegistry: preferenceObservationRegistry
+      )
+    }
+  }
+
+  package func rebuildRuntimeRegistrations(
+    into actionRegistry: LocalActionRegistry? = nil,
+    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
+    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
+    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
+    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
+    hotkeyRegistry: HotkeyRegistry? = nil,
+    lifecycleRegistry: LocalLifecycleRegistry? = nil,
+    taskRegistry: LocalTaskRegistry? = nil,
+    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
+  ) {
+    actionRegistry?.reset()
+    keyHandlerRegistry?.reset()
+    pointerHandlerRegistry?.reset()
+    focusBindingRegistry?.reset()
+    focusedValuesRegistry?.reset()
+    hotkeyRegistry?.reset()
+    lifecycleRegistry?.reset()
+    taskRegistry?.reset()
+    preferenceObservationRegistry?.reset()
+
+    restoreRuntimeRegistrations(
+      into: actionRegistry,
+      keyHandlerRegistry: keyHandlerRegistry,
+      pointerHandlerRegistry: pointerHandlerRegistry,
+      focusBindingRegistry: focusBindingRegistry,
+      focusedValuesRegistry: focusedValuesRegistry,
+      hotkeyRegistry: hotkeyRegistry,
+      lifecycleRegistry: lifecycleRegistry,
+      taskRegistry: taskRegistry,
+      preferenceObservationRegistry: preferenceObservationRegistry
     )
   }
 

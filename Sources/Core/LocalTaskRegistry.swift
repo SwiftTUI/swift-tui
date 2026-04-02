@@ -34,6 +34,10 @@ package final class LocalTaskRegistry: Equatable {
     registration: TaskRegistration
   ) {
     registrations[identity] = registration
+    ViewNodeContext.current?.recordTaskRegistration(
+      identity: identity,
+      registration: registration
+    )
   }
 
   package func registration(

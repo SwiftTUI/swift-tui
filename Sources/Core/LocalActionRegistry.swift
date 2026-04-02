@@ -27,7 +27,13 @@ package final class LocalActionRegistry: Equatable {
     handler: @escaping Handler,
     followUpInvalidationIdentity: Identity? = nil
   ) {
-    handlers[identity] = .init(
+    let registration = Registration(
+      handler: handler,
+      followUpInvalidationIdentity: followUpInvalidationIdentity
+    )
+    handlers[identity] = registration
+    ViewNodeContext.current?.recordActionRegistration(
+      identity: identity,
       handler: handler,
       followUpInvalidationIdentity: followUpInvalidationIdentity
     )

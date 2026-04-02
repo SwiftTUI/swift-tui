@@ -18,6 +18,8 @@ package final class ViewGraph {
   package private(set) var root: ViewNode?
 
   private var nodesByIdentity: [Identity: ViewNode]
+  private var rootEvaluator: (@MainActor () -> Void)?
+  private var evaluationRootIdentity: Identity?
   private var committedLifecycleState: LifecycleStateSnapshot
   private var frameOrder: [Identity]
   private var stableTaskCancelEvents: [LifecycleEvent]
@@ -28,6 +30,8 @@ package final class ViewGraph {
 
   package init() {
     nodesByIdentity = [:]
+    rootEvaluator = nil
+    evaluationRootIdentity = nil
     committedLifecycleState = .init()
     frameOrder = []
     stableTaskCancelEvents = []
@@ -44,7 +48,20 @@ package final class ViewGraph {
     }
   }
 
-  package func evaluateDirtyNodes() {}
+  package func setRootEvaluator(
+    rootIdentity: Identity,
+    _ evaluate: @escaping @MainActor () -> Void
+  ) {
+    evaluationRootIdentity = rootIdentity
+    rootEvaluator = evaluate
+  }
+
+  package func evaluateDirtyNodes() {
+    rootEvaluator?()
+    if let evaluationRootIdentity {
+      root = nodesByIdentity[evaluationRootIdentity]
+    }
+  }
 
   package func beginFrame() {
     previousRootIdentity = root?.identity
@@ -167,14 +184,27 @@ package final class ViewGraph {
     resolved: ResolvedNode,
     placed: PlacedNode?
   ) -> [LifecycleEvent] {
-    let rootIdentity = resolved.identity
+    return finalizeFrame(
+      rootIdentity: resolved.identity,
+      resolved: resolved,
+      placed: placed
+    )
+  }
+
+  package func finalizeFrame(
+    rootIdentity: Identity,
+    resolved: ResolvedNode,
+    placed: PlacedNode?
+  ) -> [LifecycleEvent] {
     root = nodesByIdentity[rootIdentity]
 
     var removedIdentities: Set<Identity> = []
+    var traversedIdentities: Set<Identity> = []
     if let previousRootIdentity {
       collectRemovedIdentities(
         from: previousRootIdentity,
-        removedIdentities: &removedIdentities
+        removedIdentities: &removedIdentities,
+        traversedIdentities: &traversedIdentities
       )
     }
 
@@ -210,10 +240,25 @@ package final class ViewGraph {
     return root.snapshot()
   }
 
+  package func snapshot(
+    rootIdentity: Identity
+  ) -> ResolvedNode {
+    guard let root = nodesByIdentity[rootIdentity] else {
+      fatalError("View graph has no node for root identity \(rootIdentity).")
+    }
+    self.root = root
+    return root.snapshot()
+  }
+
   private func collectRemovedIdentities(
     from identity: Identity,
-    removedIdentities: inout Set<Identity>
+    removedIdentities: inout Set<Identity>,
+    traversedIdentities: inout Set<Identity>
   ) {
+    guard traversedIdentities.insert(identity).inserted else {
+      return
+    }
+
     guard let node = nodesByIdentity[identity], node.wasPresentAtFrameStart else {
       return
     }
@@ -221,7 +266,8 @@ package final class ViewGraph {
     for childIdentity in node.previousChildrenIdentities {
       collectRemovedIdentities(
         from: childIdentity,
-        removedIdentities: &removedIdentities
+        removedIdentities: &removedIdentities,
+        traversedIdentities: &traversedIdentities
       )
     }
 

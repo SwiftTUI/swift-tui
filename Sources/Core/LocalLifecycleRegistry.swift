@@ -34,6 +34,10 @@ package final class LocalLifecycleRegistry: Equatable {
     handler: @escaping Handler
   ) {
     appearHandlers[handlerID] = handler
+    ViewNodeContext.current?.recordLifecycleAppearRegistration(
+      handlerID: handlerID,
+      handler: handler
+    )
   }
 
   package func registerDisappear(
@@ -41,6 +45,10 @@ package final class LocalLifecycleRegistry: Equatable {
     handler: @escaping Handler
   ) {
     disappearHandlers[handlerID] = handler
+    ViewNodeContext.current?.recordLifecycleDisappearRegistration(
+      handlerID: handlerID,
+      handler: handler
+    )
   }
 
   package func appearHandler(
