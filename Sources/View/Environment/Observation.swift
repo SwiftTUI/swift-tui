@@ -67,7 +67,7 @@ package final class ObservationBridge: Equatable {
     guard observedPasses[identity] == pass else {
       return
     }
-    viewGraph?.queueDirty([identity])
+    viewGraph?.queueDirtyForObservationChange(observedBy: identity)
     invalidator?.requestInvalidation(of: [identity])
   }
 }

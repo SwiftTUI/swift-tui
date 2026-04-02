@@ -148,7 +148,10 @@ package final class ViewNode {
 
     let didChange = stateSlots[ordinal].set(value)
     if didChange {
-      requestInvalidation()
+      ownerGraph?.queueDirtyForStateChange(
+        .init(identity: identity, ordinal: ordinal)
+      )
+      invalidator?.requestInvalidation(of: [identity])
     }
   }
 

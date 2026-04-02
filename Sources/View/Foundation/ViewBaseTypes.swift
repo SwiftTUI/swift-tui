@@ -103,6 +103,7 @@ public struct Bindable<Model> where Model: AnyObject, Model: Observable {
   ) -> Binding<Value> {
     // Register the observable property access while the enclosing body is
     // being built so writes map back into the existing invalidation pipeline.
+    ViewNodeContext.current?.recordObservableRead(ObjectIdentifier(wrappedValue))
     _ = wrappedValue[keyPath: keyPath]
     return Binding(
       mainActorGet: { wrappedValue[keyPath: keyPath] },

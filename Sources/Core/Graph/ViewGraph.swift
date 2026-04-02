@@ -25,6 +25,9 @@ package final class ViewGraph {
   private var latestLifecycleEvents: [LifecycleEvent]
   private var registrationAliasesByIdentity: [Identity: Set<Identity>]
   private var registrationAliasTargets: [Identity: Identity]
+  private var stateSlotDependents: [StateSlotKey: Set<Identity>]
+  private var environmentDependents: [ObjectIdentifier: Set<Identity>]
+  private var observableDependents: [ObjectIdentifier: Set<Identity>]
 
   package init() {
     nodesByIdentity = [:]
@@ -43,6 +46,9 @@ package final class ViewGraph {
     latestLifecycleEvents = []
     registrationAliasesByIdentity = [:]
     registrationAliasTargets = [:]
+    stateSlotDependents = [:]
+    environmentDependents = [:]
+    observableDependents = [:]
   }
 
   package func invalidate(_ identities: Set<Identity>) {
@@ -59,6 +65,37 @@ package final class ViewGraph {
     for identity in identities {
       nodesByIdentity[identity]?.markDirty()
     }
+  }
+
+  package func queueDirtyForStateChange(
+    _ key: StateSlotKey
+  ) {
+    queueDirty(Set([key.identity]).union(stateSlotDependents[key] ?? []))
+  }
+
+  package func queueDirtyForObservationChange(
+    observedBy identity: Identity
+  ) {
+    let dirtyIdentities =
+      Set([identity]).union(observableDependencyIdentities(triggeredBy: identity))
+    queueDirty(dirtyIdentities)
+  }
+
+  package func invalidateEnvironmentReaders(
+    within identities: Set<Identity>,
+    changedKeys: Set<ObjectIdentifier>
+  ) {
+    let dirtyIdentities = environmentDependencyIdentities(
+      within: identities,
+      changedKeys: changedKeys
+    )
+    guard !dirtyIdentities.isEmpty else {
+      invalidate(identities)
+      return
+    }
+
+    invalidatedIdentities.formUnion(dirtyIdentities)
+    queueDirty(dirtyIdentities)
   }
 
   package func setRootEvaluator(
@@ -180,6 +217,7 @@ package final class ViewGraph {
     resolved: ResolvedNode,
     accessedStateSlots: Int
   ) {
+    let previousDependencies = node.dependencies
     guard node.finishEvaluation(accessedStateSlots: accessedStateSlots) else {
       return
     }
@@ -194,6 +232,10 @@ package final class ViewGraph {
     node.apply(
       resolved: resolved,
       children: childNodes
+    )
+    reindexDependencies(
+      for: node,
+      previous: previousDependencies
     )
 
     if node.wasPresentAtFrameStart {
@@ -463,6 +505,30 @@ package final class ViewGraph {
     return root.snapshot()
   }
 
+  package func dependencies(
+    for identity: Identity
+  ) -> DependencySet? {
+    nodesByIdentity[identity]?.dependencies
+  }
+
+  package func stateDependentIdentities(
+    for key: StateSlotKey
+  ) -> Set<Identity> {
+    stateSlotDependents[key] ?? []
+  }
+
+  package func environmentDependentIdentities(
+    for key: ObjectIdentifier
+  ) -> Set<Identity> {
+    environmentDependents[key] ?? []
+  }
+
+  package func observableDependentIdentities(
+    for key: ObjectIdentifier
+  ) -> Set<Identity> {
+    observableDependents[key] ?? []
+  }
+
   package func restoreRuntimeRegistrations(
     for resolved: ResolvedNode,
     into actionRegistry: LocalActionRegistry? = nil,
@@ -609,6 +675,7 @@ package final class ViewGraph {
 
     node.setLifecycleState(.disappearing)
     node.parent = nil
+    removeDependencyEdges(for: node)
 
     if let target = registrationAliasTargets.removeValue(forKey: node.identity) {
       registrationAliasesByIdentity[target]?.remove(node.identity)
@@ -618,6 +685,98 @@ package final class ViewGraph {
     }
     registrationAliasesByIdentity.removeValue(forKey: node.identity)
     nodesByIdentity.removeValue(forKey: node.identity)
+  }
+
+  private func reindexDependencies(
+    for node: ViewNode,
+    previous: DependencySet
+  ) {
+    removeDependencyEdges(
+      for: node.identity,
+      dependencies: previous
+    )
+    insertDependencyEdges(
+      for: node.identity,
+      dependencies: node.dependencies
+    )
+  }
+
+  private func removeDependencyEdges(
+    for node: ViewNode
+  ) {
+    removeDependencyEdges(
+      for: node.identity,
+      dependencies: node.dependencies
+    )
+  }
+
+  private func removeDependencyEdges(
+    for identity: Identity,
+    dependencies: DependencySet
+  ) {
+    for key in dependencies.stateSlotReads {
+      stateSlotDependents[key]?.remove(identity)
+      if stateSlotDependents[key]?.isEmpty == true {
+        stateSlotDependents.removeValue(forKey: key)
+      }
+    }
+    for key in dependencies.environmentReads {
+      environmentDependents[key]?.remove(identity)
+      if environmentDependents[key]?.isEmpty == true {
+        environmentDependents.removeValue(forKey: key)
+      }
+    }
+    for key in dependencies.observableReads {
+      observableDependents[key]?.remove(identity)
+      if observableDependents[key]?.isEmpty == true {
+        observableDependents.removeValue(forKey: key)
+      }
+    }
+  }
+
+  private func insertDependencyEdges(
+    for identity: Identity,
+    dependencies: DependencySet
+  ) {
+    for key in dependencies.stateSlotReads {
+      stateSlotDependents[key, default: []].insert(identity)
+    }
+    for key in dependencies.environmentReads {
+      environmentDependents[key, default: []].insert(identity)
+    }
+    for key in dependencies.observableReads {
+      observableDependents[key, default: []].insert(identity)
+    }
+  }
+
+  private func observableDependencyIdentities(
+    triggeredBy identity: Identity
+  ) -> Set<Identity> {
+    guard let dependencies = nodesByIdentity[identity]?.dependencies,
+      !dependencies.observableReads.isEmpty
+    else {
+      return []
+    }
+
+    return dependencies.observableReads.reduce(into: Set<Identity>()) { partial, key in
+      partial.formUnion(observableDependents[key] ?? [])
+    }
+  }
+
+  private func environmentDependencyIdentities(
+    within roots: Set<Identity>,
+    changedKeys: Set<ObjectIdentifier>
+  ) -> Set<Identity> {
+    changedKeys.reduce(into: Set<Identity>()) { partial, key in
+      let dependents = environmentDependents[key] ?? []
+      partial.formUnion(
+        dependents.filter { dependent in
+          roots.contains { root in
+            dependent == root || dependent.isDescendant(of: root)
+          }
+        }
+      )
+    }
   }
 
   private func collectViewportLifecycleEvents(

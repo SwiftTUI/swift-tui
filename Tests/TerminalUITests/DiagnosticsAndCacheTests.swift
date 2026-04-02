@@ -728,7 +728,7 @@ struct DiagnosticsAndCacheTests {
     )
     updatedContext.localFocusedValuesRegistry = focusedValuesRegistry
 
-    let updated = renderer.render(
+    _ = renderer.render(
       makeRoot(secondLine: "Planet!"),
       context: updatedContext
     )

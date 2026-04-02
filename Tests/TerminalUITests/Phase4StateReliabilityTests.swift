@@ -17,7 +17,7 @@ struct Phase4StateReliabilityTests {
     let firstActionRegistry = LocalActionRegistry()
     let secondActionRegistry = LocalActionRegistry()
 
-    var firstContext = ResolveContext(
+    let firstContext = ResolveContext(
       identity: testIdentity("Root", "CounterA"),
       localActionRegistry: firstActionRegistry,
       applyEnvironmentValues: true
@@ -30,7 +30,7 @@ struct Phase4StateReliabilityTests {
       firstArtifacts.semanticSnapshot.focusRegions.first?.identity
     )
 
-    var secondContext = ResolveContext(
+    let secondContext = ResolveContext(
       identity: testIdentity("Root", "CounterB"),
       localActionRegistry: secondActionRegistry,
       applyEnvironmentValues: true

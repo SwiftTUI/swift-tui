@@ -711,7 +711,7 @@ struct SwiftUISurfaceTests {
     let firstRenderer = DefaultRenderer()
     let secondRenderer = DefaultRenderer()
 
-    var firstContext = ResolveContext(
+    let firstContext = ResolveContext(
       identity: testIdentity("RootA"),
       localActionRegistry: firstActionRegistry,
       applyEnvironmentValues: true
@@ -724,7 +724,7 @@ struct SwiftUISurfaceTests {
       firstArtifacts.semanticSnapshot.focusRegions.first?.identity
     )
 
-    var secondContext = ResolveContext(
+    let secondContext = ResolveContext(
       identity: testIdentity("RootB"),
       localActionRegistry: secondActionRegistry,
       applyEnvironmentValues: true

@@ -1,4 +1,5 @@
 public import Core
+import Observation
 
 /// Declares a typed environment value.
 public protocol EnvironmentKey {
@@ -102,14 +103,20 @@ public struct EnvironmentValues: Equatable, Sendable {
   public subscript<K: EnvironmentKey>(key: K.Type) -> K.Value {
     get {
       let identifier = ObjectIdentifier(key)
+      MainActor.assumeIsolated {
+        ViewNodeContext.current?.recordEnvironmentRead(identifier)
+      }
       guard let boxed = storage[identifier] else {
-        return K.defaultValue
+        let defaultValue = K.defaultValue
+        recordObservableEnvironmentRead(defaultValue)
+        return defaultValue
       }
       guard let typed: K.Value = boxed.value(as: K.Value.self) else {
         preconditionFailure(
           "Environment type mismatch for \(String(reflecting: key)). Expected \(K.Value.self), found \(boxed.valueTypeDescription)."
         )
       }
+      recordObservableEnvironmentRead(typed)
       return typed
     }
     set {
@@ -143,6 +150,18 @@ public struct EnvironmentValues: Equatable, Sendable {
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.snapshotValues == rhs.snapshotValues
+  }
+
+  private func recordObservableEnvironmentRead<Value>(
+    _ value: Value
+  ) {
+    guard let observable = value as? any Observable & AnyObject else {
+      return
+    }
+    let observableID = ObjectIdentifier(observable)
+    MainActor.assumeIsolated {
+      ViewNodeContext.current?.recordObservableRead(observableID)
+    }
   }
 }
 
@@ -179,6 +198,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var observationBridge: ObservationBridge?
   package var viewGraph: ViewGraph?
   package var imageAssetResolver: ImageAssetResolver?
+  package var runtimeRegistrationReplayMode: RuntimeRegistrationReplayMode
 
   /// Creates a public resolve context from authored configuration only.
   public init(
@@ -226,6 +246,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.resolveWorkTracker = resolveWorkTracker
     childContext.focusedValues = focusedValues
     childContext.imageAssetResolver = imageAssetResolver
+    childContext.runtimeRegistrationReplayMode = runtimeRegistrationReplayMode
     return childContext
   }
 
@@ -261,6 +282,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.resolveWorkTracker = resolveWorkTracker
     replacedContext.focusedValues = focusedValues
     replacedContext.imageAssetResolver = imageAssetResolver
+    replacedContext.runtimeRegistrationReplayMode = runtimeRegistrationReplayMode
     return replacedContext
   }
 
@@ -377,7 +399,13 @@ extension ResolveContext {
     observationBridge = nil
     viewGraph = nil
     imageAssetResolver = nil
+    runtimeRegistrationReplayMode = .eagerDuringResolve
   }
+}
+
+package enum RuntimeRegistrationReplayMode: Sendable {
+  case eagerDuringResolve
+  case deferredUntilPostPass
 }
 
 extension EnvironmentValues {

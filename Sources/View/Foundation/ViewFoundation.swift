@@ -230,18 +230,20 @@ package func resolveView<V: View>(
     transaction: context.transaction,
     invalidator: context.invalidationProxy?.invalidator
   ) {
-    context.viewGraph?.restoreRuntimeRegistrations(
-      for: reused,
-      into: context.localActionRegistry,
-      keyHandlerRegistry: context.localKeyHandlerRegistry,
-      pointerHandlerRegistry: context.localPointerHandlerRegistry,
-      focusBindingRegistry: context.localFocusBindingRegistry,
-      focusedValuesRegistry: context.localFocusedValuesRegistry,
-      hotkeyRegistry: context.hotkeyRegistry,
-      lifecycleRegistry: context.localLifecycleRegistry,
-      taskRegistry: context.localTaskRegistry,
-      preferenceObservationRegistry: context.localPreferenceObservationRegistry
-    )
+    if context.runtimeRegistrationReplayMode == .eagerDuringResolve {
+      context.viewGraph?.restoreRuntimeRegistrations(
+        for: reused,
+        into: context.localActionRegistry,
+        keyHandlerRegistry: context.localKeyHandlerRegistry,
+        pointerHandlerRegistry: context.localPointerHandlerRegistry,
+        focusBindingRegistry: context.localFocusBindingRegistry,
+        focusedValuesRegistry: context.localFocusedValuesRegistry,
+        hotkeyRegistry: context.hotkeyRegistry,
+        lifecycleRegistry: context.localLifecycleRegistry,
+        taskRegistry: context.localTaskRegistry,
+        preferenceObservationRegistry: context.localPreferenceObservationRegistry
+      )
+    }
     context.recordResolvedReuse(
       count: resolvedNodeCount(in: reused)
     )
@@ -253,8 +255,10 @@ package func resolveView<V: View>(
     invalidator: context.invalidationProxy?.invalidator
   )
   if let graphNode, graphNode.isAtOutermostEvaluationDepth {
+    var retainedContext = context
+    retainedContext.runtimeRegistrationReplayMode = .deferredUntilPostPass
     context.viewGraph?.setEvaluator(for: context.identity) {
-      _ = resolveView(view, in: context)
+      _ = resolveView(view, in: retainedContext)
     }
   }
   context.recordResolvedComputation()
