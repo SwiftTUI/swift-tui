@@ -280,6 +280,9 @@ public final class RunLoop<State: Equatable & Sendable> {
     while await iterator.next() != nil {
       let pendingEvents = await drainPendingEvents(from: eventPump)
       guard !pendingEvents.isEmpty else {
+        if scheduler.hasPendingFrame(at: .now()) {
+          try renderPendingFrames(renderedFrames: &renderedFrames)
+        }
         continue
       }
 

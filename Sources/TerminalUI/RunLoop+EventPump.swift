@@ -110,6 +110,7 @@ extension RunLoop {
       ?? AsyncStream { continuation in
         continuation.finish()
       }
+    let wakeNotifyingScheduler = scheduler as? any WakeNotifyingFrameScheduling
 
     let completion = EventPumpCompletion(remainingStreams: 2)
     let buffer = EventPumpBuffer()
@@ -134,6 +135,10 @@ extension RunLoop {
         }
         completion.streamFinished(continuation)
       }
+
+      wakeNotifyingScheduler?.setWakeHandler {
+        continuation.yield()
+      }
     }
 
     return EventPump(
@@ -144,6 +149,7 @@ extension RunLoop {
       cancel: {
         inputTask?.cancel()
         signalTask?.cancel()
+        wakeNotifyingScheduler?.setWakeHandler(nil)
       }
     )
   }

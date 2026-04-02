@@ -38,6 +38,10 @@ public protocol Invalidating: AnyObject {
   func requestInvalidation(of identities: Set<Identity>)
 }
 
+package protocol WakeNotifyingFrameScheduling: AnyObject {
+  func setWakeHandler(_ handler: (@Sendable () -> Void)?)
+}
+
 /// Scheduler contract used by the runtime event loop.
 public protocol FrameScheduling: Invalidating {
   func requestInput()
@@ -57,6 +61,7 @@ public final class FrameScheduler: FrameScheduling {
   private var signalNames: Set<String> = []
   private var externalReasons: Set<String> = []
   private var nextDeadline: MonotonicInstant?
+  private let wakeHandlerLock = OSAllocatedUnfairLock<(@Sendable () -> Void)?>(uncheckedState: nil)
 
   public init() {}
 
@@ -67,6 +72,7 @@ public final class FrameScheduler: FrameScheduling {
   public func requestInvalidation(of identities: Set<Identity>) {
     pendingCauses.insert(.invalidation)
     invalidatedIdentities.formUnion(identities)
+    wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
   public func requestSignal(named name: String) {
@@ -77,6 +83,7 @@ public final class FrameScheduler: FrameScheduling {
   public func requestExternalWake(reason: String) {
     pendingCauses.insert(.external)
     externalReasons.insert(reason)
+    wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
   public func requestDeadline(_ deadline: MonotonicInstant) {
@@ -143,5 +150,11 @@ public final class FrameScheduler: FrameScheduling {
     signalNames.removeAll(keepingCapacity: true)
     externalReasons.removeAll(keepingCapacity: true)
     nextDeadline = nil
+  }
+}
+
+extension FrameScheduler: WakeNotifyingFrameScheduling {
+  package func setWakeHandler(_ handler: (@Sendable () -> Void)?) {
+    wakeHandlerLock.withLockUnchecked { $0 = handler }
   }
 }

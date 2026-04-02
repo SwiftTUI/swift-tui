@@ -1509,6 +1509,50 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("toast auto-dismiss rerenders without additional input")
+  func toastAutoDismissRerendersWithoutAdditionalInput() async throws {
+    let terminalSize = Size(width: 32, height: 8)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("ToastRuntimeRoot")
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      inputReader: GateInputReader(gate: AsyncEventGate(), event: .character("q")),
+      signalReader: TimedSignalReader(
+        signals: [
+          .init(delayNanoseconds: 1_000_000_000, value: "SIGTERM")
+        ]
+      ),
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        ToastAutoDismissHarnessView(terminalSize: terminalSize)
+      }
+    )
+    runLoop.attachDynamicStateStore(
+      DynamicStateStore(invalidationIdentities: [rootIdentity])
+    )
+
+    let result = try await runLoop.run()
+
+    let firstFrame = try #require(terminal.frames.first)
+    let lastFrame = try #require(terminal.frames.last)
+
+    #expect(result.exitReason == .signal("SIGTERM"))
+    #expect(result.renderedFrames == 2)
+    #expect(firstFrame.contains("Action performed"))
+    #expect(!lastFrame.contains("Action performed"))
+  }
+
+  @MainActor
   @Test("mouse input updates built-in controls through click drag and wheel paths")
   func mouseInputUpdatesBuiltInControls() async throws {
     let box = MouseControlBox()
@@ -3071,6 +3115,27 @@ private func scopeSectionFixture() -> some View {
     }
     .id(testIdentity("Root", "Scope"))
     .focusScope()
+  }
+}
+
+private struct ToastAutoDismissHarnessView: View {
+  let terminalSize: Size
+
+  @State private var isToastPresented = true
+
+  var body: some View {
+    Text("Workspace")
+      .frame(
+        width: terminalSize.width,
+        height: terminalSize.height,
+        alignment: .topLeading
+      )
+      .toast(
+        "Action performed",
+        isPresented: $isToastPresented,
+        style: .success,
+        duration: 0.01
+      )
   }
 }
 

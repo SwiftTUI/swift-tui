@@ -158,7 +158,6 @@ extension TabView {
         ForEach(options.indices, id: \.self) { index in
           let option = options[index]
           let isSelected = index == activeIndex
-          let isFocusedTab = focusActive && isSelected
 
           PointerRouteView(
             identity: tabItemIdentity(
@@ -169,8 +168,6 @@ extension TabView {
               tabItemView(
                 label: option.label.displayText,
                 isSelected: isSelected,
-                isStripFocused: focusActive,
-                isFocusedTab: isFocusedTab,
                 tone: activeTone,
                 style: tabStyle,
                 styleEnvironment: styleEnvironment
@@ -179,8 +176,6 @@ extension TabView {
                 tabItemRuleSegment(
                   label: option.label.displayText,
                   isSelected: isSelected,
-                  isStripFocused: focusActive,
-                  isFocusedTab: isFocusedTab,
                   style: tabStyle
                 )
               }
@@ -190,6 +185,12 @@ extension TabView {
         Spacer(minLength: 0)
       }
       .frame(height: hasRule ? 2 : 1, alignment: .leading)
+      .overlay {
+        if focusActive {
+          Rectangle()
+            .fill(AnyShapeStyle(.terminalAccent(activeTone)).opacity(0.1))
+        }
+      }
       if options.indices.contains(activeIndex) {
         ResolvedContentView(node: options[activeIndex].node)
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -205,8 +206,6 @@ extension TabView {
   private func tabItemView(
     label: String,
     isSelected: Bool,
-    isStripFocused: Bool,
-    isFocusedTab: Bool,
     tone: TerminalTone,
     style: TabViewStyle,
     styleEnvironment: StyleEnvironmentSnapshot
@@ -216,8 +215,6 @@ extension TabView {
       underlineTabItem(
         label: label,
         isSelected: isSelected,
-        isStripFocused: isStripFocused,
-        isFocusedTab: isFocusedTab,
         tone: tone,
         styleEnvironment: styleEnvironment
       )
@@ -225,8 +222,6 @@ extension TabView {
       roundedTabItem(
         label: label,
         isSelected: isSelected,
-        isStripFocused: isStripFocused,
-        isFocusedTab: isFocusedTab,
         tone: tone,
         styleEnvironment: styleEnvironment
       )
@@ -234,8 +229,6 @@ extension TabView {
       powerlineTabItem(
         label: label,
         isSelected: isSelected,
-        isStripFocused: isStripFocused,
-        isFocusedTab: isFocusedTab,
         tone: tone,
         styleEnvironment: styleEnvironment
       )
@@ -247,33 +240,23 @@ extension TabView {
   private func underlineTabItem(
     label: String,
     isSelected: Bool,
-    isStripFocused: Bool,
-    isFocusedTab: Bool,
     tone: TerminalTone,
     styleEnvironment: StyleEnvironmentSnapshot
   ) -> some View {
-    let labelText = tabFocusMarkedLabel(
-      label,
-      showsFocusMarker: isFocusedTab
-    )
     let foreground: AnyShapeStyle =
       isSelected
       ? AnyShapeStyle(.terminalAccent(tone))
-      : isStripFocused
-        ? styleEnvironment.theme.foreground
-        : .semantic(.muted)
-    return Text("\(labelText) ")
+      : .semantic(.muted)
+    return Text("\(label) ")
       .lineLimit(1)
       .foregroundStyle(foreground)
-      .drawMetadata(.init(opacity: isSelected || isStripFocused ? 1.0 : 0.4))
+      .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.4))
   }
 
   @ViewBuilder
   private func tabItemRuleSegment(
     label: String,
     isSelected: Bool,
-    isStripFocused: Bool,
-    isFocusedTab: Bool,
     style: TabViewStyle
   ) -> some View {
     let resolvedStyle = style == .automatic ? TabViewStyle.underline : style
@@ -281,16 +264,12 @@ extension TabView {
     case .automatic, .underline:
       underlineRuleSegment(
         label: label,
-        isSelected: isSelected,
-        isStripFocused: isStripFocused,
-        isFocusedTab: isFocusedTab
+        isSelected: isSelected
       )
     case .rounded:
       roundedRuleSegment(
         label: label,
-        isSelected: isSelected,
-        isStripFocused: isStripFocused,
-        isFocusedTab: isFocusedTab
+        isSelected: isSelected
       )
     case .powerline:
       EmptyView()
@@ -299,29 +278,18 @@ extension TabView {
 
   private func underlineRuleSegment(
     label: String,
-    isSelected: Bool,
-    isStripFocused: Bool,
-    isFocusedTab: Bool
+    isSelected: Bool
   ) -> some View {
     let width = label.count
-    let text: String
-    let foreground: AnyShapeStyle
-    if isSelected && isFocusedTab {
-      text = "╺" + String(repeating: "━", count: width) + "╸"
-      foreground = AnyShapeStyle(.terminalAccent(.accent))
-    } else if isSelected {
-      text = " \(String(repeating: "━", count: width)) "
-      foreground = .semantic(.separator)
-    } else if isStripFocused {
-      text = " \(String(repeating: "─", count: width)) "
-      foreground = AnyShapeStyle(.terminalAccent(.neutral))
-    } else {
-      text = " \(String(repeating: "─", count: width)) "
-      foreground = .semantic(.separator)
-    }
+    let text =
+      if isSelected {
+        " \(String(repeating: "━", count: width)) "
+      } else {
+        " \(String(repeating: "─", count: width)) "
+      }
     return Text(text)
       .lineLimit(1)
-      .foregroundStyle(foreground)
+      .foregroundStyle(.semantic(.separator))
       .frame(height: 1, alignment: .leading)
   }
 
@@ -330,24 +298,16 @@ extension TabView {
   private func roundedTabItem(
     label: String,
     isSelected: Bool,
-    isStripFocused: Bool,
-    isFocusedTab: Bool,
     tone: TerminalTone,
     styleEnvironment: StyleEnvironmentSnapshot
   ) -> some View {
     let prefix = isSelected ? "╭" : " "
     let suffix = isSelected ? "╮" : " "
-    let labelText = tabFocusMarkedLabel(
-      label,
-      showsFocusMarker: isFocusedTab
-    )
     let foreground: AnyShapeStyle =
       isSelected
       ? AnyShapeStyle(.terminalAccent(tone))
-      : isStripFocused
-        ? styleEnvironment.theme.foreground
-        : .semantic(.muted)
-    return Text("\(prefix)\(labelText)\(suffix)")
+      : .semantic(.muted)
+    return Text("\(prefix)\(label)\(suffix)")
       .lineLimit(1)
       .foregroundStyle(foreground)
       .background {
@@ -359,28 +319,18 @@ extension TabView {
 
   private func roundedRuleSegment(
     label: String,
-    isSelected: Bool,
-    isStripFocused: Bool,
-    isFocusedTab: Bool
+    isSelected: Bool
   ) -> some View {
     let width = label.count + 1
     let text =
-      if isSelected && isFocusedTab {
-        "╰" + String(repeating: "═", count: width) + "╯"
-      } else if isSelected {
+      if isSelected {
         "╰" + String(repeating: "─", count: width) + "╯"
       } else {
         " " + String(repeating: "─", count: width) + " "
       }
     return Text(text)
       .lineLimit(1)
-      .foregroundStyle(
-        isFocusedTab
-          ? AnyShapeStyle(.terminalAccent(.accent))
-          : isStripFocused
-            ? AnyShapeStyle(.terminalAccent(.neutral))
-            : .semantic(.separator)
-      )
+      .foregroundStyle(.semantic(.separator))
       .frame(height: 1, alignment: .leading)
   }
 
@@ -389,32 +339,22 @@ extension TabView {
   private func powerlineTabItem(
     label: String,
     isSelected: Bool,
-    isStripFocused: Bool,
-    isFocusedTab: Bool,
     tone: TerminalTone,
     styleEnvironment: StyleEnvironmentSnapshot
   ) -> some View {
-    let labelText = tabFocusMarkedLabel(
-      label,
-      showsFocusMarker: isFocusedTab
-    )
     let foreground: AnyShapeStyle =
       isSelected
       ? styleEnvironment.theme.foreground
-      : isStripFocused
-        ? styleEnvironment.theme.foreground
-        : .semantic(.muted)
-    return Text("\(labelText) ")
+      : .semantic(.muted)
+    return Text("\(label) ")
       .lineLimit(1)
       .foregroundStyle(foreground)
       .background {
         if isSelected {
           Rectangle().fill(AnyShapeStyle(.terminalTab(tone, isSelected: true)))
-        } else if isStripFocused {
-          Rectangle().fill(AnyShapeStyle(.terminalTab(tone, isSelected: false)))
         }
       }
-      .drawMetadata(.init(opacity: isSelected || isStripFocused ? 1.0 : 0.6))
+      .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.6))
   }
 }
 
@@ -467,14 +407,6 @@ private func tabItemLabel(
     }
   }
   return nil
-}
-
-private func tabFocusMarkedLabel(
-  _ label: String,
-  showsFocusMarker: Bool
-) -> String {
-  let marker = showsFocusMarker ? controlFocusRailGlyph : " "
-  return "\(marker)\(label)"
 }
 
 private struct ResolvedContentView: View, ResolvableView {
