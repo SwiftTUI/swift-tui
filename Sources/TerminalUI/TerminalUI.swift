@@ -70,10 +70,12 @@ public struct DefaultRenderer {
   public let rasterizer: Rasterizer
   public let commitPlanner: CommitPlanner
   private let imageRepository: ImageAssetRepository
+  private let viewGraph: ViewGraph
 
   private let retainedFrames: RetainedFrameStore
 
   /// Creates a renderer with the supplied pipeline components.
+  @MainActor
   public init(
     resolver: Resolver = .init(),
     layoutEngine: LayoutEngine = .init(cache: MeasurementCache()),
@@ -89,6 +91,7 @@ public struct DefaultRenderer {
     self.rasterizer = rasterizer
     self.commitPlanner = commitPlanner
     imageRepository = sharedImageAssetRepository
+    viewGraph = .init()
     retainedFrames = .init()
   }
 
@@ -146,6 +149,9 @@ public struct DefaultRenderer {
 
     var resolveContext = context
     resolveContext.imageAssetResolver = imageRepository.resolver()
+    viewGraph.beginFrame()
+    viewGraph.invalidate(context.invalidatedIdentities)
+    resolveContext.viewGraph = viewGraph
     resolveContext.resolveReuseSession = retainedFrames.resolveSession(
       invalidatedIdentities: context.invalidatedIdentities
     )
@@ -200,7 +206,8 @@ public struct DefaultRenderer {
       )
     }
     let (commit, commitDuration) = measurePhase {
-      commitPlanner.plan(
+      _ = viewGraph.finalizeFrame(rootIdentity: resolved.identity)
+      return commitPlanner.plan(
         resolved: resolved,
         placed: placed,
         semantics: semantics,

@@ -7,6 +7,7 @@ public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: View
   public var selection: Binding<SelectionValue>
   package var label: Label
   package var content: Content
+  private let authoringScope: DynamicPropertyScope?
 
   public init<S: StringProtocol>(
     _ title: S,
@@ -16,6 +17,7 @@ public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: View
     self.selection = selection
     label = Text(String(title))
     self.content = content()
+    authoringScope = currentDynamicPropertyScope()
   }
 
   public init(
@@ -26,6 +28,7 @@ public struct Picker<SelectionValue: Hashable, Label: View, Content: View>: View
     self.selection = selection
     self.label = label()
     self.content = content()
+    authoringScope = currentDynamicPropertyScope()
   }
 
   package func resolveElements(
@@ -62,7 +65,7 @@ extension Picker {
 
     if isEnabled {
       let binding = selection
-      let dynamicPropertyScope = currentDynamicPropertyScope()
+      let dynamicPropertyScope = currentDynamicPropertyScope() ?? authoringScope
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
         let delta: Int?
         switch pickerStyle {

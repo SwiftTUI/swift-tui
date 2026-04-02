@@ -8,16 +8,19 @@ public struct CommitPlanner {
     placed: PlacedNode? = nil,
     semantics: SemanticSnapshot,
     transaction: TransactionSnapshot = .init(),
+    lifecycleEvents: [LifecycleCommitEntry]? = nil,
     previousLifecycleState: CommittedLifecycleState? = nil
   ) -> CommitPlan {
     let nextLifecycleState = lifecycleState(
       from: resolved,
       placed: placed
     )
-    let lifecycle = lifecycleDiff(
-      previous: previousLifecycleState ?? .init(),
-      next: nextLifecycleState
-    )
+    let lifecycle =
+      lifecycleEvents
+      ?? lifecycleDiff(
+        previous: previousLifecycleState ?? .init(),
+        next: nextLifecycleState
+      )
     let handlerInstallations = semantics.interactionRegions.map {
       HandlerInstallation(handlerID: $0.routeID)
     }

@@ -177,6 +177,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var localTaskRegistry: LocalTaskRegistry?
   package var dynamicStateStore: DynamicStateStore?
   package var observationBridge: ObservationBridge?
+  package var viewGraph: ViewGraph?
   package var imageAssetResolver: ImageAssetResolver?
 
   /// Creates a public resolve context from authored configuration only.
@@ -221,6 +222,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.hotkeyRegistry = hotkeyRegistry
     childContext.dynamicStateStore = dynamicStateStore
     childContext.observationBridge = observationBridge
+    childContext.viewGraph = viewGraph
     childContext.resolveReuseSession = resolveReuseSession
     childContext.focusedValues = focusedValues
     childContext.imageAssetResolver = imageAssetResolver
@@ -255,6 +257,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.hotkeyRegistry = hotkeyRegistry
     replacedContext.dynamicStateStore = dynamicStateStore
     replacedContext.observationBridge = observationBridge
+    replacedContext.viewGraph = viewGraph
     replacedContext.resolveReuseSession = resolveReuseSession
     replacedContext.focusedValues = focusedValues
     replacedContext.imageAssetResolver = imageAssetResolver
@@ -300,7 +303,14 @@ public struct ResolveContext: Equatable, Sendable {
 
   @MainActor
   package func reusedResolvedSubtreeIfAvailable() -> ResolvedNode? {
-    resolveReuseSession?.reusedResolvedSubtree(for: self)
+    guard let reused = resolveReuseSession?.reusedResolvedSubtree(for: self) else {
+      return nil
+    }
+    viewGraph?.recordReusedSubtree(
+      reused,
+      invalidator: dynamicStateStore?.invalidator
+    )
+    return reused
   }
 
   @MainActor
@@ -370,6 +380,7 @@ extension ResolveContext {
     self.localTaskRegistry = localTaskRegistry
     dynamicStateStore = nil
     observationBridge = nil
+    viewGraph = nil
     imageAssetResolver = nil
   }
 }

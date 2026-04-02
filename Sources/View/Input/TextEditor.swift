@@ -12,7 +12,10 @@ public struct TextEditor: View, ResolvableView {
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+    let dynamicPropertyScope = makeDynamicPropertyScope(for: context)
+    return withDynamicPropertyScope(dynamicPropertyScope) {
+      [resolvedNode(in: context)]
+    }
   }
 }
 

@@ -56,7 +56,7 @@ private struct FocusStateLocation<Value: Equatable> {
 
 @MainActor
 private final class FocusStateBox<Value: Equatable> {
-  let sourceLocation: String
+  private var ordinal: Int?
 
   private struct Storage {
     var localStorage: FocusStateStorage<Value>
@@ -65,11 +65,7 @@ private final class FocusStateBox<Value: Equatable> {
 
   private let storage: OSAllocatedUnfairLock<Storage>
 
-  init(
-    seedValue: Value,
-    sourceLocation: String
-  ) {
-    self.sourceLocation = sourceLocation
+  init(seedValue: Value) {
     storage = OSAllocatedUnfairLock(
       uncheckedState:
         Storage(
@@ -112,13 +108,27 @@ private final class FocusStateBox<Value: Equatable> {
       storage.boundLocation
     }
   }
+
+  func currentOrdinal(
+    for scope: DynamicPropertyScope?
+  ) -> Int? {
+    if let ordinal {
+      return ordinal
+    }
+    guard let scope else {
+      return nil
+    }
+    let ordinal = scope.ordinalTracker.claimOrdinal()
+    self.ordinal = ordinal
+    return ordinal
+  }
 }
 
 extension DynamicPropertyScope {
   fileprivate func focusStateKey(
-    for sourceLocation: String
+    for ordinal: Int
   ) -> String {
-    "\(viewIdentity.path)#FocusState[\(sourceLocation)]"
+    "\(viewIdentity.path)#FocusState[\(ordinal)]"
   }
 }
 
@@ -150,44 +160,18 @@ public struct FocusState<Value: Equatable> {
 
   private let box: FocusStateBox<Value>
 
-  private init(
-    seedValue: Value,
-    fileID: StaticString,
-    line: UInt,
-    column: UInt
-  ) {
-    box = FocusStateBox(
-      seedValue: seedValue,
-      sourceLocation: "\(fileID):\(line):\(column)"
-    )
+  private init(seedValue: Value) {
+    box = FocusStateBox(seedValue: seedValue)
   }
 
   /// Creates a boolean focus state with a default value of `false`.
-  public init(
-    fileID: StaticString = #fileID,
-    line: UInt = #line,
-    column: UInt = #column
-  ) where Value == Bool {
-    self.init(
-      seedValue: false,
-      fileID: fileID,
-      line: line,
-      column: column
-    )
+  public init() where Value == Bool {
+    self.init(seedValue: false)
   }
 
   /// Creates an optional focus state with a default value of `nil`.
-  public init<Wrapped: Hashable>(
-    fileID: StaticString = #fileID,
-    line: UInt = #line,
-    column: UInt = #column
-  ) where Value == Wrapped? {
-    self.init(
-      seedValue: nil,
-      fileID: fileID,
-      line: line,
-      column: column
-    )
+  public init<Wrapped: Hashable>() where Value == Wrapped? {
+    self.init(seedValue: nil)
   }
 
   public var wrappedValue: Value {
@@ -221,9 +205,43 @@ public struct FocusState<Value: Equatable> {
   private func makeLocation(
     for scope: DynamicPropertyScope
   ) -> FocusStateLocation<Value> {
+    guard let ordinal = box.currentOrdinal(for: scope) else {
+      return localLocation()
+    }
+
+    let seedSnapshot = box.currentLocalSnapshot()
+
+    if let viewNode = scope.viewNode {
+      let bindingID = "\(viewNode.identity.path)#FocusState[\(ordinal)]"
+      let storage = viewNode.stateSlot(
+        ordinal: ordinal,
+        seed: FocusStateStorage(
+          value: seedSnapshot.value,
+          hasPendingRequest: seedSnapshot.hasPendingRequest
+        )
+      )
+
+      return FocusStateLocation(
+        bindingID: bindingID,
+        snapshot: {
+          storage.currentSnapshot()
+        },
+        requestValue: { newValue in
+          storage.requestValue(newValue)
+          viewNode.requestInvalidation()
+        },
+        applyRuntimeValue: { newValue in
+          let didChange = storage.applyRuntimeValue(newValue)
+          if didChange {
+            viewNode.requestInvalidation()
+          }
+          return didChange
+        }
+      )
+    }
+
     if let stateStore = scope.stateStore {
-      let stateKey = scope.focusStateKey(for: box.sourceLocation)
-      let seedSnapshot = box.currentLocalSnapshot()
+      let stateKey = scope.focusStateKey(for: ordinal)
       let storage = stateStore.value(
         for: stateKey,
         seedValue: FocusStateStorage(
@@ -264,7 +282,7 @@ public struct FocusState<Value: Equatable> {
 
   private func localLocation() -> FocusStateLocation<Value> {
     FocusStateLocation(
-      bindingID: box.sourceLocation,
+      bindingID: "FocusState.local[\(ObjectIdentifier(box))]",
       snapshot: {
         box.currentLocalSnapshot()
       },

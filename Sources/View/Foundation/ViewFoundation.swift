@@ -209,9 +209,41 @@ package func resolveView<V: View>(
   if let reused = context.reusedResolvedSubtreeIfAvailable() {
     return reused
   }
-  context.recordResolvedComputation()
-  return normalizeResolvedElements(
-    resolveViewElements(view, in: context),
-    in: context
+
+  let graphNode = context.viewGraph?.beginEvaluation(
+    identity: context.identity,
+    invalidator: context.dynamicStateStore?.invalidator
   )
+  context.recordResolvedComputation()
+  let erased: Any = view
+  var accessedStateSlots = 0
+  let resolved = ViewNodeContext.withValue(graphNode) {
+    if erased is any ResolvableView {
+      return normalizeResolvedElements(
+        resolveViewElements(view, in: context),
+        in: context
+      )
+    }
+
+    let dynamicPropertyScope = makeDynamicPropertyScope(
+      for: context,
+      viewNode: graphNode
+    )
+    return withDynamicPropertyScope(dynamicPropertyScope) {
+      let resolved = normalizeResolvedElements(
+        resolveViewElements(view, in: context),
+        in: context
+      )
+      accessedStateSlots = dynamicPropertyScope.ordinalTracker.nextOrdinal
+      return resolved
+    }
+  }
+  if let graphNode {
+    context.viewGraph?.finishEvaluation(
+      graphNode,
+      resolved: resolved,
+      accessedStateSlots: accessedStateSlots
+    )
+  }
+  return resolved
 }

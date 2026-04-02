@@ -6,6 +6,7 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
   public var data: Data
   public var id: KeyPath<Data.Element, ID>
   package let content: @MainActor (Data.Element) -> Content
+  private let authoringScope: DynamicPropertyScope?
 
   public init(
     _ data: Data,
@@ -15,18 +16,25 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
     self.data = data
     self.id = id
     self.content = content
+    authoringScope = currentDynamicPropertyScope()
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var resolved: [ResolvedNode] = []
+    let dynamicPropertyScope = currentDynamicPropertyScope() ?? authoringScope
     for element in data {
       let elementContext = context.replacingIdentity(
         with: context.identity.explicitID(element[keyPath: id])
       )
-      let view = elementContext.trackingObservableAccess {
-        content(element)
+      let view = withDynamicPropertyScope(dynamicPropertyScope) {
+        elementContext.trackingObservableAccess {
+          content(element)
+        }
       }
-      resolved.append(contentsOf: view.resolveElements(in: elementContext))
+      let elements = withDynamicPropertyScope(dynamicPropertyScope) {
+        view.resolveElements(in: elementContext)
+      }
+      resolved.append(contentsOf: elements)
     }
     return resolved
   }

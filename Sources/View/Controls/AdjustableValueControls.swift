@@ -6,6 +6,7 @@ public struct Stepper<Label: View>: View, ResolvableView {
   public var bounds: ClosedRange<Int>?
   public var step: Int
   private var label: Label
+  private let authoringScope: DynamicPropertyScope?
 
   public init<S: StringProtocol>(
     _ title: S,
@@ -17,6 +18,7 @@ public struct Stepper<Label: View>: View, ResolvableView {
     self.bounds = bounds
     self.step = max(1, step)
     label = Text(String(title))
+    authoringScope = currentDynamicPropertyScope()
   }
 
   public init(
@@ -29,6 +31,7 @@ public struct Stepper<Label: View>: View, ResolvableView {
     self.bounds = bounds
     self.step = max(1, step)
     self.label = label()
+    authoringScope = currentDynamicPropertyScope()
   }
 
   package func resolveElements(
@@ -65,7 +68,7 @@ extension Stepper {
       let binding = value
       let bounds = bounds
       let step = step
-      let dynamicPropertyScope = currentDynamicPropertyScope()
+      let dynamicPropertyScope = currentDynamicPropertyScope() ?? authoringScope
       context.localActionRegistry?.register(
         identity: context.identity,
         handler: {
