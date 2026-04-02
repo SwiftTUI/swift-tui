@@ -23,6 +23,39 @@ extension ResolvedNode {
 @MainActor
 @Suite
 struct TabViewSurfaceTests {
+  private func renderTabView(
+    style: TabViewStyle = .automatic,
+    focused: Bool = false
+  ) -> String {
+    var environmentValues = EnvironmentValues()
+    if focused {
+      environmentValues.focusedIdentity = testIdentity("Tabs")
+    }
+
+    return DefaultRenderer().render(
+      TabView(selection: .constant("home")) {
+        Text("Home content")
+          .tabItem(TabItemLabel("Home", detail: "3"))
+          .tag("home")
+
+        Text("Settings content")
+          .tabItem(TabItemLabel("Settings"))
+          .tag("settings")
+
+        Text("Logs content")
+          .tabItem(TabItemLabel("Logs"))
+          .tag("logs")
+      }
+      .tabViewStyle(style)
+      .id(testIdentity("Tabs")),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues
+      ),
+      proposal: .init(width: 40, height: 4)
+    ).rasterSurface.lines.joined(separator: "\n")
+  }
+
   @Test("TabView resolves typed labels into semantics and strip chrome")
   func tabViewResolvesTypedLabels() throws {
     let artifacts = DefaultRenderer().render(
@@ -48,5 +81,29 @@ struct TabViewSurfaceTests {
     #expect(homeNode.semanticMetadata.tabItemLabel == TabItemLabel("Home", detail: "3"))
     #expect(homeNode.semanticMetadata.presentationRole == nil)
     #expect(artifacts.resolvedTree.semanticMetadata.presentationRole == .tabView)
+  }
+
+  @Test("focused tabs make the selected tab visibly distinct across styles")
+  func focusedTabsUseClearerFocusTreatment() {
+    let underlineSurface = renderTabView(style: .underline, focused: true)
+    let roundedSurface = renderTabView(style: .rounded, focused: true)
+    let powerlineSurface = renderTabView(style: .powerline, focused: true)
+
+    #expect(underlineSurface.contains("▌Home · 3 "))
+    #expect(underlineSurface.contains("╺━━━━━━━━╸"))
+    #expect(roundedSurface.contains("╭▌Home · 3╮"))
+    #expect(roundedSurface.contains("╰═════════╯"))
+    #expect(powerlineSurface.contains("▌Home · 3 "))
+  }
+
+  @Test("unfocused tabs keep the legacy strip text without the focus marker")
+  func unfocusedTabsDoNotShowFocusMarker() {
+    let underlineSurface = renderTabView(style: .underline, focused: false)
+    let roundedSurface = renderTabView(style: .rounded, focused: false)
+    let powerlineSurface = renderTabView(style: .powerline, focused: false)
+
+    #expect(!underlineSurface.contains("▌Home · 3"))
+    #expect(!roundedSurface.contains("▌Home · 3"))
+    #expect(!powerlineSurface.contains("▌Home · 3"))
   }
 }

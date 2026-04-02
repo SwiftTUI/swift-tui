@@ -239,7 +239,7 @@ package struct ToolbarHostingRoot<Content: View>: View, ResolvableView {
 
     let hostContext = context.child(component: .named("ToolbarHost"))
     var children: [ResolvedNode] = []
-    children.reserveCapacity(3)
+    children.reserveCapacity(4)
 
     if hasTopToolbar {
       children.append(
@@ -259,6 +259,13 @@ package struct ToolbarHostingRoot<Content: View>: View, ResolvableView {
     }
 
     children.append(baseNode)
+
+    if hasBottomToolbar {
+      children.append(
+        Spacer(minLength: 0)
+          .resolve(in: hostContext.child(component: .named("spacer")))
+      )
+    }
 
     if hasBottomToolbar {
       children.append(

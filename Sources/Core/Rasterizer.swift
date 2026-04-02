@@ -10,8 +10,18 @@ public struct Rasterizer {
 
   /// Rasterizes a draw tree into a ``RasterSurface``.
   public func rasterize(_ draw: DrawNode) -> RasterSurface {
+    rasterize(draw, minimumSize: .zero)
+  }
+
+  package func rasterize(
+    _ draw: DrawNode,
+    minimumSize: Size
+  ) -> RasterSurface {
     let extent = maximumExtent(for: draw, clip: nil)
-    let surfaceSize = Size(width: extent.x, height: extent.y)
+    let surfaceSize = Size(
+      width: max(extent.x, max(0, minimumSize.width)),
+      height: max(extent.y, max(0, minimumSize.height))
+    )
     guard surfaceSize.width > 0, surfaceSize.height > 0 else {
       return RasterSurface()
     }
@@ -840,9 +850,10 @@ extension Rasterizer {
         return .constant(color.opacity(amount))
       case .sampled(let gradient):
         let faded = LinearGradient(
-          gradient: Gradient(stops: gradient.gradient.stops.map {
-            .init(color: $0.color.opacity(amount), location: $0.location)
-          }),
+          gradient: Gradient(
+            stops: gradient.gradient.stops.map {
+              .init(color: $0.color.opacity(amount), location: $0.location)
+            }),
           startPoint: gradient.startPoint,
           endPoint: gradient.endPoint
         )

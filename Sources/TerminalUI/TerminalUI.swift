@@ -194,7 +194,10 @@ public struct DefaultRenderer {
       drawExtractor.extract(from: placed)
     }
     let (raster, rasterDuration) = measurePhase {
-      rasterizer.rasterize(draw)
+      rasterizer.rasterize(
+        draw,
+        minimumSize: minimumRasterSurfaceSize(for: proposal)
+      )
     }
     let (commit, commitDuration) = measurePhase {
       commitPlanner.plan(
@@ -250,5 +253,21 @@ public struct DefaultRenderer {
       taskRegistry: resolveContext.localTaskRegistry
     )
     return artifacts
+  }
+
+  private func minimumRasterSurfaceSize(
+    for proposal: ProposedSize
+  ) -> Size {
+    guard
+      case .finite(let width) = proposal.width,
+      case .finite(let height) = proposal.height
+    else {
+      return .zero
+    }
+
+    return .init(
+      width: max(0, width),
+      height: max(0, height)
+    )
   }
 }
