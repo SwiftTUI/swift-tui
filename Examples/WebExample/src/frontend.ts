@@ -25,34 +25,35 @@ const repositoryUrl = "https://github.com/GoodHatsLLC/swift-terminal-ui";
 const architectureUrl = `${repositoryUrl}/blob/main/docs/ARCHITECTURE.md`;
 const runtimeUrl = `${repositoryUrl}/blob/main/docs/RUNTIME.md`;
 
-const syntaxTokens = [
-  "View body",
-  "@State",
-  "@Binding",
-  "@FocusState",
-  "Layout",
-  "WindowGroup",
+const pipelinePhases = [
+  "resolve",
+  "measure",
+  "place",
+  "semantics",
+  "draw",
+  "raster",
+  "commit",
 ];
 
 const platformFrames = [
   {
     name: "Terminal",
-    detail: "Interactive runtime with alternate-screen ownership, focus routing, and capability-aware output.",
+    detail: "Alternate-screen, raw-mode, capability-aware output. The native runtime.",
     chrome: "platform-terminal",
   },
   {
     name: "macOS",
-    detail: "SwiftUI host chrome wrapped around the same terminal UI through HostedSceneSession.",
+    detail: "SwiftUI host chrome via HostedSceneSession.",
     chrome: "platform-macos",
   },
   {
     name: "iOS",
-    detail: "The same terminal surface can live inside native app chrome when you want mobile or touch-friendly hosting.",
+    detail: "Same surface, native app chrome, touch input.",
     chrome: "platform-ios",
   },
   {
     name: "Web",
-    detail: "The Bun host builds WebAssembly assets and mounts the app in the browser through WebTUIGUI.",
+    detail: "WASI build mounted in the browser via WebTUIGUI.",
     chrome: "platform-web",
   },
 ];
@@ -61,22 +62,22 @@ const parityPoints = [
   {
     title: "Same authoring surface",
     body:
-      "You write body-based View types with @State, @Binding, @FocusState, environment values, Layout, and Scene declarations.",
+      "@State, @Binding, @FocusState, environment values, Layout protocol, Scene declarations. The types you already know.",
   },
   {
     title: "Same layout contract",
     body:
-      "Parents propose. Children choose. Modifier order matters. Measurement and placement stay recursive instead of collapsing into a terminal-specific shortcut.",
+      "Parents propose, children choose. Modifier order matters. Measurement and placement are recursive — no terminal shortcuts.",
   },
   {
-    title: "Same identity and state model",
+    title: "Same identity model",
     body:
-      "State is keyed by identity in the tree plus source location, so view-local state survives rerenders the same way SwiftUI authors expect.",
+      "State keyed by tree identity + source location. View-local state survives rerenders exactly as SwiftUI authors expect.",
   },
   {
-    title: "Terminal-native runtime where it belongs",
+    title: "Terminal-native runtime",
     body:
-      "The extra machinery lives in the runtime: input parsing, focus routing, alternate-screen ownership, lifecycle staging, commit planning, and incremental presentation.",
+      "Input parsing, focus routing, alternate-screen ownership, lifecycle staging, commit planning, and incremental presentation.",
   },
 ];
 
@@ -112,7 +113,7 @@ async function bootstrap(): Promise<void> {
       <header class="site-header" data-reveal>
         <a class="brand" href="#top" aria-label="TerminalUI home">
           <span class="brand-mark">TerminalUI</span>
-          <span class="brand-note">SwiftUI-shaped terminal apps in Swift</span>
+          <span class="brand-note">SwiftUI's authoring model for the terminal</span>
         </a>
         <nav class="site-nav" aria-label="Primary">
           <a href="#demo">Demo</a>
@@ -133,15 +134,14 @@ async function bootstrap(): Promise<void> {
       <main class="marketing-site">
         <section class="hero" id="top">
           <div class="hero-copy" data-reveal>
-            <p class="eyebrow">$ TerminalUI</p>
-            <h1>SwiftUI syntax for terminal apps.</h1>
+            <p class="eyebrow">import TerminalUI</p>
+            <h1>A real view system for the terminal.</h1>
             <p class="hero-lede">
-              Terminal apps are fun, useful, and still one of the best ways to ship sharp tools.
-              TerminalUI makes them comfortable to author in Swift with a view system, layout
-              model, focus environment, and runtime that deliberately echo SwiftUI.
+              SwiftUI's authoring model — body-based views, recursive layout, identity-keyed state,
+              focus routing — applied to terminal apps. Built on a strict 7-phase rendering pipeline.
             </p>
-            <div class="token-row" aria-label="Core syntax">
-              ${renderSyntaxTokens()}
+            <div class="pipeline-strip" aria-label="Rendering pipeline">
+              ${renderPipeline()}
             </div>
             <div class="hero-actions">
               <a class="button button-primary" href="${repositoryUrl}" target="_blank" rel="noreferrer">
@@ -157,11 +157,10 @@ async function bootstrap(): Promise<void> {
             <div class="hero-stage-header">
               <div>
                 <p class="section-label">Live demo</p>
-                <h2>Center the app. Let the terminal do the talking.</h2>
+                <h2>The real app, running in the browser.</h2>
               </div>
               <p class="hero-stage-note">
-                This is the real wasm app running in the browser. Resize it, switch scenes, and type
-                into it.
+                This is the actual WASI binary. Resize it, switch scenes, type into it.
               </p>
             </div>
 
@@ -202,26 +201,25 @@ async function bootstrap(): Promise<void> {
         <section class="info-block info-block-syntax" id="syntax">
           <div class="info-copy" data-reveal>
             <p class="section-label">01 / Syntax</p>
-            <h2>The DSL looks like SwiftUI because it is supposed to.</h2>
+            <h2>The DSL is SwiftUI. Not a sketch of it.</h2>
             <p>
-              Views have bodies. State lives where you author it. Scenes describe windows.
-              The goal is not a terminal-flavored mini language. The goal is to make terminal
-              apps feel natural to people who already build SwiftUI.
+              Views have bodies. State is identity-keyed. Layout is recursive — parents propose,
+              children choose. It's not a string builder with SwiftUI names.
             </p>
           </div>
 
           <div class="info-panel" data-reveal>
-            <pre class="code-sample"><code>${escapeHtml(syntaxSample)}</code></pre>
+            <pre class="code-sample"><code>${highlightSwift(syntaxSample)}</code></pre>
           </div>
         </section>
 
         <section class="info-block info-block-platforms" id="platforms">
           <div class="info-copy" data-reveal>
             <p class="section-label">02 / Platforms</p>
-            <h2>Build the same terminal UI for the terminal, native wrappers, and the web.</h2>
+            <h2>One codebase. Terminal, macOS, iOS, web.</h2>
             <p>
-              The repository already covers the runtime, the SwiftUI host for macOS and iOS, and
-              the Bun-based web host. Same UI. Different chrome. Different place to live.
+              Same rendering pipeline, different host chrome. The terminal runtime, SwiftUI
+              wrapper, and Bun-based web host all ship in the repo.
             </p>
           </div>
 
@@ -233,11 +231,10 @@ async function bootstrap(): Promise<void> {
         <section class="info-block info-block-parity" id="why-swiftui">
           <div class="info-copy" data-reveal>
             <p class="section-label">03 / SwiftUI parity</p>
-            <h2>This is basically SwiftUI in syntax and implementation.</h2>
+            <h2>Parity in syntax and implementation.</h2>
             <p>
-              Not a string builder wearing SwiftUI names. The surface API matches, and the
-              underlying model matches too: recursive layout, structural environment propagation,
-              identity-based state, scene ownership, and explicit lifecycle boundaries.
+              Recursive layout. Structural environment propagation. Identity-based state.
+              Scene ownership. Explicit lifecycle boundaries.
             </p>
           </div>
 
@@ -318,10 +315,32 @@ async function bootstrap(): Promise<void> {
   }
 }
 
-function renderSyntaxTokens(): string {
-  return syntaxTokens
-    .map((token) => `<span class="token-chip">${token}</span>`)
+function renderPipeline(): string {
+  return pipelinePhases
+    .map((phase, i) => {
+      const sep = i < pipelinePhases.length - 1 ? `<span class="pipeline-sep">\u2192</span>` : "";
+      return `<span class="pipeline-phase">${phase}</span>${sep}`;
+    })
     .join("");
+}
+
+function highlightSwift(code: string): string {
+  const keywords = new Set(["import", "struct", "var", "private", "some"]);
+  const types = new Set(["App", "Scene", "WindowGroup", "VStack", "Text", "ProgressView", "Button", "Double"]);
+
+  // Single-pass tokenizer — each match is consumed once, no cascading.
+  const pattern = /@\w+|"[^"]*?"|\.\w+(?=\()|(?<!\w)\d+(?:\.\d+)?(?!\w)|\b[A-Za-z_]\w*\b/g;
+
+  const escaped = escapeHtml(code);
+  return escaped.replace(pattern, (match) => {
+    if (match.startsWith("@")) return `<span class="syn-at">${match}</span>`;
+    if (match.startsWith('"')) return `<span class="syn-str">${match}</span>`;
+    if (match.startsWith(".")) return `<span class="syn-prop">${match}</span>`;
+    if (/^\d/.test(match)) return `<span class="syn-num">${match}</span>`;
+    if (keywords.has(match)) return `<span class="syn-kw">${match}</span>`;
+    if (types.has(match)) return `<span class="syn-type">${match}</span>`;
+    return match;
+  });
 }
 
 function renderPlatformFrames(): string {

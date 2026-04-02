@@ -111,6 +111,34 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("keyboardShortcut actions only handle their declared key press")
+  func keyboardShortcutActionsOnlyHandleDeclaredKeyPress() {
+    final class CounterBox {
+      var count = 0
+    }
+
+    let counter = CounterBox()
+    let hotkeyRegistry = HotkeyRegistry()
+    var context = ResolveContext(
+      identity: testIdentity("KeyboardShortcutProbe"),
+      applyEnvironmentValues: true
+    )
+    context.hotkeyRegistry = hotkeyRegistry
+
+    _ = Text("Probe")
+      .keyboardShortcut(.character("/"), label: "Search") {
+        counter.count += 1
+      }
+      .resolve(in: context)
+
+    #expect(hotkeyRegistry.registeredBindings().count == 1)
+    #expect(!hotkeyRegistry.dispatch(KeyPress(.character("x"))))
+    #expect(counter.count == 0)
+    #expect(hotkeyRegistry.dispatch(KeyPress(.character("/"))))
+    #expect(counter.count == 1)
+  }
+
+  @MainActor
   @Test("generic onKeyPress handles runtime key input across frames")
   func genericOnKeyPressHandlesRuntimeKeyInputAcrossFrames() async throws {
     let terminalSize = Size(width: 24, height: 4)
@@ -1051,6 +1079,28 @@ struct InteractiveRuntimeTests {
     #expect(result.exitReason == RunLoopExitReason.inputEnded)
     let lastFrame = try #require(terminal.frames.last)
     #expect(lastFrame.contains("History: background-action"))
+    #expect(lastFrame.contains("Palette: closed"))
+    #expect(lastFrame.contains("Workspace"))
+  }
+
+  @MainActor
+  @Test("command palette shortcut ignores unrelated key presses")
+  func commandPaletteShortcutIgnoresUnrelatedKeyPresses() async throws {
+    let terminalSize = Size(width: 40, height: 12)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [.key(.character("x"))],
+      rootIdentity: testIdentity("CommandPaletteShortcutHarness"),
+      terminalSize: terminalSize
+    ) {
+      CommandPaletteShortcutHarnessView(terminalSize: terminalSize)
+    }
+
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+    #expect(!terminal.frames.contains(where: { $0.contains("Command Palette") }))
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(lastFrame.contains("History: none"))
     #expect(lastFrame.contains("Palette: closed"))
     #expect(lastFrame.contains("Workspace"))
   }
