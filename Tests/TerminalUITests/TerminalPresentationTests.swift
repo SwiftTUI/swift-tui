@@ -572,6 +572,7 @@ struct TerminalPresentationTests {
       ]
     )
     let metrics = try host.present(surface)
+    try host.drainPendingPresentation()
 
     #expect(
       controller.writes == [
@@ -600,6 +601,7 @@ struct TerminalPresentationTests {
       lines: ["ABCD", "EFGH"]
     )
     let metrics = try host.present(surface)
+    try host.drainPendingPresentation()
 
     #expect(
       controller.writes == [
@@ -625,6 +627,7 @@ struct TerminalPresentationTests {
       lines: ["alpha", "same"]
     )
     _ = try host.present(initialSurface)
+    try host.drainPendingPresentation()
 
     let writesBeforeUpdate = controller.writes.count
     let updatedSurface = RasterSurface(
@@ -632,6 +635,7 @@ struct TerminalPresentationTests {
       lines: ["alpXa", "same"]
     )
     let metrics = try host.present(updatedSurface)
+    try host.drainPendingPresentation()
     let incrementalWrites = Array(controller.writes.dropFirst(writesBeforeUpdate))
 
     #expect(
@@ -778,7 +782,7 @@ struct TerminalPresentationTests {
   }
 }
 
-private final class PresentationMockTerminalController: TerminalControlling {
+private final class PresentationMockTerminalController: TerminalControlling, @unchecked Sendable {
   private let isTTYValue: Bool
   private(set) var writes: [String] = []
 

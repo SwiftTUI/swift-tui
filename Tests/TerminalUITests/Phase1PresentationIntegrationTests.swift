@@ -147,12 +147,14 @@ struct Phase1PresentationIntegrationTests {
       lines: ["alpha", "bravo"]
     )
     _ = try host.present(initial)
+    try host.drainPendingPresentation()
 
     let resized = RasterSurface(
       size: .init(width: 10, height: 2),
       lines: ["alpha", "bravo"]
     )
     let metrics = try host.present(resized)
+    try host.drainPendingPresentation()
 
     #expect(metrics.strategy == .fullRepaint)
     #expect(metrics.usedFullRepaint)
@@ -182,8 +184,10 @@ private func presentScenario(
     capabilityProfile: .previewUnicode
   )
   _ = try host.present(previous)
+  try host.drainPendingPresentation()
   let writesBeforeUpdate = controller.writes.count
   let metrics = try host.present(current)
+  try host.drainPendingPresentation()
   let incrementalWrites = Array(controller.writes.dropFirst(writesBeforeUpdate))
   let renderer = TerminalSurfaceRenderer(capabilityProfile: .previewUnicode)
   let fullRepaintMetrics = TerminalPresentationMetrics.fullRepaint(
@@ -198,7 +202,7 @@ private func presentScenario(
   )
 }
 
-private final class PresentationController: TerminalControlling {
+private final class PresentationController: TerminalControlling, @unchecked Sendable {
   private(set) var writes: [String] = []
 
   func isATTY(_: Int32) -> Bool {

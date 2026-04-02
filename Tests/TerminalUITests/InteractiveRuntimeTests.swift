@@ -2195,7 +2195,7 @@ private final class RecordingInvalidator: Invalidating {
   }
 }
 
-private final class MockTerminalController: TerminalControlling {
+private final class MockTerminalController: TerminalControlling, @unchecked Sendable {
   let originalAttributes: termios
   private(set) var setAttributesCalls: [termios] = []
   private(set) var writes: [String] = []

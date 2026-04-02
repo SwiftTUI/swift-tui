@@ -257,7 +257,7 @@ private final class BenchmarkHarness {
   }
 }
 
-private final class BenchmarkPresentationController: TerminalControlling {
+private final class BenchmarkPresentationController: TerminalControlling, @unchecked Sendable {
   func isATTY(_: Int32) -> Bool {
     true
   }

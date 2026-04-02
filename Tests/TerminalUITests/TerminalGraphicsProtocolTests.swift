@@ -56,6 +56,7 @@ struct TerminalGraphicsProtocolTests {
     )
 
     _ = try host.present(surface)
+    try host.drainPendingPresentation()
 
     let kittyWrite = try #require(
       controller.writes.first { write in
@@ -140,6 +141,7 @@ struct TerminalGraphicsProtocolTests {
     )
 
     _ = try host.present(surface)
+    try host.drainPendingPresentation()
 
     let kittyWrites = controller.writes.filter { write in
       write.contains("\u{001B}_G")
@@ -199,6 +201,7 @@ struct TerminalGraphicsProtocolTests {
     )
 
     _ = try host.present(surface)
+    try host.drainPendingPresentation()
 
     #expect(
       controller.writes.contains { write in
@@ -240,6 +243,7 @@ struct TerminalGraphicsProtocolTests {
     )
 
     _ = try host.present(surface)
+    try host.drainPendingPresentation()
 
     #expect(
       controller.writes == [
@@ -294,9 +298,11 @@ struct TerminalGraphicsProtocolTests {
     )
 
     _ = try host.present(initialSurface)
+    try host.drainPendingPresentation()
     let writesBeforeIncrementalUpdate = controller.writes.count
 
     let metrics = try host.present(updatedSurface)
+    try host.drainPendingPresentation()
     let incrementalWrites = Array(controller.writes.dropFirst(writesBeforeIncrementalUpdate))
 
     #expect(
@@ -377,6 +383,7 @@ struct TerminalGraphicsProtocolTests {
     )
 
     _ = try host.present(surface)
+    try host.drainPendingPresentation()
 
     // A graphics-protocol image command should be emitted.
     #expect(
@@ -401,7 +408,9 @@ struct TerminalGraphicsProtocolTests {
   }
 }
 
-private final class GraphicsProtocolMockTerminalController: TerminalControlling {
+private final class GraphicsProtocolMockTerminalController:
+  TerminalControlling, @unchecked Sendable
+{
   private let isTTYValue: Bool
   private let cellPixelSizeValue: Size?
   private var queuedReadResponses: [[UInt8]]

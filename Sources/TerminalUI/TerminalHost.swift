@@ -1,4 +1,5 @@
 import Core
+import Dispatch
 import Synchronization
 
 #if canImport(Darwin)
@@ -206,7 +207,7 @@ extension TerminalHosting {
 }
 
 #if !canImport(WASILibc)
-  package protocol TerminalControlling {
+  package protocol TerminalControlling: Sendable {
     func isATTY(_ fileDescriptor: Int32) -> Bool
     func getAttributes(from fileDescriptor: Int32) throws -> termios
     func setAttributes(_ attributes: termios, on fileDescriptor: Int32) throws
@@ -390,6 +391,121 @@ extension TerminalHosting {
     }
   }
 
+  private struct PresentationFrame: Sendable {
+    var output: String
+  }
+
+  private final class PresentationWriter: @unchecked Sendable {
+    private struct State {
+      var pending: PresentationFrame?
+      var isWriting = false
+      var didDropFrame = false
+      var pendingError: TerminalHostError?
+    }
+
+    private let controller: any TerminalControlling
+    private let outputFileDescriptor: Int32
+    private let queue = DispatchQueue(label: "swift-terminal-ui.presentation-writer")
+    private let state = Mutex(State())
+
+    init(
+      controller: any TerminalControlling,
+      outputFileDescriptor: Int32
+    ) {
+      self.controller = controller
+      self.outputFileDescriptor = outputFileDescriptor
+    }
+
+    func submit(
+      _ frame: PresentationFrame
+    ) {
+      let shouldStart = state.withLock { state in
+        guard state.pendingError == nil else {
+          return false
+        }
+        if state.pending != nil {
+          state.didDropFrame = true
+        }
+        state.pending = frame
+
+        guard !state.isWriting else {
+          return false
+        }
+
+        state.isWriting = true
+        return true
+      }
+
+      guard shouldStart else {
+        return
+      }
+
+      queue.async { [self] in
+        writePendingFrames()
+      }
+    }
+
+    func consumeDropFlag() -> Bool {
+      state.withLock { state in
+        let didDropFrame = state.didDropFrame
+        state.didDropFrame = false
+        return didDropFrame
+      }
+    }
+
+    func consumePendingError() throws {
+      let pendingError = state.withLock { state in
+        let pendingError = state.pendingError
+        state.pendingError = nil
+        return pendingError
+      }
+
+      if let pendingError {
+        throw pendingError
+      }
+    }
+
+    func drain() {
+      queue.sync {}
+    }
+
+    private func writePendingFrames() {
+      while true {
+        let frame: PresentationFrame? = state.withLock { state in
+          guard let frame = state.pending else {
+            state.isWriting = false
+            return nil
+          }
+
+          state.pending = nil
+          return frame
+        }
+
+        guard let frame else {
+          return
+        }
+
+        do {
+          try controller.write(frame.output, to: outputFileDescriptor)
+        } catch let error as TerminalHostError {
+          state.withLock { state in
+            state.pending = nil
+            state.isWriting = false
+            state.pendingError = error
+          }
+          return
+        } catch {
+          state.withLock { state in
+            state.pending = nil
+            state.isWriting = false
+            state.pendingError = .failedToWrite(errno: EIO)
+          }
+          return
+        }
+      }
+    }
+  }
+
   /// Default terminal-backed host that owns raw mode and screen presentation.
   public final class TerminalHost: TerminalHosting {
     public var surfaceSize: Size {
@@ -415,8 +531,10 @@ extension TerminalHosting {
     private var hasProbedAppearance = false
     private var hasProbedGraphicsCapabilities = false
     private var cachedGraphicsCapabilities: TerminalGraphicsCapabilities?
-    private var lastPresentedSurface: RasterSurface?
+    private var lastSubmittedSurface: RasterSurface?
     private var transmittedKittyImages: Set<UInt32> = []
+    private var forceFullRepaint = false
+    private var presentationWriter: PresentationWriter?
 
     public convenience init(
       inputFileDescriptor: Int32 = 0,
@@ -485,8 +603,10 @@ extension TerminalHosting {
       savedAttributes = currentAttributes
       savedInputFileStatusFlags = currentFileStatusFlags
       rawModeEnabled = true
-      lastPresentedSurface = nil
+      lastSubmittedSurface = nil
       transmittedKittyImages.removeAll()
+      forceFullRepaint = false
+      presentationWriter = nil
 
       var shouldRestoreOnFailure = true
       defer {
@@ -495,8 +615,10 @@ extension TerminalHosting {
           savedAttributes = nil
           self.savedInputFileStatusFlags = nil
           rawModeEnabled = false
-          lastPresentedSurface = nil
+          lastSubmittedSurface = nil
           transmittedKittyImages.removeAll()
+          forceFullRepaint = false
+          presentationWriter = nil
           if let savedInputFileStatusFlags {
             try? controller.setFileStatusFlags(savedInputFileStatusFlags, on: inputFileDescriptor)
           }
@@ -520,13 +642,16 @@ extension TerminalHosting {
         return
       }
 
+      let presentationWriter = self.presentationWriter
       let savedAttributes = self.savedAttributes
       let savedInputFileStatusFlags = self.savedInputFileStatusFlags
       self.savedAttributes = nil
       self.savedInputFileStatusFlags = nil
       rawModeEnabled = false
-      lastPresentedSurface = nil
+      lastSubmittedSurface = nil
       transmittedKittyImages.removeAll()
+      forceFullRepaint = false
+      self.presentationWriter = nil
 
       var attributesToRestore = savedAttributes
       var fileStatusFlagsToRestore = savedInputFileStatusFlags
@@ -539,14 +664,17 @@ extension TerminalHosting {
         }
       }
 
-      try write(clearScreenSequence())
-      try write(cursorSequence(to: .zero))
+      presentationWriter?.drain()
+      try presentationWriter?.consumePendingError()
+
+      try writeSynchronously(clearScreenSequence())
+      try writeSynchronously(cursorSequence(to: .zero))
       if capabilityProfile.supportsMouseReporting {
-        try write(disableMouseReportingSequence())
+        try writeSynchronously(disableMouseReportingSequence())
       }
-      try write(resetStyleSequence())
-      try write(showCursorSequence())
-      try write(exitAlternateScreenSequence())
+      try writeSynchronously(resetStyleSequence())
+      try writeSynchronously(showCursorSequence())
+      try writeSynchronously(exitAlternateScreenSequence())
 
       if let savedInputFileStatusFlags {
         try controller.setFileStatusFlags(savedInputFileStatusFlags, on: inputFileDescriptor)
@@ -559,7 +687,9 @@ extension TerminalHosting {
     }
 
     public func write(_ output: String) throws {
-      try controller.write(output, to: outputFileDescriptor)
+      try drainPendingPresentation()
+      try writeSynchronously(output)
+      invalidatePresentationState()
     }
 
     public func clearScreen() throws {
@@ -572,6 +702,11 @@ extension TerminalHosting {
 
     @discardableResult
     public func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+      try synchronizePresentationState()
+      if !surface.imageAttachments.isEmpty, !hasProbedGraphicsCapabilities {
+        try drainPendingPresentation()
+      }
+
       let graphicsCapabilities = resolvedGraphicsCapabilities(
         probingProtocols: !surface.imageAttachments.isEmpty
       )
@@ -583,9 +718,10 @@ extension TerminalHosting {
       let plan = TerminalPresentationPlanner(
         capabilityProfile: capabilityProfile
       ).plan(
-        previousSurface: lastPresentedSurface,
+        previousSurface: forceFullRepaint ? nil : lastSubmittedSurface,
         currentSurface: preparedSurface
       )
+      forceFullRepaint = false
 
       var bytesWritten = 0
       let origin = Point.zero
@@ -629,10 +765,14 @@ extension TerminalHosting {
       }
 
       if !bufferedOutput.isEmpty {
-        try write(bufferedOutput)
+        presentationWriterIfNeeded().submit(
+          .init(
+            output: bufferedOutput
+          )
+        )
       }
 
-      lastPresentedSurface = preparedSurface
+      lastSubmittedSurface = preparedSurface
 
       return TerminalPresentationMetrics(
         bytesWritten: bytesWritten,
@@ -640,6 +780,56 @@ extension TerminalHosting {
         cellsChanged: plan.cellsChanged,
         strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental
       )
+    }
+
+    package func drainPendingPresentation() throws {
+      guard let presentationWriter else {
+        return
+      }
+
+      presentationWriter.drain()
+      if presentationWriter.consumeDropFlag() {
+        forceFullRepaint = true
+        transmittedKittyImages.removeAll()
+      }
+      try presentationWriter.consumePendingError()
+    }
+
+    private func synchronizePresentationState() throws {
+      guard let presentationWriter else {
+        return
+      }
+
+      if presentationWriter.consumeDropFlag() {
+        forceFullRepaint = true
+        transmittedKittyImages.removeAll()
+      }
+      try presentationWriter.consumePendingError()
+    }
+
+    private func presentationWriterIfNeeded() -> PresentationWriter {
+      if let presentationWriter {
+        return presentationWriter
+      }
+
+      let presentationWriter = PresentationWriter(
+        controller: controller,
+        outputFileDescriptor: outputFileDescriptor
+      )
+      self.presentationWriter = presentationWriter
+      return presentationWriter
+    }
+
+    private func writeSynchronously(
+      _ output: String
+    ) throws {
+      try controller.write(output, to: outputFileDescriptor)
+    }
+
+    private func invalidatePresentationState() {
+      lastSubmittedSurface = nil
+      transmittedKittyImages.removeAll()
+      forceFullRepaint = false
     }
 
     private func refreshAppearanceIfNeeded() {
@@ -663,7 +853,7 @@ extension TerminalHosting {
     private func performAppearanceQuery(
       _ query: TerminalAppearanceQuery
     ) throws -> Color? {
-      try controller.write(query.request, to: outputFileDescriptor)
+      try writeSynchronously(query.request)
       var buffer: [UInt8] = []
       let timeoutMilliseconds = 40
 
@@ -786,7 +976,7 @@ extension TerminalHosting {
     private func performGraphicsQuery(
       _ query: TerminalGraphicsQuery
     ) throws -> [UInt8] {
-      try controller.write(query.request, to: outputFileDescriptor)
+      try writeSynchronously(query.request)
       var buffer: [UInt8] = []
       let timeoutMilliseconds = 40
 
