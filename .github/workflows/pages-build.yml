@@ -47,8 +47,10 @@ jobs:
         with:
           path: |
             ~/.bun/install/cache
+            node_modules
+            GUI/WebTUIGUI/node_modules
             Examples/WebExample/node_modules
-          key: ${{ runner.os }}-bun-webexample-${{ hashFiles('Examples/WebExample/bun.lock') }}
+          key: ${{ runner.os }}-bun-webexample-${{ hashFiles('bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-bun-webexample-
 
@@ -91,9 +93,8 @@ jobs:
               --checksum 9fa4016ee632c7e9e906608ec3b55cf13dfc4dff44e47574c5af58064dc33fd9
           fi
 
-      - name: Install ghostty-web for local build
+      - name: Install Bun workspace deps
         shell: bash
-        working-directory: GUI/WebTUIGUI
         run: |
           set -euo pipefail
           hash -r

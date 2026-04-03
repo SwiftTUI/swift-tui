@@ -1,5 +1,4 @@
-import type { WebTUISceneManifest } from "../../../GUI/WebTUIGUI/src/WebTUISceneManifest.ts";
-import type { WebTUITerminalStyle } from "../../../GUI/WebTUIGUI/src/WebTUITerminalStyle.ts";
+import type { WebTUISceneManifest, WebTUITerminalStyle } from "webtuigui";
 
 export const fallbackManifest: WebTUISceneManifest = {
   defaultSceneId: "main",

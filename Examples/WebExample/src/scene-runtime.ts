@@ -1,11 +1,11 @@
 import {
   WebTUISceneRuntime,
   type WebTUISceneRuntimeOptions,
-} from "../../../GUI/WebTUIGUI/src/WebTUISceneRuntime.ts";
+} from "webtuigui";
 import {
   encodeResizeControlMessage,
   type BrowserWASIBridge,
-} from "../../../GUI/WebTUIGUI/src/wasi/BrowserWASIBridge.ts";
+} from "webtuigui";
 
 import {
   SharedInputQueueWriter,

@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@bjorn3/browser_wasi_shim": "^0.4.2",
-    "webtuigui": "file:../../GUI/WebTUIGUI"
+    "webtuigui": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest"

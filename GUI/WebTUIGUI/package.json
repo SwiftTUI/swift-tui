@@ -1,6 +1,8 @@
 {
   "name": "webtuigui",
+  "version": "0.1.0",
   "module": "index.ts",
+  "exports": "./index.ts",
   "type": "module",
   "private": true,
   "scripts": {

@@ -16,6 +16,10 @@ swiftly run swift --version
 Native-only development should also work in Xcode, but the documented package
 and wasm build path for this wrapper uses `swiftly` plus Bun.
 
+This package now lives in the repo's Bun workspace. Run `bun install` from the
+repo root or from any workspace package directory, and Bun will maintain one
+root `bun.lock` plus stable relative workspace links.
+
 ## Ghostty Dependency
 
 This package now consumes the published [`ghostty-web`](https://www.npmjs.com/package/ghostty-web)

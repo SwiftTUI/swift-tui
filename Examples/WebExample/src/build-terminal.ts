@@ -4,7 +4,7 @@ import {
   buildAppWasm,
   copyGhosttyWasmAsset,
   generateSceneManifest,
-} from "../../../GUI/WebTUIGUI/index.ts";
+} from "webtuigui";
 
 const packagePath = resolve(import.meta.dir, "../TerminalApp");
 const outputDirectory = resolve(import.meta.dir, "../TerminalApp/dist");

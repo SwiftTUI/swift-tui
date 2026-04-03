@@ -68,6 +68,7 @@ xcuserdata/
 .claude/worktrees/*
 .swiftpm
 .worktrees
+node_modules/
 reference
 .playwright-cli
 output

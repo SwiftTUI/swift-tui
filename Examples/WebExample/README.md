@@ -27,6 +27,10 @@ The example has two parts:
 bun install
 ```
 
+`WebExample` and `GUI/WebTUIGUI` now share the repo's Bun workspace, so running
+`bun install` from the repo root is preferred. Running it from
+`Examples/WebExample` also works and updates the root workspace lockfile.
+
 ## Development
 
 ```bash

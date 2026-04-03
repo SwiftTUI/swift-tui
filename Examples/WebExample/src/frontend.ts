@@ -1,7 +1,7 @@
 import {
   createWebTUIApp,
   type WebTUIAppController,
-} from "../../../GUI/WebTUIGUI/src/WebTUIApp.ts";
+} from "webtuigui";
 import "./index.css";
 import {
   defaultStyle,
