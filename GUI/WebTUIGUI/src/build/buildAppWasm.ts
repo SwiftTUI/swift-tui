@@ -1,6 +1,7 @@
 import { mkdir, rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { resolveSwiftArtifacts, type SwiftArtifactPaths } from "./resolveSwiftArtifacts.ts";
+import { stripPackagedWasm } from "./stripPackagedWasm.ts";
 
 export interface BuildAppWasmOptions {
   packagePath: string;
@@ -16,8 +17,10 @@ export async function buildAppWasm(
     product: options.product,
   });
 
+  const packagedWasmPath = join(options.outputDirectory, "assets", "app.wasm");
   await mkdir(join(options.outputDirectory, "assets"), { recursive: true });
-  await rm(join(options.outputDirectory, "assets", "app.wasm"), { force: true });
-  await Bun.write(join(options.outputDirectory, "assets", "app.wasm"), await Bun.file(artifacts.wasmPath).arrayBuffer());
+  await rm(packagedWasmPath, { force: true });
+  await Bun.write(packagedWasmPath, await Bun.file(artifacts.wasmPath).arrayBuffer());
+  await stripPackagedWasm(packagedWasmPath);
   return artifacts;
 }
