@@ -91,6 +91,14 @@ jobs:
               --checksum 9fa4016ee632c7e9e906608ec3b55cf13dfc4dff44e47574c5af58064dc33fd9
           fi
 
+      - name: Install ghostty-web for local build
+        shell: bash
+        working-directory: GUI/WebTUIGUI
+        run: |
+          set -euo pipefail
+          hash -r
+          bun install --frozen-lockfile
+
       - name: Build WebExample
         shell: bash
         working-directory: Examples/WebExample
