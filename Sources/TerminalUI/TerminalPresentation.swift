@@ -299,7 +299,8 @@ struct TerminalPresentationPlanner {
 
   func plan(
     previousSurface: RasterSurface?,
-    currentSurface: RasterSurface
+    currentSurface: RasterSurface,
+    damage: PresentationDamage? = nil
   ) -> TerminalPresentationPlan {
     let renderer = TerminalSurfaceRenderer(
       capabilityProfile: capabilityProfile
@@ -321,9 +322,17 @@ struct TerminalPresentationPlanner {
       max(previousSurface.cells.count, currentSurface.cells.count),
       currentSurface.size.height
     )
+    let rowsToDiff: [Int] =
+      if let damage {
+        damage.dirtyRows
+          .filter { $0 >= 0 && $0 < rowCount }
+          .sorted()
+      } else {
+        Array(0..<rowCount)
+      }
     var spanUpdates: [TerminalPresentationPlan.SpanUpdate] = []
 
-    for row in 0..<rowCount {
+    for row in rowsToDiff {
       let previousRow = row < previousSurface.cells.count ? previousSurface.cells[row] : []
       let currentRow = row < currentSurface.cells.count ? currentSurface.cells[row] : []
       let rowSpans = renderer.diffSpans(

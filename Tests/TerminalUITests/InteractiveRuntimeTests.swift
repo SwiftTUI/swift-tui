@@ -375,7 +375,7 @@ struct InteractiveRuntimeTests {
   func viewNodeStateSlotsPreserveTypedValues() {
     let invalidator = RecordingInvalidator()
     let node = ViewNode(identity: testIdentity("RuntimeRoot"))
-    node.beginEvaluation(invalidator: invalidator)
+    node.beginEvaluation(frameID: 1, invalidator: invalidator)
 
     let initial: Int = node.stateSlot(ordinal: 0, seed: 0)
     let repeated: Int = node.stateSlot(ordinal: 0, seed: 99)

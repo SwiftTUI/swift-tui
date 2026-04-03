@@ -40,4 +40,48 @@ struct LayoutReuseAncestorInvalidationTests {
     #expect(updated.diagnostics.placedNodesComputed == 1)
     #expect(updated.diagnostics.placedNodesReused == 2)
   }
+
+  @Test("nested invalidation still reuses clean sibling subtrees")
+  func nestedInvalidationReusesCleanSiblingSubtrees() {
+    let renderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    final class BranchDetailBox: @unchecked Sendable {
+      var detail = "Branch A detail"
+    }
+    let box = BranchDetailBox()
+
+    func makeRoot() -> some View {
+      VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Branch A header")
+          Text(box.detail)
+        }
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Branch B header")
+          Text("Branch B detail")
+        }
+      }
+    }
+
+    _ = renderer.render(
+      makeRoot(),
+      context: .init(identity: testIdentity("LayoutReuse", "NestedRoot"))
+    )
+
+    box.detail = "Branch A detail updated"
+
+    let updated = renderer.render(
+      makeRoot(),
+      context: .init(
+        identity: testIdentity("LayoutReuse", "NestedRoot"),
+        invalidatedIdentities: [testIdentity("LayoutReuse", "NestedRoot", "VStack[0]", "VStack[1]")]
+      )
+    )
+
+    #expect(updated.diagnostics.measuredNodesComputed == 3)
+    #expect(updated.diagnostics.measuredNodesReused == 4)
+    #expect(updated.diagnostics.placedNodesComputed == 3)
+    #expect(updated.diagnostics.placedNodesReused == 4)
+  }
 }

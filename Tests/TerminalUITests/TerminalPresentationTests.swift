@@ -429,6 +429,35 @@ struct TerminalPresentationTests {
     #expect(plan.cellsChanged == 1)
   }
 
+  @Test("presentation planner only diffs hinted rows when damage is provided")
+  func presentationPlannerOnlyDiffsHintedRows() {
+    let planner = TerminalPresentationPlanner(
+      capabilityProfile: .previewUnicode
+    )
+    let previousSurface = RasterSurface(
+      size: .init(width: 8, height: 3),
+      lines: ["alpha", "bravo", "charlie"]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 8, height: 3),
+      lines: ["alpXa", "bravo", "charlXe"]
+    )
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface,
+      damage: .init(dirtyRows: [2])
+    )
+
+    #expect(plan.strategy == .incremental)
+    #expect(
+      plan.spanUpdates == [
+        .init(row: 2, column: 5, renderedSpan: "X", cellsChanged: 1)
+      ])
+    #expect(plan.linesTouched == 1)
+    #expect(plan.cellsChanged == 1)
+  }
+
   @Test("presentation planner clears trailing text when the row shrinks")
   func presentationPlannerClearsTrailingTailWhenTextShrinks() {
     let planner = TerminalPresentationPlanner(
@@ -516,6 +545,66 @@ struct TerminalPresentationTests {
     #expect(plan.cellsChanged == 2)
   }
 
+  @Test("presentation planner preserves wide glyph normalization with damage hints")
+  func presentationPlannerPreservesWideGlyphNormalizationWithDamageHints() {
+    let planner = TerminalPresentationPlanner(
+      capabilityProfile: .previewUnicode
+    )
+    let previousSurface = RasterSurface(
+      size: .init(width: 4, height: 1),
+      cells: [
+        [
+          .init(character: "a"),
+          .init(
+            character: "界",
+            spanWidth: 2,
+            style: .init(foregroundColor: .cyan)
+          ),
+          .init(
+            character: " ",
+            spanWidth: 0,
+            continuationLeadX: 1,
+            style: .init(foregroundColor: .cyan)
+          ),
+          .init(character: "b"),
+        ]
+      ]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 4, height: 1),
+      cells: [
+        [
+          .init(character: "a"),
+          .init(
+            character: "界",
+            spanWidth: 2,
+            style: .init(foregroundColor: .magenta)
+          ),
+          .init(
+            character: " ",
+            spanWidth: 0,
+            continuationLeadX: 1,
+            style: .init(foregroundColor: .magenta)
+          ),
+          .init(character: "b"),
+        ]
+      ]
+    )
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface,
+      damage: .init(dirtyRows: [0])
+    )
+
+    #expect(plan.strategy == .incremental)
+    #expect(
+      plan.spanUpdates == [
+        .init(row: 0, column: 1, renderedSpan: "界", cellsChanged: 2)
+      ])
+    #expect(plan.cellsChanged == 2)
+  }
+
   @Test("presentation planner orders multiple spans from left to right")
   func presentationPlannerOrdersMultipleSpansLeftToRight() {
     let planner = TerminalPresentationPlanner(
@@ -543,6 +632,61 @@ struct TerminalPresentationTests {
       ])
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 2)
+  }
+
+  @Test("presentation planner limits incremental work to hinted dirty rows")
+  func presentationPlannerLimitsIncrementalWorkToHintedDirtyRows() {
+    let planner = TerminalPresentationPlanner(
+      capabilityProfile: .previewUnicode
+    )
+    let previousSurface = RasterSurface(
+      size: .init(width: 8, height: 2),
+      lines: ["same", "beta"]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 8, height: 2),
+      lines: ["same", "beXa"]
+    )
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface,
+      damage: .init(dirtyRows: [1])
+    )
+
+    #expect(plan.strategy == .incremental)
+    #expect(
+      plan.spanUpdates == [
+        .init(row: 1, column: 2, renderedSpan: "X", cellsChanged: 1)
+      ])
+    #expect(plan.linesTouched == 1)
+    #expect(plan.cellsChanged == 1)
+  }
+
+  @Test("presentation planner ignores damage hints when surfaces are incompatible")
+  func presentationPlannerIgnoresDamageHintsForIncompatibleSurfaces() {
+    let planner = TerminalPresentationPlanner(
+      capabilityProfile: .previewUnicode
+    )
+    let previousSurface = RasterSurface(
+      size: .init(width: 4, height: 1),
+      lines: ["same"],
+      attachments: ["previous"]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 4, height: 1),
+      lines: ["diff"],
+      attachments: ["current"]
+    )
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface,
+      damage: .init(dirtyRows: [0])
+    )
+
+    #expect(plan.strategy == .fullRepaint)
+    #expect(!plan.renderedOutput.isEmpty)
   }
 
   @Test("terminal host presents styled surfaces through the capability-aware renderer")

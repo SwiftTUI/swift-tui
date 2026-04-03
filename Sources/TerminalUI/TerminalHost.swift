@@ -173,6 +173,14 @@ public protocol TerminalHosting: AnyObject {
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics
 }
 
+package protocol DamageAwareTerminalHosting: TerminalHosting {
+  @discardableResult
+  func present(
+    _ surface: RasterSurface,
+    damage: PresentationDamage?
+  ) throws -> TerminalPresentationMetrics
+}
+
 extension TerminalHosting {
   public var theme: Theme? {
     nil
@@ -510,7 +518,7 @@ extension TerminalHosting {
   }
 
   /// Default terminal-backed host that owns raw mode and screen presentation.
-  public final class TerminalHost: TerminalHosting {
+  public final class TerminalHost: TerminalHosting, DamageAwareTerminalHosting {
     public var surfaceSize: Size {
       (try? controller.windowSize(of: outputFileDescriptor)) ?? fallbackSize
     }
@@ -705,6 +713,17 @@ extension TerminalHosting {
 
     @discardableResult
     public func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+      try present(
+        surface,
+        damage: nil
+      )
+    }
+
+    @discardableResult
+    package func present(
+      _ surface: RasterSurface,
+      damage: PresentationDamage?
+    ) throws -> TerminalPresentationMetrics {
       try synchronizePresentationState()
       if !surface.imageAttachments.isEmpty, !hasProbedGraphicsCapabilities {
         try drainPendingPresentation()
@@ -722,7 +741,8 @@ extension TerminalHosting {
         capabilityProfile: capabilityProfile
       ).plan(
         previousSurface: forceFullRepaint ? nil : lastSubmittedSurface,
-        currentSurface: preparedSurface
+        currentSurface: preparedSurface,
+        damage: forceFullRepaint ? nil : damage
       )
       forceFullRepaint = false
 

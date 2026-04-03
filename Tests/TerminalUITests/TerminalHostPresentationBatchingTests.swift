@@ -68,6 +68,40 @@ struct TerminalHostPresentationBatchingTests {
     #expect(incrementalWrites == ["\u{001B}[1;4HX"])
   }
 
+  @Test("terminal host damage-aware presentation batches only hinted rows")
+  func damageAwareUpdatesBatchOnlyHintedRows() throws {
+    let controller = PresentationWriteCountingController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .previewUnicode
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 2),
+        lines: ["same", "beta"]
+      )
+    )
+    try host.drainPendingPresentation()
+    let writesBeforeUpdate = controller.writes.count
+
+    let damageAwareHost: any DamageAwareTerminalHosting = host
+    _ = try damageAwareHost.present(
+      RasterSurface(
+        size: .init(width: 8, height: 2),
+        lines: ["same", "beXa"]
+      ),
+      damage: .init(dirtyRows: [1])
+    )
+    try host.drainPendingPresentation()
+
+    let incrementalWrites = Array(controller.writes.dropFirst(writesBeforeUpdate))
+    #expect(incrementalWrites == ["\u{001B}[2;3HX"])
+  }
+
   @Test("terminal host drops stale pending frames and forces a full repaint on recovery")
   func droppedPendingFramesForceFullRepaintRecovery() throws {
     let controller = BlockingPresentationWriteController(isTTY: true)

@@ -4,18 +4,21 @@
 @MainActor
 private final class RetainedFrameStore {
   private var previousFrame: FrameArtifacts?
+  private var previousFrameIndex: RetainedFrameIndex?
 
   func layoutSession(
     invalidatedIdentities: Set<Identity>
   ) -> RetainedLayoutSession {
     RetainedLayoutSession(
       previousFrame: previousFrame,
+      previousFrameIndex: previousFrameIndex,
       invalidatedIdentities: invalidatedIdentities
     )
   }
 
   func store(_ artifacts: FrameArtifacts) {
     previousFrame = artifacts
+    previousFrameIndex = .init(frame: artifacts)
   }
 }
 
@@ -170,6 +173,11 @@ public struct DefaultRenderer {
         passContext: layoutPassContext
       )
     }
+    let presentationDamage = presentationDamage(
+      rootIdentity: resolveContext.identity,
+      placed: placed,
+      retainedLayout: layoutPassContext.retainedLayout
+    )
     let (semantics, semanticsDuration) = measurePhase {
       semanticExtractor.extract(from: placed)
     }
@@ -196,6 +204,7 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
+    layoutEngine.cache?.prune(keeping: viewGraph.liveIdentitySnapshot())
     let phaseTimings = FramePhaseTimings(
       resolve: resolveDuration,
       measure: measureDuration,
@@ -224,6 +233,7 @@ public struct DefaultRenderer {
       semanticSnapshot: semantics,
       drawTree: draw,
       rasterSurface: raster,
+      presentationDamage: presentationDamage,
       commitPlan: commit,
       diagnostics: diagnostics
     )
@@ -246,5 +256,139 @@ public struct DefaultRenderer {
       width: max(0, width),
       height: max(0, height)
     )
+  }
+
+  private func presentationDamage(
+    rootIdentity: Identity,
+    placed: PlacedNode,
+    retainedLayout: RetainedLayoutSession?
+  ) -> PresentationDamage? {
+    guard let retainedLayout,
+      let previousFrameIndex = retainedLayout.previousFrameIndex
+    else {
+      return nil
+    }
+
+    let directlyInvalidated = retainedLayout.invalidationSummary.directlyInvalidated
+    guard !directlyInvalidated.isEmpty, !directlyInvalidated.contains(rootIdentity) else {
+      return nil
+    }
+
+    var currentPlacedByIdentity: [Identity: PlacedNode] = [:]
+    indexPlacedNodes(placed, into: &currentPlacedByIdentity)
+
+    var dirtyRows: Set<Int> = []
+    for identity in directlyInvalidated {
+      guard previousFrameIndex.resolvedNode(for: identity) != nil else {
+        return nil
+      }
+      guard
+        let previousPath = placedPath(
+          to: identity,
+          in: previousFrameIndex.placedByIdentity
+        ),
+        let currentPath = placedPath(
+          to: identity,
+          in: currentPlacedByIdentity
+        ),
+        cleanSiblingBoundsAreStable(
+          previousPath: previousPath,
+          currentPath: currentPath
+        )
+      else {
+        return nil
+      }
+      let previousPlaced = previousPath.last
+      let currentPlaced = currentPath.last
+
+      if let previousBounds = previousPlaced?.bounds {
+        rows(for: previousBounds, into: &dirtyRows)
+      }
+      if let currentBounds = currentPlaced?.bounds {
+        rows(for: currentBounds, into: &dirtyRows)
+      }
+    }
+
+    return .init(dirtyRows: dirtyRows)
+  }
+
+  private func placedPath(
+    to identity: Identity,
+    in index: [Identity: PlacedNode]
+  ) -> [PlacedNode]? {
+    var identities: [Identity] = []
+    var currentIdentity: Identity? = identity
+
+    while let current = currentIdentity {
+      guard index[current] != nil else {
+        return nil
+      }
+      identities.append(current)
+      currentIdentity = current.parent
+    }
+
+    return identities.reversed().compactMap { index[$0] }
+  }
+
+  private func cleanSiblingBoundsAreStable(
+    previousPath: [PlacedNode],
+    currentPath: [PlacedNode]
+  ) -> Bool {
+    guard previousPath.count == currentPath.count, previousPath.count > 1 else {
+      return previousPath.count == currentPath.count
+    }
+
+    for index in previousPath.indices.dropLast() {
+      let previousAncestor = previousPath[index]
+      let currentAncestor = currentPath[index]
+      let dirtyChildIdentity = previousPath[index + 1].identity
+      let previousChildren = previousAncestor.children
+      let currentChildren = currentAncestor.children
+
+      guard
+        previousChildren.map(\.identity) == currentChildren.map(\.identity)
+      else {
+        return false
+      }
+
+      for (previousChild, currentChild) in zip(previousChildren, currentChildren)
+      where previousChild.identity != dirtyChildIdentity {
+        guard previousChild.bounds == currentChild.bounds else {
+          return false
+        }
+      }
+    }
+
+    return true
+  }
+
+  private func indexPlacedNodes(
+    _ node: PlacedNode,
+    into storage: inout [Identity: PlacedNode]
+  ) {
+    storage[node.identity] = node
+    for child in node.children {
+      indexPlacedNodes(child, into: &storage)
+    }
+  }
+
+  private func rows(
+    for bounds: Rect,
+    into dirtyRows: inout Set<Int>
+  ) {
+    guard bounds.size.height > 0 else {
+      return
+    }
+
+    let lowerBound = max(0, bounds.origin.y)
+    let upperBound = max(lowerBound, bounds.origin.y + bounds.size.height)
+    for row in lowerBound..<upperBound {
+      dirtyRows.insert(row)
+    }
+  }
+
+  @MainActor
+  package func liveIdentitySnapshot() -> Set<Identity> {
+    viewGraph.liveIdentitySnapshot()
   }
 }

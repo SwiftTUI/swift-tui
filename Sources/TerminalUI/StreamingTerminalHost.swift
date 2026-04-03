@@ -1,9 +1,12 @@
 import Synchronization
 
-package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable {
+package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalHosting,
+  @unchecked Sendable
+{
   private struct State {
     var surfaceSize: Size
     var renderStyle: TerminalRenderStyle
+    var lastSubmittedSurface: RasterSurface?
   }
 
   private let state: Mutex<State>
@@ -39,7 +42,8 @@ package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable 
         renderStyle: .init(
           appearance: resolvedAppearance,
           theme: theme
-        )
+        ),
+        lastSubmittedSurface: nil
       )
     )
   }
@@ -61,6 +65,7 @@ package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable 
   ) {
     state.withLock { state in
       state.surfaceSize = surfaceSize
+      state.lastSubmittedSurface = nil
     }
   }
 
@@ -69,6 +74,7 @@ package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable 
   ) {
     state.withLock { state in
       state.renderStyle.appearance = appearance
+      state.lastSubmittedSurface = nil
     }
   }
 
@@ -77,6 +83,7 @@ package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable 
   ) {
     state.withLock { state in
       state.renderStyle.theme = theme
+      state.lastSubmittedSurface = nil
     }
   }
 
@@ -85,6 +92,7 @@ package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable 
   ) {
     state.withLock { state in
       state.renderStyle = style
+      state.lastSubmittedSurface = nil
     }
   }
 
@@ -126,5 +134,60 @@ package final class StreamingTerminalHost: TerminalHosting, @unchecked Sendable 
     let row = max(1, point.y + 1)
     let column = max(1, point.x + 1)
     try write("\u{001B}[\(row);\(column)H")
+  }
+
+  @discardableResult
+  package func present(
+    _ surface: RasterSurface
+  ) throws -> TerminalPresentationMetrics {
+    try present(
+      surface,
+      damage: nil
+    )
+  }
+
+  @discardableResult
+  package func present(
+    _ surface: RasterSurface,
+    damage: PresentationDamage?
+  ) throws -> TerminalPresentationMetrics {
+    let previousSurface = state.withLock(\.lastSubmittedSurface)
+    let plan = TerminalPresentationPlanner(
+      capabilityProfile: capabilityProfile
+    ).plan(
+      previousSurface: previousSurface,
+      currentSurface: surface,
+      damage: damage
+    )
+
+    var output = ""
+    switch plan.strategy {
+    case .fullRepaint:
+      output += "\u{001B}[2J"
+      output += "\u{001B}[1;1H"
+      output += TerminalSurfaceRenderer(
+        capabilityProfile: capabilityProfile
+      ).render(surface)
+    case .incremental:
+      for spanUpdate in plan.spanUpdates {
+        output += "\u{001B}[\(max(1, spanUpdate.row + 1));\(max(1, spanUpdate.column + 1))H"
+        output += spanUpdate.renderedSpan
+      }
+    }
+
+    if !output.isEmpty {
+      try write(output)
+    }
+
+    state.withLock { state in
+      state.lastSubmittedSurface = surface
+    }
+
+    return TerminalPresentationMetrics(
+      bytesWritten: output.utf8.count,
+      linesTouched: plan.linesTouched,
+      cellsChanged: plan.cellsChanged,
+      strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental
+    )
   }
 }

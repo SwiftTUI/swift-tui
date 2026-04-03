@@ -144,89 +144,41 @@ package struct ScrollViewportContext: Equatable, Sendable {
   }
 }
 
-package struct RetainedLayoutSession: Sendable {
-  package var invalidatedIdentities: Set<Identity>
+package struct RetainedFrameIndex: Sendable {
+  package let resolvedByIdentity: [Identity: ResolvedNode]
+  package let measuredByIdentity: [Identity: MeasuredNode]
+  package let placedByIdentity: [Identity: PlacedNode]
 
-  private let resolvedNodes: [Identity: ResolvedNode]
-  private let measuredNodes: [Identity: MeasuredNode]
-  private let placedNodes: [Identity: PlacedNode]
+  package init(frame: FrameArtifacts) {
+    var resolvedByIdentity: [Identity: ResolvedNode] = [:]
+    Self.index(frame.resolvedTree, into: &resolvedByIdentity)
+    self.resolvedByIdentity = resolvedByIdentity
 
-  package init(
-    previousFrame: FrameArtifacts?,
-    invalidatedIdentities: Set<Identity>
-  ) {
-    self.invalidatedIdentities = invalidatedIdentities
+    var measuredByIdentity: [Identity: MeasuredNode] = [:]
+    Self.index(frame.measuredTree, into: &measuredByIdentity)
+    self.measuredByIdentity = measuredByIdentity
 
-    guard let previousFrame else {
-      resolvedNodes = [:]
-      measuredNodes = [:]
-      placedNodes = [:]
-      return
-    }
-
-    var resolvedNodes: [Identity: ResolvedNode] = [:]
-    Self.index(previousFrame.resolvedTree, into: &resolvedNodes)
-    self.resolvedNodes = resolvedNodes
-
-    var measuredNodes: [Identity: MeasuredNode] = [:]
-    Self.index(previousFrame.measuredTree, into: &measuredNodes)
-    self.measuredNodes = measuredNodes
-
-    var placedNodes: [Identity: PlacedNode] = [:]
-    Self.index(previousFrame.placedTree, into: &placedNodes)
-    self.placedNodes = placedNodes
+    var placedByIdentity: [Identity: PlacedNode] = [:]
+    Self.index(frame.placedTree, into: &placedByIdentity)
+    self.placedByIdentity = placedByIdentity
   }
 
   package func resolvedNode(
     for identity: Identity
   ) -> ResolvedNode? {
-    resolvedNodes[identity]
+    resolvedByIdentity[identity]
   }
 
   package func measuredNode(
     for identity: Identity
   ) -> MeasuredNode? {
-    measuredNodes[identity]
+    measuredByIdentity[identity]
   }
 
   package func placedNode(
     for identity: Identity
   ) -> PlacedNode? {
-    placedNodes[identity]
-  }
-
-  package func invalidationAffectsSubtree(
-    at identity: Identity
-  ) -> Bool {
-    invalidatedIdentities.contains { invalidatedIdentity in
-      invalidatedIdentity.isDescendant(of: identity)
-        || identity.isDescendant(of: invalidatedIdentity)
-    }
-  }
-
-  package func isDirectlyInvalidated(
-    _ identity: Identity
-  ) -> Bool {
-    invalidatedIdentities.contains(identity)
-  }
-
-  package func hasSyntheticInvalidatedAncestor(
-    _ identity: Identity
-  ) -> Bool {
-    invalidatedIdentities.contains { invalidatedIdentity in
-      guard resolvedNodes[invalidatedIdentity] == nil else {
-        return false
-      }
-      return identity.isDescendant(of: invalidatedIdentity)
-    }
-  }
-
-  package func containsInvalidatedDescendant(
-    of identity: Identity
-  ) -> Bool {
-    invalidatedIdentities.contains { invalidatedIdentity in
-      invalidatedIdentity.isDescendant(of: identity)
-    }
+    placedByIdentity[identity]
   }
 
   private static func index(
@@ -257,6 +209,166 @@ package struct RetainedLayoutSession: Sendable {
     for child in node.children {
       index(child, into: &storage)
     }
+  }
+}
+
+package struct RetainedInvalidationSummary: Sendable {
+  package let directlyInvalidated: Set<Identity>
+  package let identitiesWithInvalidatedDescendants: Set<Identity>
+  package let identitiesWithSyntheticInvalidatedAncestors: Set<Identity>
+  package let affectedIndexedChildSourceRoots: Set<Identity>
+
+  package init(
+    invalidatedIdentities: Set<Identity>,
+    previousFrameIndex: RetainedFrameIndex?
+  ) {
+    directlyInvalidated = invalidatedIdentities
+
+    var identitiesWithInvalidatedDescendants: Set<Identity> = []
+    for invalidatedIdentity in invalidatedIdentities {
+      var ancestor = invalidatedIdentity.parent
+      while let current = ancestor {
+        identitiesWithInvalidatedDescendants.insert(current)
+        ancestor = current.parent
+      }
+    }
+    self.identitiesWithInvalidatedDescendants = identitiesWithInvalidatedDescendants
+
+    guard let previousFrameIndex else {
+      identitiesWithSyntheticInvalidatedAncestors = []
+      affectedIndexedChildSourceRoots = []
+      return
+    }
+
+    let previousResolvedIdentities = Set(previousFrameIndex.resolvedByIdentity.keys)
+    let syntheticInvalidatedIdentities = invalidatedIdentities.subtracting(previousResolvedIdentities)
+
+    var identitiesWithSyntheticInvalidatedAncestors: Set<Identity> = []
+    if !syntheticInvalidatedIdentities.isEmpty {
+      for identity in previousResolvedIdentities {
+        var ancestor = identity.parent
+        while let current = ancestor {
+          if syntheticInvalidatedIdentities.contains(current) {
+            identitiesWithSyntheticInvalidatedAncestors.insert(identity)
+            break
+          }
+          ancestor = current.parent
+        }
+      }
+    }
+    self.identitiesWithSyntheticInvalidatedAncestors = identitiesWithSyntheticInvalidatedAncestors
+
+    var affectedIndexedChildSourceRoots: Set<Identity> = []
+    if !invalidatedIdentities.isEmpty {
+      for resolvedNode in previousFrameIndex.resolvedByIdentity.values {
+        guard let source = resolvedNode.indexedChildSource else {
+          continue
+        }
+        if invalidatedIdentities.contains(where: { invalidatedIdentity in
+          invalidatedIdentity.isDescendant(of: source.identityRoot)
+            || source.identityRoot.isDescendant(of: invalidatedIdentity)
+        }) {
+          affectedIndexedChildSourceRoots.insert(source.identityRoot)
+        }
+      }
+    }
+    self.affectedIndexedChildSourceRoots = affectedIndexedChildSourceRoots
+  }
+
+  package func isDirectlyInvalidated(
+    _ identity: Identity
+  ) -> Bool {
+    directlyInvalidated.contains(identity)
+  }
+
+  package func containsInvalidatedDescendant(
+    of identity: Identity
+  ) -> Bool {
+    identitiesWithInvalidatedDescendants.contains(identity)
+  }
+
+  package func hasSyntheticInvalidatedAncestor(
+    _ identity: Identity
+  ) -> Bool {
+    identitiesWithSyntheticInvalidatedAncestors.contains(identity)
+  }
+
+  package func affectsIndexedChildSource(
+    root identityRoot: Identity
+  ) -> Bool {
+    affectedIndexedChildSourceRoots.contains(identityRoot)
+  }
+}
+
+package struct RetainedLayoutSession: Sendable {
+  package var invalidatedIdentities: Set<Identity>
+  package let previousFrame: FrameArtifacts?
+  package let previousFrameIndex: RetainedFrameIndex?
+  package let invalidationSummary: RetainedInvalidationSummary
+
+  package init(
+    previousFrame: FrameArtifacts?,
+    previousFrameIndex: RetainedFrameIndex?,
+    invalidatedIdentities: Set<Identity>
+  ) {
+    self.invalidatedIdentities = invalidatedIdentities
+    self.previousFrame = previousFrame
+    self.previousFrameIndex = previousFrameIndex
+    invalidationSummary = RetainedInvalidationSummary(
+      invalidatedIdentities: invalidatedIdentities,
+      previousFrameIndex: previousFrameIndex
+    )
+  }
+
+  package func resolvedNode(
+    for identity: Identity
+  ) -> ResolvedNode? {
+    previousFrameIndex?.resolvedNode(for: identity)
+  }
+
+  package func measuredNode(
+    for identity: Identity
+  ) -> MeasuredNode? {
+    previousFrameIndex?.measuredNode(for: identity)
+  }
+
+  package func placedNode(
+    for identity: Identity
+  ) -> PlacedNode? {
+    previousFrameIndex?.placedNode(for: identity)
+  }
+
+  package func invalidationAffectsSubtree(
+    at identity: Identity
+  ) -> Bool {
+    invalidatedIdentities.contains { invalidatedIdentity in
+      invalidatedIdentity.isDescendant(of: identity)
+        || identity.isDescendant(of: invalidatedIdentity)
+    }
+  }
+
+  package func isDirectlyInvalidated(
+    _ identity: Identity
+  ) -> Bool {
+    invalidationSummary.isDirectlyInvalidated(identity)
+  }
+
+  package func hasSyntheticInvalidatedAncestor(
+    _ identity: Identity
+  ) -> Bool {
+    invalidationSummary.hasSyntheticInvalidatedAncestor(identity)
+  }
+
+  package func containsInvalidatedDescendant(
+    of identity: Identity
+  ) -> Bool {
+    invalidationSummary.containsInvalidatedDescendant(of: identity)
+  }
+
+  package func affectsIndexedChildSource(
+    root identityRoot: Identity
+  ) -> Bool {
+    invalidationSummary.affectsIndexedChildSource(root: identityRoot)
   }
 }
 
@@ -419,6 +531,16 @@ public struct FrameContext: Equatable, Sendable {
   }
 }
 
+package struct PresentationDamage: Equatable, Sendable {
+  package var dirtyRows: Set<Int>
+
+  package init(
+    dirtyRows: Set<Int> = []
+  ) {
+    self.dirtyRows = dirtyRows
+  }
+}
+
 /// The complete output of one rendered frame.
 public struct FrameArtifacts: Equatable, Sendable {
   public var resolvedTree: ResolvedNode
@@ -427,6 +549,7 @@ public struct FrameArtifacts: Equatable, Sendable {
   public var semanticSnapshot: SemanticSnapshot
   public var drawTree: DrawNode
   public var rasterSurface: RasterSurface
+  package var presentationDamage: PresentationDamage?
   public var commitPlan: CommitPlan
   public var diagnostics: FrameDiagnostics
 
@@ -447,6 +570,29 @@ public struct FrameArtifacts: Equatable, Sendable {
     self.semanticSnapshot = semanticSnapshot
     self.drawTree = drawTree
     self.rasterSurface = rasterSurface
+    presentationDamage = nil
+    self.commitPlan = commitPlan
+    self.diagnostics = diagnostics
+  }
+
+  package init(
+    resolvedTree: ResolvedNode,
+    measuredTree: MeasuredNode,
+    placedTree: PlacedNode,
+    semanticSnapshot: SemanticSnapshot,
+    drawTree: DrawNode,
+    rasterSurface: RasterSurface,
+    presentationDamage: PresentationDamage?,
+    commitPlan: CommitPlan,
+    diagnostics: FrameDiagnostics = .init()
+  ) {
+    self.resolvedTree = resolvedTree
+    self.measuredTree = measuredTree
+    self.placedTree = placedTree
+    self.semanticSnapshot = semanticSnapshot
+    self.drawTree = drawTree
+    self.rasterSurface = rasterSurface
+    self.presentationDamage = presentationDamage
     self.commitPlan = commitPlan
     self.diagnostics = diagnostics
   }

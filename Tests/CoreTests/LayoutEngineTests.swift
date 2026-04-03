@@ -50,6 +50,69 @@ struct LayoutEngineTests {
     #expect(metrics2.hits == metrics1.hits + 1)
   }
 
+  @Test("measurement cache keeps at most four proposal variants per identity")
+  func measurementCacheCapsProposalVariantsPerIdentity() {
+    let cache = MeasurementCache()
+    let engine = LayoutEngine(cache: cache)
+    let resolved = leaf("capped", size: .init(width: 6, height: 1))
+
+    _ = engine.measure(resolved, proposal: .init(width: 1, height: nil))
+    _ = engine.measure(resolved, proposal: .init(width: 2, height: nil))
+    _ = engine.measure(resolved, proposal: .init(width: 3, height: nil))
+    _ = engine.measure(resolved, proposal: .init(width: 4, height: nil))
+    let primedMetrics = cache.metrics
+
+    _ = engine.measure(resolved, proposal: .init(width: 2, height: nil))
+    let afterRecentHit = cache.metrics
+
+    _ = engine.measure(resolved, proposal: .init(width: 5, height: nil))
+    let afterEviction = cache.metrics
+
+    _ = engine.measure(resolved, proposal: .init(width: 2, height: nil))
+    let afterRetainedHit = cache.metrics
+
+    _ = engine.measure(resolved, proposal: .init(width: 1, height: nil))
+    let afterEvictedLookup = cache.metrics
+
+    #expect(primedMetrics.entries == 4)
+    #expect(cache.count == 4)
+    #expect(afterRecentHit.hits == primedMetrics.hits + 1)
+    #expect(afterEviction.entries == 4)
+    #expect(afterRetainedHit.hits == afterEviction.hits + 1)
+    #expect(afterEvictedLookup.entries == 4)
+    #expect(afterEvictedLookup.misses == afterRetainedHit.misses + 1)
+    #expect(afterEvictedLookup.stores == afterRetainedHit.stores + 1)
+  }
+
+  @Test("measurement cache prunes dead identities")
+  func measurementCachePrunesDeadIdentities() {
+    let cache = MeasurementCache()
+    let engine = LayoutEngine(cache: cache)
+    let kept = leaf("kept", size: .init(width: 4, height: 1))
+    let pruned = leaf("pruned", size: .init(width: 5, height: 1))
+
+    _ = engine.measure(kept, proposal: .unspecified)
+    _ = engine.measure(kept, proposal: .init(width: 2, height: nil))
+    _ = engine.measure(pruned, proposal: .unspecified)
+    let beforePrune = cache.metrics
+
+    cache.prune(keeping: [kept.identity])
+    let afterPrune = cache.metrics
+
+    _ = engine.measure(kept, proposal: .unspecified)
+    let afterKeptHit = cache.metrics
+
+    _ = engine.measure(pruned, proposal: .unspecified)
+    let afterPrunedMiss = cache.metrics
+
+    #expect(beforePrune.entries == 3)
+    #expect(afterPrune.entries == 2)
+    #expect(afterKeptHit.hits == afterPrune.hits + 1)
+    #expect(afterPrunedMiss.misses == afterKeptHit.misses + 1)
+    #expect(afterPrunedMiss.stores == afterKeptHit.stores + 1)
+    #expect(afterPrunedMiss.entries == 3)
+  }
+
   @Test("stack with spacers spreads remainder across the range")
   func stackWithSpacersSpreadsRemainderAcrossRange() {
     let engine = LayoutEngine()

@@ -6,6 +6,7 @@ extension RunLoop {
     observationBridge.attachInvalidator(scheduler)
 
     while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+      var rerenderedForFocusSync = false
       while true {
         let artifacts = renderer.render(
           viewBuilder(stateContainer.state, focusTracker.currentFocusIdentity),
@@ -33,10 +34,24 @@ extension RunLoop {
         }
 
         if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged {
+          rerenderedForFocusSync = true
           continue
         }
 
-        try terminalHost.present(artifacts.rasterSurface)
+        let presentationDamage: PresentationDamage? =
+          if rerenderedForFocusSync {
+            nil
+          } else {
+            artifacts.presentationDamage
+          }
+        if let damageAwareHost = terminalHost as? any DamageAwareTerminalHosting {
+          try damageAwareHost.present(
+            artifacts.rasterSurface,
+            damage: presentationDamage
+          )
+        } else {
+          try terminalHost.present(artifacts.rasterSurface)
+        }
         lifecycleCoordinator.applyCommittedFrame(
           plan: artifacts.commitPlan,
           currentLifecycleRegistry: localLifecycleRegistry,
@@ -51,7 +66,7 @@ extension RunLoop {
           postActionInvalidationIdentities.removeAll(keepingCapacity: true)
         }
         observationBridge.prune(
-          keeping: Set(artifacts.resolvedTree.collectIdentities())
+          keeping: renderer.liveIdentitySnapshot()
         )
         renderedFrames += 1
 

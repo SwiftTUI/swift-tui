@@ -83,19 +83,19 @@ struct Phase4ObservationAndEnvironmentTests {
 
     var shownContext = ResolveContext(identity: testIdentity("Root"))
     shownContext.observationBridge = bridge
-    let shownArtifacts = renderer.render(
+    _ = renderer.render(
       ConditionalObservableRoot(showCounter: true, model: model),
       context: shownContext
     )
-    bridge.prune(keeping: Set(shownArtifacts.resolvedTree.collectIdentities()))
+    bridge.prune(keeping: renderer.liveIdentitySnapshot())
 
     var hiddenContext = ResolveContext(identity: testIdentity("Root"))
     hiddenContext.observationBridge = bridge
-    let hiddenArtifacts = renderer.render(
+    _ = renderer.render(
       ConditionalObservableRoot(showCounter: false, model: model),
       context: hiddenContext
     )
-    bridge.prune(keeping: Set(hiddenArtifacts.resolvedTree.collectIdentities()))
+    bridge.prune(keeping: renderer.liveIdentitySnapshot())
     invalidator.clear()
 
     model.count = 1

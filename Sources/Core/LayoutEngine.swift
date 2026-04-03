@@ -1,19 +1,18 @@
-/// A retained cache of measured subtrees keyed by identity and proposal.
-// SAFETY: Stores only Sendable data (MeasurementKey, MeasurementInput, MeasuredNode) but has
-// unsynchronized mutable state (storage dict, counters). Only accessed from the layout engine
-// during a single frame's layout pass on one thread. Never shared across concurrent contexts.
-public final class MeasurementCache: @unchecked Sendable {
-  private struct MeasurementKey: Hashable, Sendable {
-    let identity: Identity
-    let proposal: ProposedSize
-  }
+import OrderedCollections
 
+/// A retained cache of measured subtrees keyed by identity and proposal.
+// SAFETY: Stores only Sendable data (ResolvedNode, MeasuredNode) but has unsynchronized mutable
+// state (storage dict, counters). Only accessed from the layout engine during a single frame's
+// layout pass on one thread. Never shared across concurrent contexts.
+public final class MeasurementCache: @unchecked Sendable {
   private struct CachedMeasurement: Sendable {
     let resolved: ResolvedNode
     let node: MeasuredNode
   }
 
-  private var storage: [MeasurementKey: CachedMeasurement] = [:]
+  private static let maxProposalVariantsPerIdentity = 4
+
+  private var storage: [Identity: OrderedDictionary<ProposedSize, CachedMeasurement>] = [:]
   private var generation = 0
   private var lookups = 0
   private var hits = 0
@@ -25,14 +24,14 @@ public final class MeasurementCache: @unchecked Sendable {
 
   /// The number of cached entries.
   public var count: Int {
-    storage.count
+    storage.values.reduce(0) { $0 + $1.count }
   }
 
   /// Snapshot metrics describing cache usage.
   public var metrics: MeasurementCacheMetrics {
     MeasurementCacheMetrics(
       generation: generation,
-      entries: storage.count,
+      entries: count,
       lookups: lookups,
       hits: hits,
       misses: misses,
@@ -47,11 +46,17 @@ public final class MeasurementCache: @unchecked Sendable {
     proposal: ProposedSize
   ) -> MeasuredNode? {
     lookups += 1
-    let key = MeasurementKey(identity: resolved.identity, proposal: proposal)
-    guard let cached = storage[key] else {
+    guard var variants = storage[resolved.identity] else {
       misses += 1
       return nil
     }
+    guard let cached = variants.removeValue(forKey: proposal) else {
+      storage[resolved.identity] = variants
+      misses += 1
+      return nil
+    }
+    variants[proposal] = cached
+    storage[resolved.identity] = variants
     guard cached.resolved.isEquivalentForMeasurement(to: resolved) else {
       misses += 1
       return nil
@@ -66,10 +71,24 @@ public final class MeasurementCache: @unchecked Sendable {
     for resolved: ResolvedNode
   ) {
     stores += 1
-    storage[MeasurementKey(identity: node.identity, proposal: node.proposal)] = CachedMeasurement(
+    var variants = storage[node.identity] ?? [:]
+    variants.removeValue(forKey: node.proposal)
+    variants[node.proposal] = CachedMeasurement(
       resolved: resolved,
       node: node
     )
+    if variants.count > Self.maxProposalVariantsPerIdentity,
+      let oldestProposal = variants.elements.first?.key
+    {
+      variants.removeValue(forKey: oldestProposal)
+    }
+    storage[node.identity] = variants
+  }
+
+  package func prune(
+    keeping identities: Set<Identity>
+  ) {
+    storage = storage.filter { identities.contains($0.key) }
   }
 
   /// Clears the cache and advances its generation counter.
@@ -924,10 +943,11 @@ public struct LayoutEngine {
       return false
     }
 
-    return passContext?.invalidatedIdentities.contains { invalidatedIdentity in
-      invalidatedIdentity.isDescendant(of: source.identityRoot)
-        || source.identityRoot.isDescendant(of: invalidatedIdentity)
-    } ?? false
+    guard let retainedLayout = passContext?.retainedLayout else {
+      return false
+    }
+
+    return retainedLayout.affectsIndexedChildSource(root: source.identityRoot)
   }
 
   private func supportsRetainedLayoutReuse(

@@ -28,6 +28,8 @@ package final class ViewGraph {
   private var stateSlotDependents: [StateSlotKey: Set<Identity>]
   private var environmentDependents: [ObjectIdentifier: Set<Identity>]
   private var observableDependents: [ObjectIdentifier: Set<Identity>]
+  private var currentFrameID: UInt64
+  private var liveIdentities: Set<Identity>
 
   package init() {
     nodesByIdentity = [:]
@@ -49,6 +51,8 @@ package final class ViewGraph {
     stateSlotDependents = [:]
     environmentDependents = [:]
     observableDependents = [:]
+    currentFrameID = 0
+    liveIdentities = []
   }
 
   package func invalidate(_ identities: Set<Identity>) {
@@ -153,14 +157,7 @@ package final class ViewGraph {
       return false
     }
 
-    let dirtyFrontier = nodesByIdentity.values
-      .filter { $0.isDirty && !$0.hasDirtyAncestor }
-      .sorted { lhs, rhs in
-        if lhs.identity.components.count == rhs.identity.components.count {
-          return lhs.identity < rhs.identity
-        }
-        return lhs.identity.components.count < rhs.identity.components.count
-      }
+    let dirtyFrontier = dirtyFrontierNodes()
 
     if dirtyFrontier.isEmpty {
       if let evaluationRootIdentity {
@@ -187,6 +184,7 @@ package final class ViewGraph {
   }
 
   package func beginFrame() {
+    currentFrameID &+= 1
     frameOrder.removeAll(keepingCapacity: true)
     stableTaskCancelEvents.removeAll(keepingCapacity: true)
     stableTaskStartIdentities.removeAll(keepingCapacity: true)
@@ -194,10 +192,6 @@ package final class ViewGraph {
     structuralTaskCancelEvents.removeAll(keepingCapacity: true)
     structuralDisappearEvents.removeAll(keepingCapacity: true)
     latestLifecycleEvents.removeAll(keepingCapacity: true)
-
-    for node in nodesByIdentity.values {
-      node.prepareForFrame()
-    }
   }
 
   package func beginEvaluation(
@@ -205,10 +199,14 @@ package final class ViewGraph {
     invalidator: (any Invalidating)?
   ) -> ViewNode {
     let node = nodeForIdentity(for: identity)
+    node.prepareForFrame(currentFrameID)
     if !node.wasVisitedThisFrame {
       frameOrder.append(identity)
     }
-    node.beginEvaluation(invalidator: invalidator)
+    node.beginEvaluation(
+      frameID: currentFrameID,
+      invalidator: invalidator
+    )
     return node
   }
 
@@ -282,10 +280,14 @@ package final class ViewGraph {
     invalidator: (any Invalidating)?
   ) {
     let node = nodeForIdentity(for: subtree.identity)
+    node.prepareForFrame(currentFrameID)
     if !node.wasVisitedThisFrame {
       frameOrder.append(subtree.identity)
     }
-    node.beginReuse(invalidator: invalidator)
+    node.beginReuse(
+      frameID: currentFrameID,
+      invalidator: invalidator
+    )
     let childNodes = subtree.children.map { child -> ViewNode in
       recordReusedSubtree(
         child,
@@ -350,6 +352,7 @@ package final class ViewGraph {
     guard let node = nodesByIdentity[identity] else {
       return nil
     }
+    node.prepareForFrame(currentFrameID)
     guard !invalidatedIdentities.isEmpty else {
       return nil
     }
@@ -374,6 +377,7 @@ package final class ViewGraph {
       return nil
     }
     guard node.canReuse(
+      frameID: currentFrameID,
       environment: environment,
       transaction: transaction
     ) else {
@@ -450,7 +454,11 @@ package final class ViewGraph {
     root = nodesByIdentity[rootIdentity]
 
     for identity in frameOrder {
-      guard let node = nodesByIdentity[identity], !node.wasPresentAtFrameStart else {
+      guard let node = nodesByIdentity[identity] else {
+        continue
+      }
+      node.setCommittedPresence(true)
+      guard !node.wasPresentAtFrameStart else {
         continue
       }
       node.setLifecycleState(.alive)
@@ -483,6 +491,7 @@ package final class ViewGraph {
       + structuralTaskStarts
       + viewportTaskStarts
 
+    liveIdentities.formUnion(frameOrder)
     invalidatedIdentities.removeAll(keepingCapacity: true)
     graphLocalDirtyIdentities.removeAll(keepingCapacity: true)
     return latestLifecycleEvents
@@ -527,6 +536,10 @@ package final class ViewGraph {
     for key: ObjectIdentifier
   ) -> Set<Identity> {
     observableDependents[key] ?? []
+  }
+
+  package func liveIdentitySnapshot() -> Set<Identity> {
+    liveIdentities
   }
 
   package func restoreRuntimeRegistrations(
@@ -621,6 +634,48 @@ package final class ViewGraph {
     return node
   }
 
+  private func dirtyFrontierNodes() -> [ViewNode] {
+    var frontier: [ViewNode] = []
+    var frontierIdentities: Set<Identity> = []
+
+    for identity in graphLocalDirtyIdentities {
+      guard let node = nodesByIdentity[identity], node.isDirty else {
+        continue
+      }
+
+      var ancestor = node.parent
+      var hasDirtyAncestor = false
+      var visitedAncestors: Set<ObjectIdentifier> = []
+
+      while let current = ancestor {
+        let currentID = ObjectIdentifier(current)
+        guard visitedAncestors.insert(currentID).inserted else {
+          break
+        }
+        if current.isDirty {
+          hasDirtyAncestor = true
+          break
+        }
+        ancestor = current.parent
+      }
+
+      guard !hasDirtyAncestor,
+        frontierIdentities.insert(node.identity).inserted
+      else {
+        continue
+      }
+
+      frontier.append(node)
+    }
+
+    return frontier.sorted { lhs, rhs in
+      if lhs.identity.components.count == rhs.identity.components.count {
+        return lhs.identity < rhs.identity
+      }
+      return lhs.identity.components.count < rhs.identity.components.count
+    }
+  }
+
   private func applyStructuralChildDiff(
     for node: ViewNode,
     resolved: ResolvedNode
@@ -646,6 +701,8 @@ package final class ViewGraph {
   private func removeSubtree(
     rootedAt node: ViewNode
   ) {
+    node.prepareForFrame(currentFrameID)
+
     for child in node.children {
       removeSubtree(rootedAt: child)
     }
@@ -674,8 +731,10 @@ package final class ViewGraph {
     }
 
     node.setLifecycleState(.disappearing)
+    node.setCommittedPresence(false)
     node.parent = nil
     removeDependencyEdges(for: node)
+    liveIdentities.remove(node.identity)
 
     if let target = registrationAliasTargets.removeValue(forKey: node.identity) {
       registrationAliasesByIdentity[target]?.remove(node.identity)

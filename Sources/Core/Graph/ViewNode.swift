@@ -39,9 +39,14 @@ package final class ViewNode {
   private var cachedResolvedNode: ResolvedNode?
   private var registrationCaptureDepth: Int
   private var evaluationDepth: Int
+  private var hasCommittedPresence: Bool
+  private var preparedFrameID: UInt64
+  private var visitedFrameID: UInt64
   private var evaluator: (@MainActor () -> Void)?
 
-  package init(identity: Identity) {
+  package init(
+    identity: Identity
+  ) {
     self.identity = identity
     resolvedIdentity = identity
     children = []
@@ -73,23 +78,36 @@ package final class ViewNode {
     dependencyTracker = .init()
     registrationCaptureDepth = 0
     evaluationDepth = 0
+    hasCommittedPresence = false
+    preparedFrameID = 0
+    visitedFrameID = 0
     evaluator = nil
   }
 
-  package func prepareForFrame() {
-    wasPresentAtFrameStart = true
+  package func prepareForFrame(
+    _ frameID: UInt64
+  ) {
+    guard preparedFrameID != frameID else {
+      return
+    }
+
+    wasPresentAtFrameStart = hasCommittedPresence
     wasVisitedThisFrame = false
     previousChildrenIdentities = children.map(\.identity)
     previousLifecycleMetadata = lifecycleMetadata
     currentBodyStateSlotCount = 0
+    preparedFrameID = frameID
   }
 
   package func beginEvaluation(
+    frameID: UInt64,
     invalidator: (any Invalidating)?
   ) {
+    prepareForFrame(frameID)
     if evaluationDepth == 0 {
       self.invalidator = invalidator
       wasVisitedThisFrame = true
+      visitedFrameID = frameID
       isDirty = false
       currentBodyStateSlotCount = 0
       _ = dependencyTracker.reset()
@@ -98,10 +116,13 @@ package final class ViewNode {
   }
 
   package func beginReuse(
+    frameID: UInt64,
     invalidator: (any Invalidating)?
   ) {
+    prepareForFrame(frameID)
     self.invalidator = invalidator
     wasVisitedThisFrame = true
+    visitedFrameID = frameID
     isDirty = false
   }
 
@@ -241,10 +262,12 @@ package final class ViewNode {
   }
 
   package func canReuse(
+    frameID: UInt64,
     environment: EnvironmentSnapshot,
     transaction: TransactionSnapshot
   ) -> Bool {
-    wasPresentAtFrameStart
+    prepareForFrame(frameID)
+    return wasPresentAtFrameStart
       && !wasVisitedThisFrame
       && !isDirty
       && supportsRetainedReuse
@@ -589,5 +612,24 @@ package final class ViewNode {
     }
 
     return false
+  }
+
+  package func isPrepared(
+    for frameID: UInt64
+  ) -> Bool {
+    preparedFrameID == frameID
+  }
+
+  package func visitedThisFrame(
+    _ frameID: UInt64
+  ) -> Bool {
+    prepareForFrame(frameID)
+    return visitedFrameID == frameID
+  }
+
+  package func setCommittedPresence(
+    _ hasCommittedPresence: Bool
+  ) {
+    self.hasCommittedPresence = hasCommittedPresence
   }
 }
