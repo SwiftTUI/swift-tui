@@ -52,10 +52,15 @@ extension Rasterizer {
     clip: Rect?
   ) -> (x: Int, y: Int) {
     let effectiveClip = intersect(clip, node.clipBounds)
-    let visibleBounds =
-      effectiveClip.flatMap { clip in
-        intersect(node.bounds, clip)
-      } ?? node.bounds
+    let visibleBounds: Rect
+    if let effectiveClip {
+      guard let clippedBounds = intersect(node.bounds, effectiveClip) else {
+        return (x: 0, y: 0)
+      }
+      visibleBounds = clippedBounds
+    } else {
+      visibleBounds = node.bounds
+    }
 
     var maxX = visibleBounds.origin.x + visibleBounds.size.width
     var maxY = visibleBounds.origin.y + visibleBounds.size.height

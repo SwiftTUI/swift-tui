@@ -329,7 +329,7 @@ struct DiagnosticsAndCacheTests {
     #expect(second.diagnostics.placedNodesComputed > 0)
   }
 
-  @Test("default renderer reuses measurements across ScrollView position changes")
+  @Test("default renderer reuses measurement and placement work across ScrollView position changes")
   func defaultRendererReusesMeasurementsAcrossScrollPositionChanges() {
     final class ScrollPositionBox: @unchecked Sendable {
       var position = ScrollPosition.zero
@@ -375,9 +375,9 @@ struct DiagnosticsAndCacheTests {
     )
 
     #expect(second.diagnostics.measuredNodesComputed == 0)
-    #expect(second.diagnostics.measuredNodesReused == second.diagnostics.measuredNodeCount)
-    #expect(second.diagnostics.placedNodesComputed == first.diagnostics.placedNodesComputed)
-    #expect(second.diagnostics.placedNodesReused == 0)
+    #expect(second.diagnostics.measuredNodesReused > 0)
+    #expect(second.diagnostics.placedNodesComputed < first.diagnostics.placedNodesComputed)
+    #expect(second.diagnostics.placedNodesReused > 0)
   }
 
   @Test("lazy stacks reduce placement work across scroll position changes")
@@ -462,7 +462,8 @@ struct DiagnosticsAndCacheTests {
 
     #expect(eagerSecond.diagnostics.measuredNodesComputed == 0)
     #expect(lazySecond.diagnostics.measuredNodesComputed == 0)
-    #expect(lazySecond.diagnostics.measuredNodesReused == lazySecond.diagnostics.measuredNodeCount)
+    #expect(lazySecond.diagnostics.measuredNodesReused > 0)
+    #expect(eagerSecond.diagnostics.placedNodesReused > 0)
     #expect(lazySecond.diagnostics.placedNodeCount < eagerSecond.diagnostics.placedNodeCount)
   }
 

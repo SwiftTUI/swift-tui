@@ -1,7 +1,7 @@
 import Synchronization
 
-package final class InjectedTerminalInputReader: TerminalInputReading, @unchecked Sendable {
-  private struct State {
+package final class InjectedTerminalInputReader: TerminalInputReading, Sendable {
+  private struct State: Sendable {
     var parser = TerminalInputParser()
     var controlParser = ControlMessageParser()
     var continuation: AsyncStream<InputEvent>.Continuation?

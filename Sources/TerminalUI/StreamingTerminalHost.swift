@@ -1,9 +1,8 @@
 import Synchronization
 
-package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalHosting,
-  @unchecked Sendable
+package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalHosting, Sendable
 {
-  private struct State {
+  private struct State: Sendable {
     var surfaceSize: Size
     var renderStyle: TerminalRenderStyle
     var lastSubmittedSurface: RasterSurface?

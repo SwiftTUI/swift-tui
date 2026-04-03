@@ -917,7 +917,8 @@ public struct LayoutEngine {
       return nil
     }
 
-    guard let retainedLayout,
+    guard
+      let retainedLayout,
       !retainedLayout.isDirectlyInvalidated(resolved.identity),
       !retainedLayout.hasSyntheticInvalidatedAncestor(resolved.identity),
       !retainedLayout.containsInvalidatedDescendant(of: resolved.identity),
@@ -925,14 +926,53 @@ public struct LayoutEngine {
       let previousResolved = retainedLayout.resolvedNode(for: resolved.identity),
       let previousMeasured = retainedLayout.measuredNode(for: resolved.identity),
       let previousPlaced = retainedLayout.placedNode(for: resolved.identity),
-      previousResolved.isEquivalentForMeasurement(to: resolved),
-      previousMeasured == measured,
-      previousPlaced.bounds == bounds
+      previousResolved.isEquivalentForMeasurement(to: resolved)
     else {
       return nil
     }
 
-    return previousPlaced
+    let measurementMatches = previousMeasured == measured
+    let translationMeasurementMatches = isEquivalentForViewportTranslation(previousMeasured, measured)
+
+    if previousPlaced.bounds == bounds {
+      guard measurementMatches else {
+        return nil
+      }
+      return previousPlaced
+    }
+
+    guard
+      viewportContext != nil,
+      previousPlaced.bounds.size == bounds.size,
+      measurementMatches || translationMeasurementMatches
+    else {
+      return nil
+    }
+
+    let delta = Point(
+      x: bounds.origin.x - previousPlaced.bounds.origin.x,
+      y: bounds.origin.y - previousPlaced.bounds.origin.y
+    )
+    guard delta != .zero else {
+      return previousPlaced
+    }
+
+    return translatedPlacement(
+      previousPlaced,
+      by: delta
+    )
+  }
+
+  private func isEquivalentForViewportTranslation(
+    _ lhs: MeasuredNode,
+    _ rhs: MeasuredNode
+  ) -> Bool {
+    lhs.identity == rhs.identity
+      && lhs.measuredSize == rhs.measuredSize
+      && lhs.childMeasurements.count == rhs.childMeasurements.count
+      && zip(lhs.childMeasurements, rhs.childMeasurements).allSatisfy {
+        isEquivalentForViewportTranslation($0, $1)
+      }
   }
 
   private func hasInvalidatedIndexedDescendant(

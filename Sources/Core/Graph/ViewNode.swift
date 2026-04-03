@@ -402,68 +402,23 @@ package final class ViewNode {
   }
 
   package func restoreRuntimeRegistrations(
-    into actionRegistry: LocalActionRegistry? = nil,
-    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
-    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
-    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
-    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
-    hotkeyRegistry: HotkeyRegistry? = nil,
-    lifecycleRegistry: LocalLifecycleRegistry? = nil,
-    taskRegistry: LocalTaskRegistry? = nil,
-    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
+    into registrations: RuntimeRegistrationSet
   ) {
     var traversedNodes: Set<ObjectIdentifier> = []
     restoreRuntimeRegistrations(
-      into: actionRegistry,
-      keyHandlerRegistry: keyHandlerRegistry,
-      pointerHandlerRegistry: pointerHandlerRegistry,
-      focusBindingRegistry: focusBindingRegistry,
-      focusedValuesRegistry: focusedValuesRegistry,
-      hotkeyRegistry: hotkeyRegistry,
-      lifecycleRegistry: lifecycleRegistry,
-      taskRegistry: taskRegistry,
-      preferenceObservationRegistry: preferenceObservationRegistry,
+      into: registrations,
       traversedNodes: &traversedNodes
     )
   }
 
   package func restoreOwnRuntimeRegistrations(
-    into actionRegistry: LocalActionRegistry? = nil,
-    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
-    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
-    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
-    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
-    hotkeyRegistry: HotkeyRegistry? = nil,
-    lifecycleRegistry: LocalLifecycleRegistry? = nil,
-    taskRegistry: LocalTaskRegistry? = nil,
-    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
+    into registrations: RuntimeRegistrationSet
   ) {
-    actionRegistry?.restore(registeredHandlers.actionRegistrations)
-    keyHandlerRegistry?.restore(registeredHandlers.keyHandlerRegistrations)
-    keyHandlerRegistry?.restoreKeyPressHandlers(
-      registeredHandlers.keyPressHandlerRegistrations
-    )
-    pointerHandlerRegistry?.restore(registeredHandlers.pointerHandlerRegistrations)
-    focusBindingRegistry?.restore(registeredHandlers.focusBindingRegistrations)
-    focusedValuesRegistry?.restore(registeredHandlers.focusedValuesRegistrations)
-    hotkeyRegistry?.restore(registeredHandlers.hotkeyRegistrations)
-    lifecycleRegistry?.restore(registeredHandlers.lifecycleRegistrations)
-    taskRegistry?.restore(registeredHandlers.taskRegistrations)
-    preferenceObservationRegistry?.restore(
-      registeredHandlers.preferenceObservationRegistrations
-    )
+    registrations.restore(from: registeredHandlers)
   }
 
   private func restoreRuntimeRegistrations(
-    into actionRegistry: LocalActionRegistry? = nil,
-    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
-    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
-    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
-    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
-    hotkeyRegistry: HotkeyRegistry? = nil,
-    lifecycleRegistry: LocalLifecycleRegistry? = nil,
-    taskRegistry: LocalTaskRegistry? = nil,
-    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil,
+    into registrations: RuntimeRegistrationSet,
     traversedNodes: inout Set<ObjectIdentifier>
   ) {
     let nodeID = ObjectIdentifier(self)
@@ -472,64 +427,24 @@ package final class ViewNode {
     }
 
     restoreOwnRuntimeRegistrations(
-      into: actionRegistry,
-      keyHandlerRegistry: keyHandlerRegistry,
-      pointerHandlerRegistry: pointerHandlerRegistry,
-      focusBindingRegistry: focusBindingRegistry,
-      focusedValuesRegistry: focusedValuesRegistry,
-      hotkeyRegistry: hotkeyRegistry,
-      lifecycleRegistry: lifecycleRegistry,
-      taskRegistry: taskRegistry,
-      preferenceObservationRegistry: preferenceObservationRegistry
+      into: registrations
     )
 
     for child in children {
       child.restoreRuntimeRegistrations(
-        into: actionRegistry,
-        keyHandlerRegistry: keyHandlerRegistry,
-        pointerHandlerRegistry: pointerHandlerRegistry,
-        focusBindingRegistry: focusBindingRegistry,
-        focusedValuesRegistry: focusedValuesRegistry,
-        hotkeyRegistry: hotkeyRegistry,
-        lifecycleRegistry: lifecycleRegistry,
-        taskRegistry: taskRegistry,
-        preferenceObservationRegistry: preferenceObservationRegistry,
+        into: registrations,
         traversedNodes: &traversedNodes
       )
     }
   }
 
   package func rebuildRuntimeRegistrations(
-    into actionRegistry: LocalActionRegistry? = nil,
-    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
-    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
-    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
-    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
-    hotkeyRegistry: HotkeyRegistry? = nil,
-    lifecycleRegistry: LocalLifecycleRegistry? = nil,
-    taskRegistry: LocalTaskRegistry? = nil,
-    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
+    into registrations: RuntimeRegistrationSet
   ) {
-    actionRegistry?.reset()
-    keyHandlerRegistry?.reset()
-    pointerHandlerRegistry?.reset()
-    focusBindingRegistry?.reset()
-    focusedValuesRegistry?.reset()
-    hotkeyRegistry?.reset()
-    lifecycleRegistry?.reset()
-    taskRegistry?.reset()
-    preferenceObservationRegistry?.reset()
+    registrations.resetAll()
 
     restoreRuntimeRegistrations(
-      into: actionRegistry,
-      keyHandlerRegistry: keyHandlerRegistry,
-      pointerHandlerRegistry: pointerHandlerRegistry,
-      focusBindingRegistry: focusBindingRegistry,
-      focusedValuesRegistry: focusedValuesRegistry,
-      hotkeyRegistry: hotkeyRegistry,
-      lifecycleRegistry: lifecycleRegistry,
-      taskRegistry: taskRegistry,
-      preferenceObservationRegistry: preferenceObservationRegistry
+      into: registrations
     )
   }
 

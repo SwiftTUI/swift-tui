@@ -1,5 +1,5 @@
 @MainActor
-package final class TaskRegistration: @unchecked Sendable {
+package final class TaskRegistration: Sendable {
   package let descriptor: TaskDescriptor
   private let operationClosure: @MainActor @Sendable () async -> Void
 

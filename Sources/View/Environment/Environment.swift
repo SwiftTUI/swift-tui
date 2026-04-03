@@ -200,6 +200,21 @@ public struct ResolveContext: Equatable, Sendable {
   package var imageAssetResolver: ImageAssetResolver?
   package var runtimeRegistrationReplayMode: RuntimeRegistrationReplayMode
 
+  @MainActor
+  package var runtimeRegistrations: RuntimeRegistrationSet {
+    RuntimeRegistrationSet(
+      actionRegistry: localActionRegistry,
+      keyHandlerRegistry: localKeyHandlerRegistry,
+      pointerHandlerRegistry: localPointerHandlerRegistry,
+      focusBindingRegistry: localFocusBindingRegistry,
+      focusedValuesRegistry: localFocusedValuesRegistry,
+      hotkeyRegistry: hotkeyRegistry,
+      lifecycleRegistry: localLifecycleRegistry,
+      taskRegistry: localTaskRegistry,
+      preferenceObservationRegistry: localPreferenceObservationRegistry
+    )
+  }
+
   /// Creates a public resolve context from authored configuration only.
   public init(
     identity: Identity = .init(components: [] as [IdentityComponent]),

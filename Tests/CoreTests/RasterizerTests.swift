@@ -61,4 +61,50 @@ struct RasterizerTests {
     #expect(surface.cells[0][0].style?.foregroundColor != nil)
     #expect(surface.cells[0][0].style?.backgroundColor == .red)
   }
+
+  @Test("fully clipped descendants do not expand the raster surface extent")
+  func clippedDescendantsDoNotExpandSurfaceExtent() {
+    let rasterizer = Rasterizer()
+    let viewportBounds = Rect(origin: .zero, size: .init(width: 3, height: 2))
+    let draw = DrawNode(
+      identity: testIdentity("viewport"),
+      bounds: viewportBounds,
+      clipBounds: viewportBounds,
+      children: [
+        DrawNode(
+          identity: testIdentity("visible"),
+          bounds: .init(origin: .zero, size: .init(width: 3, height: 1)),
+          commands: [
+            .text(
+              bounds: .init(origin: .zero, size: .init(width: 3, height: 1)),
+              content: "ABC",
+              style: .init(),
+              lineLimit: nil,
+              truncationMode: .tail,
+              wrappingStrategy: .wordBoundary
+            )
+          ]
+        ),
+        DrawNode(
+          identity: testIdentity("clipped"),
+          bounds: .init(origin: .init(x: 0, y: 4), size: .init(width: 3, height: 1)),
+          commands: [
+            .text(
+              bounds: .init(origin: .init(x: 0, y: 4), size: .init(width: 3, height: 1)),
+              content: "XYZ",
+              style: .init(),
+              lineLimit: nil,
+              truncationMode: .tail,
+              wrappingStrategy: .wordBoundary
+            )
+          ]
+        ),
+      ]
+    )
+
+    let surface = rasterizer.rasterize(draw)
+    #expect(surface.size == .init(width: 3, height: 2))
+    #expect(surface.lines.prefix(1) == ["ABC"])
+    #expect(surface.lines.dropFirst(1).allSatisfy { $0.isEmpty })
+  }
 }

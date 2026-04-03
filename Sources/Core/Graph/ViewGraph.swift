@@ -544,79 +544,31 @@ package final class ViewGraph {
 
   package func restoreRuntimeRegistrations(
     for resolved: ResolvedNode,
-    into actionRegistry: LocalActionRegistry? = nil,
-    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
-    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
-    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
-    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
-    hotkeyRegistry: HotkeyRegistry? = nil,
-    lifecycleRegistry: LocalLifecycleRegistry? = nil,
-    taskRegistry: LocalTaskRegistry? = nil,
-    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
+    into registrations: RuntimeRegistrationSet
   ) {
     restoreRuntimeRegistrations(
       for: resolved,
-      actionRegistry: actionRegistry,
-      keyHandlerRegistry: keyHandlerRegistry,
-      pointerHandlerRegistry: pointerHandlerRegistry,
-      focusBindingRegistry: focusBindingRegistry,
-      focusedValuesRegistry: focusedValuesRegistry,
-      hotkeyRegistry: hotkeyRegistry,
-      lifecycleRegistry: lifecycleRegistry,
-      taskRegistry: taskRegistry,
-      preferenceObservationRegistry: preferenceObservationRegistry
+      registrations: registrations
     )
   }
 
   private func restoreRuntimeRegistrations(
     for resolved: ResolvedNode,
-    actionRegistry: LocalActionRegistry? = nil,
-    keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
-    pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
-    focusBindingRegistry: LocalFocusBindingRegistry? = nil,
-    focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
-    hotkeyRegistry: HotkeyRegistry? = nil,
-    lifecycleRegistry: LocalLifecycleRegistry? = nil,
-    taskRegistry: LocalTaskRegistry? = nil,
-    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
+    registrations: RuntimeRegistrationSet
   ) {
     nodesByIdentity[resolved.identity]?.restoreOwnRuntimeRegistrations(
-      into: actionRegistry,
-      keyHandlerRegistry: keyHandlerRegistry,
-      pointerHandlerRegistry: pointerHandlerRegistry,
-      focusBindingRegistry: focusBindingRegistry,
-      focusedValuesRegistry: focusedValuesRegistry,
-      hotkeyRegistry: hotkeyRegistry,
-      lifecycleRegistry: lifecycleRegistry,
-      taskRegistry: taskRegistry,
-      preferenceObservationRegistry: preferenceObservationRegistry
+      into: registrations
     )
     for aliasIdentity in registrationAliasesByIdentity[resolved.identity] ?? [] {
       nodesByIdentity[aliasIdentity]?.restoreOwnRuntimeRegistrations(
-        into: actionRegistry,
-        keyHandlerRegistry: keyHandlerRegistry,
-        pointerHandlerRegistry: pointerHandlerRegistry,
-        focusBindingRegistry: focusBindingRegistry,
-        focusedValuesRegistry: focusedValuesRegistry,
-        hotkeyRegistry: hotkeyRegistry,
-        lifecycleRegistry: lifecycleRegistry,
-        taskRegistry: taskRegistry,
-        preferenceObservationRegistry: preferenceObservationRegistry
+        into: registrations
       )
     }
 
     for child in resolved.children {
       restoreRuntimeRegistrations(
         for: child,
-        actionRegistry: actionRegistry,
-        keyHandlerRegistry: keyHandlerRegistry,
-        pointerHandlerRegistry: pointerHandlerRegistry,
-        focusBindingRegistry: focusBindingRegistry,
-        focusedValuesRegistry: focusedValuesRegistry,
-        hotkeyRegistry: hotkeyRegistry,
-        lifecycleRegistry: lifecycleRegistry,
-        taskRegistry: taskRegistry,
-        preferenceObservationRegistry: preferenceObservationRegistry
+        registrations: registrations
       )
     }
   }

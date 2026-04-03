@@ -383,6 +383,8 @@ extension CustomLayoutProxy {
 public final class CustomLayoutHandle: @unchecked Sendable {
   public let proxy: any CustomLayoutProxy
   package let measurementReuseSignature: String?
+  package let placementHandler:
+    (@Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) -> [PlacedNode])?
 
   public init(
     _ proxy: some CustomLayoutProxy,
@@ -390,10 +392,41 @@ public final class CustomLayoutHandle: @unchecked Sendable {
   ) {
     self.proxy = proxy
     self.measurementReuseSignature = measurementReuseSignature
+    placementHandler = nil
+  }
+
+  package init(
+    _ proxy: some CustomLayoutProxy,
+    measurementReuseSignature: String? = nil,
+    placementHandler:
+      (@Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) -> [PlacedNode])?
+      = nil
+  ) {
+    self.proxy = proxy
+    self.measurementReuseSignature = measurementReuseSignature
+    self.placementHandler = placementHandler
   }
 
   public var debugName: String {
     proxy.debugName
+  }
+
+  package func placeSubviews(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: Rect,
+    passContext: LayoutPassContext?
+  ) -> [PlacedNode] {
+    if let placementHandler {
+      return placementHandler(engine, node, measured, bounds, passContext)
+    }
+    return proxy.placeSubviews(
+      engine: engine,
+      node: node,
+      measured: measured,
+      in: bounds
+    )
   }
 }
 

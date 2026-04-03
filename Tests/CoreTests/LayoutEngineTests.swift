@@ -572,6 +572,65 @@ struct LayoutEngineTests {
     ]
     #expect(!parent.supportsRetainedReuse)
   }
+
+  @Test("retained placement translates eager scroll subtrees when only viewport origin changes")
+  func retainedPlacementTranslatesEagerViewportShift() {
+    let engine = LayoutEngine()
+    let resolved = stack(
+      "scroll-content",
+      axis: .vertical,
+      children: [
+        leaf("row-0", size: .init(width: 2, height: 1)),
+        leaf("row-1", size: .init(width: 2, height: 1)),
+        leaf("row-2", size: .init(width: 2, height: 1)),
+      ]
+    )
+
+    let measured = engine.measure(resolved, proposal: .init(width: 8, height: 3))
+    let initialBounds = Rect(origin: .zero, size: measured.measuredSize)
+    let initialPlaced = engine.place(
+      resolved,
+      measured: measured,
+      in: initialBounds,
+      passContext: nil
+    )
+    let previousFrame = FrameArtifacts(
+      resolvedTree: resolved,
+      measuredTree: measured,
+      placedTree: initialPlaced,
+      semanticSnapshot: .init(),
+      drawTree: .init(identity: resolved.identity, bounds: initialBounds),
+      rasterSurface: .init(),
+      presentationDamage: nil,
+      commitPlan: .init()
+    )
+    let retainedLayout = RetainedLayoutSession(
+      previousFrame: previousFrame,
+      previousFrameIndex: .init(frame: previousFrame),
+      invalidatedIdentities: []
+    )
+    let passContext = LayoutPassContext(
+      retainedLayout: retainedLayout,
+      scrollViewportContext: .init(
+        axes: [.vertical],
+        viewportRect: .init(origin: .zero, size: .init(width: 8, height: 1)),
+        contentOffset: .init(x: 0, y: 1)
+      )
+    )
+
+    let shifted = engine.place(
+      resolved,
+      measured: measured,
+      in: .init(origin: .init(x: 0, y: -1), size: measured.measuredSize),
+      passContext: passContext
+    )
+
+    #expect(shifted.bounds.origin == .init(x: 0, y: -1))
+    #expect(shifted.contentBounds.origin == .init(x: 0, y: -1))
+    #expect(shifted.children.map(\.bounds.origin.y) == [-1, 0, 1])
+    #expect(passContext.workMetrics.placedNodesComputed == 0)
+    #expect(passContext.workMetrics.placedNodesReused == 4)
+  }
 }
 
 private func leaf(

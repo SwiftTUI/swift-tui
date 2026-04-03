@@ -233,15 +233,7 @@ package func resolveView<V: View>(
     if context.runtimeRegistrationReplayMode == .eagerDuringResolve {
       context.viewGraph?.restoreRuntimeRegistrations(
         for: reused,
-        into: context.localActionRegistry,
-        keyHandlerRegistry: context.localKeyHandlerRegistry,
-        pointerHandlerRegistry: context.localPointerHandlerRegistry,
-        focusBindingRegistry: context.localFocusBindingRegistry,
-        focusedValuesRegistry: context.localFocusedValuesRegistry,
-        hotkeyRegistry: context.hotkeyRegistry,
-        lifecycleRegistry: context.localLifecycleRegistry,
-        taskRegistry: context.localTaskRegistry,
-        preferenceObservationRegistry: context.localPreferenceObservationRegistry
+        into: context.runtimeRegistrations
       )
     }
     context.recordResolvedReuse(

@@ -217,11 +217,12 @@ extension LayoutEngine {
         )
       ]
     case .custom(let handle):
-      return handle.proxy.placeSubviews(
+      return handle.placeSubviews(
         engine: self,
         node: resolved,
         measured: measured,
-        in: bounds
+        in: bounds,
+        passContext: passContext
       )
     }
   }
@@ -644,5 +645,45 @@ extension LayoutEngine {
     case .intrinsic:
       return .generic
     }
+  }
+
+  package func translatedPlacement(
+    _ node: PlacedNode,
+    by delta: Point
+  ) -> PlacedNode {
+    let translatedBounds = translated(node.bounds, by: delta)
+    let translatedChildren = node.children.map { child in
+      translatedPlacement(child, by: delta)
+    }
+
+    return PlacedNode(
+      identity: node.identity,
+      kind: node.kind,
+      environmentSnapshot: node.environmentSnapshot,
+      bounds: translatedBounds,
+      contentBounds: translated(node.contentBounds, by: delta),
+      clipBounds: node.clipBounds.map { translated($0, by: delta) },
+      zIndex: node.zIndex,
+      children: translatedChildren,
+      semanticRole: node.semanticRole,
+      layoutMetadata: node.layoutMetadata,
+      drawMetadata: node.drawMetadata,
+      semanticMetadata: node.semanticMetadata,
+      lifecycleMetadata: node.lifecycleMetadata,
+      drawPayload: node.drawPayload
+    )
+  }
+
+  private func translated(
+    _ rect: Rect,
+    by delta: Point
+  ) -> Rect {
+    Rect(
+      origin: .init(
+        x: rect.origin.x + delta.x,
+        y: rect.origin.y + delta.y
+      ),
+      size: rect.size
+    )
   }
 }

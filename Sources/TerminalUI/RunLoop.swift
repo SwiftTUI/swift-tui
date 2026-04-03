@@ -50,7 +50,7 @@ public protocol SignalReading: AnyObject {
 }
 
 /// Emits runtime signals from an in-process source.
-public final class InProcessSignalReader: SignalReading, @unchecked Sendable {
+public final class InProcessSignalReader: SignalReading, Sendable {
   private let continuation = Mutex<AsyncStream<String>.Continuation?>(nil)
 
   public init() {}
@@ -109,6 +109,20 @@ public final class RunLoop<State: Equatable & Sendable> {
   package let localTaskRegistry = LocalTaskRegistry()
   package let lifecycleCoordinator = LifecycleCoordinator()
   package let observationBridge = ObservationBridge()
+
+  package var runtimeRegistrations: RuntimeRegistrationSet {
+    RuntimeRegistrationSet(
+      actionRegistry: localActionRegistry,
+      keyHandlerRegistry: localKeyHandlerRegistry,
+      pointerHandlerRegistry: localPointerHandlerRegistry,
+      focusBindingRegistry: localFocusBindingRegistry,
+      focusedValuesRegistry: localFocusedValuesRegistry,
+      hotkeyRegistry: hotkeyRegistry,
+      lifecycleRegistry: localLifecycleRegistry,
+      taskRegistry: localTaskRegistry,
+      preferenceObservationRegistry: localPreferenceObservationRegistry
+    )
+  }
 
   package var latestSemanticSnapshot = SemanticSnapshot()
   package var currentFocusedValues = FocusedValues()
@@ -211,7 +225,9 @@ public final class RunLoop<State: Equatable & Sendable> {
       environmentValues: environmentValues,
       proposal: proposal,
       viewBuilder: { state, focusedIdentity in
-        AnyView(viewBuilder(state, focusedIdentity))
+        scopedAnyView {
+          viewBuilder(state, focusedIdentity)
+        }
       }
     )
   }

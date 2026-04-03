@@ -114,15 +114,8 @@ extension RunLoop {
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
       effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
     }
-    localActionRegistry.reset()
-    localPointerHandlerRegistry.reset()
-    localFocusBindingRegistry.reset()
-    localFocusedValuesRegistry.reset()
-    localPreferenceObservationRegistry.reset()
-    localKeyHandlerRegistry.reset()
-    hotkeyRegistry.reset()
-    localLifecycleRegistry.reset()
-    localTaskRegistry.reset()
+    let registrations = runtimeRegistrations
+    registrations.resetAll()
 
     var context = ResolveContext(
       identity: rootIdentity,

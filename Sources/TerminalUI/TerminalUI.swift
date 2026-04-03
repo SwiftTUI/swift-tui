@@ -91,16 +91,9 @@ public struct DefaultRenderer {
     }
 
     var resolveContext = context
+    let runtimeRegistrations = resolveContext.runtimeRegistrations
     resolveContext.imageAssetResolver = imageRepository.resolver()
-    resolveContext.localActionRegistry?.reset()
-    resolveContext.localKeyHandlerRegistry?.reset()
-    resolveContext.localPointerHandlerRegistry?.reset()
-    resolveContext.localFocusBindingRegistry?.reset()
-    resolveContext.localFocusedValuesRegistry?.reset()
-    resolveContext.localPreferenceObservationRegistry?.reset()
-    resolveContext.hotkeyRegistry?.reset()
-    resolveContext.localLifecycleRegistry?.reset()
-    resolveContext.localTaskRegistry?.reset()
+    runtimeRegistrations.resetAll()
     viewGraph.beginFrame()
     viewGraph.invalidate(context.invalidatedIdentities)
     resolveContext.viewGraph = viewGraph
@@ -126,26 +119,10 @@ public struct DefaultRenderer {
     }
     let resolved = viewGraph.snapshot()
     if usedSelectiveDirtyEvaluation {
-      resolveContext.localActionRegistry?.reset()
-      resolveContext.localKeyHandlerRegistry?.reset()
-      resolveContext.localPointerHandlerRegistry?.reset()
-      resolveContext.localFocusBindingRegistry?.reset()
-      resolveContext.localFocusedValuesRegistry?.reset()
-      resolveContext.localPreferenceObservationRegistry?.reset()
-      resolveContext.hotkeyRegistry?.reset()
-      resolveContext.localLifecycleRegistry?.reset()
-      resolveContext.localTaskRegistry?.reset()
+      runtimeRegistrations.resetAll()
       viewGraph.restoreRuntimeRegistrations(
         for: resolved,
-        into: resolveContext.localActionRegistry,
-        keyHandlerRegistry: resolveContext.localKeyHandlerRegistry,
-        pointerHandlerRegistry: resolveContext.localPointerHandlerRegistry,
-        focusBindingRegistry: resolveContext.localFocusBindingRegistry,
-        focusedValuesRegistry: resolveContext.localFocusedValuesRegistry,
-        hotkeyRegistry: resolveContext.hotkeyRegistry,
-        lifecycleRegistry: resolveContext.localLifecycleRegistry,
-        taskRegistry: resolveContext.localTaskRegistry,
-        preferenceObservationRegistry: resolveContext.localPreferenceObservationRegistry
+        into: runtimeRegistrations
       )
     }
     let layoutPassContext = LayoutPassContext(

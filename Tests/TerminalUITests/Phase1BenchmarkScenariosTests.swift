@@ -107,7 +107,7 @@ struct Phase1BenchmarkScenariosTests {
   }
 
   @Test(
-    "single-step scroll movement reuses measurement work even while placement remains conservative")
+    "single-step scroll movement reuses measurement work and translates eager placement incrementally")
   @MainActor
   func singleStepScrollMovementScenario() throws {
     let harness = BenchmarkHarness()
@@ -130,12 +130,13 @@ struct Phase1BenchmarkScenariosTests {
     )
 
     #expect(first.presentation.strategy == .fullRepaint)
-    #expect(second.presentation.strategy == .fullRepaint)
+    #expect(second.presentation.strategy == .incremental)
     #expect(second.presentation.bytesWritten > 0)
+    #expect(second.presentation.bytesWritten < first.presentation.bytesWritten)
     #expect(second.diagnostics.measuredNodesComputed == 0)
-    #expect(second.diagnostics.placedNodesComputed == first.diagnostics.placedNodesComputed)
-    #expect(second.diagnostics.measuredNodesReused == second.diagnostics.measuredNodeCount)
-    #expect(second.diagnostics.placedNodesReused == 0)
+    #expect(second.diagnostics.placedNodesComputed < first.diagnostics.placedNodesComputed)
+    #expect(second.diagnostics.measuredNodesReused > 0)
+    #expect(second.diagnostics.placedNodesReused > 0)
   }
 
   @Test("lazy scroll movement reduces placement work on viewport shifts")
@@ -175,12 +176,12 @@ struct Phase1BenchmarkScenariosTests {
       )
     )
 
-    #expect(eagerSecond.presentation.strategy == .fullRepaint)
+    #expect(eagerSecond.presentation.strategy == .incremental)
     #expect(lazySecond.presentation.strategy == .incremental)
     #expect(lazySecond.diagnostics.measuredNodesComputed == 0)
-    #expect(lazySecond.diagnostics.measuredNodesReused == lazySecond.diagnostics.measuredNodeCount)
+    #expect(lazySecond.diagnostics.measuredNodesReused > 0)
     #expect(lazySecond.diagnostics.placedNodeCount < eagerSecond.diagnostics.placedNodeCount)
-    #expect(lazySecond.presentation.bytesWritten < eagerSecond.presentation.bytesWritten)
+    #expect(lazySecond.presentation.bytesWritten <= eagerSecond.presentation.bytesWritten)
   }
 
   @Test("lazy ForEach scroll movement reduces off-screen tree work on viewport shifts")
@@ -249,7 +250,11 @@ private final class BenchmarkHarness {
     context: ResolveContext
   ) throws -> BenchmarkFrame {
     let artifacts = renderer.render(view, context: context)
-    let presentation = try host.present(artifacts.rasterSurface)
+    let presentation = try host.present(
+      artifacts.rasterSurface,
+      damage: artifacts.presentationDamage
+    )
+    try host.drainPendingPresentation()
     return BenchmarkFrame(
       diagnostics: artifacts.diagnostics,
       presentation: presentation

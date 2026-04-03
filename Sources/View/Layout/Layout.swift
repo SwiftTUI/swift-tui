@@ -278,9 +278,19 @@ public struct AnyLayout: Layout {
     let box = ConcreteAnyLayoutBox(layout: layout)
     self.box = box
     if box.builtinLayoutBehavior == nil {
+      let proxyBox = LayoutProxyBox(box: box)
       customLayoutHandle = CustomLayoutHandle(
-        LayoutProxyBox(box: box),
-        measurementReuseSignature: box.measurementReuseSignature
+        proxyBox,
+        measurementReuseSignature: box.measurementReuseSignature,
+        placementHandler: { engine, node, measured, bounds, passContext in
+          proxyBox.placeSubviews(
+            engine: engine,
+            node: node,
+            measured: measured,
+            in: bounds,
+            passContext: passContext
+          )
+        }
       )
     } else {
       customLayoutHandle = nil
@@ -646,6 +656,22 @@ private final class LayoutProxyBox: CustomLayoutProxy, @unchecked Sendable {
     measured: MeasuredNode,
     in bounds: Rect
   ) -> [PlacedNode] {
+    placeSubviews(
+      engine: engine,
+      node: node,
+      measured: measured,
+      in: bounds,
+      passContext: nil
+    )
+  }
+
+  package func placeSubviews(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: Rect,
+    passContext: LayoutPassContext?
+  ) -> [PlacedNode] {
     let placementRecorder = LayoutSubviewPlacementRecorder()
     let subviews = node.children.map { child in
       LayoutSubview(
@@ -673,7 +699,11 @@ private final class LayoutProxyBox: CustomLayoutProxy, @unchecked Sendable {
       let placement =
         placementRecorder.placement(for: child.identity)
         ?? defaultPlacement(in: bounds, proposal: measured.proposal)
-      let childMeasurement = engine.measure(child, proposal: placement.proposal)
+      let childMeasurement = engine.measure(
+        child,
+        proposal: placement.proposal,
+        passContext: passContext
+      )
       return engine.place(
         child,
         measured: childMeasurement,
@@ -685,7 +715,8 @@ private final class LayoutProxyBox: CustomLayoutProxy, @unchecked Sendable {
           ),
           size: childMeasurement.measuredSize
         ),
-        viewportContext: placement.viewportContext
+        viewportContext: placement.viewportContext,
+        passContext: passContext
       )
     }
   }

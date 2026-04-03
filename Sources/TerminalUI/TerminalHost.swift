@@ -406,8 +406,8 @@ extension TerminalHosting {
     var output: String
   }
 
-  private final class PresentationWriter: @unchecked Sendable {
-    private struct State {
+  private final class PresentationWriter: Sendable {
+    private struct State: Sendable {
       var pending: PresentationFrame?
       var isWriting = false
       var didDropFrame = false
@@ -519,6 +519,47 @@ extension TerminalHosting {
 
   /// Default terminal-backed host that owns raw mode and screen presentation.
   public final class TerminalHost: TerminalHosting, DamageAwareTerminalHosting {
+    private struct CapabilityProbeState {
+      var hasProbedAppearance = false
+      var hasProbedGraphicsCapabilities = false
+      var cachedGraphicsCapabilities: TerminalGraphicsCapabilities?
+    }
+
+    private struct PresentationSession {
+      var lastSubmittedSurface: RasterSurface?
+      var transmittedKittyImages: Set<UInt32> = []
+      var forceFullRepaint = false
+      var writer: PresentationWriter?
+
+      mutating func reset() {
+        lastSubmittedSurface = nil
+        transmittedKittyImages.removeAll()
+        forceFullRepaint = false
+        writer = nil
+      }
+
+      mutating func invalidateRetainedState() {
+        lastSubmittedSurface = nil
+        transmittedKittyImages.removeAll()
+        forceFullRepaint = false
+      }
+
+      mutating func markDroppedFrame() {
+        forceFullRepaint = true
+        transmittedKittyImages.removeAll()
+      }
+
+      var previousSurface: RasterSurface? {
+        forceFullRepaint ? nil : lastSubmittedSurface
+      }
+
+      func presentationDamage(
+        requested damage: PresentationDamage?
+      ) -> PresentationDamage? {
+        forceFullRepaint ? nil : damage
+      }
+    }
+
     public var surfaceSize: Size {
       (try? controller.windowSize(of: outputFileDescriptor)) ?? fallbackSize
     }
@@ -539,13 +580,8 @@ extension TerminalHosting {
     private var savedAttributes: termios?
     private var savedInputFileStatusFlags: Int32?
     private var rawModeEnabled = false
-    private var hasProbedAppearance = false
-    private var hasProbedGraphicsCapabilities = false
-    private var cachedGraphicsCapabilities: TerminalGraphicsCapabilities?
-    private var lastSubmittedSurface: RasterSurface?
-    private var transmittedKittyImages: Set<UInt32> = []
-    private var forceFullRepaint = false
-    private var presentationWriter: PresentationWriter?
+    private var capabilityProbe = CapabilityProbeState()
+    private var presentationSession = PresentationSession()
 
     public convenience init(
       inputFileDescriptor: Int32 = 0,
@@ -614,10 +650,7 @@ extension TerminalHosting {
       savedAttributes = currentAttributes
       savedInputFileStatusFlags = currentFileStatusFlags
       rawModeEnabled = true
-      lastSubmittedSurface = nil
-      transmittedKittyImages.removeAll()
-      forceFullRepaint = false
-      presentationWriter = nil
+      presentationSession.reset()
 
       var shouldRestoreOnFailure = true
       defer {
@@ -626,10 +659,7 @@ extension TerminalHosting {
           savedAttributes = nil
           self.savedInputFileStatusFlags = nil
           rawModeEnabled = false
-          lastSubmittedSurface = nil
-          transmittedKittyImages.removeAll()
-          forceFullRepaint = false
-          presentationWriter = nil
+          presentationSession.reset()
           if let savedInputFileStatusFlags {
             try? controller.setFileStatusFlags(savedInputFileStatusFlags, on: inputFileDescriptor)
           }
@@ -653,16 +683,13 @@ extension TerminalHosting {
         return
       }
 
-      let presentationWriter = self.presentationWriter
+      let presentationWriter = presentationSession.writer
       let savedAttributes = self.savedAttributes
       let savedInputFileStatusFlags = self.savedInputFileStatusFlags
       self.savedAttributes = nil
       self.savedInputFileStatusFlags = nil
       rawModeEnabled = false
-      lastSubmittedSurface = nil
-      transmittedKittyImages.removeAll()
-      forceFullRepaint = false
-      self.presentationWriter = nil
+      presentationSession.reset()
 
       var attributesToRestore = savedAttributes
       var fileStatusFlagsToRestore = savedInputFileStatusFlags
@@ -725,7 +752,7 @@ extension TerminalHosting {
       damage: PresentationDamage?
     ) throws -> TerminalPresentationMetrics {
       try synchronizePresentationState()
-      if !surface.imageAttachments.isEmpty, !hasProbedGraphicsCapabilities {
+      if !surface.imageAttachments.isEmpty, !capabilityProbe.hasProbedGraphicsCapabilities {
         try drainPendingPresentation()
       }
 
@@ -740,11 +767,11 @@ extension TerminalHosting {
       let plan = TerminalPresentationPlanner(
         capabilityProfile: capabilityProfile
       ).plan(
-        previousSurface: forceFullRepaint ? nil : lastSubmittedSurface,
+        previousSurface: presentationSession.previousSurface,
         currentSurface: preparedSurface,
-        damage: forceFullRepaint ? nil : damage
+        damage: presentationSession.presentationDamage(requested: damage)
       )
-      forceFullRepaint = false
+      presentationSession.forceFullRepaint = false
 
       var bytesWritten = 0
       let origin = Point.zero
@@ -771,7 +798,7 @@ extension TerminalHosting {
           for: preparedSurface,
           capabilityProfile: capabilityProfile,
           graphicsCapabilities: graphicsCapabilities,
-          transmittedKittyImages: &transmittedKittyImages
+          transmittedKittyImages: &presentationSession.transmittedKittyImages
         ) {
           append(writeStep)
         }
@@ -795,7 +822,7 @@ extension TerminalHosting {
         )
       }
 
-      lastSubmittedSurface = preparedSurface
+      presentationSession.lastSubmittedSurface = preparedSurface
 
       return TerminalPresentationMetrics(
         bytesWritten: bytesWritten,
@@ -806,32 +833,30 @@ extension TerminalHosting {
     }
 
     package func drainPendingPresentation() throws {
-      guard let presentationWriter else {
+      guard let presentationWriter = presentationSession.writer else {
         return
       }
 
       presentationWriter.drain()
       if presentationWriter.consumeDropFlag() {
-        forceFullRepaint = true
-        transmittedKittyImages.removeAll()
+        presentationSession.markDroppedFrame()
       }
       try presentationWriter.consumePendingError()
     }
 
     private func synchronizePresentationState() throws {
-      guard let presentationWriter else {
+      guard let presentationWriter = presentationSession.writer else {
         return
       }
 
       if presentationWriter.consumeDropFlag() {
-        forceFullRepaint = true
-        transmittedKittyImages.removeAll()
+        presentationSession.markDroppedFrame()
       }
       try presentationWriter.consumePendingError()
     }
 
     private func presentationWriterIfNeeded() -> PresentationWriter {
-      if let presentationWriter {
+      if let presentationWriter = presentationSession.writer {
         return presentationWriter
       }
 
@@ -839,7 +864,7 @@ extension TerminalHosting {
         controller: controller,
         outputFileDescriptor: outputFileDescriptor
       )
-      self.presentationWriter = presentationWriter
+      presentationSession.writer = presentationWriter
       return presentationWriter
     }
 
@@ -850,16 +875,14 @@ extension TerminalHosting {
     }
 
     private func invalidatePresentationState() {
-      lastSubmittedSurface = nil
-      transmittedKittyImages.removeAll()
-      forceFullRepaint = false
+      presentationSession.invalidateRetainedState()
     }
 
     private func refreshAppearanceIfNeeded() {
-      guard !hasProbedAppearance else {
+      guard !capabilityProbe.hasProbedAppearance else {
         return
       }
-      hasProbedAppearance = true
+      capabilityProbe.hasProbedAppearance = true
 
       appearance = TerminalAppearance.detect(
         environment: environment,
@@ -911,23 +934,23 @@ extension TerminalHosting {
     }
 
     private func baselineGraphicsCapabilities() -> TerminalGraphicsCapabilities {
-      var capabilities = cachedGraphicsCapabilities ?? .none
+      var capabilities = capabilityProbe.cachedGraphicsCapabilities ?? .none
       if capabilities.cellPixelSize == nil {
         capabilities.cellPixelSize = try? controller.cellPixelSize(of: outputFileDescriptor)
       }
-      cachedGraphicsCapabilities = capabilities
+      capabilityProbe.cachedGraphicsCapabilities = capabilities
       return capabilities
     }
 
     private func probeGraphicsCapabilitiesIfNeeded() -> TerminalGraphicsCapabilities {
-      if hasProbedGraphicsCapabilities {
+      if capabilityProbe.hasProbedGraphicsCapabilities {
         return baselineGraphicsCapabilities()
       }
-      hasProbedGraphicsCapabilities = true
+      capabilityProbe.hasProbedGraphicsCapabilities = true
 
       var capabilities = baselineGraphicsCapabilities()
       guard controller.isATTY(outputFileDescriptor) else {
-        cachedGraphicsCapabilities = capabilities
+        capabilityProbe.cachedGraphicsCapabilities = capabilities
         return capabilities
       }
 
@@ -992,7 +1015,7 @@ extension TerminalHosting {
         capabilities.preferredProtocol = .sixel
       }
 
-      cachedGraphicsCapabilities = capabilities
+      capabilityProbe.cachedGraphicsCapabilities = capabilities
       return capabilities
     }
 
