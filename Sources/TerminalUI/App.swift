@@ -57,17 +57,29 @@ extension Never: Scene {
 }
 
 @MainActor
-package protocol SceneConfigurationProviding {
+protocol SceneConfigurationProviding {
   func windowSceneConfigurations() -> [WindowSceneConfiguration]
 }
 
-package struct WindowSceneConfiguration {
-  package var identifier: WindowIdentifier
-  package var title: String?
-  package var rootIdentity: Identity
+@_spi(Runners) public struct WindowSceneConfiguration {
+  @_spi(Runners) public var identifier: WindowIdentifier
+  @_spi(Runners) public var title: String?
+  @_spi(Runners) public var rootIdentity: Identity
   // AnyView policy: retain an erased root-view builder here for deferred
   // authored-content capture between scene declarations and the runtime.
-  package var makeRootView: @MainActor () -> AnyView
+  @_spi(Runners) public var makeRootView: @MainActor () -> AnyView
+
+  @_spi(Runners) public init(
+    identifier: WindowIdentifier,
+    title: String?,
+    rootIdentity: Identity,
+    makeRootView: @escaping @MainActor () -> AnyView
+  ) {
+    self.identifier = identifier
+    self.title = title
+    self.rootIdentity = rootIdentity
+    self.makeRootView = makeRootView
+  }
 }
 
 package struct WindowHostLayout: Layout {
@@ -287,8 +299,7 @@ public protocol App {
   var body: Body { get }
 }
 
-@MainActor
-package func collectWindowSceneConfigurations<S: Scene>(
+@_spi(Runners) @MainActor public func collectWindowSceneConfigurations<S: Scene>(
   from scene: S
 ) -> [WindowSceneConfiguration] {
   if let provider = scene as? any SceneConfigurationProviding {

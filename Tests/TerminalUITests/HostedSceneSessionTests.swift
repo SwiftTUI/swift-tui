@@ -2,7 +2,6 @@ import Testing
 import View
 
 @testable import TerminalUI
-@testable import TerminalUIScenes
 
 @MainActor
 @Suite

@@ -2,8 +2,7 @@ import Foundation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
-@testable import TerminalUIScenes
+@_spi(Runners) @testable import TerminalUI
 @testable import View
 
 @MainActor
@@ -40,7 +39,7 @@ struct AppRuntimeTests {
     let terminal = RecordingTerminalHost()
     let actionRecorder = ActionRecorder()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Action Window") {
         ActionWindow(actionRecorder: actionRecorder)
       },
@@ -70,7 +69,7 @@ struct AppRuntimeTests {
   func windowGroupScenesPresentAtTerminalCanvasSize() async throws {
     let terminal = RecordingTerminalHost(surfaceSize: .init(width: 20, height: 4))
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Canvas Window") {
         Text("Hello")
       },
@@ -94,7 +93,7 @@ struct AppRuntimeTests {
   func windowGroupClipsOverflowingContentToTerminalCanvas() async throws {
     let terminal = RecordingTerminalHost(surfaceSize: .init(width: 16, height: 4))
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Clipped Window") {
         Rectangle()
           .fill(Color.red)
@@ -115,7 +114,7 @@ struct AppRuntimeTests {
   func appLauncherPersistsStatefulTextFieldBindings() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Form Window") {
         StatefulFormWindow()
       },
@@ -145,7 +144,7 @@ struct AppRuntimeTests {
   func appLauncherPersistsStatefulTextEditorBindings() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Editor Window") {
         StatefulTextEditorWindow()
       },
@@ -177,7 +176,7 @@ struct AppRuntimeTests {
   func appLauncherDismissesAlertOverlays() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Alert Window") {
         AlertWindow()
       },
@@ -203,7 +202,7 @@ struct AppRuntimeTests {
   func runtimeFocusMovementWritesBackIntoRenderedFocusIdentity() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Focus Window") {
         FocusReadoutWindow()
       },
@@ -229,7 +228,7 @@ struct AppRuntimeTests {
   func runtimeFocusFallsBackWhenFocusedControlDisappears() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Disappear Window") {
         DisappearingFocusWindow()
       },
@@ -252,7 +251,7 @@ struct AppRuntimeTests {
   func arrowKeysUseGeometryAwareTopLevelFocusTraversal() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Geometry Focus Window") {
         GeometryFocusWindow()
       },
@@ -274,7 +273,7 @@ struct AppRuntimeTests {
   func runtimeFocusSyncWritesBoolFocusState() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Bool Focus Window") {
         BoolFocusStateWindow()
       },
@@ -296,7 +295,7 @@ struct AppRuntimeTests {
   func programmaticBoolFocusStateRequestsMoveFocus() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Requested Focus Window") {
         RequestedBoolFocusWindow()
       },
@@ -318,7 +317,7 @@ struct AppRuntimeTests {
   func optionalFocusStateTracksRuntimeFocusChanges() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Optional Focus Window") {
         OptionalFocusStateWindow()
       },
@@ -342,7 +341,7 @@ struct AppRuntimeTests {
   func focusedValueTracksFocusedControl() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Focused Value Window") {
         FocusedValueWindow()
       },
@@ -365,7 +364,7 @@ struct AppRuntimeTests {
   func focusedValueIncludesAncestorPublishers() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Focused Ancestor Window") {
         FocusedAncestorValueWindow()
       },
@@ -388,7 +387,7 @@ struct AppRuntimeTests {
   func defaultFocusSeedsFocusState() async throws {
     let terminal = RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Default Focus Window") {
         DefaultFocusWindow()
       },

@@ -1,6 +1,6 @@
 # Public API Inventory
 
-Last updated: March 30, 2026
+Last updated: April 3, 2026
 
 This page is the post-migration reference for the public surface of the package. It separates the canonical SwiftUI-shaped API and actor-isolation model from package-only seams that still exist in the codebase.
 
@@ -50,12 +50,17 @@ The runtime-facing public surface is also canonical:
 - `TerminalUISceneManifest`
 - `HostedSceneSession`
 
-### `TerminalUIScenes`
+### Peer runner packages
 
-The optional multi-scene runtime surface is also supported:
+Executable launch is now intentionally outside the root package surface:
 
-- `MultiSceneLauncher`
-- the separate `TerminalUIScenes` library product for multi-scene apps
+- `Runners/TerminalUICLI` exposes `TerminalCLIAppRunner` plus the default
+  terminal-native `App.main()` story
+- `Runners/TerminalUIWASI` exposes `TerminalWASIAppRunner` plus the default
+  WASI `App.main()` story
+
+These are supported peer packages, but they are not root library products in
+`Package.swift`.
 
 ### `Core`
 

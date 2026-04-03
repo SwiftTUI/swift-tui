@@ -53,7 +53,7 @@ package func sceneManifest(
 }
 
 extension TerminalUISceneManifest {
-  package var jsonString: String {
+  @_spi(Runners) public var jsonString: String {
     let scenesJSON = scenes.map(\.jsonString).joined(separator: ",")
     return """
       {"defaultSceneID":"\(escapedJSONString(defaultSceneID.rawValue))","scenes":[\(scenesJSON)]}
@@ -62,7 +62,7 @@ extension TerminalUISceneManifest {
 }
 
 extension TerminalUISceneDescriptor {
-  package var jsonString: String {
+  @_spi(Runners) public var jsonString: String {
     let titleValue =
       if let title {
         "\"\(escapedJSONString(title))\""

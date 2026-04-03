@@ -1,8 +1,8 @@
 import GalleryDemoViews
 import Observation
 import TerminalUI
+import TerminalUICLI
 import TerminalUICharts
-import TerminalUIScenes
 
 @main
 struct GalleryDemoApp: App {
@@ -15,7 +15,7 @@ struct GalleryDemoApp: App {
   }
 
   static func main() async {
-    try! await MultiSceneLauncher.run(Self.self)
+    try! await TerminalCLIAppRunner.run(Self.self)
   }
 
   private static func galleryLaunchFailureMessage(

@@ -1,6 +1,6 @@
 # Source Layout
 
-Last updated: March 30, 2026
+Last updated: April 3, 2026
 
 This is the current ownership map for the codebase. It documents where
 subsystems live after the March 2026 source split and should stay aligned with
@@ -11,12 +11,17 @@ future file moves.
 - Library products:
   - `View`
   - `TerminalUI`
-  - `TerminalUIScenes`
   - `TerminalUICharts`
 - Internal support targets:
   - `Core`
   - `PrototypeUIComponents`
   - `UnixSignals`
+
+- Peer runner and wrapper packages:
+  - `Runners/TerminalUICLI`
+  - `Runners/TerminalUIWASI`
+  - `GUI/SwiftUITUIGUI`
+  - `GUI/WebTUIGUI`
 
 `Core` remains the shared pipeline target, but it is not exposed as a separate
 library product. Downstream package consumers reach those types through
@@ -50,10 +55,10 @@ library product. Downstream package consumers reach those types through
 - `LinkOpening.swift`: runtime link opener
 - `TerminalUI.docc/`: module landing page and runtime guides
 
-## `TerminalUIScenes`
+## `Runners/TerminalUICLI`
 
-- `TerminalUIScenes.swift`: product re-export surface
-- `MultiSceneLauncher.swift`: compatibility app launch path plus CLI-mode routing while the runner split is still in progress
+- `TerminalUICLI.swift`: re-export surface for the CLI runner package
+- `TerminalCLIAppRunner.swift`: terminal-native app launch, CLI-mode routing, and single-scene test helper
 - `SceneRuntime.swift`: per-scene runtime orchestration for multi-scene terminal apps
 - `SceneLifecycle.swift`: scene session coordination
 - `CLIMode.swift`: attach/list CLI argument parsing
@@ -61,7 +66,16 @@ library product. Downstream package consumers reach those types through
 - `SocketServer.swift` and `SocketClient.swift`: Unix-domain-socket discovery and attach plumbing
 - `AttachProxy.swift`: terminal attach forwarding
 - `PtyPair.swift`: native pty support
-- `TerminalUIScenes.docc/`: module landing page and multi-scene guidance
+
+## `Runners/TerminalUIWASI`
+
+- `TerminalUIWASI.swift`: re-export surface for the WASI runner package
+- `TerminalWASIAppRunner.swift`: manifest mode plus WASI scene selection and launch
+
+## Wrapper Packages
+
+- `GUI/SwiftUITUIGUI`: SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
+- `GUI/WebTUIGUI`: Bun-based web host that consumes a `TerminalUIWASI` build and manifest
 
 ## `Core`
 
@@ -116,7 +130,8 @@ library product. Downstream package consumers reach those types through
 - `Tests/CoreTests`: pipeline, layout, raster, and focus infrastructure tests
 - `Tests/ViewTests`: authoring-layer and environment-level tests
 - `Tests/TerminalUITests`: runtime, rendering, fixture, and end-to-end behavioral tests
-- `Tests/TerminalUIScenesTests`: compatibility launch, attach, pty, and CLI-scene-management tests
+- `Runners/TerminalUICLI/Tests/TerminalUICLITests`: terminal-native runner, attach, pty, and CLI-scene-management tests
+- `Runners/TerminalUIWASI/Tests/TerminalUIWASITests`: WASI runner and manifest-mode tests
 - `Tests/PrototypeUIComponentsTests`: prototype-surface regression coverage
 
 ## Reliability Rules

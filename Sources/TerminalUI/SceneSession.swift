@@ -1,16 +1,16 @@
-package struct TerminalUISceneSessionState: Equatable, Sendable {
-  package init() {}
+@_spi(Runners) public struct TerminalUISceneSessionState: Equatable, Sendable {
+  @_spi(Runners) public init() {}
 }
 
-package struct SceneSessionResources {
-  package let terminalHost: any TerminalHosting
-  package let terminalInputReader: any TerminalInputReading
-  package let signalReader: (any SignalReading)?
-  package let scheduler: any FrameScheduling
-  package let surfaceName: String
-  package let environmentValues: [String: String]
+@_spi(Runners) public struct SceneSessionResources {
+  @_spi(Runners) public let terminalHost: any TerminalHosting
+  @_spi(Runners) public let terminalInputReader: any TerminalInputReading
+  @_spi(Runners) public let signalReader: (any SignalReading)?
+  @_spi(Runners) public let scheduler: any FrameScheduling
+  @_spi(Runners) public let surfaceName: String
+  @_spi(Runners) public let environmentValues: [String: String]
 
-  package init(
+  @_spi(Runners) public init(
     terminalHost: any TerminalHosting,
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
@@ -27,9 +27,9 @@ package struct SceneSessionResources {
   }
 }
 
-package enum SceneSession {
+@_spi(Runners) public enum SceneSession {
   @MainActor
-  package static func run(
+  @_spi(Runners) public static func run(
     configuration: WindowSceneConfiguration,
     sessionName: String,
     stateContainer: StateContainer<TerminalUISceneSessionState>,

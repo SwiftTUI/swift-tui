@@ -43,7 +43,7 @@ Today the repository already has:
 - runtime appearance updates in
   [StreamingTerminalHost.swift](../Sources/TerminalUI/StreamingTerminalHost.swift)
   and
-  [HostedSceneSession.swift](../Sources/TerminalUIScenes/HostedSceneSession.swift)
+  [HostedSceneSession.swift](../Sources/TerminalUI/HostedSceneSession.swift)
 - SwiftUI and web wrapper style layers in
   [GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUITerminalStyle.swift](../GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUITerminalStyle.swift)
   and
@@ -120,11 +120,11 @@ Primary files:
 
 - [TerminalHost.swift](../Sources/TerminalUI/TerminalHost.swift)
 - [StreamingTerminalHost.swift](../Sources/TerminalUI/StreamingTerminalHost.swift)
-- [HostedSceneSession.swift](../Sources/TerminalUIScenes/HostedSceneSession.swift)
-- [SceneSession.swift](../Sources/TerminalUIScenes/SceneSession.swift)
+- [HostedSceneSession.swift](../Sources/TerminalUI/HostedSceneSession.swift)
+- [SceneSession.swift](../Sources/TerminalUI/SceneSession.swift)
 - [RunLoop+Rendering.swift](../Sources/TerminalUI/RunLoop+Rendering.swift)
 - [TerminalControlMessages.swift](../Sources/TerminalUI/TerminalControlMessages.swift)
-- [MultiSceneLauncher.swift](../Sources/TerminalUIScenes/MultiSceneLauncher.swift)
+- [TerminalWASIAppRunner.swift](../Runners/TerminalUIWASI/Sources/TerminalUIWASI/TerminalWASIAppRunner.swift)
 
 Changes:
 
@@ -188,7 +188,7 @@ Root package:
 
 - [SwiftUISurfaceTests.swift](../Tests/TerminalUITests/SwiftUISurfaceTests.swift)
 - [StreamingTerminalHostTests.swift](../Tests/TerminalUITests/StreamingTerminalHostTests.swift)
-- [HostedSceneSessionTests.swift](../Tests/TerminalUIScenesTests/HostedSceneSessionTests.swift)
+- [HostedSceneSessionTests.swift](../Tests/TerminalUITests/HostedSceneSessionTests.swift)
 
 Wrapper packages:
 

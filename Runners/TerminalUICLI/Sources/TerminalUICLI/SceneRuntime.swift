@@ -1,23 +1,10 @@
-import Core
-import TerminalUI
-import View
+@_spi(Runners) import TerminalUI
 
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
 #endif
-
-enum SceneRuntimeError: Error, CustomStringConvertible {
-  case secondaryScenesUnavailableOnWASI
-
-  var description: String {
-    switch self {
-    case .secondaryScenesUnavailableOnWASI:
-      return "Secondary scenes are unavailable when building for WASI."
-    }
-  }
-}
 
 /// Manages the runtime for a single scene within a multi-scene app.
 ///
@@ -52,52 +39,21 @@ final class SceneRuntime {
       self.resources = resources
     } else if isPrimary {
       ptyPair = nil
-      #if canImport(WASILibc)
-        let signalReader = InProcessSignalReader()
-        let initialStyle = SceneRuntime.wasiRenderStyle()
-        let host = WebTerminalHost(
-          surfaceSize: .init(width: 80, height: 24),
-          theme: initialStyle?.theme
-        )
-        if let initialStyle {
-          host.updateStyle(initialStyle)
-        }
-        self.resources = SceneSessionResources(
-          terminalHost: host,
-          terminalInputReader: InputReader { message in
-            switch message {
-            case .resize(let size):
-              host.updateSurfaceSize(size)
-              signalReader.send("SIGWINCH")
-            case .style(let style):
-              host.updateStyle(style)
-              signalReader.send("SIGWINCH")
-            }
-          },
-          signalReader: signalReader,
-          surfaceName: "ghostty-web"
-        )
-      #else
-        self.resources = SceneSessionResources(
-          terminalHost: TerminalHost(),
-          terminalInputReader: InputReader(),
-          signalReader: defaultSignalReader()
-        )
-      #endif
+      self.resources = SceneSessionResources(
+        terminalHost: TerminalHost(),
+        terminalInputReader: InputReader(),
+        signalReader: defaultSignalReader()
+      )
     } else {
-      #if canImport(WASILibc)
-        throw SceneRuntimeError.secondaryScenesUnavailableOnWASI
-      #else
-        let pty = try PtyPair()
-        ptyPair = pty
-        self.resources = SceneSessionResources(
-          terminalHost: TerminalHost(
-            inputFileDescriptor: pty.masterFD,
-            outputFileDescriptor: pty.masterFD
-          ),
-          terminalInputReader: InputReader(fileDescriptor: pty.masterFD)
-        )
-      #endif
+      let pty = try PtyPair()
+      ptyPair = pty
+      self.resources = SceneSessionResources(
+        terminalHost: TerminalHost(
+          inputFileDescriptor: pty.masterFD,
+          outputFileDescriptor: pty.masterFD
+        ),
+        terminalInputReader: InputReader(fileDescriptor: pty.masterFD)
+      )
     }
 
     stateContainer = StateContainer(
@@ -190,16 +146,4 @@ final class SceneRuntime {
 
     return false
   }
-
-  #if canImport(WASILibc)
-    private static func wasiRenderStyle() -> TerminalRenderStyle? {
-      guard let encoded = currentProcessEnvironment()["TUIGUI_RENDER_STYLE"],
-        !encoded.isEmpty
-      else {
-        return nil
-      }
-
-      return TerminalRenderStyleCodec.decodeBase64(encoded)
-    }
-  #endif
 }

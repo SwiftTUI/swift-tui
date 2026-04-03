@@ -92,7 +92,8 @@ Tests are now split by layer:
 - `Tests/CoreTests/` -- pipeline, layout, raster, and focus infrastructure
 - `Tests/ViewTests/` -- authoring-surface, environment, and actor-isolation behavior
 - `Tests/TerminalUITests/` -- runtime, rendering, fixtures, and end-to-end behavioral coverage
-- `Tests/TerminalUIScenesTests/` -- scene launcher, hosted session, socket, and pty behavior
+- `Runners/TerminalUICLI/Tests/TerminalUICLITests/` -- terminal-native runner, socket, pty, attach, and CLI-scene-management behavior
+- `Runners/TerminalUIWASI/Tests/TerminalUIWASITests/` -- WASI runner and manifest-mode behavior
 - `Tests/PrototypeUIComponentsTests/` -- prototype-surface regression coverage
 
 Repository-shape and policy regressions that do not require execution are enforced in `prek`

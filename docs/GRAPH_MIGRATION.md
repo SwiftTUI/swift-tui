@@ -848,8 +848,8 @@ Build and run the WebExample. Verify the graph types compile under
 
 **7.4 — iOS**
 
-Build the HostedSceneSession path. Verify `TerminalUIScenes` compiles and
-the graph integrates with the SwiftUI host wrapper.
+Build the `HostedSceneSession` path. Verify the shared `TerminalUI` hosted-scene
+seams integrate with the SwiftUI host wrapper.
 
 **7.5 — Android**
 

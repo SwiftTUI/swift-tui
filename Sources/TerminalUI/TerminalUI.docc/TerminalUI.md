@@ -22,7 +22,10 @@ Use it when you want to:
 - ``DefaultRenderer`` for one-shot rendering and frame inspection
 - ``RunLoop`` for interactive sessions that own terminal I/O, scheduling, focus, lifecycle staging, and presentation
 
-Scene declarations such as ``App`` and ``WindowGroup`` also live here, but the public launch helper for scene-based apps is still packaged separately in `TerminalUIScenes`.
+Scene declarations such as ``App`` and ``WindowGroup`` also live here, but
+executable launch now lives in peer runner packages: `Runners/TerminalUICLI`
+for terminal-native apps and `Runners/TerminalUIWASI` for WASI builds.
+`TerminalUI` itself is library-only.
 
 ## Topics
 

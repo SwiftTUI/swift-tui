@@ -48,7 +48,7 @@ The repo now has dedicated test targets for:
 - `CoreTests`
 - `ViewTests`
 - `TerminalUITests`
-- `TerminalUIScenesTests`
+- `TerminalUICLITests`
 - `PrototypeUIComponentsTests`
 
 This part of the original plan is complete.
@@ -116,7 +116,7 @@ should update the doc set in the same change as file moves.
 - `Tests/CoreTests`
 - `Tests/ViewTests`
 - `Tests/TerminalUITests`
-- `Tests/TerminalUIScenesTests`
+- `Runners/TerminalUICLI/Tests/TerminalUICLITests`
 
 If a future refactor touches package boundaries, also re-check
 [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md), [STATUS.md](STATUS.md), and

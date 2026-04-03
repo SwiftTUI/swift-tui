@@ -15,6 +15,7 @@ let package = Package(
   ],
   dependencies: [
     .package(path: "../.."),
+    .package(path: "../../Runners/TerminalUICLI"),
     .package(path: "Packages/swift-todoist"),
     .package(
       url: "https://github.com/pointfreeco/swift-structured-queries.git",
@@ -30,7 +31,7 @@ let package = Package(
       name: "TodoistDemo",
       dependencies: [
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
+        .product(name: "TerminalUICLI", package: "TerminalUICLI"),
         .product(name: "TodoistAPI", package: "swift-todoist"),
         .product(name: "StructuredQueries", package: "swift-structured-queries"),
         .product(name: "StructuredQueriesSQLite", package: "swift-structured-queries"),
@@ -44,6 +45,6 @@ let package = Package(
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
         .product(name: "GRDB", package: "GRDB.swift"),
       ]
-    )
+    ),
   ]
 )

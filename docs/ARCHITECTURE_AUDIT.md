@@ -1,7 +1,7 @@
 # Architecture Audit
 
 **Date:** 2026-03-30
-**Scope:** Current working tree, including `Core`, `View`, `TerminalUI`, `TerminalUIScenes`, wrapper packages, and the top-level docs that describe them
+**Scope:** Current working tree, including `Core`, `View`, `TerminalUI`, peer runner packages, wrapper packages, and the top-level docs that describe them
 
 ## Executive Summary
 
@@ -15,7 +15,7 @@ audit called for:
 - typed semantic roles and structured route identifiers replaced the old
   string-token model
 - test coverage is now split across `CoreTests`, `ViewTests`,
-  `TerminalUITests`, `TerminalUIScenesTests`, and
+  `TerminalUITests`, `TerminalUICLITests`, and
   `PrototypeUIComponentsTests`
 - retained resolve reuse is present and wired into `DefaultRenderer`
 
@@ -64,8 +64,8 @@ audit is no longer the active architecture story.
 ### Test-target split
 
 The repo no longer relies on a single `TerminalUITests` bucket for everything.
-`CoreTests`, `ViewTests`, and `TerminalUIScenesTests` now exist and materially
-improve subsystem-local verification.
+`CoreTests`, `ViewTests`, and the peer runner-package test suites now exist and
+materially improve subsystem-local verification.
 
 ### Incremental resolve
 

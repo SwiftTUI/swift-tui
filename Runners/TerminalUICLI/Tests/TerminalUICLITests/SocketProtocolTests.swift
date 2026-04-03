@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import TerminalUIScenes
+@testable import TerminalUICLI
 
 struct SceneInfoTests {
   @Test("SceneInfo encodes to JSON")

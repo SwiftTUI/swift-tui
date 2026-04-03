@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import TerminalUIScenes
+@testable import TerminalUICLI
 
 #if canImport(Darwin)
   import Darwin

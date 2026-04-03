@@ -16,7 +16,7 @@
   }
 #endif
 
-package func defaultSignalReader() -> (any SignalReading)? {
+@_spi(Runners) public func defaultSignalReader() -> (any SignalReading)? {
   #if canImport(UnixSignals)
     SignalReader()
   #else

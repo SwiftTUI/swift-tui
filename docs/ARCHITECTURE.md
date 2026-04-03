@@ -28,12 +28,11 @@ Last updated: March 30, 2026
 - Adds terminal host integration, alternate-screen ownership, input parsing, signal handling, capability-aware presentation, `RunLoop`, and rendering entry points
 - Hosts wrapper-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
 
-### `TerminalUIScenes`
+### Peer runner packages
 
-- Builds the optional scene-runtime layer on top of `TerminalUI`
-- Adds pty-backed secondary scene sessions, socket discovery, attachment, and multi-scene orchestration
-- Currently carries the public scene-launch path, including the single-window case
-- Acts as a compatibility launch layer while the platform-runner split is still in progress
+- `Runners/TerminalUICLI` builds the terminal-native executable layer on top of `TerminalUI`
+- `Runners/TerminalUIWASI` builds the WASI executable layer on top of `TerminalUI`
+- `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI` wrap the same authored `TerminalUI` apps for host-managed environments
 
 Detailed per-file ownership lives in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
 
@@ -109,17 +108,20 @@ The core runtime is intentionally narrow today:
 - one full-canvas `WindowGroup` per session
 - keyboard-first interaction with optional mouse input when the terminal supports reporting
 
-Multi-scene orchestration is packaged separately in `TerminalUIScenes`.
+Executable launch and multi-scene orchestration are packaged separately in peer
+runner packages rather than in the root `TerminalUI` library.
 
-That scene layer now serves two distinct launch modes:
+Those runner layers now serve three distinct launch modes:
 
-- terminal-owned launch via `MultiSceneLauncher.run(MyApp.self)` or the default
-  `App.main()` provided by `TerminalUIScenes`
+- terminal-owned launch via `TerminalCLIAppRunner.run(MyApp.self)` or the
+  default `App.main()` provided by `Runners/TerminalUICLI`
+- WASI launch and manifest generation via `TerminalWASIAppRunner` in
+  `Runners/TerminalUIWASI`
 - wrapper-owned launch via `TerminalUISceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`
 
 CLI scene management is runner policy rather than an authored-scene rule. A
-one-window app and a multi-window app now share the same compatibility launch
-path.
+one-window app and a multi-window app now share the same runner story, while
+`TerminalUI` itself remains library-only.
 
 ## Important Data Products
 

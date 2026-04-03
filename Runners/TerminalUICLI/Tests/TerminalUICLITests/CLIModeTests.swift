@@ -1,6 +1,6 @@
 import Testing
 
-@testable import TerminalUIScenes
+@testable import TerminalUICLI
 
 struct CLIModeTests {
   @Test("No arguments produces app mode")

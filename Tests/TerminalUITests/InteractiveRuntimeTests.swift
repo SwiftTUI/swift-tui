@@ -3,7 +3,6 @@ import Testing
 
 @testable import Core
 @testable import TerminalUI
-@testable import TerminalUIScenes
 @testable import View
 
 #if canImport(Darwin)
@@ -1484,7 +1483,7 @@ struct InteractiveRuntimeTests {
       }
     )
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Resize Window") {
         Text("Resize")
       },

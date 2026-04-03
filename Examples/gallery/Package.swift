@@ -19,7 +19,8 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(path: "../..")
+    .package(path: "../.."),
+    .package(path: "../../Runners/TerminalUICLI"),
   ],
   targets: [
     .target(
@@ -34,7 +35,7 @@ let package = Package(
       dependencies: [
         "GalleryDemoViews",
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
+        .product(name: "TerminalUICLI", package: "TerminalUICLI"),
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
       ]
     ),

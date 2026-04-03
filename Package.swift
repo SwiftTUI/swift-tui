@@ -8,7 +8,7 @@ let nativeRuntimePlatforms: [PackageDescription.Platform] = [
   .macOS,
   .linux,
   .android,
-  .iOS
+  .iOS,
 ]
 
 let explicitPlatforms = ProcessInfo.processInfo.environment["DISABLE_EXPLICIT_PLATFORMS"] != "1"
@@ -25,47 +25,46 @@ let packagePlatforms: [SupportedPlatform]? = {
 }()
 
 let packageDependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.6"),
-    .package(
-      url: "https://github.com/apple/swift-collections.git",
-      from: "1.4.1"
-    ),
-    .package(
-      url: "https://github.com/apple/swift-async-algorithms.git",
-      from: "1.1.3"
-    ),
-    .package(
-        url: "https://github.com/tayloraswift/swift-png.git",
-        exact: "4.4.9"
-      )
-  ]
+  .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.6"),
+  .package(
+    url: "https://github.com/apple/swift-collections.git",
+    from: "1.4.1"
+  ),
+  .package(
+    url: "https://github.com/apple/swift-async-algorithms.git",
+    from: "1.1.3"
+  ),
+  .package(
+    url: "https://github.com/tayloraswift/swift-png.git",
+    exact: "4.4.9"
+  ),
+]
 
 let terminalUIDependencies: [Target.Dependency] = [
-    "Core",
-    "View",
-    .target(
-      name: "UnixSignals",
-      condition: .when(platforms: nativeRuntimePlatforms),
-    ),
-    .product(
-      name: "PNG",
-      package: "swift-png",
-      condition: .when(platforms: nativeRuntimePlatforms),
-    )
-  ]
+  "Core",
+  "View",
+  .target(
+    name: "UnixSignals",
+    condition: .when(platforms: nativeRuntimePlatforms),
+  ),
+  .product(
+    name: "PNG",
+    package: "swift-png",
+    condition: .when(platforms: nativeRuntimePlatforms),
+  ),
+]
 
 let terminalUITestDependencies: [Target.Dependency] = [
-    "TerminalUI",
-    "Core",
-    "View",
-    "TerminalUIScenes",
-    "TerminalUICharts",
-    .product(
-      name: "PNG",
-      package: "swift-png",
-      condition: .when(platforms: nativeRuntimePlatforms),
-    )
-  ]
+  "TerminalUI",
+  "Core",
+  "View",
+  "TerminalUICharts",
+  .product(
+    name: "PNG",
+    package: "swift-png",
+    condition: .when(platforms: nativeRuntimePlatforms),
+  ),
+]
 
 func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDescription
   .SwiftSetting]
@@ -89,7 +88,6 @@ let package = Package(
     .library(name: "View", targets: ["View"]),
     .library(name: "TerminalUICharts", targets: ["TerminalUICharts"]),
     .library(name: "TerminalUI", targets: ["TerminalUI"]),
-    .library(name: "TerminalUIScenes", targets: ["TerminalUIScenes"]),
   ],
   dependencies: packageDependencies,
   targets: [
@@ -144,17 +142,6 @@ let package = Package(
       resources: [],
       swiftSettings: swiftSettings()
     ),
-    .target(
-      name: "TerminalUIScenes",
-      dependencies: [
-        "TerminalUI",
-        .target(
-          name: "UnixSignals",
-          condition: .when(platforms: nativeRuntimePlatforms)
-        ),
-      ],
-      swiftSettings: swiftSettings()
-    ),
     .testTarget(
       name: "CoreTests",
       dependencies: [
@@ -183,16 +170,6 @@ let package = Package(
       name: "TerminalUITests",
       dependencies: terminalUITestDependencies,
       exclude: ["Fixtures"],
-      swiftSettings: swiftSettings()
-    ),
-    .testTarget(
-      name: "TerminalUIScenesTests",
-      dependencies: [
-        "TerminalUIScenes",
-        "TerminalUI",
-        "Core",
-        "View",
-      ],
       swiftSettings: swiftSettings()
     ),
   ]

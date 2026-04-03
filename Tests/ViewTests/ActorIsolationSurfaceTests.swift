@@ -1,7 +1,7 @@
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@_spi(Runners) @testable import TerminalUI
 @testable import View
 
 @MainActor

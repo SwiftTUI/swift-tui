@@ -19,9 +19,15 @@ under `Sources/`.
 - [../README.md](../README.md): public landing page for the repository
 - `Sources/View/View.docc`: public module overview for `View`
 - `Sources/TerminalUI/TerminalUI.docc`: public module overview for `TerminalUI`
-- `Sources/TerminalUIScenes/TerminalUIScenes.docc`: public module overview for `TerminalUIScenes`
 - `Sources/TerminalUICharts/TerminalUICharts.docc`: public module overview for `TerminalUICharts`
 - `Sources/Core/Core.docc`: target-level reference for the shared pipeline types re-exported through `TerminalUI`
+
+Peer runner and wrapper packages live at:
+
+- `Runners/TerminalUICLI`
+- `Runners/TerminalUIWASI`
+- `GUI/SwiftUITUIGUI`
+- `GUI/WebTUIGUI`
 
 Generate DocC archives with the repo-default `swiftly` toolchain:
 

@@ -18,7 +18,7 @@
 
   // MARK: - InstanceInfo
 
-  /// Describes a running TerminalUIScenes app instance discovered via socket files.
+  /// Describes a running TerminalUI CLI app instance discovered via socket files.
   struct InstanceInfo: Sendable {
     let identifier: String
     let socketPath: String

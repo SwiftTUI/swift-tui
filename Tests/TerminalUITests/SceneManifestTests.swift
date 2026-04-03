@@ -1,8 +1,7 @@
 import Testing
 import View
 
-@testable import TerminalUI
-@testable import TerminalUIScenes
+@_spi(Runners) @testable import TerminalUI
 
 @MainActor
 @Suite

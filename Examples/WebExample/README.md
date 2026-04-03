@@ -59,4 +59,4 @@ bun run start
 - The Bun server serves `/ghostty-vt.wasm` from the built `dist/` directory, using the version shipped by the npm `ghostty-web` package.
 - `TerminalApp/Sources/WebExampleScenes/WebExampleApp.swift` is the reusable
   `TerminalUI.App` definition. `TerminalApp/Sources/TerminalApp/main.swift`
-  is only the launcher and calls `try await MultiSceneLauncher.run(WebExampleApp.self)`.
+  is only the launcher and calls `try await TerminalWASIAppRunner.run(WebExampleApp.self)`.

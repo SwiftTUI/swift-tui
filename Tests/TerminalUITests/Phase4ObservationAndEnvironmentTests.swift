@@ -2,8 +2,7 @@ import Observation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
-@testable import TerminalUIScenes
+@_spi(Runners) @testable import TerminalUI
 @testable import View
 
 @MainActor
@@ -777,7 +776,7 @@ struct Phase4ObservationAndEnvironmentTests {
     let model = Phase4ObservableForm()
     let terminal = Phase4RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Observable Form") {
         BindableFormView(model: model)
       },
@@ -855,7 +854,7 @@ struct Phase4ObservationAndEnvironmentTests {
       nextAppearance: lightAppearance
     )
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Appearance Probe") {
         AppearanceProbeView()
       },
@@ -882,7 +881,7 @@ struct Phase4ObservationAndEnvironmentTests {
   func runtimeExposesTerminalSurfaceSizeThroughEnvironmentReaders() async throws {
     let terminal = Phase4RecordingTerminalHost()
 
-    let result = try await MultiSceneLauncher.run(
+    let result = try await runTestSceneSession(
       scene: WindowGroup("Terminal Size Probe") {
         TerminalSizeProbeView()
       },

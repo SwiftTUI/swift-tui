@@ -20,6 +20,7 @@ let package = Package(
   ],
   dependencies: [
     .package(path: "../../.."),
+    .package(path: "../../../Runners/TerminalUIWASI"),
     .package(path: "../../gallery"),
   ],
   targets: [
@@ -29,7 +30,6 @@ let package = Package(
         .product(name: "GalleryDemoViews", package: "gallery"),
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
-        .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
       ],
       path: "Sources/WebExampleScenes"
     ),
@@ -37,7 +37,7 @@ let package = Package(
       name: "WebExampleApp",
       dependencies: [
         "WebExampleScenes",
-        .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
+        .product(name: "TerminalUIWASI", package: "TerminalUIWASI"),
       ],
       path: "Sources/TerminalApp"
     ),

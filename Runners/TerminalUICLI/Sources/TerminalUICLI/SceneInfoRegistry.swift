@@ -1,4 +1,5 @@
 #if !canImport(WASILibc)
+  @_spi(Runners) import TerminalUI
   import Synchronization
 
   final class SceneInfoRegistry: Sendable {

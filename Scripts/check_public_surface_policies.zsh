@@ -16,10 +16,10 @@ view_protocol_block="$(awk '
   /public protocol View \{/ { collecting = 1 }
   /extension Never: View \{/ { collecting = 0 }
   collecting { print }
-' Sources/View/ViewFoundation.swift)"
+' Sources/View/Foundation/ViewFoundation.swift)"
 
 if [[ -z "$view_protocol_block" ]]; then
-  fail "Could not isolate the public View protocol block in Sources/View/ViewFoundation.swift."
+  fail "Could not isolate the public View protocol block in Sources/View/Foundation/ViewFoundation.swift."
 else
   [[ "$view_protocol_block" == *"associatedtype Body: View = Never"* ]] \
     || fail "The public View protocol must keep associatedtype Body: View = Never."
@@ -32,13 +32,13 @@ else
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol View \{' \
-  Sources/View/ViewFoundation.swift
+  Sources/View/Foundation/ViewFoundation.swift
 then
   fail "The public View protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '@ViewBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/View/ViewFoundation.swift
+  Sources/View/Foundation/ViewFoundation.swift
 then
   fail "View.body must stay @ViewBuilder and @MainActor-annotated."
 fi
@@ -74,7 +74,7 @@ then
 fi
 
 if ! rg -U -n -P --quiet -- '@MainActor\s+public func resolve<' \
-  Sources/View/ViewFoundation.swift
+  Sources/View/Foundation/ViewFoundation.swift
 then
   fail "Resolver.resolve must stay @MainActor."
 fi
@@ -86,29 +86,29 @@ then
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?public init\s*\(\s*@_inheritActorContext get: @escaping @isolated\(any\) @Sendable \(\) -> Value,\s*@_inheritActorContext set: @escaping @isolated\(any\) @Sendable \(Value\) -> Void' \
-  Sources/View/ViewBaseTypes.swift
+  Sources/View/Foundation/ViewBaseTypes.swift
 then
   fail "Binding.init(get:set:) must keep its actor-inheriting SwiftUI-style signature."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '@_inheritActorContext' Sources/View/ViewModifiers.swift; then
+if ! rg -n --fixed-strings --quiet -- '@_inheritActorContext' Sources/View/Modifiers/ViewModifiers.swift; then
   fail "ViewModifiers.task must keep actor-inheriting task closures."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'public func task<ID: Hashable & Sendable>(' \
-  Sources/View/ViewModifiers.swift
+  Sources/View/Modifiers/ViewModifiers.swift
 then
   fail "The public task(id:) overload must stay available."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'action: @escaping @MainActor @Sendable () -> Void' \
-  Sources/View/Button.swift
+  Sources/View/Controls/Button.swift
 then
   fail "Button public actions must stay @MainActor @Sendable."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'private let handler: @MainActor @Sendable (LinkDestination) -> Bool' \
-  Sources/View/Environment.swift
+  Sources/View/Environment/Environment.swift
 then
   fail "OpenLinkAction must stay main-actor-aware."
 fi
@@ -288,20 +288,24 @@ if ! rg -n --fixed-strings --quiet -- '`TerminalUI`' README.md; then
   fail "README.md should name TerminalUI explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '`TerminalUIScenes`' README.md; then
-  fail "README.md should name TerminalUIScenes explicitly."
+if ! rg -n --fixed-strings --quiet -- '`Runners/TerminalUICLI`' README.md; then
+  fail "README.md should name the TerminalUICLI runner package explicitly."
+fi
+
+if ! rg -n --fixed-strings --quiet -- '`Runners/TerminalUIWASI`' README.md; then
+  fail "README.md should name the TerminalUIWASI runner package explicitly."
 fi
 
 if ! rg -n --fixed-strings --quiet -- '### `TerminalUI`' docs/PUBLIC_API_INVENTORY.md; then
   fail "docs/PUBLIC_API_INVENTORY.md should classify the TerminalUI runtime explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '### `TerminalUIScenes`' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should classify the TerminalUIScenes runtime explicitly."
+if ! rg -n --fixed-strings --quiet -- '### Peer runner packages' docs/PUBLIC_API_INVENTORY.md; then
+  fail "docs/PUBLIC_API_INVENTORY.md should classify the peer runner packages explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '`TerminalUI`, with `TerminalUIScenes` as the optional multi-scene layer' docs/PUBLIC_SURFACE_POLICY.md; then
-  fail "docs/PUBLIC_SURFACE_POLICY.md should name TerminalUI and TerminalUIScenes explicitly."
+if ! rg -n --fixed-strings --quiet -- '`TerminalUI` for shared runtime integration plus peer runner packages for executable launch' docs/PUBLIC_SURFACE_POLICY.md; then
+  fail "docs/PUBLIC_SURFACE_POLICY.md should describe the library-plus-runner package model explicitly."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'Experimental or showcase targets follow the same rule' docs/PUBLIC_SURFACE_POLICY.md; then

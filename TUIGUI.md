@@ -1,6 +1,6 @@
 # TUIGUI Design And Status
 
-Last updated: April 1, 2026
+Last updated: April 3, 2026
 
 ## Goal
 
@@ -29,17 +29,17 @@ The wrapper-facing root work is landed:
 
 - `TerminalUI` exposes `TerminalUISceneDescriptor`,
   `TerminalUISceneManifest`, and `HostedSceneSession`
-- `MultiSceneLauncher` exposes:
-  - public app launch for scene-based apps
-  - manifest-only mode through `TUIGUI_MODE=manifest`
+- `Runners/TerminalUICLI` owns terminal-native `App.main()`, attach/list CLI
+  behavior, and pty-backed scene management
+- `Runners/TerminalUIWASI` owns manifest-only mode through `TUIGUI_MODE=manifest`
+  plus WASI scene launch
 - shared control-message parsing lives in
   `Sources/TerminalUI/TerminalControlMessages.swift`
 - embedded hosts use `InjectedTerminalInputReader` and
   `StreamingTerminalHost`
 - hosted sessions now accept paired render-style updates so terminal appearance
   and semantic theme move together at runtime
-- `TerminalUIScenes` now provides the default `App.main()` implementation that
-  launches through `MultiSceneLauncher`
+- `TerminalUI` is now library-only; executable launch is entirely runner-owned
 
 ### `GUI/SwiftUITUIGUI`
 
@@ -102,12 +102,14 @@ the root package.
 
 ## Current Constraints
 
-- The native multi-scene terminal story is ahead of the WASI story:
-  - `SceneRuntime.swift` still rejects secondary scenes on WASI
-  - `MultiSceneLauncher.swift` still selects a single scene for the current WASI process
+- CLI multi-scene management and authored multiple scenes are intentionally
+  separate concepts:
+  - `Runners/TerminalUICLI` can manage multiple native scenes with discovery,
+    ptys, and attach flows
+  - `Runners/TerminalUIWASI` still executes one selected scene per wasm process
 - Wrapper packages still own scene switching UI and style surfaces. The root package exposes scene manifests and hosted sessions, not a full cross-platform app shell.
 - `GUI/WebTUIGUI` build scripts shell out to `swift`, so Bun-driven builds still require a shell where `swift` resolves to the `swiftly`-managed Swift 6.3.0 toolchain.
-- Wrapper packages are intentionally outside the root package products. Consumers opt into them separately.
+- Runner and wrapper packages are intentionally outside the root package products. Consumers opt into them separately.
 
 ## Non-Negotiable Decisions
 
@@ -124,13 +126,14 @@ the root package.
 Verified on March 30, 2026:
 
 ```bash
-swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core
-swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target TerminalUIScenes
-swiftly run swift test --filter TerminalUIScenesTests.SceneManifestTests
-swiftly run swift test --filter TerminalUIScenesTests.HostedSceneSessionTests
+swiftly run swift test
+cd Runners/TerminalUICLI && swiftly run swift test
+cd Runners/TerminalUIWASI && swiftly run swift test
+cd GUI/SwiftUITUIGUI && swiftly run swift test
 ```
 
-The two wasm build commands succeed on the repo-default Swift 6.3.0 toolchain.
+The root package plus peer runner and SwiftUI wrapper packages succeed on the
+repo-default Swift 6.3.0 toolchain.
 
 ## Out Of Scope
 

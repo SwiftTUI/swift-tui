@@ -1,5 +1,5 @@
 import TerminalUI
-import TerminalUIScenes
+import TerminalUICLI
 
 @main
 struct TodoistDemoApp: App {

@@ -1,12 +1,10 @@
 import Core
-import TerminalUI
+@_spi(Runners) import TerminalUI
 import Testing
 import View
 
-@testable import TerminalUIScenes
-
 @MainActor
-struct MultiSceneLauncherTests {
+struct AppSceneConfigurationTests {
   @Test("Extracts multiple scene configurations from App body")
   func extractsMultipleConfigurations() {
     struct TwoSceneApp: App {

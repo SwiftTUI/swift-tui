@@ -1,4 +1,4 @@
-package import Core
+public import Core
 
 @MainActor
 package protocol ViewNode {
@@ -55,7 +55,7 @@ public struct Resolver {
 
   /// Resolves `root` in the supplied context.
   @MainActor
-  package func resolve<V: View>(
+  public func resolve<V: View>(
     _ root: V,
     in context: ResolveContext = .init()
   ) -> ResolvedNode {

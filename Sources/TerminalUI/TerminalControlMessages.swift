@@ -92,9 +92,9 @@ package struct ControlMessageParser {
   }
 }
 
-package enum TerminalRenderStyleCodec {
+@_spi(Runners) public enum TerminalRenderStyleCodec {
   // Keep this transport schema aligned with GUI/WebTUIGUI/src/WebTUITerminalStyle.ts.
-  package static func decodeBase64(
+  @_spi(Runners) public static func decodeBase64(
     _ encoded: String
   ) -> TerminalRenderStyle? {
     guard let bytes = StyleTransportBase64.decode(encoded) else {
@@ -110,7 +110,7 @@ package enum TerminalRenderStyleCodec {
     return decodeStyle(from: value)
   }
 
-  package static func encodeBase64(
+  @_spi(Runners) public static func encodeBase64(
     _ style: TerminalRenderStyle
   ) -> String? {
     let json = encodeStyle(style)

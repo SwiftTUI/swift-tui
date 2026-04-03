@@ -1,6 +1,6 @@
 import Testing
 
-@testable import TerminalUIScenes
+@testable import TerminalUICLI
 
 @MainActor
 struct SceneLifecycleTests {

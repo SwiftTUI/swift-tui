@@ -1,7 +1,7 @@
 import Synchronization
 import Testing
 
-@testable import TerminalUI
+@_spi(Runners) @testable import TerminalUI
 
 @Suite
 struct InjectedTerminalInputReaderTests {

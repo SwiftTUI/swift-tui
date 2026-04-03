@@ -1,19 +1,24 @@
-import TerminalUI
+@_spi(Runners) import TerminalUI
 import Testing
-import View
 
-@testable import TerminalUIScenes
+@testable import TerminalUICLI
 
 @Suite
 @MainActor
 struct SceneInfoRegistryTests {
   @Test("Scene info registry reflects attachment changes")
   func reflectsAttachmentChanges() throws {
-    let group = SceneGroup(scenes: [
-      AnyScene(WindowGroup("Primary", id: WindowIdentifier("primary")) { EmptyView() }),
-      AnyScene(WindowGroup("Secondary", id: WindowIdentifier("secondary")) { EmptyView() }),
-    ])
-    let configurations = collectWindowSceneConfigurations(from: group)
+    struct TwoSceneApp: App {
+      var body: some Scene {
+        WindowGroup("Primary", id: WindowIdentifier("primary")) {
+          EmptyView()
+        }
+        WindowGroup("Secondary", id: WindowIdentifier("secondary")) {
+          EmptyView()
+        }
+      }
+    }
+    let configurations = collectWindowSceneConfigurations(from: TwoSceneApp().body)
 
     let primary = try SceneRuntime(configuration: configurations[0], isPrimary: true)
     let secondary = try SceneRuntime(configuration: configurations[1], isPrimary: false)

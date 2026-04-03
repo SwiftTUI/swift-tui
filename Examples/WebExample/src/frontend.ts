@@ -89,7 +89,7 @@ const parityPoints = [
 ];
 
 const syntaxSample = `import TerminalUI
-import TerminalUIScenes
+import TerminalUICLI
 
 @main
 struct DeployApp: App {

@@ -1,10 +1,9 @@
 import Dispatch
 import Synchronization
-import TerminalUI
+@_spi(Runners) import TerminalUI
 import Testing
-import View
 
-@testable import TerminalUIScenes
+@testable import TerminalUICLI
 
 #if canImport(Darwin)
   import Darwin

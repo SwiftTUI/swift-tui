@@ -12,7 +12,7 @@ let package = Package(
     .library(
       name: "ExampleScenes",
       targets: ["ExampleScenes"]
-    ),
+    )
   ],
   dependencies: [
     .package(path: "../../.."),
@@ -25,7 +25,6 @@ let package = Package(
         .product(name: "GalleryDemoViews", package: "gallery"),
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
-        .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
       ],
       path: "Sources/ExampleScenes"
     )

@@ -8,7 +8,7 @@ Choose the level that matches your app:
 
 - use ``DefaultRenderer`` when you need frame artifacts or textual previews
 - use ``RunLoop`` when you want full control over state, focus, input handling, and terminal hosting
-- use scene declarations plus `TerminalUIScenes.MultiSceneLauncher` when you want the higher-level app story that also scales to multiple windows
+- use ``TerminalUISceneManifest`` and ``HostedSceneSession`` when you want wrapper-driven scene hosting on top of the shared runtime
 
 `App`, `Scene`, and `DefaultRenderer` are `@MainActor` authoring APIs. Construct app values and evaluate fresh `View` trees on the main actor, then hand the resulting runtime or pipeline artifacts to whichever layer you need next.
 
@@ -40,16 +40,20 @@ Use it when your app wants explicit control over state containers, focus tracker
 
 ## Scene-Based Apps
 
-The public scene declarations live in `TerminalUI`, but the default `@main`
-launch path currently comes from `TerminalUIScenes`.
+The public scene declarations live in `TerminalUI`, but executable launch lives
+in peer runner packages.
 
-Import `TerminalUIScenes` and mark your app type with `@main` to use the
-default `App.main()` that forwards to `MultiSceneLauncher`. When you need an
-explicit launcher instead, call:
+For terminal-native apps, import `TerminalUICLI` and mark your app type with
+`@main` to use the default CLI `App.main()`. When you need an explicit
+launcher, call:
 
 ```swift
-try await MultiSceneLauncher.run(MyApp.self)
+try await TerminalCLIAppRunner.run(MyApp.self)
 ```
 
-That launcher also supports the single-window case today, but that policy lives
-in the runner layer rather than in a special `TerminalUI` single-scene path.
+For WASI apps, import `TerminalUIWASI` and either rely on its default
+`App.main()` or call `TerminalWASIAppRunner.run(MyApp.self)` explicitly.
+
+`TerminalUI` itself is library-only. It owns scene declarations, manifests, and
+hosted-session APIs, but it does not provide a default `App.main()` or an
+executable product on its own.

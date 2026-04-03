@@ -1,6 +1,6 @@
 # Testing And Fixture Policy
 
-Last updated: March 30, 2026
+Last updated: April 3, 2026
 
 This policy keeps reliability work predictable in the current decomposed
 codebase.
@@ -31,12 +31,13 @@ test suite, not by a separate pre-commit hook.
 - `Tests/CoreTests`: pipeline, layout, raster, and low-level infrastructure
 - `Tests/ViewTests`: authoring-surface, environment, and actor-isolation behavior
 - `Tests/TerminalUITests`: runtime, rendering, fixture, and benchmark scenarios
-- `Tests/TerminalUIScenesTests`: scene launcher, hosted session, attach, socket, and pty behavior
+- `Runners/TerminalUICLI/Tests/TerminalUICLITests`: terminal-native runner, attach, socket, and pty behavior
+- `Runners/TerminalUIWASI/Tests/TerminalUIWASITests`: WASI runner and manifest-mode behavior
 - `Tests/PrototypeUIComponentsTests`: prototype-surface regression coverage
 
 Prefer the smallest target that can prove the behavior under test. Keep
-cross-layer coverage in `TerminalUITests` and `TerminalUIScenesTests`, not as
-the default place for every new assertion.
+cross-layer coverage in `TerminalUITests` and the runner-package test suites,
+not as the default place for every new assertion.
 
 ## Principles
 

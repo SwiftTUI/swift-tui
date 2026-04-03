@@ -1,4 +1,4 @@
-import TerminalUIScenes
+import TerminalUIWASI
 import WebExampleScenes
 
-try await MultiSceneLauncher.run(WebExampleApp.self)
+try await TerminalWASIAppRunner.run(WebExampleApp.self)
