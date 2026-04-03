@@ -1,4 +1,3 @@
-
 public import Core
 
 /// Overlays children along the z axis using alignment rules.
@@ -12,14 +11,6 @@ public struct ZStack<Content: View>: View, ResolvableView {
   ) {
     self.alignment = alignment
     self.content = content()
-  }
-
-  package init(
-    alignment: Alignment = .center,
-    children: [AnyView]
-  ) where Content == VariadicView<AnyView> {
-    self.alignment = alignment
-    content = VariadicView(children)
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {

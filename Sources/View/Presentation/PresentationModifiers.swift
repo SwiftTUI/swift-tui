@@ -285,8 +285,8 @@ private struct TerminalPresentationModifier<
             title: title,
             kind: kind,
             backdropOpacity: 0,
-            actionViews: declaredBuilderChildren(from: actions),
-            messageViews: declaredBuilderChildren(from: message),
+            actionViews: erasedDeclaredBuilderChildren(from: actions),
+            messageViews: erasedDeclaredBuilderChildren(from: message),
             contentViews: [],
             dismiss: { [isPresented] in
               isPresented.wrappedValue = false
@@ -326,7 +326,7 @@ private struct TerminalSheetModifier<Content: View, SheetContent: View>: View,
             backdropOpacity: 0,
             actionViews: [],
             messageViews: [],
-            contentViews: declaredBuilderChildren(from: sheetContent),
+            contentViews: erasedDeclaredBuilderChildren(from: sheetContent),
             dismiss: { [isPresented] in
               isPresented.wrappedValue = false
             }
@@ -616,7 +616,7 @@ private struct ToastModifier<Content: View, ToastContent: View>: View,
       return [node]
     }
 
-    let contentViews = declaredBuilderChildren(from: toastContent)
+    let contentViews = erasedDeclaredBuilderChildren(from: toastContent)
     node.preferenceValues.merge(
       ToastPreferenceKey.self,
       value: .init(

@@ -10,27 +10,11 @@ public struct Group<Content: View>: View, ResolvableView {
     self.content = content()
   }
 
-  package init(children: [AnyView]) where Content == VariadicView<AnyView> {
-    content = VariadicView(children)
-  }
-
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     resolveDeclaredChildren(
       content,
       in: context,
       kindName: "Group"
     )
-  }
-}
-
-@MainActor
-func composedView(from children: [AnyView]) -> AnyView {
-  switch children.count {
-  case 0:
-    return AnyView(EmptyView())
-  case 1:
-    return children[0]
-  default:
-    return AnyView(Group(children: children))
   }
 }

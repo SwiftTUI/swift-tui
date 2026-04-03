@@ -1,9 +1,8 @@
 package import Core
+
 /// The builder artifact produced when a ``ViewBuilder`` contains multiple child
 /// expressions in sequence.
-public struct TupleView<each Content: View>: View, ResolvableView, BuilderCompositeView,
-  DeclaredChildrenView
-{
+public struct TupleView<each Content: View>: View, ResolvableView, DeclaredChildrenView {
   package let value: (repeat each Content)
 
   package init(
@@ -14,17 +13,6 @@ public struct TupleView<each Content: View>: View, ResolvableView, BuilderCompos
 
   public var body: Never {
     fatalError("TupleView is a builder composition artifact.")
-  }
-
-  package var builderChildren: [AnyView] {
-    var children: [AnyView] = []
-    for child in repeat each value {
-      appendDeclaredBuilderChildren(
-        from: child,
-        into: &children
-      )
-    }
-    return children
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -48,6 +36,17 @@ public struct TupleView<each Content: View>: View, ResolvableView, BuilderCompos
         kindName: kindName,
         nextIndex: &nextIndex,
         into: &resolved
+      )
+    }
+  }
+
+  package func appendErasedDeclaredChildren(
+    into children: inout [AnyView]
+  ) {
+    for child in repeat each value {
+      appendErasedDeclaredBuilderChildren(
+        from: child,
+        into: &children
       )
     }
   }

@@ -40,8 +40,11 @@ package protocol DeclaredChildrenView {
     nextIndex: inout Int,
     into resolved: inout [ResolvedNode]
   )
-}
 
+  func appendErasedDeclaredChildren(
+    into children: inout [AnyView]
+  )
+}
 
 /// Resolves authored views into resolved render trees.
 ///
@@ -145,24 +148,26 @@ package func resolveDeclaredChildren<V: View>(
 }
 
 @MainActor
-package func appendDeclaredBuilderChildren<V: View>(
+package func appendErasedDeclaredBuilderChildren<V: View>(
   from view: V,
   into children: inout [AnyView]
 ) {
   let erased: Any = view
-  if let composite = erased as? any BuilderCompositeView {
-    children.append(contentsOf: composite.builderChildren)
+  if let structural = erased as? any DeclaredChildrenView {
+    structural.appendErasedDeclaredChildren(
+      into: &children
+    )
     return
   }
   children.append(scopedAnyView { view })
 }
 
 @MainActor
-package func declaredBuilderChildren<V: View>(
+package func erasedDeclaredBuilderChildren<V: View>(
   from view: V
 ) -> [AnyView] {
   var children: [AnyView] = []
-  appendDeclaredBuilderChildren(
+  appendErasedDeclaredBuilderChildren(
     from: view,
     into: &children
   )

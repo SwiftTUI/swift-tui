@@ -104,7 +104,7 @@ func assertRenderedTextFixtures<Content: View>(
     )
     return
   }
-  let rootView = composedFixtureRoot(from: declaredBuilderChildren(from: view()))
+  let rootView = composedFixtureRoot(from: erasedDeclaredBuilderChildren(from: view()))
 
   let fixtureRootDirectory =
     fixtureDirectory
@@ -415,14 +415,10 @@ private func sanitizePathComponent(
 private func composedFixtureRoot(
   from children: [AnyView]
 ) -> AnyView {
-  switch children.count {
-  case 0:
-    AnyView(EmptyView())
-  case 1:
-    children[0]
-  default:
-    AnyView(Group(children: children))
-  }
+  combinedView(
+    from: children,
+    kindName: "Group"
+  )
 }
 
 private enum RenderedTextFixtureIssue: Error, CustomStringConvertible {

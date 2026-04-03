@@ -2,9 +2,7 @@ package import Core
 
 /// The builder artifact produced by array-like view composition such as
 /// `ForEach` expansion or `buildArray` support.
-public struct VariadicView<Content: View>: View, ResolvableView, BuilderCompositeView,
-  DeclaredChildrenView
-{
+public struct VariadicView<Content: View>: View, ResolvableView, DeclaredChildrenView {
   package let content: [Content]
 
   package init(
@@ -15,10 +13,6 @@ public struct VariadicView<Content: View>: View, ResolvableView, BuilderComposit
 
   public var body: Never {
     fatalError("VariadicView is a builder composition artifact.")
-  }
-
-  package var builderChildren: [AnyView] {
-    content.flatMap { declaredBuilderChildren(from: $0) }
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -42,6 +36,17 @@ public struct VariadicView<Content: View>: View, ResolvableView, BuilderComposit
         kindName: kindName,
         nextIndex: &nextIndex,
         into: &resolved
+      )
+    }
+  }
+
+  package func appendErasedDeclaredChildren(
+    into children: inout [AnyView]
+  ) {
+    for element in content {
+      appendErasedDeclaredBuilderChildren(
+        from: element,
+        into: &children
       )
     }
   }

@@ -705,7 +705,7 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
             backdropOpacity: 0.7,
             actionViews: [],
             messageViews: [],
-            contentViews: declaredBuilderChildren(from: paletteSheet(for: registrations)),
+            contentViews: erasedDeclaredBuilderChildren(from: paletteSheet(for: registrations)),
             dismiss: { [isPresented] in
               isPresented.wrappedValue = false
               query = ""

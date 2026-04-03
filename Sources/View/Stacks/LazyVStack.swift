@@ -16,16 +16,6 @@ public struct LazyVStack<Content: View>: View, ResolvableView {
     self.content = content()
   }
 
-  package init(
-    alignment: HorizontalAlignment = .center,
-    spacing: Int? = nil,
-    children: [AnyView]
-  ) where Content == VariadicView<AnyView> {
-    self.alignment = alignment
-    self.spacing = spacing
-    content = VariadicView(children)
-  }
-
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let stackContext = context.settingEnvironment(\.stackAxis, to: .vertical)
     let childContext = stackContext.indexedChild(

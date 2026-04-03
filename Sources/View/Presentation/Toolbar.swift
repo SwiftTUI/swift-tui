@@ -120,8 +120,8 @@ private struct ToolbarModifier<Content: View, Leading: View, Trailing: View>:
             attachmentIdentity: node.identity,
             placement: placement,
             style: context.environmentValues.toolbarStyle,
-            leadingViews: declaredBuilderChildren(from: leading),
-            trailingViews: declaredBuilderChildren(from: trailing)
+            leadingViews: erasedDeclaredBuilderChildren(from: leading),
+            trailingViews: erasedDeclaredBuilderChildren(from: trailing)
           )
         ]
       )
@@ -151,7 +151,7 @@ private struct ToolbarItemModifier<Content: View, Item: View>: View, ResolvableV
             placement: placement,
             alignment: alignment,
             isEnabled: isEnabled,
-            itemViews: declaredBuilderChildren(from: item)
+            itemViews: erasedDeclaredBuilderChildren(from: item)
           )
         ]
       )

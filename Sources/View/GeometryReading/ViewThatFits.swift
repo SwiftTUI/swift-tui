@@ -13,14 +13,6 @@ public struct ViewThatFits<Content: View>: View, ResolvableView {
     self.content = content()
   }
 
-  package init(
-    in axes: Axis.Set = [.horizontal, .vertical],
-    children: [AnyView]
-  ) where Content == VariadicView<AnyView> {
-    self.axes = axes
-    content = VariadicView(children)
-  }
-
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let resolvedChildren = resolveDeclaredChildren(
       content,
