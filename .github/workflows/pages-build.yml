@@ -113,7 +113,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: Examples/WebExample/dist
+          path: Examples/WebExample/pages-dist
 
   deploy-pages:
     name: Deploy GitHub Pages

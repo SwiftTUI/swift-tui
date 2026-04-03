@@ -25,5 +25,5 @@ export const defaultStyle: WebTUITerminalStyle = {
   backgroundOpacity: 0.94,
 };
 
-export const terminalAppManifestPath = "/TerminalApp/dist/scene-manifest.json";
-export const terminalAppWasmPath = "/TerminalApp/dist/assets/app.wasm";
+export const terminalAppManifestPath = "./TerminalApp/dist/scene-manifest.json";
+export const terminalAppWasmPath = "./TerminalApp/dist/assets/app.wasm";

@@ -16,8 +16,15 @@ import {
   type WasmSceneResizeEvent,
 } from "./scene-runtime.ts";
 
-const terminalAppManifestUrl = new URL(terminalAppManifestPath, location.href);
-const terminalAppWasmUrl = new URL(terminalAppWasmPath, location.href);
+declare global {
+  interface Window {
+    coi?: Record<string, unknown>;
+  }
+}
+
+const coiServiceWorkerUrl = new URL("./coi-serviceworker.js", import.meta.url);
+const terminalAppManifestUrl = new URL(terminalAppManifestPath, import.meta.url);
+const terminalAppWasmUrl = new URL(terminalAppWasmPath, import.meta.url);
 const minimumFrameWidth = 320;
 const minimumFrameHeight = 240;
 const backtabSequence = new TextEncoder().encode("\u001B[Z");
@@ -100,7 +107,60 @@ struct DeployApp: App {
   }
 }`;
 
-await bootstrap();
+if (await ensureCrossOriginIsolation()) {
+  await bootstrap();
+}
+
+async function ensureCrossOriginIsolation(): Promise<boolean> {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  if (window.crossOriginIsolated !== false) {
+    return true;
+  }
+
+  if (!window.isSecureContext || !("serviceWorker" in navigator)) {
+    return true;
+  }
+
+  const root = document.querySelector<HTMLDivElement>("#root");
+  if (root) {
+    root.innerHTML = `
+      <div class="page-shell">
+        <main class="marketing-site">
+          <section class="hero" id="top">
+            <div class="hero-copy">
+              <p class="eyebrow">Preparing browser runtime</p>
+              <h1>Enabling cross-origin isolation…</h1>
+              <p class="hero-lede">
+                GitHub Pages cannot set the COOP/COEP headers this demo needs, so the page is
+                installing a small service worker workaround and will reload once it is ready.
+              </p>
+            </div>
+          </section>
+        </main>
+      </div>
+    `;
+  }
+
+  window.coi = {
+    ...(window.coi ?? {}),
+    quiet: true,
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = coiServiceWorkerUrl.href;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("failed to load COI service worker helper"));
+    document.head.append(script);
+  });
+
+  await new Promise((resolve) => window.setTimeout(resolve, 50));
+  return window.crossOriginIsolated !== false;
+}
 
 async function bootstrap(): Promise<void> {
   const root = document.querySelector<HTMLDivElement>("#root");
