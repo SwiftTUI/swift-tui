@@ -1,0 +1,192 @@
+name: Examples Linux Build + Web Pages
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-examples:
+    name: Build ${{ matrix.example }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - gallery
+          - todoist
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache swiftly toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/swiftly
+            ~/.swiftly
+          key: ${{ runner.os }}-swiftly-6.4-v1
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-${{ matrix.example }}-${{ hashFiles(format('Examples/{0}/Package.resolved', matrix.example)) }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-${{ matrix.example }}-
+
+      - name: Install/activate Swift 6.4 via swiftly
+        shell: bash
+        run: |
+          set -euo pipefail
+          if swift --version 2>/dev/null | grep -q "Swift version 6.4"; then
+            echo "Swift 6.4 already available on runner"
+            exit 0
+          fi
+
+          if ! command -v swiftly >/dev/null 2>&1; then
+            curl -O https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz
+            tar zxf swiftly-$(uname -m).tar.gz
+            ./swiftly init --quiet-shell-followup
+          fi
+
+          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+          hash -r
+
+          if ! swiftly list | grep -q "6.4"; then
+            swiftly install 6.4
+          fi
+          swiftly use 6.4
+          swiftly run swift --version
+
+      - name: Build example package
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh" ]; then
+            . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+            hash -r
+          fi
+          swiftly run swift build --package-path "Examples/${{ matrix.example }}"
+
+  build-web-example:
+    name: Build WebExample
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache swiftly toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/swiftly
+            ~/.swiftly
+          key: ${{ runner.os }}-swiftly-6.4-v1
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-webexample-${{ hashFiles('Examples/WebExample/TerminalApp/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-webexample-
+
+      - name: Cache Bun deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            Examples/WebExample/node_modules
+          key: ${{ runner.os }}-bun-webexample-${{ hashFiles('Examples/WebExample/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-webexample-
+
+      - name: Install/activate Swift 6.4 via swiftly
+        shell: bash
+        run: |
+          set -euo pipefail
+          if swift --version 2>/dev/null | grep -q "Swift version 6.4"; then
+            echo "Swift 6.4 already available on runner"
+          else
+            if ! command -v swiftly >/dev/null 2>&1; then
+              curl -O https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz
+              tar zxf swiftly-$(uname -m).tar.gz
+              ./swiftly init --quiet-shell-followup
+            fi
+
+            . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+            hash -r
+
+            if ! swiftly list | grep -q "6.4"; then
+              swiftly install 6.4
+            fi
+            swiftly use 6.4
+          fi
+
+          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+          hash -r
+          swiftly run swift --version
+
+      - name: Install wasm Swift SDK used by WebExample
+        shell: bash
+        run: |
+          set -euo pipefail
+          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+          hash -r
+
+          if ! swiftly run swift sdk list | grep -q "swift-6.3-RELEASE_wasm"; then
+            swiftly run swift sdk install swift-6.3-RELEASE_wasm
+          fi
+
+      - name: Build WebExample
+        shell: bash
+        working-directory: Examples/WebExample
+        run: |
+          set -euo pipefail
+          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+          hash -r
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: Examples/WebExample/dist
+
+  deploy-pages:
+    name: Deploy GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - build-examples
+      - build-web-example
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
