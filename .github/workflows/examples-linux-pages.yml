@@ -31,7 +31,7 @@ jobs:
           path: |
             ~/.local/share/swiftly
             ~/.swiftly
-          key: ${{ runner.os }}-swiftly-6.4-v1
+          key: ${{ runner.os }}-swiftly-6.3.0-v1
 
       - name: Cache SwiftPM
         uses: actions/cache@v4
@@ -43,12 +43,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-swiftpm-${{ matrix.example }}-
 
-      - name: Install/activate Swift 6.4 via swiftly
+      - name: Install/activate Swift 6.3.0 via swiftly
         shell: bash
         run: |
           set -euo pipefail
-          if swift --version 2>/dev/null | grep -q "Swift version 6.4"; then
-            echo "Swift 6.4 already available on runner"
+          if swift --version 2>/dev/null | grep -q "Swift version 6.3.0"; then
+            echo "Swift 6.3.0 already available on runner"
             exit 0
           fi
 
@@ -61,10 +61,10 @@ jobs:
           . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
           hash -r
 
-          if ! swiftly list | grep -q "6.4"; then
-            swiftly install 6.4
+          if ! swiftly list | grep -q "6.3.0"; then
+            swiftly install 6.3.0
           fi
-          swiftly use 6.4
+          swiftly use 6.3.0
           swiftly run swift --version
 
       - name: Build example package
@@ -96,7 +96,7 @@ jobs:
           path: |
             ~/.local/share/swiftly
             ~/.swiftly
-          key: ${{ runner.os }}-swiftly-6.4-v1
+          key: ${{ runner.os }}-swiftly-6.3.0-v1
 
       - name: Cache SwiftPM
         uses: actions/cache@v4
@@ -118,12 +118,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-webexample-
 
-      - name: Install/activate Swift 6.4 via swiftly
+      - name: Install/activate Swift 6.3.0 via swiftly
         shell: bash
         run: |
           set -euo pipefail
-          if swift --version 2>/dev/null | grep -q "Swift version 6.4"; then
-            echo "Swift 6.4 already available on runner"
+          if swift --version 2>/dev/null | grep -q "Swift version 6.3.0"; then
+            echo "Swift 6.3.0 already available on runner"
           else
             if ! command -v swiftly >/dev/null 2>&1; then
               curl -O https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz
@@ -134,10 +134,10 @@ jobs:
             . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
             hash -r
 
-            if ! swiftly list | grep -q "6.4"; then
-              swiftly install 6.4
+            if ! swiftly list | grep -q "6.3.0"; then
+              swiftly install 6.3.0
             fi
-            swiftly use 6.4
+            swiftly use 6.3.0
           fi
 
           . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
