@@ -1,6 +1,10 @@
 import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { buildAppWasm, copyGhosttyWasmAsset, generateSceneManifest } from "webtuigui";
+import {
+  buildAppWasm,
+  copyGhosttyWasmAsset,
+  generateSceneManifest,
+} from "../../../GUI/WebTUIGUI/index.ts";
 
 const packagePath = resolve(import.meta.dir, "../TerminalApp");
 const outputDirectory = resolve(import.meta.dir, "../TerminalApp/dist");

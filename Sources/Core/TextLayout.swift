@@ -1,3 +1,5 @@
+import DequeModule
+
 /// A single rendered text cluster and the number of terminal cells it occupies.
 public struct TextCluster: Equatable, Sendable {
   public var character: Character
@@ -58,6 +60,16 @@ package final class TextLayoutCache: @unchecked Sendable {
     let options: TextLayoutOptions
   }
 
+  private struct CacheEntry: Sendable {
+    var result: TextLayoutResult
+    var generation: UInt64
+  }
+
+  private struct AccessRecord: Sendable {
+    let key: Key
+    let generation: UInt64
+  }
+
   package struct Metrics: Equatable, Sendable {
     package var entries: Int
     package var lookups: Int
@@ -84,13 +96,14 @@ package final class TextLayoutCache: @unchecked Sendable {
   }
 
   private struct Storage {
-    var entries: [Key: TextLayoutResult] = [:]
-    var order: [Key] = []
+    var entries: [Key: CacheEntry] = [:]
+    var order: Deque<AccessRecord> = []
     var lookups = 0
     var hits = 0
     var misses = 0
     var stores = 0
     var evictions = 0
+    var nextGeneration: UInt64 = 0
   }
 
   package static let shared = TextLayoutCache()
@@ -124,6 +137,7 @@ package final class TextLayoutCache: @unchecked Sendable {
       storage.misses = 0
       storage.stores = 0
       storage.evictions = 0
+      storage.nextGeneration = 0
     }
   }
 
@@ -135,13 +149,16 @@ package final class TextLayoutCache: @unchecked Sendable {
 
     if let cached = storage.withLock({ storage -> TextLayoutResult? in
       storage.lookups += 1
-      guard let cached = storage.entries[key] else {
+      guard var cached = storage.entries[key] else {
         storage.misses += 1
         return nil
       }
       storage.hits += 1
-      promote(key, in: &storage)
-      return cached
+      let generation = nextGeneration(in: &storage)
+      cached.generation = generation
+      storage.entries[key] = cached
+      storage.order.append(.init(key: key, generation: generation))
+      return cached.result
     }) {
       return cached
     }
@@ -152,37 +169,48 @@ package final class TextLayoutCache: @unchecked Sendable {
     )
 
     return storage.withLock { storage in
-      if let cached = storage.entries[key] {
+      if var cached = storage.entries[key] {
         storage.hits += 1
-        promote(key, in: &storage)
-        return cached
+        let generation = nextGeneration(in: &storage)
+        cached.generation = generation
+        storage.entries[key] = cached
+        storage.order.append(.init(key: key, generation: generation))
+        return cached.result
       }
 
       storage.stores += 1
-      storage.entries[key] = result
-      storage.order.append(key)
+      let generation = nextGeneration(in: &storage)
+      storage.entries[key] = .init(
+        result: result,
+        generation: generation
+      )
+      storage.order.append(.init(key: key, generation: generation))
       evictIfNeeded(in: &storage)
       return result
     }
   }
 
-  private func promote(
-    _ key: Key,
+  private func nextGeneration(
     in storage: inout Storage
-  ) {
-    guard let index = storage.order.firstIndex(of: key) else {
-      return
-    }
-    storage.order.remove(at: index)
-    storage.order.append(key)
+  ) -> UInt64 {
+    storage.nextGeneration &+= 1
+    return storage.nextGeneration
   }
 
   private func evictIfNeeded(
     in storage: inout Storage
   ) {
-    while storage.order.count > capacity {
-      let victim = storage.order.removeFirst()
-      storage.entries.removeValue(forKey: victim)
+    while storage.entries.count > capacity {
+      guard let victim = storage.order.popFirst() else {
+        break
+      }
+      guard let entry = storage.entries[victim.key] else {
+        continue
+      }
+      guard entry.generation == victim.generation else {
+        continue
+      }
+      storage.entries.removeValue(forKey: victim.key)
       storage.evictions += 1
     }
   }

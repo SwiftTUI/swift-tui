@@ -139,14 +139,14 @@ public struct LayoutEngine {
       retainedLayout: passContext?.retainedLayout,
       hasInvalidatedIndexedDescendant: hasInvalidatedIndexedDescendant
     ) {
-      passContext?.workMetrics.measuredNodesReused += countMeasuredNodes(retained)
+      passContext?.workMetrics.measuredNodesReused += retained.subtreeNodeCount
       return retained
     }
 
     if !hasInvalidatedIndexedDescendant,
       let cached = cache?.lookup(resolved: resolved, proposal: proposal)
     {
-      passContext?.workMetrics.measuredNodesReused += countMeasuredNodes(cached)
+      passContext?.workMetrics.measuredNodesReused += cached.subtreeNodeCount
       return cached
     }
 
@@ -265,7 +265,7 @@ public struct LayoutEngine {
       viewportContext: viewportContext,
       retainedLayout: passContext?.retainedLayout
     ) {
-      passContext?.workMetrics.placedNodesReused += countPlacedNodes(retained)
+      passContext?.workMetrics.placedNodesReused += retained.subtreeNodeCount
       return retained
     }
 
@@ -996,12 +996,6 @@ public struct LayoutEngine {
     resolved.supportsRetainedReuse
   }
 
-  private func countMeasuredNodes(
-    _ node: MeasuredNode
-  ) -> Int {
-    1 + node.childMeasurements.reduce(0) { $0 + countMeasuredNodes($1) }
-  }
-
   private func storedChildMeasurements(
     for resolved: ResolvedNode,
     measuredChildren: [MeasuredNode]
@@ -1012,13 +1006,6 @@ public struct LayoutEngine {
 
     return []
   }
-
-  private func countPlacedNodes(
-    _ node: PlacedNode
-  ) -> Int {
-    1 + node.children.reduce(0) { $0 + countPlacedNodes($1) }
-  }
-
   // MARK: - Inset helpers
 
   private func inset(

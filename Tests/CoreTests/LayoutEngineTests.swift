@@ -605,7 +605,6 @@ struct LayoutEngineTests {
       commitPlan: .init()
     )
     let retainedLayout = RetainedLayoutSession(
-      previousFrame: previousFrame,
       previousFrameIndex: .init(frame: previousFrame),
       invalidatedIdentities: []
     )

@@ -237,7 +237,7 @@ package func resolveView<V: View>(
       )
     }
     context.recordResolvedReuse(
-      count: resolvedNodeCount(in: reused)
+      count: reused.subtreeNodeCount
     )
     return reused
   }
@@ -285,13 +285,4 @@ package func resolveView<V: View>(
     )
   }
   return resolved
-}
-
-@MainActor
-private func resolvedNodeCount(
-  in node: ResolvedNode
-) -> Int {
-  1 + node.children.reduce(into: 0) { partialResult, child in
-    partialResult += resolvedNodeCount(in: child)
-  }
 }

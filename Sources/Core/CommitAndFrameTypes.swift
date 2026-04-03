@@ -302,17 +302,14 @@ package struct RetainedInvalidationSummary: Sendable {
 
 package struct RetainedLayoutSession: Sendable {
   package var invalidatedIdentities: Set<Identity>
-  package let previousFrame: FrameArtifacts?
   package let previousFrameIndex: RetainedFrameIndex?
   package let invalidationSummary: RetainedInvalidationSummary
 
   package init(
-    previousFrame: FrameArtifacts?,
     previousFrameIndex: RetainedFrameIndex?,
     invalidatedIdentities: Set<Identity>
   ) {
     self.invalidatedIdentities = invalidatedIdentities
-    self.previousFrame = previousFrame
     self.previousFrameIndex = previousFrameIndex
     invalidationSummary = RetainedInvalidationSummary(
       invalidatedIdentities: invalidatedIdentities,
@@ -614,16 +611,16 @@ extension FrameDiagnostics {
     Self(
       proposal: measured.proposal,
       invalidatedIdentities: invalidatedIdentities,
-      resolvedNodeCount: countResolvedNodes(resolved),
-      measuredNodeCount: countMeasuredNodes(measured),
-      placedNodeCount: countPlacedNodes(placed),
+      resolvedNodeCount: resolved.subtreeNodeCount,
+      measuredNodeCount: measured.subtreeNodeCount,
+      placedNodeCount: placed.subtreeNodeCount,
       resolvedNodesComputed: resolveWork?.resolvedNodesComputed ?? 0,
       resolvedNodesReused: resolveWork?.resolvedNodesReused ?? 0,
       measuredNodesComputed: layoutWork?.measuredNodesComputed ?? 0,
       measuredNodesReused: layoutWork?.measuredNodesReused ?? 0,
       placedNodesComputed: layoutWork?.placedNodesComputed ?? 0,
       placedNodesReused: layoutWork?.placedNodesReused ?? 0,
-      drawNodeCount: countDrawNodes(draw),
+      drawNodeCount: draw.subtreeNodeCount,
       interactionRegionCount: semantics.interactionRegions.count,
       focusRegionCount: semantics.focusRegions.count,
       scrollRouteCount: semantics.scrollRoutes.count,
@@ -631,29 +628,5 @@ extension FrameDiagnostics {
       phaseTimings: phaseTimings,
       measurementCache: measurementCache
     )
-  }
-
-  private static func countResolvedNodes(
-    _ node: ResolvedNode
-  ) -> Int {
-    1 + node.children.reduce(0) { $0 + countResolvedNodes($1) }
-  }
-
-  private static func countMeasuredNodes(
-    _ node: MeasuredNode
-  ) -> Int {
-    1 + node.childMeasurements.reduce(0) { $0 + countMeasuredNodes($1) }
-  }
-
-  private static func countPlacedNodes(
-    _ node: PlacedNode
-  ) -> Int {
-    1 + node.children.reduce(0) { $0 + countPlacedNodes($1) }
-  }
-
-  private static func countDrawNodes(
-    _ node: DrawNode
-  ) -> Int {
-    1 + node.children.reduce(0) { $0 + countDrawNodes($1) }
   }
 }

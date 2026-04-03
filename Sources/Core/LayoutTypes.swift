@@ -322,8 +322,13 @@ public struct MeasuredNode: Equatable, Sendable {
   public var identity: Identity
   public var proposal: ProposedSize
   public var measuredSize: Size
-  public var childMeasurements: [MeasuredNode]
+  public var childMeasurements: [MeasuredNode] {
+    didSet {
+      recomputeSubtreeNodeCount()
+    }
+  }
   public var containerAllocationSnapshot: ContainerAllocationSnapshot?
+  package private(set) var subtreeNodeCount: Int
 
   public init(
     identity: Identity,
@@ -337,6 +342,12 @@ public struct MeasuredNode: Equatable, Sendable {
     self.measuredSize = measuredSize
     self.childMeasurements = childMeasurements
     self.containerAllocationSnapshot = containerAllocationSnapshot
+    subtreeNodeCount = 1
+    recomputeSubtreeNodeCount()
+  }
+
+  private mutating func recomputeSubtreeNodeCount() {
+    subtreeNodeCount = 1 + childMeasurements.reduce(0) { $0 + $1.subtreeNodeCount }
   }
 }
 

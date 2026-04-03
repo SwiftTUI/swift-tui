@@ -3,21 +3,18 @@
 
 @MainActor
 private final class RetainedFrameStore {
-  private var previousFrame: FrameArtifacts?
   private var previousFrameIndex: RetainedFrameIndex?
 
   func layoutSession(
     invalidatedIdentities: Set<Identity>
   ) -> RetainedLayoutSession {
     RetainedLayoutSession(
-      previousFrame: previousFrame,
       previousFrameIndex: previousFrameIndex,
       invalidatedIdentities: invalidatedIdentities
     )
   }
 
   func store(_ artifacts: FrameArtifacts) {
-    previousFrame = artifacts
     previousFrameIndex = .init(frame: artifacts)
   }
 }

@@ -179,6 +179,7 @@ public struct ResolvedNode: Equatable, Sendable {
   public var children: [ResolvedNode] {
     didSet {
       recomputePreferenceValues()
+      recomputeSubtreeNodeCount()
       recomputeSupportsRetainedReuse()
     }
   }
@@ -201,6 +202,7 @@ public struct ResolvedNode: Equatable, Sendable {
     }
   }
   package var preferenceValues: PreferenceValues
+  package private(set) var subtreeNodeCount: Int
   public var supportsRetainedReuse: Bool
 
   public init(
@@ -231,7 +233,9 @@ public struct ResolvedNode: Equatable, Sendable {
     self.intrinsicSize = intrinsicSize
     self.indexedChildSource = nil
     preferenceValues = Self.combinedPreferenceValues(for: children)
+    subtreeNodeCount = 1
     self.supportsRetainedReuse = true
+    recomputeSubtreeNodeCount()
     recomputeSupportsRetainedReuse()
   }
 
@@ -264,12 +268,18 @@ public struct ResolvedNode: Equatable, Sendable {
     self.intrinsicSize = intrinsicSize
     self.indexedChildSource = indexedChildSource
     preferenceValues = Self.combinedPreferenceValues(for: children)
+    subtreeNodeCount = 1
     self.supportsRetainedReuse = true
+    recomputeSubtreeNodeCount()
     recomputeSupportsRetainedReuse()
   }
 
   private mutating func recomputePreferenceValues() {
     preferenceValues = Self.combinedPreferenceValues(for: children)
+  }
+
+  private mutating func recomputeSubtreeNodeCount() {
+    subtreeNodeCount = 1 + children.reduce(0) { $0 + $1.subtreeNodeCount }
   }
 
   private mutating func recomputeSupportsRetainedReuse() {
@@ -337,10 +347,6 @@ public struct ResolvedNode: Equatable, Sendable {
       }
     }
     return nil
-  }
-
-  package var subtreeNodeCount: Int {
-    1 + children.reduce(0) { $0 + $1.subtreeNodeCount }
   }
 
   package func collectIdentities(into identities: inout [Identity]) {
@@ -447,13 +453,18 @@ public struct PlacedNode: Equatable, Sendable {
   public var contentBounds: Rect
   public var clipBounds: Rect?
   public var zIndex: Double
-  public var children: [PlacedNode]
+  public var children: [PlacedNode] {
+    didSet {
+      recomputeSubtreeNodeCount()
+    }
+  }
   public var semanticRole: SemanticRole
   public var layoutMetadata: LayoutMetadata
   public var drawMetadata: DrawMetadata
   public var semanticMetadata: SemanticMetadata
   public var lifecycleMetadata: LifecycleMetadata
   public var drawPayload: DrawPayload
+  package private(set) var subtreeNodeCount: Int
 
   public init(
     identity: Identity,
@@ -485,6 +496,12 @@ public struct PlacedNode: Equatable, Sendable {
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
+    subtreeNodeCount = 1
+    recomputeSubtreeNodeCount()
+  }
+
+  private mutating func recomputeSubtreeNodeCount() {
+    subtreeNodeCount = 1 + children.reduce(0) { $0 + $1.subtreeNodeCount }
   }
 
   package func collectLifecycleNodes(
@@ -654,7 +671,12 @@ public struct DrawNode: Equatable, Sendable {
   public var clipBounds: Rect?
   public var metadata: DrawMetadata
   public var commands: [DrawCommand]
-  public var children: [DrawNode]
+  public var children: [DrawNode] {
+    didSet {
+      recomputeSubtreeNodeCount()
+    }
+  }
+  package private(set) var subtreeNodeCount: Int
 
   public init(
     identity: Identity,
@@ -672,5 +694,11 @@ public struct DrawNode: Equatable, Sendable {
     self.metadata = metadata
     self.commands = commands
     self.children = children
+    subtreeNodeCount = 1
+    recomputeSubtreeNodeCount()
+  }
+
+  private mutating func recomputeSubtreeNodeCount() {
+    subtreeNodeCount = 1 + children.reduce(0) { $0 + $1.subtreeNodeCount }
   }
 }
