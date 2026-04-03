@@ -1,6 +1,9 @@
 import Core
-import Dispatch
 import Synchronization
+
+#if canImport(Dispatch)
+  @unsafe @preconcurrency import Dispatch
+#endif
 
 #if canImport(Darwin)
   package import Darwin
@@ -42,7 +45,7 @@ import Synchronization
     _ buffer: UnsafeRawPointer?,
     _ count: Int
   ) -> Int {
-    Glibc.write(fileDescriptor, buffer, count)
+    unsafe Glibc.write(fileDescriptor, buffer, count)
   }
 
   private func platformRead(
@@ -50,7 +53,7 @@ import Synchronization
     _ buffer: UnsafeMutableRawPointer?,
     _ count: Int
   ) -> Int {
-    Glibc.read(fileDescriptor, buffer, count)
+    unsafe Glibc.read(fileDescriptor, buffer, count)
   }
 
   private func platformPoll(
@@ -58,7 +61,7 @@ import Synchronization
     _ count: nfds_t,
     _ timeoutMilliseconds: Int32
   ) -> Int32 {
-    Glibc.poll(descriptors, count, timeoutMilliseconds)
+    unsafe Glibc.poll(descriptors, count, timeoutMilliseconds)
   }
 #elseif canImport(Android)
   private func platformWrite(
@@ -66,7 +69,7 @@ import Synchronization
     _ buffer: UnsafeRawPointer?,
     _ count: Int
   ) -> Int {
-    Android.write(fileDescriptor, buffer, count)
+    unsafe Android.write(fileDescriptor, buffer, count)
   }
 
   private func platformRead(
@@ -74,7 +77,7 @@ import Synchronization
     _ buffer: UnsafeMutableRawPointer?,
     _ count: Int
   ) -> Int {
-    Android.read(fileDescriptor, buffer, count)
+    unsafe Android.read(fileDescriptor, buffer, count)
   }
 
   private func platformPoll(
@@ -82,7 +85,7 @@ import Synchronization
     _ count: nfds_t,
     _ timeoutMilliseconds: Int32
   ) -> Int32 {
-    Android.poll(descriptors, count, timeoutMilliseconds)
+    unsafe Android.poll(descriptors, count, timeoutMilliseconds)
   }
 #elseif canImport(WASILibc)
   private func platformWrite(
@@ -90,7 +93,7 @@ import Synchronization
     _ buffer: UnsafeRawPointer?,
     _ count: Int
   ) -> Int {
-    Int(WASILibc.write(fileDescriptor, buffer, count))
+    Int(unsafe WASILibc.write(fileDescriptor, buffer, count))
   }
 #endif
 

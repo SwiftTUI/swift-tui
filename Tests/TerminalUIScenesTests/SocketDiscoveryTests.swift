@@ -62,31 +62,14 @@ struct SocketDiscoveryTests {
       atPath: (server.socketPath as NSString).deletingLastPathComponent,
       withIntermediateDirectories: true
     )
-    let staleFD = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+    let staleFD = sceneSocket()
     #expect(staleFD >= 0)
 
-    var addr = sockaddr_un()
-    addr.sun_family = sa_family_t(AF_UNIX)
-    let sunPathSize = MemoryLayout.size(ofValue: addr.sun_path)
-    unsafe withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
-      unsafe server.socketPath.withCString { cstr in
-        _ = unsafe Darwin.strncpy(
-          unsafe UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
-          cstr,
-          sunPathSize - 1
-        )
-      }
-    }
+    var addr = sceneSocketAddress(for: server.socketPath)
 
-    let bindResult = unsafe withUnsafePointer(to: &addr) {
-      unsafe Darwin.bind(
-        staleFD,
-        unsafe UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
-        socklen_t(MemoryLayout<sockaddr_un>.size)
-      )
-    }
+    let bindResult = sceneBind(staleFD, &addr)
     #expect(bindResult == 0)
-    Darwin.close(staleFD)
+    sceneClose(staleFD)
 
     let task = Task {
       try await server.run()

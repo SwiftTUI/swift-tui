@@ -53,11 +53,11 @@
     /// Scans the socket directory for live instances, removes stale sockets.
     static func discoverInstances(appName: String) -> [InstanceInfo] {
       let dir = "/tmp/terminalui/\(appName)"
-      guard let dp = unsafe Darwin.opendir(dir) else { return [] }
-      defer { unsafe Darwin.closedir(dp) }
+      guard let dp = unsafe sceneOpenDirectory(dir) else { return [] }
+      defer { unsafe sceneCloseDirectory(dp) }
 
       var instances: [DiscoveredInstance] = []
-      while let entry = unsafe Darwin.readdir(dp) {
+      while let entry = unsafe sceneReadDirectory(dp) {
         let entryName = unsafe withUnsafePointer(to: entry.pointee.d_name) { ptr in
           unsafe String(
             cString: unsafe UnsafeRawPointer(ptr).assumingMemoryBound(to: CChar.self)
@@ -84,7 +84,7 @@
           )
         } else {
           // Remove stale socket
-          _ = unsafe Darwin.unlink(socketPath)
+          _ = sceneUnlink(socketPath)
         }
       }
       return
@@ -123,41 +123,25 @@
     /// Connects to a socket, sends a request line, reads the response.
     static func sendRequest(socketPath: String, request: String) throws(SocketClientError) -> String
     {
-      let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+      let fd = sceneSocket()
       guard fd >= 0 else { throw .connectionFailed(errno) }
-      defer { Darwin.close(fd) }
+      defer { sceneClose(fd) }
 
-      var addr = sockaddr_un()
-      addr.sun_family = sa_family_t(AF_UNIX)
-      let sunPathSize = MemoryLayout.size(ofValue: addr.sun_path)
-      unsafe withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
-        unsafe socketPath.withCString { cstr in
-          _ = unsafe Darwin.strncpy(
-            unsafe UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
-            cstr,
-            sunPathSize - 1
-          )
-        }
-      }
+      var addr = sceneSocketAddress(for: socketPath)
 
-      let connectResult = unsafe withUnsafePointer(to: &addr) {
-        unsafe Darwin.connect(
-          fd,
-          unsafe UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
-          socklen_t(MemoryLayout<sockaddr_un>.size))
-      }
+      let connectResult = sceneConnect(fd, &addr)
       guard connectResult == 0 else { throw .connectionFailed(errno) }
 
       // Send request
       let sent = unsafe request.withCString { ptr in
         let byteCount = unsafe strlen(ptr)
-        return unsafe Darwin.write(fd, ptr, byteCount)
+        return unsafe sceneWrite(fd, ptr, byteCount)
       }
       guard sent > 0 else { throw .sendFailed(errno) }
 
       // Read response (up to 64 KB)
       var buffer = [UInt8](repeating: 0, count: 65536)
-      let bytesRead = unsafe Darwin.read(fd, &buffer, 65536)
+      let bytesRead = unsafe sceneRead(fd, &buffer, 65536)
       guard bytesRead > 0 else { throw .readFailed(errno) }
       return String(decoding: buffer.prefix(bytesRead), as: UTF8.self)
     }
@@ -165,29 +149,13 @@
     // MARK: - Private helpers
 
     private static func isSocketLive(_ path: String) -> Bool {
-      let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+      let fd = sceneSocket()
       guard fd >= 0 else { return false }
-      defer { Darwin.close(fd) }
+      defer { sceneClose(fd) }
 
-      var addr = sockaddr_un()
-      addr.sun_family = sa_family_t(AF_UNIX)
-      let sunPathSize = MemoryLayout.size(ofValue: addr.sun_path)
-      unsafe withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
-        unsafe path.withCString { cstr in
-          _ = unsafe Darwin.strncpy(
-            unsafe UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
-            cstr,
-            sunPathSize - 1
-          )
-        }
-      }
+      var addr = sceneSocketAddress(for: path)
 
-      let result = unsafe withUnsafePointer(to: &addr) {
-        unsafe Darwin.connect(
-          fd,
-          unsafe UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
-          socklen_t(MemoryLayout<sockaddr_un>.size))
-      }
+      let result = sceneConnect(fd, &addr)
       return result == 0
     }
 

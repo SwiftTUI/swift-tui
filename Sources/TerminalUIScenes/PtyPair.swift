@@ -33,11 +33,16 @@
       let fd = masterFD
       guard fd >= 0 else { return false }
 
-      var byte: UInt8 = 0
-      let result = unsafe withUnsafePointer(to: &byte) { ptr in
-        unsafe Darwin.write(fd, ptr, 0)
-      }
-      return result == 0
+      // PTY masters report a hangup when no slave is attached. That signal is
+      // stable across Darwin and Linux, unlike zero-byte writes.
+      var descriptor = pollfd(
+        fd: fd,
+        events: Int16(POLLHUP | POLLOUT),
+        revents: 0
+      )
+      let result = unsafe poll(&descriptor, 1, 0)
+      guard result > 0 else { return false }
+      return (descriptor.revents & Int16(POLLHUP)) == 0
     }
 
     init() throws(PtyError) {
@@ -50,25 +55,14 @@
 
       // We only need the slave path, not the slave fd — clients open it themselves.
       // Read the path before closing the slave fd.
-      let pathBuffer = UnsafeMutablePointer<CChar>.allocate(capacity: 1024)
-      defer { unsafe pathBuffer.deallocate() }
-
-      #if canImport(Darwin)
-        let pathResult = unsafe ptsname_r(masterFD, pathBuffer, 1024)
-      #elseif canImport(Glibc)
-        let pathResult = unsafe ptsname_r(masterFD, pathBuffer, 1024)
-      #endif
-
-      guard pathResult == 0 else {
-        Darwin.close(masterFD)
-        Darwin.close(slaveFD)
+      guard let slavePath = sceneTTYName(slaveFD) else {
+        sceneClose(masterFD)
+        sceneClose(slaveFD)
         throw .slavePathUnavailable
       }
 
-      let slavePath = unsafe String(cString: pathBuffer)
-
       // Close the slave fd — clients will open the slave path themselves.
-      Darwin.close(slaveFD)
+      sceneClose(slaveFD)
 
       self._masterFD = Mutex(masterFD)
       self.slavePath = slavePath
@@ -81,7 +75,7 @@
         return current
       }
       if fd >= 0 {
-        Darwin.close(fd)
+        sceneClose(fd)
       }
     }
 
@@ -92,7 +86,7 @@
         return current
       }
       if fd >= 0 {
-        Darwin.close(fd)
+        sceneClose(fd)
       }
     }
   }

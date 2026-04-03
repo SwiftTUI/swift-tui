@@ -659,10 +659,10 @@ struct TerminalPresentationTests {
     var didCloseWriteDescriptor = false
     defer {
       if !didCloseReadDescriptor {
-        _ = Darwin.close(readDescriptor)
+        _ = close(readDescriptor)
       }
       if !didCloseWriteDescriptor {
-        _ = Darwin.close(writeDescriptor)
+        _ = close(writeDescriptor)
       }
     }
 
@@ -682,7 +682,7 @@ struct TerminalPresentationTests {
       drainStarted.signal()
       usleep(20_000)
       var buffer = Array(repeating: UInt8(0), count: 8192)
-      _ = unsafe Darwin.read(readDescriptor, &buffer, buffer.count)
+      _ = unsafe read(readDescriptor, &buffer, buffer.count)
       drainFinished.signal()
     }
 
@@ -693,11 +693,11 @@ struct TerminalPresentationTests {
 
     #expect(drainFinished.wait(timeout: .now() + 1) == .success)
 
-    _ = Darwin.close(writeDescriptor)
+    _ = close(writeDescriptor)
     didCloseWriteDescriptor = true
 
     let remainingBytes = try readAllBytes(from: readDescriptor)
-    _ = Darwin.close(readDescriptor)
+    _ = close(readDescriptor)
     didCloseReadDescriptor = true
 
     #expect(remainingBytes.suffix(2) == Array("ok".utf8))
@@ -833,7 +833,7 @@ private func fillPipeUntilWouldBlock(
     }
 
     while true {
-      let result = unsafe Darwin.write(writeDescriptor, baseAddress, chunk.count)
+      let result = unsafe write(writeDescriptor, baseAddress, chunk.count)
       if result > 0 {
         continue
       }
@@ -855,7 +855,7 @@ private func readAllBytes(
 
   while true {
     var buffer = Array(repeating: UInt8(0), count: 4096)
-    let bytesRead = unsafe Darwin.read(fileDescriptor, &buffer, buffer.count)
+    let bytesRead = unsafe read(fileDescriptor, &buffer, buffer.count)
     if bytesRead > 0 {
       collected.append(contentsOf: buffer.prefix(Int(bytesRead)))
       continue

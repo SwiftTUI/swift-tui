@@ -173,42 +173,26 @@ struct SceneInfo: Sendable {
         if isSocketLive(socketPath) {
           throw SceneDiscoveryServerError.identifierAlreadyInUse(path: socketPath)
         }
-        _ = unsafe Darwin.unlink(socketPath)
+        _ = sceneUnlink(socketPath)
       }
 
-      let serverFD = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+      let serverFD = sceneSocket()
       guard serverFD >= 0 else {
         throw SceneDiscoveryServerError.failedToCreateSocket(errno: errno)
       }
 
       var shouldCleanupSocketPath = false
       defer {
-        Darwin.close(serverFD)
+        sceneClose(serverFD)
         if shouldCleanupSocketPath {
-          _ = unsafe Darwin.unlink(socketPath)
+          _ = sceneUnlink(socketPath)
         }
       }
 
       // Bind
-      var addr = sockaddr_un()
-      addr.sun_family = sa_family_t(AF_UNIX)
-      let sunPathSize = MemoryLayout.size(ofValue: addr.sun_path)
-      unsafe withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
-        unsafe socketPath.withCString { cstr in
-          _ = unsafe Darwin.strncpy(
-            unsafe UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
-            cstr,
-            sunPathSize - 1
-          )
-        }
-      }
+      var addr = sceneSocketAddress(for: socketPath)
 
-      let bindResult = unsafe withUnsafePointer(to: &addr) {
-        unsafe Darwin.bind(
-          serverFD,
-          unsafe UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
-          socklen_t(MemoryLayout<sockaddr_un>.size))
-      }
+      let bindResult = sceneBind(serverFD, &addr)
       guard bindResult == 0 else {
         if errno == EADDRINUSE {
           throw SceneDiscoveryServerError.identifierAlreadyInUse(path: socketPath)
@@ -217,7 +201,7 @@ struct SceneInfo: Sendable {
       }
       shouldCleanupSocketPath = true
 
-      guard Darwin.listen(serverFD, 5) == 0 else {
+      guard sceneListen(serverFD, 5) == 0 else {
         throw SceneDiscoveryServerError.failedToListen(errno: errno)
       }
 
@@ -234,7 +218,7 @@ struct SceneInfo: Sendable {
           continue
         }
 
-        let clientFD = Darwin.accept(serverFD, nil, nil)
+        let clientFD = sceneAccept(serverFD)
         guard clientFD >= 0 else {
           if errno == EAGAIN || errno == EWOULDBLOCK { continue }
           break
@@ -253,40 +237,24 @@ struct SceneInfo: Sendable {
       var current = ""
       for component in components {
         current += "/\(component)"
-        _ = unsafe mkdir(current, 0o755)
+        _ = unsafe current.withCString { cPath in
+          unsafe mkdir(cPath, 0o755)
+        }
       }
     }
 
     private func pathExists(_ path: String) -> Bool {
-      unsafe path.withCString { cPath in
-        unsafe Darwin.access(cPath, F_OK) == 0
-      }
+      sceneAccess(path, F_OK) == 0
     }
 
     private func isSocketLive(_ path: String) -> Bool {
-      let fd = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
+      let fd = sceneSocket()
       guard fd >= 0 else { return false }
-      defer { Darwin.close(fd) }
+      defer { sceneClose(fd) }
 
-      var addr = sockaddr_un()
-      addr.sun_family = sa_family_t(AF_UNIX)
-      let sunPathSize = MemoryLayout.size(ofValue: addr.sun_path)
-      unsafe withUnsafeMutablePointer(to: &addr.sun_path) { ptr in
-        unsafe path.withCString { cstr in
-          _ = unsafe Darwin.strncpy(
-            unsafe UnsafeMutableRawPointer(ptr).assumingMemoryBound(to: CChar.self),
-            cstr,
-            sunPathSize - 1
-          )
-        }
-      }
+      var addr = sceneSocketAddress(for: path)
 
-      let result = unsafe withUnsafePointer(to: &addr) {
-        unsafe Darwin.connect(
-          fd,
-          unsafe UnsafeRawPointer($0).assumingMemoryBound(to: sockaddr.self),
-          socklen_t(MemoryLayout<sockaddr_un>.size))
-      }
+      let result = sceneConnect(fd, &addr)
       return result == 0
     }
 
@@ -296,10 +264,10 @@ struct SceneInfo: Sendable {
       sceneProvider: @escaping @Sendable () -> [SceneInfo],
       attachHandler: @escaping @Sendable (String) -> SocketResponse
     ) async {
-      defer { Darwin.close(fd) }
+      defer { sceneClose(fd) }
 
       var buffer = [UInt8](repeating: 0, count: 4096)
-      let bytesRead = unsafe Darwin.read(fd, &buffer, buffer.count)
+      let bytesRead = unsafe sceneRead(fd, &buffer, buffer.count)
       guard bytesRead > 0 else { return }
       let raw = String(decoding: buffer.prefix(bytesRead), as: UTF8.self)
 
@@ -325,7 +293,7 @@ struct SceneInfo: Sendable {
 
       unsafe encoded.withCString { cstr in
         let byteCount = unsafe strlen(cstr)
-        _ = unsafe Darwin.write(fd, cstr, byteCount)
+        _ = unsafe sceneWrite(fd, cstr, byteCount)
       }
     }
   }

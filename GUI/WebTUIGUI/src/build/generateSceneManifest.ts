@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { loadWebTUISceneManifest, webTUISceneManifestToJSON, type WebTUISceneManifest } from "../WebTUISceneManifest.ts";
+import { swiftCommandPrefix } from "./swiftCommandPrefix.ts";
 
 export interface GenerateSceneManifestOptions {
   packagePath: string;
@@ -23,9 +24,7 @@ async function runManifestCommand(
 ): Promise<string> {
   const proc = Bun.spawn({
     cmd: [
-      "swiftly",
-      "run",
-      "swift",
+      ...swiftCommandPrefix(),
       "run",
       "--package-path",
       options.packagePath,

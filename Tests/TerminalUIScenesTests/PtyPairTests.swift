@@ -20,11 +20,9 @@ struct PtyPairTests {
   @Test("Close invalidates the master fd")
   func closeInvalidatesMasterFD() throws {
     let pty = try PtyPair()
-    let fd = pty.masterFD
     pty.close()
-    // Writing to a closed fd should fail
-    let result = unsafe Darwin.write(fd, "x", 1)
-    #expect(result == -1)
+    #expect(pty.masterFD == -1)
+    #expect(!pty.hasAttachedClient())
   }
 
   @Test("Multiple allocations produce distinct fds")
@@ -42,11 +40,11 @@ struct PtyPairTests {
     let pty = try PtyPair()
     #expect(!pty.hasAttachedClient())
 
-    let slaveFD = unsafe Darwin.open(pty.slavePath, O_RDWR | O_NOCTTY)
+    let slaveFD = sceneOpen(pty.slavePath, O_RDWR | O_NOCTTY)
     #expect(slaveFD >= 0)
     #expect(pty.hasAttachedClient())
 
-    Darwin.close(slaveFD)
+    sceneClose(slaveFD)
     #expect(!pty.hasAttachedClient())
     pty.close()
   }

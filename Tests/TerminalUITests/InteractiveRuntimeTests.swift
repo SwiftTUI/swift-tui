@@ -511,10 +511,10 @@ struct InteractiveRuntimeTests {
     var didCloseWriteDescriptor = false
     defer {
       if !didCloseReadDescriptor {
-        _ = Darwin.close(readDescriptor)
+        _ = close(readDescriptor)
       }
       if !didCloseWriteDescriptor {
-        _ = Darwin.close(writeDescriptor)
+        _ = close(writeDescriptor)
       }
     }
 
@@ -531,7 +531,7 @@ struct InteractiveRuntimeTests {
     ).flatMap { $0 }
 
     try writeAllBytes(burstBytes, to: writeDescriptor)
-    _ = Darwin.close(writeDescriptor)
+    _ = close(writeDescriptor)
     didCloseWriteDescriptor = true
 
     let inputReader = InputReader(fileDescriptor: readDescriptor)
@@ -543,7 +543,7 @@ struct InteractiveRuntimeTests {
       return events
     }.value
 
-    _ = Darwin.close(readDescriptor)
+    _ = close(readDescriptor)
     didCloseReadDescriptor = true
 
     #expect(
@@ -568,10 +568,10 @@ struct InteractiveRuntimeTests {
     var didCloseWriteDescriptor = false
     defer {
       if !didCloseReadDescriptor {
-        _ = Darwin.close(readDescriptor)
+        _ = close(readDescriptor)
       }
       if !didCloseWriteDescriptor {
-        _ = Darwin.close(writeDescriptor)
+        _ = close(writeDescriptor)
       }
     }
 
@@ -603,11 +603,11 @@ struct InteractiveRuntimeTests {
     }
 
     _ = await writerTask.result
-    _ = Darwin.close(writeDescriptor)
+    _ = close(writeDescriptor)
     didCloseWriteDescriptor = true
     let receivedEvents = await receivedEventsTask.value
 
-    _ = Darwin.close(readDescriptor)
+    _ = close(readDescriptor)
     didCloseReadDescriptor = true
 
     #expect(!receivedEvents.isEmpty)
@@ -2375,7 +2375,7 @@ private func writeAllBytes(
     while totalBytesWritten < bytes.count {
       let nextAddress = unsafe baseAddress.advanced(by: totalBytesWritten)
       let bytesRemaining = bytes.count - totalBytesWritten
-      let bytesWritten = unsafe Darwin.write(fileDescriptor, nextAddress, bytesRemaining)
+      let bytesWritten = unsafe write(fileDescriptor, nextAddress, bytesRemaining)
       guard bytesWritten >= 0 else {
         throw TerminalHostError.failedToWrite(errno: errno)
       }

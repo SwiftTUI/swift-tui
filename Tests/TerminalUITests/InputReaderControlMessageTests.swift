@@ -157,19 +157,11 @@ private func writeAllBytes(
         return 0
       }
       let nextAddress = unsafe baseAddress.advanced(by: bytesWritten)
-      #if canImport(Darwin)
-        return unsafe Darwin.write(
-          fileDescriptor,
-          nextAddress,
-          bytes.count - bytesWritten
-        )
-      #elseif canImport(Glibc)
-        return unsafe Glibc.write(
-          fileDescriptor,
-          nextAddress,
-          bytes.count - bytesWritten
-        )
-      #endif
+      return unsafe write(
+        fileDescriptor,
+        nextAddress,
+        bytes.count - bytesWritten
+      )
     }
 
     if written > 0 {

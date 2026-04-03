@@ -380,11 +380,11 @@ private func openReadOnlyFile(
     #if canImport(Darwin)
       unsafe Darwin.open(cPath, O_RDONLY)
     #elseif canImport(Glibc)
-      Glibc.open(cPath, O_RDONLY)
+      unsafe Glibc.open(cPath, O_RDONLY)
     #elseif canImport(Android)
-      Android.open(cPath, O_RDONLY)
+      unsafe Android.open(cPath, O_RDONLY)
     #elseif canImport(WASILibc)
-      WASILibc.open(cPath, O_RDONLY)
+      unsafe WASILibc.open(cPath, O_RDONLY)
     #endif
   }
 }
@@ -411,10 +411,10 @@ private func readFileChunk(
   #if canImport(Darwin)
     unsafe Darwin.read(fileDescriptor, buffer, count)
   #elseif canImport(Glibc)
-    Glibc.read(fileDescriptor, buffer, count)
+    unsafe Glibc.read(fileDescriptor, buffer, count)
   #elseif canImport(Android)
-    Android.read(fileDescriptor, buffer, count)
+    unsafe Android.read(fileDescriptor, buffer, count)
   #elseif canImport(WASILibc)
-    Int(WASILibc.read(fileDescriptor, buffer, count))
+    Int(unsafe WASILibc.read(fileDescriptor, buffer, count))
   #endif
 }

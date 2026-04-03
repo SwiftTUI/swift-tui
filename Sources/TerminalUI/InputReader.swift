@@ -28,7 +28,7 @@ import Core
     _ buffer: UnsafeMutableRawPointer?,
     _ count: Int
   ) -> Int {
-    Glibc.read(fileDescriptor, buffer, count)
+    unsafe Glibc.read(fileDescriptor, buffer, count)
   }
 #elseif canImport(Android)
   private func platformRead(
@@ -36,7 +36,7 @@ import Core
     _ buffer: UnsafeMutableRawPointer?,
     _ count: Int
   ) -> Int {
-    Android.read(fileDescriptor, buffer, count)
+    unsafe Android.read(fileDescriptor, buffer, count)
   }
 #elseif canImport(WASILibc)
   private func platformRead(
@@ -44,7 +44,7 @@ import Core
     _ buffer: UnsafeMutableRawPointer?,
     _ count: Int
   ) -> Int {
-    Int(WASILibc.read(fileDescriptor, buffer, count))
+    Int(unsafe WASILibc.read(fileDescriptor, buffer, count))
   }
 #endif
 

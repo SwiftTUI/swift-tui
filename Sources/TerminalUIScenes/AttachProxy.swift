@@ -29,14 +29,14 @@
     /// forwards slave output to stdout, and relays SIGWINCH.
     /// Returns when the slave closes or the task is cancelled.
     static func run(slavePath: String) async throws {
-      let slaveFD = unsafe Darwin.open(slavePath, O_RDWR | O_NOCTTY)
+      let slaveFD = sceneOpen(slavePath, O_RDWR | O_NOCTTY)
       guard slaveFD >= 0 else {
         throw AttachProxyError.failedToOpenSlave(
           path: slavePath,
           errno: errno
         )
       }
-      defer { Darwin.close(slaveFD) }
+      defer { sceneClose(slaveFD) }
 
       // Set the slave's window size to match the current terminal
       syncWindowSize(from: STDOUT_FILENO, to: slaveFD)
@@ -68,10 +68,10 @@
             let ready = unsafe poll(&pfd, 1, 100)
             guard ready > 0 else { continue }
 
-            let n = unsafe Darwin.read(STDIN_FILENO, &buffer, buffer.count)
+            let n = unsafe sceneRead(STDIN_FILENO, &buffer, buffer.count)
             if n <= 0 { break }
             _ = unsafe buffer.withUnsafeBufferPointer { buf in
-              unsafe Darwin.write(slaveFD, buf.baseAddress!, n)
+              unsafe sceneWrite(slaveFD, buf.baseAddress!, n)
             }
           }
         }
@@ -84,10 +84,10 @@
             let ready = unsafe poll(&pfd, 1, 100)
             guard ready > 0 else { continue }
 
-            let n = unsafe Darwin.read(slaveFD, &buffer, buffer.count)
+            let n = unsafe sceneRead(slaveFD, &buffer, buffer.count)
             if n <= 0 { break }
             _ = unsafe buffer.withUnsafeBufferPointer { buf in
-              unsafe Darwin.write(STDOUT_FILENO, buf.baseAddress!, n)
+              unsafe sceneWrite(STDOUT_FILENO, buf.baseAddress!, n)
             }
           }
         }

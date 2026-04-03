@@ -1,5 +1,6 @@
 import { dirname, join, resolve } from "node:path";
 import { runCommand } from "./runCommand.ts";
+import { swiftCommandPrefix } from "./swiftCommandPrefix.ts";
 
 export interface ResolveSwiftArtifactsOptions {
   packagePath: string;
@@ -20,9 +21,7 @@ export async function resolveSwiftArtifacts(
   };
 
   await runCommand([
-    "swiftly",
-    "run",
-    "swift",
+    ...swiftCommandPrefix(),
     "build",
     "--package-path",
     options.packagePath,
@@ -46,9 +45,7 @@ export async function resolveSwiftArtifacts(
   });
 
   const binPath = await runCommand([
-    "swiftly",
-    "run",
-    "swift",
+    ...swiftCommandPrefix(),
     "build",
     "--package-path",
     options.packagePath,

@@ -20,7 +20,7 @@ import Synchronization
   import Darwin
   import Dispatch
 #else
-  @preconcurrency import Dispatch
+  @unsafe @preconcurrency import Dispatch
 #endif
 
 #if canImport(Glibc)

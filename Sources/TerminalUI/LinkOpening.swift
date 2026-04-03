@@ -69,11 +69,14 @@ package func openLinkInSystem(
       guard let baseAddress = buffer.baseAddress else {
         return ENOENT
       }
+      guard let executable = unsafe baseAddress[0] else {
+        return ENOENT
+      }
 
       if searchPath {
         return unsafe posix_spawnp(
           &pid,
-          baseAddress[0],
+          executable,
           nil,
           nil,
           baseAddress,
