@@ -46,15 +46,15 @@ The runtime-facing public surface is also canonical:
 - `ResolveContext` as external renderer or resolver configuration only
 - terminal host, graphics-capability, and input or signal integration types that support the runtime
 - app and scene entry points, including `App`, `Scene`, `SceneBuilder`, `WindowGroup`, and `WindowIdentifier`
+- `TerminalUISceneDescriptor`
+- `TerminalUISceneManifest`
+- `HostedSceneSession`
 
 ### `TerminalUIScenes`
 
 The optional multi-scene runtime surface is also supported:
 
 - `MultiSceneLauncher`
-- `TerminalUISceneDescriptor`
-- `TerminalUISceneManifest`
-- `HostedSceneSession`
 - the separate `TerminalUIScenes` library product for multi-scene apps
 
 ### `Core`

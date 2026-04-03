@@ -11,7 +11,7 @@ TerminalUI is for teams who want the ergonomics of declarative SwiftUI authoring
 - A real rendering pipeline. Frames move through a strict `resolve -> measure -> place -> semantics -> draw -> raster -> commit` pipeline, which keeps layout, interaction, presentation, and lifecycle work separate and testable.
 - Runtime behavior designed for real TUIs. The runtime owns alternate-screen presentation, terminal sizing, keyboard and mouse input, Unix signals, focus routing, lifecycle staging, and task start or cancellation after commit.
 - Capability-aware output. The same frame artifacts can be rendered for previews, snapshot tests, or live terminals with ASCII, ANSI16, ANSI256, or true-color output.
-- Layered products instead of one monolith. `View` handles authoring, `Core` handles the pure pipeline, `TerminalUI` handles runtime integration, `TerminalUIScenes` adds multi-scene orchestration, and `TerminalUICharts` adds compact charting.
+- Layered products instead of one monolith. `View` handles authoring, `Core` handles the pure pipeline, `TerminalUI` handles runtime integration plus wrapper-facing scene hosting, `TerminalUIScenes` currently carries the compatibility scene-launch layer, and `TerminalUICharts` adds compact charting.
 
 ## A Quick Look
 
@@ -73,9 +73,9 @@ apps through `MultiSceneLauncher`. When you want an explicit launcher instead of
 try await MultiSceneLauncher.run(DemoApp.self)
 ```
 
-`MultiSceneLauncher` gracefully falls back to the single-scene runtime when the
-app only declares one `WindowGroup`, so the same launch path works for
-single-window and multi-window apps today.
+The same launch path works for single-window and multi-window apps today, but
+that policy now lives in the runner layer rather than in a `TerminalUI`
+single-scene special case.
 
 ## What Ships Today
 
@@ -92,8 +92,8 @@ single-window and multi-window apps today.
 | Library Product | Role |
 | --- | --- |
 | `View` | SwiftUI-shaped authoring surface: `View`, builders, property wrappers, environment, focus, layouts, containers, and controls. |
-| `TerminalUI` | Terminal runtime integration plus low-level rendering entry points. This product re-exports the `View` and `Core` layers used by the runtime. |
-| `TerminalUIScenes` | Optional scene-runtime layer for multi-window apps, public scene launch, scene manifests, hosted sessions, and attachment flows. This product re-exports `TerminalUI`. |
+| `TerminalUI` | Terminal runtime integration plus low-level rendering entry points, scene manifests, and retained hosted-scene sessions for wrapper packages. This product re-exports the `View` and `Core` layers used by the runtime. |
+| `TerminalUIScenes` | Optional compatibility scene-launch layer for terminal-owned multi-window apps, attachment flows, and the current public launcher. This product re-exports `TerminalUI`. |
 | `TerminalUICharts` | Compact chart and metric views built on `View` and the shared pipeline types re-exported through `TerminalUI`. |
 
 `Core` remains the shared pipeline and data-model target that powers these
@@ -144,13 +144,13 @@ swiftly run swift package generate-documentation --target TerminalUI
 
 Peer GUI packaging lives outside the root package products:
 
-- `GUI/SwiftUITUIGUI`: SwiftUI wrapper package for macOS and iOS, built on `HostedSceneSession`
+- `GUI/SwiftUITUIGUI`: SwiftUI wrapper package for macOS and iOS, built on `TerminalUI` scene manifests and `HostedSceneSession`
 - `GUI/WebTUIGUI`: Bun-based web wrapper package that builds a TerminalUI wasm app bundle and hosts it in the browser
 
 ## Current Constraints
 
 - The core `TerminalUI` runtime is still intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
-- The scene-based public launch path currently lives in `TerminalUIScenes.MultiSceneLauncher`, including the single-scene case.
+- The scene-based public launch path currently lives in `TerminalUIScenes.MultiSceneLauncher`; `TerminalUI` no longer enforces a separate single-scene app path.
 - The terminal-native toolbar surface is now supported through `toolbar(...)`, `toolbarItem(...)`, and `toolbarStyle(.default)`. The older keyboard-help APIs are removed, and the gallery now demonstrates the toolbar surface directly.
 - Command palettes remain a terminal-native workflow surface, but the shortcut/help-strip exploration no longer defines the public direction.
 

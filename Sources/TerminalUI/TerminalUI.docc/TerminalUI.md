@@ -22,7 +22,7 @@ Use it when you want to:
 - ``DefaultRenderer`` for one-shot rendering and frame inspection
 - ``RunLoop`` for interactive sessions that own terminal I/O, scheduling, focus, lifecycle staging, and presentation
 
-Scene declarations such as ``App`` and ``WindowGroup`` also live here, but the current public launch helper for scene-based apps is in the separate `TerminalUIScenes` product.
+Scene declarations such as ``App`` and ``WindowGroup`` also live here, but the public launch helper for scene-based apps is still packaged separately in `TerminalUIScenes`.
 
 ## Topics
 

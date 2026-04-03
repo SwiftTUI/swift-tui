@@ -46,9 +46,8 @@ pages.
 ### Scene and multi-scene surface
 
 - `@MainActor` `App`, `Scene`, `SceneBuilder`, `WindowIdentifier`, and `WindowGroup` declarations in `TerminalUI`
+- `TerminalUISceneDescriptor`, `TerminalUISceneManifest`, and `HostedSceneSession` in `TerminalUI` for wrapper tooling and retained non-terminal hosting
 - `MultiSceneLauncher` in `TerminalUIScenes` for public scene launch, including the single-window case today
-- `TerminalUISceneDescriptor`, `TerminalUISceneManifest`, and `MultiSceneLauncher.sceneManifest(...)` for wrapper tooling and non-terminal packaging
-- `HostedSceneSession` for embedding a retained `WindowGroup` runtime inside non-terminal hosts
 - Pty-backed secondary scenes, Unix-domain-socket discovery, scene attachment, and lazy rendering of unattached secondary scenes
 - `TabView` and `NavigationSplitView` for terminal-native shell composition
 - terminal-native `alert` and `confirmationDialog` presentation in the canonical `View` surface
@@ -59,9 +58,9 @@ pages.
 
 ## Current Constraints
 
-- The core `TerminalUI` runtime remains single-host and single-scene. The multi-scene story lives in the separate `TerminalUIScenes` product.
-- The public scene launch path currently goes through `TerminalUIScenes.MultiSceneLauncher`, even when an app only has one `WindowGroup`.
-- Embedded GUI wrappers can now host retained scene runtimes through `HostedSceneSession`, and the repository now includes peer wrapper packages at `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`. Those packages still own their own platform shell integration, scene switching chrome, and style surfaces.
+- The core `TerminalUI` runtime still renders one active scene into one active host per session, but it no longer decides that an authored app must declare exactly one scene. Runner policy still lives in `TerminalUIScenes`.
+- The public scene launch path currently goes through `TerminalUIScenes.MultiSceneLauncher`, including one-window apps, but CLI scene management no longer branches on scene count.
+- Embedded GUI wrappers now use `TerminalUI` scene manifests plus `HostedSceneSession`, and the repository includes peer wrapper packages at `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`. Those packages still own their own platform shell integration, scene switching chrome, and style surfaces.
 - Embedded GUI wrappers intentionally own the mapping from host light/dark mode
   to explicit theme variants; the root TUI app continues to render semantic
   tokens without knowing which wrapper theme is active.

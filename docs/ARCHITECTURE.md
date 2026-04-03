@@ -26,14 +26,14 @@ Last updated: March 30, 2026
 
 - Re-exports the public package surface that matters for single-session runtime work
 - Adds terminal host integration, alternate-screen ownership, input parsing, signal handling, capability-aware presentation, `RunLoop`, and rendering entry points
-- Hosts wrapper-facing runtime seams such as shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
+- Hosts wrapper-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
 
 ### `TerminalUIScenes`
 
 - Builds the optional scene-runtime layer on top of `TerminalUI`
 - Adds pty-backed secondary scene sessions, socket discovery, attachment, and multi-scene orchestration
 - Currently carries the public scene-launch path, including the single-window case
-- Also exposes wrapper-facing scene manifests and hosted-scene sessions so peer GUI packages can embed `WindowGroup` scenes without shell-owned stdio
+- Acts as a compatibility launch layer while the platform-runner split is still in progress
 
 Detailed per-file ownership lives in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
 
@@ -115,7 +115,11 @@ That scene layer now serves two distinct launch modes:
 
 - terminal-owned launch via `MultiSceneLauncher.run(MyApp.self)` or the default
   `App.main()` provided by `TerminalUIScenes`
-- wrapper-owned launch via `MultiSceneLauncher.sceneManifest(...)` and `HostedSceneSession`
+- wrapper-owned launch via `TerminalUISceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`
+
+CLI scene management is runner policy rather than an authored-scene rule. A
+one-window app and a multi-window app now share the same compatibility launch
+path.
 
 ## Important Data Products
 

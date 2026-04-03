@@ -30,7 +30,7 @@ public enum MultiSceneLauncher {
   public static func run<A: App>(_ app: A) async throws {
     let configurations = collectWindowSceneConfigurations(from: app.body)
     if requestedManifestMode() {
-      print(TerminalUIScenes.sceneManifest(from: configurations).jsonString)
+      print(TerminalUI.sceneManifest(from: configurations).jsonString)
       return
     }
     guard !configurations.isEmpty else {
@@ -70,9 +70,7 @@ public enum MultiSceneLauncher {
   public static func sceneManifest<A: App>(
     for app: A
   ) -> TerminalUISceneManifest {
-    TerminalUIScenes.sceneManifest(
-      from: collectWindowSceneConfigurations(from: app.body)
-    )
+    TerminalUISceneManifest(for: app)
   }
 
   @MainActor
@@ -85,16 +83,9 @@ public enum MultiSceneLauncher {
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
     onOutput: @escaping @Sendable (String) -> Void
   ) throws -> HostedSceneSession {
-    let configurations = collectWindowSceneConfigurations(from: app.body)
-    guard let configuration = configurations.first(where: { $0.identifier == sceneID }) else {
-      throw HostedSceneSessionError.sceneNotFound(sceneID)
-    }
-
-    let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
-    return HostedSceneSession(
-      configuration: configuration,
-      isDefault: configuration.identifier == configurations.first?.identifier,
-      sessionName: sessionName,
+    try HostedSceneSession(
+      for: app,
+      sceneID: sceneID,
       initialSize: initialSize,
       appearance: appearance,
       theme: theme,
@@ -111,8 +102,8 @@ public enum MultiSceneLauncher {
     inputReader: any InputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler()
-  ) async throws -> RunLoopResult<MultiSceneRuntimeState> {
-    let configuration = try primaryWindowSceneConfiguration(from: scene)
+  ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
+    let configuration = try singleSceneConfiguration(from: scene)
     let terminalInputReader: any TerminalInputReading =
       if let terminalInputReader = inputReader as? any TerminalInputReading {
         terminalInputReader
@@ -140,19 +131,6 @@ public enum MultiSceneLauncher {
       appName: String,
       instanceName: String?
     ) async throws {
-      if configurations.count == 1 {
-        _ = try await run(
-          configuration: configurations[0],
-          sessionName: sessionName,
-          resources: .init(
-            terminalHost: TerminalHost(),
-            terminalInputReader: InputReader(),
-            signalReader: defaultSignalReader()
-          )
-        )
-        return
-      }
-
       // Create scene runtimes
       var sceneRuntimes: [SceneRuntime] = []
       for (index, config) in configurations.enumerated() {
@@ -178,7 +156,7 @@ public enum MultiSceneLauncher {
         }
       )
 
-      var sceneTasks: [Task<RunLoopResult<MultiSceneRuntimeState>, any Error>] = []
+      var sceneTasks: [Task<RunLoopResult<TerminalUISceneSessionState>, any Error>] = []
       for runtime in sceneRuntimes {
         let sceneID = runtime.configuration.identifier.rawValue
         let task = Task { @MainActor in
@@ -259,9 +237,9 @@ public enum MultiSceneLauncher {
     configuration: WindowSceneConfiguration,
     sessionName: String,
     resources: SceneSessionResources
-  ) async throws -> RunLoopResult<MultiSceneRuntimeState> {
+  ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
     let stateContainer = StateContainer(
-      initialState: MultiSceneRuntimeState(),
+      initialState: TerminalUISceneSessionState(),
       invalidationIdentities: [configuration.rootIdentity]
     )
     let focusTracker = FocusTracker(
@@ -622,6 +600,31 @@ private func environmentValue(
       return nil
     }
     return unsafe String(cString: rawValue)
+  }
+}
+
+@MainActor
+private func singleSceneConfiguration<S: Scene>(
+  from scene: S
+) throws -> WindowSceneConfiguration {
+  let configurations = collectWindowSceneConfigurations(from: scene)
+  guard !configurations.isEmpty else {
+    throw AppLaunchError.noScenes
+  }
+  guard configurations.count == 1 else {
+    throw SingleSceneRuntimeError.multipleScenesUnsupported(count: configurations.count)
+  }
+  return configurations[0]
+}
+
+private enum SingleSceneRuntimeError: Error, Equatable, Sendable, CustomStringConvertible {
+  case multipleScenesUnsupported(count: Int)
+
+  var description: String {
+    switch self {
+    case .multipleScenesUnsupported(let count):
+      return "Expected exactly one scene, but received \(count)."
+    }
   }
 }
 

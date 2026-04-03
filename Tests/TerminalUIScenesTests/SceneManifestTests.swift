@@ -1,6 +1,7 @@
 import Testing
 import View
 
+@testable import TerminalUI
 @testable import TerminalUIScenes
 
 @MainActor
@@ -19,7 +20,7 @@ struct SceneManifestTests {
 
   @Test("scene manifest exposes descriptors in declaration order")
   func sceneManifestUsesDeclarationOrder() {
-    let manifest = MultiSceneLauncher.sceneManifest(for: MultiSceneApp())
+    let manifest = TerminalUISceneManifest(for: MultiSceneApp())
 
     #expect(manifest.defaultSceneID == WindowIdentifier("dashboard"))
     #expect(
@@ -32,7 +33,7 @@ struct SceneManifestTests {
 
   @Test("scene manifest renders stable JSON")
   func sceneManifestRendersStableJSON() {
-    let manifest = MultiSceneLauncher.sceneManifest(for: MultiSceneApp())
+    let manifest = TerminalUISceneManifest(for: MultiSceneApp())
 
     #expect(
       manifest.jsonString

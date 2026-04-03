@@ -11,9 +11,9 @@ import Testing
 struct AppRuntimeTests {
   @Test("App body resolves a single WindowGroup into a terminal scene")
   func appBodyResolvesSingleWindowGroup() throws {
-    let configuration = try primaryWindowSceneConfiguration(
-      from: GreetingApp().body
-    )
+    let configurations = collectWindowSceneConfigurations(from: GreetingApp().body)
+    #expect(configurations.count == 1)
+    let configuration = try #require(configurations.first)
 
     #expect(configuration.identifier == WindowIdentifier("Greeting-Window"))
     #expect(configuration.rootIdentity == testIdentity("App", "Greeting-Window"))
@@ -26,16 +26,12 @@ struct AppRuntimeTests {
     #expect(artifacts.resolvedTree.descendant(withText: "Hello from App") != nil)
   }
 
-  @Test("App body rejects multiple WindowGroup scenes for the single-terminal runtime")
-  func appBodyRejectsMultipleScenes() {
-    do {
-      _ = try primaryWindowSceneConfiguration(from: MultiWindowApp().body)
-      Issue.record("Expected a multiple-scenes error")
-    } catch let error as AppLaunchError {
-      #expect(error == .multipleScenesUnsupported(count: 2))
-    } catch {
-      Issue.record("Unexpected error: \(error)")
-    }
+  @Test("App body preserves multiple WindowGroup scenes without collapsing them")
+  func appBodyPreservesMultipleScenes() {
+    let configurations = collectWindowSceneConfigurations(from: MultiWindowApp().body)
+
+    #expect(configurations.count == 2)
+    #expect(configurations.map(\.identifier) == [WindowIdentifier("One"), WindowIdentifier("Two")])
   }
 
   @MainActor

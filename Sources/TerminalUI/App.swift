@@ -5,14 +5,11 @@ public import View
 /// runtime configuration.
 public enum AppLaunchError: Error, Equatable, Sendable, CustomStringConvertible {
   case noScenes
-  case multipleScenesUnsupported(count: Int)
 
   public var description: String {
     switch self {
     case .noScenes:
       return "App.body did not produce any scenes."
-    case .multipleScenesUnsupported(let count):
-      return "Expected exactly one scene, but App.body produced \(count)."
     }
   }
 }
@@ -299,20 +296,6 @@ package func collectWindowSceneConfigurations<S: Scene>(
   }
 
   return collectWindowSceneConfigurations(from: scene.body)
-}
-
-@MainActor
-package func primaryWindowSceneConfiguration<S: Scene>(
-  from scene: S
-) throws -> WindowSceneConfiguration {
-  let configurations = collectWindowSceneConfigurations(from: scene)
-  guard !configurations.isEmpty else {
-    throw AppLaunchError.noScenes
-  }
-  guard configurations.count == 1 else {
-    throw AppLaunchError.multipleScenesUnsupported(count: configurations.count)
-  }
-  return configurations[0]
 }
 
 private func normalizedWindowIdentifier(_ value: String) -> String {

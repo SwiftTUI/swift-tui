@@ -2,7 +2,6 @@ import GhosttyTerminal
 import Observation
 import SwiftUI
 import TerminalUI
-import TerminalUIScenes
 
 @MainActor
 @Observable
@@ -30,7 +29,7 @@ public final class SwiftUITUISceneHost {
       style: style
     )
 
-    let session = try MultiSceneLauncher.makeHostedSceneSession(
+    let session = try HostedSceneSession(
       for: app,
       sceneID: descriptor.id,
       initialSize: .init(width: 80, height: 24),

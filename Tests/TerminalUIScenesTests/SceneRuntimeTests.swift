@@ -42,7 +42,7 @@ struct SceneRuntimeTests {
           }
 
           return RunLoopResult(
-            finalState: MultiSceneRuntimeState(),
+            finalState: TerminalUISceneSessionState(),
             renderedFrames: 1,
             exitReason: .inputEnded
           )
@@ -53,7 +53,7 @@ struct SceneRuntimeTests {
         }
 
         return RunLoopResult(
-          finalState: MultiSceneRuntimeState(),
+          finalState: TerminalUISceneSessionState(),
           renderedFrames: 1,
           exitReason: .inputEnded
         )

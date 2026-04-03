@@ -27,12 +27,11 @@ Swift 6.3.0 toolchain.
 
 The wrapper-facing root work is landed:
 
-- `TerminalUIScenes` exposes `TerminalUISceneDescriptor`,
+- `TerminalUI` exposes `TerminalUISceneDescriptor`,
   `TerminalUISceneManifest`, and `HostedSceneSession`
 - `MultiSceneLauncher` exposes:
   - public app launch for scene-based apps
   - manifest-only mode through `TUIGUI_MODE=manifest`
-  - hosted-session creation through `makeHostedSceneSession(...)`
 - shared control-message parsing lives in
   `Sources/TerminalUI/TerminalControlMessages.swift`
 - embedded hosts use `InjectedTerminalInputReader` and

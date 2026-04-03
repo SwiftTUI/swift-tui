@@ -26,6 +26,9 @@ library product. Downstream package consumers reach those types through
 
 - `TerminalUI.swift`: `DefaultRenderer` plus retained-frame and resolve-reuse plumbing
 - `App.swift`: `App`, `Scene`, `SceneBuilder`, `WindowGroup`, and scene collection helpers
+- `SceneManifest.swift`: `TerminalUISceneDescriptor`, `TerminalUISceneManifest`, and manifest generation from authored scenes
+- `HostedSceneSession.swift`: retained hosted scene runtime for GUI wrappers and other non-terminal hosts
+- `SceneSession.swift`: shared scene-session bootstrap used by hosted sessions and compatibility launch paths
 - `RunLoop.swift`: runtime coordinator and shared runtime state
 - `RunLoop+EventDispatch.swift`: keyboard, signal, focus, action, and scroll dispatch
 - `RunLoop+PointerHandling.swift`: pointer routing, activation, capture, and scroll-wheel handling
@@ -50,10 +53,7 @@ library product. Downstream package consumers reach those types through
 ## `TerminalUIScenes`
 
 - `TerminalUIScenes.swift`: product re-export surface
-- `MultiSceneLauncher.swift`: public app launch path, manifest mode, hosted-session factory, and CLI routing
-- `SceneManifest.swift`: `TerminalUISceneDescriptor` and `TerminalUISceneManifest`
-- `HostedSceneSession.swift`: retained hosted scene runtime for GUI wrappers
-- `SceneSession.swift`: shared scene-runtime bootstrap
+- `MultiSceneLauncher.swift`: compatibility app launch path plus CLI-mode routing while the runner split is still in progress
 - `SceneRuntime.swift`: per-scene runtime orchestration for multi-scene terminal apps
 - `SceneLifecycle.swift`: scene session coordination
 - `CLIMode.swift`: attach/list CLI argument parsing
@@ -116,7 +116,7 @@ library product. Downstream package consumers reach those types through
 - `Tests/CoreTests`: pipeline, layout, raster, and focus infrastructure tests
 - `Tests/ViewTests`: authoring-layer and environment-level tests
 - `Tests/TerminalUITests`: runtime, rendering, fixture, and end-to-end behavioral tests
-- `Tests/TerminalUIScenesTests`: scene launcher, hosted session, attach, pty, and manifest tests
+- `Tests/TerminalUIScenesTests`: compatibility launch, attach, pty, and CLI-scene-management tests
 - `Tests/PrototypeUIComponentsTests`: prototype-surface regression coverage
 
 ## Reliability Rules

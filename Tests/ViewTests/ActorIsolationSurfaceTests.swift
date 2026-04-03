@@ -93,9 +93,9 @@ struct ActorIsolationSurfaceTests {
       }
     }
 
-    let configuration = try primaryWindowSceneConfiguration(
-      from: SurfaceApp().body
-    )
+    let configurations = collectWindowSceneConfigurations(from: SurfaceApp().body)
+    #expect(configurations.count == 1)
+    let configuration = try #require(configurations.first)
     let artifacts = DefaultRenderer().render(
       configuration.makeRootView(),
       context: .init(identity: configuration.rootIdentity)

@@ -24,7 +24,6 @@ let package = Package(
       name: "SwiftUITUIGUI",
       dependencies: [
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
         .product(name: "GhosttyTerminal", package: "libghostty-spm"),
       ]
     ),
@@ -33,7 +32,6 @@ let package = Package(
       dependencies: [
         "SwiftUITUIGUI",
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUIScenes", package: "swift-terminal-ui"),
         .product(name: "GhosttyTerminal", package: "libghostty-spm"),
       ]
     ),

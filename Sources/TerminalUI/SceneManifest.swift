@@ -25,6 +25,13 @@ public struct TerminalUISceneManifest: Codable, Sendable {
     self.defaultSceneID = defaultSceneID
     self.scenes = scenes
   }
+
+  @MainActor
+  public init<A: App>(for app: A) {
+    self = sceneManifest(
+      from: collectWindowSceneConfigurations(from: app.body)
+    )
+  }
 }
 
 package func sceneManifest(

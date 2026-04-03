@@ -21,7 +21,7 @@ struct HostedSceneSessionTests {
   @Test("hosted scene session rerenders on resize without exiting")
   func hostedSceneSessionRerendersOnResize() async throws {
     let recorder = OutputRecorder()
-    let session = try MultiSceneLauncher.makeHostedSceneSession(
+    let session = try HostedSceneSession(
       for: HostedApp(),
       sceneID: WindowIdentifier("primary"),
       initialSize: .init(width: 24, height: 6),
@@ -56,7 +56,7 @@ struct HostedSceneSessionTests {
   @Test("hosted scene session schedules a new frame on appearance update")
   func hostedSceneSessionRerendersOnAppearanceUpdate() async throws {
     let recorder = OutputRecorder()
-    let session = try MultiSceneLauncher.makeHostedSceneSession(
+    let session = try HostedSceneSession(
       for: HostedApp(),
       sceneID: WindowIdentifier("primary"),
       initialSize: .init(width: 24, height: 6),
@@ -98,7 +98,7 @@ struct HostedSceneSessionTests {
   @Test("hosted scene session schedules a new frame on style update")
   func hostedSceneSessionRerendersOnStyleUpdate() async throws {
     let recorder = OutputRecorder()
-    let session = try MultiSceneLauncher.makeHostedSceneSession(
+    let session = try HostedSceneSession(
       for: HostedApp(),
       sceneID: WindowIdentifier("primary"),
       initialSize: .init(width: 24, height: 6),
@@ -158,7 +158,7 @@ struct HostedSceneSessionTests {
   @Test("hosted scene session throws when the requested scene does not exist")
   func hostedSceneSessionThrowsForUnknownScene() throws {
     do {
-      _ = try MultiSceneLauncher.makeHostedSceneSession(
+      _ = try HostedSceneSession(
         for: HostedApp(),
         sceneID: WindowIdentifier("missing"),
         initialSize: .init(width: 24, height: 6),

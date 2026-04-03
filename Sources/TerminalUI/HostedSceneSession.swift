@@ -1,5 +1,3 @@
-import TerminalUI
-
 public enum HostedSceneSessionError: Error, Equatable, Sendable, CustomStringConvertible {
   case sceneNotFound(WindowIdentifier)
 
@@ -21,9 +19,36 @@ public final class HostedSceneSession {
   private let inputReader: InjectedTerminalInputReader
   private let signalReader: InProcessSignalReader
   private let scheduler: any FrameScheduling
-  private let stateContainer: StateContainer<MultiSceneRuntimeState>
+  private let stateContainer: StateContainer<TerminalUISceneSessionState>
   private let focusTracker: FocusTracker
   private var runTask: Task<RunLoopExitReason, any Error>?
+
+  public convenience init<A: App>(
+    for app: A,
+    sceneID: WindowIdentifier,
+    initialSize: Size,
+    appearance: TerminalAppearance,
+    theme: ThemeColors? = nil,
+    capabilityProfile: TerminalCapabilityProfile = .trueColor,
+    onOutput: @escaping @Sendable (String) -> Void
+  ) throws {
+    let configurations = collectWindowSceneConfigurations(from: app.body)
+    guard let configuration = configurations.first(where: { $0.identifier == sceneID }) else {
+      throw HostedSceneSessionError.sceneNotFound(sceneID)
+    }
+
+    let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
+    self.init(
+      configuration: configuration,
+      isDefault: configuration.identifier == configurations.first?.identifier,
+      sessionName: sessionName,
+      initialSize: initialSize,
+      appearance: appearance,
+      theme: theme,
+      capabilityProfile: capabilityProfile,
+      onOutput: onOutput
+    )
+  }
 
   package init(
     configuration: WindowSceneConfiguration,
@@ -62,7 +87,7 @@ public final class HostedSceneSession {
     }
     scheduler = FrameScheduler()
     stateContainer = StateContainer(
-      initialState: MultiSceneRuntimeState(),
+      initialState: TerminalUISceneSessionState(),
       invalidationIdentities: [configuration.rootIdentity]
     )
     focusTracker = FocusTracker(
@@ -83,7 +108,8 @@ public final class HostedSceneSession {
       surfaceName: "hosted-\(configuration.identifier.rawValue)"
     )
 
-    let task = Task { @MainActor [configuration, sessionName, stateContainer, focusTracker, resources] in
+    let task = Task {
+      @MainActor [configuration, sessionName, stateContainer, focusTracker, resources] in
       let result = try await SceneSession.run(
         configuration: configuration,
         sessionName: sessionName,

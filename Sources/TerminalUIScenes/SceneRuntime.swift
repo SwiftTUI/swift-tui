@@ -8,10 +8,6 @@ import View
   import Glibc
 #endif
 
-// A minimal state type used by SceneRuntime's RunLoop.
-// MultiSceneLauncher (Task 9) will reference this type.
-package struct MultiSceneRuntimeState: Equatable, Sendable {}
-
 enum SceneRuntimeError: Error, CustomStringConvertible {
   case secondaryScenesUnavailableOnWASI
 
@@ -30,14 +26,14 @@ enum SceneRuntimeError: Error, CustomStringConvertible {
 @MainActor
 final class SceneRuntime {
   typealias SessionRunner =
-    @MainActor (SceneRuntime, String) async throws -> RunLoopResult<MultiSceneRuntimeState>
+    @MainActor (SceneRuntime, String) async throws -> RunLoopResult<TerminalUISceneSessionState>
 
   let configuration: WindowSceneConfiguration
   let isPrimary: Bool
   private(set) var lifecycle: SceneLifecycle
   private let ptyPair: PtyPair?
   private let resources: SceneSessionResources
-  private let stateContainer: StateContainer<MultiSceneRuntimeState>
+  private let stateContainer: StateContainer<TerminalUISceneSessionState>
   private let focusTracker: FocusTracker
   private let sessionRunner: SessionRunner
 
@@ -105,7 +101,7 @@ final class SceneRuntime {
     }
 
     stateContainer = StateContainer(
-      initialState: MultiSceneRuntimeState(),
+      initialState: TerminalUISceneSessionState(),
       invalidationIdentities: [configuration.rootIdentity]
     )
     focusTracker = FocusTracker(
@@ -129,7 +125,7 @@ final class SceneRuntime {
   func run(
     sessionName: String,
     onAttachmentChanged: @escaping @Sendable (Bool) -> Void = { _ in }
-  ) async throws -> RunLoopResult<MultiSceneRuntimeState> {
+  ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
     if isPrimary {
       return try await sessionRunner(self, sessionName)
     }
@@ -167,7 +163,7 @@ final class SceneRuntime {
 
   private func runSceneSession(
     sessionName: String
-  ) async throws -> RunLoopResult<MultiSceneRuntimeState> {
+  ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
     try await SceneSession.run(
       configuration: configuration,
       sessionName: sessionName,

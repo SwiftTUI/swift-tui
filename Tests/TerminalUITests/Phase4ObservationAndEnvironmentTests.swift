@@ -676,7 +676,9 @@ struct Phase4ObservationAndEnvironmentTests {
       }
     }
 
-    let configuration = try primaryWindowSceneConfiguration(from: scene)
+    let configurations = collectWindowSceneConfigurations(from: scene)
+    #expect(configurations.count == 1)
+    let configuration = try #require(configurations.first)
     let artifacts = renderer.render(
       configuration.makeRootView(),
       context: .init(

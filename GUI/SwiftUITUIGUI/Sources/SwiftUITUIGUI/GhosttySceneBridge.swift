@@ -2,7 +2,6 @@ import Foundation
 import GhosttyTerminal
 import SwiftUI
 import TerminalUI
-import TerminalUIScenes
 
 @MainActor
 final class GhosttySceneBridge {

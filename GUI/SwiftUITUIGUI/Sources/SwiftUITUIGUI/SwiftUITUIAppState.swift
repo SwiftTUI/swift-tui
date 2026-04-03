@@ -1,6 +1,5 @@
 import Observation
 import TerminalUI
-import TerminalUIScenes
 
 public struct SwiftUITUISceneDescriptor: Identifiable, Hashable, Sendable {
   public var id: WindowIdentifier
@@ -47,7 +46,7 @@ public final class SwiftUITUIAppState<A: TerminalUI.App> {
     selectedSceneID: WindowIdentifier? = nil,
     style: SwiftUITUITerminalStyle = .default
   ) throws {
-    let manifest = MultiSceneLauncher.sceneManifest(for: app)
+    let manifest = TerminalUISceneManifest(for: app)
     guard !manifest.scenes.isEmpty else {
       throw AppLaunchError.noScenes
     }

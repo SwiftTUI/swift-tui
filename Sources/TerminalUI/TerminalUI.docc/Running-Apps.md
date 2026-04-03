@@ -51,5 +51,5 @@ explicit launcher instead, call:
 try await MultiSceneLauncher.run(MyApp.self)
 ```
 
-That launcher also supports the single-window case today, so scene-based apps
-can start on that path without committing to a multi-window design.
+That launcher also supports the single-window case today, but that policy lives
+in the runner layer rather than in a special `TerminalUI` single-scene path.

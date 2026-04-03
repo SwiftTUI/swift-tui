@@ -1,4 +1,6 @@
-import TerminalUI
+package struct TerminalUISceneSessionState: Equatable, Sendable {
+  package init() {}
+}
 
 package struct SceneSessionResources {
   package let terminalHost: any TerminalHosting
@@ -30,10 +32,10 @@ package enum SceneSession {
   package static func run(
     configuration: WindowSceneConfiguration,
     sessionName: String,
-    stateContainer: StateContainer<MultiSceneRuntimeState>,
+    stateContainer: StateContainer<TerminalUISceneSessionState>,
     focusTracker: FocusTracker,
     resources: SceneSessionResources
-  ) async throws -> RunLoopResult<MultiSceneRuntimeState> {
+  ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
     var environmentValues = EnvironmentValues()
     environmentValues.terminalAppearance = resources.terminalHost.appearance
     environmentValues.themeOverride = resources.terminalHost.theme
@@ -59,7 +61,7 @@ package enum SceneSession {
       focusTracker: focusTracker,
       environment: environmentSnapshot,
       environmentValues: environmentValues,
-      viewBuilder: { (_: MultiSceneRuntimeState, _: Identity?) in
+      viewBuilder: { (_: TerminalUISceneSessionState, _: Identity?) in
         WindowHostView(content: configuration.makeRootView())
       }
     )
