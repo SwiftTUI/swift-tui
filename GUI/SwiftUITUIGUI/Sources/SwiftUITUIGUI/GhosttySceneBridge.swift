@@ -5,22 +5,6 @@ import TerminalUI
 
 @MainActor
 final class GhosttySceneBridge {
-  actor CallbackRouter {
-    weak var bridge: GhosttySceneBridge?
-
-    init(bridge: GhosttySceneBridge) {
-      self.bridge = bridge
-    }
-
-    func handleInput(_ data: Data) async {
-      await bridge?.receiveTerminalInput(Array(data))
-    }
-
-    func handleResize(_ viewport: InMemoryTerminalViewport) async {
-      await bridge?.handleSurfaceResize(viewport)
-    }
-  }
-
   enum BridgeError: Error, Equatable {
     case missingSession
   }
@@ -30,8 +14,7 @@ final class GhosttySceneBridge {
 
   private var style: SwiftUITUITerminalStyle
   private var session: (any HostedSceneSessionHandling)?
-  private let callbackRouter: CallbackRouter
-  private let terminalSession: InMemoryTerminalSession
+  private var terminalSession: InMemoryTerminalSession! = nil
   private var bufferedOutput: [String] = []
   private var surfaceReady = false
   private var currentColorScheme: SwiftUI.ColorScheme = .light
@@ -49,20 +32,19 @@ final class GhosttySceneBridge {
       terminalConfiguration: style.terminalConfiguration
     )
     viewState = TerminalViewState(controller: controller)
-    callbackRouter = CallbackRouter(bridge: self)
-
-    terminalSession = InMemoryTerminalSession(
-      write: { [callbackRouter] data in
-        Task {
-          await callbackRouter.handleInput(data)
+    let terminalSession = InMemoryTerminalSession(
+      write: { [weak self] data in
+        Task { @MainActor [weak self] in
+          self?.receiveTerminalInput(Array(data))
         }
       },
-      resize: { [callbackRouter] viewport in
-        Task {
-          await callbackRouter.handleResize(viewport)
+      resize: { [weak self] viewport in
+        Task { @MainActor [weak self] in
+          self?.handleSurfaceResize(viewport)
         }
       }
     )
+    self.terminalSession = terminalSession
 
     viewState.configuration = TerminalSurfaceOptions(
       backend: .inMemory(terminalSession),

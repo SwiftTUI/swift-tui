@@ -79,6 +79,7 @@ public enum TerminalWASIAppRunner {
   }
 
   #if canImport(WASILibc)
+    @MainActor
     private static func selectedWASISelection(
       from selections: [SelectedWindowScene]
     ) -> SelectedWindowScene {
