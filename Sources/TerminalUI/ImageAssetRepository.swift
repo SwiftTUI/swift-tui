@@ -102,7 +102,7 @@ extension ImageLookupKey: Hashable {
 }
 #endif
 
-final class ImageAssetRepository: @unchecked Sendable {
+final class ImageAssetRepository: Sendable {
   private struct Storage {
     var resolutions: [ImageLookupKey: ResolvedImageAsset] = [:]
     var decodedImages: [ImageAssetReference: DecodedPNGImage] = [:]

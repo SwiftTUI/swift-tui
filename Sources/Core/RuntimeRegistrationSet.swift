@@ -44,6 +44,24 @@ package struct RuntimeRegistrationSet {
     preferenceObservationRegistry?.reset()
   }
 
+  package func removeSubtrees(
+    rootedAt roots: [Identity]
+  ) {
+    guard !roots.isEmpty else {
+      return
+    }
+
+    actionRegistry?.removeSubtrees(rootedAt: roots)
+    keyHandlerRegistry?.removeSubtrees(rootedAt: roots)
+    pointerHandlerRegistry?.removeSubtrees(rootedAt: roots)
+    focusBindingRegistry?.removeSubtrees(rootedAt: roots)
+    focusedValuesRegistry?.removeSubtrees(rootedAt: roots)
+    hotkeyRegistry?.removeSubtrees(rootedAt: roots)
+    lifecycleRegistry?.removeSubtrees(rootedAt: roots)
+    taskRegistry?.removeSubtrees(rootedAt: roots)
+    preferenceObservationRegistry?.removeSubtrees(rootedAt: roots)
+  }
+
   package func restore(
     from handlers: NodeHandlers
   ) {

@@ -47,8 +47,7 @@ private struct KittyPayload: Sendable {
   var dataSize: Int
 }
 
-// SAFETY: Mutable caches are protected by OSAllocatedUnfairLock.
-final class TerminalImageRenderer: @unchecked Sendable {
+final class TerminalImageRenderer: Sendable {
   private struct Storage {
     var kittyPayloads: [TerminalImageVariantKey: KittyPayload] = [:]
     var sixelPayloads: [TerminalImageVariantKey: String] = [:]

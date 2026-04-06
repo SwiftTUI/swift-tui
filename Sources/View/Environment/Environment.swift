@@ -183,7 +183,14 @@ public struct ResolveContext: Equatable, Sendable {
   public var environmentValues: EnvironmentValues
   package var focusedValues: FocusedValues
   public var transaction: TransactionSnapshot
-  public var invalidatedIdentities: Set<Identity>
+  public var invalidatedIdentities: Set<Identity> {
+    didSet {
+      invalidationSummary = .init(
+        invalidatedIdentities: invalidatedIdentities
+      )
+    }
+  }
+  package var invalidationSummary: InvalidationSummary
   package var resolveWorkTracker: ResolveWorkTracker?
   package var localActionRegistry: LocalActionRegistry?
   package var localPointerHandlerRegistry: LocalPointerHandlerRegistry?
@@ -198,7 +205,6 @@ public struct ResolveContext: Equatable, Sendable {
   package var observationBridge: ObservationBridge?
   package var viewGraph: ViewGraph?
   package var imageAssetResolver: ImageAssetResolver?
-  package var runtimeRegistrationReplayMode: RuntimeRegistrationReplayMode
 
   @MainActor
   package var runtimeRegistrations: RuntimeRegistrationSet {
@@ -244,6 +250,7 @@ public struct ResolveContext: Equatable, Sendable {
       environmentValues: environmentValues,
       transaction: transaction,
       invalidatedIdentities: invalidatedIdentities,
+      invalidationSummary: invalidationSummary,
       localActionRegistry: localActionRegistry,
       localKeyHandlerRegistry: localKeyHandlerRegistry,
       localLifecycleRegistry: localLifecycleRegistry,
@@ -261,7 +268,6 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.resolveWorkTracker = resolveWorkTracker
     childContext.focusedValues = focusedValues
     childContext.imageAssetResolver = imageAssetResolver
-    childContext.runtimeRegistrationReplayMode = runtimeRegistrationReplayMode
     return childContext
   }
 
@@ -280,6 +286,7 @@ public struct ResolveContext: Equatable, Sendable {
       environmentValues: environmentValues,
       transaction: transaction,
       invalidatedIdentities: invalidatedIdentities,
+      invalidationSummary: invalidationSummary,
       localActionRegistry: localActionRegistry,
       localKeyHandlerRegistry: localKeyHandlerRegistry,
       localLifecycleRegistry: localLifecycleRegistry,
@@ -297,7 +304,6 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.resolveWorkTracker = resolveWorkTracker
     replacedContext.focusedValues = focusedValues
     replacedContext.imageAssetResolver = imageAssetResolver
-    replacedContext.runtimeRegistrationReplayMode = runtimeRegistrationReplayMode
     return replacedContext
   }
 
@@ -332,10 +338,7 @@ public struct ResolveContext: Equatable, Sendable {
     at identity: Identity? = nil
   ) -> Bool {
     let targetIdentity = identity ?? self.identity
-    return invalidatedIdentities.contains { invalidatedIdentity in
-      invalidatedIdentity.isDescendant(of: targetIdentity)
-        || targetIdentity.isDescendant(of: invalidatedIdentity)
-    }
+    return invalidationSummary.intersectsSubtree(at: targetIdentity)
   }
 
   @MainActor
@@ -381,6 +384,7 @@ extension ResolveContext {
     environmentValues: EnvironmentValues = .init(),
     transaction: TransactionSnapshot = .init(),
     invalidatedIdentities: Set<Identity> = [],
+    invalidationSummary: InvalidationSummary? = nil,
     localActionRegistry: LocalActionRegistry? = nil,
     localFocusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
     localKeyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
@@ -401,6 +405,9 @@ extension ResolveContext {
       : environment
     self.transaction = transaction
     self.invalidatedIdentities = invalidatedIdentities
+    self.invalidationSummary =
+      invalidationSummary
+      ?? .init(invalidatedIdentities: invalidatedIdentities)
     resolveWorkTracker = .init()
     self.localActionRegistry = localActionRegistry
     self.localPointerHandlerRegistry = nil
@@ -414,13 +421,7 @@ extension ResolveContext {
     observationBridge = nil
     viewGraph = nil
     imageAssetResolver = nil
-    runtimeRegistrationReplayMode = .eagerDuringResolve
   }
-}
-
-package enum RuntimeRegistrationReplayMode: Sendable {
-  case eagerDuringResolve
-  case deferredUntilPostPass
 }
 
 extension EnvironmentValues {

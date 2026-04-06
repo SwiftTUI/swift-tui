@@ -231,16 +231,15 @@ package func resolveView<V: View>(
   if let reused = context.viewGraph?.reusableSnapshot(
     for: context.identity,
     invalidatedIdentities: context.invalidatedIdentities,
+    invalidationSummary: context.invalidationSummary,
     environment: context.environment,
     transaction: context.transaction,
     invalidator: context.invalidationProxy?.invalidator
   ) {
-    if context.runtimeRegistrationReplayMode == .eagerDuringResolve {
-      context.viewGraph?.restoreRuntimeRegistrations(
-        for: reused,
-        into: context.runtimeRegistrations
-      )
-    }
+    context.viewGraph?.restoreRuntimeRegistrations(
+      for: reused,
+      into: context.runtimeRegistrations
+    )
     context.recordResolvedReuse(
       count: reused.subtreeNodeCount
     )
@@ -252,10 +251,8 @@ package func resolveView<V: View>(
     invalidator: context.invalidationProxy?.invalidator
   )
   if let graphNode, graphNode.isAtOutermostEvaluationDepth {
-    var retainedContext = context
-    retainedContext.runtimeRegistrationReplayMode = .deferredUntilPostPass
     context.viewGraph?.setEvaluator(for: context.identity) {
-      _ = resolveView(view, in: retainedContext)
+      _ = resolveView(view, in: context)
     }
   }
   context.recordResolvedComputation()

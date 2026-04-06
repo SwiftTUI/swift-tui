@@ -54,7 +54,7 @@ public struct TextLayoutOptions: Equatable, Hashable, Sendable {
   }
 }
 
-package final class TextLayoutCache: @unchecked Sendable {
+package final class TextLayoutCache: Sendable {
   private struct Key: Hashable, Sendable {
     let content: String
     let options: TextLayoutOptions

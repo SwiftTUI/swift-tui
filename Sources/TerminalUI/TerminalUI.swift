@@ -90,15 +90,11 @@ public struct DefaultRenderer {
     var resolveContext = context
     let runtimeRegistrations = resolveContext.runtimeRegistrations
     resolveContext.imageAssetResolver = imageRepository.resolver()
-    runtimeRegistrations.resetAll()
     viewGraph.beginFrame()
     viewGraph.invalidate(context.invalidatedIdentities)
     resolveContext.viewGraph = viewGraph
     resolveContext.observationBridge?.attachViewGraph(viewGraph)
     resolveContext.observationBridge?.beginTrackingPass()
-    resolveContext.runtimeRegistrationReplayMode = .eagerDuringResolve
-    var retainedResolveContext = resolveContext
-    retainedResolveContext.runtimeRegistrationReplayMode = .deferredUntilPostPass
     let wrappedRoot = ToastHostingRoot(
       content: TerminalPresentationHostingRoot(
         content: ToolbarHostingRoot(content: root)
@@ -108,20 +104,23 @@ public struct DefaultRenderer {
       _ = resolver.resolve(wrappedRoot, in: resolveContext)
     }
     viewGraph.setEvaluator(for: resolveContext.identity) {
-      _ = resolver.resolve(wrappedRoot, in: retainedResolveContext)
+      _ = resolver.resolve(wrappedRoot, in: resolveContext)
+    }
+    let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
+    if let dirtyEvaluationPlan {
+      runtimeRegistrations.removeSubtrees(
+        rootedAt: dirtyEvaluationPlan.frontierIdentities
+      )
+    } else {
+      runtimeRegistrations.resetAll()
     }
 
-    let (usedSelectiveDirtyEvaluation, resolveDuration) = measurePhase {
-      viewGraph.evaluateDirtyNodes()
-    }
-    let resolved = viewGraph.snapshot()
-    if usedSelectiveDirtyEvaluation {
-      runtimeRegistrations.resetAll()
-      viewGraph.restoreRuntimeRegistrations(
-        for: resolved,
-        into: runtimeRegistrations
+    let (_, resolveDuration) = measurePhase {
+      viewGraph.evaluateDirtyNodes(
+        using: dirtyEvaluationPlan
       )
     }
+    let resolved = viewGraph.snapshot()
     let layoutPassContext = LayoutPassContext(
       retainedLayout: retainedFrames.layoutSession(
         invalidatedIdentities: context.invalidatedIdentities

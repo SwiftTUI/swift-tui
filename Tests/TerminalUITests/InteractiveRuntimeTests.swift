@@ -1295,7 +1295,7 @@ struct InteractiveRuntimeTests {
     #expect(recorder.destinations == ["https://example.com"])
   }
 
-  @Test("reused interactive subtrees replay local handlers after registry reset")
+  @Test("reused interactive subtrees keep local handlers across selective dirty frames")
   func reusedInteractiveSubtreesReplayLocalHandlers() {
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
@@ -1318,9 +1318,6 @@ struct InteractiveRuntimeTests {
     #expect(keyRegistry.dispatch(identity: testIdentity("Root", "Harness[0]"), event: .return))
     #expect(recorder.actionCount == 1)
     #expect(recorder.keyEvents == [.return])
-
-    actionRegistry.reset()
-    keyRegistry.reset()
 
     _ = renderer.render(
       ReusedHandlerRoot(recorder: recorder, dirtyLabel: "Dirty 1"),

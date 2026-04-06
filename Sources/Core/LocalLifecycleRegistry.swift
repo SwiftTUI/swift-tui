@@ -68,6 +68,29 @@ package final class LocalLifecycleRegistry: Equatable {
     disappearHandlers.removeAll(keepingCapacity: true)
   }
 
+  package func removeSubtrees(
+    rootedAt roots: [Identity]
+  ) {
+    guard !roots.isEmpty else {
+      return
+    }
+
+    for handlerID in appearHandlers.keys
+    where identityMatchesAnySubtreeRoot(
+      lifecycleHandlerIdentity(from: handlerID),
+      roots: roots
+    ) {
+      appearHandlers.removeValue(forKey: handlerID)
+    }
+    for handlerID in disappearHandlers.keys
+    where identityMatchesAnySubtreeRoot(
+      lifecycleHandlerIdentity(from: handlerID),
+      roots: roots
+    ) {
+      disappearHandlers.removeValue(forKey: handlerID)
+    }
+  }
+
   package func snapshot() -> LifecycleHandlerSnapshot {
     .init(
       appearHandlers: appearHandlers,
@@ -89,4 +112,25 @@ package final class LocalLifecycleRegistry: Equatable {
       disappearHandlers[handlerID] = handler
     }
   }
+}
+
+private func identityMatchesAnySubtreeRoot(
+  _ identity: Identity,
+  roots: [Identity]
+) -> Bool {
+  roots.contains { root in
+    identity == root || identity.isDescendant(of: root)
+  }
+}
+
+private func lifecycleHandlerIdentity(
+  from handlerID: String
+) -> Identity {
+  let identityPath = String(handlerID.split(separator: "#", maxSplits: 1).first ?? "")
+  guard !identityPath.isEmpty else {
+    return .init(components: [] as [IdentityComponent])
+  }
+  return .init(
+    components: identityPath.split(separator: "/").map(String.init)
+  )
 }

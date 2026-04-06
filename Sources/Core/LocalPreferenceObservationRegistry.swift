@@ -1,4 +1,4 @@
-package struct PreferenceObservationRegistrationSnapshot: @unchecked Sendable {
+package struct PreferenceObservationRegistrationSnapshot: Sendable {
   package var identity: Identity
   package var handlerID: String
   fileprivate let box: any PreferenceObservationBox
@@ -124,6 +124,20 @@ package final class LocalPreferenceObservationRegistry: Equatable {
     registrations.removeAll(keepingCapacity: true)
   }
 
+  package func removeSubtrees(
+    rootedAt roots: [Identity]
+  ) {
+    guard !roots.isEmpty else {
+      return
+    }
+
+    for (handlerID, _) in registrations.filter({
+      identityMatchesAnySubtreeRoot($0.value.identity, roots: roots)
+    }) {
+      registrations.removeValue(forKey: handlerID)
+    }
+  }
+
   package func snapshot() -> [PreferenceObservationRegistrationSnapshot] {
     registrations.values.sorted(by: { $0.handlerID < $1.handlerID })
   }
@@ -138,5 +152,14 @@ package final class LocalPreferenceObservationRegistry: Equatable {
     for registration in snapshot {
       registrations[registration.handlerID] = registration
     }
+  }
+}
+
+private func identityMatchesAnySubtreeRoot(
+  _ identity: Identity,
+  roots: [Identity]
+) -> Bool {
+  roots.contains { root in
+    identity == root || identity.isDescendant(of: root)
   }
 }

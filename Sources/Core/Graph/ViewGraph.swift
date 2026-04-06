@@ -5,6 +5,10 @@ package struct LifecycleStateNode: Equatable, Sendable {
   var task: TaskDescriptor?
 }
 
+package struct DirtyEvaluationPlan: Equatable, Sendable {
+  package let frontierIdentities: [Identity]
+}
+
 @MainActor
 package final class ViewGraph {
   package private(set) var root: ViewNode?
@@ -143,30 +147,35 @@ package final class ViewGraph {
     registrationAliasesByIdentity[identity, default: []].insert(aliasIdentity)
   }
 
-  package func evaluateDirtyNodes() -> Bool {
+  package func selectiveDirtyEvaluationPlan() -> DirtyEvaluationPlan? {
     let canEvaluateDirtyFrontier =
       !graphLocalDirtyIdentities.isEmpty
       && !invalidatedIdentities.isEmpty
       && invalidatedIdentities.isSubset(of: graphLocalDirtyIdentities)
 
-    if root == nil || !canEvaluateDirtyFrontier {
-      rootEvaluator?()
-      if let evaluationRootIdentity {
-        root = nodesByIdentity[evaluationRootIdentity]
-      }
-      return false
+    guard root != nil, canEvaluateDirtyFrontier else {
+      return nil
     }
 
     let dirtyFrontier = dirtyFrontierNodes()
 
     if dirtyFrontier.isEmpty {
-      if let evaluationRootIdentity {
-        root = nodesByIdentity[evaluationRootIdentity]
-      }
-      return false
+      return nil
     }
 
     guard dirtyFrontier.allSatisfy(\.hasEvaluator) else {
+      return nil
+    }
+
+    return DirtyEvaluationPlan(
+      frontierIdentities: dirtyFrontier.map(\.identity)
+    )
+  }
+
+  package func evaluateDirtyNodes(
+    using plan: DirtyEvaluationPlan? = nil
+  ) -> Bool {
+    guard let plan = plan ?? selectiveDirtyEvaluationPlan() else {
       rootEvaluator?()
       if let evaluationRootIdentity {
         root = nodesByIdentity[evaluationRootIdentity]
@@ -174,8 +183,8 @@ package final class ViewGraph {
       return false
     }
 
-    for node in dirtyFrontier {
-      node.evaluate()
+    for identity in plan.frontierIdentities {
+      nodesByIdentity[identity]?.evaluate()
     }
     if let evaluationRootIdentity {
       root = nodesByIdentity[evaluationRootIdentity]
@@ -345,6 +354,7 @@ package final class ViewGraph {
   package func reusableSnapshot(
     for identity: Identity,
     invalidatedIdentities: Set<Identity>,
+    invalidationSummary: InvalidationSummary? = nil,
     environment: EnvironmentSnapshot,
     transaction: TransactionSnapshot,
     invalidator: (any Invalidating)?
@@ -355,6 +365,25 @@ package final class ViewGraph {
     node.prepareForFrame(currentFrameID)
     guard !invalidatedIdentities.isEmpty else {
       return nil
+    }
+
+    guard node.canReuse(
+      frameID: currentFrameID,
+      environment: environment,
+      transaction: transaction
+    ) else {
+      return nil
+    }
+
+    let invalidationSummary = invalidationSummary
+      ?? .init(invalidatedIdentities: invalidatedIdentities)
+    if !invalidationSummary.intersectsSubtree(at: identity) {
+      let snapshot = node.snapshot()
+      recordReusedSubtree(
+        snapshot,
+        invalidator: invalidator
+      )
+      return snapshot
     }
 
     let snapshot = node.snapshot()
@@ -374,13 +403,6 @@ package final class ViewGraph {
         || identity.isDescendant(of: invalidatedIdentity)
     }
     guard !conflictsWithInvalidation else {
-      return nil
-    }
-    guard node.canReuse(
-      frameID: currentFrameID,
-      environment: environment,
-      transaction: transaction
-    ) else {
       return nil
     }
     recordReusedSubtree(

@@ -388,10 +388,7 @@ extension CustomLayoutProxy {
 }
 
 /// Reference wrapper used to carry a custom layout through the pipeline.
-// SAFETY: Stores `any CustomLayoutProxy` existential. CustomLayoutProxy requires Sendable
-// conformance, but the existential wrapper prevents the compiler from proving it.
-// All stored properties are immutable after construction (let-bound).
-public final class CustomLayoutHandle: @unchecked Sendable {
+public final class CustomLayoutHandle: Sendable {
   public let proxy: any CustomLayoutProxy
   package let measurementReuseSignature: String?
   package let placementHandler:

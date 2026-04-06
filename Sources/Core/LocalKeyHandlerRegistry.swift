@@ -113,6 +113,25 @@ package final class LocalKeyHandlerRegistry: Equatable {
     keyPressHandlers.removeAll(keepingCapacity: true)
   }
 
+  package func removeSubtrees(
+    rootedAt roots: [Identity]
+  ) {
+    guard !roots.isEmpty else {
+      return
+    }
+
+    for identity in handlers.keys.filter({
+      identityMatchesAnySubtreeRoot($0, roots: roots)
+    }) {
+      handlers.removeValue(forKey: identity)
+    }
+    for identity in keyPressHandlers.keys.filter({
+      identityMatchesAnySubtreeRoot($0, roots: roots)
+    }) {
+      keyPressHandlers.removeValue(forKey: identity)
+    }
+  }
+
   package func snapshot() -> [Identity: Handler] {
     handlers
   }
@@ -139,5 +158,14 @@ package final class LocalKeyHandlerRegistry: Equatable {
     for (identity, handler) in snapshot {
       keyPressHandlers[identity] = handler
     }
+  }
+}
+
+private func identityMatchesAnySubtreeRoot(
+  _ identity: Identity,
+  roots: [Identity]
+) -> Bool {
+  roots.contains { root in
+    identity == root || identity.isDescendant(of: root)
   }
 }

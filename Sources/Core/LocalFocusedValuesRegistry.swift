@@ -106,6 +106,21 @@ package final class LocalFocusedValuesRegistry: Equatable {
     registrations.removeAll(keepingCapacity: true)
   }
 
+  package func removeSubtrees(
+    rootedAt roots: [Identity]
+  ) {
+    guard !roots.isEmpty else {
+      return
+    }
+
+    registrations.removeAll { registration in
+      identityMatchesAnySubtreeRoot(
+        registration.identity,
+        roots: roots
+      )
+    }
+  }
+
   package func snapshot() -> [FocusedValuesRegistrationSnapshot] {
     registrations
   }
@@ -118,5 +133,14 @@ package final class LocalFocusedValuesRegistry: Equatable {
     }
 
     registrations.append(contentsOf: snapshot)
+  }
+}
+
+private func identityMatchesAnySubtreeRoot(
+  _ identity: Identity,
+  roots: [Identity]
+) -> Bool {
+  roots.contains { root in
+    identity == root || identity.isDescendant(of: root)
   }
 }

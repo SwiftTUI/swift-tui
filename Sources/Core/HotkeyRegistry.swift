@@ -90,6 +90,21 @@ package final class HotkeyRegistry: Equatable {
     entries.removeAll(keepingCapacity: true)
   }
 
+  package func removeSubtrees(
+    rootedAt roots: [Identity]
+  ) {
+    guard !roots.isEmpty else {
+      return
+    }
+
+    entries.removeAll { registration in
+      identityMatchesAnySubtreeRoot(
+        registration.identity,
+        roots: roots
+      )
+    }
+  }
+
   package func snapshot() -> [HotkeyRegistrationSnapshot] {
     entries
   }
@@ -99,5 +114,14 @@ package final class HotkeyRegistry: Equatable {
       return
     }
     entries.append(contentsOf: snapshot)
+  }
+}
+
+private func identityMatchesAnySubtreeRoot(
+  _ identity: Identity,
+  roots: [Identity]
+) -> Bool {
+  roots.contains { root in
+    identity == root || identity.isDescendant(of: root)
   }
 }

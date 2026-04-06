@@ -114,6 +114,21 @@ package final class LocalFocusBindingRegistry: Equatable {
     registrations.removeAll(keepingCapacity: true)
   }
 
+  package func removeSubtrees(
+    rootedAt roots: [Identity]
+  ) {
+    guard !roots.isEmpty else {
+      return
+    }
+
+    registrations.removeAll { registration in
+      identityMatchesAnySubtreeRoot(
+        registration.identity,
+        roots: roots
+      )
+    }
+  }
+
   package func snapshot() -> [FocusBindingRegistrationSnapshot] {
     registrations
   }
@@ -143,5 +158,14 @@ package final class LocalFocusBindingRegistry: Equatable {
     }
 
     return orderedBindingIDs.compactMap { grouped[$0] }
+  }
+}
+
+private func identityMatchesAnySubtreeRoot(
+  _ identity: Identity,
+  roots: [Identity]
+) -> Bool {
+  roots.contains { root in
+    identity == root || identity.isDescendant(of: root)
   }
 }

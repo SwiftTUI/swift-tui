@@ -89,6 +89,20 @@ package final class LocalPointerHandlerRegistry: Equatable {
     handlers.removeAll(keepingCapacity: true)
   }
 
+  package func removeSubtrees(
+    rootedAt roots: [Identity]
+  ) {
+    guard !roots.isEmpty else {
+      return
+    }
+
+    for routeID in handlers.keys.filter({
+      identityMatchesAnySubtreeRoot($0.identity, roots: roots)
+    }) {
+      handlers.removeValue(forKey: routeID)
+    }
+  }
+
   package func snapshot() -> [RouteID: Handler] {
     handlers
   }
@@ -101,5 +115,14 @@ package final class LocalPointerHandlerRegistry: Equatable {
     for (routeID, handler) in snapshot {
       handlers[routeID] = handler
     }
+  }
+}
+
+private func identityMatchesAnySubtreeRoot(
+  _ identity: Identity,
+  roots: [Identity]
+) -> Bool {
+  roots.contains { root in
+    identity == root || identity.isDescendant(of: root)
   }
 }

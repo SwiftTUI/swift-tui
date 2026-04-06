@@ -50,6 +50,20 @@ package final class LocalTaskRegistry: Equatable {
     registrations.removeAll(keepingCapacity: true)
   }
 
+  package func removeSubtrees(
+    rootedAt roots: [Identity]
+  ) {
+    guard !roots.isEmpty else {
+      return
+    }
+
+    for identity in registrations.keys.filter({
+      identityMatchesAnySubtreeRoot($0, roots: roots)
+    }) {
+      registrations.removeValue(forKey: identity)
+    }
+  }
+
   package func snapshot() -> [Identity: TaskRegistration] {
     registrations
   }
@@ -64,5 +78,14 @@ package final class LocalTaskRegistry: Equatable {
     for (identity, registration) in snapshot {
       registrations[identity] = registration
     }
+  }
+}
+
+private func identityMatchesAnySubtreeRoot(
+  _ identity: Identity,
+  roots: [Identity]
+) -> Bool {
+  roots.contains { root in
+    identity == root || identity.isDescendant(of: root)
   }
 }

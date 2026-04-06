@@ -60,6 +60,20 @@ package final class LocalActionRegistry: Equatable {
     handlers.removeAll(keepingCapacity: true)
   }
 
+  package func removeSubtrees(
+    rootedAt roots: [Identity]
+  ) {
+    guard !roots.isEmpty else {
+      return
+    }
+
+    for identity in handlers.keys.filter({
+      identityMatchesAnySubtreeRoot($0, roots: roots)
+    }) {
+      handlers.removeValue(forKey: identity)
+    }
+  }
+
   package func snapshot() -> [Identity: Registration] {
     handlers
   }
@@ -72,5 +86,14 @@ package final class LocalActionRegistry: Equatable {
     for (identity, registration) in snapshot {
       handlers[identity] = registration
     }
+  }
+}
+
+private func identityMatchesAnySubtreeRoot(
+  _ identity: Identity,
+  roots: [Identity]
+) -> Bool {
+  roots.contains { root in
+    identity == root || identity.isDescendant(of: root)
   }
 }

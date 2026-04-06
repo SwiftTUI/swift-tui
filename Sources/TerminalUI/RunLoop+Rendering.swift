@@ -1,24 +1,49 @@
 import Core
 import View
 
+package struct FocusSyncRerenderBudget: Equatable, Sendable {
+  package let maximumRerenders: Int
+  package private(set) var rerenderCount: Int
+
+  package init(maximumRerenders: Int = 16) {
+    precondition(maximumRerenders > 0)
+    self.maximumRerenders = maximumRerenders
+    rerenderCount = 0
+  }
+
+  /// Returns `true` when another focus-sync rerender is still allowed.
+  package mutating func recordRerender() -> Bool {
+    rerenderCount += 1
+    return rerenderCount < maximumRerenders
+  }
+}
+
 extension RunLoop {
   package func renderPendingFrames(renderedFrames: inout Int) throws {
     observationBridge.attachInvalidator(scheduler)
 
     while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+      let causeSummary = scheduledFrame.causes
+        .map(\.rawValue)
+        .sorted()
+        .joined(separator: "+")
       var rerenderedForFocusSync = false
+      var focusSyncBudget = FocusSyncRerenderBudget()
+      var focusSyncBudgetExceeded = false
+      var artifacts: FrameArtifacts?
       while true {
-        let artifacts = renderer.render(
+        let renderedArtifacts = renderer.render(
           viewBuilder(stateContainer.state, focusTracker.currentFocusIdentity),
           context: resolveContext(for: scheduledFrame),
           proposal: proposal()
         )
+        artifacts = renderedArtifacts
 
-        latestSemanticSnapshot = artifacts.semanticSnapshot
+        latestSemanticSnapshot = renderedArtifacts.semanticSnapshot
 
-        let focusChanged = focusTracker.updateRegions(artifacts.semanticSnapshot.focusRegions)
+        let focusChanged = focusTracker.updateRegions(renderedArtifacts.semanticSnapshot.focusRegions)
         let desiredFocusRequest = localFocusBindingRegistry.desiredFocusRequest(
-          allowedIdentities: Set(artifacts.semanticSnapshot.focusRegions.map(\.identity))
+          allowedIdentities: Set(renderedArtifacts.semanticSnapshot.focusRegions.map(\.identity))
         )
         let appliedFocusRequest = applyDesiredFocusRequest(desiredFocusRequest)
         let focusStateChanged = localFocusBindingRegistry.sync(
@@ -26,7 +51,7 @@ extension RunLoop {
         )
         let resolvedFocusedValues = localFocusedValuesRegistry.focusedValues(
           for: focusTracker.currentFocusIdentity,
-          in: artifacts.resolvedTree
+          in: renderedArtifacts.resolvedTree
         )
         let focusedValuesChanged = resolvedFocusedValues != currentFocusedValues
         if focusedValuesChanged {
@@ -35,49 +60,61 @@ extension RunLoop {
 
         if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged {
           rerenderedForFocusSync = true
+          if !focusSyncBudget.recordRerender() {
+            focusSyncBudgetExceeded = true
+            break
+          }
           continue
         }
-
-        let presentationDamage: PresentationDamage? =
-          if rerenderedForFocusSync {
-            nil
-          } else {
-            artifacts.presentationDamage
-          }
-        if let damageAwareHost = terminalHost as? any DamageAwareTerminalHosting {
-          try damageAwareHost.present(
-            artifacts.rasterSurface,
-            damage: presentationDamage
-          )
-        } else {
-          try terminalHost.present(artifacts.rasterSurface)
-        }
-        lifecycleCoordinator.applyCommittedFrame(
-          plan: artifacts.commitPlan,
-          currentLifecycleRegistry: localLifecycleRegistry,
-          currentTaskRegistry: localTaskRegistry
-        )
-        _ = localPreferenceObservationRegistry.applyChanges(
-          since: previousPreferenceObservations
-        )
-        previousPreferenceObservations = localPreferenceObservationRegistry.snapshot()
-        if !postActionInvalidationIdentities.isEmpty {
-          scheduler.requestInvalidation(of: postActionInvalidationIdentities)
-          postActionInvalidationIdentities.removeAll(keepingCapacity: true)
-        }
-        observationBridge.prune(
-          keeping: renderer.liveIdentitySnapshot()
-        )
-        renderedFrames += 1
-
-        if let transientPressedIdentity,
-          transientPressedIdentity == pressedIdentity
-        {
-          self.transientPressedIdentity = nil
-          setPressedIdentity(nil, transient: false)
-        }
-
         break
+      }
+
+      guard let artifacts else {
+        preconditionFailure("Focus synchronization produced no frame artifacts.")
+      }
+      if focusSyncBudgetExceeded {
+        assertionFailure(
+          "Focus synchronization did not converge after \(focusSyncBudget.rerenderCount) rerenders for frame causes \(causeSummary). The runtime will present the latest available tree and continue."
+        )
+      }
+
+      let presentationDamage: PresentationDamage? =
+        if rerenderedForFocusSync {
+          nil
+        } else {
+          artifacts.presentationDamage
+        }
+      if let damageAwareHost = terminalHost as? any DamageAwareTerminalHosting {
+        try damageAwareHost.present(
+          artifacts.rasterSurface,
+          damage: presentationDamage
+        )
+      } else {
+        try terminalHost.present(artifacts.rasterSurface)
+      }
+      lifecycleCoordinator.applyCommittedFrame(
+        plan: artifacts.commitPlan,
+        currentLifecycleRegistry: localLifecycleRegistry,
+        currentTaskRegistry: localTaskRegistry
+      )
+      _ = localPreferenceObservationRegistry.applyChanges(
+        since: previousPreferenceObservations
+      )
+      previousPreferenceObservations = localPreferenceObservationRegistry.snapshot()
+      if !postActionInvalidationIdentities.isEmpty {
+        scheduler.requestInvalidation(of: postActionInvalidationIdentities)
+        postActionInvalidationIdentities.removeAll(keepingCapacity: true)
+      }
+      observationBridge.prune(
+        keeping: renderer.liveIdentitySnapshot()
+      )
+      renderedFrames += 1
+
+      if let transientPressedIdentity,
+        transientPressedIdentity == pressedIdentity
+      {
+        self.transientPressedIdentity = nil
+        setPressedIdentity(nil, transient: false)
       }
     }
   }
@@ -114,9 +151,6 @@ extension RunLoop {
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
       effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
     }
-    let registrations = runtimeRegistrations
-    registrations.resetAll()
-
     var context = ResolveContext(
       identity: rootIdentity,
       environment: environment,

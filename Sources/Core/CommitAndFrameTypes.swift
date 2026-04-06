@@ -96,6 +96,64 @@ public struct MeasurementCacheMetrics: Equatable, Sendable {
   }
 }
 
+package struct InvalidationSummary: Equatable, Sendable {
+  package let directlyInvalidated: Set<Identity>
+  package let identitiesWithInvalidatedDescendants: Set<Identity>
+
+  package init(
+    invalidatedIdentities: Set<Identity>
+  ) {
+    directlyInvalidated = invalidatedIdentities
+
+    var identitiesWithInvalidatedDescendants: Set<Identity> = []
+    for invalidatedIdentity in invalidatedIdentities {
+      var ancestor = invalidatedIdentity.parent
+      while let current = ancestor {
+        identitiesWithInvalidatedDescendants.insert(current)
+        ancestor = current.parent
+      }
+    }
+    self.identitiesWithInvalidatedDescendants = identitiesWithInvalidatedDescendants
+  }
+
+  package var isEmpty: Bool {
+    directlyInvalidated.isEmpty
+  }
+
+  package func isDirectlyInvalidated(
+    _ identity: Identity
+  ) -> Bool {
+    directlyInvalidated.contains(identity)
+  }
+
+  package func containsInvalidatedDescendant(
+    of identity: Identity
+  ) -> Bool {
+    identitiesWithInvalidatedDescendants.contains(identity)
+  }
+
+  package func hasInvalidatedAncestor(
+    of identity: Identity
+  ) -> Bool {
+    var ancestor = identity.parent
+    while let current = ancestor {
+      if directlyInvalidated.contains(current) {
+        return true
+      }
+      ancestor = current.parent
+    }
+    return false
+  }
+
+  package func intersectsSubtree(
+    at identity: Identity
+  ) -> Bool {
+    isDirectlyInvalidated(identity)
+      || containsInvalidatedDescendant(of: identity)
+      || hasInvalidatedAncestor(of: identity)
+  }
+}
+
 package struct ResolveWorkMetrics: Equatable, Sendable {
   package var resolvedNodesComputed: Int
   package var resolvedNodesReused: Int
@@ -213,26 +271,26 @@ package struct RetainedFrameIndex: Sendable {
 }
 
 package struct RetainedInvalidationSummary: Sendable {
-  package let directlyInvalidated: Set<Identity>
-  package let identitiesWithInvalidatedDescendants: Set<Identity>
+  private let base: InvalidationSummary
   package let identitiesWithSyntheticInvalidatedAncestors: Set<Identity>
   package let affectedIndexedChildSourceRoots: Set<Identity>
+
+  package var directlyInvalidated: Set<Identity> {
+    base.directlyInvalidated
+  }
+
+  package var identitiesWithInvalidatedDescendants: Set<Identity> {
+    base.identitiesWithInvalidatedDescendants
+  }
 
   package init(
     invalidatedIdentities: Set<Identity>,
     previousFrameIndex: RetainedFrameIndex?
   ) {
-    directlyInvalidated = invalidatedIdentities
-
-    var identitiesWithInvalidatedDescendants: Set<Identity> = []
-    for invalidatedIdentity in invalidatedIdentities {
-      var ancestor = invalidatedIdentity.parent
-      while let current = ancestor {
-        identitiesWithInvalidatedDescendants.insert(current)
-        ancestor = current.parent
-      }
-    }
-    self.identitiesWithInvalidatedDescendants = identitiesWithInvalidatedDescendants
+    let base = InvalidationSummary(
+      invalidatedIdentities: invalidatedIdentities
+    )
+    self.base = base
 
     guard let previousFrameIndex else {
       identitiesWithSyntheticInvalidatedAncestors = []
@@ -264,10 +322,7 @@ package struct RetainedInvalidationSummary: Sendable {
         guard let source = resolvedNode.indexedChildSource else {
           continue
         }
-        if invalidatedIdentities.contains(where: { invalidatedIdentity in
-          invalidatedIdentity.isDescendant(of: source.identityRoot)
-            || source.identityRoot.isDescendant(of: invalidatedIdentity)
-        }) {
+        if base.intersectsSubtree(at: source.identityRoot) {
           affectedIndexedChildSourceRoots.insert(source.identityRoot)
         }
       }
@@ -278,13 +333,13 @@ package struct RetainedInvalidationSummary: Sendable {
   package func isDirectlyInvalidated(
     _ identity: Identity
   ) -> Bool {
-    directlyInvalidated.contains(identity)
+    base.isDirectlyInvalidated(identity)
   }
 
   package func containsInvalidatedDescendant(
     of identity: Identity
   ) -> Bool {
-    identitiesWithInvalidatedDescendants.contains(identity)
+    base.containsInvalidatedDescendant(of: identity)
   }
 
   package func hasSyntheticInvalidatedAncestor(
@@ -298,12 +353,25 @@ package struct RetainedInvalidationSummary: Sendable {
   ) -> Bool {
     affectedIndexedChildSourceRoots.contains(identityRoot)
   }
+
+  package func intersectsSubtree(
+    at identity: Identity
+  ) -> Bool {
+    base.intersectsSubtree(at: identity)
+  }
 }
 
 package struct RetainedLayoutSession: Sendable {
-  package var invalidatedIdentities: Set<Identity>
+  package var invalidatedIdentities: Set<Identity> {
+    didSet {
+      invalidationSummary = .init(
+        invalidatedIdentities: invalidatedIdentities,
+        previousFrameIndex: previousFrameIndex
+      )
+    }
+  }
   package let previousFrameIndex: RetainedFrameIndex?
-  package let invalidationSummary: RetainedInvalidationSummary
+  package var invalidationSummary: RetainedInvalidationSummary
 
   package init(
     previousFrameIndex: RetainedFrameIndex?,
@@ -338,10 +406,7 @@ package struct RetainedLayoutSession: Sendable {
   package func invalidationAffectsSubtree(
     at identity: Identity
   ) -> Bool {
-    invalidatedIdentities.contains { invalidatedIdentity in
-      invalidatedIdentity.isDescendant(of: identity)
-        || identity.isDescendant(of: invalidatedIdentity)
-    }
+    invalidationSummary.intersectsSubtree(at: identity)
   }
 
   package func isDirectlyInvalidated(
@@ -495,7 +560,14 @@ public struct FrameDiagnostics: Equatable, Sendable {
 public struct FrameContext: Equatable, Sendable {
   public var environment: EnvironmentSnapshot
   public var transaction: TransactionSnapshot
-  public var invalidatedIdentities: Set<Identity>
+  public var invalidatedIdentities: Set<Identity> {
+    didSet {
+      invalidationSummary = .init(
+        invalidatedIdentities: invalidatedIdentities
+      )
+    }
+  }
+  package var invalidationSummary: InvalidationSummary
   public var timestamp: MonotonicInstant
 
   /// Creates a frame context.
@@ -508,6 +580,9 @@ public struct FrameContext: Equatable, Sendable {
     self.environment = environment
     self.transaction = transaction
     self.invalidatedIdentities = invalidatedIdentities
+    invalidationSummary = .init(
+      invalidatedIdentities: invalidatedIdentities
+    )
     self.timestamp = timestamp
   }
 
@@ -521,10 +596,7 @@ public struct FrameContext: Equatable, Sendable {
   public func invalidationAffectsSubtree(
     at identity: Identity
   ) -> Bool {
-    invalidatedIdentities.contains { invalidatedIdentity in
-      invalidatedIdentity.isDescendant(of: identity)
-        || identity.isDescendant(of: invalidatedIdentity)
-    }
+    invalidationSummary.intersectsSubtree(at: identity)
   }
 }
 
