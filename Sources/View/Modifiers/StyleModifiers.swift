@@ -110,13 +110,10 @@ extension View {
     _ tag: V,
     includeOptional: Bool = true
   ) -> some View {
-    semanticMetadata(
-      .init(
-        selectionTag: .init(
-          value: AnyHashable(tag),
-          includeOptional: includeOptional
-        )
-      )
+    TagValueView(
+      content: self,
+      tag: tag,
+      includeOptional: includeOptional
     )
   }
 
@@ -247,6 +244,37 @@ extension View {
         )
       )
     )
+  }
+}
+
+public struct TagValueView<Content: View, Value: Hashable>: View, ResolvableView {
+  var content: Content
+  var tag: Value
+  var includeOptional: Bool
+
+  public init(
+    content: Content,
+    tag: Value,
+    includeOptional: Bool = true
+  ) {
+    self.content = content
+    self.tag = tag
+    self.includeOptional = includeOptional
+  }
+
+  package func resolveElements(
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let tagged = SemanticMetadataModifier(
+      content: content,
+      metadata: .init(
+        selectionTag: .init(
+          value: AnyHashable(tag),
+          includeOptional: includeOptional
+        )
+      )
+    )
+    return tagged.resolveElements(in: context)
   }
 }
 

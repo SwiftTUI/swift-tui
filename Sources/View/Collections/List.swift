@@ -1,7 +1,5 @@
 package import Core
 
-// AnyView policy: keep the collection surface typed and only erase at the
-// resolve boundary where heterogeneous children are flattened for extraction.
 /// Groups related collection content with optional header and footer content.
 public struct Section<Content: View, Header: View, Footer: View>: View,
   ResolvableView
@@ -136,14 +134,6 @@ public struct List<SelectionValue: Hashable, Content: View>: View, ResolvableVie
   ) {
     self.selection = selection
     self.content = content()
-  }
-
-  package init(
-    selection: Binding<SelectionValue>,
-    contentViews: [AnyView]
-  ) where Content == VariadicView<AnyView> {
-    self.selection = selection
-    content = VariadicView(contentViews)
   }
 
   package func resolveElements(

@@ -61,19 +61,61 @@ protocol SceneConfigurationProviding {
   func windowSceneConfigurations() -> [WindowSceneConfiguration]
 }
 
+@_spi(Runners) @MainActor public struct DeferredRootView: View, ResolvableView {
+  private let resolveElementsClosure: (ResolveContext) -> [ResolvedNode]
+
+  private static func resolveWithAuthoringContext(
+    _ authoringContext: AuthoringContext?,
+    _ apply: @escaping @MainActor (ResolveContext) -> [ResolvedNode]
+  ) -> @MainActor (ResolveContext) -> [ResolvedNode] {
+    guard let authoringContext else {
+      return apply
+    }
+
+    return { context in
+      withAuthoringContext(authoringContext) {
+        apply(context)
+      }
+    }
+  }
+
+  package init<V: View>(
+    authoringContext: AuthoringContext?,
+    @ViewBuilder content: @escaping @MainActor () -> V
+  ) {
+    let rootView = withAuthoringContext(authoringContext) {
+      content()
+    }
+    let erased: Any = rootView
+
+    if let resolvable = erased as? any ResolvableView {
+      resolveElementsClosure = Self.resolveWithAuthoringContext(authoringContext) { context in
+        resolvable.resolveElements(in: context)
+      }
+      return
+    }
+
+    resolveElementsClosure = Self.resolveWithAuthoringContext(authoringContext) { context in
+      resolveViewElements(rootView, in: context)
+    }
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    resolveElementsClosure(context)
+  }
+}
+
 @_spi(Runners) public struct WindowSceneConfiguration {
   @_spi(Runners) public var identifier: WindowIdentifier
   @_spi(Runners) public var title: String?
   @_spi(Runners) public var rootIdentity: Identity
-  // AnyView policy: retain an erased root-view builder here for deferred
-  // authored-content capture between scene declarations and the runtime.
-  @_spi(Runners) public var makeRootView: @MainActor () -> AnyView
+  @_spi(Runners) public var makeRootView: @MainActor () -> DeferredRootView
 
   @_spi(Runners) public init(
     identifier: WindowIdentifier,
     title: String?,
     rootIdentity: Identity,
-    makeRootView: @escaping @MainActor () -> AnyView
+    makeRootView: @escaping @MainActor () -> DeferredRootView
   ) {
     self.identifier = identifier
     self.title = title
@@ -133,10 +175,10 @@ package struct WindowHostLayout: Layout {
   }
 }
 
-package struct WindowHostView: View {
-  package let content: AnyView
+package struct WindowHostView<Content: View>: View {
+  package let content: Content
 
-  package init(content: AnyView) {
+  package init(content: Content) {
     self.content = content
   }
 
@@ -231,10 +273,7 @@ public struct WindowGroup: Scene {
   public let title: String?
   public let id: WindowIdentifier
 
-  // AnyView policy: retain this stored erased builder for deferred
-  // authored-content capture, and restore the original dynamic-property scope
-  // when the scene root is built later.
-  private let contentBuilder: @MainActor () -> AnyView
+  private let contentBuilder: @MainActor () -> DeferredRootView
 
   /// Creates a window scene with an explicit identifier.
   public init<Content: View>(
@@ -245,7 +284,7 @@ public struct WindowGroup: Scene {
     self.id = id
     let authoringScope = currentAuthoringContext()
     contentBuilder = {
-      scopedAnyView(authoringContext: authoringScope) {
+      DeferredRootView(authoringContext: authoringScope) {
         content()
       }
     }
@@ -263,7 +302,7 @@ public struct WindowGroup: Scene {
     self.id = id ?? WindowIdentifier(normalizedTitle)
     let authoringScope = currentAuthoringContext()
     contentBuilder = {
-      scopedAnyView(authoringContext: authoringScope) {
+      DeferredRootView(authoringContext: authoringScope) {
         content()
       }
     }

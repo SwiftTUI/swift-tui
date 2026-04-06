@@ -2,10 +2,8 @@ import Core
 import Synchronization
 import View
 
-// AnyView policy: retain this internal erased builder as typed runtime plumbing
-// for the run loop while keeping the public authoring surface generic.
-package typealias ErasedStateBodyBuilder<State: Equatable & Sendable> =
-  (_ state: State, _ focusedIdentity: Identity?) -> AnyView
+package typealias DeferredStateBodyBuilder<State: Equatable & Sendable> =
+  (_ state: State, _ focusedIdentity: Identity?) -> DeferredRootView
 
 /// Handles a key event and may mutate run-loop state.
 public typealias StateKeyHandler<State: Equatable & Sendable> =
@@ -94,7 +92,7 @@ public final class RunLoop<State: Equatable & Sendable> {
   package let stateContainer: StateContainer<State>
   package let focusTracker: FocusTracker
   package let keyHandler: StateKeyHandler<State>?
-  package let viewBuilder: ErasedStateBodyBuilder<State>
+  package let viewBuilder: DeferredStateBodyBuilder<State>
   package let environment: EnvironmentSnapshot
   package let environmentValues: EnvironmentValues
   package let proposalOverride: ProposedSize?
@@ -146,7 +144,7 @@ public final class RunLoop<State: Equatable & Sendable> {
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     proposal: ProposedSize? = nil,
-    viewBuilder: @escaping ErasedStateBodyBuilder<State>
+    viewBuilder: @escaping DeferredStateBodyBuilder<State>
   ) {
     self.rootIdentity = rootIdentity
     self.renderer = renderer
@@ -176,7 +174,7 @@ public final class RunLoop<State: Equatable & Sendable> {
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     proposal: ProposedSize? = nil,
-    viewBuilder: @escaping ErasedStateBodyBuilder<State>
+    viewBuilder: @escaping DeferredStateBodyBuilder<State>
   ) {
     self.init(
       rootIdentity: rootIdentity,
@@ -211,6 +209,7 @@ public final class RunLoop<State: Equatable & Sendable> {
     proposal: ProposedSize? = nil,
     viewBuilder: @escaping (_ state: State, _ focusedIdentity: Identity?) -> Content
   ) {
+    let authoringScope = currentAuthoringContext()
     self.init(
       rootIdentity: rootIdentity,
       renderer: renderer,
@@ -225,7 +224,7 @@ public final class RunLoop<State: Equatable & Sendable> {
       environmentValues: environmentValues,
       proposal: proposal,
       viewBuilder: { state, focusedIdentity in
-        scopedAnyView {
+        DeferredRootView(authoringContext: authoringScope) {
           viewBuilder(state, focusedIdentity)
         }
       }
@@ -310,12 +309,13 @@ public final class RunLoop<State: Equatable & Sendable> {
         if let exitReason = handle(event) {
           let shouldFlushBeforeExit =
             handledNonExitEvent
-            || (hadReadyFrameBeforeEvent && {
-              if case .signal = exitReason {
-                return true
-              }
-              return false
-            }())
+            || (hadReadyFrameBeforeEvent
+              && {
+                if case .signal = exitReason {
+                  return true
+                }
+                return false
+              }())
           if shouldFlushBeforeExit {
             try renderPendingFrames(renderedFrames: &renderedFrames)
           }

@@ -11,8 +11,6 @@ extension EnvironmentValues {
   }
 }
 
-// AnyView policy: retain deferred authored-content capture here so outline row
-// builders keep their original dynamic-property scope.
 /// Presents hierarchical collection data as an outline.
 public struct OutlineGroup<Data, ID, RowContent>: View
 where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
@@ -66,26 +64,21 @@ extension List {
     selection: Binding<SelectionValue>,
     children: KeyPath<Data.Element, [Data.Element]?>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
-  ) where Data: RandomAccessCollection, Content == VariadicView<AnyView> {
-    let authoringScope = currentAuthoringContext()
+  )
+  where
+    Data: RandomAccessCollection,
+    Content == OutlineGroup<Data, SelectionValue, TagValueView<RowContent, SelectionValue>>
+  {
     self.init(
-      selection: selection,
-      contentViews: [
-        scopedAnyView(authoringContext: authoringScope) {
-          OutlineTree(
-            elements: Array(data),
-            id: { $0[keyPath: id] },
-            children: { $0[keyPath: children] ?? [] },
-            rowContent: { element in
-              withAuthoringContext(authoringScope) {
-                rowContent(element).tag(element[keyPath: id])
-              }
-            },
-            authoringScope: authoringScope
-          )
-        }
-      ]
-    )
+      selection: selection
+    ) {
+      OutlineGroup(data, id: id, children: children) { element in
+        TagValueView(
+          content: rowContent(element),
+          tag: element[keyPath: id]
+        )
+      }
+    }
   }
 
   public init<Data, RowContent: View>(
@@ -94,26 +87,21 @@ extension List {
     selection: Binding<SelectionValue>,
     children: KeyPath<Data.Element, [Data.Element]>,
     @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
-  ) where Data: RandomAccessCollection, Content == VariadicView<AnyView> {
-    let authoringScope = currentAuthoringContext()
+  )
+  where
+    Data: RandomAccessCollection,
+    Content == OutlineGroup<Data, SelectionValue, TagValueView<RowContent, SelectionValue>>
+  {
     self.init(
-      selection: selection,
-      contentViews: [
-        scopedAnyView(authoringContext: authoringScope) {
-          OutlineTree(
-            elements: Array(data),
-            id: { $0[keyPath: id] },
-            children: { $0[keyPath: children] },
-            rowContent: { element in
-              withAuthoringContext(authoringScope) {
-                rowContent(element).tag(element[keyPath: id])
-              }
-            },
-            authoringScope: authoringScope
-          )
-        }
-      ]
-    )
+      selection: selection
+    ) {
+      OutlineGroup(data, id: id, children: children) { element in
+        TagValueView(
+          content: rowContent(element),
+          tag: element[keyPath: id]
+        )
+      }
+    }
   }
 
   public init<Data, ID, RowContent: View>(
@@ -125,27 +113,18 @@ extension List {
   )
   where
     Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID?,
-    Content == VariadicView<AnyView>
+    Content == OutlineGroup<Data, ID, TagValueView<RowContent, ID>>
   {
-    let authoringScope = currentAuthoringContext()
     self.init(
-      selection: selection,
-      contentViews: [
-        scopedAnyView(authoringContext: authoringScope) {
-          OutlineTree(
-            elements: Array(data),
-            id: { $0[keyPath: id] },
-            children: { $0[keyPath: children] ?? [] },
-            rowContent: { element in
-              withAuthoringContext(authoringScope) {
-                rowContent(element).tag(element[keyPath: id])
-              }
-            },
-            authoringScope: authoringScope
-          )
-        }
-      ]
-    )
+      selection: selection
+    ) {
+      OutlineGroup(data, id: id, children: children) { element in
+        TagValueView(
+          content: rowContent(element),
+          tag: element[keyPath: id]
+        )
+      }
+    }
   }
 
   public init<Data, ID, RowContent: View>(
@@ -157,27 +136,18 @@ extension List {
   )
   where
     Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID?,
-    Content == VariadicView<AnyView>
+    Content == OutlineGroup<Data, ID, TagValueView<RowContent, ID>>
   {
-    let authoringScope = currentAuthoringContext()
     self.init(
-      selection: selection,
-      contentViews: [
-        scopedAnyView(authoringContext: authoringScope) {
-          OutlineTree(
-            elements: Array(data),
-            id: { $0[keyPath: id] },
-            children: { $0[keyPath: children] },
-            rowContent: { element in
-              withAuthoringContext(authoringScope) {
-                rowContent(element).tag(element[keyPath: id])
-              }
-            },
-            authoringScope: authoringScope
-          )
-        }
-      ]
-    )
+      selection: selection
+    ) {
+      OutlineGroup(data, id: id, children: children) { element in
+        TagValueView(
+          content: rowContent(element),
+          tag: element[keyPath: id]
+        )
+      }
+    }
   }
 }
 
@@ -191,7 +161,7 @@ extension List where SelectionValue: Hashable {
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
     SelectionValue == Data.Element.ID,
-    Content == VariadicView<AnyView>
+    Content == OutlineGroup<Data, Data.Element.ID, TagValueView<RowContent, Data.Element.ID>>
   {
     self.init(
       data,
@@ -211,7 +181,7 @@ extension List where SelectionValue: Hashable {
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
     SelectionValue == Data.Element.ID,
-    Content == VariadicView<AnyView>
+    Content == OutlineGroup<Data, Data.Element.ID, TagValueView<RowContent, Data.Element.ID>>
   {
     self.init(
       data,
@@ -231,7 +201,7 @@ extension List where SelectionValue: Hashable {
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
     SelectionValue == Data.Element.ID?,
-    Content == VariadicView<AnyView>
+    Content == OutlineGroup<Data, Data.Element.ID, TagValueView<RowContent, Data.Element.ID>>
   {
     self.init(
       data,
@@ -251,7 +221,7 @@ extension List where SelectionValue: Hashable {
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
     SelectionValue == Data.Element.ID?,
-    Content == VariadicView<AnyView>
+    Content == OutlineGroup<Data, Data.Element.ID, TagValueView<RowContent, Data.Element.ID>>
   {
     self.init(
       data,
