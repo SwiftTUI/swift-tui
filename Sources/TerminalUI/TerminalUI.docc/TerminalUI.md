@@ -17,15 +17,19 @@ Use it when you want to:
 
 ## Runtime Story
 
-`TerminalUI` has two main public entry paths:
+`TerminalUI` has two main direct public entry paths:
 
 - ``DefaultRenderer`` for one-shot rendering and frame inspection
 - ``RunLoop`` for interactive sessions that own terminal I/O, scheduling, focus, lifecycle staging, and presentation
 
+It also owns the shared scene-hosting APIs that peer platform integration
+packages build on.
+
 Scene declarations such as ``App`` and ``WindowGroup`` also live here, but
-executable launch now lives in peer runner packages: `Runners/TerminalUICLI`
-for terminal-native apps and `Runners/TerminalUIWASI` for WASI builds.
-`TerminalUI` itself is library-only.
+platform integration lives in peer packages: executable runner packages
+`Runners/TerminalUICLI` and `Runners/TerminalUIWASI`, plus embedded host
+packages `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`. `TerminalUI` itself is
+library-only.
 
 ## Topics
 

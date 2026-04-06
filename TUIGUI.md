@@ -4,7 +4,8 @@ Last updated: April 5, 2026
 
 ## Goal
 
-Make TerminalUI apps shippable outside a local terminal in two peer packages:
+Make TerminalUI apps shippable outside a local terminal in two peer embedded
+host packages:
 
 - `GUI/SwiftUITUIGUI`: an SPM package that lets a macOS or iOS app host a TerminalUI scene inside SwiftUI
 - `GUI/WebTUIGUI`: a Bun-based package that lets a TerminalUI app ship in the browser on top of `ghostty-web`
@@ -12,8 +13,8 @@ Make TerminalUI apps shippable outside a local terminal in two peer packages:
 The authoring story stays the same:
 
 - app authors continue to write `App`, `Scene`, and `WindowGroup` in the root package
-- wrapper packages own terminal-surface hosting, scene selection chrome, and wrapper-local style surfaces
-- scene state must survive wrapper-driven scene switches
+- host packages own terminal-surface hosting, scene selection chrome, and host-local style surfaces
+- scene state must survive host-driven scene switches
 - resize and host style changes must continue to flow through the same runtime invalidation path as terminal `SIGWINCH`
 
 All Swift build commands in this document assume the repo-default `swiftly`
@@ -25,7 +26,7 @@ Swift 6.3.0 toolchain.
 
 ### Root package support
 
-The wrapper-facing root work is landed:
+The host-facing root work is landed:
 
 - `TerminalUI` exposes `TerminalUISceneDescriptor`,
   `TerminalUISceneManifest`, and `HostedSceneSession`
@@ -43,7 +44,7 @@ The wrapper-facing root work is landed:
 
 ### `GUI/SwiftUITUIGUI`
 
-The SwiftUI wrapper package is landed as a standalone SPM package:
+The SwiftUI host package is landed as a standalone SPM package:
 
 - package root: `GUI/SwiftUITUIGUI`
 - dependencies:
@@ -64,7 +65,7 @@ The SwiftUI wrapper package is landed as a standalone SPM package:
 
 ### `GUI/WebTUIGUI`
 
-The web wrapper package is also landed:
+The web host package is also landed:
 
 - package root: `GUI/WebTUIGUI`
 - build stack: Bun plus the repo-managed Swift 6.3.0 toolchain
@@ -91,14 +92,14 @@ The current boundary is:
   - retained hosted runtime sessions
   - manifest generation
   - control-message contract for resize and render-style updates
-- wrapper packages:
+- host packages:
   - window or browser shell integration
   - terminal widget embedding
-  - scene tabs, pickers, or other wrapper-local chrome
-  - wrapper-specific style mapping and host light/dark-to-theme binding
+  - scene tabs, pickers, or other host-local chrome
+  - host-specific style mapping and host light/dark-to-theme binding
 
-This is intentional. Wrapper packages are peer packages, not new products in
-the root package.
+This is intentional. Host packages are peer platform integration packages, not
+new products in the root package.
 
 ## Current Constraints
 
@@ -107,17 +108,17 @@ the root package.
   - `Runners/TerminalUICLI` can manage multiple native scenes with discovery,
     ptys, and attach flows
   - `Runners/TerminalUIWASI` still executes one selected scene per wasm process
-- Wrapper packages still own scene switching UI and style surfaces. The root package exposes scene manifests and hosted sessions, not a full cross-platform app shell.
+- Host packages still own scene switching UI and style surfaces. The root package exposes scene manifests and hosted sessions, not a full cross-platform app shell.
 - `GUI/WebTUIGUI` build scripts prefer `swiftly run swift` when `swiftly` is installed and fall back to plain `swift` otherwise, so Bun-driven builds still need either the repo-default `swiftly` setup or a shell where `swift` already resolves to the matching Swift 6.3.0 toolchain.
-- Runner and wrapper packages are intentionally outside the root package products. Consumers opt into them separately.
+- Executable runner packages and embedded host packages are intentionally outside the root package products. Consumers opt into them separately.
 
 ## Non-Negotiable Decisions
 
-1. GUI wrappers are peer packages, not new top-level products in the root package.
+1. GUI host packages are peer packages, not new top-level products in the root package.
 2. The root package exposes first-class scene manifest and hosted-session APIs so peer packages do not rely on package-only internals.
 3. Each scene gets its own retained runtime session. Switching scenes changes which hosted session is visible; it does not rebuild the app body from scratch.
-4. Scene switching is wrapper-managed. It is not a new terminal escape-sequence protocol.
-5. Terminal style is wrapper-owned. The Swift package and the Bun package expose mirrored style concepts, not a shared cross-language source file, and wrappers choose the active theme variant.
+4. Scene switching is host-managed. It is not a new terminal escape-sequence protocol.
+5. Terminal style is host-owned. The Swift package and the Bun package expose mirrored style concepts, not a shared cross-language source file, and host packages choose the active theme variant.
 6. The web package keeps one wasm module instance per scene and one `ghostty-web` terminal per scene so scene state survives switches without a more complex protocol.
 7. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior and is now extended with paired render-style updates.
 
@@ -132,7 +133,7 @@ cd Runners/TerminalUIWASI && swiftly run swift test
 cd GUI/SwiftUITUIGUI && swiftly run swift test
 ```
 
-The root package plus peer runner and SwiftUI wrapper packages succeed on the
+The root package plus peer executable runner and SwiftUI host packages succeed on the
 repo-default Swift 6.3.0 toolchain.
 
 ## Out Of Scope

@@ -10,8 +10,8 @@ future file moves.
 
 - `Sources/`: root Swift package targets (`Core`, `View`, `PrototypeUIComponents`, `TerminalUICharts`, `TerminalUI`, and the vendored `UnixSignals` support target)
 - `Tests/`: root Swift package tests for the package products plus prototype regressions
-- `Runners/`: peer SwiftPM runner packages for terminal-native CLI launch and WASI launch
-- `GUI/`: peer wrapper packages for SwiftUI hosting and Bun/browser hosting
+- `Runners/`: peer SwiftPM executable runner packages for terminal-native CLI launch and WASI launch
+- `GUI/`: peer embedded host packages for SwiftUI hosting and Bun/browser hosting
 - `Examples/`: sibling example apps and example-specific package manifests
 - `Fixtures/`: shared transport fixtures consumed by both Swift and web tests
 - `Scripts/`: repository policy scripts and hook helpers
@@ -28,11 +28,13 @@ future file moves.
   - `PrototypeUIComponents`
   - `UnixSignals`
 
-- Peer runner and wrapper packages:
-  - `Runners/TerminalUICLI`
-  - `Runners/TerminalUIWASI`
-  - `GUI/SwiftUITUIGUI`
-  - `GUI/WebTUIGUI`
+- Peer platform integration packages:
+  - executable runner packages:
+    - `Runners/TerminalUICLI`
+    - `Runners/TerminalUIWASI`
+  - embedded host packages:
+    - `GUI/SwiftUITUIGUI`
+    - `GUI/WebTUIGUI`
 
 `Core` remains the shared pipeline target, but it is not exposed as a separate
 library product. Downstream package consumers reach those types through
@@ -43,7 +45,7 @@ library product. Downstream package consumers reach those types through
 - `TerminalUI.swift`: `DefaultRenderer` plus retained-frame and resolve-reuse plumbing
 - `App.swift`: `App`, `Scene`, `SceneBuilder`, `WindowGroup`, and scene collection helpers
 - `SceneManifest.swift`: `TerminalUISceneDescriptor`, `TerminalUISceneManifest`, and manifest generation from authored scenes
-- `HostedSceneSession.swift`: retained hosted scene runtime for GUI wrappers and other non-terminal hosts
+- `HostedSceneSession.swift`: retained hosted scene runtime for GUI host packages and other non-terminal hosts
 - `SceneSession.swift`: shared scene-session bootstrap used by hosted sessions and compatibility launch paths
 - `RunLoop.swift`: runtime coordinator and shared runtime state
 - `RunLoop+EventDispatch.swift`: keyboard, signal, focus, action, and scroll dispatch
@@ -53,7 +55,7 @@ library product. Downstream package consumers reach those types through
 - `LifecycleCoordinator.swift`: post-present lifecycle staging
 - `TaskRunner.swift`: lifecycle-owned task execution and cancellation
 - `TerminalHost.swift`: fd-backed terminal host plus the WASI-facing `WebTerminalHost`
-- `StreamingTerminalHost.swift`: wrapper-facing terminal host that emits presentation output through a closure
+- `StreamingTerminalHost.swift`: host-facing terminal host that emits presentation output through a closure
 - `TerminalPresentation.swift`: capability-aware surface diffing and text presentation
 - `TerminalAppearanceDetection.swift`: appearance probing
 - `TerminalGraphicsCapabilities.swift`: Kitty, Sixel, and cell-pixel capability detection
@@ -83,7 +85,7 @@ library product. Downstream package consumers reach those types through
 - `TerminalUIWASI.swift`: re-export surface for the WASI runner package
 - `TerminalWASIAppRunner.swift`: manifest mode plus WASI scene selection and launch
 
-## Wrapper Packages
+## Embedded Host Packages
 
 - `GUI/SwiftUITUIGUI`: SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
 - `GUI/WebTUIGUI`: Bun-based web host that consumes a `TerminalUIWASI` build and manifest

@@ -51,14 +51,17 @@ The runtime-facing public surface is also canonical:
 - `TerminalUISceneManifest`
 - `HostedSceneSession`
 
-### Peer runner packages
+### Peer platform integration packages
 
-Executable launch is now intentionally outside the root package surface:
+Platform-specific execution and embedding are intentionally outside the root
+package surface:
 
-- `Runners/TerminalUICLI` exposes `TerminalCLIAppRunner` plus the default
-  terminal-native `App.main()` story
-- `Runners/TerminalUIWASI` exposes `TerminalWASIAppRunner` plus the default
-  WASI `App.main()` story
+- executable runner packages:
+  - `Runners/TerminalUICLI` exposes `TerminalCLIAppRunner` plus the default terminal-native `App.main()` story
+  - `Runners/TerminalUIWASI` exposes `TerminalWASIAppRunner` plus the default WASI `App.main()` story
+- embedded host packages:
+  - `GUI/SwiftUITUIGUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell
+  - `GUI/WebTUIGUI` hosts a `TerminalUIWASI` build in the browser using the same manifest and hosted-session story
 
 These are supported peer packages, but they are not root library products in
 `Package.swift`.

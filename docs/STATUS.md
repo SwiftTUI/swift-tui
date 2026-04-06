@@ -47,9 +47,10 @@ command palette plus toast/sheet presentation surfaces now live in the main
 ### Scene and multi-scene surface
 
 - `@MainActor` `App`, `Scene`, `SceneBuilder`, `WindowIdentifier`, and `WindowGroup` declarations in `TerminalUI`
-- `TerminalUISceneDescriptor`, `TerminalUISceneManifest`, and `HostedSceneSession` in `TerminalUI` for wrapper tooling and retained non-terminal hosting
+- `TerminalUISceneDescriptor`, `TerminalUISceneManifest`, and `HostedSceneSession` in `TerminalUI` for host-package tooling and retained non-terminal hosting
 - `TerminalCLIAppRunner` in `Runners/TerminalUICLI` for terminal-native executable launch, scene discovery, attach, and pty-backed secondary scenes
 - `TerminalWASIAppRunner` in `Runners/TerminalUIWASI` for manifest generation and WASI-hosted scene launch
+- The same authored `App` can feed three execution modes: terminal-native execution, WASI execution, or host-managed embedding through peer GUI host packages
 - Pty-backed secondary scenes, Unix-domain-socket discovery, scene attachment, and lazy rendering of unattached secondary scenes
 - `TabView` and `NavigationSplitView` for terminal-native shell composition
 - terminal-native `alert` and `confirmationDialog` presentation in the canonical `View` surface
@@ -61,11 +62,11 @@ command palette plus toast/sheet presentation surfaces now live in the main
 ## Current Constraints
 
 - The core `TerminalUI` runtime still renders one active scene into one active host per session, but it no longer decides that an authored app must declare exactly one scene.
-- `TerminalUI` is now library-only. Executable launch policy lives in `Runners/TerminalUICLI` and `Runners/TerminalUIWASI`, while GUI wrappers stay in `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`.
-- Embedded GUI wrappers now use `TerminalUI` scene manifests plus `HostedSceneSession`, and the repository includes peer wrapper packages at `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`. Those packages still own their own platform shell integration, scene switching chrome, and style surfaces.
-- Embedded GUI wrappers intentionally own the mapping from host light/dark mode
+- `TerminalUI` is now library-only. Platform integration splits between executable runner packages in `Runners/` and embedded host packages in `GUI/`.
+- Embedded GUI host packages now use `TerminalUI` scene manifests plus `HostedSceneSession`, and the repository includes peer host packages at `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`. Those packages still own their own platform shell integration, scene switching chrome, and style surfaces.
+- Embedded GUI host packages intentionally own the mapping from host light/dark mode
   to explicit theme variants; the root TUI app continues to render semantic
-  tokens without knowing which wrapper theme is active.
+  tokens without knowing which host theme is active.
 - The runtime is keyboard-first, but mouse input is supported where the terminal advertises reporting. Pointer interaction should be treated as additive rather than as the primary design center.
 - Image decoding and terminal presentation are PNG-only in the current runtime. Broader media formats and animation remain deferred.
 - WASI support now works with the `swiftly`-managed Swift 6.3.0 toolchain and `swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm ...` through the `Runners/TerminalUIWASI` / example-app build path. The shorter `swift ...` form is fine from a shell where `swift` already resolves through `swiftly`. `xcrun swift` may still resolve to an incompatible Xcode toolchain.

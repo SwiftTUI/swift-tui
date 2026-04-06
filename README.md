@@ -11,7 +11,7 @@ TerminalUI is for teams who want the ergonomics of declarative SwiftUI authoring
 - A real rendering pipeline. Frames move through a strict `resolve -> measure -> place -> semantics -> draw -> raster -> commit` pipeline, which keeps layout, interaction, presentation, and lifecycle work separate and testable.
 - Runtime behavior designed for real TUIs. The runtime owns alternate-screen presentation, terminal sizing, keyboard and mouse input, Unix signals, focus routing, lifecycle staging, and task start or cancellation after commit.
 - Capability-aware output. The same frame artifacts can be rendered for previews, snapshot tests, or live terminals with ASCII, ANSI16, ANSI256, or true-color output.
-- Layered products instead of one monolith. `View` handles authoring, `Core` handles the pure pipeline, `TerminalUI` handles shared runtime integration plus wrapper-facing scene hosting, and `TerminalUICharts` adds compact charting. Executable launch lives in peer runner packages: `Runners/TerminalUICLI`, `GUI/SwiftUITUIGUI`, and `Runners/TerminalUIWASI`; the web story is `GUI/WebTUIGUI` on top of a WASI build.
+- Layered products instead of one monolith. `View` handles authoring, `Core` handles the pure pipeline, `TerminalUI` handles shared runtime integration plus host-facing scene hosting, and `TerminalUICharts` adds compact charting. Platform integration lives in peer packages: executable runner packages in `Runners/` and embedded host packages in `GUI/`.
 
 ## A Quick Look
 
@@ -49,8 +49,8 @@ let output = await MainActor.run {
 print(output)
 ```
 
-For full interactive applications, choose a runner package. For terminal-native
-apps, import `TerminalUICLI`:
+For full interactive applications, choose a platform integration package. For
+terminal-native executable apps, import `TerminalUICLI`:
 
 ```swift
 import TerminalUICLI
@@ -72,10 +72,16 @@ want an explicit launcher instead of `@main`, call:
 try await TerminalCLIAppRunner.run(DemoApp.self)
 ```
 
-The same authored `App` and `Scene` declarations also feed `GUI/SwiftUITUIGUI`
-for SwiftUI-hosted apps and `Runners/TerminalUIWASI` for WASI builds.
-`TerminalUI` on its own is library-only and does not provide an executable
-product or default `App.main()`.
+The same authored `App` and `Scene` declarations can then flow into three
+execution modes:
+
+- terminal-native execution via the executable runner package `Runners/TerminalUICLI`
+- WASI execution via the executable runner package `Runners/TerminalUIWASI`
+- host-managed embedding via the embedded host packages `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`
+
+`TerminalUI` on its own is library-only. It provides the shared runtime,
+`TerminalUISceneManifest`, and `HostedSceneSession`, but it does not provide an
+executable product or default `App.main()`.
 
 ## What Ships Today
 
@@ -85,7 +91,7 @@ product or default `App.main()`.
 - Presentation and workflow surfaces: `alert`, `confirmationDialog`, `sheet`, `toast`, command registration through `.command(...)`, and command discovery through `CommandPalette` / `.commandPalette(...)`
 - Toolbar chrome: `toolbar(...)`, `toolbarItem(...)`, and `toolbarStyle(.default)` for terminal-native top and bottom bars
 - Runtime integration: `Resolver`, `DefaultRenderer`, `RunLoop`, terminal input parsing, signal handling, alternate-screen ownership, capability-aware presentation, and lifecycle or task staging
-- Platform runners: `Runners/TerminalUICLI` for native CLI launch and attach flows, `GUI/SwiftUITUIGUI` for SwiftUI hosting, `Runners/TerminalUIWASI` for WASI launch, and `GUI/WebTUIGUI` as the Bun web host that consumes the WASI build
+- Platform integration packages: executable runners `Runners/TerminalUICLI` and `Runners/TerminalUIWASI`, plus embedded hosts `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`
 - Compact metrics and charts: `ProgressView`, `BarChart`, `ColumnChart`, `ComparisonChart`, `Sparkline`, `Timeline`, `ThresholdGauge`, and related support types in `TerminalUICharts`
 
 ## Package Products
@@ -93,7 +99,7 @@ product or default `App.main()`.
 | Library Product | Role |
 | --- | --- |
 | `View` | SwiftUI-shaped authoring surface: `View`, builders, property wrappers, environment, focus, layouts, containers, and controls. |
-| `TerminalUI` | Terminal runtime integration plus low-level rendering entry points, scene manifests, and retained hosted-scene sessions for wrapper packages. This product re-exports the `View` and `Core` layers used by the runtime. |
+| `TerminalUI` | Terminal runtime integration plus low-level rendering entry points, scene manifests, and retained hosted-scene sessions for embedded host packages. This product re-exports the `View` and `Core` layers used by the runtime. |
 | `TerminalUICharts` | Compact chart and metric views built on `View` and the shared pipeline types re-exported through `TerminalUI`. |
 
 `Core` remains the shared pipeline and data-model target that powers these
@@ -105,12 +111,29 @@ particular, `PrototypeUIComponents` remains a repo-local target for help-strip
 and other exploratory workflow surfaces plus regression coverage rather than a
 downstream import.
 
-## Runner Packages
+## Platform Integration Model
 
-- `Runners/TerminalUICLI`: terminal-native executable runner, scene discovery, ptys, and attach flows
-- `GUI/SwiftUITUIGUI`: SwiftUI host package for macOS and iOS
-- `Runners/TerminalUIWASI`: WASI executable runner plus manifest mode
-- `GUI/WebTUIGUI`: Bun-only browser host that consumes a `TerminalUIWASI` build
+Authored `View`, `Scene`, and `App` values feed a shared runtime in
+`TerminalUI`, then a peer platform integration package connects that runtime to
+the concrete shell:
+
+- authored app surface: `View`, `Scene`, and `App`
+- shared runtime: `RunLoop`, `TerminalUISceneManifest`, and `HostedSceneSession`
+- peer platform integration package: an executable runner package or an embedded host package
+- platform shell: a terminal process, a WASI runtime, a SwiftUI app, or a browser host
+
+Executable runner packages own top-level execution and default `App.main()`
+stories. Embedded host packages retain one or more hosted scene sessions inside
+another app or runtime lifecycle.
+
+## Platform Integration Packages
+
+- executable runner packages:
+  - `Runners/TerminalUICLI`: terminal-native executable runner, scene discovery, ptys, and attach flows
+  - `Runners/TerminalUIWASI`: WASI executable runner plus manifest mode
+- embedded host packages:
+  - `GUI/SwiftUITUIGUI`: SwiftUI host package for macOS and iOS
+  - `GUI/WebTUIGUI`: Bun-only browser host that consumes a `TerminalUIWASI` build
 
 ## Requirements
 
@@ -148,17 +171,17 @@ Generate per-module DocC archives with:
 swiftly run swift package generate-documentation --target TerminalUI
 ```
 
-## GUI Wrapper Packages
+## Embedded Host Packages
 
-Peer GUI packaging lives outside the root package products:
+Peer host packaging lives outside the root package products:
 
-- `GUI/SwiftUITUIGUI`: SwiftUI wrapper package for macOS and iOS, built on `TerminalUI` scene manifests and `HostedSceneSession`
-- `GUI/WebTUIGUI`: Bun-based web wrapper package that builds a TerminalUI wasm app bundle and hosts it in the browser
+- `GUI/SwiftUITUIGUI`: SwiftUI host package for macOS and iOS, built on `TerminalUI` scene manifests and `HostedSceneSession`
+- `GUI/WebTUIGUI`: Bun-based web host package that builds a TerminalUI wasm app bundle and hosts it in the browser
 
 ## Current Constraints
 
 - The core `TerminalUI` runtime is still intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
-- Executable launch policy now lives outside the root package. Use `Runners/TerminalUICLI` for terminal-native apps, `GUI/SwiftUITUIGUI` for SwiftUI hosts, or `Runners/TerminalUIWASI` for WASI builds; `GUI/WebTUIGUI` consumes the WASI output.
+- Platform integration now lives outside the root package. Use executable runner packages for terminal-native or WASI execution, and embedded host packages for SwiftUI or browser embedding.
 - The terminal-native toolbar surface is now supported through `toolbar(...)`, `toolbarItem(...)`, and `toolbarStyle(.default)`. The older keyboard-help APIs are removed, and the gallery now demonstrates the toolbar surface directly.
 - Command registration, sheets, toasts, and the command palette are now part of the supported `View` surface. Prototype help-strip exploration still lives in `PrototypeUIComponents` while broader launcher-like shell workflows remain unsettled.
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: March 30, 2026
+Last updated: April 5, 2026
 
 ## Target Boundaries
 
@@ -26,13 +26,23 @@ Last updated: March 30, 2026
 
 - Re-exports the public package surface that matters for single-session runtime work
 - Adds terminal host integration, alternate-screen ownership, input parsing, signal handling, capability-aware presentation, `RunLoop`, and rendering entry points
-- Hosts wrapper-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
+- Hosts host-facing runtime seams such as scene manifests, retained hosted-scene sessions, shared terminal control-message parsing, injected input streams, and streaming terminal output sinks for non-terminal hosts
 
-### Peer runner packages
+### Platform integration packages
 
-- `Runners/TerminalUICLI` builds the terminal-native executable layer on top of `TerminalUI`
-- `Runners/TerminalUIWASI` builds the WASI executable layer on top of `TerminalUI`
-- `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI` wrap the same authored `TerminalUI` apps for host-managed environments
+- executable runner packages `Runners/TerminalUICLI` and `Runners/TerminalUIWASI` build top-level execution layers on top of `TerminalUI`
+- embedded host packages `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI` host the same authored `TerminalUI` apps inside platform-managed shells
+
+The conceptual model is:
+
+```text
+authored app surface -> shared TerminalUI runtime -> platform integration package -> platform shell
+```
+
+That last integration layer comes in two forms:
+
+- executable runner packages own top-level execution and default `App.main()` stories
+- embedded host packages retain `HostedSceneSession` values inside another app or runtime lifecycle
 
 Detailed per-file ownership lives in [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md).
 
@@ -108,20 +118,19 @@ The core runtime is intentionally narrow today:
 - one full-canvas `WindowGroup` per session
 - keyboard-first interaction with optional mouse input when the terminal supports reporting
 
-Executable launch and multi-scene orchestration are packaged separately in peer
-runner packages rather than in the root `TerminalUI` library.
+Platform integration and multi-scene orchestration are packaged separately in
+peer platform integration packages rather than in the root `TerminalUI`
+library.
 
-Those runner layers now serve three distinct launch modes:
+Those integration layers now serve three execution modes:
 
-- terminal-owned launch via `TerminalCLIAppRunner.run(MyApp.self)` or the
-  default `App.main()` provided by `Runners/TerminalUICLI`
-- WASI launch and manifest generation via `TerminalWASIAppRunner` in
-  `Runners/TerminalUIWASI`
-- wrapper-owned launch via `TerminalUISceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`
+- terminal-native executable execution via `TerminalCLIAppRunner.run(MyApp.self)` or the default `App.main()` provided by `Runners/TerminalUICLI`
+- WASI executable execution and manifest generation via `TerminalWASIAppRunner` in `Runners/TerminalUIWASI`
+- host-managed embedding via `TerminalUISceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`, as used by `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`
 
-CLI scene management is runner policy rather than an authored-scene rule. A
-one-window app and a multi-window app now share the same runner story, while
-`TerminalUI` itself remains library-only.
+CLI scene management is executable-runner policy rather than an authored-scene
+rule. A one-window app and a multi-window app now share the same runner story,
+while `TerminalUI` itself remains library-only.
 
 ## Important Data Products
 
@@ -138,7 +147,7 @@ one-window app and a multi-window app now share the same runner story, while
 
 - The public styling story is semantic-token-first: TUI views author against
   `.foreground`, `.background`, `.warning`, `.tint`, and related roles
-- Hosts and wrapper packages choose the active theme; the inner TUI app does not
+- Hosts and embedded host packages choose the active theme; the inner TUI app does not
   branch on light/dark or inspect theme choice directly
 - Terminal appearance can be inferred heuristically or queried actively from the
   host and can synthesize the default semantic theme when no explicit host theme

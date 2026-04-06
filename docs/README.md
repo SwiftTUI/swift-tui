@@ -22,7 +22,7 @@ under `Sources/`.
 - `Sources/TerminalUICharts/TerminalUICharts.docc`: public module overview for `TerminalUICharts`
 - `Sources/Core/Core.docc`: target-level reference for the shared pipeline types re-exported through `TerminalUI`
 
-Peer runner and wrapper packages live at:
+Peer platform integration packages live at:
 
 - `Runners/TerminalUICLI`
 - `Runners/TerminalUIWASI`
@@ -48,9 +48,9 @@ default package-development documentation uses `swiftly`.
 - [FOCUS.md](FOCUS.md): focus traversal, focused values, and default-focus behavior
 - [STATE_KEYING.md](STATE_KEYING.md): retained-graph state-keying rules and their interaction with authored view identity
 
-## Platform And Wrapper Docs
+## Platform Integration Docs
 
-- [../TUIGUI.md](../TUIGUI.md): wrapper-package architecture and current status for `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`
+- [../TUIGUI.md](../TUIGUI.md): host-package architecture and current status for `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`
 - [ANDROID.md](ANDROID.md): Android cross-compilation notes for the Swift package targets
 
 ## Product Direction And Scope
