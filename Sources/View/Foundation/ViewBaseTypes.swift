@@ -16,8 +16,8 @@ public typealias LayoutRect = Rect
 @propertyWrapper
 /// A mutable projection into another owned value.
 public struct Binding<Value> {
-  private let getter: @MainActor () -> Value
-  private let setter: @MainActor (Value) -> Void
+  nonisolated(unsafe) private let getter: @MainActor () -> Value
+  nonisolated(unsafe) private let setter: @MainActor (Value) -> Void
 
   package init(
     mainActorGet getter: @escaping @MainActor () -> Value,
@@ -70,11 +70,10 @@ public struct Binding<Value> {
   }
 }
 
-// SAFETY: Binding stores non-Sendable closures (getter/setter), but when Value is Sendable
-// the closures are typically created from @MainActor state accessors that are safe to transfer.
-// This mirrors SwiftUI's own Binding Sendable conformance. The @unchecked is required because
-// the compiler cannot prove closure Sendability through the conditional conformance.
-extension Binding: @unchecked Sendable where Value: Sendable {}
+// SAFETY: Binding closures are invoked only by @MainActor entry points on this
+// type; `nonisolated(unsafe)` keeps that assumption on the stored closures
+// while allowing the binding container itself to be transferred.
+extension Binding: Sendable where Value: Sendable {}
 
 @dynamicMemberLookup
 @propertyWrapper

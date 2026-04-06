@@ -174,6 +174,7 @@ private struct ChromeProbeView: View {
   }
 }
 
+@MainActor
 private func sampleModel() -> TodoistAppModel {
   let databaseURL =
     FileManager.default.temporaryDirectory

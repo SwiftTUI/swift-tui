@@ -3,8 +3,8 @@
 #if canImport(os)
   import os
 
-  package final class OSAllocatedUnfairLock<State>: @unchecked Sendable {
-    private let rawLock: os.OSAllocatedUnfairLock<State>
+  package final class OSAllocatedUnfairLock<State>: Sendable {
+    nonisolated(unsafe) private let rawLock: os.OSAllocatedUnfairLock<State>
 
     package init(
       uncheckedState initialState: State
@@ -30,8 +30,8 @@
   // WASI support is currently focused on making the pure framework layers build.
   // The runtime remains out of scope, and those layers execute single-threaded in
   // current bring-up flows, so a no-op lock is sufficient for now.
-  package final class OSAllocatedUnfairLock<State>: @unchecked Sendable {
-    private var state: State
+  package final class OSAllocatedUnfairLock<State>: Sendable {
+    nonisolated(unsafe) private var state: State
 
     package init(
       uncheckedState initialState: State

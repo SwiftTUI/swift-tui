@@ -434,14 +434,14 @@ package struct RetainedLayoutSession: Sendable {
   }
 }
 
-// SAFETY: Created per-frame and exclusively accessed during the layout phase on a single thread.
-// Contains RetainedLayoutSession (Sendable) and mutable workMetrics. The @unchecked is needed
-// because the class has mutable stored properties without synchronization.
-package final class LayoutPassContext: @unchecked Sendable {
+// SAFETY: Created per-frame and exclusively accessed during the layout phase on
+// a single thread. `nonisolated(unsafe)` narrows the unsafety to the mutable
+// members that accumulate per-pass work.
+package final class LayoutPassContext: Sendable {
   package let retainedLayout: RetainedLayoutSession?
   package let invalidatedIdentities: Set<Identity>
-  package var scrollViewportContext: ScrollViewportContext?
-  package var workMetrics: LayoutWorkMetrics
+  nonisolated(unsafe) package var scrollViewportContext: ScrollViewportContext?
+  nonisolated(unsafe) package var workMetrics: LayoutWorkMetrics
 
   package init(
     retainedLayout: RetainedLayoutSession? = nil,

@@ -1,5 +1,6 @@
 public import Core
 import Observation
+import Synchronization
 
 /// Declares a typed environment value.
 public protocol EnvironmentKey {
@@ -345,14 +346,14 @@ public struct ResolveContext: Equatable, Sendable {
   package func recordResolvedComputation(
     count: Int = 1
   ) {
-    resolveWorkTracker?.workMetrics.resolvedNodesComputed += max(0, count)
+    resolveWorkTracker?.recordResolvedComputation(count: count)
   }
 
   @MainActor
   package func recordResolvedReuse(
     count: Int = 1
   ) {
-    resolveWorkTracker?.workMetrics.resolvedNodesReused += max(0, count)
+    resolveWorkTracker?.recordResolvedReuse(count: count)
   }
 
   @MainActor
@@ -453,17 +454,38 @@ extension ResolveContext {
   }
 }
 
-package final class ResolveWorkTracker: @unchecked Sendable {
-  package var workMetrics: ResolveWorkMetrics
+package final class ResolveWorkTracker: Sendable {
+  private let workMetrics: Mutex<ResolveWorkMetrics>
 
   package init(
     workMetrics: ResolveWorkMetrics = .init()
   ) {
-    self.workMetrics = workMetrics
+    self.workMetrics = Mutex(workMetrics)
+  }
+
+  package func recordResolvedComputation(
+    count: Int = 1
+  ) {
+    workMetrics.withLock { workMetrics in
+      workMetrics.resolvedNodesComputed += max(0, count)
+    }
+  }
+
+  package func recordResolvedReuse(
+    count: Int = 1
+  ) {
+    workMetrics.withLock { workMetrics in
+      workMetrics.resolvedNodesReused += max(0, count)
+    }
+  }
+
+  package var snapshot: ResolveWorkMetrics {
+    workMetrics.withLock { $0 }
   }
 }
 
-package final class ResolveInvalidationProxy: @unchecked Sendable {
+@MainActor
+package final class ResolveInvalidationProxy {
   package weak var invalidator: (any Invalidating)?
 
   package init(

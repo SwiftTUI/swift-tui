@@ -7,7 +7,7 @@ package protocol IndexedChildSourceView {
   ) -> (any IndexedChildSource)?
 }
 
-package struct ForEachIndexedChildSource<Data, ID, Content>: IndexedChildSource, @unchecked Sendable
+package struct ForEachIndexedChildSource<Data, ID, Content>: IndexedChildSource, Sendable
 where Data: RandomAccessCollection, ID: Hashable, Content: View {
   private final class ChildCache {
     var storage: [Int: ResolvedNode] = [:]
@@ -17,11 +17,11 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
   package let identityRoot: Identity
   package let measurementSignature: String
 
-  private let data: Data
-  private let id: KeyPath<Data.Element, ID>
-  private let content: @MainActor (Data.Element) -> Content
-  private let childContext: ResolveContext
-  private let cache = ChildCache()
+  nonisolated(unsafe) private let data: Data
+  nonisolated(unsafe) private let id: KeyPath<Data.Element, ID>
+  nonisolated(unsafe) private let content: @MainActor (Data.Element) -> Content
+  nonisolated(unsafe) private let childContext: ResolveContext
+  nonisolated(unsafe) private let cache = ChildCache()
 
   package init(
     data: Data,

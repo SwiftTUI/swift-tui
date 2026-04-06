@@ -1107,7 +1107,7 @@ extension TerminalHosting {
     }
   }
 #else
-  public final class WebTerminalHost: TerminalHosting, @unchecked Sendable {
+  public final class WebTerminalHost: TerminalHosting, Sendable {
     private struct State {
       var surfaceSize: Size
       var renderStyle: TerminalRenderStyle

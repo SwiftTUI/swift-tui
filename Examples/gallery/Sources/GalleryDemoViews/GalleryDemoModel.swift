@@ -1,7 +1,8 @@
 import Observation
 
+@MainActor
 @Observable
-public final class GalleryDemoModel: @unchecked Sendable {
+public final class GalleryDemoModel {
   public var activeTab = "controls"
   public var isPalettePresented = false
   public var selectedControlDemo = "buttons"

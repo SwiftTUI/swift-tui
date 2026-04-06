@@ -99,9 +99,7 @@ public struct UnixSignalsSequence: AsyncSequence, Sendable {
 
 @available(macOS 10.15, iOS 18.0, watchOS 26.0, tvOS 26, *)
 extension UnixSignalsSequence {
-  // SAFETY: All mutable state is protected by a Mutex<StateMachine>. The @unchecked is needed
-  // because Mutex existential conformance isn't inferred by the compiler in all configurations.
-  fileprivate final class Storage: @unchecked Sendable {
+  fileprivate final class Storage: Sendable {
     private let stateMachine: Mutex<StateMachine>
 
     init(signals: Set<UnixSignal>) async {

@@ -206,7 +206,7 @@ public struct CommandCatalog: Sendable {
 
 // MARK: - Preference Key
 
-private struct CommandRegistration: @unchecked Sendable,
+private struct CommandRegistration: Sendable,
   CustomStringConvertible,
   CustomDebugStringConvertible
 {
@@ -230,7 +230,7 @@ private struct CommandRegistration: @unchecked Sendable,
   }
 }
 
-private struct CommandPreferenceValue: @unchecked Sendable,
+private struct CommandPreferenceValue: Sendable,
   CustomStringConvertible,
   CustomDebugStringConvertible
 {

@@ -30,22 +30,22 @@ extension EnvironmentValues {
 
 // AnyView policy: toolbar builders are authored with heterogeneous child views
 // and stored for later root-host rendering.
-private struct ToolbarDefinitionRegistration: @unchecked Sendable {
+private struct ToolbarDefinitionRegistration: Sendable {
   var attachmentIdentity: Identity
   var placement: ToolbarPlacement
   var style: ToolbarStyle
-  var leadingViews: [AnyView]
-  var trailingViews: [AnyView]
+  nonisolated(unsafe) var leadingViews: [AnyView]
+  nonisolated(unsafe) var trailingViews: [AnyView]
 }
 
 // AnyView policy: contextual toolbar items are authored in-place and hoisted to
 // the root toolbar host for later rendering.
-private struct ToolbarItemRegistration: @unchecked Sendable {
+private struct ToolbarItemRegistration: Sendable {
   var attachmentIdentity: Identity
   var placement: ToolbarPlacement
   var alignment: ToolbarAlignment
   var isEnabled: Bool
-  var itemViews: [AnyView]
+  nonisolated(unsafe) var itemViews: [AnyView]
 }
 
 private struct ToolbarPreferenceValue: Sendable {

@@ -61,7 +61,7 @@ package enum TerminalPresentationKind: Equatable, Sendable {
 
 // AnyView policy: retain heterogeneous action and message content here while
 // modal requests are hoisted through preferences to the root presentation host.
-package struct TerminalPresentationRequest: @unchecked Sendable,
+package struct TerminalPresentationRequest: Sendable,
   CustomStringConvertible,
   CustomDebugStringConvertible
 {
@@ -69,10 +69,10 @@ package struct TerminalPresentationRequest: @unchecked Sendable,
   var title: String
   var kind: TerminalPresentationKind
   var backdropOpacity: Double
-  var actionViews: [AnyView]
-  var messageViews: [AnyView]
+  nonisolated(unsafe) var actionViews: [AnyView]
+  nonisolated(unsafe) var messageViews: [AnyView]
   /// Arbitrary content for sheet presentations (used instead of actionViews/messageViews).
-  var contentViews: [AnyView]
+  nonisolated(unsafe) var contentViews: [AnyView]
   var dismiss: @MainActor @Sendable () -> Void
 
   package var description: String {
@@ -84,7 +84,7 @@ package struct TerminalPresentationRequest: @unchecked Sendable,
   }
 }
 
-package struct TerminalPresentationPreferenceValue: @unchecked Sendable,
+package struct TerminalPresentationPreferenceValue: Sendable,
   CustomStringConvertible,
   CustomDebugStringConvertible
 {
@@ -545,8 +545,8 @@ public enum ToastStyle: Equatable, Sendable {
   }
 }
 
-private struct ToastRequest: @unchecked Sendable {
-  var contentViews: [AnyView]
+private struct ToastRequest: Sendable {
+  nonisolated(unsafe) var contentViews: [AnyView]
   var style: ToastStyle
   var duration: Double?
   var dismiss: @MainActor @Sendable () -> Void

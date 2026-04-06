@@ -421,11 +421,11 @@ public struct DrawMetadata: Equatable, Sendable {
 }
 
 /// A type-erased selection identity used by lists, tables, and pickers.
-// SAFETY: AnyHashable is not Sendable because it type-erases, but SelectionTag values are
-// constructed from Hashable & Sendable tag types (typically String, Int, or enum cases).
-// The type-erased AnyHashable wrapper prevents the compiler from proving Sendability.
-public struct SelectionTag: Equatable, @unchecked Sendable {
-  public var value: AnyHashable
+// SAFETY: Selection tags are authored from hashable values but stored in
+// `AnyHashable`, which the compiler cannot prove Sendable through type
+// erasure. The unsafe boundary is limited to the erased payload member.
+public struct SelectionTag: Equatable, Sendable {
+  nonisolated(unsafe) public var value: AnyHashable
   public var includeOptional: Bool
 
   public init(value: AnyHashable, includeOptional: Bool = true) {

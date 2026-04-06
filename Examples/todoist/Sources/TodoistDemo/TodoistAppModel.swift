@@ -2,8 +2,9 @@ import Foundation
 import Observation
 import TodoistAPI
 
+@MainActor
 @Observable
-final class TodoistAppModel: @unchecked Sendable {
+final class TodoistAppModel: Sendable {
   @ObservationIgnored private let repository: TodoistRepository
   @ObservationIgnored private var didStart = false
 
@@ -33,6 +34,7 @@ final class TodoistAppModel: @unchecked Sendable {
     lastErrorDetails = nil
   }
 
+  @MainActor
   static func live(authTokenOverride: String? = nil) throws -> TodoistAppModel {
     let paths = try TodoistDemoConfiguration.paths()
     let authToken =
@@ -99,18 +101,21 @@ final class TodoistAppModel: @unchecked Sendable {
     }
   }
 
+  @MainActor
   func requestRefresh() {
     Swift.Task { @MainActor in
       await refresh()
     }
   }
 
+  @MainActor
   func requestAddTask() {
     Swift.Task { @MainActor in
       await addTask()
     }
   }
 
+  @MainActor
   func requestCloseSelectedTask() {
     Swift.Task { @MainActor in
       await closeSelectedTask()

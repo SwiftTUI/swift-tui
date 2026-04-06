@@ -194,7 +194,7 @@ public struct DefaultRenderer {
       semantics: semantics,
       draw: draw,
       invalidatedIdentities: frameContext.invalidatedIdentities,
-      resolveWork: resolveContext.resolveWorkTracker?.workMetrics,
+      resolveWork: resolveContext.resolveWorkTracker?.snapshot,
       layoutWork: layoutPassContext.workMetrics,
       phaseTimings: phaseTimings,
       measurementCache: layoutEngine.cache?.metrics

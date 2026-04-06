@@ -6,7 +6,7 @@ private struct FocusStateSnapshot<Value: Equatable> {
 }
 
 @MainActor
-private final class FocusStateStorage<Value: Equatable>: @unchecked Sendable {
+private final class FocusStateStorage<Value: Equatable> {
   private let snapshot: OSAllocatedUnfairLock<FocusStateSnapshot<Value>>
 
   init(

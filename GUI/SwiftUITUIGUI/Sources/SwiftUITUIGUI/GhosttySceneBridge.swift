@@ -5,13 +5,20 @@ import TerminalUI
 
 @MainActor
 final class GhosttySceneBridge {
-  final class CallbackRouter: @unchecked Sendable {
-    var onInput: ((Data) -> Void)?
-    var onResize: ((InMemoryTerminalViewport) -> Void)?
-  }
-
-  final class BridgeProxy {
+  actor CallbackRouter {
     weak var bridge: GhosttySceneBridge?
+
+    init(bridge: GhosttySceneBridge) {
+      self.bridge = bridge
+    }
+
+    func handleInput(_ data: Data) async {
+      await bridge?.receiveTerminalInput(Array(data))
+    }
+
+    func handleResize(_ viewport: InMemoryTerminalViewport) async {
+      await bridge?.handleSurfaceResize(viewport)
+    }
   }
 
   enum BridgeError: Error, Equatable {
@@ -24,7 +31,6 @@ final class GhosttySceneBridge {
   private var style: SwiftUITUITerminalStyle
   private var session: (any HostedSceneSessionHandling)?
   private let callbackRouter: CallbackRouter
-  private let bridgeProxy: BridgeProxy
   private let terminalSession: InMemoryTerminalSession
   private var bufferedOutput: [String] = []
   private var surfaceReady = false
@@ -43,36 +49,26 @@ final class GhosttySceneBridge {
       terminalConfiguration: style.terminalConfiguration
     )
     viewState = TerminalViewState(controller: controller)
-    callbackRouter = CallbackRouter()
-    bridgeProxy = BridgeProxy()
+    callbackRouter = CallbackRouter(bridge: self)
 
     terminalSession = InMemoryTerminalSession(
       write: { [callbackRouter] data in
-        callbackRouter.onInput?(data)
+        Task {
+          await callbackRouter.handleInput(data)
+        }
       },
       resize: { [callbackRouter] viewport in
-        callbackRouter.onResize?(viewport)
+        Task {
+          await callbackRouter.handleResize(viewport)
+        }
       }
     )
-
-    callbackRouter.onInput = { [bridgeProxy] data in
-      Task { @MainActor in
-        bridgeProxy.bridge?.receiveTerminalInput(Array(data))
-      }
-    }
-
-    callbackRouter.onResize = { [bridgeProxy] viewport in
-      Task { @MainActor in
-        bridgeProxy.bridge?.handleSurfaceResize(viewport)
-      }
-    }
 
     viewState.configuration = TerminalSurfaceOptions(
       backend: .inMemory(terminalSession),
       fontSize: style.fontSize,
       context: .window
     )
-    bridgeProxy.bridge = self
   }
 
   func attach(session: any HostedSceneSessionHandling) {

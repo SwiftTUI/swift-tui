@@ -1,6 +1,4 @@
-// SAFETY: Contains non-Sendable closures (@MainActor Handler). Access is
-// confined to @MainActor.
-package struct LifecycleHandlerSnapshot: @unchecked Sendable {
+package struct LifecycleHandlerSnapshot: Sendable {
   package var appearHandlers: [String: LocalLifecycleRegistry.Handler]
   package var disappearHandlers: [String: LocalLifecycleRegistry.Handler]
 
@@ -15,7 +13,7 @@ package struct LifecycleHandlerSnapshot: @unchecked Sendable {
 
 @MainActor
 package final class LocalLifecycleRegistry: Equatable {
-  package typealias Handler = @MainActor () -> Void
+  package typealias Handler = @MainActor @Sendable () -> Void
 
   private var appearHandlers: [String: Handler] = [:]
   private var disappearHandlers: [String: Handler] = [:]

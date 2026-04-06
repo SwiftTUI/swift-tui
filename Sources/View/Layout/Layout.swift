@@ -583,17 +583,17 @@ package struct VerticalAlignmentGuideModifier<Content: View>: View, ResolvableVi
   }
 }
 
-// SAFETY: Stores an existential `any AnyLayoutBox` which the compiler cannot prove Sendable.
-// The underlying concrete types are value-type layout implementations that are effectively immutable
-// after construction. Only accessed during the layout phase on a single thread.
-private final class LayoutProxyBox: CustomLayoutProxy, @unchecked Sendable {
+// SAFETY: Custom layouts keep type-erased cache state and the existential box
+// is not proven Sendable. The unsafe boundary is limited to those two members,
+// while the proxy type itself still models the rest of its API as Sendable.
+private final class LayoutProxyBox: CustomLayoutProxy, Sendable {
   private struct CacheKey: Hashable {
     var identity: Identity
     var proposal: ProposedSize
   }
 
-  let box: any AnyLayoutBox
-  private var cachedStates: [CacheKey: Any] = [:]
+  nonisolated(unsafe) private let box: any AnyLayoutBox
+  nonisolated(unsafe) private var cachedStates: [CacheKey: Any] = [:]
 
   init(box: any AnyLayoutBox) {
     self.box = box

@@ -1,10 +1,10 @@
 import DequeModule
 
 /// A retained cache of measured subtrees keyed by identity and proposal.
-// SAFETY: Stores only Sendable data (ResolvedNode, MeasuredNode) but has unsynchronized mutable
-// state (storage dict, counters). Only accessed from the layout engine during a single frame's
-// layout pass on one thread. Never shared across concurrent contexts.
-public final class MeasurementCache: @unchecked Sendable {
+// SAFETY: Mutable cache storage is confined to the renderer's single-threaded
+// layout pass. `nonisolated(unsafe)` keeps the unsafety at the exact mutable
+// member instead of the whole reference type.
+public final class MeasurementCache: Sendable {
   private struct CachedMeasurement: Sendable {
     let resolved: ResolvedNode
     let node: MeasuredNode
@@ -34,7 +34,7 @@ public final class MeasurementCache: @unchecked Sendable {
     var stores = 0
   }
 
-  private var storage = Storage()
+  nonisolated(unsafe) private var storage = Storage()
 
   /// Creates an empty measurement cache.
   public init() {}
