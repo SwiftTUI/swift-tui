@@ -50,4 +50,15 @@ public struct VariadicView<Content: View>: View, ResolvableView, DeclaredChildre
       )
     }
   }
+
+  package func appendDeferredDeclaredChildren(
+    into children: inout [DeferredViewPayload]
+  ) {
+    for element in content {
+      appendDeferredDeclaredBuilderChildren(
+        from: element,
+        into: &children
+      )
+    }
+  }
 }

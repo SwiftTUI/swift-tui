@@ -21,6 +21,22 @@ public struct Label<Title: View, Icon: View>: View, ResolvableView {
     self.icon = icon()
   }
 
+  public init<S: StringProtocol>(
+    _ title: S,
+    image name: String
+  ) where Title == Text, Icon == Image {
+    self.title = Text(String(title))
+    icon = Image(name)
+  }
+
+  public init<S1: StringProtocol, S2: StringProtocol>(
+    _ title: S1,
+    systemImage symbol: S2
+  ) where Title == Text, Icon == Text {
+    self.title = Text(String(title))
+    icon = Text(String(symbol))
+  }
+
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {

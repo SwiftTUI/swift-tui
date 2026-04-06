@@ -50,4 +50,15 @@ public struct TupleView<each Content: View>: View, ResolvableView, DeclaredChild
       )
     }
   }
+
+  package func appendDeferredDeclaredChildren(
+    into children: inout [DeferredViewPayload]
+  ) {
+    for child in repeat each value {
+      appendDeferredDeclaredBuilderChildren(
+        from: child,
+        into: &children
+      )
+    }
+  }
 }

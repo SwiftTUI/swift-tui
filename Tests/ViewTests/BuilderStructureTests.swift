@@ -33,6 +33,20 @@ struct BuilderStructureTests {
     #expect(resolvedNodeLabelText(from: resolved) == "A B C D")
   }
 
+  @Test("deferred declared builder children preserve nested builder output order")
+  func deferredDeclaredBuilderChildrenPreserveNestedBuilderOutputOrder() {
+    let resolved = Resolver().resolve(
+      DeferredPayloadGroupView(
+        kindName: "DeferredProbe",
+        payloads: deferredDeclaredBuilderChildren(from: nestedBuilderProbe())
+      ),
+      in: .init(identity: testIdentity("BuilderStructure", "DeferredTraversal"))
+    )
+
+    #expect(resolved.kind == .view("DeferredProbe"))
+    #expect(resolvedNodeLabelText(from: resolved) == "A B C D")
+  }
+
   @Test("limited-availability builder branches still resolve through the compatibility seam")
   func limitedAvailabilityBuilderBranchesStillResolve() {
     let children = erasedDeclaredBuilderChildren(
@@ -44,6 +58,23 @@ struct BuilderStructureTests {
         kindName: "AvailabilityProbe"
       ),
       in: .init(identity: testIdentity("BuilderStructure", "Availability"))
+    )
+
+    #expect(children.count == 1)
+    #expect(resolvedNodeLabelText(from: resolved) == "Current")
+  }
+
+  @Test("deferred builder children preserve limited-availability output")
+  func deferredBuilderChildrenPreserveLimitedAvailabilityOutput() {
+    let children = deferredDeclaredBuilderChildren(
+      from: limitedAvailabilityBuilderProbe()
+    )
+    let resolved = Resolver().resolve(
+      DeferredPayloadGroupView(
+        kindName: "DeferredAvailabilityProbe",
+        payloads: children
+      ),
+      in: .init(identity: testIdentity("BuilderStructure", "DeferredAvailability"))
     )
 
     #expect(children.count == 1)

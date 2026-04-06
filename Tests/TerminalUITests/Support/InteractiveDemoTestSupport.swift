@@ -379,9 +379,7 @@ private func controlsColumn(
       GroupBox {
         VStack(alignment: .leading, spacing: 0) {
           HStack(alignment: .center, spacing: 1) {
-            Label("Presets") {
-              Text("▤")
-            }
+            Label("Presets", systemImage: "▤")
             Spacer()
             quickPresetMenuView(state: state, bindings: bindings)
           }

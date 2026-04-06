@@ -59,8 +59,8 @@ package enum TerminalPresentationKind: Equatable, Sendable {
   }
 }
 
-// AnyView policy: retain heterogeneous action and message content here while
-// modal requests are hoisted through preferences to the root presentation host.
+// Presentation payload policy: retain heterogeneous authored payloads here
+// while modal requests are hoisted through preferences to the root host.
 package struct TerminalPresentationRequest: Sendable,
   CustomStringConvertible,
   CustomDebugStringConvertible
@@ -69,10 +69,10 @@ package struct TerminalPresentationRequest: Sendable,
   var title: String
   var kind: TerminalPresentationKind
   var backdropOpacity: Double
-  nonisolated(unsafe) var actionViews: [AnyView]
-  nonisolated(unsafe) var messageViews: [AnyView]
-  /// Arbitrary content for sheet presentations (used instead of actionViews/messageViews).
-  nonisolated(unsafe) var contentViews: [AnyView]
+  var actionPayloads: [DeferredViewPayload]
+  var messagePayloads: [DeferredViewPayload]
+  /// Arbitrary content for sheet presentations (used instead of action/message payloads).
+  var contentPayloads: [DeferredViewPayload]
   var dismiss: @MainActor @Sendable () -> Void
 
   package var description: String {
@@ -80,7 +80,7 @@ package struct TerminalPresentationRequest: Sendable,
   }
 
   package var debugDescription: String {
-    "TerminalPresentationRequest(identity: \(attachmentIdentity.path), kind: \(kind.debugName), title: \(String(reflecting: title)), actions: \(actionViews.count), messages: \(messageViews.count), content: \(contentViews.count))"
+    "TerminalPresentationRequest(identity: \(attachmentIdentity.path), kind: \(kind.debugName), title: \(String(reflecting: title)), actions: \(actionPayloads.count), messages: \(messagePayloads.count), content: \(contentPayloads.count))"
   }
 }
 
@@ -257,8 +257,8 @@ private func defaultPresentationActions(
   )
 }
 
-// AnyView policy: retain heterogeneous child storage here for authored message
-// and action content in hoisted terminal presentations.
+// Presentation payload policy: retain heterogeneous child payloads here for
+// authored message and action content in hoisted terminal presentations.
 private struct TerminalPresentationModifier<
   Content: View, Actions: View,
   Message: View
@@ -285,9 +285,9 @@ private struct TerminalPresentationModifier<
             title: title,
             kind: kind,
             backdropOpacity: 0,
-            actionViews: erasedDeclaredBuilderChildren(from: actions),
-            messageViews: erasedDeclaredBuilderChildren(from: message),
-            contentViews: [],
+            actionPayloads: deferredDeclaredBuilderChildren(from: actions),
+            messagePayloads: deferredDeclaredBuilderChildren(from: message),
+            contentPayloads: [],
             dismiss: { [isPresented] in
               isPresented.wrappedValue = false
             }
@@ -299,8 +299,8 @@ private struct TerminalPresentationModifier<
   }
 }
 
-// AnyView policy: retain heterogeneous sheet content while hoisting through
-// preferences to the root presentation host.
+// Presentation payload policy: retain heterogeneous sheet content while
+// hoisting through preferences to the root presentation host.
 private struct TerminalSheetModifier<Content: View, SheetContent: View>: View,
   ResolvableView
 {
@@ -324,9 +324,9 @@ private struct TerminalSheetModifier<Content: View, SheetContent: View>: View,
             title: title,
             kind: .sheet,
             backdropOpacity: 0,
-            actionViews: [],
-            messageViews: [],
-            contentViews: erasedDeclaredBuilderChildren(from: sheetContent),
+            actionPayloads: [],
+            messagePayloads: [],
+            contentPayloads: deferredDeclaredBuilderChildren(from: sheetContent),
             dismiss: { [isPresented] in
               isPresented.wrappedValue = false
             }
@@ -365,9 +365,9 @@ private struct TerminalHostedPresentation: View {
       TerminalPresentationSurface(
         title: request.title,
         kind: request.kind,
-        actionViews: request.actionViews,
-        messageViews: request.messageViews,
-        contentViews: request.contentViews,
+        actionPayloads: request.actionPayloads,
+        messagePayloads: request.messagePayloads,
+        contentPayloads: request.contentPayloads,
         dismiss: request.dismiss
       )
       .padding(
@@ -387,9 +387,9 @@ private struct TerminalHostedPresentation: View {
 private struct TerminalPresentationSurface: View, ResolvableView {
   var title: String
   var kind: TerminalPresentationKind
-  var actionViews: [AnyView]
-  var messageViews: [AnyView]
-  var contentViews: [AnyView]
+  var actionPayloads: [DeferredViewPayload]
+  var messagePayloads: [DeferredViewPayload]
+  var contentPayloads: [DeferredViewPayload]
   var dismiss: @MainActor @Sendable () -> Void
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -455,9 +455,12 @@ private struct TerminalPresentationSurface: View, ResolvableView {
     Group {
       ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
-          if !messageViews.isEmpty {
+          if !messagePayloads.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
-              combinedView(from: messageViews, kindName: "PresentationMessage")
+              DeferredPayloadGroupView(
+                kindName: "PresentationMessage",
+                payloads: messagePayloads
+              )
             }
             .padding(.init(horizontal: 1, vertical: 1))
           }
@@ -477,7 +480,10 @@ private struct TerminalPresentationSurface: View, ResolvableView {
   private var sheetBody: some View {
     ScrollView(.vertical) {
       VStack(alignment: .leading, spacing: 0) {
-        combinedView(from: contentViews, kindName: "SheetContent")
+        DeferredPayloadGroupView(
+          kindName: "SheetContent",
+          payloads: contentPayloads
+        )
       }
       .padding(.init(horizontal: 1, vertical: 1))
     }
@@ -492,8 +498,8 @@ private struct TerminalPresentationSurface: View, ResolvableView {
 
   private var presentationActions: some View {
     HStack(spacing: 1) {
-      ForEach(actionViews.indices, id: \.self) { index in
-        actionViews[index]
+      ForEach(actionPayloads.indices, id: \.self) { index in
+        DeferredPayloadView(payload: actionPayloads[index])
           .fixedSize()
       }
     }
@@ -546,7 +552,7 @@ public enum ToastStyle: Equatable, Sendable {
 }
 
 private struct ToastRequest: Sendable {
-  nonisolated(unsafe) var contentViews: [AnyView]
+  var contentPayloads: [DeferredViewPayload]
   var style: ToastStyle
   var duration: Double?
   var dismiss: @MainActor @Sendable () -> Void
@@ -616,13 +622,13 @@ private struct ToastModifier<Content: View, ToastContent: View>: View,
       return [node]
     }
 
-    let contentViews = erasedDeclaredBuilderChildren(from: toastContent)
+    let contentPayloads = deferredDeclaredBuilderChildren(from: toastContent)
     node.preferenceValues.merge(
       ToastPreferenceKey.self,
       value: .init(
         requests: [
           .init(
-            contentViews: contentViews,
+            contentPayloads: contentPayloads,
             style: style,
             duration: duration,
             dismiss: { [isPresented] in
@@ -712,7 +718,10 @@ private struct ToastSurface: View {
       Text(request.style.icon)
         .foregroundStyle(.terminalAccent(request.style.tone))
       VStack {
-        combinedView(from: request.contentViews, kindName: "ToastContent")
+        DeferredPayloadGroupView(
+          kindName: "ToastContent",
+          payloads: request.contentPayloads
+        )
       }
     }
     .padding(1)

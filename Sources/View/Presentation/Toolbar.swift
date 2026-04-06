@@ -28,29 +28,30 @@ extension EnvironmentValues {
   }
 }
 
-// AnyView policy: toolbar builders are authored with heterogeneous child views
-// and stored for later root-host rendering.
 private struct ToolbarDefinitionRegistration: Sendable {
   var attachmentIdentity: Identity
   var placement: ToolbarPlacement
   var style: ToolbarStyle
-  nonisolated(unsafe) var leadingViews: [AnyView]
-  nonisolated(unsafe) var trailingViews: [AnyView]
+  var leadingItemNode: ResolvedNode
+  var trailingItemNode: ResolvedNode
 }
 
-// AnyView policy: contextual toolbar items are authored in-place and hoisted to
-// the root toolbar host for later rendering.
 private struct ToolbarItemRegistration: Sendable {
   var attachmentIdentity: Identity
   var placement: ToolbarPlacement
   var alignment: ToolbarAlignment
-  var isEnabled: Bool
-  nonisolated(unsafe) var itemViews: [AnyView]
+  var itemNode: ResolvedNode
 }
 
 private struct ToolbarPreferenceValue: Sendable {
   var definitions: [ToolbarDefinitionRegistration] = []
   var items: [ToolbarItemRegistration] = []
+}
+
+private struct ToolbarIdentitySeed: Hashable, Sendable {
+  var fileID: String
+  var line: UInt
+  var column: UInt
 }
 
 private enum ToolbarPreferenceKey: PreferenceKey {
@@ -69,42 +70,70 @@ private enum ToolbarPreferenceKey: PreferenceKey {
 extension View {
   /// Defines a toolbar for `placement` and establishes the nearest contextual
   /// toolbar scope for descendants in this subtree.
-  public func toolbar<Leading: View, Trailing: View>(
+  public func toolbar<LeadingLabel: View, TrailingLabel: View>(
     placement: ToolbarPlacement = .bottom,
-    @ViewBuilder leading: () -> Leading,
-    @ViewBuilder trailing: () -> Trailing
+    leadingAction: (@MainActor @Sendable () -> Void)? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    column: UInt = #column,
+    leading: @escaping @MainActor () -> LeadingLabel,
+    trailingAction: (@MainActor @Sendable () -> Void)? = nil,
+    trailing: @escaping @MainActor () -> TrailingLabel
   ) -> some View {
     ToolbarModifier(
       content: self,
       placement: placement,
       leading: leading(),
-      trailing: trailing()
+      leadingAction: leadingAction,
+      trailing: trailing(),
+      trailingAction: trailingAction,
+      actionAuthoringContext: currentAuthoringContext(),
+      identitySeed: .init(
+        fileID: String(describing: fileID),
+        line: line,
+        column: column
+      )
     )
   }
 
   /// Registers a contextual toolbar item within the nearest enclosing toolbar
   /// scope.
-  public func toolbarItem<Item: View>(
+  public func toolbarItem<Label: View>(
     alignment: ToolbarAlignment,
     isEnabled: Bool = true,
-    @ViewBuilder item: () -> Item
+    action: (@MainActor @Sendable () -> Void)? = nil,
+    fileID: StaticString = #fileID,
+    line: UInt = #line,
+    column: UInt = #column,
+    label: @escaping @MainActor () -> Label
   ) -> some View {
     ToolbarItemModifier(
       content: self,
       alignment: alignment,
       isEnabled: isEnabled,
-      item: item()
+      action: action,
+      label: label(),
+      actionAuthoringContext: currentAuthoringContext(),
+      identitySeed: .init(
+        fileID: String(describing: fileID),
+        line: line,
+        column: column
+      )
     )
   }
 }
 
-private struct ToolbarModifier<Content: View, Leading: View, Trailing: View>:
+private struct ToolbarModifier<Content: View, LeadingLabel: View, TrailingLabel: View>:
   View, ResolvableView
 {
   var content: Content
   var placement: ToolbarPlacement
-  var leading: Leading
-  var trailing: Trailing
+  var leading: LeadingLabel
+  var leadingAction: (@MainActor @Sendable () -> Void)?
+  var trailing: TrailingLabel
+  var trailingAction: (@MainActor @Sendable () -> Void)?
+  var actionAuthoringContext: AuthoringContext?
+  var identitySeed: ToolbarIdentitySeed
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let scopedContext = context.settingEnvironment(
@@ -112,6 +141,17 @@ private struct ToolbarModifier<Content: View, Leading: View, Trailing: View>:
       to: placement
     )
     var node = content.resolve(in: scopedContext)
+    let itemIdentityRoot = node.identity.explicitID(identitySeed)
+    let leadingContext = toolbarLabelContext(
+      in: scopedContext,
+      itemIdentityRoot: itemIdentityRoot,
+      component: .named("ToolbarLeadingLabel")
+    )
+    let trailingContext = toolbarLabelContext(
+      in: scopedContext,
+      itemIdentityRoot: itemIdentityRoot,
+      component: .named("ToolbarTrailingLabel")
+    )
     node.preferenceValues.merge(
       ToolbarPreferenceKey.self,
       value: .init(
@@ -120,8 +160,20 @@ private struct ToolbarModifier<Content: View, Leading: View, Trailing: View>:
             attachmentIdentity: node.identity,
             placement: placement,
             style: context.environmentValues.toolbarStyle,
-            leadingViews: erasedDeclaredBuilderChildren(from: leading),
-            trailingViews: erasedDeclaredBuilderChildren(from: trailing)
+            leadingItemNode: resolvedToolbarItemNode(
+              label: leading,
+              action: leadingAction,
+              actionAuthoringContext: actionAuthoringContext,
+              isEnabled: true,
+              in: leadingContext
+            ),
+            trailingItemNode: resolvedToolbarItemNode(
+              label: trailing,
+              action: trailingAction,
+              actionAuthoringContext: actionAuthoringContext,
+              isEnabled: true,
+              in: trailingContext
+            )
           )
         ]
       )
@@ -130,17 +182,21 @@ private struct ToolbarModifier<Content: View, Leading: View, Trailing: View>:
   }
 }
 
-private struct ToolbarItemModifier<Content: View, Item: View>: View, ResolvableView {
+private struct ToolbarItemModifier<Content: View, Label: View>: View, ResolvableView {
   var content: Content
   var alignment: ToolbarAlignment
   var isEnabled: Bool
-  var item: Item
+  var action: (@MainActor @Sendable () -> Void)?
+  var label: Label
+  var actionAuthoringContext: AuthoringContext?
+  var identitySeed: ToolbarIdentitySeed
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     guard let placement = context.environmentValues.toolbarScopePlacement else {
       return [node]
     }
+    let itemIdentityRoot = node.identity.explicitID(identitySeed)
 
     node.preferenceValues.merge(
       ToolbarPreferenceKey.self,
@@ -150,8 +206,17 @@ private struct ToolbarItemModifier<Content: View, Item: View>: View, ResolvableV
             attachmentIdentity: node.identity,
             placement: placement,
             alignment: alignment,
-            isEnabled: isEnabled,
-            itemViews: erasedDeclaredBuilderChildren(from: item)
+            itemNode: resolvedToolbarItemNode(
+              label: label,
+              action: action,
+              actionAuthoringContext: actionAuthoringContext,
+              isEnabled: isEnabled,
+              in: toolbarLabelContext(
+                in: context,
+                itemIdentityRoot: itemIdentityRoot,
+                component: .named("ToolbarItemLabel")
+              )
+            )
           )
         ]
       )
@@ -160,19 +225,74 @@ private struct ToolbarItemModifier<Content: View, Item: View>: View, ResolvableV
   }
 }
 
+private func toolbarLabelContext(
+  in context: ResolveContext,
+  itemIdentityRoot: Identity,
+  component: IdentityComponent
+) -> ResolveContext {
+  context.replacingIdentity(with: itemIdentityRoot.child(component))
+}
+
+@MainActor
+private func resolvedToolbarItemNode<Label: View>(
+  label: Label,
+  action: (@MainActor @Sendable () -> Void)?,
+  actionAuthoringContext: AuthoringContext?,
+  isEnabled: Bool,
+  in context: ResolveContext
+) -> ResolvedNode {
+  let effectiveIsEnabled = context.environmentValues.isEnabled && isEnabled
+  var labelContext = context.settingEnvironment(\.isEnabled, to: effectiveIsEnabled)
+  labelContext.localActionRegistry = nil
+  labelContext.localPointerHandlerRegistry = nil
+  labelContext.localFocusBindingRegistry = nil
+  labelContext.localFocusedValuesRegistry = nil
+  labelContext.localPreferenceObservationRegistry = nil
+  labelContext.localKeyHandlerRegistry = nil
+  labelContext.hotkeyRegistry = nil
+  labelContext.localLifecycleRegistry = nil
+  labelContext.localTaskRegistry = nil
+
+  var node = normalizeResolvedElements(
+    resolveViewElements(label, in: labelContext),
+    in: labelContext
+  )
+  node.stripToolbarInteractionMetadataRecursively()
+
+  guard let action else {
+    return node
+  }
+
+  if effectiveIsEnabled {
+    let dynamicPropertyScope = currentAuthoringContext() ?? actionAuthoringContext
+    context.localActionRegistry?.register(
+      identity: node.identity,
+      handler: {
+        withAuthoringContext(dynamicPropertyScope) {
+          action()
+          return true
+        }
+      },
+      followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+    )
+  }
+
+  node.semanticMetadata = focusableControlMetadata(
+    focusInteractions: .activate,
+    presentationRole: .button
+  )
+  return node
+}
+
 private enum ToolbarRenderRole: Sendable {
   case staticItem
   case contextual
 }
 
-// AnyView policy: flattened toolbar entries are built from heterogeneous
-// toolbar builders before layout-time selection.
 private struct ToolbarRenderItem {
-  var view: AnyView
-  var attachmentIdentity: Identity
+  var node: ResolvedNode
   var alignment: ToolbarAlignment
   var role: ToolbarRenderRole
-  var isEnabled: Bool
   var overflowRank: Int
 }
 
@@ -209,10 +329,9 @@ private struct ToolbarOverflowSortKey: Comparable {
 }
 
 private struct PendingToolbarContextualItem {
-  var view: AnyView
+  var node: ResolvedNode
   var attachmentIdentity: Identity
   var alignment: ToolbarAlignment
-  var isEnabled: Bool
   var sourceOrder: Int
   var overflowKey: ToolbarOverflowSortKey
 }
@@ -360,18 +479,14 @@ package struct ToolbarHostingRoot<Content: View>: View, ResolvableView {
     }
 
     for definition in definitions {
-      for view in definition.leadingViews {
-        renderItems.append(
-          .init(
-            view: view,
-            attachmentIdentity: definition.attachmentIdentity,
-            alignment: .leading,
-            role: .staticItem,
-            isEnabled: true,
-            overflowRank: .max
-          )
+      renderItems.append(
+        .init(
+          node: definition.leadingItemNode,
+          alignment: .leading,
+          role: .staticItem,
+          overflowRank: .max
         )
-      }
+      )
     }
 
     let contextualItems = contextualRenderItems(
@@ -382,18 +497,14 @@ package struct ToolbarHostingRoot<Content: View>: View, ResolvableView {
     renderItems.append(contentsOf: contextualItems.filter { $0.alignment == .leading })
 
     for definition in definitions {
-      for view in definition.trailingViews.reversed() {
-        renderItems.append(
-          .init(
-            view: view,
-            attachmentIdentity: definition.attachmentIdentity,
-            alignment: .trailing,
-            role: .staticItem,
-            isEnabled: true,
-            overflowRank: .max
-          )
+      renderItems.append(
+        .init(
+          node: definition.trailingItemNode,
+          alignment: .trailing,
+          role: .staticItem,
+          overflowRank: .max
         )
-      }
+      )
     }
 
     renderItems.append(contentsOf: contextualItems.filter { $0.alignment == .trailing })
@@ -422,31 +533,24 @@ package struct ToolbarHostingRoot<Content: View>: View, ResolvableView {
       .map(\.element)
 
     var pending: [PendingToolbarContextualItem] = []
-    pending.reserveCapacity(registrations.count * 2)
+    pending.reserveCapacity(registrations.count)
     var sourceOrder = 0
 
     for registration in registrations {
-      let views =
-        registration.alignment == .leading
-        ? registration.itemViews
-        : registration.itemViews.reversed()
-      for view in views {
-        pending.append(
-          .init(
-            view: view,
-            attachmentIdentity: registration.attachmentIdentity,
-            alignment: registration.alignment,
-            isEnabled: registration.isEnabled,
-            sourceOrder: sourceOrder,
-            overflowKey: overflowKey(
-              for: registration.attachmentIdentity,
-              focusedIdentity: focusedIdentity,
-              sourceOrder: sourceOrder
-            )
+      pending.append(
+        .init(
+          node: registration.itemNode,
+          attachmentIdentity: registration.attachmentIdentity,
+          alignment: registration.alignment,
+          sourceOrder: sourceOrder,
+          overflowKey: overflowKey(
+            for: registration.attachmentIdentity,
+            focusedIdentity: focusedIdentity,
+            sourceOrder: sourceOrder
           )
         )
-        sourceOrder += 1
-      }
+      )
+      sourceOrder += 1
     }
 
     let ranked = pending.sorted { lhs, rhs in
@@ -461,11 +565,9 @@ package struct ToolbarHostingRoot<Content: View>: View, ResolvableView {
 
     return pending.map { item in
       ToolbarRenderItem(
-        view: item.view,
-        attachmentIdentity: item.attachmentIdentity,
+        node: item.node,
         alignment: item.alignment,
         role: .contextual,
-        isEnabled: item.isEnabled,
         overflowRank: overflowRanks[item.sourceOrder] ?? .max
       )
     }
@@ -534,15 +636,12 @@ package struct ToolbarHostingRoot<Content: View>: View, ResolvableView {
 private struct ToolbarPlacementSurface: View {
   var style: ToolbarStyle
 
-  // AnyView policy: toolbar surfaces render hoisted heterogeneous toolbar
-  // entries after the root host selects a placement.
   var items: [ToolbarRenderItem]
 
   var body: some View {
     ToolbarRowLayout().callAsFunction {
       ForEach(items.indices, id: \.self) { index in
-        items[index].view
-          .disabled(!items[index].isEnabled)
+        ResolvedToolbarItemView(node: items[index].node)
           .fixedSize()
           .layoutValue(
             key: ToolbarLayoutMetadataKey.self,
@@ -570,6 +669,28 @@ private struct ToolbarPlacementSurface: View {
     switch style {
     case .default:
       AnyShapeStyle(.terminalRow(.neutral))
+    }
+  }
+}
+
+private struct ResolvedToolbarItemView: View, ResolvableView {
+  var node: ResolvedNode
+
+  package func resolveElements(in _: ResolveContext) -> [ResolvedNode] {
+    [node]
+  }
+}
+
+extension ResolvedNode {
+  fileprivate mutating func stripToolbarInteractionMetadataRecursively() {
+    semanticMetadata = .init(
+      isFocusable: false,
+      allowsHitTesting: false
+    )
+    lifecycleMetadata = .init()
+    preferenceValues = .init()
+    for index in children.indices {
+      children[index].stripToolbarInteractionMetadataRecursively()
     }
   }
 }

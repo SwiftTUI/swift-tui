@@ -117,6 +117,62 @@ struct ToolbarSurfaceTests {
     #expect(bottomLine.contains("Three"))
     #expect(bottomLine.contains("Four"))
   }
+
+  @Test("toolbar actions come from the explicit action parameter")
+  func toolbarActionsComeFromTheExplicitActionParameter() throws {
+    let actionRegistry = LocalActionRegistry()
+    var didTrigger = false
+
+    let artifacts = renderedArtifacts(
+      Text("Body")
+        .toolbar(
+          placement: .bottom,
+          leadingAction: {
+            didTrigger = true
+          },
+          leading: {
+            Text("Run")
+          },
+          trailing: {
+            Text("Idle")
+          }
+        ),
+      height: 2,
+      localActionRegistry: actionRegistry
+    )
+
+    let actionIdentity = try #require(
+      artifacts.semanticSnapshot.focusRegions.first?.identity
+    )
+    #expect(actionRegistry.dispatch(identity: actionIdentity))
+    #expect(didTrigger)
+  }
+
+  @Test("toolbar labels strip nested interactive behavior without an explicit action")
+  func toolbarLabelsStripNestedInteractiveBehaviorWithoutAnExplicitAction() {
+    let actionRegistry = LocalActionRegistry()
+
+    let artifacts = renderedArtifacts(
+      Text("Body")
+        .toolbar(
+          placement: .bottom,
+          leading: {
+            Button(
+              "Nested",
+              action: {}
+            )
+          },
+          trailing: {
+            Text("Idle")
+          }
+        ),
+      height: 2,
+      localActionRegistry: actionRegistry
+    )
+
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("Nested"))
+    #expect(artifacts.semanticSnapshot.focusRegions.isEmpty)
+  }
 }
 
 @MainActor
@@ -126,17 +182,34 @@ private func renderedLines<V: View>(
   height: Int = 4,
   focusedIdentity: Identity? = nil
 ) -> [String] {
+  renderedArtifacts(
+    view,
+    width: width,
+    height: height,
+    focusedIdentity: focusedIdentity
+  ).rasterSurface.lines
+}
+
+@MainActor
+private func renderedArtifacts<V: View>(
+  _ view: V,
+  width: Int = 32,
+  height: Int = 4,
+  focusedIdentity: Identity? = nil,
+  localActionRegistry: LocalActionRegistry? = nil
+) -> FrameArtifacts {
   var environmentValues = EnvironmentValues()
   environmentValues.terminalSize = .init(width: width, height: height)
   environmentValues.focusedIdentity = focusedIdentity
 
-  let artifacts = DefaultRenderer().render(
+  return DefaultRenderer().render(
     view,
     context: .init(
       identity: testIdentity("ToolbarSurface"),
-      environmentValues: environmentValues
+      environmentValues: environmentValues,
+      localActionRegistry: localActionRegistry,
+      applyEnvironmentValues: true
     ),
     proposal: .init(width: width, height: height)
   )
-  return artifacts.rasterSurface.lines
 }

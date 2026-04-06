@@ -86,4 +86,24 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
       )
     }
   }
+
+  package func appendDeferredDeclaredChildren(
+    into children: inout [DeferredViewPayload]
+  ) {
+    switch storage {
+    case .trueContent(let content):
+      appendDeferredDeclaredBuilderChildren(
+        from: content,
+        into: &children
+      )
+    case .falseContent(let content):
+      if collapsesImplicitEmptyFalseBranch, content is EmptyView {
+        return
+      }
+      appendDeferredDeclaredBuilderChildren(
+        from: content,
+        into: &children
+      )
+    }
+  }
 }

@@ -44,6 +44,10 @@ package protocol DeclaredChildrenView {
   func appendErasedDeclaredChildren(
     into children: inout [AnyView]
   )
+
+  func appendDeferredDeclaredChildren(
+    into children: inout [DeferredViewPayload]
+  )
 }
 
 /// Resolves authored views into resolved render trees.
@@ -168,6 +172,37 @@ package func erasedDeclaredBuilderChildren<V: View>(
 ) -> [AnyView] {
   var children: [AnyView] = []
   appendErasedDeclaredBuilderChildren(
+    from: view,
+    into: &children
+  )
+  return children
+}
+
+@MainActor
+package func appendDeferredDeclaredBuilderChildren<V: View>(
+  from view: V,
+  into children: inout [DeferredViewPayload]
+) {
+  let erased: Any = view
+  if let structural = erased as? any DeclaredChildrenView {
+    structural.appendDeferredDeclaredChildren(
+      into: &children
+    )
+    return
+  }
+  children.append(
+    DeferredViewPayload {
+      view
+    }
+  )
+}
+
+@MainActor
+package func deferredDeclaredBuilderChildren<V: View>(
+  from view: V
+) -> [DeferredViewPayload] {
+  var children: [DeferredViewPayload] = []
+  appendDeferredDeclaredBuilderChildren(
     from: view,
     into: &children
   )

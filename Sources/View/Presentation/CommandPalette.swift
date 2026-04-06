@@ -703,9 +703,11 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
             title: "Command Palette",
             kind: .sheet,
             backdropOpacity: 0.7,
-            actionViews: [],
-            messageViews: [],
-            contentViews: erasedDeclaredBuilderChildren(from: paletteSheet(for: registrations)),
+            actionPayloads: [],
+            messagePayloads: [],
+            contentPayloads: deferredDeclaredBuilderChildren(
+              from: paletteSheet(for: registrations)
+            ),
             dismiss: { [isPresented] in
               isPresented.wrappedValue = false
               query = ""

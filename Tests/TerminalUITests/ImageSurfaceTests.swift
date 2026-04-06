@@ -65,6 +65,39 @@ struct ImageSurfaceTests {
     #expect(attachment.bounds.size == .init(width: 2, height: 1))
   }
 
+  @Test("Label supports SwiftUI-style image convenience")
+  func labelImageConvenienceResolvesThroughEnvironmentRoots() throws {
+    let pngBytes = try makePNGBytes(
+      width: 16,
+      height: 16,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 255, blue: 255), count: 256)
+    )
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let nested = root.appendingPathComponent("icons", isDirectory: true)
+    let fileURL = nested.appendingPathComponent("label.png")
+
+    try FileManager.default.createDirectory(
+      at: nested,
+      withIntermediateDirectories: true
+    )
+    try Data(pngBytes).write(to: fileURL)
+    defer {
+      try? FileManager.default.removeItem(at: root)
+    }
+
+    let artifacts = DefaultRenderer().render(
+      Label("Brand", image: "icons/label.png")
+        .environment(\.imageResourceRoots, [root.path]),
+      context: .init(identity: testIdentity("Label", "Image"))
+    )
+    let attachment = try #require(artifacts.rasterSurface.imageAttachments.first)
+
+    #expect(artifacts.rasterSurface.imageAttachments.count == 1)
+    #expect(attachment.resolvedReference == .filePath(fileURL.path))
+    #expect(resolvedNodeLabelText(from: artifacts.resolvedTree) == "Brand")
+  }
+
   @Test("file URL images percent decode local paths without Foundation in the runtime")
   func fileURLImagesPercentDecodeLocalPaths() throws {
     let pngBytes = try makePNGBytes(

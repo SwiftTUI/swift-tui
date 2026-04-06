@@ -1526,6 +1526,16 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.lines == ["◎ Network"])
   }
 
+  @Test("Label supports SwiftUI-style systemImage convenience for glyph labels")
+  func labelRendersSystemImageConvenience() {
+    let artifacts = DefaultRenderer().render(
+      Label("Presets", systemImage: "▤"),
+      context: .init(identity: testIdentity("Label", "SystemImage"))
+    )
+
+    #expect(artifacts.rasterSurface.lines == ["▤ Presets"])
+  }
+
   @Test("LabeledContent aligns a muted label against trailing value content")
   func labeledContentRendersLabelAndValue() {
     let artifacts = DefaultRenderer().render(
