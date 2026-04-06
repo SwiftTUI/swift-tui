@@ -16,7 +16,7 @@ import Testing
 struct SceneRuntimeTests {
   @Test("Secondary scene input end suspends and reattaches")
   func secondarySceneSuspendsAndReattaches() async throws {
-    let configuration = collectWindowSceneConfigurations(
+    let selection = collectWindowSceneSelections(
       from: WindowGroup("Secondary", id: WindowIdentifier("secondary")) {
         Text("Secondary")
       }
@@ -27,7 +27,7 @@ struct SceneRuntimeTests {
     let firstSessionShouldEnd = Mutex<Bool>(false)
 
     let runtime = try SceneRuntime(
-      configuration: configuration,
+      selection: selection,
       isPrimary: false,
       sessionRunner: { _, _ in
         let invocation = invocationCount.withLock { count -> Int in

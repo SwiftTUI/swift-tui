@@ -23,8 +23,8 @@ public enum TerminalCLIAppRunner {
   /// Runs a scene-based app. Call this from your app type's `main()`.
   @MainActor
   public static func run<A: App>(_ app: A) async throws {
-    let configurations = collectWindowSceneConfigurations(from: app.body)
-    guard !configurations.isEmpty else {
+    let selections = collectWindowSceneSelections(from: app.body)
+    guard !selections.isEmpty else {
       throw AppLaunchError.noScenes
     }
 
@@ -35,7 +35,7 @@ public enum TerminalCLIAppRunner {
     switch mode {
     case .app(let instanceName):
       try await launchApp(
-        configurations: configurations,
+        selections: selections,
         sessionName: sessionName,
         appName: appName,
         instanceName: instanceName
@@ -58,7 +58,14 @@ public enum TerminalCLIAppRunner {
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler()
   ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
-    let configuration = try singleSceneConfiguration(from: scene)
+    let selections = collectWindowSceneSelections(from: scene)
+    guard !selections.isEmpty else {
+      throw AppLaunchError.noScenes
+    }
+    guard selections.count == 1 else {
+      throw SingleSceneRuntimeError.multipleScenesUnsupported(count: selections.count)
+    }
+    let selection = selections[0]
     let terminalInputReader: any TerminalInputReading =
       if let terminalInputReader = inputReader as? any TerminalInputReading {
         terminalInputReader
@@ -66,8 +73,8 @@ public enum TerminalCLIAppRunner {
         KeyboardOnlyInputAdapter(inputReader: inputReader)
       }
 
-    return try await run(
-      configuration: configuration,
+    return try await runSelectedScene(
+      selection: selection,
       sessionName: sessionName,
       resources: .init(
         terminalHost: terminalHost,
@@ -80,16 +87,16 @@ public enum TerminalCLIAppRunner {
 
   @MainActor
   private static func launchApp(
-    configurations: [WindowSceneConfiguration],
+    selections: [SelectedWindowScene],
     sessionName: String,
     appName: String,
     instanceName: String?
   ) async throws {
     // Create scene runtimes
     var sceneRuntimes: [SceneRuntime] = []
-    for (index, config) in configurations.enumerated() {
+    for (index, selection) in selections.enumerated() {
       let runtime = try SceneRuntime(
-        configuration: config,
+        selection: selection,
         isPrimary: index == 0
       )
       sceneRuntimes.append(runtime)
@@ -112,7 +119,7 @@ public enum TerminalCLIAppRunner {
 
     var sceneTasks: [Task<RunLoopResult<TerminalUISceneSessionState>, any Error>] = []
     for runtime in sceneRuntimes {
-      let sceneID = runtime.configuration.identifier.rawValue
+      let sceneID = runtime.selection.identifier.rawValue
       let task = Task { @MainActor in
         try await runtime.run(
           sessionName: sessionName,
@@ -171,17 +178,17 @@ public enum TerminalCLIAppRunner {
   }
 
   @MainActor
-  private static func run(
-    configuration: WindowSceneConfiguration,
+  private static func runSelectedScene(
+    selection: SelectedWindowScene,
     sessionName: String,
     resources: SceneSessionResources
   ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
     let stateContainer = StateContainer(
       initialState: TerminalUISceneSessionState(),
-      invalidationIdentities: [configuration.rootIdentity]
+      invalidationIdentities: [selection.rootIdentity]
     )
     let focusTracker = FocusTracker(
-      invalidationIdentities: [configuration.rootIdentity]
+      invalidationIdentities: [selection.rootIdentity]
     )
 
     defer {
@@ -190,12 +197,11 @@ public enum TerminalCLIAppRunner {
       }
     }
 
-    return try await SceneSession.run(
-      configuration: configuration,
+    return try await selection.run(
       sessionName: sessionName,
+      resources: resources,
       stateContainer: stateContainer,
-      focusTracker: focusTracker,
-      resources: resources
+      focusTracker: focusTracker
     )
   }
 
@@ -426,20 +432,6 @@ public enum TerminalCLIAppRunner {
 
     return scenes
   }
-}
-
-@MainActor
-private func singleSceneConfiguration<S: Scene>(
-  from scene: S
-) throws -> WindowSceneConfiguration {
-  let configurations = collectWindowSceneConfigurations(from: scene)
-  guard !configurations.isEmpty else {
-    throw AppLaunchError.noScenes
-  }
-  guard configurations.count == 1 else {
-    throw SingleSceneRuntimeError.multipleScenesUnsupported(count: configurations.count)
-  }
-  return configurations[0]
 }
 
 private enum SingleSceneRuntimeError: Error, Equatable, Sendable, CustomStringConvertible {

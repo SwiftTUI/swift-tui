@@ -81,12 +81,18 @@ public struct GalleryDemoSceneView: View {
       Divider()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .toolbar(placement: .bottom) {
-      Text("[Tab] move focus")
-      Text("[Return] activate")
-    } trailing: {
-      Text("[q] quit")
-    }
+    .toolbar(
+      placement: .bottom,
+      leading: {
+        HStack(spacing: 2) {
+          Text("[Tab] move focus")
+          Text("[Return] activate")
+        }
+      },
+      trailing: {
+        Text("[q] quit")
+      }
+    )
     .commandPalette(
       isPresented: $model.isPalettePresented,
       shortcut: .character("/"),

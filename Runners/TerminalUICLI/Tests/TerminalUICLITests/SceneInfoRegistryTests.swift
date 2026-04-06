@@ -18,10 +18,10 @@ struct SceneInfoRegistryTests {
         }
       }
     }
-    let configurations = collectWindowSceneConfigurations(from: TwoSceneApp().body)
+    let selections = collectWindowSceneSelections(from: TwoSceneApp().body)
 
-    let primary = try SceneRuntime(configuration: configurations[0], isPrimary: true)
-    let secondary = try SceneRuntime(configuration: configurations[1], isPrimary: false)
+    let primary = try SceneRuntime(selection: selections[0], isPrimary: true)
+    let secondary = try SceneRuntime(selection: selections[1], isPrimary: false)
     let registry = SceneInfoRegistry(runtimes: [primary, secondary])
 
     let initial = registry.scenes()

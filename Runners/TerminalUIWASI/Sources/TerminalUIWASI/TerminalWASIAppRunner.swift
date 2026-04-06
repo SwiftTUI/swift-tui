@@ -14,7 +14,8 @@ public enum TerminalWASIAppRunnerError: Error, Equatable, Sendable, CustomString
   public var description: String {
     switch self {
     case .nativeExecutionUnsupported:
-      return "TerminalWASIAppRunner can run natively only in manifest mode. Build for WASI to execute scenes."
+      return
+        "TerminalWASIAppRunner can run natively only in manifest mode. Build for WASI to execute scenes."
     }
   }
 }
@@ -28,19 +29,19 @@ public enum TerminalWASIAppRunner {
 
   @MainActor
   public static func run<A: App>(_ app: A) async throws {
-    let configurations = collectWindowSceneConfigurations(from: app.body)
+    let selections = collectWindowSceneSelections(from: app.body)
     if requestedManifestMode() {
       print(TerminalUISceneManifest(for: app).jsonString)
       return
     }
 
-    guard !configurations.isEmpty else {
+    guard !selections.isEmpty else {
       throw AppLaunchError.noScenes
     }
 
     #if canImport(WASILibc)
-      _ = try await run(
-        configuration: selectedWASIConfiguration(from: configurations),
+      _ = try await runSelectedScene(
+        selection: selectedWASISelection(from: selections),
         sessionName: String(reflecting: A.self),
         resources: wasiSceneResources()
       )
@@ -50,17 +51,17 @@ public enum TerminalWASIAppRunner {
   }
 
   @MainActor
-  private static func run(
-    configuration: WindowSceneConfiguration,
+  private static func runSelectedScene(
+    selection: SelectedWindowScene,
     sessionName: String,
     resources: SceneSessionResources
   ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
     let stateContainer = StateContainer(
       initialState: TerminalUISceneSessionState(),
-      invalidationIdentities: [configuration.rootIdentity]
+      invalidationIdentities: [selection.rootIdentity]
     )
     let focusTracker = FocusTracker(
-      invalidationIdentities: [configuration.rootIdentity]
+      invalidationIdentities: [selection.rootIdentity]
     )
 
     defer {
@@ -69,25 +70,24 @@ public enum TerminalWASIAppRunner {
       }
     }
 
-    return try await SceneSession.run(
-      configuration: configuration,
+    return try await selection.run(
       sessionName: sessionName,
+      resources: resources,
       stateContainer: stateContainer,
-      focusTracker: focusTracker,
-      resources: resources
+      focusTracker: focusTracker
     )
   }
 
   #if canImport(WASILibc)
-    private static func selectedWASIConfiguration(
-      from configurations: [WindowSceneConfiguration]
-    ) -> WindowSceneConfiguration {
+    private static func selectedWASISelection(
+      from selections: [SelectedWindowScene]
+    ) -> SelectedWindowScene {
       guard let selector = wasiSceneSelector() else {
-        return configurations[0]
+        return selections[0]
       }
 
-      return configurations.first(where: { $0.identifier.rawValue == selector })
-        ?? configurations[0]
+      return selections.first(where: { $0.identifier.rawValue == selector })
+        ?? selections[0]
     }
 
     @MainActor

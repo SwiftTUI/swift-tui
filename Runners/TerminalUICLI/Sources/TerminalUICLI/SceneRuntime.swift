@@ -15,7 +15,7 @@ final class SceneRuntime {
   typealias SessionRunner =
     @MainActor (SceneRuntime, String) async throws -> RunLoopResult<TerminalUISceneSessionState>
 
-  let configuration: WindowSceneConfiguration
+  let selection: SelectedWindowScene
   let isPrimary: Bool
   private(set) var lifecycle: SceneLifecycle
   private let ptyPair: PtyPair?
@@ -25,12 +25,12 @@ final class SceneRuntime {
   private let sessionRunner: SessionRunner
 
   init(
-    configuration: WindowSceneConfiguration,
+    selection: SelectedWindowScene,
     isPrimary: Bool,
     resources: SceneSessionResources? = nil,
     sessionRunner: SessionRunner? = nil
   ) throws {
-    self.configuration = configuration
+    self.selection = selection
     self.isPrimary = isPrimary
     self.lifecycle = SceneLifecycle(isPrimary: isPrimary)
 
@@ -58,10 +58,10 @@ final class SceneRuntime {
 
     stateContainer = StateContainer(
       initialState: TerminalUISceneSessionState(),
-      invalidationIdentities: [configuration.rootIdentity]
+      invalidationIdentities: [selection.rootIdentity]
     )
     focusTracker = FocusTracker(
-      invalidationIdentities: [configuration.rootIdentity]
+      invalidationIdentities: [selection.rootIdentity]
     )
     self.sessionRunner =
       sessionRunner ?? { runtime, sessionName in
@@ -71,8 +71,8 @@ final class SceneRuntime {
 
   var sceneInfo: SceneInfo {
     SceneInfo(
-      id: configuration.identifier.rawValue,
-      title: configuration.title,
+      id: selection.identifier.rawValue,
+      title: selection.title,
       ptyPath: ptyPair?.slavePath,
       isAttached: lifecycle.state == .rendering
     )
@@ -120,12 +120,11 @@ final class SceneRuntime {
   private func runSceneSession(
     sessionName: String
   ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
-    try await SceneSession.run(
-      configuration: configuration,
+    try await selection.run(
       sessionName: sessionName,
+      resources: resources,
       stateContainer: stateContainer,
-      focusTracker: focusTracker,
-      resources: resources
+      focusTracker: focusTracker
     )
   }
 
