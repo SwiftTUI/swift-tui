@@ -46,7 +46,8 @@ The runtime-facing public surface is also canonical:
 - `RunLoop`
 - `ResolveContext` as external renderer or resolver configuration only
 - terminal host, graphics-capability, and input or signal integration types that support the runtime
-- app and scene entry points, including `App`, `Scene`, `SceneBuilder`, `WindowGroup`, and `WindowIdentifier`
+- app and scene entry points, including `App`, `Scene`, `SceneBuilder`, `WindowGroup`, `WindowIdentifier`, and the typed scene builder artifacts
+- `AnyScene` as the explicit scene-erasure escape hatch
 - `TerminalUISceneDescriptor`
 - `TerminalUISceneManifest`
 - `HostedSceneSession`

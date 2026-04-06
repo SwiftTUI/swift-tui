@@ -10,27 +10,25 @@ import Testing
 struct AppRuntimeTests {
   @Test("App body resolves a single WindowGroup into a terminal scene")
   func appBodyResolvesSingleWindowGroup() throws {
-    let configurations = collectWindowSceneConfigurations(from: GreetingApp().body)
-    #expect(configurations.count == 1)
-    let configuration = try #require(configurations.first)
-
-    #expect(configuration.identifier == WindowIdentifier("Greeting-Window"))
-    #expect(configuration.rootIdentity == testIdentity("App", "Greeting-Window"))
-
-    let artifacts = DefaultRenderer().render(
-      configuration.makeRootView(),
-      context: .init(identity: configuration.rootIdentity)
+    var visitor = AppRuntimeSceneVisitor()
+    let selection = try #require(
+      withFirstWindowSceneConfiguration(
+        in: GreetingApp().body,
+        visitor: &visitor
+      )
     )
 
-    #expect(artifacts.resolvedTree.descendant(withText: "Hello from App") != nil)
+    #expect(selection.identifier == WindowIdentifier("Greeting-Window"))
+    #expect(selection.rootIdentity == testIdentity("App", "Greeting-Window"))
+    #expect(selection.artifacts.resolvedTree.descendant(withText: "Hello from App") != nil)
   }
 
   @Test("App body preserves multiple WindowGroup scenes without collapsing them")
   func appBodyPreservesMultipleScenes() {
-    let configurations = collectWindowSceneConfigurations(from: MultiWindowApp().body)
+    let descriptors = collectWindowSceneDescriptors(from: MultiWindowApp().body)
 
-    #expect(configurations.count == 2)
-    #expect(configurations.map(\.identifier) == [WindowIdentifier("One"), WindowIdentifier("Two")])
+    #expect(descriptors.count == 2)
+    #expect(descriptors.map(\.id) == [WindowIdentifier("One"), WindowIdentifier("Two")])
   }
 
   @MainActor
@@ -474,6 +472,32 @@ struct AppRuntimeTests {
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
     #expect(surface.contains("Outer true"))
     #expect(surface.contains("Inner true false"))
+  }
+}
+
+@MainActor
+private struct AppRuntimeSceneSelection {
+  let identifier: WindowIdentifier
+  let rootIdentity: Identity
+  let artifacts: FrameArtifacts
+}
+
+@MainActor
+private struct AppRuntimeSceneVisitor: WindowSceneConfigurationVisitor {
+  mutating func visit<Content: View>(
+    descriptor _: TerminalUISceneDescriptor,
+    configuration: WindowSceneConfiguration<Content>
+  ) -> WindowSceneConfigurationVisitResult<AppRuntimeSceneSelection> {
+    .finish(
+      AppRuntimeSceneSelection(
+        identifier: configuration.identifier,
+        rootIdentity: configuration.rootIdentity,
+        artifacts: DefaultRenderer().render(
+          configuration.makeScopedRootView(),
+          context: .init(identity: configuration.rootIdentity)
+        )
+      )
+    )
   }
 }
 

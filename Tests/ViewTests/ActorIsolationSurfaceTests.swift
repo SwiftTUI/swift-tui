@@ -93,16 +93,16 @@ struct ActorIsolationSurfaceTests {
       }
     }
 
-    let configurations = collectWindowSceneConfigurations(from: SurfaceApp().body)
-    #expect(configurations.count == 1)
-    let configuration = try #require(configurations.first)
-    let artifacts = DefaultRenderer().render(
-      configuration.makeRootView(),
-      context: .init(identity: configuration.rootIdentity)
+    var visitor = ActorIsolationSceneVisitor()
+    let selection = try #require(
+      withFirstWindowSceneConfiguration(
+        in: SurfaceApp().body,
+        visitor: &visitor
+      )
     )
 
-    #expect(configuration.identifier == WindowIdentifier("Actor-Surface"))
-    #expect(artifacts.resolvedTree.identity == configuration.rootIdentity)
+    #expect(selection.identifier == WindowIdentifier("Actor-Surface"))
+    #expect(selection.artifacts.resolvedTree.identity == selection.rootIdentity)
   }
 
   @Test("RunLoop typed builders still accept AnyView via Content == AnyView")
@@ -129,7 +129,7 @@ struct ActorIsolationSurfaceTests {
 
     func makeRunLoop<Content: View>(
       viewBuilder: @escaping (_ state: Int, _ focusedIdentity: Identity?) -> Content
-    ) -> RunLoop<Int> {
+    ) -> RunLoop<Int, Content> {
       let identity = testIdentity("ActorIsolation", "RunLoop")
       return RunLoop(
         rootIdentity: identity,
@@ -146,5 +146,31 @@ struct ActorIsolationSurfaceTests {
     }
 
     #expect(runLoop.rootIdentity == testIdentity("ActorIsolation", "RunLoop"))
+  }
+}
+
+@MainActor
+private struct ActorIsolationSceneSelection {
+  let identifier: WindowIdentifier
+  let rootIdentity: Identity
+  let artifacts: FrameArtifacts
+}
+
+@MainActor
+private struct ActorIsolationSceneVisitor: WindowSceneConfigurationVisitor {
+  mutating func visit<Content: View>(
+    descriptor _: TerminalUISceneDescriptor,
+    configuration: WindowSceneConfiguration<Content>
+  ) -> WindowSceneConfigurationVisitResult<ActorIsolationSceneSelection> {
+    .finish(
+      ActorIsolationSceneSelection(
+        identifier: configuration.identifier,
+        rootIdentity: configuration.rootIdentity,
+        artifacts: DefaultRenderer().render(
+          configuration.makeScopedRootView(),
+          context: .init(identity: configuration.rootIdentity)
+        )
+      )
+    )
   }
 }

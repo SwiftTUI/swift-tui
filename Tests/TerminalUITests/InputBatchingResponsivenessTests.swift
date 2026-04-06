@@ -1,4 +1,5 @@
 import Testing
+import View
 
 @testable import TerminalUI
 
@@ -8,7 +9,9 @@ struct InputBatchingResponsivenessTests {
   @Test("pointer batching keeps a short debounce window")
   func pointerBatchingUsesShortDebounce() {
     #expect(InputReaderTiming.mouseEventFlushDelayMilliseconds == 1)
-    #expect(RunLoop<EventBatchProbeState>.EventPumpTiming.coalescedPointerDrainYieldCount == 4)
+    #expect(
+      RunLoop<EventBatchProbeState, EmptyView>.EventPumpTiming.coalescedPointerDrainYieldCount == 4
+    )
   }
 
   @Test("pointer burst coalescing still preserves event boundaries")

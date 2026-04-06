@@ -675,17 +675,17 @@ struct Phase4ObservationAndEnvironmentTests {
       }
     }
 
-    let configurations = collectWindowSceneConfigurations(from: scene)
-    #expect(configurations.count == 1)
-    let configuration = try #require(configurations.first)
-    let artifacts = renderer.render(
-      configuration.makeRootView(),
-      context: .init(
-        identity: configuration.rootIdentity,
-        localActionRegistry: actionRegistry,
-        applyEnvironmentValues: true
+    var visitor = WindowGroupAuthoringScopeVisitor(
+      renderer: renderer,
+      actionRegistry: actionRegistry
+    )
+    let selection = try #require(
+      withFirstWindowSceneConfiguration(
+        in: scene,
+        visitor: &visitor
       )
     )
+    let artifacts = selection.artifacts
 
     #expect(artifacts.resolvedTree.descendant(withText: "Primary") != nil)
     #expect(actionRegistry.dispatch(identity: testIdentity("WindowGroupForEachAction")))
@@ -894,6 +894,35 @@ struct Phase4ObservationAndEnvironmentTests {
     #expect(result.exitReason == .quitKey)
     let firstFrame = try #require(terminal.frames.first)
     #expect(firstFrame.contains("Terminal 60x18"))
+  }
+}
+
+@MainActor
+private struct WindowGroupAuthoringScopeSelection {
+  let artifacts: FrameArtifacts
+}
+
+@MainActor
+private struct WindowGroupAuthoringScopeVisitor: WindowSceneConfigurationVisitor {
+  let renderer: DefaultRenderer
+  let actionRegistry: LocalActionRegistry
+
+  mutating func visit<Content: View>(
+    descriptor _: TerminalUISceneDescriptor,
+    configuration: WindowSceneConfiguration<Content>
+  ) -> WindowSceneConfigurationVisitResult<WindowGroupAuthoringScopeSelection> {
+    .finish(
+      WindowGroupAuthoringScopeSelection(
+        artifacts: renderer.render(
+          configuration.makeScopedRootView(),
+          context: .init(
+            identity: configuration.rootIdentity,
+            localActionRegistry: actionRegistry,
+            applyEnvironmentValues: true
+          )
+        )
+      )
+    )
   }
 }
 

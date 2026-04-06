@@ -10,15 +10,14 @@ func runTestSceneSession<S: Scene>(
   signalReader: (any SignalReading)? = nil,
   scheduler: any FrameScheduling = FrameScheduler()
 ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
-  let configurations = collectWindowSceneConfigurations(from: scene)
-  guard !configurations.isEmpty else {
+  let descriptors = collectWindowSceneDescriptors(from: scene)
+  guard !descriptors.isEmpty else {
     throw AppLaunchError.noScenes
   }
-  guard configurations.count == 1 else {
-    throw TestSceneSessionError.multipleScenesUnsupported(count: configurations.count)
+  guard descriptors.count == 1 else {
+    throw TestSceneSessionError.multipleScenesUnsupported(count: descriptors.count)
   }
 
-  let configuration = configurations[0]
   let terminalInputReader: any TerminalInputReading =
     if let terminalInputReader = inputReader as? any TerminalInputReading {
       terminalInputReader
@@ -26,21 +25,31 @@ func runTestSceneSession<S: Scene>(
       TestKeyboardOnlyInputAdapter(inputReader: inputReader)
     }
 
-  return try await SceneSession.run(
-    configuration: configuration,
-    sessionName: sessionName,
-    stateContainer: StateContainer(
-      initialState: TerminalUISceneSessionState(),
-      invalidationIdentities: [configuration.rootIdentity]
-    ),
-    focusTracker: FocusTracker(
-      invalidationIdentities: [configuration.rootIdentity]
-    ),
-    resources: .init(
+  var visitor = TestSceneSessionSelectionVisitor(
+    sessionName: sessionName
+  )
+  guard
+    let selection = withFirstWindowSceneConfiguration(
+      in: scene,
+      visitor: &visitor
+    )
+  else {
+    throw AppLaunchError.noScenes
+  }
+
+  return try await selection.run(
+    SceneSessionResources(
       terminalHost: terminalHost,
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,
       scheduler: scheduler
+    ),
+    StateContainer(
+      initialState: TerminalUISceneSessionState(),
+      invalidationIdentities: [selection.rootIdentity]
+    ),
+    FocusTracker(
+      invalidationIdentities: [selection.rootIdentity]
     )
   )
 }
@@ -53,6 +62,44 @@ private enum TestSceneSessionError: Error, Equatable, Sendable, CustomStringConv
     case .multipleScenesUnsupported(let count):
       return "Expected exactly one scene, but received \(count)."
     }
+  }
+}
+
+@MainActor
+private struct TestSceneSessionSelection {
+  let rootIdentity: Identity
+  let run:
+    (
+      SceneSessionResources,
+      StateContainer<TerminalUISceneSessionState>,
+      FocusTracker
+    ) async throws -> RunLoopResult<TerminalUISceneSessionState>
+}
+
+@MainActor
+private struct TestSceneSessionSelectionVisitor: WindowSceneConfigurationVisitor {
+  let sessionName: String
+
+  mutating func visit<Content: View>(
+    descriptor _: TerminalUISceneDescriptor,
+    configuration: WindowSceneConfiguration<Content>
+  ) -> WindowSceneConfigurationVisitResult<TestSceneSessionSelection> {
+    let sessionName = self.sessionName
+
+    return .finish(
+      TestSceneSessionSelection(
+        rootIdentity: configuration.rootIdentity,
+        run: { resources, stateContainer, focusTracker in
+          try await SceneSession.run(
+            configuration: configuration,
+            sessionName: sessionName,
+            stateContainer: stateContainer,
+            focusTracker: focusTracker,
+            resources: resources
+          )
+        }
+      )
+    )
   }
 }
 

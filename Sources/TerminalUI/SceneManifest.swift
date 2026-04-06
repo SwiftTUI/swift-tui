@@ -29,26 +29,19 @@ public struct TerminalUISceneManifest: Codable, Sendable {
   @MainActor
   public init<A: App>(for app: A) {
     self = sceneManifest(
-      from: collectWindowSceneConfigurations(from: app.body)
+      from: collectWindowSceneDescriptors(from: app.body)
     )
   }
 }
 
 package func sceneManifest(
-  from configurations: [WindowSceneConfiguration]
+  from descriptors: [TerminalUISceneDescriptor]
 ) -> TerminalUISceneManifest {
-  let defaultSceneID = configurations.first?.identifier ?? WindowIdentifier("window")
-  let scenes = configurations.enumerated().map { index, configuration in
-    TerminalUISceneDescriptor(
-      id: configuration.identifier,
-      title: configuration.title,
-      isDefault: index == 0
-    )
-  }
+  let defaultSceneID = descriptors.first?.id ?? WindowIdentifier("window")
 
   return TerminalUISceneManifest(
     defaultSceneID: defaultSceneID,
-    scenes: scenes
+    scenes: descriptors
   )
 }
 

@@ -1,3 +1,5 @@
+import View
+
 public enum HostedSceneSessionError: Error, Equatable, Sendable, CustomStringConvertible {
   case sceneNotFound(WindowIdentifier)
 
@@ -9,11 +11,17 @@ public enum HostedSceneSessionError: Error, Equatable, Sendable, CustomStringCon
   }
 }
 
+package typealias HostedSceneRunner =
+  (
+    SceneSessionResources,
+    StateContainer<TerminalUISceneSessionState>,
+    FocusTracker
+  ) async throws -> RunLoopResult<TerminalUISceneSessionState>
+
 @MainActor
 public final class HostedSceneSession {
   public let descriptor: TerminalUISceneDescriptor
 
-  private let configuration: WindowSceneConfiguration
   private let sessionName: String
   private let host: StreamingTerminalHost
   private let inputReader: InjectedTerminalInputReader
@@ -21,6 +29,7 @@ public final class HostedSceneSession {
   private let scheduler: any FrameScheduling
   private let stateContainer: StateContainer<TerminalUISceneSessionState>
   private let focusTracker: FocusTracker
+  private let runScene: HostedSceneRunner
   private var runTask: Task<RunLoopExitReason, any Error>?
 
   public convenience init<A: App>(
@@ -32,41 +41,47 @@ public final class HostedSceneSession {
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
     onOutput: @escaping @Sendable (String) -> Void
   ) throws {
-    let configurations = collectWindowSceneConfigurations(from: app.body)
-    guard let configuration = configurations.first(where: { $0.identifier == sceneID }) else {
+    let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
+    var visitor = HostedSceneSelectionVisitor(
+      sessionName: sessionName
+    )
+    guard
+      let selection = withWindowSceneConfiguration(
+        in: app.body,
+        matching: sceneID,
+        visitor: &visitor
+      )
+    else {
       throw HostedSceneSessionError.sceneNotFound(sceneID)
     }
 
-    let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
     self.init(
-      configuration: configuration,
-      isDefault: configuration.identifier == configurations.first?.identifier,
+      descriptor: selection.descriptor,
+      rootIdentity: selection.rootIdentity,
       sessionName: sessionName,
       initialSize: initialSize,
       appearance: appearance,
       theme: theme,
       capabilityProfile: capabilityProfile,
+      runScene: selection.runScene,
       onOutput: onOutput
     )
   }
 
   package init(
-    configuration: WindowSceneConfiguration,
-    isDefault: Bool,
+    descriptor: TerminalUISceneDescriptor,
+    rootIdentity: Identity,
     sessionName: String,
     initialSize: Size,
     appearance: TerminalAppearance,
     theme: ThemeColors? = nil,
     capabilityProfile: TerminalCapabilityProfile,
+    runScene: @escaping HostedSceneRunner,
     onOutput: @escaping @Sendable (String) -> Void
   ) {
-    self.configuration = configuration
+    self.descriptor = descriptor
     self.sessionName = sessionName
-    descriptor = TerminalUISceneDescriptor(
-      id: configuration.identifier,
-      title: configuration.title,
-      isDefault: isDefault
-    )
+    self.runScene = runScene
     signalReader = InProcessSignalReader()
     host = StreamingTerminalHost(
       surfaceSize: initialSize,
@@ -88,10 +103,10 @@ public final class HostedSceneSession {
     scheduler = FrameScheduler()
     stateContainer = StateContainer(
       initialState: TerminalUISceneSessionState(),
-      invalidationIdentities: [configuration.rootIdentity]
+      invalidationIdentities: [rootIdentity]
     )
     focusTracker = FocusTracker(
-      invalidationIdentities: [configuration.rootIdentity]
+      invalidationIdentities: [rootIdentity]
     )
   }
 
@@ -105,17 +120,15 @@ public final class HostedSceneSession {
       terminalInputReader: inputReader,
       signalReader: signalReader,
       scheduler: scheduler,
-      surfaceName: "hosted-\(configuration.identifier.rawValue)"
+      surfaceName: "hosted-\(descriptor.id.rawValue)"
     )
 
     let task = Task {
-      @MainActor [configuration, sessionName, stateContainer, focusTracker, resources] in
-      let result = try await SceneSession.run(
-        configuration: configuration,
-        sessionName: sessionName,
-        stateContainer: stateContainer,
-        focusTracker: focusTracker,
-        resources: resources
+      @MainActor [runScene, stateContainer, focusTracker, resources] in
+      let result = try await runScene(
+        resources,
+        stateContainer,
+        focusTracker
       )
       return result.exitReason
     }
@@ -169,5 +182,40 @@ public final class HostedSceneSession {
   public func stop() {
     inputReader.finish()
     signalReader.finish()
+  }
+}
+
+@MainActor
+private struct HostedSceneSelection {
+  let descriptor: TerminalUISceneDescriptor
+  let rootIdentity: Identity
+  let runScene: HostedSceneRunner
+}
+
+@MainActor
+private struct HostedSceneSelectionVisitor: WindowSceneConfigurationVisitor {
+  let sessionName: String
+
+  mutating func visit<Content: View>(
+    descriptor: TerminalUISceneDescriptor,
+    configuration: WindowSceneConfiguration<Content>
+  ) -> WindowSceneConfigurationVisitResult<HostedSceneSelection> {
+    let sessionName = self.sessionName
+
+    return .finish(
+      HostedSceneSelection(
+        descriptor: descriptor,
+        rootIdentity: configuration.rootIdentity,
+        runScene: { resources, stateContainer, focusTracker in
+          try await SceneSession.run(
+            configuration: configuration,
+            sessionName: sessionName,
+            stateContainer: stateContainer,
+            focusTracker: focusTracker,
+            resources: resources
+          )
+        }
+      )
+    )
   }
 }

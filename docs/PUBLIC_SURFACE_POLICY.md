@@ -90,6 +90,17 @@ but it is not the default authoring model for this package.
 - New stored `AnyView`, `[AnyView]`, or closure-returning-`AnyView` members should carry a nearby `AnyView policy:` comment explaining why typed storage is not practical in that file.
 - Reviewers should treat new erasure sites as design decisions, not as convenience refactors.
 
+## AnyScene Policy
+
+`AnyScene` remains part of the supported runtime surface as the scene-layer
+equivalent of `AnyView`, but it is not the default way to compose authored
+scenes.
+
+- Prefer typed `@SceneBuilder` composition and generic `WindowGroup<Content>` storage.
+- Do not add public APIs that expose `[AnyScene]` or reintroduce flattened scene-array builder storage as the normal representation.
+- Internal `AnyScene` storage is acceptable only for explicit scene erasure, such as availability unification or narrow compatibility seams where concrete scene types genuinely diverge.
+- Reviewers should treat new `AnyScene` storage as an architectural choice, not as a convenience refactor.
+
 ## Review Checklist
 
 Before adding a new public symbol, ask:

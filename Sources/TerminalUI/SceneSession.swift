@@ -1,3 +1,5 @@
+import View
+
 @_spi(Runners) public struct TerminalUISceneSessionState: Equatable, Sendable {
   @_spi(Runners) public init() {}
 }
@@ -29,8 +31,8 @@
 
 @_spi(Runners) public enum SceneSession {
   @MainActor
-  @_spi(Runners) public static func run(
-    configuration: WindowSceneConfiguration,
+  @_spi(Runners) public static func run<Content: View>(
+    configuration: WindowSceneConfiguration<Content>,
     sessionName: String,
     stateContainer: StateContainer<TerminalUISceneSessionState>,
     focusTracker: FocusTracker,
@@ -62,7 +64,7 @@
       environment: environmentSnapshot,
       environmentValues: environmentValues,
       viewBuilder: { (_: TerminalUISceneSessionState, _: Identity?) in
-        WindowHostView(content: configuration.makeRootView())
+        WindowHostView(content: configuration.makeScopedRootView())
       }
     )
 

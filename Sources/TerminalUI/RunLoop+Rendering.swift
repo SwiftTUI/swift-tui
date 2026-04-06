@@ -33,7 +33,11 @@ extension RunLoop {
       var artifacts: FrameArtifacts?
       while true {
         let renderedArtifacts = renderer.render(
-          viewBuilder(stateContainer.state, focusTracker.currentFocusIdentity),
+          viewBuilder(
+            (
+              state: stateContainer.state,
+              focusedIdentity: focusTracker.currentFocusIdentity
+            )),
           context: resolveContext(for: scheduledFrame),
           proposal: proposal()
         )
@@ -41,7 +45,8 @@ extension RunLoop {
 
         latestSemanticSnapshot = renderedArtifacts.semanticSnapshot
 
-        let focusChanged = focusTracker.updateRegions(renderedArtifacts.semanticSnapshot.focusRegions)
+        let focusChanged = focusTracker.updateRegions(
+          renderedArtifacts.semanticSnapshot.focusRegions)
         let desiredFocusRequest = localFocusBindingRegistry.desiredFocusRequest(
           allowedIdentities: Set(renderedArtifacts.semanticSnapshot.focusRegions.map(\.identity))
         )

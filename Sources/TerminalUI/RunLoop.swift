@@ -2,8 +2,13 @@ import Core
 import Synchronization
 import View
 
-package typealias DeferredStateBodyBuilder<State: Equatable & Sendable> =
-  (_ state: State, _ focusedIdentity: Identity?) -> DeferredRootView
+package typealias ViewBuilderInput<State: Equatable & Sendable> = (
+  state: State,
+  focusedIdentity: Identity?
+)
+
+package typealias DeferredStateBodyBuilder<State: Equatable & Sendable, Content: View> =
+  ScopedMapper<ViewBuilderInput<State>, Content>
 
 /// Handles a key event and may mutate run-loop state.
 public typealias StateKeyHandler<State: Equatable & Sendable> =
@@ -77,7 +82,7 @@ public final class InProcessSignalReader: SignalReading, Sendable {
 
 @MainActor
 /// Drives an interactive terminal session for a state-backed view tree.
-public final class RunLoop<State: Equatable & Sendable> {
+public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package enum RuntimeEvent {
     case input(InputEvent)
     case signal(String)
@@ -92,7 +97,7 @@ public final class RunLoop<State: Equatable & Sendable> {
   package let stateContainer: StateContainer<State>
   package let focusTracker: FocusTracker
   package let keyHandler: StateKeyHandler<State>?
-  package let viewBuilder: DeferredStateBodyBuilder<State>
+  package let viewBuilder: DeferredStateBodyBuilder<State, Content>
   package let environment: EnvironmentSnapshot
   package let environmentValues: EnvironmentValues
   package let proposalOverride: ProposedSize?
@@ -144,7 +149,7 @@ public final class RunLoop<State: Equatable & Sendable> {
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     proposal: ProposedSize? = nil,
-    viewBuilder: @escaping DeferredStateBodyBuilder<State>
+    viewBuilder: DeferredStateBodyBuilder<State, Content>
   ) {
     self.rootIdentity = rootIdentity
     self.renderer = renderer
@@ -174,7 +179,7 @@ public final class RunLoop<State: Equatable & Sendable> {
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     proposal: ProposedSize? = nil,
-    viewBuilder: @escaping DeferredStateBodyBuilder<State>
+    viewBuilder: DeferredStateBodyBuilder<State, Content>
   ) {
     self.init(
       rootIdentity: rootIdentity,
@@ -194,7 +199,7 @@ public final class RunLoop<State: Equatable & Sendable> {
   }
 
   /// Creates a run loop from a strongly typed `View` builder.
-  public convenience init<Content: View>(
+  public convenience init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
     terminalHost: any TerminalHosting,
@@ -209,7 +214,6 @@ public final class RunLoop<State: Equatable & Sendable> {
     proposal: ProposedSize? = nil,
     viewBuilder: @escaping (_ state: State, _ focusedIdentity: Identity?) -> Content
   ) {
-    let authoringScope = currentAuthoringContext()
     self.init(
       rootIdentity: rootIdentity,
       renderer: renderer,
@@ -223,17 +227,15 @@ public final class RunLoop<State: Equatable & Sendable> {
       environment: environment,
       environmentValues: environmentValues,
       proposal: proposal,
-      viewBuilder: { state, focusedIdentity in
-        DeferredRootView(authoringContext: authoringScope) {
-          viewBuilder(state, focusedIdentity)
-        }
+      viewBuilder: ScopedMapper { input in
+        viewBuilder(input.state, input.focusedIdentity)
       }
     )
   }
 
   /// Creates a run loop from a strongly typed `View` builder and a keyboard-only
   /// input source.
-  public convenience init<Content: View>(
+  public convenience init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
     terminalHost: any TerminalHosting,

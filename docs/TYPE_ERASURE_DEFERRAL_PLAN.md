@@ -1,6 +1,6 @@
 # Type Erasure Deferral Plan
 
-Last updated: March 30, 2026
+Last updated: April 5, 2026
 
 ## Goal
 
@@ -37,6 +37,16 @@ Recommendation:
 
 - Treat the maximum ceiling as the target architecture.
 - Treat the compatibility ceiling as a temporary waypoint only if semver or rollout constraints require it.
+
+## Current Runtime And Scene Status
+
+The runtime and scene layer now follow the maximum path:
+
+- `WindowGroup<Content>` is generic
+- `SceneBuilder` lowers into typed scene artifacts instead of `SceneGroup`
+- `AnyScene` exists only as the explicit scene-erasure seam
+- `RunLoop<State, Content>` stores typed deferred builders through scoped generic helpers
+- hosted scene selection and manifest generation traverse typed scenes directly instead of collecting `[WindowSceneConfiguration]`
 
 ## Investigation Findings
 

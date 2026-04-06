@@ -43,7 +43,8 @@ library product. Downstream package consumers reach those types through
 ## `TerminalUI`
 
 - `TerminalUI.swift`: `DefaultRenderer` plus retained-frame and resolve-reuse plumbing
-- `App.swift`: `App`, `Scene`, `SceneBuilder`, `WindowGroup`, and scene collection helpers
+- `App.swift`: `App`, `Scene`, `SceneBuilder`, `WindowGroup`, `AnyScene`, and typed scene builder artifacts
+- `SceneTraversal.swift`: typed scene traversal, descriptor collection, and window-scene selection helpers
 - `SceneManifest.swift`: `TerminalUISceneDescriptor`, `TerminalUISceneManifest`, and manifest generation from authored scenes
 - `HostedSceneSession.swift`: retained hosted scene runtime for GUI host packages and other non-terminal hosts
 - `SceneSession.swift`: shared scene-session bootstrap used by hosted sessions and compatibility launch paths

@@ -3,7 +3,7 @@ import Testing
 
 @MainActor
 struct SceneConfigurationAccessTests {
-  @Test("collectWindowSceneConfigurations extracts multiple scenes")
+  @Test("collectWindowSceneDescriptors extracts multiple scenes")
   func collectsMultipleScenes() {
     struct TwoSceneApp: App {
       var body: some Scene {
@@ -15,9 +15,9 @@ struct SceneConfigurationAccessTests {
         }
       }
     }
-    let configs = collectWindowSceneConfigurations(from: TwoSceneApp().body)
-    #expect(configs.count == 2)
-    #expect(configs[0].identifier == WindowIdentifier("alpha"))
-    #expect(configs[1].identifier == WindowIdentifier("beta"))
+    let descriptors = collectWindowSceneDescriptors(from: TwoSceneApp().body)
+    #expect(descriptors.count == 2)
+    #expect(descriptors[0].id == WindowIdentifier("alpha"))
+    #expect(descriptors[1].id == WindowIdentifier("beta"))
   }
 }
