@@ -118,7 +118,7 @@ These should become first-class public framework surface:
 ### Keep Deferred Until The Shell Model Is Stable
 
 - `NavigationStack`
-- sheets and popovers
+- popover-style presentation beyond the current sheet support
 
 ### Incubate In `PrototypeUIComponents` First
 
@@ -126,7 +126,7 @@ These are valuable, but they should prove themselves before graduating into the
 canonical `View` story:
 
 - keybinding/help models
-- command palette or searchable action surfaces
+- launcher-style searchable action surfaces beyond the shipped command palette
 - terminal-specific status/help bars
 - richer launcher or workspace-switcher surfaces
 

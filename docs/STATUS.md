@@ -1,6 +1,6 @@
 # Status
 
-Last updated: April 3, 2026
+Last updated: April 5, 2026
 
 ## Product Status
 
@@ -18,8 +18,8 @@ The terminal-native roadmap work described in
 [TERMINAL_NATIVE_ROADMAP.md](TERMINAL_NATIVE_ROADMAP.md) is now substantially
 landed: automatic chrome has been reset, shell navigation primitives are
 canonical, multiline editing and indeterminate loading are public, and the
-example apps now teach pane-oriented workspaces instead of scrolled component
-pages.
+command palette plus toast/sheet presentation surfaces now live in the main
+`View` module instead of only in prototype explorations.
 
 ## Shipped Surface
 
@@ -30,6 +30,7 @@ pages.
 - Controls and primitives including `Text`, rich `Text` interpolation, `Link`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, determinate and indeterminate `ProgressView`, `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `Spacer`, `Divider`, and shapes
 - PNG-backed `Image` with named-resource, local-file-URL, and embedded-byte sources plus `.resizable()`, `.scaledToFit()`, and `.scaledToFill()`
 - Environment, observation, and focus including `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`, `@FocusedValue`, `@FocusedBinding`, `PreferenceKey`, subtree preference readers, `OpenLinkAction`, actor-context-aware `.task(...)`, and default-focus modifiers
+- Presentation and workflow surfaces including terminal-native `alert`, `confirmationDialog`, `sheet`, `toast`, `.command(...)`, `CommandPalette`, and `.commandPalette(...)`
 - Toolbar chrome including `toolbar(...)`, `toolbarItem(...)`, and `toolbarStyle(.default)` for terminal-native top and bottom bars
 
 ### Runtime surface
@@ -75,10 +76,7 @@ pages.
   - anchor-based preference APIs such as `anchorPreference(...)` and `transformAnchorPreference(...)` until local coordinate spaces and anchor resolution ship
 - Some higher-level workflow surfaces are still unsettled:
   - richer multiline editing behaviors beyond the current `TextEditor`
-
-Prototype command-palette surfaces still exist in the repo-local
-`PrototypeUIComponents` target, but the old help-strip API has been retired in
-favor of the supported toolbar surface.
+  - a long-term home for prototype help-strip and launcher-like shell workflows beyond the shipped toolbar and command-palette APIs
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
   - `ResolvableView`
@@ -88,7 +86,7 @@ favor of the supported toolbar surface.
 See [VISION.md](VISION.md) for the rationale and the intended ordering.
 
 - `NavigationStack`
-- sheets and popover-style presentation
+- popover-style presentation beyond the current sheet support
 - richer accessibility and assistive-technology modeling beyond the current semantic tree
 
 The project now treats terminal-native reinterpretation as a first-class design

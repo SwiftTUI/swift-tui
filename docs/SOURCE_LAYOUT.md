@@ -1,10 +1,21 @@
 # Source Layout
 
-Last updated: April 3, 2026
+Last updated: April 5, 2026
 
 This is the current ownership map for the codebase. It documents where
 subsystems live after the March 2026 source split and should stay aligned with
 future file moves.
+
+## Repository Layout
+
+- `Sources/`: root Swift package targets (`Core`, `View`, `PrototypeUIComponents`, `TerminalUICharts`, `TerminalUI`, and the vendored `UnixSignals` support target)
+- `Tests/`: root Swift package tests for the package products plus prototype regressions
+- `Runners/`: peer SwiftPM runner packages for terminal-native CLI launch and WASI launch
+- `GUI/`: peer wrapper packages for SwiftUI hosting and Bun/browser hosting
+- `Examples/`: sibling example apps and example-specific package manifests
+- `Fixtures/`: shared transport fixtures consumed by both Swift and web tests
+- `Scripts/`: repository policy scripts and hook helpers
+- `docs/`: reference docs, plans, and historical implementation records
 
 ## Package Surface
 
@@ -102,20 +113,22 @@ library product. Downstream package consumers reach those types through
 
 ## `View`
 
-- `ViewFoundation.swift`, `ViewBaseTypes.swift`, and `ViewCompositionHelpers.swift`: `View`, `ViewBuilder`, `AnyView`, base public types, and internal composition helpers
-- `State.swift` and `Observation.swift`: `@State`, repo-owned `@Bindable`, and observation plumbing
-- `Environment.swift`, `ImageEnvironment.swift`, `Preference.swift`, `FocusedValue.swift`, `FocusState.swift`, and `DefaultFocus.swift`: environment, preferences, focused values, and focus bindings
-- `Layout.swift`, `ContainerViews.swift`, `GeometryReader.swift`, `ScrollViewSupport.swift`, `Collections.swift`, `CollectionSupport.swift`, `OutlineViews.swift`, and `NavigationViews.swift`: layout, collection, scroll, tab, and split-navigation surfaces
-- `ViewPrimitives.swift`, `TextStyles.swift`, `StylePrimitives.swift`, `StyleEnvironment.swift`, `StyleModifiers.swift`, `ShapeStyles.swift`, `Rectangle.swift`, `RoundedRectangle.swift`, and `TileBackground.swift`: primitives, styling, and shape support
-- `Image.swift`: SwiftUI-shaped PNG image surface
-- `Button.swift`, `ValueControls.swift`, `TextEditor.swift`, `SecureField.swift`, `AdjustableValueControls.swift`, `Picker.swift`, `PickerRendering.swift`, `Menu.swift`, `MenuRendering.swift`, `LabeledContainers.swift`, `PresentationModifiers.swift`, `Toolbar.swift`, `ProgressView.swift`, `Link.swift`, `MetricTrackSupport.swift`, and `SelectionAndValueSupport.swift`: controls, toolbar chrome, and interaction surfaces
-- `ViewModifiers.swift`: public modifiers and package-only wrapper views
+- `Foundation/AnyView.swift`, `Foundation/StylePrimitives.swift`, `Foundation/ViewBaseTypes.swift`, `Foundation/ViewCompositionHelpers.swift`, and `Foundation/ViewFoundation.swift`: `View`, `Resolver`, `AnyView`, style primitives, and internal composition helpers
+- `ViewBuilder/ViewBuilder.swift`, `ViewBuilder/TupleView.swift`, `ViewBuilder/ConditionalContentView.swift`, `ViewBuilder/VariadicView.swift`, and `ViewBuilder/EmptyView.swift`: typed builder artifacts and builder machinery
+- `State/State.swift`, `State/FocusState.swift`, and `State/FocusedValue.swift`: `@State`, focus bindings, and focused-value projections
+- `Environment/Environment.swift`, `Environment/ImageEnvironment.swift`, `Environment/Observation.swift`, and `Environment/StyleEnvironment.swift`: environment storage, repo-owned `@Bindable`, image resource roots, and style environment plumbing
+- `Focus/DefaultFocus.swift`: default-focus modifiers and focus defaults
+- `Layout/Layout.swift`, `Stacks/*.swift`, `ScrollView/*.swift`, `GeometryReading/*.swift`, `Collections/*.swift`, and `NavigationViews/*.swift`: layout, stack, scroll, geometry, collection, and navigation surfaces
+- `Primitives/*.swift` and `Shapes/*.swift`: text/image primitives, labeled containers, tile backgrounds, and basic shapes
+- `Controls/*.swift`: control surfaces, rendering helpers, and shared control support
+- `Presentation/PresentationModifiers.swift`, `Presentation/Toolbar.swift`, and `Presentation/CommandPalette.swift`: alerts, confirmation dialogs, sheets, toasts, toolbar chrome, command registration, and the canonical command-palette surface
+- `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifiers and the package-only wrapper views that back them
 - `View.docc/`: module landing page and authoring guides
 
 ## `PrototypeUIComponents`
 
-- `PrototypeModels.swift`: keybinding groups, command models, and search helpers for experimental terminal-native workflow surfaces
-- `PrototypeSurfaces.swift`: repo-local command-palette views used for exploration and regression coverage
+- `PrototypeModels.swift`: keybinding groups, prototype command models, and search helpers for experimental terminal-native workflow surfaces
+- `PrototypeSurfaces.swift`: repo-local help-strip and simplified command-surface views used for exploration and regression coverage
 
 ## `TerminalUICharts`
 
@@ -133,6 +146,7 @@ library product. Downstream package consumers reach those types through
 - `Runners/TerminalUICLI/Tests/TerminalUICLITests`: terminal-native runner, attach, pty, and CLI-scene-management tests
 - `Runners/TerminalUIWASI/Tests/TerminalUIWASITests`: WASI runner and manifest-mode tests
 - `Tests/PrototypeUIComponentsTests`: prototype-surface regression coverage
+- `Fixtures/Transport`: shared transport fixtures for terminal render-style encoding/decoding tests across Swift and web hosts
 
 ## Reliability Rules
 

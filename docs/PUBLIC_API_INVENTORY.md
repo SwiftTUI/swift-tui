@@ -1,6 +1,6 @@
 # Public API Inventory
 
-Last updated: April 3, 2026
+Last updated: April 5, 2026
 
 This page is the post-migration reference for the public surface of the package. It separates the canonical SwiftUI-shaped API and actor-isolation model from package-only seams that still exist in the codebase.
 
@@ -22,10 +22,11 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - `TabItemLabel`, `TabView`, `NavigationSplitView`
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`
+- `Command`, `CommandCatalog`, `CommandPalette`, and `ToastStyle`
 - `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `FocusInteractions`, `LinkDestination`, `OpenLinkAction`, `ToolbarPlacement`, `ToolbarAlignment`, and `ToolbarStyle`
 - image-source environment configuration such as `EnvironmentValues.imageResourceRoots`
 - `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and repo-owned `@Bindable`
-- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.toolbar(...)`, `.toolbarItem(...)`, `.toolbarStyle(...)`, `.alert(...)`, and `.confirmationDialog(...)`
+- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.toolbar(...)`, `.toolbarItem(...)`, `.toolbarStyle(...)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.toast(...)`, `.command(...)`, and `.commandPalette(...)`
 - `Resolver` and the public `ResolveContext` configuration surface for low-level rendering entry points
 
 Important public-surface rules after the lowering migration:
@@ -128,8 +129,8 @@ Prototype and showcase code may still live in the repository as sibling example 
 Current rule:
 
 - `PrototypeUIComponents` is a package target used by experiments and tests, not a library product that downstream packages should import as a supported API surface
-- the current prototype target hosts command-palette exploration such as `PrototypeCommandPalette`
-- prototype widgets are allowed to inform future canonical APIs, but they should not be documented as the framework's primary authoring model
+- the current prototype target still hosts help-strip and simplified command-surface experiments such as `PrototypeHelpSurface` and `PrototypeCommandPalette`
+- canonical command registration and command-palette APIs now live in `View`, so prototype widgets should be documented as exploratory variants rather than as the primary workflow surface
 - README and architecture-facing docs should describe prototype code as exploratory or showcase-only when it appears at all
 - terminal-native interaction surfaces that are still being shaped, such as command palettes or launcher-like flows, should land here first rather than forcing premature API commitments onto `View`
 

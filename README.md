@@ -82,6 +82,7 @@ product or default `App.main()`.
 - Layout and containers: `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `ViewThatFits`, and custom `Layout`
 - State and focus: `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, focused values, focus effect controls, and default-focus modifiers
 - Controls and content: `Text`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `GroupBox`, `ControlGroup`, `TabView`, `NavigationSplitView`, and terminal-native alert or confirmation presentation
+- Presentation and workflow surfaces: `alert`, `confirmationDialog`, `sheet`, `toast`, command registration through `.command(...)`, and command discovery through `CommandPalette` / `.commandPalette(...)`
 - Toolbar chrome: `toolbar(...)`, `toolbarItem(...)`, and `toolbarStyle(.default)` for terminal-native top and bottom bars
 - Runtime integration: `Resolver`, `DefaultRenderer`, `RunLoop`, terminal input parsing, signal handling, alternate-screen ownership, capability-aware presentation, and lifecycle or task staging
 - Platform runners: `Runners/TerminalUICLI` for native CLI launch and attach flows, `GUI/SwiftUITUIGUI` for SwiftUI hosting, `Runners/TerminalUIWASI` for WASI launch, and `GUI/WebTUIGUI` as the Bun web host that consumes the WASI build
@@ -100,8 +101,9 @@ products, but it is not shipped as a separate library product today.
 
 Prototype and showcase code still lives in this repository, but it is
 intentionally not part of the supported package product surface. In
-particular, `PrototypeUIComponents` remains a repo-local target for experiments
-and regression coverage rather than a downstream import.
+particular, `PrototypeUIComponents` remains a repo-local target for help-strip
+and other exploratory workflow surfaces plus regression coverage rather than a
+downstream import.
 
 ## Runner Packages
 
@@ -158,11 +160,11 @@ Peer GUI packaging lives outside the root package products:
 - The core `TerminalUI` runtime is still intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
 - Executable launch policy now lives outside the root package. Use `Runners/TerminalUICLI` for terminal-native apps, `GUI/SwiftUITUIGUI` for SwiftUI hosts, or `Runners/TerminalUIWASI` for WASI builds; `GUI/WebTUIGUI` consumes the WASI output.
 - The terminal-native toolbar surface is now supported through `toolbar(...)`, `toolbarItem(...)`, and `toolbarStyle(.default)`. The older keyboard-help APIs are removed, and the gallery now demonstrates the toolbar surface directly.
-- Command palettes remain a terminal-native workflow surface, but the shortcut/help-strip exploration no longer defines the public direction.
+- Command registration, sheets, toasts, and the command palette are now part of the supported `View` surface. Prototype help-strip exploration still lives in `PrototypeUIComponents` while broader launcher-like shell workflows remain unsettled.
 
 ## Upcoming Work
 
-- `NavigationStack` and sheet or popover-style presentation
+- `NavigationStack` and richer popover-style presentation beyond the current sheet support
 - richer focus ergonomics and scroll control
 
 ## Documentation

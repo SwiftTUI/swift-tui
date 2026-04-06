@@ -74,12 +74,12 @@ Some SwiftUI concepts likely belong in TerminalUI eventually, but the package do
 Deferred items:
 
 - `NavigationStack`
-- sheets and popovers
+- popover-style presentation beyond the current sheet support
 
 Prototype-first items:
 
 - terminal-native help and keybinding surfaces
-- command palettes and launcher-style action pickers
+- launcher-style action pickers beyond the shipped command palette
 
 These should not be implemented just because terminal frameworks often have
 analogous surfaces. They should land only once the terminal-specific interaction

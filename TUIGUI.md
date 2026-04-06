@@ -1,6 +1,6 @@
 # TUIGUI Design And Status
 
-Last updated: April 3, 2026
+Last updated: April 5, 2026
 
 ## Goal
 
@@ -108,7 +108,7 @@ the root package.
     ptys, and attach flows
   - `Runners/TerminalUIWASI` still executes one selected scene per wasm process
 - Wrapper packages still own scene switching UI and style surfaces. The root package exposes scene manifests and hosted sessions, not a full cross-platform app shell.
-- `GUI/WebTUIGUI` build scripts shell out to `swift`, so Bun-driven builds still require a shell where `swift` resolves to the `swiftly`-managed Swift 6.3.0 toolchain.
+- `GUI/WebTUIGUI` build scripts prefer `swiftly run swift` when `swiftly` is installed and fall back to plain `swift` otherwise, so Bun-driven builds still need either the repo-default `swiftly` setup or a shell where `swift` already resolves to the matching Swift 6.3.0 toolchain.
 - Runner and wrapper packages are intentionally outside the root package products. Consumers opt into them separately.
 
 ## Non-Negotiable Decisions
