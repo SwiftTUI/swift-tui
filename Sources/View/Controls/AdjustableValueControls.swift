@@ -1,10 +1,13 @@
 package import Core
 
-/// Increments or decrements an integer binding.
+/// Increments or decrements a numeric binding.
 public struct Stepper<Label: View>: View, ResolvableView {
-  public var value: Binding<Int>
-  public var bounds: ClosedRange<Int>?
-  public var step: Int
+  private enum ValueStorage {
+    case integer(Binding<Int>, bounds: ClosedRange<Int>?, step: Int)
+    case double(Binding<Double>, bounds: ClosedRange<Double>?, step: Double)
+  }
+
+  private var valueStorage: ValueStorage
   private var label: Label
   private let authoringScope: AuthoringContext?
 
@@ -14,9 +17,26 @@ public struct Stepper<Label: View>: View, ResolvableView {
     in bounds: ClosedRange<Int>? = nil,
     step: Int = 1
   ) where Label == Text {
-    self.value = value
-    self.bounds = bounds
-    self.step = max(1, step)
+    valueStorage = .integer(
+      value,
+      bounds: bounds,
+      step: Int.sanitizedControlStep(step)
+    )
+    label = Text(String(title))
+    authoringScope = currentAuthoringContext()
+  }
+
+  public init<S: StringProtocol>(
+    _ title: S,
+    value: Binding<Double>,
+    in bounds: ClosedRange<Double>? = nil,
+    step: Double = 1
+  ) where Label == Text {
+    valueStorage = .double(
+      value,
+      bounds: bounds,
+      step: Double.sanitizedControlStep(step)
+    )
     label = Text(String(title))
     authoringScope = currentAuthoringContext()
   }
@@ -27,9 +47,26 @@ public struct Stepper<Label: View>: View, ResolvableView {
     step: Int = 1,
     @ViewBuilder label: () -> Label
   ) {
-    self.value = value
-    self.bounds = bounds
-    self.step = max(1, step)
+    valueStorage = .integer(
+      value,
+      bounds: bounds,
+      step: Int.sanitizedControlStep(step)
+    )
+    self.label = label()
+    authoringScope = currentAuthoringContext()
+  }
+
+  public init(
+    value: Binding<Double>,
+    in bounds: ClosedRange<Double>? = nil,
+    step: Double = 1,
+    @ViewBuilder label: () -> Label
+  ) {
+    valueStorage = .double(
+      value,
+      bounds: bounds,
+      step: Double.sanitizedControlStep(step)
+    )
     self.label = label()
     authoringScope = currentAuthoringContext()
   }
@@ -45,14 +82,48 @@ extension Stepper {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    switch valueStorage {
+    case .integer(let binding, let bounds, let step):
+      resolvedNode(
+        value: binding,
+        bounds: bounds,
+        step: step,
+        in: context
+      )
+    case .double(let binding, let bounds, let step):
+      resolvedNode(
+        value: binding,
+        bounds: bounds,
+        step: step,
+        in: context
+      )
+    }
+  }
+
+  private func resolvedNode<Value: AdjustableControlValue>(
+    value binding: Binding<Value>,
+    bounds: ClosedRange<Value>?,
+    step: Value,
+    in context: ResolveContext
+  ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isPressed = context.environmentValues.pressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
-    let currentValue = clampedControlValue(value.wrappedValue, to: bounds)
-    let canDecrement = stepperCanAdjust(currentValue, delta: -step, bounds: bounds)
-    let canIncrement = stepperCanAdjust(currentValue, delta: step, bounds: bounds)
+    let currentValue = clampedControlValue(binding.wrappedValue, to: bounds)
+    let canDecrement = stepperCanAdjust(
+      currentValue,
+      delta: -1,
+      step: step,
+      bounds: bounds
+    )
+    let canIncrement = stepperCanAdjust(
+      currentValue,
+      delta: 1,
+      step: step,
+      bounds: bounds
+    )
     let chrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
@@ -65,7 +136,6 @@ extension Stepper {
     )
 
     if isEnabled {
-      let binding = value
       let bounds = bounds
       let step = step
       let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
@@ -75,7 +145,8 @@ extension Stepper {
           withAuthoringContext(dynamicPropertyScope) {
             let next = steppedControlValue(
               from: binding.wrappedValue,
-              delta: step,
+              delta: 1,
+              step: step,
               bounds: bounds
             )
             guard next != binding.wrappedValue else {
@@ -88,20 +159,21 @@ extension Stepper {
         followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
       )
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
-        let delta: Int
+        let deltaCount: Int
         switch event {
         case .arrowLeft:
-          delta = -step
+          deltaCount = -1
         case .arrowRight:
-          delta = step
+          deltaCount = 1
         default:
           return false
         }
 
         return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundIntControlValue(
+          updateBoundControlValue(
             binding,
-            delta: delta,
+            delta: deltaCount,
+            step: step,
             bounds: bounds
           )
         }
@@ -123,9 +195,10 @@ extension Stepper {
         }
 
         return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundIntControlValue(
+          updateBoundControlValue(
             binding,
-            delta: wheelDelta * step,
+            delta: wheelDelta,
+            step: step,
             bounds: bounds
           )
         }
@@ -136,9 +209,10 @@ extension Stepper {
         }
 
         return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundIntControlValue(
+          updateBoundControlValue(
             binding,
-            delta: -step,
+            delta: -1,
+            step: step,
             bounds: bounds
           )
         }
@@ -149,9 +223,10 @@ extension Stepper {
         }
 
         return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundIntControlValue(
+          updateBoundControlValue(
             binding,
-            delta: step,
+            delta: 1,
+            step: step,
             bounds: bounds
           )
         }
@@ -161,6 +236,8 @@ extension Stepper {
     let child = stepperBody(
       controlIdentity: context.identity,
       value: currentValue,
+      step: step,
+      bounds: bounds,
       canDecrement: canDecrement,
       canIncrement: canIncrement,
       showsFocusRail: isFocused && showsFocusEffect,
@@ -186,9 +263,11 @@ extension Stepper {
   }
 
   @ViewBuilder
-  private func stepperBody(
+  private func stepperBody<Value: AdjustableControlValue>(
     controlIdentity: Identity,
-    value: Int,
+    value: Value,
+    step: Value,
+    bounds: ClosedRange<Value>?,
     canDecrement: Bool,
     canIncrement: Bool,
     showsFocusRail: Bool,
@@ -216,7 +295,7 @@ extension Stepper {
       .semanticMetadata(.init(participatesInPointerHitTesting: true))
     let controls = HStack(alignment: .center, spacing: 1) {
       decrementControl
-      Text("\(value)")
+      Text(formattedControlValue(value, bounds: bounds, step: step))
         .foregroundStyle(controlForeground)
       incrementControl
     }
@@ -242,11 +321,14 @@ extension Stepper {
   }
 }
 
-/// Adjusts an integer binding along a bounded linear range.
+/// Adjusts a numeric binding along a bounded linear range.
 public struct Slider<Label: View>: View, ResolvableView {
-  public var value: Binding<Int>
-  public var bounds: ClosedRange<Int>
-  public var step: Int
+  private enum ValueStorage {
+    case integer(Binding<Int>, bounds: ClosedRange<Int>, step: Int)
+    case double(Binding<Double>, bounds: ClosedRange<Double>, step: Double)
+  }
+
+  private var valueStorage: ValueStorage
   private var label: Label
 
   public init<S: StringProtocol>(
@@ -255,9 +337,25 @@ public struct Slider<Label: View>: View, ResolvableView {
     in bounds: ClosedRange<Int>,
     step: Int = 1
   ) where Label == Text {
-    self.value = value
-    self.bounds = bounds
-    self.step = max(1, step)
+    valueStorage = .integer(
+      value,
+      bounds: bounds,
+      step: Int.sanitizedControlStep(step)
+    )
+    label = Text(String(title))
+  }
+
+  public init<S: StringProtocol>(
+    _ title: S,
+    value: Binding<Double>,
+    in bounds: ClosedRange<Double>,
+    step: Double = 1
+  ) where Label == Text {
+    valueStorage = .double(
+      value,
+      bounds: bounds,
+      step: Double.sanitizedControlStep(step)
+    )
     label = Text(String(title))
   }
 
@@ -267,9 +365,25 @@ public struct Slider<Label: View>: View, ResolvableView {
     step: Int = 1,
     @ViewBuilder label: () -> Label
   ) {
-    self.value = value
-    self.bounds = bounds
-    self.step = max(1, step)
+    valueStorage = .integer(
+      value,
+      bounds: bounds,
+      step: Int.sanitizedControlStep(step)
+    )
+    self.label = label()
+  }
+
+  public init(
+    value: Binding<Double>,
+    in bounds: ClosedRange<Double>,
+    step: Double = 1,
+    @ViewBuilder label: () -> Label
+  ) {
+    valueStorage = .double(
+      value,
+      bounds: bounds,
+      step: Double.sanitizedControlStep(step)
+    )
     self.label = label()
   }
 
@@ -284,12 +398,36 @@ extension Slider {
   private func resolvedNode(
     in context: ResolveContext
   ) -> ResolvedNode {
+    switch valueStorage {
+    case .integer(let binding, let bounds, let step):
+      resolvedNode(
+        value: binding,
+        bounds: bounds,
+        step: step,
+        in: context
+      )
+    case .double(let binding, let bounds, let step):
+      resolvedNode(
+        value: binding,
+        bounds: bounds,
+        step: step,
+        in: context
+      )
+    }
+  }
+
+  private func resolvedNode<Value: AdjustableControlValue>(
+    value binding: Binding<Value>,
+    bounds: ClosedRange<Value>,
+    step: Value,
+    in context: ResolveContext
+  ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isPressed = context.environmentValues.pressedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
-    let currentValue = clampedControlValue(value.wrappedValue, to: bounds)
+    let currentValue = clampedControlValue(binding.wrappedValue, to: bounds)
     let chrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect,
@@ -302,7 +440,6 @@ extension Slider {
     )
 
     if isEnabled {
-      let binding = value
       let bounds = bounds
       let step = step
       let dynamicPropertyScope = currentAuthoringContext()
@@ -312,7 +449,8 @@ extension Slider {
           withAuthoringContext(dynamicPropertyScope) {
             let next = steppedControlValue(
               from: binding.wrappedValue,
-              delta: step,
+              delta: 1,
+              step: step,
               bounds: bounds
             )
             guard next != binding.wrappedValue else {
@@ -325,20 +463,21 @@ extension Slider {
         followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
       )
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
-        let delta: Int
+        let deltaCount: Int
         switch event {
         case .arrowLeft:
-          delta = -step
+          deltaCount = -1
         case .arrowRight:
-          delta = step
+          deltaCount = 1
         default:
           return false
         }
 
         return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundIntControlValue(
+          updateBoundControlValue(
             binding,
-            delta: delta,
+            delta: deltaCount,
+            step: step,
             bounds: bounds
           )
         }
@@ -357,9 +496,10 @@ extension Slider {
         }
 
         return withAuthoringContext(dynamicPropertyScope) {
-          updateBoundIntControlValue(
+          updateBoundControlValue(
             binding,
-            delta: wheelDelta * step,
+            delta: wheelDelta,
+            step: step,
             bounds: bounds
           )
         }
@@ -382,9 +522,10 @@ extension Slider {
           }
 
           return withAuthoringContext(dynamicPropertyScope) {
-            updateBoundIntControlValue(
+            updateBoundControlValue(
               binding,
-              delta: wheelDelta * step,
+              delta: wheelDelta,
+              step: step,
               bounds: bounds
             )
           }
@@ -397,6 +538,8 @@ extension Slider {
     let child = sliderBody(
       controlIdentity: context.identity,
       value: currentValue,
+      bounds: bounds,
+      step: step,
       showsFocusRail: isFocused && showsFocusEffect,
       isHighlighted: (isFocused && showsFocusEffect) || isPressed,
       isActiveNavigation: (isFocused && showsFocusEffect) || isPressed,
@@ -420,9 +563,11 @@ extension Slider {
   }
 
   @ViewBuilder
-  private func sliderBody(
+  private func sliderBody<Value: AdjustableControlValue>(
     controlIdentity: Identity,
-    value: Int,
+    value: Value,
+    bounds: ClosedRange<Value>,
+    step: Value,
     showsFocusRail: Bool,
     isHighlighted: Bool,
     isActiveNavigation: Bool,
@@ -444,7 +589,7 @@ extension Slider {
       .semanticMetadata(.init(participatesInPointerHitTesting: true))
     let controls = HStack(alignment: .center, spacing: 1) {
       trackView
-      Text("\(value)")
+      Text(formattedControlValue(value, bounds: bounds, step: step))
         .foregroundStyle(valueStyle)
     }
     .drawMetadata(.init(opacity: contentChrome.opacity))
@@ -467,37 +612,19 @@ extension Slider {
     .drawMetadata(.init(opacity: chrome.opacity))
     row
   }
-
-  private func sliderTrack(
-    value: Int,
-    bounds: ClosedRange<Int>
-  ) -> String {
-    let segmentCount = 8
-    let span = max(1, bounds.upperBound - bounds.lowerBound)
-    let normalized = Double(value - bounds.lowerBound) / Double(span)
-    let position = min(
-      max(0, Int((normalized * Double(segmentCount - 1)).rounded())),
-      segmentCount - 1
-    )
-
-    var characters = Array(repeating: Character("─"), count: segmentCount)
-    for index in 0..<position {
-      characters[index] = Character("━")
-    }
-    characters[position] = Character("●")
-    return String(characters)
-  }
 }
 
 @MainActor
-private func updateBoundIntControlValue(
-  _ binding: Binding<Int>,
+private func updateBoundControlValue<Value: AdjustableControlValue>(
+  _ binding: Binding<Value>,
   delta: Int,
-  bounds: ClosedRange<Int>?
+  step: Value,
+  bounds: ClosedRange<Value>?
 ) -> Bool {
   let next = steppedControlValue(
     from: binding.wrappedValue,
     delta: delta,
+    step: step,
     bounds: bounds
   )
   guard next != binding.wrappedValue else {

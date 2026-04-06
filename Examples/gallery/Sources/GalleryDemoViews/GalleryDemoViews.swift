@@ -446,7 +446,7 @@ public struct GalleryDemoSceneView: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
       }
     case "split":
-      NavigationSplitView {
+      HStack(alignment: .top, spacing: 0) {
         List(selection: $model.navigationSidebarSelection) {
           Text("Examples").tag("examples")
           Text("Docs").tag("docs")
@@ -455,7 +455,9 @@ public struct GalleryDemoSceneView: View {
         .listStyle(.insetGrouped)
         .frame(
           minWidth: 16, idealWidth: 16, maxWidth: 16, maxHeight: .infinity, alignment: .topLeading)
-      } content: {
+        .clipped()
+        Divider()
+
         List(selection: $model.navigationContentSelection) {
           ForEach(navigationItems) { item in
             Text(item.title)
@@ -465,7 +467,9 @@ public struct GalleryDemoSceneView: View {
         .listStyle(.plain)
         .frame(
           minWidth: 20, idealWidth: 20, maxWidth: 20, maxHeight: .infinity, alignment: .topLeading)
-      } detail: {
+        .clipped()
+        Divider()
+
         GroupBox("Inspector") {
           VStack(alignment: .leading, spacing: 0) {
             Label(selectedNavigationItem.title) {
@@ -479,7 +483,10 @@ public struct GalleryDemoSceneView: View {
           }
         }
         .padding(1)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .clipped()
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .frame(
         maxWidth: .infinity,
         minHeight: 11,

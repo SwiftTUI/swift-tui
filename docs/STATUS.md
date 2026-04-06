@@ -52,7 +52,7 @@ command palette plus toast/sheet presentation surfaces now live in the main
 - `TerminalWASIAppRunner` in `Runners/TerminalUIWASI` for manifest generation and WASI-hosted scene launch
 - The same authored `App` can feed three execution modes: terminal-native execution, WASI execution, or host-managed embedding through peer GUI host packages
 - Pty-backed secondary scenes, Unix-domain-socket discovery, scene attachment, and lazy rendering of unattached secondary scenes
-- `TabView` and `NavigationSplitView` for terminal-native shell composition
+- `TabView` for terminal-native shell composition
 - terminal-native `alert` and `confirmationDialog` presentation in the canonical `View` surface
 
 ### Charts

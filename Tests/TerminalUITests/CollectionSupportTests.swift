@@ -157,4 +157,35 @@ struct CollectionSupportTests {
     #expect(stepperCanAdjust(9, delta: 1, bounds: 0...10))
     #expect(!stepperCanAdjust(10, delta: 1, bounds: 0...10))
   }
+
+  @Test("double control values preserve fractional steps and clean formatting")
+  func doubleControlValuesPreserveFractionalStepsAndFormatting() {
+    #expect(clampedControlValue(-0.5, to: 0.0...1.0) == 0.0)
+    #expect(
+      steppedControlValue(
+        from: 0.2,
+        delta: 1,
+        step: 0.1,
+        bounds: 0.0...1.0
+      ) == 0.3
+    )
+    #expect(
+      steppedControlValue(
+        from: 0.35,
+        delta: 1,
+        step: 0.1,
+        bounds: 0.0...1.0
+      ) == 0.45
+    )
+    #expect(
+      sliderValue(
+        at: 5,
+        in: .init(origin: .zero, size: .init(width: 11, height: 1)),
+        bounds: 0.0...1.0,
+        step: 0.25
+      ) == 0.5
+    )
+    #expect(formattedControlValue(0.30000000000000004, bounds: 0.0...1.0, step: 0.1) == "0.3")
+    #expect(formattedControlValue(0.45, bounds: 0.0...1.0, step: 0.1) == "0.45")
+  }
 }

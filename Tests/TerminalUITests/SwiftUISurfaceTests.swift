@@ -1723,6 +1723,69 @@ struct SwiftUISurfaceTests {
     #expect(box.value == 1)
   }
 
+  @Test("Double Stepper and Slider support clean fractional values")
+  func doubleAdjustableControlsRenderCleanFractionalValues() {
+    final class StepperBox {
+      var value = 0.2
+    }
+
+    final class SliderBox {
+      var value = 0.45
+    }
+
+    let stepperBox = StepperBox()
+    let sliderBox = SliderBox()
+    let actionRegistry = LocalActionRegistry()
+    let keyRegistry = LocalKeyHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = testIdentity("DoubleSlider")
+
+    let artifacts = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 1) {
+        Stepper(
+          "Amount",
+          value: Binding(
+            get: { stepperBox.value },
+            set: { stepperBox.value = $0 }
+          ),
+          in: 0.0...1.0,
+          step: 0.1
+        )
+        .id(testIdentity("DoubleStepper"))
+
+        Slider(
+          "Ratio",
+          value: Binding(
+            get: { sliderBox.value },
+            set: { sliderBox.value = $0 }
+          ),
+          in: 0.0...1.0,
+          step: 0.1
+        )
+        .id(testIdentity("DoubleSlider"))
+      },
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localActionRegistry: actionRegistry,
+        localKeyHandlerRegistry: keyRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(surface.contains("Amount"))
+    #expect(surface.contains("Ratio"))
+    #expect(surface.contains("0.2"))
+    #expect(surface.contains("0.45"))
+    #expect(!surface.contains("0.200000"))
+    #expect(!surface.contains("0.449999"))
+    #expect(actionRegistry.dispatch(identity: testIdentity("DoubleStepper")))
+    #expect(stepperBox.value == 0.3)
+    #expect(keyRegistry.dispatch(identity: testIdentity("DoubleSlider"), event: .arrowRight))
+    #expect(sliderBox.value == 0.55)
+  }
+
   @Test("Stepper renders its editing chrome directly from focus")
   func stepperRendersEditingChromeFromFocus() {
     func render(focused: Bool) -> RasterSurface {

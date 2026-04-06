@@ -583,8 +583,8 @@ struct Phase4ObservationAndEnvironmentTests {
     #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 1") != nil)
   }
 
-  @Test("NavigationSplitView preserves stored builder panels under stateful actions")
-  func navigationSplitViewPreservesStoredBuilderPanels() throws {
+  @Test("Split-pane layouts preserve stored builder panels under stateful actions")
+  func splitPaneLayoutPreservesStoredBuilderPanels() throws {
     let invalidator = Phase4RecordingInvalidator()
     let actionRegistry = LocalActionRegistry()
     let renderer = DefaultRenderer()
@@ -598,7 +598,7 @@ struct Phase4ObservationAndEnvironmentTests {
     initialContext.invalidationProxy = invalidationProxy
 
     let initialArtifacts = renderer.render(
-      NavigationSplitActionCounterView(),
+      SplitPaneActionCounterView(),
       context: initialContext
     )
     #expect(initialArtifacts.resolvedTree.descendant(withText: "Count 0") != nil)
@@ -611,7 +611,7 @@ struct Phase4ObservationAndEnvironmentTests {
     var updatedContext = initialContext
     updatedContext.invalidatedIdentities = invalidatedIdentities
     let updatedArtifacts = renderer.render(
-      NavigationSplitActionCounterView(),
+      SplitPaneActionCounterView(),
       context: updatedContext
     )
 
@@ -1136,18 +1136,24 @@ private struct EnvironmentReaderActionCounterView: View {
   }
 }
 
-private struct NavigationSplitActionCounterView: View {
+private struct SplitPaneActionCounterView: View {
   @State private var count = 0
 
   var body: some View {
-    NavigationSplitView {
+    HStack(alignment: .top, spacing: 0) {
       Button("Primary") {
         count += 1
       }
       .id(testIdentity("NavigationSplitAction"))
-    } detail: {
+      .frame(maxHeight: .infinity, alignment: .topLeading)
+      .clipped()
+      Divider()
+
       Text("Count \(count)")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .clipped()
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 

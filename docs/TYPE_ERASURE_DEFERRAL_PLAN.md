@@ -201,7 +201,6 @@ Labeling family:
 
 Navigation and scenes:
 
-- `NavigationSplitView<Sidebar, Content, Detail>` is already generic and should keep typed storage
 - `WindowGroup<Content>` should become generic if the project wants maximum deferral across the full stack
 
 Charts:

@@ -150,7 +150,7 @@ at each phase boundary:
 - `ForEach` with explicit IDs
 - Conditional branch (`if/else` with `@State` toggle)
 - Nested `ScrollView` with `LazyVStack`
-- `NavigationSplitView` with sidebar + detail
+- Split-pane layout built from `HStack` + `Divider`
 - `Button` with action handler
 - `TextField` with `@Binding`
 - `onAppear` + `onDisappear` + `.task` lifecycle

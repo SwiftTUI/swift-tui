@@ -86,9 +86,9 @@ analogous surfaces. They should land only once the terminal-specific interaction
 model is clear and the API still reads like the same product.
 
 Navigation-oriented surfaces that are especially central to terminal UX, such as
-`NavigationSplitView` and `TabView`, may land earlier than their desktop-GUI
-counterparts if they are expressed as a SwiftUI-shaped but terminal-native
-subset.
+`TabView` and split-pane workspace layouts composed from stacks, may land
+earlier than their desktop-GUI counterparts if they are expressed as a
+SwiftUI-shaped but terminal-native subset.
 
 Current implementation status and short-term constraints live in [STATUS.md](STATUS.md). Deferred items should not jump ahead of foundation work without an explicit tradeoff.
 

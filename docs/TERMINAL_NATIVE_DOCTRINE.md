@@ -143,8 +143,9 @@ works better with:
 - transient overlays
 
 That does not mean TerminalUI should copy tmux APIs. It does mean SwiftUI
-concepts like `NavigationSplitView`, `TabView`, dialogs, and command surfaces
-should be reinterpreted in a way that respects terminal-native navigation.
+concepts like `TabView`, split-pane workspace layouts, dialogs, and command
+surfaces should be reinterpreted in a way that respects terminal-native
+navigation.
 
 ### 6. Full-Width Ownership Beats Floating Islands
 

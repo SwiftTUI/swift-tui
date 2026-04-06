@@ -26,8 +26,8 @@ As of March 29, 2026, the roadmap’s primary execution phases are landed:
 
 - Phase 0: governance and public-surface positioning updated across the docs
 - Phase 1: automatic chrome reset shipped across the default component set
-- Phase 2: `TabView`, `NavigationSplitView`, `alert`, and
-  `confirmationDialog` are canonical public surface
+- Phase 2: `TabView`, `alert`, and `confirmationDialog` are canonical public
+  surface
 - Phase 3: `TextEditor`, indeterminate `ProgressView`, and prototype help or
   command surfaces are in place
 - Phase 4: collection defaults and pane-local examples have been reworked
@@ -113,7 +113,6 @@ These should become first-class public framework surface:
 - indeterminate `ProgressView`
 - `alert`
 - `confirmationDialog`
-- `NavigationSplitView`
 
 ### Keep Deferred Until The Shell Model Is Stable
 
@@ -241,13 +240,12 @@ instead of scrolled forms.
 ### Scope
 
 - `TabView`
-- `NavigationSplitView`
 - `alert`
 - `confirmationDialog`
 
 ### Primary files
 
-- [NavigationViews.swift](../Sources/View/NavigationViews.swift) (hosts both `TabView` and `NavigationSplitView`)
+- [TabView.swift](../Sources/View/NavigationViews/TabView.swift)
 - New [PresentationModifiers.swift](../Sources/View/PresentationModifiers.swift)
 - [Environment.swift](../Sources/View/Environment.swift)
 - [StyleEnvironment.swift](../Sources/View/StyleEnvironment.swift)
@@ -260,7 +258,8 @@ instead of scrolled forms.
 
 ### Decisions
 
-- `NavigationSplitView` should land before `NavigationStack`
+- split-pane workspace layouts should stay stack-composed until a dedicated
+  `NavigationStack` exists
 - tabs should be rendered as terminal-native mode switches, not desktop chrome
 - alerts and confirmations should feel like focused terminal overlays or action
   prompts, not floating dialog cards
@@ -531,7 +530,8 @@ The highest-leverage first slice is:
 
 1. Phase 0 governance updates
 2. Phase 1 automatic chrome reset
-3. the smallest viable `TabView` and `NavigationSplitView` from Phase 2
+3. the smallest viable `TabView` and terminal-native split-pane workspace
+   layouts from Phase 2
 4. gallery and Todoist structural redesign on top of those primitives
 
 That slice changes the visual language, the shell model, and the teaching
