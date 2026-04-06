@@ -1,3 +1,5 @@
+import Synchronization
+
 /// A scheduling priority for lifecycle-owned tasks.
 public enum TaskPriority: String, Equatable, Sendable {
   case userInitiated
@@ -299,7 +301,8 @@ package struct RetainedInvalidationSummary: Sendable {
     }
 
     let previousResolvedIdentities = Set(previousFrameIndex.resolvedByIdentity.keys)
-    let syntheticInvalidatedIdentities = invalidatedIdentities.subtracting(previousResolvedIdentities)
+    let syntheticInvalidatedIdentities = invalidatedIdentities.subtracting(
+      previousResolvedIdentities)
 
     var identitiesWithSyntheticInvalidatedAncestors: Set<Identity> = []
     if !syntheticInvalidatedIdentities.isEmpty {
@@ -434,14 +437,15 @@ package struct RetainedLayoutSession: Sendable {
   }
 }
 
-// SAFETY: Created per-frame and exclusively accessed during the layout phase on
-// a single thread. `nonisolated(unsafe)` narrows the unsafety to the mutable
-// members that accumulate per-pass work.
 package final class LayoutPassContext: Sendable {
+  private struct MutableState: Sendable {
+    var scrollViewportContext: ScrollViewportContext?
+    var workMetrics: LayoutWorkMetrics
+  }
+
   package let retainedLayout: RetainedLayoutSession?
   package let invalidatedIdentities: Set<Identity>
-  nonisolated(unsafe) package var scrollViewportContext: ScrollViewportContext?
-  nonisolated(unsafe) package var workMetrics: LayoutWorkMetrics
+  private let state: Mutex<MutableState>
 
   package init(
     retainedLayout: RetainedLayoutSession? = nil,
@@ -450,8 +454,26 @@ package final class LayoutPassContext: Sendable {
   ) {
     self.retainedLayout = retainedLayout
     self.invalidatedIdentities = invalidatedIdentities
-    self.scrollViewportContext = scrollViewportContext
-    workMetrics = .init()
+    state = .init(
+      .init(
+        scrollViewportContext: scrollViewportContext,
+        workMetrics: .init()
+      )
+    )
+  }
+
+  package var scrollViewportContext: ScrollViewportContext? {
+    state.withLock { $0.scrollViewportContext }
+  }
+
+  package var workMetrics: LayoutWorkMetrics {
+    state.withLock { $0.workMetrics }
+  }
+
+  package func updateWorkMetrics(
+    _ update: (inout LayoutWorkMetrics) -> Void
+  ) {
+    state.withLock { update(&$0.workMetrics) }
   }
 }
 

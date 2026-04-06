@@ -8,7 +8,7 @@ import Testing
 struct CollectionSupportTests {
   @Test("picker selection helpers support exact and optional matches")
   func pickerSelectionHelpersSupportExactAndOptionalMatches() {
-    let tag = SelectionTag(value: AnyHashable(3), includeOptional: true)
+    let tag = SelectionTag(value: 3, includeOptional: true)
 
     #expect(pickerSelectionMatches(tag, selection: 3))
     #expect(!pickerSelectionMatches(tag, selection: 4))
@@ -17,7 +17,7 @@ struct CollectionSupportTests {
     #expect(pickerSelectionValue(from: tag, as: Int.self) == 3)
     #expect(pickerSelectionValue(from: tag, as: Optional<Int>.self) == .some(3))
 
-    let nonOptionalTag = SelectionTag(value: AnyHashable(3), includeOptional: false)
+    let nonOptionalTag = SelectionTag(value: 3, includeOptional: false)
     #expect(pickerSelectionMatches(nonOptionalTag, selection: Optional<Int>.some(3)))
     #expect(pickerSelectionValue(from: nonOptionalTag, as: Optional<Int>.self) == .some(3))
     #expect(!pickerSelectionMatches(nonOptionalTag, selection: Optional<Int>.none))

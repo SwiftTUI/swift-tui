@@ -16,12 +16,12 @@ public typealias LayoutRect = Rect
 @propertyWrapper
 /// A mutable projection into another owned value.
 public struct Binding<Value> {
-  nonisolated(unsafe) private let getter: @MainActor () -> Value
-  nonisolated(unsafe) private let setter: @MainActor (Value) -> Void
+  private let getter: @MainActor @Sendable () -> Value
+  private let setter: @MainActor @Sendable (Value) -> Void
 
   package init(
-    mainActorGet getter: @escaping @MainActor () -> Value,
-    set setter: @escaping @MainActor (Value) -> Void
+    mainActorGet getter: @escaping @MainActor @Sendable () -> Value,
+    set setter: @escaping @MainActor @Sendable (Value) -> Void
   ) {
     self.getter = getter
     self.setter = setter
@@ -36,8 +36,8 @@ public struct Binding<Value> {
     // Binding dereferences remain @MainActor in this package's authoring model.
     // The public initializer still matches SwiftUI-style actor-inheriting closure
     // signatures so call sites compose naturally from authored view contexts.
-    self.getter = unsafe unsafeBitCast(get, to: (@MainActor () -> Value).self)
-    self.setter = unsafe unsafeBitCast(set, to: (@MainActor (Value) -> Void).self)
+    self.getter = unsafe unsafeBitCast(get, to: (@MainActor @Sendable () -> Value).self)
+    self.setter = unsafe unsafeBitCast(set, to: (@MainActor @Sendable (Value) -> Void).self)
   }
 
   @MainActor
@@ -70,9 +70,6 @@ public struct Binding<Value> {
   }
 }
 
-// SAFETY: Binding closures are invoked only by @MainActor entry points on this
-// type; `nonisolated(unsafe)` keeps that assumption on the stored closures
-// while allowing the binding container itself to be transferred.
 extension Binding: Sendable where Value: Sendable {}
 
 @dynamicMemberLookup

@@ -14,8 +14,13 @@ struct ResolveReuseAncestorInvalidationTests {
       layoutEngine: .init(cache: MeasurementCache())
     )
     let rootIdentity = testIdentity("Root")
-    final class SelectionBox: @unchecked Sendable {
-      var value = "Overview"
+    final class SelectionBox: Sendable {
+      private let valueStorage = LockedBox("Overview")
+
+      var value: String {
+        get { valueStorage.value }
+        set { valueStorage.value = newValue }
+      }
     }
     let box = SelectionBox()
 
@@ -95,8 +100,13 @@ struct ResolveReuseAncestorInvalidationTests {
     )
     let rootIdentity = testIdentity("Root")
 
-    final class SelectionBox: @unchecked Sendable {
-      var selectedIndex = 0
+    final class SelectionBox: Sendable {
+      private let selectedIndexStorage = LockedBox(0)
+
+      var selectedIndex: Int {
+        get { selectedIndexStorage.value }
+        set { selectedIndexStorage.value = newValue }
+      }
     }
     let selectionBox = SelectionBox()
 

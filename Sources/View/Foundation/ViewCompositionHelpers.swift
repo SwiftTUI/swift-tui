@@ -3,8 +3,8 @@ package import Core
 /// A deferred authored child payload that preserves authoring scope without
 /// exposing `AnyView` as the transport type.
 @MainActor
-package struct DeferredViewPayload: @unchecked Sendable {
-  private let resolveElementsClosure: @MainActor (ResolveContext) -> [ResolvedNode]
+package struct DeferredViewPayload: Sendable {
+  private let resolveElementsClosure: @MainActor @Sendable (ResolveContext) -> [ResolvedNode]
 
   package init<V: View>(
     authoringContext: AuthoringContext? = currentAuthoringContext(),

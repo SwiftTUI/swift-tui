@@ -1,16 +1,16 @@
 package import Core
 
 protocol OptionalSelectionValue {
-  static func optionalSelectionValue(from tag: AnyHashable) -> Self?
+  static func optionalSelectionValue(from tagValue: Any) -> Self?
 }
 
 protocol OptionalSelectionMatchable {
-  var wrappedTagValue: AnyHashable? { get }
+  var wrappedTagValue: Any? { get }
 }
 
 extension Optional: OptionalSelectionValue where Wrapped: Hashable {
-  static func optionalSelectionValue(from tag: AnyHashable) -> Wrapped?? {
-    guard let wrapped = tag.base as? Wrapped else {
+  static func optionalSelectionValue(from tagValue: Any) -> Wrapped?? {
+    guard let wrapped = tagValue as? Wrapped else {
       return nil
     }
     return .some(wrapped)
@@ -18,10 +18,10 @@ extension Optional: OptionalSelectionValue where Wrapped: Hashable {
 }
 
 extension Optional: OptionalSelectionMatchable where Wrapped: Hashable {
-  var wrappedTagValue: AnyHashable? {
+  var wrappedTagValue: Any? {
     switch self {
     case .some(let wrapped):
-      return AnyHashable(wrapped)
+      return wrapped
     case .none:
       return nil
     }
@@ -32,7 +32,9 @@ func pickerSelectionMatches<SelectionValue: Hashable>(
   _ tag: SelectionTag,
   selection: SelectionValue
 ) -> Bool {
-  if AnyHashable(selection) == tag.value {
+  if let exactValue = tag.value(as: SelectionValue.self),
+    exactValue == selection
+  {
     return true
   }
 
@@ -42,14 +44,21 @@ func pickerSelectionMatches<SelectionValue: Hashable>(
     return false
   }
 
-  return optionalSelection.wrappedTagValue == tag.value
+  guard
+    let wrappedTagValue = optionalSelection.wrappedTagValue as? any Hashable,
+    let tagValue = tag.baseValue as? any Hashable
+  else {
+    return false
+  }
+
+  return AnyHashable(wrappedTagValue) == AnyHashable(tagValue)
 }
 
 func pickerSelectionValue<SelectionValue: Hashable>(
   from tag: SelectionTag,
   as _: SelectionValue.Type
 ) -> SelectionValue? {
-  if let exactValue = tag.value.base as? SelectionValue {
+  if let exactValue = tag.value(as: SelectionValue.self) {
     return exactValue
   }
 
@@ -59,7 +68,7 @@ func pickerSelectionValue<SelectionValue: Hashable>(
     return nil
   }
 
-  return optionalType.optionalSelectionValue(from: tag.value) as? SelectionValue
+  return optionalType.optionalSelectionValue(from: tag.baseValue) as? SelectionValue
 }
 
 func clampedControlValue(

@@ -101,10 +101,29 @@ struct LayoutAndRenderingPipelineTests {
 
   @Test("render registers lifecycle work in the commit plan without executing it during resolve")
   func renderRegistersLifecycleWorkWithoutExecutingItDuringResolve() async throws {
-    final class CounterBox: @unchecked Sendable {
-      var appearCount = 0
-      var disappearCount = 0
-      var taskCount = 0
+    final class CounterBox: Sendable {
+      private struct State: Sendable {
+        var appearCount = 0
+        var disappearCount = 0
+        var taskCount = 0
+      }
+
+      private let state = LockedBox(State())
+
+      var appearCount: Int {
+        get { state.value.appearCount }
+        set { state.withLock { $0.appearCount = newValue } }
+      }
+
+      var disappearCount: Int {
+        get { state.value.disappearCount }
+        set { state.withLock { $0.disappearCount = newValue } }
+      }
+
+      var taskCount: Int {
+        get { state.value.taskCount }
+        set { state.withLock { $0.taskCount = newValue } }
+      }
     }
 
     let counters = CounterBox()

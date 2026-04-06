@@ -15,8 +15,9 @@ extension EnvironmentValues {
   }
 }
 
+@MainActor
 @Observable
-private final class DependencyObservableModel: @unchecked Sendable {
+private final class DependencyObservableModel {
   var name = "Ada"
 }
 

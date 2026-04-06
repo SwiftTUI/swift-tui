@@ -7,21 +7,18 @@ package protocol IndexedChildSourceView {
   ) -> (any IndexedChildSource)?
 }
 
-package struct ForEachIndexedChildSource<Data, ID, Content>: IndexedChildSource, Sendable
+@MainActor
+package final class ForEachIndexedChildSource<Data, ID, Content>: IndexedChildSource
 where Data: RandomAccessCollection, ID: Hashable, Content: View {
-  private final class ChildCache {
-    var storage: [Int: ResolvedNode] = [:]
-  }
+  private let countStorage: Int
+  private let identityRootStorage: Identity
+  private let measurementSignatureStorage: String
 
-  package let count: Int
-  package let identityRoot: Identity
-  package let measurementSignature: String
-
-  nonisolated(unsafe) private let data: Data
-  nonisolated(unsafe) private let id: KeyPath<Data.Element, ID>
-  nonisolated(unsafe) private let content: @MainActor (Data.Element) -> Content
-  nonisolated(unsafe) private let childContext: ResolveContext
-  nonisolated(unsafe) private let cache = ChildCache()
+  private let data: Data
+  private let id: KeyPath<Data.Element, ID>
+  private let content: @MainActor (Data.Element) -> Content
+  private let childContext: ResolveContext
+  private var cache: [Int: ResolvedNode] = [:]
 
   package init(
     data: Data,
@@ -33,16 +30,28 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
     self.id = id
     self.content = content
     self.childContext = childContext
-    identityRoot = childContext.identity
-    count = data.count
-    measurementSignature = data.map {
+    identityRootStorage = childContext.identity
+    countStorage = data.count
+    measurementSignatureStorage = data.map {
       childContext.identity.explicitID($0[keyPath: id]).path
     }.joined(separator: "|")
   }
 
-  package func child(at index: Int) -> ResolvedNode {
+  nonisolated package var count: Int {
+    MainActor.assumeIsolated { countStorage }
+  }
+
+  nonisolated package var identityRoot: Identity {
+    MainActor.assumeIsolated { identityRootStorage }
+  }
+
+  nonisolated package var measurementSignature: String {
+    MainActor.assumeIsolated { measurementSignatureStorage }
+  }
+
+  nonisolated package func child(at index: Int) -> ResolvedNode {
     MainActor.assumeIsolated {
-      if let cached = cache.storage[index] {
+      if let cached = cache[index] {
         return cached
       }
 
@@ -57,7 +66,7 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
       let elements = resolveViewElements(view, in: elementContext)
       elementContext.recordResolvedComputation(count: elements.count)
       let normalized = normalizeResolvedElements(elements, in: elementContext)
-      cache.storage[index] = normalized
+      cache[index] = normalized
       return normalized
     }
   }

@@ -926,23 +926,35 @@ private struct WindowGroupAuthoringScopeVisitor: WindowSceneConfigurationVisitor
   }
 }
 
-@Observable
-private final class Phase4ObservableCounter: @unchecked Sendable {
-  var count = 0
+private final class Phase4ObservableCounter: Observable, Sendable {
+  private let observationRegistrar = ObservationRegistrar()
+  private let countStorage = LockedBox(0)
+
+  var count: Int {
+    get {
+      observationRegistrar.access(self, keyPath: \.count)
+      return countStorage.value
+    }
+    set {
+      observationRegistrar.withMutation(of: self, keyPath: \.count) {
+        countStorage.value = newValue
+      }
+    }
+  }
 }
 
 @Observable
-private final class Phase4ObservableForm: @unchecked Sendable {
+private final class Phase4ObservableForm {
   var name = ""
 }
 
 @Observable
-private final class Phase4SelectionModel: @unchecked Sendable {
+private final class Phase4SelectionModel {
   var selection = "browser"
 }
 
 @Observable
-private final class Phase4ObservableRow: Identifiable, @unchecked Sendable {
+private final class Phase4ObservableRow: Identifiable {
   let id: Int
   var title: String
 
@@ -1190,7 +1202,7 @@ private struct StatefulStepperCounterView: View {
 }
 
 @Observable
-private final class Phase4GalleryLikeModel: @unchecked Sendable {
+private final class Phase4GalleryLikeModel {
   var activeTab = "controls"
   var selectedControlDemo = "buttons"
   var primaryCount = 0

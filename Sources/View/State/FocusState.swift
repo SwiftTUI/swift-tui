@@ -7,42 +7,33 @@ private struct FocusStateSnapshot<Value: Equatable> {
 
 @MainActor
 private final class FocusStateStorage<Value: Equatable> {
-  private let snapshot: OSAllocatedUnfairLock<FocusStateSnapshot<Value>>
+  private var snapshot: FocusStateSnapshot<Value>
 
   init(
     value: Value,
     hasPendingRequest: Bool = false
   ) {
-    snapshot = OSAllocatedUnfairLock(
-      uncheckedState:
-        .init(
-          value: value,
-          hasPendingRequest: hasPendingRequest
-        )
+    snapshot = .init(
+      value: value,
+      hasPendingRequest: hasPendingRequest
     )
   }
 
   func currentSnapshot() -> FocusStateSnapshot<Value> {
-    snapshot.withLockUnchecked { snapshot in
-      snapshot
-    }
+    snapshot
   }
 
   func requestValue(_ newValue: Value) {
-    snapshot.withLockUnchecked { snapshot in
-      snapshot.value = newValue
-      snapshot.hasPendingRequest = true
-    }
+    snapshot.value = newValue
+    snapshot.hasPendingRequest = true
   }
 
   @discardableResult
   func applyRuntimeValue(_ newValue: Value) -> Bool {
-    snapshot.withLockUnchecked { snapshot in
-      let didChange = snapshot.value != newValue
-      snapshot.value = newValue
-      snapshot.hasPendingRequest = false
-      return didChange
-    }
+    let didChange = snapshot.value != newValue
+    snapshot.value = newValue
+    snapshot.hasPendingRequest = false
+    return didChange
   }
 }
 
@@ -63,50 +54,34 @@ private final class FocusStateBox<Value: Equatable> {
     var boundLocation: FocusStateLocation<Value>?
   }
 
-  private let storage: OSAllocatedUnfairLock<Storage>
+  private var storage: Storage
 
   init(seedValue: Value) {
-    storage = OSAllocatedUnfairLock(
-      uncheckedState:
-        Storage(
-          localStorage: .init(value: seedValue),
-          boundLocation: nil
-        )
+    storage = Storage(
+      localStorage: .init(value: seedValue),
+      boundLocation: nil
     )
   }
 
   func currentLocalSnapshot() -> FocusStateSnapshot<Value> {
-    let localStorage = storage.withLockUnchecked { storage in
-      storage.localStorage
-    }
-    return localStorage.currentSnapshot()
+    storage.localStorage.currentSnapshot()
   }
 
   func requestLocalValue(_ newValue: Value) {
-    let localStorage = storage.withLockUnchecked { storage in
-      storage.localStorage
-    }
-    localStorage.requestValue(newValue)
+    storage.localStorage.requestValue(newValue)
   }
 
   @discardableResult
   func applyRuntimeLocalValue(_ newValue: Value) -> Bool {
-    let localStorage = storage.withLockUnchecked { storage in
-      storage.localStorage
-    }
-    return localStorage.applyRuntimeValue(newValue)
+    storage.localStorage.applyRuntimeValue(newValue)
   }
 
   func remember(_ location: FocusStateLocation<Value>) {
-    storage.withLockUnchecked { storage in
-      storage.boundLocation = location
-    }
+    storage.boundLocation = location
   }
 
   func currentLocation() -> FocusStateLocation<Value>? {
-    storage.withLockUnchecked { storage in
-      storage.boundLocation
-    }
+    storage.boundLocation
   }
 
   func currentOrdinal(

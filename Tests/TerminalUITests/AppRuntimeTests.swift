@@ -848,8 +848,13 @@ private struct FocusEnvironmentWindow: View {
   }
 }
 
-private final class ActionRecorder: @unchecked Sendable {
-  var count = 0
+private final class ActionRecorder: Sendable {
+  private let countStorage = LockedBox(0)
+
+  var count: Int {
+    get { countStorage.value }
+    set { countStorage.value = newValue }
+  }
 }
 
 private final class RecordingTerminalHost: TerminalHosting {

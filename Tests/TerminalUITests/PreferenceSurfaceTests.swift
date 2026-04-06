@@ -142,11 +142,7 @@ struct PreferenceSurfaceTests {
   @Test("onPreferenceChange fires on non-default initial values and subsequent changes only")
   @MainActor
   func onPreferenceChangeFiresOnNonDefaultInitialValuesAndSubsequentChangesOnly() {
-    final class Recorder: @unchecked Sendable {
-      var values: [String?] = []
-    }
-
-    let recorder = Recorder()
+    let recorder = LockedBox<[String?]>([])
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
@@ -162,7 +158,7 @@ struct PreferenceSurfaceTests {
         Text("Observed")
           .preference(key: OptionalStringPreferenceKey.self, value: value)
           .onPreferenceChange(OptionalStringPreferenceKey.self) { nextValue in
-            recorder.values.append(nextValue)
+            recorder.withLock { $0.append(nextValue) }
           },
         context: context
       )
@@ -177,7 +173,7 @@ struct PreferenceSurfaceTests {
     render("second")
 
     #expect(
-      recorder.values == [
+      recorder.value == [
         "first",
         "second",
       ]

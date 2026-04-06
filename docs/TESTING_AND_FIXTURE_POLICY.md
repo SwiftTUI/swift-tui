@@ -1,6 +1,6 @@
 # Testing And Fixture Policy
 
-Last updated: April 3, 2026
+Last updated: April 6, 2026
 
 This policy keeps reliability work predictable in the current decomposed
 codebase.
@@ -13,6 +13,7 @@ hooks instead of the Swift test suite:
 - `swift-format`: formats staged Swift files
 - `no-foundation-in-library-products`: inline `prek.toml` check that forbids `Foundation` imports in the Foundation-free `Core`, `View`, and `TerminalUI` library layers
 - `Scripts/check_public_surface_policies.zsh`: enforces public-surface guardrails, actor-isolation documentation, and related docs
+- `Scripts/check_concurrency_safety_policies.zsh`: forbids `@unchecked Sendable` and `nonisolated(unsafe)` in checked-in Swift sources so concurrency-safety regressions fail before test execution
 
 Keep runtime, integration, and behavioral guarantees in tests. Move pure
 repository-shape or text-pattern checks into hooks when they can fail earlier

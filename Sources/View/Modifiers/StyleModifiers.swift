@@ -106,7 +106,7 @@ extension View {
     }
   }
 
-  public func tag<V: Hashable>(
+  public func tag<V: Hashable & Sendable>(
     _ tag: V,
     includeOptional: Bool = true
   ) -> some View {
@@ -247,7 +247,7 @@ extension View {
   }
 }
 
-public struct TagValueView<Content: View, Value: Hashable>: View, ResolvableView {
+public struct TagValueView<Content: View, Value: Hashable & Sendable>: View, ResolvableView {
   var content: Content
   var tag: Value
   var includeOptional: Bool
@@ -269,7 +269,7 @@ public struct TagValueView<Content: View, Value: Hashable>: View, ResolvableView
       content: content,
       metadata: .init(
         selectionTag: .init(
-          value: AnyHashable(tag),
+          value: tag,
           includeOptional: includeOptional
         )
       )

@@ -174,6 +174,7 @@ struct ViewResolutionTests {
   }
 }
 
-private final class ResolveInvocationCounter: @unchecked Sendable {
+@MainActor
+private final class ResolveInvocationCounter {
   var count = 0
 }

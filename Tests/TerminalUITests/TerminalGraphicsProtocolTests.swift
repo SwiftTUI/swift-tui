@@ -409,13 +409,17 @@ struct TerminalGraphicsProtocolTests {
 }
 
 private final class GraphicsProtocolMockTerminalController:
-  TerminalControlling, @unchecked Sendable
+  TerminalControlling
 {
   private let isTTYValue: Bool
   private let cellPixelSizeValue: Size?
-  private var queuedReadResponses: [[UInt8]]
+  private let queuedReadResponsesStorage: LockedBox<[[UInt8]]>
+  private let writesStorage = LockedBox<[String]>([])
 
-  private(set) var writes: [String] = []
+  private(set) var writes: [String] {
+    get { writesStorage.value }
+    set { writesStorage.value = newValue }
+  }
 
   init(
     isTTY: Bool,
@@ -423,8 +427,8 @@ private final class GraphicsProtocolMockTerminalController:
     cellPixelSize: Size? = nil
   ) {
     isTTYValue = isTTY
-    queuedReadResponses = readResponses
     cellPixelSizeValue = cellPixelSize
+    queuedReadResponsesStorage = LockedBox(readResponses)
   }
 
   func isATTY(_: Int32) -> Bool {
@@ -452,7 +456,7 @@ private final class GraphicsProtocolMockTerminalController:
   func setFileStatusFlags(_: Int32, on _: Int32) throws {}
 
   func write(_ output: String, to _: Int32) throws {
-    writes.append(output)
+    writesStorage.withLock { $0.append(output) }
   }
 
   func read(
@@ -460,9 +464,11 @@ private final class GraphicsProtocolMockTerminalController:
     maxBytes _: Int,
     timeoutMilliseconds _: Int
   ) throws -> [UInt8] {
-    guard !queuedReadResponses.isEmpty else {
-      return []
+    queuedReadResponsesStorage.withLock { queuedReadResponses in
+      guard !queuedReadResponses.isEmpty else {
+        return []
+      }
+      return queuedReadResponses.removeFirst()
     }
-    return queuedReadResponses.removeFirst()
   }
 }

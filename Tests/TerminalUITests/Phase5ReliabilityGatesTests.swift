@@ -60,7 +60,7 @@ private final class Phase5PresentationHarness {
   }
 }
 
-private final class Phase5PresentationController: TerminalControlling, @unchecked Sendable {
+private final class Phase5PresentationController: TerminalControlling {
   func isATTY(_: Int32) -> Bool {
     true
   }

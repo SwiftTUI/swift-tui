@@ -202,8 +202,13 @@ private func presentScenario(
   )
 }
 
-private final class PresentationController: TerminalControlling, @unchecked Sendable {
-  private(set) var writes: [String] = []
+private final class PresentationController: TerminalControlling {
+  private let writesStorage = LockedBox<[String]>([])
+
+  private(set) var writes: [String] {
+    get { writesStorage.value }
+    set { writesStorage.value = newValue }
+  }
 
   func isATTY(_: Int32) -> Bool {
     true
@@ -226,7 +231,7 @@ private final class PresentationController: TerminalControlling, @unchecked Send
   func setFileStatusFlags(_: Int32, on _: Int32) throws {}
 
   func write(_ output: String, to _: Int32) throws {
-    writes.append(output)
+    writesStorage.withLock { $0.append(output) }
   }
 
   func read(

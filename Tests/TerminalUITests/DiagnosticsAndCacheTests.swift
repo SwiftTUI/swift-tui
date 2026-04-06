@@ -33,31 +33,37 @@ private struct ResolveProbeRecord: Equatable {
   let unrelatedSubtreeAffected: Bool
 }
 
-private final class BranchResolveRecorder: @unchecked Sendable {
-  private let lock = NSLock()
-  private(set) var identities: [Identity] = []
+private final class BranchResolveRecorder: Sendable {
+  private let identitiesStorage = LockedBox<[Identity]>([])
+
+  var identities: [Identity] {
+    identitiesStorage.value
+  }
 
   func record(_ identity: Identity) {
-    lock.lock()
-    defer { lock.unlock() }
-    identities.append(identity)
+    identitiesStorage.withLock {
+      $0.append(identity)
+    }
   }
 
   func reset() {
-    lock.lock()
-    defer { lock.unlock() }
-    identities.removeAll(keepingCapacity: true)
+    identitiesStorage.withLock {
+      $0.removeAll(keepingCapacity: true)
+    }
   }
 }
 
-private final class ResolveProbeRecorder: @unchecked Sendable {
-  private let lock = NSLock()
-  private(set) var records: [ResolveProbeRecord] = []
+private final class ResolveProbeRecorder: Sendable {
+  private let recordsStorage = LockedBox<[ResolveProbeRecord]>([])
+
+  var records: [ResolveProbeRecord] {
+    recordsStorage.value
+  }
 
   func record(_ record: ResolveProbeRecord) {
-    lock.lock()
-    defer { lock.unlock() }
-    records.append(record)
+    recordsStorage.withLock {
+      $0.append(record)
+    }
   }
 }
 
@@ -331,21 +337,17 @@ struct DiagnosticsAndCacheTests {
 
   @Test("default renderer reuses measurement and placement work across ScrollView position changes")
   func defaultRendererReusesMeasurementsAcrossScrollPositionChanges() {
-    final class ScrollPositionBox: @unchecked Sendable {
-      var position = ScrollPosition.zero
-    }
-
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
-    let box = ScrollPositionBox()
+    let box = LockedBox(ScrollPosition.zero)
 
     func makeView() -> some View {
       ScrollView(
         .vertical,
         position: Binding(
-          get: { box.position },
-          set: { box.position = $0 }
+          get: { box.value },
+          set: { box.value = $0 }
         )
       ) {
         VStack(alignment: .leading, spacing: 0) {
@@ -367,7 +369,9 @@ struct DiagnosticsAndCacheTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    box.position.scrollBy(y: 1)
+    box.withLock {
+      $0.scrollBy(y: 1)
+    }
 
     let second = renderer.render(
       makeView(),
@@ -382,25 +386,21 @@ struct DiagnosticsAndCacheTests {
 
   @Test("lazy stacks reduce placement work across scroll position changes")
   func lazyStacksReducePlacementWorkAcrossScrollPositionChanges() {
-    final class ScrollPositionBox: @unchecked Sendable {
-      var position = ScrollPosition.zero
-    }
-
     let eagerRenderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
     let lazyRenderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
-    let eagerBox = ScrollPositionBox()
-    let lazyBox = ScrollPositionBox()
+    let eagerBox = LockedBox(ScrollPosition.zero)
+    let lazyBox = LockedBox(ScrollPosition.zero)
 
     func makeEagerView() -> some View {
       ScrollView(
         .vertical,
         position: Binding(
-          get: { eagerBox.position },
-          set: { eagerBox.position = $0 }
+          get: { eagerBox.value },
+          set: { eagerBox.value = $0 }
         )
       ) {
         VStack(alignment: .leading, spacing: 0) {
@@ -421,8 +421,8 @@ struct DiagnosticsAndCacheTests {
       ScrollView(
         .vertical,
         position: Binding(
-          get: { lazyBox.position },
-          set: { lazyBox.position = $0 }
+          get: { lazyBox.value },
+          set: { lazyBox.value = $0 }
         )
       ) {
         LazyVStack(alignment: .leading, spacing: 0) {
@@ -448,8 +448,8 @@ struct DiagnosticsAndCacheTests {
       context: .init(identity: testIdentity("LazyRoot"))
     )
 
-    eagerBox.position.scrollBy(y: 1)
-    lazyBox.position.scrollBy(y: 1)
+    eagerBox.withLock { $0.scrollBy(y: 1) }
+    lazyBox.withLock { $0.scrollBy(y: 1) }
 
     let eagerSecond = eagerRenderer.render(
       makeEagerView(),
@@ -469,25 +469,21 @@ struct DiagnosticsAndCacheTests {
 
   @Test("single-ForEach lazy stacks lower off-screen resolution and measurement work on scroll")
   func singleForEachLazyStacksLowerOffScreenWorkOnScroll() {
-    final class ScrollPositionBox: @unchecked Sendable {
-      var position = ScrollPosition.zero
-    }
-
     let stableRenderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
     let lazyRenderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
-    let stableBox = ScrollPositionBox()
-    let lazyBox = ScrollPositionBox()
+    let stableBox = LockedBox(ScrollPosition.zero)
+    let lazyBox = LockedBox(ScrollPosition.zero)
 
     func makeStableView() -> some View {
       ScrollView(
         .vertical,
         position: Binding(
-          get: { stableBox.position },
-          set: { stableBox.position = $0 }
+          get: { stableBox.value },
+          set: { stableBox.value = $0 }
         )
       ) {
         LazyVStack(alignment: .leading, spacing: 0) {
@@ -508,8 +504,8 @@ struct DiagnosticsAndCacheTests {
       ScrollView(
         .vertical,
         position: Binding(
-          get: { lazyBox.position },
-          set: { lazyBox.position = $0 }
+          get: { lazyBox.value },
+          set: { lazyBox.value = $0 }
         )
       ) {
         LazyVStack(alignment: .leading, spacing: 0) {
@@ -530,8 +526,8 @@ struct DiagnosticsAndCacheTests {
       context: .init(identity: testIdentity("LazyRoot"))
     )
 
-    stableBox.position.scrollBy(y: 1)
-    lazyBox.position.scrollBy(y: 1)
+    stableBox.withLock { $0.scrollBy(y: 1) }
+    lazyBox.withLock { $0.scrollBy(y: 1) }
 
     let stableSecond = stableRenderer.render(
       makeStableView(),
@@ -844,7 +840,7 @@ struct DiagnosticsAndCacheTests {
 
     #expect(
       recorder.identities == [
-        testIdentity("Root", "Branches[1]"),
+        testIdentity("Root", "Branches[1]")
       ]
     )
     #expect(updated.diagnostics.resolvedNodesComputed == 4)
@@ -853,11 +849,7 @@ struct DiagnosticsAndCacheTests {
 
   @Test("draw-only style changes reuse measurement and placement work")
   func drawOnlyStyleChangesReuseLayoutWork() {
-    final class StyleBox: @unchecked Sendable {
-      var highlighted = false
-    }
-
-    let box = StyleBox()
+    let box = LockedBox(false)
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
@@ -867,7 +859,7 @@ struct DiagnosticsAndCacheTests {
         Text("Stable")
         Text("Accent")
           .foregroundStyle(
-            box.highlighted
+            box.value
               ? AnyShapeStyle(.success)
               : AnyShapeStyle(.muted)
           )
@@ -879,7 +871,7 @@ struct DiagnosticsAndCacheTests {
       context: .init(identity: testIdentity("Root"))
     )
 
-    box.highlighted = true
+    box.value = true
 
     let second = renderer.render(
       makeRoot(),
@@ -899,11 +891,7 @@ struct DiagnosticsAndCacheTests {
 
   @Test("text content changes still invalidate layout reuse")
   func textContentChangesStillInvalidateLayoutReuse() {
-    final class TextBox: @unchecked Sendable {
-      var value = "Accent"
-    }
-
-    let box = TextBox()
+    let box = LockedBox("Accent")
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )

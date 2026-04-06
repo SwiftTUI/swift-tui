@@ -926,9 +926,14 @@ struct TerminalPresentationTests {
   }
 }
 
-private final class PresentationMockTerminalController: TerminalControlling, @unchecked Sendable {
+private final class PresentationMockTerminalController: TerminalControlling {
   private let isTTYValue: Bool
-  private(set) var writes: [String] = []
+  private let writesStorage = LockedBox<[String]>([])
+
+  private(set) var writes: [String] {
+    get { writesStorage.value }
+    set { writesStorage.value = newValue }
+  }
 
   init(isTTY: Bool) {
     isTTYValue = isTTY
@@ -955,7 +960,7 @@ private final class PresentationMockTerminalController: TerminalControlling, @un
   func setFileStatusFlags(_: Int32, on _: Int32) throws {}
 
   func write(_ output: String, to _: Int32) throws {
-    writes.append(output)
+    writesStorage.withLock { $0.append(output) }
   }
 
   func read(

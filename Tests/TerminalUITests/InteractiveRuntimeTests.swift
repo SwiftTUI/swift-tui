@@ -1196,7 +1196,7 @@ struct InteractiveRuntimeTests {
       terminalSize: .init(width: 20, height: 1),
       configureEnvironmentValues: { environmentValues in
         environmentValues.openLinkAction = OpenLinkAction { destination in
-          recorder.destinations.append(destination)
+          recorder.record(destination)
           return true
         }
       },
@@ -1230,7 +1230,7 @@ struct InteractiveRuntimeTests {
       terminalSize: .init(width: 24, height: 1),
       configureEnvironmentValues: { environmentValues in
         environmentValues.openLinkAction = OpenLinkAction { destination in
-          recorder.destinations.append(destination)
+          recorder.record(destination)
           return true
         }
       },
@@ -1282,7 +1282,7 @@ struct InteractiveRuntimeTests {
       terminalSize: terminalSize,
       configureEnvironmentValues: { environmentValues in
         environmentValues.openLinkAction = OpenLinkAction { destination in
-          recorder.destinations.append(destination)
+          recorder.record(destination)
           return true
         }
       },
@@ -2038,8 +2038,13 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("run loop collapses queued scroll bursts into a small number of rendered updates")
   func runLoopBatchesQueuedScrollBursts() async throws {
-    final class ScrollPositionBox: @unchecked Sendable {
-      var position = ScrollPosition.zero
+    final class ScrollPositionBox: Sendable {
+      private let storage = LockedBox(ScrollPosition.zero)
+
+      var position: ScrollPosition {
+        get { storage.value }
+        set { storage.value = newValue }
+      }
     }
 
     let box = ScrollPositionBox()
@@ -2103,8 +2108,13 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("run loop collapses queued scroll bursts through LazyVStack content")
   func runLoopBatchesQueuedScrollBurstsWithLazyStacks() async throws {
-    final class ScrollPositionBox: @unchecked Sendable {
-      var position = ScrollPosition.zero
+    final class ScrollPositionBox: Sendable {
+      private let storage = LockedBox(ScrollPosition.zero)
+
+      var position: ScrollPosition {
+        get { storage.value }
+        set { storage.value = newValue }
+      }
     }
 
     let box = ScrollPositionBox()
@@ -2226,11 +2236,26 @@ private final class RecordingInvalidator: Invalidating {
   }
 }
 
-private final class MockTerminalController: TerminalControlling, @unchecked Sendable {
+private final class MockTerminalController: TerminalControlling {
   let originalAttributes: termios
-  private(set) var setAttributesCalls: [termios] = []
-  private(set) var writes: [String] = []
-  private(set) var fileStatusFlags: Int32 = 0
+  private let setAttributesCallsStorage = LockedBox<[termios]>([])
+  private let writesStorage = LockedBox<[String]>([])
+  private let fileStatusFlagsStorage = LockedBox<Int32>(0)
+
+  private(set) var setAttributesCalls: [termios] {
+    get { setAttributesCallsStorage.value }
+    set { setAttributesCallsStorage.value = newValue }
+  }
+
+  private(set) var writes: [String] {
+    get { writesStorage.value }
+    set { writesStorage.value = newValue }
+  }
+
+  private(set) var fileStatusFlags: Int32 {
+    get { fileStatusFlagsStorage.value }
+    set { fileStatusFlagsStorage.value = newValue }
+  }
 
   init() {
     var attributes = termios()
@@ -2250,7 +2275,7 @@ private final class MockTerminalController: TerminalControlling, @unchecked Send
   }
 
   func setAttributes(_ attributes: termios, on _: Int32) throws {
-    setAttributesCalls.append(attributes)
+    setAttributesCallsStorage.withLock { $0.append(attributes) }
   }
 
   func windowSize(of _: Int32) throws -> Size {
@@ -2262,11 +2287,11 @@ private final class MockTerminalController: TerminalControlling, @unchecked Send
   }
 
   func setFileStatusFlags(_ flags: Int32, on _: Int32) throws {
-    fileStatusFlags = flags
+    fileStatusFlagsStorage.value = flags
   }
 
   func write(_ output: String, to _: Int32) throws {
-    writes.append(output)
+    writesStorage.withLock { $0.append(output) }
   }
 
   func read(
@@ -2388,14 +2413,16 @@ private struct RunLoopInvalidationRecord: Equatable {
   let subtreeAffected: Bool
 }
 
-private final class RunLoopInvalidationRecorder: @unchecked Sendable {
-  private let lock = NSLock()
-  private(set) var records: [RunLoopInvalidationRecord] = []
+private final class RunLoopInvalidationRecorder: Sendable {
+  private let recordsStorage = LockedBox<[RunLoopInvalidationRecord]>([])
+
+  private(set) var records: [RunLoopInvalidationRecord] {
+    get { recordsStorage.value }
+    set { recordsStorage.value = newValue }
+  }
 
   func record(_ record: RunLoopInvalidationRecord) {
-    lock.lock()
-    defer { lock.unlock() }
-    records.append(record)
+    recordsStorage.withLock { $0.append(record) }
   }
 }
 
@@ -2467,21 +2494,30 @@ private struct RunLoopInvalidationProbeRoot: View, ResolvableView {
   }
 }
 
-private final class ReusedHandlerRecorder: @unchecked Sendable {
-  private let lock = NSLock()
-  private(set) var actionCount = 0
-  private(set) var keyEvents: [KeyEvent] = []
+private final class ReusedHandlerRecorder: Sendable {
+  private struct State: Sendable {
+    var actionCount = 0
+    var keyEvents: [KeyEvent] = []
+  }
+
+  private let state = LockedBox(State())
+
+  private(set) var actionCount: Int {
+    get { state.value.actionCount }
+    set { state.withLock { $0.actionCount = newValue } }
+  }
+
+  private(set) var keyEvents: [KeyEvent] {
+    get { state.value.keyEvents }
+    set { state.withLock { $0.keyEvents = newValue } }
+  }
 
   func recordAction() {
-    lock.lock()
-    defer { lock.unlock() }
-    actionCount += 1
+    state.withLock { $0.actionCount += 1 }
   }
 
   func recordKey(_ event: KeyEvent) {
-    lock.lock()
-    defer { lock.unlock() }
-    keyEvents.append(event)
+    state.withLock { $0.keyEvents.append(event) }
   }
 }
 
@@ -2527,8 +2563,16 @@ private struct ReusedHandlerRoot: View, ResolvableView {
   }
 }
 
-private final class LinkOpenRecorder: @unchecked Sendable {
-  var destinations: [LinkDestination] = []
+private final class LinkOpenRecorder: Sendable {
+  private let destinationsStorage = LockedBox<[LinkDestination]>([])
+
+  var destinations: [LinkDestination] {
+    destinationsStorage.value
+  }
+
+  func record(_ destination: LinkDestination) {
+    destinationsStorage.withLock { $0.append(destination) }
+  }
 }
 
 private final class ScriptedInputReader: InputReading {
@@ -2719,28 +2763,37 @@ private struct LifecycleRuntimeState: Equatable, Sendable {
   var showChild = true
 }
 
-private final class RuntimeLifecycleRecorder: @unchecked Sendable {
-  private let lock = NSLock()
-  private(set) var appearCountsAtPresent: [Int] = []
-  private(set) var orderedEvents: [String] = []
+private final class RuntimeLifecycleRecorder: Sendable {
+  private struct State: Sendable {
+    var appearCountsAtPresent: [Int] = []
+    var orderedEvents: [String] = []
+  }
+
+  private let state = LockedBox(State())
+
+  private(set) var appearCountsAtPresent: [Int] {
+    get { state.value.appearCountsAtPresent }
+    set { state.withLock { $0.appearCountsAtPresent = newValue } }
+  }
+
+  private(set) var orderedEvents: [String] {
+    get { state.value.orderedEvents }
+    set { state.withLock { $0.orderedEvents = newValue } }
+  }
 
   func record(_ event: String) {
-    lock.lock()
-    defer { lock.unlock() }
-    orderedEvents.append(event)
+    state.withLock { $0.orderedEvents.append(event) }
   }
 
   func recordAppearCountAtPresent() {
-    lock.lock()
-    defer { lock.unlock() }
-    let appearCount = orderedEvents.filter { $0.hasPrefix("appear:") }.count
-    appearCountsAtPresent.append(appearCount)
+    state.withLock { state in
+      let appearCount = state.orderedEvents.filter { $0.hasPrefix("appear:") }.count
+      state.appearCountsAtPresent.append(appearCount)
+    }
   }
 
   func events(matchingPrefix prefix: String) -> [String] {
-    lock.lock()
-    defer { lock.unlock() }
-    return orderedEvents.filter { $0.hasPrefix(prefix) }
+    state.withLock { $0.orderedEvents.filter { $0.hasPrefix(prefix) } }
   }
 
   func waitForEvent(
@@ -2778,9 +2831,7 @@ private final class RuntimeLifecycleRecorder: @unchecked Sendable {
   }
 
   private func contains(_ event: String) -> Bool {
-    lock.lock()
-    defer { lock.unlock() }
-    return orderedEvents.contains(event)
+    state.withLock { $0.orderedEvents.contains(event) }
   }
 }
 

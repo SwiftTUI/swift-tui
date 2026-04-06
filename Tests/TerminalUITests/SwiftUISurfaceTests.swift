@@ -143,18 +143,48 @@ private struct RaisedGuideReadingLayout: Layout {
   }
 }
 
-private final class LayoutCacheCounter: @unchecked Sendable {
-  var makeCalls = 0
-  var lastMeasuredCache = 0
-  var lastPlacedCache = 0
+private final class LayoutCacheCounter: Sendable {
+  private struct State: Sendable {
+    var makeCalls = 0
+    var lastMeasuredCache = 0
+    var lastPlacedCache = 0
+  }
+
+  private let state = LockedBox(State())
+
+  var makeCalls: Int {
+    state.value.makeCalls
+  }
+
+  var lastMeasuredCache: Int {
+    state.value.lastMeasuredCache
+  }
+
+  var lastPlacedCache: Int {
+    state.value.lastPlacedCache
+  }
+
+  func nextMakeCallCount() -> Int {
+    state.withLock { state in
+      state.makeCalls += 1
+      return state.makeCalls
+    }
+  }
+
+  func recordMeasuredCache(_ cache: Int) {
+    state.withLock { $0.lastMeasuredCache = cache }
+  }
+
+  func recordPlacedCache(_ cache: Int) {
+    state.withLock { $0.lastPlacedCache = cache }
+  }
 }
 
 private struct CacheTrackingLayout: Layout {
   let counter: LayoutCacheCounter
 
   func makeCache(subviews _: LayoutSubviews) -> Int {
-    counter.makeCalls += 1
-    return counter.makeCalls
+    counter.nextMakeCallCount()
   }
 
   func updateCache(
@@ -167,7 +197,7 @@ private struct CacheTrackingLayout: Layout {
     subviews: LayoutSubviews,
     cache: inout Int
   ) -> LayoutSize {
-    counter.lastMeasuredCache = cache
+    counter.recordMeasuredCache(cache)
     return subviews.first?.sizeThatFits(.unspecified) ?? .zero
   }
 
@@ -177,7 +207,7 @@ private struct CacheTrackingLayout: Layout {
     subviews: LayoutSubviews,
     cache: inout Int
   ) {
-    counter.lastPlacedCache = cache
+    counter.recordPlacedCache(cache)
     guard let subview = subviews.first else {
       return
     }
@@ -191,8 +221,16 @@ private struct CacheTrackingLayout: Layout {
   }
 }
 
-private final class SharedLayoutCacheRecorder: @unchecked Sendable {
-  var placedValues: [Int] = []
+private final class SharedLayoutCacheRecorder: Sendable {
+  private let placedValuesStorage = LockedBox<[Int]>([])
+
+  var placedValues: [Int] {
+    placedValuesStorage.value
+  }
+
+  func appendPlacedValue(_ value: Int) {
+    placedValuesStorage.withLock { $0.append(value) }
+  }
 }
 
 private struct WidthStampingLayout: Layout {
@@ -223,7 +261,7 @@ private struct WidthStampingLayout: Layout {
     subviews: LayoutSubviews,
     cache: inout Int
   ) {
-    recorder.placedValues.append(cache)
+    recorder.appendPlacedValue(cache)
     guard let subview = subviews.first else {
       return
     }
@@ -356,10 +394,29 @@ struct SwiftUISurfaceTests {
   @Test(
     "public lifecycle modifiers register on the resolved node without executing during resolution")
   func publicLifecycleModifiersRegisterWithoutExecuting() async throws {
-    final class CounterBox: @unchecked Sendable {
-      var appearCount = 0
-      var disappearCount = 0
-      var taskCount = 0
+    final class CounterBox: Sendable {
+      private struct State: Sendable {
+        var appearCount = 0
+        var disappearCount = 0
+        var taskCount = 0
+      }
+
+      private let state = LockedBox(State())
+
+      var appearCount: Int {
+        get { state.value.appearCount }
+        set { state.withLock { $0.appearCount = newValue } }
+      }
+
+      var disappearCount: Int {
+        get { state.value.disappearCount }
+        set { state.withLock { $0.disappearCount = newValue } }
+      }
+
+      var taskCount: Int {
+        get { state.value.taskCount }
+        set { state.withLock { $0.taskCount = newValue } }
+      }
     }
 
     let counters = CounterBox()
@@ -3689,15 +3746,23 @@ struct SwiftUISurfaceTests {
 
   @Test("Link resolves as focusable rich text and dispatches open-link actions")
   func linkResolvesAsFocusableRichText() {
-    final class OpenLinkRecorder: @unchecked Sendable {
-      var destinations: [LinkDestination] = []
+    final class OpenLinkRecorder: Sendable {
+      private let destinationsStorage = LockedBox<[LinkDestination]>([])
+
+      var destinations: [LinkDestination] {
+        destinationsStorage.value
+      }
+
+      func record(_ destination: LinkDestination) {
+        destinationsStorage.withLock { $0.append(destination) }
+      }
     }
 
     let recorder = OpenLinkRecorder()
     let actionRegistry = LocalActionRegistry()
     var environmentValues = EnvironmentValues()
     environmentValues.openLinkAction = OpenLinkAction { destination in
-      recorder.destinations.append(destination)
+      recorder.record(destination)
       return true
     }
 

@@ -46,8 +46,13 @@ struct LayoutReuseAncestorInvalidationTests {
     let renderer = DefaultRenderer(
       layoutEngine: .init(cache: MeasurementCache())
     )
-    final class BranchDetailBox: @unchecked Sendable {
-      var detail = "Branch A detail"
+    final class BranchDetailBox: Sendable {
+      private let detailStorage = LockedBox("Branch A detail")
+
+      var detail: String {
+        get { detailStorage.value }
+        set { detailStorage.value = newValue }
+      }
     }
     let box = BranchDetailBox()
 

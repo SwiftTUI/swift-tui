@@ -1,6 +1,6 @@
 # Public Surface Policy
 
-Last updated: April 5, 2026
+Last updated: April 6, 2026
 
 This note defines how the package should think about its public API shape after the public-surface consolidation.
 
@@ -22,6 +22,8 @@ The canonical public surface is the one used in README examples, architecture do
 - property wrappers and environment plumbing that feel like SwiftUI
 - runtime integration points in `TerminalUI` that host those views in a terminal session or shared scene host
 - peer platform integration packages when the app needs terminal-native execution, WASI execution, or host-managed embedding
+
+The supported package model is `TerminalUI` for shared runtime integration plus peer runner packages for executable launch or embedded hosting.
 
 In this repo, an executable runner package owns top-level execution and the
 default `App.main()` story, while an embedded host package retains
@@ -70,6 +72,15 @@ Runtime bridges and staging adapters are acceptable while the package is still r
 If retained, host-staging adapters belong in this category as package-internal compatibility seams, not as part of the public story.
 
 Compatibility factories such as the old `Package` helpers do not qualify as canonical runtime API and should not be reintroduced.
+
+## Structured Concurrency Policy
+
+Checked-in Swift sources should stay inside the structured concurrency model.
+
+- Do not introduce `@unchecked Sendable`.
+- Do not introduce `nonisolated(unsafe)`.
+- Prefer explicit actor isolation, `Sendable` generic constraints, or `Synchronization` primitives such as `Mutex` when shared mutable state is unavoidable.
+- If a type participates in the public or package-visible authoring surface, prefer modeling the isolation honestly over suppressing the compiler.
 
 ## View Lowering Policy
 

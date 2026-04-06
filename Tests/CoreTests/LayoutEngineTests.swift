@@ -715,7 +715,7 @@ private func stack(
   )
 }
 
-private final class NoOpCustomLayoutProxy: CustomLayoutProxy, @unchecked Sendable {
+private final class NoOpCustomLayoutProxy: CustomLayoutProxy {
   var debugName: String {
     "NoOpCustomLayoutProxy"
   }

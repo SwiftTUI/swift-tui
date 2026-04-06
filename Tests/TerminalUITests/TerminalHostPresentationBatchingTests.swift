@@ -159,9 +159,14 @@ struct TerminalHostPresentationBatchingTests {
   }
 }
 
-private final class PresentationWriteCountingController: TerminalControlling, @unchecked Sendable {
+private final class PresentationWriteCountingController: TerminalControlling {
   private let isTTYValue: Bool
-  private(set) var writes: [String] = []
+  private let writesStorage = LockedBox<[String]>([])
+
+  private(set) var writes: [String] {
+    get { writesStorage.value }
+    set { writesStorage.value = newValue }
+  }
 
   init(isTTY: Bool) {
     isTTYValue = isTTY
@@ -192,7 +197,7 @@ private final class PresentationWriteCountingController: TerminalControlling, @u
   func setFileStatusFlags(_: Int32, on _: Int32) throws {}
 
   func write(_ output: String, to _: Int32) throws {
-    writes.append(output)
+    writesStorage.withLock { $0.append(output) }
   }
 
   func read(
@@ -204,13 +209,17 @@ private final class PresentationWriteCountingController: TerminalControlling, @u
   }
 }
 
-private final class BlockingPresentationWriteController: TerminalControlling, @unchecked Sendable {
+private final class BlockingPresentationWriteController: TerminalControlling {
   private let isTTYValue: Bool
   private let blockedWriteStarted = DispatchSemaphore(value: 0)
   private let releaseBlockedWrite = DispatchSemaphore(value: 0)
+  private let shouldBlockFirstWriteStorage = LockedBox(true)
+  private let writesStorage = LockedBox<[String]>([])
 
-  private var shouldBlockFirstWrite = true
-  private(set) var writes: [String] = []
+  private(set) var writes: [String] {
+    get { writesStorage.value }
+    set { writesStorage.value = newValue }
+  }
 
   init(isTTY: Bool) {
     isTTYValue = isTTY
@@ -241,15 +250,22 @@ private final class BlockingPresentationWriteController: TerminalControlling, @u
   func setFileStatusFlags(_: Int32, on _: Int32) throws {}
 
   func write(_ output: String, to _: Int32) throws {
+    let shouldBlockFirstWrite = shouldBlockFirstWriteStorage.withLock { state in
+      let shouldBlock = state
+      if state {
+        state = false
+      }
+      return shouldBlock
+    }
+
     if shouldBlockFirstWrite {
-      shouldBlockFirstWrite = false
       blockedWriteStarted.signal()
       guard releaseBlockedWrite.wait(timeout: .now() + 1) == .success else {
         throw TerminalHostError.failedToWrite(errno: ETIMEDOUT)
       }
     }
 
-    writes.append(output)
+    writesStorage.withLock { $0.append(output) }
   }
 
   func read(

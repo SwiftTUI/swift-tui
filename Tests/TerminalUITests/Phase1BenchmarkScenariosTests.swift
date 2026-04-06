@@ -107,7 +107,8 @@ struct Phase1BenchmarkScenariosTests {
   }
 
   @Test(
-    "single-step scroll movement reuses measurement work and translates eager placement incrementally")
+    "single-step scroll movement reuses measurement work and translates eager placement incrementally"
+  )
   @MainActor
   func singleStepScrollMovementScenario() throws {
     let harness = BenchmarkHarness()
@@ -262,7 +263,7 @@ private final class BenchmarkHarness {
   }
 }
 
-private final class BenchmarkPresentationController: TerminalControlling, @unchecked Sendable {
+private final class BenchmarkPresentationController: TerminalControlling {
   func isATTY(_: Int32) -> Bool {
     true
   }
@@ -294,16 +295,31 @@ private final class BenchmarkPresentationController: TerminalControlling, @unche
   }
 }
 
-private final class CounterBox: @unchecked Sendable {
-  var count = 0
+private final class CounterBox: Sendable {
+  private let countStorage = LockedBox(0)
+
+  var count: Int {
+    get { countStorage.value }
+    set { countStorage.value = newValue }
+  }
 }
 
-private final class TextBox: @unchecked Sendable {
-  var value = ""
+private final class TextBox: Sendable {
+  private let valueStorage = LockedBox("")
+
+  var value: String {
+    get { valueStorage.value }
+    set { valueStorage.value = newValue }
+  }
 }
 
-private final class ScrollBox: @unchecked Sendable {
-  var position = ScrollPosition.zero
+private final class ScrollBox: Sendable {
+  private let positionStorage = LockedBox(ScrollPosition.zero)
+
+  var position: ScrollPosition {
+    get { positionStorage.value }
+    set { positionStorage.value = newValue }
+  }
 }
 
 private enum Phase1BenchmarkIdentity {

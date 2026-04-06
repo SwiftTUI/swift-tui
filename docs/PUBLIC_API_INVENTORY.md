@@ -52,7 +52,7 @@ The runtime-facing public surface is also canonical:
 - `TerminalUISceneManifest`
 - `HostedSceneSession`
 
-### Peer platform integration packages
+### Peer runner packages
 
 Platform-specific execution and embedding are intentionally outside the root
 package surface:

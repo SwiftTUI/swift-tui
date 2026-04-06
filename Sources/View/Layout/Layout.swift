@@ -274,6 +274,7 @@ public struct AnyLayout: Layout {
   }
 
   /// Erases a concrete layout type.
+  @MainActor
   public init<L: Layout>(_ layout: L) {
     let box = ConcreteAnyLayoutBox(layout: layout)
     self.box = box
@@ -583,24 +584,22 @@ package struct VerticalAlignmentGuideModifier<Content: View>: View, ResolvableVi
   }
 }
 
-// SAFETY: Custom layouts keep type-erased cache state and the existential box
-// is not proven Sendable. The unsafe boundary is limited to those two members,
-// while the proxy type itself still models the rest of its API as Sendable.
-private final class LayoutProxyBox: CustomLayoutProxy, Sendable {
+@MainActor
+private final class LayoutProxyBox: CustomLayoutProxy {
   private struct CacheKey: Hashable {
     var identity: Identity
     var proposal: ProposedSize
   }
 
-  nonisolated(unsafe) private let box: any AnyLayoutBox
-  nonisolated(unsafe) private var cachedStates: [CacheKey: Any] = [:]
+  private let box: any AnyLayoutBox
+  private var cachedStates: [CacheKey: Any] = [:]
 
   init(box: any AnyLayoutBox) {
     self.box = box
   }
 
-  var debugName: String {
-    box.debugName
+  nonisolated var debugName: String {
+    MainActor.assumeIsolated { box.debugName }
   }
 
   private func ensureCache(
@@ -628,96 +627,102 @@ private final class LayoutProxyBox: CustomLayoutProxy, Sendable {
     cachedStates = cachedStates.filter { $0.key.identity != identity }
   }
 
-  func measureContainer(
+  nonisolated func measureContainer(
     engine: LayoutEngine,
     node: ResolvedNode,
     proposal: ProposedSize
   ) -> Size {
-    let subviews = node.children.map { child in
-      LayoutSubview(child: child, engine: engine)
+    MainActor.assumeIsolated {
+      let subviews = node.children.map { child in
+        LayoutSubview(child: child, engine: engine)
+      }
+      var cache = ensureCache(
+        for: node,
+        proposal: proposal,
+        subviews: subviews
+      )
+      let result = box.sizeThatFits(
+        proposal: proposal,
+        subviews: subviews,
+        cache: &cache
+      )
+      cachedStates[CacheKey(identity: node.identity, proposal: proposal)] = cache
+      return result
     }
-    var cache = ensureCache(
-      for: node,
-      proposal: proposal,
-      subviews: subviews
-    )
-    let result = box.sizeThatFits(
-      proposal: proposal,
-      subviews: subviews,
-      cache: &cache
-    )
-    cachedStates[CacheKey(identity: node.identity, proposal: proposal)] = cache
-    return result
   }
 
-  func placeSubviews(
+  nonisolated func placeSubviews(
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
     in bounds: Rect
   ) -> [PlacedNode] {
-    placeSubviews(
-      engine: engine,
-      node: node,
-      measured: measured,
-      in: bounds,
-      passContext: nil
-    )
+    MainActor.assumeIsolated {
+      placeSubviews(
+        engine: engine,
+        node: node,
+        measured: measured,
+        in: bounds,
+        passContext: nil
+      )
+    }
   }
 
-  package func placeSubviews(
+  nonisolated package func placeSubviews(
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
     in bounds: Rect,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
-    let placementRecorder = LayoutSubviewPlacementRecorder()
-    let subviews = node.children.map { child in
-      LayoutSubview(
-        child: child,
-        engine: engine,
-        placementRecorder: placementRecorder
+    MainActor.assumeIsolated {
+      let placementRecorder = LayoutSubviewPlacementRecorder()
+      let subviews = node.children.map { child in
+        LayoutSubview(
+          child: child,
+          engine: engine,
+          placementRecorder: placementRecorder
+        )
+      }
+      let cacheKey = CacheKey(identity: node.identity, proposal: measured.proposal)
+      var cache = ensureCache(
+        for: node,
+        proposal: measured.proposal,
+        subviews: subviews
       )
-    }
-    let cacheKey = CacheKey(identity: node.identity, proposal: measured.proposal)
-    var cache = ensureCache(
-      for: node,
-      proposal: measured.proposal,
-      subviews: subviews
-    )
-    box.placeSubviews(
-      in: bounds,
-      proposal: measured.proposal,
-      subviews: subviews,
-      cache: &cache
-    )
-    cachedStates[cacheKey] = cache
-    discardCachedStates(for: node.identity)
+      box.placeSubviews(
+        in: bounds,
+        proposal: measured.proposal,
+        subviews: subviews,
+        cache: &cache
+      )
+      cachedStates[cacheKey] = cache
+      discardCachedStates(for: node.identity)
 
-    return node.children.map { child in
-      let placement =
-        placementRecorder.placement(for: child.identity)
-        ?? defaultPlacement(in: bounds, proposal: measured.proposal)
-      let childMeasurement = engine.measure(
-        child,
-        proposal: placement.proposal,
-        passContext: passContext
-      )
-      return engine.place(
-        child,
-        measured: childMeasurement,
-        in: LayoutRect(
-          origin: placedOrigin(
-            for: childMeasurement.measuredSize,
-            at: placement.position,
-            anchor: placement.anchor
+      return node.children.map { child in
+        let placement =
+          placementRecorder.placement(for: child.identity)
+          ?? defaultPlacement(in: bounds, proposal: measured.proposal)
+        let childMeasurement = engine.measure(
+          child,
+          proposal: placement.proposal,
+          passContext: passContext
+        )
+        return engine.place(
+          child,
+          measured: childMeasurement,
+          in: LayoutRect(
+            origin: placedOrigin(
+              for: childMeasurement.measuredSize,
+              at: placement.position,
+              anchor: placement.anchor
+            ),
+            size: childMeasurement.measuredSize
           ),
-          size: childMeasurement.measuredSize
-        ),
-        viewportContext: placement.viewportContext,
-        passContext: passContext
-      )
+          viewportContext: placement.viewportContext,
+          passContext: passContext
+        )
+      }
     }
   }
 }

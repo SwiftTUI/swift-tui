@@ -30,6 +30,7 @@ swift format format -i --configuration .swift-format.json Sources/ Tests/  # For
 - **swift-format**: Auto-formats staged `.swift` files on commit.
 - **no-foundation-in-library-products**: Blocks commits that add `import Foundation` or `public import Foundation` in the Foundation-free `Sources/Core`, `Sources/View`, and `Sources/TerminalUI` library layers.
 - **public-surface-policies**: Enforces public surface guardrails, prototype target packaging rules, and the docs that describe that policy.
+- **structured-concurrency-escape-hatches**: Blocks checked-in Swift sources from using `@unchecked Sendable` or `nonisolated(unsafe)`; use actor isolation, `Sendable` storage, or `Synchronization` primitives instead.
 
 There is not currently a separate checked-in source-layout hook. Keep
 `docs/SOURCE_LAYOUT.md` aligned with file moves in ordinary review.

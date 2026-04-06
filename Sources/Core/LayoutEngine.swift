@@ -1,9 +1,7 @@
 import DequeModule
+import Synchronization
 
 /// A retained cache of measured subtrees keyed by identity and proposal.
-// SAFETY: Mutable cache storage is confined to the renderer's single-threaded
-// layout pass. `nonisolated(unsafe)` keeps the unsafety at the exact mutable
-// member instead of the whole reference type.
 public final class MeasurementCache: Sendable {
   private struct CachedMeasurement: Sendable {
     let resolved: ResolvedNode
@@ -34,26 +32,28 @@ public final class MeasurementCache: Sendable {
     var stores = 0
   }
 
-  nonisolated(unsafe) private var storage = Storage()
+  private let storage: Mutex<Storage> = .init(.init())
 
   /// Creates an empty measurement cache.
   public init() {}
 
   /// The number of cached entries.
   public var count: Int {
-    storage.entryCount
+    storage.withLock { $0.entryCount }
   }
 
   /// Snapshot metrics describing cache usage.
   public var metrics: MeasurementCacheMetrics {
-    MeasurementCacheMetrics(
-      generation: storage.epochGeneration,
-      entries: count,
-      lookups: storage.lookups,
-      hits: storage.hits,
-      misses: storage.misses,
-      stores: storage.stores
-    )
+    storage.withLock { storage in
+      MeasurementCacheMetrics(
+        generation: storage.epochGeneration,
+        entries: storage.entryCount,
+        lookups: storage.lookups,
+        hits: storage.hits,
+        misses: storage.misses,
+        stores: storage.stores
+      )
+    }
   }
 
   /// Returns a cached measurement for `resolved` and `proposal` when the
@@ -62,33 +62,35 @@ public final class MeasurementCache: Sendable {
     resolved: ResolvedNode,
     proposal: ProposedSize
   ) -> MeasuredNode? {
-    storage.lookups += 1
-    guard var identityStorage = storage.entriesByIdentity[resolved.identity] else {
-      storage.misses += 1
-      return nil
-    }
+    storage.withLock { storage in
+      storage.lookups += 1
+      guard var identityStorage = storage.entriesByIdentity[resolved.identity] else {
+        storage.misses += 1
+        return nil
+      }
 
-    guard let cached = identityStorage.entries[proposal] else {
+      guard let cached = identityStorage.entries[proposal] else {
+        storage.entriesByIdentity[resolved.identity] = identityStorage
+        storage.misses += 1
+        return nil
+      }
+
+      let generation = nextGeneration(in: &storage)
+      identityStorage.entries[proposal] = .init(
+        resolved: cached.resolved,
+        node: cached.node,
+        generation: generation
+      )
+      identityStorage.order.append(.init(proposal: proposal, generation: generation))
+      compactOrderIfNeeded(in: &identityStorage)
       storage.entriesByIdentity[resolved.identity] = identityStorage
-      storage.misses += 1
-      return nil
+      guard cached.resolved.isEquivalentForMeasurement(to: resolved) else {
+        storage.misses += 1
+        return nil
+      }
+      storage.hits += 1
+      return cached.node
     }
-
-    let generation = nextGeneration(in: &storage)
-    identityStorage.entries[proposal] = .init(
-      resolved: cached.resolved,
-      node: cached.node,
-      generation: generation
-    )
-    identityStorage.order.append(.init(proposal: proposal, generation: generation))
-    compactOrderIfNeeded(in: &identityStorage)
-    storage.entriesByIdentity[resolved.identity] = identityStorage
-    guard cached.resolved.isEquivalentForMeasurement(to: resolved) else {
-      storage.misses += 1
-      return nil
-    }
-    storage.hits += 1
-    return cached.node
   }
 
   /// Stores `node` as the cached measurement for `resolved`.
@@ -96,49 +98,55 @@ public final class MeasurementCache: Sendable {
     _ node: MeasuredNode,
     for resolved: ResolvedNode
   ) {
-    storage.stores += 1
-    var identityStorage = storage.entriesByIdentity[node.identity] ?? .init()
-    let generation = nextGeneration(in: &storage)
+    storage.withLock { storage in
+      storage.stores += 1
+      var identityStorage = storage.entriesByIdentity[node.identity] ?? .init()
+      let generation = nextGeneration(in: &storage)
 
-    if identityStorage.entries[node.proposal] == nil {
-      storage.entryCount += 1
-    }
+      if identityStorage.entries[node.proposal] == nil {
+        storage.entryCount += 1
+      }
 
-    identityStorage.entries[node.proposal] = CachedMeasurement(
-      resolved: resolved,
-      node: node,
-      generation: generation
-    )
-    identityStorage.order.append(.init(proposal: node.proposal, generation: generation))
-    compactOrderIfNeeded(in: &identityStorage)
-    let shouldKeepIdentity = evictIfNeeded(
-      for: node.identity,
-      in: &identityStorage,
-      storage: &storage
-    )
-    if shouldKeepIdentity {
-      storage.entriesByIdentity[node.identity] = identityStorage
+      identityStorage.entries[node.proposal] = CachedMeasurement(
+        resolved: resolved,
+        node: node,
+        generation: generation
+      )
+      identityStorage.order.append(.init(proposal: node.proposal, generation: generation))
+      compactOrderIfNeeded(in: &identityStorage)
+      let shouldKeepIdentity = evictIfNeeded(
+        for: node.identity,
+        in: &identityStorage,
+        storage: &storage
+      )
+      if shouldKeepIdentity {
+        storage.entriesByIdentity[node.identity] = identityStorage
+      }
     }
   }
 
   package func prune(
     keeping identities: Set<Identity>
   ) {
-    let retained = storage.entriesByIdentity.filter { identities.contains($0.key) }
-    storage.entriesByIdentity = retained
-    storage.entryCount = retained.reduce(0) { $0 + $1.value.entries.count }
+    storage.withLock { storage in
+      let retained = storage.entriesByIdentity.filter { identities.contains($0.key) }
+      storage.entriesByIdentity = retained
+      storage.entryCount = retained.reduce(0) { $0 + $1.value.entries.count }
+    }
   }
 
   /// Clears the cache and advances its generation counter.
   public func reset() {
-    storage.epochGeneration += 1
-    storage.accessGeneration = 0
-    storage.entriesByIdentity.removeAll(keepingCapacity: true)
-    storage.entryCount = 0
-    storage.lookups = 0
-    storage.hits = 0
-    storage.misses = 0
-    storage.stores = 0
+    storage.withLock { storage in
+      storage.epochGeneration += 1
+      storage.accessGeneration = 0
+      storage.entriesByIdentity.removeAll(keepingCapacity: true)
+      storage.entryCount = 0
+      storage.lookups = 0
+      storage.hits = 0
+      storage.misses = 0
+      storage.stores = 0
+    }
   }
 
   private func nextGeneration(
@@ -205,7 +213,7 @@ public final class MeasurementCache: Sendable {
 }
 
 /// Measures and places resolved nodes under SwiftUI-style layout rules.
-public struct LayoutEngine {
+public struct LayoutEngine: Sendable {
   public let cache: MeasurementCache?
 
   /// Creates a layout engine with an optional retained measurement cache.
@@ -241,18 +249,24 @@ public struct LayoutEngine {
       retainedLayout: passContext?.retainedLayout,
       hasInvalidatedIndexedDescendant: hasInvalidatedIndexedDescendant
     ) {
-      passContext?.workMetrics.measuredNodesReused += retained.subtreeNodeCount
+      passContext?.updateWorkMetrics {
+        $0.measuredNodesReused += retained.subtreeNodeCount
+      }
       return retained
     }
 
     if !hasInvalidatedIndexedDescendant,
       let cached = cache?.lookup(resolved: resolved, proposal: proposal)
     {
-      passContext?.workMetrics.measuredNodesReused += cached.subtreeNodeCount
+      passContext?.updateWorkMetrics {
+        $0.measuredNodesReused += cached.subtreeNodeCount
+      }
       return cached
     }
 
-    passContext?.workMetrics.measuredNodesComputed += 1
+    passContext?.updateWorkMetrics {
+      $0.measuredNodesComputed += 1
+    }
 
     let effectiveProposal = proposalApplyingFixedSizeMetadata(
       resolved.layoutMetadata,
@@ -367,11 +381,15 @@ public struct LayoutEngine {
       viewportContext: viewportContext,
       retainedLayout: passContext?.retainedLayout
     ) {
-      passContext?.workMetrics.placedNodesReused += retained.subtreeNodeCount
+      passContext?.updateWorkMetrics {
+        $0.placedNodesReused += retained.subtreeNodeCount
+      }
       return retained
     }
 
-    passContext?.workMetrics.placedNodesComputed += 1
+    passContext?.updateWorkMetrics {
+      $0.placedNodesComputed += 1
+    }
 
     let hasChildren =
       if let source = resolved.indexedChildSource {
@@ -1034,7 +1052,8 @@ public struct LayoutEngine {
     }
 
     let measurementMatches = previousMeasured == measured
-    let translationMeasurementMatches = isEquivalentForViewportTranslation(previousMeasured, measured)
+    let translationMeasurementMatches = isEquivalentForViewportTranslation(
+      previousMeasured, measured)
 
     if previousPlaced.bounds == bounds {
       guard measurementMatches else {
