@@ -67,7 +67,8 @@ extension SecureField {
       showsLabel: showsLabel,
       style: effectiveStyle,
       chrome: chrome,
-      placeholderStyle: styleEnvironment.themeStyle(for: .placeholder)
+      placeholderStyle: styleEnvironment.themeStyle(for: .placeholder),
+      focusActive: isFocused && showsFocusEffect
     ).resolve(
       in: context.child(component: .named("SecureFieldBody"))
     )

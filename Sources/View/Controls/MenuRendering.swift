@@ -25,6 +25,7 @@ extension Menu {
           .overlay {
             RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
               chrome.borderStyle,
+              style: isFocused ? .thick : .init(),
               backgroundStyle: chrome.borderBackgroundStyle
             )
           }

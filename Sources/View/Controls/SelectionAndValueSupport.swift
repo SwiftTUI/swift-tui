@@ -688,7 +688,8 @@ package func mutateTextEntryBinding(
 package func textEditorBody(
   displayText: String,
   chrome: ControlChrome,
-  scrollPosition: Binding<ScrollPosition>
+  scrollPosition: Binding<ScrollPosition>,
+  focusActive: Bool = false
 ) -> some View {
   ScrollView(.vertical, showsIndicators: true, position: scrollPosition) {
     VStack(alignment: .leading, spacing: 0) {
@@ -705,6 +706,7 @@ package func textEditorBody(
   .overlay {
     RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
       chrome.borderStyle,
+      style: focusActive ? .thick : .init(),
       backgroundStyle: chrome.borderBackgroundStyle
     )
   }

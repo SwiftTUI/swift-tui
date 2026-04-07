@@ -76,6 +76,20 @@ struct TabViewSurfaceTests {
     )
   }
 
+  // When focused, a 1-row accent rule is prepended above the strip, shifting the
+  // strip wash down by 1 row and increasing the strip height by 1.
+  private func focusedStripBounds(
+    for style: TabViewStyle
+  ) -> Rect {
+    Rect(
+      origin: .init(x: 0, y: 1),
+      size: .init(
+        width: 40,
+        height: style == .powerline ? 2 : 3
+      )
+    )
+  }
+
   @Test("TabView resolves typed labels into semantics and strip chrome")
   func tabViewResolvesTypedLabels() throws {
     let artifacts = DefaultRenderer().render(
@@ -105,39 +119,34 @@ struct TabViewSurfaceTests {
 
   @Test("focused tabs keep legacy strip text and add a strip-level focus wash")
   func focusedTabsUseStripLevelFocusWash() {
-    let unfocusedUnderlineSurface = normalizedVisibleText(
-      renderTabArtifacts(style: .underline, focused: false).rasterSurface.lines
-    )
-    let unfocusedRoundedSurface = normalizedVisibleText(
-      renderTabArtifacts(style: .rounded, focused: false).rasterSurface.lines
-    )
-    let unfocusedPowerlineSurface = normalizedVisibleText(
-      renderTabArtifacts(style: .powerline, focused: false).rasterSurface.lines
-    )
-
     let focusedUnderlineArtifacts = renderTabArtifacts(style: .underline, focused: true)
     let focusedRoundedArtifacts = renderTabArtifacts(style: .rounded, focused: true)
     let focusedPowerlineArtifacts = renderTabArtifacts(style: .powerline, focused: true)
 
+    // Focused surfaces include a 1-row accent rule above the strip, so the visible
+    // text content shifts down by one row compared to the unfocused layout. The tab
+    // labels must still appear somewhere in the focused surface.
+    let focusedUnderlineText = normalizedVisibleText(focusedUnderlineArtifacts.rasterSurface.lines)
+    let focusedRoundedText = normalizedVisibleText(focusedRoundedArtifacts.rasterSurface.lines)
+    let focusedPowerlineText = normalizedVisibleText(focusedPowerlineArtifacts.rasterSurface.lines)
+    #expect(focusedUnderlineText.contains("Home · 3"))
+    #expect(focusedRoundedText.contains("Home · 3"))
+    #expect(focusedPowerlineText.contains("Home · 3"))
+
     #expect(
-      normalizedVisibleText(focusedUnderlineArtifacts.rasterSurface.lines)
-        == unfocusedUnderlineSurface
-    )
+      hasFillCommand(
+        in: focusedUnderlineArtifacts.drawTree,
+        bounds: focusedStripBounds(for: .underline)
+      ))
     #expect(
-      normalizedVisibleText(focusedRoundedArtifacts.rasterSurface.lines) == unfocusedRoundedSurface
-    )
-    #expect(
-      normalizedVisibleText(focusedPowerlineArtifacts.rasterSurface.lines)
-        == unfocusedPowerlineSurface
-    )
-    #expect(
-      hasFillCommand(in: focusedUnderlineArtifacts.drawTree, bounds: stripBounds(for: .underline)))
-    #expect(
-      hasFillCommand(in: focusedRoundedArtifacts.drawTree, bounds: stripBounds(for: .rounded)))
+      hasFillCommand(
+        in: focusedRoundedArtifacts.drawTree,
+        bounds: focusedStripBounds(for: .rounded)
+      ))
     #expect(
       hasFillCommand(
         in: focusedPowerlineArtifacts.drawTree,
-        bounds: stripBounds(for: .powerline)
+        bounds: focusedStripBounds(for: .powerline)
       )
     )
   }

@@ -3952,9 +3952,9 @@ struct SwiftUISurfaceTests {
 
     #expect(
       artifacts.rasterSurface.lines == [
-        "╭──╮",
-        "│OK│",
-        "╰──╯",
+        "┏━━┓",
+        "┃OK┃",
+        "┗━━┛",
       ])
     #expect(artifacts.rasterSurface.cells[0][0].style?.backgroundColor == nil)
     #expect(artifacts.rasterSurface.cells[1][1].style?.backgroundColor != nil)
