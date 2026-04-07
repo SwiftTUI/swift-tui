@@ -219,12 +219,12 @@ struct FocusTransitionTests {
     let focusedLines = focused.rasterSurface.lines
     let unfocusedLines = unfocused.rasterSurface.lines
 
-    // Unfocused: unselected tabs use light underline ─, selected uses ▄
-    #expect(unfocusedLines.contains { $0.contains("─") }, "Unfocused unselected tabs should have light underline")
-    #expect(unfocusedLines.contains { $0.contains("▄") }, "Unfocused selected tab should use block underline (▄)")
+    // Unfocused: unselected tabs use ▁, selected uses ▂
+    #expect(unfocusedLines.contains { $0.contains("▁") }, "Unfocused unselected tabs should use lower one-eighth block (▁)")
+    #expect(unfocusedLines.contains { $0.contains("▂") }, "Unfocused selected tab should use lower quarter block (▂)")
 
     // Focused: selected tab uses ▄, unselected tabs use ▂
-    #expect(focusedLines.contains { $0.contains("▄") }, "Focused selected tab should use block underline (▄)")
+    #expect(focusedLines.contains { $0.contains("▄") }, "Focused selected tab should use lower half block (▄)")
     #expect(focusedLines.contains { $0.contains("▂") }, "Focused unselected tabs should use lower quarter block (▂)")
   }
 

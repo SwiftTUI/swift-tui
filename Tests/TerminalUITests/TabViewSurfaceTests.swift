@@ -187,7 +187,7 @@ struct TabViewSurfaceTests {
       Array(lines)
         == [
           "Controls Collections Layout Appearance Charts",
-          "──────── ─────────── ▄▄▄▄▄▄ ────────── ──────",
+          "▁▁▁▁▁▁▁▁ ▁▁▁▁▁▁▁▁▁▁▁ ▂▂▂▂▂▂ ▁▁▁▁▁▁▁▁▁▁ ▁▁▁▁▁▁",
         ]
     )
   }
