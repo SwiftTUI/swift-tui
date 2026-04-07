@@ -87,7 +87,8 @@ public struct ScrollView<Content: View>: View, ResolvableView {
             return false
           }
           return withAuthoringContext(dynamicPropertyScope) {
-            var next = binding.wrappedValue
+            let current = binding.wrappedValue
+            var next = current
             var changed = false
             if axes.contains(.horizontal), deltaX != 0 {
               next.scrollBy(x: deltaX)
@@ -107,6 +108,10 @@ public struct ScrollView<Content: View>: View, ResolvableView {
               let maxY = max(0, ctx.contentBounds.size.height - ctx.viewportRect.size.height)
               next.x = min(max(0, next.x), maxX)
               next.y = min(max(0, next.y), maxY)
+            }
+
+            guard next != current else {
+              return false
             }
 
             binding.wrappedValue = next
@@ -132,7 +137,8 @@ public struct ScrollView<Content: View>: View, ResolvableView {
                 return false
               }
               return withAuthoringContext(dynamicPropertyScope) {
-                var next = binding.wrappedValue
+                let current = binding.wrappedValue
+                var next = current
                 switch axis {
                 case .horizontal:
                   next.scrollTo(
@@ -150,8 +156,16 @@ public struct ScrollView<Content: View>: View, ResolvableView {
                   )
                 }
 
-                binding.wrappedValue = next
-                return true
+                if next != current {
+                  binding.wrappedValue = next
+                  return true
+                }
+
+                if case .down(.primary) = event.kind {
+                  return true
+                }
+
+                return false
               }
             default:
               return false

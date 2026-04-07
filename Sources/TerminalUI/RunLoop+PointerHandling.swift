@@ -30,8 +30,10 @@ extension RunLoop {
     switch mouseEvent.kind {
     case .moved:
       return armedPointerRouteID != nil || capturedPointerRouteID != nil
-    case .down, .up, .dragged, .scrolled:
+    case .down, .up, .dragged:
       return true
+    case .scrolled:
+      return false
     }
   }
 
@@ -193,7 +195,7 @@ extension RunLoop {
 
     if let scrollRoute = scrollTarget(at: location, deltaX: deltaX, deltaY: deltaY) {
       let routeID = primaryRouteID(for: scrollRoute.identity)
-      _ = dispatchPointerEvent(
+      let handled = dispatchPointerEvent(
         preferredRouteID: routeID,
         identity: scrollRoute.identity,
         event: .init(
@@ -206,8 +208,11 @@ extension RunLoop {
           )
         )
       )
+      if handled {
+        scheduler.requestInvalidation(of: [scrollRoute.identity])
+      }
     } else if let hitTarget {
-      _ = dispatchPointerEvent(
+      let handled = dispatchPointerEvent(
         preferredRouteID: hitTarget.region.routeID,
         identity: hitTarget.region.identity,
         event: .init(
@@ -217,6 +222,9 @@ extension RunLoop {
           scrollContext: scrollContext(for: hitTarget.region.identity)
         )
       )
+      if handled {
+        scheduler.requestInvalidation(of: [hitTarget.region.identity])
+      }
     }
   }
 

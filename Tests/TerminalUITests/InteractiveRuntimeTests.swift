@@ -1950,6 +1950,168 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("handled pointer scrolling invalidates the scroll route even for external position bindings")
+  func handledPointerScrollingInvalidatesScrollRouteForExternalBindings() throws {
+    let terminalSize = Size(width: 20, height: 8)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("ExternalPointerScrollInvalidation")
+    let scrollIdentity = testIdentity("ExternalPointerScrollInvalidation", "Scroll")
+    let scheduler = FrameScheduler()
+    let box = LockedBox(ScrollPosition.zero)
+
+    let view =
+      ScrollView(
+        .vertical,
+        position: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<10) { index in
+            Text("Mouse \(index)")
+          }
+        }
+      }
+      .id(scrollIdentity)
+      .frame(width: 10, height: 5, alignment: .topLeading)
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalAppearance = terminal.appearance
+    environmentValues.terminalSize = terminalSize
+
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: ScriptedTerminalInputReader(events: []),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: environmentValues,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        view
+      }
+    )
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    #expect(runLoop.handle(.input(.mouse(
+      .init(kind: .scrolled(deltaX: 0, deltaY: 1), location: centerPoint(of: scrollRect))
+    ))) == nil)
+    #expect(box.value == .init(x: 0, y: 1))
+
+    let scheduledFrame = try #require(
+      scheduler.consumeReadyFrame(at: .now())
+    )
+    #expect(scheduledFrame.causes.contains(.invalidation))
+    #expect(scheduledFrame.invalidatedIdentities == [scrollIdentity])
+  }
+
+  @MainActor
+  @Test("clamped pointer scrolling does not schedule a frame when nothing changes")
+  func clampedPointerScrollingDoesNotScheduleFrameWhenNothingChanges() throws {
+    let terminalSize = Size(width: 20, height: 8)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("ClampedPointerScroll")
+    let scrollIdentity = testIdentity("ClampedPointerScroll", "Scroll")
+    let scheduler = FrameScheduler()
+    let box = LockedBox(ScrollPosition.zero)
+
+    let view =
+      ScrollView(
+        .vertical,
+        position: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<10) { index in
+            Text("Mouse \(index)")
+          }
+        }
+      }
+      .id(scrollIdentity)
+      .frame(width: 10, height: 5, alignment: .topLeading)
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalAppearance = terminal.appearance
+    environmentValues.terminalSize = terminalSize
+
+    let previewArtifacts = DefaultRenderer().render(
+      view,
+      context: .init(
+        identity: rootIdentity,
+        environmentValues: environmentValues
+      ),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+    let scrollRoute = try #require(
+      previewArtifacts.semanticSnapshot.scrollRoutes.first { route in
+        route.identity == scrollIdentity
+      }
+    )
+    let focusIdentity = try #require(
+      previewArtifacts.semanticSnapshot.focusRegions.first?.identity
+    )
+    let maxY = max(
+      0,
+      scrollRoute.contentBounds.size.height - scrollRoute.viewportRect.size.height
+    )
+    box.value = .init(x: 0, y: maxY)
+
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: ScriptedTerminalInputReader(events: []),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: environmentValues,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        view
+      }
+    )
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    _ = runLoop.focusTracker.setFocus(to: focusIdentity)
+    scheduler.reset()
+
+    #expect(runLoop.handle(.input(.mouse(
+      .init(kind: .scrolled(deltaX: 0, deltaY: 1), location: centerPoint(of: scrollRoute.viewportRect))
+    ))) == nil)
+    #expect(box.value == .init(x: 0, y: maxY))
+    #expect(scheduler.consumeReadyFrame(at: .now()) == nil)
+  }
+
+  @MainActor
   @Test("button drag-out cancel prevents activation")
   func mouseDragOutCancelsButtonActivation() async throws {
     let box = MouseControlBox()
