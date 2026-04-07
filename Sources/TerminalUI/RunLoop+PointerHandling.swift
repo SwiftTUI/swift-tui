@@ -228,9 +228,9 @@ extension RunLoop {
   }
 
   /// Returns whether a click at `location` should move focus to `focusIdentity`.
-  /// Focus is set when the click is directly on the focus region (no more-specific
-  /// descendant focus region contains the point) or the target is an activation
-  /// identity.
+  /// Focus is set unless a more-specific descendant focus region contains the
+  /// point and is smaller than the candidate (indicating a child control, not
+  /// an overlay like a scroll indicator).
   package func shouldClickFocus(
     _ focusIdentity: Identity,
     at location: Point
@@ -239,15 +239,25 @@ extension RunLoop {
       return true
     }
 
-    // Check that no descendant focus region contains this point.  If one
-    // does, the click is inside a child's focusable area and should not
-    // steal focus to an ancestor container.
-    let hasDescendantFocus = latestSemanticSnapshot.focusRegions.contains { region in
-      region.identity != focusIdentity
-        && region.rect.contains(location)
-        && region.identity.isDescendant(of: focusIdentity)
+    let candidateRegion = latestSemanticSnapshot.focusRegions.first {
+      $0.identity == focusIdentity
     }
-    return !hasDescendantFocus
+    guard let candidateRect = candidateRegion?.rect else {
+      return true
+    }
+
+    let candidateArea = candidateRect.size.width * candidateRect.size.height
+    let hasSmallerDescendant = latestSemanticSnapshot.focusRegions.contains { region in
+      guard region.identity != focusIdentity,
+        region.rect.contains(location),
+        region.identity.isDescendant(of: focusIdentity)
+      else {
+        return false
+      }
+      let regionArea = region.rect.size.width * region.rect.size.height
+      return regionArea < candidateArea
+    }
+    return !hasSmallerDescendant
   }
 
   package func scrollTarget(
