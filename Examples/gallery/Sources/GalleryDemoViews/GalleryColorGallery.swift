@@ -51,7 +51,7 @@ struct GalleryColorGallery: View {
   }
 
   private func terminalPaletteSection(
-    palette: [Int: Color]
+    palette: TerminalPalette
   ) -> some View {
     GroupBox("Terminal palette (host)") {
       VStack(alignment: .leading, spacing: 0) {
