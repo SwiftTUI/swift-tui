@@ -193,6 +193,7 @@ extension Picker {
       .overlay {
         RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
           containerChrome.borderStyle,
+          style: isFocused && showsFocusEffect ? .thick : .init(),
           backgroundStyle: containerChrome.borderBackgroundStyle
         )
       }
@@ -416,6 +417,7 @@ extension Picker {
       .overlay {
         RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
           containerChrome.borderStyle,
+          style: isFocused && showsFocusEffect ? .thick : .init(),
           backgroundStyle: containerChrome.borderBackgroundStyle
         )
       }
@@ -465,6 +467,7 @@ extension Picker {
       .overlay {
         RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
           containerChrome.borderStyle,
+          style: isFocused && showsFocusEffect ? .thick : .init(),
           backgroundStyle: containerChrome.borderBackgroundStyle
         )
       }

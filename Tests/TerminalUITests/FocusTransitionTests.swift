@@ -1,0 +1,249 @@
+import Testing
+
+@testable import Core
+@testable import TerminalUI
+@testable import View
+
+/// Tests that focus transitions between controls (Tab/Shift-Tab) produce
+/// visually distinct rendered frames — both in static rendering and through
+/// the RunLoop's live focus-transition pipeline.
+@MainActor
+@Suite
+struct FocusTransitionTests {
+
+  // MARK: - Fixtures
+
+  private static func tabViewWithPicker() -> some View {
+    TabView(selection: .constant("demo")) {
+      Picker("Options", selection: .constant("one")) {
+        Text("One").tag("one")
+        Text("Two").tag("two")
+        Text("Three").tag("three")
+      }
+      .pickerStyle(.segmented)
+      .tabItem("Demo")
+      .tag("demo")
+
+      Text("Other tab")
+        .tabItem("Other")
+        .tag("other")
+    }
+    .id(testIdentity("Tabs"))
+  }
+
+  private func renderArtifacts(
+    focusedIdentity: Identity? = nil
+  ) -> FrameArtifacts {
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = focusedIdentity
+    return DefaultRenderer().render(
+      Self.tabViewWithPicker(),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues
+      ),
+      proposal: .init(width: 50, height: 10)
+    )
+  }
+
+  // MARK: - Static rendering tests
+
+  @Test("focus regions include both the TabView and the Picker inside it")
+  func focusRegionsIncludeTabViewAndPicker() {
+    let regions = renderArtifacts().semanticSnapshot.focusRegions
+    #expect(regions.count >= 2)
+    #expect(regions.contains { $0.identity == testIdentity("Tabs") })
+    #expect(regions.contains { $0.identity != testIdentity("Tabs") })
+  }
+
+  @Test("segmented picker renders visually different styling when focused")
+  func segmentedPickerShowsFocusHighlight() {
+    let unfocusedArtifacts = renderArtifacts()
+    let focusRegions = unfocusedArtifacts.semanticSnapshot.focusRegions
+
+    guard let pickerRegion = focusRegions.first(where: { $0.identity != testIdentity("Tabs") })
+    else {
+      Issue.record("Picker focus region not found")
+      return
+    }
+
+    let unfocusedStyles = unfocusedArtifacts.rasterSurface.styleRuns
+    let pickerFocusedStyles = renderArtifacts(focusedIdentity: pickerRegion.identity)
+      .rasterSurface.styleRuns
+    let tabFocusedStyles = renderArtifacts(focusedIdentity: testIdentity("Tabs"))
+      .rasterSurface.styleRuns
+
+    #expect(pickerFocusedStyles != unfocusedStyles,
+      "Picker focus should produce different styling than unfocused")
+    #expect(tabFocusedStyles != unfocusedStyles,
+      "TabView focus should produce different styling than unfocused")
+    #expect(pickerFocusedStyles != tabFocusedStyles,
+      "Picker focus should differ from TabView focus")
+  }
+
+  @Test("standalone Picker renders focus highlight when focusedIdentity matches")
+  func standalonePickerFocusHighlight() {
+    var env = EnvironmentValues()
+    env.focusedIdentity = testIdentity("Picker")
+
+    let focused = DefaultRenderer().render(
+      Picker("Options", selection: .constant("one")) {
+        Text("One").tag("one")
+        Text("Two").tag("two")
+      }
+      .pickerStyle(.segmented)
+      .id(testIdentity("Picker")),
+      context: .init(identity: testIdentity("Root"), environmentValues: env),
+      proposal: .init(width: 20, height: 4)
+    ).rasterSurface.styleRuns
+
+    let unfocused = DefaultRenderer().render(
+      Picker("Options", selection: .constant("one")) {
+        Text("One").tag("one")
+        Text("Two").tag("two")
+      }
+      .pickerStyle(.segmented)
+      .id(testIdentity("Picker")),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 20, height: 4)
+    ).rasterSurface.styleRuns
+
+    #expect(focused != unfocused,
+      "Standalone Picker styling should differ when focused")
+  }
+
+  @Test("segmented picker uses heavy border when focused")
+  func segmentedPickerUsesHeavyBorderWhenFocused() {
+    let unfocusedArtifacts = renderArtifacts()
+    let focusRegions = unfocusedArtifacts.semanticSnapshot.focusRegions
+    guard let pickerRegion = focusRegions.first(where: { $0.identity != testIdentity("Tabs") })
+    else {
+      Issue.record("Picker focus region not found")
+      return
+    }
+
+    let pickerFocusedArtifacts = renderArtifacts(focusedIdentity: pickerRegion.identity)
+    let focusedLines = pickerFocusedArtifacts.rasterSurface.lines
+
+    let hasHeavyBorder = focusedLines.contains { $0.contains("┏") || $0.contains("┗") }
+    #expect(hasHeavyBorder, "Focused segmented picker should use heavy border characters (┏┗)")
+
+    let unfocusedLines = unfocusedArtifacts.rasterSurface.lines
+    let unfocusedHasHeavy = unfocusedLines.contains { $0.contains("┏") || $0.contains("┗") }
+    #expect(!unfocusedHasHeavy, "Unfocused picker should not use heavy border characters")
+  }
+
+  // MARK: - RunLoop integration tests
+
+  @Test("Tab key in RunLoop moves focus and changes rendered frame styling")
+  func tabKeyRunLoopProducesDifferentFrame() throws {
+    let terminalSize = Size(width: 50, height: 10)
+    let terminal = FocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("FocusTransition")
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalAppearance = terminal.appearance
+    environmentValues.terminalSize = terminalSize
+
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: FocusTestInputReader(events: []),
+      signalReader: FocusTestSignalReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: focusTracker,
+      environmentValues: environmentValues,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in Self.tabViewWithPicker() }
+    )
+
+    focusTracker.invalidator = runLoop.scheduler as? (any Invalidating)
+
+    // Initial render
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+
+    let initialFocus = focusTracker.currentFocusIdentity
+    let initialStyles = terminal.latestSurface?.styleRuns ?? []
+    #expect(initialFocus != nil)
+
+    // Tab → focus should move to next control
+    _ = runLoop.handleKeyPress(KeyPress(.tab))
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let afterTabFocus = focusTracker.currentFocusIdentity
+    let afterTabStyles = terminal.latestSurface?.styleRuns ?? []
+
+    #expect(initialFocus != afterTabFocus, "Tab should move focus")
+    #expect(afterTabFocus != nil)
+    #expect(afterTabStyles != initialStyles,
+      "Rendered frame should change after Tab (focus highlight moved)")
+
+    // Shift-Tab → focus should move back
+    _ = runLoop.handleKeyPress(KeyPress(.tab, modifiers: .shift))
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let afterShiftTabFocus = focusTracker.currentFocusIdentity
+    let afterShiftTabStyles = terminal.latestSurface?.styleRuns ?? []
+
+    #expect(afterShiftTabFocus == initialFocus, "Shift-Tab should return to original")
+    #expect(afterShiftTabStyles != afterTabStyles,
+      "Shift-Tab frame should differ from Tab frame (focus moved back)")
+  }
+}
+
+// MARK: - Test support types
+
+private final class FocusTestTerminalHost: TerminalHosting {
+  var surfaceSize: Size { surfaceSizeProvider() }
+  let capabilityProfile: TerminalCapabilityProfile
+  let appearance: TerminalAppearance
+  var graphicsCapabilities: TerminalGraphicsCapabilities { .init() }
+  var theme: Theme? { nil }
+  private(set) var latestSurface: RasterSurface?
+  private let surfaceSizeProvider: () -> Size
+
+  init(
+    surfaceSizeProvider: @escaping () -> Size,
+    capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
+    appearance: TerminalAppearance = .fallback
+  ) {
+    self.surfaceSizeProvider = surfaceSizeProvider
+    self.capabilityProfile = capabilityProfile
+    self.appearance = appearance
+  }
+
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func write(_: String) throws {}
+  func clearScreen() throws {}
+  func moveCursor(to _: Point) throws {}
+
+  @discardableResult
+  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+    latestSurface = surface
+    return TerminalPresentationMetrics(bytesWritten: 0, linesTouched: surface.lines.count, cellsChanged: 0)
+  }
+}
+
+extension FocusTestTerminalHost: DamageAwareTerminalHosting {
+  func present(_ surface: RasterSurface, damage: PresentationDamage?) throws -> TerminalPresentationMetrics {
+    try present(surface)
+  }
+}
+
+private final class FocusTestInputReader: TerminalInputReading {
+  private let scriptedEvents: [InputEvent]
+  init(events: [InputEvent]) { scriptedEvents = events }
+  func inputEvents() -> AsyncStream<InputEvent> {
+    AsyncStream { cont in for e in scriptedEvents { cont.yield(e) }; cont.finish() }
+  }
+}
+
+private final class FocusTestSignalReader: SignalReading {
+  func events() -> AsyncStream<String> { AsyncStream { $0.finish() } }
+}
