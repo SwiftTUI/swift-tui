@@ -103,13 +103,15 @@ extension Button {
     case .plain:
       child = ButtonPlainBody(
         label: label,
-        chrome: chrome
+        chrome: chrome,
+        focusActive: isFocused && showsFocusEffect
       )
       .resolve(in: childContext)
     case .link:
       child = ButtonLinkBody(
         label: label,
-        chrome: chrome
+        chrome: chrome,
+        focusActive: isFocused && showsFocusEffect
       )
       .resolve(in: childContext)
     case .automatic, .bordered, .borderedProminent:
@@ -118,7 +120,8 @@ extension Button {
         chrome: chrome,
         buttonStyle: buttonStyle,
         prominence: effectiveProminence,
-        borderShape: context.environmentValues.buttonBorderShape
+        borderShape: context.environmentValues.buttonBorderShape,
+        focusActive: isFocused && showsFocusEffect
       )
       .resolve(in: childContext)
     }
@@ -140,24 +143,34 @@ extension Button {
 private struct ButtonPlainBody<Label: View>: View {
   var label: Label
   var chrome: ControlChrome
+  var focusActive: Bool
 
   var body: some View {
-    label
-      .foregroundStyle(chrome.foregroundStyle)
-      .drawMetadata(.init(opacity: chrome.opacity))
+    controlFocusRow(
+      showsRail: focusActive,
+      railStyle: chrome.borderStyle,
+      isHighlighted: focusActive,
+      backgroundStyle: chrome.backgroundStyle,
+      reservesRailSpaceWhenHidden: false
+    ) {
+      label
+    }
+    .foregroundStyle(chrome.foregroundStyle)
+    .drawMetadata(.init(opacity: chrome.opacity))
   }
 }
 
 private struct ButtonLinkBody<Label: View>: View {
   var label: Label
   var chrome: ControlChrome
+  var focusActive: Bool
 
   var body: some View {
     ButtonPlainBody(
-      label: label,
-      chrome: chrome
+      label: label.underline(),
+      chrome: chrome,
+      focusActive: focusActive
     )
-    .underline()
     .background {
       Rectangle().fill(chrome.backgroundStyle)
     }
@@ -170,6 +183,7 @@ private struct ButtonChromeBody<Label: View>: View {
   var buttonStyle: ButtonStyle
   var prominence: ControlProminence
   var borderShape: ButtonBorderShape
+  var focusActive: Bool
 
   private var usesDenseBorderlessChrome: Bool {
     buttonStyle != .bordered
@@ -187,7 +201,8 @@ private struct ButtonChromeBody<Label: View>: View {
     let styledLabel =
       ButtonPlainBody(
         label: label,
-        chrome: chrome
+        chrome: chrome,
+        focusActive: false
       )
       .padding(
         .init(
@@ -208,7 +223,8 @@ private struct ButtonChromeBody<Label: View>: View {
           ButtonChromeBorder(
             chrome: chrome,
             prominence: prominence,
-            borderShape: borderShape
+            borderShape: borderShape,
+            focusActive: focusActive
           )
         }
       }
@@ -250,18 +266,22 @@ private struct ButtonChromeBorder: View {
   var chrome: ControlChrome
   var prominence: ControlProminence
   var borderShape: ButtonBorderShape
+  var focusActive: Bool
 
   @ViewBuilder
   var body: some View {
+    let strokeStyle: StrokeStyle = focusActive ? .thick : .init()
     switch (borderShape, prominence) {
     case (.roundedRectangle, _), (.automatic, .increased):
       RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
         chrome.borderStyle,
+        style: strokeStyle,
         backgroundStyle: chrome.borderBackgroundStyle
       )
     default:
       Rectangle().chromeStrokeBorder(
         chrome.borderStyle,
+        style: strokeStyle,
         backgroundStyle: chrome.borderBackgroundStyle
       )
     }

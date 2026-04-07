@@ -133,6 +133,99 @@ struct FocusTransitionTests {
     #expect(!unfocusedHasHeavy, "Unfocused picker should not use heavy border characters")
   }
 
+  @Test("focused TextField uses heavy border")
+  func focusedTextFieldUsesHeavyBorder() {
+    var env = EnvironmentValues()
+    env.focusedIdentity = testIdentity("Field")
+
+    let focused = DefaultRenderer().render(
+      TextField("Name", text: .constant("hello"))
+        .textFieldStyle(.roundedBorder)
+        .id(testIdentity("Field")),
+      context: .init(identity: testIdentity("Root"), environmentValues: env),
+      proposal: .init(width: 20, height: 4)
+    )
+
+    let focusedLines = focused.rasterSurface.lines
+    let hasHeavy = focusedLines.contains { $0.contains("┏") || $0.contains("┗") }
+    #expect(hasHeavy, "Focused TextField should use heavy border")
+
+    let unfocused = DefaultRenderer().render(
+      TextField("Name", text: .constant("hello"))
+        .textFieldStyle(.roundedBorder)
+        .id(testIdentity("Field")),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 20, height: 4)
+    )
+
+    let unfocusedLines = unfocused.rasterSurface.lines
+    let unfocusedHasHeavy = unfocusedLines.contains { $0.contains("┏") || $0.contains("┗") }
+    #expect(!unfocusedHasHeavy, "Unfocused TextField should not use heavy border")
+  }
+
+  @Test("focused plain button shows focus rail")
+  func focusedPlainButtonShowsRail() {
+    var env = EnvironmentValues()
+    env.focusedIdentity = testIdentity("Btn")
+
+    let focused = DefaultRenderer().render(
+      Button("Submit") {}
+        .buttonStyle(.plain)
+        .id(testIdentity("Btn")),
+      context: .init(identity: testIdentity("Root"), environmentValues: env),
+      proposal: .init(width: 14, height: 1)
+    )
+
+    let focusedLines = focused.rasterSurface.lines
+    let hasRail = focusedLines.contains { $0.contains("▌") }
+    #expect(hasRail, "Focused plain button should show focus rail (▌)")
+  }
+
+  @Test("focused bordered button uses heavy border")
+  func focusedBorderedButtonUsesHeavyBorder() {
+    var env = EnvironmentValues()
+    env.focusedIdentity = testIdentity("Btn")
+
+    let focused = DefaultRenderer().render(
+      Button("Submit") {}
+        .buttonStyle(.bordered)
+        .id(testIdentity("Btn")),
+      context: .init(identity: testIdentity("Root"), environmentValues: env),
+      proposal: .init(width: 14, height: 3)
+    )
+
+    let focusedLines = focused.rasterSurface.lines
+    let hasHeavy = focusedLines.contains { $0.contains("┏") || $0.contains("┗") }
+    #expect(hasHeavy, "Focused bordered button should use heavy border")
+  }
+
+  @Test("focused TabView adds heavy top rule above tab strip")
+  func focusedTabViewAddsTopRule() {
+    var env = EnvironmentValues()
+    env.focusedIdentity = testIdentity("Tabs")
+
+    let focused = DefaultRenderer().render(
+      Self.tabViewWithPicker(),
+      context: .init(identity: testIdentity("Root"), environmentValues: env),
+      proposal: .init(width: 50, height: 12)
+    )
+
+    let unfocused = DefaultRenderer().render(
+      Self.tabViewWithPicker(),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 50, height: 12)
+    )
+
+    // Focused should have more style runs on the first line (the accent rule)
+    let focusedFirstLineStyles = focused.rasterSurface.styleRuns.filter { $0.y == 0 }
+    let unfocusedFirstLineStyles = unfocused.rasterSurface.styleRuns.filter { $0.y == 0 }
+
+    #expect(
+      focusedFirstLineStyles != unfocusedFirstLineStyles,
+      "Focused TabView first line should differ from unfocused (accent rule added)"
+    )
+  }
+
   // MARK: - RunLoop integration tests
 
   @Test("Tab key in RunLoop moves focus and changes rendered frame styling")

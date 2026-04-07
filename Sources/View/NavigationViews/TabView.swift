@@ -154,6 +154,15 @@ extension TabView {
 
     let hasRule = tabStyle != .powerline
     VStack(alignment: .leading, spacing: 0) {
+      if focusActive {
+        HStack(alignment: .top, spacing: 0) {
+          Spacer(minLength: 0)
+        }
+        .frame(height: 1)
+        .overlay {
+          Rectangle().fill(AnyShapeStyle(.terminalAccent(activeTone)))
+        }
+      }
       HStack(alignment: .top, spacing: 0) {
         ForEach(options.indices, id: \.self) { index in
           let option = options[index]
@@ -184,7 +193,7 @@ extension TabView {
         }
         Spacer(minLength: 0)
       }
-      .frame(height: hasRule ? 2 : 1, alignment: .leading)
+      .frame(height: (hasRule ? 2 : 1) + (focusActive ? 1 : 0), alignment: .leading)
       .background {
         if focusActive {
           Rectangle()

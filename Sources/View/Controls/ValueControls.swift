@@ -167,7 +167,8 @@ package func textEntryFieldBody<Label: View>(
   showsLabel: Bool,
   style: TextFieldStyle,
   chrome: ControlChrome,
-  placeholderStyle: AnyShapeStyle
+  placeholderStyle: AnyShapeStyle,
+  focusActive: Bool = false
 ) -> some View {
   let textStyle =
     isShowingPrompt ? placeholderStyle : chrome.foregroundStyle
@@ -196,6 +197,7 @@ package func textEntryFieldBody<Label: View>(
         .overlay {
           RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
             chrome.borderStyle,
+            style: focusActive ? .thick : .init(),
             backgroundStyle: chrome.borderBackgroundStyle
           )
         }
@@ -298,7 +300,8 @@ extension TextField {
       showsLabel: showsLabel,
       style: effectiveStyle,
       chrome: chrome,
-      placeholderStyle: styleEnvironment.themeStyle(for: .placeholder)
+      placeholderStyle: styleEnvironment.themeStyle(for: .placeholder),
+      focusActive: isFocused && showsFocusEffect
     ).resolve(
       in: context.child(component: .named("TextFieldBody"))
     )

@@ -49,7 +49,8 @@ extension TextEditor {
     let child = textEditorBody(
       displayText: entryText.displayText,
       chrome: chrome,
-      scrollPosition: $scrollPosition
+      scrollPosition: $scrollPosition,
+      focusActive: isFocused && showsFocusEffect
     ).resolve(
       in: context.child(component: .named("TextEditorBody"))
     )
