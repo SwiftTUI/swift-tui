@@ -9,7 +9,9 @@
       "Bash(ls /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/*.swift)",
       "Read(//tmp/**)",
       "Bash(find:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(ls -1 /Users/adamz/Developer/repos/swift-terminal-ui/Sources/Core/*.swift)",
+      "Bash(ls -1 /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/*.swift)"
     ]
   }
 }

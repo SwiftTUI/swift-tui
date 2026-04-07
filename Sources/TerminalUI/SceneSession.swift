@@ -11,6 +11,7 @@ import View
   @_spi(Runners) public let scheduler: any FrameScheduling
   @_spi(Runners) public let surfaceName: String
   @_spi(Runners) public let environmentValues: [String: String]
+  @_spi(Runners) public let diagnosticsLogger: FrameDiagnosticsLogger?
 
   @_spi(Runners) public init(
     terminalHost: any TerminalHosting,
@@ -18,7 +19,8 @@ import View
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
     surfaceName: String = "terminal",
-    environmentValues: [String: String] = [:]
+    environmentValues: [String: String] = [:],
+    diagnosticsLogger: FrameDiagnosticsLogger? = nil
   ) {
     self.terminalHost = terminalHost
     self.terminalInputReader = terminalInputReader
@@ -26,6 +28,7 @@ import View
     self.scheduler = scheduler
     self.surfaceName = surfaceName
     self.environmentValues = environmentValues
+    self.diagnosticsLogger = diagnosticsLogger
   }
 }
 
@@ -67,6 +70,7 @@ import View
         WindowHostView(content: configuration.makeScopedRootView())
       }
     )
+    runLoop.diagnosticsLogger = resources.diagnosticsLogger
 
     return try await runLoop.run()
   }

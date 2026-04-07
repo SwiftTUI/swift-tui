@@ -34,6 +34,13 @@ final class SceneRuntime {
     self.isPrimary = isPrimary
     self.lifecycle = SceneLifecycle(isPrimary: isPrimary)
 
+    let diagnosticsLogger: FrameDiagnosticsLogger? =
+      if isPrimary, let path = Self.diagnosticsFilePath() {
+        FrameDiagnosticsLogger(path: path)
+      } else {
+        nil
+      }
+
     if let resources {
       ptyPair = nil
       self.resources = resources
@@ -42,7 +49,8 @@ final class SceneRuntime {
       self.resources = SceneSessionResources(
         terminalHost: TerminalHost(),
         terminalInputReader: InputReader(),
-        signalReader: defaultSignalReader()
+        signalReader: defaultSignalReader(),
+        diagnosticsLogger: diagnosticsLogger
       )
     } else {
       let pty = try PtyPair()
@@ -126,6 +134,25 @@ final class SceneRuntime {
       stateContainer: stateContainer,
       focusTracker: focusTracker
     )
+  }
+
+  /// Returns a diagnostics output file path when the `TERMUI_DIAGNOSTICS`
+  /// environment variable is set. A value of `1` or `true` writes to
+  /// `/tmp/termui-diagnostics.tsv`; any other truthy value is treated as a
+  /// custom file path.
+  private static func diagnosticsFilePath() -> String? {
+    guard let value = unsafe getenv("TERMUI_DIAGNOSTICS") else {
+      return nil
+    }
+    let string = unsafe String(cString: value)
+    switch string.lowercased() {
+    case "", "0", "false", "no":
+      return nil
+    case "1", "true", "yes":
+      return "/tmp/termui-diagnostics.tsv"
+    default:
+      return string
+    }
   }
 
   private func waitForClient(

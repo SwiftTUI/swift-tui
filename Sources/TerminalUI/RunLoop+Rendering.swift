@@ -89,14 +89,18 @@ extension RunLoop {
         } else {
           artifacts.presentationDamage
         }
+      let presentClock = ContinuousClock()
+      let presentStart = presentClock.now
+      var presentationMetrics = TerminalPresentationMetrics()
       if let damageAwareHost = terminalHost as? any DamageAwareTerminalHosting {
-        try damageAwareHost.present(
+        presentationMetrics = try damageAwareHost.present(
           artifacts.rasterSurface,
           damage: presentationDamage
         )
       } else {
-        try terminalHost.present(artifacts.rasterSurface)
+        presentationMetrics = try terminalHost.present(artifacts.rasterSurface)
       }
+      let presentationDuration = presentStart.duration(to: presentClock.now)
       lifecycleCoordinator.applyCommittedFrame(
         plan: artifacts.commitPlan,
         currentLifecycleRegistry: localLifecycleRegistry,
@@ -114,6 +118,46 @@ extension RunLoop {
         keeping: renderer.liveIdentitySnapshot()
       )
       renderedFrames += 1
+
+      if let diagnosticsLogger {
+        let diag = artifacts.diagnostics
+        let cacheMetrics = diag.measurementCache
+        let cacheHitRate: Double? =
+          if let cacheMetrics, cacheMetrics.lookups > 0 {
+            Double(cacheMetrics.hits) / Double(cacheMetrics.lookups)
+          } else {
+            nil
+          }
+        let pipelineTotal = diag.phaseTimings?.total ?? .zero
+        diagnosticsLogger.log(
+          FrameDiagnosticRecord(
+            frameNumber: renderedFrames,
+            causeSummary: causeSummary,
+            focusSyncRerenders: focusSyncBudget.rerenderCount,
+            invalidatedIdentityCount: diag.invalidatedIdentities.count,
+            resolvedNodeCount: diag.resolvedNodeCount,
+            resolvedNodesComputed: diag.resolvedNodesComputed,
+            resolvedNodesReused: diag.resolvedNodesReused,
+            measuredNodeCount: diag.measuredNodeCount,
+            measuredNodesComputed: diag.measuredNodesComputed,
+            measuredNodesReused: diag.measuredNodesReused,
+            placedNodeCount: diag.placedNodeCount,
+            drawNodeCount: diag.drawNodeCount,
+            interactionRegionCount: diag.interactionRegionCount,
+            focusRegionCount: diag.focusRegionCount,
+            phaseTimings: diag.phaseTimings,
+            presentationStrategy: presentationMetrics.strategy == .fullRepaint
+              ? "full" : "incremental",
+            presentationBytesWritten: presentationMetrics.bytesWritten,
+            presentationLinesTouched: presentationMetrics.linesTouched,
+            presentationCellsChanged: presentationMetrics.cellsChanged,
+            presentationDuration: presentationDuration,
+            damageRowCount: presentationDamage.map(\.dirtyRows.count),
+            measurementCacheHitRate: cacheHitRate,
+            totalFrameDuration: pipelineTotal + presentationDuration
+          )
+        )
+      }
 
       if let transientPressedIdentity,
         transientPressedIdentity == pressedIdentity
