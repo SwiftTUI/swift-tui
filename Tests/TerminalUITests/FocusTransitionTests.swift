@@ -199,8 +199,8 @@ struct FocusTransitionTests {
     #expect(hasHeavy, "Focused bordered button should use heavy border")
   }
 
-  @Test("focused TabView adds heavy top rule above tab strip")
-  func focusedTabViewAddsTopRule() {
+  @Test("focused TabView promotes tab underlines to heavy")
+  func focusedTabViewPromotesUnderlines() {
     var env = EnvironmentValues()
     env.focusedIdentity = testIdentity("Tabs")
 
@@ -216,14 +216,21 @@ struct FocusTransitionTests {
       proposal: .init(width: 50, height: 12)
     )
 
-    // Focused should have more style runs on the first line (the accent rule)
-    let focusedFirstLineStyles = focused.rasterSurface.styleRuns.filter { $0.y == 0 }
-    let unfocusedFirstLineStyles = unfocused.rasterSurface.styleRuns.filter { $0.y == 0 }
+    let focusedLines = focused.rasterSurface.lines
+    let unfocusedLines = unfocused.rasterSurface.lines
 
-    #expect(
-      focusedFirstLineStyles != unfocusedFirstLineStyles,
-      "Focused TabView first line should differ from unfocused (accent rule added)"
-    )
+    // Unfocused: unselected tabs use light underline ─
+    let unfocusedRuleLine = unfocusedLines.first { $0.contains("─") } ?? ""
+    #expect(unfocusedRuleLine.contains("─"), "Unfocused tabs should have light underline")
+
+    // Focused: all tabs promoted to heavy ━ (no light ─ remaining in the rule line)
+    let focusedRuleLine = focusedLines.first { $0.contains("━") } ?? ""
+    #expect(focusedRuleLine.contains("━"), "Focused tabs should have heavy underline")
+    // The rule line should not contain light dashes when focused
+    let focusedHasLight = focusedLines.contains { line in
+      line.contains("─") && line.contains("━")
+    }
+    #expect(!focusedHasLight, "Focused tab strip should not mix heavy and light underlines")
   }
 
   // MARK: - RunLoop integration tests
