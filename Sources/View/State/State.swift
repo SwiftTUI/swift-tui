@@ -53,10 +53,18 @@ package func withAuthoringContext<Result>(
 @MainActor
 package final class AuthoringOrdinalTracker {
   private(set) var nextOrdinal = 0
+  private var frozen = false
 
   package init() {}
 
-  package func claimOrdinal() -> Int {
+  /// Prevents new ordinal claims.  Existing cached ordinals on `StateBox`
+  /// instances are unaffected — only first-time claims are blocked.
+  package func freeze() {
+    frozen = true
+  }
+
+  package func claimOrdinal() -> Int? {
+    guard !frozen else { return nil }
     defer {
       nextOrdinal += 1
     }
@@ -128,7 +136,9 @@ private final class StateBox<Value> {
     guard let context else {
       return nil
     }
-    let ordinal = context.ordinalTracker.claimOrdinal()
+    guard let ordinal = context.ordinalTracker.claimOrdinal() else {
+      return nil
+    }
     self.ordinal = ordinal
     return ordinal
   }

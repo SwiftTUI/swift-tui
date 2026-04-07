@@ -93,7 +93,9 @@ private final class FocusStateBox<Value: Equatable> {
     guard let context else {
       return nil
     }
-    let ordinal = context.ordinalTracker.claimOrdinal()
+    guard let ordinal = context.ordinalTracker.claimOrdinal() else {
+      return nil
+    }
     self.ordinal = ordinal
     return ordinal
   }

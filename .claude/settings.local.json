@@ -8,7 +8,8 @@
       "Bash(grep:*)",
       "Bash(ls /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/*.swift)",
       "Read(//tmp/**)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git stash:*)"
     ]
   }
 }

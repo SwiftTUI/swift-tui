@@ -54,7 +54,7 @@ private struct BoolDefaultFocusModifier<Content: View>: View, ResolvableView {
   ) -> Bool {
     guard
       let authoringContext = currentAuthoringContext(),
-      let ordinal = authoringContext.ordinalTracker.claimOrdinal() as Int?,
+      let ordinal = authoringContext.ordinalTracker.claimOrdinal(),
       let viewNode = authoringContext.viewNode
     else {
       return true
@@ -101,7 +101,7 @@ private struct OptionalDefaultFocusModifier<Content: View, Value: Hashable>: Vie
   ) -> Bool {
     guard
       let authoringContext = currentAuthoringContext(),
-      let ordinal = authoringContext.ordinalTracker.claimOrdinal() as Int?,
+      let ordinal = authoringContext.ordinalTracker.claimOrdinal(),
       let viewNode = authoringContext.viewNode
     else {
       return true
