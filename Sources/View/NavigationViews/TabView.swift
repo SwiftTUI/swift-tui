@@ -154,15 +154,6 @@ extension TabView {
 
     let hasRule = tabStyle != .powerline
     VStack(alignment: .leading, spacing: 0) {
-      if focusActive {
-        HStack(alignment: .top, spacing: 0) {
-          Spacer(minLength: 0)
-        }
-        .frame(height: 1)
-        .overlay {
-          Rectangle().fill(AnyShapeStyle(.terminalAccent(activeTone)))
-        }
-      }
       HStack(alignment: .top, spacing: 0) {
         ForEach(options.indices, id: \.self) { index in
           let option = options[index]
@@ -185,6 +176,7 @@ extension TabView {
                 tabItemRuleSegment(
                   label: option.label.displayText,
                   isSelected: isSelected,
+                  isFocused: focusActive,
                   style: tabStyle
                 )
               }
@@ -193,7 +185,7 @@ extension TabView {
         }
         Spacer(minLength: 0)
       }
-      .frame(height: (hasRule ? 2 : 1) + (focusActive ? 1 : 0), alignment: .leading)
+      .frame(height: hasRule ? 2 : 1, alignment: .leading)
       .background {
         if focusActive {
           Rectangle()
@@ -263,6 +255,7 @@ extension TabView {
   private func tabItemRuleSegment(
     label: String,
     isSelected: Bool,
+    isFocused: Bool,
     style: TabViewStyle
   ) -> some View {
     let resolvedStyle = style == .automatic ? TabViewStyle.underline : style
@@ -270,12 +263,14 @@ extension TabView {
     case .automatic, .underline:
       underlineRuleSegment(
         label: label,
-        isSelected: isSelected
+        isSelected: isSelected,
+        isFocused: isFocused
       )
     case .rounded:
       roundedRuleSegment(
         label: label,
-        isSelected: isSelected
+        isSelected: isSelected,
+        isFocused: isFocused
       )
     case .powerline:
       EmptyView()
@@ -284,15 +279,13 @@ extension TabView {
 
   private func underlineRuleSegment(
     label: String,
-    isSelected: Bool
+    isSelected: Bool,
+    isFocused: Bool
   ) -> some View {
     let width = tabLabelCellWidth(label)
+    let heavy = isSelected || isFocused
     let text =
-      if isSelected {
-        "\(String(repeating: "━", count: width)) "
-      } else {
-        "\(String(repeating: "─", count: width)) "
-      }
+      "\(String(repeating: heavy ? "━" : "─", count: width)) "
     return Text(text)
       .lineLimit(1)
       .foregroundStyle(.separator)
@@ -324,12 +317,16 @@ extension TabView {
 
   private func roundedRuleSegment(
     label: String,
-    isSelected: Bool
+    isSelected: Bool,
+    isFocused: Bool
   ) -> some View {
     let width = tabLabelCellWidth(label)
     let text =
       if isSelected {
-        "╰" + String(repeating: "─", count: width) + "╯"
+        (isFocused ? "┗" : "╰") + String(repeating: isFocused ? "━" : "─", count: width)
+          + (isFocused ? "┛" : "╯")
+      } else if isFocused {
+        " " + String(repeating: "━", count: width) + " "
       } else {
         " " + String(repeating: "─", count: width) + " "
       }

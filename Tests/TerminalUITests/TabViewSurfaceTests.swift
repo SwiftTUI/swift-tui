@@ -76,20 +76,6 @@ struct TabViewSurfaceTests {
     )
   }
 
-  // When focused, a 1-row accent rule is prepended above the strip, shifting the
-  // strip wash down by 1 row and increasing the strip height by 1.
-  private func focusedStripBounds(
-    for style: TabViewStyle
-  ) -> Rect {
-    Rect(
-      origin: .init(x: 0, y: 1),
-      size: .init(
-        width: 40,
-        height: style == .powerline ? 2 : 3
-      )
-    )
-  }
-
   @Test("TabView resolves typed labels into semantics and strip chrome")
   func tabViewResolvesTypedLabels() throws {
     let artifacts = DefaultRenderer().render(
@@ -117,15 +103,13 @@ struct TabViewSurfaceTests {
     #expect(artifacts.resolvedTree.semanticMetadata.presentationRole == .tabView)
   }
 
-  @Test("focused tabs keep legacy strip text and add a strip-level focus wash")
+  @Test("focused tabs keep tab label text and add a strip-level focus wash")
   func focusedTabsUseStripLevelFocusWash() {
     let focusedUnderlineArtifacts = renderTabArtifacts(style: .underline, focused: true)
     let focusedRoundedArtifacts = renderTabArtifacts(style: .rounded, focused: true)
     let focusedPowerlineArtifacts = renderTabArtifacts(style: .powerline, focused: true)
 
-    // Focused surfaces include a 1-row accent rule above the strip, so the visible
-    // text content shifts down by one row compared to the unfocused layout. The tab
-    // labels must still appear somewhere in the focused surface.
+    // Tab labels must still be present (underlines may change weight when focused)
     let focusedUnderlineText = normalizedVisibleText(focusedUnderlineArtifacts.rasterSurface.lines)
     let focusedRoundedText = normalizedVisibleText(focusedRoundedArtifacts.rasterSurface.lines)
     let focusedPowerlineText = normalizedVisibleText(focusedPowerlineArtifacts.rasterSurface.lines)
@@ -134,19 +118,13 @@ struct TabViewSurfaceTests {
     #expect(focusedPowerlineText.contains("Home · 3"))
 
     #expect(
-      hasFillCommand(
-        in: focusedUnderlineArtifacts.drawTree,
-        bounds: focusedStripBounds(for: .underline)
-      ))
+      hasFillCommand(in: focusedUnderlineArtifacts.drawTree, bounds: stripBounds(for: .underline)))
     #expect(
-      hasFillCommand(
-        in: focusedRoundedArtifacts.drawTree,
-        bounds: focusedStripBounds(for: .rounded)
-      ))
+      hasFillCommand(in: focusedRoundedArtifacts.drawTree, bounds: stripBounds(for: .rounded)))
     #expect(
       hasFillCommand(
         in: focusedPowerlineArtifacts.drawTree,
-        bounds: focusedStripBounds(for: .powerline)
+        bounds: stripBounds(for: .powerline)
       )
     )
   }
