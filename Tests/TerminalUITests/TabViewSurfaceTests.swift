@@ -52,7 +52,7 @@ struct TabViewSurfaceTests {
         identity: testIdentity("Root"),
         environmentValues: environmentValues
       ),
-      proposal: .init(width: 40, height: 4)
+      proposal: .init(width: 80, height: 4)
     )
   }
 
@@ -70,7 +70,7 @@ struct TabViewSurfaceTests {
     Rect(
       origin: .zero,
       size: .init(
-        width: 40,
+        width: 80,
         height: style == .powerline ? 1 : 2
       )
     )

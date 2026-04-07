@@ -282,13 +282,15 @@ extension TabView {
     isSelected: Bool,
     isFocused: Bool
   ) -> some View {
-    let width = tabLabelCellWidth(label)
+    let baseWidth = tabLabelCellWidth(label)
+    let width = isFocused ? baseWidth * 2 : baseWidth
     let heavy = isSelected || isFocused
+    let foreground: AnyShapeStyle = isFocused ? AnyShapeStyle(.terminalAccent(.accent)) : .semantic(.separator)
     let text =
       "\(String(repeating: heavy ? "━" : "─", count: width)) "
     return Text(text)
       .lineLimit(1)
-      .foregroundStyle(.separator)
+      .foregroundStyle(foreground)
       .frame(height: 1, alignment: .leading)
   }
 
@@ -320,7 +322,9 @@ extension TabView {
     isSelected: Bool,
     isFocused: Bool
   ) -> some View {
-    let width = tabLabelCellWidth(label)
+    let baseWidth = tabLabelCellWidth(label)
+    let width = isFocused ? baseWidth * 2 : baseWidth
+    let foreground: AnyShapeStyle = isFocused ? AnyShapeStyle(.terminalAccent(.accent)) : .semantic(.separator)
     let text =
       if isSelected {
         (isFocused ? "┗" : "╰") + String(repeating: isFocused ? "━" : "─", count: width)
@@ -332,7 +336,7 @@ extension TabView {
       }
     return Text(text)
       .lineLimit(1)
-      .foregroundStyle(.separator)
+      .foregroundStyle(foreground)
       .frame(height: 1, alignment: .leading)
   }
 
