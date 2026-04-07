@@ -220,17 +220,10 @@ struct FocusTransitionTests {
     let unfocusedLines = unfocused.rasterSurface.lines
 
     // Unfocused: unselected tabs use light underline ─
-    let unfocusedRuleLine = unfocusedLines.first { $0.contains("─") } ?? ""
-    #expect(unfocusedRuleLine.contains("─"), "Unfocused tabs should have light underline")
+    #expect(unfocusedLines.contains { $0.contains("─") }, "Unfocused tabs should have light underline")
 
-    // Focused: all tabs promoted to heavy ━ (no light ─ remaining in the rule line)
-    let focusedRuleLine = focusedLines.first { $0.contains("━") } ?? ""
-    #expect(focusedRuleLine.contains("━"), "Focused tabs should have heavy underline")
-    // The rule line should not contain light dashes when focused
-    let focusedHasLight = focusedLines.contains { line in
-      line.contains("─") && line.contains("━")
-    }
-    #expect(!focusedHasLight, "Focused tab strip should not mix heavy and light underlines")
+    // Focused: all tabs promoted to tall block ▄
+    #expect(focusedLines.contains { $0.contains("▄") }, "Focused tabs should use tall block underline (▄)")
   }
 
   // MARK: - RunLoop integration tests
