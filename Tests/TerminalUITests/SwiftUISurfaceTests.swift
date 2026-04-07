@@ -350,7 +350,7 @@ struct SwiftUISurfaceTests {
     #expect(resolved.kind == .view("VStack"))
     #expect(resolved.children.count == 4)
     #expect(resolved.children[0].identity == testIdentity("Root", "VStack[0]"))
-    #expect(resolved.children[1].identity == testIdentity("Root", "VStack[1]"))
+    #expect(resolved.children[1].identity == testIdentity("Root", "true", "VStack[1]"))
     #expect(resolved.children[2].identity == testIdentity("Root", "VStack[2]", "Group[0]"))
     #expect(resolved.children[3].identity == testIdentity("Root", "VStack[2]", "Group[2]"))
   }
@@ -479,15 +479,16 @@ struct SwiftUISurfaceTests {
     let shown = Resolver().resolve(makeRoot(true), in: .init(identity: testIdentity("Root")))
     let hidden = Resolver().resolve(makeRoot(false), in: .init(identity: testIdentity("Root")))
 
-    #expect(shown.identity == testIdentity("Root", "Group[0]"))
-    #expect(hidden.identity == testIdentity("Root", "Group[0]"))
-    #expect(shown.lifecycleMetadata.appearHandlerIDs == ["Root/Group[0]#appear[0]"])
-    #expect(hidden.lifecycleMetadata.appearHandlerIDs == ["Root/Group[0]#appear[0]"])
+    #expect(shown.identity == testIdentity("Root", "true", "Group[0]"))
+    #expect(hidden.identity == testIdentity("Root", "false", "Group[0]"))
+    #expect(shown.lifecycleMetadata.appearHandlerIDs == ["Root/true/Group[0]#appear[0]"])
+    #expect(hidden.lifecycleMetadata.appearHandlerIDs == ["Root/false/Group[0]#appear[0]"])
     #expect(
-      shown.lifecycleMetadata.task == .init(id: "Root/Group[0]#task[\"shown\"]", priority: .medium))
+      shown.lifecycleMetadata.task
+        == .init(id: "Root/true/Group[0]#task[\"shown\"]", priority: .medium))
     #expect(
       hidden.lifecycleMetadata.task
-        == .init(id: "Root/Group[0]#task[\"hidden\"]", priority: .medium))
+        == .init(id: "Root/false/Group[0]#task[\"hidden\"]", priority: .medium))
   }
 
   @Test(
@@ -527,36 +528,39 @@ struct SwiftUISurfaceTests {
     #expect(
       shownArtifacts.commitPlan.lifecycle == [
         .init(
-          identity: testIdentity("Root", "VStack[0]"),
-          operation: .appear(handlerIDs: ["Root/VStack[0]#appear[0]"])
+          identity: testIdentity("Root", "true", "VStack[0]"),
+          operation: .appear(handlerIDs: ["Root/true/VStack[0]#appear[0]"])
         ),
         .init(
-          identity: testIdentity("Root", "VStack[0]"),
-          operation: .taskStart(.init(id: "Root/VStack[0]#task[\"load\"]", priority: .medium))
+          identity: testIdentity("Root", "true", "VStack[0]"),
+          operation: .taskStart(.init(id: "Root/true/VStack[0]#task[\"load\"]", priority: .medium))
         ),
       ]
     )
     #expect(
       updatedTaskArtifacts.commitPlan.lifecycle == [
         .init(
-          identity: testIdentity("Root", "VStack[0]"),
-          operation: .taskCancel(.init(id: "Root/VStack[0]#task[\"load\"]", priority: .medium))
+          identity: testIdentity("Root", "true", "VStack[0]"),
+          operation: .taskCancel(
+            .init(id: "Root/true/VStack[0]#task[\"load\"]", priority: .medium))
         ),
         .init(
-          identity: testIdentity("Root", "VStack[0]"),
-          operation: .taskStart(.init(id: "Root/VStack[0]#task[\"refresh\"]", priority: .medium))
+          identity: testIdentity("Root", "true", "VStack[0]"),
+          operation: .taskStart(
+            .init(id: "Root/true/VStack[0]#task[\"refresh\"]", priority: .medium))
         ),
       ]
     )
     #expect(
       removedArtifacts.commitPlan.lifecycle == [
         .init(
-          identity: testIdentity("Root", "VStack[0]"),
-          operation: .taskCancel(.init(id: "Root/VStack[0]#task[\"refresh\"]", priority: .medium))
+          identity: testIdentity("Root", "true", "VStack[0]"),
+          operation: .taskCancel(
+            .init(id: "Root/true/VStack[0]#task[\"refresh\"]", priority: .medium))
         ),
         .init(
-          identity: testIdentity("Root", "VStack[0]"),
-          operation: .disappear(handlerIDs: ["Root/VStack[0]#disappear[0]"])
+          identity: testIdentity("Root", "true", "VStack[0]"),
+          operation: .disappear(handlerIDs: ["Root/true/VStack[0]#disappear[0]"])
         ),
       ]
     )

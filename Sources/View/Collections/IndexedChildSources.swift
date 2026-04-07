@@ -122,9 +122,11 @@ extension ConditionalContent: IndexedChildSourceView {
   ) -> (any IndexedChildSource)? {
     switch storage {
     case .trueContent(let content):
-      return makeIndexedChildSource(from: content, in: childContext)
+      let branchContext = childContext.child(component: .init(rawValue: "true"))
+      return makeIndexedChildSource(from: content, in: branchContext)
     case .falseContent(let content):
-      return makeIndexedChildSource(from: content, in: childContext)
+      let branchContext = childContext.child(component: .init(rawValue: "false"))
+      return makeIndexedChildSource(from: content, in: branchContext)
     }
   }
 }

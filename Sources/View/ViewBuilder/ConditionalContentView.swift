@@ -34,9 +34,10 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
   ) {
     switch storage {
     case .trueContent(let content):
+      let branchContext = context.child(component: .init(rawValue: "true"))
       appendDeclaredChildNodes(
         content,
-        in: context,
+        in: branchContext,
         kindName: kindName,
         nextIndex: &nextIndex,
         into: &resolved
@@ -45,9 +46,10 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
       if collapsesImplicitEmptyFalseBranch, content is EmptyView {
         return
       }
+      let branchContext = context.child(component: .init(rawValue: "false"))
       appendDeclaredChildNodes(
         content,
-        in: context,
+        in: branchContext,
         kindName: kindName,
         nextIndex: &nextIndex,
         into: &resolved
@@ -58,12 +60,14 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     switch storage {
     case .trueContent(let content):
-      return resolveViewElements(content, in: context)
+      let branchContext = context.child(component: .init(rawValue: "true"))
+      return resolveViewElements(content, in: branchContext)
     case .falseContent(let content):
       if collapsesImplicitEmptyFalseBranch, content is EmptyView {
         return []
       }
-      return resolveViewElements(content, in: context)
+      let branchContext = context.child(component: .init(rawValue: "false"))
+      return resolveViewElements(content, in: branchContext)
     }
   }
 
