@@ -1046,7 +1046,7 @@ public struct LayoutEngine: Sendable {
       let previousResolved = retainedLayout.resolvedNode(for: resolved.identity),
       let previousMeasured = retainedLayout.measuredNode(for: resolved.identity),
       let previousPlaced = retainedLayout.placedNode(for: resolved.identity),
-      previousResolved.isEquivalentForMeasurement(to: resolved)
+      previousResolved.isEquivalentForPlacement(to: resolved)
     else {
       return nil
     }

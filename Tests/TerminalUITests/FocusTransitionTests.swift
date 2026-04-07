@@ -230,6 +230,138 @@ struct FocusTransitionTests {
 
   // MARK: - RunLoop integration tests
 
+  @Test("Tab/Shift-Tab transitions update both controls' focus highlights correctly")
+  func tabTransitionsUpdateBothHighlights() throws {
+    let terminalSize = Size(width: 50, height: 10)
+    let terminal = FocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("HighlightSync")
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalAppearance = terminal.appearance
+    environmentValues.terminalSize = terminalSize
+
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: FocusTestInputReader(events: []),
+      signalReader: FocusTestSignalReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: focusTracker,
+      environmentValues: environmentValues,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in Self.tabViewWithPicker() }
+    )
+
+    focusTracker.invalidator = runLoop.scheduler as? (any Invalidating)
+
+    // Initial render — TabView gets focus by default
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+
+    let tabViewIdentity = testIdentity("Tabs")
+    #expect(focusTracker.currentFocusIdentity == tabViewIdentity,
+      "Initial focus should be on TabView")
+
+    // State 1: TabView focused → tab strip has focus indicators, Picker has no heavy border
+    var lines = terminal.latestSurface!.lines
+    let state1TabHasFocusBlock = lines.contains { $0.contains("▄") || $0.contains("▂") }
+    #expect(state1TabHasFocusBlock,
+      "State 1: Focused TabView should show focus block characters in underline")
+    #expect(!lines.contains { $0.contains("┏") || $0.contains("┗") },
+      "State 1: Picker should NOT show heavy border when TabView is focused")
+
+    // Tab → focus moves to Picker
+    _ = runLoop.handleKeyPress(KeyPress(.tab))
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let pickerIdentity = focusTracker.currentFocusIdentity
+    #expect(pickerIdentity != tabViewIdentity,
+      "After Tab, focus should have moved away from TabView")
+
+    // State 2: Picker focused → Picker SHOULD have heavy border
+    lines = terminal.latestSurface!.lines
+    #expect(lines.contains { $0.contains("┏") || $0.contains("┗") },
+      "State 2: Picker SHOULD show heavy border when focused")
+
+    // Shift-Tab → focus moves back to TabView
+    _ = runLoop.handleKeyPress(KeyPress(.tab, modifiers: .shift))
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    #expect(focusTracker.currentFocusIdentity == tabViewIdentity,
+      "After Shift-Tab, focus should return to TabView")
+
+    // State 3: TabView focused again → Picker should NOT have heavy border
+    lines = terminal.latestSurface!.lines
+    #expect(!lines.contains { $0.contains("┏") || $0.contains("┗") },
+      "State 3: Picker should NOT show heavy border after losing focus")
+  }
+
+  @Test("Multiple rapid Tab/Shift-Tab cycles maintain correct highlights")
+  func multipleRapidCyclesMaintainHighlights() throws {
+    let terminalSize = Size(width: 50, height: 10)
+    let terminal = FocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("RapidCycles")
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalAppearance = terminal.appearance
+    environmentValues.terminalSize = terminalSize
+
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: FocusTestInputReader(events: []),
+      signalReader: FocusTestSignalReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: focusTracker,
+      environmentValues: environmentValues,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in Self.tabViewWithPicker() }
+    )
+
+    focusTracker.invalidator = runLoop.scheduler as? (any Invalidating)
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+
+    let tabViewIdentity = testIdentity("Tabs")
+
+    for cycle in 1...5 {
+      // Tab → Picker
+      _ = runLoop.handleKeyPress(KeyPress(.tab))
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+      #expect(focusTracker.currentFocusIdentity != tabViewIdentity,
+        "Cycle \(cycle): After Tab, focus should be on Picker")
+
+      var lines = terminal.latestSurface!.lines
+      #expect(!lines.contains { $0.contains("▄") },
+        "Cycle \(cycle) after Tab: TabView should NOT show ▄")
+      #expect(lines.contains { $0.contains("┏") || $0.contains("┗") },
+        "Cycle \(cycle) after Tab: Picker SHOULD show heavy border")
+
+      // Shift-Tab → TabView
+      _ = runLoop.handleKeyPress(KeyPress(.tab, modifiers: .shift))
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+      #expect(focusTracker.currentFocusIdentity == tabViewIdentity,
+        "Cycle \(cycle): After Shift-Tab, focus should be on TabView")
+
+      lines = terminal.latestSurface!.lines
+      #expect(lines.contains { $0.contains("▄") },
+        "Cycle \(cycle) after Shift-Tab: TabView SHOULD show ▄")
+      #expect(!lines.contains { $0.contains("┏") || $0.contains("┗") },
+        "Cycle \(cycle) after Shift-Tab: Picker should NOT show heavy border")
+    }
+  }
+
   @Test("Tab key in RunLoop moves focus and changes rendered frame styling")
   func tabKeyRunLoopProducesDifferentFrame() throws {
     let terminalSize = Size(width: 50, height: 10)
