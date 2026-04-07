@@ -282,15 +282,16 @@ extension TabView {
     isSelected: Bool,
     isFocused: Bool
   ) -> some View {
-    let baseWidth = tabLabelCellWidth(label)
-    let width = isFocused ? baseWidth * 2 : baseWidth
-    let heavy = isSelected || isFocused
-    let foreground: AnyShapeStyle = isFocused ? AnyShapeStyle(.terminalAccent(.accent)) : .semantic(.separator)
+    let width = tabLabelCellWidth(label)
+    let glyph: Character =
+      if isFocused { "▄" }
+      else if isSelected { "━" }
+      else { "─" }
     let text =
-      "\(String(repeating: heavy ? "━" : "─", count: width)) "
+      "\(String(repeating: glyph, count: width)) "
     return Text(text)
       .lineLimit(1)
-      .foregroundStyle(foreground)
+      .foregroundStyle(.separator)
       .frame(height: 1, alignment: .leading)
   }
 
@@ -322,21 +323,19 @@ extension TabView {
     isSelected: Bool,
     isFocused: Bool
   ) -> some View {
-    let baseWidth = tabLabelCellWidth(label)
-    let width = isFocused ? baseWidth * 2 : baseWidth
-    let foreground: AnyShapeStyle = isFocused ? AnyShapeStyle(.terminalAccent(.accent)) : .semantic(.separator)
+    let width = tabLabelCellWidth(label)
     let text =
-      if isSelected {
-        (isFocused ? "┗" : "╰") + String(repeating: isFocused ? "━" : "─", count: width)
-          + (isFocused ? "┛" : "╯")
-      } else if isFocused {
-        " " + String(repeating: "━", count: width) + " "
+      if isFocused {
+        (isSelected ? "╰" : " ") + String(repeating: "▄", count: width)
+          + (isSelected ? "╯" : " ")
+      } else if isSelected {
+        "╰" + String(repeating: "─", count: width) + "╯"
       } else {
         " " + String(repeating: "─", count: width) + " "
       }
     return Text(text)
       .lineLimit(1)
-      .foregroundStyle(foreground)
+      .foregroundStyle(.separator)
       .frame(height: 1, alignment: .leading)
   }
 
