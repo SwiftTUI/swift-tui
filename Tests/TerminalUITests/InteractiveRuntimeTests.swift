@@ -761,7 +761,7 @@ struct InteractiveRuntimeTests {
     #expect(resolved.descendant(withText: "Wide: \u{754C}\u{1F642}e\u{301} cells align") != nil)
     #expect(resolved.descendant(withText: "Scroll: viewport clips overflow") != nil)
     #expect(
-      resolved.descendant(withText: "Tab | Enter | arrows | q | unicode | mono | plain | dark")
+      resolved.descendant(withText: "Tab | Enter | arrows | q | unicode | mono | plain | increased")
         != nil)
 
     let artifacts = DefaultRenderer().render(

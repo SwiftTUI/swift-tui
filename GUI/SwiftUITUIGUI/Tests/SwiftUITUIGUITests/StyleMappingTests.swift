@@ -1,35 +1,38 @@
+import TerminalUI
 import Testing
 
 @testable import SwiftUITUIGUI
 
 @Test
-func terminal_style_maps_to_ghostty_configuration_and_theme_variants() {
+func terminal_style_maps_to_ghostty_configuration_and_single_host_style() {
   let palette = SwiftUITUITerminalPalette(
-    foreground: "#112233",
-    background: "#445566",
-    cursor: "#778899",
-    selectionBackground: "#AABBCC",
-    selectionForeground: "#DDEEFF",
-    ansiColors: [
-      "#000000",
-      "#111111",
-      "#222222",
-      "#333333",
-      "#444444",
-      "#555555",
-      "#666666",
-      "#777777",
-      "#888888",
-      "#999999",
-      "#AAAAAA",
-      "#BBBBBB",
-      "#CCCCCC",
-      "#DDDDDD",
-      "#EEEEEE",
-      "#FFFFFF",
-    ]
+    foreground: .hex("#112233"),
+    background: .hex("#445566"),
+    cursor: .hex("#778899"),
+    selectionBackground: .hex("#AABBCC"),
+    selectionForeground: .hex("#DDEEFF"),
+    ansi: .init(
+      indexedColors: [
+        0: .hex("#000000"),
+        1: .hex("#111111"),
+        2: .hex("#222222"),
+        3: .hex("#333333"),
+        4: .hex("#444444"),
+        5: .hex("#555555"),
+        6: .hex("#666666"),
+        7: .hex("#777777"),
+        8: .hex("#888888"),
+        9: .hex("#999999"),
+        10: .hex("#AAAAAA"),
+        11: .hex("#BBBBBB"),
+        12: .hex("#CCCCCC"),
+        13: .hex("#DDDDDD"),
+        14: .hex("#EEEEEE"),
+        15: .hex("#FFFFFF"),
+      ]
+    )
   )
-  let lightTheme = ThemeColors(
+  let theme = Theme(
     foreground: .hex("#102030"),
     background: .hex("#203040"),
     tint: .hex("#304050"),
@@ -45,22 +48,6 @@ func terminal_style_maps_to_ghostty_configuration_and_theme_variants() {
     info: .hex("#D0E0F0"),
     muted: .hex("#E0F0FF")
   )
-  let darkTheme = ThemeColors(
-    foreground: .hex("#F0E0D0"),
-    background: .hex("#E0D0C0"),
-    tint: .hex("#D0C0B0"),
-    separator: .hex("#C0B0A0"),
-    selection: .hex("#B0A090"),
-    placeholder: .hex("#A09080"),
-    link: .hex("#908070"),
-    fill: .hex("#807060"),
-    windowBackground: .hex("#706050"),
-    success: .hex("#605040"),
-    warning: .hex("#504030"),
-    danger: .hex("#403020"),
-    info: .hex("#302010"),
-    muted: .hex("#201000")
-  )
 
   let style = SwiftUITUITerminalStyle(
     fontSize: 13,
@@ -68,14 +55,8 @@ func terminal_style_maps_to_ghostty_configuration_and_theme_variants() {
     cursorStyle: .underline,
     cursorBlink: false,
     backgroundOpacity: 0.5,
-    lightVariant: .init(
-      palette: palette,
-      theme: lightTheme
-    ),
-    darkVariant: .init(
-      palette: palette,
-      theme: darkTheme
-    )
+    palette: palette,
+    theme: theme
   )
 
   let configuration = style.terminalConfiguration
@@ -86,20 +67,15 @@ func terminal_style_maps_to_ghostty_configuration_and_theme_variants() {
   #expect(renderedConfiguration.contains("cursor-style-blink = false"))
   #expect(renderedConfiguration.contains("background-opacity = 0.5"))
 
-  let theme = style.terminalTheme
-  #expect(theme.light.rendered.contains("background = #445566"))
-  #expect(theme.light.rendered.contains("foreground = #112233"))
-  #expect(theme.light.rendered.contains("palette = 15=#FFFFFF"))
+  let terminalTheme = style.terminalTheme
+  #expect(terminalTheme.light.rendered.contains("background = #445566"))
+  #expect(terminalTheme.light.rendered.contains("foreground = #112233"))
+  #expect(terminalTheme.light.rendered.contains("palette = 15=#FFFFFF"))
+  #expect(terminalTheme.dark.rendered.contains("background = #445566"))
 
-  let lightRenderStyle = style.renderStyle(for: .light)
-  #expect(lightRenderStyle.appearance.colorScheme == .light)
-  #expect(lightRenderStyle.theme == lightTheme)
-  #expect(lightRenderStyle.appearance.foregroundColor == .hex("#112233"))
-  #expect(lightRenderStyle.appearance.backgroundColor == .hex("#445566"))
-
-  let darkRenderStyle = style.renderStyle(for: .dark)
-  #expect(darkRenderStyle.appearance.colorScheme == .dark)
-  #expect(darkRenderStyle.theme == darkTheme)
-  #expect(darkRenderStyle.appearance.foregroundColor == .hex("#112233"))
-  #expect(darkRenderStyle.appearance.backgroundColor == .hex("#445566"))
+  let renderStyle = style.renderStyle
+  #expect(renderStyle.theme == theme)
+  #expect(renderStyle.appearance.foregroundColor == .hex("#112233"))
+  #expect(renderStyle.appearance.backgroundColor == .hex("#445566"))
+  #expect(renderStyle.appearance.palette[15] == .hex("#FFFFFF"))
 }

@@ -94,24 +94,23 @@ extension ShapeStyle where Self == TerminalChromeStyle {
 
 extension Theme {
   package func resolvedStyle(
-    for chromeStyle: TerminalChromeStyle
+    for chromeStyle: TerminalChromeStyle,
+    appearance: TerminalAppearance
   ) -> AnyShapeStyle {
-    let appearance = synthesizedAppearance(for: self)
-
     switch chromeStyle.kind {
     case .accent(let tone):
       return .color(terminalToneColor(for: tone, appearance: appearance))
     case .surface(let tone):
       return terminalSurfaceStyle(tone: tone, appearance: appearance)
     case .surfaceBackground:
-      return background
+      return .color(background)
     case .border(let tone):
       return terminalBorderStyle(tone: tone, appearance: appearance)
     case .tile(let tone):
       return .color(
         appearance.backgroundColor.mixed(with:
           terminalToneColor(for: tone, appearance: appearance),
-          amount: appearance.colorScheme == .dark ? 0.18 : 0.1
+          amount: interpolatedAmount(dark: 0.18, light: 0.1, appearance: appearance)
         )
       )
     case .row(let tone, let isSelected, let isOdd):
@@ -128,14 +127,14 @@ extension Theme {
       return .color(
         appearance.backgroundColor.mixed(with:
           terminalToneColor(for: tone, appearance: appearance),
-          amount: appearance.colorScheme == .dark ? 0.16 : 0.08
+          amount: interpolatedAmount(dark: 0.16, light: 0.08, appearance: appearance)
         )
       )
     case .keycap(let tone):
       return .color(
         appearance.backgroundColor.mixed(with:
           terminalToneColor(for: tone, appearance: appearance),
-          amount: appearance.colorScheme == .dark ? 0.1 : 0.05
+          amount: interpolatedAmount(dark: 0.1, light: 0.05, appearance: appearance)
         )
       )
     case .tab(let tone, let isSelected):
@@ -143,24 +142,17 @@ extension Theme {
         return .color(
           appearance.backgroundColor.mixed(with:
             terminalToneColor(for: tone, appearance: appearance),
-            amount: appearance.colorScheme == .dark ? 0.22 : 0.14
+            amount: interpolatedAmount(dark: 0.22, light: 0.14, appearance: appearance)
           )
         )
       }
       return .color(
         appearance.backgroundColor.mixed(with:
           terminalToneColor(for: tone, appearance: appearance),
-          amount: appearance.colorScheme == .dark ? 0.06 : 0.03
+          amount: interpolatedAmount(dark: 0.06, light: 0.03, appearance: appearance)
         )
       )
     }
-  }
-
-  private func resolvedThemeColor(
-    _ style: AnyShapeStyle,
-    fallback: Color
-  ) -> Color {
-    resolveStyleColor(style: style, theme: self) ?? fallback
   }
 
   private func terminalToneColor(
@@ -169,19 +161,19 @@ extension Theme {
   ) -> Color {
     switch tone {
     case .accent:
-      return resolvedThemeColor(tint, fallback: appearance.tintColor)
+      return tint
     case .info:
-      return resolvedThemeColor(info, fallback: .hex("#4CC9F0"))
+      return info
     case .success:
-      return resolvedThemeColor(success, fallback: .hex("#04B575"))
+      return success
     case .warning:
-      return resolvedThemeColor(warning, fallback: .hex("#F2B94B"))
+      return warning
     case .danger:
-      return resolvedThemeColor(danger, fallback: .hex("#F76E6E"))
+      return danger
     case .neutral:
       return appearance.backgroundColor.mixed(with:
         appearance.foregroundColor,
-        amount: appearance.colorScheme == .dark ? 0.54 : 0.44
+        amount: interpolatedAmount(dark: 0.54, light: 0.44, appearance: appearance)
       )
     }
   }
@@ -193,7 +185,7 @@ extension Theme {
     .color(
       appearance.backgroundColor.mixed(with:
         terminalToneColor(for: tone, appearance: appearance),
-        amount: appearance.colorScheme == .dark ? 0.1 : 0.05
+        amount: interpolatedAmount(dark: 0.1, light: 0.05, appearance: appearance)
       )
     )
   }
@@ -207,8 +199,8 @@ extension Theme {
         terminalToneColor(for: tone, appearance: appearance),
         amount:
           tone == .neutral
-          ? (appearance.colorScheme == .dark ? 0.24 : 0.18)
-          : (appearance.colorScheme == .dark ? 0.52 : 0.36)
+          ? interpolatedAmount(dark: 0.24, light: 0.18, appearance: appearance)
+          : interpolatedAmount(dark: 0.52, light: 0.36, appearance: appearance)
       )
     )
   }
@@ -225,15 +217,15 @@ extension Theme {
       return .color(
         neutralBase.mixed(with:
           terminalToneColor(for: tone, appearance: appearance),
-          amount: appearance.colorScheme == .dark ? 0.18 : 0.11
+          amount: interpolatedAmount(dark: 0.18, light: 0.11, appearance: appearance)
         )
       )
     }
 
     let overlayStrength =
       isOdd
-      ? (appearance.colorScheme == .dark ? 0.04 : 0.02)
-      : (appearance.colorScheme == .dark ? 0.03 : 0.01)
+      ? interpolatedAmount(dark: 0.04, light: 0.02, appearance: appearance)
+      : interpolatedAmount(dark: 0.03, light: 0.01, appearance: appearance)
 
     return .color(
       neutralBase.mixed(with:
@@ -242,68 +234,26 @@ extension Theme {
       )
     )
   }
+
+  private func interpolatedAmount(
+    dark: Double,
+    light: Double,
+    appearance: TerminalAppearance
+  ) -> Double {
+    let darkness = min(1, max(0, 1 - appearance.backgroundColor.relativeLuminance))
+    return light + ((dark - light) * darkness)
+  }
 }
 
 package func synthesizedAppearance(
   for theme: Theme
 ) -> TerminalAppearance {
   let fallback = TerminalAppearance.fallback
-  let foreground = synthesizedAppearanceColor(
-    from: theme.foreground,
-    theme: theme,
-    fallback: fallback.foregroundColor
-  )
-  let background = synthesizedAppearanceColor(
-    from: theme.background,
-    theme: theme,
-    fallback: fallback.backgroundColor
-  )
-  let tint = synthesizedAppearanceColor(
-    from: theme.tint,
-    theme: theme,
-    fallback: fallback.tintColor
-  )
-
   return .init(
-    foregroundColor: foreground,
-    backgroundColor: background,
-    tintColor: tint,
+    foregroundColor: theme.foreground,
+    backgroundColor: theme.background,
+    tintColor: theme.tint,
     palette: fallback.palette,
     source: .fallback
   )
-}
-
-private func synthesizedAppearanceColor(
-  from style: AnyShapeStyle,
-  theme: Theme,
-  fallback: Color,
-  depth: Int = 0
-) -> Color {
-  guard depth < 8 else {
-    return fallback
-  }
-
-  switch style {
-  case .semantic(let role):
-    return synthesizedAppearanceColor(
-      from: theme.style(for: role),
-      theme: theme,
-      fallback: fallback,
-      depth: depth + 1
-    )
-  case .color(let color):
-    return color
-  case .linearGradient(let gradient):
-    return gradient.gradient.stops.first?.color ?? fallback
-  case .terminalChrome:
-    return fallback
-  case .opacity(let inner, let amount):
-    let resolved = synthesizedAppearanceColor(
-      from: inner,
-      theme: theme,
-      fallback: fallback,
-      depth: depth + 1
-    )
-    return resolved.opacity(amount)
-  }
 }

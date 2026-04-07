@@ -2,6 +2,6 @@ fixture stacked-bar-chart
 configuration preview-ascii
 surface 28x2
 capability glyph=ascii color=none styles=false
-appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 contrast=increased source=fallback
 01│Mix··················sum·100
 02│################

@@ -1307,34 +1307,6 @@ struct SwiftUISurfaceTests {
         ))
   }
 
-  @Test("preferredColorScheme overrides effective appearance for its subtree")
-  func preferredColorSchemeOverridesEffectiveAppearance() {
-    var environmentValues = EnvironmentValues()
-    environmentValues.terminalAppearance = .fallback
-
-    let artifacts = DefaultRenderer().render(
-      VStack(alignment: .leading, spacing: 0) {
-        EnvironmentReader(\.colorScheme) { scheme in
-          Text("Outer \(scheme.rawValue)")
-        }
-        EnvironmentReader(\.colorScheme) { scheme in
-          Text("Inner \(scheme.rawValue)")
-        }
-        .preferredColorScheme(.light)
-      },
-      context: .init(
-        identity: testIdentity("PreferredColorScheme"),
-        environmentValues: environmentValues
-      )
-    )
-
-    #expect(
-      artifacts.rasterSurface.lines == [
-        "Outer dark",
-        "Inner light",
-      ])
-  }
-
   @Test("explicit foregroundStyle and tint override appearance-derived defaults")
   func explicitStyleAndTintOverrideAppearanceDefaults() {
     var environmentValues = EnvironmentValues()
@@ -1357,9 +1329,18 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(artifacts.rasterSurface.cells[0][0].style?.foregroundColor == Color.blue)
-    #expect(artifacts.rasterSurface.cells[1][0].style?.foregroundColor == Color.red)
-    #expect(artifacts.rasterSurface.cells[2][0].style?.foregroundColor == Color.yellow)
+    #expect(
+      artifacts.rasterSurface.cells[0][0].style?.foregroundColor?.hexString()
+        == Color.blue.hexString()
+    )
+    #expect(
+      artifacts.rasterSurface.cells[1][0].style?.foregroundColor?.hexString()
+        == Color.red.hexString()
+    )
+    #expect(
+      artifacts.rasterSurface.cells[2][0].style?.foregroundColor?.hexString()
+        == Color.yellow.hexString()
+    )
   }
 
   @Test("node draw metadata foregroundStyle wins over inherited environment foregroundStyle")
@@ -1377,10 +1358,10 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.cells[1][0].style?.foregroundColor == Color.blue)
   }
 
-  @Test("resolveStyleColorResult surfaces recursion and empty-gradient diagnostics")
+  @Test("resolveStyleColorResult resolves semantic colors and surfaces empty-gradient diagnostics")
   func colorResolutionDiagnosticsAreExplicit() {
-    let recursiveTheme = Theme(
-      foreground: .semantic(.foreground)
+    let theme = Theme(
+      foreground: .hex("#102030")
     )
     let emptyGradient = LinearGradient(
       gradient: .init(stops: []),
@@ -1391,8 +1372,8 @@ struct SwiftUISurfaceTests {
     #expect(
       resolveStyleColorResult(
         style: .semantic(.foreground),
-        theme: recursiveTheme
-      ) == .failure(.recursionLimitExceeded(limit: 8, style: .semantic(.foreground)))
+        theme: theme
+      ) == .success(.hex("#102030"))
     )
     #expect(
       resolveStyleColorResult(
@@ -1410,7 +1391,7 @@ struct SwiftUISurfaceTests {
       tintColor: .blue,
       source: .override
     )
-    let theme = appearance.semanticTheme()
+    let theme = appearance.synthesizedTheme()
 
     let accent = resolveStyleColor(
       style: AnyShapeStyle(.terminalAccent(.warning)),
@@ -1439,7 +1420,7 @@ struct SwiftUISurfaceTests {
       tintColor: .blue,
       source: .override
     )
-    let themeColors = ThemeColors(
+    let theme = Theme(
       foreground: .hex("#111827"),
       background: .hex("#F8FAFC"),
       tint: .hex("#2563EB"),
@@ -1457,26 +1438,28 @@ struct SwiftUISurfaceTests {
     )
     let snapshot = StyleEnvironmentSnapshot(
       appearance: appearance,
-      theme: themeColors.theme
+      theme: theme
     )
 
     #expect(
       resolveStyleColor(
         style: .semantic(.warning),
         theme: snapshot.theme
-      ) == themeColors.warning
+      ) == theme.warning
     )
     #expect(
       resolveStyleColor(
         style: AnyShapeStyle(.terminalAccent(.warning)),
-        theme: snapshot.theme
-      ) == themeColors.warning
+        theme: snapshot.theme,
+        appearance: snapshot.appearance
+      ) == theme.warning
     )
     #expect(
       resolveStyleColor(
         style: AnyShapeStyle(.terminalAccent(.success)),
-        theme: snapshot.theme
-      ) == themeColors.success
+        theme: snapshot.theme,
+        appearance: snapshot.appearance
+      ) == theme.success
     )
   }
 
@@ -1555,19 +1538,19 @@ struct SwiftUISurfaceTests {
       isFocused: false
     )
 
-    #expect(idle.foregroundStyle == semanticTheme.foreground)
-    #expect(resolveStyleColor(style: idle.backgroundStyle, theme: semanticTheme) != nil)
-    #expect(resolveStyleColor(style: idle.borderStyle, theme: semanticTheme) != nil)
+    #expect(idle.foregroundStyle == semanticTheme.style(for: .foreground))
+    #expect(resolveStyleColor(style: idle.backgroundStyle, theme: semanticTheme, appearance: appearance) != nil)
+    #expect(resolveStyleColor(style: idle.borderStyle, theme: semanticTheme, appearance: appearance) != nil)
     #expect(idle.opacity == 1)
 
-    #expect(resolveStyleColor(style: focused.backgroundStyle, theme: semanticTheme) != nil)
-    #expect(resolveStyleColor(style: focused.borderStyle, theme: semanticTheme) != nil)
+    #expect(resolveStyleColor(style: focused.backgroundStyle, theme: semanticTheme, appearance: appearance) != nil)
+    #expect(resolveStyleColor(style: focused.borderStyle, theme: semanticTheme, appearance: appearance) != nil)
     #expect(idle.borderStyle != focused.borderStyle)
     #expect(focused.opacity == 1)
 
-    #expect(disabled.foregroundStyle == semanticTheme.placeholder)
-    #expect(resolveStyleColor(style: disabled.backgroundStyle, theme: semanticTheme) != nil)
-    #expect(resolveStyleColor(style: disabled.borderStyle, theme: semanticTheme) != nil)
+    #expect(disabled.foregroundStyle == semanticTheme.style(for: .placeholder))
+    #expect(resolveStyleColor(style: disabled.backgroundStyle, theme: semanticTheme, appearance: appearance) != nil)
+    #expect(resolveStyleColor(style: disabled.borderStyle, theme: semanticTheme, appearance: appearance) != nil)
     #expect(disabled.opacity == 0.6)
   }
 
@@ -3761,11 +3744,8 @@ struct SwiftUISurfaceTests {
     )
     environmentValues.terminalAppearance = appearance
 
-    let theme = appearance.semanticTheme()
-    let expectedLinkColor = resolveStyleColor(
-      style: theme.link,
-      theme: theme
-    )
+    let theme = appearance.synthesizedTheme()
+    let expectedLinkColor = theme.link
     final class TapBox {
       var didTap = false
     }

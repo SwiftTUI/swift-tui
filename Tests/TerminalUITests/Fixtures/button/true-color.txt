@@ -2,7 +2,7 @@ fixture button
 configuration true-color
 surface 18x3
 capability glyph=unicode color=trueColor styles=true
-appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 contrast=increased source=fallback
 01│\u{001B}[48;2;86;182;194m·\u{001B}[0m\u{001B}[38;2;0;0;0;48;2;86;182;194mDeploy\u{001B}[0m\u{001B}[48;2;86;182;194m·\u{001B}[0m
 02│
 03│

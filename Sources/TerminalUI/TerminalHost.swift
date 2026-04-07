@@ -1122,7 +1122,7 @@ extension TerminalHosting {
 
     public convenience init(
       surfaceSize: Size,
-      theme: ThemeColors? = nil,
+      theme: Theme? = nil,
       capabilityProfile: TerminalCapabilityProfile = .trueColor,
       graphicsCapabilities: TerminalGraphicsCapabilities = .none,
       environment: [String: String]? = nil
@@ -1140,7 +1140,7 @@ extension TerminalHosting {
     public init(
       surfaceSize: Size,
       outputFileDescriptor: Int32,
-      theme: ThemeColors? = nil,
+      theme: Theme? = nil,
       capabilityProfile: TerminalCapabilityProfile = .trueColor,
       graphicsCapabilities: TerminalGraphicsCapabilities = .none,
       environment: [String: String]? = nil
@@ -1172,7 +1172,7 @@ extension TerminalHosting {
     }
 
     public var theme: Theme? {
-      state.withLock { $0.renderStyle.theme?.theme }
+      state.withLock(\.renderStyle.theme)
     }
 
     public func updateSurfaceSize(_ surfaceSize: Size) {
@@ -1182,7 +1182,7 @@ extension TerminalHosting {
     }
 
     public func updateTheme(
-      _ theme: ThemeColors?
+      _ theme: Theme?
     ) {
       state.withLock { state in
         state.renderStyle.theme = theme

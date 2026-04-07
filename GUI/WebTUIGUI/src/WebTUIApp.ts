@@ -9,9 +9,7 @@ import {
 import {
   mergeWebTUITerminalStyle,
   normalizeWebTUITerminalStyle,
-  resolveWebTUIColorScheme,
   type ResolvedWebTUITerminalStyle,
-  type WebTUIColorScheme,
   type WebTUITerminalStyle,
 } from "./WebTUITerminalStyle.ts";
 import { WebTUISceneRuntime, type WebTUISceneRuntimeOptions } from "./WebTUISceneRuntime.ts";
@@ -65,19 +63,6 @@ class InternalWebTUIAppController implements WebTUIAppController {
   private readonly sceneRuntimeFactory: RuntimeFactory;
   private readonly runtimes = new Map<string, WebTUISceneRuntime>();
   private readonly bridges = new Map<string, BrowserWASIBridge>();
-  private currentColorScheme: WebTUIColorScheme;
-  private colorSchemeMediaQuery?: MediaQueryList;
-  private readonly colorSchemeListener = () => {
-    const nextScheme = this.resolveActiveColorScheme();
-    if (nextScheme === this.currentColorScheme) {
-      return;
-    }
-
-    this.currentColorScheme = nextScheme;
-    for (const runtime of this.runtimes.values()) {
-      runtime.setStyleAndScheme(this.style, this.currentColorScheme);
-    }
-  };
 
   constructor(options: {
     mount: HTMLElement;
@@ -99,7 +84,6 @@ class InternalWebTUIAppController implements WebTUIAppController {
         ? options.initialSceneId
         : options.manifest.scenes.find((scene) => scene.id === options.manifest.defaultSceneId)?.id ??
           options.manifest.defaultSceneId;
-    this.currentColorScheme = this.resolveActiveColorScheme();
 
     this.sceneRoot = (options.createElement ?? defaultCreateElement)("div");
     this.sceneRoot.className = "webtuigui-scene-root";
@@ -108,7 +92,6 @@ class InternalWebTUIAppController implements WebTUIAppController {
   }
 
   async initialize(): Promise<void> {
-    this.bindColorSchemeListener();
     await this.ensureRuntime(this.selectedSceneId);
     await this.switchScene(this.selectedSceneId);
   }
@@ -135,11 +118,9 @@ class InternalWebTUIAppController implements WebTUIAppController {
   ): void {
     const merged = mergeWebTUITerminalStyle(this.style, style);
     this.style = merged;
-    this.currentColorScheme = this.resolveActiveColorScheme();
-    this.bindColorSchemeListener();
 
     for (const runtime of this.runtimes.values()) {
-      runtime.setStyleAndScheme(this.style, this.currentColorScheme);
+      runtime.setStyle(this.style);
     }
     this.applyHostFrameStyle();
   }
@@ -175,13 +156,11 @@ class InternalWebTUIAppController implements WebTUIAppController {
       rows: 24,
       environment: this.environment,
       renderStyle: this.style,
-      colorScheme: this.currentColorScheme,
     });
     const runtime = this.sceneRuntimeFactory({
       mount: this.sceneRoot,
       descriptor,
       style: this.style,
-      colorScheme: this.currentColorScheme,
       bridge,
       onInput: (chunk) => bridge.sendInput(chunk),
     });
@@ -191,42 +170,6 @@ class InternalWebTUIAppController implements WebTUIAppController {
     await runtime.mount();
     runtime.setVisible(id === this.selectedSceneId);
     return runtime;
-  }
-
-  private resolveActiveColorScheme(): WebTUIColorScheme {
-    return resolveWebTUIColorScheme(this.style, this.detectSystemColorScheme());
-  }
-
-  private detectSystemColorScheme(): WebTUIColorScheme {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return "dark";
-    }
-
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  }
-
-  private bindColorSchemeListener(): void {
-    this.unbindColorSchemeListener();
-
-    if (this.style.colorSchemeMode !== "system") {
-      return;
-    }
-
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return;
-    }
-
-    this.colorSchemeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    this.colorSchemeMediaQuery.addEventListener("change", this.colorSchemeListener);
-  }
-
-  private unbindColorSchemeListener(): void {
-    if (!this.colorSchemeMediaQuery) {
-      return;
-    }
-
-    this.colorSchemeMediaQuery.removeEventListener("change", this.colorSchemeListener);
-    this.colorSchemeMediaQuery = undefined;
   }
 
   private applyHostFrameStyle(): void {

@@ -829,7 +829,10 @@ extension Rasterizer {
       return .sampled(gradient)
     case .terminalChrome(let chromeStyle):
       return resolvedColorMode(
-        from: environment.theme.resolvedStyle(for: chromeStyle),
+        from: environment.theme.resolvedStyle(
+          for: chromeStyle,
+          appearance: environment.appearance
+        ),
         environment: environment,
         depth: depth + 1
       )
@@ -918,28 +921,14 @@ extension Rasterizer {
     for role: SemanticStyleRole,
     environment: StyleEnvironmentSnapshot
   ) -> AnyShapeStyle {
-    switch role {
-    case .foreground:
-      return environment.foregroundStyle ?? environment.theme.foreground
-    case .tint:
-      return environment.tintStyle ?? environment.theme.tint
-    default:
-      return environment.theme.style(for: role)
-    }
+    environment.resolvedStyle(for: role)
   }
 
   private func semanticStyleFallback(
     for role: SemanticStyleRole,
     environment: StyleEnvironmentSnapshot
   ) -> AnyShapeStyle {
-    switch role {
-    case .foreground:
-      return environment.theme.foreground
-    case .tint:
-      return environment.theme.tint
-    default:
-      return environment.theme.style(for: role)
-    }
+    environment.themeStyle(for: role)
   }
 
   private func sample(

@@ -45,7 +45,7 @@ struct StreamingTerminalHostTests {
       outputHandler: { _ in }
     )
 
-    let updatedTheme = ThemeColors(
+    let updatedTheme = Theme(
       foreground: .hex("#102030"),
       background: .hex("#F8FAFC"),
       tint: .hex("#1D4ED8"),
@@ -77,6 +77,6 @@ struct StreamingTerminalHostTests {
     host.updateStyle(updatedStyle)
 
     #expect(host.appearance == updatedStyle.appearance)
-    #expect(host.theme == updatedTheme.theme)
+    #expect(host.theme == updatedTheme)
   }
 }

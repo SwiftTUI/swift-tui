@@ -340,7 +340,7 @@ extension TabView {
   ) -> some View {
     let foreground: AnyShapeStyle =
       isSelected
-      ? styleEnvironment.theme.foreground
+      ? styleEnvironment.resolvedStyle(for: .foreground)
       : .semantic(.muted)
     return Text("\(label) ")
       .lineLimit(1)

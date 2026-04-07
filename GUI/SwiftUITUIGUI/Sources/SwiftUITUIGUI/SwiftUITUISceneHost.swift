@@ -23,7 +23,7 @@ public final class SwiftUITUISceneHost {
     style: SwiftUITUITerminalStyle
   ) throws {
     self.descriptor = descriptor
-    let initialRenderStyle = style.renderStyle(for: TerminalUI.ColorScheme.light)
+    let initialRenderStyle = style.renderStyle
     bridge = GhosttySceneBridge(
       descriptor: descriptor,
       style: style
@@ -80,10 +80,6 @@ public final class SwiftUITUISceneHost {
 
   public func apply(style: SwiftUITUITerminalStyle) {
     bridge.apply(style: style)
-  }
-
-  public func updateAppearance(_ colorScheme: SwiftUI.ColorScheme) {
-    bridge.updateAppearance(colorScheme)
   }
 
   var bridgeForTesting: GhosttySceneBridge {

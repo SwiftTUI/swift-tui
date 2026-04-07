@@ -96,7 +96,7 @@ The current boundary is:
   - window or browser shell integration
   - terminal widget embedding
   - scene tabs, pickers, or other host-local chrome
-  - host-specific style mapping and host light/dark-to-theme binding
+  - host-specific style mapping and host-owned theme swapping
 
 This is intentional. Host packages are peer platform integration packages, not
 new products in the root package.

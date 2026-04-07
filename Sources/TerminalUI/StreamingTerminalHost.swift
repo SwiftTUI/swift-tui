@@ -18,7 +18,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   package init(
     surfaceSize: Size,
     appearance: TerminalAppearance? = nil,
-    theme: ThemeColors? = nil,
+    theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
     graphicsCapabilities: TerminalGraphicsCapabilities = .none,
     environment: [String: String]? = nil,
@@ -56,7 +56,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   }
 
   package var theme: Theme? {
-    state.withLock { $0.renderStyle.theme?.theme }
+    state.withLock(\.renderStyle.theme)
   }
 
   package func updateSurfaceSize(
@@ -78,7 +78,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   }
 
   package func updateTheme(
-    _ theme: ThemeColors?
+    _ theme: Theme?
   ) {
     state.withLock { state in
       state.renderStyle.theme = theme

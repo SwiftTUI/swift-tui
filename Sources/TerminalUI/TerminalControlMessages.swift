@@ -131,7 +131,7 @@ package struct ControlMessageParser {
       return nil
     }
 
-    let theme: ThemeColors?
+    let theme: Theme?
     switch object["theme"] {
     case nil, .some(.null):
       theme = nil
@@ -158,11 +158,6 @@ package struct ControlMessageParser {
       let foregroundColor = decodeColor(named: "foregroundColor", from: object),
       let backgroundColor = decodeColor(named: "backgroundColor", from: object),
       let tintColor = decodeColor(named: "tintColor", from: object),
-      let colorScheme = decodeEnum(
-        named: "colorScheme",
-        from: object,
-        as: ColorScheme.self
-      ),
       let colorSchemeContrast = decodeEnum(
         named: "colorSchemeContrast",
         from: object,
@@ -177,10 +172,10 @@ package struct ControlMessageParser {
       return nil
     }
 
-    let palette: [Int: Color]
+    let palette: TerminalPalette
     switch object["palette"] {
     case nil, .some(.null):
-      palette = [:]
+      palette = .default
     case .some(let value):
       guard let paletteObject = value.objectValue else {
         return nil
@@ -197,7 +192,7 @@ package struct ControlMessageParser {
         }
         decodedPalette[index] = color
       }
-      palette = decodedPalette
+      palette = .init(indexedColors: decodedPalette)
     }
 
     return .init(
@@ -205,7 +200,6 @@ package struct ControlMessageParser {
       backgroundColor: backgroundColor,
       tintColor: tintColor,
       palette: palette,
-      colorScheme: colorScheme,
       colorSchemeContrast: colorSchemeContrast,
       source: source
     )
@@ -213,7 +207,7 @@ package struct ControlMessageParser {
 
   private static func decodeTheme(
     from object: [String: StyleTransportJSONValue]
-  ) -> ThemeColors? {
+  ) -> Theme? {
     guard
       let foreground = decodeColor(named: "foreground", from: object),
       let background = decodeColor(named: "background", from: object),
@@ -286,6 +280,7 @@ package struct ControlMessageParser {
     _ appearance: TerminalAppearance
   ) -> String {
     let paletteEntries = appearance.palette
+      .indexedColors
       .sorted { lhs, rhs in
         lhs.key < rhs.key
       }
@@ -298,7 +293,6 @@ package struct ControlMessageParser {
       "\"backgroundColor\":\(encodeColor(appearance.backgroundColor))",
       "\"tintColor\":\(encodeColor(appearance.tintColor))",
       "\"palette\":{\(paletteEntries.joined(separator: ","))}",
-      "\"colorScheme\":\(styleTransportJSONStringLiteral(appearance.colorScheme.rawValue))",
       "\"colorSchemeContrast\":\(styleTransportJSONStringLiteral(appearance.colorSchemeContrast.rawValue))",
       "\"source\":\(styleTransportJSONStringLiteral(appearance.source.rawValue))",
     ]
@@ -307,7 +301,7 @@ package struct ControlMessageParser {
   }
 
   private static func encodeTheme(
-    _ theme: ThemeColors
+    _ theme: Theme
   ) -> String {
     let fields = [
       "\"foreground\":\(encodeColor(theme.foreground))",

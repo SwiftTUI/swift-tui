@@ -128,8 +128,6 @@ private struct SceneSwitcherBar: SwiftUI.View {
 }
 
 private struct SceneTerminalSurface: SwiftUI.View {
-  @Environment(\.colorScheme) private var colorScheme
-
   let host: SwiftUITUISceneHost?
 
   var body: some SwiftUI.View {
@@ -140,9 +138,6 @@ private struct SceneTerminalSurface: SwiftUI.View {
           // same TerminalView across scene swaps can leave the previous
           // in-memory session holding a freed surface pointer.
           .id(host.descriptor.id)
-          .onChange(of: colorScheme, initial: true) { _, newValue in
-            host.updateAppearance(newValue)
-          }
           .task {
             host.start()
           }

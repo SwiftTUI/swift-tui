@@ -148,7 +148,7 @@ while `TerminalUI` itself remains library-only.
 - The public styling story is semantic-token-first: TUI views author against
   `.foreground`, `.background`, `.warning`, `.tint`, and related roles
 - Hosts and embedded host packages choose the active theme; the inner TUI app does not
-  branch on light/dark or inspect theme choice directly
+  branch on host style variants or inspect theme choice directly
 - Terminal appearance can be inferred heuristically or queried actively from the
   host and can synthesize the default semantic theme when no explicit host theme
   is provided

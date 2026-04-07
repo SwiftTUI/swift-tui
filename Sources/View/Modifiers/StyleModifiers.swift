@@ -1,12 +1,6 @@
 public import Core
 
 extension View {
-  public func preferredColorScheme(
-    _ colorScheme: ColorScheme?
-  ) -> some View {
-    environment(\.preferredColorScheme, colorScheme)
-  }
-
   public func controlProminence(
     _ prominence: ControlProminence
   ) -> some View {

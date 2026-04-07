@@ -743,7 +743,7 @@ private func interactiveDemoCapabilityBadge(
     }
 
   let styleLabel = profile.emitsStyleEscapeSequences ? "styled" : "plain"
-  return "\(glyphLabel) | \(colorLabel) | \(styleLabel) | \(appearance.colorScheme.rawValue)"
+  return "\(glyphLabel) | \(colorLabel) | \(styleLabel) | \(appearance.colorSchemeContrast.rawValue)"
 }
 
 @MainActor

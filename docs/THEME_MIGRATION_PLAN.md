@@ -1,203 +1,124 @@
-# Theme Migration Plan
+# Theme-Only Styling Architecture
 
-Last updated: April 1, 2026
+Last updated: April 6, 2026
 
-Status: landed in the root runtime plus the SwiftUI and web wrapper packages.
+Status: landed
 
 ## Goal
 
-Move TerminalUI from an appearance-driven light/dark styling model to a
-theme-first model where:
+TerminalUI now treats styling as a theme-only system:
 
-- semantic tokens such as `.foreground`, `.background`, `.warning`, and
-  `.tint` resolve through an active `Theme`
-- the wrapping host application owns that active theme
-- the inner TUI app continues to author only against semantic tokens and does
-  not branch on theme choice
-- terminal-native execution still gets a default theme that matches the
-  detected terminal colors
-- hosted wrappers on SwiftUI and web can bind host light/dark mode to
-  host-defined theme variants
-- themes can switch at runtime without rebuilding the app
-- direct hex color authoring is ergonomic and first-class
+- app authors render semantic roles such as `.foreground`, `.background`,
+  `.warning`, and `.tint`
+- hosts provide one active semantic `Theme` plus one active `TerminalPalette`
+- `TerminalAppearance` remains host metadata and fallback input, not the
+  canonical styling surface
+- runtime theme changes happen by replacing the active host style object
+- the framework does not model built-in display modes or host color-scheme
+  selection anywhere in the styling API
 
-## Non-Negotiable Decisions
+## Canonical Model
 
-1. `Theme` is host-owned render configuration, not app-authored UI state.
-2. TUI apps should not need to know which theme is active.
-3. `TerminalAppearance` remains valuable, but as host metadata and terminal
-   palette state rather than the canonical semantic styling source.
-4. The framework must preserve the current default terminal look when no host
-   theme is supplied.
-5. Wrapper packages own the mapping from host light/dark mode to explicit theme
-   variants.
+### `Theme`
 
-## Current State
+`Theme` is the canonical semantic token map used during rendering.
 
-Today the repository already has:
+- every token stores a concrete `Color`
+- `Theme` is transport-safe and `Codable`
+- semantic roles resolve through `Theme` during rendering
+- local view styling may still use richer `ShapeStyle` values such as gradients
+  or terminal chrome styles, but those richer graphs are not the public theme
+  transport format
 
-- semantic roles in [Styling.swift](../Sources/Core/Styling.swift)
-- a public `Theme` type in [Styling.swift](../Sources/Core/Styling.swift)
-- terminal appearance detection and synthesis in
-  [Appearance.swift](../Sources/Core/Appearance.swift)
-- runtime appearance updates in
-  [StreamingTerminalHost.swift](../Sources/TerminalUI/StreamingTerminalHost.swift)
-  and
-  [HostedSceneSession.swift](../Sources/TerminalUI/HostedSceneSession.swift)
-- SwiftUI and web wrapper style layers in
-  [GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUITerminalStyle.swift](../GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUITerminalStyle.swift)
-  and
-  [GUI/WebTUIGUI/src/WebTUITerminalStyle.ts](../GUI/WebTUIGUI/src/WebTUITerminalStyle.ts)
+### `TerminalPalette`
 
-The main mismatch is that semantic roles and terminal chrome are still partly
-derived from `TerminalAppearance` and `ColorScheme`, which makes theme
-selection feel like GUI light/dark mode instead of a host-controlled terminal
-theme.
+`TerminalPalette` is the canonical host palette for terminal-emulator color
+slots.
 
-## Target Architecture
+- it carries the concrete ANSI 16-color palette
+- wrapper packages use it to configure embedded terminal widgets
+- runtime transport uses it as part of `TerminalAppearance`
 
-### Core Model
+### `TerminalAppearance`
 
-- `Theme` becomes the canonical semantic token map used during rendering.
-- `TerminalAppearance` keeps:
-  - foreground/background/tint colors
-  - terminal palette
-  - contrast and inferred scheme metadata
-  - host inspection data for wrappers, demos, and diagnostics
-- when the host does not supply a theme, the framework synthesizes one from
-  `TerminalAppearance`
+`TerminalAppearance` is host facts plus fallback synthesis input.
 
-### Runtime Model
+- it carries foreground, background, tint, ANSI palette, source, and contrast
+  metadata
+- it can synthesize a default semantic theme through
+  `TerminalAppearance.synthesizedTheme()`
+- app authors should not treat it as the primary styling API
 
-- terminal hosts carry both:
-  - `TerminalAppearance`
-  - optional host-supplied theme state
-- `RunLoop` injects both values into resolve/raster state every frame
-- hosted sessions can update appearance and theme together at runtime
-- the WASI/browser control-message path can do the same
+## Runtime Model
 
-### Wrapper Model
+`TerminalRenderStyle` is the runtime style bundle.
 
-- wrappers define explicit theme variants
-- wrappers map host light/dark mode to those variants
-- wrappers send both:
-  - terminal-emulator palette settings
-  - TerminalUI semantic theme settings
+- `appearance: TerminalAppearance`
+- `theme: Theme?`
 
-## Migration Phases
+The runtime injects both into the environment every frame.
 
-### Phase 1: Core Theme Ownership
+- when `theme` is present, semantic roles resolve from that theme
+- when `theme` is absent, the runtime synthesizes one from `appearance`
+- hosted sessions, streaming hosts, and browser/WASI bridges all update style
+  through the same single-style payload
 
-Primary files:
+## Wrapper Model
 
-- [Styling.swift](../Sources/Core/Styling.swift)
-- [Appearance.swift](../Sources/Core/Appearance.swift)
-- [TerminalChromeStyle.swift](../Sources/Core/TerminalChromeStyle.swift)
-- [Rasterizer.swift](../Sources/Core/Rasterizer.swift)
-- [Environment.swift](../Sources/View/Environment/Environment.swift)
-- [StyleEnvironment.swift](../Sources/View/Environment/StyleEnvironment.swift)
+Wrapper packages now expose one active host style object at a time.
 
-Changes:
+### SwiftUI host
 
-- add explicit active-theme state to the style environment snapshot
-- resolve semantic roles from the active theme first
-- keep `TerminalAppearance.semanticTheme()` as the default-theme fallback path
-- remove the current dependency on `.preferredColorScheme(...)` for choosing
-  semantic token values
-- make terminal chrome styles such as `.terminalAccent(...)`,
-  `.terminalSurface(...)`, and `.terminalBorder(...)` derive from the active
-  theme rather than from hard-coded light/dark color branches
+`SwiftUITUITerminalStyle` owns:
 
-Expected result:
+- one palette
+- one theme
+- cursor, font, and background-opacity options
 
-- semantic token styling and terminal chrome agree on the active theme
-- theme selection is no longer equivalent to “pretend the app is in light or
-  dark mode”
+It no longer exposes built-in paired theme variants or host color-scheme routing.
 
-### Phase 2: Runtime Theme Updates
+### Web host
 
-Primary files:
+`WebTUITerminalStyle` owns:
 
-- [TerminalHost.swift](../Sources/TerminalUI/TerminalHost.swift)
-- [StreamingTerminalHost.swift](../Sources/TerminalUI/StreamingTerminalHost.swift)
-- [HostedSceneSession.swift](../Sources/TerminalUI/HostedSceneSession.swift)
-- [SceneSession.swift](../Sources/TerminalUI/SceneSession.swift)
-- [RunLoop+Rendering.swift](../Sources/TerminalUI/RunLoop+Rendering.swift)
-- [TerminalControlMessages.swift](../Sources/TerminalUI/TerminalControlMessages.swift)
-- [TerminalWASIAppRunner.swift](../Runners/TerminalUIWASI/Sources/TerminalUIWASI/TerminalWASIAppRunner.swift)
+- one palette
+- one theme
+- cursor, font, and background-opacity options
 
-Changes:
+It no longer exposes built-in paired theme variants, system color-scheme
+ detection, or scheme-switched runtime updates.
 
-- teach terminal hosts to carry host-supplied theme state
-- add a paired runtime update API so hosted wrappers can switch appearance and
-  theme together
-- extend the browser/WASI control-message channel beyond resize so a running
-  scene can receive host style updates
+Hosts that want multiple themes swap complete style objects themselves.
 
-Expected result:
+## Authoring Rules
 
-- wrappers can switch themes at runtime through the same invalidation path used
-  for resize and hosted appearance changes
+- TUI apps author against semantic roles and explicit local colors.
+- TUI apps do not branch on host theme choice.
+- Hosts own theme selection.
+- Terminal-native execution keeps a sensible fallback look by synthesizing a
+  theme from terminal appearance.
+- Automatic chrome resolves from the active theme plus appearance facts rather
+  than from discrete mode branches.
 
-### Phase 3: Wrapper Migration
+## Removed Concepts
 
-Primary files:
+The styling stack no longer includes:
 
-- [GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUITerminalStyle.swift](../GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUITerminalStyle.swift)
-- [GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/GhosttySceneBridge.swift](../GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/GhosttySceneBridge.swift)
-- [GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUISceneHost.swift](../GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/SwiftUITUISceneHost.swift)
-- [GUI/WebTUIGUI/src/WebTUITerminalStyle.ts](../GUI/WebTUIGUI/src/WebTUITerminalStyle.ts)
-- [GUI/WebTUIGUI/src/WebTUISceneRuntime.ts](../GUI/WebTUIGUI/src/WebTUISceneRuntime.ts)
-- [GUI/WebTUIGUI/src/WebTUIApp.ts](../GUI/WebTUIGUI/src/WebTUIApp.ts)
-- [GUI/WebTUIGUI/src/wasi/BrowserWASIBridge.ts](../GUI/WebTUIGUI/src/wasi/BrowserWASIBridge.ts)
+- `ThemeColors`
+- `ColorScheme`
+- `.preferredColorScheme(...)`
+- wrapper-level `lightVariant` / `darkVariant`
+- wrapper-level `lightTheme` / `darkTheme`
+- wrapper-level `lightPalette` / `darkPalette`
+- web `colorSchemeMode`
+- built-in system color-scheme listeners for choosing TUI theme state
 
-Changes:
-
-- replace wrapper “light palette / dark palette” semantics with explicit host
-  variants that contain both:
-  - terminal-emulator palette state
-  - TerminalUI semantic theme state
-- bind those variants to host light/dark mode in the wrapper, not in the TUI
-  app
-- preserve current defaults so wrappers still work out of the box
-
-Expected result:
-
-- the wrapper owns theme choice
-- the TUI app still just renders semantic roles
-
-### Phase 4: Hex Ergonomics And Cleanup
-
-Primary files:
-
-- [Color.swift](../Sources/Core/Color.swift)
-- [Styling.swift](../Sources/Core/Styling.swift)
-- wrapper style files listed above
-
-Changes:
-
-- add non-throwing or convenience APIs that make hex color theme authoring easy
-  in Swift
-- update wrapper APIs so hex theme construction is direct and pleasant
-- remove or de-emphasize repository docs and examples that present light/dark
-  mode as the core styling abstraction
+This is a pre-release library, so these were removed directly instead of being
+kept as compatibility shims.
 
 ## Verification
 
-Root package:
-
-- [SwiftUISurfaceTests.swift](../Tests/TerminalUITests/SwiftUISurfaceTests.swift)
-- [StreamingTerminalHostTests.swift](../Tests/TerminalUITests/StreamingTerminalHostTests.swift)
-- [HostedSceneSessionTests.swift](../Tests/TerminalUITests/HostedSceneSessionTests.swift)
-
-Wrapper packages:
-
-- [StyleMappingTests.swift](../GUI/SwiftUITUIGUI/Tests/SwiftUITUIGUITests/StyleMappingTests.swift)
-- [ResizeBridgeTests.swift](../GUI/SwiftUITUIGUI/Tests/SwiftUITUIGUITests/ResizeBridgeTests.swift)
-- [WebTUITerminalStyle.test.ts](../GUI/WebTUIGUI/src/WebTUITerminalStyle.test.ts)
-- [WebTUIApp.test.ts](../GUI/WebTUIGUI/src/WebTUIApp.test.ts)
-
-Required commands before considering the migration complete:
+Required verification for this architecture remains:
 
 ```bash
 swift test
@@ -205,22 +126,9 @@ cd GUI/SwiftUITUIGUI && swift test
 cd GUI/WebTUIGUI && bun test
 ```
 
-## Success Criteria
+Key coverage areas:
 
-- A consumer can supply a `Theme`-equivalent semantic token map without the TUI
-  app knowing which theme is active.
-- The default terminal experience still looks like today when no theme is
-  provided.
-- SwiftUI and web wrappers can bind host light/dark changes to wrapper-owned
-  theme variants.
-- Hosted sessions and browser sessions can switch themes at runtime.
-- Hex colors are first-class in both Swift and web wrapper theme APIs.
-
-## Landing Notes
-
-- The root runtime now carries `TerminalRenderStyle`, which keeps terminal
-  appearance metadata and optional semantic `ThemeColors` together.
-- Hosted sessions, streaming hosts, and WASI/browser bridges all support
-  runtime style updates through the shared control-message path.
-- SwiftUI and web wrappers now own explicit light/dark theme variants and bind
-  them to host color-scheme changes outside the inner TUI app.
+- theme resolution falls back to `TerminalAppearance.synthesizedTheme()`
+- runtime style transport round-trips a single theme payload
+- hosted wrappers update running sessions without any mode argument
+- repo guards fail if legacy mode-based styling APIs are reintroduced

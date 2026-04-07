@@ -11,7 +11,6 @@ const { createWebTUIApp } = await import("./WebTUIApp.ts");
 import type { WebTUIAppOptions } from "./WebTUIApp.ts";
 import type {
   ResolvedWebTUITerminalStyle,
-  WebTUIColorScheme,
   WebTUITerminalStyle,
 } from "./WebTUITerminalStyle.ts";
 import type { WebTUISceneRuntimeOptions } from "./WebTUISceneRuntime.ts";
@@ -20,10 +19,7 @@ class FakeRuntime {
   readonly descriptorId: string;
   mountCount = 0;
   visible = false;
-  styleUpdates: Array<{
-    style: WebTUITerminalStyle | ResolvedWebTUITerminalStyle;
-    colorScheme: WebTUIColorScheme;
-  }> = [];
+  styleUpdates: Array<WebTUITerminalStyle | ResolvedWebTUITerminalStyle> = [];
   disposed = false;
 
   constructor(descriptorId: string) {
@@ -38,11 +34,10 @@ class FakeRuntime {
     this.visible = visible;
   }
 
-  setStyleAndScheme(
-    style: WebTUITerminalStyle | ResolvedWebTUITerminalStyle,
-    colorScheme: WebTUIColorScheme
+  setStyle(
+    style: WebTUITerminalStyle | ResolvedWebTUITerminalStyle
   ): void {
-    this.styleUpdates.push({ style, colorScheme });
+    this.styleUpdates.push(style);
   }
 
   resize(_columns: number, _rows: number): void {}
@@ -56,7 +51,7 @@ class FakeRuntime {
   }
 }
 
-test("app controller switches scenes and propagates style variants", async () => {
+test("app controller switches scenes and propagates active styles", async () => {
   const runtimes = new Map<string, FakeRuntime>();
   const seenRuntimeOptions = new Map<string, WebTUISceneRuntimeOptions>();
   const mount = makeElement("div");
@@ -70,31 +65,28 @@ test("app controller switches scenes and propagates style variants", async () =>
       ],
     },
     style: {
-      colorSchemeMode: "dark",
-      dark: {
-        theme: {
-          foreground: "#111111",
-          background: "#f0f0f0",
-          tint: "#0057b8",
-          separator: "#cccccc",
-          selection: "#ddeeff",
-          placeholder: "#666666",
-          link: "#0057b8",
-          fill: "#f7f7f7",
-          windowBackground: "#ffffff",
-          success: "#1a7f37",
-          warning: "#9a6700",
-          danger: "#cf222e",
-          info: "#0969da",
-          muted: "#57606a",
-        },
+      theme: {
+        foreground: "#111111",
+        background: "#f0f0f0",
+        tint: "#0057b8",
+        separator: "#cccccc",
+        selection: "#ddeeff",
+        placeholder: "#666666",
+        link: "#0057b8",
+        fill: "#f7f7f7",
+        windowBackground: "#ffffff",
+        success: "#1a7f37",
+        warning: "#9a6700",
+        danger: "#cf222e",
+        info: "#0969da",
+        muted: "#57606a",
       },
     },
     createElement: (tagName: string) => makeElement(tagName) as unknown as HTMLElement,
-    sceneRuntimeFactory: (options: WebTUISceneRuntimeOptions) => {
-      const runtime = new FakeRuntime(options.descriptor.id);
-      runtimes.set(options.descriptor.id, runtime);
-      seenRuntimeOptions.set(options.descriptor.id, options);
+    sceneRuntimeFactory: (runtimeOptions: WebTUISceneRuntimeOptions) => {
+      const runtime = new FakeRuntime(runtimeOptions.descriptor.id);
+      runtimes.set(runtimeOptions.descriptor.id, runtime);
+      seenRuntimeOptions.set(runtimeOptions.descriptor.id, runtimeOptions);
       return runtime as unknown as never;
     },
   };
@@ -104,7 +96,7 @@ test("app controller switches scenes and propagates style variants", async () =>
   const dashboardOptions = seenRuntimeOptions.get("dashboard");
 
   expect(controller.selectedSceneId).toBe("dashboard");
-  expect(dashboardOptions?.colorScheme).toBe("dark");
+  expect(dashboardOptions?.style.theme?.background).toBe("#f0f0f0");
   expect(dashboardRuntime?.visible).toBe(true);
   expect(dashboardRuntime?.mountCount).toBe(1);
 
@@ -121,13 +113,11 @@ test("app controller switches scenes and propagates style variants", async () =>
   expect(dashboardRuntime?.mountCount).toBe(1);
 
   controller.setStyle({
-    colorSchemeMode: "light",
     cursorBlink: true,
   });
 
-  expect(dashboardRuntime?.styleUpdates.at(-1)?.colorScheme).toBe("light");
-  expect(controlsRuntime?.styleUpdates.at(-1)?.colorScheme).toBe("light");
-  expect(dashboardRuntime?.styleUpdates.at(-1)?.style.cursorBlink).toBe(true);
+  expect(dashboardRuntime?.styleUpdates.at(-1)?.cursorBlink).toBe(true);
+  expect(controlsRuntime?.styleUpdates.at(-1)?.cursorBlink).toBe(true);
 
   await controller.dispose();
   expect(dashboardRuntime?.disposed).toBe(true);

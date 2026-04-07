@@ -264,7 +264,7 @@ private func serializeRenderedSnapshot(
     "configuration \(configuration.name)",
     "surface \(surfaceSize.width)x\(surfaceSize.height)",
     "capability glyph=\(configuration.capabilityProfile.glyphLevel.rawValue) color=\(configuration.capabilityProfile.colorLevel.rawValue) styles=\(configuration.capabilityProfile.emitsStyleEscapeSequences)",
-    "appearance fg=\(hexString(configuration.appearance.foregroundColor)) bg=\(hexString(configuration.appearance.backgroundColor)) tint=\(hexString(configuration.appearance.tintColor)) scheme=\(configuration.appearance.colorScheme.rawValue) contrast=\(configuration.appearance.colorSchemeContrast.rawValue) source=\(configuration.appearance.source.rawValue)",
+    "appearance fg=\(hexString(configuration.appearance.foregroundColor)) bg=\(hexString(configuration.appearance.backgroundColor)) tint=\(hexString(configuration.appearance.tintColor)) contrast=\(configuration.appearance.colorSchemeContrast.rawValue) source=\(configuration.appearance.source.rawValue)",
   ]
 
   let body = renderedLines.enumerated().map { index, line in

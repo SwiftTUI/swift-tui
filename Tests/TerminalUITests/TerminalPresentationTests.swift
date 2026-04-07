@@ -135,7 +135,6 @@ struct TerminalPresentationTests {
     #expect(appearance.foregroundColor == TerminalAppearance.defaultPalette[0])
     #expect(appearance.backgroundColor == TerminalAppearance.defaultPalette[15])
     #expect(appearance.tintColor == TerminalAppearance.defaultPalette[4])
-    #expect(appearance.colorScheme == .light)
     #expect(appearance.source == .environmentHeuristics)
   }
 
@@ -160,7 +159,6 @@ struct TerminalPresentationTests {
     #expect(appearance.foregroundColor == hexColor("#111213"))
     #expect(appearance.backgroundColor == hexColor("#F8F7F6"))
     #expect(appearance.tintColor == Color.magenta)
-    #expect(appearance.colorScheme == ColorScheme.light)
     #expect(appearance.source == AppearanceSource.activeQuery)
   }
 

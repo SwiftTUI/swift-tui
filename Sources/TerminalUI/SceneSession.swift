@@ -40,7 +40,7 @@ import View
   ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
     var environmentValues = EnvironmentValues()
     environmentValues.terminalAppearance = resources.terminalHost.appearance
-    environmentValues.themeOverride = resources.terminalHost.theme
+    environmentValues.theme = resources.terminalHost.theme
 
     var environmentSnapshot = EnvironmentSnapshot(
       debugSignature: sessionName,

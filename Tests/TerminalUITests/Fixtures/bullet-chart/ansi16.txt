@@ -2,6 +2,6 @@ fixture bullet-chart
 configuration ansi16
 surface 28x2
 capability glyph=unicode color=ansi16 styles=true
-appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 contrast=increased source=fallback
 01│\u{001B}[90mRollout\u{001B}[0m·················\u{001B}[90mt·90\u{001B}[0m
 02│\u{001B}[92m██████████\u{001B}[0m\u{001B}[90m──\u{001B}[0m\u{001B}[93m◇\u{001B}[0m\u{001B}[90m─\u{001B}[0m

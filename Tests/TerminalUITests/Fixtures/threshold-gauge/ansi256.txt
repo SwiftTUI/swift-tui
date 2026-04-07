@@ -2,6 +2,6 @@ fixture threshold-gauge
 configuration ansi256
 surface 28x2
 capability glyph=unicode color=ansi256 styles=true
-appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 contrast=increased source=fallback
 01│\u{001B}[38;5;66mSLO\u{001B}[0m···················\u{001B}[38;5;60m84/100\u{001B}[0m
 02│\u{001B}[38;5;179m━━━━━━━━━━━\u{001B}[0m\u{001B}[38;5;114m◆━━\u{001B}[0m

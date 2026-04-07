@@ -1,7 +1,6 @@
 import { StdIOPipe } from "./StdIOPipe.ts";
 import {
   encodeWebTUITerminalRenderStyleBase64,
-  type WebTUIColorScheme,
   type WebTUITerminalStyle,
 } from "../WebTUITerminalStyle.ts";
 
@@ -11,7 +10,6 @@ export interface BrowserWASIBridgeOptions {
   rows: number;
   environment?: Record<string, string>;
   renderStyle?: WebTUITerminalStyle;
-  colorScheme?: WebTUIColorScheme;
 }
 
 export interface BrowserWASIOutputSink {
@@ -40,8 +38,7 @@ export class BrowserWASIBridge {
       ...(options.renderStyle
         ? {
             TUIGUI_RENDER_STYLE: encodeWebTUITerminalRenderStyleBase64(
-              options.renderStyle,
-              options.colorScheme ?? "dark"
+              options.renderStyle
             ),
           }
         : {}),
@@ -76,14 +73,10 @@ export class BrowserWASIBridge {
   }
 
   updateRenderStyle(
-    style: WebTUITerminalStyle,
-    colorScheme: WebTUIColorScheme = "dark"
+    style: WebTUITerminalStyle
   ): void {
-    this.environment.TUIGUI_RENDER_STYLE = encodeWebTUITerminalRenderStyleBase64(
-      style,
-      colorScheme
-    );
-    this.stdin.write(encodeRenderStyleControlMessage(style, colorScheme));
+    this.environment.TUIGUI_RENDER_STYLE = encodeWebTUITerminalRenderStyleBase64(style);
+    this.stdin.write(encodeRenderStyleControlMessage(style));
   }
 
   sendInput(
@@ -119,9 +112,8 @@ export function encodeResizeControlMessage(
 }
 
 export function encodeRenderStyleControlMessage(
-  style: WebTUITerminalStyle,
-  colorScheme: WebTUIColorScheme = "dark"
+  style: WebTUITerminalStyle
 ): Uint8Array {
-  const encoded = encodeWebTUITerminalRenderStyleBase64(style, colorScheme);
+  const encoded = encodeWebTUITerminalRenderStyleBase64(style);
   return new TextEncoder().encode(`\u001Estyle:${encoded}\n`);
 }

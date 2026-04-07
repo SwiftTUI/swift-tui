@@ -78,7 +78,7 @@ default package-development documentation uses `swiftly`.
 - [ARCHITECTURE_AUDIT.md](ARCHITECTURE_AUDIT.md): March 2026 architecture audit after the source split
 - [REFACTOR_PLAN.md](REFACTOR_PLAN.md): follow-up ledger from that architecture audit
 - [GRAPH_MIGRATION.md](GRAPH_MIGRATION.md): completed persistent-graph migration record
-- [THEME_MIGRATION_PLAN.md](THEME_MIGRATION_PLAN.md): landed theme-system migration record across runtime and wrappers
+- [THEME_MIGRATION_PLAN.md](THEME_MIGRATION_PLAN.md): landed theme-only styling architecture record across runtime and wrappers
 - [TOOLBAR_IMPLEMENTATION_PLAN.md](TOOLBAR_IMPLEMENTATION_PLAN.md): landed toolbar implementation record covering keyboard-help API removal
 - [`plans/`](plans): dated implementation plans retained for larger refactors such as the runner-package split
 

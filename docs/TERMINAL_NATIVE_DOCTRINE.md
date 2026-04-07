@@ -406,7 +406,7 @@ Default styling should assume:
 - fill is for emphasis, not for every container
 - borders are structural, not decorative
 - gradients are opt-in, not the baseline
-- high contrast in light and dark mode is non-negotiable
+- high contrast across bright, dim, and mid-luminance themes is non-negotiable
 
 ### API And Component Priorities
 

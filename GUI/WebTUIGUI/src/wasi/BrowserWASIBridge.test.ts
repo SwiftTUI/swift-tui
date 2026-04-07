@@ -12,23 +12,21 @@ import {
 
 test("bridge seeds initial render style and emits runtime style updates", async () => {
   const style = {
-    dark: {
-      theme: {
-        foreground: "#ededed",
-        background: "#111111",
-        tint: "#56b6c2",
-        separator: "#4c566a",
-        selection: "#2e3440",
-        placeholder: "#8c92ac",
-        link: "#5ba3ff",
-        fill: "#2b303b",
-        windowBackground: "#15181e",
-        success: "#61c67b",
-        warning: "#ebb33c",
-        danger: "#e05757",
-        info: "#56b6c2",
-        muted: "#8c92ac",
-      },
+    theme: {
+      foreground: "#ededed",
+      background: "#111111",
+      tint: "#56b6c2",
+      separator: "#4c566a",
+      selection: "#2e3440",
+      placeholder: "#8c92ac",
+      link: "#5ba3ff",
+      fill: "#2b303b",
+      windowBackground: "#15181e",
+      success: "#61c67b",
+      warning: "#ebb33c",
+      danger: "#e05757",
+      info: "#56b6c2",
+      muted: "#8c92ac",
     },
   };
 
@@ -37,7 +35,6 @@ test("bridge seeds initial render style and emits runtime style updates", async 
     columns: 80,
     rows: 24,
     renderStyle: style,
-    colorScheme: "dark",
   });
 
   expect(
@@ -46,12 +43,12 @@ test("bridge seeds initial render style and emits runtime style updates", async 
   ).toBe("#111111");
   expect(
     bridge.environment.TUIGUI_RENDER_STYLE
-  ).toBe(encodeWebTUITerminalRenderStyleBase64(style, "dark"));
+  ).toBe(encodeWebTUITerminalRenderStyleBase64(style));
 
-  bridge.updateRenderStyle(style, "dark");
+  bridge.updateRenderStyle(style);
   const input = await bridge.stdin.read();
   expect(Array.from(input ?? [])).toEqual(
-    Array.from(encodeRenderStyleControlMessage(style, "dark"))
+    Array.from(encodeRenderStyleControlMessage(style))
   );
 });
 

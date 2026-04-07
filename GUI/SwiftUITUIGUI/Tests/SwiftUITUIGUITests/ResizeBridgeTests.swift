@@ -59,47 +59,28 @@ func bridge_forwards_resize_and_style_updates() async throws {
   )
   #expect(session.receivedResizes == [.init(width: 120, height: 40)])
 
-  bridge.updateAppearance(.dark)
-  #expect(session.receivedStyles.last?.appearance.colorScheme == .dark)
-  #expect(session.receivedStyles.last?.theme == style.theme(for: .dark))
+  #expect(session.receivedStyles.last == style.renderStyle)
 
   let swappedStyle = SwiftUITUITerminalStyle(
-    lightVariant: .init(
-      palette: .init(
-        foreground: "#0A0B0C",
-        background: "#1A1B1C",
-        cursor: "#2A2B2C",
-        selectionBackground: "#3A3B3C",
-        selectionForeground: "#4A4B4C",
-        ansiColors: SwiftUITUITerminalPalette.defaultLight.ansiColors
-      ),
-      theme: ThemeColors(
-        foreground: .hex("#0A0B0C"),
-        background: .hex("#1A1B1C"),
-        tint: .hex("#2A2B2C")
-      )
+    palette: .init(
+      foreground: .hex("#5A5B5C"),
+      background: .hex("#6A6B6C"),
+      cursor: .hex("#7A7B7C"),
+      selectionBackground: .hex("#8A8B8C"),
+      selectionForeground: .hex("#9A9B9C"),
+      ansi: .default
     ),
-    darkVariant: .init(
-      palette: .init(
-        foreground: "#5A5B5C",
-        background: "#6A6B6C",
-        cursor: "#7A7B7C",
-        selectionBackground: "#8A8B8C",
-        selectionForeground: "#9A9B9C",
-        ansiColors: SwiftUITUITerminalPalette.defaultDark.ansiColors
-      ),
-      theme: ThemeColors(
-        foreground: .hex("#5A5B5C"),
-        background: .hex("#6A6B6C"),
-        tint: .hex("#7A7B7C")
-      )
+    theme: Theme(
+      foreground: .hex("#5A5B5C"),
+      background: .hex("#6A6B6C"),
+      tint: .hex("#7A7B7C")
     )
   )
 
   bridge.apply(style: swappedStyle)
   #expect(session.receivedStyles.last?.appearance.foregroundColor == .hex("#5A5B5C"))
   #expect(session.receivedStyles.last?.appearance.backgroundColor == .hex("#6A6B6C"))
-  #expect(session.receivedStyles.last?.theme == swappedStyle.theme(for: .dark))
+  #expect(session.receivedStyles.last?.theme == swappedStyle.theme)
 
   bridge.stopSession()
   #expect(session.stopCount == 1)

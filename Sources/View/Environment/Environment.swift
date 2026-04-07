@@ -140,10 +140,9 @@ public struct EnvironmentValues: Equatable, Sendable {
       values: mergedValues,
       style: StyleEnvironmentSnapshot(
         appearance: terminalAppearance,
-        themeOverride: themeOverride,
+        theme: theme,
         foregroundStyle: foregroundStyle,
         tintStyle: tintStyle,
-        preferredColorScheme: preferredColorScheme,
         isEnabled: isEnabled
       )
     )

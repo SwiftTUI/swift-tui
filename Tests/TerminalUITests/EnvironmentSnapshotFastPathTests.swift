@@ -13,9 +13,6 @@ struct EnvironmentSnapshotFastPathTests {
       values: ["theme": "dark", "mode": "compact"],
       style: .init(
         appearance: .fallback,
-        preferredColorScheme: .dark,
-        colorScheme: .dark,
-        colorSchemeContrast: .increased,
         isEnabled: true
       )
     )
@@ -24,9 +21,6 @@ struct EnvironmentSnapshotFastPathTests {
       values: ["mode": "compact", "theme": "dark"],
       style: .init(
         appearance: .fallback,
-        preferredColorScheme: .dark,
-        colorScheme: .dark,
-        colorSchemeContrast: .increased,
         isEnabled: true
       )
     )
@@ -58,7 +52,6 @@ struct EnvironmentSnapshotFastPathTests {
   func resolveContextSnapshotsCompareEqual() {
     var environmentValues = EnvironmentValues()
     environmentValues.isEnabled = false
-    environmentValues.preferredColorScheme = .dark
 
     let left = ResolveContext(
       identity: testIdentity("Root"),

@@ -1,6 +1,6 @@
 public import Core
 
-enum ThemeOverrideKey: EnvironmentKey {
+enum ThemeKey: EnvironmentKey {
   static let defaultValue: Theme? = nil
 }
 
@@ -18,10 +18,6 @@ private enum TerminalAppearanceKey: EnvironmentKey {
 
 private enum TerminalSizeKey: EnvironmentKey {
   static let defaultValue = Size(width: 80, height: 24)
-}
-
-private enum PreferredColorSchemeKey: EnvironmentKey {
-  static let defaultValue: ColorScheme? = nil
 }
 
 private enum ControlProminenceKey: EnvironmentKey {
@@ -103,17 +99,8 @@ extension EnvironmentValues {
     set { self[TerminalSizeKey.self] = newValue }
   }
 
-  public var colorScheme: ColorScheme {
-    preferredColorScheme ?? terminalAppearance.colorScheme
-  }
-
   public var colorSchemeContrast: ColorSchemeContrast {
     terminalAppearance.colorSchemeContrast
-  }
-
-  public var preferredColorScheme: ColorScheme? {
-    get { self[PreferredColorSchemeKey.self] }
-    set { self[PreferredColorSchemeKey.self] = newValue }
   }
 
   public var controlProminence: ControlProminence {
@@ -166,9 +153,9 @@ extension EnvironmentValues {
     set { self[TableHeaderVisibilityKey.self] = newValue }
   }
 
-  package var themeOverride: Theme? {
-    get { self[ThemeOverrideKey.self] }
-    set { self[ThemeOverrideKey.self] = newValue }
+  package var theme: Theme? {
+    get { self[ThemeKey.self] }
+    set { self[ThemeKey.self] = newValue }
   }
 
   public var foregroundStyle: AnyShapeStyle? {
@@ -219,10 +206,9 @@ extension EnvironmentValues {
   package var styleEnvironmentSnapshot: StyleEnvironmentSnapshot {
     .init(
       appearance: terminalAppearance,
-      themeOverride: themeOverride,
+      theme: theme,
       foregroundStyle: foregroundStyle,
       tintStyle: tintStyle,
-      preferredColorScheme: preferredColorScheme,
       isEnabled: isEnabled
     )
   }

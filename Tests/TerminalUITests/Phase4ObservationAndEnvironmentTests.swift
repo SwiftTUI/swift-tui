@@ -845,7 +845,6 @@ struct Phase4ObservationAndEnvironmentTests {
       foregroundColor: hexColor("#161A20"),
       backgroundColor: hexColor("#F6F7F9"),
       tintColor: .blue,
-      colorScheme: .light,
       source: .fallback
     )
 
@@ -872,8 +871,8 @@ struct Phase4ObservationAndEnvironmentTests {
     #expect(result.exitReason == .quitKey)
     let firstFrame = try #require(terminal.frames.first)
     let lastFrame = try #require(terminal.frames.last)
-    #expect(firstFrame.contains("Scheme dark"))
-    #expect(lastFrame.contains("Scheme light"))
+    #expect(firstFrame.contains("Background #1E222A"))
+    #expect(lastFrame.contains("Background #F6F7F9"))
   }
 
   @MainActor
@@ -1124,7 +1123,7 @@ private struct EnvironmentReaderActionCounterView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      EnvironmentReader(\.colorScheme) { _ in
+      EnvironmentReader(\.terminalAppearance) { _ in
         Button("Primary") {
           count += 1
         }
@@ -1373,8 +1372,8 @@ private struct GalleryLikeObservableSceneView: View {
 private struct AppearanceProbeView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      EnvironmentReader(\.colorScheme) { scheme in
-        Text("Scheme \(scheme == .dark ? "dark" : "light")")
+      EnvironmentReader(\.terminalAppearance) { appearance in
+        Text("Background \(appearance.backgroundColor.hexString())")
       }
       Button("Refresh") {}
     }

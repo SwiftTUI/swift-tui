@@ -37,7 +37,7 @@ public final class HostedSceneSession {
     sceneID: WindowIdentifier,
     initialSize: Size,
     appearance: TerminalAppearance,
-    theme: ThemeColors? = nil,
+    theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
     onOutput: @escaping @Sendable (String) -> Void
   ) throws {
@@ -74,7 +74,7 @@ public final class HostedSceneSession {
     sessionName: String,
     initialSize: Size,
     appearance: TerminalAppearance,
-    theme: ThemeColors? = nil,
+    theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile,
     runScene: @escaping HostedSceneRunner,
     onOutput: @escaping @Sendable (String) -> Void
@@ -166,7 +166,7 @@ public final class HostedSceneSession {
   }
 
   public func updateTheme(
-    _ theme: ThemeColors?
+    _ theme: Theme?
   ) {
     host.updateTheme(theme)
     signalReader.send("SIGWINCH")

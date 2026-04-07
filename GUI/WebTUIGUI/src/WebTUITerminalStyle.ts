@@ -1,16 +1,8 @@
 import type { ITheme } from "./vendor/ghostty-web.ts";
 
-export type WebTUIColorScheme = "light" | "dark";
-export type WebTUIColorSchemeMode = WebTUIColorScheme | "system";
-
 export type WebTUITerminalCursorStyle = "block" | "bar" | "underline";
 
-export interface WebTUITerminalPalette {
-  foreground?: string;
-  background?: string;
-  cursor?: string;
-  selectionBackground?: string;
-  selectionForeground?: string;
+export interface WebTUIANSIColors {
   black?: string;
   red?: string;
   green?: string;
@@ -29,7 +21,16 @@ export interface WebTUITerminalPalette {
   brightWhite?: string;
 }
 
-export interface WebTUITerminalThemeColors {
+export interface WebTUITerminalPalette {
+  foreground?: string;
+  background?: string;
+  cursor?: string;
+  selectionBackground?: string;
+  selectionForeground?: string;
+  ansi?: WebTUIANSIColors;
+}
+
+export interface WebTUITerminalTheme {
   foreground?: string;
   background?: string;
   tint?: string;
@@ -46,29 +47,23 @@ export interface WebTUITerminalThemeColors {
   muted?: string;
 }
 
-export interface WebTUITerminalThemeVariant {
-  palette?: WebTUITerminalPalette;
-  theme?: WebTUITerminalThemeColors;
-}
-
 export interface WebTUITerminalStyle {
   fontSize?: number;
   fontFamily?: string;
   cursorStyle?: WebTUITerminalCursorStyle;
   cursorBlink?: boolean;
   backgroundOpacity?: number;
-  colorSchemeMode?: WebTUIColorSchemeMode;
-  light?: WebTUITerminalThemeVariant;
-  dark?: WebTUITerminalThemeVariant;
-  lightPalette?: WebTUITerminalPalette;
-  darkPalette?: WebTUITerminalPalette;
-  lightTheme?: WebTUITerminalThemeColors;
-  darkTheme?: WebTUITerminalThemeColors;
+  palette?: WebTUITerminalPalette;
+  theme?: WebTUITerminalTheme;
 }
 
-export interface ResolvedWebTUITerminalThemeVariant {
-  palette: Required<WebTUITerminalPalette>;
-  theme: Required<WebTUITerminalThemeColors>;
+export interface ResolvedWebTUITerminalPalette {
+  foreground: string;
+  background: string;
+  cursor: string;
+  selectionBackground: string;
+  selectionForeground: string;
+  ansi: Required<WebTUIANSIColors>;
 }
 
 export interface ResolvedWebTUITerminalStyle {
@@ -77,14 +72,13 @@ export interface ResolvedWebTUITerminalStyle {
   cursorStyle: WebTUITerminalCursorStyle;
   cursorBlink: boolean;
   backgroundOpacity: number;
-  colorSchemeMode: WebTUIColorSchemeMode;
-  light: ResolvedWebTUITerminalThemeVariant;
-  dark: ResolvedWebTUITerminalThemeVariant;
+  palette: ResolvedWebTUITerminalPalette;
+  theme: Required<WebTUITerminalTheme>;
 }
 
 export interface WebTUITerminalRenderStyle {
   appearance: WebTUITerminalAppearance;
-  theme?: WebTUITerminalThemeColors;
+  theme?: WebTUITerminalTheme;
 }
 
 export interface WebTUITerminalAppearance {
@@ -92,7 +86,6 @@ export interface WebTUITerminalAppearance {
   backgroundColor: string;
   tintColor: string;
   palette: Record<string, string>;
-  colorScheme: WebTUIColorScheme;
   colorSchemeContrast: "standard" | "increased";
   source: "activeQuery" | "environmentHeuristics" | "fallback" | "override";
 }
@@ -100,55 +93,35 @@ export interface WebTUITerminalAppearance {
 const defaultFontFamily =
   '"SFMono-Regular", "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono", monospace';
 
-const defaultDarkPalette: Required<WebTUITerminalPalette> = {
-  foreground: "#d4d4d4",
-  background: "#1e1e1e",
-  cursor: "#ffffff",
-  selectionBackground: "#264f78",
-  selectionForeground: "#ffffff",
-  black: "#000000",
-  red: "#cd3131",
-  green: "#0dbc79",
-  yellow: "#e5e510",
-  blue: "#2472c8",
-  magenta: "#bc3fbc",
-  cyan: "#11a8cd",
-  white: "#e5e5e5",
-  brightBlack: "#666666",
-  brightRed: "#f14c4c",
-  brightGreen: "#23d18b",
-  brightYellow: "#f5f543",
-  brightBlue: "#3b8eea",
-  brightMagenta: "#d670d6",
-  brightCyan: "#29b8db",
-  brightWhite: "#e5e5e5",
+const defaultANSI: Required<WebTUIANSIColors> = {
+  black: "#20242c",
+  red: "#e05757",
+  green: "#61c67b",
+  yellow: "#ebb33c",
+  blue: "#5ba3ff",
+  magenta: "#b46eff",
+  cyan: "#56b6c2",
+  white: "#eceff4",
+  brightBlack: "#8c92ac",
+  brightRed: "#ff7b72",
+  brightGreen: "#7ee787",
+  brightYellow: "#f2cc60",
+  brightBlue: "#79c0ff",
+  brightMagenta: "#d2a8ff",
+  brightCyan: "#7de2d1",
+  brightWhite: "#ffffff",
 };
 
-const defaultLightPalette: Required<WebTUITerminalPalette> = {
-  foreground: "#1f2328",
-  background: "#ffffff",
-  cursor: "#1f2328",
-  selectionBackground: "#c8ddff",
-  selectionForeground: "#1f2328",
-  black: "#1f2328",
-  red: "#cf222e",
-  green: "#1a7f37",
-  yellow: "#9a6700",
-  blue: "#0969da",
-  magenta: "#8250df",
-  cyan: "#1b7c83",
-  white: "#6e7781",
-  brightBlack: "#57606a",
-  brightRed: "#a40e26",
-  brightGreen: "#116329",
-  brightYellow: "#633c01",
-  brightBlue: "#0550ae",
-  brightMagenta: "#8250df",
-  brightCyan: "#116b74",
-  brightWhite: "#24292f",
+const defaultPalette: ResolvedWebTUITerminalPalette = {
+  foreground: "#eceff4",
+  background: "#1e222a",
+  cursor: "#56b6c2",
+  selectionBackground: "#2e3440",
+  selectionForeground: "#eceff4",
+  ansi: defaultANSI,
 };
 
-const defaultDarkTheme: Required<WebTUITerminalThemeColors> = {
+const defaultTheme: Required<WebTUITerminalTheme> = {
   foreground: "#eceff4",
   background: "#1e222a",
   tint: "#56b6c2",
@@ -165,59 +138,19 @@ const defaultDarkTheme: Required<WebTUITerminalThemeColors> = {
   muted: "#8c92ac",
 };
 
-const defaultLightTheme: Required<WebTUITerminalThemeColors> = {
-  foreground: "#1f2328",
-  background: "#ffffff",
-  tint: "#0969da",
-  separator: "#d0d7de",
-  selection: "#c8ddff",
-  placeholder: "#6e7781",
-  link: "#0969da",
-  fill: "#f6f8fa",
-  windowBackground: "#ffffff",
-  success: "#1a7f37",
-  warning: "#9a6700",
-  danger: "#cf222e",
-  info: "#1b7c83",
-  muted: "#57606a",
-};
-
-const defaultStyle: Omit<ResolvedWebTUITerminalStyle, "light" | "dark"> = {
-  fontSize: 14,
-  fontFamily: defaultFontFamily,
-  cursorStyle: "block",
-  cursorBlink: false,
-  backgroundOpacity: 1,
-  colorSchemeMode: "dark",
-};
-
 export function normalizeWebTUITerminalStyle(
   style: WebTUITerminalStyle = {}
 ): ResolvedWebTUITerminalStyle {
+  const palette = normalizePalette(style.palette, defaultPalette);
+  const theme = normalizeTheme(style.theme, palette, defaultTheme);
   return {
-    ...defaultStyle,
-    fontSize: normalizeFontSize(style.fontSize ?? defaultStyle.fontSize),
-    fontFamily: style.fontFamily ?? defaultStyle.fontFamily,
-    cursorStyle: style.cursorStyle ?? defaultStyle.cursorStyle,
-    cursorBlink: style.cursorBlink ?? defaultStyle.cursorBlink,
-    backgroundOpacity: normalizeOpacity(style.backgroundOpacity ?? defaultStyle.backgroundOpacity),
-    colorSchemeMode: style.colorSchemeMode ?? defaultStyle.colorSchemeMode,
-    light: resolveThemeVariant(
-      style.light ?? {
-        palette: style.lightPalette,
-        theme: style.lightTheme,
-      },
-      defaultLightPalette,
-      defaultLightTheme
-    ),
-    dark: resolveThemeVariant(
-      style.dark ?? {
-        palette: style.darkPalette,
-        theme: style.darkTheme,
-      },
-      defaultDarkPalette,
-      defaultDarkTheme
-    ),
+    fontSize: normalizeFontSize(style.fontSize ?? 14),
+    fontFamily: style.fontFamily ?? defaultFontFamily,
+    cursorStyle: style.cursorStyle ?? "block",
+    cursorBlink: style.cursorBlink ?? false,
+    backgroundOpacity: normalizeOpacity(style.backgroundOpacity ?? 1),
+    palette,
+    theme,
   };
 }
 
@@ -225,64 +158,38 @@ export function mergeWebTUITerminalStyle(
   base: WebTUITerminalStyle,
   patch: WebTUITerminalStyle
 ): ResolvedWebTUITerminalStyle {
+  const resolvedBase = normalizeWebTUITerminalStyle(base);
   return normalizeWebTUITerminalStyle({
-    ...normalizeWebTUITerminalStyle(base),
+    ...resolvedBase,
     ...patch,
-    light: mergeThemeVariant(
-      normalizeWebTUITerminalStyle(base).light,
-      patch.light ?? {
-        palette: patch.lightPalette,
-        theme: patch.lightTheme,
-      }
-    ),
-    dark: mergeThemeVariant(
-      normalizeWebTUITerminalStyle(base).dark,
-      patch.dark ?? {
-        palette: patch.darkPalette,
-        theme: patch.darkTheme,
-      }
-    ),
+    palette: mergePalette(resolvedBase.palette, patch.palette),
+    theme: patch.theme ? { ...resolvedBase.theme, ...patch.theme } : resolvedBase.theme,
   });
 }
 
-export function resolveWebTUIColorScheme(
-  style: WebTUITerminalStyle,
-  systemScheme: WebTUIColorScheme = "dark"
-): WebTUIColorScheme {
-  const normalized = normalizeWebTUITerminalStyle(style);
-  return normalized.colorSchemeMode === "system"
-    ? systemScheme
-    : normalized.colorSchemeMode;
-}
-
 export function resolveWebTUITerminalRenderStyle(
-  style: WebTUITerminalStyle,
-  colorScheme: WebTUIColorScheme = "dark"
+  style: WebTUITerminalStyle
 ): WebTUITerminalRenderStyle {
   const normalized = normalizeWebTUITerminalStyle(style);
-  const variant = resolveVariantForScheme(normalized, colorScheme);
   return {
     appearance: {
-      foregroundColor: variant.theme.foreground,
-      backgroundColor: variant.theme.background,
-      tintColor: variant.theme.tint,
-      palette: paletteToIndexedMap(variant.palette),
-      colorScheme,
-      colorSchemeContrast: contrastRatio(variant.theme.foreground, variant.theme.background) >= 7
+      foregroundColor: normalized.theme.foreground,
+      backgroundColor: normalized.theme.background,
+      tintColor: normalized.theme.tint,
+      palette: paletteToIndexedMap(normalized.palette.ansi),
+      colorSchemeContrast: contrastRatio(normalized.theme.foreground, normalized.theme.background) >= 7
         ? "increased"
         : "standard",
       source: "override",
     },
-    theme: { ...variant.theme },
+    theme: { ...normalized.theme },
   };
 }
 
 export function encodeWebTUITerminalRenderStyleBase64(
-  style: WebTUITerminalStyle,
-  colorScheme: WebTUIColorScheme = "dark"
+  style: WebTUITerminalStyle
 ): string {
-  const encoded = JSON.stringify(resolveWebTUITerminalRenderStyle(style, colorScheme));
-  return encodeBase64(encoded);
+  return encodeBase64(JSON.stringify(resolveWebTUITerminalRenderStyle(style)));
 }
 
 export function decodeWebTUITerminalRenderStyleBase64(
@@ -301,97 +208,56 @@ export function decodeWebTUITerminalRenderStyleBase64(
 }
 
 export function ghosttyThemeForStyle(
-  style: WebTUITerminalStyle,
-  colorScheme: WebTUIColorScheme = "dark"
+  style: WebTUITerminalStyle
 ): ITheme {
   const normalized = normalizeWebTUITerminalStyle(style);
-  const variant = resolveVariantForScheme(normalized, colorScheme);
   return {
-    foreground: variant.palette.foreground,
-    background: variant.palette.background,
-    cursor: variant.palette.cursor,
-    selectionBackground: variant.palette.selectionBackground,
-    selectionForeground: variant.palette.selectionForeground,
-    black: variant.palette.black,
-    red: variant.palette.red,
-    green: variant.palette.green,
-    yellow: variant.palette.yellow,
-    blue: variant.palette.blue,
-    magenta: variant.palette.magenta,
-    cyan: variant.palette.cyan,
-    white: variant.palette.white,
-    brightBlack: variant.palette.brightBlack,
-    brightRed: variant.palette.brightRed,
-    brightGreen: variant.palette.brightGreen,
-    brightYellow: variant.palette.brightYellow,
-    brightBlue: variant.palette.brightBlue,
-    brightMagenta: variant.palette.brightMagenta,
-    brightCyan: variant.palette.brightCyan,
-    brightWhite: variant.palette.brightWhite,
+    foreground: normalized.palette.foreground,
+    background: normalized.palette.background,
+    cursor: normalized.palette.cursor,
+    selectionBackground: normalized.palette.selectionBackground,
+    selectionForeground: normalized.palette.selectionForeground,
+    black: normalized.palette.ansi.black,
+    red: normalized.palette.ansi.red,
+    green: normalized.palette.ansi.green,
+    yellow: normalized.palette.ansi.yellow,
+    blue: normalized.palette.ansi.blue,
+    magenta: normalized.palette.ansi.magenta,
+    cyan: normalized.palette.ansi.cyan,
+    white: normalized.palette.ansi.white,
+    brightBlack: normalized.palette.ansi.brightBlack,
+    brightRed: normalized.palette.ansi.brightRed,
+    brightGreen: normalized.palette.ansi.brightGreen,
+    brightYellow: normalized.palette.ansi.brightYellow,
+    brightBlue: normalized.palette.ansi.brightBlue,
+    brightMagenta: normalized.palette.ansi.brightMagenta,
+    brightCyan: normalized.palette.ansi.brightCyan,
+    brightWhite: normalized.palette.ansi.brightWhite,
   };
 }
 
 export function webTUITerminalBackgroundColor(
-  style: WebTUITerminalStyle,
-  colorScheme: WebTUIColorScheme = "dark"
+  style: WebTUITerminalStyle
 ): string {
   const normalized = normalizeWebTUITerminalStyle(style);
-  const variant = resolveVariantForScheme(normalized, colorScheme);
-  return hexToRgba(variant.theme.background, normalized.backgroundOpacity);
+  return hexToRgba(normalized.theme.background, normalized.backgroundOpacity);
 }
 
 export function applyWebTUITerminalStyle(
   element: HTMLElement,
-  style: WebTUITerminalStyle,
-  colorScheme: WebTUIColorScheme = "dark"
+  style: WebTUITerminalStyle
 ): void {
   const normalized = normalizeWebTUITerminalStyle(style);
-  const variant = resolveVariantForScheme(normalized, colorScheme);
   element.style.fontFamily = normalized.fontFamily;
   element.style.fontSize = `${normalized.fontSize}px`;
-  element.style.background = hexToRgba(variant.theme.background, normalized.backgroundOpacity);
-  element.style.color = variant.theme.foreground;
-}
-
-function resolveVariantForScheme(
-  style: ResolvedWebTUITerminalStyle,
-  colorScheme: WebTUIColorScheme
-): ResolvedWebTUITerminalThemeVariant {
-  return colorScheme === "light" ? style.light : style.dark;
-}
-
-function resolveThemeVariant(
-  input: WebTUITerminalThemeVariant | undefined,
-  defaultPalette: Required<WebTUITerminalPalette>,
-  defaultTheme: Required<WebTUITerminalThemeColors>
-): ResolvedWebTUITerminalThemeVariant {
-  const palette = normalizePalette(input?.palette, defaultPalette);
-  const theme = normalizeTheme(input?.theme, palette, defaultTheme);
-  return { palette, theme };
-}
-
-function mergeThemeVariant(
-  base: ResolvedWebTUITerminalThemeVariant,
-  patch: WebTUITerminalThemeVariant | undefined
-): ResolvedWebTUITerminalThemeVariant {
-  if (!patch) {
-    return base;
-  }
-
-  return resolveThemeVariant(
-    {
-      palette: patch.palette ?? base.palette,
-      theme: patch.theme ?? base.theme,
-    },
-    base.palette,
-    base.theme
-  );
+  element.style.background = hexToRgba(normalized.theme.background, normalized.backgroundOpacity);
+  element.style.color = normalized.theme.foreground;
 }
 
 function normalizePalette(
   input: WebTUITerminalPalette | undefined,
-  defaults: Required<WebTUITerminalPalette>
-): Required<WebTUITerminalPalette> {
+  defaults: ResolvedWebTUITerminalPalette
+): ResolvedWebTUITerminalPalette {
   return {
     foreground: normalizeHexColor(input?.foreground ?? defaults.foreground),
     background: normalizeHexColor(input?.background ?? defaults.background),
@@ -402,6 +268,30 @@ function normalizePalette(
     selectionForeground: normalizeHexColor(
       input?.selectionForeground ?? defaults.selectionForeground
     ),
+    ansi: normalizeANSI(input?.ansi, defaults.ansi),
+  };
+}
+
+function mergePalette(
+  base: ResolvedWebTUITerminalPalette,
+  patch: WebTUITerminalPalette | undefined
+): WebTUITerminalPalette {
+  if (!patch) {
+    return base;
+  }
+
+  return {
+    ...base,
+    ...patch,
+    ansi: patch.ansi ? { ...base.ansi, ...patch.ansi } : base.ansi,
+  };
+}
+
+function normalizeANSI(
+  input: WebTUIANSIColors | undefined,
+  defaults: Required<WebTUIANSIColors>
+): Required<WebTUIANSIColors> {
+  return {
     black: normalizeHexColor(input?.black ?? defaults.black),
     red: normalizeHexColor(input?.red ?? defaults.red),
     green: normalizeHexColor(input?.green ?? defaults.green),
@@ -422,10 +312,10 @@ function normalizePalette(
 }
 
 function normalizeTheme(
-  input: WebTUITerminalThemeColors | undefined,
-  palette: Required<WebTUITerminalPalette>,
-  defaults: Required<WebTUITerminalThemeColors>
-): Required<WebTUITerminalThemeColors> {
+  input: WebTUITerminalTheme | undefined,
+  palette: ResolvedWebTUITerminalPalette,
+  defaults: Required<WebTUITerminalTheme>
+): Required<WebTUITerminalTheme> {
   const derived = themeFromPalette(palette, defaults);
   return {
     foreground: normalizeHexColor(input?.foreground ?? derived.foreground),
@@ -446,47 +336,47 @@ function normalizeTheme(
 }
 
 function themeFromPalette(
-  palette: Required<WebTUITerminalPalette>,
-  defaults: Required<WebTUITerminalThemeColors>
-): Required<WebTUITerminalThemeColors> {
+  palette: ResolvedWebTUITerminalPalette,
+  defaults: Required<WebTUITerminalTheme>
+): Required<WebTUITerminalTheme> {
   return {
     foreground: palette.foreground,
     background: palette.background,
-    tint: palette.cyan,
-    separator: palette.brightBlack,
+    tint: palette.cursor,
+    separator: palette.ansi.brightBlack,
     selection: palette.selectionBackground,
-    placeholder: palette.brightBlack,
-    link: palette.blue,
+    placeholder: palette.ansi.brightBlack,
+    link: palette.ansi.blue,
     fill: defaults.fill,
     windowBackground: palette.background,
-    success: palette.green,
-    warning: palette.yellow,
-    danger: palette.red,
-    info: palette.cyan,
-    muted: palette.brightBlack,
+    success: palette.ansi.green,
+    warning: palette.ansi.yellow,
+    danger: palette.ansi.red,
+    info: palette.ansi.cyan,
+    muted: palette.ansi.brightBlack,
   };
 }
 
 function paletteToIndexedMap(
-  palette: Required<WebTUITerminalPalette>
+  ansi: Required<WebTUIANSIColors>
 ): Record<string, string> {
   return {
-    0: palette.black,
-    1: palette.red,
-    2: palette.green,
-    3: palette.yellow,
-    4: palette.blue,
-    5: palette.magenta,
-    6: palette.cyan,
-    7: palette.white,
-    8: palette.brightBlack,
-    9: palette.brightRed,
-    10: palette.brightGreen,
-    11: palette.brightYellow,
-    12: palette.brightBlue,
-    13: palette.brightMagenta,
-    14: palette.brightCyan,
-    15: palette.brightWhite,
+    0: ansi.black,
+    1: ansi.red,
+    2: ansi.green,
+    3: ansi.yellow,
+    4: ansi.blue,
+    5: ansi.magenta,
+    6: ansi.cyan,
+    7: ansi.white,
+    8: ansi.brightBlack,
+    9: ansi.brightRed,
+    10: ansi.brightGreen,
+    11: ansi.brightYellow,
+    12: ansi.brightBlue,
+    13: ansi.brightMagenta,
+    14: ansi.brightCyan,
+    15: ansi.brightWhite,
   };
 }
 
@@ -577,7 +467,8 @@ function relativeLuminance(color: string): number {
       : ((value + 0.055) / 1.055) ** 2.4;
   };
 
-  return 0.2126 * toLinear(channels.red) + 0.7152 * toLinear(channels.green) + 0.0722 * toLinear(channels.blue);
+  return 0.2126 * toLinear(channels.red) + 0.7152 * toLinear(channels.green)
+    + 0.0722 * toLinear(channels.blue);
 }
 
 function encodeBase64(value: string): string {

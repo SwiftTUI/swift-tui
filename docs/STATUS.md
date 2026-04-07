@@ -1,6 +1,6 @@
 # Status
 
-Last updated: April 5, 2026
+Last updated: April 6, 2026
 
 ## Product Status
 
@@ -38,7 +38,7 @@ command palette plus toast/sheet presentation surfaces now live in the main
 - `DefaultRenderer` for one-shot rendering and pipeline inspection from the main actor
 - `RunLoop` for interactive terminal sessions
 - `TerminalHost`, terminal appearance detection, graphics-capability probing, capability-aware presentation, and OSC 8 hyperlink emission when supported
-- host-owned `ThemeColors` and paired `TerminalRenderStyle` updates so hosted
+- host-owned `Theme` and paired `TerminalRenderStyle` updates so hosted
   sessions and browser/WASI runtimes can switch semantic themes at runtime
 - Keyboard parsing, mouse input parsing, Unix signal handling, and runtime scheduling
 - Identity-driven lifecycle diffs with post-present appear, disappear, task start, and task cancel staging
@@ -64,9 +64,9 @@ command palette plus toast/sheet presentation surfaces now live in the main
 - The core `TerminalUI` runtime still renders one active scene into one active host per session, but it no longer decides that an authored app must declare exactly one scene.
 - `TerminalUI` is now library-only. Platform integration splits between executable runner packages in `Runners/` and embedded host packages in `GUI/`.
 - Embedded GUI host packages now use `TerminalUI` scene manifests plus `HostedSceneSession`, and the repository includes peer host packages at `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`. Those packages still own their own platform shell integration, scene switching chrome, and style surfaces.
-- Embedded GUI host packages intentionally own the mapping from host light/dark mode
-  to explicit theme variants; the root TUI app continues to render semantic
-  tokens without knowing which host theme is active.
+- Embedded GUI host packages own one active host style object at a time and
+  can swap it at runtime; the root TUI app continues to render semantic tokens
+  without knowing which host theme is active.
 - The runtime is keyboard-first, but mouse input is supported where the terminal advertises reporting. Pointer interaction should be treated as additive rather than as the primary design center.
 - Image decoding and terminal presentation are PNG-only in the current runtime. Broader media formats and animation remain deferred.
 - WASI support now works with the `swiftly`-managed Swift 6.3.0 toolchain and `swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm ...` through the `Runners/TerminalUIWASI` / example-app build path. The shorter `swift ...` form is fine from a shell where `swift` already resolves through `swiftly`. `xcrun swift` may still resolve to an incompatible Xcode toolchain.

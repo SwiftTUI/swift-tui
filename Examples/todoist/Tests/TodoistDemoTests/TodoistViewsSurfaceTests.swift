@@ -21,10 +21,10 @@ struct TodoistViewsSurfaceTests {
     launcher.setupStatusMessage = "Enter your Todoist API token to initialize the cache."
 
     let surface = renderText(
-      TodoistDemoSceneView(launcher: launcher)
-        .preferredColorScheme(.light),
+      TodoistDemoSceneView(launcher: launcher),
       width: 72,
-      height: 28
+      height: 28,
+      environmentValues: themedEnvironment(brightTodoistAppearance)
     )
 
     #expect(surface.contains("Todoist"))
@@ -34,31 +34,31 @@ struct TodoistViewsSurfaceTests {
     #expect(surface.contains("Database"))
   }
 
-  @Test("Todoist scene renders distinct light and dark chrome")
-  func sceneRendersDistinctLightAndDarkChrome() throws {
+  @Test("Todoist scene renders distinct host-driven chrome themes")
+  func sceneRendersDistinctHostDrivenChromeThemes() throws {
     let launcher = try TodoistDemoLauncher()
     launcher.model = sampleModel()
 
-    let light = renderANSI(
-      TodoistDemoSceneView(launcher: launcher)
-        .preferredColorScheme(.light),
+    let bright = renderANSI(
+      TodoistDemoSceneView(launcher: launcher),
       width: 88,
-      height: 40
+      height: 40,
+      environmentValues: themedEnvironment(brightTodoistAppearance)
     )
-    let dark = renderANSI(
-      TodoistDemoSceneView(launcher: launcher)
-        .preferredColorScheme(.dark),
+    let subdued = renderANSI(
+      TodoistDemoSceneView(launcher: launcher),
       width: 88,
-      height: 40
+      height: 40,
+      environmentValues: themedEnvironment(subduedTodoistAppearance)
     )
 
-    #expect(light != dark)
-    #expect(light.contains("Todoist"))
-    #expect(dark.contains("Todoist"))
-    #expect(light.contains("Workspace"))
-    #expect(dark.contains("Workspace"))
-    #expect(light.contains("Ship dense chrome refresh"))
-    #expect(dark.contains("Ship dense chrome refresh"))
+    #expect(bright != subdued)
+    #expect(bright.contains("Todoist"))
+    #expect(subdued.contains("Todoist"))
+    #expect(bright.contains("Workspace"))
+    #expect(subdued.contains("Workspace"))
+    #expect(bright.contains("Ship dense chrome refresh"))
+    #expect(subdued.contains("Ship dense chrome refresh"))
   }
 
   @Test("Todoist workspace shows sync progress while busy")
@@ -69,10 +69,10 @@ struct TodoistViewsSurfaceTests {
     launcher.model = model
 
     let surface = renderText(
-      TodoistDemoSceneView(launcher: launcher)
-        .preferredColorScheme(.dark),
+      TodoistDemoSceneView(launcher: launcher),
       width: 88,
-      height: 40
+      height: 40,
+      environmentValues: themedEnvironment(subduedTodoistAppearance)
     )
 
     #expect(surface.contains("Syncing"))
@@ -91,10 +91,10 @@ struct TodoistViewsSurfaceTests {
     launcher.model = model
 
     let surface = renderText(
-      TodoistDemoSceneView(launcher: launcher)
-        .preferredColorScheme(.dark),
+      TodoistDemoSceneView(launcher: launcher),
       width: 121,
-      height: 24
+      height: 24,
+      environmentValues: themedEnvironment(subduedTodoistAppearance)
     )
 
     #expect(surface.contains("Projects"))
@@ -114,10 +114,10 @@ struct TodoistViewsSurfaceTests {
     launcher.model = model
 
     let surface = renderText(
-      TodoistDemoSceneView(launcher: launcher)
-        .preferredColorScheme(.dark),
+      TodoistDemoSceneView(launcher: launcher),
       width: 121,
-      height: 30
+      height: 30,
+      environmentValues: themedEnvironment(subduedTodoistAppearance)
     )
 
     #expect(surface.contains("Last Error"))
@@ -128,35 +128,57 @@ struct TodoistViewsSurfaceTests {
   @Test("Filled and plain controls render different default chrome")
   func filledControlsRenderDifferentChrome() {
     let plainText = renderText(
-      ChromeProbeView(filled: false)
-        .preferredColorScheme(.dark),
+      ChromeProbeView(filled: false),
       width: 40,
-      height: 8
+      height: 8,
+      environmentValues: themedEnvironment(subduedTodoistAppearance)
     )
     let plain = renderANSI(
-      ChromeProbeView(filled: false)
-        .preferredColorScheme(.dark),
+      ChromeProbeView(filled: false),
       width: 40,
-      height: 8
+      height: 8,
+      environmentValues: themedEnvironment(subduedTodoistAppearance)
     )
 
     let filledText = renderText(
-      ChromeProbeView(filled: true)
-        .preferredColorScheme(.dark),
+      ChromeProbeView(filled: true),
       width: 40,
-      height: 8
+      height: 8,
+      environmentValues: themedEnvironment(subduedTodoistAppearance)
     )
     let filled = renderANSI(
-      ChromeProbeView(filled: true)
-        .preferredColorScheme(.dark),
+      ChromeProbeView(filled: true),
       width: 40,
-      height: 8
+      height: 8,
+      environmentValues: themedEnvironment(subduedTodoistAppearance)
     )
 
     #expect(plain != filled)
     #expect(plainText.contains("Refresh"))
     #expect(filledText.contains("Refresh"))
   }
+}
+
+private let brightTodoistAppearance = TerminalAppearance(
+  foregroundColor: .hex("#1f2328"),
+  backgroundColor: .hex("#ffffff"),
+  tintColor: .hex("#0969da"),
+  source: .override
+)
+
+private let subduedTodoistAppearance = TerminalAppearance(
+  foregroundColor: .hex("#e6edf3"),
+  backgroundColor: .hex("#0d1117"),
+  tintColor: .hex("#2f81f7"),
+  source: .override
+)
+
+private func themedEnvironment(
+  _ appearance: TerminalAppearance
+) -> EnvironmentValues {
+  var environmentValues = EnvironmentValues()
+  environmentValues.terminalAppearance = appearance
+  return environmentValues
 }
 
 private struct ChromeProbeView: View {

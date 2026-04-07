@@ -8,7 +8,6 @@ import {
   applyWebTUITerminalStyle,
   ghosttyThemeForStyle,
   normalizeWebTUITerminalStyle,
-  type WebTUIColorScheme,
   type ResolvedWebTUITerminalStyle,
   type WebTUITerminalStyle,
 } from "./WebTUITerminalStyle.ts";
@@ -19,7 +18,6 @@ export interface WebTUISceneRuntimeOptions {
   mount: HTMLElement;
   descriptor: WebTUISceneDescriptor;
   style: WebTUITerminalStyle;
-  colorScheme: WebTUIColorScheme;
   bridge?: BrowserWASIBridge;
   onInput(chunk: Uint8Array): void;
 }
@@ -34,7 +32,6 @@ export class WebTUISceneRuntime {
   private readonly bridge?: BrowserWASIBridge;
   private readonly onInput: (chunk: Uint8Array) => void;
   private currentStyle: ResolvedWebTUITerminalStyle;
-  private currentColorScheme: WebTUIColorScheme;
   private readonly inputEncoder = new TextEncoder();
   private detachPointerTrackingFallback?: () => void;
   private mouseButtonsPressed = 0;
@@ -45,7 +42,6 @@ export class WebTUISceneRuntime {
   constructor(options: WebTUISceneRuntimeOptions) {
     this.descriptor = options.descriptor;
     this.currentStyle = normalizeWebTUITerminalStyle(options.style);
-    this.currentColorScheme = options.colorScheme;
     this.bridge = options.bridge;
     this.onInput = options.onInput;
     this.element = document.createElement("section");
@@ -70,10 +66,7 @@ export class WebTUISceneRuntime {
     }
 
     await init();
-    const options = this.terminalOptionsForStyle(
-      this.currentStyle,
-      this.currentColorScheme
-    );
+    const options = this.terminalOptionsForStyle(this.currentStyle);
     this.terminal = new Terminal(options);
     this.fitAddon = new FitAddon();
     this.terminal.loadAddon(this.fitAddon);
@@ -99,7 +92,7 @@ export class WebTUISceneRuntime {
     });
 
     this.terminal.open(this.terminalMount);
-    this.applyStyle(this.currentStyle, this.currentColorScheme);
+    this.applyStyle(this.currentStyle);
     this.fitAddon.fit();
     this.fitAddon.observeResize();
     this.installPointerTrackingFallback();
@@ -118,28 +111,17 @@ export class WebTUISceneRuntime {
   setStyle(
     style: WebTUITerminalStyle
   ): void {
-    this.setStyleAndScheme(style, this.currentColorScheme);
-  }
-
-  setStyleAndScheme(
-    style: WebTUITerminalStyle,
-    colorScheme: WebTUIColorScheme
-  ): void {
     this.currentStyle = normalizeWebTUITerminalStyle(style);
-    this.currentColorScheme = colorScheme;
     const terminalOptions = this.terminal?.options;
     if (terminalOptions) {
       terminalOptions.fontSize = this.currentStyle.fontSize;
       terminalOptions.fontFamily = this.currentStyle.fontFamily;
       terminalOptions.cursorBlink = this.currentStyle.cursorBlink;
       terminalOptions.cursorStyle = this.currentStyle.cursorStyle;
-      terminalOptions.theme = ghosttyThemeForStyle(
-        this.currentStyle,
-        this.currentColorScheme
-      );
+      terminalOptions.theme = ghosttyThemeForStyle(this.currentStyle);
     }
-    this.applyStyle(this.currentStyle, this.currentColorScheme);
-    this.bridge?.updateRenderStyle(this.currentStyle, this.currentColorScheme);
+    this.applyStyle(this.currentStyle);
+    this.bridge?.updateRenderStyle(this.currentStyle);
     this.fitAddon?.fit();
   }
 
@@ -170,8 +152,7 @@ export class WebTUISceneRuntime {
   }
 
   private terminalOptionsForStyle(
-    style: WebTUITerminalStyle,
-    colorScheme: WebTUIColorScheme
+    style: WebTUITerminalStyle
   ): ITerminalOptions {
     const normalized = normalizeWebTUITerminalStyle(style);
     return {
@@ -179,16 +160,15 @@ export class WebTUISceneRuntime {
       cursorStyle: normalized.cursorStyle,
       fontFamily: normalized.fontFamily,
       fontSize: normalized.fontSize,
-      theme: ghosttyThemeForStyle(normalized, colorScheme),
+      theme: ghosttyThemeForStyle(normalized),
       allowTransparency: normalized.backgroundOpacity < 1,
     };
   }
 
   private applyStyle(
-    style: WebTUITerminalStyle,
-    colorScheme: WebTUIColorScheme
+    style: WebTUITerminalStyle
   ): void {
-    applyWebTUITerminalStyle(this.element, style, colorScheme);
+    applyWebTUITerminalStyle(this.element, style);
     this.element.style.padding = "0.75rem";
     this.element.style.borderRadius = "16px";
     this.element.style.boxShadow = "0 20px 50px rgba(0, 0, 0, 0.28)";

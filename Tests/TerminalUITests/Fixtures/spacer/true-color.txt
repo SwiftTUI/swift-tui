@@ -2,6 +2,6 @@ fixture spacer
 configuration true-color
 surface 6x2
 capability glyph=unicode color=trueColor styles=true
-appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 scheme=dark contrast=increased source=fallback
+appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 contrast=increased source=fallback
 01│
 02│

@@ -17,7 +17,6 @@ final class GhosttySceneBridge {
   private var terminalSession: InMemoryTerminalSession! = nil
   private var bufferedOutput: [String] = []
   private var surfaceReady = false
-  private var currentColorScheme: SwiftUI.ColorScheme = .light
   private(set) var lastViewportSize: Size?
 
   init(
@@ -85,11 +84,6 @@ final class GhosttySceneBridge {
     syncSessionStyle()
   }
 
-  func updateAppearance(_ colorScheme: SwiftUI.ColorScheme) {
-    currentColorScheme = colorScheme
-    syncSessionStyle()
-  }
-
   func receiveOutput(_ output: String) {
     if surfaceReady {
       terminalSession.receive(output)
@@ -126,7 +120,7 @@ final class GhosttySceneBridge {
       return
     }
 
-    session.updateStyle(style.renderStyle(for: currentColorScheme.terminalUIScheme))
+    session.updateStyle(style.renderStyle)
   }
 }
 
@@ -140,16 +134,3 @@ protocol HostedSceneSessionHandling: AnyObject {
 }
 
 extension HostedSceneSession: HostedSceneSessionHandling {}
-
-extension SwiftUI.ColorScheme {
-  fileprivate var terminalUIScheme: TerminalUI.ColorScheme {
-    switch self {
-    case .light:
-      return .light
-    case .dark:
-      return .dark
-    @unknown default:
-      return .light
-    }
-  }
-}
