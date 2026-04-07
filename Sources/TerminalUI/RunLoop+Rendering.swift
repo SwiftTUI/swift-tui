@@ -31,11 +31,19 @@ extension RunLoop {
       var focusSyncBudget = FocusSyncRerenderBudget()
       var focusSyncBudgetExceeded = false
       var artifacts: FrameArtifacts?
+      let currentState = stateContainer.state
+      if previousRenderedState != currentState {
+        renderer.forceRootEvaluation()
+        previousRenderedState = currentState
+      }
       while true {
+        if rerenderedForFocusSync {
+          renderer.forceRootEvaluation()
+        }
         let renderedArtifacts = renderer.render(
           viewBuilder(
             (
-              state: stateContainer.state,
+              state: currentState,
               focusedIdentity: focusTracker.currentFocusIdentity
             )),
           context: resolveContext(for: scheduledFrame),

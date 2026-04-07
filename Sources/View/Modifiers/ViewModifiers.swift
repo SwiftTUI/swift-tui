@@ -299,7 +299,9 @@ package func scrollViewMetadata(
   presentationRole: PresentationRole
 ) -> SemanticMetadata {
   .init(
+    isFocusable: true,
     focusInteractions: .edit,
+    participatesInPointerHitTesting: true,
     scrollRole: .scrollView,
     presentationRole: presentationRole
   )

@@ -43,21 +43,29 @@ public struct ScrollView<Content: View>: View, ResolvableView {
       let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
       var focusedIndicatorAxes: AxisSet = []
       if indicatorVisibility == .visible {
-        if focusedIdentity == verticalScrollIndicatorIdentity(for: context.identity) {
-          focusedIndicatorAxes.insert(.vertical)
-        }
-        if focusedIdentity == horizontalScrollIndicatorIdentity(for: context.identity) {
-          focusedIndicatorAxes.insert(.horizontal)
+        if isFocused {
+          // When the scroll view itself is focused, highlight all visible
+          // scroll indicators so the user sees which view owns focus.
+          focusedIndicatorAxes = axes
+        } else {
+          if focusedIdentity == verticalScrollIndicatorIdentity(for: context.identity) {
+            focusedIndicatorAxes.insert(.vertical)
+          }
+          if focusedIdentity == horizontalScrollIndicatorIdentity(for: context.identity) {
+            focusedIndicatorAxes.insert(.horizontal)
+          }
         }
       }
+      // The scroll view container itself should not show a focus ring —
+      // only the scroll indicator highlights when the scroll view is focused.
       let containerChrome = styleEnvironment.controlChrome(
         isEnabled: context.environmentValues.isEnabled,
-        isFocused: isFocused && showsFocusEffect
+        isFocused: false
       )
       let contentChrome = styleEnvironment.rowChrome(
         isEnabled: context.environmentValues.isEnabled,
-        isFocused: isFocused && showsFocusEffect,
-        isSelected: isFocused && showsFocusEffect
+        isFocused: false,
+        isSelected: false
       )
       if context.environmentValues.isEnabled {
         let binding = position
@@ -205,12 +213,10 @@ public struct ScrollView<Content: View>: View, ResolvableView {
             )
           ).resolvedBehavior,
           drawMetadata: .init(
-            backgroundStyle: isFocused && showsFocusEffect ? contentChrome.backgroundStyle : nil,
             scrollIndicatorAxes: indicatorVisibility == .visible ? axes : nil,
             focusedScrollIndicatorAxes: focusedIndicatorAxes.isEmpty ? nil : focusedIndicatorAxes,
             scrollIndicatorForegroundStyle: indicatorFocusStyle,
-            opacity: isFocused && showsFocusEffect
-              ? contentChrome.opacity : containerChrome.opacity,
+            opacity: containerChrome.opacity,
             clipsToBounds: true
           ),
           semanticMetadata: scrollViewMetadata(

@@ -808,6 +808,7 @@ struct InteractiveRuntimeTests {
       InteractiveDemoIdentity.inputField,
       InteractiveDemoIdentity.selectionModePicker,
       InteractiveDemoIdentity.textLabDisclosure,
+      InteractiveDemoIdentity.textLabScrollPreview,
       verticalScrollIndicatorIdentity(for: InteractiveDemoIdentity.textLabScrollPreview),
     ]
 
@@ -866,6 +867,7 @@ struct InteractiveRuntimeTests {
         InteractiveDemoIdentity.inputField,
         InteractiveDemoIdentity.selectionModePicker,
         InteractiveDemoIdentity.textLabDisclosure,
+        InteractiveDemoIdentity.textLabScrollPreview,
         verticalScrollIndicatorIdentity(for: InteractiveDemoIdentity.textLabScrollPreview),
       ])
     #expect(

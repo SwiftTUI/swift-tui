@@ -135,6 +135,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var armedPointerRouteID: RouteID?
   package var capturedPointerRouteID: RouteID?
   package var postActionInvalidationIdentities: Set<Identity> = []
+  package var previousRenderedState: State?
 
   /// Optional file-based diagnostics logger. When set, every rendered frame
   /// emits a tab-separated record to the configured output file.

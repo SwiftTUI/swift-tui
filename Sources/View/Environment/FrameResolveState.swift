@@ -13,12 +13,19 @@ package final class FrameResolveState: @unchecked Sendable {
   package var focusedValues: FocusedValues
   package var transaction: TransactionSnapshot
   package var selectiveEvaluationEnabled: Bool
+
+  /// When true, the next call to ``update(from:)`` will force root evaluation
+  /// regardless of whether environment values changed.  The RunLoop sets this
+  /// when the view builder's input changed (state mutation) or during focus
+  /// sync re-renders.
+  package var forceRootEvaluation: Bool = false
+
   private var previousFocusedIdentity: Identity?
   private var previousPressedIdentity: Identity?
 
   /// Whether the per-frame environment values changed in a way that
   /// requires root re-evaluation (e.g., focus or pressed identity changed).
-  package var environmentRequiresRootEvaluation: Bool = false
+  package private(set) var environmentRequiresRootEvaluation: Bool = false
 
   package init() {
     invalidatedIdentities = []
@@ -34,10 +41,12 @@ package final class FrameResolveState: @unchecked Sendable {
     let newFocused = context.environmentValues.focusedIdentity
     let newPressed = context.environmentValues.pressedIdentity
     environmentRequiresRootEvaluation =
-      newFocused != previousFocusedIdentity
+      forceRootEvaluation
+      || newFocused != previousFocusedIdentity
       || newPressed != previousPressedIdentity
     previousFocusedIdentity = newFocused
     previousPressedIdentity = newPressed
+    forceRootEvaluation = false
 
     invalidatedIdentities = context.invalidatedIdentities
     invalidationSummary = context.invalidationSummary

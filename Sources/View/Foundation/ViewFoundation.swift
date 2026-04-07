@@ -263,9 +263,9 @@ package func resolveView<V: View>(
   _ view: V,
   in context: ResolveContext
 ) -> ResolvedNode {
-  // When a shared FrameResolveState is available, refresh per-frame
-  // invalidation data so evaluator closures captured on prior frames
-  // see the current frame's dirty set.
+  // When a shared FrameResolveState is available, refresh the per-frame
+  // invalidation set so evaluator closures captured on prior frames see
+  // the current frame's dirty identities.
   var context = context
   if let fs = context.frameState {
     context.invalidatedIdentities = fs.invalidatedIdentities

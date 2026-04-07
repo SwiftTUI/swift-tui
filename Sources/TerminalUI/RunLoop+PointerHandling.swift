@@ -46,9 +46,6 @@ extension RunLoop {
     }
 
     let hitTarget = hitTarget(at: location)
-    if let focusIdentity = hitTarget?.focusIdentity {
-      _ = focusTracker.setFocus(to: focusIdentity)
-    }
 
     guard let hitTarget else {
       armedPointerRouteID = nil
@@ -71,6 +68,11 @@ extension RunLoop {
     )
 
     if customHandled {
+      if let focusIdentity = hitTarget.focusIdentity,
+        shouldClickFocus(focusIdentity, at: location)
+      {
+        _ = focusTracker.setFocus(to: focusIdentity)
+      }
       armedPointerRouteID = nil
       if shouldCapturePointer(routeID: hitTarget.region.routeID) {
         capturedPointerRouteID = hitTarget.region.routeID
@@ -83,14 +85,15 @@ extension RunLoop {
 
     capturedPointerRouteID = nil
     if let focusIdentity = hitTarget.focusIdentity,
-      isActivationIdentity(focusIdentity)
+      shouldClickFocus(focusIdentity, at: location)
     {
+      _ = focusTracker.setFocus(to: focusIdentity)
       armedPointerRouteID = hitTarget.region.routeID
       setPressedIdentity(focusIdentity, transient: false)
-    } else {
-      armedPointerRouteID = nil
-      setPressedIdentity(nil, transient: false)
+      return
     }
+    armedPointerRouteID = nil
+    setPressedIdentity(nil, transient: false)
   }
 
   package func handleMouseUp(
@@ -187,12 +190,8 @@ extension RunLoop {
     deltaY: Int,
     location: Point
   ) {
-    let hitTarget = hitTarget(at: location)
-
-    if let focusIdentity = hitTarget?.focusIdentity {
-      _ = focusTracker.setFocus(to: focusIdentity)
-    }
-
+    // Scroll events should not move keyboard focus — the scroll target
+    // is resolved independently via scrollTarget(at:).
     if let scrollRoute = scrollTarget(at: location, deltaX: deltaX, deltaY: deltaY) {
       let routeID = primaryRouteID(for: scrollRoute.identity)
       let handled = dispatchPointerEvent(
@@ -211,7 +210,7 @@ extension RunLoop {
       if handled {
         scheduler.requestInvalidation(of: [scrollRoute.identity])
       }
-    } else if let hitTarget {
+    } else if let hitTarget = hitTarget(at: location) {
       let handled = dispatchPointerEvent(
         preferredRouteID: hitTarget.region.routeID,
         identity: hitTarget.region.identity,
@@ -226,6 +225,29 @@ extension RunLoop {
         scheduler.requestInvalidation(of: [hitTarget.region.identity])
       }
     }
+  }
+
+  /// Returns whether a click at `location` should move focus to `focusIdentity`.
+  /// Focus is set when the click is directly on the focus region (no more-specific
+  /// descendant focus region contains the point) or the target is an activation
+  /// identity.
+  package func shouldClickFocus(
+    _ focusIdentity: Identity,
+    at location: Point
+  ) -> Bool {
+    if isActivationIdentity(focusIdentity) {
+      return true
+    }
+
+    // Check that no descendant focus region contains this point.  If one
+    // does, the click is inside a child's focusable area and should not
+    // steal focus to an ancestor container.
+    let hasDescendantFocus = latestSemanticSnapshot.focusRegions.contains { region in
+      region.identity != focusIdentity
+        && region.rect.contains(location)
+        && region.identity.isDescendant(of: focusIdentity)
+    }
+    return !hasDescendantFocus
   }
 
   package func scrollTarget(

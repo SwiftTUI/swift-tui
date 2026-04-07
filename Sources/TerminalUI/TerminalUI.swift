@@ -118,19 +118,27 @@ public struct DefaultRenderer {
     viewGraph.setEvaluator(for: resolveContext.identity) {
       _ = resolver.resolve(wrappedRoot, in: resolveContext)
     }
-    let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
-    if let dirtyEvaluationPlan {
-      runtimeRegistrations.removeSubtrees(
-        rootedAt: dirtyEvaluationPlan.frontierIdentities
-      )
+    let (_, resolveDuration): (Void, Duration)
+    if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
+      // Nothing is dirty — skip evaluation entirely and reuse the
+      // existing tree snapshot.  The root evaluator and registrations
+      // are untouched.
+      resolveDuration = .zero
     } else {
-      runtimeRegistrations.resetAll()
-    }
+      let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
+      if let dirtyEvaluationPlan {
+        runtimeRegistrations.removeSubtrees(
+          rootedAt: dirtyEvaluationPlan.frontierIdentities
+        )
+      } else {
+        runtimeRegistrations.resetAll()
+      }
 
-    let (_, resolveDuration) = measurePhase {
-      viewGraph.evaluateDirtyNodes(
-        using: dirtyEvaluationPlan
-      )
+      (_, resolveDuration) = measurePhase {
+        viewGraph.evaluateDirtyNodes(
+          using: dirtyEvaluationPlan
+        )
+      }
     }
     let resolved = viewGraph.snapshot()
     let layoutPassContext = LayoutPassContext(
@@ -378,6 +386,13 @@ public struct DefaultRenderer {
   @MainActor
   package func enableSelectiveEvaluation() {
     frameState.selectiveEvaluationEnabled = true
+  }
+
+  /// Forces the next render to use root evaluation regardless of whether
+  /// selective evaluation would otherwise apply.
+  @MainActor
+  package func forceRootEvaluation() {
+    frameState.forceRootEvaluation = true
   }
 
   @MainActor

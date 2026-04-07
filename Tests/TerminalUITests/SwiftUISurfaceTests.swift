@@ -3493,7 +3493,7 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(
-      artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("InnerButton")])
+      artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("Scrollable"), testIdentity("InnerButton")])
     #expect(unfocused.rasterSurface.lines == artifacts.rasterSurface.lines)
     #expect(unfocused.rasterSurface != artifacts.rasterSurface)
   }
@@ -3538,12 +3538,12 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(artifacts.semanticSnapshot.focusRegions.map(\.identity) == [indicatorIdentity])
+    #expect(artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("Scrollable"), indicatorIdentity])
     #expect(registry.dispatch(identity: indicatorIdentity, event: .arrowDown))
     #expect(box.position == .init(x: 0, y: 1))
   }
 
-  @Test("ScrollView is not a top-level focus stop by default but still handles arrow-key scrolling")
+  @Test("ScrollView is a focusable view that handles arrow-key scrolling")
   func scrollViewBindsPositionAndHandlesArrowKeys() {
     final class ScrollBox {
       var position = ScrollPosition()
@@ -3581,7 +3581,7 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(initialArtifacts.semanticSnapshot.focusRegions.isEmpty)
+    #expect(initialArtifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("Scrollable")])
     #expect(initialArtifacts.rasterSurface.lines.prefix(2) == ["Row 0", "Row 1"])
     #expect(registry.dispatch(identity: testIdentity("Scrollable"), event: .arrowDown))
     #expect(box.position == .init(x: 0, y: 1))
@@ -3646,7 +3646,7 @@ struct SwiftUISurfaceTests {
       )
     ).rasterSurface
 
-    #expect(unfocused != focused)
+    #expect(unfocused == focused)
   }
 
   @Test("Button resolves built-in control chrome, focus semantics, and action role routing")

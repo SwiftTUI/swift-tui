@@ -162,12 +162,21 @@ package final class ViewGraph {
   }
 
   package func selectiveDirtyEvaluationPlan() -> DirtyEvaluationPlan? {
-    let canEvaluateDirtyFrontier =
-      !graphLocalDirtyIdentities.isEmpty
-      && !invalidatedIdentities.isEmpty
-      && invalidatedIdentities.isSubset(of: graphLocalDirtyIdentities)
+    guard root != nil,
+      !graphLocalDirtyIdentities.isEmpty,
+      !invalidatedIdentities.isEmpty
+    else {
+      return nil
+    }
 
-    guard root != nil, canEvaluateDirtyFrontier else {
+    // Every invalidated identity that has a node in the graph must be
+    // tracked as graph-local dirty.  Identities without graph nodes
+    // (e.g. scheduler-provided identities for views not yet rendered)
+    // cannot produce a dirty frontier and are safe to ignore.
+    let graphKnownInvalidated = invalidatedIdentities.filter {
+      nodesByIdentity[$0] != nil
+    }
+    guard graphKnownInvalidated.isSubset(of: graphLocalDirtyIdentities) else {
       return nil
     }
 
@@ -177,13 +186,33 @@ package final class ViewGraph {
       return nil
     }
 
-    guard dirtyFrontier.allSatisfy(\.hasEvaluator) else {
+    // Promote frontier nodes without evaluators to their nearest ancestor
+    // that has one.  This is safe because the caller has already verified
+    // that the view builder's state and environment haven't changed, so
+    // ancestor evaluators (including root) hold valid captured content.
+    var promotedFrontier: [ViewNode] = []
+    var promotedIdentities: Set<Identity> = []
+    for node in dirtyFrontier {
+      let target = node.hasEvaluator ? node : nearestEvaluatorAncestor(of: node)
+      guard let target, promotedIdentities.insert(target.identity).inserted else {
+        continue
+      }
+      target.markDirty()
+      promotedFrontier.append(target)
+    }
+
+    guard !promotedFrontier.isEmpty, promotedFrontier.allSatisfy(\.hasEvaluator) else {
       return nil
     }
 
     return DirtyEvaluationPlan(
-      frontierIdentities: dirtyFrontier.map(\.identity)
+      frontierIdentities: promotedFrontier.map(\.identity)
     )
+  }
+
+  /// Whether any identities are dirty and need evaluation this frame.
+  package var hasDirtyWork: Bool {
+    !invalidatedIdentities.isEmpty || !graphLocalDirtyIdentities.isEmpty
   }
 
   package func evaluateDirtyNodes(
@@ -589,6 +618,24 @@ package final class ViewGraph {
         registrations: registrations
       )
     }
+  }
+
+  private func nearestEvaluatorAncestor(
+    of node: ViewNode
+  ) -> ViewNode? {
+    var current = node.parent
+    var visited: Set<ObjectIdentifier> = []
+    while let ancestor = current {
+      let id = ObjectIdentifier(ancestor)
+      guard visited.insert(id).inserted else {
+        return nil
+      }
+      if ancestor.hasEvaluator {
+        return ancestor
+      }
+      current = ancestor.parent
+    }
+    return nil
   }
 
   private func nodeForIdentity(
