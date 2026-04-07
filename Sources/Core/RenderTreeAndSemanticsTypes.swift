@@ -412,6 +412,28 @@ public struct ResolvedNode: Equatable, Sendable {
         lhsChild.isEquivalentForMeasurement(to: rhsChild)
       }
   }
+
+  /// Stricter equivalence check used by the retained layout placement cache.
+  /// Like `isEquivalentForMeasurement` but uses full draw payload equality
+  /// instead of the relaxed measurement comparison, ensuring that visual-only
+  /// changes (such as a shape's stroke style changing from thick to thin) are
+  /// detected even when they don't affect measurement.
+  package func isEquivalentForPlacement(
+    to other: Self
+  ) -> Bool {
+    identity == other.identity
+      && kind == other.kind
+      && environmentSnapshot == other.environmentSnapshot
+      && layoutBehavior.isEquivalentForMeasurement(to: other.layoutBehavior)
+      && layoutMetadata == other.layoutMetadata
+      && drawPayload == other.drawPayload
+      && intrinsicSize == other.intrinsicSize
+      && indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature
+      && children.count == other.children.count
+      && zip(children, other.children).allSatisfy { lhsChild, rhsChild in
+        lhsChild.isEquivalentForPlacement(to: rhsChild)
+      }
+  }
 }
 
 extension ResolvedNode {

@@ -11,7 +11,11 @@
       "Bash(find:*)",
       "Bash(git stash:*)",
       "Bash(ls -1 /Users/adamz/Developer/repos/swift-terminal-ui/Sources/Core/*.swift)",
-      "Bash(ls -1 /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/*.swift)"
+      "Bash(ls -1 /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/*.swift)",
+      "Bash(git -C /Users/adamz/Developer/repos/swift-terminal-ui add Sources/View/Controls/PickerRendering.swift Tests/TerminalUITests/FocusTransitionTests.swift)",
+      "Bash(git -C /Users/adamz/Developer/repos/swift-terminal-ui commit -m ':*)",
+      "Bash(git commit:*)",
+      "Bash(git add:*)"
     ]
   }
 }
