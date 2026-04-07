@@ -66,6 +66,20 @@ package final class ViewGraph {
     }
   }
 
+  /// Invalidates identities AND queues them as graph-local dirty so that
+  /// `selectiveDirtyEvaluationPlan()` can include them in the dirty frontier
+  /// instead of falling back to full root re-evaluation.  Only identities
+  /// with existing graph nodes are queued.
+  package func invalidateAndQueueDirty(_ identities: Set<Identity>) {
+    invalidatedIdentities.formUnion(identities)
+    for identity in identities {
+      if let node = nodesByIdentity[identity] {
+        node.markDirty()
+        graphLocalDirtyIdentities.insert(identity)
+      }
+    }
+  }
+
   package func queueDirty(
     _ identities: Set<Identity>
   ) {
@@ -290,9 +304,11 @@ package final class ViewGraph {
   ) {
     let node = nodeForIdentity(for: subtree.identity)
     node.prepareForFrame(currentFrameID)
-    if !node.wasVisitedThisFrame {
-      frameOrder.append(subtree.identity)
+
+    if node.wasVisitedThisFrame {
+      return
     }
+    frameOrder.append(subtree.identity)
     node.beginReuse(
       frameID: currentFrameID,
       invalidator: invalidator
@@ -362,10 +378,11 @@ package final class ViewGraph {
     guard let node = nodesByIdentity[identity] else {
       return nil
     }
-    node.prepareForFrame(currentFrameID)
     guard !invalidatedIdentities.isEmpty else {
       return nil
     }
+
+    node.prepareForFrame(currentFrameID)
 
     guard node.canReuse(
       frameID: currentFrameID,
@@ -386,45 +403,20 @@ package final class ViewGraph {
       return snapshot
     }
 
-    let snapshot = node.snapshot()
     let conflictsWithInvalidation = invalidatedIdentities.contains { invalidatedIdentity in
-      if invalidatedIdentity == identity {
-        return true
-      }
-      if subtree(snapshot, contains: invalidatedIdentity) {
-        return true
-      }
-      let invalidatedSubtreeContainsIdentity =
-        nodesByIdentity[invalidatedIdentity].map { invalidatedNode in
-          subtree(invalidatedNode.snapshot(), contains: identity)
-        } ?? false
-      return invalidatedSubtreeContainsIdentity
+      invalidatedIdentity == identity
         || invalidatedIdentity.isDescendant(of: identity)
         || identity.isDescendant(of: invalidatedIdentity)
     }
     guard !conflictsWithInvalidation else {
       return nil
     }
+    let snapshot = node.snapshot()
     recordReusedSubtree(
       snapshot,
       invalidator: invalidator
     )
     return snapshot
-  }
-
-  private func subtree(
-    _ node: ResolvedNode,
-    contains identity: Identity
-  ) -> Bool {
-    if node.identity == identity {
-      return true
-    }
-
-    for child in node.children where subtree(child, contains: identity) {
-      return true
-    }
-
-    return false
   }
 
   @discardableResult
@@ -578,7 +570,11 @@ package final class ViewGraph {
     for resolved: ResolvedNode,
     registrations: RuntimeRegistrationSet
   ) {
-    nodesByIdentity[resolved.identity]?.restoreOwnRuntimeRegistrations(
+    guard let node = nodesByIdentity[resolved.identity] else {
+      return
+    }
+
+    node.restoreOwnRuntimeRegistrations(
       into: registrations
     )
     for aliasIdentity in registrationAliasesByIdentity[resolved.identity] ?? [] {

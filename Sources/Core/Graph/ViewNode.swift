@@ -448,6 +448,11 @@ package final class ViewNode {
     )
   }
 
+  /// Whether this node has a cached resolved snapshot available for reuse.
+  package var hasCachedSnapshot: Bool {
+    cachedResolvedNode != nil
+  }
+
   package func snapshot() -> ResolvedNode {
     if let cachedResolvedNode {
       return cachedResolvedNode

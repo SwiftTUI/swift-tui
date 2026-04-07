@@ -33,6 +33,7 @@ public struct DefaultRenderer {
   public let commitPlanner: CommitPlanner
   private let imageRepository: ImageAssetRepository
   private let viewGraph: ViewGraph
+  private let frameState: FrameResolveState
 
   private let retainedFrames: RetainedFrameStore
 
@@ -54,6 +55,7 @@ public struct DefaultRenderer {
     self.commitPlanner = commitPlanner
     imageRepository = sharedImageAssetRepository
     viewGraph = .init()
+    frameState = .init()
     retainedFrames = .init()
   }
 
@@ -90,8 +92,18 @@ public struct DefaultRenderer {
     var resolveContext = context
     let runtimeRegistrations = resolveContext.runtimeRegistrations
     resolveContext.imageAssetResolver = imageRepository.resolver()
+    resolveContext.frameState = frameState
+    frameState.update(from: resolveContext)
     viewGraph.beginFrame()
-    viewGraph.invalidate(context.invalidatedIdentities)
+    let canUseSelectiveEvaluation =
+      frameState.selectiveEvaluationEnabled
+      && !frameState.environmentRequiresRootEvaluation
+      && !context.invalidatedIdentities.contains(resolveContext.identity)
+    if canUseSelectiveEvaluation {
+      viewGraph.invalidateAndQueueDirty(context.invalidatedIdentities)
+    } else {
+      viewGraph.invalidate(context.invalidatedIdentities)
+    }
     resolveContext.viewGraph = viewGraph
     resolveContext.observationBridge?.attachViewGraph(viewGraph)
     resolveContext.observationBridge?.beginTrackingPass()
@@ -358,6 +370,14 @@ public struct DefaultRenderer {
     for row in lowerBound..<upperBound {
       dirtyRows.insert(row)
     }
+  }
+
+  /// Enables selective dirty-frontier evaluation for subsequent frames.
+  /// Call after the first full render has established the tree and
+  /// evaluator closures.
+  @MainActor
+  package func enableSelectiveEvaluation() {
+    frameState.selectiveEvaluationEnabled = true
   }
 
   @MainActor

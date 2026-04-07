@@ -263,10 +263,17 @@ package func resolveView<V: View>(
   _ view: V,
   in context: ResolveContext
 ) -> ResolvedNode {
+  // When a shared FrameResolveState is available, refresh per-frame
+  // invalidation data so evaluator closures captured on prior frames
+  // see the current frame's dirty set.
+  var context = context
+  if let fs = context.frameState {
+    context.invalidatedIdentities = fs.invalidatedIdentities
+  }
   if let reused = context.viewGraph?.reusableSnapshot(
     for: context.identity,
-    invalidatedIdentities: context.invalidatedIdentities,
-    invalidationSummary: context.invalidationSummary,
+    invalidatedIdentities: context.effectiveInvalidatedIdentities,
+    invalidationSummary: context.effectiveInvalidationSummary,
     environment: context.environment,
     transaction: context.transaction,
     invalidator: context.invalidationProxy?.invalidator

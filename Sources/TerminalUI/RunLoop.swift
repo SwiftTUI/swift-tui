@@ -290,6 +290,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     var renderedFrames = 0
     try renderPendingFrames(renderedFrames: &renderedFrames)
 
+    // After the initial render establishes the view tree and evaluator
+    // closures, enable selective dirty evaluation for subsequent frames.
+    // This avoids full root re-evaluation when only small subtrees change.
+    renderer.enableSelectiveEvaluation()
+
     let eventPump = makeEventPump()
     defer {
       eventPump.cancel()

@@ -205,6 +205,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var observationBridge: ObservationBridge?
   package var viewGraph: ViewGraph?
   package var imageAssetResolver: ImageAssetResolver?
+  package var frameState: FrameResolveState?
 
   @MainActor
   package var runtimeRegistrations: RuntimeRegistrationSet {
@@ -268,6 +269,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.resolveWorkTracker = resolveWorkTracker
     childContext.focusedValues = focusedValues
     childContext.imageAssetResolver = imageAssetResolver
+    childContext.frameState = frameState
     return childContext
   }
 
@@ -304,6 +306,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.resolveWorkTracker = resolveWorkTracker
     replacedContext.focusedValues = focusedValues
     replacedContext.imageAssetResolver = imageAssetResolver
+    replacedContext.frameState = frameState
     return replacedContext
   }
 
@@ -325,6 +328,18 @@ public struct ResolveContext: Equatable, Sendable {
     transform(&copy.environmentValues[keyPath: keyPath])
     copy.environment = copy.environmentValues.applying(to: copy.environment)
     return copy
+  }
+
+  /// Returns the effective per-frame invalidation set, preferring the shared
+  /// ``FrameResolveState`` when available (updated each frame by the renderer).
+  @MainActor
+  package var effectiveInvalidatedIdentities: Set<Identity> {
+    frameState?.invalidatedIdentities ?? invalidatedIdentities
+  }
+
+  @MainActor
+  package var effectiveInvalidationSummary: InvalidationSummary {
+    frameState?.invalidationSummary ?? invalidationSummary
   }
 
   /// Returns whether `identity` is directly invalidated in this context.
