@@ -177,6 +177,7 @@ extension TabView {
                   label: option.label.displayText,
                   isSelected: isSelected,
                   isFocused: focusActive,
+                  tone: activeTone,
                   style: tabStyle
                 )
               }
@@ -256,6 +257,7 @@ extension TabView {
     label: String,
     isSelected: Bool,
     isFocused: Bool,
+    tone: TerminalTone,
     style: TabViewStyle
   ) -> some View {
     let resolvedStyle = style == .automatic ? TabViewStyle.underline : style
@@ -264,13 +266,15 @@ extension TabView {
       underlineRuleSegment(
         label: label,
         isSelected: isSelected,
-        isFocused: isFocused
+        isFocused: isFocused,
+        tone: tone
       )
     case .rounded:
       roundedRuleSegment(
         label: label,
         isSelected: isSelected,
-        isFocused: isFocused
+        isFocused: isFocused,
+        tone: tone
       )
     case .powerline:
       EmptyView()
@@ -280,18 +284,23 @@ extension TabView {
   private func underlineRuleSegment(
     label: String,
     isSelected: Bool,
-    isFocused: Bool
+    isFocused: Bool,
+    tone: TerminalTone
   ) -> some View {
     let width = tabLabelCellWidth(label)
     let glyph: Character =
-      if isFocused { "▄" }
-      else if isSelected { "━" }
+      if isSelected { "▄" }
+      else if isFocused { "▂" }
       else { "─" }
+    let foreground: AnyShapeStyle =
+      isSelected
+      ? AnyShapeStyle(.terminalAccent(tone))
+      : .semantic(.separator)
     let text =
       "\(String(repeating: glyph, count: width)) "
     return Text(text)
       .lineLimit(1)
-      .foregroundStyle(.separator)
+      .foregroundStyle(foreground)
       .frame(height: 1, alignment: .leading)
   }
 
@@ -321,21 +330,25 @@ extension TabView {
   private func roundedRuleSegment(
     label: String,
     isSelected: Bool,
-    isFocused: Bool
+    isFocused: Bool,
+    tone: TerminalTone
   ) -> some View {
     let width = tabLabelCellWidth(label)
     let text =
-      if isFocused {
-        (isSelected ? "╰" : " ") + String(repeating: "▄", count: width)
-          + (isSelected ? "╯" : " ")
-      } else if isSelected {
-        "╰" + String(repeating: "─", count: width) + "╯"
+      if isSelected {
+        "╰" + String(repeating: "▄", count: width) + "╯"
+      } else if isFocused {
+        " " + String(repeating: "▂", count: width) + " "
       } else {
         " " + String(repeating: "─", count: width) + " "
       }
+    let foreground: AnyShapeStyle =
+      isSelected
+      ? AnyShapeStyle(.terminalAccent(tone))
+      : .semantic(.separator)
     return Text(text)
       .lineLimit(1)
-      .foregroundStyle(.separator)
+      .foregroundStyle(foreground)
       .frame(height: 1, alignment: .leading)
   }
 
