@@ -134,7 +134,6 @@ public struct GalleryDemoSceneView: View {
       Button("Control Panel") {
         model.isPalettePresented = true
       }
-      .buttonStyle(.plain)
     }
     .padding(.init(horizontal: 1, vertical: 0))
     .background(.terminalRow(.accent, isSelected: true))

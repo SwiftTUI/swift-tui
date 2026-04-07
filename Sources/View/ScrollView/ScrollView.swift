@@ -62,11 +62,6 @@ public struct ScrollView<Content: View>: View, ResolvableView {
         isEnabled: context.environmentValues.isEnabled,
         isFocused: false
       )
-      let contentChrome = styleEnvironment.rowChrome(
-        isEnabled: context.environmentValues.isEnabled,
-        isFocused: false,
-        isSelected: false
-      )
       if context.environmentValues.isEnabled {
         let binding = position
         let dynamicPropertyScope = currentAuthoringContext()
