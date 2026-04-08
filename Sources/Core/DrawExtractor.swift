@@ -4,11 +4,7 @@ public struct DrawExtractor {
 
   /// Extracts a draw tree from a placed tree.
   public func extract(from placed: borrowing PlacedNode) -> DrawNode {
-    extract(
-      from: placed,
-      inheritedBorderMask: nil,
-      isInBackgroundSubtree: false
-    )
+    extractIteratively(from: placed)
   }
 }
 
@@ -18,44 +14,117 @@ private struct BorderMask {
   var strokeWidth: Int
 }
 
+private enum ExtractionStep {
+  case descend(
+    node: PlacedNode,
+    inheritedBorderMask: BorderMask?,
+    isInBackgroundSubtree: Bool
+  )
+  case assemble(
+    node: PlacedNode,
+    inheritedBorderMask: BorderMask?,
+    isInBackgroundSubtree: Bool,
+    children: [PlacedNode]
+  )
+}
+
 extension DrawExtractor {
-  private func extract(
+  private func extractIteratively(
+    from root: PlacedNode
+  ) -> DrawNode {
+    var steps: [ExtractionStep] = [
+      .descend(
+        node: root,
+        inheritedBorderMask: nil,
+        isInBackgroundSubtree: false
+      )
+    ]
+    steps.reserveCapacity(root.subtreeNodeCount * 2)
+
+    var builtNodes: [DrawNode] = []
+    builtNodes.reserveCapacity(root.subtreeNodeCount)
+
+    while let step = steps.popLast() {
+      switch step {
+      case .descend(let node, let inheritedBorderMask, let isInBackgroundSubtree):
+        let children = Array(node.children)
+        let overlayBorderMask = overlayBorderMask(
+          kind: node.kind,
+          children: children
+        )
+
+        steps.append(
+          .assemble(
+            node: node,
+            inheritedBorderMask: inheritedBorderMask,
+            isInBackgroundSubtree: isInBackgroundSubtree,
+            children: children
+          )
+        )
+
+        for index in children.indices.reversed() {
+          steps.append(
+            .descend(
+              node: children[index],
+              inheritedBorderMask: inheritedBorderMaskForChild(
+                forChildAt: index,
+                kind: node.kind,
+                inheritedBorderMask: inheritedBorderMask,
+                overlayBorderMask: overlayBorderMask
+              ),
+              isInBackgroundSubtree: isInBackgroundSubtreeForChild(
+                forChildAt: index,
+                kind: node.kind,
+                inheritedValue: isInBackgroundSubtree
+              )
+            )
+          )
+        }
+      case .assemble(
+        let node,
+        let inheritedBorderMask,
+        let isInBackgroundSubtree,
+        let children
+      ):
+        let childCount = children.count
+        let childNodes: [DrawNode] =
+          if childCount == 0 {
+            []
+          } else {
+            Array(builtNodes.suffix(childCount))
+          }
+        if childCount > 0 {
+          builtNodes.removeLast(childCount)
+        }
+
+        builtNodes.append(
+          makeDrawNode(
+            from: node,
+            children: children,
+            childNodes: childNodes,
+            inheritedBorderMask: inheritedBorderMask,
+            isInBackgroundSubtree: isInBackgroundSubtree
+          )
+        )
+      }
+    }
+
+    return builtNodes.removeLast()
+  }
+
+  private func makeDrawNode(
     from placed: borrowing PlacedNode,
+    children: [PlacedNode],
+    childNodes: [DrawNode],
     inheritedBorderMask: BorderMask?,
     isInBackgroundSubtree: Bool
   ) -> DrawNode {
     let identity = placed.identity
     let environmentSnapshot = placed.environmentSnapshot
     let bounds = placed.bounds
-    let children: [PlacedNode] = Array(placed.children)
     let layoutMetadata = placed.layoutMetadata
     let drawMetadata = placed.drawMetadata
     let drawPayload = placed.drawPayload
-
-    let overlayBorderMask = overlayBorderMask(
-      kind: placed.kind,
-      children: children
-    )
-    var childNodes: [DrawNode] = []
-    childNodes.reserveCapacity(children.count)
-    for index in children.indices {
-      childNodes.append(
-        extract(
-          from: children[index],
-          inheritedBorderMask: inheritedBorderMaskForChild(
-            forChildAt: index,
-            kind: placed.kind,
-            inheritedBorderMask: inheritedBorderMask,
-            overlayBorderMask: overlayBorderMask
-          ),
-          isInBackgroundSubtree: isInBackgroundSubtreeForChild(
-            forChildAt: index,
-            kind: placed.kind,
-            inheritedValue: isInBackgroundSubtree
-          )
-        )
-      )
-    }
     var commands: [DrawCommand] = []
     let drawsRule: Bool
 

@@ -273,17 +273,16 @@ public enum SceneBuilder {
     EmptyScene()
   }
 
-  public static func buildPartialBlock<Content: Scene>(
-    first content: Content
+  public static func buildBlock<Content: Scene>(
+    _ scene: Content
   ) -> Content {
-    content
+    scene
   }
 
-  public static func buildPartialBlock<Accumulated: Scene, Next: Scene>(
-    accumulated: Accumulated,
-    next: Next
-  ) -> TupleScene<Accumulated, Next> {
-    TupleScene((accumulated, next))
+  public static func buildBlock<each Content: Scene>(
+    _ scenes: repeat each Content
+  ) -> TupleScene<repeat each Content> {
+    TupleScene((repeat each scenes))
   }
 
   public static func buildOptional<Content: Scene>(

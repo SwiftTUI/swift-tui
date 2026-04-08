@@ -328,12 +328,13 @@ public struct ResolvedNode: Equatable, Sendable {
   package func descendant(
     with identity: Identity
   ) -> ResolvedNode? {
-    if self.identity == identity {
-      return self
-    }
-    for child in children {
-      if let match = child.descendant(with: identity) {
-        return match
+    var stack: [ResolvedNode] = [self]
+    while let node = stack.popLast() {
+      if node.identity == identity {
+        return node
+      }
+      for child in node.children.reversed() {
+        stack.append(child)
       }
     }
     return nil
@@ -342,21 +343,36 @@ public struct ResolvedNode: Equatable, Sendable {
   package func path(
     to identity: Identity
   ) -> [Identity]? {
-    if self.identity == identity {
-      return [self.identity]
-    }
-    for child in children {
-      if let childPath = child.path(to: identity) {
-        return [self.identity] + childPath
+    var stack: [(node: ResolvedNode, isExiting: Bool)] = [(self, false)]
+    var path: [Identity] = []
+
+    while let frame = stack.popLast() {
+      if frame.isExiting {
+        path.removeLast()
+        continue
+      }
+
+      path.append(frame.node.identity)
+      if frame.node.identity == identity {
+        return path
+      }
+
+      stack.append((frame.node, true))
+      for child in frame.node.children.reversed() {
+        stack.append((child, false))
       }
     }
+
     return nil
   }
 
   package func collectIdentities(into identities: inout [Identity]) {
-    identities.append(identity)
-    for child in children {
-      child.collectIdentities(into: &identities)
+    var stack: [ResolvedNode] = [self]
+    while let node = stack.popLast() {
+      identities.append(node.identity)
+      for child in node.children.reversed() {
+        stack.append(child)
+      }
     }
   }
 
@@ -369,19 +385,22 @@ public struct ResolvedNode: Equatable, Sendable {
   package func collectLifecycleNodes(
     into nodes: inout [LifecycleStateNode]
   ) {
-    if !lifecycleMetadata.isEmpty {
-      nodes.append(
-        LifecycleStateNode(
-          identity: identity,
-          appearHandlerIDs: lifecycleMetadata.appearHandlerIDs,
-          disappearHandlerIDs: lifecycleMetadata.disappearHandlerIDs,
-          task: lifecycleMetadata.task
+    var stack: [ResolvedNode] = [self]
+    while let node = stack.popLast() {
+      if !node.lifecycleMetadata.isEmpty {
+        nodes.append(
+          LifecycleStateNode(
+            identity: node.identity,
+            appearHandlerIDs: node.lifecycleMetadata.appearHandlerIDs,
+            disappearHandlerIDs: node.lifecycleMetadata.disappearHandlerIDs,
+            task: node.lifecycleMetadata.task
+          )
         )
-      )
-    }
+      }
 
-    for child in children {
-      child.collectLifecycleNodes(into: &nodes)
+      for child in node.children.reversed() {
+        stack.append(child)
+      }
     }
   }
 
@@ -389,14 +408,14 @@ public struct ResolvedNode: Equatable, Sendable {
     appearIDs: inout [String],
     disappearIDs: inout [String]
   ) {
-    appearIDs.append(contentsOf: lifecycleMetadata.appearHandlerIDs)
-    disappearIDs.append(contentsOf: lifecycleMetadata.disappearHandlerIDs)
+    var stack: [ResolvedNode] = [self]
+    while let node = stack.popLast() {
+      appearIDs.append(contentsOf: node.lifecycleMetadata.appearHandlerIDs)
+      disappearIDs.append(contentsOf: node.lifecycleMetadata.disappearHandlerIDs)
 
-    for child in children {
-      child.collectLifecycleHandlerIDs(
-        appearIDs: &appearIDs,
-        disappearIDs: &disappearIDs
-      )
+      for child in node.children.reversed() {
+        stack.append(child)
+      }
     }
   }
 
@@ -533,19 +552,22 @@ public struct PlacedNode: Equatable, Sendable {
   package func collectLifecycleNodes(
     into nodes: inout [LifecycleStateNode]
   ) {
-    if !lifecycleMetadata.isEmpty {
-      nodes.append(
-        LifecycleStateNode(
-          identity: identity,
-          appearHandlerIDs: lifecycleMetadata.appearHandlerIDs,
-          disappearHandlerIDs: lifecycleMetadata.disappearHandlerIDs,
-          task: lifecycleMetadata.task
+    var stack: [PlacedNode] = [self]
+    while let node = stack.popLast() {
+      if !node.lifecycleMetadata.isEmpty {
+        nodes.append(
+          LifecycleStateNode(
+            identity: node.identity,
+            appearHandlerIDs: node.lifecycleMetadata.appearHandlerIDs,
+            disappearHandlerIDs: node.lifecycleMetadata.disappearHandlerIDs,
+            task: node.lifecycleMetadata.task
+          )
         )
-      )
-    }
+      }
 
-    for child in children {
-      child.collectLifecycleNodes(into: &nodes)
+      for child in node.children.reversed() {
+        stack.append(child)
+      }
     }
   }
 }

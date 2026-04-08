@@ -6,8 +6,8 @@ import View
 @MainActor
 @Suite
 struct SceneBuilderBackboneTests {
-  @Test("TupleScene preserves authored order")
-  func tupleScenePreservesAuthoredOrder() {
+  @Test("SceneBuilder preserves authored order across multiple scenes")
+  func sceneBuilderPreservesAuthoredOrderAcrossMultipleScenes() {
     struct OrderedApp: App {
       var body: some Scene {
         WindowGroup("First") {
@@ -16,11 +16,21 @@ struct SceneBuilderBackboneTests {
         WindowGroup("Second") {
           Text("Two")
         }
+        WindowGroup("Third") {
+          Text("Three")
+        }
       }
     }
 
     let descriptors = collectWindowSceneDescriptors(from: OrderedApp().body)
-    #expect(descriptors.map(\.id) == [WindowIdentifier("First"), WindowIdentifier("Second")])
+    #expect(
+      descriptors.map(\.id)
+        == [
+          WindowIdentifier("First"),
+          WindowIdentifier("Second"),
+          WindowIdentifier("Third"),
+        ]
+    )
   }
 
   @Test("ConditionalScene preserves the active branch")

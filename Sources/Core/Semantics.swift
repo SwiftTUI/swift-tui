@@ -126,47 +126,87 @@ extension SemanticExtractor {
     preVisit: (PlacedNode, [Identity], Identity?, Rect?, Int, inout Int) -> Void,
     postVisit: (PlacedNode, [Identity], Identity?, Rect?, inout Int) -> Void
   ) {
-    let nodeScopePath =
-      node.semanticMetadata.focusScopeBoundary
-      ? scopePath + [node.identity]
-      : scopePath
-    let nodeSectionIdentity =
-      node.semanticMetadata.focusSectionBoundary
-      ? node.identity
-      : sectionIdentity
-    let nodeClipRect = combinedClipRect(
-      inherited: clipRect,
-      next: node.clipBounds
-    )
-    let nodeHitTestOrder = hitTestOrder
-    hitTestOrder += 1
-
-    preVisit(
-      node,
-      nodeScopePath,
-      nodeSectionIdentity,
-      nodeClipRect,
-      nodeHitTestOrder,
-      &hitTestOrder
-    )
-    for child in node.children {
-      walk(
-        child,
-        scopePath: nodeScopePath,
-        sectionIdentity: nodeSectionIdentity,
-        clipRect: nodeClipRect,
-        hitTestOrder: &hitTestOrder,
-        preVisit: preVisit,
-        postVisit: postVisit
-      )
+    enum Phase {
+      case enter
+      case exit
     }
-    postVisit(
-      node,
-      nodeScopePath,
-      nodeSectionIdentity,
-      nodeClipRect,
-      &hitTestOrder
-    )
+
+    struct Frame {
+      let node: PlacedNode
+      let scopePath: [Identity]
+      let sectionIdentity: Identity?
+      let clipRect: Rect?
+      let phase: Phase
+    }
+
+    var stack: [Frame] = [
+      Frame(
+        node: node,
+        scopePath: scopePath,
+        sectionIdentity: sectionIdentity,
+        clipRect: clipRect,
+        phase: .enter
+      )
+    ]
+
+    while let frame = stack.popLast() {
+      switch frame.phase {
+      case .enter:
+        let nodeScopePath =
+          frame.node.semanticMetadata.focusScopeBoundary
+          ? frame.scopePath + [frame.node.identity]
+          : frame.scopePath
+        let nodeSectionIdentity =
+          frame.node.semanticMetadata.focusSectionBoundary
+          ? frame.node.identity
+          : frame.sectionIdentity
+        let nodeClipRect = combinedClipRect(
+          inherited: frame.clipRect,
+          next: frame.node.clipBounds
+        )
+        let nodeHitTestOrder = hitTestOrder
+        hitTestOrder += 1
+
+        preVisit(
+          frame.node,
+          nodeScopePath,
+          nodeSectionIdentity,
+          nodeClipRect,
+          nodeHitTestOrder,
+          &hitTestOrder
+        )
+
+        stack.append(
+          Frame(
+            node: frame.node,
+            scopePath: nodeScopePath,
+            sectionIdentity: nodeSectionIdentity,
+            clipRect: nodeClipRect,
+            phase: .exit
+          )
+        )
+
+        for child in frame.node.children.reversed() {
+          stack.append(
+            Frame(
+              node: child,
+              scopePath: nodeScopePath,
+              sectionIdentity: nodeSectionIdentity,
+              clipRect: nodeClipRect,
+              phase: .enter
+            )
+          )
+        }
+      case .exit:
+        postVisit(
+          frame.node,
+          frame.scopePath,
+          frame.sectionIdentity,
+          frame.clipRect,
+          &hitTestOrder
+        )
+      }
+    }
   }
 
   private func combinedClipRect(
