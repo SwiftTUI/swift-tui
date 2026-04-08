@@ -22,7 +22,7 @@ struct ColorGallery: View {
           semanticRolesSection
         }
       }
-    }
+    }.background(Color.red)
   }
 
   private var namedColorsSection: some View {
