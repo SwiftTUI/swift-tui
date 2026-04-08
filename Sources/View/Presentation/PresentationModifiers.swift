@@ -1,20 +1,9 @@
 package import Core
 
-package enum TerminalPresentationKind: Equatable, Sendable {
+package enum BuiltinPromptPresentationKind: Equatable, Sendable {
   case alert
   case confirmationDialog
   case sheet
-
-  var debugName: String {
-    switch self {
-    case .alert:
-      "alert"
-    case .confirmationDialog:
-      "confirmationDialog"
-    case .sheet:
-      "sheet"
-    }
-  }
 
   var alignment: Alignment {
     switch self {
@@ -24,6 +13,17 @@ package enum TerminalPresentationKind: Equatable, Sendable {
       .bottomLeading
     case .sheet:
       .center
+    }
+  }
+
+  var family: PresentationFamilyID {
+    switch self {
+    case .alert:
+      .alert
+    case .confirmationDialog:
+      .confirmationDialog
+    case .sheet:
+      .sheet
     }
   }
 
@@ -57,97 +57,9 @@ package enum TerminalPresentationKind: Equatable, Sendable {
       true
     }
   }
-}
 
-// Presentation payload policy: retain heterogeneous authored payloads here
-// while modal requests are hoisted through preferences to the root host.
-package struct TerminalPresentationRequest: Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
-  var attachmentIdentity: Identity
-  var title: String
-  var kind: TerminalPresentationKind
-  var backdropOpacity: Double
-  var actionPayloads: [DeferredViewPayload]
-  var messagePayloads: [DeferredViewPayload]
-  /// Arbitrary content for sheet presentations (used instead of action/message payloads).
-  var contentPayloads: [DeferredViewPayload]
-  var dismiss: @MainActor @Sendable () -> Void
-
-  package var description: String {
-    debugDescription
-  }
-
-  package var debugDescription: String {
-    "TerminalPresentationRequest(identity: \(attachmentIdentity.path), kind: \(kind.debugName), title: \(String(reflecting: title)), actions: \(actionPayloads.count), messages: \(messagePayloads.count), content: \(contentPayloads.count))"
-  }
-}
-
-package struct TerminalPresentationPreferenceValue: Sendable,
-  CustomStringConvertible,
-  CustomDebugStringConvertible
-{
-  var requests: [TerminalPresentationRequest] = []
-
-  package var description: String {
-    debugDescription
-  }
-
-  package var debugDescription: String {
-    requests.map(\.debugDescription).joined(separator: ", ")
-  }
-}
-
-package enum TerminalPresentationPreferenceKey: PreferenceKey {
-  package static let defaultValue = TerminalPresentationPreferenceValue()
-
-  package static func reduce(
-    value: inout TerminalPresentationPreferenceValue,
-    nextValue: () -> TerminalPresentationPreferenceValue
-  ) {
-    value.requests.append(contentsOf: nextValue().requests)
-  }
-}
-
-package struct TerminalPresentationHostingRoot<Content: View>: View, ResolvableView {
-  package var content: Content
-
-  package init(content: Content) {
-    self.content = content
-  }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    var baseNode = normalizeResolvedElements(
-      resolveViewElements(content, in: context),
-      in: context
-    )
-    let requests = baseNode.preferenceValues[TerminalPresentationPreferenceKey.self].requests
-    guard !requests.isEmpty else {
-      return [baseNode]
-    }
-
-    let hostContext = context.child(component: .named("PresentationHost"))
-    let baseContext = hostContext.child(component: .named("base"))
-    baseNode = normalizeResolvedElements(
-      resolveViewElements(content, in: baseContext),
-      in: baseContext
-    )
-    baseNode.setEnabledRecursively(false)
-    let overlayNode = TerminalPresentationOverlayHost(requests: requests).resolve(
-      in: hostContext.child(component: .named("overlay"))
-    )
-
-    return [
-      ResolvedNode(
-        identity: hostContext.identity,
-        kind: .view("PresentationHost"),
-        children: [baseNode, overlayNode],
-        environmentSnapshot: hostContext.environment,
-        transactionSnapshot: hostContext.transaction,
-        layoutBehavior: .overlay(alignment: .topLeading)
-      )
-    ]
+  var requestToken: String {
+    family.rawValue
   }
 }
 
@@ -156,7 +68,7 @@ extension View {
     _ title: S,
     isPresented: Binding<Bool>
   ) -> some View {
-    TerminalPresentationModifier(
+    BuiltinPromptPresentationModifier(
       content: self,
       title: String(title),
       isPresented: isPresented,
@@ -175,7 +87,7 @@ extension View {
     @ViewBuilder actions: () -> Actions,
     @ViewBuilder message: () -> Message
   ) -> some View {
-    TerminalPresentationModifier(
+    BuiltinPromptPresentationModifier(
       content: self,
       title: String(title),
       isPresented: isPresented,
@@ -189,7 +101,7 @@ extension View {
     _ title: S,
     isPresented: Binding<Bool>
   ) -> some View {
-    TerminalPresentationModifier(
+    BuiltinPromptPresentationModifier(
       content: self,
       title: String(title),
       isPresented: isPresented,
@@ -208,7 +120,7 @@ extension View {
     @ViewBuilder actions: () -> Actions,
     @ViewBuilder message: () -> Message
   ) -> some View {
-    TerminalPresentationModifier(
+    BuiltinPromptPresentationModifier(
       content: self,
       title: String(title),
       isPresented: isPresented,
@@ -222,7 +134,7 @@ extension View {
     isPresented: Binding<Bool>,
     @ViewBuilder content sheetContent: () -> SheetContent
   ) -> some View {
-    TerminalSheetModifier(
+    BuiltinSheetPresentationModifier(
       content: self,
       title: "",
       isPresented: isPresented,
@@ -235,7 +147,7 @@ extension View {
     isPresented: Binding<Bool>,
     @ViewBuilder content sheetContent: () -> SheetContent
   ) -> some View {
-    TerminalSheetModifier(
+    BuiltinSheetPresentationModifier(
       content: self,
       title: String(title),
       isPresented: isPresented,
@@ -246,7 +158,7 @@ extension View {
 
 @MainActor
 private func defaultPresentationActions(
-  kind: TerminalPresentationKind,
+  kind: BuiltinPromptPresentationKind,
   isPresented: Binding<Bool>
 ) -> Button<Text> {
   Button(
@@ -257,16 +169,14 @@ private func defaultPresentationActions(
   )
 }
 
-// Presentation payload policy: retain heterogeneous child payloads here for
-// authored message and action content in hoisted terminal presentations.
-private struct TerminalPresentationModifier<
+private struct BuiltinPromptPresentationModifier<
   Content: View, Actions: View,
   Message: View
 >: View, ResolvableView {
   var content: Content
   var title: String
   var isPresented: Binding<Bool>
-  var kind: TerminalPresentationKind
+  var kind: BuiltinPromptPresentationKind
   var actions: Actions
   var message: Message
 
@@ -277,19 +187,30 @@ private struct TerminalPresentationModifier<
     }
 
     node.preferenceValues.merge(
-      TerminalPresentationPreferenceKey.self,
+      PresentationCoordinatorPreferenceKey.self,
       value: .init(
         requests: [
           .init(
+            requestID: .init(
+              attachmentIdentity: node.identity,
+              family: kind.family,
+              token: kind.requestToken
+            ),
             attachmentIdentity: node.identity,
-            title: title,
-            kind: kind,
-            backdropOpacity: 0,
-            actionPayloads: deferredDeclaredBuilderChildren(from: actions),
-            messagePayloads: deferredDeclaredBuilderChildren(from: message),
-            contentPayloads: [],
-            dismiss: { [isPresented] in
-              isPresented.wrappedValue = false
+            family: kind.family,
+            priority: 0,
+            surfacePayload: DeferredViewPayload {
+              BuiltinHostedPromptPresentation(
+                title: title,
+                kind: kind,
+                backdropOpacity: 0,
+                actionPayloads: deferredDeclaredBuilderChildren(from: actions),
+                messagePayloads: deferredDeclaredBuilderChildren(from: message),
+                contentPayloads: [],
+                dismiss: { [isPresented] in
+                  isPresented.wrappedValue = false
+                }
+              )
             }
           )
         ]
@@ -299,9 +220,7 @@ private struct TerminalPresentationModifier<
   }
 }
 
-// Presentation payload policy: retain heterogeneous sheet content while
-// hoisting through preferences to the root presentation host.
-private struct TerminalSheetModifier<Content: View, SheetContent: View>: View,
+private struct BuiltinSheetPresentationModifier<Content: View, SheetContent: View>: View,
   ResolvableView
 {
   var content: Content
@@ -316,19 +235,30 @@ private struct TerminalSheetModifier<Content: View, SheetContent: View>: View,
     }
 
     node.preferenceValues.merge(
-      TerminalPresentationPreferenceKey.self,
+      PresentationCoordinatorPreferenceKey.self,
       value: .init(
         requests: [
           .init(
+            requestID: .init(
+              attachmentIdentity: node.identity,
+              family: PresentationFamilyID.sheet,
+              token: BuiltinPromptPresentationKind.sheet.requestToken
+            ),
             attachmentIdentity: node.identity,
-            title: title,
-            kind: .sheet,
-            backdropOpacity: 0,
-            actionPayloads: [],
-            messagePayloads: [],
-            contentPayloads: deferredDeclaredBuilderChildren(from: sheetContent),
-            dismiss: { [isPresented] in
-              isPresented.wrappedValue = false
+            family: .sheet,
+            priority: 0,
+            surfacePayload: DeferredViewPayload {
+              BuiltinHostedPromptPresentation(
+                title: title,
+                kind: .sheet,
+                backdropOpacity: 0,
+                actionPayloads: [],
+                messagePayloads: [],
+                contentPayloads: deferredDeclaredBuilderChildren(from: sheetContent),
+                dismiss: { [isPresented] in
+                  isPresented.wrappedValue = false
+                }
+              )
             }
           )
         ]
@@ -338,37 +268,48 @@ private struct TerminalSheetModifier<Content: View, SheetContent: View>: View,
   }
 }
 
-private struct TerminalPresentationOverlayHost: View {
-  var requests: [TerminalPresentationRequest]
+package struct BuiltinHostedPromptPresentation: View {
+  package var title: String
+  package var kind: BuiltinPromptPresentationKind
+  package var backdropOpacity: Double
+  package var actionPayloads: [DeferredViewPayload]
+  package var messagePayloads: [DeferredViewPayload]
+  package var contentPayloads: [DeferredViewPayload]
+  package var dismiss: @MainActor @Sendable () -> Void
 
-  var body: some View {
-    ZStack(alignment: .topLeading) {
-      ForEach(requests.indices, id: \.self) { index in
-        TerminalHostedPresentation(request: requests[index])
-      }
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  package init(
+    title: String,
+    kind: BuiltinPromptPresentationKind,
+    backdropOpacity: Double,
+    actionPayloads: [DeferredViewPayload],
+    messagePayloads: [DeferredViewPayload],
+    contentPayloads: [DeferredViewPayload],
+    dismiss: @escaping @MainActor @Sendable () -> Void
+  ) {
+    self.title = title
+    self.kind = kind
+    self.backdropOpacity = backdropOpacity
+    self.actionPayloads = actionPayloads
+    self.messagePayloads = messagePayloads
+    self.contentPayloads = contentPayloads
+    self.dismiss = dismiss
   }
-}
 
-private struct TerminalHostedPresentation: View {
-  var request: TerminalPresentationRequest
-
-  var body: some View {
+  package var body: some View {
     ZStack(alignment: .topLeading) {
-      if request.backdropOpacity > 0 {
+      if backdropOpacity > 0 {
         Rectangle()
-          .fill(.background.opacity(request.backdropOpacity))
+          .fill(.background.opacity(backdropOpacity))
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
 
-      TerminalPresentationSurface(
-        title: request.title,
-        kind: request.kind,
-        actionPayloads: request.actionPayloads,
-        messagePayloads: request.messagePayloads,
-        contentPayloads: request.contentPayloads,
-        dismiss: request.dismiss
+      BuiltinPromptPresentationSurface(
+        title: title,
+        kind: kind,
+        actionPayloads: actionPayloads,
+        messagePayloads: messagePayloads,
+        contentPayloads: contentPayloads,
+        dismiss: dismiss
       )
       .padding(
         .init(
@@ -378,32 +319,23 @@ private struct TerminalHostedPresentation: View {
           trailing: 1
         )
       )
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: request.kind.alignment)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: kind.alignment)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .onKeyPress(.escape) {
+      dismiss()
+      return .handled
+    }
   }
 }
 
-private struct TerminalPresentationSurface: View, ResolvableView {
+private struct BuiltinPromptPresentationSurface: View {
   var title: String
-  var kind: TerminalPresentationKind
+  var kind: BuiltinPromptPresentationKind
   var actionPayloads: [DeferredViewPayload]
   var messagePayloads: [DeferredViewPayload]
   var contentPayloads: [DeferredViewPayload]
   var dismiss: @MainActor @Sendable () -> Void
-
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    // Register escape-to-dismiss key handler on the presentation surface.
-    context.localKeyHandlerRegistry?.register(identity: context.identity) {
-      [dismiss] event in
-      guard event == .escape else {
-        return false
-      }
-      dismiss()
-      return true
-    }
-    return resolveViewElements(body, in: context)
-  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -505,21 +437,6 @@ private struct TerminalPresentationSurface: View, ResolvableView {
     }
     .fixedSize()
     .padding(.init(horizontal: 1, vertical: 0))
-
-  }
-}
-
-extension ResolvedNode {
-  fileprivate mutating func setEnabledRecursively(
-    _ isEnabled: Bool
-  ) {
-    var style = environmentSnapshot.style
-    style.isEnabled = isEnabled
-    environmentSnapshot.style = style
-
-    for index in children.indices {
-      children[index].setEnabledRecursively(isEnabled)
-    }
   }
 }
 
@@ -548,28 +465,6 @@ public enum ToastStyle: Equatable, Sendable {
     case .warning: "⚠"
     case .danger: "✗"
     }
-  }
-}
-
-private struct ToastRequest: Sendable {
-  var contentPayloads: [DeferredViewPayload]
-  var style: ToastStyle
-  var duration: Double?
-  var dismiss: @MainActor @Sendable () -> Void
-}
-
-private struct ToastPreferenceValue: Sendable {
-  var requests: [ToastRequest] = []
-}
-
-private enum ToastPreferenceKey: PreferenceKey {
-  static let defaultValue = ToastPreferenceValue()
-
-  static func reduce(
-    value: inout ToastPreferenceValue,
-    nextValue: () -> ToastPreferenceValue
-  ) {
-    value.requests.append(contentsOf: nextValue().requests)
   }
 }
 
@@ -624,15 +519,27 @@ private struct ToastModifier<Content: View, ToastContent: View>: View,
 
     let contentPayloads = deferredDeclaredBuilderChildren(from: toastContent)
     node.preferenceValues.merge(
-      ToastPreferenceKey.self,
+      PresentationCoordinatorPreferenceKey.self,
       value: .init(
         requests: [
           .init(
-            contentPayloads: contentPayloads,
-            style: style,
-            duration: duration,
-            dismiss: { [isPresented] in
-              isPresented.wrappedValue = false
+            requestID: .init(
+              attachmentIdentity: node.identity,
+              family: .toast,
+              token: PresentationFamilyID.toast.rawValue
+            ),
+            attachmentIdentity: node.identity,
+            family: .toast,
+            priority: 0,
+            surfacePayload: DeferredViewPayload {
+              BuiltinToastHostedPresentation(
+                contentPayloads: contentPayloads,
+                style: style,
+                duration: duration,
+                dismiss: { [isPresented] in
+                  isPresented.wrappedValue = false
+                }
+              )
             }
           )
         ]
@@ -642,85 +549,39 @@ private struct ToastModifier<Content: View, ToastContent: View>: View,
   }
 }
 
-package struct ToastHostingRoot<Content: View>: View, ResolvableView {
-  package var content: Content
-
-  package init(content: Content) {
-    self.content = content
-  }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let baseNode = normalizeResolvedElements(
-      resolveViewElements(content, in: context),
-      in: context
-    )
-    let requests = baseNode.preferenceValues[ToastPreferenceKey.self].requests
-    guard !requests.isEmpty else {
-      return [baseNode]
-    }
-
-    let hostContext = context.child(component: .named("ToastHost"))
-    let baseContext = hostContext.child(component: .named("base"))
-    let hostedBaseNode = normalizeResolvedElements(
-      resolveViewElements(content, in: baseContext),
-      in: baseContext
-    )
-    let overlayNode = ToastOverlayHost(requests: requests).resolve(
-      in: hostContext.child(component: .named("overlay"))
-    )
-
-    return [
-      ResolvedNode(
-        identity: hostContext.identity,
-        kind: .view("ToastHost"),
-        children: [hostedBaseNode, overlayNode],
-        environmentSnapshot: hostContext.environment,
-        transactionSnapshot: hostContext.transaction,
-        layoutBehavior: .overlay(alignment: .topLeading)
-      )
-    ]
-  }
-}
-
-private struct ToastOverlayHost: View {
-  var requests: [ToastRequest]
+private struct BuiltinToastHostedPresentation: View {
+  var contentPayloads: [DeferredViewPayload]
+  var style: ToastStyle
+  var duration: Double?
+  var dismiss: @MainActor @Sendable () -> Void
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Spacer(minLength: 0)
-      ForEach(requests.indices, id: \.self) { index in
-        ToastSurface(request: requests[index])
+    EnvironmentReader(\.presentationPlacementContext) { placementContext in
+      VStack(alignment: .leading, spacing: 0) {
+        Spacer(minLength: 0)
+        toastCard
       }
-    }
-    .padding(.bottom, 1)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-    .allowsHitTesting(false)
-  }
-}
-
-private struct ToastSurface: View {
-  var request: ToastRequest
-
-  var body: some View {
-    toastContent
+      .padding(.bottom, 1 + placementContext.familyIndex * 5)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+      .allowsHitTesting(false)
       .task {
-        guard let duration = request.duration, duration > 0 else {
+        guard let duration, duration > 0 else {
           return
         }
         try? await Task.sleep(for: .seconds(duration))
-        request.dismiss()
+        dismiss()
       }
+    }
   }
 
-  @ViewBuilder
-  private var toastContent: some View {
+  private var toastCard: some View {
     HStack(alignment: .center, spacing: 1) {
-      Text(request.style.icon)
-        .foregroundStyle(.terminalAccent(request.style.tone))
+      Text(style.icon)
+        .foregroundStyle(.terminalAccent(style.tone))
       VStack {
         DeferredPayloadGroupView(
           kindName: "ToastContent",
-          payloads: request.contentPayloads
+          payloads: contentPayloads
         )
       }
     }
@@ -730,7 +591,7 @@ private struct ToastSurface: View {
     }
     .overlay {
       Rectangle().chromeStrokeBorder(
-        .terminalBorder(request.style.tone)
+        .terminalBorder(style.tone)
       )
     }
     .frame(
@@ -741,5 +602,19 @@ private struct ToastSurface: View {
       maxHeight: .finite(5),
       alignment: .leading
     )
+  }
+}
+
+extension ResolvedNode {
+  package mutating func setEnabledRecursively(
+    _ isEnabled: Bool
+  ) {
+    var style = environmentSnapshot.style
+    style.isEnabled = isEnabled
+    environmentSnapshot.style = style
+
+    for index in children.indices {
+      children[index].setEnabledRecursively(isEnabled)
+    }
   }
 }
