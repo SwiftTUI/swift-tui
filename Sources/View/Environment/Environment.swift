@@ -129,22 +129,35 @@ public struct EnvironmentValues: Equatable, Sendable {
   }
 
   fileprivate func applying(
-    to snapshot: EnvironmentSnapshot
+    to snapshot: EnvironmentSnapshot,
+    reuseStyle: Bool = false
   ) -> EnvironmentSnapshot {
     var mergedValues = snapshot.values
     if !snapshotValues.isEmpty {
       mergedValues.merge(snapshotValues) { _, new in new }
     }
-    return EnvironmentSnapshot(
-      debugSignature: snapshot.debugSignature,
-      values: mergedValues,
-      style: StyleEnvironmentSnapshot(
+    let style: StyleEnvironmentSnapshot
+    if reuseStyle {
+      // Non-style keypath changed: reuse heavy fields, update lightweight ones.
+      style = StyleEnvironmentSnapshot(
+        heavyFields: snapshot.style.heavyFields,
+        foregroundStyle: foregroundStyle,
+        tintStyle: tintStyle,
+        isEnabled: isEnabled
+      )
+    } else {
+      style = StyleEnvironmentSnapshot(
         appearance: terminalAppearance,
         theme: theme,
         foregroundStyle: foregroundStyle,
         tintStyle: tintStyle,
         isEnabled: isEnabled
       )
+    }
+    return EnvironmentSnapshot(
+      debugSignature: snapshot.debugSignature,
+      values: mergedValues,
+      style: style
     )
   }
 
@@ -316,7 +329,9 @@ public struct ResolveContext: Equatable, Sendable {
   ) -> Self {
     var copy = self
     copy.environmentValues[keyPath: keyPath] = value
-    copy.environment = copy.environmentValues.applying(to: copy.environment)
+    let reuseStyle = !Self.isStyleKeyPath(keyPath)
+    copy.environment = copy.environmentValues.applying(
+      to: copy.environment, reuseStyle: reuseStyle)
     return copy
   }
 
@@ -326,8 +341,21 @@ public struct ResolveContext: Equatable, Sendable {
   ) -> Self {
     var copy = self
     transform(&copy.environmentValues[keyPath: keyPath])
-    copy.environment = copy.environmentValues.applying(to: copy.environment)
+    let reuseStyle = !Self.isStyleKeyPath(keyPath)
+    copy.environment = copy.environmentValues.applying(
+      to: copy.environment, reuseStyle: reuseStyle)
     return copy
+  }
+
+  private static func isStyleKeyPath<Value>(
+    _ keyPath: WritableKeyPath<EnvironmentValues, Value>
+  ) -> Bool {
+    let erased: AnyKeyPath = keyPath
+    return erased == \EnvironmentValues.terminalAppearance
+      || erased == \EnvironmentValues.theme
+      || erased == \EnvironmentValues.foregroundStyle
+      || erased == \EnvironmentValues.tintStyle
+      || erased == \EnvironmentValues.isEnabled
   }
 
   /// Returns the effective per-frame invalidation set, preferring the shared

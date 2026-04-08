@@ -25,6 +25,9 @@ let package = Package(
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
         .product(name: "TerminalUICLI", package: "TerminalUICLI"),
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
+      ],
+      linkerSettings: [
+        .unsafeFlags(["-Xlinker", "-stack_size", "-Xlinker", "0x800000"]),
       ]
     ),
   ]

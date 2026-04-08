@@ -360,10 +360,26 @@ public struct TerminalRenderStyle: Equatable, Sendable, Codable {
   }
 }
 
+/// Heap-allocated storage for the large ``TerminalAppearance`` and ``Theme``
+/// value types.  Keeping them behind a reference avoids ~5 KB of stack copies
+/// at every level of view-tree resolution.
+package final class StyleHeavyFieldsStorage: Sendable {
+  package let appearance: TerminalAppearance
+  package let theme: Theme
+
+  package init(appearance: TerminalAppearance, theme: Theme) {
+    self.appearance = appearance
+    self.theme = theme
+  }
+}
+
 /// Styling state captured from the environment during resolve.
 public struct StyleEnvironmentSnapshot: Equatable, Sendable {
-  public var appearance: TerminalAppearance
-  public var theme: Theme
+  /// Boxed storage for the heavy value-type fields (~5 KB → 8 bytes).
+  package var heavyFields: StyleHeavyFieldsStorage
+
+  public var appearance: TerminalAppearance { heavyFields.appearance }
+  public var theme: Theme { heavyFields.theme }
   public var foregroundStyle: AnyShapeStyle?
   public var tintStyle: AnyShapeStyle?
   public var isEnabled: Bool
@@ -375,11 +391,35 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
     tintStyle: AnyShapeStyle? = nil,
     isEnabled: Bool = true
   ) {
-    self.appearance = appearance
-    self.theme = theme ?? appearance.synthesizedTheme()
+    self.heavyFields = StyleHeavyFieldsStorage(
+      appearance: appearance,
+      theme: theme ?? appearance.synthesizedTheme()
+    )
     self.foregroundStyle = foregroundStyle
     self.tintStyle = tintStyle
     self.isEnabled = isEnabled
+  }
+
+  /// Creates a snapshot reusing existing heavy-field storage (no copy).
+  package init(
+    heavyFields: StyleHeavyFieldsStorage,
+    foregroundStyle: AnyShapeStyle?,
+    tintStyle: AnyShapeStyle?,
+    isEnabled: Bool
+  ) {
+    self.heavyFields = heavyFields
+    self.foregroundStyle = foregroundStyle
+    self.tintStyle = tintStyle
+    self.isEnabled = isEnabled
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.heavyFields === rhs.heavyFields
+      || (lhs.appearance == rhs.appearance
+        && lhs.theme == rhs.theme
+        && lhs.foregroundStyle == rhs.foregroundStyle
+        && lhs.tintStyle == rhs.tintStyle
+        && lhs.isEnabled == rhs.isEnabled)
   }
 }
 
