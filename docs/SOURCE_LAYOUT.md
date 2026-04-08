@@ -1,6 +1,6 @@
 # Source Layout
 
-Last updated: April 5, 2026
+Last updated: April 8, 2026
 
 This is the current ownership map for the codebase. It documents where
 subsystems live after the March 2026 source split and should stay aligned with
@@ -8,11 +8,12 @@ future file moves.
 
 ## Repository Layout
 
-- `Sources/`: root Swift package targets (`Core`, `View`, `PrototypeUIComponents`, `TerminalUICharts`, `TerminalUI`, and the vendored `UnixSignals` support target)
+- `Sources/`: root Swift package targets (`Core`, `View`, `PrototypeUIComponents`, `TerminalUICharts`, and `TerminalUI`)
 - `Tests/`: root Swift package tests for the package products plus prototype regressions
 - `Runners/`: peer SwiftPM executable runner packages for terminal-native CLI launch and WASI launch
 - `GUI/`: peer embedded host packages for SwiftUI hosting and Bun/browser hosting
 - `Examples/`: sibling example apps and example-specific package manifests
+- `Vendor/`: sibling vendored Swift packages such as `UnixSignals` and `swift-figlet`
 - `Fixtures/`: shared transport fixtures consumed by both Swift and web tests
 - `Scripts/`: repository policy scripts and hook helpers
 - `docs/`: reference docs, plans, and historical implementation records
@@ -26,7 +27,6 @@ future file moves.
 - Internal support targets:
   - `Core`
   - `PrototypeUIComponents`
-  - `UnixSignals`
 
 - Peer platform integration packages:
   - executable runner packages:
@@ -35,6 +35,10 @@ future file moves.
   - embedded host packages:
     - `GUI/SwiftUITUIGUI`
     - `GUI/WebTUIGUI`
+
+- Vendored local packages:
+  - `Vendor/UnixSignals`
+  - `Vendor/swift-figlet`
 
 `Core` remains the shared pipeline target, but it is not exposed as a separate
 library product. Downstream package consumers reach those types through

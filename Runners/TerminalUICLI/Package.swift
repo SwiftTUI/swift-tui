@@ -24,13 +24,15 @@ let package = Package(
     .library(name: "TerminalUICLI", targets: ["TerminalUICLI"])
   ],
   dependencies: [
-    .package(path: "../..")
+    .package(path: "../.."),
+    .package(path: "../../Vendor/UnixSignals"),
   ],
   targets: [
     .target(
       name: "TerminalUICLI",
       dependencies: [
-        .product(name: "TerminalUI", package: "swift-terminal-ui")
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "UnixSignals", package: "UnixSignals"),
       ],
       swiftSettings: swiftSettings()
     ),
