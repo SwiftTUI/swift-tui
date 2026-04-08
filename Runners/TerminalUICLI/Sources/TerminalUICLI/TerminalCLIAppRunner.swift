@@ -451,8 +451,8 @@ extension App {
   /// Mark a terminal-only app with `@main` to use this automatically, or call
   /// `TerminalCLIAppRunner.run(Self.self)` from a custom launcher when you
   /// need explicit error handling.
-  public static func main() async throws {
-    try await TerminalCLIAppRunner.run(Self.self)
+  public static func main() async {
+    try! await TerminalCLIAppRunner.run(Self.self)
   }
 }
 

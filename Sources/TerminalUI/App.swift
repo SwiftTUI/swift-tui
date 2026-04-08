@@ -399,14 +399,14 @@ public struct WindowGroup<Content: View>: Scene {
 }
 
 /// A terminal application declaration composed of scenes.
-@preconcurrency @MainActor
+@MainActor
 public protocol App {
   associatedtype Body: Scene
 
-  @MainActor @preconcurrency
+  @MainActor
   init()
 
-  @SceneBuilder @MainActor @preconcurrency
+  @SceneBuilder @MainActor
   var body: Body { get }
 }
 
