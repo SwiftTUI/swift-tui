@@ -25,6 +25,7 @@ let packagePlatforms: [SupportedPlatform]? = {
 }()
 
 let packageDependencies: [Package.Dependency] = [
+  .package(path: "Vendor/UnixSignals"),
   .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.6"),
   .package(
     url: "https://github.com/apple/swift-collections.git",
@@ -43,8 +44,9 @@ let packageDependencies: [Package.Dependency] = [
 let terminalUIDependencies: [Target.Dependency] = [
   "Core",
   "View",
-  .target(
+  .product(
     name: "UnixSignals",
+    package: "UnixSignals",
     condition: .when(platforms: nativeRuntimePlatforms),
   ),
   .product(
@@ -91,23 +93,6 @@ let package = Package(
   ],
   dependencies: packageDependencies,
   targets: [
-    .target(
-      name: "UnixSignals",
-      dependencies: [
-        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
-      ],
-      path: "Sources/Vendor/UnixSignals",
-      swiftSettings: swiftSettings()
-    ),
-    .testTarget(
-      name: "UnixSignalsTests",
-      dependencies: [
-        "UnixSignals",
-        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-      ],
-      path: "Sources/Vendor/UnixSignalsTests",
-      swiftSettings: swiftSettings()
-    ),
     .target(
       name: "Core",
       dependencies: [
