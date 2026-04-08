@@ -11,7 +11,9 @@ usage() {
   cat <<'EOF'
 Usage: Scripts/check_demo_builds.zsh [--skip-clean]
 
-Builds the repository's demo packages and host shells:
+Builds the repository's demo packages and host shells, then runs stack-safety
+input harnesses against the terminal examples:
+  - Examples/scroll-diagnostic
   - Examples/gallery
   - Examples/todoist
   - Examples/SwiftUIExample/TerminalApp
@@ -54,6 +56,7 @@ require_command() {
 
 require_command swift
 require_command bun
+require_command python3
 require_command xcodebuild
 
 typeset -a failures=()
@@ -78,6 +81,7 @@ run_step() {
 }
 
 typeset -a cleanable_swift_packages=(
+  "Examples/scroll-diagnostic"
   "Examples/gallery"
   "Examples/todoist"
   "Examples/SwiftUIExample/TerminalApp"
@@ -95,9 +99,52 @@ if (( skip_clean == 0 )); then
 fi
 
 run_step \
+  "Build Examples/scroll-diagnostic (debug)" \
+  "$repo_root" \
+  swift build --package-path Examples/scroll-diagnostic
+
+run_step \
   "Build Examples/gallery" \
   "$repo_root" \
   swift build --package-path Examples/gallery
+
+run_step \
+  "Build Examples/scroll-diagnostic (release)" \
+  "$repo_root" \
+  swift build -c release --package-path Examples/scroll-diagnostic
+
+run_step \
+  "Build Examples/gallery (release)" \
+  "$repo_root" \
+  swift build -c release --package-path Examples/gallery
+
+run_step \
+  "Stack safety Examples/scroll-diagnostic (debug)" \
+  "$repo_root" \
+  python3 Scripts/stack_safety_harness.py \
+    --binary Examples/scroll-diagnostic/.build/debug/scroll-diagnostic \
+    --count 20
+
+run_step \
+  "Stack safety Examples/scroll-diagnostic (release)" \
+  "$repo_root" \
+  python3 Scripts/stack_safety_harness.py \
+    --binary Examples/scroll-diagnostic/.build/release/scroll-diagnostic \
+    --count 20
+
+run_step \
+  "Stack safety Examples/gallery (debug)" \
+  "$repo_root" \
+  python3 Scripts/stack_safety_harness.py \
+    --binary Examples/gallery/.build/debug/gallery-demo \
+    --count 20
+
+run_step \
+  "Stack safety Examples/gallery (release)" \
+  "$repo_root" \
+  python3 Scripts/stack_safety_harness.py \
+    --binary Examples/gallery/.build/release/gallery-demo \
+    --count 20
 
 run_step \
   "Build Examples/todoist" \
