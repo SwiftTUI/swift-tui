@@ -32,14 +32,17 @@ let package = Package(
     targets: [
         .target(
             name: "swift-figlet",
-            resources: [
-                .process("Resources"),
+            exclude: [
+                "Resources",
             ],
             swiftSettings: swiftSettings()
         ),
         .testTarget(
             name: "swift-figletTests",
             dependencies: ["swift-figlet"],
+            exclude: [
+                "Fixtures",
+            ],
             swiftSettings: swiftSettings()
         ),
         .executableTarget(
