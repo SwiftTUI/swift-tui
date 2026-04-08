@@ -191,7 +191,11 @@ public struct ResolvedNode: Equatable, Sendable {
     }
   }
   public var layoutMetadata: LayoutMetadata
-  public var drawMetadata: DrawMetadata
+  public var drawMetadata: DrawMetadata {
+    get { _boxedDrawMetadata.value }
+    set { _boxedDrawMetadata.value = newValue }
+  }
+  package var _boxedDrawMetadata: Boxed<DrawMetadata>
   public var semanticMetadata: SemanticMetadata
   public var lifecycleMetadata: LifecycleMetadata
   public var drawPayload: DrawPayload
@@ -226,7 +230,7 @@ public struct ResolvedNode: Equatable, Sendable {
     self.transactionSnapshot = transactionSnapshot
     self.layoutBehavior = layoutBehavior
     self.layoutMetadata = layoutMetadata
-    self.drawMetadata = drawMetadata
+    self._boxedDrawMetadata = Boxed(drawMetadata)
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
@@ -261,7 +265,7 @@ public struct ResolvedNode: Equatable, Sendable {
     self.transactionSnapshot = transactionSnapshot
     self.layoutBehavior = layoutBehavior
     self.layoutMetadata = layoutMetadata
-    self.drawMetadata = drawMetadata
+    self._boxedDrawMetadata = Boxed(drawMetadata)
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload

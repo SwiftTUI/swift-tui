@@ -1,5 +1,5 @@
 /// The payload attached to a draw node.
-public enum DrawPayload: Equatable, Sendable {
+public indirect enum DrawPayload: Equatable, Sendable {
   case none
   case text(String)
   case richText(RichTextPayload)

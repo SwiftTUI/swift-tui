@@ -17,17 +17,14 @@ public enum ViewBuilder {
     EmptyView()
   }
 
-  public static func buildPartialBlock<Content: View>(
-    first content: Content
-  ) -> Content {
-    content
+  public static func buildBlock<V: View>(_ view: V) -> V {
+    view
   }
 
-  public static func buildPartialBlock<Accumulated: View, Next: View>(
-    accumulated: Accumulated,
-    next: Next
-  ) -> TupleView<Accumulated, Next> {
-    TupleView((accumulated, next))
+  public static func buildBlock<each V: View>(
+    _ views: repeat each V
+  ) -> TupleView<repeat each V> {
+    TupleView((repeat each views))
   }
 
   public static func buildOptional<Content: View>(

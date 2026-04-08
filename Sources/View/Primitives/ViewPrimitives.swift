@@ -8,7 +8,11 @@ public struct Text: View, ResolvableView {
   }
 
   package var storage: Storage
-  public var drawMetadata: DrawMetadata
+  public var drawMetadata: DrawMetadata {
+    get { _boxedDrawMetadata.value }
+    set { _boxedDrawMetadata.value = newValue }
+  }
+  package var _boxedDrawMetadata: Boxed<DrawMetadata>
   public var semanticMetadata: SemanticMetadata
 
   public var content: String {
@@ -27,7 +31,7 @@ public struct Text: View, ResolvableView {
     semanticMetadata: SemanticMetadata = SemanticMetadata()
   ) {
     storage = .plain(content)
-    self.drawMetadata = drawMetadata
+    self._boxedDrawMetadata = Boxed(drawMetadata)
     self.semanticMetadata = semanticMetadata
   }
 
@@ -41,7 +45,7 @@ public struct Text: View, ResolvableView {
     } else {
       storage = .rich(content)
     }
-    self.drawMetadata = drawMetadata
+    self._boxedDrawMetadata = Boxed(drawMetadata)
     self.semanticMetadata = semanticMetadata
   }
 
