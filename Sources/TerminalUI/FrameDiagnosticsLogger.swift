@@ -47,7 +47,7 @@ public final class FrameDiagnosticsLogger {
   /// Creates a logger that writes to the given file path.
   /// The file is created (or truncated) immediately.
   public init?(path: String) {
-    let fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+    let fd = unsafe open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
     guard fd >= 0 else {
       return nil
     }
