@@ -23,11 +23,10 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`
 - `Command`, `CommandCatalog`, `CommandPalette`, and `ToastStyle`
-- presentation primitives and coordinator policy types, including `PresentationFamilyID`, `PresentationLaneID`, `PresentationFamilySelectionPolicy`, `PresentationLaneOrdering`, `PresentationLaneVisibilityPolicy`, `PresentationBackgroundInteraction`, `PresentationFamilyPolicy`, `PresentationLanePolicy`, `PresentationCoordinatorConfiguration`, and `PresentationPlacementContext`
 - `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `FocusInteractions`, `LinkDestination`, and `OpenLinkAction`
 - image-source environment configuration such as `EnvironmentValues.imageResourceRoots`
 - `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and repo-owned `@Bindable`
-- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.presentationCoordinator(...)`, `.presentation(...)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.toast(...)`, `.command(...)`, and `.commandPalette(...)`
+- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.toast(...)`, `.command(...)`, and `.commandPalette(...)`
 - `Resolver` and the public `ResolveContext` configuration surface for low-level rendering entry points
 
 Important public-surface rules after the lowering migration:
@@ -98,6 +97,7 @@ These migration-era APIs are no longer public:
 - concrete wrapper-view implementation types such as `IDView`, `LayoutMetadataModifier`, `DrawMetadataModifier`, `SemanticMetadataModifier`, `EnvironmentWritingModifier`, `EnvironmentTransformModifier`, `PaddingView`, `FrameView`, `OverlayView`, and `BackgroundView`
 - runtime registry and replay types such as `LocalActionRegistry`, `LocalKeyHandlerRegistry`, `LocalLifecycleRegistry`, `LocalTaskRegistry`, `TaskRegistration`, `LifecycleHandlerSnapshot`, and `LocalKeyEvent`
 - keyboard-help compatibility APIs such as `KeyboardShortcut`, `KeyboardShortcutGroup`, `KeyboardShortcutHelpView`, `.keyboardShortcut(...)`, and `.keyboardShortcutHelp(...)`
+- generic presentation coordination surface such as `PresentationFamilyID`, `PresentationLaneID`, `PresentationFamilySelectionPolicy`, `PresentationLaneOrdering`, `PresentationLaneVisibilityPolicy`, `PresentationBackgroundInteraction`, `PresentationFamilyPolicy`, `PresentationLanePolicy`, `PresentationCoordinatorConfiguration`, `PresentationPlacementContext`, `.presentationCoordinator(...)`, and `.presentation(...)`
 
 ### Removed Public Styling Compatibility
 

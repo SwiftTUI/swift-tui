@@ -300,25 +300,27 @@ package func resolveView<V: View>(
   context.recordResolvedComputation()
   let erased: Any = view
   var accessedStateSlots = 0
-  let resolved = ViewNodeContext.withValue(graphNode) {
-    if erased is any ResolvableView {
-      return normalizeResolvedElements(
-        resolveViewElements(view, in: context),
-        in: context
-      )
-    }
+  let resolved = ViewUpdateGuard.withViewUpdate {
+    ViewNodeContext.withValue(graphNode) {
+      if erased is any ResolvableView {
+        return normalizeResolvedElements(
+          resolveViewElements(view, in: context),
+          in: context
+        )
+      }
 
-    let authoringContext = makeAuthoringContext(
-      for: context,
-      viewNode: graphNode
-    )
-    return withAuthoringContext(authoringContext) {
-      let resolved = normalizeResolvedElements(
-        resolveViewElements(view, in: context),
-        in: context
+      let authoringContext = makeAuthoringContext(
+        for: context,
+        viewNode: graphNode
       )
-      accessedStateSlots = authoringContext.ordinalTracker.nextOrdinal
-      return resolved
+      return withAuthoringContext(authoringContext) {
+        let resolved = normalizeResolvedElements(
+          resolveViewElements(view, in: context),
+          in: context
+        )
+        accessedStateSlots = authoringContext.ordinalTracker.nextOrdinal
+        return resolved
+      }
     }
   }
   if let graphNode {
