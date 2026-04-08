@@ -36,6 +36,7 @@ public struct DefaultRenderer {
   private let imageRepository: ImageAssetRepository
   private let viewGraph: ViewGraph
   private let frameState: FrameResolveState
+  private let presentationCoordinatorState: PresentationCoordinatorState
 
   private let retainedFrames: RetainedFrameStore
 
@@ -58,6 +59,7 @@ public struct DefaultRenderer {
     imageRepository = sharedImageAssetRepository
     viewGraph = .init()
     frameState = .init()
+    presentationCoordinatorState = .init()
     retainedFrames = .init()
   }
 
@@ -115,10 +117,9 @@ public struct DefaultRenderer {
     resolveContext.viewGraph = viewGraph
     resolveContext.observationBridge?.attachViewGraph(viewGraph)
     resolveContext.observationBridge?.beginTrackingPass()
-    let wrappedRoot = ToastHostingRoot(
-      content: TerminalPresentationHostingRoot(
-        content: root
-      )
+    let wrappedRoot = PresentationHostingRoot(
+      content: root,
+      coordinatorState: presentationCoordinatorState
     )
     viewGraph.setRootEvaluator(rootIdentity: resolveContext.identity) {
       _ = resolver.resolve(wrappedRoot, in: resolveContext)

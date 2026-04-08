@@ -695,22 +695,20 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
 
     let registrations = node.preferenceValues[CommandPreferenceKey.self].registrations
     node.preferenceValues.merge(
-      TerminalPresentationPreferenceKey.self,
+      PresentationCoordinatorPreferenceKey.self,
       value: .init(
         requests: [
           .init(
-            attachmentIdentity: node.identity,
-            title: "Command Palette",
-            kind: .sheet,
-            backdropOpacity: 0.7,
-            actionPayloads: [],
-            messagePayloads: [],
-            contentPayloads: deferredDeclaredBuilderChildren(
-              from: paletteSheet(for: registrations)
+            requestID: .init(
+              attachmentIdentity: node.identity,
+              family: .commandPalette,
+              token: PresentationFamilyID.commandPalette.rawValue
             ),
-            dismiss: { [isPresented] in
-              isPresented.wrappedValue = false
-              query = ""
+            attachmentIdentity: node.identity,
+            family: .commandPalette,
+            priority: 0,
+            surfacePayload: DeferredViewPayload {
+              palettePresentation(for: registrations)
             }
           )
         ]
@@ -720,24 +718,37 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
     return [node]
   }
 
-  private func paletteSheet(
+  private func palettePresentation(
     for registrations: [CommandRegistration]
   ) -> some View {
     let commands = registrations.map(\.command)
-    return CommandPalette(
-      query: Binding(
-        get: { query },
-        set: { query = $0 }
+    return BuiltinHostedPromptPresentation(
+      title: "Command Palette",
+      kind: .sheet,
+      backdropOpacity: 0.7,
+      actionPayloads: [],
+      messagePayloads: [],
+      contentPayloads: deferredDeclaredBuilderChildren(
+        from: CommandPalette(
+          query: Binding(
+            get: { query },
+            set: { query = $0 }
+          ),
+          commands: commands,
+          placeholder: placeholder,
+          onDismiss: { [isPresented] in
+            isPresented.wrappedValue = false
+            query = ""
+          }
+        ) { command in
+          execute(command, using: registrations)
+        }
       ),
-      commands: commands,
-      placeholder: placeholder,
-      onDismiss: { [isPresented] in
+      dismiss: { [isPresented] in
         isPresented.wrappedValue = false
         query = ""
       }
-    ) { command in
-      execute(command, using: registrations)
-    }
+    )
   }
 
   @MainActor
