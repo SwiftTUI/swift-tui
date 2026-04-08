@@ -69,16 +69,13 @@ public struct ControlChrome: Equatable, Sendable {
 /// The resolved chrome used to render a container such as a group box.
 public struct ContainerChrome: Equatable, Sendable {
   public var foregroundStyle: AnyShapeStyle
-  public var backgroundStyle: AnyShapeStyle
   public var borderStyle: AnyShapeStyle
 
   public init(
     foregroundStyle: AnyShapeStyle,
-    backgroundStyle: AnyShapeStyle,
     borderStyle: AnyShapeStyle
   ) {
     self.foregroundStyle = foregroundStyle
-    self.backgroundStyle = backgroundStyle
     self.borderStyle = borderStyle
   }
 }
@@ -506,7 +503,8 @@ extension TerminalAppearance {
     let luminance = min(1, max(0, base.relativeLuminance))
     let lightenStrength = amount * (invert ? luminance : 1 - luminance)
     let darkenStrength = amount * (invert ? 1 - luminance : luminance)
-    return base
+    return
+      base
       .mixed(with: .white, amount: lightenStrength)
       .mixed(with: .black, amount: darkenStrength)
   }
@@ -684,7 +682,6 @@ extension StyleEnvironmentSnapshot {
     let tone: TerminalTone = prominence == .increased ? .accent : .neutral
     return .init(
       foregroundStyle: resolvedStyle(for: .foreground),
-      backgroundStyle: themeStyle(for: .background),
       borderStyle: AnyShapeStyle(.terminalBorder(tone))
     )
   }
