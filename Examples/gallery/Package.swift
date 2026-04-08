@@ -9,10 +9,6 @@ let package = Package(
     .iOS(.v18),
   ],
   products: [
-    .library(
-      name: "GalleryDemoViews",
-      targets: ["GalleryDemoViews"]
-    ),
     .executable(
       name: "gallery-demo",
       targets: ["GalleryDemo"]
@@ -23,17 +19,9 @@ let package = Package(
     .package(path: "../../Runners/TerminalUICLI"),
   ],
   targets: [
-    .target(
-      name: "GalleryDemoViews",
-      dependencies: [
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
-      ]
-    ),
     .executableTarget(
       name: "GalleryDemo",
       dependencies: [
-        "GalleryDemoViews",
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
         .product(name: "TerminalUICLI", package: "TerminalUICLI"),
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),

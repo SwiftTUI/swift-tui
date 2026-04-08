@@ -16,7 +16,7 @@ It provides:
 - layout composition through ``Layout``, ``AnyLayout``, the built-in stack layouts,
   and viewport-lazy containers such as ``LazyVStack`` and ``LazyHStack``, including
   the single-``ForEach`` full-lazy path
-- the controls, containers, metrics, and modifiers that make up most authored terminal interfaces, including single-line and multiline text entry, split navigation, tab shells, toolbars, terminal-native presentation (`alert`, `confirmationDialog`, `sheet`, `toast`), and command registration plus command-palette workflows
+- the controls, containers, metrics, and modifiers that make up most authored terminal interfaces, including single-line and multiline text entry, split navigation, tab shells, terminal-native presentation (`alert`, `confirmationDialog`, `sheet`, `toast`), and command registration plus command-palette workflows
 
 `View` is intentionally close to SwiftUI in shape. The goal is not to expose a terminal-specific DSL. The goal is to preserve the parts of SwiftUI that make large UI codebases composable and predictable while still targeting cell-based rendering.
 

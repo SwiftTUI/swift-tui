@@ -89,7 +89,6 @@ executable product or default `App.main()`.
 - State and focus: `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, focused values, focus effect controls, and default-focus modifiers
 - Controls and content: `Text`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `GroupBox`, `ControlGroup`, `TabView`, and terminal-native alert or confirmation presentation
 - Presentation and workflow surfaces: `alert`, `confirmationDialog`, `sheet`, `toast`, command registration through `.command(...)`, and command discovery through `CommandPalette` / `.commandPalette(...)`
-- Toolbar chrome: `toolbar(...)`, `toolbarItem(...)`, and `toolbarStyle(.default)` for terminal-native top and bottom bars
 - Runtime integration: `Resolver`, `DefaultRenderer`, `RunLoop`, terminal input parsing, signal handling, alternate-screen ownership, capability-aware presentation, and lifecycle or task staging
 - Platform integration packages: executable runners `Runners/TerminalUICLI` and `Runners/TerminalUIWASI`, plus embedded hosts `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`
 - Compact metrics and charts: `ProgressView`, `BarChart`, `ColumnChart`, `ComparisonChart`, `Sparkline`, `Timeline`, `ThresholdGauge`, and related support types in `TerminalUICharts`
@@ -182,7 +181,6 @@ Peer host packaging lives outside the root package products:
 
 - The core `TerminalUI` runtime is still intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
 - Platform integration now lives outside the root package. Use executable runner packages for terminal-native or WASI execution, and embedded host packages for SwiftUI or browser embedding.
-- The terminal-native toolbar surface is now supported through `toolbar(...)`, `toolbarItem(...)`, and `toolbarStyle(.default)`. The older keyboard-help APIs are removed, and the gallery now demonstrates the toolbar surface directly.
 - Command registration, sheets, toasts, and the command palette are now part of the supported `View` surface. Prototype help-strip exploration still lives in `PrototypeUIComponents` while broader launcher-like shell workflows remain unsettled.
 
 ## Upcoming Work

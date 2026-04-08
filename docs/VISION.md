@@ -32,7 +32,7 @@ What that means in practice:
 - Layout primitives come first: stacks, frames, padding, overlays, scrolling, and custom layouts
 - State and environment come next: `@State`, `@Binding`, `@Observable`, focused values, and focus bindings
 - Runtime correctness comes next: lifecycle ownership, task staging, and incremental terminal presentation
-- Broader orchestration APIs such as stack navigation, toolbars, sheets, and popovers arrive only after the foundation is firm
+- Broader orchestration APIs such as stack navigation, sheets, and popovers arrive only after the foundation is firm
 - Terminal-only chrome that would bend the public authoring story away from SwiftUI does not belong in the core library
 
 ### Deviations From SwiftUI

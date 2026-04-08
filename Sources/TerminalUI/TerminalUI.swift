@@ -117,7 +117,7 @@ public struct DefaultRenderer {
     resolveContext.observationBridge?.beginTrackingPass()
     let wrappedRoot = ToastHostingRoot(
       content: TerminalPresentationHostingRoot(
-        content: ToolbarHostingRoot(content: root)
+        content: root
       )
     )
     viewGraph.setRootEvaluator(rootIdentity: resolveContext.identity) {
