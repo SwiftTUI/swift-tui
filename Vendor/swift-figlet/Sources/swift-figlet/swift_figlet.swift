@@ -1,4 +1,8 @@
-public import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 public enum FigletError: Error, CustomStringConvertible, Sendable {
     case fontNotFound(String)
@@ -82,7 +86,7 @@ public struct FigletText: CustomStringConvertible, Equatable, Sendable {
         var sawContent = false
 
         for row in rows {
-            if !row.trimmingCharacters(in: .whitespaces).isEmpty || sawContent {
+            if row.containsNonWhitespace || sawContent {
                 sawContent = true
                 output.append(row)
             }
@@ -143,8 +147,12 @@ public struct FigletFont: Sendable {
         self = try Self.load(identifier: name)
     }
 
-    public init(fileURL: URL) throws {
-        self = try Self.load(fileURL: fileURL, fallbackName: fileURL.deletingPathExtension().lastPathComponent)
+    public init(named name: String, searchDirectories: [String]) throws {
+        self = try Self.load(identifier: name, searchDirectories: searchDirectories)
+    }
+
+    public init(filePath: String) throws {
+        self = try Self.load(filePath: filePath, fallbackName: filePath.lastPathComponentWithoutExtension)
     }
 
     public var info: String {
@@ -152,79 +160,102 @@ public struct FigletFont: Sendable {
     }
 
     public static func bundledFontNames() -> [String] {
-        guard let resourceURL = Bundle.module.resourceURL else {
-            return [defaultFontName]
+        availableFontNames(in: defaultFontSearchDirectories())
+    }
+
+    public static func availableFontNames(in searchDirectories: [String]) -> [String] {
+        uniquePaths(searchDirectories).flatMap { directory in
+            directoryEntries(at: directory)
+                .filter { $0.hasSupportedFontExtension }
+                .map(\.lastPathComponentWithoutExtension)
         }
-
-        let urls = (try? FileManager.default.contentsOfDirectory(
-            at: resourceURL,
-            includingPropertiesForKeys: nil
-        )) ?? []
-
-        return urls
-            .filter { ["flf", "tlf"].contains($0.pathExtension.lowercased()) }
-            .map { $0.deletingPathExtension().lastPathComponent }
-            .reduce(into: Set<String>()) { result, name in
-                result.insert(name)
-            }
-            .sorted()
+        .reduce(into: Set<String>()) { result, name in
+            result.insert(name)
+        }
+        .sorted()
     }
 
     static func load(identifier: String) throws -> FigletFont {
-        if let fileURL = resolveExternalFontURL(for: identifier) {
-            return try load(fileURL: fileURL, fallbackName: fileURL.deletingPathExtension().lastPathComponent)
+        try load(identifier: identifier, searchDirectories: defaultFontSearchDirectories())
+    }
+
+    static func load(identifier: String, searchDirectories: [String]) throws -> FigletFont {
+        if let filePath = resolveExternalFontPath(for: identifier) {
+            return try load(filePath: filePath, fallbackName: filePath.lastPathComponentWithoutExtension)
         }
 
-        for ext in ["flf", "tlf"] {
-            if let resourceURL = Bundle.module.url(forResource: identifier, withExtension: ext, subdirectory: "Fonts") {
-                return try load(fileURL: resourceURL, fallbackName: identifier)
-            }
-            if let resourceURL = Bundle.module.url(forResource: identifier, withExtension: ext) {
-                return try load(fileURL: resourceURL, fallbackName: identifier)
+        for directory in uniquePaths(searchDirectories) {
+            if let filePath = resolveFontPath(named: identifier, in: directory) {
+                return try load(filePath: filePath, fallbackName: filePath.lastPathComponentWithoutExtension)
             }
         }
 
         throw FigletError.fontNotFound(identifier)
     }
 
-    private static func load(fileURL: URL, fallbackName: String) throws -> FigletFont {
-        let data: String
-        do {
-            data = try String(contentsOf: fileURL, encoding: .utf8)
-        } catch {
-            throw FigletError.invalidFont("unable to read font at \(fileURL.path)")
-        }
-
+    private static func load(filePath: String, fallbackName: String) throws -> FigletFont {
+        let data = try readUTF8File(at: filePath)
         return try parse(data: data, name: fallbackName)
     }
 
-    private static func resolveExternalFontURL(for identifier: String) -> URL? {
-        let fileManager = FileManager.default
-
-        if fileManager.fileExists(atPath: identifier) {
-            return URL(fileURLWithPath: identifier)
+    private static func resolveExternalFontPath(for identifier: String) -> String? {
+        if fileExists(at: identifier) {
+            return identifier
         }
 
         for ext in ["flf", "tlf"] {
             let candidate = "\(identifier).\(ext)"
-            if fileManager.fileExists(atPath: candidate) {
-                return URL(fileURLWithPath: candidate)
+            if fileExists(at: candidate) {
+                return candidate
             }
         }
 
         return nil
     }
 
+    private static func resolveFontPath(named identifier: String, in directory: String) -> String? {
+        if identifier.hasSupportedFontExtension {
+            let directPath = pathByAppending(directory, identifier)
+            return fileExists(at: directPath) ? directPath : nil
+        }
+
+        for ext in ["flf", "tlf"] {
+            let candidate = pathByAppending(directory, "\(identifier).\(ext)")
+            if fileExists(at: candidate) {
+                return candidate
+            }
+        }
+
+        return nil
+    }
+
+    private static func defaultFontSearchDirectories() -> [String] {
+        var directories: [String] = []
+
+        if let envValue = environmentValue(named: "SWIFT_FIGLET_FONT_DIRS") {
+            directories.append(contentsOf: envValue.split(separator: ":").map(String.init))
+        }
+
+        if let envValue = environmentValue(named: "SWIFT_FIGLET_FONT_DIR") {
+            directories.append(envValue)
+        }
+
+        if let homeDirectory = environmentValue(named: "HOME") {
+            directories.append(pathByAppending(homeDirectory, ".figfonts"))
+        }
+
+        directories.append("figfonts")
+
+        return uniquePaths(directories).filter(isDirectory(at:))
+    }
+
     private static func parse(data: String, name: String) throws -> FigletFont {
-        let sanitized = data
-            .replacingOccurrences(of: "\u{0085}", with: " ")
-            .replacingOccurrences(of: "\u{2028}", with: " ")
-            .replacingOccurrences(of: "\u{2029}", with: " ")
-            .normalizedNewlines()
+        let sanitized = data.sanitizedFontData()
 
-        var lines = ArraySlice(sanitized.split(separator: "\n", omittingEmptySubsequences: false).map(String.init))
+        let lines = sanitized.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var lineIndex = 0
 
-        let headerLine = try consumeLine(from: &lines)
+        let headerLine = try consumeLine(from: lines, index: &lineIndex)
         guard headerLine.hasPrefix("flf2") || headerLine.hasPrefix("tlf2") else {
             throw FigletError.invalidFont("\(name) is not a valid figlet font")
         }
@@ -263,49 +294,52 @@ public struct FigletFont: Sendable {
 
         var commentLinesBuffer: [String] = []
         for _ in 0..<commentLines {
-            commentLinesBuffer.append(try consumeLine(from: &lines))
+            commentLinesBuffer.append(try consumeLine(from: lines, index: &lineIndex))
         }
 
         var characters: [Int: [String]] = [:]
         var widths: [Int: Int] = [:]
 
         for codePoint in 32..<127 {
-            let glyph = try consumeGlyph(from: &lines, height: height)
+            let glyph = try consumeGlyph(from: lines, index: &lineIndex, height: height)
             if codePoint == 32 || !glyph.rows.joined().isEmpty {
                 characters[codePoint] = glyph.rows
                 widths[codePoint] = glyph.width
             }
         }
 
-        for character in ["Ä", "Ö", "Ü", "ä", "ö", "ü", "ß"] {
-            guard !lines.isEmpty else { break }
-            let glyph = try consumeGlyph(from: &lines, height: height)
-            if !glyph.rows.joined().isEmpty, let scalar = character.unicodeScalars.first {
-                characters[Int(scalar.value)] = glyph.rows
-                widths[Int(scalar.value)] = glyph.width
-            }
-        }
+        do {
+            for character in ["Ä", "Ö", "Ü", "ä", "ö", "ü", "ß"] {
+                guard lineIndex < lines.count, glyphIdentifier(in: lines[lineIndex]) == nil else {
+                    break
+                }
 
-        while !lines.isEmpty {
-            let definition = try consumeLine(from: &lines).trimmingCharacters(in: .whitespaces)
-            guard !definition.isEmpty else {
-                continue
+                let glyph = try consumeGlyph(from: lines, index: &lineIndex, height: height)
+                if !glyph.rows.joined().isEmpty, let scalar = character.unicodeScalars.first {
+                    characters[Int(scalar.value)] = glyph.rows
+                    widths[Int(scalar.value)] = glyph.width
+                }
             }
 
-            guard let identifier = definition.split(separator: " ", maxSplits: 1).first else {
-                continue
-            }
+            while lineIndex < lines.count {
+                let definition = try consumeLine(from: lines, index: &lineIndex).trimmingFigletWhitespace()
+                guard !definition.isEmpty else {
+                    continue
+                }
 
-            let token = String(identifier)
-            guard token.lowercased().hasPrefix("0x"), let codePoint = Int(token.dropFirst(2), radix: 16) else {
-                continue
-            }
+                guard let codePoint = glyphIdentifier(in: definition) else {
+                    continue
+                }
 
-            let glyph = try consumeGlyph(from: &lines, height: height)
-            if !glyph.rows.joined().isEmpty {
-                characters[codePoint] = glyph.rows
-                widths[codePoint] = glyph.width
+                let glyph = try consumeGlyph(from: lines, index: &lineIndex, height: height)
+                if !glyph.rows.joined().isEmpty {
+                    characters[codePoint] = glyph.rows
+                    widths[codePoint] = glyph.width
+                }
             }
+        } catch {
+            // Extended glyph tables are optional; keep the ASCII core usable even if
+            // a font's supplementary section is truncated or uses an unsupported layout.
         }
 
         return FigletFont(
@@ -344,6 +378,26 @@ public struct FigletFont: Sendable {
     }
 }
 
+private func parseGlyphIdentifier(_ token: String) -> Int? {
+    if token.lowercased().hasPrefix("0x") {
+        return Int(token.dropFirst(2), radix: 16)
+    }
+
+    return Int(token)
+}
+
+private func glyphIdentifier(in definition: String) -> Int? {
+    guard let identifier = definition
+        .trimmingFigletWhitespace()
+        .split(separator: " ", maxSplits: 1)
+        .first
+    else {
+        return nil
+    }
+
+    return parseGlyphIdentifier(String(identifier))
+}
+
 public struct Figlet: Sendable {
     public let font: FigletFont
     public let configuration: FigletConfiguration
@@ -353,6 +407,15 @@ public struct Figlet: Sendable {
         configuration: FigletConfiguration = FigletConfiguration()
     ) throws {
         self.font = try FigletFont(named: name)
+        self.configuration = configuration
+    }
+
+    public init(
+        fontNamed name: String = FigletFont.defaultFontName,
+        configuration: FigletConfiguration = FigletConfiguration(),
+        searchDirectories: [String]
+    ) throws {
+        self.font = try FigletFont(named: name, searchDirectories: searchDirectories)
         self.configuration = configuration
     }
 
@@ -588,7 +651,7 @@ private struct FigletBuilder {
 
     private func replaceHardBlanks(in buffer: [String]) -> String {
         let output = buffer.joined(separator: "\n") + "\n"
-        return output.replacingOccurrences(of: String(font.hardBlank), with: " ")
+        return output.replacingCharacters(matching: font.hardBlank, with: " ")
     }
 
     private func smushAmount(buffer: [String], glyph: [String]) -> Int {
@@ -742,20 +805,21 @@ private struct FigletBuilder {
     }
 }
 
-private func consumeLine(from lines: inout ArraySlice<String>) throws -> String {
-    guard let line = lines.popFirst() else {
+private func consumeLine(from lines: [String], index: inout Int) throws -> String {
+    guard index < lines.count else {
         throw FigletError.invalidFont("unexpected end of font data")
     }
-    return line
+    defer { index += 1 }
+    return lines[index]
 }
 
-private func consumeGlyph(from lines: inout ArraySlice<String>, height: Int) throws -> (width: Int, rows: [String]) {
+private func consumeGlyph(from lines: [String], index: inout Int, height: Int) throws -> (width: Int, rows: [String]) {
     var rows: [String] = []
     var width = 0
     var endMarker: Character?
 
     for _ in 0..<height {
-        let rawLine = try consumeLine(from: &lines)
+        let rawLine = try consumeLine(from: lines, index: &index)
         if endMarker == nil {
             endMarker = rawLine.trimmingTrailingWhitespace().last
         }
@@ -781,10 +845,131 @@ private func stripEndMarker(from line: String, marker: Character) -> String {
     return String(characters)
 }
 
+private func fileExists(at path: String) -> Bool {
+    path.withCString { access($0, F_OK) == 0 }
+}
+
+private func isDirectory(at path: String) -> Bool {
+    guard let directory = opendir(path) else {
+        return false
+    }
+    closedir(directory)
+    return true
+}
+
+private func directoryEntries(at path: String) -> [String] {
+    guard let directory = opendir(path) else {
+        return []
+    }
+    defer { closedir(directory) }
+
+    var entries: [String] = []
+    while let entryPointer = readdir(directory) {
+        let name = withUnsafePointer(to: &entryPointer.pointee.d_name) { pointer in
+            pointer.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: entryPointer.pointee.d_name)) {
+                String(cString: $0)
+            }
+        }
+
+        if name != "." && name != ".." {
+            entries.append(name)
+        }
+    }
+
+    return entries
+}
+
+private func readUTF8File(at path: String) throws -> String {
+    guard let file = fopen(path, "rb") else {
+        throw FigletError.invalidFont("unable to read font at \(path)")
+    }
+    defer { fclose(file) }
+
+    guard fseek(file, 0, SEEK_END) == 0 else {
+        throw FigletError.invalidFont("unable to read font at \(path)")
+    }
+
+    let size = ftell(file)
+    guard size >= 0 else {
+        throw FigletError.invalidFont("unable to read font at \(path)")
+    }
+
+    rewind(file)
+
+    var buffer = [UInt8](repeating: 0, count: Int(size))
+    let bufferCount = buffer.count
+    let bytesRead = buffer.withUnsafeMutableBytes { bytes in
+        fread(bytes.baseAddress, 1, bufferCount, file)
+    }
+
+    return String(decoding: buffer.prefix(bytesRead), as: UTF8.self)
+}
+
+private func environmentValue(named name: String) -> String? {
+    guard let value = getenv(name) else {
+        return nil
+    }
+    return String(cString: value)
+}
+
+private func pathByAppending(_ base: String, _ component: String) -> String {
+    if component.hasPrefix("/") {
+        return component
+    }
+    if base.isEmpty || base == "." {
+        return component
+    }
+    if component == ".." {
+        return base.deletingLastPathComponent
+    }
+    if component.hasPrefix("../") {
+        return pathByAppending(base.deletingLastPathComponent, String(component.dropFirst(3)))
+    }
+    if base.hasSuffix("/") {
+        return base + component
+    }
+    return base + "/" + component
+}
+
+private func uniquePaths(_ paths: [String]) -> [String] {
+    var seen = Set<String>()
+    var result: [String] = []
+
+    for path in paths where !path.isEmpty {
+        let normalized = path.normalizedPath
+        if seen.insert(normalized).inserted {
+            result.append(normalized)
+        }
+    }
+
+    return result
+}
+
 private extension String {
-    func normalizedNewlines() -> String {
-        replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
+    func sanitizedFontData() -> String {
+        var characters: [Character] = []
+        let source = Array(self)
+        var index = 0
+
+        while index < source.count {
+            let character = source[index]
+
+            switch character {
+            case "\r":
+                if index + 1 < source.count, source[index + 1] == "\n" {
+                    index += 1
+                }
+                characters.append("\n")
+            case "\u{0085}", "\u{2028}", "\u{2029}":
+                characters.append(" ")
+            default:
+                characters.append(character)
+            }
+
+            index += 1
+        }
+
+        return String(characters)
     }
 
     func trimmingTrailingWhitespace() -> String {
@@ -793,6 +978,22 @@ private extension String {
             characters.removeLast()
         }
         return String(characters)
+    }
+
+    func trimmingFigletWhitespace() -> String {
+        let characters = Array(self)
+        var start = 0
+        var end = characters.count
+
+        while start < end, characters[start].isFigletWhitespace {
+            start += 1
+        }
+
+        while end > start, characters[end - 1].isFigletWhitespace {
+            end -= 1
+        }
+
+        return String(characters[start..<end])
     }
 
     func replacingCharacter(at index: Int, with replacement: Character) -> String {
@@ -806,9 +1007,75 @@ private extension String {
 
     func trimmingTrailingWhitespaceAndNewlines() -> String {
         var value = self
-        while let last = value.last, last.isWhitespace || last.isNewline {
+        while let last = value.last, last.isFigletWhitespaceOrNewline {
             value.removeLast()
         }
         return value
+    }
+
+    func replacingCharacters(matching target: Character, with replacement: Character) -> String {
+        String(map { $0 == target ? replacement : $0 })
+    }
+
+    var lastPathComponentWithoutExtension: String {
+        let lastComponent = split(separator: "/").last.map(String.init) ?? self
+        guard let dotIndex = lastComponent.lastIndex(of: ".") else {
+            return lastComponent
+        }
+        return String(lastComponent[..<dotIndex])
+    }
+
+    var deletingLastPathComponent: String {
+        guard let slashIndex = lastIndex(of: "/") else {
+            return "."
+        }
+        if slashIndex == startIndex {
+            return "/"
+        }
+        return String(self[..<slashIndex])
+    }
+
+    var normalizedPath: String {
+        let absolute = hasPrefix("/")
+        var components: [Substring] = []
+
+        for component in split(separator: "/", omittingEmptySubsequences: true) {
+            if component == "." {
+                continue
+            }
+            if component == ".." {
+                if !components.isEmpty {
+                    components.removeLast()
+                }
+                continue
+            }
+            components.append(component)
+        }
+
+        let joined = components.joined(separator: "/")
+        if absolute {
+            return "/" + joined
+        }
+        return joined.isEmpty ? (absolute ? "/" : ".") : joined
+    }
+
+    var hasSupportedFontExtension: Bool {
+        hasSuffix(".flf") || hasSuffix(".tlf")
+    }
+}
+
+private extension Substring {
+    var containsNonWhitespace: Bool {
+        contains { !$0.isFigletWhitespace }
+    }
+}
+
+private extension Character {
+    var isFigletWhitespace: Bool {
+        self == " " || self == "\t"
+    }
+
+    var isFigletWhitespaceOrNewline: Bool {
+        isFigletWhitespace || self == "\n" || self == "\r"
     }
 }

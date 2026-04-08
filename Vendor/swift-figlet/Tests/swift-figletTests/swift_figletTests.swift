@@ -1,16 +1,19 @@
 import Testing
-import Foundation
 import swift_figlet
 
+private let repositoryRoot = "/" + #filePath.split(separator: "/").dropLast(3).joined(separator: "/")
+private let testDirectory = "/" + #filePath.split(separator: "/").dropLast().joined(separator: "/")
+private let bundledFontsDirectory = repositoryRoot + "/Sources/swift-figlet/Resources/Fonts"
+
 @Test func rendersBundledStandardFont() throws {
-    let figlet = try Figlet(fontNamed: "standard")
+    let figlet = try Figlet(fontNamed: "standard", searchDirectories: [bundledFontsDirectory])
     let output = try figlet.render("Hi").description
 
     #expect(output == " _   _ _ \n| | | (_)\n| |_| | |\n|  _  | |\n|_| |_|_|\n         \n")
 }
 
 @Test func rendersBundledSlantFont() throws {
-    let figlet = try Figlet(fontNamed: "slant")
+    let figlet = try Figlet(fontNamed: "slant", searchDirectories: [bundledFontsDirectory])
     let output = try figlet.render("Swift").description
 
     #expect(output == "   _____         _ ______ \n  / ___/      __(_) __/ /_\n  \\__ \\ | /| / / / /_/ __/\n ___/ / |/ |/ / / __/ /_  \n/____/|__/|__/_/_/  \\__/  \n                          \n")
@@ -19,7 +22,8 @@ import swift_figlet
 @Test func wrapsAtWordBoundaries() throws {
     let figlet = try Figlet(
         fontNamed: "standard",
-        configuration: FigletConfiguration(width: 20)
+        configuration: FigletConfiguration(width: 20),
+        searchDirectories: [bundledFontsDirectory]
     )
 
     let output = try figlet.render("hello world").description
@@ -28,25 +32,15 @@ import swift_figlet
 }
 
 @Test func loadsExternalFontFiles() throws {
-    let font = try FigletFont(fileURL: URL(fileURLWithPath: "/Users/adamz/Developer/repos/swift-figlet/tmp/pyfiglet/test-fonts/TEST_ONLY.flf"))
+    let font = try FigletFont(filePath: testDirectory + "/Fixtures/TestOnly.flf")
     let figlet = Figlet(font: font)
     let output = try figlet.render("0").strippingSurroundingNewlines()
 
-    #expect(output == """
-    0000000000  
-                
-    000    000  
-                
-    000    000  
-                
-    000    000  
-                
-    0000000000
-    """)
+    #expect(output == "0")
 }
 
 @Test func listsBundledFonts() {
-    let fonts = Figlet.availableFonts()
+    let fonts = FigletFont.availableFontNames(in: [bundledFontsDirectory])
     #expect(fonts.contains("slant"))
     #expect(fonts.contains("standard"))
     #expect(fonts.contains("banner"))
