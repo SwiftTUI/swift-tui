@@ -22,11 +22,8 @@ extension RunLoop {
   package func renderPendingFrames(renderedFrames: inout Int) throws {
     observationBridge.attachInvalidator(scheduler)
 
+    let hasDiagnosticsLogger = diagnosticsLogger != nil
     while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
-      let causeSummary = scheduledFrame.causes
-        .map(\.rawValue)
-        .sorted()
-        .joined(separator: "+")
       var rerenderedForFocusSync = false
       var focusSyncBudget = FocusSyncRerenderBudget()
       var focusSyncBudgetExceeded = false
@@ -47,7 +44,8 @@ extension RunLoop {
               focusedIdentity: focusTracker.currentFocusIdentity
             )),
           context: resolveContext(for: scheduledFrame),
-          proposal: proposal()
+          proposal: proposal(),
+          collectsDiagnostics: hasDiagnosticsLogger
         )
         artifacts = renderedArtifacts
 
@@ -86,8 +84,9 @@ extension RunLoop {
         preconditionFailure("Focus synchronization produced no frame artifacts.")
       }
       if focusSyncBudgetExceeded {
+        let causes = scheduledFrame.causes.map(\.rawValue).sorted().joined(separator: "+")
         assertionFailure(
-          "Focus synchronization did not converge after \(focusSyncBudget.rerenderCount) rerenders for frame causes \(causeSummary). The runtime will present the latest available tree and continue."
+          "Focus synchronization did not converge after \(focusSyncBudget.rerenderCount) rerenders for frame causes \(causes). The runtime will present the latest available tree and continue."
         )
       }
 
@@ -97,9 +96,17 @@ extension RunLoop {
         } else {
           artifacts.presentationDamage
         }
-      let presentClock = ContinuousClock()
-      let presentStart = presentClock.now
       var presentationMetrics = TerminalPresentationMetrics()
+      let presentStart: ContinuousClock.Instant?
+      let presentClock: ContinuousClock?
+      if hasDiagnosticsLogger {
+        let clock = ContinuousClock()
+        presentClock = clock
+        presentStart = clock.now
+      } else {
+        presentClock = nil
+        presentStart = nil
+      }
       if let damageAwareHost = terminalHost as? any DamageAwareTerminalHosting {
         presentationMetrics = try damageAwareHost.present(
           artifacts.rasterSurface,
@@ -108,7 +115,12 @@ extension RunLoop {
       } else {
         presentationMetrics = try terminalHost.present(artifacts.rasterSurface)
       }
-      let presentationDuration = presentStart.duration(to: presentClock.now)
+      let presentationDuration: Duration =
+        if let presentStart, let presentClock {
+          presentStart.duration(to: presentClock.now)
+        } else {
+          .zero
+        }
       lifecycleCoordinator.applyCommittedFrame(
         plan: artifacts.commitPlan,
         currentLifecycleRegistry: localLifecycleRegistry,
@@ -137,6 +149,10 @@ extension RunLoop {
             nil
           }
         let pipelineTotal = diag.phaseTimings?.total ?? .zero
+        let causeSummary = scheduledFrame.causes
+          .map(\.rawValue)
+          .sorted()
+          .joined(separator: "+")
         diagnosticsLogger.log(
           FrameDiagnosticRecord(
             frameNumber: renderedFrames,

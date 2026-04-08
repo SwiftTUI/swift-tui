@@ -159,15 +159,17 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
       damage: damage
     )
 
-    var output = ""
+    var output: String
     switch plan.strategy {
     case .fullRepaint:
-      output += "\u{001B}[2J"
-      output += "\u{001B}[1;1H"
-      output += TerminalSurfaceRenderer(
+      let rendered = TerminalSurfaceRenderer(
         capabilityProfile: capabilityProfile
       ).render(surface)
+      output = "\u{001B}[2J\u{001B}[1;1H\(rendered)"
     case .incremental:
+      let estimatedSize = plan.spanUpdates.reduce(0) { $0 + 16 + $1.renderedSpan.utf8.count }
+      output = ""
+      output.reserveCapacity(estimatedSize)
       for spanUpdate in plan.spanUpdates {
         output += "\u{001B}[\(max(1, spanUpdate.row + 1));\(max(1, spanUpdate.column + 1))H"
         output += spanUpdate.renderedSpan
