@@ -16,13 +16,14 @@ package struct Boxed<Value: Equatable & Sendable>: Equatable, Sendable {
   }
 
   package var value: Value {
-    get { _storage.value }
-    set {
-      if isKnownUniquelyReferenced(&_storage) {
-        _storage.value = newValue
-      } else {
-        _storage = _BoxStorage(newValue)
+    _read {
+      yield _storage.value
+    }
+    _modify {
+      if !isKnownUniquelyReferenced(&_storage) {
+        _storage = _BoxStorage(_storage.value)
       }
+      yield &_storage.value
     }
   }
 

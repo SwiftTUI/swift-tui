@@ -224,13 +224,71 @@ public struct DrawMetadata: Equatable, Sendable {
     }
   }
 
-  public var baseStyle: BaseStyle
-  public var borderShapeStyle: AnyShapeStyle?
-  public var borderStrokeStyle: StrokeStyle?
-  public var scrollIndicatorAxes: AxisSet?
-  public var focusedScrollIndicatorAxes: AxisSet?
-  public var scrollIndicatorForegroundStyle: AnyShapeStyle?
-  public var listStyle: ListStyleMetadata?
+  package struct HeavyFields: Equatable, Sendable {
+    var baseStyle: BaseStyle
+    var borderShapeStyle: AnyShapeStyle?
+    var borderStrokeStyle: StrokeStyle?
+    var scrollIndicatorAxes: AxisSet?
+    var focusedScrollIndicatorAxes: AxisSet?
+    var scrollIndicatorForegroundStyle: AnyShapeStyle?
+    var listStyle: ListStyleMetadata?
+
+    init(
+      foregroundStyle: AnyShapeStyle? = nil,
+      backgroundStyle: AnyShapeStyle? = nil,
+      borderShapeStyle: AnyShapeStyle? = nil,
+      borderStrokeStyle: StrokeStyle? = nil,
+      scrollIndicatorAxes: AxisSet? = nil,
+      focusedScrollIndicatorAxes: AxisSet? = nil,
+      scrollIndicatorForegroundStyle: AnyShapeStyle? = nil,
+      listStyle: ListStyleMetadata? = nil,
+      emphasis: TextStyle.TextEmphasis = [],
+      underlineStyle: TextLineStyle? = nil,
+      strikethroughStyle: TextLineStyle? = nil,
+      opacity: Double? = nil
+    ) {
+      baseStyle = .init(
+        foregroundStyle: foregroundStyle,
+        backgroundStyle: backgroundStyle,
+        emphasis: emphasis,
+        underlineStyle: underlineStyle,
+        strikethroughStyle: strikethroughStyle,
+        opacity: opacity
+      )
+      self.borderShapeStyle = borderShapeStyle
+      self.borderStrokeStyle = borderStrokeStyle
+      self.scrollIndicatorAxes = scrollIndicatorAxes
+      self.focusedScrollIndicatorAxes = focusedScrollIndicatorAxes
+      self.scrollIndicatorForegroundStyle = scrollIndicatorForegroundStyle
+      self.listStyle = listStyle
+    }
+
+    func merging(_ other: Self) -> Self {
+      var merged = self
+      merged.baseStyle = baseStyle.merging(other.baseStyle)
+      merged.borderShapeStyle = other.borderShapeStyle ?? borderShapeStyle
+      merged.borderStrokeStyle = other.borderStrokeStyle ?? borderStrokeStyle
+      merged.scrollIndicatorAxes = other.scrollIndicatorAxes ?? scrollIndicatorAxes
+      merged.focusedScrollIndicatorAxes =
+        other.focusedScrollIndicatorAxes ?? focusedScrollIndicatorAxes
+      merged.scrollIndicatorForegroundStyle =
+        other.scrollIndicatorForegroundStyle ?? scrollIndicatorForegroundStyle
+      merged.listStyle =
+        switch (listStyle, other.listStyle) {
+        case (let lhs?, let rhs?):
+          lhs.merging(rhs)
+        case (_, let rhs?):
+          rhs
+        case (let lhs?, nil):
+          lhs
+        case (nil, nil):
+          nil
+        }
+      return merged
+    }
+  }
+
+  package var heavyFields: Boxed<HeavyFields>
   public var clipsToBounds: Bool
   public var clipIdentifier: String?
   public var compositingHint: String?
@@ -261,19 +319,6 @@ public struct DrawMetadata: Equatable, Sendable {
     compositingHint: String? = nil,
     imagePreference: String? = nil
   ) {
-    baseStyle = .init(
-      foregroundStyle: foregroundStyle,
-      backgroundStyle: backgroundStyle,
-      emphasis: emphasis,
-      underlineStyle: underlineStyle,
-      strikethroughStyle: strikethroughStyle,
-      opacity: opacity
-    )
-    self.borderShapeStyle = borderShapeStyle
-    self.borderStrokeStyle = borderStrokeStyle
-    self.scrollIndicatorAxes = scrollIndicatorAxes
-    self.focusedScrollIndicatorAxes = focusedScrollIndicatorAxes
-    self.scrollIndicatorForegroundStyle = scrollIndicatorForegroundStyle
     let resolvedListStyle =
       listStyle?.merging(
         .init(
@@ -293,12 +338,32 @@ public struct DrawMetadata: Equatable, Sendable {
         sectionSeparatorTopVisibility: listSectionSeparatorTopVisibility,
         sectionSeparatorBottomVisibility: listSectionSeparatorBottomVisibility
       )
-    self.listStyle = resolvedListStyle.isDefault ? nil : resolvedListStyle
+    heavyFields = Boxed(
+      HeavyFields(
+        foregroundStyle: foregroundStyle,
+        backgroundStyle: backgroundStyle,
+        borderShapeStyle: borderShapeStyle,
+        borderStrokeStyle: borderStrokeStyle,
+        scrollIndicatorAxes: scrollIndicatorAxes,
+        focusedScrollIndicatorAxes: focusedScrollIndicatorAxes,
+        scrollIndicatorForegroundStyle: scrollIndicatorForegroundStyle,
+        listStyle: resolvedListStyle.isDefault ? nil : resolvedListStyle,
+        emphasis: emphasis,
+        underlineStyle: underlineStyle,
+        strikethroughStyle: strikethroughStyle,
+        opacity: opacity
+      )
+    )
     self.clipsToBounds = clipsToBounds
     self.clipIdentifier = clipIdentifier
     self.compositingHint = compositingHint
     self.imagePreference = imagePreference
     ruleStackAxis = nil
+  }
+
+  public var baseStyle: BaseStyle {
+    get { heavyFields.value.baseStyle }
+    set { heavyFields.value.baseStyle = newValue }
   }
 
   public var foregroundStyle: AnyShapeStyle? {
@@ -339,84 +404,96 @@ public struct DrawMetadata: Equatable, Sendable {
   public var listRowForegroundStyle: AnyShapeStyle? {
     get { listStyle?.rowForegroundStyle }
     set {
-      var listStyle = self.listStyle ?? .init()
-      listStyle.rowForegroundStyle = newValue
-      self.listStyle = listStyle.isDefault ? nil : listStyle
+      var updated = listStyle ?? .init()
+      updated.rowForegroundStyle = newValue
+      listStyle = updated.isDefault ? nil : updated
     }
   }
 
   public var listRowBackgroundStyle: AnyShapeStyle? {
     get { listStyle?.rowBackgroundStyle }
     set {
-      var listStyle = self.listStyle ?? .init()
-      listStyle.rowBackgroundStyle = newValue
-      self.listStyle = listStyle.isDefault ? nil : listStyle
+      var updated = listStyle ?? .init()
+      updated.rowBackgroundStyle = newValue
+      listStyle = updated.isDefault ? nil : updated
     }
   }
 
   public var listRowSeparatorTopVisibility: Visibility? {
     get { listStyle?.rowSeparatorTopVisibility }
     set {
-      var listStyle = self.listStyle ?? .init()
-      listStyle.rowSeparatorTopVisibility = newValue
-      self.listStyle = listStyle.isDefault ? nil : listStyle
+      var updated = listStyle ?? .init()
+      updated.rowSeparatorTopVisibility = newValue
+      listStyle = updated.isDefault ? nil : updated
     }
   }
 
   public var listRowSeparatorBottomVisibility: Visibility? {
     get { listStyle?.rowSeparatorBottomVisibility }
     set {
-      var listStyle = self.listStyle ?? .init()
-      listStyle.rowSeparatorBottomVisibility = newValue
-      self.listStyle = listStyle.isDefault ? nil : listStyle
+      var updated = listStyle ?? .init()
+      updated.rowSeparatorBottomVisibility = newValue
+      listStyle = updated.isDefault ? nil : updated
     }
   }
 
   public var listSectionSeparatorTopVisibility: Visibility? {
     get { listStyle?.sectionSeparatorTopVisibility }
     set {
-      var listStyle = self.listStyle ?? .init()
-      listStyle.sectionSeparatorTopVisibility = newValue
-      self.listStyle = listStyle.isDefault ? nil : listStyle
+      var updated = listStyle ?? .init()
+      updated.sectionSeparatorTopVisibility = newValue
+      listStyle = updated.isDefault ? nil : updated
     }
   }
 
   public var listSectionSeparatorBottomVisibility: Visibility? {
     get { listStyle?.sectionSeparatorBottomVisibility }
     set {
-      var listStyle = self.listStyle ?? .init()
-      listStyle.sectionSeparatorBottomVisibility = newValue
-      self.listStyle = listStyle.isDefault ? nil : listStyle
+      var updated = listStyle ?? .init()
+      updated.sectionSeparatorBottomVisibility = newValue
+      listStyle = updated.isDefault ? nil : updated
     }
   }
 
   public func merging(_ other: Self) -> Self {
     var merged = self
-    merged.baseStyle = baseStyle.merging(other.baseStyle)
-    merged.borderShapeStyle = other.borderShapeStyle ?? borderShapeStyle
-    merged.borderStrokeStyle = other.borderStrokeStyle ?? borderStrokeStyle
-    merged.scrollIndicatorAxes = other.scrollIndicatorAxes ?? scrollIndicatorAxes
-    merged.focusedScrollIndicatorAxes =
-      other.focusedScrollIndicatorAxes ?? focusedScrollIndicatorAxes
-    merged.scrollIndicatorForegroundStyle =
-      other.scrollIndicatorForegroundStyle ?? scrollIndicatorForegroundStyle
-    merged.listStyle =
-      switch (listStyle, other.listStyle) {
-      case (let lhs?, let rhs?):
-        lhs.merging(rhs)
-      case (_, let rhs?):
-        rhs
-      case (let lhs?, nil):
-        lhs
-      case (nil, nil):
-        nil
-      }
+    merged.heavyFields.value = heavyFields.value.merging(other.heavyFields.value)
     merged.clipsToBounds = clipsToBounds || other.clipsToBounds
     merged.clipIdentifier = other.clipIdentifier ?? clipIdentifier
     merged.compositingHint = other.compositingHint ?? compositingHint
     merged.imagePreference = other.imagePreference ?? imagePreference
     merged.ruleStackAxis = other.ruleStackAxis ?? ruleStackAxis
     return merged
+  }
+
+  public var borderShapeStyle: AnyShapeStyle? {
+    get { heavyFields.value.borderShapeStyle }
+    set { heavyFields.value.borderShapeStyle = newValue }
+  }
+
+  public var borderStrokeStyle: StrokeStyle? {
+    get { heavyFields.value.borderStrokeStyle }
+    set { heavyFields.value.borderStrokeStyle = newValue }
+  }
+
+  public var scrollIndicatorAxes: AxisSet? {
+    get { heavyFields.value.scrollIndicatorAxes }
+    set { heavyFields.value.scrollIndicatorAxes = newValue }
+  }
+
+  public var focusedScrollIndicatorAxes: AxisSet? {
+    get { heavyFields.value.focusedScrollIndicatorAxes }
+    set { heavyFields.value.focusedScrollIndicatorAxes = newValue }
+  }
+
+  public var scrollIndicatorForegroundStyle: AnyShapeStyle? {
+    get { heavyFields.value.scrollIndicatorForegroundStyle }
+    set { heavyFields.value.scrollIndicatorForegroundStyle = newValue }
+  }
+
+  public var listStyle: ListStyleMetadata? {
+    get { heavyFields.value.listStyle }
+    set { heavyFields.value.listStyle = newValue }
   }
 }
 
