@@ -393,13 +393,14 @@ extension SnapshotRenderer {
     case .image(let bounds, let identity, let payload):
       return
         "image[\(describe(bounds)) id=\(identity.path) source=\(describe(payload.source)) asset=\(describe(payload.resolvedAsset))]"
-    case .fill(let bounds, let geometry, let style, let mode):
+    case .fill(let bounds, let geometry, let insetAmount, let style, let mode):
       return
-        "fill[\(describe(bounds)) \(describe(geometry)) mode=\(describe(mode)) style=\(describe(style))]"
+        "fill[\(describe(bounds)) \(describe(geometry, insetAmount: insetAmount)) mode=\(describe(mode)) style=\(describe(style))]"
     case .stroke(
-      let bounds, let geometry, let style, let strokeStyle, let strokeBorder, let backgroundStyle):
+      let bounds, let geometry, let insetAmount, let style, let strokeStyle, let strokeBorder,
+      let backgroundStyle):
       return
-        "stroke[\(describe(bounds)) \(describe(geometry)) \(describe(strokeStyle)) border=\(strokeBorder) style=\(describe(style)) bg=\(backgroundStyle.map(describe) ?? "nil")]"
+        "stroke[\(describe(bounds)) \(describe(geometry, insetAmount: insetAmount)) \(describe(strokeStyle)) border=\(strokeBorder) style=\(describe(style)) bg=\(backgroundStyle.map(describe) ?? "nil")]"
     case .rule(let bounds, let style, let strokeStyle, let stackAxis):
       return
         "rule[\(describe(bounds)) \(describe(strokeStyle)) style=\(describe(style)) stackAxis=\(stackAxis?.rawValue ?? "nil")]"
@@ -543,17 +544,25 @@ extension SnapshotRenderer {
     return lineStyle.pattern.rawValue
   }
 
-  private func describe(_ geometry: ShapeGeometry) -> String {
-    switch geometry {
-    case .rectangle:
-      return "rectangle"
-    case .roundedRectangle(let cornerRadius):
-      return "roundedRectangle(\(cornerRadius))"
+  private func describe(
+    _ geometry: ShapeGeometry,
+    insetAmount: Int = 0
+  ) -> String {
+    let base =
+      switch geometry {
+      case .rectangle:
+        "rectangle"
+      case .roundedRectangle(let cornerRadius):
+        "roundedRectangle(\(cornerRadius))"
+      }
+    if insetAmount > 0 {
+      return "\(base).inset(\(insetAmount))"
     }
+    return base
   }
 
   private func describe(_ payload: ShapePayload) -> String {
-    "\(describe(payload.geometry)),\(describe(payload.operation))"
+    "\(describe(payload.geometry, insetAmount: payload.insetAmount)),\(describe(payload.operation))"
   }
 
   private func describe(_ operation: ShapeOperation) -> String {

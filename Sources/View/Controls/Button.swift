@@ -250,13 +250,13 @@ private struct ButtonChromeBackground: View {
       if usesDenseBorderlessChrome {
         RoundedRectangle(cornerRadius: 1).fill(chrome.backgroundStyle)
       } else {
-        RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
+        RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(chrome.backgroundStyle)
       }
     default:
       if usesDenseBorderlessChrome {
         Rectangle().fill(chrome.backgroundStyle)
       } else {
-        Rectangle().chromeFill(chrome.backgroundStyle)
+        Rectangle().inset(by: 1).fill(chrome.backgroundStyle)
       }
     }
   }

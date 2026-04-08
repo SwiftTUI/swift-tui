@@ -451,7 +451,7 @@ private func selectionSummary(
     }
     .padding(1)
     .background {
-      RoundedRectangle(cornerRadius: 1).chromeFill(.windowBackground)
+      RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.windowBackground)
     }
     .overlay {
       RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(.separator)
@@ -528,7 +528,7 @@ private func textLabColumn(
             .lineLimit(1)
             .padding(.init(horizontal: 1))
             .background {
-              RoundedRectangle(cornerRadius: 1).chromeFill(.windowBackground)
+              RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.windowBackground)
             }
             .overlay {
               RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
@@ -743,7 +743,8 @@ private func interactiveDemoCapabilityBadge(
     }
 
   let styleLabel = profile.emitsStyleEscapeSequences ? "styled" : "plain"
-  return "\(glyphLabel) | \(colorLabel) | \(styleLabel) | \(appearance.colorSchemeContrast.rawValue)"
+  return
+    "\(glyphLabel) | \(colorLabel) | \(styleLabel) | \(appearance.colorSchemeContrast.rawValue)"
 }
 
 @MainActor

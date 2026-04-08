@@ -13,6 +13,7 @@ extension DrawExtractor {
         .fill(
           bounds: bounds,
           geometry: .rectangle,
+          insetAmount: 0,
           style: backgroundStyle,
           mode: .full
         )
@@ -35,6 +36,7 @@ extension DrawExtractor {
           .fill(
             bounds: lineBounds,
             geometry: .rectangle,
+            insetAmount: 0,
             style: backgroundStyle,
             mode: .full
           )

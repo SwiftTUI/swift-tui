@@ -42,6 +42,7 @@ struct RasterizerTests {
         .fill(
           bounds: bounds,
           geometry: .rectangle,
+          insetAmount: 0,
           style: .color(.red),
           mode: .full
         ),

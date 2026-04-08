@@ -4,11 +4,35 @@ public import Core
 public protocol Shape: View {
   var geometry: ShapeGeometry { get }
   var kindName: String { get }
+  var insetAmount: Int { get }
 }
 
-extension Shape {
+/// A shape that can be inset geometrically before being rendered.
+public protocol InsettableShape: Shape {}
+
+/// A shape wrapper that insets its base geometry before rendering.
+public struct InsetShape<Base: InsettableShape>: InsettableShape, ResolvableView {
+  public var base: Base
+  public var amount: Int
+
+  public init(
+    base: Base,
+    amount: Int
+  ) {
+    self.base = base
+    self.amount = amount
+  }
+
+  public var geometry: ShapeGeometry {
+    base.geometry
+  }
+
   public var kindName: String {
-    String(describing: Self.self)
+    base.kindName
+  }
+
+  public var insetAmount: Int {
+    base.insetAmount + max(0, amount)
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -18,6 +42,33 @@ extension Shape {
         drawPayload: .shape(
           .init(
             geometry: geometry,
+            insetAmount: insetAmount,
+            operation: .fill(style: nil, mode: .full)
+          )
+        ),
+        in: context
+      )
+    ]
+  }
+}
+
+extension Shape {
+  public var kindName: String {
+    String(describing: Self.self)
+  }
+
+  public var insetAmount: Int {
+    0
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    [
+      resolveLeafNode(
+        kindName: kindName,
+        drawPayload: .shape(
+          .init(
+            geometry: geometry,
+            insetAmount: insetAmount,
             operation: .fill(style: nil, mode: .full)
           )
         ),
@@ -30,6 +81,7 @@ extension Shape {
     ShapeRenderView(
       kindName: kindName,
       geometry: geometry,
+      insetAmount: insetAmount,
       operation: .fill(style: AnyShapeStyle(style), mode: .full)
     )
   }
@@ -65,6 +117,7 @@ extension Shape {
     ShapeRenderView(
       kindName: kindName,
       geometry: geometry,
+      insetAmount: insetAmount,
       operation: .stroke(
         style: AnyShapeStyle(style),
         strokeStyle: strokeStyle,
@@ -105,6 +158,7 @@ extension Shape {
     ShapeRenderView(
       kindName: kindName,
       geometry: geometry,
+      insetAmount: insetAmount,
       operation: .stroke(
         style: AnyShapeStyle(style),
         strokeStyle: strokeStyle,
@@ -114,20 +168,18 @@ extension Shape {
     )
   }
 
-  package func chromeFill<S: ShapeStyle>(
-    _ style: S,
-    strokeWidth: Int = 1
-  ) -> some View {
-    ShapeRenderView(
-      kindName: kindName,
-      geometry: geometry,
-      operation: .fill(
-        style: AnyShapeStyle(style),
-        mode: .interior(strokeWidth: max(1, strokeWidth))
-      )
+}
+
+extension InsettableShape {
+  public func inset(by amount: Int) -> some InsettableShape {
+    InsetShape(
+      base: self,
+      amount: max(0, amount)
     )
   }
+}
 
+extension Shape {
   package func chromeStrokeBorder<S: ShapeStyle>(
     _ style: S,
     style strokeStyle: StrokeStyle = .init(),
@@ -136,6 +188,7 @@ extension Shape {
     ShapeRenderView(
       kindName: kindName,
       geometry: geometry,
+      insetAmount: insetAmount,
       operation: .stroke(
         style: AnyShapeStyle(style),
         strokeStyle: strokeStyle,
@@ -149,6 +202,7 @@ extension Shape {
 private struct ShapeRenderView: View, ResolvableView {
   var kindName: String
   var geometry: ShapeGeometry
+  var insetAmount: Int
   var operation: ShapeOperation
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -158,6 +212,7 @@ private struct ShapeRenderView: View, ResolvableView {
         drawPayload: .shape(
           .init(
             geometry: geometry,
+            insetAmount: insetAmount,
             operation: operation
           )
         ),

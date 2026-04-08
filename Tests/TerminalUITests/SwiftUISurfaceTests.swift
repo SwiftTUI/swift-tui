@@ -1144,7 +1144,7 @@ struct SwiftUISurfaceTests {
   func strokedShapesKeepBorderCellsFreeOfInteriorFill() {
     let artifacts = DefaultRenderer().render(
       RoundedRectangle(cornerRadius: 1)
-        .chromeFill(.warning)
+        .inset(by: 1).fill(.warning)
         .overlay {
           RoundedRectangle(cornerRadius: 1).strokeBorder(.danger)
         }
@@ -1162,12 +1162,12 @@ struct SwiftUISurfaceTests {
     #expect(artifacts.rasterSurface.cells[1][2].style?.backgroundColor != nil)
   }
 
-  @Test("rounded interior fills cover inset corner cells on taller containers")
+  @Test("rounded inset fills preserve rounded corner cells on taller containers")
   @MainActor
-  func roundedInteriorFillsCoverInsetCornerCells() {
+  func roundedInsetFillsPreserveRoundedCornerCells() {
     let artifacts = DefaultRenderer().render(
       RoundedRectangle(cornerRadius: 1)
-        .chromeFill(.warning)
+        .inset(by: 1).fill(.warning)
         .overlay {
           RoundedRectangle(cornerRadius: 1).strokeBorder(.danger)
         }
@@ -1183,10 +1183,11 @@ struct SwiftUISurfaceTests {
         "│     │",
         "╰─────╯",
       ])
-    #expect(artifacts.rasterSurface.cells[1][1].style?.backgroundColor != nil)
-    #expect(artifacts.rasterSurface.cells[1][5].style?.backgroundColor != nil)
-    #expect(artifacts.rasterSurface.cells[3][1].style?.backgroundColor != nil)
-    #expect(artifacts.rasterSurface.cells[3][5].style?.backgroundColor != nil)
+    #expect(artifacts.rasterSurface.cells[1][1].style?.backgroundColor == nil)
+    #expect(artifacts.rasterSurface.cells[1][5].style?.backgroundColor == nil)
+    #expect(artifacts.rasterSurface.cells[3][1].style?.backgroundColor == nil)
+    #expect(artifacts.rasterSurface.cells[3][5].style?.backgroundColor == nil)
+    #expect(artifacts.rasterSurface.cells[2][3].style?.backgroundColor != nil)
   }
 
   @Test("explicit internal border background styles only the border ring")
@@ -1543,18 +1544,30 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(idle.foregroundStyle == semanticTheme.style(for: .foreground))
-    #expect(resolveStyleColor(style: idle.backgroundStyle, theme: semanticTheme, appearance: appearance) != nil)
-    #expect(resolveStyleColor(style: idle.borderStyle, theme: semanticTheme, appearance: appearance) != nil)
+    #expect(
+      resolveStyleColor(style: idle.backgroundStyle, theme: semanticTheme, appearance: appearance)
+        != nil)
+    #expect(
+      resolveStyleColor(style: idle.borderStyle, theme: semanticTheme, appearance: appearance)
+        != nil)
     #expect(idle.opacity == 1)
 
-    #expect(resolveStyleColor(style: focused.backgroundStyle, theme: semanticTheme, appearance: appearance) != nil)
-    #expect(resolveStyleColor(style: focused.borderStyle, theme: semanticTheme, appearance: appearance) != nil)
+    #expect(
+      resolveStyleColor(
+        style: focused.backgroundStyle, theme: semanticTheme, appearance: appearance) != nil)
+    #expect(
+      resolveStyleColor(style: focused.borderStyle, theme: semanticTheme, appearance: appearance)
+        != nil)
     #expect(idle.borderStyle != focused.borderStyle)
     #expect(focused.opacity == 1)
 
     #expect(disabled.foregroundStyle == semanticTheme.style(for: .placeholder))
-    #expect(resolveStyleColor(style: disabled.backgroundStyle, theme: semanticTheme, appearance: appearance) != nil)
-    #expect(resolveStyleColor(style: disabled.borderStyle, theme: semanticTheme, appearance: appearance) != nil)
+    #expect(
+      resolveStyleColor(
+        style: disabled.backgroundStyle, theme: semanticTheme, appearance: appearance) != nil)
+    #expect(
+      resolveStyleColor(style: disabled.borderStyle, theme: semanticTheme, appearance: appearance)
+        != nil)
     #expect(disabled.opacity == 0.6)
   }
 
@@ -2159,8 +2172,8 @@ struct SwiftUISurfaceTests {
     #expect(box.value == 2)
   }
 
-  @Test("Picker radioGroup fills the selected row cleanly across an explicit frame width")
-  func pickerRadioGroupFillsSelectedRowAcrossFrameWidth() {
+  @Test("Picker radioGroup preserves rounded inset corners across an explicit frame width")
+  func pickerRadioGroupPreservesRoundedInsetCornersAcrossFrameWidth() {
     let artifacts = DefaultRenderer().render(
       Picker("Mode", selection: .constant(1)) {
         Text("One").tag(1)
@@ -2173,8 +2186,8 @@ struct SwiftUISurfaceTests {
     )
 
     let selectedRow = artifacts.rasterSurface.cells[2]
-    #expect(selectedRow[1].style?.backgroundColor != nil)
-    #expect(selectedRow[14].style?.backgroundColor == selectedRow[1].style?.backgroundColor)
+    #expect(selectedRow[1].style?.backgroundColor == nil)
+    #expect(selectedRow[14].style?.backgroundColor != nil)
   }
 
   @Test("Picker radioGroup preserves its label and leading option under vertical stack compression")
@@ -3493,7 +3506,9 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(
-      artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("Scrollable"), testIdentity("InnerButton")])
+      artifacts.semanticSnapshot.focusRegions.map(\.identity) == [
+        testIdentity("Scrollable"), testIdentity("InnerButton"),
+      ])
     #expect(unfocused.rasterSurface.lines == artifacts.rasterSurface.lines)
     #expect(unfocused.rasterSurface != artifacts.rasterSurface)
   }
@@ -3538,7 +3553,10 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("Scrollable"), indicatorIdentity])
+    #expect(
+      artifacts.semanticSnapshot.focusRegions.map(\.identity) == [
+        testIdentity("Scrollable"), indicatorIdentity,
+      ])
     #expect(registry.dispatch(identity: indicatorIdentity, event: .arrowDown))
     #expect(box.position == .init(x: 0, y: 1))
   }
@@ -3581,7 +3599,9 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(initialArtifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("Scrollable")])
+    #expect(
+      initialArtifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("Scrollable")]
+    )
     #expect(initialArtifacts.rasterSurface.lines.prefix(2) == ["Row 0", "Row 1"])
     #expect(registry.dispatch(identity: testIdentity("Scrollable"), event: .arrowDown))
     #expect(box.position == .init(x: 0, y: 1))
@@ -5233,7 +5253,7 @@ struct SwiftUISurfaceTests {
         .padding(1)
         .frame(width: 8, height: 3, alignment: .center)
         .background {
-          RoundedRectangle(cornerRadius: 1).chromeFill(.fill)
+          RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.fill)
         }
         .overlay {
           RoundedRectangle(cornerRadius: 1)
@@ -5318,7 +5338,7 @@ struct SwiftUISurfaceTests {
             .padding(1)
             .frame(width: 8, height: 3, alignment: .center)
             .background {
-              RoundedRectangle(cornerRadius: 1).chromeFill(.fill)
+              RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.fill)
             }
             .overlay {
               RoundedRectangle(cornerRadius: 1)

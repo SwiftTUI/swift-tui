@@ -11,6 +11,7 @@ public struct DrawExtractor {
 private struct BorderMask {
   var bounds: Rect
   var geometry: ShapeGeometry
+  var insetAmount: Int
   var strokeWidth: Int
 }
 
@@ -157,6 +158,7 @@ extension DrawExtractor {
         .fill(
           bounds: maskedBackgroundFill.bounds,
           geometry: maskedBackgroundFill.geometry,
+          insetAmount: maskedBackgroundFill.insetAmount,
           style: maskedBackgroundFill.style,
           mode: maskedBackgroundFill.mode
         )
@@ -206,6 +208,7 @@ extension DrawExtractor {
           .fill(
             bounds: bounds,
             geometry: payload.geometry,
+            insetAmount: payload.insetAmount,
             style: style ?? drawMetadata.foregroundStyle ?? .semantic(.foreground),
             mode: mode
           )
@@ -215,6 +218,7 @@ extension DrawExtractor {
           .stroke(
             bounds: bounds,
             geometry: payload.geometry,
+            insetAmount: payload.insetAmount,
             style: style
               ?? drawMetadata.borderShapeStyle
               ?? drawMetadata.foregroundStyle
@@ -251,6 +255,7 @@ extension DrawExtractor {
         .stroke(
           bounds: bounds,
           geometry: .rectangle,
+          insetAmount: 0,
           style: borderShapeStyle,
           strokeStyle: drawMetadata.borderStrokeStyle ?? .init(),
           strokeBorder: true,
@@ -324,6 +329,7 @@ extension DrawExtractor {
       return BorderMask(
         bounds: placed.bounds,
         geometry: payload.geometry,
+        insetAmount: payload.insetAmount,
         strokeWidth: max(1, strokeStyle.lineWidth)
       )
     }
@@ -335,6 +341,7 @@ extension DrawExtractor {
     return BorderMask(
       bounds: placed.bounds,
       geometry: .rectangle,
+      insetAmount: 0,
       strokeWidth: max(1, placed.drawMetadata.borderStrokeStyle?.lineWidth ?? 1)
     )
   }
@@ -347,28 +354,28 @@ extension DrawExtractor {
   ) -> (
     bounds: Rect,
     geometry: ShapeGeometry,
+    insetAmount: Int,
     style: AnyShapeStyle,
     mode: ShapeFillMode
   ) {
     guard let inheritedBorderMask,
       inheritedBorderMask.bounds == bounds
     else {
-      return (bounds, .rectangle, style, defaultMode)
+      return (bounds, .rectangle, 0, style, defaultMode)
     }
 
-    let strokeWidth: Int =
-      switch defaultMode {
-      case .full:
-        inheritedBorderMask.strokeWidth
-      case .interior(let strokeWidth):
-        max(strokeWidth, inheritedBorderMask.strokeWidth)
-      }
+    let maskedFill = combinedMaskedFill(
+      insetAmount: 0,
+      mode: defaultMode,
+      inheritedBorderMask: inheritedBorderMask
+    )
 
     return (
       bounds,
       inheritedBorderMask.geometry,
+      maskedFill.insetAmount,
       style,
-      .interior(strokeWidth: strokeWidth)
+      maskedFill.mode
     )
   }
 
@@ -399,20 +406,19 @@ extension DrawExtractor {
     inheritedBorderMask: BorderMask
   ) -> DrawCommand {
     switch command {
-    case .fill(let commandBounds, _, let style, let mode)
+    case .fill(let commandBounds, _, let insetAmount, let style, let mode)
     where commandBounds == inheritedBorderMask.bounds && commandBounds == bounds:
-      let strokeWidth: Int =
-        switch mode {
-        case .full:
-          inheritedBorderMask.strokeWidth
-        case .interior(let strokeWidth):
-          max(strokeWidth, inheritedBorderMask.strokeWidth)
-        }
+      let maskedFill = combinedMaskedFill(
+        insetAmount: insetAmount,
+        mode: mode,
+        inheritedBorderMask: inheritedBorderMask
+      )
       return .fill(
         bounds: commandBounds,
         geometry: inheritedBorderMask.geometry,
+        insetAmount: maskedFill.insetAmount,
         style: style,
-        mode: .interior(strokeWidth: strokeWidth)
+        mode: maskedFill.mode
       )
     case .group(let commandBounds, let children):
       return .group(
@@ -437,6 +443,31 @@ extension DrawExtractor {
     default:
       return command
     }
+  }
+
+  private func combinedMaskedFill(
+    insetAmount: Int,
+    mode: ShapeFillMode,
+    inheritedBorderMask: BorderMask
+  ) -> (insetAmount: Int, mode: ShapeFillMode) {
+    let existingReservedWidth =
+      switch mode {
+      case .full:
+        max(0, insetAmount)
+      case .interior(let strokeWidth):
+        max(0, insetAmount) + strokeWidth
+      }
+    let borderReservedWidth =
+      max(0, inheritedBorderMask.insetAmount) + inheritedBorderMask.strokeWidth
+    let finalReservedWidth = max(existingReservedWidth, borderReservedWidth)
+    let finalInsetAmount = max(max(0, insetAmount), inheritedBorderMask.insetAmount)
+    let additionalInset = max(0, finalReservedWidth - finalInsetAmount)
+    let finalMode: ShapeFillMode =
+      additionalInset == 0 ? .full : .interior(strokeWidth: additionalInset)
+    return (
+      insetAmount: finalInsetAmount,
+      mode: finalMode
+    )
   }
 }
 
