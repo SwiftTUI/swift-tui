@@ -15,6 +15,7 @@ subview
 subviews
 SwiftUITUIGUI
 TUIGUI
+UICLI
 wasi
 xcrun
 Xlinker

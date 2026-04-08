@@ -44,12 +44,6 @@ extension View {
     environment(\.tabViewStyle, style)
   }
 
-  public func toolbarStyle(
-    _ style: ToolbarStyle
-  ) -> some View {
-    environment(\.toolbarStyle, style)
-  }
-
   public func outlineStyle(
     _ style: OutlineStyle
   ) -> some View {

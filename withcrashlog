@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CRASH_DIR="$HOME/Library/Logs/DiagnosticReports"
+
+usage() {
+  echo "Usage: $0 <command...>" >&2
+  echo "Optional: CRASH_PROCESS_NAME=ExactProcessName $0 <command...>" >&2
+  exit 1
+}
+
+if [ $# -eq 0 ]; then
+  usage
+fi
+
+if [ ! -d "$CRASH_DIR" ]; then
+  echo "Crash log directory not found: $CRASH_DIR" >&2
+  exit 1
+fi
+
+if ! command -v script >/dev/null 2>&1; then
+  echo "'script' not found in PATH" >&2
+  exit 1
+fi
+
+tmp_before="$(mktemp)"
+tmp_after="$(mktemp)"
+status_file="$(mktemp)"
+trap 'rm -f "$tmp_before" "$tmp_after" "$status_file"' EXIT
+
+had_tty=0
+orig_stty=""
+if [ -t 0 ] && [ -t 1 ]; then
+  had_tty=1
+  orig_stty="$(stty -g || true)"
+fi
+
+repair_terminal() {
+  if [ "$had_tty" -ne 1 ]; then
+    return 0
+  fi
+
+  # Best-effort recovery from TUI damage.
+  printf '\033[?1049l' || true # leave alt screen
+  printf '\033[?25h' || true   # show cursor
+  printf '\033[0m' || true     # reset attributes
+  printf '\033[?1000l' || true
+  printf '\033[?1002l' || true
+  printf '\033[?1003l' || true
+  printf '\033[?1004l' || true
+  printf '\033[?1005l' || true
+  printf '\033[?1006l' || true
+  printf '\033[?1015l' || true
+  printf '\033[?2004l' || true # disable bracketed paste
+
+  if [ -n "$orig_stty" ]; then
+    stty "$orig_stty" 2>/dev/null || stty sane 2>/dev/null || true
+  else
+    stty sane 2>/dev/null || true
+  fi
+
+  tput sgr0 2>/dev/null || true
+  tput cnorm 2>/dev/null || true
+}
+
+expected_process_name() {
+  if [ -n "${CRASH_PROCESS_NAME:-}" ]; then
+    printf '%s\n' "$CRASH_PROCESS_NAME"
+    return
+  fi
+
+  if [ $# -ge 3 ] && [ "$1" = "swift" ] && [ "$2" = "run" ]; then
+    case "$3" in
+    -*)
+      basename "$1"
+      ;;
+    *)
+      basename "$3"
+      ;;
+    esac
+    return
+  fi
+
+  basename "$1"
+}
+
+process_name_from_log() {
+  local logfile="$1"
+
+  case "$logfile" in
+  *.crash)
+    awk -F':' '
+        /^Process[[:space:]]*:/ {
+          sub(/^[[:space:]]+/, "", $2)
+          sub(/[[:space:]]*\[[0-9]+\][[:space:]]*$/, "", $2)
+          print $2
+          exit
+        }
+      ' "$logfile"
+    ;;
+  *.ips)
+    python3 - "$logfile" <<'PY'
+import json, sys
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8", errors="replace") as f:
+    for line in f:
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            obj = json.loads(line)
+        except Exception:
+            continue
+        for key in ("procName", "processName"):
+            val = obj.get(key)
+            if val:
+                print(val)
+                raise SystemExit(0)
+        break
+PY
+    ;;
+  *)
+    return 0
+    ;;
+  esac
+}
+
+select_most_recent() {
+  python3 - "$@" <<'PY'
+import os, sys
+paths = sys.argv[1:]
+paths.sort(key=lambda p: os.stat(p).st_mtime)
+print(paths[-1])
+PY
+}
+
+find "$CRASH_DIR" -maxdepth 1 -type f \
+  \( -name "*.crash" -o -name "*.ips" -o -name "*.spin" \) \
+  -exec basename {} \; | sort -u >"$tmp_before"
+
+target_name="$(expected_process_name "$@")"
+
+# Run inside a dedicated PTY. The child shell records the actual exit code.
+set +e
+env STATUS_FILE="$status_file" script -q /dev/null /bin/bash -lc '
+  trap '\''code=$?; printf "%s\n" "$code" > "$STATUS_FILE"; exit "$code"'\'' EXIT
+  CrashReporterClient_COLLECT_CRASHES=1 "$@"
+' bash "$@"
+script_rc=$?
+set -e
+
+repair_terminal
+
+# Prefer the child's recorded exit code. Fall back to script's exit code.
+if [ -s "$status_file" ]; then
+  exit_code="$(tr -dc "0-9" <"$status_file")"
+  if [ -z "$exit_code" ]; then
+    exit_code="$script_rc"
+  fi
+else
+  exit_code="$script_rc"
+fi
+
+sleep 1
+
+find "$CRASH_DIR" -maxdepth 1 -type f \
+  \( -name "*.crash" -o -name "*.ips" -o -name "*.spin" \) \
+  -exec basename {} \; | sort -u >"$tmp_after"
+
+mapfile -t new_logs < <(comm -13 "$tmp_before" "$tmp_after")
+
+if [ "${#new_logs[@]}" -eq 0 ]; then
+  echo "No new crash logs detected." >&2
+  exit "$exit_code"
+fi
+
+matched_logs=()
+for log_name in "${new_logs[@]}"; do
+  log_path="$CRASH_DIR/$log_name"
+  actual_name="$(process_name_from_log "$log_path" || true)"
+  if [ -n "${actual_name:-}" ] && [ "$actual_name" = "$target_name" ]; then
+    matched_logs+=("$log_path")
+  fi
+done
+
+if [ "${#matched_logs[@]}" -gt 0 ]; then
+  selected_log="$(select_most_recent "${matched_logs[@]}")"
+else
+  all_paths=()
+  for log_name in "${new_logs[@]}"; do
+    all_paths+=("$CRASH_DIR/$log_name")
+  done
+  selected_log="$(select_most_recent "${all_paths[@]}")"
+  echo "No new crash log matched Process: $target_name; using most recent new crash log." >&2
+  echo "Set CRASH_PROCESS_NAME=... for stricter matching." >&2
+fi
+
+echo "=== Crash log: $selected_log ==="
+echo
+cat "$selected_log"
+
+exit "$exit_code"

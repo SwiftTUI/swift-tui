@@ -346,7 +346,7 @@ The important parts of the model:
 This is especially important for:
 
 - app commands and menus
-- toolbar and command routing
+- command routing
 - front-most-window behavior on macOS-style apps
 - cross-tree coordination that should follow focus rather than direct containment
 

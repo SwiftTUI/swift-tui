@@ -31,7 +31,6 @@ command palette plus toast/sheet presentation surfaces now live in the main
 - PNG-backed `Image` with named-resource, local-file-URL, and embedded-byte sources plus `.resizable()`, `.scaledToFit()`, and `.scaledToFill()`
 - Environment, observation, and focus including `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`, `@FocusedValue`, `@FocusedBinding`, `PreferenceKey`, subtree preference readers, `OpenLinkAction`, actor-context-aware `.task(...)`, and default-focus modifiers
 - Presentation and workflow surfaces including terminal-native `alert`, `confirmationDialog`, `sheet`, `toast`, `.command(...)`, `CommandPalette`, and `.commandPalette(...)`
-- Toolbar chrome including `toolbar(...)`, `toolbarItem(...)`, and `toolbarStyle(.default)` for terminal-native top and bottom bars
 
 ### Runtime surface
 
@@ -77,7 +76,7 @@ command palette plus toast/sheet presentation surfaces now live in the main
   - anchor-based preference APIs such as `anchorPreference(...)` and `transformAnchorPreference(...)` until local coordinate spaces and anchor resolution ship
 - Some higher-level workflow surfaces are still unsettled:
   - richer multiline editing behaviors beyond the current `TextEditor`
-  - a long-term home for prototype help-strip and launcher-like shell workflows beyond the shipped toolbar and command-palette APIs
+  - a long-term home for prototype help-strip and launcher-like shell workflows beyond the command-palette APIs
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
   - `ResolvableView`
