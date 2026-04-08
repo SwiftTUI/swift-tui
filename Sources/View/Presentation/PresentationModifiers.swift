@@ -1,66 +1,118 @@
 package import Core
 
-package enum BuiltinPromptPresentationKind: Equatable, Sendable {
-  case alert
-  case confirmationDialog
-  case sheet
+package struct PromptPresentationSpec: Sendable {
+  package var token: String
+  package var descriptor: PromptPresentationDescriptor
+  package var reconcile:
+    @MainActor @Sendable (
+      PresentationCoordinatorRegistry,
+      Identity,
+      PromptPresentationItem
+    ) -> Void
 
-  var alignment: Alignment {
-    switch self {
-    case .alert:
-      .center
-    case .confirmationDialog:
-      .bottomLeading
-    case .sheet:
-      .center
+  package init(
+    token: String,
+    descriptor: PromptPresentationDescriptor,
+    reconcile:
+      @escaping @MainActor @Sendable (
+        PresentationCoordinatorRegistry,
+        Identity,
+        PromptPresentationItem
+      ) -> Void
+  ) {
+    self.token = token
+    self.descriptor = descriptor
+    self.reconcile = reconcile
+  }
+}
+
+package func alertPromptPresentationSpec() -> PromptPresentationSpec {
+  PromptPresentationSpec(
+    token: "alert",
+    descriptor: .init(
+      alignment: .center,
+      presentationRole: .alert,
+      backdropOpacity: 0,
+      defaultDismissTitle: "Dismiss",
+      headerTone: .neutral,
+      minWidth: 24,
+      maxWidth: 48,
+      scrollMinHeight: 2,
+      scrollIdealHeight: 6,
+      scrollMaxHeight: 10,
+      bodyMode: .messageAndActions
+    ),
+    reconcile: { registry, sourceIdentity, item in
+      registry.alert.sync(
+        sourceIdentity: sourceIdentity,
+        items: [item]
+      )
     }
-  }
+  )
+}
 
-  var family: PresentationFamilyID {
-    switch self {
-    case .alert:
-      .alert
-    case .confirmationDialog:
-      .confirmationDialog
-    case .sheet:
-      .sheet
+package func confirmationDialogPromptPresentationSpec() -> PromptPresentationSpec {
+  PromptPresentationSpec(
+    token: "confirmationDialog",
+    descriptor: .init(
+      alignment: .bottomLeading,
+      presentationRole: .confirmationDialog,
+      backdropOpacity: 0,
+      defaultDismissTitle: "Cancel",
+      headerTone: .accent,
+      minWidth: 20,
+      scrollMinHeight: 3,
+      scrollIdealHeight: 4,
+      scrollMaxHeight: 6,
+      bodyMode: .messageAndActions
+    ),
+    reconcile: { registry, sourceIdentity, item in
+      registry.confirmationDialog.sync(
+        sourceIdentity: sourceIdentity,
+        items: [item]
+      )
     }
-  }
+  )
+}
 
-  var presentationRole: PresentationRole {
-    switch self {
-    case .alert:
-      .alert
-    case .confirmationDialog:
-      .confirmationDialog
-    case .sheet:
-      .sheet
+package func sheetPromptPresentationSpec(
+  backdropOpacity: Double = 0
+) -> PromptPresentationSpec {
+  PromptPresentationSpec(
+    token: "sheet",
+    descriptor: .init(
+      alignment: .center,
+      presentationRole: .sheet,
+      backdropOpacity: backdropOpacity,
+      defaultDismissTitle: "Close",
+      headerTone: .accent,
+      minWidth: 20,
+      scrollMinHeight: 4,
+      scrollIdealHeight: 12,
+      scrollMaxHeight: 20,
+      bodyMode: .contentOnly
+    ),
+    reconcile: { registry, sourceIdentity, item in
+      registry.sheet.sync(
+        sourceIdentity: sourceIdentity,
+        items: [item]
+      )
     }
-  }
+  )
+}
 
-  var defaultDismissTitle: String {
-    switch self {
-    case .alert:
-      "Dismiss"
-    case .confirmationDialog:
-      "Cancel"
-    case .sheet:
-      "Close"
+package func commandPalettePromptPresentationSpec() -> PromptPresentationSpec {
+  let baseSpec = sheetPromptPresentationSpec(backdropOpacity: 0.7)
+  return PromptPresentationSpec(
+    token: "commandPalette",
+    descriptor: baseSpec.descriptor,
+    reconcile: { registry, sourceIdentity, item in
+      registry.commandPalette.sync(
+        sourceIdentity: sourceIdentity,
+        items: [item]
+      )
     }
-  }
-
-  var usesContentPresentation: Bool {
-    switch self {
-    case .alert, .confirmationDialog:
-      false
-    case .sheet:
-      true
-    }
-  }
-
-  var requestToken: String {
-    family.rawValue
-  }
+  )
 }
 
 extension View {
@@ -68,13 +120,14 @@ extension View {
     _ title: S,
     isPresented: Binding<Bool>
   ) -> some View {
-    BuiltinPromptPresentationModifier(
+    let spec = alertPromptPresentationSpec()
+    return BuiltinPromptPresentationModifier(
       content: self,
       title: String(title),
       isPresented: isPresented,
-      kind: .alert,
+      spec: spec,
       actions: defaultPresentationActions(
-        kind: .alert,
+        defaultDismissTitle: spec.descriptor.defaultDismissTitle,
         isPresented: isPresented
       ),
       message: EmptyView()
@@ -91,7 +144,7 @@ extension View {
       content: self,
       title: String(title),
       isPresented: isPresented,
-      kind: .alert,
+      spec: alertPromptPresentationSpec(),
       actions: actions(),
       message: message()
     )
@@ -101,13 +154,14 @@ extension View {
     _ title: S,
     isPresented: Binding<Bool>
   ) -> some View {
-    BuiltinPromptPresentationModifier(
+    let spec = confirmationDialogPromptPresentationSpec()
+    return BuiltinPromptPresentationModifier(
       content: self,
       title: String(title),
       isPresented: isPresented,
-      kind: .confirmationDialog,
+      spec: spec,
       actions: defaultPresentationActions(
-        kind: .confirmationDialog,
+        defaultDismissTitle: spec.descriptor.defaultDismissTitle,
         isPresented: isPresented
       ),
       message: EmptyView()
@@ -124,7 +178,7 @@ extension View {
       content: self,
       title: String(title),
       isPresented: isPresented,
-      kind: .confirmationDialog,
+      spec: confirmationDialogPromptPresentationSpec(),
       actions: actions(),
       message: message()
     )
@@ -138,6 +192,7 @@ extension View {
       content: self,
       title: "",
       isPresented: isPresented,
+      spec: sheetPromptPresentationSpec(),
       sheetContent: sheetContent()
     )
   }
@@ -151,6 +206,7 @@ extension View {
       content: self,
       title: String(title),
       isPresented: isPresented,
+      spec: sheetPromptPresentationSpec(),
       sheetContent: sheetContent()
     )
   }
@@ -158,11 +214,11 @@ extension View {
 
 @MainActor
 private func defaultPresentationActions(
-  kind: BuiltinPromptPresentationKind,
+  defaultDismissTitle: String,
   isPresented: Binding<Bool>
 ) -> Button<Text> {
   Button(
-    kind.defaultDismissTitle,
+    defaultDismissTitle,
     action: {
       isPresented.wrappedValue = false
     }
@@ -176,7 +232,7 @@ private struct BuiltinPromptPresentationModifier<
   var content: Content
   var title: String
   var isPresented: Binding<Bool>
-  var kind: BuiltinPromptPresentationKind
+  var spec: PromptPresentationSpec
   var actions: Actions
   var message: Message
 
@@ -186,33 +242,33 @@ private struct BuiltinPromptPresentationModifier<
       return [node]
     }
 
+    let sourceIdentity = node.identity
+    let item = PromptPresentationItem(
+      id: presentationAttachmentID(
+        for: sourceIdentity,
+        token: spec.token
+      ),
+      title: title,
+      descriptor: spec.descriptor,
+      actionPayloads: deferredDeclaredBuilderChildren(from: actions),
+      messagePayloads: deferredDeclaredBuilderChildren(from: message),
+      contentPayloads: [],
+      dismiss: { [isPresented] in
+        isPresented.wrappedValue = false
+      }
+    )
+
     node.preferenceValues.merge(
-      PresentationCoordinatorPreferenceKey.self,
+      PresentationCoordinatorDeclarationPreferenceKey.self,
       value: .init(
-        requests: [
-          .init(
-            requestID: .init(
-              attachmentIdentity: node.identity,
-              family: kind.family,
-              token: kind.requestToken
-            ),
-            attachmentIdentity: node.identity,
-            family: kind.family,
-            priority: 0,
-            surfacePayload: DeferredViewPayload {
-              BuiltinHostedPromptPresentation(
-                title: title,
-                kind: kind,
-                backdropOpacity: 0,
-                actionPayloads: deferredDeclaredBuilderChildren(from: actions),
-                messagePayloads: deferredDeclaredBuilderChildren(from: message),
-                contentPayloads: [],
-                dismiss: { [isPresented] in
-                  isPresented.wrappedValue = false
-                }
-              )
-            }
-          )
+        declarations: [
+          .init(sourceIdentity: sourceIdentity) { registry in
+            spec.reconcile(
+              registry,
+              sourceIdentity,
+              item
+            )
+          }
         ]
       )
     )
@@ -226,6 +282,7 @@ private struct BuiltinSheetPresentationModifier<Content: View, SheetContent: Vie
   var content: Content
   var title: String
   var isPresented: Binding<Bool>
+  var spec: PromptPresentationSpec
   var sheetContent: SheetContent
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -234,33 +291,33 @@ private struct BuiltinSheetPresentationModifier<Content: View, SheetContent: Vie
       return [node]
     }
 
+    let sourceIdentity = node.identity
+    let item = PromptPresentationItem(
+      id: presentationAttachmentID(
+        for: sourceIdentity,
+        token: spec.token
+      ),
+      title: title,
+      descriptor: spec.descriptor,
+      actionPayloads: [],
+      messagePayloads: [],
+      contentPayloads: deferredDeclaredBuilderChildren(from: sheetContent),
+      dismiss: { [isPresented] in
+        isPresented.wrappedValue = false
+      }
+    )
+
     node.preferenceValues.merge(
-      PresentationCoordinatorPreferenceKey.self,
+      PresentationCoordinatorDeclarationPreferenceKey.self,
       value: .init(
-        requests: [
-          .init(
-            requestID: .init(
-              attachmentIdentity: node.identity,
-              family: PresentationFamilyID.sheet,
-              token: BuiltinPromptPresentationKind.sheet.requestToken
-            ),
-            attachmentIdentity: node.identity,
-            family: .sheet,
-            priority: 0,
-            surfacePayload: DeferredViewPayload {
-              BuiltinHostedPromptPresentation(
-                title: title,
-                kind: .sheet,
-                backdropOpacity: 0,
-                actionPayloads: [],
-                messagePayloads: [],
-                contentPayloads: deferredDeclaredBuilderChildren(from: sheetContent),
-                dismiss: { [isPresented] in
-                  isPresented.wrappedValue = false
-                }
-              )
-            }
-          )
+        declarations: [
+          .init(sourceIdentity: sourceIdentity) { registry in
+            spec.reconcile(
+              registry,
+              sourceIdentity,
+              item
+            )
+          }
         ]
       )
     )
@@ -268,87 +325,68 @@ private struct BuiltinSheetPresentationModifier<Content: View, SheetContent: Vie
   }
 }
 
-package struct BuiltinHostedPromptPresentation: View {
-  package var title: String
-  package var kind: BuiltinPromptPresentationKind
-  package var backdropOpacity: Double
-  package var actionPayloads: [DeferredViewPayload]
-  package var messagePayloads: [DeferredViewPayload]
-  package var contentPayloads: [DeferredViewPayload]
-  package var dismiss: @MainActor @Sendable () -> Void
+package struct HostedPromptPresentation: View {
+  package var item: PromptPresentationItem
 
   package init(
-    title: String,
-    kind: BuiltinPromptPresentationKind,
-    backdropOpacity: Double,
-    actionPayloads: [DeferredViewPayload],
-    messagePayloads: [DeferredViewPayload],
-    contentPayloads: [DeferredViewPayload],
-    dismiss: @escaping @MainActor @Sendable () -> Void
+    item: PromptPresentationItem
   ) {
-    self.title = title
-    self.kind = kind
-    self.backdropOpacity = backdropOpacity
-    self.actionPayloads = actionPayloads
-    self.messagePayloads = messagePayloads
-    self.contentPayloads = contentPayloads
-    self.dismiss = dismiss
+    self.item = item
   }
 
   package var body: some View {
     ZStack(alignment: .topLeading) {
-      if backdropOpacity > 0 {
+      if item.descriptor.backdropOpacity > 0 {
         Rectangle()
-          .fill(.background.opacity(backdropOpacity))
+          .fill(.background.opacity(item.descriptor.backdropOpacity))
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
 
-      BuiltinPromptPresentationSurface(
-        title: title,
-        kind: kind,
-        actionPayloads: actionPayloads,
-        messagePayloads: messagePayloads,
-        contentPayloads: contentPayloads,
-        dismiss: dismiss
-      )
-      .padding(
-        .init(
-          top: 1,
-          leading: 1,
-          bottom: 1,
-          trailing: 1
+      PromptPresentationSurface(item: item)
+        .padding(
+          .init(
+            top: 1,
+            leading: 1,
+            bottom: 1,
+            trailing: 1
+          )
         )
-      )
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: kind.alignment)
+        .frame(
+          maxWidth: .infinity,
+          maxHeight: .infinity,
+          alignment: item.descriptor.alignment
+        )
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .onKeyPress(.escape) {
-      dismiss()
+      item.dismiss()
       return .handled
     }
   }
 }
 
-private struct BuiltinPromptPresentationSurface: View {
-  var title: String
-  var kind: BuiltinPromptPresentationKind
-  var actionPayloads: [DeferredViewPayload]
-  var messagePayloads: [DeferredViewPayload]
-  var contentPayloads: [DeferredViewPayload]
-  var dismiss: @MainActor @Sendable () -> Void
+package struct PromptPresentationSurface: View {
+  package var item: PromptPresentationItem
 
-  var body: some View {
+  package init(
+    item: PromptPresentationItem
+  ) {
+    self.item = item
+  }
+
+  package var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       presentationHeader
-      if kind.usesContentPresentation {
-        sheetBody
-      } else {
-        alertDialogBody
+      switch item.descriptor.bodyMode {
+      case .contentOnly:
+        contentBody
+      case .messageAndActions:
+        messageAndActionBody
       }
     }
     .padding(.init(horizontal: 1, vertical: 1))
     .background {
-      RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.terminalSurfaceBackground)
+      RoundedRectangle(cornerRadius: 1).fill(AnyShapeStyle(.terminalSurfaceBackground))
     }
     .overlay {
       RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
@@ -356,42 +394,49 @@ private struct BuiltinPromptPresentationSurface: View {
       )
     }
     .frame(
-      minWidth: .finite(kind == .alert ? 24 : 20),
-      maxWidth: kind == .alert ? .finite(48) : .infinity,
+      minWidth: .finite(item.descriptor.minWidth),
+      maxWidth: maximumWidth,
       alignment: .leading
     )
     .focusScope()
     .semanticMetadata(
       .init(
-        presentationRole: kind.presentationRole
+        presentationRole: item.descriptor.presentationRole
       )
     )
   }
 
+  private var maximumWidth: ProposedDimension {
+    if let maxWidth = item.descriptor.maxWidth {
+      return .finite(maxWidth)
+    }
+    return .infinity
+  }
+
   private var presentationHeader: some View {
     HStack(alignment: .center, spacing: 1) {
-      if !title.isEmpty {
-        Text(title)
+      if !item.title.isEmpty {
+        Text(item.title)
           .bold()
       }
       Spacer(minLength: 0)
-      Button("×", role: .close, action: dismiss)
+      Button("×", role: .close, action: item.dismiss)
         .buttonStyle(.borderedProminent)
     }
     .frame(height: 1, alignment: .leading)
     .padding(.init(horizontal: 1, vertical: 0))
-    .background(.terminalRow(kind == .alert ? .neutral : .accent, isSelected: true))
+    .background(.terminalRow(item.descriptor.headerTone, isSelected: true))
   }
 
-  private var alertDialogBody: some View {
+  private var messageAndActionBody: some View {
     Group {
       ScrollView(.vertical) {
         VStack(alignment: .leading, spacing: 0) {
-          if !messagePayloads.isEmpty {
+          if !item.messagePayloads.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
               DeferredPayloadGroupView(
                 kindName: "PresentationMessage",
-                payloads: messagePayloads
+                payloads: item.messagePayloads
               )
             }
             .padding(.init(horizontal: 1, vertical: 1))
@@ -400,38 +445,38 @@ private struct BuiltinPromptPresentationSurface: View {
       }
       .frame(
         maxWidth: .infinity,
-        minHeight: .finite(kind == .alert ? 2 : 3),
-        idealHeight: .finite(kind == .alert ? 6 : 4),
-        maxHeight: .finite(kind == .alert ? 10 : 6),
+        minHeight: .finite(item.descriptor.scrollMinHeight),
+        idealHeight: .finite(item.descriptor.scrollIdealHeight),
+        maxHeight: .finite(item.descriptor.scrollMaxHeight),
         alignment: .topLeading
       )
       presentationActions
     }
   }
 
-  private var sheetBody: some View {
+  private var contentBody: some View {
     ScrollView(.vertical) {
       VStack(alignment: .leading, spacing: 0) {
         DeferredPayloadGroupView(
-          kindName: "SheetContent",
-          payloads: contentPayloads
+          kindName: "PresentationContent",
+          payloads: item.contentPayloads
         )
       }
       .padding(.init(horizontal: 1, vertical: 1))
     }
     .frame(
       maxWidth: .infinity,
-      minHeight: .finite(4),
-      idealHeight: .finite(12),
-      maxHeight: .finite(20),
+      minHeight: .finite(item.descriptor.scrollMinHeight),
+      idealHeight: .finite(item.descriptor.scrollIdealHeight),
+      maxHeight: .finite(item.descriptor.scrollMaxHeight),
       alignment: .topLeading
     )
   }
 
   private var presentationActions: some View {
     HStack(spacing: 1) {
-      ForEach(actionPayloads.indices, id: \.self) { index in
-        DeferredPayloadView(payload: actionPayloads[index])
+      ForEach(item.actionPayloads.indices, id: \.self) { index in
+        DeferredPayloadView(payload: item.actionPayloads[index])
           .fixedSize()
       }
     }
@@ -517,31 +562,30 @@ private struct ToastModifier<Content: View, ToastContent: View>: View,
       return [node]
     }
 
-    let contentPayloads = deferredDeclaredBuilderChildren(from: toastContent)
+    let sourceIdentity = node.identity
+    let item = ToastPresentationItem(
+      id: presentationAttachmentID(
+        for: sourceIdentity,
+        token: "toast"
+      ),
+      contentPayloads: deferredDeclaredBuilderChildren(from: toastContent),
+      style: style,
+      duration: duration,
+      dismiss: { [isPresented] in
+        isPresented.wrappedValue = false
+      }
+    )
+
     node.preferenceValues.merge(
-      PresentationCoordinatorPreferenceKey.self,
+      PresentationCoordinatorDeclarationPreferenceKey.self,
       value: .init(
-        requests: [
-          .init(
-            requestID: .init(
-              attachmentIdentity: node.identity,
-              family: .toast,
-              token: PresentationFamilyID.toast.rawValue
-            ),
-            attachmentIdentity: node.identity,
-            family: .toast,
-            priority: 0,
-            surfacePayload: DeferredViewPayload {
-              BuiltinToastHostedPresentation(
-                contentPayloads: contentPayloads,
-                style: style,
-                duration: duration,
-                dismiss: { [isPresented] in
-                  isPresented.wrappedValue = false
-                }
-              )
-            }
-          )
+        declarations: [
+          .init(sourceIdentity: sourceIdentity) { registry in
+            registry.toast.sync(
+              sourceIdentity: sourceIdentity,
+              items: [item]
+            )
+          }
         ]
       )
     )
@@ -549,49 +593,51 @@ private struct ToastModifier<Content: View, ToastContent: View>: View,
   }
 }
 
-private struct BuiltinToastHostedPresentation: View {
-  var contentPayloads: [DeferredViewPayload]
-  var style: ToastStyle
-  var duration: Double?
-  var dismiss: @MainActor @Sendable () -> Void
+package struct ToastCoordinatorBodyView: View {
+  package var items: [ToastPresentationItem]
 
-  var body: some View {
-    EnvironmentReader(\.presentationPlacementContext) { placementContext in
-      VStack(alignment: .leading, spacing: 0) {
-        Spacer(minLength: 0)
-        toastCard
-      }
-      .padding(.bottom, 1 + placementContext.familyIndex * 5)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-      .allowsHitTesting(false)
-      .task {
-        guard let duration, duration > 0 else {
-          return
-        }
-        try? await Task.sleep(for: .seconds(duration))
-        dismiss()
-      }
-    }
+  package init(
+    items: [ToastPresentationItem]
+  ) {
+    self.items = items
   }
 
-  private var toastCard: some View {
+  package var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Spacer(minLength: 0)
+      VStack(alignment: .leading, spacing: 1) {
+        ForEach(items) { item in
+          ToastPresentationView(item: item)
+        }
+      }
+      .padding(.bottom, 1)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+    .allowsHitTesting(false)
+  }
+}
+
+private struct ToastPresentationView: View {
+  var item: ToastPresentationItem
+
+  var body: some View {
     HStack(alignment: .center, spacing: 1) {
-      Text(style.icon)
-        .foregroundStyle(.terminalAccent(style.tone))
+      Text(item.style.icon)
+        .foregroundStyle(.terminalAccent(item.style.tone))
       VStack {
         DeferredPayloadGroupView(
           kindName: "ToastContent",
-          payloads: contentPayloads
+          payloads: item.contentPayloads
         )
       }
     }
     .padding(1)
     .background {
-      Rectangle().inset(by: 1).fill(.terminalSurfaceBackground)
+      Rectangle().fill(AnyShapeStyle(.terminalSurfaceBackground))
     }
     .overlay {
       Rectangle().chromeStrokeBorder(
-        .terminalBorder(style.tone)
+        .terminalBorder(item.style.tone)
       )
     }
     .frame(
@@ -602,19 +648,12 @@ private struct BuiltinToastHostedPresentation: View {
       maxHeight: .finite(5),
       alignment: .leading
     )
-  }
-}
-
-extension ResolvedNode {
-  package mutating func setEnabledRecursively(
-    _ isEnabled: Bool
-  ) {
-    var style = environmentSnapshot.style
-    style.isEnabled = isEnabled
-    environmentSnapshot.style = style
-
-    for index in children.indices {
-      children[index].setEnabledRecursively(isEnabled)
+    .task {
+      guard let duration = item.duration, duration > 0 else {
+        return
+      }
+      try? await Task.sleep(for: .seconds(duration))
+      item.dismiss()
     }
   }
 }

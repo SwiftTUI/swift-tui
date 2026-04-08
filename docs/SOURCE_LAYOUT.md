@@ -124,7 +124,7 @@ library product. Downstream package consumers reach those types through
 - `Layout/Layout.swift`, `Stacks/*.swift`, `ScrollView/*.swift`, `GeometryReading/*.swift`, `Collections/*.swift`, and `NavigationViews/*.swift`: layout, stack, scroll, geometry, collection, and navigation surfaces
 - `Primitives/*.swift` and `Shapes/*.swift`: text/image primitives, labeled containers, tile backgrounds, and basic shapes
 - `Controls/*.swift`: control surfaces, rendering helpers, and shared control support
-- `Presentation/PresentationCoordinator.swift`, `Presentation/PresentationModifiers.swift`, and `Presentation/CommandPalette.swift`: shared presentation hoisting and arbitration, generic presentation primitives, built-in alert/confirmation-dialog/sheet/toast surfaces, command registration, and the canonical command-palette surface
+- `Presentation/PresentationCoordinator.swift`, `Presentation/PresentationModifiers.swift`, and `Presentation/CommandPalette.swift`: shared presentation host, family coordinators, package-only declaration reconciliation, built-in alert/confirmation-dialog/sheet/toast surfaces, command registration, and the canonical command-palette surface
 - `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifiers and the package-only wrapper views that back them
 - `View.docc/`: module landing page and authoring guides
 

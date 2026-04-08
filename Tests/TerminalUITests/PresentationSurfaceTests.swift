@@ -149,6 +149,129 @@ struct PresentationSurfaceTests {
     #expect(surface.contains("█") || surface.contains("▼"))
   }
 
+  @Test("toast and alert overlays share the first frame and use fixed family order")
+  func toastAndAlertOverlaysUseFixedFamilyOrder() throws {
+    let artifacts = DefaultRenderer().render(
+      Text("Workspace")
+        .toast(
+          "Saved successfully",
+          isPresented: .constant(true),
+          style: .success,
+          duration: nil
+        )
+        .alert(
+          "Delete project",
+          isPresented: .constant(true),
+          actions: {
+            Button("Delete") {}
+          },
+          message: {
+            Text("This cannot be undone.")
+          }
+        )
+        .frame(width: 40, height: 10, alignment: .topLeading),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 40, height: 10)
+    )
+
+    let kinds = viewKindNames(in: artifacts.resolvedTree)
+    let toastIndex = try #require(kinds.firstIndex(of: "ToastPresentation"))
+    let alertIndex = try #require(kinds.firstIndex(of: "AlertPresentation"))
+
+    #expect(kinds.contains("ToastPresentation"))
+    #expect(kinds.contains("AlertPresentation"))
+    #expect(toastIndex < alertIndex)
+  }
+
+  @Test("command palette stays above the other built-in presentation families")
+  func commandPaletteUsesTopmostFamilyLayer() throws {
+    let artifacts = DefaultRenderer().render(
+      Text("Workspace")
+        .command(id: "open-file", title: "Open File")
+        .toast(
+          "Saved successfully",
+          isPresented: .constant(true),
+          style: .success,
+          duration: nil
+        )
+        .sheet("Inspector", isPresented: .constant(true)) {
+          Text("Sheet body")
+        }
+        .alert(
+          "Delete project",
+          isPresented: .constant(true),
+          actions: {
+            Button("Delete") {}
+          },
+          message: {
+            Text("This cannot be undone.")
+          }
+        )
+        .frame(width: 48, height: 14, alignment: .topLeading)
+        .commandPalette(isPresented: .constant(true)),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 48, height: 14)
+    )
+
+    let kinds = viewKindNames(in: artifacts.resolvedTree)
+    let toastIndex = try #require(kinds.firstIndex(of: "ToastPresentation"))
+    let sheetIndex = try #require(kinds.firstIndex(of: "SheetPresentation"))
+    let alertIndex = try #require(kinds.firstIndex(of: "AlertPresentation"))
+    let paletteIndex = try #require(kinds.firstIndex(of: "CommandPalettePresentation"))
+
+    #expect(toastIndex < sheetIndex)
+    #expect(sheetIndex < alertIndex)
+    #expect(alertIndex < paletteIndex)
+  }
+
+  @Test("declarative reconciliation prunes stale overlays when the source subtree disappears")
+  func declarativeReconciliationPrunesStaleSourceOverlays() {
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("Root")
+
+    let initial = renderer.render(
+      ConditionalAlertPresentationView(showAlertSource: true),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 40, height: 8)
+    )
+    let updated = renderer.render(
+      ConditionalAlertPresentationView(showAlertSource: false),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 40, height: 8)
+    )
+
+    let initialSurface = initial.rasterSurface.lines.joined(separator: "\n")
+    let updatedSurface = updated.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(initialSurface.contains("Delete project"))
+    #expect(!updatedSurface.contains("Delete project"))
+  }
+
+  @Test("render-time coordinator mutation is rejected and does not surface the presentation")
+  func renderTimeCoordinatorMutationIsRejected() {
+    var recordedMessage: String?
+    PresentationMutationGuard.onInvalidMutation = { message in
+      recordedMessage = message
+    }
+    defer {
+      PresentationMutationGuard.onInvalidMutation = nil
+    }
+
+    let artifacts = DefaultRenderer().render(
+      RenderTimePresentationMutationProbe(),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 40, height: 8)
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(
+      recordedMessage
+        == "AlertPresentationCoordinator.present(_:) must not be called during view update.")
+    #expect(surface.contains("Workspace"))
+    #expect(!surface.contains("Illegal mutation"))
+  }
+
   @Test("toast renders in the bottom-left corner by default")
   func toastRendersInBottomLeftCorner() {
     let artifacts = DefaultRenderer().render(
@@ -171,6 +294,59 @@ struct PresentationSurfaceTests {
 
     #expect(messageIndex >= 3)
     #expect(messageLine.first != " ")
+  }
+}
+
+private struct ConditionalAlertPresentationView: View {
+  var showAlertSource: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      if showAlertSource {
+        Text("Attachment")
+          .alert(
+            "Delete project",
+            isPresented: .constant(true),
+            actions: {
+              Button("Delete") {}
+            },
+            message: {
+              Text("This cannot be undone.")
+            }
+          )
+      } else {
+        Text("Attachment removed")
+      }
+    }
+    .frame(width: 40, height: 8, alignment: .topLeading)
+  }
+}
+
+private struct RenderTimePresentationMutationProbe: View, ResolvableView {
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let spec = alertPromptPresentationSpec()
+    let sourceIdentity = context.identity
+
+    context.environmentValues.alertPresentationCoordinator.present(
+      PromptPresentationItem(
+        id: presentationAttachmentID(
+          for: sourceIdentity,
+          token: spec.token
+        ),
+        title: "Illegal mutation",
+        descriptor: spec.descriptor,
+        actionPayloads: deferredDeclaredBuilderChildren(
+          from: Button("Dismiss") {}
+        ),
+        messagePayloads: deferredDeclaredBuilderChildren(
+          from: Text("Should never render.")
+        ),
+        contentPayloads: [],
+        dismiss: {}
+      )
+    )
+
+    return Text("Workspace").resolveElements(in: context)
   }
 }
 
@@ -198,5 +374,26 @@ private func hasFillCommand(
     return hasFillCommand(child, bounds: bounds)
   default:
     return false
+  }
+}
+
+private func viewKindNames(
+  in node: ResolvedNode
+) -> [String] {
+  var kinds: [String] = []
+  collectViewKindNames(in: node, into: &kinds)
+  return kinds
+}
+
+private func collectViewKindNames(
+  in node: ResolvedNode,
+  into kinds: inout [String]
+) {
+  if case .view(let name) = node.kind {
+    kinds.append(name)
+  }
+
+  for child in node.children {
+    collectViewKindNames(in: child, into: &kinds)
   }
 }

@@ -693,24 +693,22 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
       return [node]
     }
 
+    let sourceIdentity = node.identity
     let registrations = node.preferenceValues[CommandPreferenceKey.self].registrations
+    let item = palettePresentationItem(
+      for: registrations,
+      sourceIdentity: sourceIdentity
+    )
     node.preferenceValues.merge(
-      PresentationCoordinatorPreferenceKey.self,
+      PresentationCoordinatorDeclarationPreferenceKey.self,
       value: .init(
-        requests: [
-          .init(
-            requestID: .init(
-              attachmentIdentity: node.identity,
-              family: .commandPalette,
-              token: PresentationFamilyID.commandPalette.rawValue
-            ),
-            attachmentIdentity: node.identity,
-            family: .commandPalette,
-            priority: 0,
-            surfacePayload: DeferredViewPayload {
-              palettePresentation(for: registrations)
-            }
-          )
+        declarations: [
+          .init(sourceIdentity: sourceIdentity) { registry in
+            registry.commandPalette.sync(
+              sourceIdentity: sourceIdentity,
+              items: [item]
+            )
+          }
         ]
       )
     )
@@ -718,14 +716,19 @@ private struct CommandPaletteModifier<Content: View>: View, ResolvableView {
     return [node]
   }
 
-  private func palettePresentation(
-    for registrations: [CommandRegistration]
-  ) -> some View {
+  private func palettePresentationItem(
+    for registrations: [CommandRegistration],
+    sourceIdentity: Identity
+  ) -> PromptPresentationItem {
     let commands = registrations.map(\.command)
-    return BuiltinHostedPromptPresentation(
+    let spec = commandPalettePromptPresentationSpec()
+    return PromptPresentationItem(
+      id: presentationAttachmentID(
+        for: sourceIdentity,
+        token: spec.token
+      ),
       title: "Command Palette",
-      kind: .sheet,
-      backdropOpacity: 0.7,
+      descriptor: spec.descriptor,
       actionPayloads: [],
       messagePayloads: [],
       contentPayloads: deferredDeclaredBuilderChildren(

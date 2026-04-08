@@ -1542,6 +1542,46 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("imperative presentation handle mutations invalidate and render on the next frame")
+  func imperativePresentationHandleMutationRerendersOnNextFrame() async throws {
+    let terminalSize = Size(width: 40, height: 10)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("ImperativePresentationRuntimeRoot")
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      inputReader: GateInputReader(gate: AsyncEventGate(), event: .character("q")),
+      signalReader: TimedSignalReader(
+        signals: [
+          .init(delayNanoseconds: 1_000_000_000, value: "SIGTERM")
+        ]
+      ),
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        ImperativeAlertPresentationHarnessView(terminalSize: terminalSize)
+      }
+    )
+    let result = try await runLoop.run()
+
+    let firstFrame = try #require(terminal.frames.first)
+    let lastFrame = try #require(terminal.frames.last)
+
+    #expect(result.exitReason == .signal("SIGTERM"))
+    #expect(result.renderedFrames == 2)
+    #expect(!firstFrame.contains("Imperative alert"))
+    #expect(lastFrame.contains("Imperative alert"))
+  }
+
+  @MainActor
   @Test("mouse input updates built-in controls through click drag and wheel paths")
   func mouseInputUpdatesBuiltInControls() async throws {
     let box = MouseControlBox()
@@ -1952,7 +1992,8 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
-  @Test("handled pointer scrolling invalidates the scroll route even for external position bindings")
+  @Test(
+    "handled pointer scrolling invalidates the scroll route even for external position bindings")
   func handledPointerScrollingInvalidatesScrollRouteForExternalBindings() throws {
     let terminalSize = Size(width: 20, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
@@ -2015,9 +2056,12 @@ struct InteractiveRuntimeTests {
     var renderedFrames = 0
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
 
-    #expect(runLoop.handle(.input(.mouse(
-      .init(kind: .scrolled(deltaX: 0, deltaY: 1), location: centerPoint(of: scrollRect))
-    ))) == nil)
+    #expect(
+      runLoop.handle(
+        .input(
+          .mouse(
+            .init(kind: .scrolled(deltaX: 0, deltaY: 1), location: centerPoint(of: scrollRect))
+          ))) == nil)
     #expect(box.value == .init(x: 0, y: 1))
 
     let scheduledFrame = try #require(
@@ -2106,9 +2150,14 @@ struct InteractiveRuntimeTests {
     _ = runLoop.focusTracker.setFocus(to: focusIdentity)
     scheduler.reset()
 
-    #expect(runLoop.handle(.input(.mouse(
-      .init(kind: .scrolled(deltaX: 0, deltaY: 1), location: centerPoint(of: scrollRoute.viewportRect))
-    ))) == nil)
+    #expect(
+      runLoop.handle(
+        .input(
+          .mouse(
+            .init(
+              kind: .scrolled(deltaX: 0, deltaY: 1),
+              location: centerPoint(of: scrollRoute.viewportRect))
+          ))) == nil)
     #expect(box.value == .init(x: 0, y: maxY))
     #expect(scheduler.consumeReadyFrame(at: .now()) == nil)
   }
@@ -3326,6 +3375,38 @@ private struct ToastAutoDismissHarnessView: View {
         style: .success,
         duration: 0.01
       )
+  }
+}
+
+private struct ImperativeAlertPresentationHarnessView: View {
+  let terminalSize: Size
+
+  var body: some View {
+    EnvironmentReader(\.alertPresentationCoordinator) { coordinator in
+      Text("Workspace")
+        .frame(
+          width: terminalSize.width,
+          height: terminalSize.height,
+          alignment: .topLeading
+        )
+        .onAppear {
+          coordinator.present(
+            PromptPresentationItem(
+              id: "imperative-alert",
+              title: "Imperative alert",
+              descriptor: alertPromptPresentationSpec().descriptor,
+              actionPayloads: deferredDeclaredBuilderChildren(
+                from: Button("Dismiss") {}
+              ),
+              messagePayloads: deferredDeclaredBuilderChildren(
+                from: Text("Presented after lifecycle commit.")
+              ),
+              contentPayloads: [],
+              dismiss: {}
+            )
+          )
+        }
+    }
   }
 }
 
