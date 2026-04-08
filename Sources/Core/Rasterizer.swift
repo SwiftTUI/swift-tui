@@ -80,24 +80,42 @@ extension Rasterizer {
     for node: DrawNode,
     clip: Rect?
   ) -> (x: Int, y: Int) {
-    let effectiveClip = intersect(clip, node.clipBounds)
-    let visibleBounds: Rect
-    if let effectiveClip {
-      guard let clippedBounds = intersect(node.bounds, effectiveClip) else {
-        return (x: 0, y: 0)
-      }
-      visibleBounds = clippedBounds
-    } else {
-      visibleBounds = node.bounds
+    struct Frame {
+      let node: DrawNode
+      let clip: Rect?
     }
 
-    var maxX = visibleBounds.origin.x + visibleBounds.size.width
-    var maxY = visibleBounds.origin.y + visibleBounds.size.height
+    var maxX = 0
+    var maxY = 0
+    var hasVisibleExtent = false
+    var stack: [Frame] = [Frame(node: node, clip: clip)]
 
-    for child in node.children {
-      let childExtent = maximumExtent(for: child, clip: effectiveClip)
-      maxX = max(maxX, childExtent.x)
-      maxY = max(maxY, childExtent.y)
+    while let frame = stack.popLast() {
+      let effectiveClip = intersect(frame.clip, frame.node.clipBounds)
+      let visibleBounds: Rect
+      if let effectiveClip {
+        guard let clippedBounds = intersect(frame.node.bounds, effectiveClip) else {
+          continue
+        }
+        visibleBounds = clippedBounds
+      } else {
+        visibleBounds = frame.node.bounds
+      }
+
+      let nodeMaxX = visibleBounds.origin.x + visibleBounds.size.width
+      let nodeMaxY = visibleBounds.origin.y + visibleBounds.size.height
+      if hasVisibleExtent {
+        maxX = max(maxX, nodeMaxX)
+        maxY = max(maxY, nodeMaxY)
+      } else {
+        maxX = nodeMaxX
+        maxY = nodeMaxY
+        hasVisibleExtent = true
+      }
+
+      for child in frame.node.children.reversed() {
+        stack.append(Frame(node: child, clip: effectiveClip))
+      }
     }
 
     return (x: maxX, y: maxY)
@@ -110,234 +128,237 @@ extension Rasterizer {
     clip: Rect?,
     dirtyRows: Set<Int>?
   ) {
-    if let dirtyRows {
-      let effectiveClip = intersect(clip, node.clipBounds)
+    struct Frame {
+      let node: DrawNode
+      let clip: Rect?
+    }
+
+    var stack: [Frame] = [Frame(node: node, clip: clip)]
+
+    while let frame = stack.popLast() {
+      let effectiveClip = intersect(frame.clip, frame.node.clipBounds)
       let visibleBounds: Rect
       if let effectiveClip {
-        guard let clipped = intersect(node.bounds, effectiveClip) else {
-          return
+        guard let clipped = intersect(frame.node.bounds, effectiveClip) else {
+          continue
         }
         visibleBounds = clipped
       } else {
-        visibleBounds = node.bounds
+        visibleBounds = frame.node.bounds
       }
-      let nodeTop = max(0, visibleBounds.origin.y)
-      let nodeBottom = nodeTop + max(0, visibleBounds.size.height)
-      if nodeBottom > nodeTop {
-        var intersects = false
-        for row in dirtyRows {
-          if row >= nodeTop, row < nodeBottom {
-            intersects = true
-            break
+
+      if let dirtyRows {
+        let nodeTop = max(0, visibleBounds.origin.y)
+        let nodeBottom = nodeTop + max(0, visibleBounds.size.height)
+        if nodeBottom > nodeTop {
+          var intersects = false
+          for row in dirtyRows {
+            if row >= nodeTop, row < nodeBottom {
+              intersects = true
+              break
+            }
+          }
+          if !intersects {
+            continue
           }
         }
-        if !intersects { return }
       }
-    }
 
-    let effectiveClip = intersect(clip, node.clipBounds)
-    for command in node.commands {
       paint(
-        command: command,
-        environment: node.environmentSnapshot.style,
+        commands: frame.node.commands,
+        environment: frame.node.environmentSnapshot.style,
         cells: &cells,
         imageAttachments: &imageAttachments,
         clip: effectiveClip,
         dirtyRows: dirtyRows
       )
-    }
 
-    for child in node.children {
-      paint(
-        node: child,
-        cells: &cells,
-        imageAttachments: &imageAttachments,
-        clip: effectiveClip,
-        dirtyRows: dirtyRows
-      )
+      for child in frame.node.children.reversed() {
+        stack.append(Frame(node: child, clip: effectiveClip))
+      }
     }
   }
 
   private func paint(
-    command: DrawCommand,
+    commands: [DrawCommand],
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     imageAttachments: inout [RasterImageAttachment],
     clip: Rect?,
     dirtyRows: Set<Int>? = nil
   ) {
-    switch command {
-    case .group(_, let children):
-      for child in children {
-        paint(
-          command: child,
-          environment: environment,
-          cells: &cells,
-          imageAttachments: &imageAttachments,
-          clip: clip,
-          dirtyRows: dirtyRows
-        )
-      }
-    case .text(
-      let bounds,
-      let content,
-      let style,
-      let lineLimit,
-      let truncationMode,
-      let wrappingStrategy
-    ):
-      guard bounds.size.height > 0, bounds.size.width > 0 else {
-        return
-      }
+    struct Frame {
+      let command: DrawCommand
+      let clip: Rect?
+    }
 
-      let layout = layoutText(
-        for: content,
-        width: bounds.size.width,
-        lineLimit: lineLimit,
-        truncationMode: truncationMode,
-        wrappingStrategy: wrappingStrategy
-      )
+    var stack: [Frame] = []
+    stack.reserveCapacity(commands.count)
+    for command in commands.reversed() {
+      stack.append(Frame(command: command, clip: clip))
+    }
 
-      for (lineIndex, line) in layout.lines.prefix(bounds.size.height).enumerated() {
-        var x = bounds.origin.x
-        for cluster in line.clusters {
-          guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
-            break
-          }
-
-          let resolvedStyle = resolveTextStyle(
-            style,
-            environment: environment,
-            bounds: bounds,
-            sampleX: x,
-            sampleY: bounds.origin.y + lineIndex,
-            width: cluster.cellWidth
-          )
-
-          write(
-            cluster.character,
-            width: cluster.cellWidth,
-            style: resolvedStyle.isDefault ? nil : resolvedStyle,
-            atX: x,
-            y: bounds.origin.y + lineIndex,
-            cells: &cells,
-            clip: clip
-          )
-          x += cluster.cellWidth
-          if x >= bounds.origin.x + bounds.size.width {
-            break
-          }
+    while let frame = stack.popLast() {
+      switch frame.command {
+      case .group(_, let children):
+        for child in children.reversed() {
+          stack.append(Frame(command: child, clip: frame.clip))
         }
-      }
-    case .richText(
-      let bounds,
-      let payload,
-      let lineLimit,
-      let truncationMode,
-      let wrappingStrategy
-    ):
-      guard bounds.size.height > 0, bounds.size.width > 0 else {
-        return
-      }
+      case .clip(let bounds, let child):
+        stack.append(Frame(command: child, clip: bounds))
+      case .text(
+        let bounds,
+        let content,
+        let style,
+        let lineLimit,
+        let truncationMode,
+        let wrappingStrategy
+      ):
+        guard bounds.size.height > 0, bounds.size.width > 0 else {
+          continue
+        }
 
-      let layout = layoutRichText(
-        for: payload,
-        options: .init(
+        let layout = layoutText(
+          for: content,
           width: bounds.size.width,
           lineLimit: lineLimit,
           truncationMode: truncationMode,
           wrappingStrategy: wrappingStrategy
         )
-      )
 
-      for (lineIndex, line) in layout.lines.prefix(bounds.size.height).enumerated() {
-        var x = bounds.origin.x
-        for cluster in line.clusters {
-          guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
-            break
-          }
+        for (lineIndex, line) in layout.lines.prefix(bounds.size.height).enumerated() {
+          var x = bounds.origin.x
+          for cluster in line.clusters {
+            guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
+              break
+            }
 
-          let run = cluster.runIndex.flatMap { runIndex in
-            payload.runs.indices.contains(runIndex) ? payload.runs[runIndex] : nil
-          }
-          let resolvedStyle = resolveTextStyle(
-            run?.style ?? .init(),
-            environment: environment,
-            bounds: bounds,
-            sampleX: x,
-            sampleY: bounds.origin.y + lineIndex,
-            width: cluster.cellWidth
-          )
+            let resolvedStyle = resolveTextStyle(
+              style,
+              environment: environment,
+              bounds: bounds,
+              sampleX: x,
+              sampleY: bounds.origin.y + lineIndex,
+              width: cluster.cellWidth
+            )
 
-          write(
-            cluster.character,
-            width: cluster.cellWidth,
-            style: resolvedStyle.isDefault ? nil : resolvedStyle,
-            hyperlink: run?.destination?.rawValue,
-            atX: x,
-            y: bounds.origin.y + lineIndex,
-            cells: &cells,
-            clip: clip
-          )
-          x += cluster.cellWidth
-          if x >= bounds.origin.x + bounds.size.width {
-            break
+            write(
+              cluster.character,
+              width: cluster.cellWidth,
+              style: resolvedStyle.isDefault ? nil : resolvedStyle,
+              atX: x,
+              y: bounds.origin.y + lineIndex,
+              cells: &cells,
+              clip: frame.clip
+            )
+            x += cluster.cellWidth
+            if x >= bounds.origin.x + bounds.size.width {
+              break
+            }
           }
         }
-      }
-    case .image(let bounds, let identity, let payload):
-      imageAttachments.append(
-        RasterImageAttachment(
-          identity: identity,
-          bounds: bounds,
-          source: payload.source,
-          resolvedReference: payload.resolvedAsset?.reference,
-          pixelSize: payload.resolvedAsset?.pixelSize,
-          isResizable: payload.isResizable,
-          scalingMode: payload.scalingMode
+      case .richText(
+        let bounds,
+        let payload,
+        let lineLimit,
+        let truncationMode,
+        let wrappingStrategy
+      ):
+        guard bounds.size.height > 0, bounds.size.width > 0 else {
+          continue
+        }
+
+        let layout = layoutRichText(
+          for: payload,
+          options: .init(
+            width: bounds.size.width,
+            lineLimit: lineLimit,
+            truncationMode: truncationMode,
+            wrappingStrategy: wrappingStrategy
+          )
         )
-      )
-    case .fill(let bounds, let geometry, let style, let mode):
-      paintFill(
-        in: bounds,
-        geometry: geometry,
-        style: style,
-        mode: mode,
-        environment: environment,
-        cells: &cells,
-        clip: clip
-      )
-    case .stroke(
-      let bounds, let geometry, let style, let strokeStyle, let strokeBorder, let backgroundStyle):
-      paintStroke(
-        in: bounds,
-        geometry: geometry,
-        style: style,
-        strokeStyle: strokeStyle,
-        strokeBorder: strokeBorder,
-        backgroundStyle: backgroundStyle,
-        environment: environment,
-        cells: &cells,
-        clip: clip
-      )
-    case .rule(let bounds, let style, let strokeStyle, let stackAxis):
-      paintRule(
-        in: bounds,
-        style: style,
-        strokeStyle: strokeStyle,
-        stackAxis: stackAxis,
-        environment: environment,
-        cells: &cells,
-        clip: clip
-      )
-    case .clip(let bounds, let child):
-      paint(
-        command: child,
-        environment: environment,
-        cells: &cells,
-        imageAttachments: &imageAttachments,
-        clip: bounds
-      )
+
+        for (lineIndex, line) in layout.lines.prefix(bounds.size.height).enumerated() {
+          var x = bounds.origin.x
+          for cluster in line.clusters {
+            guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
+              break
+            }
+
+            let run = cluster.runIndex.flatMap { runIndex in
+              payload.runs.indices.contains(runIndex) ? payload.runs[runIndex] : nil
+            }
+            let resolvedStyle = resolveTextStyle(
+              run?.style ?? .init(),
+              environment: environment,
+              bounds: bounds,
+              sampleX: x,
+              sampleY: bounds.origin.y + lineIndex,
+              width: cluster.cellWidth
+            )
+
+            write(
+              cluster.character,
+              width: cluster.cellWidth,
+              style: resolvedStyle.isDefault ? nil : resolvedStyle,
+              hyperlink: run?.destination?.rawValue,
+              atX: x,
+              y: bounds.origin.y + lineIndex,
+              cells: &cells,
+              clip: frame.clip
+            )
+            x += cluster.cellWidth
+            if x >= bounds.origin.x + bounds.size.width {
+              break
+            }
+          }
+        }
+      case .image(let bounds, let identity, let payload):
+        imageAttachments.append(
+          RasterImageAttachment(
+            identity: identity,
+            bounds: bounds,
+            source: payload.source,
+            resolvedReference: payload.resolvedAsset?.reference,
+            pixelSize: payload.resolvedAsset?.pixelSize,
+            isResizable: payload.isResizable,
+            scalingMode: payload.scalingMode
+          )
+        )
+      case .fill(let bounds, let geometry, let style, let mode):
+        paintFill(
+          in: bounds,
+          geometry: geometry,
+          style: style,
+          mode: mode,
+          environment: environment,
+          cells: &cells,
+          clip: frame.clip
+        )
+      case .stroke(
+        let bounds, let geometry, let style, let strokeStyle, let strokeBorder, let backgroundStyle):
+        paintStroke(
+          in: bounds,
+          geometry: geometry,
+          style: style,
+          strokeStyle: strokeStyle,
+          strokeBorder: strokeBorder,
+          backgroundStyle: backgroundStyle,
+          environment: environment,
+          cells: &cells,
+          clip: frame.clip
+        )
+      case .rule(let bounds, let style, let strokeStyle, let stackAxis):
+        paintRule(
+          in: bounds,
+          style: style,
+          strokeStyle: strokeStyle,
+          stackAxis: stackAxis,
+          environment: environment,
+          cells: &cells,
+          clip: frame.clip
+        )
+      }
     }
   }
 
