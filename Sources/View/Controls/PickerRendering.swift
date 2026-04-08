@@ -188,7 +188,7 @@ extension Picker {
       }
       .padding(.init(horizontal: 1, vertical: 1))
       .background {
-        RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
+        RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(containerChrome.backgroundStyle)
       }
       .overlay {
         RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
@@ -389,7 +389,7 @@ extension Picker {
               if isSelected {
                 Rectangle().fill(.tint)
               } else if isActiveNavigation && showsFocusEffect {
-                Rectangle().chromeFill(
+                Rectangle().inset(by: 1).fill(
                   segmentChrome.backgroundStyle
                 )
               }
@@ -412,7 +412,7 @@ extension Picker {
       }
       .padding(.init(horizontal: 1, vertical: 1))
       .background {
-        RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
+        RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(containerChrome.backgroundStyle)
       }
       .overlay {
         RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
@@ -462,7 +462,7 @@ extension Picker {
       }
       .padding(.init(horizontal: 1, vertical: 1))
       .background {
-        RoundedRectangle(cornerRadius: 1).chromeFill(containerChrome.backgroundStyle)
+        RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(containerChrome.backgroundStyle)
       }
       .overlay {
         RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(

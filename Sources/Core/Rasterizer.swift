@@ -325,10 +325,11 @@ extension Rasterizer {
             scalingMode: payload.scalingMode
           )
         )
-      case .fill(let bounds, let geometry, let style, let mode):
+      case .fill(let bounds, let geometry, let insetAmount, let style, let mode):
         paintFill(
           in: bounds,
           geometry: geometry,
+          insetAmount: insetAmount,
           style: style,
           mode: mode,
           environment: environment,
@@ -336,10 +337,12 @@ extension Rasterizer {
           clip: frame.clip
         )
       case .stroke(
-        let bounds, let geometry, let style, let strokeStyle, let strokeBorder, let backgroundStyle):
+        let bounds, let geometry, let insetAmount, let style, let strokeStyle, let strokeBorder,
+        let backgroundStyle):
         paintStroke(
           in: bounds,
           geometry: geometry,
+          insetAmount: insetAmount,
           style: style,
           strokeStyle: strokeStyle,
           strokeBorder: strokeBorder,
@@ -365,6 +368,7 @@ extension Rasterizer {
   private func paintFill(
     in bounds: Rect,
     geometry: ShapeGeometry,
+    insetAmount: Int,
     style: AnyShapeStyle,
     mode: ShapeFillMode,
     environment: StyleEnvironmentSnapshot,
@@ -375,6 +379,10 @@ extension Rasterizer {
       return
     }
 
+    let shapeBounds = insetBounds(bounds, by: max(0, insetAmount), strokeBorder: true)
+    guard shapeBounds.size.width > 0, shapeBounds.size.height > 0 else {
+      return
+    }
     let colorMode = resolvedColorMode(
       from: style,
       environment: environment
@@ -398,13 +406,13 @@ extension Rasterizer {
       isTranslucent = false
     }
 
-    for y in bounds.origin.y..<(bounds.origin.y + bounds.size.height) {
-      for x in bounds.origin.x..<(bounds.origin.x + bounds.size.width) {
+    for y in shapeBounds.origin.y..<(shapeBounds.origin.y + shapeBounds.size.height) {
+      for x in shapeBounds.origin.x..<(shapeBounds.origin.x + shapeBounds.size.width) {
         guard
           shapeContains(
             pointX: x,
             pointY: y,
-            in: bounds,
+            in: shapeBounds,
             geometry: geometry,
             fillMode: mode
           )
@@ -432,7 +440,7 @@ extension Rasterizer {
           // Sampled (gradient) fill: resolve per-cell.
           let fillColor = resolveColor(
             from: colorMode,
-            bounds: bounds,
+            bounds: shapeBounds,
             sampleX: x,
             sampleY: y
           )
@@ -445,7 +453,7 @@ extension Rasterizer {
               " ",
               style: resolvedBackgroundTextStyle(
                 colorMode: colorMode,
-                bounds: bounds,
+                bounds: shapeBounds,
                 x: x,
                 y: y
               ),
@@ -488,6 +496,7 @@ extension Rasterizer {
   private func paintStroke(
     in bounds: Rect,
     geometry: ShapeGeometry,
+    insetAmount: Int,
     style: AnyShapeStyle,
     strokeStyle: StrokeStyle,
     strokeBorder: Bool,
@@ -500,13 +509,17 @@ extension Rasterizer {
       return
     }
 
+    let shapeBounds = insetBounds(bounds, by: max(0, insetAmount), strokeBorder: true)
+    guard shapeBounds.size.width > 0, shapeBounds.size.height > 0 else {
+      return
+    }
     let foregroundColorMode = resolvedColorMode(
       from: style,
       environment: environment
     )
     let lineWidth = max(1, strokeStyle.lineWidth)
     for inset in 0..<lineWidth {
-      let insetRect = insetBounds(bounds, by: inset, strokeBorder: strokeBorder)
+      let insetRect = insetBounds(shapeBounds, by: inset, strokeBorder: strokeBorder)
       guard insetRect.size.width > 0, insetRect.size.height > 0 else {
         continue
       }
@@ -528,7 +541,7 @@ extension Rasterizer {
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
           fallbackBackgroundSides: [.top],
           environment: environment,
-          bounds: bounds,
+          bounds: shapeBounds,
           x: x,
           y: minY,
           cells: &cells,
@@ -541,7 +554,7 @@ extension Rasterizer {
             backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
             fallbackBackgroundSides: [.bottom],
             environment: environment,
-            bounds: bounds,
+            bounds: shapeBounds,
             x: x,
             y: maxY,
             cells: &cells,
@@ -558,7 +571,7 @@ extension Rasterizer {
             backgroundStyle: backgroundStyle?.backgroundStyle(for: .left),
             fallbackBackgroundSides: [.left],
             environment: environment,
-            bounds: bounds,
+            bounds: shapeBounds,
             x: minX,
             y: y,
             cells: &cells,
@@ -571,7 +584,7 @@ extension Rasterizer {
               backgroundStyle: backgroundStyle?.backgroundStyle(for: .right),
               fallbackBackgroundSides: [.right],
               environment: environment,
-              bounds: bounds,
+              bounds: shapeBounds,
               x: maxX,
               y: y,
               cells: &cells,
@@ -587,7 +600,7 @@ extension Rasterizer {
         backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
         fallbackBackgroundSides: [.top, .left],
         environment: environment,
-        bounds: bounds,
+        bounds: shapeBounds,
         x: minX,
         y: minY,
         cells: &cells,
@@ -600,7 +613,7 @@ extension Rasterizer {
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
           fallbackBackgroundSides: [.top, .right],
           environment: environment,
-          bounds: bounds,
+          bounds: shapeBounds,
           x: maxX,
           y: minY,
           cells: &cells,
@@ -614,7 +627,7 @@ extension Rasterizer {
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
           fallbackBackgroundSides: [.bottom, .left],
           environment: environment,
-          bounds: bounds,
+          bounds: shapeBounds,
           x: minX,
           y: maxY,
           cells: &cells,
@@ -628,7 +641,7 @@ extension Rasterizer {
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
           fallbackBackgroundSides: [.bottom, .right],
           environment: environment,
-          bounds: bounds,
+          bounds: shapeBounds,
           x: maxX,
           y: maxY,
           cells: &cells,

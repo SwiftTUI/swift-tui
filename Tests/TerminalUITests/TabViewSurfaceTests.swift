@@ -223,7 +223,7 @@ private func hasFillCommand(
   switch command {
   case .group(_, let children):
     return children.contains(where: { hasFillCommand($0, bounds: bounds) })
-  case .fill(let commandBounds, _, _, _):
+  case .fill(let commandBounds, _, _, _, _):
     return commandBounds == bounds
   case .clip(_, let child):
     return hasFillCommand(child, bounds: bounds)

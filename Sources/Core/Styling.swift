@@ -169,11 +169,12 @@ extension ShapeStyle {
       let fadedStops = gradient.gradient.stops.map {
         Gradient.Stop(color: $0.color.opacity(clamped), location: $0.location)
       }
-      return .linearGradient(.init(
-        gradient: .init(stops: fadedStops),
-        startPoint: gradient.startPoint,
-        endPoint: gradient.endPoint
-      ))
+      return .linearGradient(
+        .init(
+          gradient: .init(stops: fadedStops),
+          startPoint: gradient.startPoint,
+          endPoint: gradient.endPoint
+        ))
     case let style:
       // Semantic/chrome styles can't carry alpha until resolved —
       // wrap for deferred resolution in the rasterizer.
@@ -597,13 +598,16 @@ public enum ShapeOperation: Equatable, Sendable {
 /// Low-level draw payload for a shape node.
 public struct ShapePayload: Equatable, Sendable {
   public var geometry: ShapeGeometry
+  public var insetAmount: Int
   public var operation: ShapeOperation
 
   public init(
     geometry: ShapeGeometry,
+    insetAmount: Int = 0,
     operation: ShapeOperation
   ) {
     self.geometry = geometry
+    self.insetAmount = max(0, insetAmount)
     self.operation = operation
   }
 }
@@ -683,7 +687,9 @@ extension ResolvedTextStyle {
     let blendedBackground: Color? =
       switch (backgroundColor, underlay.backgroundColor) {
       case (let overlay?, let under?) where overlay.alpha < 1:
-          under.mixed(with: Color(red: overlay.red, green: overlay.green, blue: overlay.blue), amount: overlay.alpha)
+        under.mixed(
+          with: Color(red: overlay.red, green: overlay.green, blue: overlay.blue),
+          amount: overlay.alpha)
       case (let overlay?, _):
         overlay
       case (nil, let under?):
@@ -707,8 +713,7 @@ extension ResolvedTextStyle {
     let opaque = Color(red: overlay.red, green: overlay.green, blue: overlay.blue)
     return .init(
       foregroundColor: foregroundColor.map { $0.mixed(with: opaque, amount: amount) },
-      backgroundColor: 
-        (backgroundColor ?? Color.black).mixed(with: opaque, amount: amount),
+      backgroundColor: (backgroundColor ?? Color.black).mixed(with: opaque, amount: amount),
       emphasis: emphasis,
       underlineStyle: underlineStyle,
       strikethroughStyle: strikethroughStyle,

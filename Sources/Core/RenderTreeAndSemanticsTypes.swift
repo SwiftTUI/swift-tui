@@ -696,12 +696,14 @@ public indirect enum DrawCommand: Equatable, Sendable {
   case fill(
     bounds: Rect,
     geometry: ShapeGeometry,
+    insetAmount: Int,
     style: AnyShapeStyle,
     mode: ShapeFillMode
   )
   case stroke(
     bounds: Rect,
     geometry: ShapeGeometry,
+    insetAmount: Int,
     style: AnyShapeStyle,
     strokeStyle: StrokeStyle,
     strokeBorder: Bool,

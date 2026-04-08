@@ -1,7 +1,7 @@
 public import Core
 
 /// A rectangle with rounded corners expressed in terminal cells.
-public struct RoundedRectangle: Shape, ResolvableView {
+public struct RoundedRectangle: InsettableShape, ResolvableView {
   public var cornerRadius: Int
 
   public init(cornerRadius: Int) {

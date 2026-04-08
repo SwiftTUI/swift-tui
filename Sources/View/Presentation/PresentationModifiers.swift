@@ -348,7 +348,7 @@ private struct BuiltinPromptPresentationSurface: View {
     }
     .padding(.init(horizontal: 1, vertical: 1))
     .background {
-      RoundedRectangle(cornerRadius: 1).chromeFill(.terminalSurfaceBackground)
+      RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.terminalSurfaceBackground)
     }
     .overlay {
       RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
@@ -587,7 +587,7 @@ private struct BuiltinToastHostedPresentation: View {
     }
     .padding(1)
     .background {
-      Rectangle().chromeFill(.terminalSurfaceBackground)
+      Rectangle().inset(by: 1).fill(.terminalSurfaceBackground)
     }
     .overlay {
       Rectangle().chromeStrokeBorder(

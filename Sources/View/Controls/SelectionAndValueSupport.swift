@@ -401,8 +401,8 @@ private func controlDisplayPrecision(
   let componentPrecisions =
     [trimmedDecimalPlaces(for: step)]
     + [bounds?.lowerBound, bounds?.upperBound]
-      .compactMap { $0 }
-      .map(trimmedDecimalPlaces(for:))
+    .compactMap { $0 }
+    .map(trimmedDecimalPlaces(for:))
   return min(
     max(0, componentPrecisions.max() ?? 0),
     maxControlFractionDigits
@@ -468,7 +468,8 @@ private func trimmedControlString(
       fraction.removeLast()
     }
 
-    text = fraction.isEmpty
+    text =
+      fraction.isEmpty
       ? String(text[..<decimalIndex])
       : "\(text[..<decimalIndex]).\(fraction)"
   }
@@ -701,7 +702,7 @@ package func textEditorBody(
     .padding(.init(horizontal: 1, vertical: 1))
   }
   .background {
-    RoundedRectangle(cornerRadius: 1).chromeFill(chrome.backgroundStyle)
+    RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(chrome.backgroundStyle)
   }
   .overlay {
     RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(

@@ -69,6 +69,7 @@ extension DrawExtractor {
             .fill(
               bounds: lineBounds,
               geometry: .rectangle,
+              insetAmount: 0,
               style: backgroundStyle,
               mode: .full
             )
@@ -137,12 +138,14 @@ extension DrawExtractor {
       .fill(
         bounds: bounds,
         geometry: .roundedRectangle(cornerRadius: 1),
+        insetAmount: 0,
         style: payload.backgroundStyle ?? .semantic(.fill),
         mode: .interior(strokeWidth: 1)
       ),
       .stroke(
         bounds: bounds,
         geometry: .roundedRectangle(cornerRadius: 1),
+        insetAmount: 0,
         style: payload.borderStyle ?? .semantic(.separator),
         strokeStyle: .init(lineVariant: .rounded),
         strokeBorder: true,
