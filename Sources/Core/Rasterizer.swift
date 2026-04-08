@@ -17,6 +17,15 @@ public struct Rasterizer {
     _ draw: DrawNode,
     minimumSize: Size
   ) -> RasterSurface {
+    rasterize(draw, minimumSize: minimumSize, previousSurface: nil, damage: nil)
+  }
+
+  package func rasterize(
+    _ draw: DrawNode,
+    minimumSize: Size,
+    previousSurface: RasterSurface?,
+    damage: PresentationDamage?
+  ) -> RasterSurface {
     let extent = maximumExtent(for: draw, clip: nil)
     let surfaceSize = Size(
       width: max(extent.x, max(0, minimumSize.width)),
@@ -26,16 +35,36 @@ public struct Rasterizer {
       return RasterSurface()
     }
 
-    var cells = Array(
-      repeating: Array(repeating: RasterCell.empty, count: surfaceSize.width),
-      count: surfaceSize.height
-    )
-    var imageAttachments: [RasterImageAttachment] = []
+    let dirtyRows: Set<Int>?
+    var cells: [[RasterCell]]
+    var imageAttachments: [RasterImageAttachment]
+
+    if let previousSurface, let damage,
+      previousSurface.size == surfaceSize,
+      !damage.dirtyRows.isEmpty
+    {
+      cells = previousSurface.cells
+      imageAttachments = []
+      dirtyRows = damage.dirtyRows
+      let emptyRow = Array(repeating: RasterCell.empty, count: surfaceSize.width)
+      for row in damage.dirtyRows where row >= 0 && row < cells.count {
+        cells[row] = emptyRow
+      }
+    } else {
+      cells = Array(
+        repeating: Array(repeating: RasterCell.empty, count: surfaceSize.width),
+        count: surfaceSize.height
+      )
+      imageAttachments = []
+      dirtyRows = nil
+    }
+
     paint(
       node: draw,
       cells: &cells,
       imageAttachments: &imageAttachments,
-      clip: nil
+      clip: nil,
+      dirtyRows: dirtyRows
     )
 
     return RasterSurface(
@@ -78,8 +107,34 @@ extension Rasterizer {
     node: DrawNode,
     cells: inout [[RasterCell]],
     imageAttachments: inout [RasterImageAttachment],
-    clip: Rect?
+    clip: Rect?,
+    dirtyRows: Set<Int>?
   ) {
+    if let dirtyRows {
+      let effectiveClip = intersect(clip, node.clipBounds)
+      let visibleBounds: Rect
+      if let effectiveClip {
+        guard let clipped = intersect(node.bounds, effectiveClip) else {
+          return
+        }
+        visibleBounds = clipped
+      } else {
+        visibleBounds = node.bounds
+      }
+      let nodeTop = max(0, visibleBounds.origin.y)
+      let nodeBottom = nodeTop + max(0, visibleBounds.size.height)
+      if nodeBottom > nodeTop {
+        var intersects = false
+        for row in dirtyRows {
+          if row >= nodeTop, row < nodeBottom {
+            intersects = true
+            break
+          }
+        }
+        if !intersects { return }
+      }
+    }
+
     let effectiveClip = intersect(clip, node.clipBounds)
     for command in node.commands {
       paint(
@@ -87,7 +142,8 @@ extension Rasterizer {
         environment: node.environmentSnapshot.style,
         cells: &cells,
         imageAttachments: &imageAttachments,
-        clip: effectiveClip
+        clip: effectiveClip,
+        dirtyRows: dirtyRows
       )
     }
 
@@ -96,7 +152,8 @@ extension Rasterizer {
         node: child,
         cells: &cells,
         imageAttachments: &imageAttachments,
-        clip: effectiveClip
+        clip: effectiveClip,
+        dirtyRows: dirtyRows
       )
     }
   }
@@ -106,7 +163,8 @@ extension Rasterizer {
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     imageAttachments: inout [RasterImageAttachment],
-    clip: Rect?
+    clip: Rect?,
+    dirtyRows: Set<Int>? = nil
   ) {
     switch command {
     case .group(_, let children):
@@ -116,7 +174,8 @@ extension Rasterizer {
           environment: environment,
           cells: &cells,
           imageAttachments: &imageAttachments,
-          clip: clip
+          clip: clip,
+          dirtyRows: dirtyRows
         )
       }
     case .text(
