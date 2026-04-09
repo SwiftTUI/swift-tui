@@ -54,9 +54,18 @@ package struct AnimatableSnapshot: Equatable, Sendable {
       snapshot.opacity = explicit
     }
 
-    // Foreground/background colors
-    snapshot.foregroundColor = extractColor(from: node.drawMetadata.baseStyle.foregroundStyle)
-    snapshot.backgroundColor = extractColor(from: node.drawMetadata.baseStyle.backgroundStyle)
+    // Foreground/background colors.  `.foregroundStyle(color)` on a
+    // generic view writes to the environment rather than to the node's
+    // own draw metadata; leaf views such as `TextFigure` pick it up from
+    // the environment at rasterize time.  Prefer the node's local draw
+    // metadata (set by text-specific modifiers) and fall back to the
+    // environment snapshot so environment-carried colors are still
+    // animated.
+    snapshot.foregroundColor =
+      extractColor(from: node.drawMetadata.baseStyle.foregroundStyle)
+      ?? extractColor(from: node.environmentSnapshot.style.foregroundStyle)
+    snapshot.backgroundColor =
+      extractColor(from: node.drawMetadata.baseStyle.backgroundStyle)
 
     // Layout-derived animatables
     switch node.layoutBehavior {

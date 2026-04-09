@@ -29,11 +29,6 @@ var fontCount: Int { EmbeddedFigletFont.allCases.count }
             HStack {
               Stepper("font", value: $fontNumber)
                 Text(font.rawValue)
-                Button("↴"){
-                  withAnimation(.easeInOut(duration: .seconds(2.0))) {
-                    color = color.rotatedHue(by: 40.0)
-                  }
-                }
               }
               .task(id: fontNumber) {
                 if fontNumber < 0 {
@@ -44,9 +39,19 @@ var fontCount: Int { EmbeddedFigletFont.allCases.count }
                 font = EmbeddedFigletFont.allCases[fontNumber]
               }
           TextFigure("Gallery", font: font)
-            .foregroundStyle(color)
+            .foregroundStyle(Color.red)
             .padding(1)
           }
+          Button("↴"){
+            withAnimation(.easeInOut(duration: .seconds(2.0))) {
+              color = color.rotatedHue(by: 40.0)
+            }
+          }
+          Text(
+            """
+            #####################################
+            """
+          ).foregroundStyle(color)
           terminalPaletteSection(palette: appearance.palette)
           namedColorsSection
           semanticRolesSection
