@@ -157,6 +157,15 @@ flf2a$ 1 1 1 0 0
     #expect(output == " _   _ _ \n| | | (_)\n| |_| | |\n|  _  | |\n|_| |_|_|\n         \n")
 }
 
+@Test func rendersBundledAscii12FontByDefault() throws {
+    let bundled = try Figlet(fontNamed: "ascii12")
+    let embedded = try Figlet(embeddedFont: .ascii12)
+    let bundledOutput = try bundled.render("Swift").description
+    let embeddedOutput = try embedded.render("Swift").description
+
+    #expect(bundledOutput == embeddedOutput)
+}
+
 @Test func reportsLayoutMetricsForEmbeddedFonts() throws {
     let figlet = try Figlet(embeddedFont: .standard)
     let metrics = try figlet.layoutMetrics(for: "Hi")

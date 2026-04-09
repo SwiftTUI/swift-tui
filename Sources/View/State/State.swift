@@ -31,6 +31,24 @@ package func makeAuthoringContext(
 }
 
 @MainActor
+package func makeDeferredAuthoringContext(
+  from context: AuthoringContext? = currentAuthoringContext()
+) -> AuthoringContext? {
+  guard let context else {
+    return nil
+  }
+
+  let ordinalTracker = AuthoringOrdinalTracker()
+  ordinalTracker.freeze()
+  return AuthoringContext(
+    viewIdentity: context.viewIdentity,
+    focusedValues: context.focusedValues,
+    viewNode: context.viewNode,
+    ordinalTracker: ordinalTracker
+  )
+}
+
+@MainActor
 package func withAuthoringContext<Result>(
   _ context: AuthoringContext?,
   _ apply: () -> Result

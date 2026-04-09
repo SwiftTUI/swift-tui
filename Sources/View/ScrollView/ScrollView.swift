@@ -6,6 +6,7 @@ public struct ScrollView<Content: View>: View, ResolvableView {
   public var showsIndicators: Bool
   @State private var internalPosition = ScrollPosition.zero
   private var explicitPosition: Binding<ScrollPosition>?
+  private let authoringScope: AuthoringContext?
   private var content: Content
   public var position: Binding<ScrollPosition> {
     explicitPosition ?? $internalPosition
@@ -18,6 +19,7 @@ public struct ScrollView<Content: View>: View, ResolvableView {
     self.axes = axes
     self.showsIndicators = showsIndicators
     explicitPosition = nil
+    authoringScope = makeDeferredAuthoringContext()
     self.content = content()
   }
   public init(
@@ -29,6 +31,7 @@ public struct ScrollView<Content: View>: View, ResolvableView {
     self.axes = axes
     self.showsIndicators = showsIndicators
     explicitPosition = position
+    authoringScope = makeDeferredAuthoringContext()
     self.content = content()
   }
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -184,7 +187,9 @@ public struct ScrollView<Content: View>: View, ResolvableView {
           horizontalScrollIndicatorIdentity(for: context.identity)
         )
       }
-      let child = content.resolve(in: context.child(component: .named("ScrollContent")))
+      let child = withAuthoringContext(authoringScope) {
+        content.resolve(in: context.child(component: .named("ScrollContent")))
+      }
       let indicatorFocusStyle =
         showsFocusEffect && !focusedIndicatorAxes.isEmpty
         ? styleEnvironment.controlChrome(

@@ -11,11 +11,10 @@ package struct DeferredViewPayload: Sendable {
     @ViewBuilder content: @escaping @MainActor () -> V
   ) {
     // Deferred payloads are resolved in a different part of the tree (e.g.
-    // a presentation overlay).  Freeze the ordinal tracker so that @State
-    // accessed through closures (e.g. button actions) still resolves via
-    // its cached ordinal, but NEW first-time ordinal claims fall back to
-    // local storage instead of claiming slots on the capture-site ViewNode.
-    authoringContext?.ordinalTracker.freeze()
+    // a presentation overlay). Preserve the original owner identity and
+    // ViewNode, but isolate future first-time ordinal claims from the
+    // capture-site tracker.
+    let authoringContext = makeDeferredAuthoringContext(from: authoringContext)
     let builder = ScopedBuilder(
       authoringContext: authoringContext,
       content: content
