@@ -1,5 +1,7 @@
+import Foundation
 import Testing
 import swift_figlet
+import swift_figlet_embedded_fonts
 
 private let repositoryRoot = "/" + #filePath.split(separator: "/").dropLast(3).joined(separator: "/")
 private let testDirectory = "/" + #filePath.split(separator: "/").dropLast().joined(separator: "/")
@@ -39,8 +41,36 @@ private let bundledFontsDirectory = repositoryRoot + "/Sources/swift-figlet/Reso
     #expect(output == "0")
 }
 
+@Test func loadsFontsFromFontLibraryObjects() throws {
+    let fontData = try String(contentsOfFile: testDirectory + "/Fixtures/TestOnly.flf", encoding: .utf8)
+    let fontLibrary = FigletFontLibrary(
+        name: "Test Fixtures",
+        fontData: ["TestOnly": fontData]
+    )
+
+    let figlet = try Figlet(fontNamed: "TestOnly", fontLibrary: fontLibrary)
+    let output = try figlet.render("0").strippingSurroundingNewlines()
+
+    #expect(output == "0")
+}
+
+@Test func rendersEmbeddedStandardFontLibrary() throws {
+    let figlet = try Figlet(fontNamed: "standard", fontLibrary: SwiftFigletEmbeddedFonts.library)
+    let output = try figlet.render("Hi").description
+
+    #expect(output == " _   _ _ \n| | | (_)\n| |_| | |\n|  _  | |\n|_| |_|_|\n         \n")
+}
+
 @Test func listsBundledFonts() {
     let fonts = FigletFont.availableFontNames(in: [bundledFontsDirectory])
+    #expect(fonts.contains("slant"))
+    #expect(fonts.contains("standard"))
+    #expect(fonts.contains("banner"))
+    #expect(fonts.contains("mono9"))
+}
+
+@Test func listsEmbeddedFonts() {
+    let fonts = Figlet.availableFonts(fontLibraries: [SwiftFigletEmbeddedFonts.library])
     #expect(fonts.contains("slant"))
     #expect(fonts.contains("standard"))
     #expect(fonts.contains("banner"))

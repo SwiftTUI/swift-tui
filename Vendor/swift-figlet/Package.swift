@@ -24,9 +24,17 @@ let package = Package(
             name: "swift-figlet",
             targets: ["swift-figlet"]
         ),
+        .library(
+            name: "swift-figlet-embedded-fonts",
+            targets: ["swift-figlet-embedded-fonts"]
+        ),
         .executable(
             name: "figlet",
             targets: ["figlet"]
+        ),
+        .executable(
+            name: "figlet-embedded",
+            targets: ["figlet-embedded"]
         )
     ],
     targets: [
@@ -37,9 +45,22 @@ let package = Package(
             ],
             swiftSettings: swiftSettings()
         ),
+        .target(
+            name: "swift-figlet-embedded-fonts",
+            dependencies: ["swift-figlet"],
+            swiftSettings: swiftSettings()
+        ),
+        .target(
+            name: "figlet-cli",
+            dependencies: ["swift-figlet"],
+            swiftSettings: swiftSettings()
+        ),
         .testTarget(
             name: "swift-figletTests",
-            dependencies: ["swift-figlet"],
+            dependencies: [
+                "swift-figlet",
+                "swift-figlet-embedded-fonts",
+            ],
             exclude: [
                 "Fixtures",
             ],
@@ -47,7 +68,15 @@ let package = Package(
         ),
         .executableTarget(
             name: "figlet",
-            dependencies: ["swift-figlet"],
+            dependencies: ["figlet-cli"],
+            swiftSettings: swiftSettings()
+        ),
+        .executableTarget(
+            name: "figlet-embedded",
+            dependencies: [
+                "figlet-cli",
+                "swift-figlet-embedded-fonts",
+            ],
             swiftSettings: swiftSettings()
         ),
     ],
