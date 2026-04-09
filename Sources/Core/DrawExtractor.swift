@@ -179,6 +179,14 @@ extension DrawExtractor {
           wrappingStrategy: layoutMetadata.textWrappingStrategy ?? .wordBoundary
         )
       )
+    case .textFigure(let payload):
+      commands.append(
+        .preformattedText(
+          bounds: bounds,
+          lines: TextFigureSupport.render(payload, boundsWidth: bounds.size.width).lines,
+          style: textStyle(from: drawMetadata)
+        )
+      )
     case .richText(let payload):
       commands.append(
         .richText(

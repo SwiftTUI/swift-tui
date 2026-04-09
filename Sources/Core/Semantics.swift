@@ -245,6 +245,8 @@ extension SemanticExtractor {
     nextHitTestOrder: inout Int
   ) {
     switch node.drawPayload {
+    case .textFigure:
+      break
     case .richText(let payload):
       appendRichTextSemantics(
         for: node,

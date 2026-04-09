@@ -558,6 +558,14 @@ extension LayoutEngine {
 
     switch node.layoutBehavior {
     case .intrinsic:
+      if case .textFigure(let payload) = node.drawPayload {
+        if axis == .horizontal {
+          return TextFigureSupport.layoutMetrics(for: payload).minimumWidth
+        }
+        if !payload.content.isEmpty {
+          return min(1, mainDimension(of: idealMeasurement.measuredSize, for: axis))
+        }
+      }
       if case .text(let content) = node.drawPayload,
         axis == .vertical,
         !content.isEmpty

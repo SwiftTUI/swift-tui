@@ -26,6 +26,7 @@ let packagePlatforms: [SupportedPlatform]? = {
 
 let packageDependencies: [Package.Dependency] = [
   .package(path: "Vendor/UnixSignals"),
+  .package(path: "Vendor/swift-figlet"),
   .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.6"),
   .package(
     url: "https://github.com/apple/swift-collections.git",
@@ -99,6 +100,8 @@ let package = Package(
         .product(name: "DequeModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+        .product(name: "swift-figlet", package: "swift-figlet"),
+        .product(name: "swift-figlet-embedded-fonts", package: "swift-figlet"),
       ],
       swiftSettings: swiftSettings()
     ),

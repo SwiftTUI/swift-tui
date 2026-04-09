@@ -17,6 +17,8 @@ struct ColorGallery: View {
     ScrollView {
       EnvironmentReader(\.terminalAppearance) { appearance in
         VStack(alignment: .leading, spacing: 1) {
+          TextFigure("Gallery", font: "this")
+            .foregroundStyle(Color.black)
           terminalPaletteSection(palette: appearance.palette)
           namedColorsSection
           semanticRolesSection

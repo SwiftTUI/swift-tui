@@ -119,6 +119,33 @@ struct CollectionSupportTests {
     #expect(resolvedNodeLabelText(from: node) == "Alpha Docs Beta")
   }
 
+  @Test("collection text extraction uses TextFigure source text instead of banner output")
+  func collectionTextExtractionUsesTextFigureSourceText() {
+    let node = ResolvedNode(
+      identity: testIdentity("FigureRow"),
+      kind: .view("Group"),
+      children: [
+        .init(
+          identity: testIdentity("FigureRow", "0"),
+          kind: .view("TextFigure"),
+          drawPayload: .textFigure(
+            .init(
+              content: "Alpha",
+              font: "standard"
+            )
+          )
+        ),
+        .init(
+          identity: testIdentity("FigureRow", "1"),
+          kind: .view("Text"),
+          drawPayload: .text("Beta")
+        ),
+      ]
+    )
+
+    #expect(resolvedNodeLabelText(from: node) == "Alpha Beta")
+  }
+
   @Test("table row cell payloads preserve per-cell text and merged row styling")
   func tableRowCellPayloadsPreserveMergedCellStyling() {
     let row = ResolvedNode(

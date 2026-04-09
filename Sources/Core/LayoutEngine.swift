@@ -557,6 +557,11 @@ public struct LayoutEngine: Sendable {
           metadata: resolved.layoutMetadata,
           proposal: proposal
         )
+      case .textFigure(let payload):
+        return measuredTextFigureSize(
+          for: payload,
+          proposal: proposal
+        )
       case .richText(let payload):
         return measuredTextSize(
           for: payload.visibleText,
@@ -888,6 +893,16 @@ public struct LayoutEngine: Sendable {
       truncationMode: metadata.textTruncationMode ?? .tail,
       wrappingStrategy: metadata.textWrappingStrategy ?? .wordBoundary
     ).size
+  }
+
+  private func measuredTextFigureSize(
+    for payload: TextFigurePayload,
+    proposal: ProposedSize
+  ) -> Size {
+    TextFigureSupport.measuredSize(
+      for: payload,
+      proposal: proposal
+    )
   }
 
   private func measuredRuleSize(

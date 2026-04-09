@@ -213,7 +213,7 @@ extension LayoutEngine {
 
     let textAwareDimensions =
       switch resolved.drawPayload {
-      case .text, .richText:
+      case .text, .textFigure, .richText:
         baseDimensions.overridingVerticalGuides { alignment in
           switch alignment {
           case .firstTextBaseline:

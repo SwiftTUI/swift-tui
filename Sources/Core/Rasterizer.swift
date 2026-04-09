@@ -257,6 +257,44 @@ extension Rasterizer {
             }
           }
         }
+      case .preformattedText(
+        let bounds,
+        let lines,
+        let style
+      ):
+        guard bounds.size.height > 0, bounds.size.width > 0 else {
+          continue
+        }
+
+        for (lineIndex, line) in lines.prefix(bounds.size.height).enumerated() {
+          let clusters = layoutText(for: line, width: nil).lines.first?.clusters ?? []
+          var x = bounds.origin.x
+          for cluster in clusters {
+            guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
+              break
+            }
+
+            let resolvedStyle = resolveTextStyle(
+              style,
+              environment: environment,
+              bounds: bounds,
+              sampleX: x,
+              sampleY: bounds.origin.y + lineIndex,
+              width: cluster.cellWidth
+            )
+
+            write(
+              cluster.character,
+              width: cluster.cellWidth,
+              style: resolvedStyle.isDefault ? nil : resolvedStyle,
+              atX: x,
+              y: bounds.origin.y + lineIndex,
+              cells: &cells,
+              clip: frame.clip
+            )
+            x += cluster.cellWidth
+          }
+        }
       case .richText(
         let bounds,
         let payload,

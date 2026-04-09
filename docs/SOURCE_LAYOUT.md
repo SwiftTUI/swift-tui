@@ -98,7 +98,7 @@ library product. Downstream package consumers reach those types through
 ## `Core`
 
 - `GeometryTypes.swift`, `EnvironmentAndNodeTypes.swift`, and `LayoutTypes.swift`: geometry, proposals, placement, layout metadata, and node infrastructure
-- `RenderTreeAndSemanticsTypes.swift`: resolved-tree, semantic snapshot, and draw-tree data types
+- `RenderTreeAndSemanticsTypes.swift`: resolved-tree, semantic snapshot, and draw-tree data types, including `TextFigure` draw payload support
 - `CommitAndFrameTypes.swift`: commit plans, diagnostics, retained resolve frames, and frame artifacts
 - `NodeMetadata.swift`: grouped node metadata used by measurement and refactor follow-up work
 - `LayoutEngine.swift` plus `LayoutEngine+Alignment.swift`, `LayoutEngine+List.swift`, `LayoutEngine+Placement.swift`, `LayoutEngine+Stack.swift`, `LayoutEngine+Table.swift`, and `LayoutEngine+Utility.swift`: decomposed measurement and placement engine
@@ -109,6 +109,7 @@ library product. Downstream package consumers reach those types through
 - `CommitPlanner.swift`: lifecycle diffing and commit packaging
 - `Scheduler.swift`: invalidation and wake scheduling
 - `StateContainer.swift`: runtime-owned state storage
+- `TextFigureSupport.swift`: embedded-FIGlet font lookup, layout metrics, caching, and rendering support used by proposal-aware figure text
 - `FocusTracker.swift`, `FocusPolicy.swift`, `FocusInteractionTypes.swift`, and `FocusedValues.swift`: focus state and focus-value transport
 - `PreferenceValues.swift`: preference storage
 - `SemanticRoleTypes.swift` and `BuiltinPointerRoutes.swift`: closed semantic roles and structured pointer routes
@@ -126,7 +127,7 @@ library product. Downstream package consumers reach those types through
 - `Environment/Environment.swift`, `Environment/ImageEnvironment.swift`, `Environment/Observation.swift`, and `Environment/StyleEnvironment.swift`: environment storage, repo-owned `@Bindable`, image resource roots, and style environment plumbing
 - `Focus/DefaultFocus.swift`: default-focus modifiers and focus defaults
 - `Layout/Layout.swift`, `Stacks/*.swift`, `ScrollView/*.swift`, `GeometryReading/*.swift`, `Collections/*.swift`, and `NavigationViews/*.swift`: layout, stack, scroll, geometry, collection, and navigation surfaces
-- `Primitives/*.swift` and `Shapes/*.swift`: text/image primitives, labeled containers, tile backgrounds, and basic shapes
+- `Primitives/*.swift` and `Shapes/*.swift`: text/image primitives including `TextFigure`, labeled containers, tile backgrounds, and basic shapes
 - `Controls/*.swift`: control surfaces, rendering helpers, and shared control support
 - `Presentation/PresentationCoordinator.swift`, `Presentation/PresentationModifiers.swift`, and `Presentation/CommandPalette.swift`: shared presentation host, family coordinators, package-only declaration reconciliation, built-in alert/confirmation-dialog/sheet/toast surfaces, command registration, and the canonical command-palette surface
 - `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifiers and the package-only wrapper views that back them
