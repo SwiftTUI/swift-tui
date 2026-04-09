@@ -180,19 +180,19 @@ private func webTUIDefaultRenderStyle() -> TerminalRenderStyle {
       colorSchemeContrast: .increased,
       source: .override
     ),
-      theme: .init(
-        foreground: .hex("#eceff4"),
-        background: .hex("#1e222a"),
-        tint: .hex("#56b6c2"),
-        separator: .hex("#8c92ac"),
-        selection: .hex("#2e3440"),
-        placeholder: .hex("#8c92ac"),
-        link: .hex("#5ba3ff"),
-        fill: .hex("#2b303b"),
-        windowBackground: .hex("#1e222a"),
-        success: .hex("#61c67b"),
-        warning: .hex("#ebb33c"),
-        danger: .hex("#e05757"),
+    theme: .init(
+      foreground: .hex("#eceff4"),
+      background: .hex("#1e222a"),
+      tint: .hex("#56b6c2"),
+      separator: .hex("#8c92ac"),
+      selection: .hex("#2e3440"),
+      placeholder: .hex("#8c92ac"),
+      link: .hex("#5ba3ff"),
+      fill: .hex("#2b303b"),
+      windowBackground: .hex("#1e222a"),
+      success: .hex("#61c67b"),
+      warning: .hex("#ebb33c"),
+      danger: .hex("#e05757"),
       info: .hex("#56b6c2"),
       muted: .hex("#8c92ac")
     )

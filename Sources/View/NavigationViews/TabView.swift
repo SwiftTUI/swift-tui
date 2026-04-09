@@ -289,9 +289,7 @@ extension TabView {
   ) -> some View {
     let width = tabLabelCellWidth(label)
     let glyph: Character =
-      if isSelected && isFocused { "▄" }
-      else if isSelected || isFocused { "▂" }
-      else { "▁" }
+      if isSelected && isFocused { "▄" } else if isSelected || isFocused { "▂" } else { "▁" }
     let foreground: AnyShapeStyle =
       isSelected
       ? AnyShapeStyle(.terminalAccent(tone))
@@ -335,9 +333,7 @@ extension TabView {
   ) -> some View {
     let width = tabLabelCellWidth(label)
     let glyph: Character =
-      if isSelected && isFocused { "▄" }
-      else if isSelected || isFocused { "▂" }
-      else { "▁" }
+      if isSelected && isFocused { "▄" } else if isSelected || isFocused { "▂" } else { "▁" }
     let text =
       if isSelected {
         "╰" + String(repeating: glyph, count: width) + "╯"

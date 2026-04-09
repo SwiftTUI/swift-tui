@@ -13,7 +13,7 @@ let package = Package(
     .library(
       name: "SwiftUITUIGUI",
       targets: ["SwiftUITUIGUI"]
-    ),
+    )
   ],
   dependencies: [
     .package(path: "../.."),

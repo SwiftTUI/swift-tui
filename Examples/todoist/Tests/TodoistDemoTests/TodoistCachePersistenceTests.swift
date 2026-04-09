@@ -11,34 +11,36 @@ struct TodoistCachePersistenceTests {
     let dbQueue = try DatabaseQueue(path: ":memory:")
 
     try dbQueue.write { db in
-      try db.execute(sql: """
-        CREATE TABLE projects (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          is_favorite BOOLEAN NOT NULL DEFAULT 0,
-          is_inbox_project BOOLEAN NOT NULL DEFAULT 0,
-          is_archived BOOLEAN NOT NULL DEFAULT 0,
-          is_deleted BOOLEAN NOT NULL DEFAULT 0,
-          child_order INTEGER,
-          color_name TEXT,
-          updated_at TEXT
-        )
-        """)
+      try db.execute(
+        sql: """
+          CREATE TABLE projects (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            is_favorite BOOLEAN NOT NULL DEFAULT 0,
+            is_inbox_project BOOLEAN NOT NULL DEFAULT 0,
+            is_archived BOOLEAN NOT NULL DEFAULT 0,
+            is_deleted BOOLEAN NOT NULL DEFAULT 0,
+            child_order INTEGER,
+            color_name TEXT,
+            updated_at TEXT
+          )
+          """)
 
-      try db.execute(sql: """
-        CREATE TABLE tasks (
-          id TEXT PRIMARY KEY,
-          project_id TEXT,
-          content TEXT NOT NULL,
-          details_text TEXT,
-          priority INTEGER,
-          checked BOOLEAN NOT NULL DEFAULT 0,
-          is_deleted BOOLEAN NOT NULL DEFAULT 0,
-          child_order INTEGER,
-          due_text TEXT,
-          updated_at TEXT
-        )
-        """)
+      try db.execute(
+        sql: """
+          CREATE TABLE tasks (
+            id TEXT PRIMARY KEY,
+            project_id TEXT,
+            content TEXT NOT NULL,
+            details_text TEXT,
+            priority INTEGER,
+            checked BOOLEAN NOT NULL DEFAULT 0,
+            is_deleted BOOLEAN NOT NULL DEFAULT 0,
+            child_order INTEGER,
+            due_text TEXT,
+            updated_at TEXT
+          )
+          """)
 
       try CachedProject(
         id: "project-1",

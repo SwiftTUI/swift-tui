@@ -57,10 +57,12 @@ public struct Animation: Equatable, Hashable, Sendable {
     duration: Duration = .milliseconds(500),
     bounce: Double = 0.0
   ) -> Animation {
-    Animation(curve: .spring(.init(
-      duration: durationSeconds(duration),
-      bounce: bounce
-    )))
+    Animation(
+      curve: .spring(
+        .init(
+          duration: durationSeconds(duration),
+          bounce: bounce
+        )))
   }
 
   public static var smooth: Animation { spring(bounce: 0.0) }
@@ -94,9 +96,11 @@ public struct Animation: Equatable, Hashable, Sendable {
     damping: Double,
     initialVelocity: Double = 0.0
   ) -> Animation {
-    Animation(curve: .spring(.init(
-      mass: mass, stiffness: stiffness, damping: damping
-    )))
+    Animation(
+      curve: .spring(
+        .init(
+          mass: mass, stiffness: stiffness, damping: damping
+        )))
   }
 
   // MARK: - Custom

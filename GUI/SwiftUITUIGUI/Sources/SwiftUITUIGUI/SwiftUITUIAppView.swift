@@ -1,6 +1,6 @@
 import GhosttyTerminal
-import TerminalUI
 import SwiftUI
+import TerminalUI
 
 public struct SwiftUITUIAppView<A: TerminalUI.App>: SwiftUI.View {
   private let state: SwiftUITUIAppState<A>
@@ -45,47 +45,47 @@ private struct TerminalSurfaceHost: SwiftUI.View {
 }
 
 #if canImport(AppKit) && !targetEnvironment(macCatalyst)
-@available(macOS 14.0, *)
-private struct TerminalSurfaceRepresentable: NSViewRepresentable {
-  let context: TerminalViewState
+  @available(macOS 14.0, *)
+  private struct TerminalSurfaceRepresentable: NSViewRepresentable {
+    let context: TerminalViewState
 
-  func makeNSView(context _: Context) -> TerminalView {
-    let view = TerminalView(frame: .zero)
-    configure(view)
-    return view
-  }
+    func makeNSView(context _: Context) -> TerminalView {
+      let view = TerminalView(frame: .zero)
+      configure(view)
+      return view
+    }
 
-  func updateNSView(_ view: TerminalView, context _: Context) {
-    configure(view)
-  }
+    func updateNSView(_ view: TerminalView, context _: Context) {
+      configure(view)
+    }
 
-  private func configure(_ view: TerminalView) {
-    view.delegate = context
-    view.controller = context.controller
-    view.configuration = context.configuration
+    private func configure(_ view: TerminalView) {
+      view.delegate = context
+      view.controller = context.controller
+      view.configuration = context.configuration
+    }
   }
-}
 #elseif canImport(UIKit)
-@available(iOS 17.0, macCatalyst 17.0, *)
-private struct TerminalSurfaceRepresentable: UIViewRepresentable {
-  let context: TerminalViewState
+  @available(iOS 17.0, macCatalyst 17.0, *)
+  private struct TerminalSurfaceRepresentable: UIViewRepresentable {
+    let context: TerminalViewState
 
-  func makeUIView(context _: Context) -> TerminalView {
-    let view = TerminalView(frame: .zero)
-    configure(view)
-    return view
-  }
+    func makeUIView(context _: Context) -> TerminalView {
+      let view = TerminalView(frame: .zero)
+      configure(view)
+      return view
+    }
 
-  func updateUIView(_ view: TerminalView, context _: Context) {
-    configure(view)
-  }
+    func updateUIView(_ view: TerminalView, context _: Context) {
+      configure(view)
+    }
 
-  private func configure(_ view: TerminalView) {
-    view.delegate = context
-    view.controller = context.controller
-    view.configuration = context.configuration
+    private func configure(_ view: TerminalView) {
+      view.delegate = context
+      view.controller = context.controller
+      view.configuration = context.configuration
+    }
   }
-}
 #endif
 
 private struct SceneSwitcherBar: SwiftUI.View {

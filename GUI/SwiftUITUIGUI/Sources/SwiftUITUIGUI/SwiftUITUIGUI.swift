@@ -1,3 +1,3 @@
-@_exported import TerminalUI
 import GhosttyTerminal
 import SwiftUI
+@_exported import TerminalUI

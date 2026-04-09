@@ -1,6 +1,6 @@
 @_exported import Core
 @_exported import View
-@_exported import swift_figlet_embedded_fonts
+@_exported import EmbeddedFonts
 
 @MainActor
 private final class RetainedFrameStore {

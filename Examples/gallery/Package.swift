@@ -12,7 +12,7 @@ let package = Package(
     .executable(
       name: "gallery-demo",
       targets: ["GalleryDemo"]
-    ),
+    )
   ],
   dependencies: [
     .package(path: "../.."),
@@ -28,6 +28,6 @@ let package = Package(
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
         .product(name: "Algorithms", package: "swift-algorithms"),
       ]
-    ),
+    )
   ]
 )

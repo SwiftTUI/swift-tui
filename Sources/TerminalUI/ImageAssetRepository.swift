@@ -21,7 +21,9 @@ struct RGBAImagePixel: Equatable, Hashable, Sendable {
   var alpha: Int
 
   var color: Color {
-    Color(red: Double(red)/255.0, green: Double(green)/255.0, blue: Double(blue)/255.0, alpha: Double(alpha)/255.0)
+    Color(
+      red: Double(red) / 255.0, green: Double(green) / 255.0, blue: Double(blue) / 255.0,
+      alpha: Double(alpha) / 255.0)
   }
 
   init(
@@ -36,18 +38,18 @@ struct RGBAImagePixel: Equatable, Hashable, Sendable {
     self.alpha = min(255, max(0, alpha))
   }
 
-#if canImport(PNG)
-  init(
-    _ pixel: PNG.RGBA<UInt8>
-  ) {
-    self.init(
-      red: Int(pixel.r),
-      green: Int(pixel.g),
-      blue: Int(pixel.b),
-      alpha: Int(pixel.a)
-    )
-  }
-#endif
+  #if canImport(PNG)
+    init(
+      _ pixel: PNG.RGBA<UInt8>
+    ) {
+      self.init(
+        red: Int(pixel.r),
+        green: Int(pixel.g),
+        blue: Int(pixel.b),
+        alpha: Int(pixel.a)
+      )
+    }
+  #endif
 }
 
 struct DecodedPNGImage: Sendable {
@@ -80,26 +82,26 @@ extension ImageLookupKey: Hashable {
 
 #if canImport(PNG)
   private struct InMemoryPNGSource: PNG.BytestreamSource {
-  private let buffer: [UInt8]
-  private var index = 0
+    private let buffer: [UInt8]
+    private var index = 0
 
-  init(
-    _ buffer: [UInt8]
-  ) {
-    self.buffer = buffer
-  }
-
-  mutating func read(
-    count: Int
-  ) -> [UInt8]? {
-    guard count >= 0, index + count <= buffer.count else {
-      return nil
+    init(
+      _ buffer: [UInt8]
+    ) {
+      self.buffer = buffer
     }
-    let chunk = Array(buffer[index..<(index + count)])
-    index += count
-    return chunk
+
+    mutating func read(
+      count: Int
+    ) -> [UInt8]? {
+      guard count >= 0, index + count <= buffer.count else {
+        return nil
+      }
+      let chunk = Array(buffer[index..<(index + count)])
+      index += count
+      return chunk
+    }
   }
-}
 #endif
 
 final class ImageAssetRepository: Sendable {
@@ -199,38 +201,38 @@ final class ImageAssetRepository: Sendable {
   private func loadDecodedImage(
     for reference: ImageAssetReference
   ) -> DecodedPNGImage? {
-#if canImport(PNG)
-    switch reference {
-    case .namedResource:
+    #if canImport(PNG)
+      switch reference {
+      case .namedResource:
+        return nil
+      case .filePath(let path):
+        guard let pngBytes = readFileBytes(at: path) else {
+          return nil
+        }
+        var source = InMemoryPNGSource(pngBytes)
+        guard let image = try? PNG.Image.decompress(stream: &source) else {
+          return nil
+        }
+        return DecodedPNGImage(
+          pngBytes: pngBytes,
+          pixelSize: .init(width: image.size.x, height: image.size.y),
+          pixels: image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
+        )
+      case .embeddedPNG(let bytes):
+        var source = InMemoryPNGSource(bytes)
+        guard let image = try? PNG.Image.decompress(stream: &source) else {
+          return nil
+        }
+        return DecodedPNGImage(
+          pngBytes: bytes,
+          pixelSize: .init(width: image.size.x, height: image.size.y),
+          pixels: image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
+        )
+      }
+    #else
+      _ = reference
       return nil
-    case .filePath(let path):
-      guard let pngBytes = readFileBytes(at: path) else {
-        return nil
-      }
-      var source = InMemoryPNGSource(pngBytes)
-      guard let image = try? PNG.Image.decompress(stream: &source) else {
-        return nil
-      }
-      return DecodedPNGImage(
-        pngBytes: pngBytes,
-        pixelSize: .init(width: image.size.x, height: image.size.y),
-        pixels: image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
-      )
-    case .embeddedPNG(let bytes):
-      var source = InMemoryPNGSource(bytes)
-      guard let image = try? PNG.Image.decompress(stream: &source) else {
-        return nil
-      }
-      return DecodedPNGImage(
-        pngBytes: bytes,
-        pixelSize: .init(width: image.size.x, height: image.size.y),
-        pixels: image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
-      )
-    }
-#else
-    _ = reference
-    return nil
-#endif
+    #endif
   }
 
   private func intrinsicCellSize(

@@ -12,7 +12,7 @@ let package = Package(
     .executable(
       name: "scroll-diagnostic",
       targets: ["ScrollDiagnostic"]
-    ),
+    )
   ],
   dependencies: [
     .package(path: "../.."),
@@ -26,6 +26,6 @@ let package = Package(
         .product(name: "TerminalUICLI", package: "TerminalUICLI"),
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
       ]
-    ),
+    )
   ]
 )
