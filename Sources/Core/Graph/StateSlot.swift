@@ -31,6 +31,22 @@ package struct AnyStateSlot {
     )
   }
 
+  package func stores<T>(_ type: T.Type) -> Bool {
+    guard case .value(_, let valueType, _) = storage else {
+      return false
+    }
+    return valueType == T.self
+  }
+
+  package var storedTypeDescription: String {
+    switch storage {
+    case .uninitialized:
+      return "uninitialized"
+    case .value(_, let valueType, _):
+      return String(reflecting: valueType)
+    }
+  }
+
   package func value<T>(as type: T.Type) -> T {
     guard case .value(let value, let valueType, _) = storage else {
       fatalError("State slot accessed before initialization.")

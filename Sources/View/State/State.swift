@@ -31,6 +31,27 @@ package func makeAuthoringContext(
 }
 
 @MainActor
+package func dynamicPropertyAuthoringContext(
+  for context: ResolveContext,
+  current: AuthoringContext? = currentAuthoringContext(),
+  viewNode: Core.ViewNode? = ViewNodeContext.current
+) -> AuthoringContext {
+  if let current, current.viewNode === viewNode {
+    return AuthoringContext(
+      viewIdentity: context.identity,
+      focusedValues: context.focusedValues,
+      viewNode: viewNode,
+      ordinalTracker: current.ordinalTracker
+    )
+  }
+
+  return makeAuthoringContext(
+    for: context,
+    viewNode: viewNode
+  )
+}
+
+@MainActor
 package func makeDeferredAuthoringContext(
   from context: AuthoringContext? = currentAuthoringContext()
 ) -> AuthoringContext? {
