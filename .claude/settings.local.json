@@ -36,7 +36,19 @@
       "Bash(awk '{:*)",
       "Bash(awk '/^ \\\\\\(type \\\\$/{:*)",
       "Bash(wasm-dis /Users/adamz/Developer/repos/swift-terminal-ui/Examples/WebExample/TerminalApp/dist/assets/app.wasm)",
-      "Bash(awk '/^ \\\\\\(type \\\\$/{n=gsub\\(/i32/,\"\"\\);n+=gsub\\(/i64/,\"\"\\);n+=gsub\\(/f32/,\"\"\\);n+=gsub\\(/f64/,\"\"\\);print n}')"
+      "Bash(awk '/^ \\\\\\(type \\\\$/{n=gsub\\(/i32/,\"\"\\);n+=gsub\\(/i64/,\"\"\\);n+=gsub\\(/f32/,\"\"\\);n+=gsub\\(/f64/,\"\"\\);print n}')",
+      "Bash(git -c commit.gpgsign=false commit -m \"docs: spec for interactive gallery rewrite\")",
+      "Bash(git -c commit.gpgsign=false commit -m \"docs: implementation plan for gallery rewrite\")",
+      "Bash(swiftly run:*)",
+      "Bash(git -c commit.gpgsign=false commit -m \"feat\\(gallery\\): counter tab with branding header and step slider\")",
+      "Bash(git -c commit.gpgsign=false commit -m \"feat\\(gallery\\): todo model types and seed items\")",
+      "Bash(git -c commit.gpgsign=false commit -m \"feat\\(gallery\\): todo tab list, filter, delete, clear\")",
+      "Bash(git -c commit.gpgsign=false commit -m \"feat\\(gallery\\): todo tab sheet-based task intake\")",
+      "Bash(git -c commit.gpgsign=false commit -m \"feat\\(gallery\\): calculator tab with four-function state machine\")",
+      "Bash(git -c commit.gpgsign=false commit -m \"chore\\(gallery\\): drop unused swift-algorithms dep\")",
+      "Bash(timeout 2 swift run --package-path Examples/gallery gallery-demo)",
+      "Bash(echo \"---exit: $?\")",
+      "Bash(swift run:*)"
     ]
   }
 }

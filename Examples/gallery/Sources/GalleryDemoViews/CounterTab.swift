@@ -3,6 +3,7 @@ import TerminalUI
 struct CounterTab: View {
   @State private var count: Int = 0
   @State private var step: Int = 1
+  @State private var color: Color = .red
 
   var body: some View {
     VStack(alignment: .center, spacing: 1) {
@@ -12,16 +13,24 @@ struct CounterTab: View {
       countDisplay
       Spacer(minLength: 1)
       controls
-      stepSlider
+      Slider("Step", value: $step, in: 1...9, step: 1)
       Spacer(minLength: 0)
     }
     .padding(1)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .onChange(
+      of: count,
+      {
+        withAnimation {
+          color = color.rotatedHue(by: 30)
+        }
+      })
   }
 
   private var brandingHeader: some View {
     VStack(alignment: .center, spacing: 0) {
-      TextFigure("TerminalUI", font: .small)
+      TextFigure("TerminalUI", font: .future)
+        .foregroundStyle(color)
       Text("A SwiftUI-shaped terminal UI")
         .foregroundStyle(.separator)
     }
@@ -29,8 +38,7 @@ struct CounterTab: View {
   }
 
   private var countDisplay: some View {
-    Text("\(count)")
-      .bold()
+    TextFigure("\(count)", font: .smMono9)
       .frame(maxWidth: .infinity, alignment: .center)
   }
 
@@ -53,15 +61,5 @@ struct CounterTab: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .center)
-  }
-
-  private var stepSlider: some View {
-    HStack(spacing: 1) {
-      Text("Step")
-        .foregroundStyle(.separator)
-      Slider("Step", value: $step, in: 1...10, step: 1)
-      Text("\(step)")
-    }
-    .padding(.horizontal, 2)
   }
 }

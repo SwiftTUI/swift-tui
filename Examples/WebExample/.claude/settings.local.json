@@ -6,7 +6,11 @@
       "Bash(ls /Users/adamz/Developer/repos/swift-terminal-ui/Tests/CoreTests/*.swift)",
       "Bash(ls /Users/adamz/Developer/repos/swift-terminal-ui/Tests/ViewTests/*.swift)",
       "Bash(grep -l \"Renderer\\\\|renderFrame\\\\|LayoutEngine\" /Users/adamz/Developer/repos/swift-terminal-ui/Tests/TerminalUITests/*.swift)",
-      "Bash(grep -l \"DefaultRenderer\\\\|Renderer\\(\" /Users/adamz/Developer/repos/swift-terminal-ui/Tests/TerminalUITests/*.swift)"
+      "Bash(grep -l \"DefaultRenderer\\\\|Renderer\\(\" /Users/adamz/Developer/repos/swift-terminal-ui/Tests/TerminalUITests/*.swift)",
+      "Skill(nothing-design)",
+      "Bash(bun build:*)",
+      "Bash(bunx tsc:*)",
+      "Bash(bun test:*)"
     ]
   }
 }
