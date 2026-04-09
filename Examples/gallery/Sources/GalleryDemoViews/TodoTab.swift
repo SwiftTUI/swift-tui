@@ -1,8 +1,13 @@
+import Foundation
 import TerminalUI
 
 struct TodoTab: View {
   @State private var items: [TodoItem] = TodoItem.seeds
   @State private var filter: TodoFilter = .all
+  @State private var isPresentingNew: Bool = false
+  @State private var draftTitle: String = ""
+  @State private var draftPriority: TodoPriority = .normal
+  @FocusState private var titleFocused: Bool
 
   private var visibleItems: [TodoItem] {
     items.filter(filter.matches)
@@ -10,6 +15,10 @@ struct TodoTab: View {
 
   private var remaining: Int {
     items.filter { !$0.done }.count
+  }
+
+  private var canAddDraft: Bool {
+    !draftTitle.trimmingCharacters(in: .whitespaces).isEmpty
   }
 
   var body: some View {
@@ -22,6 +31,9 @@ struct TodoTab: View {
     }
     .padding(1)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .sheet("New task", isPresented: $isPresentingNew) {
+      newTaskSheetBody
+    }
   }
 
   private var header: some View {
@@ -57,13 +69,57 @@ struct TodoTab: View {
 
   private var footer: some View {
     HStack(spacing: 2) {
-      // Placeholder — replaced with "New task" button in Task 5.
-      Text(" ")
+      Button("+ New task") {
+        draftTitle = ""
+        draftPriority = .normal
+        isPresentingNew = true
+        titleFocused = true
+      }
       Spacer()
       Button("Clear ✓") {
         items.removeAll { $0.done }
       }
     }
+  }
+
+  private var newTaskSheetBody: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Title").foregroundStyle(.separator)
+      TextField("What needs doing?", text: $draftTitle)
+        .focused($titleFocused)
+
+      Text("Priority").foregroundStyle(.separator)
+      Picker("Priority", selection: $draftPriority) {
+        ForEach(TodoPriority.allCases) { option in
+          Text(option.label).tag(option)
+        }
+      }
+
+      Spacer(minLength: 1)
+
+      HStack(spacing: 2) {
+        Spacer()
+        Button("Cancel", role: .cancel) {
+          isPresentingNew = false
+        }
+        Button("Add") {
+          addDraft()
+        }
+        .disabled(!canAddDraft)
+      }
+    }
+    .padding(1)
+  }
+
+  private func addDraft() {
+    let trimmed = draftTitle.trimmingCharacters(in: .whitespaces)
+    guard !trimmed.isEmpty else { return }
+    items.append(
+      TodoItem(title: trimmed, priority: draftPriority)
+    )
+    draftTitle = ""
+    draftPriority = .normal
+    isPresentingNew = false
   }
 
   private func doneBinding(for item: TodoItem) -> Binding<Bool> {
