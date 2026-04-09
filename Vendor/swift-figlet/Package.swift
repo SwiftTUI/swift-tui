@@ -21,45 +21,33 @@ let package = Package(
     name: "swift-figlet",
     products: [
         .library(
-            name: "swift-figlet",
-            targets: ["swift-figlet"]
+            name: "SwiftFiglet",
+            targets: ["SwiftFiglet"]
         ),
         .library(
-            name: "swift-figlet-embedded-fonts",
-            targets: ["swift-figlet-embedded-fonts"]
+            name: "EmbeddedFonts",
+            targets: ["EmbeddedFonts"]
         ),
         .executable(
             name: "figlet",
             targets: ["figlet"]
-        ),
-        .executable(
-            name: "figlet-embedded",
-            targets: ["figlet-embedded"]
         )
     ],
     targets: [
         .target(
-            name: "swift-figlet",
-            resources: [
-                .process("Resources"),
-            ],
+            name: "SwiftFiglet",
             swiftSettings: swiftSettings()
         ),
         .target(
-            name: "swift-figlet-embedded-fonts",
-            dependencies: ["swift-figlet"],
-            swiftSettings: swiftSettings()
-        ),
-        .target(
-            name: "figlet-cli",
-            dependencies: ["swift-figlet"],
+            name: "EmbeddedFonts",
+            dependencies: ["SwiftFiglet"],
             swiftSettings: swiftSettings()
         ),
         .testTarget(
-            name: "swift-figletTests",
+            name: "SwiftFigletTests",
             dependencies: [
-                "swift-figlet",
-                "swift-figlet-embedded-fonts",
+                "SwiftFiglet",
+                "EmbeddedFonts",
             ],
             exclude: [
                 "Fixtures",
@@ -68,14 +56,9 @@ let package = Package(
         ),
         .executableTarget(
             name: "figlet",
-            dependencies: ["figlet-cli"],
-            swiftSettings: swiftSettings()
-        ),
-        .executableTarget(
-            name: "figlet-embedded",
             dependencies: [
-                "figlet-cli",
-                "swift-figlet-embedded-fonts",
+            "SwiftFiglet",
+            "EmbeddedFonts"
             ],
             swiftSettings: swiftSettings()
         ),
