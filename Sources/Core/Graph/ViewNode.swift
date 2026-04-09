@@ -7,7 +7,7 @@ package final class ViewNode {
   package private(set) var resolvedIdentity: Identity
 
   package private(set) var children: [ViewNode]
-  package private(set) var stateSlots: [AnyStateSlot]
+  package private(set) var stateSlots: [Int: AnyStateSlot]
   package private(set) var dependencies: DependencySet
   package private(set) var lifecycleState: NodeLifecycleState
   package private(set) var registeredHandlers: NodeHandlers
@@ -52,7 +52,7 @@ package final class ViewNode {
     self.identity = identity
     resolvedIdentity = identity
     children = []
-    stateSlots = []
+    stateSlots = [:]
     dependencies = .init()
     lifecycleState = .alive
     registeredHandlers = .init()
@@ -145,45 +145,43 @@ package final class ViewNode {
     return true
   }
 
+  package func hasStateSlot(
+    ordinal: Int
+  ) -> Bool {
+    stateSlots[ordinal] != nil
+  }
+
   package func stateSlot<Value>(
     ordinal: Int,
     seed: @autoclosure () -> Value
   ) -> Value {
-    if ordinal >= stateSlots.count {
-      while stateSlots.count <= ordinal {
-        stateSlots.append(.init())
-      }
-    }
-
-    stateSlots[ordinal].initializeIfNeeded(with: seed())
+    var slot = stateSlots[ordinal] ?? .init()
+    slot.initializeIfNeeded(with: seed())
+    stateSlots[ordinal] = slot
 
     dependencyTracker.recordStateRead(
       .init(identity: identity, ordinal: ordinal)
     )
 
-    guard stateSlots[ordinal].stores(Value.self) else {
-      let slotTypes = stateSlots.enumerated().map { index, slot in
-        "\(index):\(slot.storedTypeDescription)"
+    guard slot.stores(Value.self) else {
+      let slotTypes = stateSlots.keys.sorted().map { index in
+        "\(index):\(stateSlots[index]?.storedTypeDescription ?? "missing")"
       }.joined(separator: ", ")
       fatalError(
-        "State slot type mismatch on node \(identity) ordinal \(ordinal). Expected \(Value.self), found \(stateSlots[ordinal].storedTypeDescription). Slots: [\(slotTypes)]"
+        "State slot type mismatch on node \(identity) ordinal \(ordinal). Expected \(Value.self), found \(slot.storedTypeDescription). Slots: [\(slotTypes)]"
       )
     }
 
-    return stateSlots[ordinal].value(as: Value.self)
+    return slot.value(as: Value.self)
   }
 
   package func setStateSlot<Value>(
     ordinal: Int,
     value: Value
   ) {
-    if ordinal >= stateSlots.count {
-      while stateSlots.count <= ordinal {
-        stateSlots.append(.init())
-      }
-    }
-
-    let didChange = stateSlots[ordinal].set(value)
+    var slot = stateSlots[ordinal] ?? .init()
+    let didChange = slot.set(value)
+    stateSlots[ordinal] = slot
     if didChange {
       ownerGraph?.queueDirtyForStateChange(
         .init(identity: identity, ordinal: ordinal)
@@ -210,12 +208,9 @@ package final class ViewNode {
     ordinal: Int,
     value: Value
   ) {
-    if ordinal >= stateSlots.count {
-      while stateSlots.count <= ordinal {
-        stateSlots.append(.init())
-      }
-    }
-    _ = stateSlots[ordinal].set(value)
+    var slot = stateSlots[ordinal] ?? .init()
+    _ = slot.set(value)
+    stateSlots[ordinal] = slot
   }
 
   package func markDirty() {

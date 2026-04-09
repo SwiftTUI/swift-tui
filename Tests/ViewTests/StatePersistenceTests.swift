@@ -41,13 +41,13 @@ struct StatePersistenceTests {
     #expect(updated.rasterSurface.lines.contains("Second 10"))
   }
 
-  @Test("reordering state access remaps persisted values by ordinal")
-  func accessReorderingRemapsValuesByOrdinal() throws {
+  @Test("reordering body access preserves persisted values by declaration order")
+  func accessReorderingPreservesValuesByDeclarationOrder() throws {
     let renderer = DefaultRenderer()
     let actionRegistry = LocalActionRegistry()
 
     let initial = renderer.render(
-      MultiStateCounterView(),
+      ReorderableMultiStateCounterView(showSecondFirst: false),
       context: ResolveContext(
         identity: testIdentity("OrdinalSwap"),
         localActionRegistry: actionRegistry,
@@ -60,7 +60,7 @@ struct StatePersistenceTests {
     #expect(actionRegistry.dispatch(identity: actionIdentity))
 
     let swapped = renderer.render(
-      AccessOrderSwappedMultiStateCounterView(),
+      ReorderableMultiStateCounterView(showSecondFirst: true),
       context: ResolveContext(
         identity: testIdentity("OrdinalSwap"),
         localActionRegistry: LocalActionRegistry(),
@@ -68,8 +68,8 @@ struct StatePersistenceTests {
       )
     )
 
-    #expect(swapped.rasterSurface.lines.contains("First 10"))
-    #expect(swapped.rasterSurface.lines.contains("Second 2"))
+    #expect(swapped.rasterSurface.lines.contains("First 2"))
+    #expect(swapped.rasterSurface.lines.contains("Second 10"))
   }
 
   @Test("onChange on a stateful view reserves modifier storage after body state slots")
@@ -155,6 +155,47 @@ struct StatePersistenceTests {
 
     #expect(box.events == ["1->1", "1->3"])
   }
+
+  @Test("action-only state access preserves declaration-order slots across rerenders")
+  func actionOnlyStateAccessPreservesDeclarationOrderSlotsAcrossRerenders() {
+    let renderer = DefaultRenderer()
+    let firstRegistry = LocalActionRegistry()
+
+    _ = renderer.render(
+      DeferredStateActionOrderFixture(),
+      context: ResolveContext(
+        identity: testIdentity("DeferredActionState"),
+        localActionRegistry: firstRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(firstRegistry.dispatch(identity: testIdentity("DigitAction")))
+
+    let afterDigitRegistry = LocalActionRegistry()
+    let afterDigit = renderer.render(
+      DeferredStateActionOrderFixture(),
+      context: ResolveContext(
+        identity: testIdentity("DeferredActionState"),
+        localActionRegistry: afterDigitRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(afterDigit.rasterSurface.lines.contains("9"))
+    #expect(afterDigitRegistry.dispatch(identity: testIdentity("CaptureAction")))
+
+    let afterCapture = renderer.render(
+      DeferredStateActionOrderFixture(),
+      context: ResolveContext(
+        identity: testIdentity("DeferredActionState"),
+        localActionRegistry: LocalActionRegistry(),
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(afterCapture.rasterSurface.lines.contains("captured"))
+  }
 }
 
 private struct MultiStateCounterView: View {
@@ -175,14 +216,27 @@ private struct MultiStateCounterView: View {
   }
 }
 
-private struct AccessOrderSwappedMultiStateCounterView: View {
+private struct ReorderableMultiStateCounterView: View {
+  let showSecondFirst: Bool
+
   @State private var first = 1
   @State private var second = 10
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
-      Text("Second \(second)")
-      Text("First \(first)")
+      if showSecondFirst {
+        Text("Second \(second)")
+        Text("First \(first)")
+      } else {
+        Text("First \(first)")
+        Text("Second \(second)")
+      }
+      Button(
+        "Increment First",
+        action: {
+          first += 1
+        }
+      )
     }
   }
 }
@@ -220,6 +274,37 @@ private struct StatefulOnChangeFixture: View {
     }
     .onChange(of: count, initial: true) { oldValue, newValue in
       box.record(oldValue: oldValue, newValue: newValue)
+    }
+  }
+}
+
+private struct DeferredStateActionOrderFixture: View {
+  @State private var text = "0"
+  @State private var deferredNumber: Double? = nil
+  @State private var clearOnNextDigit = false
+  @State private var isError = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text(text)
+      Button("Digit") {
+        if isError || clearOnNextDigit || text == "0" {
+          text = "9"
+          clearOnNextDigit = false
+          isError = false
+          return
+        }
+        text += "9"
+      }
+      .id(testIdentity("DigitAction"))
+
+      Button("Capture") {
+        if deferredNumber == nil {
+          deferredNumber = Double(text)
+        }
+        text = deferredNumber == nil ? "missing" : "captured"
+      }
+      .id(testIdentity("CaptureAction"))
     }
   }
 }

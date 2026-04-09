@@ -47,7 +47,7 @@ private struct FocusStateLocation<Value: Equatable> {
 
 @MainActor
 private final class FocusStateBox<Value: Equatable> {
-  private var ordinal: Int?
+  private let slotOrdinal: Int
 
   private struct Storage {
     var localStorage: FocusStateStorage<Value>
@@ -56,7 +56,11 @@ private final class FocusStateBox<Value: Equatable> {
 
   private var storage: Storage
 
-  init(seedValue: Value) {
+  init(
+    seedValue: Value,
+    slotOrdinal: Int
+  ) {
+    self.slotOrdinal = slotOrdinal
     storage = Storage(
       localStorage: .init(value: seedValue),
       boundLocation: nil
@@ -84,20 +88,8 @@ private final class FocusStateBox<Value: Equatable> {
     storage.boundLocation
   }
 
-  func currentOrdinal(
-    for context: AuthoringContext?
-  ) -> Int? {
-    if let ordinal {
-      return ordinal
-    }
-    guard let context else {
-      return nil
-    }
-    guard let ordinal = context.ordinalTracker.claimOrdinal() else {
-      return nil
-    }
-    self.ordinal = ordinal
-    return ordinal
+  var currentOrdinal: Int {
+    slotOrdinal
   }
 }
 
@@ -129,18 +121,42 @@ public struct FocusState<Value: Equatable> {
 
   private let box: FocusStateBox<Value>
 
-  private init(seedValue: Value) {
-    box = FocusStateBox(seedValue: seedValue)
+  private init(
+    seedValue: Value,
+    line: UInt,
+    column: UInt
+  ) {
+    box = FocusStateBox(
+      seedValue: seedValue,
+      slotOrdinal: StateSlotOrdinals.authored(
+        line: line,
+        column: column
+      )
+    )
   }
 
   /// Creates a boolean focus state with a default value of `false`.
-  public init() where Value == Bool {
-    self.init(seedValue: false)
+  public init(
+    line: UInt = #line,
+    column: UInt = #column
+  ) where Value == Bool {
+    self.init(
+      seedValue: false,
+      line: line,
+      column: column
+    )
   }
 
   /// Creates an optional focus state with a default value of `nil`.
-  public init<Wrapped: Hashable>() where Value == Wrapped? {
-    self.init(seedValue: nil)
+  public init<Wrapped: Hashable>(
+    line: UInt = #line,
+    column: UInt = #column
+  ) where Value == Wrapped? {
+    self.init(
+      seedValue: nil,
+      line: line,
+      column: column
+    )
   }
 
   public var wrappedValue: Value {
@@ -174,10 +190,7 @@ public struct FocusState<Value: Equatable> {
   private func makeLocation(
     for context: AuthoringContext
   ) -> FocusStateLocation<Value> {
-    guard let ordinal = box.currentOrdinal(for: context) else {
-      return localLocation()
-    }
-
+    let ordinal = box.currentOrdinal
     let seedSnapshot = box.currentLocalSnapshot()
 
     if let viewNode = context.viewNode {

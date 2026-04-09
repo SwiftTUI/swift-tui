@@ -54,11 +54,12 @@ private struct BoolDefaultFocusModifier<Content: View>: View, ResolvableView {
   ) -> Bool {
     guard
       let authoringContext = currentAuthoringContext(),
-      let ordinal = authoringContext.ordinalTracker.claimOrdinal(),
+      let modifierOrdinal = authoringContext.ordinalTracker.claimOrdinal(),
       let viewNode = authoringContext.viewNode
     else {
       return true
     }
+    let ordinal = StateSlotOrdinals.defaultFocus(modifierOrdinal)
 
     let hasSeeded: Bool = viewNode.stateSlot(
       ordinal: ordinal,
@@ -101,11 +102,12 @@ private struct OptionalDefaultFocusModifier<Content: View, Value: Hashable>: Vie
   ) -> Bool {
     guard
       let authoringContext = currentAuthoringContext(),
-      let ordinal = authoringContext.ordinalTracker.claimOrdinal(),
+      let modifierOrdinal = authoringContext.ordinalTracker.claimOrdinal(),
       let viewNode = authoringContext.viewNode
     else {
       return true
     }
+    let ordinal = StateSlotOrdinals.defaultFocus(modifierOrdinal)
 
     let hasSeeded: Bool = viewNode.stateSlot(
       ordinal: ordinal,
