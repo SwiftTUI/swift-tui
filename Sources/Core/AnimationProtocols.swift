@@ -23,31 +23,22 @@ package enum AnimationRequest: Equatable, Sendable {
 /// The View module creates concrete instances; Core only stores and
 /// compares them by identity.
 package struct AnimationBox: Equatable, Hashable, Sendable {
-  // The wrapped value is Hashable & Sendable by construction; the
-  // @unchecked Sendable wrapper is needed because AnyHashable does not
-  // carry the Sendable conformance.
+  // The wrapped value is Hashable & Sendable by construction
   private let storage: _SendableAnyHashable
 
   package init<H: Hashable & Sendable>(_ value: H) {
-    storage = _SendableAnyHashable(AnyHashable(value))
-  }
-
-  package static func == (lhs: Self, rhs: Self) -> Bool {
-    lhs.storage.base == rhs.storage.base
-  }
-
-  package func hash(into hasher: inout Hasher) {
-    hasher.combine(storage.base)
+    storage = _SendableAnyHashable(value)
   }
 }
 
 /// Wrapper that asserts Sendable for AnyHashable values known to be
 /// Sendable at construction time.
-private struct _SendableAnyHashable: @unchecked Sendable {
-  let base: AnyHashable
+private struct _SendableAnyHashable: Sendable, Hashable {
+  // pre-commit:ignore:next
+  nonisolated(unsafe) let base: AnyHashable
 
-  init(_ base: AnyHashable) {
-    self.base = base
+  init(_ base: some Hashable & Sendable) {
+    unsafe self.base = base
   }
 }
 

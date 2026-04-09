@@ -5,7 +5,7 @@ package import Core
 /// updates this object with the current frame's environment and
 /// invalidation data so that re-used evaluators see fresh values.
 @MainActor
-package final class FrameResolveState: @unchecked Sendable {
+package final class FrameResolveState {
   package var invalidatedIdentities: Set<Identity>
   package var invalidationSummary: InvalidationSummary
   package var environmentValues: EnvironmentValues
