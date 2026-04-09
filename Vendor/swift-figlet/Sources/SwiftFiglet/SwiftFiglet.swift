@@ -252,11 +252,12 @@ public struct FigletFont: Sendable {
     )
   }
 
-  public init(filePath: String) throws {
-    self = try Self.load(
-      filePath: filePath, fallbackName: filePath.lastPathComponentWithoutExtension)
-  }
-
+  #if !canImport(WASILibc)
+    public init(filePath: String) throws {
+      self = try Self.load(
+        filePath: filePath, fallbackName: filePath.lastPathComponentWithoutExtension)
+    }
+  #endif
   public var info: String {
     comment
   }
@@ -272,7 +273,6 @@ public struct FigletFont: Sendable {
   public static func availableFontNames(fontLibraries: [FigletFontLibrary]) -> [String] {
     availableFontNames(in: defaultFontSearchDirectories(), libraries: fontLibraries)
   }
-
   public static func availableFontNames(in searchDirectories: [String]) -> [String] {
     availableFontNames(in: searchDirectories, libraries: [])
   }
@@ -318,9 +318,12 @@ public struct FigletFont: Sendable {
     fontLibraries: [FigletFontLibrary],
     searchDirectories: [String]
   ) throws -> FigletFont {
-    if let filePath = resolveExternalFontPath(for: identifier) {
-      return try load(filePath: filePath, fallbackName: filePath.lastPathComponentWithoutExtension)
-    }
+    #if !canImport(WASILibc)
+      if let filePath = resolveExternalFontPath(for: identifier) {
+        return try load(
+          filePath: filePath, fallbackName: filePath.lastPathComponentWithoutExtension)
+      }
+    #endif
 
     for fontLibrary in fontLibraries {
       if let font = try fontLibrary.font(named: identifier) {
@@ -328,72 +331,79 @@ public struct FigletFont: Sendable {
       }
     }
 
-    for directory in uniquePaths(searchDirectories) {
-      if let filePath = resolveFontPath(named: identifier, in: directory) {
-        return try load(
-          filePath: filePath, fallbackName: filePath.lastPathComponentWithoutExtension)
+    #if !canImport(WASILibc)
+
+      for directory in uniquePaths(searchDirectories) {
+        if let filePath = resolveFontPath(named: identifier, in: directory) {
+          return try load(
+            filePath: filePath, fallbackName: filePath.lastPathComponentWithoutExtension)
+        }
       }
-    }
+    #endif
 
     throw FigletError.fontNotFound(identifier)
   }
 
-  private static func load(filePath: String, fallbackName: String) throws -> FigletFont {
-    let data = try readUTF8File(at: filePath)
-    return try parse(data: data, name: fallbackName)
-  }
-
-  private static func resolveExternalFontPath(for identifier: String) -> String? {
-    if fileExists(at: identifier) {
-      return identifier
+  #if !canImport(WASILibc)
+    private static func load(filePath: String, fallbackName: String) throws -> FigletFont {
+      let data = try readUTF8File(at: filePath)
+      return try parse(data: data, name: fallbackName)
     }
 
-    for ext in ["flf", "tlf"] {
-      let candidate = "\(identifier).\(ext)"
-      if fileExists(at: candidate) {
-        return candidate
+    private static func resolveExternalFontPath(for identifier: String) -> String? {
+      if fileExists(at: identifier) {
+        return identifier
       }
-    }
 
-    return nil
-  }
-
-  private static func resolveFontPath(named identifier: String, in directory: String) -> String? {
-    if identifier.hasSupportedFontExtension {
-      let directPath = pathByAppending(directory, identifier)
-      return fileExists(at: directPath) ? directPath : nil
-    }
-
-    for ext in ["flf", "tlf"] {
-      let candidate = pathByAppending(directory, "\(identifier).\(ext)")
-      if fileExists(at: candidate) {
-        return candidate
+      for ext in ["flf", "tlf"] {
+        let candidate = "\(identifier).\(ext)"
+        if fileExists(at: candidate) {
+          return candidate
+        }
       }
+
+      return nil
     }
 
-    return nil
-  }
+    private static func resolveFontPath(named identifier: String, in directory: String) -> String? {
+      if identifier.hasSupportedFontExtension {
+        let directPath = pathByAppending(directory, identifier)
+        return fileExists(at: directPath) ? directPath : nil
+      }
 
+      for ext in ["flf", "tlf"] {
+        let candidate = pathByAppending(directory, "\(identifier).\(ext)")
+        if fileExists(at: candidate) {
+          return candidate
+        }
+      }
+
+      return nil
+    }
+  #endif
   private static func defaultFontSearchDirectories() -> [String] {
-    var directories: [String] = []
+    #if !canImport(WASILibc)
+      var directories: [String] = []
 
-    if let envValue = environmentValue(named: "SWIFT_FIGLET_FONT_DIRS") {
-      directories.append(contentsOf: envValue.split(separator: ":").map(String.init))
-    }
+      if let envValue = environmentValue(named: "SWIFT_FIGLET_FONT_DIRS") {
+        directories.append(contentsOf: envValue.split(separator: ":").map(String.init))
+      }
 
-    if let envValue = environmentValue(named: "SWIFT_FIGLET_FONT_DIR") {
-      directories.append(envValue)
-    }
+      if let envValue = environmentValue(named: "SWIFT_FIGLET_FONT_DIR") {
+        directories.append(envValue)
+      }
 
-    if let homeDirectory = environmentValue(named: "HOME") {
-      directories.append(pathByAppending(homeDirectory, ".figfonts"))
-    }
+      if let homeDirectory = environmentValue(named: "HOME") {
+        directories.append(pathByAppending(homeDirectory, ".figfonts"))
+      }
 
-    directories.append("figfonts")
+      directories.append("figfonts")
 
-    return uniquePaths(directories).filter(isDirectory(at:))
+      return uniquePaths(directories).filter(isDirectory(at:))
+    #else
+      return []
+    #endif
   }
-
   fileprivate static func parse(data: String, name: String) throws -> FigletFont {
     let sanitized = data.sanitizedFontData()
 
@@ -1136,74 +1146,81 @@ private func stripEndMarker(from line: String, marker: Character) -> String {
   return String(characters)
 }
 
-private func fileExists(at path: String) -> Bool {
-  unsafe path.withCString { unsafe access($0, F_OK) == 0 }
-}
-
-private func isDirectory(at path: String) -> Bool {
-  guard let directory = unsafe opendir(path) else {
-    return false
+#if !canImport(WASILibc)
+  private func fileExists(at path: String) -> Bool {
+    unsafe path.withCString { unsafe access($0, F_OK) == 0 }
   }
-  unsafe closedir(directory)
-  return true
-}
 
-private func directoryEntries(at path: String) -> [String] {
-  guard let directory = unsafe opendir(path) else {
-    return []
+  private func isDirectory(at path: String) -> Bool {
+    guard let directory = unsafe opendir(path) else {
+      return false
+    }
+    unsafe closedir(directory)
+    return true
   }
-  defer { unsafe closedir(directory) }
 
-  var entries: [String] = []
-  while let entryPointer = unsafe readdir(directory) {
-    let name = unsafe withUnsafePointer(to: &entryPointer.pointee.d_name) { pointer in
-      unsafe pointer.withMemoryRebound(
-        to: CChar.self, capacity: MemoryLayout.size(ofValue: entryPointer.pointee.d_name)
-      ) {
-        unsafe String(cString: $0)
+  private func directoryEntries(at path: String) -> [String] {
+    guard let directory = unsafe opendir(path) else {
+      return []
+    }
+    defer { unsafe closedir(directory) }
+
+    var entries: [String] = []
+    while let entryPointer = unsafe readdir(directory) {
+      let name = unsafe withUnsafePointer(to: &entryPointer.pointee.d_name) { pointer in
+        unsafe pointer.withMemoryRebound(
+          to: CChar.self, capacity: MemoryLayout.size(ofValue: entryPointer.pointee.d_name)
+        ) {
+          unsafe String(cString: $0)
+        }
+      }
+
+      if name != "." && name != ".." {
+        entries.append(name)
       }
     }
 
-    if name != "." && name != ".." {
-      entries.append(name)
+    return entries
+  }
+
+  private func readUTF8File(at path: String) throws -> String {
+    guard let file = unsafe fopen(path, "rb") else {
+      throw FigletError.invalidFont("unable to read font at \(path)")
     }
+    defer { unsafe fclose(file) }
+
+    guard unsafe fseek(file, 0, SEEK_END) == 0 else {
+      throw FigletError.invalidFont("unable to read font at \(path)")
+    }
+
+    let size = unsafe ftell(file)
+    guard size >= 0 else {
+      throw FigletError.invalidFont("unable to read font at \(path)")
+    }
+
+    unsafe rewind(file)
+
+    var buffer = [UInt8](repeating: 0, count: Int(size))
+    let bufferCount = buffer.count
+    let bytesRead = unsafe buffer.withUnsafeMutableBytes { bytes in
+      unsafe fread(bytes.baseAddress, 1, bufferCount, file)
+    }
+
+    return String(decoding: buffer.prefix(bytesRead), as: UTF8.self)
   }
 
-  return entries
-}
-
-private func readUTF8File(at path: String) throws -> String {
-  guard let file = unsafe fopen(path, "rb") else {
-    throw FigletError.invalidFont("unable to read font at \(path)")
+  private func environmentValue(named name: String) -> String? {
+    guard let value = unsafe getenv(name) else {
+      return nil
+    }
+    return unsafe String(cString: value)
   }
-  defer { unsafe fclose(file) }
-
-  guard unsafe fseek(file, 0, SEEK_END) == 0 else {
-    throw FigletError.invalidFont("unable to read font at \(path)")
-  }
-
-  let size = unsafe ftell(file)
-  guard size >= 0 else {
-    throw FigletError.invalidFont("unable to read font at \(path)")
-  }
-
-  unsafe rewind(file)
-
-  var buffer = [UInt8](repeating: 0, count: Int(size))
-  let bufferCount = buffer.count
-  let bytesRead = unsafe buffer.withUnsafeMutableBytes { bytes in
-    unsafe fread(bytes.baseAddress, 1, bufferCount, file)
-  }
-
-  return String(decoding: buffer.prefix(bytesRead), as: UTF8.self)
-}
-
-private func environmentValue(named name: String) -> String? {
-  guard let value = unsafe getenv(name) else {
-    return nil
-  }
-  return unsafe String(cString: value)
-}
+#else
+  // WASI has no POSIX filesystem access from SwiftWasm's libc shim.
+  // `directoryEntries` is referenced by the public `availableFontNames(in:libraries:)`
+  // API, so we stub it to return nothing; fonts must be supplied via `FigletFontLibrary`.
+  private func directoryEntries(at path: String) -> [String] { [] }
+#endif
 
 private func pathByAppending(_ base: String, _ component: String) -> String {
   if component.hasPrefix("/") {

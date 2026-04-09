@@ -1,7 +1,6 @@
 import Algorithms
 import Observation
 import TerminalUI
-import TerminalUICLI
 
 public struct GalleryView: View {
 

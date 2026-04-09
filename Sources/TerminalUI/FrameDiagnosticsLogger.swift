@@ -47,18 +47,27 @@ public final class FrameDiagnosticsLogger {
   /// Creates a logger that writes to the given file path.
   /// The file is created (or truncated) immediately.
   public init?(path: String) {
-    let fd = unsafe open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
-    guard fd >= 0 else {
+    #if !canImport(WASILibc)
+      let fd = unsafe open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+      guard fd >= 0 else {
+        return nil
+      }
+      fileDescriptor = fd
+      ownsDescriptor = true
+    #else
+      // WASI builds have no POSIX file I/O exposed; the logger is unavailable.
+      fileDescriptor = -1
+      ownsDescriptor = false
       return nil
-    }
-    fileDescriptor = fd
-    ownsDescriptor = true
+    #endif
   }
 
   deinit {
-    if ownsDescriptor {
-      close(fileDescriptor)
-    }
+    #if !canImport(WASILibc)
+      if ownsDescriptor {
+        close(fileDescriptor)
+      }
+    #endif
   }
 
   /// Records a single frame's diagnostics.
@@ -158,10 +167,12 @@ public final class FrameDiagnosticsLogger {
   }
 
   private func writeLine(_ line: String) {
-    var data = line + "\n"
-    data.withUTF8 { buffer in
-      _ = unsafe write(fileDescriptor, buffer.baseAddress, buffer.count)
-    }
+    #if !canImport(WASILibc)
+      var data = line + "\n"
+      data.withUTF8 { buffer in
+        _ = unsafe write(fileDescriptor, buffer.baseAddress, buffer.count)
+      }
+    #endif
   }
 
   private func formatMs(_ duration: Duration?) -> String {
