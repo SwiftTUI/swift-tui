@@ -196,6 +196,31 @@ struct AppRuntimeTests {
   }
 
   @MainActor
+  @Test("App launcher presents sheet overlays without resetting parent state")
+  func appLauncherPresentsSheetOverlaysWithoutResettingParentState() async throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 40, height: 12))
+
+    let result = try await runTestSceneSession(
+      scene: WindowGroup("Sheet Window") {
+        SheetPresentationWindow()
+      },
+      sessionName: "AppRuntimeTests.SheetPresentationWindow",
+      terminalHost: terminal,
+      inputReader: ScriptedInputReader(events: [.return, .character("q")]),
+      signalReader: EmptySignalReader()
+    )
+
+    #expect(result.exitReason == .quitKey)
+    #expect(result.renderedFrames >= 2)
+
+    let firstFrame = try #require(terminal.frames.first)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(firstFrame.contains("Count 0"))
+    #expect(lastFrame.contains("Count 1"))
+    #expect(lastFrame.contains("Sheet body"))
+  }
+
+  @MainActor
   @Test("runtime focus movement writes back into the rendered focus identity")
   func runtimeFocusMovementWritesBackIntoRenderedFocusIdentity() async throws {
     let terminal = RecordingTerminalHost()
@@ -595,6 +620,34 @@ private struct AlertWindow: View {
     Button("Background") {}
       .id(testIdentity("AlertWindow", "Background"))
       .alert("Archive task", isPresented: $isAlertPresented)
+  }
+}
+
+private struct SheetPresentationWindow: View {
+  @State private var count = 0
+  @State private var isSheetPresented = false
+  @State private var draftTitle = ""
+  @FocusState private var titleFocused: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Count \(count)")
+      Button("Present") {
+        count += 1
+        draftTitle = ""
+        isSheetPresented = true
+      }
+    }
+    .sheet("Inspector", isPresented: $isSheetPresented) {
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Sheet body")
+        TextField("Draft", text: $draftTitle)
+          .focused($titleFocused)
+          .onAppear {
+            titleFocused = true
+          }
+      }
+    }
   }
 }
 

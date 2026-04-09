@@ -1182,6 +1182,8 @@ private struct PresentedAlertDismissView: View {
 private struct PresentedSheetCounterView: View {
   @State private var count = 0
   @State private var isSheetPresented = false
+  @State private var draftTitle = ""
+  @FocusState private var titleFocused: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
@@ -1192,12 +1194,20 @@ private struct PresentedSheetCounterView: View {
       .id(testIdentity("IncrementAction"))
 
       Button("Present") {
+        draftTitle = ""
         isSheetPresented = true
       }
       .id(testIdentity("PresentSheetAction"))
     }
     .sheet("Inspector", isPresented: $isSheetPresented) {
-      Text("Sheet body")
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Sheet body")
+        TextField("Draft", text: $draftTitle)
+          .focused($titleFocused)
+          .onAppear {
+            titleFocused = true
+          }
+      }
     }
   }
 }
