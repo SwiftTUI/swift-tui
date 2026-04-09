@@ -1063,10 +1063,15 @@ package struct PresentationHostingRoot<Content: View>: View, ResolvableView {
 
     let hostContext = context.child(component: .named("PresentationHost"))
     let baseContext = hostContext.child(component: .named("base"))
-    var hostedBaseNode = normalizeResolvedElements(
-      resolveViewElements(content, in: baseContext),
-      in: baseContext
-    )
+    let hostedBasePayload = DeferredViewPayload(
+      authoringContext: makeAuthoringContext(
+        for: contentContext,
+        viewNode: ViewNodeContext.current
+      )
+    ) {
+      content
+    }
+    var hostedBaseNode = hostedBasePayload.resolve(in: baseContext)
     if hostState.disablesBaseInteraction {
       hostedBaseNode.setEnabledRecursively(false)
     }
