@@ -131,7 +131,7 @@ struct CollectionSupportTests {
           drawPayload: .textFigure(
             .init(
               content: "Alpha",
-              font: "standard"
+              font: embeddedTextFigureFont(named: "standard")
             )
           )
         ),
@@ -144,6 +144,13 @@ struct CollectionSupportTests {
     )
 
     #expect(resolvedNodeLabelText(from: node) == "Alpha Beta")
+  }
+
+  private func embeddedTextFigureFont(named name: String) -> TextFigureFont {
+    guard let font = TextFigure.availableFonts.first(where: { $0.rawValue == name }) else {
+      fatalError("Missing embedded TextFigure font \(name)")
+    }
+    return font
   }
 
   @Test("table row cell payloads preserve per-cell text and merged row styling")

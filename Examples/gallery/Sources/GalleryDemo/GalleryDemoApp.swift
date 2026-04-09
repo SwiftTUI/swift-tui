@@ -1,3 +1,4 @@
+import Algorithms
 import Observation
 import TerminalUI
 import TerminalUICLI
@@ -13,19 +14,46 @@ struct GalleryDemoApp: App {
 }
 
 struct ColorGallery: View {
+
+
+@State var fontNumber: Int = 2
+// @State var font: SwiftFigletEmbeddedFonts.Font = .acrobatic
+var fontCount: Int { SwiftFigletEmbeddedFonts.Font.allCases.count }
+
   var body: some View {
     ScrollView {
       EnvironmentReader(\.terminalAppearance) { appearance in
         VStack(alignment: .leading, spacing: 1) {
-          TextFigure("Gallery", font: "this")
+          VStack(alignment: .leading) {
+            HStack {
+              Stepper("", value: $fontNumber)
+              if fontNumber >= 0 && fontNumber < fontCount {
+                Text(SwiftFigletEmbeddedFonts.Font.allCases[fontNumber].rawValue)
+              }
+            }
+              // .onChange(of: fontNumber) {
+              //   if fontNumber >= 0 && fontNumber < fontCount {
+              //     font = SwiftFigletEmbeddedFonts.Font.allCases[fontNumber]
+              //   } else {
+              //     fontNumber = 0
+              //   }
+              // }
+          if fontNumber >= 0 && fontNumber < fontCount {
+          TextFigure("Gallery", font: SwiftFigletEmbeddedFonts.Font.allCases[fontNumber])
             .foregroundStyle(Color.black)
+            .padding(1)
+            .background(Color.red)
+            .padding(1)
+          }
+          }
           terminalPaletteSection(palette: appearance.palette)
           namedColorsSection
           semanticRolesSection
         }
       }
-    }.background(Color.red)
+    }
   }
+
 
   private var namedColorsSection: some View {
     GroupBox("Named colors") {
@@ -66,7 +94,7 @@ struct ColorGallery: View {
   ) -> some View {
     GroupBox("Terminal palette (host)") {
       VStack(alignment: .leading, spacing: 0) {
-        ForEach([Array(0...4), Array(5...9), Array(10...14), Array(15...15)], id: \.self) { row in
+        ForEach(Array(0...15).chunks(ofCount: 3), id: \.self) { row in
           HStack(alignment: .center, spacing: 1) {
             ForEach(row, id: \.self) { index in
               GalleryColorTile(

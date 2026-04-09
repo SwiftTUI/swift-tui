@@ -1,14 +1,16 @@
 import Synchronization
 import swift_figlet
-import swift_figlet_embedded_fonts
+@_exported import swift_figlet_embedded_fonts
+
+public typealias TextFigureFont = SwiftFigletEmbeddedFonts.Font
 
 public struct TextFigurePayload: Equatable, Hashable, Sendable {
   public var content: String
-  public var font: String
+  public var font: TextFigureFont
 
   public init(
     content: String,
-    font: String
+    font: TextFigureFont
   ) {
     self.content = content
     self.font = font
@@ -26,18 +28,11 @@ package struct TextFigureRenderResult: Equatable, Sendable {
 }
 
 package enum TextFigureSupport {
-  private static let fontLibrary = SwiftFigletEmbeddedFonts.library
-  private static let fontCache = Mutex<[String: FigletFont]>([:])
+  private static let fontCache = Mutex<[TextFigureFont: FigletFont]>([:])
   private static let metricsCache = Mutex<[TextFigurePayload: TextFigureLayoutMetrics]>([:])
 
-  package static var availableFonts: [String] {
-    Figlet.availableFonts(fontLibraries: [fontLibrary])
-  }
-
-  package static func supportsFont(
-    named name: String
-  ) -> Bool {
-    availableFonts.contains(name)
+  package static var availableFonts: [TextFigureFont] {
+    TextFigureFont.allCases
   }
 
   package static func layoutMetrics(
@@ -62,7 +57,7 @@ package enum TextFigureSupport {
       )
     } else {
       reportTextFigureConfigurationError(
-        "TextFigure could not resolve embedded font '\(payload.font)'"
+        "TextFigure could not resolve embedded font '\(payload.font.rawValue)'"
       )
       resolvedMetrics = fallbackLayoutMetrics(for: payload.content)
     }
@@ -97,7 +92,7 @@ package enum TextFigureSupport {
     }
 
     reportTextFigureConfigurationError(
-      "TextFigure could not measure embedded font '\(payload.font)'"
+      "TextFigure could not measure embedded font '\(payload.font.rawValue)'"
     )
     return fallbackLayoutMetrics(for: payload.content).idealSize
   }
@@ -115,7 +110,7 @@ package enum TextFigureSupport {
 
     guard let text = try? resolvedFiglet(for: payload, width: renderWidth).render(payload.content) else {
       reportTextFigureConfigurationError(
-        "TextFigure could not render embedded font '\(payload.font)'"
+        "TextFigure could not render embedded font '\(payload.font.rawValue)'"
       )
       return fallbackRenderResult(for: payload.content)
     }
@@ -141,17 +136,20 @@ package enum TextFigureSupport {
   }
 
   private static func cachedFont(
-    named name: String
+    named font: TextFigureFont
   ) throws -> FigletFont {
-    if let cached = fontCache.withLock({ $0[name] }) {
+    if let cached = fontCache.withLock({ $0[font] }) {
       return cached
     }
 
-    let font = try FigletFont(named: name, fontLibrary: fontLibrary)
+    let resolvedFont = try FigletFont(
+      named: font.rawValue,
+      fontLibrary: SwiftFigletEmbeddedFonts.library
+    )
     fontCache.withLock {
-      $0[name] = font
+      $0[font] = resolvedFont
     }
-    return font
+    return resolvedFont
   }
 
   private static func renderedLines(
