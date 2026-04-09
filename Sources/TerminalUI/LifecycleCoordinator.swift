@@ -48,6 +48,10 @@ package final class LifecycleCoordinator {
       for handlerID in handlerIDs {
         previousLifecycleHandlers.disappearHandlers[handlerID]?()
       }
+    case .change(let handlerIDs):
+      for handlerID in handlerIDs {
+        currentLifecycleRegistry.changeHandler(for: handlerID)?()
+      }
     case .taskStart(let descriptor):
       guard let registration = currentTaskRegistry.registration(for: entry.identity),
         registration.descriptor == descriptor

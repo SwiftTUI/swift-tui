@@ -31,6 +31,8 @@ public struct CommitPlanner {
         .appear(handlerIDs: handlerIDs)
       case .disappear(let handlerIDs):
         .disappear(handlerIDs: handlerIDs)
+      case .change(let handlerIDs):
+        .change(handlerIDs: handlerIDs)
       case .taskStart(let descriptor):
         .taskStart(descriptor)
       case .taskCancel(let descriptor):

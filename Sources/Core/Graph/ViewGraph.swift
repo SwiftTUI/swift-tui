@@ -523,8 +523,23 @@ package final class ViewGraph {
       from: resolved,
       placed: placed
     )
-    let (viewportTaskCancels, viewportDisappears, viewportAppears, viewportTaskStarts) =
+    let (
+      viewportTaskCancels,
+      viewportDisappears,
+      viewportAppears,
+      viewportChanges,
+      viewportTaskStarts
+    ) =
       partitionLifecycleEvents(viewportLifecycleEvents)
+    let changeEvents = frameOrder.compactMap { identity -> LifecycleEvent? in
+      guard let node = nodesByIdentity[identity], !node.pendingChangeHandlerIDs.isEmpty else {
+        return nil
+      }
+      return .init(
+        identity: identity,
+        operation: .change(handlerIDs: node.pendingChangeHandlerIDs)
+      )
+    }
     let structuralTaskStarts = stableTaskStartIdentities.compactMap { identity -> LifecycleEvent? in
       guard let task = nodesByIdentity[identity]?.lifecycleMetadata.task else {
         return nil
@@ -543,6 +558,8 @@ package final class ViewGraph {
       + viewportDisappears
       + structuralAppearEvents
       + viewportAppears
+      + changeEvents
+      + viewportChanges
       + structuralTaskStarts
       + viewportTaskStarts
 
@@ -958,11 +975,13 @@ package final class ViewGraph {
     taskCancels: [LifecycleEvent],
     disappears: [LifecycleEvent],
     appears: [LifecycleEvent],
+    changes: [LifecycleEvent],
     taskStarts: [LifecycleEvent]
   ) {
     var taskCancels: [LifecycleEvent] = []
     var disappears: [LifecycleEvent] = []
     var appears: [LifecycleEvent] = []
+    var changes: [LifecycleEvent] = []
     var taskStarts: [LifecycleEvent] = []
 
     for event in events {
@@ -973,6 +992,8 @@ package final class ViewGraph {
         disappears.append(event)
       case .appear:
         appears.append(event)
+      case .change:
+        changes.append(event)
       case .taskStart:
         taskStarts.append(event)
       }
@@ -982,6 +1003,7 @@ package final class ViewGraph {
       taskCancels,
       disappears,
       appears,
+      changes,
       taskStarts
     )
   }

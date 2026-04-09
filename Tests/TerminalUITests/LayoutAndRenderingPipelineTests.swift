@@ -195,4 +195,32 @@ struct LayoutAndRenderingPipelineTests {
     #expect(counters.disappearCount == 1)
     #expect(counters.taskCount == 1)
   }
+
+  @Test("lifecycle coordinator replays change handlers from committed frames")
+  func lifecycleCoordinatorReplaysChangeHandlers() {
+    final class CounterBox {
+      var changeCount = 0
+    }
+
+    let counters = CounterBox()
+    let lifecycleRegistry = LocalLifecycleRegistry()
+    lifecycleRegistry.registerChange(handlerID: "Root#change[0]") {
+      counters.changeCount += 1
+    }
+
+    LifecycleCoordinator().applyCommittedFrame(
+      plan: .init(
+        lifecycle: [
+          .init(
+            identity: testIdentity("Root"),
+            operation: .change(handlerIDs: ["Root#change[0]"])
+          )
+        ]
+      ),
+      currentLifecycleRegistry: lifecycleRegistry,
+      currentTaskRegistry: LocalTaskRegistry()
+    )
+
+    #expect(counters.changeCount == 1)
+  }
 }

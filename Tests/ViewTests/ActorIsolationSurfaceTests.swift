@@ -63,11 +63,16 @@ struct ActorIsolationSurfaceTests {
     #expect(box.count == 0)
   }
 
-  @Test("Task modifiers, including task(id:), and DefaultRenderer render on the main actor")
-  func taskModifiersAndRendererRenderOnMainActor() {
+  @Test("Task and onChange modifiers, plus DefaultRenderer, render on the main actor")
+  func taskAndOnChangeModifiersAndRendererRenderOnMainActor() {
     struct TaskSurface: View {
       var body: some View {
         Text("Work")
+          .onChange(of: 1, initial: true) {}
+          .onChange(of: 1, initial: true) { oldValue, newValue in
+            _ = oldValue
+            _ = newValue
+          }
           .task {}
           .task(id: 1) {}
       }
