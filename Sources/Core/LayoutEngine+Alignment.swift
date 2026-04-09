@@ -185,6 +185,22 @@ extension LayoutEngine {
           height: measured.measuredSize.height
         )
       }
+    case .offset:
+      if let child = resolved.children.first,
+        let childMeasurement = measured.childMeasurements.first
+      {
+        baseDimensions = propagatedViewDimensions(
+          size: measured.measuredSize,
+          from: viewDimensions(for: child, measured: childMeasurement),
+          offsetX: 0,
+          offsetY: 0
+        )
+      } else {
+        baseDimensions = ViewDimensions(
+          width: measured.measuredSize.width,
+          height: measured.measuredSize.height
+        )
+      }
     case .decoration(let primaryIndex, _):
       if resolved.children.indices.contains(primaryIndex),
         measured.childMeasurements.indices.contains(primaryIndex)

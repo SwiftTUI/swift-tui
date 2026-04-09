@@ -161,6 +161,27 @@ extension LayoutEngine {
           passContext: passContext
         )
       ]
+    case .offset(let x, let y):
+      guard let childMeasurement = measured.childMeasurements.first,
+        let child = resolved.children.first
+      else {
+        return []
+      }
+
+      return [
+        place(
+          child,
+          measured: childMeasurement,
+          in: Rect(
+            origin: .init(
+              x: bounds.origin.x + x,
+              y: bounds.origin.y + y
+            ),
+            size: childMeasurement.measuredSize
+          ),
+          passContext: passContext
+        )
+      ]
     case .decoration(let primaryIndex, let alignment):
       guard
         resolved.children.indices.contains(primaryIndex),
@@ -601,6 +622,14 @@ extension LayoutEngine {
     }
 
     switch resolved.layoutBehavior {
+    case .offset(let x, let y):
+      if let child = children.first {
+        return translated(
+          child.contentBounds,
+          by: .init(x: -x, y: -y)
+        )
+      }
+      return bounds
     case .lazyStack(let axis, _, _, _):
       guard
         let snapshot = measured.containerAllocationSnapshot?.lazyStack,
@@ -639,8 +668,8 @@ extension LayoutEngine {
       return .control
     }
     switch resolved.layoutBehavior {
-    case .stack, .lazyStack, .overlay, .padding, .frame, .flexibleFrame, .decoration, .viewThatFits,
-      .custom:
+    case .stack, .lazyStack, .overlay, .padding, .frame, .offset, .flexibleFrame, .decoration,
+      .viewThatFits, .custom:
       return .container
     case .intrinsic:
       return .generic

@@ -3885,6 +3885,7 @@ private struct StatefulImplicitPointerScrollFixture: View {
 private struct GalleryLikeScrollFixture: View {
   @State private var fontNumber = 2
   @State private var font: SwiftFigletEmbeddedFonts.Font = .acrobatic
+  @State private var taskRuns = 0
 
   private var fontCount: Int {
     SwiftFigletEmbeddedFonts.Font.allCases.count
@@ -3898,8 +3899,10 @@ private struct GalleryLikeScrollFixture: View {
             HStack {
               Stepper("", value: $fontNumber)
               Text(font.rawValue)
+              Text("Task \(taskRuns)")
             }
             .task(id: fontNumber) {
+              taskRuns += 1
               if fontNumber >= 0 && fontNumber < fontCount {
                 font = SwiftFigletEmbeddedFonts.Font.allCases[fontNumber]
               } else {

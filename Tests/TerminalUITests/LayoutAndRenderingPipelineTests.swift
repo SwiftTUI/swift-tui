@@ -99,6 +99,26 @@ struct LayoutAndRenderingPipelineTests {
     #expect(region.rect == .init(origin: .zero, size: .init(width: 3, height: 1)))
   }
 
+  @Test("offset moves clipped focus and interaction regions")
+  func offsetTranslatesClippedSemanticRegions() throws {
+    let artifacts = DefaultRenderer().render(
+      Text("Tap")
+        .semanticMetadata(.init(isFocusable: true, participatesInPointerHitTesting: true))
+        .frame(width: 3, height: 1, alignment: .leading)
+        .clipped()
+        .offset(x: 2, y: 1)
+        .frame(width: 6, height: 3, alignment: .topLeading),
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    let interactionRegion = try #require(artifacts.semanticSnapshot.interactionRegions.first)
+    let focusRegion = try #require(artifacts.semanticSnapshot.focusRegions.first)
+
+    #expect(
+      interactionRegion.rect == .init(origin: .init(x: 2, y: 1), size: .init(width: 3, height: 1)))
+    #expect(focusRegion.rect == .init(origin: .init(x: 2, y: 1), size: .init(width: 3, height: 1)))
+  }
+
   @Test("render registers lifecycle work in the commit plan without executing it during resolve")
   func renderRegistersLifecycleWorkWithoutExecutingItDuringResolve() async throws {
     final class CounterBox: Sendable {
