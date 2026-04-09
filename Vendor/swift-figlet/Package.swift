@@ -40,8 +40,8 @@ let package = Package(
     targets: [
         .target(
             name: "swift-figlet",
-            exclude: [
-                "Resources",
+            resources: [
+                .process("Resources"),
             ],
             swiftSettings: swiftSettings()
         ),

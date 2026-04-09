@@ -17,7 +17,7 @@ struct ColorGallery: View {
 
 
 @State var fontNumber: Int = 2
-// @State var font: SwiftFigletEmbeddedFonts.Font = .acrobatic
+@State var font: SwiftFigletEmbeddedFonts.Font = .acrobatic
 var fontCount: Int { SwiftFigletEmbeddedFonts.Font.allCases.count }
 
   var body: some View {
@@ -27,19 +27,17 @@ var fontCount: Int { SwiftFigletEmbeddedFonts.Font.allCases.count }
           VStack(alignment: .leading) {
             HStack {
               Stepper("", value: $fontNumber)
-              if fontNumber >= 0 && fontNumber < fontCount {
-                Text(SwiftFigletEmbeddedFonts.Font.allCases[fontNumber].rawValue)
+                Text(font.rawValue)
               }
-            }
-              // .onChange(of: fontNumber) {
-              //   if fontNumber >= 0 && fontNumber < fontCount {
-              //     font = SwiftFigletEmbeddedFonts.Font.allCases[fontNumber]
-              //   } else {
-              //     fontNumber = 0
-              //   }
-              // }
+              .task(id: fontNumber) {
+                if fontNumber >= 0 && fontNumber < fontCount {
+                  font = SwiftFigletEmbeddedFonts.Font.allCases[fontNumber]
+                } else {
+                  fontNumber = 0
+                }
+              }
           if fontNumber >= 0 && fontNumber < fontCount {
-          TextFigure("Gallery", font: SwiftFigletEmbeddedFonts.Font.allCases[fontNumber])
+          TextFigure("Gallery", font: font)
             .foregroundStyle(Color.black)
             .padding(1)
             .background(Color.red)

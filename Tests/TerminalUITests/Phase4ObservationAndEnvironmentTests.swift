@@ -583,6 +583,41 @@ struct Phase4ObservationAndEnvironmentTests {
     #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 1") != nil)
   }
 
+  @Test("ScrollView stored content preserves the original state owner")
+  func scrollViewStoredContentPreservesTheOriginalStateOwner() throws {
+    let invalidator = Phase4RecordingInvalidator()
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      localActionRegistry: actionRegistry,
+      applyEnvironmentValues: true
+    )
+    initialContext.invalidationProxy = invalidationProxy
+
+    let initialArtifacts = renderer.render(
+      ScrollViewActionCounterView(),
+      context: initialContext
+    )
+    #expect(initialArtifacts.resolvedTree.descendant(withText: "Count 0") != nil)
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("ScrollViewAction")))
+
+    let invalidatedIdentities = collectedInvalidatedIdentities(from: invalidator)
+    #expect(!invalidatedIdentities.isEmpty)
+
+    var updatedContext = initialContext
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    let updatedArtifacts = renderer.render(
+      ScrollViewActionCounterView(),
+      context: updatedContext
+    )
+
+    #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 1") != nil)
+  }
+
   @Test("Split-pane layouts preserve stored builder panels under stateful actions")
   func splitPaneLayoutPreservesStoredBuilderPanels() throws {
     let invalidator = Phase4RecordingInvalidator()
@@ -1132,6 +1167,28 @@ private struct EnvironmentReaderActionCounterView: View {
 
       Text("Count \(count)")
     }
+  }
+}
+
+private struct ScrollViewActionCounterView: View {
+  @State private var count = 0
+
+  var body: some View {
+    ScrollView(.vertical) {
+      VStack(alignment: .leading, spacing: 0) {
+        Button("Primary") {
+          count += 1
+        }
+        .id(testIdentity("ScrollViewAction"))
+
+        Text("Count \(count)")
+
+        ForEach(0..<8) { index in
+          Text("Row \(index)")
+        }
+      }
+    }
+    .frame(width: 14, height: 4, alignment: .topLeading)
   }
 }
 

@@ -1,3 +1,5 @@
+import Foundation
+
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
@@ -379,6 +381,8 @@ public struct FigletFont: Sendable {
             directories.append(envValue)
         }
 
+        directories.append(contentsOf: bundledFontSearchDirectories())
+
         if let homeDirectory = environmentValue(named: "HOME") {
             directories.append(pathByAppending(homeDirectory, ".figfonts"))
         }
@@ -386,6 +390,25 @@ public struct FigletFont: Sendable {
         directories.append("figfonts")
 
         return uniquePaths(directories).filter(isDirectory(at:))
+    }
+
+    private static func bundledFontSearchDirectories() -> [String] {
+        #if SWIFT_PACKAGE
+        return uniquePaths(
+            [
+                Bundle.module.resourceURL?.path,
+                Bundle.module.resourcePath,
+                Bundle.module.resourceURL?.appendingPathComponent("Fonts", isDirectory: true).path,
+                Bundle.module.resourceURL?.appendingPathComponent("Resources/Fonts", isDirectory: true)
+                    .path,
+                Bundle.module.resourcePath.map { pathByAppending($0, "Fonts") },
+                Bundle.module.resourcePath.map { pathByAppending($0, "Resources/Fonts") },
+            ].compactMap { $0 }
+        )
+        .filter(isDirectory(at:))
+        #else
+        []
+        #endif
     }
 
     fileprivate static func parse(data: String, name: String) throws -> FigletFont {
