@@ -16,9 +16,10 @@ struct GalleryDemoApp: App {
 struct ColorGallery: View {
 
 
-@State var fontNumber: Int = 2
-@State var font: SwiftFigletEmbeddedFonts.Font = .acrobatic
-var fontCount: Int { SwiftFigletEmbeddedFonts.Font.allCases.count }
+@State var fontNumber: Int = EmbeddedFigletFont.allCases.firstIndex(of: .dosRebel)!
+@State var font: EmbeddedFigletFont = .dosRebel
+@State var color: Color = .red
+var fontCount: Int { EmbeddedFigletFont.allCases.count }
 
   var body: some View {
     ScrollView {
@@ -26,23 +27,25 @@ var fontCount: Int { SwiftFigletEmbeddedFonts.Font.allCases.count }
         VStack(alignment: .leading, spacing: 1) {
           VStack(alignment: .leading) {
             HStack {
-              Stepper("", value: $fontNumber)
+              Stepper("font", value: $fontNumber)
                 Text(font.rawValue)
-              }
-              .task(id: fontNumber) {
-                if fontNumber >= 0 && fontNumber < fontCount {
-                  font = SwiftFigletEmbeddedFonts.Font.allCases[fontNumber]
-                } else {
-                  fontNumber = 0
+                Button("↴"){
+                  withAnimation(.easeInOut(duration: .seconds(2.0))) {
+                    color = color.rotatedHue(by: 40.0)
+                  }
                 }
               }
-          if fontNumber >= 0 && fontNumber < fontCount {
+              .task(id: fontNumber) {
+                if fontNumber < 0 {
+                  fontNumber = fontCount - 1
+                } else if fontNumber > fontCount {
+                  fontNumber = 0
+                }
+                font = EmbeddedFigletFont.allCases[fontNumber]
+              }
           TextFigure("Gallery", font: font)
-            .foregroundStyle(Color.black)
+            .foregroundStyle(color)
             .padding(1)
-            .background(Color.red)
-            .padding(1)
-          }
           }
           terminalPaletteSection(palette: appearance.palette)
           namedColorsSection
