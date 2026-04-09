@@ -10,5 +10,6 @@ words:
   - Ghostty
   - Sparkline
   - Sparklines
+  - uppercased
 ignoreWords: []
 import: []
