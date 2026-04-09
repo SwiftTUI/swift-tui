@@ -4,11 +4,9 @@ import TerminalUI
 public struct ExampleApp: App {
   public init() {}
 
-  private let model = GalleryDemoModel()
-
   public var body: some Scene {
     WindowGroup("Component Gallery") {
-      GalleryDemoSceneView(model: model)
+      GalleryView()
     }
     WindowGroup("Details", id: WindowIdentifier("details")) {
       GeometryReader { geometry in

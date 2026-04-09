@@ -12,7 +12,11 @@ let package = Package(
     .executable(
       name: "gallery-demo",
       targets: ["GalleryDemo"]
-    )
+    ),
+    .library(
+      name: "GalleryDemoViews",
+      targets: ["GalleryDemoViews"]
+    ),
   ],
   dependencies: [
     .package(path: "../.."),
@@ -23,11 +27,18 @@ let package = Package(
     .executableTarget(
       name: "GalleryDemo",
       dependencies: [
+        "GalleryDemoViews",
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+      ]
+    ),
+    .target(
+      name: "GalleryDemoViews",
+      dependencies: [
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
         .product(name: "TerminalUICLI", package: "TerminalUICLI"),
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
         .product(name: "Algorithms", package: "swift-algorithms"),
       ]
-    )
+    ),
   ]
 )
