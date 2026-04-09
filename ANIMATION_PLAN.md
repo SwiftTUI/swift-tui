@@ -17,6 +17,132 @@ This is **not** API-surface mimicry. The internal model (resolve-once,
 animate-through-pipeline, identity-keyed animation state) matches SwiftUI's
 approach, scoped to terminal-representable properties.
 
+The design must be future-compatible with:
+
+- built-in spring families such as `.smooth`, `.snappy`, and `.bouncy`
+- `Binding.animation(_:)`
+- transaction-scoped animation overrides
+- custom transitions
+- later phase-based and keyframe-based APIs such as `phaseAnimator` and
+  `keyframeAnimator`
+
+The design must also respect the realities of a terminal renderer:
+
+- layout is cell-quantized
+- presentation is incremental and idle frames should still converge to zero
+  bytes written
+- semantics, focus, lifecycle, and tasks remain driven by the committed tree,
+  not by temporary animation overlays
+
+## SwiftUI Findings That Shape The Design
+
+SwiftUI's animation model is more constrained and more structured than it first
+appears:
+
+1. `withAnimation`, `Binding.animation(_:)`, and `.animation(_:value:)` are all
+   transaction-based APIs. They do not directly animate closures or views;
+   they annotate a specific update with `Animation?` intent.
+2. `Transaction` is per-update and ephemeral. It is propagated during one UI
+   refresh, then discarded.
+3. `.animation(_:value:)` is value-gated. It only writes animation into the
+   transaction when the watched value changes.
+4. Only animatable properties interpolate. Non-interpolable state changes still
+   snap.
+5. Structural transitions are distinct from ordinary property animation.
+   `transition(_:)` applies when a view is inserted into or removed from the
+   hierarchy.
+6. Modern SwiftUI custom transitions are phase-based. The important mental model
+   is `willAppear -> identity -> didDisappear`.
+7. `phaseAnimator` is layered on top of ordinary animation. It advances through
+   discrete phases and still uses normal `Animation` values between them.
+8. `keyframeAnimator` is a different class of system. It defines a timeline of
+   values directly and is not a good substitute for retargetable, interactive
+   state animation.
+
+These findings point to one architectural split that we should preserve:
+
+- `Animation` decides how progress evolves over time.
+- animatable surfaces decide what can interpolate.
+- `TransactionSnapshot` scopes animation intent to a single update.
+- transitions are structural visual effects layered on top of lifecycle and
+  diffing, not a second kind of state invalidation.
+
+## Design Principles
+
+### 1. Keep SwiftUI's Transaction Model
+
+The system should feel SwiftUI-shaped because it uses the same conceptual flow:
+
+- authored API writes animation intent into the current transaction
+- resolve propagates transaction intent through the tree
+- animatable runtime surfaces decide whether to interpolate
+
+We should not build a parallel "global animator" API that bypasses
+transactions.
+
+### 2. Separate Animation From Transition
+
+Animation and transition overlap, but they are not the same thing:
+
+- ordinary animation applies to state changes on views that survive the update
+- transition applies to insertion/removal of view identity
+
+Internally they can share clocks, sampling, and scheduling, but they should not
+collapse into one enum or one modifier type.
+
+### 3. Preserve The Existing Pipeline
+
+The current pipeline:
+
+```text
+resolve -> measure -> place -> semantics -> draw -> raster -> commit
+```
+
+should remain the mental model.
+
+Animation should be introduced as:
+
+```text
+resolve -> animate/sample -> measure -> place -> semantics -> draw -> raster -> commit
+```
+
+where "animate/sample" is a package-only controller that can:
+
+- capture from/to snapshots for changed animatable properties
+- inject interpolated values before measure (so layout sees intermediate state)
+- overlay disappearing transition snapshots during draw
+- return the next wake deadline
+
+### 4. Keep Time Out Of `TransactionSnapshot`
+
+`TransactionSnapshot` should carry intent, not progress.
+
+If frame time lives inside `TransactionSnapshot`, retained resolve reuse will
+collapse because every animation frame would look like a new transaction even
+when nothing else changed.
+
+### 5. Be Honest About Terminal Limits
+
+A terminal can render some kinds of animation convincingly and others poorly.
+
+Good v1 fits:
+
+- color interpolation
+- opacity fades
+- integer-cell offset and reveal/clipping transitions
+- spring timing for interruptible value changes
+
+Poor v1 fits:
+
+- sub-cell transforms
+- rotation
+- blur
+- arbitrary scale
+- matched geometry
+
+The public design should not imply broad visual capabilities that the renderer
+cannot deliver.
+
 ## Design Decisions
 
 These were settled during the brainstorming conversation:
@@ -421,7 +547,7 @@ For each active animation:
 
 1. Compute `elapsed = timestamp - startTime`
 2. Apply delay (skip if `elapsed < delay`)
-3. Evaluate animation curve → progress (may overshoot for springs)
+3. Evaluate animation curve -> progress (may overshoot for springs)
 4. Interpolate: `current = from + (to - from) * progress`
    - For colors: use `Color.interpolated(to:progress:method: .perceptual)`
    - For integers: truncate interpolated Double to Int
@@ -446,26 +572,26 @@ In `RunLoop+Rendering.swift`, the frame rendering flow becomes:
 
 ```
  1. Resolve (unchanged)
- 2. → animationController.processResolvedTree(resolved, transaction, timestamp)
- 3. → animationController.applyInterpolations(to: &resolved, at: timestamp)
+ 2. -> animationController.processResolvedTree(resolved, transaction, timestamp)
+ 3. -> animationController.applyInterpolations(to: &resolved, at: timestamp)
  4. Measure (uses interpolated values — layout sees intermediate padding/size)
  5. Place (uses interpolated values — positions reflect intermediate state)
  6. Semantics (unchanged)
  7. Draw (uses interpolated values — colors/opacity are intermediate)
  8. Raster (unchanged)
  9. Commit (unchanged)
-10. → if tickResult.hasActiveAnimations:
+10. -> if tickResult.hasActiveAnimations:
        scheduler.requestDeadline(tickResult.nextDeadline)
 ```
 
-Steps 2–3 are the only new insertions. The rest of the pipeline is untouched.
+Steps 2-3 are the only new insertions. The rest of the pipeline is untouched.
 
 ### Frame Cadence
 
 - **30 FPS** target during active animation (`frameInterval = .milliseconds(33)`)
 - Next deadline: `min(earliestAnimationEnd, now + frameInterval)` across all
   active animations
-- When all animations complete, no more deadlines are requested → runtime
+- When all animations complete, no more deadlines are requested -> runtime
   returns to idle event-driven mode (zero-cost when not animating)
 
 ### Interrupted Animation Retargeting
@@ -480,8 +606,11 @@ When a new animation starts for a key that already has an active animation:
 
 The controller tracks which identities are new (inserted) vs removed by
 comparing the identity set between frames. This feeds into the transition
-system (Layer 4). Removed identities keep their animations alive until
-transitions complete.
+system (Layer 4).
+
+Removed identities are retained as non-semantic visual overlays — they
+participate only in draw/raster for the duration of the removal animation
+(see Layer 4). They do not remain in the live semantic tree.
 
 ---
 
@@ -539,19 +668,25 @@ The type erasure resolves transitions down to their concrete property effects.
 The `Transition` protocol's `body` method is the authoring surface;
 `AnyTransition` flattens it into property deltas.
 
+**Known limitation:** `TransitionModifiers` currently supports only opacity and
+offset effects. Custom transitions that use other modifiers in their `body` will
+have those effects silently ignored until the effect palette is expanded. This
+is an intentional constraint — the internal runtime is phase-based and ready for
+a wider effect set, but the renderer should only promise what it can deliver.
+
 ### Built-in Transitions
 
 ```swift
 extension AnyTransition {
     /// Fades in/out
     public static var opacity: AnyTransition
-    // willAppear: opacity = 0 → 1
-    // didDisappear: opacity = 1 → 0
+    // willAppear: opacity = 0 -> 1
+    // didDisappear: opacity = 1 -> 0
 
     /// Slides from a specific edge
     public static func move(edge: Edge) -> AnyTransition
-    // willAppear: offset from edge → origin
-    // didDisappear: origin → offset to edge
+    // willAppear: offset from edge -> origin
+    // didDisappear: origin -> offset to edge
 
     /// Leading in, trailing out
     public static var slide: AnyTransition
@@ -559,8 +694,8 @@ extension AnyTransition {
 
     /// Fixed offset shift
     public static func offset(x: Int = 0, y: Int = 0) -> AnyTransition
-    // willAppear: offset(x,y) → (0,0)
-    // didDisappear: (0,0) → offset(x,y)
+    // willAppear: offset(x,y) -> (0,0)
+    // didDisappear: (0,0) -> offset(x,y)
 
     /// Push: old exits one way, new enters from same direction
     public static func push(from edge: Edge) -> AnyTransition
@@ -577,6 +712,16 @@ extension AnyTransition {
     ) -> AnyTransition
 }
 ```
+
+Do not promise these yet:
+
+- `.scale` — no sub-cell scaling
+- rotation-based transitions
+- blur-based transitions
+- transform-heavy custom transitions
+
+Those effects are natural in SwiftUI, but they are not a good first fit for a
+cell rasterizer.
 
 ### .transition() View Modifier
 
@@ -613,11 +758,15 @@ struct WipeTransition: Transition {
 
 ### Lifecycle Integration with AnimationController
 
+Transitions are driven by identity diffing from `ViewGraph`. The runtime
+already knows which nodes appeared, disappeared, and preserved identity each
+frame. That is the right place to decide whether a transition track starts.
+
 **Insertion:**
 
 1. A new identity appears in the resolved tree that wasn't in the previous frame
 2. Controller checks if the node has a `.transition()` modifier
-3. If yes: starts animation from `willAppear` phase modifiers → `identity`
+3. If yes: starts animation from `willAppear` phase modifiers -> `identity`
    phase modifiers
 4. The transition's property deltas (opacity, offset) become the `from` values;
    identity values are the `to` values
@@ -625,16 +774,24 @@ struct WipeTransition: Transition {
 
 **Removal:**
 
+This is the most important transition design constraint in the repo:
+
+**Removed views cannot remain in the live semantic tree just because they are
+still animating visually.** Semantics, focus, tasks, lifecycle, and interaction
+must already reflect removal. The animation controller retains only a
+non-semantic visual snapshot.
+
 1. An identity from the previous frame is absent in the new resolved tree
 2. Controller checks if the node had a `.transition()` modifier
-3. If yes: the node is **kept alive** in the resolved tree during the animation
-4. Starts animation from `identity` phase modifiers → `didDisappear` phase
+3. If yes: the controller retains a non-semantic visual snapshot at the node's
+   last placed position
+4. Starts animation from `identity` phase modifiers -> `didDisappear` phase
    modifiers
-5. When animation completes, the node is truly removed from the tree
-6. During the animation, the node continues to participate in draw + raster
-   but **not** in layout (it occupies no space — same as SwiftUI)
+5. The snapshot participates only in draw/raster — not in layout, focus,
+   semantics, or interaction
+6. When the removal animation completes, the snapshot is purged
 
-**Kept-alive nodes** — the key complexity:
+**Removal snapshot structure:**
 
 ```swift
 package struct RemovalEntry: Sendable {
@@ -660,65 +817,96 @@ Matches SwiftUI behavior.
 
 ## Layer 5: Scheduler Wake Integration
 
-### The Problem
+### Existing Infrastructure
 
-The current run loop only wakes on two streams: input events and signals. The
-event pump merges these into an `AsyncSequence`. When no input arrives and no
-signal fires, the loop sleeps — even if `requestDeadline()` was called.
-Animation frames need to render on a timer with no user interaction.
+The repo already has wake-notification plumbing. No new stream or protocol is
+needed — the existing mechanism must be extended to cover deadline-driven wakes.
 
-### Wake Stream on FrameScheduler
+**What exists today:**
+
+- `WakeNotifyingFrameScheduling` protocol
+  (`Sources/Core/Scheduler.swift:41`) with
+  `setWakeHandler(_ handler: (@Sendable () -> Void)?)`.
+
+- `FrameScheduler` conforms, storing the handler behind
+  `wakeHandlerLock: OSAllocatedUnfairLock`.
+
+- `requestInvalidation(of:)` and `requestExternalWake(reason:)` already call
+  the wake handler after mutating pending state.
+
+- The event pump (`RunLoop+EventPump.swift:113`) already wires the wake handler
+  into the unified `AsyncStream<Void>` that input and signal tasks also yield
+  into:
+
+  ```swift
+  wakeNotifyingScheduler?.setWakeHandler {
+      continuation.yield()
+  }
+  ```
+
+- The run loop (`RunLoop.swift:311`) already handles wake-without-events:
+
+  ```swift
+  guard !pendingEvents.isEmpty else {
+      if scheduler.hasPendingFrame(at: .now()) {
+          try renderPendingFrames(renderedFrames: &renderedFrames)
+      }
+      continue
+  }
+  ```
+
+- `ScheduledFrame` already carries `triggeredDeadline`, `nextDeadline`, and
+  `.deadline` as a `WakeCause`.
+
+### The Gaps
+
+**1. `requestDeadline` does not call the wake handler.**
+(`Scheduler.swift:89-95`) It stores the deadline but never fires the handler.
+If animation requests a future deadline and nothing else wakes the loop, the
+loop sleeps through it.
+
+**2. The coalesce path silently drops the wake.** When `requestDeadline` is
+called with a deadline earlier than the existing one, it updates the stored
+value but the early-return path (line 90-92) never notifies.
+
+**3. No timed-wait for future deadlines.** Even if `requestDeadline` called the
+wake handler immediately, the loop would wake, find
+`hasPendingFrame(at: .now()) == false` (because the deadline is in the future),
+and go back to sleep with no mechanism to wake again at the right time. The
+event pump needs the ability to sleep until a specific deadline rather than
+blocking indefinitely on the next yield.
+
+### Required Changes
+
+**Fix 1 — `requestDeadline` must notify:**
 
 ```swift
-// Core module (Scheduler.swift)
-package final class FrameScheduler: FrameScheduling, AnimationAwareInvalidating {
-    // Existing fields...
-
-    // NEW: continuation-backed wake notifier
-    private var wakeContinuation: AsyncStream<Void>.Continuation?
-    package var wakeStream: AsyncStream<Void>  // vended once to the run loop
-
-    private func notifyWake() {
-        wakeContinuation?.yield()
+public func requestDeadline(_ deadline: MonotonicInstant) {
+    if let existing = nextDeadline {
+        nextDeadline = min(existing, deadline)
+    } else {
+        nextDeadline = deadline
     }
+    wakeHandlerLock.withLockUnchecked { $0 }?()
 }
 ```
 
-`requestDeadline()` and `requestInvalidation()` both call `notifyWake()`. This
-wakes the run loop even when there's no input.
+**Fix 2 — Timed wake for future deadlines:**
 
-### Event Pump Merge
+The event pump or run loop must be able to sleep until the next deadline
+instead of waiting indefinitely for a yield. Implementation options include a
+delayed `Task.sleep`-then-yield in the scheduler, a timed `AsyncStream`
+iteration in the event pump, or a racing `select`-style wait. The specific
+mechanism should be chosen during implementation; the requirement is: when a
+future deadline is the only pending wake source, the loop must wake at (or
+shortly after) that instant without requiring external input or a second
+`requestDeadline` call.
 
-In `RunLoop+EventPump.swift`, the event pump currently merges input + signals.
-Add the scheduler wake as a third stream:
+**Fix 3 — Carry animation request on `ScheduledFrame`:**
 
-```swift
-// TerminalUI module (RunLoop+EventPump.swift)
-let merged = merge(
-    inputEvents,        // keyboard, mouse
-    signalEvents,       // SIGWINCH, etc.
-    schedulerWakes      // deadline reached, background invalidation
-)
-```
-
-### Run Loop Changes
-
-In `RunLoop.swift`, the main loop body adds one check:
-
-```swift
-// After draining pending events:
-if pendingEvents.isEmpty {
-    // Woke from scheduler (deadline or background invalidation)
-    if scheduler.hasPendingFrame(at: .now()) {
-        try renderPendingFrames(renderedFrames: &renderedFrames)
-    }
-    continue
-}
-```
-
-This is already partially there in the existing code — it checks
-`hasPendingFrame` when events are empty. The missing piece is the wake stream
-that causes the loop to actually wake up when a deadline arrives.
+Add `package var animationRequest: AnimationRequest` to `ScheduledFrame` and
+`FrameContext` so the animation controller can read the transaction's animation
+intent.
 
 ### Deadline-Only Frame Reuse
 
@@ -728,7 +916,7 @@ need re-rendering. Two changes needed:
 1. **Resolve reuse with empty invalidation set:** Currently the reuse check
    requires `invalidatedIdentities` to be non-empty. For animation frames,
    empty means "nothing re-resolved, just re-interpolate." Fix: treat empty
-   invalidation set as "nothing is dirty" → full resolve reuse.
+   invalidation set as "nothing is dirty" -> full resolve reuse.
 
 2. **Transaction reuse equivalence:** Use `isReuseEquivalent(to:)` instead of
    `==` for transaction comparison during resolve reuse. This ignores
@@ -741,18 +929,18 @@ only the animation controller's interpolation + measure/place/draw/raster run.
 
 ```
 State change inside withAnimation
-  → invalidation with animation request
-  → scheduler.requestInvalidation() + notifyWake()
-  → run loop wakes
-  → frame renders (resolve runs, animation controller captures from/to)
-  → animation controller returns nextDeadline
-  → scheduler.requestDeadline(nextDeadline)
-  → notifyWake() (for the NEXT tick)
-  → run loop wakes at deadline
-  → frame renders (resolve REUSED, interpolation runs, measure/place/draw/raster)
-  → repeat until all animations complete
-  → no more deadlines requested
-  → run loop returns to idle (zero cost)
+  -> invalidation with animation request
+  -> scheduler.requestInvalidation() (calls wake handler)
+  -> run loop wakes
+  -> frame renders (resolve runs, animation controller captures from/to)
+  -> animation controller returns nextDeadline
+  -> scheduler.requestDeadline(nextDeadline) (calls wake handler)
+  -> run loop sleeps until deadline
+  -> run loop wakes at deadline
+  -> frame renders (resolve REUSED, interpolation runs, measure/place/draw/raster)
+  -> repeat until all animations complete
+  -> no more deadlines requested
+  -> run loop returns to idle (zero cost)
 ```
 
 ### Broader Fix
@@ -761,8 +949,54 @@ This wake integration also fixes existing gaps unrelated to animation:
 
 - Lifecycle-driven invalidations (`onAppear` tasks that mutate state) now wake
   the loop
-- External invalidation via `requestExternalWake()` now actually wakes
+- External invalidation via `requestExternalWake()` already wakes (this is
+  working today)
 - Background `@Observable` changes propagate without waiting for input
+
+---
+
+## Future Compatibility
+
+### 1. `Binding.animation(_:)`
+
+The mutation-time transaction plumbing should be built so bindings can reuse it
+without touching the animation controller.
+
+### 2. Body-Scoped Animation APIs
+
+SwiftUI now has body-scoped animation and transaction modifiers. The internal
+transaction override helpers added for `.animation(_:value:)` should be reusable
+for these later surfaces.
+
+### 3. `phaseAnimator`
+
+`phaseAnimator` should be implemented as a separate higher-level engine that:
+
+- drives a phase sequence
+- selects an `Animation?` per phase edge
+- delegates actual interpolation to the same base animation controller
+
+The current work should therefore avoid baking "exactly one from/to state" too
+deeply into runtime types.
+
+### 4. `keyframeAnimator`
+
+Keyframes should be a separate timeline/value engine. They should not reuse the
+same internal type as transaction-carried state animation.
+
+The scheduler and frame clock can be shared, but the sampled value generation
+should be separate.
+
+### 5. Completion Support
+
+SwiftUI now exposes animation completion criteria. We do not need to implement
+that in the first public slice, but we should not paint ourselves into a corner.
+
+Recommendation:
+
+- assign stable internal animation batch IDs when creating tracks
+- keep controller-owned track groups explicit
+- later add completion observers keyed by batch ID and completion criteria
 
 ---
 
@@ -790,13 +1024,55 @@ reuse.
 - `Sources/Core/EnvironmentAndNodeTypes.swift`
 - `Sources/Core/CommitPlanner.swift` (reuse predicate)
 
+**Key repo-specific fix:**
+
+`ViewGraph.reusableSnapshot(...)` currently bails out when
+`invalidatedIdentities` is empty. Animation frames and future timeline frames
+need empty-invalidation reuse to be legal.
+
 **Acceptance criteria:**
 
 - Deadline frames with no invalidated identities reuse resolved subtrees
 - Transaction debug signatures do not break reuse
 - No public animation API exposed yet
 
-### Phase 1: Animation Type System
+### Phase 1: Scheduler Wake Integration
+
+**Objectives:** Wire deadline wakes into the existing run loop infrastructure so
+deadline-only frames can render without user input.
+
+**Changes:**
+
+1. Fix `requestDeadline` to call the wake handler after storing the deadline
+2. Add timed-wait support so the loop sleeps until a future deadline rather
+   than blocking indefinitely
+3. Fix the deadline coalesce path to wake when a new deadline is earlier than
+   the existing one
+4. Preserve mouse coalescing for input batches
+5. Carry animation request on `ScheduledFrame` and `FrameContext`
+
+**Files:**
+
+- `Sources/Core/Scheduler.swift`
+- `Sources/Core/CommitAndFrameTypes.swift`
+- `Sources/TerminalUI/RunLoop.swift`
+- `Sources/TerminalUI/RunLoop+EventPump.swift`
+
+**Key repo-specific constraint:**
+
+The event pump already supports scheduler wake callbacks through
+`WakeNotifyingFrameScheduling`; the missing pieces are (a) `requestDeadline`
+calling the wake handler, (b) timed-wait for future deadlines, and (c) carrying
+animation requests through scheduled frames.
+
+**Acceptance criteria:**
+
+- Scheduled deadlines trigger rendering without user input
+- Background invalidations trigger rendering without input
+- Existing input and signal behavior unchanged
+- Lifecycle-driven invalidations wake the loop
+
+### Phase 2: Animation Type System
 
 **Objectives:** Build the `Animation` type, spring solver, bezier solver,
 `CustomAnimation` protocol.
@@ -826,7 +1102,7 @@ reuse.
 - `Animation.smooth`, `.snappy`, `.bouncy` produce distinct spring behaviors
 - `CustomAnimation` protocol allows user-defined animation curves
 
-### Phase 2: Mutation-Time Plumbing
+### Phase 3: Mutation-Time Plumbing
 
 **Objectives:** Let `withAnimation` attach animation intent to invalidations.
 
@@ -858,7 +1134,7 @@ reuse.
 - State writes inside `withAnimation(nil)` explicitly disable animation
 - Plain mutations behave exactly as before
 
-### Phase 3: Public View API + Resolve-Time Modifiers
+### Phase 4: Public View API + Resolve-Time Modifiers
 
 **Objectives:** Expose the authored API, implement subtree-scoped
 `.animation(_:value:)`.
@@ -886,7 +1162,7 @@ reuse.
 - `.transaction()` can strip animation from a subtree
 - No value-less `.animation(_:)` surface is added
 
-### Phase 4: Animation Controller
+### Phase 5: Animation Controller
 
 **Objectives:** Build the stateful animation engine.
 
@@ -913,7 +1189,7 @@ reuse.
 - Interrupted animations retarget from current displayed value
 - Animations complete and stop requesting frames
 
-### Phase 5: Transition System
+### Phase 6: Transition System
 
 **Objectives:** Implement the modern `Transition` protocol and built-in
 transitions.
@@ -926,7 +1202,7 @@ transitions.
 4. Add combinators: `combined(with:)`, `asymmetric(insertion:removal:)`
 5. Add `.transition()` view modifier
 6. Add insertion/removal tracking to `AnimationController`
-7. Add kept-alive node support for removal animations
+7. Add non-semantic removal snapshot support for exit animations
 
 **Files:**
 
@@ -937,35 +1213,12 @@ transitions.
 **Acceptance criteria:**
 
 - New views fade in with `.transition(.opacity)`
-- Removed views animate out before being removed from draw tree
+- Removed views animate out as non-semantic overlays before being purged
 - `.asymmetric()` uses different transitions for insertion and removal
 - Custom transitions via the `Transition` protocol work
 - Views without `.transition()` snap immediately
-
-### Phase 6: Scheduler Wake Integration
-
-**Objectives:** Wire deadline wakes into the run loop event pump.
-
-**Changes:**
-
-1. Add wake stream (`AsyncStream<Void>`) to `FrameScheduler`
-2. Merge wake stream into `RunLoop.EventPump`
-3. Update run loop to render on scheduler wake with no input events
-4. Preserve mouse coalescing for input batches
-5. Fix resolve reuse for empty invalidation sets (if not done in Phase 0)
-
-**Files:**
-
-- `Sources/Core/Scheduler.swift`
-- `Sources/TerminalUI/RunLoop.swift`
-- `Sources/TerminalUI/RunLoop+EventPump.swift`
-
-**Acceptance criteria:**
-
-- Scheduled deadlines trigger rendering without user input
-- Background invalidations trigger rendering without input
-- Existing input and signal behavior unchanged
-- Lifecycle-driven invalidations wake the loop
+- Removal overlays do not participate in layout, focus, semantics, or
+  interaction
 
 ### Phase 7: Testing + Docs
 
@@ -981,23 +1234,31 @@ transitions.
    changes don't defeat reuse
 5. **Animation controller** — color interpolation, opacity fade, integer
    truncation for position, retargeting from interrupted state
-6. **Transitions** — insertion/removal lifecycle, kept-alive nodes during
-   removal, combinators, custom transitions
-7. **Scheduler wake** — deadline wakes, background invalidation wakes
+6. **Transitions** — insertion/removal lifecycle, non-semantic removal overlays,
+   combinators, custom transitions
+7. **Scheduler wake** — deadline wakes, background invalidation wakes,
+   timed-wait for future deadlines
 8. **Interactive runtime** — animation progresses over deadlines without input,
    stops scheduling after completion
 
+**Regression cases worth pinning:**
+
+- interrupted spring retargeting starts from the current displayed value
+- explicit `.animation(nil, value:)` beats inherited animation
+- transitions do not keep removed views interactive
+- focus/selection routes reflect only the committed tree, not disappearing
+  overlays
+- damage tracking still converges to zero bytes after animation completes
+
 **Suggested test files:**
 
-- `Tests/TerminalUITests/AnimationSolverTests.swift`
-- `Tests/TerminalUITests/AnimationControllerTests.swift`
-- `Tests/TerminalUITests/TransitionTests.swift`
-- `Tests/TerminalUITests/AnimationPipelineTests.swift`
-
-**Docs updates:**
-
-- `docs/PUBLIC_API_INVENTORY.md`
-- `docs/SOURCE_LAYOUT.md`
+- `Tests/CoreTests/Graph/ViewGraphTests.swift`
+- New `Tests/CoreTests/AnimationSchedulerTests.swift`
+- New `Tests/ViewTests/AnimationSurfaceTests.swift`
+- New `Tests/TerminalUITests/AnimationSolverTests.swift`
+- New `Tests/TerminalUITests/AnimationControllerTests.swift`
+- New `Tests/TerminalUITests/TransitionTests.swift`
+- New `Tests/TerminalUITests/AnimationPipelineTests.swift`
 
 ---
 
@@ -1022,16 +1283,45 @@ transitions.
 | File | Module | Changes |
 |------|--------|---------|
 | `Sources/Core/EnvironmentAndNodeTypes.swift` | Core | AnimationRequest on TransactionSnapshot |
-| `Sources/Core/Scheduler.swift` | Core | AnimationAwareInvalidating, wake stream |
+| `Sources/Core/Scheduler.swift` | Core | AnimationAwareInvalidating, requestDeadline wake fix, timed-wait support |
 | `Sources/Core/StateContainer.swift` | Core | Animation-aware invalidation path |
 | `Sources/Core/CommitAndFrameTypes.swift` | Core | Animation request on ScheduledFrame/FrameContext |
 | `Sources/Core/CommitPlanner.swift` | Core | Reuse predicate for empty invalidation sets |
 | `Sources/Core/Graph/ViewNode.swift` | Core | setStateSlotSilently for non-invalidating writes |
 | `Sources/View/State.swift` | View | Propagate animation request from task-local |
 | `Sources/View/Environment/FrameResolveState.swift` | View | Transaction transformation helpers |
-| `Sources/TerminalUI/RunLoop.swift` | TerminalUI | Scheduler wake handling |
-| `Sources/TerminalUI/RunLoop+EventPump.swift` | TerminalUI | Merge wake stream |
+| `Sources/TerminalUI/RunLoop.swift` | TerminalUI | Timed-wait for future deadlines |
+| `Sources/TerminalUI/RunLoop+EventPump.swift` | TerminalUI | Timed-wait integration (if needed at pump level) |
 | `Sources/TerminalUI/RunLoop+Rendering.swift` | TerminalUI | Animation controller integration |
+
+---
+
+## Rollout Recommendation
+
+### PR 1: Foundation + Plumbing
+
+- Phase 0 (foundation types, reuse semantics)
+- Phase 1 (scheduler wake integration)
+- Phase 2 (animation type system, solvers)
+- Phase 3 (mutation-time plumbing)
+- Tests for scheduling, reuse, wake behavior, and solver correctness
+
+This PR proves the runtime can handle deadline wakes and animation-aware
+transactions before any user-facing animation API depends on them.
+
+### PR 2: Public API + Controller
+
+- Phase 4 (public view API, resolve-time modifiers)
+- Phase 5 (animation controller)
+- Phase 7 partial (controller tests, interpolation tests)
+
+### PR 3: Transitions
+
+- Phase 6 (transition system)
+- Phase 7 partial (transition tests, integration tests, docs)
+
+This sequencing reduces integration risk: the runtime proves itself first, then
+the animation engine, then the transition lifecycle.
 
 ---
 
@@ -1045,21 +1335,39 @@ entirely — only interpolation + measure/place/draw/raster run.
 
 ### Risk: Scheduler wake integration changes runtime behavior broadly
 
-**Mitigation:** Targeted tests for background invalidation and input handling.
-Keep event coalescing for pointer streams. Keep scheduler wake notifications
-package-only.
+**Mitigation:** The changes are minimal — `requestDeadline` calling the
+existing wake handler, plus timed-wait support. Targeted tests for background
+invalidation and input handling. Keep event coalescing for pointer streams.
+Keep scheduler wake notifications package-only.
 
-### Risk: Kept-alive removal nodes create complexity
+### Risk: Removal transitions fight lifecycle semantics
 
-**Mitigation:** Removal nodes are frozen snapshots placed at their last known
-position. They participate in draw but not layout. Clear ownership: the
-`AnimationController.removingNodes` dictionary manages their lifecycle.
+**Mitigation:** Render exiting nodes only as non-semantic visual overlays.
+Keep lifecycle, tasks, focus, and interaction bound to the committed tree.
+
+### Risk: Transition API shape outruns runtime reality
+
+**Mitigation:** `AnyTransition` flattens custom transitions into a fixed
+property-effect palette (`TransitionModifiers`: opacity + offset). The
+`Transition` protocol is the correct authoring surface, but the renderer only
+promises effects it can deliver. Document the limitation; expand the palette
+incrementally.
+
+### Risk: Terminal visuals make some SwiftUI transitions look bad
+
+**Mitigation:** Constrain v1 built-ins to opacity, offset, push, slide, and
+reveal. Explicitly defer scale, blur, and rotation-based transitions.
 
 ### Risk: Integer-stepped position animations look bad
 
 **Mitigation:** 30fps cadence smooths small movements. Position animation is
 opt-in (only happens when the user applies `.animation()` to position-affecting
 properties). Most terminal UIs will primarily use color/opacity transitions.
+
+### Risk: `.animation(_:value:)` needs stored previous values during resolve
+
+**Mitigation:** Explicit non-invalidating state-store path for modifier
+bookkeeping (`setStateSlotSilently`). Behavior stays local to the modifier.
 
 ### Risk: CustomAnimation protocol adds surface area too early
 
@@ -1068,39 +1376,19 @@ properties). Most terminal UIs will primarily use color/opacity transitions.
 implemented as `CustomAnimation` conformances, so the protocol is validated by
 its own built-in usage.
 
-### Risk: `.animation(_:value:)` needs stored previous values during resolve
-
-**Mitigation:** Explicit non-invalidating state-store path for modifier
-bookkeeping (`setStateSlotSilently`). Behavior stays local to the modifier.
-
 ---
 
-## Rollout Recommendation
+## Documentation Updates
 
-### PR 1: Foundation + Plumbing
+These doc updates should ship in the same changes that introduce the public
+APIs:
 
-- Phase 0 (foundation types, reuse semantics)
-- Phase 1 (animation type system, solvers)
-- Phase 2 (mutation-time plumbing)
-- Phase 6 (scheduler wake integration)
-- Tests for scheduling, reuse, and solver correctness
-
-This PR proves the runtime can handle deadline wakes and animation-aware
-transactions before any user-facing animation API depends on them.
-
-### PR 2: Public API + Controller
-
-- Phase 3 (public view API, resolve-time modifiers)
-- Phase 4 (animation controller)
-- Phase 7 (controller tests, interpolation tests)
-
-### PR 3: Transitions
-
-- Phase 5 (transition system)
-- Phase 7 (transition tests, integration tests, docs)
-
-This sequencing reduces integration risk: the runtime proves itself first, then
-the animation engine, then the transition lifecycle.
+- `docs/PUBLIC_API_INVENTORY.md`
+- `docs/SOURCE_LAYOUT.md`
+- `docs/STATUS.md`
+- `docs/ARCHITECTURE.md`
+- `docs/RUNTIME.md`
+- `docs/README.md`
 
 ---
 
@@ -1108,9 +1396,44 @@ the animation engine, then the transition lifecycle.
 
 These are enabled by this architecture but not part of this plan:
 
-- `keyframeAnimator(initialValue:repeating:content:keyframes:)`
+- `Binding.animation(_:)`
+- public `Transaction` / `TransactionKey`
+- body-scoped `.animation(_:body:)`
+- `contentTransition(_:)`
 - `phaseAnimator(_:content:animation:)`
+- `keyframeAnimator(initialValue:repeating:content:keyframes:)`
 - `matchedGeometryEffect`
 - Gradient interpolation
 - `TerminalChromeStyle` interpolation
+- Navigation and scroll transitions
 - 60fps mode (if terminal I/O permits)
+
+---
+
+## References
+
+### SwiftUI docs
+
+- [Animations](https://developer.apple.com/documentation/swiftui/animations)
+- [withAnimation(_:_:)](https://developer.apple.com/documentation/swiftui/withanimation%28_%3A_%3A%29/)
+- [Transaction](https://developer.apple.com/documentation/swiftui/transaction)
+- [Transition](https://developer.apple.com/documentation/swiftui/transition)
+- [View.transition(_:)](https://developer.apple.com/documentation/SwiftUI/View/transition%28_%3A%29-5h5h0)
+
+### WWDC sessions
+
+- [Explore SwiftUI animation (WWDC23)](https://developer.apple.com/videos/play/wwdc2023/10156/)
+- [Wind your way through advanced animations in SwiftUI (WWDC23)](https://developer.apple.com/videos/play/wwdc2023/10157/)
+- [Animate with springs (WWDC23)](https://developer.apple.com/videos/play/wwdc2023/10158/)
+- [Enhance your UI animations and transitions (WWDC24)](https://developer.apple.com/videos/play/wwdc2024/10145/)
+- [Create custom visual effects with SwiftUI (WWDC24)](https://developer.apple.com/videos/play/wwdc2024/10151/)
+
+### Repo context
+
+- [docs/COLOR_ANIMATION_IMPLEMENTATION_PLAN.md](docs/COLOR_ANIMATION_IMPLEMENTATION_PLAN.md)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/RUNTIME.md](docs/RUNTIME.md)
+- [Sources/TerminalUI/TerminalUI.swift](Sources/TerminalUI/TerminalUI.swift)
+- [Sources/TerminalUI/RunLoop+Rendering.swift](Sources/TerminalUI/RunLoop+Rendering.swift)
+- [Sources/Core/Graph/ViewGraph.swift](Sources/Core/Graph/ViewGraph.swift)
+- [Sources/Core/Scheduler.swift](Sources/Core/Scheduler.swift)
