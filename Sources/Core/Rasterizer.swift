@@ -900,27 +900,47 @@ extension Rasterizer {
     sampleY: Int,
     width: Int
   ) -> ResolvedTextStyle {
-    ResolvedTextStyle(
-      foregroundColor: resolveColor(
-        from: style.foregroundStyle ?? environment.foregroundStyle ?? .semantic(.foreground),
+    var foregroundColor = resolveColor(
+      from: style.foregroundStyle ?? environment.foregroundStyle ?? .semantic(.foreground),
+      environment: environment,
+      bounds: bounds,
+      sampleX: sampleX + max(0, width - 1) / 2,
+      sampleY: sampleY
+    )
+    let backgroundColor = style.backgroundStyle.flatMap {
+      resolveColor(
+        from: $0,
         environment: environment,
         bounds: bounds,
         sampleX: sampleX + max(0, width - 1) / 2,
         sampleY: sampleY
-      ),
-      backgroundColor: style.backgroundStyle.flatMap {
-        resolveColor(
-          from: $0,
-          environment: environment,
-          bounds: bounds,
-          sampleX: sampleX + max(0, width - 1) / 2,
-          sampleY: sampleY
-        )
-      },
+      )
+    }
+
+    // Bake fractional opacity into the foreground color so animations and
+    // `.opacity()` modifiers produce continuously different rendered
+    // colors.  Without this, the presentation layer only sees the binary
+    // SGR "faint" attribute (`TerminalPresentation.swift`), which gives
+    // a single visible "dimmed" step regardless of progress.
+    //
+    // The blend target is the explicit backgroundColor if one is set,
+    // else the theme's background color.
+    let opacity = style.opacity
+    let bakeOpacityIntoForeground = opacity < 1 && opacity >= 0
+    if bakeOpacityIntoForeground, let fg = foregroundColor {
+      let blendTarget = backgroundColor ?? environment.theme.background
+      foregroundColor = fg.mixed(with: blendTarget, amount: 1 - opacity)
+    }
+
+    return ResolvedTextStyle(
+      foregroundColor: foregroundColor,
+      backgroundColor: backgroundColor,
       emphasis: style.emphasis,
       underlineStyle: style.underlineStyle,
       strikethroughStyle: style.strikethroughStyle,
-      opacity: style.opacity
+      // Reset opacity to 1 after baking so presentation doesn't also
+      // emit the SGR "faint" attribute on top of the blended color.
+      opacity: bakeOpacityIntoForeground ? 1.0 : opacity
     )
   }
 
