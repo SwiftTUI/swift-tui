@@ -19,6 +19,7 @@ struct ColorGallery: View {
 @State var fontNumber: Int = EmbeddedFigletFont.allCases.firstIndex(of: .dosRebel)!
 @State var font: EmbeddedFigletFont = .dosRebel
 @State var color: Color = .red
+@State var showFigure: Bool = true
 var fontCount: Int { EmbeddedFigletFont.allCases.count }
 
   var body: some View {
@@ -28,30 +29,35 @@ var fontCount: Int { EmbeddedFigletFont.allCases.count }
           VStack(alignment: .leading) {
             HStack {
               Stepper("font", value: $fontNumber)
-                Text(font.rawValue)
+              Text(font.rawValue)
+                  Button("!"){
+                    withAnimation(.easeInOut) {
+                      showFigure.toggle()
+                    }
+                  }
+                                    Button("↴"){
+                    withAnimation(.easeInOut(duration: .seconds(2.0))) {
+                      color = color.rotatedHue(by: 40.0)
+                    }
+                  }
+            }
+            .task(id: fontNumber) {
+              if fontNumber < 0 {
+                fontNumber = fontCount - 1
+              } else if fontNumber > fontCount {
+                fontNumber = 0
               }
-              .task(id: fontNumber) {
-                if fontNumber < 0 {
-                  fontNumber = fontCount - 1
-                } else if fontNumber > fontCount {
-                  fontNumber = 0
-                }
-                font = EmbeddedFigletFont.allCases[fontNumber]
-              }
-          TextFigure("Gallery", font: font)
-            .foregroundStyle(Color.red)
-            .padding(1)
-          }
-          Button("↴"){
-            withAnimation(.easeInOut(duration: .seconds(2.0))) {
-              color = color.rotatedHue(by: 40.0)
+              font = EmbeddedFigletFont.allCases[fontNumber]
+            }
+            Rectangle().fill(Color.clear).frame(height: 15).overlay(alignment: .leading) {
+            if showFigure {
+              TextFigure("Gallery", font: font)
+                .foregroundStyle(color)
+                .transition(.opacity)
+                .padding(1)
+            }
             }
           }
-          Text(
-            """
-            #####################################
-            """
-          ).foregroundStyle(color)
           terminalPaletteSection(palette: appearance.palette)
           namedColorsSection
           semanticRolesSection
