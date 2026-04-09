@@ -16,7 +16,8 @@
       "Bash(git -C /Users/adamz/Developer/repos/swift-terminal-ui commit -m ':*)",
       "Bash(git commit:*)",
       "Bash(git add:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(wc:*)"
     ]
   }
 }

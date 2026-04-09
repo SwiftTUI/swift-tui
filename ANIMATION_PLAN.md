@@ -1,9 +1,358 @@
 # Animation Implementation Plan
 
-**Date:** 2026-04-08
-**Status:** Approved
+**Date:** 2026-04-08 (plan) / 2026-04-09 (status update)
+**Status:** Phase 0–6 shipped and verified in the gallery demo; follow-up work in the "What's Next" section below
 **Branch:** `animation`
 **Supersedes:** `docs/COLOR_ANIMATION_IMPLEMENTATION_PLAN.md`
+
+---
+
+## Current Status (2026-04-09)
+
+Phases 0–6 of the original plan are shipped and green. 633 package tests pass
+(29 animation-specific, zero regressions). The gallery demo
+(`Examples/gallery`) exercises both `withAnimation` color animation
+(`color = color.rotatedHue(by:)`) and `.transition(.opacity)` insertion +
+removal of a wrapped `TextFigure`. Fades are smooth on truecolor terminals.
+
+### What ships today
+
+**Foundation protocols** — `Sources/Core/AnimationProtocols.swift`
+- `VectorArithmetic`, `Animatable`, `AnimatablePair`, `EmptyAnimatableData`
+- `Double`/`Int` conformances (integer interpolation truncates)
+- `AnimationRequest` enum (`.inherit` / `.disabled` / `.animate(AnimationBox)`)
+- `AnimationBox` — type-erased `Hashable & Sendable` wrapper for Core ↔ View
+  decoupling
+- `AnimationAwareInvalidating` protocol extending `Invalidating` with an
+  animation-request parameter
+
+**Transaction plumbing** — `Sources/Core/EnvironmentAndNodeTypes.swift`,
+`Sources/Core/AnimationContextStorage.swift`
+- `TransactionSnapshot.animationRequest` (package) with
+  `isReuseEquivalent(to:)` so debug-only fields don't defeat retained reuse
+- `@TaskLocal AnimationContextStorage.currentRequest` as the bridge between
+  `withAnimation` and state writes
+- `AnimationRegistrationSink` + `TransitionRegistrationSink` protocols: the
+  `RunLoop` installs the renderer-owned `AnimationController` as the active
+  sink for both so the View layer can hand concrete `Animation` and
+  `AnyTransition` instances off without introducing a direct module
+  dependency
+
+**Scheduler + wake integration** — `Sources/Core/Scheduler.swift`,
+`Sources/TerminalUI/RunLoop+EventPump.swift`, `RunLoop.swift`
+- `FrameScheduler.requestDeadline(_:)` now fires the wake handler (previously
+  stored deadlines silently, so animation ticks could be missed)
+- `ScheduledFrame.animationRequest` carries animation intent through to the
+  frame pipeline
+- `FrameScheduler` conforms to `AnimationAwareInvalidating`; coalescing rule is
+  "latest explicit request wins; `.inherit` never overrides an explicit
+  pending request"
+- `EventPump.scheduleDeadlineWake(_:)` — a cancellable `Task.sleep` that yields
+  into the pump stream at the deadline, so animation tick frames fire without
+  external input
+- `RunLoop+Rendering.swift` threads the scheduled frame's animation request
+  into `TransactionSnapshot` on `ResolveContext`, and requests the next
+  deadline from `AnimationController.lastTickResult` after each render
+
+**Animation type system** — `Sources/View/Animation/`
+- `SpringSolver` — full damped harmonic oscillator with under/over/critically
+  damped regimes. Constructors: `init(duration:bounce:)` and
+  `init(mass:stiffness:damping:)`. Initial conditions (`x(0)=1`, `v(0)=0`)
+  are correctly enforced in all three regimes.
+- `BezierSolver` — cubic bezier timing curves via Newton-Raphson with a
+  bisection fallback. Presets: `.linear`, `.easeIn`, `.easeOut`, `.easeInOut`.
+- `CustomAnimation` protocol with `AnimationState` (keyed Sendable storage)
+  and `AnimationContext<V: VectorArithmetic>`. **Note:** declared but not yet
+  evaluated by the controller — see "Gaps" below.
+- `Animation` struct with:
+  - Timing curves: `.default`, `.linear`, `.easeIn`, `.easeOut`, `.easeInOut`,
+    `.timingCurve(...)`
+  - Springs: `.spring(duration:bounce:)`, `.smooth`, `.snappy`, `.bouncy`,
+    `.smooth(duration:extraBounce:)` and friends,
+    `.interpolatingSpring(mass:stiffness:damping:initialVelocity:)`
+  - Modifiers: `.delay(_:)`, `.speed(_:)`, `.repeatCount(_:autoreverses:)`,
+    `.repeatForever(autoreverses:)`
+  - Custom wrapping: `Animation.init<A: CustomAnimation>(_:)`
+  - Package-level `evaluate(elapsed:) -> Double?` used by the controller
+
+**Mutation-time plumbing**
+- `StateContainer.mutate` / `.replace` read the task-local animation request
+  and forward through `AnimationAwareInvalidating` when present
+- `ViewNode.setStateSlot` does the same for `@State`-backed writes
+- `ViewNode.setStateSlotSilently` — new non-invalidating write path for
+  modifier-internal bookkeeping (used by `ValueAnimationModifier`)
+- `ViewGraph.nodeForIdentity(_:)` — new package accessor
+
+**Public view surface** — `Sources/View/Animation/`
+- `withAnimation(_:_:)` — registers the animation with the renderer-owned
+  sink and sets the task-local for the body's scope
+- `withAnimation(_:completionCriteria:_:completion:)` — public for API
+  parity; completion closure is accepted but **not yet wired through the
+  controller** (see "Gaps")
+- `View.animation(_:value:)` → `ValueAnimationModifier` — value-gated with
+  non-invalidating previous-value storage via `setStateSlotSilently`
+- `View.transaction(_:)` with a public `Transaction` shim exposing
+  `animation: Animation?` (setter works; getter returns nil because the
+  `AnimationBox` is hash-only — see "Gaps")
+
+**AnimationController** — `Sources/TerminalUI/AnimationController.swift`
+- Stateful per-renderer engine wired between resolve and measure in
+  `DefaultRenderer.render`
+- **Snapshot extraction** via `AnimatableSnapshot`:
+  - Opacity (from `drawMetadata.baseStyle.explicitOpacity`)
+  - Foreground/background colors — extractor **prefers local draw metadata,
+    falls back to `environmentSnapshot.style.foregroundStyle`**. This is
+    critical: `.foregroundStyle(color)` on a generic view writes to the
+    environment, not to the local draw metadata, so the naive extractor
+    would never animate colors applied that way.
+  - Layout-derived: offset, frame width/height. Padding and border color are
+    reserved in `AnimatableProperty` but not yet extracted or applied (see
+    "Gaps").
+- **Diff + enqueue** per `(identity, property)` key with effective-request
+  resolution (child transaction overrides parent; `.inherit` walks up)
+- **Retargeting** on the value-change path: samples the current interpolated
+  value from the existing animation and uses it as the new `from`, producing
+  smooth retargeting under interruption
+- **Interpolation** via `Color.interpolated(to:progress:method:.perceptual)`
+  for colors, direct lerp for doubles, truncated lerp for integers
+- **Write-back** to a local copy of the resolved tree; the viewGraph cache is
+  never mutated — that means tick frames can skip resolve entirely via the
+  existing `canUseSelectiveEvaluation && !viewGraph.hasDirtyWork` pipeline
+  shortcut
+
+**Transition system**
+- `Transition` protocol + `TransitionPhase` (`willAppear`/`identity`/
+  `didDisappear`), `TransitionProperties`, `TransitionContent<T>`
+- `AnyTransition` with built-ins: `.opacity`, `.move(edge:)`, `.slide`,
+  `.offset(x:y:)`, `.push(from:)`, `.identity`
+- Combinators: `.combined(with:)`, `.asymmetric(insertion:removal:)`
+- `View.transition(_:)` modifier → `TransitionViewModifier` registers per
+  identity via the controller sink at resolve time
+- **Insertion animations**: detected by identity-set diffing; `willAppear`
+  modifiers → `identity` values using the active `withAnimation` curve
+- **Removal animations** — the hard case, now working:
+  - The full previous tree root is retained so removed subtrees can be
+    captured with their complete descendant trees
+  - Previous parent identity + child index are tracked per identity
+  - **Ancestor walk-up**: when a transition-marked identity AND its parent
+    are both removed in the same frame (which is the common case — e.g.
+    `.transition(.opacity).padding(1)` where `PaddingView` wraps the text
+    with its own identity), the controller walks up disappearing ancestors
+    until it finds the first surviving one. The deepest disappearing
+    ancestor becomes the injection target; the first surviving ancestor
+    becomes the injection parent. This injects the whole padding+text unit
+    as a single fading overlay.
+  - **Cross-frame transition registration**: the registration map is split
+    into `transitionsByIdentity` (current frame, for insertions) and
+    `previousTransitionsByIdentity` (last frame, for removals). The
+    disappearing branch doesn't re-register on its removal frame because
+    `TransitionViewModifier.resolveElements` never runs, so the removal
+    lookup uses the previous frame's snapshot.
+  - **Re-injection** happens each tick in `applyInterpolations`, with
+    interpolated transition modifiers applied via
+    `interpolateRemovalModifiers` and cascaded recursively through the
+    subtree (opacity cascades to every descendant so leaf text fades;
+    offset applies only at the subtree root).
+  - **Purge on completion** when the animation curve returns nil
+
+**Smooth opacity rendering** — `Sources/Core/Rasterizer.swift`
+- Before this fix, `TerminalPresentation.swift:636` mapped any fractional
+  `style.opacity < 1` to the binary SGR "faint" attribute — so a 90-frame
+  fade had exactly 2 visible states (normal, faint). Users saw ~3 "stages"
+  total (in, faint, out).
+- `resolveTextStyle` now bakes fractional opacity into the foreground color
+  via `Color.mixed(with:amount:)`. Blend target priority:
+  1. Explicit `style.backgroundColor` if set
+  2. Otherwise `environment.theme.background`
+- After baking, `ResolvedTextStyle.opacity` is normalized to 1.0 so
+  presentation doesn't additionally emit SGR "faint" on top of the blended
+  color
+- Result: continuously smooth fades on truecolor terminals; nearest-palette
+  shades on 256-color terminals
+
+### Tests (29 animation-specific, 633 total passing)
+
+| File | Tests | Scope |
+|---|---|---|
+| `Tests/CoreTests/AnimationSchedulerTests.swift` | 5 | `requestDeadline` wake, coalesced earlier deadline re-wake, animation request propagation, post-consume reset, explicit-beats-inherit coalescing |
+| `Tests/ViewTests/AnimationSolverTests.swift` | 9 | Spring under/over/critically damped, bezier linear/easeInOut S-curve/endpoints, linear animation evaluation, preset distinctness, delay postponement |
+| `Tests/TerminalUITests/AnimationControllerTests.swift` | 6 | Snapshot extraction (local, env fallback, priority); removal injection (direct parent, ancestor walk-up, purge-on-completion) |
+| `Tests/TerminalUITests/TextFigureSurfaceTests.swift` | +1 | `fractionalOpacityProducesDistinctForegroundColors` — regression guard against the binary-faint regression |
+
+Three pre-existing tests were updated to reflect the new smooth-opacity
+semantics (opacity is baked into the color and normalized to 1.0 on raster
+style runs): `TextFigureSurfaceTests.genericViewStylingPropagatesToTextFigureOutput`,
+`SwiftUISurfaceTests.textStylingSurvivesDrawAndRaster`, and
+`InteractiveRuntimeTests.interactiveDemoSceneExercisesTruncationClippingWideGlyphsAndStyledText`.
+
+### Gaps and known limitations
+
+**Rendering + architectural**
+
+1. **Removal overlays participate in layout.** The original plan's ideal
+   (render exiting nodes as non-semantic draw-only overlays at their last
+   *placed* bounds) is not implemented. Instead, removal subtrees are
+   re-injected into the resolved tree at their previous child index and
+   flow through measure/place/draw normally. For simple cases (overlay
+   with one child, the gallery's usage) this is visually correct. For a
+   `VStack` where a sibling is removed, other siblings may briefly shift
+   during the exit animation because the re-injected child reserves layout
+   space. A proper fix hoists removals into a dedicated draw-only overlay
+   layer with frozen `PlacedNode` bounds from the previous frame.
+2. **Removal overlays are technically in the resolved tree.** Semantics,
+   focus, lifecycle, and interaction already ignore them because the
+   resolver didn't emit them in the live pass, but any new pipeline code
+   that walks the resolved tree after `applyInterpolations` without
+   knowing about removal injection would treat them as live. A per-node
+   "transient overlay" flag or a separate injection channel would make
+   this explicit.
+3. **Opacity blend target is a theme default.** The rasterizer blends toward
+   the explicit `backgroundColor` if set, else `environment.theme.background`.
+   If text is rendered over another opaque container (e.g. a colored
+   rectangle behind a label) without the text style carrying its own
+   background, the fade passes through the theme background instead of the
+   actual rendered background beneath the cell. Proper fix: pre-composite
+   against the *cell's current background* at raster time.
+4. **Custom `Transition` authoring only supports the built-in effect
+   palette.** `AnyTransition.init<T: Transition>(_:)` calls
+   `extractModifiers(from: view)` which is a placeholder returning identity
+   modifiers. User-authored `Transition` conformances whose body uses
+   anything beyond the primitive effects the controller already understands
+   will have their effects silently ignored. To make custom transitions
+   real, either (a) walk the authored body's view tree at registration time
+   to surface opacity/offset effects, or (b) expand `TransitionModifiers`
+   and rebuild custom transitions from a richer effect palette.
+5. **Transition offset effects are applied to the subtree root only.**
+   `applyTransitionModifiersRecursively` cascades opacity through every
+   descendant but applies offset only at the root. Nested offset-based
+   transitions on children of an outer offset transition don't compose.
+
+**API parity, not wired through**
+
+6. **`withAnimation` completion callbacks.** The
+   `AnimationCompletionCriteria`-accepting overload is public but its
+   completion closure is ignored. Implementing it requires: (a) assigning
+   stable batch IDs when creating animation tracks, (b) registering
+   observers keyed by `(batchID, criteria)`, (c) firing after logically
+   complete (curve returns nil) or after the removal overlay is purged.
+7. **`Transaction.animation` getter.** Returns nil because the
+   `AnimationBox` is hash-only and can't round-trip back to a concrete
+   `Animation`. Setter works (`t.animation = .easeInOut`) because writes go
+   through the box directly. Fix: keep a concrete `Animation` reference
+   alongside the hash-based key, or add a controller-backed lookup
+   registry.
+
+**Animation features**
+
+8. **`CustomAnimation` evaluation is a stub.** The protocol is public, but
+   the controller evaluates animations via `Animation.evaluate(elapsed:)`,
+   which handles `.bezier` and `.spring` curves only. Custom animations
+   fall through to a linear fallback. To enable user-authored curves, the
+   controller needs to call the protocol's `animate(value:time:context:)`
+   at tick time with a per-key `AnimationState`, and honor the
+   return-nil-means-complete contract.
+9. **`repeatCount`/`repeatForever`/`speed` are no-ops.** `delay` works; the
+   other modifiers are stored on the `Animation` but not honored by
+   `evaluate`. Needs the evaluator to apply `speed` as a time scalar and
+   track a repeat index with optional autoreverse.
+10. **Insertion-path retargeting restarts from the declared `willAppear`
+    values** instead of the currently displayed interpolated value, if the
+    insertion is interrupted by an opposite toggle mid-fade. The
+    property-value-change path already retargets correctly; only the
+    transition-driven insertion/removal paths need the same treatment.
+
+**Animatable property surface — declared but not finished**
+
+11. **`AnimatableProperty.borderColor`** is in the enum but
+    `AnimatableSnapshot.extract` doesn't read
+    `drawMetadata.baseStyle.borderShapeStyle`, and `applyValue` has no
+    case for it. Easy finish.
+12. **Padding animation** is declared
+    (`paddingTop`/`paddingLeading`/`paddingBottom`/`paddingTrailing`).
+    `AnimatableSnapshot.padding` is captured, but `diffAndEnqueue` never
+    enqueues padding edges, and `applyValue` has no padding case.
+13. **Frame size extraction only handles
+    `.frame(width:height:alignment:)`**, not `.flexibleFrame(...)`. Most
+    real view trees use the flexible variant. The extractor would need a
+    second case.
+
+**Scheduler**
+
+14. **Tick frames do not re-propagate the active animation request on
+    `ScheduledFrame`.** Currently the `animationRequest` on a deadline-only
+    frame defaults to `.inherit`. That's correct in practice because tick
+    frames carry no new state-change intent, and the controller's active
+    animations persist across tick frames regardless. But if resolve ever
+    runs on a tick frame (e.g. due to a background `@Observable` change
+    that coincides with the deadline), value-change diffs would snap
+    instead of retargeting the in-flight animation. Fix: the controller
+    should inject its current dominant active request into the frame's
+    transaction when there are active animations.
+
+**Testing**
+
+15. **No end-to-end integration test** for the full
+    `withAnimation { state = newValue } → scheduler → tick frame →
+    controller → raster` path. Unit tests cover each piece in isolation,
+    but drive-and-inspect across the tick sequence is missing. A harness
+    exists in `InteractiveRuntimeTests` and could be extended.
+
+### What's next — prioritized
+
+**P0 — finish what's declared**
+- Item 11: extract + apply `borderColor` animations
+- Item 12: extract + apply `padding` edge animations
+- Item 13: extract `.flexibleFrame` width/height
+
+These are small finishes that turn public-looking API into real features.
+
+**P0 — make custom transitions work**
+- Item 4: walk the `Transition.body` output tree at registration time to
+  extract opacity/offset effects for the current palette, OR expand the
+  palette and re-wire `extractModifiers(from:)`
+
+**P1 — animation features**
+- Item 8: evaluate `CustomAnimation` conformances in the controller
+- Item 9: `repeatCount`, `repeatForever`, `speed` honored by `evaluate`
+- Item 10: insertion/removal retargeting from the displayed value
+
+**P1 — API completeness**
+- Item 6: `withAnimation` completion callbacks (batch ID + observer
+  registry)
+- Item 7: readable `Transaction.animation` via a concrete-animation
+  registry
+
+**P2 — architectural cleanup + fidelity**
+- Item 1: removals as draw-only overlays with frozen placed bounds
+- Item 2: per-node transient flag or separate overlay channel
+- Item 3: per-cell blend target at raster time
+- Item 5: composable nested offset transitions
+- Item 14: scheduler propagates active animation request on tick frames
+
+**P2 — testing**
+- Item 15: end-to-end integration test driving an animation through the
+  real runtime and inspecting frame contents across the tick sequence
+
+### SwiftUI parity items the current code *does not* attempt
+
+The original plan explicitly deferred these; noting them here for
+completeness so nobody gets surprised:
+
+- `Binding.animation(_:)` — can be layered on top of the existing
+  mutation-time plumbing without touching the controller
+- Body-scoped `.animation(_:body:)` — uses the same transaction plumbing
+- `contentTransition(_:)` — a distinct effect with its own runtime needs
+- `phaseAnimator(_:content:animation:)` — requires a separate driving engine
+  that sequences discrete phases on top of the base animation controller
+- `keyframeAnimator(...)` — a different class of engine with its own
+  timeline and value generation; explicitly not a reuse of
+  `AnimationController`
+- `matchedGeometryEffect` — requires cross-identity placement tracking that
+  the current runtime doesn't carry
+- Gradient / `TerminalChromeStyle` color interpolation
+- 60fps mode (current target is 30fps via a fixed 33ms `frameInterval`)
+
+---
 
 ## Goal
 
@@ -1002,7 +1351,7 @@ Recommendation:
 
 ## Implementation Phases
 
-### Phase 0: Foundation Types + Reuse Semantics
+### Phase 0: Foundation Types + Reuse Semantics — ✅ shipped
 
 **Objectives:** Define core protocols, make deadline frames work with resolve
 reuse.
@@ -1036,7 +1385,7 @@ need empty-invalidation reuse to be legal.
 - Transaction debug signatures do not break reuse
 - No public animation API exposed yet
 
-### Phase 1: Scheduler Wake Integration
+### Phase 1: Scheduler Wake Integration — ✅ shipped
 
 **Objectives:** Wire deadline wakes into the existing run loop infrastructure so
 deadline-only frames can render without user input.
@@ -1072,7 +1421,7 @@ animation requests through scheduled frames.
 - Existing input and signal behavior unchanged
 - Lifecycle-driven invalidations wake the loop
 
-### Phase 2: Animation Type System
+### Phase 2: Animation Type System — ✅ shipped (CustomAnimation protocol public but evaluation is a stub — see Current Status § Gaps item 8)
 
 **Objectives:** Build the `Animation` type, spring solver, bezier solver,
 `CustomAnimation` protocol.
@@ -1102,7 +1451,7 @@ animation requests through scheduled frames.
 - `Animation.smooth`, `.snappy`, `.bouncy` produce distinct spring behaviors
 - `CustomAnimation` protocol allows user-defined animation curves
 
-### Phase 3: Mutation-Time Plumbing
+### Phase 3: Mutation-Time Plumbing — ✅ shipped
 
 **Objectives:** Let `withAnimation` attach animation intent to invalidations.
 
@@ -1134,7 +1483,7 @@ animation requests through scheduled frames.
 - State writes inside `withAnimation(nil)` explicitly disable animation
 - Plain mutations behave exactly as before
 
-### Phase 4: Public View API + Resolve-Time Modifiers
+### Phase 4: Public View API + Resolve-Time Modifiers — ✅ shipped (`Transaction.animation` getter returns nil — see Current Status § Gaps item 7)
 
 **Objectives:** Expose the authored API, implement subtree-scoped
 `.animation(_:value:)`.
@@ -1162,7 +1511,7 @@ animation requests through scheduled frames.
 - `.transaction()` can strip animation from a subtree
 - No value-less `.animation(_:)` surface is added
 
-### Phase 5: Animation Controller
+### Phase 5: Animation Controller — ✅ shipped (declared animatable properties padding/borderColor/flexibleFrame not yet extracted — see Current Status § Gaps items 11–13)
 
 **Objectives:** Build the stateful animation engine.
 
@@ -1189,7 +1538,7 @@ animation requests through scheduled frames.
 - Interrupted animations retarget from current displayed value
 - Animations complete and stop requesting frames
 
-### Phase 6: Transition System
+### Phase 6: Transition System — ✅ shipped with caveats (removal overlays participate in layout rather than being draw-only; custom Transition authoring is limited to the built-in effect palette — see Current Status § Gaps items 1, 2, 4)
 
 **Objectives:** Implement the modern `Transition` protocol and built-in
 transitions.
@@ -1220,7 +1569,7 @@ transitions.
 - Removal overlays do not participate in layout, focus, semantics, or
   interaction
 
-### Phase 7: Testing + Docs
+### Phase 7: Testing + Docs — ⚠️ partial (unit tests shipped; integration test and doc updates still pending — see Current Status § Gaps item 15)
 
 **Objectives:** Lock behavior down with deterministic tests, update docs.
 
