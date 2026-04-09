@@ -131,8 +131,15 @@ package struct AnimationTickResult: Sendable {
 /// a mapping from ``AnimationBox`` to the concrete ``Animation`` it came
 /// from (so tick sampling can re-enter the View-layer animation logic).
 /// Snapshot of a removed view retained for visual-only exit animation.
+///
+/// The snapshot holds the full subtree as it existed at the moment the
+/// node was removed from the live resolved tree, along with the parent
+/// identity and child-index needed to re-inject the subtree in roughly
+/// the same visual position during the removal animation.
 package struct RemovalEntry: Sendable {
   package var snapshot: ResolvedNode
+  package var parentIdentity: Identity?
+  package var childIndex: Int
   package var transition: AnyTransition
   package var animationBox: AnimationBox?
   package var startTime: MonotonicInstant
@@ -141,10 +148,23 @@ package struct RemovalEntry: Sendable {
 @MainActor
 package final class AnimationController {
   private var previousSnapshots: [Identity: AnimatableSnapshot] = [:]
-  private var previousResolvedByIdentity: [Identity: ResolvedNode] = [:]
+  /// Full tree from the previous frame, retained so removals can capture
+  /// their subtrees.
+  private var previousTreeRoot: ResolvedNode?
+  /// Parent identity, as walked from the previous frame's tree.
+  private var previousParentByIdentity: [Identity: Identity] = [:]
+  /// Child index within the previous parent's children list.
+  private var previousChildIndexByIdentity: [Identity: Int] = [:]
   private var activeAnimations: [AnimationKey: ActiveAnimation] = [:]
   private var registeredAnimations: [AnimationBox: Animation] = [:]
+  /// Registrations collected during the *current* frame's resolve pass.
+  /// Used to look up transitions on INSERTION.
   private var transitionsByIdentity: [Identity: AnyTransition] = [:]
+  /// Registrations that were live at the end of the *previous* frame's
+  /// resolve pass.  Used to look up transitions on REMOVAL, because the
+  /// disappearing view's `.transition()` modifier is not evaluated in
+  /// the current frame — its branch is gone.
+  private var previousTransitionsByIdentity: [Identity: AnyTransition] = [:]
   private var pendingTransitionsByIdentity: [Identity: AnyTransition] = [:]
   private var removingIdentities: [Identity: RemovalEntry] = [:]
   private var previousIdentities: Set<Identity> = []
@@ -160,10 +180,13 @@ package final class AnimationController {
 
   /// Called by the View layer at the start of resolve so the controller
   /// can collect up-to-date `.transition()` registrations.  The sink
-  /// replaces the old map wholesale — any identity that was in the
+  /// replaces the current map wholesale — any identity that was in the
   /// previous frame but is not re-registered this frame loses its
-  /// transition association.
+  /// transition association — but the PREVIOUS frame's registrations
+  /// are preserved so removal detection can still find transitions for
+  /// views whose branches are gone.
   package func beginTransitionCollection() {
+    previousTransitionsByIdentity = transitionsByIdentity
     pendingTransitionsByIdentity.removeAll(keepingCapacity: true)
   }
 
@@ -202,19 +225,27 @@ package final class AnimationController {
     }
 
     var newSnapshots: [Identity: AnimatableSnapshot] = [:]
-    var newResolvedByIdentity: [Identity: ResolvedNode] = [:]
+    var newParentByIdentity: [Identity: Identity] = [:]
+    var newChildIndexByIdentity: [Identity: Int] = [:]
     processNode(
       node,
+      parentIdentity: nil,
+      childIndex: 0,
       transaction: transaction,
       timestamp: timestamp,
-      accumulator: &newSnapshots,
-      resolvedAccumulator: &newResolvedByIdentity
+      snapshotAccumulator: &newSnapshots,
+      parentAccumulator: &newParentByIdentity,
+      childIndexAccumulator: &newChildIndexByIdentity
     )
 
-    // Detect insertions and removals by diffing identity sets.
+    // Detect insertions and removals by diffing identity sets.  Skip
+    // identities that are already mid-removal: they exist in the
+    // injected overlay but not in the live tree, so they should not be
+    // re-inserted as "new".
     let newIdentities = Set(newSnapshots.keys)
+    let liveIdentities = previousIdentities.subtracting(removingIdentities.keys)
     let insertedIdentities = newIdentities.subtracting(previousIdentities)
-    let removedIdentities = previousIdentities.subtracting(newIdentities)
+    let removedIdentities = liveIdentities.subtracting(newIdentities)
 
     // Process insertions: kick off willAppear -> identity animations.
     for identity in insertedIdentities {
@@ -228,27 +259,90 @@ package final class AnimationController {
       )
     }
 
-    // Process removals: retain the frozen snapshot and start the exit
-    // animation.  The snapshot becomes a non-semantic overlay purely
-    // for draw-time rendering.
+    // Process removals: look up the full subtree and position from the
+    // previous frame so the animation controller can re-inject them as
+    // non-semantic overlays each tick until the exit animation
+    // completes.
+    //
+    // The transition is registered against the leaf identity that the
+    // `.transition()` modifier's child resolved to, but that leaf may
+    // be wrapped by layout modifiers (e.g. `.padding(1)`) which
+    // themselves have distinct identities and disappear at the same
+    // time.  Walk up the previous parent chain until we find an
+    // ancestor that is still in the new tree — that's the insertion
+    // point — and capture the deepest disappearing ancestor as the
+    // subtree to inject.  This way the entire wrapped unit fades out.
     for identity in removedIdentities {
-      // Ignore identities that are already mid-removal (don't restart).
       guard removingIdentities[identity] == nil else { continue }
-      guard let transition = transitionsByIdentity[identity],
-        let snapshot = previousResolvedByIdentity[identity]
+      // Removal look-up uses the PREVIOUS frame's registrations: the
+      // disappearing view's `.transition()` modifier isn't evaluated in
+      // the current frame (its branch is gone), so `transitionsByIdentity`
+      // no longer contains an entry for it.  The previous frame captured
+      // the registration while the view was still present.
+      guard let transition = previousTransitionsByIdentity[identity],
+        let previousRoot = previousTreeRoot
       else { continue }
+
+      // Walk up: injectionTarget is the deepest ancestor that is ALSO
+      // gone from the new tree.  injectionParent is the first surviving
+      // ancestor (or nil if none exists, in which case we can't inject).
+      var injectionTarget = identity
+      var injectionParent = previousParentByIdentity[identity]
+      while let parent = injectionParent, !newIdentities.contains(parent) {
+        injectionTarget = parent
+        injectionParent = previousParentByIdentity[parent]
+      }
+
+      guard injectionParent != nil,
+        let subtree = findSubtree(in: previousRoot, identity: injectionTarget)
+      else { continue }
+
+      // Clear any in-flight active animations for every identity in
+      // the injected subtree — the exit animation supersedes them.
+      let injectedIdentities = collectIdentities(in: subtree)
+      activeAnimations = activeAnimations.filter {
+        !injectedIdentities.contains($0.key.identity)
+      }
+
       removingIdentities[identity] = RemovalEntry(
-        snapshot: snapshot,
+        snapshot: subtree,
+        parentIdentity: injectionParent,
+        childIndex: previousChildIndexByIdentity[injectionTarget] ?? 0,
         transition: transition,
-        animationBox: (transaction.animationRequest.animationBoxIfAny),
+        animationBox: transaction.animationRequest.animationBoxIfAny,
         startTime: timestamp
       )
     }
 
-    // Purge snapshots for identities that no longer exist in the tree.
     previousSnapshots = newSnapshots
-    previousResolvedByIdentity = newResolvedByIdentity
     previousIdentities = newIdentities
+    previousTreeRoot = node
+    previousParentByIdentity = newParentByIdentity
+    previousChildIndexByIdentity = newChildIndexByIdentity
+  }
+
+  /// Recursively searches a resolved tree for the subtree rooted at
+  /// `identity` and returns a copy of it.
+  private func findSubtree(
+    in root: ResolvedNode,
+    identity: Identity
+  ) -> ResolvedNode? {
+    if root.identity == identity { return root }
+    for child in root.children {
+      if let match = findSubtree(in: child, identity: identity) {
+        return match
+      }
+    }
+    return nil
+  }
+
+  /// Returns the set of every identity in a subtree (inclusive).
+  private func collectIdentities(in subtree: ResolvedNode) -> Set<Identity> {
+    var result: Set<Identity> = [subtree.identity]
+    for child in subtree.children {
+      result.formUnion(collectIdentities(in: child))
+    }
+    return result
   }
 
   private func enqueueInsertionAnimation(
@@ -300,10 +394,13 @@ package final class AnimationController {
 
   private func processNode(
     _ node: ResolvedNode,
+    parentIdentity: Identity?,
+    childIndex: Int,
     transaction: TransactionSnapshot,
     timestamp: MonotonicInstant,
-    accumulator: inout [Identity: AnimatableSnapshot],
-    resolvedAccumulator: inout [Identity: ResolvedNode]
+    snapshotAccumulator: inout [Identity: AnimatableSnapshot],
+    parentAccumulator: inout [Identity: Identity],
+    childIndexAccumulator: inout [Identity: Int]
   ) {
     let snapshot = AnimatableSnapshot.extract(from: node)
     let previous = previousSnapshots[node.identity]
@@ -326,20 +423,22 @@ package final class AnimationController {
     }
     // First time we see an identity: no animation, just record the snapshot.
 
-    accumulator[node.identity] = snapshot
-    // Store a children-less copy so removal overlays don't accidentally
-    // retain heavy subtrees.
-    var leafCopy = node
-    leafCopy.children = []
-    resolvedAccumulator[node.identity] = leafCopy
+    snapshotAccumulator[node.identity] = snapshot
+    if let parentIdentity {
+      parentAccumulator[node.identity] = parentIdentity
+    }
+    childIndexAccumulator[node.identity] = childIndex
 
-    for child in node.children {
+    for (index, child) in node.children.enumerated() {
       processNode(
         child,
+        parentIdentity: node.identity,
+        childIndex: index,
         transaction: transaction,
         timestamp: timestamp,
-        accumulator: &accumulator,
-        resolvedAccumulator: &resolvedAccumulator
+        snapshotAccumulator: &snapshotAccumulator,
+        parentAccumulator: &parentAccumulator,
+        childIndexAccumulator: &childIndexAccumulator
       )
     }
   }
@@ -488,7 +587,7 @@ package final class AnimationController {
     to tree: inout ResolvedNode,
     at timestamp: MonotonicInstant
   ) -> AnimationTickResult {
-    guard !activeAnimations.isEmpty else {
+    guard !activeAnimations.isEmpty || !removingIdentities.isEmpty else {
       lastTickResult = AnimationTickResult()
       return lastTickResult
     }
@@ -496,6 +595,7 @@ package final class AnimationController {
     var keysToRemove: [AnimationKey] = []
     var affectedIdentities: Set<Identity> = []
     var latestDeadline: MonotonicInstant = timestamp
+    var hasPendingWork = false
 
     // Build per-identity interpolated value maps for fast tree walk.
     var interpolated: [Identity: [AnimatableProperty: AnimatableValue]] = [:]
@@ -521,6 +621,7 @@ package final class AnimationController {
       interpolated[key.identity, default: [:]][key.property] = value
       affectedIdentities.insert(key.identity)
       latestDeadline = timestamp.advanced(by: frameInterval)
+      hasPendingWork = true
     }
 
     // Remove completed animations.
@@ -528,16 +629,167 @@ package final class AnimationController {
       activeAnimations.removeValue(forKey: key)
     }
 
-    // Apply interpolated values by walking the tree.
+    // Process removal entries: compute interpolated transition modifiers
+    // and prepare them for injection back into the tree.
+    var removalsToPurge: [Identity] = []
+    var injectionsByParent: [Identity: [(childIndex: Int, snapshot: ResolvedNode)]] = [:]
+
+    for (identity, entry) in removingIdentities {
+      let modifiers: TransitionModifiers
+      var animationComplete = false
+
+      if let box = entry.animationBox, let anim = registeredAnimations[box] {
+        let elapsed = entry.startTime.duration(to: timestamp)
+        if let progress = anim.evaluate(elapsed: elapsed) {
+          // Interpolate from identity (fully present) -> removal
+          // modifiers (fully removed).  Progress 0 == identity,
+          // progress 1 == removal.
+          modifiers = interpolateRemovalModifiers(
+            to: entry.transition.removalModifiers(),
+            progress: progress
+          )
+        } else {
+          animationComplete = true
+          modifiers = entry.transition.removalModifiers()
+        }
+      } else {
+        // No animation intent carried through — snap.
+        animationComplete = true
+        modifiers = .identity
+      }
+
+      if animationComplete {
+        removalsToPurge.append(identity)
+        affectedIdentities.insert(identity)
+        continue
+      }
+
+      // Clone the subtree and apply the interpolated transition
+      // modifiers recursively so leaf views (text, etc.) pick up the
+      // fading opacity even if the transition was applied higher up
+      // in the subtree.
+      var subtreeCopy = entry.snapshot
+      applyTransitionModifiersRecursively(modifiers, to: &subtreeCopy)
+      if let parentId = entry.parentIdentity {
+        injectionsByParent[parentId, default: []].append(
+          (childIndex: entry.childIndex, snapshot: subtreeCopy)
+        )
+      }
+      affectedIdentities.insert(identity)
+      latestDeadline = timestamp.advanced(by: frameInterval)
+      hasPendingWork = true
+    }
+
+    for identity in removalsToPurge {
+      removingIdentities.removeValue(forKey: identity)
+    }
+
+    // Apply interpolated values for in-tree animations.
     tree = applyInterpolatedValues(tree: tree, interpolated: interpolated)
 
+    // Inject removal overlays at their previous parent/index.
+    if !injectionsByParent.isEmpty {
+      tree = injectRemovals(tree: tree, injectionsByParent: injectionsByParent)
+    }
+
     let result = AnimationTickResult(
-      hasActiveAnimations: !activeAnimations.isEmpty,
-      nextDeadline: activeAnimations.isEmpty ? nil : latestDeadline,
+      hasActiveAnimations: hasPendingWork,
+      nextDeadline: hasPendingWork ? latestDeadline : nil,
       affectedIdentities: affectedIdentities
     )
     lastTickResult = result
     return result
+  }
+
+  /// Interpolates from the identity transition modifiers (fully present)
+  /// toward the removal modifiers based on `progress`.  Progress is
+  /// reported by the animation curve — 0 means "just starting", 1 means
+  /// "fully removed" — so we interpolate identity → target.
+  private func interpolateRemovalModifiers(
+    to target: TransitionModifiers,
+    progress: Double
+  ) -> TransitionModifiers {
+    var result = TransitionModifiers.identity
+    if let targetOpacity = target.opacity {
+      // Identity opacity is 1, target is the removal modifier's opacity.
+      result.opacity = 1.0 + (targetOpacity - 1.0) * progress
+    }
+    if let targetOffsetX = target.offsetX {
+      result.offsetX = Int(Double(targetOffsetX) * progress)
+    }
+    if let targetOffsetY = target.offsetY {
+      result.offsetY = Int(Double(targetOffsetY) * progress)
+    }
+    return result
+  }
+
+  /// Applies transition modifiers recursively to every node in the
+  /// subtree.  Opacity cascades (since rasterizer reads per-node opacity
+  /// and text leaves need to see it), and offset is applied only to the
+  /// root of the removed subtree to avoid double-application.
+  private func applyTransitionModifiersRecursively(
+    _ modifiers: TransitionModifiers,
+    to node: inout ResolvedNode
+  ) {
+    // Opacity cascades down to every descendant so the text leaf (which
+    // actually renders) sees the faded value.
+    if let opacity = modifiers.opacity {
+      var drawMetadata = node.drawMetadata
+      // If the node already has an explicit opacity, multiply so the
+      // animation composes with authored opacity.
+      let base = drawMetadata.baseStyle.explicitOpacity ?? 1.0
+      drawMetadata.baseStyle.explicitOpacity = base * opacity
+      node.drawMetadata = drawMetadata
+    }
+    // Offsets apply only at the subtree root.
+    // (Not yet recursed into children for offsets.)
+
+    var children = node.children
+    for i in children.indices {
+      var child = children[i]
+      // Recurse with opacity only (offset stays at the root).
+      var childMods = TransitionModifiers.identity
+      childMods.opacity = modifiers.opacity
+      applyTransitionModifiersRecursively(childMods, to: &child)
+      children[i] = child
+    }
+    node.children = children
+
+    // Apply offset to the root of the subtree only.  Only wraps an
+    // intrinsic node — if the node already carries a layout behavior we
+    // leave it alone to avoid clobbering authored layout.
+    let offsetX = modifiers.offsetX ?? 0
+    let offsetY = modifiers.offsetY ?? 0
+    if offsetX != 0 || offsetY != 0,
+      case .intrinsic = node.layoutBehavior
+    {
+      node.layoutBehavior = .offset(x: offsetX, y: offsetY)
+    }
+  }
+
+  /// Walks the current tree and injects removal snapshots at their
+  /// previous parent identity and child index.  If the previous index
+  /// exceeds the current children count, the snapshot is appended at
+  /// the end.
+  private func injectRemovals(
+    tree: ResolvedNode,
+    injectionsByParent: [Identity: [(childIndex: Int, snapshot: ResolvedNode)]]
+  ) -> ResolvedNode {
+    var node = tree
+    // Recurse first so child injections happen before parent-level
+    // splicing — this preserves the visual order of nested removals.
+    var children = node.children.map { child in
+      injectRemovals(tree: child, injectionsByParent: injectionsByParent)
+    }
+    if let injections = injectionsByParent[node.identity] {
+      let sorted = injections.sorted { $0.childIndex < $1.childIndex }
+      for injection in sorted {
+        let insertIndex = min(injection.childIndex, children.count)
+        children.insert(injection.snapshot, at: insertIndex)
+      }
+    }
+    node.children = children
+    return node
   }
 
   private func applyInterpolatedValues(

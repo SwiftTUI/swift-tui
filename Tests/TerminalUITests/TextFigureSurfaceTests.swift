@@ -105,10 +105,47 @@ struct TextFigureSurfaceTests {
 
     let styleRuns = artifacts.rasterSurface.styleRuns
     #expect(!styleRuns.isEmpty)
-    #expect(styleRuns.contains { $0.style.foregroundColor == .red })
-    #expect(styleRuns.contains { $0.style.opacity == 0.4 })
+    // Opacity is baked into the foreground color at rasterize time so
+    // the presentation layer emits a smoothly interpolated RGB instead
+    // of the binary SGR "faint" attribute.  The foreground color is
+    // therefore no longer pure red and the style's opacity is normalized
+    // to 1.0 after baking.
+    #expect(
+      styleRuns.contains { run in
+        guard let fg = run.style.foregroundColor else { return false }
+        // The baked color sits strictly between red and the theme
+        // background — it should not be the untouched red sentinel.
+        return fg != Color.red && run.style.opacity == 1.0
+      }
+    )
     #expect(styleRuns.contains { $0.style.underlineStyle != nil })
     #expect(styleRuns.contains { $0.style.strikethroughStyle != nil })
+  }
+
+  @Test("fractional opacity produces distinct blended foreground colors")
+  func fractionalOpacityProducesDistinctForegroundColors() {
+    // Guards against a regression to binary "faint" opacity rendering:
+    // two different opacity values on the same color must produce two
+    // visibly different foreground colors in the raster so animated
+    // fades look smooth.
+    let dim = render(
+      Text("Hi").foregroundStyle(Color.red).opacity(0.3)
+    )
+    let bright = render(
+      Text("Hi").foregroundStyle(Color.red).opacity(0.9)
+    )
+
+    let dimFg = dim.rasterSurface.styleRuns.first?.style.foregroundColor
+    let brightFg = bright.rasterSurface.styleRuns.first?.style.foregroundColor
+    #expect(dimFg != nil)
+    #expect(brightFg != nil)
+    #expect(
+      dimFg != brightFg,
+      "distinct opacity values must produce distinct blended foreground colors"
+    )
+    // Both style runs should carry opacity == 1.0 after baking.
+    #expect(dim.rasterSurface.styleRuns.first?.style.opacity == 1.0)
+    #expect(bright.rasterSurface.styleRuns.first?.style.opacity == 1.0)
   }
 
   private func render<V: View>(

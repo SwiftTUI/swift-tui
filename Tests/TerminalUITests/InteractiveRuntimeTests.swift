@@ -897,12 +897,18 @@ struct InteractiveRuntimeTests {
       context: .init(identity: testIdentity("InteractiveDemo", "text-features"))
     )
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    // Opacity is baked into the foreground color at rasterize time, so
+    // the style run no longer carries the raw `.cyan` + `opacity == 0.8`
+    // values.  Match on the decorations and emphasis (which flow through
+    // untouched) and verify the foreground has been perturbed from pure
+    // cyan by the opacity blend.
     let hasStyledAccentRun = artifacts.rasterSurface.styleRuns.contains { run in
-      run.style.foregroundColor == .cyan
+      guard let fg = run.style.foregroundColor else { return false }
+      return fg != Color.cyan
         && run.style.emphasis == .bold
         && run.style.underlineStyle == .init(pattern: .dash, color: .yellow)
         && run.style.strikethroughStyle == .init(pattern: .dot, color: .red)
-        && run.style.opacity == 0.8
+        && run.style.opacity == 1.0
     }
 
     #expect(surface.contains("Clip: [12]"))
