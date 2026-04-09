@@ -66,6 +66,15 @@ package final class ViewGraph {
     }
   }
 
+  /// Returns the graph node for the given identity, if any.
+  ///
+  /// Used by view modifiers such as ``ValueAnimationModifier`` that need
+  /// to reach into per-node state slot storage without triggering
+  /// invalidation.
+  package func nodeForIdentity(_ identity: Identity) -> ViewNode? {
+    nodesByIdentity[identity]
+  }
+
   /// Invalidates identities AND queues them as graph-local dirty so that
   /// `selectiveDirtyEvaluationPlan()` can include them in the dirty frontier
   /// instead of falling back to full root re-evaluation.  Only identities

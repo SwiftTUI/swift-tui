@@ -1,0 +1,183 @@
+package import Core
+
+// MARK: - Public surface
+
+extension View {
+  /// Associates an animation with a value-gated trigger.
+  ///
+  /// When `value` changes between resolves, the child subtree sees the
+  /// specified animation in its transaction; otherwise the subtree
+  /// inherits whatever animation intent the parent transaction carries.
+  ///
+  /// Passing `nil` explicitly suppresses any inherited animation for the
+  /// subtree when `value` changes.
+  public func animation<V: Equatable & Sendable>(
+    _ animation: Animation?,
+    value: V
+  ) -> some View {
+    ValueAnimationModifier(
+      content: self,
+      animation: animation,
+      value: value
+    )
+  }
+
+  /// Applies a transformation to the current transaction for this
+  /// subtree.
+  ///
+  /// Common usage is stripping animation from a specific subtree:
+  /// `.transaction { $0.animationRequest = .disabled }`.
+  public func transaction(
+    _ transform: @escaping @Sendable (inout Transaction) -> Void
+  ) -> some View {
+    TransactionModifier(content: self, transform: transform)
+  }
+}
+
+// MARK: - Transaction public shim
+
+/// A mutable view of the current transaction used with ``View/transaction(_:)``.
+///
+/// Only the animation intent is currently exposed; other SwiftUI
+/// transaction fields are out of scope for the initial public slice.
+public struct Transaction: Sendable {
+  /// The animation associated with the current transaction, if any.
+  ///
+  /// Setting this to `nil` is equivalent to `.disabled` — it suppresses
+  /// inherited animation without carrying an explicit curve.
+  public var animation: Animation? {
+    get {
+      switch request {
+      case .animate(let box):
+        return _animation(fromBox: box)
+      case .inherit, .disabled:
+        return nil
+      }
+    }
+    set {
+      if let newValue {
+        request = .animate(newValue.animationBox)
+      } else {
+        request = .disabled
+      }
+    }
+  }
+
+  /// Explicitly disables animation regardless of inherited intent.
+  public var disablesAnimations: Bool {
+    get { request == .disabled }
+    set {
+      if newValue {
+        request = .disabled
+      } else {
+        request = .inherit
+      }
+    }
+  }
+
+  package var request: AnimationRequest
+
+  package init(request: AnimationRequest) {
+    self.request = request
+  }
+
+  private func _animation(fromBox box: AnimationBox) -> Animation? {
+    // Best-effort retrieval — the box is hash-based, so we cannot
+    // directly unwrap the concrete type here.  Transaction is primarily
+    // used to *write* animation intent; reading is supported by passing
+    // through ``Animation`` values that the caller already holds.
+    nil
+  }
+}
+
+// MARK: - ValueAnimationModifier
+
+package struct ValueAnimationModifier<Content: View, Value: Equatable & Sendable>:
+  View, ResolvableView
+{
+  package var content: Content
+  package var animation: Animation?
+  package var value: Value
+
+  package init(
+    content: Content,
+    animation: Animation?,
+    value: Value
+  ) {
+    self.content = content
+    self.animation = animation
+    self.value = value
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    // Read the previous value from a non-invalidating state slot.
+    let (previousValue, ordinal) = previousValueAndOrdinal(in: context)
+    let valueChanged = previousValue.map { $0 != value } ?? true
+
+    // Store the current value without invalidating.
+    if let ordinal, let node = context.viewGraph?.nodeForIdentity(context.identity) {
+      node.setStateSlotSilently(ordinal: ordinal, value: value)
+    }
+
+    guard valueChanged else {
+      // Value unchanged — pass through the parent transaction as-is.
+      return content.resolveElements(in: context)
+    }
+
+    var childContext = context
+    if let animation {
+      childContext.transaction.animationRequest = .animate(animation.animationBox)
+    } else {
+      childContext.transaction.animationRequest = .disabled
+    }
+    return content.resolveElements(in: childContext)
+  }
+
+  private func previousValueAndOrdinal(
+    in context: ResolveContext
+  ) -> (Value?, Int?) {
+    guard let viewGraph = context.viewGraph,
+      let node = viewGraph.nodeForIdentity(context.identity)
+    else {
+      return (nil, nil)
+    }
+    // Use the last ordinal (high number) reserved for modifier bookkeeping
+    // to avoid colliding with @State ordinals.
+    let ordinal = ValueAnimationModifierSlot.reservedOrdinal
+    let stored: Value = node.stateSlot(
+      ordinal: ordinal,
+      seed: value
+    )
+    return (stored, ordinal)
+  }
+}
+
+enum ValueAnimationModifierSlot {
+  /// Reserved high ordinal for modifier-only bookkeeping.  Chosen to sit
+  /// well beyond any plausible authored @State ordinal in a body.
+  static let reservedOrdinal = 1 << 20
+}
+
+// MARK: - TransactionModifier
+
+package struct TransactionModifier<Content: View>: View, ResolvableView {
+  package var content: Content
+  package var transform: @Sendable (inout Transaction) -> Void
+
+  package init(
+    content: Content,
+    transform: @escaping @Sendable (inout Transaction) -> Void
+  ) {
+    self.content = content
+    self.transform = transform
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    var transaction = Transaction(request: context.transaction.animationRequest)
+    transform(&transaction)
+
+    var childContext = context
+    childContext.transaction.animationRequest = transaction.request
+    return content.resolveElements(in: childContext)
+  }
+}

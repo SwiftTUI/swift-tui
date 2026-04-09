@@ -79,9 +79,18 @@ extension EnvironmentSnapshot: Equatable {
 /// A transaction snapshot captured while resolving a frame.
 public struct TransactionSnapshot: Equatable, Sendable {
   public var debugSignature: String
+  package var animationRequest: AnimationRequest = .inherit
 
   public init(debugSignature: String = "") {
     self.debugSignature = debugSignature
+  }
+
+  /// Returns `true` when two snapshots carry equivalent resolve-time intent.
+  ///
+  /// Unlike `==`, this ignores debug-only fields such as `debugSignature`
+  /// that would otherwise defeat retained resolve reuse.
+  package func isReuseEquivalent(to other: Self) -> Bool {
+    animationRequest == other.animationRequest
   }
 }
 

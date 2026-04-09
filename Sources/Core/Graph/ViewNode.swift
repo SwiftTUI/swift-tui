@@ -172,8 +172,34 @@ package final class ViewNode {
       ownerGraph?.queueDirtyForStateChange(
         .init(identity: identity, ordinal: ordinal)
       )
-      invalidator?.requestInvalidation(of: [identity])
+      let animationRequest = AnimationContextStorage.currentRequest
+      if animationRequest != .inherit,
+        let animationAware = invalidator as? any AnimationAwareInvalidating
+      {
+        animationAware.requestInvalidation(
+          of: [identity],
+          animation: animationRequest
+        )
+      } else {
+        invalidator?.requestInvalidation(of: [identity])
+      }
     }
+  }
+
+  /// Stores a value in a state slot without triggering invalidation or
+  /// dirtying the graph.  Used by ``ValueAnimationModifier`` to remember
+  /// the previous watched value during resolve without causing a
+  /// re-resolve cycle.
+  package func setStateSlotSilently<Value>(
+    ordinal: Int,
+    value: Value
+  ) {
+    if ordinal >= stateSlots.count {
+      while stateSlots.count <= ordinal {
+        stateSlots.append(.init())
+      }
+    }
+    _ = stateSlots[ordinal].set(value)
   }
 
   package func markDirty() {
