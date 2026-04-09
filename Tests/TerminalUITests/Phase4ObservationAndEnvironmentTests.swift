@@ -463,6 +463,49 @@ struct Phase4ObservationAndEnvironmentTests {
       updatedArtifacts.resolvedTree.descendant(withIdentity: testIdentity("CancelAction")) == nil)
   }
 
+  @Test("sheet presentations preserve the original state owner when activated")
+  func sheetPresentationsPreserveTheOriginalStateOwner() throws {
+    let invalidator = Phase4RecordingInvalidator()
+    let actionRegistry = LocalActionRegistry()
+    let renderer = DefaultRenderer()
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
+
+    var initialContext = ResolveContext(
+      identity: testIdentity("Root"),
+      localActionRegistry: actionRegistry,
+      applyEnvironmentValues: true
+    )
+    initialContext.invalidationProxy = invalidationProxy
+
+    let initialArtifacts = renderer.render(
+      PresentedSheetCounterView(),
+      context: initialContext,
+      proposal: .init(width: 32, height: 8)
+    )
+    #expect(initialArtifacts.resolvedTree.descendant(withText: "Count 0") != nil)
+    #expect(initialArtifacts.resolvedTree.descendant(withText: "Sheet body") == nil)
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("IncrementAction")))
+    #expect(actionRegistry.dispatch(identity: testIdentity("PresentSheetAction")))
+
+    let invalidatedIdentities = invalidator.requests.reduce(into: Set<Identity>()) {
+      partial, request in
+      partial.formUnion(request)
+    }
+    #expect(!invalidatedIdentities.isEmpty)
+
+    var updatedContext = initialContext
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    let updatedArtifacts = renderer.render(
+      PresentedSheetCounterView(),
+      context: updatedContext,
+      proposal: .init(width: 32, height: 8)
+    )
+
+    #expect(updatedArtifacts.resolvedTree.descendant(withText: "Count 1") != nil)
+    #expect(updatedArtifacts.resolvedTree.descendant(withText: "Sheet body") != nil)
+  }
+
   @Test("alert action buttons rerender observed models inside wrapped content")
   func alertActionButtonsRerenderObservedModelsInsideWrappedContent() throws {
     let model = Phase4ObservableCounter()
@@ -1133,6 +1176,29 @@ private struct PresentedAlertDismissView: View {
           Text("Close the alert")
         }
       )
+  }
+}
+
+private struct PresentedSheetCounterView: View {
+  @State private var count = 0
+  @State private var isSheetPresented = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Count \(count)")
+      Button("Increment") {
+        count += 1
+      }
+      .id(testIdentity("IncrementAction"))
+
+      Button("Present") {
+        isSheetPresented = true
+      }
+      .id(testIdentity("PresentSheetAction"))
+    }
+    .sheet("Inspector", isPresented: $isSheetPresented) {
+      Text("Sheet body")
+    }
   }
 }
 
