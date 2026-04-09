@@ -83,6 +83,32 @@ extension View {
     DisappearLifecycleModifier(content: self, action: action)
   }
 
+  public func onChange<Value: Equatable & Sendable>(
+    of value: Value,
+    initial: Bool = false,
+    _ action: @escaping @MainActor @Sendable () -> Void
+  ) -> some View {
+    ChangeLifecycleModifier(
+      content: self,
+      value: value,
+      initial: initial,
+      action: { _, _ in action() }
+    )
+  }
+
+  public func onChange<Value: Equatable & Sendable>(
+    of value: Value,
+    initial: Bool = false,
+    _ action: @escaping @MainActor @Sendable (Value, Value) -> Void
+  ) -> some View {
+    ChangeLifecycleModifier(
+      content: self,
+      value: value,
+      initial: initial,
+      action: action
+    )
+  }
+
   public func task(
     priority: TaskPriority = .medium,
     @_inheritActorContext
@@ -458,6 +484,66 @@ private struct DisappearLifecycleModifier<Content: View>: View, ResolvableView {
     node.lifecycleMetadata = node.lifecycleMetadata.merging(
       .init(disappearHandlerIDs: [handlerID])
     )
+    return [node]
+  }
+}
+
+private struct ChangeLifecycleModifier<Content: View, Value: Equatable & Sendable>:
+  View, ResolvableView
+{
+  var content: Content
+  var value: Value
+  var initial: Bool
+  let action: @MainActor @Sendable (Value, Value) -> Void
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let dynamicPropertyScope = currentAuthoringContext()
+    let node = content.resolve(in: context)
+    let ownerNode = context.viewGraph?.nodeForIdentity(node.identity)
+    let modifierOrdinal = ownerNode?.claimChangeModifierOrdinal() ?? 0
+    let stateSlotOrdinal = (ownerNode?.bodyStateSlotCount ?? 0) + modifierOrdinal
+    let hadPreviousValue = ownerNode?.stateSlots.indices.contains(stateSlotOrdinal) == true
+    let previousValue = ownerNode.map { ownerNode in
+      ownerNode.stateSlot(
+        ordinal: stateSlotOrdinal,
+        seed: value
+      )
+    }
+    let shouldTrigger =
+      if hadPreviousValue {
+        previousValue.map { $0 != value } ?? false
+      } else {
+        initial
+      }
+
+    if let ownerNode {
+      ownerNode.setStateSlotSilently(
+        ordinal: stateSlotOrdinal,
+        value: value
+      )
+    }
+
+    guard shouldTrigger else {
+      return [node]
+    }
+
+    let oldValue = previousValue ?? value
+    let lifecycleAction = action
+    let handlerID = lifecycleHandlerID(
+      for: node.identity,
+      phase: "change",
+      ordinal: modifierOrdinal
+    )
+
+    context.localLifecycleRegistry?.registerChange(
+      handlerID: handlerID,
+      handler: {
+        withAuthoringContext(dynamicPropertyScope) {
+          lifecycleAction(oldValue, value)
+        }
+      }
+    )
+    ownerNode?.queueChangeHandler(handlerID)
     return [node]
   }
 }

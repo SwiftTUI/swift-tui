@@ -1,13 +1,16 @@
 package struct LifecycleHandlerSnapshot: Sendable {
   package var appearHandlers: [String: LocalLifecycleRegistry.Handler]
   package var disappearHandlers: [String: LocalLifecycleRegistry.Handler]
+  package var changeHandlers: [String: LocalLifecycleRegistry.Handler]
 
   package init(
     appearHandlers: [String: LocalLifecycleRegistry.Handler] = [:],
-    disappearHandlers: [String: LocalLifecycleRegistry.Handler] = [:]
+    disappearHandlers: [String: LocalLifecycleRegistry.Handler] = [:],
+    changeHandlers: [String: LocalLifecycleRegistry.Handler] = [:]
   ) {
     self.appearHandlers = appearHandlers
     self.disappearHandlers = disappearHandlers
+    self.changeHandlers = changeHandlers
   }
 }
 
@@ -17,6 +20,7 @@ package final class LocalLifecycleRegistry: Equatable {
 
   private var appearHandlers: [String: Handler] = [:]
   private var disappearHandlers: [String: Handler] = [:]
+  private var changeHandlers: [String: Handler] = [:]
 
   package init() {}
 
@@ -49,6 +53,17 @@ package final class LocalLifecycleRegistry: Equatable {
     )
   }
 
+  package func registerChange(
+    handlerID: String,
+    handler: @escaping Handler
+  ) {
+    changeHandlers[handlerID] = handler
+    ViewNodeContext.current?.recordLifecycleChangeRegistration(
+      handlerID: handlerID,
+      handler: handler
+    )
+  }
+
   package func appearHandler(
     for handlerID: String
   ) -> Handler? {
@@ -61,9 +76,16 @@ package final class LocalLifecycleRegistry: Equatable {
     disappearHandlers[handlerID]
   }
 
+  package func changeHandler(
+    for handlerID: String
+  ) -> Handler? {
+    changeHandlers[handlerID]
+  }
+
   package func reset() {
     appearHandlers.removeAll(keepingCapacity: true)
     disappearHandlers.removeAll(keepingCapacity: true)
+    changeHandlers.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -87,19 +109,31 @@ package final class LocalLifecycleRegistry: Equatable {
     ) {
       disappearHandlers.removeValue(forKey: handlerID)
     }
+    for handlerID in changeHandlers.keys
+    where identityMatchesAnySubtreeRoot(
+      lifecycleHandlerIdentity(from: handlerID),
+      roots: roots
+    ) {
+      changeHandlers.removeValue(forKey: handlerID)
+    }
   }
 
   package func snapshot() -> LifecycleHandlerSnapshot {
     .init(
       appearHandlers: appearHandlers,
-      disappearHandlers: disappearHandlers
+      disappearHandlers: disappearHandlers,
+      changeHandlers: changeHandlers
     )
   }
 
   package func restore(
     _ snapshot: LifecycleHandlerSnapshot
   ) {
-    guard !snapshot.appearHandlers.isEmpty || !snapshot.disappearHandlers.isEmpty else {
+    guard
+      !snapshot.appearHandlers.isEmpty
+        || !snapshot.disappearHandlers.isEmpty
+        || !snapshot.changeHandlers.isEmpty
+    else {
       return
     }
 
@@ -108,6 +142,9 @@ package final class LocalLifecycleRegistry: Equatable {
     }
     for (handlerID, handler) in snapshot.disappearHandlers {
       disappearHandlers[handlerID] = handler
+    }
+    for (handlerID, handler) in snapshot.changeHandlers {
+      changeHandlers[handlerID] = handler
     }
   }
 }

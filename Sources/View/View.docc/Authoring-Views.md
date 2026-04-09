@@ -17,7 +17,7 @@ TerminalUI now follows SwiftUI-style actor isolation for authored view trees.
 
 - `View` bodies are `@MainActor`
 - `Resolver.resolve(...)` and `DefaultRenderer.render(...)` evaluate view trees on the main actor
-- `Binding.init(get:set:)` and `.task(...)` inherit the current actor context, while button actions, `.onAppear`, and `.onDisappear` stay explicitly `@MainActor`
+- `Binding.init(get:set:)` and `.task(...)` inherit the current actor context, while button actions, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`
 - because `View.body` itself is `@MainActor`, ordinary authored view code still uses those APIs from the main actor
 
 The pure `Core` pipeline remains nonisolated. If you need off-main inspection, move to already-resolved or already-rendered pipeline artifacts rather than evaluating a fresh `View` tree off the main actor.
@@ -40,7 +40,7 @@ Most familiar modifier categories are available:
 - style modifiers such as foreground style, tint, and disabled state
 - focus modifiers such as `.focused(...)`, `.defaultFocus(...)`, and `.focusEffectDisabled()`
 - environment modifiers such as `.environment(...)` and `.transformEnvironment(...)`
-- lifecycle modifiers such as `.onAppear`, `.onDisappear`, and `.task(...)`
+- lifecycle modifiers such as `.onAppear`, `.onDisappear`, `.onChange(of:initial:_:)`, and `.task(...)`
 
 Concrete wrapper views behind those modifiers are package-only. Call sites should stay on the modifier surface.
 

@@ -67,7 +67,7 @@ The shipped ownership model is split into three categories:
   - `Resolver.resolve(...)`
   - `DefaultRenderer.render(...)`
   - scene collection helpers, typed `WindowIdentifier` values, and `WindowGroup` root-view construction
-  - action-bearing authoring APIs such as `Binding.init(get:set:)`, button actions, `OpenLinkAction` over typed `LinkDestination`s, `.onAppear`, `.onDisappear`, and `.task(...)`
+  - action-bearing authoring APIs such as `Binding.init(get:set:)`, button actions, `OpenLinkAction` over typed `LinkDestination`s, `.onAppear`, `.onDisappear`, `.onChange(of:initial:_:)`, and `.task(...)`
 - Main-actor runtime coordination and ownership:
   - `RunLoop`
   - `StateContainer`

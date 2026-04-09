@@ -111,6 +111,13 @@ package struct NodeHandlers {
     lifecycleRegistrations.disappearHandlers[handlerID] = handler
   }
 
+  package mutating func recordLifecycleChange(
+    handlerID: String,
+    handler: @escaping LocalLifecycleRegistry.Handler
+  ) {
+    lifecycleRegistrations.changeHandlers[handlerID] = handler
+  }
+
   package mutating func recordTask(
     identity: Identity,
     registration: TaskRegistration

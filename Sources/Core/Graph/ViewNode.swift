@@ -34,12 +34,14 @@ package final class ViewNode {
   package var previousLifecycleMetadata: LifecycleMetadata
   package var bodyStateSlotCount: Int?
   package var currentBodyStateSlotCount: Int
+  package private(set) var pendingChangeHandlerIDs: [String]
 
   private let dependencyTracker: DependencyTracker
   private var cachedResolvedNode: ResolvedNode?
   private var registrationCaptureDepth: Int
   private var evaluationDepth: Int
   private var hasCommittedPresence: Bool
+  private var nextChangeModifierOrdinal: Int
   private var preparedFrameID: UInt64
   private var visitedFrameID: UInt64
   private var evaluator: (@MainActor () -> Void)?
@@ -75,10 +77,12 @@ package final class ViewNode {
     previousLifecycleMetadata = .init()
     bodyStateSlotCount = nil
     currentBodyStateSlotCount = 0
+    pendingChangeHandlerIDs = []
     dependencyTracker = .init()
     registrationCaptureDepth = 0
     evaluationDepth = 0
     hasCommittedPresence = false
+    nextChangeModifierOrdinal = 0
     preparedFrameID = 0
     visitedFrameID = 0
     evaluator = nil
@@ -96,6 +100,8 @@ package final class ViewNode {
     previousChildrenIdentities = children.map(\.identity)
     previousLifecycleMetadata = lifecycleMetadata
     currentBodyStateSlotCount = 0
+    pendingChangeHandlerIDs.removeAll(keepingCapacity: true)
+    nextChangeModifierOrdinal = 0
     preparedFrameID = frameID
   }
 
@@ -261,6 +267,22 @@ package final class ViewNode {
     self.lifecycleState = lifecycleState
   }
 
+  package func claimChangeModifierOrdinal() -> Int {
+    defer {
+      nextChangeModifierOrdinal += 1
+    }
+    return nextChangeModifierOrdinal
+  }
+
+  package func queueChangeHandler(
+    _ handlerID: String
+  ) {
+    guard !pendingChangeHandlerIDs.contains(handlerID) else {
+      return
+    }
+    pendingChangeHandlerIDs.append(handlerID)
+  }
+
   package func apply(
     resolved: ResolvedNode,
     children: [ViewNode]
@@ -416,6 +438,16 @@ package final class ViewNode {
     handler: @escaping LocalLifecycleRegistry.Handler
   ) {
     registeredHandlers.recordLifecycleDisappear(
+      handlerID: handlerID,
+      handler: handler
+    )
+  }
+
+  package func recordLifecycleChangeRegistration(
+    handlerID: String,
+    handler: @escaping LocalLifecycleRegistry.Handler
+  ) {
+    registeredHandlers.recordLifecycleChange(
       handlerID: handlerID,
       handler: handler
     )

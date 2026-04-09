@@ -461,6 +461,99 @@ struct SwiftUISurfaceTests {
   }
 
   @Test(
+    "onChange(of:initial:_:) defers execution until commit and tracks old and new values")
+  func onChangeDefersExecutionUntilCommitAndTracksOldAndNewValues() async {
+    final class ChangeBox: Sendable {
+      private struct State: Sendable {
+        var events: [String] = []
+      }
+
+      private let state = LockedBox(State())
+
+      var events: [String] {
+        state.value.events
+      }
+
+      func record(oldValue: Int, newValue: Int) {
+        state.withLock { state in
+          state.events.append("\(oldValue)->\(newValue)")
+        }
+      }
+    }
+
+    let box = ChangeBox()
+    let lifecycleRegistry = LocalLifecycleRegistry()
+    let renderer = DefaultRenderer()
+
+    func makeView(_ value: Int) -> some View {
+      Text("Value \(value)")
+        .onChange(of: value, initial: true) { oldValue, newValue in
+          box.record(oldValue: oldValue, newValue: newValue)
+        }
+    }
+
+    let initialArtifacts = renderer.render(
+      makeView(1),
+      context: .init(
+        identity: testIdentity("Root"),
+        localLifecycleRegistry: lifecycleRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(box.events.isEmpty)
+    #expect(
+      initialArtifacts.commitPlan.lifecycle == [
+        .init(
+          identity: testIdentity("Root"),
+          operation: .change(handlerIDs: ["Root#change[0]"])
+        )
+      ]
+    )
+
+    await MainActor.run {
+      lifecycleRegistry.changeHandler(for: "Root#change[0]")?()
+    }
+
+    #expect(box.events == ["1->1"])
+
+    let updatedArtifacts = renderer.render(
+      makeView(2),
+      context: .init(
+        identity: testIdentity("Root"),
+        localLifecycleRegistry: lifecycleRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(
+      updatedArtifacts.commitPlan.lifecycle == [
+        .init(
+          identity: testIdentity("Root"),
+          operation: .change(handlerIDs: ["Root#change[0]"])
+        )
+      ]
+    )
+
+    await MainActor.run {
+      lifecycleRegistry.changeHandler(for: "Root#change[0]")?()
+    }
+
+    #expect(box.events == ["1->1", "1->2"])
+
+    let unchangedArtifacts = renderer.render(
+      makeView(2),
+      context: .init(
+        identity: testIdentity("Root"),
+        localLifecycleRegistry: lifecycleRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(unchangedArtifacts.commitPlan.lifecycle.isEmpty)
+  }
+
+  @Test(
     "conditional lifecycle ownership follows the resolved branch identity instead of inventing a wrapper"
   )
   func conditionalLifecycleOwnershipFollowsResolvedBranchIdentity() {

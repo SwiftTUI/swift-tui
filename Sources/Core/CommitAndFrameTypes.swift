@@ -25,6 +25,7 @@ public struct TaskDescriptor: Equatable, Sendable {
 public enum LifecycleCommitOperation: Equatable, Sendable {
   case appear(handlerIDs: [String])
   case disappear(handlerIDs: [String])
+  case change(handlerIDs: [String])
   case taskStart(TaskDescriptor)
   case taskCancel(TaskDescriptor)
 }
