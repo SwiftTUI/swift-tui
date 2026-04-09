@@ -7,7 +7,6 @@ struct TodoTab: View {
   @State private var isPresentingNew: Bool = false
   @State private var draftTitle: String = ""
   @State private var draftPriority: TodoPriority = .normal
-  @FocusState private var titleFocused: Bool
 
   private var visibleItems: [TodoItem] {
     items.filter(filter.matches)
@@ -73,7 +72,6 @@ struct TodoTab: View {
         draftTitle = ""
         draftPriority = .normal
         isPresentingNew = true
-        titleFocused = true
       }
       Spacer()
       Button("Clear ✓") {
@@ -86,8 +84,6 @@ struct TodoTab: View {
     VStack(alignment: .leading, spacing: 1) {
       Text("Title").foregroundStyle(.separator)
       TextField("What needs doing?", text: $draftTitle)
-        .focused($titleFocused)
-
       Text("Priority").foregroundStyle(.separator)
       Picker("Priority", selection: $draftPriority) {
         ForEach(TodoPriority.allCases) { option in
