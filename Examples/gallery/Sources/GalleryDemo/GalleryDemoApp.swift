@@ -31,7 +31,9 @@ struct ColorGallery: View {
               Text(font.rawValue)
               Button("!") {
                 withAnimation(.easeInOut) {
-                  showFigure.toggle()
+                  withAnimation(.easeInOut(duration: .seconds(2.0))) {
+                    showFigure.toggle()
+                  }
                 }
               }
               Button("↴") {
@@ -53,7 +55,6 @@ struct ColorGallery: View {
                 TextFigure("Gallery", font: font)
                   .foregroundStyle(color)
                   .transition(.opacity)
-                  .padding(1)
               }
             }
           }

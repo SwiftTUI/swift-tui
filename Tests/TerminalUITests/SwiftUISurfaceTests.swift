@@ -5196,15 +5196,22 @@ struct SwiftUISurfaceTests {
     #expect(lineLimit == 1)
     #expect(truncationMode == .tail)
     #expect(wrappingStrategy == .wordBoundary)
-    #expect(
-      artifacts.rasterSurface.styleRuns == [
-        RasterStyleRun(
-          x: 0,
-          y: 0,
-          length: 2,
-          style: style
-        )
-      ])
+    // The raster surface bakes fractional opacity into the foreground
+    // color so terminals see smooth intermediate shades instead of a
+    // binary SGR "faint".  The emphasis and geometry still flow through
+    // untouched; the style-run's opacity is normalized to 1.0 and the
+    // foreground color is no longer the raw semantic(.tint) sentinel.
+    #expect(artifacts.rasterSurface.styleRuns.count == 1)
+    guard let rasterRun = artifacts.rasterSurface.styleRuns.first else {
+      Issue.record("Expected one style run on the styled text raster")
+      return
+    }
+    #expect(rasterRun.x == 0)
+    #expect(rasterRun.y == 0)
+    #expect(rasterRun.length == 2)
+    #expect(rasterRun.style.emphasis == .bold)
+    #expect(rasterRun.style.opacity == 1.0)
+    #expect(rasterRun.style.foregroundColor != nil)
   }
 
   @Test("text emphasis and decoration modifiers map into typed draw metadata")
