@@ -1,9 +1,9 @@
 package import Core
-@_exported import swift_figlet_embedded_fonts
+@_exported import EmbeddedFonts
 
 /// Displays ASCII-art text using embedded FIGlet fonts.
 public struct TextFigure: View, ResolvableView {
-  public typealias Font = SwiftFigletEmbeddedFonts.Font
+  public typealias Font = EmbeddedFigletFont
 
   public var content: String
   public var font: Font

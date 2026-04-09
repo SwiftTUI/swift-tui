@@ -45,7 +45,7 @@ let packageDependencies: [Package.Dependency] = [
 let terminalUIDependencies: [Target.Dependency] = [
   "Core",
   "View",
-  .product(name: "swift-figlet-embedded-fonts", package: "swift-figlet"),
+  .product(name: "EmbeddedFonts", package: "swift-figlet"),
   .product(
     name: "UnixSignals",
     package: "UnixSignals",
@@ -101,8 +101,8 @@ let package = Package(
         .product(name: "DequeModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-        .product(name: "swift-figlet", package: "swift-figlet"),
-        .product(name: "swift-figlet-embedded-fonts", package: "swift-figlet"),
+        .product(name: "SwiftFiglet", package: "swift-figlet"),
+        .product(name: "EmbeddedFonts", package: "swift-figlet"),
       ],
       swiftSettings: swiftSettings()
     ),
@@ -111,7 +111,7 @@ let package = Package(
       name: "View",
       dependencies: [
         "Core",
-        .product(name: "swift-figlet-embedded-fonts", package: "swift-figlet"),
+        .product(name: "EmbeddedFonts", package: "swift-figlet"),
       ],
       swiftSettings: swiftSettings()
     ),

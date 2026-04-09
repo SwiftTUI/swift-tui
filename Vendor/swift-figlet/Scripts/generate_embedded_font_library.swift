@@ -270,7 +270,7 @@ for fontEntry in fontEntries {
     renderedLines.append(contentsOf: chunks.map { chunk in
         "        fontData += \"\(swiftStringLiteral(chunk))\""
     })
-    renderedLines.append("        fonts[FigletFont.\(fontEntry.caseName).rawValue] = fontData")
+    renderedLines.append("        fonts[EmbeddedFigletFont.\(fontEntry.caseName).rawValue] = fontData")
 
     renderedAssignments.append(renderedLines.joined(separator: "\n"))
     renderedCases.append("        case \(fontEntry.caseName) = \"\(swiftStringLiteral(fontEntry.fontName))\"")
@@ -282,7 +282,7 @@ let output = """
 
 public import SwiftFiglet
 
-public enum FigletFont: String, CaseIterable, Sendable {
+public enum EmbeddedFigletFont: String, CaseIterable, Sendable {
 \(renderedCases.joined(separator: "\n"))
 
     public static let library: FigletFontLibrary = {

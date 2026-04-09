@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import swift_figlet_embedded_fonts
+import EmbeddedFonts
 
 @testable import Core
 @testable import TerminalUI
@@ -3884,11 +3884,11 @@ private struct StatefulImplicitPointerScrollFixture: View {
 
 private struct GalleryLikeScrollFixture: View {
   @State private var fontNumber = 2
-  @State private var font: SwiftFigletEmbeddedFonts.Font = .acrobatic
+  @State private var font: EmbeddedFigletFont = .acrobatic
   @State private var taskRuns = 0
 
   private var fontCount: Int {
-    SwiftFigletEmbeddedFonts.Font.allCases.count
+    EmbeddedFigletFont.allCases.count
   }
 
   var body: some View {
@@ -3904,7 +3904,7 @@ private struct GalleryLikeScrollFixture: View {
             .task(id: fontNumber) {
               taskRuns += 1
               if fontNumber >= 0 && fontNumber < fontCount {
-                font = SwiftFigletEmbeddedFonts.Font.allCases[fontNumber]
+                font = EmbeddedFigletFont.allCases[fontNumber]
               } else {
                 fontNumber = 0
               }
@@ -3953,10 +3953,10 @@ private struct GalleryLikeScrollFixture: View {
 
 private struct RootAliasGalleryLikeScrollFixture: View {
   @State private var fontNumber = 2
-  @State private var font: SwiftFigletEmbeddedFonts.Font = .acrobatic
+  @State private var font: EmbeddedFigletFont = .acrobatic
 
   private var fontCount: Int {
-    SwiftFigletEmbeddedFonts.Font.allCases.count
+    EmbeddedFigletFont.allCases.count
   }
 
   var body: some View {
@@ -3970,7 +3970,7 @@ private struct RootAliasGalleryLikeScrollFixture: View {
             }
             .task(id: fontNumber) {
               if fontNumber >= 0 && fontNumber < fontCount {
-                font = SwiftFigletEmbeddedFonts.Font.allCases[fontNumber]
+                font = EmbeddedFigletFont.allCases[fontNumber]
               } else {
                 fontNumber = 0
               }
@@ -4025,10 +4025,10 @@ private struct LayoutHostedGalleryLikeScrollFixture: View {
 
 private struct LayoutHostedGalleryLikeScrollContent: View {
   @State private var fontNumber = 2
-  @State private var font: SwiftFigletEmbeddedFonts.Font = .acrobatic
+  @State private var font: EmbeddedFigletFont = .acrobatic
 
   private var fontCount: Int {
-    SwiftFigletEmbeddedFonts.Font.allCases.count
+    EmbeddedFigletFont.allCases.count
   }
 
   var body: some View {
@@ -4042,7 +4042,7 @@ private struct LayoutHostedGalleryLikeScrollContent: View {
             }
             .task(id: fontNumber) {
               if fontNumber >= 0 && fontNumber < fontCount {
-                font = SwiftFigletEmbeddedFonts.Font.allCases[fontNumber]
+                font = EmbeddedFigletFont.allCases[fontNumber]
               } else {
                 fontNumber = 0
               }
