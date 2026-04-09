@@ -30,11 +30,9 @@ struct DependencyTrackingTests {
       StateDependencyProbe()
     )
 
-    #expect(
-      dependencies.stateSlotReads == [
-        StateSlotKey(identity: testIdentity("Root"), ordinal: 0)
-      ]
-    )
+    let stateRead = try #require(dependencies.stateSlotReads.first)
+    #expect(dependencies.stateSlotReads.count == 1)
+    #expect(stateRead.identity == testIdentity("Root"))
   }
 
   @Test("environment reads populate graph dependencies")

@@ -501,10 +501,8 @@ private struct ChangeLifecycleModifier<Content: View, Value: Equatable & Sendabl
     let node = content.resolve(in: context)
     let ownerNode = context.viewGraph?.nodeForIdentity(node.identity)
     let modifierOrdinal = ownerNode?.claimChangeModifierOrdinal() ?? 0
-    let authoredStateSlotCount = dynamicPropertyScope?.ordinalTracker.nextOrdinal ?? 0
-    let stateSlotBase = max(ownerNode?.bodyStateSlotCount ?? 0, authoredStateSlotCount)
-    let stateSlotOrdinal = stateSlotBase + modifierOrdinal
-    let hadPreviousValue = ownerNode?.stateSlots.indices.contains(stateSlotOrdinal) == true
+    let stateSlotOrdinal = StateSlotOrdinals.changeModifier(modifierOrdinal)
+    let hadPreviousValue = ownerNode?.hasStateSlot(ordinal: stateSlotOrdinal) == true
     let previousValue = ownerNode.map { ownerNode in
       ownerNode.stateSlot(
         ordinal: stateSlotOrdinal,

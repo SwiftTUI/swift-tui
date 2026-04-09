@@ -111,6 +111,36 @@ package final class AuthoringOrdinalTracker {
   }
 }
 
+package enum StateSlotOrdinals {
+  private static let authoredColumnBits = 16
+  private static let changeModifierBase = -1_000_000_000
+  private static let defaultFocusBase = -2_000_000_000
+  private static let valueAnimationOrdinal = -3_000_000_000
+
+  package static func authored(
+    line: UInt,
+    column: UInt
+  ) -> Int {
+    (Int(line) << authoredColumnBits) | Int(column)
+  }
+
+  package static func changeModifier(
+    _ ordinal: Int
+  ) -> Int {
+    changeModifierBase - ordinal
+  }
+
+  package static func defaultFocus(
+    _ ordinal: Int
+  ) -> Int {
+    defaultFocusBase - ordinal
+  }
+
+  package static var valueAnimation: Int {
+    valueAnimationOrdinal
+  }
+}
+
 @MainActor
 private struct DynamicStateLocation<Value> {
   var getValue: @MainActor () -> Value
@@ -126,12 +156,16 @@ private struct DynamicStateLocation<Value> {
 
 @MainActor
 private final class StateBox<Value> {
-  private var ordinal: Int?
+  private let slotOrdinal: Int
   private var seedValue: Value
   private var boundLocation: DynamicStateLocation<Value>?
   private var retainedValuesByIdentity: [Identity: Value]
 
-  init(seedValue: Value) {
+  init(
+    seedValue: Value,
+    slotOrdinal: Int
+  ) {
+    self.slotOrdinal = slotOrdinal
     self.seedValue = seedValue
     boundLocation = nil
     retainedValuesByIdentity = [:]
@@ -166,20 +200,8 @@ private final class StateBox<Value> {
     retainedValuesByIdentity[identity] = value
   }
 
-  func currentOrdinal(
-    for context: AuthoringContext?
-  ) -> Int? {
-    if let ordinal {
-      return ordinal
-    }
-    guard let context else {
-      return nil
-    }
-    guard let ordinal = context.ordinalTracker.claimOrdinal() else {
-      return nil
-    }
-    self.ordinal = ordinal
-    return ordinal
+  var currentOrdinal: Int {
+    slotOrdinal
   }
 }
 
@@ -187,18 +209,38 @@ private final class StateBox<Value> {
 @MainActor
 /// Local value storage owned by a view identity.
 ///
-/// `@State` persistence is keyed by the view's identity path plus ordinal
-/// access order within that view.
+/// `@State` persistence is keyed by the view's identity path plus source
+/// location within that view.
 public struct State<Value> {
   private let box: StateBox<Value>
 
   /// Creates state with the supplied initial wrapped value.
-  public init(wrappedValue: Value) {
-    box = StateBox(seedValue: wrappedValue)
+  public init(
+    wrappedValue: Value,
+    line: UInt = #line,
+    column: UInt = #column
+  ) {
+    box = StateBox(
+      seedValue: wrappedValue,
+      slotOrdinal: StateSlotOrdinals.authored(
+        line: line,
+        column: column
+      )
+    )
   }
 
-  public init(initialValue: Value) {
-    box = StateBox(seedValue: initialValue)
+  public init(
+    initialValue: Value,
+    line: UInt = #line,
+    column: UInt = #column
+  ) {
+    box = StateBox(
+      seedValue: initialValue,
+      slotOrdinal: StateSlotOrdinals.authored(
+        line: line,
+        column: column
+      )
+    )
   }
 
   public var wrappedValue: Value {
@@ -236,15 +278,7 @@ public struct State<Value> {
   private func makeLocation(
     for context: AuthoringContext
   ) -> DynamicStateLocation<Value> {
-    guard let ordinal = box.currentOrdinal(for: context) else {
-      return DynamicStateLocation(
-        getValue: { box.currentSeedValue() },
-        setValue: { newValue in
-          box.updateSeedValue(newValue)
-        }
-      )
-    }
-
+    let ordinal = box.currentOrdinal
     let retainedSeed = box.retainedValue(for: context.viewIdentity) ?? box.currentSeedValue()
 
     if let viewNode = context.viewNode {

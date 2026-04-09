@@ -153,9 +153,9 @@ package struct ValueAnimationModifier<Content: View, Value: Equatable & Sendable
 }
 
 enum ValueAnimationModifierSlot {
-  /// Reserved high ordinal for modifier-only bookkeeping.  Chosen to sit
-  /// well beyond any plausible authored @State ordinal in a body.
-  static let reservedOrdinal = 1 << 20
+  /// Reserved modifier-only slot used to remember the previous watched
+  /// value without colliding with authored `@State` storage.
+  static let reservedOrdinal = StateSlotOrdinals.valueAnimation
 }
 
 // MARK: - TransactionModifier
