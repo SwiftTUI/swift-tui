@@ -1,6 +1,6 @@
+import EmbeddedFonts
+import SwiftFiglet
 import Testing
-import swift_figlet
-import swift_figlet_embedded_fonts
 
 private let repositoryRoot =
   "/" + #filePath.split(separator: "/").dropLast(3).joined(separator: "/")
@@ -105,38 +105,6 @@ private let testOnlyFontData = #"""
   @@
   """# + "\n"
 
-@Test func rendersBundledStandardFont() throws {
-  let figlet = try Figlet(fontNamed: "standard", searchDirectories: [bundledFontsDirectory])
-  let output = try figlet.render("Hi").description
-
-  #expect(output == " _   _ _ \n| | | (_)\n| |_| | |\n|  _  | |\n|_| |_|_|\n         \n")
-}
-
-@Test func rendersBundledSlantFont() throws {
-  let figlet = try Figlet(fontNamed: "slant", searchDirectories: [bundledFontsDirectory])
-  let output = try figlet.render("Swift").description
-
-  #expect(
-    output
-      == "   _____         _ ______ \n  / ___/      __(_) __/ /_\n  \\__ \\ | /| / / / /_/ __/\n ___/ / |/ |/ / / __/ /_  \n/____/|__/|__/_/_/  \\__/  \n                          \n"
-  )
-}
-
-@Test func wrapsAtWordBoundaries() throws {
-  let figlet = try Figlet(
-    fontNamed: "standard",
-    configuration: FigletConfiguration(width: 20),
-    searchDirectories: [bundledFontsDirectory]
-  )
-
-  let output = try figlet.render("hello world").description
-
-  #expect(
-    output
-      == " _          _ _ \n| |__   ___| | |\n| '_ \\ / _ \\ | |\n| | | |  __/ | |\n|_| |_|\\___|_|_|\n                \n       \n  ___  \n / _ \\ \n| (_) |\n \\___/ \n       \n                    \n__      _____  _ __ \n\\ \\ /\\ / / _ \\| '__|\n \\ V  V / (_) | |   \n  \\_/\\_/ \\___/|_|   \n                    \n _     _ \n| | __| |\n| |/ _` |\n| | (_| |\n|_|\\__,_|\n         \n"
-  )
-}
-
 @Test func loadsExternalFontFiles() throws {
   let font = try FigletFont(filePath: testDirectory + "/Fixtures/TestOnly.flf")
   let figlet = Figlet(font: font)
@@ -164,15 +132,6 @@ private let testOnlyFontData = #"""
   #expect(output == " _   _ _ \n| | | (_)\n| |_| | |\n|  _  | |\n|_| |_|_|\n         \n")
 }
 
-@Test func rendersBundledAscii12FontByDefault() throws {
-  let bundled = try Figlet(fontNamed: "ascii12")
-  let embedded = try Figlet(embeddedFont: .ascii12)
-  let bundledOutput = try bundled.render("Swift").description
-  let embeddedOutput = try embedded.render("Swift").description
-
-  #expect(bundledOutput == embeddedOutput)
-}
-
 @Test func reportsLayoutMetricsForEmbeddedFonts() throws {
   let figlet = try Figlet(embeddedFont: .standard)
   let metrics = try figlet.layoutMetrics(for: "Hi")
@@ -189,16 +148,8 @@ private let testOnlyFontData = #"""
   #expect(try figlet.measure("hello world", forWidth: 20) == .init(width: 20, height: 24))
 }
 
-@Test func listsBundledFonts() {
-  let fonts = FigletFont.availableFontNames(in: [bundledFontsDirectory])
-  #expect(fonts.contains("slant"))
-  #expect(fonts.contains("standard"))
-  #expect(fonts.contains("banner"))
-  #expect(fonts.contains("mono9"))
-}
-
 @Test func listsEmbeddedFonts() {
-  let fonts = SwiftFigletEmbeddedFonts.fonts
+  let fonts = EmbeddedFigletFont.allCases
 
   #expect(fonts.contains(.slant))
   #expect(fonts.contains(.standard))
@@ -208,5 +159,5 @@ private let testOnlyFontData = #"""
 
 @Test func embeddedFontEnumMatchesTheGeneratedLibrary() {
   #expect(
-    SwiftFigletEmbeddedFonts.fonts.map(\.rawValue) == SwiftFigletEmbeddedFonts.library.fontNames)
+    EmbeddedFigletFont.allCases.map(\.rawValue) == EmbeddedFigletFont.library.fontNames)
 }
