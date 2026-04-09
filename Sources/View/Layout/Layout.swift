@@ -152,8 +152,9 @@ extension Layout {
   public func callAsFunction<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {
-    LayoutContainer(
+    return LayoutContainer(
       layout: AnyLayout(self),
+      authoringScope: currentAuthoringContext(),
       content: content()
     )
   }
@@ -352,8 +353,9 @@ extension AnyLayout {
   public func callAsFunction<Content: View>(
     @ViewBuilder content: () -> Content
   ) -> some View {
-    LayoutContainer(
+    return LayoutContainer(
       layout: self,
+      authoringScope: currentAuthoringContext(),
       content: content()
     )
   }
@@ -514,14 +516,24 @@ public struct ZStackLayout: Layout, BuiltinLayoutBehaviorProviding {
 
 private struct LayoutContainer<Content: View>: View, ResolvableView {
   var layout: AnyLayout
+  var authoringScope: AuthoringContext?
   var content: Content
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let resolvedChildren = resolveDeclaredChildren(
-      content,
-      in: context,
-      kindName: "Layout"
-    )
+    // AnyView policy: layout containers flatten their declared children into
+    // per-child scoped leaves so selective reevaluation preserves the original
+    // authoring scope without introducing wrapper identities.
+    let children = withAuthoringContext(authoringScope) {
+      erasedDeclaredBuilderChildren(from: content)
+    }
+    let resolvedChildren = children.enumerated().map { index, child in
+      child.resolve(
+        in: context.indexedChild(
+          kind: .named("Layout"),
+          index: index
+        )
+      )
+    }
 
     return [
       ResolvedNode(

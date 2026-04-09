@@ -2059,6 +2059,70 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("root-alias ScrollView content survives pointer scrolling")
+  func rootAliasScrollViewContentSurvivesPointerScrolling() async throws {
+    let terminalSize = Size(width: 80, height: 24)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("RootAliasGalleryLikeScrollFixture")
+    let view = RootAliasGalleryLikeScrollFixture()
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: rootIdentity,
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: bottomPoint(of: scrollRect))),
+        .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: bottomPoint(of: scrollRect))),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(terminal.frames.count >= 2)
+  }
+
+  @MainActor
+  @Test("layout-hosted ScrollView content survives pointer scrolling")
+  func layoutHostedScrollViewContentSurvivesPointerScrolling() async throws {
+    let terminalSize = Size(width: 80, height: 24)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("LayoutHostedGalleryLikeScrollFixture")
+    let view = LayoutHostedGalleryLikeScrollFixture()
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: testIdentity("LayoutHostedGalleryLikeScrollFixture", "Layout[0]"),
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: bottomPoint(of: scrollRect))),
+        .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 1), location: bottomPoint(of: scrollRect))),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(terminal.frames.count >= 2)
+  }
+
+  @MainActor
   @Test(
     "handled pointer scrolling invalidates the scroll route even for external position bindings")
   func handledPointerScrollingInvalidatesScrollRouteForExternalBindings() throws {
@@ -3881,6 +3945,142 @@ private struct GalleryLikeScrollFixture: View {
     }
     .id(testIdentity("GalleryLikeScrollFixture", "Scroll"))
     .frame(width: 30, height: 10, alignment: .topLeading)
+  }
+}
+
+private struct RootAliasGalleryLikeScrollFixture: View {
+  @State private var fontNumber = 2
+  @State private var font: SwiftFigletEmbeddedFonts.Font = .acrobatic
+
+  private var fontCount: Int {
+    SwiftFigletEmbeddedFonts.Font.allCases.count
+  }
+
+  var body: some View {
+    ScrollView(.vertical) {
+      EnvironmentReader(\.terminalAppearance) { appearance in
+        VStack(alignment: .leading, spacing: 1) {
+          VStack(alignment: .leading, spacing: 0) {
+            HStack {
+              Stepper("", value: $fontNumber)
+              Text(font.rawValue)
+            }
+            .task(id: fontNumber) {
+              if fontNumber >= 0 && fontNumber < fontCount {
+                font = SwiftFigletEmbeddedFonts.Font.allCases[fontNumber]
+              } else {
+                fontNumber = 0
+              }
+            }
+
+            if fontNumber >= 0 && fontNumber < fontCount {
+              TextFigure("Gallery", font: font)
+                .foregroundStyle(Color.black)
+                .padding(1)
+                .background(Color.red)
+                .padding(1)
+            }
+          }
+
+          GroupBox("Terminal palette (host)") {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<16) { index in
+                let hasColor = appearance.palette[index] != nil
+                Text("Color \(index) \(hasColor ? "set" : "missing")")
+              }
+            }
+          }
+
+          GroupBox("Named colors") {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<9) { index in
+                Text("Named \(index)")
+              }
+            }
+          }
+
+          GroupBox("Semantic roles") {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<6) { index in
+                Text("Role \(index)")
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+private struct LayoutHostedGalleryLikeScrollFixture: View {
+  var body: some View {
+    WindowHostLayout {
+      LayoutHostedGalleryLikeScrollContent()
+    }
+  }
+}
+
+private struct LayoutHostedGalleryLikeScrollContent: View {
+  @State private var fontNumber = 2
+  @State private var font: SwiftFigletEmbeddedFonts.Font = .acrobatic
+
+  private var fontCount: Int {
+    SwiftFigletEmbeddedFonts.Font.allCases.count
+  }
+
+  var body: some View {
+    ScrollView(.vertical) {
+      EnvironmentReader(\.terminalAppearance) { appearance in
+        VStack(alignment: .leading, spacing: 1) {
+          VStack(alignment: .leading, spacing: 0) {
+            HStack {
+              Stepper("", value: $fontNumber)
+              Text(font.rawValue)
+            }
+            .task(id: fontNumber) {
+              if fontNumber >= 0 && fontNumber < fontCount {
+                font = SwiftFigletEmbeddedFonts.Font.allCases[fontNumber]
+              } else {
+                fontNumber = 0
+              }
+            }
+
+            if fontNumber >= 0 && fontNumber < fontCount {
+              TextFigure("Gallery", font: font)
+                .foregroundStyle(Color.black)
+                .padding(1)
+                .background(Color.red)
+                .padding(1)
+            }
+          }
+
+          GroupBox("Terminal palette (host)") {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<16) { index in
+                let hasColor = appearance.palette[index] != nil
+                Text("Color \(index) \(hasColor ? "set" : "missing")")
+              }
+            }
+          }
+
+          GroupBox("Named colors") {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<9) { index in
+                Text("Named \(index)")
+              }
+            }
+          }
+
+          GroupBox("Semantic roles") {
+            VStack(alignment: .leading, spacing: 0) {
+              ForEach(0..<6) { index in
+                Text("Role \(index)")
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 

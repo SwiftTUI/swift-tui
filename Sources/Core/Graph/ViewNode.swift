@@ -154,6 +154,16 @@ package final class ViewNode {
     dependencyTracker.recordStateRead(
       .init(identity: identity, ordinal: ordinal)
     )
+
+    guard stateSlots[ordinal].stores(Value.self) else {
+      let slotTypes = stateSlots.enumerated().map { index, slot in
+        "\(index):\(slot.storedTypeDescription)"
+      }.joined(separator: ", ")
+      fatalError(
+        "State slot type mismatch on node \(identity) ordinal \(ordinal). Expected \(Value.self), found \(stateSlots[ordinal].storedTypeDescription). Slots: [\(slotTypes)]"
+      )
+    }
+
     return stateSlots[ordinal].value(as: Value.self)
   }
 
