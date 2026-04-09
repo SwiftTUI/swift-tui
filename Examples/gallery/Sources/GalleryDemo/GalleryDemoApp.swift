@@ -1,6 +1,6 @@
-import Algorithms
 import GalleryDemoViews
 import TerminalUI
+import TerminalUICLI
 
 @main
 struct GalleryDemoApp: App {
