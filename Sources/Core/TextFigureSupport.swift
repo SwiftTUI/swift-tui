@@ -1,8 +1,8 @@
 import Synchronization
-import swift_figlet
-@_exported import swift_figlet_embedded_fonts
+import SwiftFiglet
+@_exported import EmbeddedFonts
 
-public typealias TextFigureFont = SwiftFigletEmbeddedFonts.Font
+public typealias TextFigureFont = EmbeddedFigletFont
 
 public struct TextFigurePayload: Equatable, Hashable, Sendable {
   public var content: String
@@ -144,7 +144,7 @@ package enum TextFigureSupport {
 
     let resolvedFont = try FigletFont(
       named: font.rawValue,
-      fontLibrary: SwiftFigletEmbeddedFonts.library
+      fontLibrary: EmbeddedFigletFont.library
     )
     fontCache.withLock {
       $0[font] = resolvedFont

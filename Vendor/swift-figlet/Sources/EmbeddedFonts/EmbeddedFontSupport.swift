@@ -2,13 +2,13 @@ public import SwiftFiglet
 
 public extension Figlet {
     init(
-        embeddedFont font: FigletFont = .standard,
+        embeddedFont font: EmbeddedFigletFont = .standard,
         configuration: FigletConfiguration = FigletConfiguration()
     ) throws {
         try self.init(
             fontNamed: font.rawValue,
             configuration: configuration,
-            fontLibrary: FigletFont.library
+            fontLibrary: EmbeddedFigletFont.library
         )
     }
 }
