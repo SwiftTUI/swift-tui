@@ -12,7 +12,7 @@ import Synchronization
 #elseif canImport(Android)
   package import Android
 #elseif canImport(WASILibc)
-  package import WASILibc
+  import WASILibc
 #endif
 
 #if canImport(Darwin)
@@ -1238,9 +1238,9 @@ extension TerminalHosting {
       try writeLock.withLock { _ in
         var written = 0
         while written < bytes.count {
-          let result = bytes.withUnsafeBytes { rawBuffer in
-            let baseAddress = rawBuffer.baseAddress?.advanced(by: written)
-            return platformWrite(
+          let result = unsafe bytes.withUnsafeBytes { rawBuffer in
+            let baseAddress = unsafe rawBuffer.baseAddress?.advanced(by: written)
+            return unsafe platformWrite(
               outputFD,
               baseAddress,
               bytes.count - written
@@ -1376,11 +1376,11 @@ package func currentProcessEnvironment() -> [String: String] {
   private func environmentValue(
     named key: String
   ) -> String? {
-    key.withCString { cKey in
-      guard let rawValue = getenv(cKey) else {
+    unsafe key.withCString { cKey in
+      guard let rawValue = unsafe getenv(cKey) else {
         return nil
       }
-      return String(cString: rawValue)
+      return unsafe String(cString: rawValue)
     }
   }
 #endif

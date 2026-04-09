@@ -20,25 +20,37 @@ export async function resolveSwiftArtifacts(
     ...process.env
   };
 
-  await runCommand([
-    ...swiftCommandPrefix(),
+  // -Osize is required (not just a size tweak): the default -O release mode
+  // emits Swift-side merged outlined-copy helpers (e.g.
+  // `$s4Core15ListDisplayLineV4KindOWOyTm`) with ~1200 i32 parameters, which
+  // exceeds the WebAssembly JS API's 1000-parameter-per-function limit and
+  // causes `WebAssembly.Module doesn't parse` errors in every browser.
+  // `-Osize` keeps the max signature comfortably under the limit.
+  const swiftBuildArgs = [
     "build",
     "--package-path",
     options.packagePath,
     "--swift-sdk",
     "swift-6.3-RELEASE_wasm",
-    "--product",
-    options.product,
     "-c",
     "release",
+    "-Xswiftc",
+    "-Osize",
     "-Xlinker",
     "--initial-memory=536870912",
     "-Xlinker",
     "--max-memory=4294967296",
-     "-Xlinker",
-     "-z",
-     "-Xlinker",
+    "-Xlinker",
+    "-z",
+    "-Xlinker",
     "stack-size=1048576",
+  ];
+
+  await runCommand([
+    ...swiftCommandPrefix(),
+    ...swiftBuildArgs,
+    "--product",
+    options.product,
   ], {
     cwd: swiftlyWorkingDirectory,
     env: environment,
@@ -46,21 +58,7 @@ export async function resolveSwiftArtifacts(
 
   const binPath = await runCommand([
     ...swiftCommandPrefix(),
-    "build",
-    "--package-path",
-    options.packagePath,
-    "--swift-sdk",
-    "swift-6.3-RELEASE_wasm",
-    "-c",
-    "release",
-    "-Xlinker",
-    "--initial-memory=536870912",
-    "-Xlinker",
-    "--max-memory=4294967296",
-     "-Xlinker",
-     "-z",
-     "-Xlinker",
-    "stack-size=1048576",
+    ...swiftBuildArgs,
     "--show-bin-path",
   ], {
     cwd: swiftlyWorkingDirectory,

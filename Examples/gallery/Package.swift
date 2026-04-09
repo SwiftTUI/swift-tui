@@ -29,13 +29,13 @@ let package = Package(
       dependencies: [
         "GalleryDemoViews",
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "TerminalUICLI", package: "TerminalUICLI"),
       ]
     ),
     .target(
       name: "GalleryDemoViews",
       dependencies: [
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUICLI", package: "TerminalUICLI"),
         .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
         .product(name: "Algorithms", package: "swift-algorithms"),
       ]
