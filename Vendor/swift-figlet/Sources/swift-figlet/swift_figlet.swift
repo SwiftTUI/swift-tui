@@ -53,6 +53,59 @@ public struct FigletConfiguration: Sendable {
     }
 }
 
+public struct FigletFontLibrary: Sendable {
+    public let name: String?
+
+    private let fonts: [String: [UInt8]]
+
+    public init(name: String? = nil, fonts: [String: [UInt8]]) {
+        self.name = name
+        self.fonts = fonts.reduce(into: [:]) { result, entry in
+            result[Self.normalizedFontName(for: entry.key)] = entry.value
+        }
+    }
+
+    public init(name: String? = nil, fontData: [String: String]) {
+        self.init(name: name, fonts: fontData.mapValues { Array($0.utf8) })
+    }
+
+    public var fontNames: [String] {
+        fonts.keys.sorted()
+    }
+
+    public func font(named identifier: String) throws -> FigletFont? {
+        guard let entry = fontEntry(named: identifier) else {
+            return nil
+        }
+
+        return try FigletFont.parse(
+            data: String(decoding: entry.data, as: UTF8.self),
+            name: entry.name
+        )
+    }
+
+    private func fontEntry(named identifier: String) -> (name: String, data: [UInt8])? {
+        guard !identifier.contains("/") else {
+            return nil
+        }
+
+        let normalizedIdentifier = Self.normalizedFontName(for: identifier)
+        guard let data = fonts[normalizedIdentifier] else {
+            return nil
+        }
+
+        return (normalizedIdentifier, data)
+    }
+
+    private static func normalizedFontName(for identifier: String) -> String {
+        if identifier.hasSupportedFontExtension {
+            return identifier.lastPathComponentWithoutExtension
+        }
+
+        return identifier
+    }
+}
+
 public struct FigletText: CustomStringConvertible, Equatable, Sendable {
     public let rawValue: String
 
@@ -147,8 +200,32 @@ public struct FigletFont: Sendable {
         self = try Self.load(identifier: name)
     }
 
+    public init(named name: String, fontLibrary: FigletFontLibrary) throws {
+        self = try Self.load(identifier: name, fontLibraries: [fontLibrary])
+    }
+
+    public init(named name: String, fontLibraries: [FigletFontLibrary]) throws {
+        self = try Self.load(identifier: name, fontLibraries: fontLibraries)
+    }
+
     public init(named name: String, searchDirectories: [String]) throws {
         self = try Self.load(identifier: name, searchDirectories: searchDirectories)
+    }
+
+    public init(named name: String, fontLibrary: FigletFontLibrary, searchDirectories: [String]) throws {
+        self = try Self.load(
+            identifier: name,
+            fontLibraries: [fontLibrary],
+            searchDirectories: searchDirectories
+        )
+    }
+
+    public init(named name: String, fontLibraries: [FigletFontLibrary], searchDirectories: [String]) throws {
+        self = try Self.load(
+            identifier: name,
+            fontLibraries: fontLibraries,
+            searchDirectories: searchDirectories
+        )
     }
 
     public init(filePath: String) throws {
@@ -160,28 +237,70 @@ public struct FigletFont: Sendable {
     }
 
     public static func bundledFontNames() -> [String] {
+        availableFontNames()
+    }
+
+    public static func availableFontNames() -> [String] {
         availableFontNames(in: defaultFontSearchDirectories())
     }
 
+    public static func availableFontNames(fontLibraries: [FigletFontLibrary]) -> [String] {
+        availableFontNames(in: defaultFontSearchDirectories(), libraries: fontLibraries)
+    }
+
     public static func availableFontNames(in searchDirectories: [String]) -> [String] {
-        uniquePaths(searchDirectories).flatMap { directory in
-            directoryEntries(at: directory)
-                .filter { $0.hasSupportedFontExtension }
-                .map(\.lastPathComponentWithoutExtension)
-        }
-        .reduce(into: Set<String>()) { result, name in
-            result.insert(name)
-        }
-        .sorted()
+        availableFontNames(in: searchDirectories, libraries: [])
+    }
+
+    public static func availableFontNames(
+        in searchDirectories: [String],
+        libraries: [FigletFontLibrary]
+    ) -> [String] {
+        uniquePaths(searchDirectories)
+            .flatMap { directory in
+                directoryEntries(at: directory)
+                    .filter { $0.hasSupportedFontExtension }
+                    .map(\.lastPathComponentWithoutExtension)
+            }
+            .reduce(into: Set(libraries.flatMap(\.fontNames))) { result, name in
+                result.insert(name)
+            }
+            .sorted()
     }
 
     static func load(identifier: String) throws -> FigletFont {
-        try load(identifier: identifier, searchDirectories: defaultFontSearchDirectories())
+        try load(
+            identifier: identifier,
+            fontLibraries: [],
+            searchDirectories: defaultFontSearchDirectories()
+        )
+    }
+
+    static func load(identifier: String, fontLibraries: [FigletFontLibrary]) throws -> FigletFont {
+        try load(
+            identifier: identifier,
+            fontLibraries: fontLibraries,
+            searchDirectories: defaultFontSearchDirectories()
+        )
     }
 
     static func load(identifier: String, searchDirectories: [String]) throws -> FigletFont {
+        try load(identifier: identifier, fontLibraries: [], searchDirectories: searchDirectories)
+    }
+
+    static func load(
+        identifier: String,
+        fontLibraries: [FigletFontLibrary],
+        searchDirectories: [String]
+    ) throws -> FigletFont {
         if let filePath = resolveExternalFontPath(for: identifier) {
             return try load(filePath: filePath, fallbackName: filePath.lastPathComponentWithoutExtension)
+        }
+
+        for fontLibrary in fontLibraries {
+            if let font = try fontLibrary.font(named: identifier) {
+                return font
+            }
         }
 
         for directory in uniquePaths(searchDirectories) {
@@ -249,7 +368,7 @@ public struct FigletFont: Sendable {
         return uniquePaths(directories).filter(isDirectory(at:))
     }
 
-    private static func parse(data: String, name: String) throws -> FigletFont {
+    fileprivate static func parse(data: String, name: String) throws -> FigletFont {
         let sanitized = data.sanitizedFontData()
 
         let lines = sanitized.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
@@ -413,6 +532,23 @@ public struct Figlet: Sendable {
     public init(
         fontNamed name: String = FigletFont.defaultFontName,
         configuration: FigletConfiguration = FigletConfiguration(),
+        fontLibrary: FigletFontLibrary
+    ) throws {
+        try self.init(fontNamed: name, configuration: configuration, fontLibraries: [fontLibrary])
+    }
+
+    public init(
+        fontNamed name: String = FigletFont.defaultFontName,
+        configuration: FigletConfiguration = FigletConfiguration(),
+        fontLibraries: [FigletFontLibrary]
+    ) throws {
+        self.font = try FigletFont(named: name, fontLibraries: fontLibraries)
+        self.configuration = configuration
+    }
+
+    public init(
+        fontNamed name: String = FigletFont.defaultFontName,
+        configuration: FigletConfiguration = FigletConfiguration(),
         searchDirectories: [String]
     ) throws {
         self.font = try FigletFont(named: name, searchDirectories: searchDirectories)
@@ -421,6 +557,34 @@ public struct Figlet: Sendable {
 
     public init(font: FigletFont, configuration: FigletConfiguration = FigletConfiguration()) {
         self.font = font
+        self.configuration = configuration
+    }
+
+    public init(
+        fontNamed name: String = FigletFont.defaultFontName,
+        configuration: FigletConfiguration = FigletConfiguration(),
+        fontLibrary: FigletFontLibrary,
+        searchDirectories: [String]
+    ) throws {
+        try self.init(
+            fontNamed: name,
+            configuration: configuration,
+            fontLibraries: [fontLibrary],
+            searchDirectories: searchDirectories
+        )
+    }
+
+    public init(
+        fontNamed name: String = FigletFont.defaultFontName,
+        configuration: FigletConfiguration = FigletConfiguration(),
+        fontLibraries: [FigletFontLibrary],
+        searchDirectories: [String]
+    ) throws {
+        self.font = try FigletFont(
+            named: name,
+            fontLibraries: fontLibraries,
+            searchDirectories: searchDirectories
+        )
         self.configuration = configuration
     }
 
@@ -441,6 +605,17 @@ public struct Figlet: Sendable {
 
     public static func availableFonts() -> [String] {
         FigletFont.bundledFontNames()
+    }
+
+    public static func availableFonts(fontLibraries: [FigletFontLibrary]) -> [String] {
+        FigletFont.availableFontNames(fontLibraries: fontLibraries)
+    }
+
+    public static func availableFonts(
+        searchDirectories: [String],
+        fontLibraries: [FigletFontLibrary]
+    ) -> [String] {
+        FigletFont.availableFontNames(in: searchDirectories, libraries: fontLibraries)
     }
 
     private var resolvedDirection: ResolvedDirection {
