@@ -554,6 +554,77 @@ struct SwiftUISurfaceTests {
   }
 
   @Test(
+    "onChange attached to a stateful view reserves modifier storage after body state slots"
+  )
+  func onChangeOnStatefulViewDoesNotCollideWithBodyStateSlots() async {
+    final class ChangeBox: Sendable {
+      private struct State: Sendable {
+        var events: [String] = []
+      }
+
+      private let state = LockedBox(State())
+
+      var events: [String] {
+        state.value.events
+      }
+
+      func record(oldValue: Int, newValue: Int) {
+        state.withLock { state in
+          state.events.append("\(oldValue)->\(newValue)")
+        }
+      }
+    }
+
+    struct StatefulOnChangeFixture: View {
+      let box: ChangeBox
+
+      @State private var color: Color = .red
+      @State private var count: Int = 1
+      @State private var step: Int = 2
+
+      var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Color")
+            .foregroundStyle(color)
+          Text("Count \(count)")
+          Text("Step \(step)")
+        }
+        .onChange(of: count, initial: true) { oldValue, newValue in
+          box.record(oldValue: oldValue, newValue: newValue)
+        }
+      }
+    }
+
+    let box = ChangeBox()
+    let lifecycleRegistry = LocalLifecycleRegistry()
+    let renderer = DefaultRenderer()
+
+    let artifacts = renderer.render(
+      StatefulOnChangeFixture(box: box),
+      context: .init(
+        identity: testIdentity("Root"),
+        localLifecycleRegistry: lifecycleRegistry,
+        applyEnvironmentValues: true
+      )
+    )
+
+    #expect(
+      artifacts.commitPlan.lifecycle == [
+        .init(
+          identity: testIdentity("Root"),
+          operation: .change(handlerIDs: ["Root#change[0]"])
+        )
+      ]
+    )
+
+    await MainActor.run {
+      lifecycleRegistry.changeHandler(for: "Root#change[0]")?()
+    }
+
+    #expect(box.events == ["1->1"])
+  }
+
+  @Test(
     "conditional lifecycle ownership follows the resolved branch identity instead of inventing a wrapper"
   )
   func conditionalLifecycleOwnershipFollowsResolvedBranchIdentity() {
