@@ -1,6 +1,40 @@
 import Core
 import Synchronization
 
+/// Manages a single deadline-wake task that sleeps until a future deadline
+/// and then yields into the event pump stream.
+///
+/// All mutable state is guarded by a `Mutex`, making this type safe for
+/// concurrent access from multiple tasks.
+package final class DeadlineWakeState: Sendable {
+  private struct State: Sendable {
+    var continuation: AsyncStream<Void>.Continuation?
+    var task: Task<Void, Never>?
+  }
+
+  private let state = Mutex(State())
+
+  func setContinuation(_ continuation: AsyncStream<Void>.Continuation) {
+    state.withLock { $0.continuation = continuation }
+  }
+
+  func schedule(sleepDuration: Duration) {
+    state.withLock { state in
+      state.task?.cancel()
+      let continuation = state.continuation
+      state.task = Task {
+        try? await Task.sleep(for: sleepDuration)
+        guard !Task.isCancelled else { return }
+        continuation?.yield()
+      }
+    }
+  }
+
+  func cancel() {
+    state.withLock { $0.task?.cancel() }
+  }
+}
+
 extension RunLoop {
   enum EventPumpTiming {
     static var coalescedPointerDrainYieldCount: Int { 4 }
@@ -10,6 +44,7 @@ extension RunLoop {
     var stream: AsyncStream<Void>
     var drainEvents: () -> [RuntimeEvent]
     var cancel: () -> Void
+    var scheduleDeadlineWake: @Sendable (Duration) -> Void
   }
 
   package final class EventPumpCompletion: Sendable {
@@ -116,8 +151,11 @@ extension RunLoop {
     let buffer = EventPumpBuffer()
     var inputTask: Task<Void, Never>?
     var signalTask: Task<Void, Never>?
+    let deadlineState = DeadlineWakeState()
 
     let stream = AsyncStream<Void> { continuation in
+      deadlineState.setContinuation(continuation)
+
       inputTask = Task {
         for await event in inputEvents {
           if buffer.enqueue(.input(event)) {
@@ -141,6 +179,10 @@ extension RunLoop {
       }
     }
 
+    let scheduleDeadlineWake: @Sendable (Duration) -> Void = { sleepDuration in
+      deadlineState.schedule(sleepDuration: sleepDuration)
+    }
+
     return EventPump(
       stream: stream,
       drainEvents: {
@@ -149,8 +191,10 @@ extension RunLoop {
       cancel: {
         inputTask?.cancel()
         signalTask?.cancel()
+        deadlineState.cancel()
         wakeNotifyingScheduler?.setWakeHandler(nil)
-      }
+      },
+      scheduleDeadlineWake: scheduleDeadlineWake
     )
   }
 

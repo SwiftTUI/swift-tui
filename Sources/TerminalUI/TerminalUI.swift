@@ -38,6 +38,7 @@ public struct DefaultRenderer {
   private let viewGraph: ViewGraph
   private let frameState: FrameResolveState
   private let presentationHostState: PresentationHostState
+  private let animationController: AnimationController
 
   private let retainedFrames: RetainedFrameStore
 
@@ -61,7 +62,16 @@ public struct DefaultRenderer {
     viewGraph = .init()
     frameState = .init()
     presentationHostState = .init()
+    animationController = .init()
     retainedFrames = .init()
+  }
+
+  /// Package-only accessor so the run loop can register animations
+  /// against the renderer's controller before a `withAnimation` body
+  /// executes.
+  @MainActor
+  package var internalAnimationController: AnimationController {
+    animationController
   }
 
   /// Renders `root` into complete frame artifacts.
@@ -129,6 +139,7 @@ public struct DefaultRenderer {
       _ = resolver.resolve(wrappedRoot, in: resolveContext)
     }
     let (_, resolveDuration): (Void, Duration)
+    animationController.beginTransitionCollection()
     if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
       // Nothing is dirty — skip evaluation entirely and reuse the
       // existing tree snapshot.  The root evaluator and registrations
@@ -150,7 +161,24 @@ public struct DefaultRenderer {
         )
       }
     }
-    let resolved = viewGraph.snapshot()
+    animationController.finishTransitionCollection()
+    var resolved = viewGraph.snapshot()
+
+    // Animation: capture from/to for changed animatable properties, then
+    // apply interpolated values to the resolved tree before measure.
+    // This is the only pipeline insertion for animation — the rest of
+    // measure/place/draw/raster runs unchanged on the mutated tree.
+    let animationTimestamp = MonotonicInstant.now()
+    animationController.processResolvedTree(
+      resolved,
+      transaction: context.transaction,
+      timestamp: animationTimestamp
+    )
+    _ = animationController.applyInterpolations(
+      to: &resolved,
+      at: animationTimestamp
+    )
+
     let layoutPassContext = LayoutPassContext(
       retainedLayout: retainedFrames.layoutSession(
         invalidatedIdentities: context.invalidatedIdentities

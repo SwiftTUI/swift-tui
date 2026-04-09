@@ -286,6 +286,17 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       try? terminalHost.disableRawMode()
     }
 
+    // Install the renderer's animation controller as the active
+    // registration sink so `withAnimation` can hand concrete Animation
+    // values off to it, and `.transition()` can register per-identity
+    // transitions with it.
+    AnimationRegistrationStorage.currentSink = renderer.internalAnimationController
+    TransitionRegistrationStorage.currentSink = renderer.internalAnimationController
+    defer {
+      AnimationRegistrationStorage.currentSink = nil
+      TransitionRegistrationStorage.currentSink = nil
+    }
+
     scheduler.requestInvalidation(of: [rootIdentity])
 
     var renderedFrames = 0
@@ -311,6 +322,14 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       guard !pendingEvents.isEmpty else {
         if scheduler.hasPendingFrame(at: .now()) {
           try renderPendingFrames(renderedFrames: &renderedFrames)
+        }
+        if let nextWake = scheduler.nextWakeInstant(after: .now()),
+          nextWake > .now()
+        {
+          let sleepDuration = MonotonicInstant.now().duration(to: nextWake)
+          if sleepDuration > .zero {
+            eventPump.scheduleDeadlineWake(sleepDuration)
+          }
         }
         continue
       }
@@ -340,6 +359,14 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
         handledNonExitEvent = true
       }
       try renderPendingFrames(renderedFrames: &renderedFrames)
+      if let nextWake = scheduler.nextWakeInstant(after: .now()),
+        nextWake > .now()
+      {
+        let sleepDuration = MonotonicInstant.now().duration(to: nextWake)
+        if sleepDuration > .zero {
+          eventPump.scheduleDeadlineWake(sleepDuration)
+        }
+      }
     }
 
     return RunLoopResult(

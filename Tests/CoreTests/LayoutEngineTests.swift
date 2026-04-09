@@ -513,6 +513,29 @@ struct LayoutEngineTests {
     #expect(child.bounds.size == .init(width: 5, height: 3))
   }
 
+  @Test("offset preserves measured size while translating child placement")
+  func offsetTranslatesChildPlacementWithoutChangingContentBounds() throws {
+    let engine = LayoutEngine()
+    let resolved = ResolvedNode(
+      identity: testIdentity("offset"),
+      kind: .view("Offset"),
+      children: [leaf("content", size: .init(width: 4, height: 1))],
+      layoutBehavior: .offset(x: 2, y: 1)
+    )
+
+    let measured = engine.measure(
+      resolved,
+      proposal: .init(width: 4, height: 1)
+    )
+    let placed = engine.place(resolved, measured: measured, origin: .zero)
+    let child = try #require(placed.children.first)
+
+    #expect(measured.measuredSize == .init(width: 4, height: 1))
+    #expect(child.bounds.origin == .init(x: 2, y: 1))
+    #expect(child.bounds.size == .init(width: 4, height: 1))
+    #expect(placed.contentBounds == .init(origin: .zero, size: .init(width: 4, height: 1)))
+  }
+
   @Test("wide-character word wrapping measures by cell width instead of cluster count")
   func wideCharacterWordWrappingUsesCellWidth() {
     let engine = LayoutEngine()
