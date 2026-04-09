@@ -134,6 +134,15 @@ extension RunLoop {
         scheduler.requestInvalidation(of: postActionInvalidationIdentities)
         postActionInvalidationIdentities.removeAll(keepingCapacity: true)
       }
+      // After rendering, request the next animation frame deadline if
+      // any animations are still in flight.  This keeps the loop
+      // waking at 30 FPS until all animations complete.
+      let animationTick = renderer.internalAnimationController.lastTickResult
+      if animationTick.hasActiveAnimations,
+        let nextDeadline = animationTick.nextDeadline
+      {
+        scheduler.requestDeadline(nextDeadline)
+      }
       observationBridge.prune(
         keeping: renderer.liveIdentitySnapshot()
       )
@@ -224,11 +233,13 @@ extension RunLoop {
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
       effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
     }
+    var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
+    transactionSnapshot.animationRequest = scheduledFrame.animationRequest
     var context = ResolveContext(
       identity: rootIdentity,
       environment: environment,
       environmentValues: effectiveEnvironmentValues,
-      transaction: .init(debugSignature: causeSummary),
+      transaction: transactionSnapshot,
       invalidatedIdentities: scheduledFrame.invalidatedIdentities,
       localActionRegistry: localActionRegistry,
       localKeyHandlerRegistry: localKeyHandlerRegistry,

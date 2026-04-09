@@ -25,7 +25,7 @@ public final class StateContainer<State: Equatable & Sendable> {
       return false
     }
     storage = newState
-    invalidator?.requestInvalidation(of: invalidationIdentities)
+    requestInvalidation()
     return true
   }
 
@@ -37,7 +37,21 @@ public final class StateContainer<State: Equatable & Sendable> {
       return false
     }
     storage = candidate
-    invalidator?.requestInvalidation(of: invalidationIdentities)
+    requestInvalidation()
     return true
+  }
+
+  private func requestInvalidation() {
+    let animationRequest = AnimationContextStorage.currentRequest
+    if animationRequest != .inherit,
+      let animationAware = invalidator as? any AnimationAwareInvalidating
+    {
+      animationAware.requestInvalidation(
+        of: invalidationIdentities,
+        animation: animationRequest
+      )
+    } else {
+      invalidator?.requestInvalidation(of: invalidationIdentities)
+    }
   }
 }
