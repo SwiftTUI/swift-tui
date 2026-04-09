@@ -3,6 +3,7 @@ attoseconds
 bjorn
 Borderless
 codegen
+Figlet
 genericize
 O_CREAT
 O_TRUNC

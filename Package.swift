@@ -45,6 +45,7 @@ let packageDependencies: [Package.Dependency] = [
 let terminalUIDependencies: [Target.Dependency] = [
   "Core",
   "View",
+  .product(name: "swift-figlet-embedded-fonts", package: "swift-figlet"),
   .product(
     name: "UnixSignals",
     package: "UnixSignals",
@@ -108,7 +109,10 @@ let package = Package(
 
     .target(
       name: "View",
-      dependencies: ["Core"],
+      dependencies: [
+        "Core",
+        .product(name: "swift-figlet-embedded-fonts", package: "swift-figlet"),
+      ],
       swiftSettings: swiftSettings()
     ),
 

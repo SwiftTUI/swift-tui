@@ -1,4 +1,3 @@
-import Foundation
 import Testing
 import swift_figlet
 import swift_figlet_embedded_fonts
@@ -6,6 +5,104 @@ import swift_figlet_embedded_fonts
 private let repositoryRoot = "/" + #filePath.split(separator: "/").dropLast(3).joined(separator: "/")
 private let testDirectory = "/" + #filePath.split(separator: "/").dropLast().joined(separator: "/")
 private let bundledFontsDirectory = repositoryRoot + "/Sources/swift-figlet/Resources/Fonts"
+private let testOnlyFontData = #"""
+flf2a$ 1 1 1 0 0
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+0@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+@@
+"""# + "\n"
 
 @Test func rendersBundledStandardFont() throws {
     let figlet = try Figlet(fontNamed: "standard", searchDirectories: [bundledFontsDirectory])
@@ -42,10 +139,9 @@ private let bundledFontsDirectory = repositoryRoot + "/Sources/swift-figlet/Reso
 }
 
 @Test func loadsFontsFromFontLibraryObjects() throws {
-    let fontData = try String(contentsOfFile: testDirectory + "/Fixtures/TestOnly.flf", encoding: .utf8)
     let fontLibrary = FigletFontLibrary(
         name: "Test Fixtures",
-        fontData: ["TestOnly": fontData]
+        fontData: ["TestOnly": testOnlyFontData]
     )
 
     let figlet = try Figlet(fontNamed: "TestOnly", fontLibrary: fontLibrary)
@@ -55,14 +151,14 @@ private let bundledFontsDirectory = repositoryRoot + "/Sources/swift-figlet/Reso
 }
 
 @Test func rendersEmbeddedStandardFontLibrary() throws {
-    let figlet = try Figlet(fontNamed: "standard", fontLibrary: SwiftFigletEmbeddedFonts.library)
+    let figlet = try Figlet(embeddedFont: .standard)
     let output = try figlet.render("Hi").description
 
     #expect(output == " _   _ _ \n| | | (_)\n| |_| | |\n|  _  | |\n|_| |_|_|\n         \n")
 }
 
 @Test func reportsLayoutMetricsForEmbeddedFonts() throws {
-    let figlet = try Figlet(fontNamed: "standard", fontLibrary: SwiftFigletEmbeddedFonts.library)
+    let figlet = try Figlet(embeddedFont: .standard)
     let metrics = try figlet.layoutMetrics(for: "Hi")
 
     #expect(metrics.minimumWidth == 8)
@@ -70,7 +166,7 @@ private let bundledFontsDirectory = repositoryRoot + "/Sources/swift-figlet/Reso
 }
 
 @Test func measuresRenderedSizeAtConcreteWidths() throws {
-    let figlet = try Figlet(fontNamed: "standard", fontLibrary: SwiftFigletEmbeddedFonts.library)
+    let figlet = try Figlet(embeddedFont: .standard)
 
     #expect(try figlet.measure("Hi", forWidth: 80) == .init(width: 9, height: 6))
     #expect(try figlet.measure("Hi", forWidth: 8) == .init(width: 7, height: 12))
@@ -86,9 +182,14 @@ private let bundledFontsDirectory = repositoryRoot + "/Sources/swift-figlet/Reso
 }
 
 @Test func listsEmbeddedFonts() {
-    let fonts = Figlet.availableFonts(fontLibraries: [SwiftFigletEmbeddedFonts.library])
-    #expect(fonts.contains("slant"))
-    #expect(fonts.contains("standard"))
-    #expect(fonts.contains("banner"))
-    #expect(fonts.contains("mono9"))
+    let fonts = SwiftFigletEmbeddedFonts.fonts
+
+    #expect(fonts.contains(.slant))
+    #expect(fonts.contains(.standard))
+    #expect(fonts.contains(.banner))
+    #expect(fonts.contains(.mono9))
+}
+
+@Test func embeddedFontEnumMatchesTheGeneratedLibrary() {
+    #expect(SwiftFigletEmbeddedFonts.fonts.map(\.rawValue) == SwiftFigletEmbeddedFonts.library.fontNames)
 }

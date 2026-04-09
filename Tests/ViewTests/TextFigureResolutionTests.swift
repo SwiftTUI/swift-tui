@@ -21,15 +21,17 @@ struct TextFigureResolutionTests {
       return
     }
 
-    #expect(payload == .init(content: "Hi", font: "standard"))
+    #expect(payload.content == "Hi")
+    #expect(payload.font.rawValue == "standard")
   }
 
   @Test("TextFigure exposes embedded font names")
   func textFigureExposesEmbeddedFontNames() {
     let fonts = TextFigure.availableFonts
+    let fontNames = Set(fonts.map(\.rawValue))
 
-    #expect(fonts.contains("standard"))
-    #expect(fonts.contains("slant"))
-    #expect(fonts.contains("banner"))
+    #expect(fontNames.contains("standard"))
+    #expect(fontNames.contains("slant"))
+    #expect(fontNames.contains("banner"))
   }
 }

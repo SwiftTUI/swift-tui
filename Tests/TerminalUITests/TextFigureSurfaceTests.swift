@@ -10,7 +10,10 @@ struct TextFigureSurfaceTests {
   @Test("TextFigure renders the embedded standard font at its ideal width")
   func textFigureRendersStandardFontAtIdealWidth() {
     let artifacts = render(TextFigure("Hi"))
-    let metrics = TextFigureSupport.layoutMetrics(for: .init(content: "Hi", font: "standard"))
+    let standardFont = embeddedFont(named: "standard")
+    let metrics = TextFigureSupport.layoutMetrics(
+      for: .init(content: "Hi", font: standardFont)
+    )
 
     #expect(metrics.idealSize == .init(width: 9, height: 6))
     #expect(artifacts.measuredTree.measuredSize == .init(width: 9, height: 6))
@@ -28,7 +31,7 @@ struct TextFigureSurfaceTests {
 
   @Test("TextFigure renders alternate embedded fonts")
   func textFigureRendersAlternateEmbeddedFonts() {
-    let artifacts = render(TextFigure("Hi", font: "slant"))
+    let artifacts = render(TextFigure("Hi", font: embeddedFont(named: "slant")))
 
     #expect(artifacts.rasterSurface.lines == [
       "    __  ___",
@@ -104,15 +107,6 @@ struct TextFigureSurfaceTests {
     #expect(styleRuns.contains { $0.style.strikethroughStyle != nil })
   }
 
-  @Test("invalid TextFigure fonts fall back to plain text")
-  func invalidTextFigureFontsFallBackToPlainText() {
-    let artifacts = render(TextFigure("Hi", font: "missing-font"))
-
-    #expect(artifacts.resolvedTree.kind == .view("TextFigure"))
-    #expect(artifacts.resolvedTree.drawPayload == .text("Hi"))
-    #expect(artifacts.rasterSurface.lines == ["Hi"])
-  }
-
   private func render<V: View>(
     _ view: V,
     proposal: ProposedSize = .unspecified
@@ -122,5 +116,12 @@ struct TextFigureSurfaceTests {
       context: .init(identity: testIdentity("Root")),
       proposal: proposal
     )
+  }
+
+  private func embeddedFont(named name: String) -> TextFigure.Font {
+    guard let font = TextFigure.availableFonts.first(where: { $0.rawValue == name }) else {
+      fatalError("Missing embedded TextFigure font \(name)")
+    }
+    return font
   }
 }
