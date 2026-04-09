@@ -88,6 +88,30 @@ const parityPoints = [
   },
 ];
 
+// Declared above the top-level `await` below — Bun's minifier rewrites
+// top-level `const` to `var`, which drops TDZ semantics. If this lived
+// further down the file, `highlightSwift` would see it as `undefined`
+// when called from `bootstrap()`.
+const swiftKeywords: ReadonlySet<string> = new Set([
+  // Declarations
+  "import", "struct", "class", "enum", "protocol", "extension",
+  "actor", "typealias", "associatedtype", "subscript",
+  "var", "let", "func", "init", "deinit", "get", "set",
+  // Access + modifiers
+  "private", "public", "internal", "fileprivate", "open",
+  "static", "final", "lazy", "weak", "unowned", "mutating", "nonmutating",
+  "override", "convenience", "required", "dynamic", "optional", "indirect",
+  // Type qualifiers
+  "some", "any", "where", "as", "is", "inout",
+  // Control flow
+  "if", "else", "guard", "switch", "case", "default",
+  "for", "while", "repeat", "in", "break", "continue", "fallthrough",
+  "return", "throw", "throws", "rethrows", "try", "catch", "do", "defer",
+  "async", "await",
+  // Literals / identifiers
+  "self", "Self", "super", "nil", "true", "false",
+]);
+
 const syntaxSample = `import TerminalUI
 import TerminalUICLI
 
@@ -107,8 +131,51 @@ struct DeployApp: App {
   }
 }`;
 
-if (await ensureCrossOriginIsolation()) {
-  await bootstrap();
+try {
+  if (await ensureCrossOriginIsolation()) {
+    await bootstrap();
+  }
+} catch (error: unknown) {
+  renderStartupError(error);
+  // Log the full error for debugging — this is the only console use
+  // in production-critical bootstrap code.
+  // eslint-disable-next-line no-console
+  console.error("Failed to start WebExample:", error);
+}
+
+function renderStartupError(error: unknown): void {
+  const root = document.querySelector<HTMLDivElement>("#root");
+  if (!root) {
+    return;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error && error.stack ? error.stack : "";
+
+  root.innerHTML = `
+    <div class="page-shell">
+      <main class="marketing-site">
+        <section class="hero" id="top">
+          <div class="hero-copy">
+            <p class="eyebrow">Startup error</p>
+            <h1>Could not boot the demo.</h1>
+            <p class="hero-lede">
+              Something went wrong while mounting the WebExample. The terminal runtime did not start.
+            </p>
+            <div class="info-panel" style="margin-top: 32px;">
+              <div class="info-panel-header">
+                <span class="info-panel-header-file">ERROR</span>
+                <span>Reload to retry</span>
+              </div>
+              <pre class="code-sample"><code>${escapeHtml(message)}${
+    stack ? `\n\n${escapeHtml(stack)}` : ""
+  }</code></pre>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  `;
 }
 
 async function ensureCrossOriginIsolation(): Promise<boolean> {
@@ -172,8 +239,8 @@ async function bootstrap(): Promise<void> {
     <div class="page-shell">
       <header class="site-header" data-reveal>
         <a class="brand" href="#top" aria-label="TerminalUI home">
+          <span class="brand-dot" aria-hidden="true"></span>
           <span class="brand-mark">TerminalUI</span>
-          <span class="brand-note">SwiftUI's authoring model for the terminal</span>
         </a>
         <nav class="site-nav" aria-label="Primary">
           <a href="#demo">Demo</a>
@@ -201,7 +268,13 @@ async function bootstrap(): Promise<void> {
               focus routing — applied to terminal apps. Built on a strict 7-phase rendering pipeline.
             </p>
             <div class="pipeline-strip" aria-label="Rendering pipeline">
-              ${renderPipeline()}
+              <div class="pipeline-strip-label">
+                <span class="pipeline-strip-label-tag">Rendering pipeline</span>
+                <span class="pipeline-strip-label-count">07 / PHASES</span>
+              </div>
+              <div class="pipeline-phases">
+                ${renderPipeline()}
+              </div>
             </div>
             <div class="hero-actions">
               <a class="button button-primary" href="${repositoryUrl}" target="_blank" rel="noreferrer">
@@ -216,12 +289,16 @@ async function bootstrap(): Promise<void> {
           <div class="hero-stage" id="demo" data-reveal>
             <div class="hero-stage-header">
               <div>
-                <p class="section-label">Live demo</p>
+                <p class="live-tag">
+                  <span class="live-tag-dot" aria-hidden="true"></span>
+                  <span class="live-tag-label">Live</span>
+                  <span>/ Demo</span>
+                </p>
                 <h2>The real app, running in the browser.</h2>
+                <p class="hero-stage-note">
+                  This is the actual WASI binary. Resize it and interact with the curated wasm-safe scene.
+                </p>
               </div>
-              <p class="hero-stage-note">
-                This is the actual WASI binary. Resize it and interact with the curated wasm-safe scene.
-              </p>
             </div>
 
             <div class="terminal-shell">
@@ -269,6 +346,10 @@ async function bootstrap(): Promise<void> {
           </div>
 
           <div class="info-panel" data-reveal>
+            <div class="info-panel-header">
+              <span class="info-panel-header-file">DeployApp.swift</span>
+              <span>Swift</span>
+            </div>
             <pre class="code-sample"><code>${highlightSwift(syntaxSample)}</code></pre>
           </div>
         </section>
@@ -383,27 +464,37 @@ async function bootstrap(): Promise<void> {
 function renderPipeline(): string {
   return pipelinePhases
     .map((phase, i) => {
-      const sep = i < pipelinePhases.length - 1 ? `<span class="pipeline-sep">\u2192</span>` : "";
-      return `<span class="pipeline-phase">${phase}</span>${sep}`;
+      const index = String(i + 1).padStart(2, "0");
+      return `
+        <div class="pipeline-phase">
+          <span class="pipeline-phase-index">${index}</span>
+          <span class="pipeline-phase-name">${phase}</span>
+        </div>
+      `;
     })
     .join("");
 }
 
 function highlightSwift(code: string): string {
-  const keywords = new Set(["import", "struct", "var", "private", "some"]);
-  const types = new Set(["App", "Scene", "WindowGroup", "VStack", "Text", "ProgressView", "Button", "Double"]);
-
-  // Single-pass tokenizer — each match is consumed once, no cascading.
-  const pattern = /@\w+|"[^"]*?"|\.\w+(?=\()|(?<!\w)\d+(?:\.\d+)?(?!\w)|\b[A-Za-z_]\w*\b/g;
+  // Single-pass tokenizer — each match consumed once, classifier decides.
+  //   comment → at-attr → string → dot-prop → number → identifier
+  const pattern =
+    /\/\/[^\n]*|@\w+|"[^"]*?"|\.\w+|(?<!\w)\d+(?:\.\d+)?(?!\w)|\b[A-Za-z_]\w*\b/g;
 
   const escaped = escapeHtml(code);
-  return escaped.replace(pattern, (match) => {
+  return escaped.replace(pattern, (match, offset: number) => {
+    if (match.startsWith("//")) return `<span class="syn-comment">${match}</span>`;
     if (match.startsWith("@")) return `<span class="syn-at">${match}</span>`;
     if (match.startsWith('"')) return `<span class="syn-str">${match}</span>`;
     if (match.startsWith(".")) return `<span class="syn-prop">${match}</span>`;
     if (/^\d/.test(match)) return `<span class="syn-num">${match}</span>`;
-    if (keywords.has(match)) return `<span class="syn-kw">${match}</span>`;
-    if (types.has(match)) return `<span class="syn-type">${match}</span>`;
+    if (swiftKeywords.has(match)) return `<span class="syn-kw">${match}</span>`;
+    if (/^[A-Z]/.test(match)) return `<span class="syn-type">${match}</span>`;
+    // Lowercase identifier followed by `:` — parameter label or type annotation
+    const after = escaped.slice(offset + match.length);
+    if (/^\s*:/.test(after)) {
+      return `<span class="syn-param">${match}</span>`;
+    }
     return match;
   });
 }
@@ -437,8 +528,8 @@ function renderPlatformFrames(): string {
 function renderParityPoints(): string {
   return parityPoints
     .map(
-      (point) => `
-        <article class="parity-card" data-reveal>
+      (point, i) => `
+        <article class="parity-card" data-reveal data-index="${String(i + 1).padStart(2, "0")}">
           <h3>${point.title}</h3>
           <p>${point.body}</p>
         </article>
