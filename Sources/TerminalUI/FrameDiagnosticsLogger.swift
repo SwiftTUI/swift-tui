@@ -81,7 +81,7 @@ public final class FrameDiagnosticsLogger {
     let totalMs = formatMs(record.totalFrameDuration)
     let cacheHit =
       record.measurementCacheHitRate.map { rate in
-        let pct = Int(rate * 1000) // tenths of a percent
+        let pct = Int(rate * 1000)  // tenths of a percent
         return "\(pct / 10).\(pct % 10)%"
       } ?? "-"
     let damageRows = record.damageRowCount.map(String.init) ?? "full"

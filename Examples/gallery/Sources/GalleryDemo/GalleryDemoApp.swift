@@ -15,12 +15,11 @@ struct GalleryDemoApp: App {
 
 struct ColorGallery: View {
 
-
-@State var fontNumber: Int = EmbeddedFigletFont.allCases.firstIndex(of: .dosRebel)!
-@State var font: EmbeddedFigletFont = .dosRebel
-@State var color: Color = .red
-@State var showFigure: Bool = true
-var fontCount: Int { EmbeddedFigletFont.allCases.count }
+  @State var fontNumber: Int = EmbeddedFigletFont.allCases.firstIndex(of: .dosRebel)!
+  @State var font: EmbeddedFigletFont = .dosRebel
+  @State var color: Color = .red
+  @State var showFigure: Bool = true
+  var fontCount: Int { EmbeddedFigletFont.allCases.count }
 
   var body: some View {
     ScrollView {
@@ -30,16 +29,16 @@ var fontCount: Int { EmbeddedFigletFont.allCases.count }
             HStack {
               Stepper("font", value: $fontNumber)
               Text(font.rawValue)
-                  Button("!"){
-                    withAnimation(.easeInOut) {
-                      showFigure.toggle()
-                    }
-                  }
-                                    Button("↴"){
-                    withAnimation(.easeInOut(duration: .seconds(2.0))) {
-                      color = color.rotatedHue(by: 40.0)
-                    }
-                  }
+              Button("!") {
+                withAnimation(.easeInOut) {
+                  showFigure.toggle()
+                }
+              }
+              Button("↴") {
+                withAnimation(.easeInOut(duration: .seconds(2.0))) {
+                  color = color.rotatedHue(by: 40.0)
+                }
+              }
             }
             .task(id: fontNumber) {
               if fontNumber < 0 {
@@ -50,12 +49,12 @@ var fontCount: Int { EmbeddedFigletFont.allCases.count }
               font = EmbeddedFigletFont.allCases[fontNumber]
             }
             Rectangle().fill(Color.clear).frame(height: 15).overlay(alignment: .leading) {
-            if showFigure {
-              TextFigure("Gallery", font: font)
-                .foregroundStyle(color)
-                .transition(.opacity)
-                .padding(1)
-            }
+              if showFigure {
+                TextFigure("Gallery", font: font)
+                  .foregroundStyle(color)
+                  .transition(.opacity)
+                  .padding(1)
+              }
             }
           }
           terminalPaletteSection(palette: appearance.palette)
@@ -65,7 +64,6 @@ var fontCount: Int { EmbeddedFigletFont.allCases.count }
       }
     }
   }
-
 
   private var namedColorsSection: some View {
     GroupBox("Named colors") {

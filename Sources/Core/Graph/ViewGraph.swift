@@ -422,15 +422,18 @@ package final class ViewGraph {
 
     node.prepareForFrame(currentFrameID)
 
-    guard node.canReuse(
-      frameID: currentFrameID,
-      environment: environment,
-      transaction: transaction
-    ) else {
+    guard
+      node.canReuse(
+        frameID: currentFrameID,
+        environment: environment,
+        transaction: transaction
+      )
+    else {
       return nil
     }
 
-    let invalidationSummary = invalidationSummary
+    let invalidationSummary =
+      invalidationSummary
       ?? .init(invalidatedIdentities: invalidatedIdentities)
     if !invalidationSummary.intersectsSubtree(at: identity) {
       let snapshot = node.snapshot()

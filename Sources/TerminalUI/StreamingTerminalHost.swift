@@ -1,7 +1,6 @@
 import Synchronization
 
-package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalHosting, Sendable
-{
+package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalHosting, Sendable {
   private struct State: Sendable {
     var surfaceSize: Size
     var renderStyle: TerminalRenderStyle

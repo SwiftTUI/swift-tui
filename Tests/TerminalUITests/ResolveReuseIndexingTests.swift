@@ -29,6 +29,9 @@ struct ResolveReuseIndexingTests {
     #expect(subtreeIdentities.first == nestedIdentity)
     #expect(subtreeIdentities.contains(nestedLeafIdentity))
     #expect(!subtreeIdentities.contains(testIdentity("Root", "VStack[0]")))
-    #expect(resolvedTree.path(to: nestedLeafIdentity) == [rootIdentity, nestedIdentity, nestedLeafIdentity])
+    #expect(
+      resolvedTree.path(to: nestedLeafIdentity) == [
+        rootIdentity, nestedIdentity, nestedLeafIdentity,
+      ])
   }
 }

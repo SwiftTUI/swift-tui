@@ -10,25 +10,25 @@ public let todoistAPIVersion = "v1"
 public let todoistAPIBasePath = "/api/\(todoistAPIVersion)/"
 
 public func getSyncBaseURI(domainBase: String = todoistBaseURL) -> String {
-    if let url = URL(string: todoistAPIBasePath, relativeTo: URL(string: domainBase)) {
-        return url.absoluteString
-    }
-    return "\(domainBase.replacingOccurrences(of: "/", with: ""))/api/v1/"
+  if let url = URL(string: todoistAPIBasePath, relativeTo: URL(string: domainBase)) {
+    return url.absoluteString
+  }
+  return "\(domainBase.replacingOccurrences(of: "/", with: ""))/api/v1/"
 }
 
 public func getAuthBaseURI(domainBase: String = todoistAuthURL) -> String {
-    if let url = URL(string: "/oauth/", relativeTo: URL(string: domainBase)) {
-        return url.absoluteString
-    }
-    return "\(domainBase.replacingOccurrences(of: "/", with: ""))/oauth/"
+  if let url = URL(string: "/oauth/", relativeTo: URL(string: domainBase)) {
+    return url.absoluteString
+  }
+  return "\(domainBase.replacingOccurrences(of: "/", with: ""))/oauth/"
 }
 
 public let ENDPOINT_REST_TASKS = "tasks"
 public let ENDPOINT_REST_TASKS_FILTER = ENDPOINT_REST_TASKS + "/filter"
 public let ENDPOINT_REST_TASKS_COMPLETED_BY_COMPLETION_DATE =
-    ENDPOINT_REST_TASKS + "/completed/by_completion_date"
+  ENDPOINT_REST_TASKS + "/completed/by_completion_date"
 public let ENDPOINT_REST_TASKS_COMPLETED_BY_DUE_DATE =
-    ENDPOINT_REST_TASKS + "/completed/by_due_date"
+  ENDPOINT_REST_TASKS + "/completed/by_due_date"
 public let ENDPOINT_REST_TASKS_COMPLETED_SEARCH = "completed/search"
 public let ENDPOINT_REST_TASKS_COMPLETED = ENDPOINT_REST_TASKS + "/completed"
 public let ENDPOINT_SYNC_QUICK_ADD = ENDPOINT_REST_TASKS + "/quick"
@@ -97,54 +97,53 @@ public let ENDPOINT_WORKSPACE_LOGO = ENDPOINT_WORKSPACES + "/logo"
 public let ENDPOINT_WORKSPACE_PLAN_DETAILS = ENDPOINT_WORKSPACES + "/plan_details"
 
 public func getWorkspaceInvitationAcceptEndpoint(_ inviteCode: String) -> String {
-    return "\(ENDPOINT_WORKSPACE_INVITATIONS)/\(inviteCode)/accept"
+  return "\(ENDPOINT_WORKSPACE_INVITATIONS)/\(inviteCode)/accept"
 }
 
 public func getWorkspaceInvitationRejectEndpoint(_ inviteCode: String) -> String {
-    return "\(ENDPOINT_WORKSPACE_INVITATIONS)/\(inviteCode)/reject"
+  return "\(ENDPOINT_WORKSPACE_INVITATIONS)/\(inviteCode)/reject"
 }
 
 public func getWorkspaceInviteUsersEndpoint(_ workspaceId: Int) -> String {
-    return "\(ENDPOINT_WORKSPACES)/\(workspaceId)/users/invite"
+  return "\(ENDPOINT_WORKSPACES)/\(workspaceId)/users/invite"
 }
 
 public func getWorkspaceUserEndpoint(_ workspaceId: Int, _ userId: Int) -> String {
-    return "\(ENDPOINT_WORKSPACES)/\(workspaceId)/users/\(userId)"
+  return "\(ENDPOINT_WORKSPACES)/\(workspaceId)/users/\(userId)"
 }
 
 public func getWorkspaceUserTasksEndpoint(_ workspaceId: Int, _ userId: Int) -> String {
-    return "\(ENDPOINT_WORKSPACES)/\(workspaceId)/users/\(userId)/tasks"
+  return "\(ENDPOINT_WORKSPACES)/\(workspaceId)/users/\(userId)/tasks"
 }
 
 public func getWorkspaceActiveProjectsEndpoint(_ workspaceId: Int) -> String {
-    return "\(ENDPOINT_WORKSPACES)/\(workspaceId)/projects/active"
+  return "\(ENDPOINT_WORKSPACES)/\(workspaceId)/projects/active"
 }
 
 public func getWorkspaceArchivedProjectsEndpoint(_ workspaceId: Int) -> String {
-    return "\(ENDPOINT_WORKSPACES)/\(workspaceId)/projects/archived"
+  return "\(ENDPOINT_WORKSPACES)/\(workspaceId)/projects/archived"
 }
 
 public func getProjectInsightsActivityStatsEndpoint(_ projectId: String) -> String {
-    return "projects/\(projectId)/insights/activity_stats"
+  return "projects/\(projectId)/insights/activity_stats"
 }
 
 public func getProjectInsightsHealthEndpoint(_ projectId: String) -> String {
-    return "projects/\(projectId)/insights/health"
+  return "projects/\(projectId)/insights/health"
 }
 
 public func getProjectInsightsHealthContextEndpoint(_ projectId: String) -> String {
-    return "projects/\(projectId)/insights/health/context"
+  return "projects/\(projectId)/insights/health/context"
 }
 
 public func getProjectInsightsProgressEndpoint(_ projectId: String) -> String {
-    return "projects/\(projectId)/insights/progress"
+  return "projects/\(projectId)/insights/progress"
 }
 
 public func getProjectInsightsHealthAnalyzeEndpoint(_ projectId: String) -> String {
-    return "projects/\(projectId)/insights/health/analyze"
+  return "projects/\(projectId)/insights/health/analyze"
 }
 
 public func getWorkspaceInsightsEndpoint(_ workspaceId: String) -> String {
-    return "workspaces/\(workspaceId)/insights"
+  return "workspaces/\(workspaceId)/insights"
 }
-

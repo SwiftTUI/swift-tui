@@ -281,7 +281,9 @@ extension TodoistAppModel {
       return nil
     }
 
-    let detail = String(message[message.index(message.startIndex, offsetBy: prefix.count)..<separatorRange.lowerBound])
+    let detail = String(
+      message[message.index(message.startIndex, offsetBy: prefix.count)..<separatorRange.lowerBound]
+    )
     let type = String(message[separatorRange.upperBound...])
 
     return [

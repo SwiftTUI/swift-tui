@@ -40,7 +40,7 @@ let package = Package(
       name: "TerminalUICLITests",
       dependencies: [
         "TerminalUICLI",
-        .product(name: "TerminalUI", package: "swift-terminal-ui")
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
       ],
       swiftSettings: swiftSettings()
     ),

@@ -1,6 +1,6 @@
+import EmbeddedFonts
 import Foundation
 import Testing
-import EmbeddedFonts
 
 @testable import Core
 @testable import TerminalUI

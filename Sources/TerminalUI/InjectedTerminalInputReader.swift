@@ -21,26 +21,27 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
   package func send(
     _ bytes: [UInt8]
   ) {
-    let (messages, events, continuation): (
-      [TerminalControlMessage],
-      [InputEvent],
-      AsyncStream<InputEvent>.Continuation?
-    ) = state.withLock { state in
-      guard !state.finished else {
-        return (
-          [],
-          [],
-          nil
-        )
-      }
+    let (messages, events, continuation):
+      (
+        [TerminalControlMessage],
+        [InputEvent],
+        AsyncStream<InputEvent>.Continuation?
+      ) = state.withLock { state in
+        guard !state.finished else {
+          return (
+            [],
+            [],
+            nil
+          )
+        }
 
-      let filtered = state.controlParser.feed(bytes)
-      let events = state.parser.feed(filtered.payload)
-      if state.continuation == nil {
-        state.pendingEvents.append(contentsOf: events)
+        let filtered = state.controlParser.feed(bytes)
+        let events = state.parser.feed(filtered.payload)
+        if state.continuation == nil {
+          state.pendingEvents.append(contentsOf: events)
+        }
+        return (filtered.messages, events, state.continuation)
       }
-      return (filtered.messages, events, state.continuation)
-    }
 
     for message in messages {
       controlHandler(message)

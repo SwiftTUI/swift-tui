@@ -19,28 +19,30 @@ struct TextFigureSurfaceTests {
     #expect(artifacts.measuredTree.measuredSize == .init(width: 9, height: 6))
     #expect(artifacts.placedTree.bounds.size == .init(width: 9, height: 6))
 
-    #expect(artifacts.rasterSurface.lines == [
-      " _   _ _",
-      "| | | (_)",
-      "| |_| | |",
-      "|  _  | |",
-      "|_| |_|_|",
-      "",
-    ])
+    #expect(
+      artifacts.rasterSurface.lines == [
+        " _   _ _",
+        "| | | (_)",
+        "| |_| | |",
+        "|  _  | |",
+        "|_| |_|_|",
+        "",
+      ])
   }
 
   @Test("TextFigure renders alternate embedded fonts")
   func textFigureRendersAlternateEmbeddedFonts() {
     let artifacts = render(TextFigure("Hi", font: embeddedFont(named: "slant")))
 
-    #expect(artifacts.rasterSurface.lines == [
-      "    __  ___",
-      "   / / / (_)",
-      "  / /_/ / /",
-      " / __  / /",
-      "/_/ /_/_/",
-      "",
-    ])
+    #expect(
+      artifacts.rasterSurface.lines == [
+        "    __  ___",
+        "   / / / (_)",
+        "  / /_/ / /",
+        " / __  / /",
+        "/_/ /_/_/",
+        "",
+      ])
   }
 
   @Test("finite width proposals reflow TextFigure output")
@@ -50,20 +52,21 @@ struct TextFigureSurfaceTests {
       proposal: .init(width: 8, height: .unspecified)
     )
 
-    #expect(artifacts.rasterSurface.lines == [
-      " _   _",
-      "| | | |",
-      "| |_| |",
-      "|  _  |",
-      "|_| |_|",
-      "",
-      " _",
-      "(_)",
-      "| |",
-      "| |",
-      "|_|",
-      "",
-    ])
+    #expect(
+      artifacts.rasterSurface.lines == [
+        " _   _",
+        "| | | |",
+        "| |_| |",
+        "|  _  |",
+        "|_| |_|",
+        "",
+        " _",
+        "(_)",
+        "| |",
+        "| |",
+        "|_|",
+        "",
+      ])
   }
 
   @Test("widths below the figure minimum clip without rewrapping again")
@@ -73,20 +76,21 @@ struct TextFigureSurfaceTests {
       proposal: .init(width: 4, height: .unspecified)
     )
 
-    #expect(artifacts.rasterSurface.lines == [
-      " _  ",
-      "| | ",
-      "| |_",
-      "|  _",
-      "|_| ",
-      "",
-      " _",
-      "(_)",
-      "| |",
-      "| |",
-      "|_|",
-      "",
-    ])
+    #expect(
+      artifacts.rasterSurface.lines == [
+        " _  ",
+        "| | ",
+        "| |_",
+        "|  _",
+        "|_| ",
+        "",
+        " _",
+        "(_)",
+        "| |",
+        "| |",
+        "|_|",
+        "",
+      ])
   }
 
   @Test("generic view styling propagates to TextFigure output")

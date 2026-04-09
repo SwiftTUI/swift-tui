@@ -1,5 +1,6 @@
-import Testing
 import TerminalUI
+import Testing
+
 @testable import SwiftUITUIGUI
 
 private struct MultiSceneApp: TerminalUI.App {

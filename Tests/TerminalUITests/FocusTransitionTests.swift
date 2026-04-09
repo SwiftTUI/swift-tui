@@ -73,11 +73,14 @@ struct FocusTransitionTests {
     let tabFocusedStyles = renderArtifacts(focusedIdentity: testIdentity("Tabs"))
       .rasterSurface.styleRuns
 
-    #expect(pickerFocusedStyles != unfocusedStyles,
+    #expect(
+      pickerFocusedStyles != unfocusedStyles,
       "Picker focus should produce different styling than unfocused")
-    #expect(tabFocusedStyles != unfocusedStyles,
+    #expect(
+      tabFocusedStyles != unfocusedStyles,
       "TabView focus should produce different styling than unfocused")
-    #expect(pickerFocusedStyles != tabFocusedStyles,
+    #expect(
+      pickerFocusedStyles != tabFocusedStyles,
       "Picker focus should differ from TabView focus")
   }
 
@@ -108,7 +111,8 @@ struct FocusTransitionTests {
       proposal: .init(width: 20, height: 4)
     ).rasterSurface.styleRuns
 
-    #expect(focused != unfocused,
+    #expect(
+      focused != unfocused,
       "Standalone Picker styling should differ when focused")
   }
 
@@ -220,12 +224,20 @@ struct FocusTransitionTests {
     let unfocusedLines = unfocused.rasterSurface.lines
 
     // Unfocused: unselected tabs use ▁, selected uses ▂
-    #expect(unfocusedLines.contains { $0.contains("▁") }, "Unfocused unselected tabs should use lower one-eighth block (▁)")
-    #expect(unfocusedLines.contains { $0.contains("▂") }, "Unfocused selected tab should use lower quarter block (▂)")
+    #expect(
+      unfocusedLines.contains { $0.contains("▁") },
+      "Unfocused unselected tabs should use lower one-eighth block (▁)")
+    #expect(
+      unfocusedLines.contains { $0.contains("▂") },
+      "Unfocused selected tab should use lower quarter block (▂)")
 
     // Focused: selected tab uses ▄, unselected tabs use ▂
-    #expect(focusedLines.contains { $0.contains("▄") }, "Focused selected tab should use lower half block (▄)")
-    #expect(focusedLines.contains { $0.contains("▂") }, "Focused unselected tabs should use lower quarter block (▂)")
+    #expect(
+      focusedLines.contains { $0.contains("▄") },
+      "Focused selected tab should use lower half block (▄)")
+    #expect(
+      focusedLines.contains { $0.contains("▂") },
+      "Focused unselected tabs should use lower quarter block (▂)")
   }
 
   // MARK: - RunLoop integration tests
@@ -263,15 +275,18 @@ struct FocusTransitionTests {
     runLoop.renderer.enableSelectiveEvaluation()
 
     let tabViewIdentity = testIdentity("Tabs")
-    #expect(focusTracker.currentFocusIdentity == tabViewIdentity,
+    #expect(
+      focusTracker.currentFocusIdentity == tabViewIdentity,
       "Initial focus should be on TabView")
 
     // State 1: TabView focused → tab strip has focus indicators, Picker has no heavy border
     var lines = terminal.latestSurface!.lines
     let state1TabHasFocusBlock = lines.contains { $0.contains("▄") || $0.contains("▂") }
-    #expect(state1TabHasFocusBlock,
+    #expect(
+      state1TabHasFocusBlock,
       "State 1: Focused TabView should show focus block characters in underline")
-    #expect(!lines.contains { $0.contains("┏") || $0.contains("┗") },
+    #expect(
+      !lines.contains { $0.contains("┏") || $0.contains("┗") },
       "State 1: Picker should NOT show heavy border when TabView is focused")
 
     // Tab → focus moves to Picker
@@ -279,24 +294,28 @@ struct FocusTransitionTests {
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
 
     let pickerIdentity = focusTracker.currentFocusIdentity
-    #expect(pickerIdentity != tabViewIdentity,
+    #expect(
+      pickerIdentity != tabViewIdentity,
       "After Tab, focus should have moved away from TabView")
 
     // State 2: Picker focused → Picker SHOULD have heavy border
     lines = terminal.latestSurface!.lines
-    #expect(lines.contains { $0.contains("┏") || $0.contains("┗") },
+    #expect(
+      lines.contains { $0.contains("┏") || $0.contains("┗") },
       "State 2: Picker SHOULD show heavy border when focused")
 
     // Shift-Tab → focus moves back to TabView
     _ = runLoop.handleKeyPress(KeyPress(.tab, modifiers: .shift))
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
 
-    #expect(focusTracker.currentFocusIdentity == tabViewIdentity,
+    #expect(
+      focusTracker.currentFocusIdentity == tabViewIdentity,
       "After Shift-Tab, focus should return to TabView")
 
     // State 3: TabView focused again → Picker should NOT have heavy border
     lines = terminal.latestSurface!.lines
-    #expect(!lines.contains { $0.contains("┏") || $0.contains("┗") },
+    #expect(
+      !lines.contains { $0.contains("┏") || $0.contains("┗") },
       "State 3: Picker should NOT show heavy border after losing focus")
   }
 
@@ -338,26 +357,32 @@ struct FocusTransitionTests {
       _ = runLoop.handleKeyPress(KeyPress(.tab))
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
 
-      #expect(focusTracker.currentFocusIdentity != tabViewIdentity,
+      #expect(
+        focusTracker.currentFocusIdentity != tabViewIdentity,
         "Cycle \(cycle): After Tab, focus should be on Picker")
 
       var lines = terminal.latestSurface!.lines
-      #expect(!lines.contains { $0.contains("▄") },
+      #expect(
+        !lines.contains { $0.contains("▄") },
         "Cycle \(cycle) after Tab: TabView should NOT show ▄")
-      #expect(lines.contains { $0.contains("┏") || $0.contains("┗") },
+      #expect(
+        lines.contains { $0.contains("┏") || $0.contains("┗") },
         "Cycle \(cycle) after Tab: Picker SHOULD show heavy border")
 
       // Shift-Tab → TabView
       _ = runLoop.handleKeyPress(KeyPress(.tab, modifiers: .shift))
       try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
 
-      #expect(focusTracker.currentFocusIdentity == tabViewIdentity,
+      #expect(
+        focusTracker.currentFocusIdentity == tabViewIdentity,
         "Cycle \(cycle): After Shift-Tab, focus should be on TabView")
 
       lines = terminal.latestSurface!.lines
-      #expect(lines.contains { $0.contains("▄") },
+      #expect(
+        lines.contains { $0.contains("▄") },
         "Cycle \(cycle) after Shift-Tab: TabView SHOULD show ▄")
-      #expect(!lines.contains { $0.contains("┏") || $0.contains("┗") },
+      #expect(
+        !lines.contains { $0.contains("┏") || $0.contains("┗") },
         "Cycle \(cycle) after Shift-Tab: Picker should NOT show heavy border")
     }
   }
@@ -407,7 +432,8 @@ struct FocusTransitionTests {
 
     #expect(initialFocus != afterTabFocus, "Tab should move focus")
     #expect(afterTabFocus != nil)
-    #expect(afterTabStyles != initialStyles,
+    #expect(
+      afterTabStyles != initialStyles,
       "Rendered frame should change after Tab (focus highlight moved)")
 
     // Shift-Tab → focus should move back
@@ -418,7 +444,8 @@ struct FocusTransitionTests {
     let afterShiftTabStyles = terminal.latestSurface?.styleRuns ?? []
 
     #expect(afterShiftTabFocus == initialFocus, "Shift-Tab should return to original")
-    #expect(afterShiftTabStyles != afterTabStyles,
+    #expect(
+      afterShiftTabStyles != afterTabStyles,
       "Shift-Tab frame should differ from Tab frame (focus moved back)")
   }
 }
@@ -453,12 +480,15 @@ private final class FocusTestTerminalHost: TerminalHosting {
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     latestSurface = surface
-    return TerminalPresentationMetrics(bytesWritten: 0, linesTouched: surface.lines.count, cellsChanged: 0)
+    return TerminalPresentationMetrics(
+      bytesWritten: 0, linesTouched: surface.lines.count, cellsChanged: 0)
   }
 }
 
 extension FocusTestTerminalHost: DamageAwareTerminalHosting {
-  func present(_ surface: RasterSurface, damage: PresentationDamage?) throws -> TerminalPresentationMetrics {
+  func present(_ surface: RasterSurface, damage: PresentationDamage?) throws
+    -> TerminalPresentationMetrics
+  {
     try present(surface)
   }
 }
@@ -467,7 +497,10 @@ private final class FocusTestInputReader: TerminalInputReading {
   private let scriptedEvents: [InputEvent]
   init(events: [InputEvent]) { scriptedEvents = events }
   func inputEvents() -> AsyncStream<InputEvent> {
-    AsyncStream { cont in for e in scriptedEvents { cont.yield(e) }; cont.finish() }
+    AsyncStream { cont in
+      for e in scriptedEvents { cont.yield(e) }
+      cont.finish()
+    }
   }
 }
 

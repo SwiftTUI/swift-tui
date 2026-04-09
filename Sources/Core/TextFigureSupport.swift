@@ -1,6 +1,6 @@
-import Synchronization
-import SwiftFiglet
 @_exported import EmbeddedFonts
+import SwiftFiglet
+import Synchronization
 
 public typealias TextFigureFont = EmbeddedFigletFont
 
@@ -86,7 +86,8 @@ package enum TextFigureSupport {
       return metrics.idealSize
     }
 
-    if let measured = try? resolvedFiglet(for: payload).measure(payload.content, forWidth: renderedWidth)
+    if let measured = try? resolvedFiglet(for: payload).measure(
+      payload.content, forWidth: renderedWidth)
     {
       return .init(width: measured.width, height: measured.height)
     }
@@ -108,7 +109,8 @@ package enum TextFigureSupport {
     let metrics = layoutMetrics(for: payload)
     let renderWidth = max(1, max(boundsWidth, metrics.minimumWidth))
 
-    guard let text = try? resolvedFiglet(for: payload, width: renderWidth).render(payload.content) else {
+    guard let text = try? resolvedFiglet(for: payload, width: renderWidth).render(payload.content)
+    else {
       reportTextFigureConfigurationError(
         "TextFigure could not render embedded font '\(payload.font.rawValue)'"
       )
@@ -155,7 +157,8 @@ package enum TextFigureSupport {
   private static func renderedLines(
     from text: FigletText
   ) -> [String] {
-    var lines = text.rawValue.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    var lines = text.rawValue.split(separator: "\n", omittingEmptySubsequences: false).map(
+      String.init)
     if lines.last == "" {
       lines.removeLast()
     }
@@ -207,14 +210,14 @@ package enum TextFigureSupport {
 package func reportTextFigureConfigurationError(
   _ message: String
 ) {
-#if DEBUG
-  if isRunningUnderSwiftTest() {
-    return
-  }
-  assertionFailure(message)
-#else
-  _ = message
-#endif
+  #if DEBUG
+    if isRunningUnderSwiftTest() {
+      return
+    }
+    assertionFailure(message)
+  #else
+    _ = message
+  #endif
 }
 
 private func isRunningUnderSwiftTest() -> Bool {

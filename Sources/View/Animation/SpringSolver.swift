@@ -1,11 +1,11 @@
 #if canImport(Darwin)
-import Darwin
+  import Darwin
 #elseif canImport(Glibc)
-import Glibc
+  import Glibc
 #elseif canImport(WASILibc)
-import WASILibc
+  import WASILibc
 #elseif canImport(ucrt)
-import ucrt
+  import ucrt
 #endif
 
 /// Solves the damped harmonic oscillator equation for spring animations.
@@ -53,10 +53,10 @@ package struct SpringSolver: Sendable {
     if dampingRatio < 1.0 {
       // Underdamped
       let dampedFrequency = naturalFrequency * sqrt(1.0 - dampingRatio * dampingRatio)
-      displacement = decay * (
-        cos(dampedFrequency * t)
-        + (dampingRatio * naturalFrequency / dampedFrequency) * sin(dampedFrequency * t)
-      )
+      displacement =
+        decay
+        * (cos(dampedFrequency * t)
+          + (dampingRatio * naturalFrequency / dampedFrequency) * sin(dampedFrequency * t))
     } else if dampingRatio > 1.0 {
       // Overdamped — solution is x(t) = a·e^(s1·t) + b·e^(s2·t)
       // with x(0)=1 and v(0)=0, so a+b=1 and a·s1+b·s2=0.
@@ -92,10 +92,9 @@ package struct SpringSolver: Sendable {
       let sinComponent = sin(dampedFrequency * t)
       let A = 1.0
       let B = (dampingRatio * naturalFrequency) / dampedFrequency
-      return decay * (
-        (-dampingRatio * naturalFrequency) * (A * cosComponent + B * sinComponent)
-        + dampedFrequency * (-A * sinComponent + B * cosComponent)
-      )
+      return decay
+        * ((-dampingRatio * naturalFrequency) * (A * cosComponent + B * sinComponent)
+          + dampedFrequency * (-A * sinComponent + B * cosComponent))
     } else if dampingRatio > 1.0 {
       let s1 = -naturalFrequency * (dampingRatio - sqrt(dampingRatio * dampingRatio - 1.0))
       let s2 = -naturalFrequency * (dampingRatio + sqrt(dampingRatio * dampingRatio - 1.0))

@@ -89,7 +89,8 @@ private struct OnKeyPressModifier<Content: View>: View, ResolvableView {
       key: KeyPress(matchKey ?? .escape, modifiers: matchModifiers)
     )
 
-    context.hotkeyRegistry?.register(identity: context.identity, binding: binding) { localKeyPress in
+    context.hotkeyRegistry?.register(identity: context.identity, binding: binding) {
+      localKeyPress in
       if let matchKey {
         guard localKeyPress.key == matchKey && localKeyPress.modifiers == matchModifiers else {
           return false

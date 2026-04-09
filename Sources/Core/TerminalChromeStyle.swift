@@ -108,8 +108,9 @@ extension Theme {
       return terminalBorderStyle(tone: tone, appearance: appearance)
     case .tile(let tone):
       return .color(
-        appearance.backgroundColor.mixed(with:
-          terminalToneColor(for: tone, appearance: appearance),
+        appearance.backgroundColor.mixed(
+          with:
+            terminalToneColor(for: tone, appearance: appearance),
           amount: interpolatedAmount(dark: 0.18, light: 0.1, appearance: appearance)
         )
       )
@@ -125,30 +126,34 @@ extension Theme {
         return .color(terminalToneColor(for: tone, appearance: appearance))
       }
       return .color(
-        appearance.backgroundColor.mixed(with:
-          terminalToneColor(for: tone, appearance: appearance),
+        appearance.backgroundColor.mixed(
+          with:
+            terminalToneColor(for: tone, appearance: appearance),
           amount: interpolatedAmount(dark: 0.16, light: 0.08, appearance: appearance)
         )
       )
     case .keycap(let tone):
       return .color(
-        appearance.backgroundColor.mixed(with:
-          terminalToneColor(for: tone, appearance: appearance),
+        appearance.backgroundColor.mixed(
+          with:
+            terminalToneColor(for: tone, appearance: appearance),
           amount: interpolatedAmount(dark: 0.1, light: 0.05, appearance: appearance)
         )
       )
     case .tab(let tone, let isSelected):
       if isSelected {
         return .color(
-          appearance.backgroundColor.mixed(with:
-            terminalToneColor(for: tone, appearance: appearance),
+          appearance.backgroundColor.mixed(
+            with:
+              terminalToneColor(for: tone, appearance: appearance),
             amount: interpolatedAmount(dark: 0.22, light: 0.14, appearance: appearance)
           )
         )
       }
       return .color(
-        appearance.backgroundColor.mixed(with:
-          terminalToneColor(for: tone, appearance: appearance),
+        appearance.backgroundColor.mixed(
+          with:
+            terminalToneColor(for: tone, appearance: appearance),
           amount: interpolatedAmount(dark: 0.06, light: 0.03, appearance: appearance)
         )
       )
@@ -171,8 +176,9 @@ extension Theme {
     case .danger:
       return danger
     case .neutral:
-      return appearance.backgroundColor.mixed(with:
-        appearance.foregroundColor,
+      return appearance.backgroundColor.mixed(
+        with:
+          appearance.foregroundColor,
         amount: interpolatedAmount(dark: 0.54, light: 0.44, appearance: appearance)
       )
     }
@@ -183,8 +189,9 @@ extension Theme {
     appearance: TerminalAppearance
   ) -> AnyShapeStyle {
     .color(
-      appearance.backgroundColor.mixed(with:
-        terminalToneColor(for: tone, appearance: appearance),
+      appearance.backgroundColor.mixed(
+        with:
+          terminalToneColor(for: tone, appearance: appearance),
         amount: interpolatedAmount(dark: 0.1, light: 0.05, appearance: appearance)
       )
     )
@@ -195,8 +202,9 @@ extension Theme {
     appearance: TerminalAppearance
   ) -> AnyShapeStyle {
     .color(
-      appearance.backgroundColor.mixed(with:
-        terminalToneColor(for: tone, appearance: appearance),
+      appearance.backgroundColor.mixed(
+        with:
+          terminalToneColor(for: tone, appearance: appearance),
         amount:
           tone == .neutral
           ? interpolatedAmount(dark: 0.24, light: 0.18, appearance: appearance)
@@ -215,8 +223,9 @@ extension Theme {
 
     if isSelected {
       return .color(
-        neutralBase.mixed(with:
-          terminalToneColor(for: tone, appearance: appearance),
+        neutralBase.mixed(
+          with:
+            terminalToneColor(for: tone, appearance: appearance),
           amount: interpolatedAmount(dark: 0.18, light: 0.11, appearance: appearance)
         )
       )
@@ -228,8 +237,9 @@ extension Theme {
       : interpolatedAmount(dark: 0.03, light: 0.01, appearance: appearance)
 
     return .color(
-      neutralBase.mixed(with:
-        appearance.foregroundColor,
+      neutralBase.mixed(
+        with:
+          appearance.foregroundColor,
         amount: overlayStrength
       )
     )

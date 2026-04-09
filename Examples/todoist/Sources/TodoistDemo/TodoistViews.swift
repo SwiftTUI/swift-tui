@@ -133,36 +133,36 @@ struct TodoistDemoRootView: View {
 
   var body: some View {
     VStack {
-    HStack(alignment: .top, spacing: 0) {
-      projectsPane
-        .frame(
-          minWidth: 24,
-          idealWidth: 24,
-          maxWidth: 24,
-          maxHeight: .infinity,
-          alignment: .topLeading
-        )
-      Divider()
-      tasksPane
-        .frame(
-          minWidth: .finite(36),
-          maxWidth: .infinity,
-          maxHeight: .infinity,
-          alignment: .topLeading
-        )
-        .layoutPriority(1)
-      Divider()
-      inspectorPane
-        .frame(
-          minWidth: 30,
-          idealWidth: 30,
-          maxWidth: 30,
-          maxHeight: .infinity,
-          alignment: .topLeading
-        )
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    if let lastErrorDetails = model.lastErrorDetails {
+      HStack(alignment: .top, spacing: 0) {
+        projectsPane
+          .frame(
+            minWidth: 24,
+            idealWidth: 24,
+            maxWidth: 24,
+            maxHeight: .infinity,
+            alignment: .topLeading
+          )
+        Divider()
+        tasksPane
+          .frame(
+            minWidth: .finite(36),
+            maxWidth: .infinity,
+            maxHeight: .infinity,
+            alignment: .topLeading
+          )
+          .layoutPriority(1)
+        Divider()
+        inspectorPane
+          .frame(
+            minWidth: 30,
+            idealWidth: 30,
+            maxWidth: 30,
+            maxHeight: .infinity,
+            alignment: .topLeading
+          )
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      if let lastErrorDetails = model.lastErrorDetails {
         Divider()
         Text("Last Error")
           .bold()
@@ -174,23 +174,23 @@ struct TodoistDemoRootView: View {
           .truncationMode(.tail)
           .foregroundStyle(.separator)
       }
-  }
-  .confirmationDialog(
-          "Close selected task?",
-          isPresented: $isCloseConfirmationPresented,
-          actions: {
-            Button("Close") {
-              isCloseConfirmationPresented = false
-              model.requestCloseSelectedTask()
-            }
-            Button("Cancel") {
-              isCloseConfirmationPresented = false
-            }
-          },
-          message: {
-            Text("This completes the task in Todoist and removes it from the active task list.")
-          }
-        )
+    }
+    .confirmationDialog(
+      "Close selected task?",
+      isPresented: $isCloseConfirmationPresented,
+      actions: {
+        Button("Close") {
+          isCloseConfirmationPresented = false
+          model.requestCloseSelectedTask()
+        }
+        Button("Cancel") {
+          isCloseConfirmationPresented = false
+        }
+      },
+      message: {
+        Text("This completes the task in Todoist and removes it from the active task list.")
+      }
+    )
     .task { [model] in
       await model.start()
     }
@@ -345,7 +345,6 @@ struct TodoistDemoRootView: View {
         .bold()
       Text(model.statusMessage)
         .foregroundStyle(.separator)
-
 
       Divider()
 
