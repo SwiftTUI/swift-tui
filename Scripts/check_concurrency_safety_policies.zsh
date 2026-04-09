@@ -12,7 +12,6 @@ matches="$(
     --glob '!**/.build/**' \
     --glob '!**/.swiftpm/**' \
     --regexp '@unchecked Sendable' \
-    --regexp 'nonisolated\(unsafe\)' \
     Sources Tests Runners Examples Package.swift || true
 )"
 

@@ -1,4 +1,4 @@
-package import Core
+import Core
 
 /// The phase a transition is in.
 ///

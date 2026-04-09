@@ -1,4 +1,4 @@
-package import Core
+import Core
 
 /// Criteria used to determine when an animation is considered complete
 /// for the purposes of firing completion callbacks.
