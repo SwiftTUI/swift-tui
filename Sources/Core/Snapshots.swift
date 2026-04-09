@@ -279,6 +279,8 @@ extension SnapshotRenderer {
       return "none"
     case .text(let content):
       return "text(\(content))"
+    case .textFigure(let payload):
+      return "textFigure(text=\(payload.content),font=\(payload.font))"
     case .richText(let payload):
       return "richText(text=\(payload.visibleText),links=\(payload.linkCount))"
     case .image(let payload):
@@ -362,6 +364,20 @@ extension SnapshotRenderer {
       }
       if wrappingStrategy != .wordBoundary {
         details += " wrapping=\(wrappingStrategy.rawValue)"
+      }
+      if !style.isDefault {
+        details += " style=\(describe(style))"
+      }
+      details += "]"
+      return details
+    case .preformattedText(
+      let bounds,
+      let lines,
+      let style
+    ):
+      var details = "preformattedText[\(describe(bounds)) lines=\(lines.count)"
+      if let firstLine = lines.first {
+        details += " firstLine=\"\(firstLine)\""
       }
       if !style.isDefault {
         details += " style=\(describe(style))"

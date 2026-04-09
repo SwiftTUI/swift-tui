@@ -685,6 +685,11 @@ public indirect enum DrawCommand: Equatable, Sendable {
     truncationMode: TextTruncationMode,
     wrappingStrategy: TextWrappingStrategy
   )
+  case preformattedText(
+    bounds: Rect,
+    lines: [String],
+    style: TextStyle
+  )
   case richText(
     bounds: Rect,
     payload: RichTextPayload,

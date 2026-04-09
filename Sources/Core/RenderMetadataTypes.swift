@@ -2,6 +2,7 @@
 public indirect enum DrawPayload: Equatable, Sendable {
   case none
   case text(String)
+  case textFigure(TextFigurePayload)
   case richText(RichTextPayload)
   case image(ImagePayload)
   case shape(ShapePayload)

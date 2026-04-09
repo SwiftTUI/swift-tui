@@ -182,6 +182,26 @@ public struct FigletText: CustomStringConvertible, Equatable, Sendable {
     }
 }
 
+public struct FigletSize: Equatable, Sendable {
+    public let width: Int
+    public let height: Int
+
+    public init(width: Int, height: Int) {
+        self.width = max(0, width)
+        self.height = max(0, height)
+    }
+}
+
+public struct FigletLayoutMetrics: Equatable, Sendable {
+    public let minimumWidth: Int
+    public let idealSize: FigletSize
+
+    public init(minimumWidth: Int, idealSize: FigletSize) {
+        self.minimumWidth = max(0, minimumWidth)
+        self.idealSize = idealSize
+    }
+}
+
 public struct FigletFont: Sendable {
     public static let defaultFontName = "standard"
 
@@ -603,6 +623,51 @@ public struct Figlet: Sendable {
         return try builder.render()
     }
 
+    public func layoutMetrics(for text: String) throws -> FigletLayoutMetrics {
+        guard configuration.width > 0 else {
+            throw FigletError.invalidConfiguration("width must be greater than zero")
+        }
+
+        guard !text.isEmpty else {
+            return FigletLayoutMetrics(
+                minimumWidth: 0,
+                idealSize: FigletSize(width: 0, height: 0)
+            )
+        }
+
+        let minimumWidth = minimumRenderableWidth(for: text)
+        let idealWidth = max(1, nonWrappingWidthUpperBound(for: text))
+        var builder = FigletBuilder(
+            text: text,
+            font: font,
+            direction: resolvedDirection,
+            width: idealWidth,
+            justification: resolvedJustification
+        )
+        let rows = try builder.renderRows()
+
+        return FigletLayoutMetrics(
+            minimumWidth: minimumWidth,
+            idealSize: measureRows(rows)
+        )
+    }
+
+    public func measure(_ text: String, forWidth width: Int) throws -> FigletSize {
+        guard width > 0 else {
+            throw FigletError.invalidConfiguration("width must be greater than zero")
+        }
+
+        let figlet = Figlet(
+            font: font,
+            configuration: FigletConfiguration(
+                width: width,
+                direction: configuration.direction,
+                justification: configuration.justification
+            )
+        )
+        return measureRenderedText(try figlet.render(text))
+    }
+
     public static func availableFonts() -> [String] {
         FigletFont.bundledFontNames()
     }
@@ -639,6 +704,18 @@ public struct Figlet: Sendable {
             return .right
         case .automatic:
             return resolvedDirection == .leftToRight ? .left : .right
+        }
+    }
+
+    private func minimumRenderableWidth(for text: String) -> Int {
+        text.unicodeScalars.reduce(into: 0) { currentMaximum, scalar in
+            currentMaximum = max(currentMaximum, font.widths[Int(scalar.value)] ?? 0)
+        }
+    }
+
+    private func nonWrappingWidthUpperBound(for text: String) -> Int {
+        text.unicodeScalars.reduce(into: 0) { total, scalar in
+            total += font.widths[Int(scalar.value)] ?? 0
         }
     }
 }
@@ -685,6 +762,10 @@ private struct FigletBuilder {
     }
 
     mutating func render() throws -> FigletText {
+        FigletText(formatProduct(try renderRows()))
+    }
+
+    mutating func renderRows() throws -> [String] {
         while iterator < text.count {
             try addCurrentCharacterToProduct()
             iterator += 1
@@ -694,7 +775,7 @@ private struct FigletBuilder {
             productQueue.append(buffer)
         }
 
-        return FigletText(formatProduct())
+        return formatRows()
     }
 
     private mutating func addCurrentCharacterToProduct() throws {
@@ -726,7 +807,7 @@ private struct FigletBuilder {
             blankMarkers.append((buffer, iterator))
         }
 
-        if nextWidth >= width {
+        if nextWidth > width {
             handleNewline()
         } else {
             for row in 0..<font.height {
@@ -737,11 +818,12 @@ private struct FigletBuilder {
         previousCharacterWidth = currentCharacterWidth
     }
 
-    private func formatProduct() -> String {
-        productQueue.reduce(into: "") { result, queuedBuffer in
-            let justified = justify(queuedBuffer)
-            result += replaceHardBlanks(in: justified)
-        }
+    private func formatProduct(_ rows: [String]) -> String {
+        rows.joined(separator: "\n") + (rows.isEmpty ? "" : "\n")
+    }
+
+    private func formatRows() -> [String] {
+        productQueue.flatMap { replaceHardBlanks(in: justify($0)) }
     }
 
     private func glyph(at index: Int) -> [String]? {
@@ -824,9 +906,10 @@ private struct FigletBuilder {
         }
     }
 
-    private func replaceHardBlanks(in buffer: [String]) -> String {
-        let output = buffer.joined(separator: "\n") + "\n"
-        return output.replacingCharacters(matching: font.hardBlank, with: " ")
+    private func replaceHardBlanks(in buffer: [String]) -> [String] {
+        buffer.map { row in
+            row.replacingCharacters(matching: font.hardBlank, with: " ")
+        }
     }
 
     private func smushAmount(buffer: [String], glyph: [String]) -> Int {
@@ -978,6 +1061,25 @@ private struct FigletBuilder {
         case kern = 64
         case smush = 128
     }
+}
+
+private func measureRenderedText(_ text: FigletText) -> FigletSize {
+    measureRows(renderedRows(from: text.rawValue))
+}
+
+private func renderedRows(from rawValue: String) -> [String] {
+    var rows = rawValue.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    if rows.last == "" {
+        rows.removeLast()
+    }
+    return rows
+}
+
+private func measureRows(_ rows: [String]) -> FigletSize {
+    FigletSize(
+        width: rows.map(\.count).max() ?? 0,
+        height: rows.count
+    )
 }
 
 private func consumeLine(from lines: [String], index: inout Int) throws -> String {

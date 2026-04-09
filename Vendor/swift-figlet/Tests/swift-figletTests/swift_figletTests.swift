@@ -30,7 +30,7 @@ private let bundledFontsDirectory = repositoryRoot + "/Sources/swift-figlet/Reso
 
     let output = try figlet.render("hello world").description
 
-    #expect(output == " _          _ _ \n| |__   ___| | |\n| '_ \\ / _ \\ | |\n| | | |  __/ | |\n|_| |_|\\___|_|_|\n                \n       \n  ___  \n / _ \\ \n| (_) |\n \\___/ \n       \n               \n__      _____  \n\\ \\ /\\ / / _ \\ \n \\ V  V / (_) |\n  \\_/\\_/ \\___/ \n               \n      _     _ \n _ __| | __| |\n| '__| |/ _` |\n| |  | | (_| |\n|_|  |_|\\__,_|\n              \n")
+    #expect(output == " _          _ _ \n| |__   ___| | |\n| '_ \\ / _ \\ | |\n| | | |  __/ | |\n|_| |_|\\___|_|_|\n                \n       \n  ___  \n / _ \\ \n| (_) |\n \\___/ \n       \n                    \n__      _____  _ __ \n\\ \\ /\\ / / _ \\| '__|\n \\ V  V / (_) | |   \n  \\_/\\_/ \\___/|_|   \n                    \n _     _ \n| | __| |\n| |/ _` |\n| | (_| |\n|_|\\__,_|\n         \n")
 }
 
 @Test func loadsExternalFontFiles() throws {
@@ -59,6 +59,22 @@ private let bundledFontsDirectory = repositoryRoot + "/Sources/swift-figlet/Reso
     let output = try figlet.render("Hi").description
 
     #expect(output == " _   _ _ \n| | | (_)\n| |_| | |\n|  _  | |\n|_| |_|_|\n         \n")
+}
+
+@Test func reportsLayoutMetricsForEmbeddedFonts() throws {
+    let figlet = try Figlet(fontNamed: "standard", fontLibrary: SwiftFigletEmbeddedFonts.library)
+    let metrics = try figlet.layoutMetrics(for: "Hi")
+
+    #expect(metrics.minimumWidth == 8)
+    #expect(metrics.idealSize == .init(width: 9, height: 6))
+}
+
+@Test func measuresRenderedSizeAtConcreteWidths() throws {
+    let figlet = try Figlet(fontNamed: "standard", fontLibrary: SwiftFigletEmbeddedFonts.library)
+
+    #expect(try figlet.measure("Hi", forWidth: 80) == .init(width: 9, height: 6))
+    #expect(try figlet.measure("Hi", forWidth: 8) == .init(width: 7, height: 12))
+    #expect(try figlet.measure("hello world", forWidth: 20) == .init(width: 20, height: 24))
 }
 
 @Test func listsBundledFonts() {

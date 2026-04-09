@@ -28,6 +28,9 @@ func collectedNodeTextParts(
   if case .text(let content) = node.drawPayload, !content.isEmpty {
     parts.append(content)
   }
+  if case .textFigure(let payload) = node.drawPayload, !payload.content.isEmpty {
+    parts.append(payload.content)
+  }
   if case .richText(let payload) = node.drawPayload, !payload.visibleText.isEmpty {
     parts.append(payload.visibleText)
   }
