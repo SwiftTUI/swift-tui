@@ -16,6 +16,7 @@ public enum LayoutBehavior: Sendable {
   case overlay(alignment: Alignment)
   case padding(EdgeInsets)
   case frame(width: Int?, height: Int?, alignment: Alignment)
+  case offset(x: Int, y: Int)
   case flexibleFrame(
     minWidth: ProposedDimension?, idealWidth: ProposedDimension?, maxWidth: ProposedDimension?,
     minHeight: ProposedDimension?, idealHeight: ProposedDimension?, maxHeight: ProposedDimension?,
@@ -58,6 +59,8 @@ extension LayoutBehavior: Equatable {
       return lhsWidth == rhsWidth
         && lhsHeight == rhsHeight
         && lhsAlignment == rhsAlignment
+    case (.offset(let lhsX, let lhsY), .offset(let rhsX, let rhsY)):
+      return lhsX == rhsX && lhsY == rhsY
     case (
       .flexibleFrame(
         let lhsMinW, let lhsIdealW, let lhsMaxW,
@@ -392,7 +395,9 @@ public final class CustomLayoutHandle: Sendable {
   public let proxy: any CustomLayoutProxy
   package let measurementReuseSignature: String?
   package let placementHandler:
-    (@Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) -> [PlacedNode])?
+    (
+      @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) -> [PlacedNode]
+    )?
 
   public init(
     _ proxy: some CustomLayoutProxy,
@@ -407,8 +412,10 @@ public final class CustomLayoutHandle: Sendable {
     _ proxy: some CustomLayoutProxy,
     measurementReuseSignature: String? = nil,
     placementHandler:
-      (@Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) -> [PlacedNode])?
-      = nil
+      (
+        @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) ->
+          [PlacedNode]
+      )? = nil
   ) {
     self.proxy = proxy
     self.measurementReuseSignature = measurementReuseSignature
