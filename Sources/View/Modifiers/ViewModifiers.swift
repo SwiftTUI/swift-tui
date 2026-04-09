@@ -146,6 +146,25 @@ extension View {
     drawMetadata(.init(clipsToBounds: true))
   }
 
+  public func offset(_ offset: Size) -> some View {
+    OffsetView(
+      content: erasedToAnyView,
+      x: offset.width,
+      y: offset.height
+    )
+  }
+
+  public func offset(
+    x: Int = 0,
+    y: Int = 0
+  ) -> some View {
+    OffsetView(
+      content: erasedToAnyView,
+      x: x,
+      y: y
+    )
+  }
+
   public func focusable(
     _ isFocusable: Bool = true,
     interactions: FocusInteractions = .automatic
@@ -583,6 +602,40 @@ package struct FrameView<Content: View>: View, ResolvableView {
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
         layoutBehavior: .frame(width: width, height: height, alignment: alignment)
+      )
+    ]
+  }
+}
+
+package struct OffsetView<Content: View>: View, ResolvableView {
+  package var content: Content
+  package var x: Int
+  package var y: Int
+
+  package init(
+    content: Content,
+    x: Int,
+    y: Int
+  ) {
+    self.content = content
+    self.x = x
+    self.y = y
+  }
+
+  @inline(never)
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let contentNode = resolveWrapperContent(
+      content,
+      in: context.child(component: .named("content"))
+    )
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("Offset"),
+        children: [contentNode],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        layoutBehavior: .offset(x: x, y: y)
       )
     ]
   }

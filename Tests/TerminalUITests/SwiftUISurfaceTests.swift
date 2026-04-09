@@ -4746,6 +4746,45 @@ struct SwiftUISurfaceTests {
     #expect(framedArtifacts.rasterSurface.lines == ["", "", "AB"])
   }
 
+  @Test("offset is layout-neutral and moves rendered output")
+  func offsetMovesRenderedOutputWithoutChangingWrapperLayout() {
+    let artifacts = DefaultRenderer().render(
+      Text("Hi")
+        .offset(.init(width: 2, height: 1))
+        .frame(width: 5, height: 3, alignment: .topLeading),
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    #expect(artifacts.measuredTree.measuredSize == .init(width: 5, height: 3))
+    #expect(artifacts.placedTree.kind == .view("Frame"))
+    #expect(artifacts.placedTree.children.count == 1)
+    #expect(artifacts.placedTree.children[0].kind == .view("Offset"))
+    #expect(artifacts.placedTree.children[0].bounds.origin == .zero)
+    #expect(artifacts.placedTree.children[0].children.map(\.bounds.origin) == [.init(x: 2, y: 1)])
+    #expect(artifacts.rasterSurface.lines == ["", "  Hi", ""])
+  }
+
+  @Test("offset preserves stack baseline placement while moving the child visually")
+  func offsetPreservesStackBaselinePlacement() {
+    let artifacts = DefaultRenderer().render(
+      HStack(alignment: .firstTextBaseline, spacing: 0) {
+        Text("A").offset(x: 0, y: 1)
+        Text("B")
+      }
+      .frame(width: 2, height: 2, alignment: .topLeading),
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    let stack = artifacts.placedTree.children[0]
+    #expect(
+      stack.children.map(\.bounds.origin) == [
+        .init(x: 0, y: 0),
+        .init(x: 1, y: 0),
+      ])
+    #expect(stack.children[0].children.map(\.bounds.origin) == [.init(x: 0, y: 1)])
+    #expect(artifacts.rasterSurface.lines == [" B", "A"])
+  }
+
   @Test("width-only flexible frames preserve intrinsic height in vertical stacks")
   func widthOnlyFlexibleFramesPreserveIntrinsicHeightInVerticalStacks() {
     let artifacts = DefaultRenderer().render(
@@ -5226,6 +5265,31 @@ struct SwiftUISurfaceTests {
     #expect(unclippedArtifacts.rasterSurface.lines == ["ABCDEFG"])
     #expect(clippedArtifacts.measuredTree.measuredSize == .init(width: 3, height: 1))
     #expect(clippedArtifacts.rasterSurface.lines == ["ABC"])
+  }
+
+  @Test("offset and clipped respect modifier order")
+  func offsetAndClippedRespectModifierOrder() {
+    let offsetThenClipped = DefaultRenderer().render(
+      Text("ABCDEFG")
+        .fixedSize()
+        .offset(x: 2)
+        .frame(width: 5, height: 1, alignment: .leading)
+        .clipped()
+        .frame(width: 7, height: 1, alignment: .leading),
+      context: .init(identity: testIdentity("OffsetThenClipped"))
+    )
+    let clippedThenOffset = DefaultRenderer().render(
+      Text("ABCDEFG")
+        .fixedSize()
+        .frame(width: 5, height: 1, alignment: .leading)
+        .clipped()
+        .offset(x: 2)
+        .frame(width: 7, height: 1, alignment: .leading),
+      context: .init(identity: testIdentity("ClippedThenOffset"))
+    )
+
+    #expect(offsetThenClipped.rasterSurface.lines == ["  ABC"])
+    #expect(clippedThenOffset.rasterSurface.lines == ["  ABCDE"])
   }
 
   @Test("fixedSize preserves ideal size along constrained axes")

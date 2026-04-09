@@ -2059,6 +2059,78 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("gallery-like ScrollView task registration survives pointer scrolling")
+  func galleryLikeScrollViewTaskRegistrationSurvivesPointerScrolling() async throws {
+    let terminalSize = Size(width: 80, height: 24)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("GalleryLikeScrollFixture")
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: ScriptedTerminalInputReader(events: []),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = terminalSize
+        return values
+      }(),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        GalleryLikeScrollFixture()
+      }
+    )
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let initialTask = try #require(runLoop.localTaskRegistry.snapshot().values.first)
+    await initialTask.run()
+    let initialTaskFrame = try #require(
+      scheduler.consumeReadyFrame(at: .now())
+    )
+    #expect(initialTaskFrame.causes.contains(.invalidation))
+    scheduler.requestInvalidation(of: initialTaskFrame.invalidatedIdentities)
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: testIdentity("GalleryLikeScrollFixture", "Scroll"),
+        in: GalleryLikeScrollFixture(),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    #expect(
+      runLoop.handle(
+        .input(
+          .mouse(
+            .init(kind: .scrolled(deltaX: 0, deltaY: 1), location: bottomPoint(of: scrollRect))
+          ))) == nil)
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let updatedTask = try #require(runLoop.localTaskRegistry.snapshot().values.first)
+    await updatedTask.run()
+    let updatedTaskFrame = try #require(
+      scheduler.consumeReadyFrame(at: .now())
+    )
+    #expect(updatedTaskFrame.causes.contains(.invalidation))
+    scheduler.requestInvalidation(of: updatedTaskFrame.invalidatedIdentities)
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+  }
+
+  @MainActor
   @Test(
     "handled pointer scrolling invalidates the scroll route even for external position bindings")
   func handledPointerScrollingInvalidatesScrollRouteForExternalBindings() throws {
@@ -3821,6 +3893,7 @@ private struct StatefulImplicitPointerScrollFixture: View {
 private struct GalleryLikeScrollFixture: View {
   @State private var fontNumber = 2
   @State private var font: SwiftFigletEmbeddedFonts.Font = .acrobatic
+  @State private var taskRuns = 0
 
   private var fontCount: Int {
     SwiftFigletEmbeddedFonts.Font.allCases.count
@@ -3834,8 +3907,10 @@ private struct GalleryLikeScrollFixture: View {
             HStack {
               Stepper("", value: $fontNumber)
               Text(font.rawValue)
+              Text("Task \(taskRuns)")
             }
             .task(id: fontNumber) {
+              taskRuns += 1
               if fontNumber >= 0 && fontNumber < fontCount {
                 font = SwiftFigletEmbeddedFonts.Font.allCases[fontNumber]
               } else {

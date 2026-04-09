@@ -245,6 +245,8 @@ extension SnapshotRenderer {
       let widthDescription = width.map { String($0) } ?? "nil"
       let heightDescription = height.map { String($0) } ?? "nil"
       return "frame(\(widthDescription),\(heightDescription),\(alignment.rawValue))"
+    case .offset(let x, let y):
+      return "offset(\(x),\(y))"
     case .flexibleFrame(
       let minW, let idealW, let maxW, let minH, let idealH, let maxH, let alignment):
       func desc(_ d: ProposedDimension?) -> String {
