@@ -1518,15 +1518,12 @@ struct InteractiveRuntimeTests {
       initialState: 0,
       invalidationIdentities: [rootIdentity]
     )
+    let quitGate = AsyncEventGate()
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       terminalHost: terminal,
-      inputReader: GateInputReader(gate: AsyncEventGate(), event: .character("q")),
-      signalReader: TimedSignalReader(
-        signals: [
-          .init(delayNanoseconds: 1_000_000_000, value: "SIGTERM")
-        ]
-      ),
+      inputReader: GateInputReader(gate: quitGate, event: .character("q")),
+      signalReader: EmptySignalReader(),
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
       focusTracker: FocusTracker(
@@ -1537,13 +1534,25 @@ struct InteractiveRuntimeTests {
         ToastAutoDismissHarnessView(terminalSize: terminalSize)
       }
     )
-    let result = try await runLoop.run()
+    let runTask = Task {
+      try await runLoop.run()
+    }
+
+    let toastDismissed = try await waitUntil {
+      guard terminal.frames.count >= 2 else {
+        return false
+      }
+      return !(terminal.frames.last ?? "").contains("Action performed")
+    }
+    await quitGate.open()
+    let result = try await runTask.value
 
     let firstFrame = try #require(terminal.frames.first)
     let lastFrame = try #require(terminal.frames.last)
 
-    #expect(result.exitReason == .signal("SIGTERM"))
-    #expect(result.renderedFrames == 2)
+    #expect(result.exitReason == .quitKey)
+    #expect(toastDismissed)
+    #expect(result.renderedFrames >= 2)
     #expect(firstFrame.contains("Action performed"))
     #expect(!lastFrame.contains("Action performed"))
   }
@@ -2354,6 +2363,316 @@ struct InteractiveRuntimeTests {
     )
   }
 
+  /// Regression for scroll views hosted inside a selected `TabView`
+  /// pane. The scroll state can advance while the selected pane keeps
+  /// presenting its stale pre-scroll snapshot, which looks like the
+  /// scroll view is frozen until some unrelated interaction forces a
+  /// broader refresh.
+  @MainActor
+  @Test("pointer scroll updates the visible surface for a TabView-hosted scroll pane")
+  func pointerScrollUpdatesVisibleSurfaceForTabHostedScrollPane() async throws {
+    let terminalSize = Size(width: 36, height: 10)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("TabHostedScrollVisibleFrame")
+    let scrollIdentity = testIdentity("TabHostedScrollVisibleFrame", "Scroll")
+    let positionBox = LockedBox(ScrollPosition.zero)
+
+    let view = TabHostedTallExternalBindingScrollFixture(
+      scrollIdentity: scrollIdentity,
+      positionBox: positionBox
+    )
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 0, deltaY: 3),
+            location: centerPoint(of: scrollRect)
+          ))
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(positionBox.value.y >= 1)
+    #expect(
+      terminal.frames.count >= 2,
+      "scroll event should drive at least one follow-up frame"
+    )
+    let firstFrame = try #require(terminal.frames.first)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(
+      firstFrame != lastFrame,
+      "the selected tab pane should repaint immediately after scroll"
+    )
+  }
+
+  @MainActor
+  @Test("pointer scroll updates the visible surface for a WindowGroup-hosted scroll pane")
+  func pointerScrollUpdatesVisibleSurfaceForWindowGroupHostedScrollPane() async throws {
+    let terminalSize = Size(width: 36, height: 10)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let scrollIdentity = testIdentity("SceneHostedScrollVisibleFrame", "Scroll")
+    let positionBox = LockedBox(ScrollPosition.zero)
+    let scene = WindowGroup("Scene Hosted Scroll") {
+      TabHostedTallExternalBindingScrollFixture(
+        scrollIdentity: scrollIdentity,
+        positionBox: positionBox
+      )
+    }
+    let rootIdentity = Identity(components: ["App", "Scene Hosted Scroll"])
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: WindowHostView(
+          content: ScopedBuilder {
+            TabHostedTallExternalBindingScrollFixture(
+              scrollIdentity: scrollIdentity,
+              positionBox: positionBox
+            )
+          }
+        ),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runTestSceneSession(
+      scene: scene,
+      sessionName: "InteractiveRuntimeTests.SceneHostedScrollVisibleFrame",
+      terminalHost: terminal,
+      inputReader: SceneScriptedTerminalInputReader(
+        events: [
+          .mouse(
+            .init(
+              kind: .scrolled(deltaX: 0, deltaY: 3),
+              location: centerPoint(of: scrollRect)
+            ))
+        ]
+      ),
+      signalReader: EmptySignalReader()
+    )
+
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+    #expect(positionBox.value.y >= 1)
+    #expect(terminal.frames.count >= 2)
+    let firstFrame = try #require(terminal.frames.first)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(
+      firstFrame != lastFrame,
+      "WindowGroup-hosted scroll panes should repaint immediately after scroll"
+    )
+  }
+
+  @Test("real InputReader scroll bursts update the visible gallery pane before any follow-up click")
+  func realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick() async throws {
+    var descriptors: [Int32] = [0, 0]
+    #expect(unsafe pipe(&descriptors) == 0)
+
+    let readDescriptor = descriptors[0]
+    let writeDescriptor = descriptors[1]
+    var didCloseReadDescriptor = false
+    var didCloseWriteDescriptor = false
+    defer {
+      if !didCloseReadDescriptor {
+        _ = close(readDescriptor)
+      }
+      if !didCloseWriteDescriptor {
+        _ = close(writeDescriptor)
+      }
+    }
+
+    let currentFlags = fcntl(readDescriptor, F_GETFL)
+    #expect(currentFlags >= 0)
+    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
+
+    let terminalSize = Size(width: 60, height: 20)
+    let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let scrollIdentity = testIdentity("RealInputReaderGalleryScroll", "Scroll")
+    let positionBox = LockedBox(ScrollPosition.zero)
+    let scene = WindowGroup("Real Input Gallery Scroll") {
+      TabHostedGalleryShapedAnimatingScrollFixture(
+        scrollIdentity: scrollIdentity,
+        positionBox: positionBox
+      )
+    }
+    let rootIdentity = testIdentity("App", "Real Input Gallery Scroll")
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: WindowHostView(
+          content: ScopedBuilder {
+            TabHostedGalleryShapedAnimatingScrollFixture(
+              scrollIdentity: scrollIdentity,
+              positionBox: positionBox
+            )
+          }
+        ),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let inputReader = InputReader(fileDescriptor: readDescriptor)
+    let runTask = Task {
+      try await runTestSceneSession(
+        scene: scene,
+        sessionName: "InteractiveRuntimeTests.RealInputReaderGalleryScroll",
+        terminalHost: terminal,
+        inputReader: inputReader,
+        signalReader: EmptySignalReader()
+      )
+    }
+
+    let didRenderInitialFrame = try await waitUntil {
+      !terminal.visibleFrames.isEmpty
+    }
+    #expect(didRenderInitialFrame)
+
+    let scrollBytes = sgrScrollDown(at: centerPoint(of: scrollRect))
+    for _ in 0..<12 {
+      try writeAllBytes(scrollBytes, to: writeDescriptor)
+      usleep(50)
+    }
+
+    let scrollBurstBecameVisible = try await waitUntil {
+      positionBox.value.y >= 10
+        && (terminal.visibleFrames.last ?? "").contains("Gallery row 5")
+    }
+
+    let frameAfterScrollBurst = terminal.visibleFrames.last ?? ""
+    let positionAfterScrollBurst = positionBox.value
+
+    let clickBytes = sgrPrimaryClick(at: .init(x: 1, y: 1))
+    try writeAllBytes(clickBytes, to: writeDescriptor)
+    try await Task.sleep(nanoseconds: 50_000_000)
+
+    let frameAfterClick = terminal.visibleFrames.last ?? ""
+
+    _ = close(writeDescriptor)
+    didCloseWriteDescriptor = true
+
+    let result = try await runTask.value
+
+    _ = close(readDescriptor)
+    didCloseReadDescriptor = true
+
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+    #expect(
+      scrollBurstBecameVisible,
+      "the scroll burst should be observable before the follow-up click"
+    )
+    #expect(positionAfterScrollBurst.y >= 10)
+    #expect(
+      frameAfterScrollBurst.contains("Gallery row 5"),
+      "the scroll burst should visibly advance the pane before any later click"
+    )
+    #expect(
+      frameAfterClick.contains("Gallery row 5"),
+      "the follow-up click should not be required to reveal the earlier scroll"
+    )
+  }
+
+  @Test(
+    "injected terminal input scroll bursts update the visible gallery pane before any follow-up click"
+  )
+  func injectedTerminalInputScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick() async throws {
+    let terminalSize = Size(width: 60, height: 20)
+    let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let scrollIdentity = testIdentity("InjectedInputGalleryScroll", "Scroll")
+    let positionBox = LockedBox(ScrollPosition.zero)
+    let scene = WindowGroup("Injected Input Gallery Scroll") {
+      TabHostedGalleryShapedAnimatingScrollFixture(
+        scrollIdentity: scrollIdentity,
+        positionBox: positionBox
+      )
+    }
+    let rootIdentity = testIdentity("App", "Injected Input Gallery Scroll")
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: WindowHostView(
+          content: ScopedBuilder {
+            TabHostedGalleryShapedAnimatingScrollFixture(
+              scrollIdentity: scrollIdentity,
+              positionBox: positionBox
+            )
+          }
+        ),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let inputReader = InjectedSceneTerminalInputReader()
+    let runTask = Task {
+      try await runTestSceneSession(
+        scene: scene,
+        sessionName: "InteractiveRuntimeTests.InjectedInputGalleryScroll",
+        terminalHost: terminal,
+        inputReader: inputReader,
+        signalReader: EmptySignalReader()
+      )
+    }
+
+    let didRenderInitialFrame = try await waitUntil {
+      !terminal.visibleFrames.isEmpty
+    }
+    #expect(didRenderInitialFrame)
+
+    let scrollBytes = sgrScrollDown(at: centerPoint(of: scrollRect))
+    for _ in 0..<12 {
+      inputReader.send(scrollBytes)
+      usleep(50)
+    }
+
+    let scrollBurstBecameVisible = try await waitUntil {
+      positionBox.value.y >= 10
+        && (terminal.visibleFrames.last ?? "").contains("Gallery row 5")
+    }
+
+    let frameAfterScrollBurst = terminal.visibleFrames.last ?? ""
+    let positionAfterScrollBurst = positionBox.value
+
+    inputReader.send(sgrPrimaryClick(at: .init(x: 1, y: 1)))
+    try await Task.sleep(nanoseconds: 50_000_000)
+
+    let frameAfterClick = terminal.visibleFrames.last ?? ""
+
+    inputReader.finish()
+    let result = try await runTask.value
+
+    #expect(result.exitReason == RunLoopExitReason.inputEnded)
+    #expect(
+      scrollBurstBecameVisible,
+      "the injected-input scroll burst should be observable before the follow-up click"
+    )
+    #expect(positionAfterScrollBurst.y >= 10)
+    #expect(
+      frameAfterScrollBurst.contains("Gallery row 5"),
+      "the injected-input scroll burst should visibly advance the pane before any later click"
+    )
+    #expect(
+      frameAfterClick.contains("Gallery row 5"),
+      "the follow-up click should not be required to reveal the earlier scroll"
+    )
+  }
+
   @MainActor
   @Test(
     "handled pointer scrolling invalidates the scroll route even for external position bindings")
@@ -2958,6 +3277,153 @@ private final class RecordingTerminalHost: TerminalHosting {
   }
 }
 
+private final class DamageRecordingTerminalHost: TerminalHosting, DamageAwareTerminalHosting {
+  var surfaceSize: Size {
+    surfaceSizeProvider()
+  }
+  let capabilityProfile: TerminalCapabilityProfile
+  let appearance: TerminalAppearance
+  private(set) var visibleFrames: [String] = []
+  private(set) var presentationMetrics: [TerminalPresentationMetrics] = []
+  private var lastSubmittedSurface: RasterSurface?
+  private var visibleSurface: RasterSurface?
+  private let surfaceSizeProvider: () -> Size
+
+  init(
+    surfaceSizeProvider: @escaping () -> Size = { InteractiveDemoLayout.frameSize },
+    capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
+    appearance: TerminalAppearance = .fallback
+  ) {
+    self.surfaceSizeProvider = surfaceSizeProvider
+    self.capabilityProfile = capabilityProfile
+    self.appearance = appearance
+  }
+
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func clearScreen() throws {}
+  func moveCursor(to _: Point) throws {}
+
+  @discardableResult
+  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+    try present(surface, damage: nil)
+  }
+
+  @discardableResult
+  func present(
+    _ surface: RasterSurface,
+    damage: PresentationDamage?
+  ) throws -> TerminalPresentationMetrics {
+    let renderer = TerminalSurfaceRenderer(
+      capabilityProfile: capabilityProfile
+    )
+    let plan = TerminalPresentationPlanner(
+      capabilityProfile: capabilityProfile
+    ).plan(
+      previousSurface: lastSubmittedSurface,
+      currentSurface: surface,
+      damage: damage
+    )
+
+    switch plan.strategy {
+    case .fullRepaint:
+      visibleSurface = surface
+    case .incremental:
+      if var visibleSurface {
+        let previousSurface = lastSubmittedSurface ?? visibleSurface
+        let rowCount = max(
+          max(previousSurface.cells.count, surface.cells.count),
+          max(previousSurface.size.height, surface.size.height)
+        )
+        let rowsToDiff =
+          if let damage {
+            damage.dirtyRows
+              .filter { $0 >= 0 && $0 < rowCount }
+              .sorted()
+          } else {
+            Array(0..<rowCount)
+          }
+
+        let requiredWidth = max(
+          visibleSurface.size.width,
+          surface.size.width,
+          previousSurface.size.width
+        )
+        let requiredHeight = max(
+          visibleSurface.size.height,
+          surface.size.height,
+          previousSurface.size.height
+        )
+        if visibleSurface.cells.count < requiredHeight {
+          visibleSurface.cells.append(
+            contentsOf: Array(
+              repeating: Array(repeating: RasterCell.empty, count: requiredWidth),
+              count: requiredHeight - visibleSurface.cells.count
+            )
+          )
+        }
+        for row in visibleSurface.cells.indices
+        where visibleSurface.cells[row].count < requiredWidth {
+          visibleSurface.cells[row].append(
+            contentsOf: Array(
+              repeating: RasterCell.empty,
+              count: requiredWidth - visibleSurface.cells[row].count
+            )
+          )
+        }
+        visibleSurface.size = .init(width: requiredWidth, height: requiredHeight)
+
+        for row in rowsToDiff {
+          let previousRow = row < previousSurface.cells.count ? previousSurface.cells[row] : []
+          let currentRow = row < surface.cells.count ? surface.cells[row] : []
+          let width = max(
+            previousSurface.size.width,
+            surface.size.width,
+            previousRow.count,
+            currentRow.count
+          )
+          let spans = renderer.diffSpans(
+            previousRow: previousRow,
+            currentRow: currentRow,
+            width: width
+          )
+
+          for span in spans {
+            for column in span {
+              let cell =
+                if column < currentRow.count {
+                  currentRow[column]
+                } else {
+                  RasterCell.empty
+                }
+              visibleSurface.cells[row][column] = cell
+            }
+          }
+        }
+
+        self.visibleSurface = visibleSurface
+      } else {
+        visibleSurface = surface
+      }
+    }
+
+    let renderedVisibleSurface = renderer.render(visibleSurface ?? surface)
+    visibleFrames.append(renderedVisibleSurface.replacingOccurrences(of: "\r\n", with: "\n"))
+    lastSubmittedSurface = surface
+
+    let metrics = TerminalPresentationMetrics(
+      bytesWritten: 0,
+      linesTouched: plan.linesTouched,
+      cellsChanged: plan.cellsChanged,
+      strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental
+    )
+    presentationMetrics.append(metrics)
+    return metrics
+  }
+
+  func write(_: String) throws {}
+}
+
 private func writeAllBytes(
   _ bytes: [UInt8],
   to fileDescriptor: Int32
@@ -2979,6 +3445,36 @@ private func writeAllBytes(
       totalBytesWritten += bytesWritten
     }
   }
+}
+
+private func waitUntil(
+  timeoutNanoseconds: UInt64 = 5_000_000_000,
+  pollNanoseconds: UInt64 = 5_000_000,
+  condition: () -> Bool
+) async throws -> Bool {
+  let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+  while DispatchTime.now().uptimeNanoseconds < deadline {
+    if condition() {
+      return true
+    }
+    try await Task.sleep(nanoseconds: pollNanoseconds)
+  }
+  return condition()
+}
+
+private func sgrScrollDown(
+  at point: Point
+) -> [UInt8] {
+  Array("\u{001B}[<65;\(point.x + 1);\(point.y + 1)M".utf8)
+}
+
+private func sgrPrimaryClick(
+  at point: Point
+) -> [UInt8] {
+  Array(
+    "\u{001B}[<0;\(point.x + 1);\(point.y + 1)M\u{001B}[<0;\(point.x + 1);\(point.y + 1)m"
+      .utf8
+  )
 }
 
 private struct RunLoopInvalidationRecord: Equatable {
@@ -3186,6 +3682,53 @@ private final class ScriptedTerminalInputReader: TerminalInputReading {
       }
       continuation.finish()
     }
+  }
+}
+
+private final class SceneScriptedTerminalInputReader: InputReading, TerminalInputReading {
+  private let scriptedEvents: [InputEvent]
+
+  init(events: [InputEvent]) {
+    scriptedEvents = events
+  }
+
+  func events() -> AsyncStream<KeyPress> {
+    AsyncStream { continuation in
+      continuation.finish()
+    }
+  }
+
+  func inputEvents() -> AsyncStream<InputEvent> {
+    AsyncStream { continuation in
+      for event in scriptedEvents {
+        continuation.yield(event)
+      }
+      continuation.finish()
+    }
+  }
+}
+
+private final class InjectedSceneTerminalInputReader: InputReading, TerminalInputReading {
+  private let inputReader = InjectedTerminalInputReader()
+
+  func send(
+    _ bytes: [UInt8]
+  ) {
+    inputReader.send(bytes)
+  }
+
+  func finish() {
+    inputReader.finish()
+  }
+
+  func events() -> AsyncStream<KeyPress> {
+    AsyncStream { continuation in
+      continuation.finish()
+    }
+  }
+
+  func inputEvents() -> AsyncStream<InputEvent> {
+    inputReader.inputEvents()
   }
 }
 
@@ -4198,6 +4741,56 @@ private struct GalleryShapedAnimatingScrollFixture: View {
     }
     .id(scrollIdentity)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+}
+
+private struct TabHostedTallExternalBindingScrollFixture: View {
+  enum Tab: Hashable {
+    case controls
+    case logs
+  }
+
+  let scrollIdentity: Identity
+  let positionBox: LockedBox<ScrollPosition>
+
+  var body: some View {
+    TabView(selection: .constant(Tab.logs)) {
+      Text("Controls")
+        .tabItem("Controls")
+        .tag(Tab.controls)
+
+      TallExternalBindingScrollFixture(
+        scrollIdentity: scrollIdentity,
+        positionBox: positionBox
+      )
+      .tabItem("Logs")
+      .tag(Tab.logs)
+    }
+  }
+}
+
+private struct TabHostedGalleryShapedAnimatingScrollFixture: View {
+  enum Tab: Hashable {
+    case controls
+    case animations
+  }
+
+  let scrollIdentity: Identity
+  let positionBox: LockedBox<ScrollPosition>
+
+  var body: some View {
+    TabView(selection: .constant(Tab.animations)) {
+      Text("Controls")
+        .tabItem("Controls")
+        .tag(Tab.controls)
+
+      GalleryShapedAnimatingScrollFixture(
+        scrollIdentity: scrollIdentity,
+        positionBox: positionBox
+      )
+      .tabItem("Animations")
+      .tag(Tab.animations)
+    }
   }
 }
 
