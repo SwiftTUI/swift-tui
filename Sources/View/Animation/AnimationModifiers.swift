@@ -82,11 +82,11 @@ public struct Transaction: Sendable {
   }
 
   private func _animation(fromBox box: AnimationBox) -> Animation? {
-    // Best-effort retrieval — the box is hash-based, so we cannot
-    // directly unwrap the concrete type here.  Transaction is primarily
-    // used to *write* animation intent; reading is supported by passing
-    // through ``Animation`` values that the caller already holds.
-    nil
+    // AnimationBox retains the original Hashable value via AnyHashable,
+    // so we can recover the concrete `Animation` with a typed unwrap.
+    // This lets `Transaction.animation` round-trip cleanly whenever
+    // the box was constructed from an `Animation` in the first place.
+    box.unwrap(as: Animation.self)
   }
 }
 
