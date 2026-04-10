@@ -5,6 +5,7 @@ set -euo pipefail
 swift_args=(
   --swift-sdk swift-6.3-RELEASE_wasm
   -c release
+  -Xswiftc -Osize
   -Xlinker --initial-memory=536870912
   -Xlinker --max-memory=4294967296
   -Xlinker -z
