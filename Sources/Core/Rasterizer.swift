@@ -239,7 +239,12 @@ extension Rasterizer {
               bounds: bounds,
               sampleX: x,
               sampleY: bounds.origin.y + lineIndex,
-              width: cluster.cellWidth
+              width: cluster.cellWidth,
+              currentCellBackground: currentCellBackground(
+                cells: cells,
+                x: x,
+                y: bounds.origin.y + lineIndex
+              )
             )
 
             write(
@@ -280,7 +285,12 @@ extension Rasterizer {
               bounds: bounds,
               sampleX: x,
               sampleY: bounds.origin.y + lineIndex,
-              width: cluster.cellWidth
+              width: cluster.cellWidth,
+              currentCellBackground: currentCellBackground(
+                cells: cells,
+                x: x,
+                y: bounds.origin.y + lineIndex
+              )
             )
 
             write(
@@ -332,7 +342,12 @@ extension Rasterizer {
               bounds: bounds,
               sampleX: x,
               sampleY: bounds.origin.y + lineIndex,
-              width: cluster.cellWidth
+              width: cluster.cellWidth,
+              currentCellBackground: currentCellBackground(
+                cells: cells,
+                x: x,
+                y: bounds.origin.y + lineIndex
+              )
             )
 
             write(
@@ -918,13 +933,29 @@ extension Rasterizer {
     )
   }
 
+  /// Returns the background color currently on the raster surface at
+  /// the given cell coordinates, or nil if the cell is unstyled or
+  /// out of bounds.  Used by ``resolveTextStyle`` to bake fractional
+  /// opacity against the actual underlying background (gap item 3).
+  private func currentCellBackground(
+    cells: [[RasterCell]],
+    x: Int,
+    y: Int
+  ) -> Color? {
+    guard y >= 0, y < cells.count, x >= 0, x < cells[y].count else {
+      return nil
+    }
+    return cells[y][x].style?.backgroundColor
+  }
+
   private func resolveTextStyle(
     _ style: TextStyle,
     environment: StyleEnvironmentSnapshot,
     bounds: Rect,
     sampleX: Int,
     sampleY: Int,
-    width: Int
+    width: Int,
+    currentCellBackground: Color? = nil
   ) -> ResolvedTextStyle {
     var foregroundColor = resolveColor(
       from: style.foregroundStyle ?? environment.foregroundStyle ?? .semantic(.foreground),
@@ -949,12 +980,24 @@ extension Rasterizer {
     // SGR "faint" attribute (`TerminalPresentation.swift`), which gives
     // a single visible "dimmed" step regardless of progress.
     //
-    // The blend target is the explicit backgroundColor if one is set,
-    // else the theme's background color.
+    // Blend target priority:
+    // 1. Explicit backgroundColor if set — overrides everything.
+    // 2. currentCellBackground — whatever is on the raster surface
+    //    at this cell right now (typically the background of whatever
+    //    container was drawn first at this position).
+    // 3. Theme background — ultimate fallback when nothing has been
+    //    drawn at this cell yet.
+    //
+    // The per-cell path closes a gap where fading text rendered over
+    // an opaque colored container silently blended toward the theme
+    // background instead of the actual background beneath the cell.
     let opacity = style.opacity
     let bakeOpacityIntoForeground = opacity < 1 && opacity >= 0
     if bakeOpacityIntoForeground, let fg = foregroundColor {
-      let blendTarget = backgroundColor ?? environment.theme.background
+      let blendTarget =
+        backgroundColor
+        ?? currentCellBackground
+        ?? environment.theme.background
       foregroundColor = fg.mixed(with: blendTarget, amount: 1 - opacity)
     }
 
