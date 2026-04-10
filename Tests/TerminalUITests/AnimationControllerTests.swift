@@ -128,6 +128,137 @@ struct LinearCustomAnimation: CustomAnimation {
 @Suite("Animation end-to-end pipeline integration")
 struct AnimationPipelineIntegrationTests {
   @Test(
+    "matchedGeometryEffect: swap between identities triggers a translation animation"
+  )
+  func matchedGeometryTriggersTranslationAnimation() throws {
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+
+    // Manual sink install: DefaultRenderer doesn't wire the sinks
+    // (RunLoop does at startup).
+    AnimationRegistrationStorage.currentSink = controller
+    TransitionRegistrationStorage.currentSink = controller
+    defer {
+      AnimationRegistrationStorage.currentSink = nil
+      TransitionRegistrationStorage.currentSink = nil
+    }
+
+    let animation = Animation.linear(duration: .milliseconds(1_000_000))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+
+    // Frame 1: hero sits in slot A (column 0).
+    _ = renderer.render(
+      HStack(spacing: 1) {
+        Text("hero").matchedGeometryEffect(id: "hero")
+        Text("other")
+      },
+      context: ResolveContext(identity: rootIdentity),
+      proposal: ProposedSize(width: .finite(40), height: .finite(3))
+    )
+    #expect(controller.activeMatchedGeometryCount == 0)
+    #expect(
+      controller.previousMatchedGeometryKeyCount > 0,
+      "frame 1 should have recorded matched geometry bounds, got \(controller.previousMatchedGeometryKeyCount)"
+    )
+
+    // Frame 2: a different view with the SAME matched-geometry key
+    // appears in slot B (column N).  The swap is conditional — we
+    // reorder the children so the hero's identity path changes.
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    _ = renderer.render(
+      HStack(spacing: 1) {
+        Text("other")
+        Text("hero").matchedGeometryEffect(id: "hero")
+      },
+      context: ResolveContext(identity: rootIdentity, transaction: transaction),
+      proposal: ProposedSize(width: .finite(40), height: .finite(3))
+    )
+
+    #expect(
+      controller.activeMatchedGeometryCount > 0,
+      "matched geometry animation should be enqueued after the swap, got \(controller.activeMatchedGeometryCount)"
+    )
+    #expect(
+      controller.lastTickResult.hasActiveAnimations,
+      "frame 2 should report active animation"
+    )
+  }
+
+  @Test(
+    "matchedGeometryEffect: at progress 0 the new identity renders at the source bounds"
+  )
+  func matchedGeometryRendersAtSourceAtProgressZero() throws {
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    AnimationRegistrationStorage.currentSink = controller
+    TransitionRegistrationStorage.currentSink = controller
+    defer {
+      AnimationRegistrationStorage.currentSink = nil
+      TransitionRegistrationStorage.currentSink = nil
+    }
+
+    let animation = Animation.linear(duration: .milliseconds(1_000_000))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+
+    // Frame 1: hero at slot 0.
+    _ = renderer.render(
+      HStack(spacing: 1) {
+        Text("hero").matchedGeometryEffect(id: "hero")
+        Text("other")
+      },
+      context: ResolveContext(identity: rootIdentity),
+      proposal: ProposedSize(width: .finite(40), height: .finite(3))
+    )
+
+    // Frame 2: hero at slot 1 (children swapped), under animate intent.
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    let frame2 = renderer.render(
+      HStack(spacing: 1) {
+        Text("other")
+        Text("hero").matchedGeometryEffect(id: "hero")
+      },
+      context: ResolveContext(identity: rootIdentity, transaction: transaction),
+      proposal: ProposedSize(width: .finite(40), height: .finite(3))
+    )
+
+    // Find any node tagged with the hero matched-geometry key in
+    // the post-overlay placed tree.  At progress ~0 the hero
+    // translation should carry it back to slot 0 (the source).
+    let heroBounds = Self.findBoundsForMatchedKey(frame2.placedTree, keyID: "hero")
+    #expect(heroBounds != nil)
+    if let heroBounds {
+      // Slot 0 is column 0, slot 1 is roughly column 6+ (after
+      // "other" and the 1-cell spacing).  At progress 0 the hero's
+      // bounds should be near column 0, not near column 6.
+      #expect(
+        heroBounds.origin.x < 5,
+        "at progress 0 hero should appear at its previous slot (column 0), got x=\(heroBounds.origin.x)"
+      )
+    }
+  }
+
+  private static func findBoundsForMatchedKey(
+    _ node: PlacedNode,
+    keyID: String
+  ) -> Rect? {
+    if let key = node.matchedGeometry, key.id == keyID {
+      return node.bounds
+    }
+    for child in node.children {
+      if let found = findBoundsForMatchedKey(child, keyID: keyID) {
+        return found
+      }
+    }
+    return nil
+  }
+
+  @Test(
     ".position(x:y:) places the child centered at the given point"
   )
   func positionPlacesCenterAtGivenPoint() throws {
