@@ -224,8 +224,8 @@ struct PresentationSurfaceTests {
     #expect(alertIndex < paletteIndex)
   }
 
-  @Test("sheet shell uses an inner-edge unicode border over colored background content")
-  func sheetShellUsesAnInnerEdgeUnicodeBorderOverColoredBackgroundContent() throws {
+  @Test("sheet shell uses a joined inner-edge unicode border over colored background content")
+  func sheetShellUsesAJoinedInnerEdgeUnicodeBorderOverColoredBackgroundContent() throws {
     let proposal = ProposedSize(width: .finite(48), height: .finite(14))
     let rootIdentity = testIdentity("Root")
 
@@ -256,11 +256,17 @@ struct PresentationSurfaceTests {
     )
 
     let topBorderCell = artifacts.rasterSurface.cells[titleLocation.y - 1][titleLocation.x]
+    let topLeadingCorner = try #require(
+      findCharacter("▟", in: artifacts.rasterSurface.lines)
+    )
     let rightBorderLocation = try #require(
       findCharacter("▌", in: artifacts.rasterSurface.lines)
     )
     let rightBorderCell = artifacts.rasterSurface.cells[rightBorderLocation.y][
       rightBorderLocation.x]
+    let bottomTrailingCorner = try #require(
+      findCharacter("▛", in: artifacts.rasterSurface.lines)
+    )
     let borderBackground = try #require(
       topBorderCell.style?.backgroundColor
     )
@@ -273,7 +279,12 @@ struct PresentationSurfaceTests {
     )
 
     #expect(topBorderCell.character == "▄")
+    #expect(artifacts.rasterSurface.cells[topLeadingCorner.y][topLeadingCorner.x].character == "▟")
     #expect(rightBorderCell.character == "▌")
+    #expect(
+      artifacts.rasterSurface.cells[bottomTrailingCorner.y][bottomTrailingCorner.x].character
+        == "▛"
+    )
     #expect(borderBackground == underlyingBackground)
     #expect(borderBackground != contentBackground)
   }
