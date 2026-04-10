@@ -13,7 +13,7 @@ jobs:
 
   build-web-example:
     name: Build WebExample
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - name: Checkout
@@ -58,26 +58,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if swift --version 2>/dev/null | grep -q "Swift version 6.3.0"; then
-            echo "Swift 6.3.0 already available on runner"
-          else
-            if ! command -v swiftly >/dev/null 2>&1; then
-              curl -O https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz
-              tar zxf swiftly-$(uname -m).tar.gz
-              ./swiftly init --quiet-shell-followup
-            fi
-
-            . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
-            hash -r
-
-            if ! swiftly list | grep -q "6.3.0"; then
-              swiftly install 6.3.0
-            fi
-            swiftly use 6.3.0
+          if ! command -v swiftly >/dev/null 2>&1 && [ ! -x "$HOME/.swiftly/bin/swiftly" ]; then
+            case "$(uname -s)" in
+              Darwin)
+                curl -L -o swiftly.pkg https://download.swift.org/swiftly/darwin/swiftly.pkg
+                installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+                "$HOME/.swiftly/bin/swiftly" init --quiet-shell-followup
+                ;;
+              Linux)
+                curl -O https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz
+                tar zxf swiftly-$(uname -m).tar.gz
+                ./swiftly init --quiet-shell-followup
+                ;;
+              *)
+                echo "Unsupported platform: $(uname -s)" >&2
+                exit 1
+                ;;
+            esac
           fi
 
           . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
           hash -r
+
+          if ! swiftly list | grep -q "6.3.0"; then
+            swiftly install 6.3.0
+          fi
+          swiftly use 6.3.0
           swiftly run swift --version
 
       - name: Install wasm Swift SDK used by WebExample
@@ -109,6 +115,13 @@ jobs:
           hash -r
           bun install --frozen-lockfile
           bun run build
+
+      - name: Validate uploaded WebExample wasm parses in the browser API
+        shell: bash
+        working-directory: Examples/WebExample
+        run: |
+          set -euo pipefail
+          bun -e 'const wasmPath = "./pages-dist/TerminalApp/dist/assets/app.wasm"; try { await WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer()); console.log(`Validated ${wasmPath}`); } catch (error) { console.error(`Failed to validate ${wasmPath}: ${error instanceof Error ? error.message : String(error)}`); process.exit(1); }'
 
       - name: Upload Pages artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
