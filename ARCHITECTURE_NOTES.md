@@ -12,6 +12,38 @@ called out in the priority section at the end.
 enumerated risks; take them seriously. The higher-cost items in particular
 are directional and need profiling or instrumentation before any code change.
 
+## Progress snapshot
+
+Last updated 2026-04-10. 7 of 11 items landed; 1 retracted; 3 structural
+items deferred pending concrete pain points.
+
+| # | Item | Status | Commit |
+|---|---|---|---|
+| 1 | `MeasurementCache` stale-entry eviction | ✅ Landed | `24ada3d` |
+| 2 | `CollectionDifference`-based `diffChildren` | ✅ Landed | `c077679` |
+| 3 | `applyStructuralChildDiff` doc comment | ✅ Landed (Option A doc-fence) | `6698483` |
+| 4 | `typeDiscriminator` on `ChildDescriptor` | ✅ Landed (infrastructure + `Text` migration) | `4ae4f5f` |
+| 5 | ~~Immutable `ResolvedNode` + kill `Boxed`~~ | ❌ Retracted (misdiagnosis) | `5bea099` |
+| 6 | `ViewNode` contains `ResolvedNode` | ✅ Landed | `d8d0a80` |
+| 7 | `registrationAliasesByIdentity` investigation | 🔎 Instrumented + findings recorded; code refactor deferred | `fdeaa3c` |
+| 8 | Decompose `ViewGraph` into 4 types | ⏸ Deferred — no concrete testability pain point yet |  |
+| 9 | Dependency-aware body re-evaluation | ⏸ Deferred — profile first |  |
+| 10 | Explicit context threading | ⏸ Deferred — blocked on concurrency or testability wall |  |
+| 11 | `Identity` interning | ⏸ Deferred — profile first |  |
+
+**Net outcome so far:** every non-deferred item landed cleanly. Suite went
+from 651 → 682 tests (+31) across the seven commits, with no regressions.
+Item 4 surfaced a SwiftPM stale-artifact gotcha that's documented in the
+commit message. Item 5 was retracted after investigation revealed two
+misdiagnoses in the original analysis; the retraction note in section 5
+documents what was wrong and why.
+
+The follow-up drip-fed work on Item 4 (migrating the remaining ~46
+`.view("Name")` call sites to the typed discriminator) is intentionally
+not scheduled — `Text` is the demonstration migration and the bridging
+compatibility rule lets the rest follow whenever they naturally come up
+in view-specific work.
+
 ---
 
 ## Section 1 — Mechanical wins
@@ -20,6 +52,12 @@ Small, self-contained changes. Each is implementable in a single PR by
 somebody who's never touched the surrounding code before.
 
 ### 1. Fix the `MeasurementCache` stale-entry bug
+
+> **Status:** ✅ **Landed in `24ada3d`** — fix evicts stale entries on
+> equivalence mismatch and splits `misses` from a new `invalidations`
+> counter. 3 new `LayoutEngineTests` cases; 1 test in
+> `DiagnosticsAndCacheTests` was implicitly asserting the buggy
+> `misses == 5` behavior and was updated to `misses == 3 + invalidations == 2`.
 
 **File:** `Sources/Core/LayoutEngine.swift:61-94`
 **Size:** ~10 LOC + 1 test.
@@ -101,6 +139,13 @@ the stale entry just moves it from "sits there doing nothing useful" to
 ---
 
 ### 2. `CollectionDifference`-based `diffChildren`
+
+> **Status:** ✅ **Landed in `c077679`** — `diffChildren` rewritten on
+> top of `new.difference(from: old).inferringMoves()`. `ChildDiffOp`
+> gained a new `.moved` case; the existing `applyStructuralChildDiff`
+> consumer ignores it via its existing `guard case .removed …`
+> fall-through, so teardown behavior is unchanged. 5 structural diff
+> tests; `reorderMatchesStableDescriptors` replaced by `reorderEmitsMove`.
 
 **File:** `Sources/Core/Graph/StructuralDiff.swift` (43 LOC today)
 **Tests:** `Tests/CoreTests/Graph/StructuralDiffTests.swift`
@@ -229,6 +274,16 @@ package func diffChildren(
 
 ### 3. Consolidate or inline `applyStructuralChildDiff`
 
+> **Status:** ✅ **Landed in `6698483`** — documented-fence variant
+> (Option A light). Added a 35-line doc comment explaining what each
+> `ChildDiffOp` case means for the reconciler, why `.matched` / `.moved`
+> / `.inserted` are intentionally no-ops here, and where they're
+> actually handled in `finishEvaluation` / `recordReusedSubtree`.
+> Option B (delete `StructuralDiff.swift`) was ruled out once Item 2
+> shipped with the diff function intact. The full consolidation
+> (Option A) remains available as a future refactor if the split-brain
+> becomes painful.
+
 **File:** `Sources/Core/Graph/ViewGraph.swift:725-745`
 **Size:** small (inline) or medium (consolidate).
 
@@ -297,6 +352,27 @@ comment.
 ---
 
 ### 4. Kill the stringly-typed `typeIdentity` on `ChildDescriptor`
+
+> **Status:** ✅ **Infrastructure landed in `4ae4f5f`** — `ResolvedNode`
+> and `ChildDescriptor` gained an optional
+> `typeDiscriminator: ObjectIdentifier?` field. `ChildDescriptor.==`
+> uses the refined rule: equal if identity + explicitID + typeIdentity
+> match AND (both discriminators match or at least one is nil).
+> `ChildDescriptor.hash` deliberately omits the discriminator so
+> bridging-equal descriptors hash the same. `Text` migrated as a
+> demonstration call site (`ObjectIdentifier(Text.self)`). Design
+> pivot from the original sketch: `NodeKind.view(String)` is unchanged
+> — no pattern-match breakage, no `StaticString`-from-runtime-`String`
+> problem. 7 new `ChildDescriptorTests`. The remaining ~46 call sites
+> stay on the legacy path and can migrate incrementally.
+>
+> **Surprise during the landing:** the first full-suite run segfaulted
+> in `PrototypeUIComponentsTests`. Root cause was stale build artifacts
+> — the test binary was linked against the pre-change `ResolvedNode`
+> layout and crashed when it loaded my new module. `swift package clean
+> && swift test` resolved it. Worth remembering: SwiftPM's incremental
+> rebuild doesn't always catch struct-layout changes in dependent
+> targets.
 
 **File:** `Sources/Core/Graph/ChildDescriptor.swift` (41 LOC today)
 **Also touches:** `Sources/Core/EnvironmentAndNodeTypes.swift:98-102`
@@ -553,6 +629,22 @@ appends, reconsider then — not now. And if you do, the right scope is
 
 ### 6. Make `ViewNode` contain `ResolvedNode`, don't duplicate its fields
 
+> **Status:** ✅ **Landed in `d8d0a80`** — 14 scattered mirror fields
+> collapsed into a single stored `committed: ResolvedNode`, with
+> computed forwarding accessors in an extension at the bottom of the
+> file so every external reader (`node.kind`, `node.lifecycleMetadata`,
+> etc.) keeps the exact same API. `cachedResolvedNode: ResolvedNode?`
+> (which muxed "have I been committed" and "is subtree snapshot fresh"
+> into one nullable) collapsed into a single `isCommittedSnapshotFresh:
+> Bool` flag. `apply(resolved:children:)` shrank from 15 lines of
+> field-by-field copying to a single `committed = resolved`.
+> `childDescriptors` became a computed property derived from
+> `committed.children.map(ChildDescriptor.init)`. Audit of the
+> committed fields' external read surface (done before touching code)
+> found only `lifecycleMetadata` (15 hits in `ViewGraph`) and
+> `childDescriptors` (1 hit); no external writes to any mirror field.
+> Full suite green on first attempt after clean build.
+
 **Files:** `Sources/Core/Graph/ViewNode.swift:1-320`,
 `Sources/Core/RenderTreeAndSemanticsTypes.swift:176-244`
 **Size:** medium. No hard dependencies (Item 5 was retracted — see
@@ -650,6 +742,21 @@ package func commit(resolved: ResolvedNode, children: [ViewNode]) {
 ---
 
 ### 7. Investigate `registrationAliasesByIdentity` (don't delete it yet)
+
+> **Status:** 🔎 **Instrumented in `fdeaa3c`** — `RegistrationAliasDiagnostics`
+> struct landed on `ViewGraph` and is wired through
+> `recordRegistrationAlias`. Full characterization suite
+> (`RegistrationAliasFindingsTests`, 10 tests) drives `DefaultRenderer`
+> over representative view shapes and pins the observed divergence
+> counts. The findings contradicted the original hypothesis and are
+> documented in detail in the "Findings from the instrumentation"
+> subsection below. **Bottom line:** the alias layer's workload is
+> tiny (2–5 calls per realistic frame, driven almost exclusively by
+> the `.id(_:)` modifier via `IDView`), the original "`IdentityTransparent`
+> marker protocol" fix would have had zero effect, and the
+> recommendation is to leave the alias layer in place and use the
+> diagnostics as a tripwire. A code refactor remains available as
+> path 2 in the Findings section if a motivation ever surfaces.
 
 **Files:** `Sources/Core/Graph/ViewGraph.swift:30-31, 147-171, 627-650, 785-791`,
 `Sources/View/Foundation/ViewFoundation.swift:110-134`
@@ -971,6 +1078,12 @@ of these should be started "just because."
 
 ### 8. Decompose `ViewGraph` into responsibility-focused types
 
+> **Status:** ⏸ **Deferred.** No concrete testability pain point has
+> surfaced yet that would justify the multi-PR rework. The current
+> integration-test coverage is sufficient for correctness; the
+> decomposition's stated payoff is "unit-testable invalidation
+> frontier" which nobody has asked for.
+
 **File:** `Sources/Core/Graph/ViewGraph.swift` (1069 lines)
 **Size:** large. Multi-PR refactor.
 
@@ -1031,6 +1144,13 @@ because of the current coupling, postpone this item.
 ---
 
 ### 9. Dependency-aware body re-evaluation
+
+> **Status:** ⏸ **Deferred — profile first.** Body re-evaluation has
+> not been shown to be a bottleneck. The snapshot-reuse path at
+> `ViewFoundation.swift:273-288` already catches most of the wasted
+> work. Item 6 removed the dependency on Item 5, so the only real
+> prerequisite is profiling data showing body-eval as the hot path.
+> Don't start without numbers.
 
 **Files:** `Sources/Core/Graph/ViewGraph.swift:227-245`,
 `Sources/View/Foundation/ViewFoundation.swift:85-134, 262-334`
@@ -1101,6 +1221,12 @@ happens one level earlier, before any resolve-context construction.
 
 ### 10. Thread animation & authoring context through `ResolveContext`, not global task-local
 
+> **Status:** ⏸ **Deferred.** Blocked on either a concurrency wall
+> (off-main-thread rendering demand) or a testability wall (tests
+> leaking context). Neither has been hit. The dynamic-property
+> ergonomics concern (property wrappers would need a different
+> mechanism) remains the main blocker if it does become needed.
+
 **Files:** `Sources/View/State/State.swift:11-90`,
 `Sources/Core/AnimationContextStorage.swift`, dozens of call sites
 **Size:** large.
@@ -1152,6 +1278,13 @@ code that doesn't, doesn't. `withAuthoringContext` becomes
 ---
 
 ### 11. `Identity` interning (hash-cons)
+
+> **Status:** ⏸ **Deferred — profile first.** No identity hashing /
+> allocation bottleneck has been measured. The Item 4 typed
+> discriminator already reduced per-child-diff hashing cost somewhat,
+> so the baseline is better than when this item was first written.
+> Do not start without profiling data showing identity as the
+> bottleneck on a realistic workload (10k+ nodes).
 
 **File:** `Sources/Core/GeometryTypes.swift:425-498`
 **Size:** large, with subtle correctness implications.
@@ -1220,42 +1353,64 @@ Ordered by rough clarity-per-unit-of-work. Ordering dependencies are noted.
 
 | # | Item | Cost | Depends on | Why |
 |---|------|------|------------|-----|
-| 1 | MeasurementCache eviction | Small | — | Real bug, 10-line fix. Do this regardless. ✅ Landed. |
-| 2 | CollectionDifference diff | Small | — | Smallest blast radius among the diff items. Unblocks future move-animation work. ✅ Landed. |
-| 3 | Consolidate `applyStructuralChildDiff` | Small | — (Option B excludes item 2) | Clarity. Pick Option A if keeping diffChildren (item 2), Option B otherwise. |
-| 4 | `typeDiscriminator` on `ChildDescriptor` | Small-med | ideally after item 2 | Perf + safety win. Lands cleanly on top of item 2's warm test surface. |
-| 5 | ~~Immutable `ResolvedNode` + kill `Boxed`~~ | — | — | **Retracted.** Based on misdiagnosis of `Boxed<_>` (a proper COW wrapper) and a landmine nobody steps on. See the retraction note in section 5. |
-| 6 | `ViewNode` contains `ResolvedNode` | Medium | — | Biggest clarity win. Prerequisite is the post-init mutation audit (done, documented in Item 5 retraction). |
-| 7 | Investigate alias layer | Medium (research), large (code) | — | Start with **instrumentation only**. The code change, if any, should come after weeks of running instrumentation in dev. |
-| 8 | Decompose `ViewGraph` | Large | — | Only worth it if you want to unit-test invalidation in isolation. |
-| 9 | Dependency-aware re-evaluation | Large | **item 6** | Only if profiling shows body re-evaluation as the hot path. |
-| 10 | Explicit context threading | Large | — | Only if you want off-main-thread rendering or hit a testability wall. |
-| 11 | `Identity` interning | Large | — | Only if profiling shows identity string allocation / comparison as a bottleneck. |
+| 1 | MeasurementCache eviction | Small | — | Real bug, 10-line fix. ✅ Landed in `24ada3d`. |
+| 2 | CollectionDifference diff | Small | — | Smallest blast radius among the diff items. Unblocks future move-animation work. ✅ Landed in `c077679`. |
+| 3 | Consolidate `applyStructuralChildDiff` | Small | — | Shipped as a documented fence (Option A light), not a full consolidation. ✅ Landed in `6698483`. |
+| 4 | `typeDiscriminator` on `ChildDescriptor` | Small-med | ideally after item 2 | Perf + safety win. Infrastructure + `Text` migration. ✅ Landed in `4ae4f5f`. |
+| 5 | ~~Immutable `ResolvedNode` + kill `Boxed`~~ | — | — | ❌ **Retracted in `5bea099`.** Based on misdiagnosis of `Boxed<_>` (a proper COW wrapper) and a landmine nobody steps on. See the retraction note in section 5. |
+| 6 | `ViewNode` contains `ResolvedNode` | Medium | — | Biggest clarity win. Prerequisite (post-init mutation audit) was already done during Item 5 retraction. ✅ Landed in `d8d0a80`. |
+| 7 | Investigate alias layer | Medium (research), large (code) | — | 🔎 Instrumentation landed in `fdeaa3c`; findings disproved the original hypothesis. Code refactor not justified — see Item 7 Findings. |
+| 8 | Decompose `ViewGraph` | Large | — | ⏸ Deferred. Only worth it if you want to unit-test invalidation in isolation; no such test request has surfaced. |
+| 9 | Dependency-aware re-evaluation | Large | — (Item 6 prerequisite landed) | ⏸ Deferred. Only if profiling shows body re-evaluation as the hot path. |
+| 10 | Explicit context threading | Large | — | ⏸ Deferred. Only if you want off-main-thread rendering or hit a testability wall. |
+| 11 | `Identity` interning | Large | — | ⏸ Deferred. Only if profiling shows identity string allocation / comparison as a bottleneck. |
 
-### Suggested landing order for the next few weeks
+### Landing history
 
-1. ✅ **Item 1** (MeasurementCache). Mechanical. **Landed in `24ada3d`.**
-2. ✅ **Item 2** (CollectionDifference). Mechanical, self-contained.
-   **Landed in `c077679`.**
-3. ~~**Item 5**~~ **Retracted.** Originally sequenced here as an Item 6
-   prerequisite. Investigation showed the premise was wrong; see the
-   retraction in section 5.
-4. **Item 4** (typeDiscriminator). Lands cleanly on top of item 2's
-   warm test surface.
-5. **Item 3** (structural diff split-brain). Item 2 shipped with
-   `diffChildren` intact, so Option B (delete StructuralDiff.swift) is
-   now off the table. Pick Option A (centralize reconciliation) or
-   just a documentation comment on `applyStructuralChildDiff`.
-6. **Item 6** (fold ResolvedNode into ViewNode). The biggest clarity
-   payoff in the document. No longer depends on item 5 — the
-   mutation-site audit is the prerequisite and it's already done.
-7. **Item 7** (alias investigation). Start instrumentation in parallel
-   with the above. The instrumentation is cheap; the code change, if any,
-   comes later.
+Recorded for posterity — this is the order the non-deferred items
+actually shipped in, and the lessons learned along the way.
 
-Items **8, 9, 10, 11** are optional structural work. Do not start any of
-them without profiling data or a concrete pain point that justifies the
-cost.
+1. ✅ **Item 1** (MeasurementCache stale-entry eviction) —
+   `24ada3d`. Small, surgical, cleanest item on the list.
+2. ✅ **Item 2** (`CollectionDifference`-based `diffChildren`) —
+   `c077679`. Self-contained rewrite with expanded test coverage.
+3. ❌ **Item 5** (Immutable `ResolvedNode` + kill `Boxed`) — retracted
+   in `5bea099`. Investigation revealed two misdiagnoses in my
+   original analysis: `Boxed<_>` is a proper COW wrapper (not a
+   type-system lie), and the quadratic construction landmine is
+   purely hypothetical (no current caller appends children
+   incrementally). The mutation-site audit done during this
+   investigation became the actual prerequisite for Item 6.
+4. ✅ **Item 4** (`typeDiscriminator` on `ChildDescriptor`) —
+   `4ae4f5f`. Design pivoted from the original sketch — the
+   architecture doc proposed widening `NodeKind.view` with a nested
+   struct, but that would have broken pattern matches at 4 call sites
+   and hit a `StaticString`-from-runtime-`String` compile error. The
+   actual landing added `typeDiscriminator: ObjectIdentifier?` as a
+   parallel field on `ResolvedNode`/`ChildDescriptor`, leaving
+   `NodeKind` completely unchanged. Also surfaced a SwiftPM
+   stale-artifact gotcha — struct-layout changes can leave the test
+   binary ABI-incompatible, `swift package clean` resolves it.
+5. ✅ **Item 3** (`applyStructuralChildDiff` split-brain) —
+   `6698483`. Doc-comment variant, not the full reconciler
+   consolidation. Option B (delete `StructuralDiff.swift`) was
+   already off the table after Item 2 shipped with the diff function
+   intact.
+6. ✅ **Item 6** (`ViewNode` contains `ResolvedNode`) — `d8d0a80`.
+   Biggest clarity win in the doc. The mutation-site audit from the
+   Item 5 retraction was the real prerequisite. Full suite green on
+   first attempt after clean build.
+7. 🔎 **Item 7 instrumentation** — `fdeaa3c`. The findings contradicted
+   the original hypothesis: standard composition primitives produce
+   zero non-trivial aliases; the only real trigger is the `.id(_:)`
+   modifier via `IDView`. The proposed `IdentityTransparent` marker
+   protocol fix would have had no effect. Recommendation is to leave
+   the alias layer in place and use the diagnostics as a tripwire. No
+   code refactor scheduled.
+
+**Items 8, 9, 10, 11 remain deferred** — each requires specific
+motivation (profiling data, testability wall, concurrency wall) before
+it's worth starting.
 
 ---
 
