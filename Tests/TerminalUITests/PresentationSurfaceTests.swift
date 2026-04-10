@@ -224,6 +224,60 @@ struct PresentationSurfaceTests {
     #expect(alertIndex < paletteIndex)
   }
 
+  @Test("sheet shell uses an inner-edge unicode border over colored background content")
+  func sheetShellUsesAnInnerEdgeUnicodeBorderOverColoredBackgroundContent() throws {
+    let proposal = ProposedSize(width: .finite(48), height: .finite(14))
+    let rootIdentity = testIdentity("Root")
+
+    let backgroundOnly = DefaultRenderer().render(
+      Rectangle()
+        .fill(.terminalAccent(.success))
+        .frame(width: 48, height: 14, alignment: .topLeading),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    let artifacts = DefaultRenderer().render(
+      Rectangle()
+        .fill(.terminalAccent(.success))
+        .sheet("Inspector", isPresented: .constant(true)) {
+          Text("Sheet body")
+        }
+        .frame(width: 48, height: 14, alignment: .topLeading),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    let titleLocation = try #require(
+      findSubstring("Inspector", in: artifacts.rasterSurface.lines)
+    )
+    let bodyLocation = try #require(
+      findSubstring("Sheet body", in: artifacts.rasterSurface.lines)
+    )
+
+    let topBorderCell = artifacts.rasterSurface.cells[titleLocation.y - 1][titleLocation.x]
+    let rightBorderLocation = try #require(
+      findCharacter("▌", in: artifacts.rasterSurface.lines)
+    )
+    let rightBorderCell = artifacts.rasterSurface.cells[rightBorderLocation.y][
+      rightBorderLocation.x]
+    let borderBackground = try #require(
+      topBorderCell.style?.backgroundColor
+    )
+    let contentBackground = try #require(
+      artifacts.rasterSurface.cells[bodyLocation.y][bodyLocation.x].style?.backgroundColor
+    )
+    let underlyingBackground = try #require(
+      backgroundOnly.rasterSurface.cells[titleLocation.y - 1][titleLocation.x].style?
+        .backgroundColor
+    )
+
+    #expect(topBorderCell.character == "▄")
+    #expect(rightBorderCell.character == "▌")
+    #expect(borderBackground == underlyingBackground)
+    #expect(borderBackground != contentBackground)
+  }
+
   @Test("declarative reconciliation prunes stale overlays when the source subtree disappears")
   func declarativeReconciliationPrunesStaleSourceOverlays() {
     let renderer = DefaultRenderer()
@@ -396,4 +450,41 @@ private func collectViewKindNames(
   for child in node.children {
     collectViewKindNames(in: child, into: &kinds)
   }
+}
+
+private func findSubstring(
+  _ substring: String,
+  in lines: [String]
+) -> (x: Int, y: Int)? {
+  let needle = Array(substring)
+  guard !needle.isEmpty else {
+    return nil
+  }
+
+  for (y, line) in lines.enumerated() {
+    let haystack = Array(line)
+    guard haystack.count >= needle.count else {
+      continue
+    }
+    let maxStart = haystack.count - needle.count
+    for start in 0...maxStart {
+      let end = start + needle.count
+      if Array(haystack[start..<end]) == needle {
+        return (x: start, y: y)
+      }
+    }
+  }
+  return nil
+}
+
+private func findCharacter(
+  _ character: Character,
+  in lines: [String]
+) -> (x: Int, y: Int)? {
+  for (y, line) in lines.enumerated() {
+    for (x, candidate) in line.enumerated() where candidate == character {
+      return (x: x, y: y)
+    }
+  }
+  return nil
 }

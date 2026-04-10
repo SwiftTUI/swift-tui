@@ -375,6 +375,8 @@ package struct PromptPresentationSurface: View {
   }
 
   package var body: some View {
+    let surfaceBackground = AnyShapeStyle(.terminalSurfaceBackground)
+
     VStack(alignment: .leading, spacing: 0) {
       presentationHeader
       switch item.descriptor.bodyMode {
@@ -386,13 +388,13 @@ package struct PromptPresentationSurface: View {
     }
     .padding(.init(horizontal: 1, vertical: 1))
     .background {
-      RoundedRectangle(cornerRadius: 1).fill(AnyShapeStyle(.terminalSurfaceBackground))
+      RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(surfaceBackground)
     }
     .overlay {
-      RoundedRectangle(cornerRadius: 1).strokeBorder(.tint)
-    }
-    .background {
-      Rectangle().fill(Color.green)
+      RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+        .terminalBorder(.accent),
+        style: .innerHalfBlock
+      )
     }
     .frame(
       minWidth: .finite(item.descriptor.minWidth),
