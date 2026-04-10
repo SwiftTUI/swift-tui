@@ -24,6 +24,31 @@ extension Rasterizer {
     )?.backgroundColor
   }
 
+  func sampledBackgroundColor(
+    inside side: BorderSide,
+    fromX x: Int,
+    y: Int,
+    cells: [[RasterCell]]
+  ) -> Color? {
+    let samplePoint: (x: Int, y: Int) =
+      switch side {
+      case .top:
+        (x, y + 1)
+      case .right:
+        (x - 1, y)
+      case .bottom:
+        (x, y - 1)
+      case .left:
+        (x + 1, y)
+      }
+
+    return resolvedCellStyle(
+      atX: samplePoint.x,
+      y: samplePoint.y,
+      cells: cells
+    )?.backgroundColor
+  }
+
   func resolvedCellStyle(
     atX x: Int,
     y: Int,

@@ -393,7 +393,7 @@ package struct PromptPresentationSurface: View {
     .overlay {
       RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
         .terminalBorder(.accent),
-        style: .innerHalfBlock
+        style: .presentationChrome
       )
     }
     .frame(
@@ -486,6 +486,7 @@ package struct PromptPresentationSurface: View {
     .fixedSize()
     .padding(.init(horizontal: 1, vertical: 0))
   }
+
 }
 
 // MARK: - Toast / Transient Notification System
