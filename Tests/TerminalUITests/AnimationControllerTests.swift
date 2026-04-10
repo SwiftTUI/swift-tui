@@ -213,6 +213,94 @@ struct AnimationControllerPropertyTests {
   }
 
   @Test(
+    "removal interrupting a mid-flight insertion fades from the displayed opacity"
+  )
+  func removalRetargetsFromMidInsertionOpacity() throws {
+    // Step 1: enqueue an insertion via .transition(.opacity).
+    // Step 2: midway through the fade-in, remove the leaf.
+    // The removal entry should capture the mid-flight opacity as its
+    // startOpacity so the exit continues from whatever is on screen
+    // instead of snapping back to 1.0.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+    let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+
+    // Frame 1: leaf inserted with .opacity transition under
+    // withAnimation intent → starts the fade-in.
+    controller.beginTransitionCollection()
+    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+
+    let frame1 = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: [ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))]
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: transaction, timestamp: t0)
+
+    // Frame 2: at t=100ms (midway), the leaf disappears.
+    // The transition registration is NOT re-emitted because the
+    // branch is gone, so the controller must use the previous frame's
+    // transition map to detect the removal.
+    var frame2 = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: []
+    )
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    var transaction2 = TransactionSnapshot()
+    transaction2.animationRequest = .animate(animation.animationBox)
+    let t1 = t0.advanced(by: .milliseconds(100))
+    controller.processResolvedTree(frame2, transaction: transaction2, timestamp: t1)
+
+    // Tick at t1 + 0ms — the removal should have just been captured
+    // with startOpacity ~0.5 (mid-insertion value).  Render it.
+    var tickTree = frame2
+    _ = controller.applyInterpolations(to: &tickTree, at: t1)
+
+    guard let injectedLeaf = tickTree.children.first(where: { $0.identity == leafIdentity })
+    else {
+      Issue.record("removal should re-inject the leaf into the tree")
+      return
+    }
+    let capturedOpacity = injectedLeaf.drawMetadata.baseStyle.explicitOpacity
+    #expect(capturedOpacity != nil)
+    if let capturedOpacity {
+      // startOpacity is ~0.5 (the insertion midpoint); at tick t1
+      // removal progress is 0 so opacity = startOpacity ≈ 0.5.
+      #expect(
+        capturedOpacity > 0.3 && capturedOpacity < 0.7,
+        "removal should start from the mid-insertion opacity, not snap to 1.0, got \(capturedOpacity)"
+      )
+    }
+
+    // Half a removal-duration later, the opacity should have
+    // progressed toward 0 but should still be strictly below the
+    // starting mid-insertion value (never jumps UP).
+    var laterTree = frame2
+    _ = controller.applyInterpolations(
+      to: &laterTree,
+      at: t1.advanced(by: .milliseconds(100))
+    )
+    if let laterLeaf = laterTree.children.first(where: { $0.identity == leafIdentity }) {
+      let laterOpacity = laterLeaf.drawMetadata.baseStyle.explicitOpacity
+      if let laterOpacity, let capturedOpacity {
+        #expect(
+          laterOpacity < capturedOpacity,
+          "removal opacity should decrease over time"
+        )
+      }
+    }
+  }
+
+  @Test(
     "withAnimation completion closure fires once the batch drains"
   )
   func completionClosureFiresOnBatchDrain() throws {

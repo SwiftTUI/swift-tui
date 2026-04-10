@@ -175,6 +175,13 @@ package struct RemovalEntry: Sendable {
   package var transition: AnyTransition
   package var animationBox: AnimationBox?
   package var startTime: MonotonicInstant
+  /// Opacity at the moment the removal was snapped.  Normally `1.0`
+  /// (the identity phase value), but when the view was still fading
+  /// in via an interrupted insertion, the controller samples the
+  /// mid-flight opacity and stores it here so the removal continues
+  /// from the value currently on screen instead of snapping back
+  /// to full opacity.
+  package var startOpacity: Double = 1.0
 }
 
 @MainActor
@@ -337,11 +344,45 @@ package final class AnimationController {
         let subtree = findSubtree(in: previousRoot, identity: injectionTarget)
       else { continue }
 
-      // Clear any in-flight active animations for every identity in
-      // the injected subtree — the exit animation supersedes them.
+      // Before clearing the injected subtree's active animations, peek
+      // at any mid-flight opacity animation on the transition's
+      // registered identity (or anywhere in the subtree) so the
+      // removal can start from the displayed value instead of
+      // snapping back to 1.0.  Must run before the filter below.
       let injectedIdentities = collectIdentities(in: subtree)
+      var initialOpacity: Double = 1.0
+      let keyOnTarget = AnimationKey(identity: identity, property: .opacity)
+      if let existing = activeAnimations[keyOnTarget],
+        let sampled = sample(existing, at: timestamp),
+        case .double(let value) = sampled
+      {
+        initialOpacity = value
+      } else {
+        for sid in injectedIdentities {
+          let k = AnimationKey(identity: sid, property: .opacity)
+          if let existing = activeAnimations[k],
+            let sampled = sample(existing, at: timestamp),
+            case .double(let value) = sampled
+          {
+            initialOpacity = value
+            break
+          }
+        }
+      }
+
+      // Now clear in-flight active animations for every identity in
+      // the injected subtree — the exit animation supersedes them.
+      // (Batch refcounts from those superseded animations are released
+      // below in a follow-up pass so the completion closure sees the
+      // exit animation replace the insertion cleanly.)
+      let supersededEntries = activeAnimations.filter {
+        injectedIdentities.contains($0.key.identity)
+      }
       activeAnimations = activeAnimations.filter {
         !injectedIdentities.contains($0.key.identity)
+      }
+      for (_, entry) in supersededEntries {
+        releaseBatch(entry.batchID)
       }
 
       removingIdentities[identity] = RemovalEntry(
@@ -350,7 +391,8 @@ package final class AnimationController {
         childIndex: previousChildIndexByIdentity[injectionTarget] ?? 0,
         transition: transition,
         animationBox: transaction.animationRequest.animationBoxIfAny,
-        startTime: timestamp
+        startTime: timestamp,
+        startOpacity: initialOpacity
       )
     }
 
@@ -397,39 +439,78 @@ package final class AnimationController {
       // No animation intent — snap to identity immediately.
       return
     }
+    let batchID = transaction.animationBatchID
     // Enqueue an animation for each modifier effect the transition
     // declares.  From values are derived from the modifiers (offset
-    // shift, reduced opacity); to values are identity.
+    // shift, reduced opacity); to values are identity.  If an animation
+    // for the same (identity, property) is already mid-flight — e.g.
+    // an interrupted removal — sample its currently displayed value
+    // and use that as the new `from`, so the insertion starts from
+    // whatever is on screen instead of snapping back to the declared
+    // `willAppear` value.
     if let startOpacity = modifiers.opacity {
       let target = snapshot.opacity ?? 1.0
-      activeAnimations[AnimationKey(identity: identity, property: .opacity)] =
+      let key = AnimationKey(identity: identity, property: .opacity)
+      let effectiveFrom =
+        sampleCurrentValue(for: key, at: timestamp)
+        ?? .double(startOpacity)
+      if let existing = activeAnimations[key] { releaseBatch(existing.batchID) }
+      retainBatch(batchID)
+      activeAnimations[key] =
         ActiveAnimation(
-          from: .double(startOpacity),
+          from: effectiveFrom,
           to: .double(target),
           animationBox: box,
-          startTime: timestamp
+          startTime: timestamp,
+          batchID: batchID
         )
     }
     if let startOffsetX = modifiers.offsetX {
       let target = snapshot.offsetX ?? 0
-      activeAnimations[AnimationKey(identity: identity, property: .offsetX)] =
+      let key = AnimationKey(identity: identity, property: .offsetX)
+      let effectiveFrom =
+        sampleCurrentValue(for: key, at: timestamp)
+        ?? .integer(startOffsetX)
+      if let existing = activeAnimations[key] { releaseBatch(existing.batchID) }
+      retainBatch(batchID)
+      activeAnimations[key] =
         ActiveAnimation(
-          from: .integer(startOffsetX),
+          from: effectiveFrom,
           to: .integer(target),
           animationBox: box,
-          startTime: timestamp
+          startTime: timestamp,
+          batchID: batchID
         )
     }
     if let startOffsetY = modifiers.offsetY {
       let target = snapshot.offsetY ?? 0
-      activeAnimations[AnimationKey(identity: identity, property: .offsetY)] =
+      let key = AnimationKey(identity: identity, property: .offsetY)
+      let effectiveFrom =
+        sampleCurrentValue(for: key, at: timestamp)
+        ?? .integer(startOffsetY)
+      if let existing = activeAnimations[key] { releaseBatch(existing.batchID) }
+      retainBatch(batchID)
+      activeAnimations[key] =
         ActiveAnimation(
-          from: .integer(startOffsetY),
+          from: effectiveFrom,
           to: .integer(target),
           animationBox: box,
-          startTime: timestamp
+          startTime: timestamp,
+          batchID: batchID
         )
     }
+  }
+
+  /// Returns the currently interpolated value of the animation at
+  /// `key` if one is in flight, or nil if the slot is empty.  Used by
+  /// the insertion path to retarget from the displayed value when a
+  /// mid-flight animation gets interrupted by an opposite toggle.
+  private func sampleCurrentValue(
+    for key: AnimationKey,
+    at timestamp: MonotonicInstant
+  ) -> AnimatableValue? {
+    guard let existing = activeAnimations[key] else { return nil }
+    return sample(existing, at: timestamp)
   }
 
   private func processNode(
@@ -801,10 +882,13 @@ package final class AnimationController {
       if let box = entry.animationBox, let anim = registeredAnimations[box] {
         let elapsed = entry.startTime.duration(to: timestamp)
         if let progress = anim.evaluate(elapsed: elapsed) {
-          // Interpolate from identity (fully present) -> removal
-          // modifiers (fully removed).  Progress 0 == identity,
-          // progress 1 == removal.
+          // Interpolate from the entry's captured starting opacity
+          // (normally 1.0 = identity, but may be lower if this
+          // removal interrupted a mid-flight insertion) toward the
+          // removal modifiers.  Progress 0 == starting state,
+          // progress 1 == fully removed.
           modifiers = interpolateRemovalModifiers(
+            from: entry.startOpacity,
             to: entry.transition.removalModifiers(),
             progress: progress
           )
@@ -861,18 +945,19 @@ package final class AnimationController {
     return result
   }
 
-  /// Interpolates from the identity transition modifiers (fully present)
+  /// Interpolates from a starting opacity (typically 1.0 = identity,
+  /// but lower if this removal interrupted a mid-flight insertion)
   /// toward the removal modifiers based on `progress`.  Progress is
-  /// reported by the animation curve — 0 means "just starting", 1 means
-  /// "fully removed" — so we interpolate identity → target.
+  /// reported by the animation curve — 0 means "just starting", 1
+  /// means "fully removed".
   private func interpolateRemovalModifiers(
+    from startOpacity: Double,
     to target: TransitionModifiers,
     progress: Double
   ) -> TransitionModifiers {
     var result = TransitionModifiers.identity
     if let targetOpacity = target.opacity {
-      // Identity opacity is 1, target is the removal modifier's opacity.
-      result.opacity = 1.0 + (targetOpacity - 1.0) * progress
+      result.opacity = startOpacity + (targetOpacity - startOpacity) * progress
     }
     if let targetOffsetX = target.offsetX {
       result.offsetX = Int(Double(targetOffsetX) * progress)
