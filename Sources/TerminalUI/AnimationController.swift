@@ -896,10 +896,23 @@ package final class AnimationController {
 
   /// Resets all per-identity state.  Used when the renderer is disposed
   /// or the view tree is completely reset.
+  ///
+  /// Clears every stored field so no stale state leaks across a reset —
+  /// leaving `removingIdentities` or `previousTreeRoot` alive would cause
+  /// the next tick after reset to try to re-inject a subtree from a
+  /// previous-generation tree.
   package func reset() {
     previousSnapshots.removeAll(keepingCapacity: true)
+    previousTreeRoot = nil
+    previousParentByIdentity.removeAll(keepingCapacity: true)
+    previousChildIndexByIdentity.removeAll(keepingCapacity: true)
     activeAnimations.removeAll(keepingCapacity: true)
     registeredAnimations.removeAll(keepingCapacity: true)
+    transitionsByIdentity.removeAll(keepingCapacity: true)
+    previousTransitionsByIdentity.removeAll(keepingCapacity: true)
+    pendingTransitionsByIdentity.removeAll(keepingCapacity: true)
+    removingIdentities.removeAll(keepingCapacity: true)
+    previousIdentities.removeAll(keepingCapacity: true)
     lastTickResult = .init()
   }
 }

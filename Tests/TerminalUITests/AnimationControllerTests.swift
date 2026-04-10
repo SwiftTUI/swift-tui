@@ -227,6 +227,68 @@ struct AnimationControllerRemovalTests {
     }
   }
 
+  @Test(
+    "reset clears transition and removal state so the next tick does not replay stale removals"
+  )
+  func resetClearsRemovalAndTransitionState() throws {
+    // Regression for Item 16: a reset mid-removal used to leave
+    // `removingIdentities` and `previousTreeRoot` alive, so the next
+    // tick would try to re-inject a subtree from a now-stale tree.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+    controller.beginTransitionCollection()
+    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+
+    // Frame 1: leaf present.
+    let leaf = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let root = ResolvedNode(
+      identity: Identity(components: [.named("root")]),
+      kind: .view("Root"),
+      children: [leaf]
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(root, transaction: .init(), timestamp: t0)
+
+    // Frame 2: leaf removed mid-animation.
+    var root2 = ResolvedNode(
+      identity: Identity(components: [.named("root")]),
+      kind: .view("Root"),
+      children: []
+    )
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(root2, transaction: transaction, timestamp: t0)
+    let preResetTick = controller.applyInterpolations(to: &root2, at: t0)
+    #expect(preResetTick.hasActiveAnimations)
+
+    // Reset while the removal is still in flight.
+    controller.reset()
+
+    // A new tree with a completely different identity should NOT see
+    // the pre-reset leaf re-injected.
+    let freshIdentity = Identity(components: [.named("fresh")])
+    var fresh = ResolvedNode(identity: freshIdentity, kind: .view("Fresh"))
+    controller.processResolvedTree(fresh, transaction: .init(), timestamp: t0)
+    let result = controller.applyInterpolations(to: &fresh, at: t0)
+
+    #expect(!result.hasActiveAnimations)
+    #expect(
+      !containsIdentity(fresh, leafIdentity),
+      "pre-reset removal state must not leak into the post-reset tree"
+    )
+  }
+
+  private func containsIdentity(_ node: ResolvedNode, _ identity: Identity) -> Bool {
+    if node.identity == identity { return true }
+    return node.children.contains { containsIdentity($0, identity) }
+  }
+
   @Test("removal entry purges after the animation completes")
   func removalPurgesAfterAnimationCompletes() throws {
     let controller = AnimationController()
