@@ -128,6 +128,80 @@ struct LinearCustomAnimation: CustomAnimation {
 @Suite("Animation end-to-end pipeline integration")
 struct AnimationPipelineIntegrationTests {
   @Test(
+    "foreground color interpolates at distinct timestamps across the full pipeline"
+  )
+  func foregroundColorInterpolatesAtDistinctTimestamps() throws {
+    // Stronger end-to-end assertion: drive two renders through
+    // DefaultRenderer to seed the controller's active animation,
+    // then apply interpolations manually at three explicit
+    // timestamps (start, midpoint, end) on a copy of the resolved
+    // tree and verify every sample produces a different foreground
+    // color.  This pins the tick-frame code path that the gallery
+    // relies on for visible color animation.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(1000))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("leaf")])
+
+    // Seed: leaf with red foreground.
+    var seedMetadata = DrawMetadata()
+    seedMetadata.baseStyle.foregroundStyle = .color(Color.red)
+    let seed = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Text"),
+      drawMetadata: seedMetadata
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(seed, transaction: .init(), timestamp: t0)
+
+    // Frame 2: leaf with blue foreground under an animate intent.
+    var frame2Metadata = DrawMetadata()
+    frame2Metadata.baseStyle.foregroundStyle = .color(Color.blue)
+    let frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Text"),
+      drawMetadata: frame2Metadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    func sampleForegroundColor(at elapsed: Duration) -> Color? {
+      var tree = frame2
+      _ = controller.applyInterpolations(
+        to: &tree,
+        at: t0.advanced(by: elapsed)
+      )
+      guard case .color(let color) = tree.drawMetadata.baseStyle.foregroundStyle
+      else { return nil }
+      return color
+    }
+
+    let atStart = sampleForegroundColor(at: .zero)
+    let atMid = sampleForegroundColor(at: .milliseconds(500))
+    let atLate = sampleForegroundColor(at: .milliseconds(900))
+
+    #expect(atStart != nil)
+    #expect(atMid != nil)
+    #expect(atLate != nil)
+    // All three samples must be distinct colors — if the pipeline
+    // weren't interpolating, they would all equal blue (or red).
+    #expect(
+      atStart != atMid,
+      "start and mid samples should differ for a 1000ms linear animation"
+    )
+    #expect(
+      atMid != atLate,
+      "mid and late samples should differ for a 1000ms linear animation"
+    )
+    #expect(
+      atStart != atLate,
+      "start and late samples should differ for a 1000ms linear animation"
+    )
+  }
+
+  @Test(
     "withAnimation color mutation enqueues an active animation through the pipeline"
   )
   func colorAnimationEnqueuesThroughFullPipeline() throws {

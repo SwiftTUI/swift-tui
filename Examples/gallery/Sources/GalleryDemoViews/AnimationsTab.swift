@@ -2,14 +2,31 @@ import TerminalUI
 
 /// Showcases the animation features that landed in the 2026-04-10
 /// gap-closure pass.  Each section exercises a distinct capability
-/// — spring/bezier curves, repeat behaviors, opacity + move
-/// transitions, frame animation, and withAnimation completion
-/// callbacks — so the gallery doubles as a visual smoke test.
+/// — spring/bezier curves, transitions with different edges, frame
+/// animation, and withAnimation completion callbacks — so the
+/// gallery doubles as a visual smoke test.
+///
+/// All durations are long (1000–2000 ms) so the interpolation is
+/// unmistakable on a 30fps terminal.  Elements are intentionally
+/// large (full-block text, big ASCII figures) so the visual change
+/// cannot be missed.
 struct AnimationsTab: View {
-  @State private var colorDemo: ColorDemoState = .init()
-  @State private var transitionDemo: TransitionDemoState = .init()
-  @State private var frameDemo: FrameDemoState = .init()
-  @State private var completionDemo: CompletionDemoState = .init()
+  // Color demo: high-contrast red↔blue toggle.  Direct field
+  // mutation inside the withAnimation closure — no mutating method
+  // indirection.
+  @State private var colorBlue: Bool = false
+  @State private var curveLabel: String = "(tap a curve)"
+
+  // Transition demo: two independent toggles.
+  @State private var showOpacityFigure: Bool = true
+  @State private var showSlideFigure: Bool = false
+
+  // Frame demo: narrow↔wide width.
+  @State private var wide: Bool = false
+
+  // Completion demo: a counter ticked by the callback closure.
+  @State private var completionRuns: Int = 0
+  @State private var completionAccent: Bool = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
@@ -31,7 +48,7 @@ struct AnimationsTab: View {
   private var header: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Animations").foregroundStyle(.foreground)
-      Text("Exercise every feature from the 2026-04-10 gap-closure pass.")
+      Text("Every button triggers a multi-second animation via withAnimation.")
         .foregroundStyle(.separator)
     }
   }
@@ -40,32 +57,34 @@ struct AnimationsTab: View {
 
   private var colorSection: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("withAnimation color").foregroundStyle(.muted)
-      HStack(spacing: 1) {
-        Text("■■■■■■■■■■")
-          .foregroundStyle(colorDemo.color)
-        Text(colorDemo.curveLabel)
-          .foregroundStyle(.separator)
-      }
+      Text("1. withAnimation foreground color — curve: \(curveLabel)")
+        .foregroundStyle(.muted)
+      // Full-block row so the colour change is unmistakable.
+      Text("████████████████████████████")
+        .foregroundStyle(colorBlue ? Color.blue : Color.red)
       HStack(spacing: 1) {
         Button("linear") {
-          withAnimation(.linear(duration: .milliseconds(400))) {
-            colorDemo.advance(curveLabel: "linear")
+          withAnimation(.linear(duration: .milliseconds(1500))) {
+            colorBlue.toggle()
+            curveLabel = "linear"
           }
         }
         Button("easeInOut") {
-          withAnimation(.easeInOut(duration: .milliseconds(400))) {
-            colorDemo.advance(curveLabel: "easeInOut")
+          withAnimation(.easeInOut(duration: .milliseconds(1500))) {
+            colorBlue.toggle()
+            curveLabel = "easeInOut"
           }
         }
         Button("spring") {
-          withAnimation(.spring(duration: .milliseconds(500), bounce: 0.2)) {
-            colorDemo.advance(curveLabel: "spring")
+          withAnimation(.spring(duration: .milliseconds(1500), bounce: 0.3)) {
+            colorBlue.toggle()
+            curveLabel = "spring"
           }
         }
         Button("bouncy") {
           withAnimation(.bouncy) {
-            colorDemo.advance(curveLabel: "bouncy")
+            colorBlue.toggle()
+            curveLabel = "bouncy"
           }
         }
       }
@@ -76,34 +95,33 @@ struct AnimationsTab: View {
 
   private var transitionSection: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text(".transition(...) insertion & removal")
+      Text("2. .transition(...) insertion & removal")
         .foregroundStyle(.muted)
       HStack(spacing: 2) {
-        Button(transitionDemo.showOpacity ? "hide opacity" : "show opacity") {
-          withAnimation(.easeInOut(duration: .milliseconds(350))) {
-            transitionDemo.showOpacity.toggle()
+        Button(showOpacityFigure ? "fade out" : "fade in") {
+          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+            showOpacityFigure.toggle()
           }
         }
-        Button(transitionDemo.showSlide ? "hide slide" : "show slide") {
-          withAnimation(.easeInOut(duration: .milliseconds(350))) {
-            transitionDemo.showSlide.toggle()
+        Button(showSlideFigure ? "slide out" : "slide in") {
+          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+            showSlideFigure.toggle()
           }
         }
       }
-      // Opacity transition — fades in/out via pre-composited color.
-      if transitionDemo.showOpacity {
-        Text("fade target")
-          .foregroundStyle(.tint)
-          .padding(1)
+      // Opacity transition — a large TextFigure fades in/out via the
+      // pre-composited cell-background blend.
+      if showOpacityFigure {
+        TextFigure("FADE", font: .smMono9)
+          .foregroundStyle(Color.cyan)
           .transition(.opacity)
       }
-      // Move transition — slides in from the leading edge and out
-      // to the trailing edge.  This uses the new wrapping path for
-      // padded roots so sibling layout does not shift.
-      if transitionDemo.showSlide {
-        Text("slide target")
-          .foregroundStyle(.tint)
-          .padding(1)
+      // Slide transition — uses .transition(.slide), which is an
+      // asymmetric move(edge: .leading) → move(edge: .trailing) that
+      // exercises the placed-level overlay injection path.
+      if showSlideFigure {
+        TextFigure("SLIDE", font: .smMono9)
+          .foregroundStyle(Color.yellow)
           .transition(.slide)
       }
     }
@@ -113,24 +131,24 @@ struct AnimationsTab: View {
 
   private var frameSection: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("frame animation via .flexibleFrame(maxWidth:)")
+      Text("3. frame animation via .frame(maxWidth:) under .smooth")
         .foregroundStyle(.muted)
       HStack(spacing: 2) {
         Button("narrow") {
-          withAnimation(.smooth(duration: .milliseconds(500))) {
-            frameDemo.wide = false
+          withAnimation(.smooth(duration: .milliseconds(1500))) {
+            wide = false
           }
         }
         Button("wide") {
-          withAnimation(.smooth(duration: .milliseconds(500))) {
-            frameDemo.wide = true
+          withAnimation(.smooth(duration: .milliseconds(1500))) {
+            wide = true
           }
         }
       }
-      Text(frameDemo.wide ? "◆ wide ◆" : "narrow")
+      Text(wide ? "◆ wide ◆" : "narrow")
         .foregroundStyle(.foreground)
         .frame(
-          maxWidth: .finite(frameDemo.wide ? 40 : 12),
+          maxWidth: .finite(wide ? 40 : 12),
           alignment: .center
         )
     }
@@ -140,67 +158,28 @@ struct AnimationsTab: View {
 
   private var completionSection: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("withAnimation completion callback")
+      Text("4. withAnimation completion callback — fires once per batch drain")
         .foregroundStyle(.muted)
       HStack(spacing: 2) {
         Button("run") {
-          let target = completionDemo.current == .a ? CompletionDemoState.Tone.b : .a
-          withAnimation(.easeInOut(duration: .milliseconds(400))) {
-            completionDemo.current = target
+          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+            completionAccent.toggle()
           } completion: {
-            // The completion closure is fired from the animation
-            // controller's tick loop which is already on the main
-            // actor; hop into it explicitly so Swift 6 strict
-            // concurrency is happy.
+            // The controller fires this from its tick loop on the
+            // main actor; Swift 6 strict concurrency requires an
+            // explicit hop since the closure signature is @Sendable.
             MainActor.assumeIsolated {
-              completionDemo.finishedRuns += 1
+              completionRuns += 1
             }
           }
         }
       }
-      Text("finished runs: \(completionDemo.finishedRuns)")
+      Text("completed runs: \(completionRuns)")
         .foregroundStyle(.separator)
-      Text("current tone")
-        .foregroundStyle(completionDemo.current.color)
+      Text("accent bar:")
+        .foregroundStyle(.muted)
+      Text("██████████████████████")
+        .foregroundStyle(completionAccent ? Color.magenta : Color.green)
     }
-  }
-}
-
-// MARK: - Local state types
-
-extension AnimationsTab {
-  struct ColorDemoState: Equatable {
-    var color: Color = .red
-    var curveLabel: String = "(tap a curve)"
-
-    mutating func advance(curveLabel: String) {
-      color = color.rotatedHue(by: 60)
-      self.curveLabel = curveLabel
-    }
-  }
-
-  struct TransitionDemoState: Equatable {
-    var showOpacity: Bool = true
-    var showSlide: Bool = false
-  }
-
-  struct FrameDemoState: Equatable {
-    var wide: Bool = false
-  }
-
-  struct CompletionDemoState: Equatable {
-    enum Tone: Equatable {
-      case a
-      case b
-
-      var color: Color {
-        switch self {
-        case .a: .cyan
-        case .b: .yellow
-        }
-      }
-    }
-    var current: Tone = .a
-    var finishedRuns: Int = 0
   }
 }
