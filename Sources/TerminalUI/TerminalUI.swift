@@ -211,13 +211,25 @@ public struct DefaultRenderer {
         passContext: layoutPassContext
       )
     }
-    let (placed, placeDuration) = measurePhase {
+    var (placed, placeDuration) = measurePhase {
       layoutEngine.place(
         resolved,
         measured: measured,
         passContext: layoutPassContext
       )
     }
+    // Inject any pending removal overlays at placed level (draw-only,
+    // no layout-shift on sibling containers).  Only applies to
+    // entries whose placedSnapshot was captured in a previous frame
+    // — the resolved-level fallback handles first-frame removals
+    // where no placed tree is cached yet.
+    animationController.applyPlacedOverlays(
+      to: &placed,
+      at: animationTimestamp
+    )
+    // Cache this frame's placed tree so the NEXT frame's removal
+    // detection can look up frozen bounds without re-running layout.
+    animationController.capturePlacedTree(placed)
     let presentationDamage = presentationDamage(
       rootIdentity: resolveContext.identity,
       placed: placed,
