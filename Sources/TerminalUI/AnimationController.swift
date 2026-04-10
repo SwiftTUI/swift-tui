@@ -182,6 +182,14 @@ package struct RemovalEntry: Sendable {
   /// from the value currently on screen instead of snapping back
   /// to full opacity.
   package var startOpacity: Double = 1.0
+  /// Frozen PlacedNode subtree captured from the previous frame's
+  /// placed tree at the moment the removal was snapped.  When
+  /// present, the controller injects this subtree into the placed
+  /// tree after layout (draw-only overlay) instead of re-injecting
+  /// at the resolved level.  When nil (no previous placed tree
+  /// cached), the controller falls back to the resolved-level
+  /// injection path — see ``applyInterpolations(to:at:)``.
+  package var placedSnapshot: PlacedNode? = nil
 }
 
 @MainActor
@@ -190,6 +198,12 @@ package final class AnimationController {
   /// Full tree from the previous frame, retained so removals can capture
   /// their subtrees.
   private var previousTreeRoot: ResolvedNode?
+  /// Previous frame's placed tree, captured at the end of each frame
+  /// via ``capturePlacedTree(_:)``.  Used by removal detection to
+  /// look up the disappearing identity's frozen bounds and inject
+  /// the overlay at placed level instead of routing it back through
+  /// measure/place.
+  private var previousPlacedRoot: PlacedNode?
   /// Parent identity, as walked from the previous frame's tree.
   private var previousParentByIdentity: [Identity: Identity] = [:]
   /// Child index within the previous parent's children list.
@@ -224,6 +238,176 @@ package final class AnimationController {
   private let defaultTransitionDuration: Duration = .milliseconds(250)
 
   package init() {}
+
+  /// Stores a snapshot of the placed tree at the end of the frame so
+  /// the next frame's removal detection can find the disappearing
+  /// identity's frozen bounds without re-running layout.
+  ///
+  /// Called by the render pipeline after ``place`` runs.  When no
+  /// removal overlays are pending this is a cheap reference copy.
+  package func capturePlacedTree(_ placed: PlacedNode) {
+    previousPlacedRoot = placed
+  }
+
+  /// Injects any removal overlays whose placedSnapshot was captured
+  /// into the placed tree, applying the current tick's interpolated
+  /// transition modifiers to them.  Runs between place and semantics
+  /// in the render pipeline.
+  ///
+  /// Overlays injected this way never flow through measure or place,
+  /// so sibling layout is not disturbed when the removed view lived
+  /// inside a VStack or other flow container.  They carry the
+  /// transient flag, so semantics/focus/lifecycle skip them.
+  package func applyPlacedOverlays(
+    to tree: inout PlacedNode,
+    at timestamp: MonotonicInstant
+  ) {
+    guard !removingIdentities.isEmpty else { return }
+
+    var injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]] = [:]
+
+    for (identity, entry) in removingIdentities {
+      guard let placedSnapshot = entry.placedSnapshot,
+        let parentId = entry.parentIdentity
+      else {
+        continue  // No placed capture → resolved-level path handles it.
+      }
+
+      let modifiers: TransitionModifiers
+      if let box = entry.animationBox, let anim = registeredAnimations[box] {
+        let elapsed = entry.startTime.duration(to: timestamp)
+        if let progress = anim.evaluate(elapsed: elapsed) {
+          modifiers = interpolateRemovalModifiers(
+            from: entry.startOpacity,
+            to: entry.transition.removalModifiers(),
+            progress: progress
+          )
+        } else {
+          continue  // Completion handled in applyInterpolations.
+        }
+      } else {
+        continue
+      }
+
+      var clone = placedSnapshot
+      applyPlacedOverlayModifiers(modifiers, to: &clone)
+      injections[parentId, default: []].append(
+        (childIndex: entry.childIndex, snapshot: clone)
+      )
+    }
+
+    if !injections.isEmpty {
+      tree = injectPlacedOverlays(tree: tree, injections: injections)
+    }
+  }
+
+  /// Applies transition modifiers to a placed overlay subtree.
+  /// Opacity cascades to every descendant's drawMetadata; offsets
+  /// translate the root bounds (and, transitively, the descendant
+  /// bounds via the same delta).  The overlay subtree carries
+  /// isTransient = true on every node so the semantic extractor and
+  /// lifecycle coordinator skip it.
+  private func applyPlacedOverlayModifiers(
+    _ modifiers: TransitionModifiers,
+    to node: inout PlacedNode
+  ) {
+    // Mark the whole subtree transient.
+    markTransient(&node)
+
+    // Opacity cascades via drawMetadata.
+    if let opacity = modifiers.opacity {
+      applyOpacityCascadingPlaced(&node, opacity: opacity)
+    }
+
+    // Offset translates the bounds of every node in the subtree by
+    // the same delta.  Sub-cell fractional offsets are rounded to
+    // integer cells.
+    let dx = modifiers.offsetX ?? 0
+    let dy = modifiers.offsetY ?? 0
+    if dx != 0 || dy != 0 {
+      translateBounds(&node, dx: dx, dy: dy)
+    }
+  }
+
+  private func markTransient(_ node: inout PlacedNode) {
+    node.isTransient = true
+    var children = node.children
+    for i in children.indices {
+      markTransient(&children[i])
+    }
+    node.children = children
+  }
+
+  private func applyOpacityCascadingPlaced(
+    _ node: inout PlacedNode,
+    opacity: Double
+  ) {
+    var drawMetadata = node.drawMetadata
+    let base = drawMetadata.baseStyle.explicitOpacity ?? 1.0
+    drawMetadata.baseStyle.explicitOpacity = base * opacity
+    node.drawMetadata = drawMetadata
+
+    var children = node.children
+    for i in children.indices {
+      applyOpacityCascadingPlaced(&children[i], opacity: opacity)
+    }
+    node.children = children
+  }
+
+  private func translateBounds(
+    _ node: inout PlacedNode,
+    dx: Int,
+    dy: Int
+  ) {
+    let delta = Point(x: dx, y: dy)
+    node.bounds = Rect(
+      origin: Point(
+        x: node.bounds.origin.x + delta.x,
+        y: node.bounds.origin.y + delta.y
+      ),
+      size: node.bounds.size
+    )
+    node.contentBounds = Rect(
+      origin: Point(
+        x: node.contentBounds.origin.x + delta.x,
+        y: node.contentBounds.origin.y + delta.y
+      ),
+      size: node.contentBounds.size
+    )
+    if let clip = node.clipBounds {
+      node.clipBounds = Rect(
+        origin: Point(
+          x: clip.origin.x + delta.x,
+          y: clip.origin.y + delta.y
+        ),
+        size: clip.size
+      )
+    }
+    var children = node.children
+    for i in children.indices {
+      translateBounds(&children[i], dx: dx, dy: dy)
+    }
+    node.children = children
+  }
+
+  private func injectPlacedOverlays(
+    tree: PlacedNode,
+    injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]]
+  ) -> PlacedNode {
+    var node = tree
+    var children = node.children.map { child in
+      injectPlacedOverlays(tree: child, injections: injections)
+    }
+    if let injectionsForNode = injections[node.identity] {
+      let sorted = injectionsForNode.sorted { $0.childIndex < $1.childIndex }
+      for injection in sorted {
+        let insertIndex = min(injection.childIndex, children.count)
+        children.insert(injection.snapshot, at: insertIndex)
+      }
+    }
+    node.children = children
+    return node
+  }
 
   /// Returns an animation request representative of whatever is
   /// currently in flight, or nil if no animations are active.
@@ -404,6 +588,19 @@ package final class AnimationController {
         releaseBatch(entry.batchID)
       }
 
+      // If a previous placed tree is cached, look up the frozen
+      // placed subtree for the same identity so the overlay can be
+      // injected post-layout (draw-only, no layout-shift).
+      let placedSnapshot: PlacedNode?
+      if let previousPlacedRoot {
+        placedSnapshot = findPlacedSubtree(
+          in: previousPlacedRoot,
+          identity: injectionTarget
+        )
+      } else {
+        placedSnapshot = nil
+      }
+
       removingIdentities[identity] = RemovalEntry(
         snapshot: subtree,
         parentIdentity: injectionParent,
@@ -411,7 +608,8 @@ package final class AnimationController {
         transition: transition,
         animationBox: transaction.animationRequest.animationBoxIfAny,
         startTime: timestamp,
-        startOpacity: initialOpacity
+        startOpacity: initialOpacity,
+        placedSnapshot: placedSnapshot
       )
     }
 
@@ -431,6 +629,23 @@ package final class AnimationController {
     if root.identity == identity { return root }
     for child in root.children {
       if let match = findSubtree(in: child, identity: identity) {
+        return match
+      }
+    }
+    return nil
+  }
+
+  /// Recursively searches a placed tree for the subtree rooted at
+  /// `identity` and returns a copy of it.  Used to capture the
+  /// frozen bounds of a disappearing subtree for draw-only overlay
+  /// injection.
+  private func findPlacedSubtree(
+    in root: PlacedNode,
+    identity: Identity
+  ) -> PlacedNode? {
+    if root.identity == identity { return root }
+    for child in root.children {
+      if let match = findPlacedSubtree(in: child, identity: identity) {
         return match
       }
     }
@@ -940,20 +1155,27 @@ package final class AnimationController {
         continue
       }
 
-      // Clone the subtree and apply the interpolated transition
-      // modifiers recursively so leaf views (text, etc.) pick up the
-      // fading opacity even if the transition was applied higher up
-      // in the subtree.  Mark every node in the cloned overlay as
-      // transient so the semantic extractor, focus tracker, and
-      // lifecycle coordinator skip them — the committed tree is
-      // still the authoritative source for routing.
-      var subtreeCopy = entry.snapshot
-      markTransient(&subtreeCopy)
-      applyTransitionModifiersRecursively(modifiers, to: &subtreeCopy)
-      if let parentId = entry.parentIdentity {
-        injectionsByParent[parentId, default: []].append(
-          (childIndex: entry.childIndex, snapshot: subtreeCopy)
-        )
+      // When a placed snapshot was captured in the previous frame
+      // we inject the overlay at the PLACED level (after layout)
+      // via ``applyPlacedOverlays`` — skip resolved-level injection
+      // here so the overlay doesn't run through measure/place.  This
+      // closes the VStack layout-shift gap.
+      if entry.placedSnapshot == nil {
+        // Resolved-level fallback path (no cached placed tree).
+        // Clone the subtree and apply the interpolated transition
+        // modifiers recursively so leaf views (text, etc.) pick up
+        // the fading opacity even if the transition was applied
+        // higher up in the subtree.  Mark every node in the cloned
+        // overlay as transient so the semantic extractor, focus
+        // tracker, and lifecycle coordinator skip them.
+        var subtreeCopy = entry.snapshot
+        markTransient(&subtreeCopy)
+        applyTransitionModifiersRecursively(modifiers, to: &subtreeCopy)
+        if let parentId = entry.parentIdentity {
+          injectionsByParent[parentId, default: []].append(
+            (childIndex: entry.childIndex, snapshot: subtreeCopy)
+          )
+        }
       }
       affectedIdentities.insert(identity)
       latestDeadline = timestamp.advanced(by: frameInterval)
@@ -1319,6 +1541,7 @@ package final class AnimationController {
   package func reset() {
     previousSnapshots.removeAll(keepingCapacity: true)
     previousTreeRoot = nil
+    previousPlacedRoot = nil
     previousParentByIdentity.removeAll(keepingCapacity: true)
     previousChildIndexByIdentity.removeAll(keepingCapacity: true)
     activeAnimations.removeAll(keepingCapacity: true)
