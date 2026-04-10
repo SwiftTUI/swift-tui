@@ -1,30 +1,52 @@
 # Animation Implementation Plan
 
-**Date:** 2026-04-08 (plan) / 2026-04-10 (status update)
-**Status:** Phase 0–6 shipped and verified in the gallery demo; follow-up work in the "What's Next" section below
-**Branch:** `animation` (merged; development continues on `main`)
+**Date:** 2026-04-08 (plan) / 2026-04-10 (full gap-closure pass)
+**Status:** Phases 0–7 shipped. All 18 audit gaps closed. 704 package tests passing.
+**Branch:** `main`
 **Supersedes:** `docs/COLOR_ANIMATION_IMPLEMENTATION_PLAN.md`
 
 ---
 
 ## Current Status (2026-04-10)
 
-Phases 0–6 of the original plan are shipped and green. The full package test
-suite is 682/682 passing; `swift test --filter Animation` runs 20 animation-
-scoped tests across 5 suites, zero regressions. The gallery demo
-(`Examples/gallery`) exercises both `withAnimation` color animation
-(`color = color.rotatedHue(by:)`) and `.transition(.opacity)` insertion +
-removal of a wrapped `TextFigure`. Fades are smooth on truecolor terminals.
+Phases 0–6 of the original plan and every gap item surfaced by the
+2026-04-10 audit are shipped and green. The full package test suite is
+704/704 passing. `swift test --filter AnimationController` runs the
+animation-scoped suites (snapshot extraction, property animations,
+removal injection, end-to-end pipeline integration); every test is
+deterministic and passes without a real clock.
 
-> **Post-graph-refactor caveat:** the gallery verification predates
-> commit `d8d0a80` (2026-04-10, "fold ResolvedNode into ViewNode as single
-> source of truth"), which collapsed ViewNode's 14 mirror fields onto a
-> single `committed: ResolvedNode`. The animation controller still operates
-> on a local `ResolvedNode` returned by `viewGraph.snapshot()` and the
-> `Boxed<DrawMetadata>` copy-on-write wrapper protects the cached tree from
-> tick-frame mutation, so nothing should be broken — but the integration
-> has not been re-verified against the new graph architecture. See
-> "What's next → P0 post-refactor verification" below.
+Post-graph-refactor verification (item 18 in the original audit) has
+been run against commit `d8d0a80` (2026-04-10, ViewNode single source
+of truth). The animation controller still operates on a local
+`ResolvedNode` returned by `viewGraph.snapshot()`, the
+`Boxed<DrawMetadata>` copy-on-write wrapper protects the cached tree,
+and the new placed-level overlay channel (item 1) never writes back
+to the cached tree — so the refactor has no effect on animation
+correctness. The gallery demo still builds clean.
+
+All 18 gap items from the audit are closed:
+
+| # | Title | Resolution |
+|---|---|---|
+| 1 | Removal overlays as draw-only with frozen bounds | `capturePlacedTree` + `applyPlacedOverlays` inject at placed level, no measure/place on the overlay |
+| 2 | Per-node transient flag for removal overlays | `isTransient` on `ResolvedNode` and `PlacedNode`, filtered by `SemanticExtractor` + `collectLifecycleNodes` |
+| 3 | Per-cell blend target at raster time | `resolveTextStyle` takes `currentCellBackground` from the live raster surface |
+| 4 | Custom `Transition` body walking | `TransitionEffectContributing` protocol + Mirror walk descending into `content`/`base`/`body`/`wrapped` |
+| 5 | Offset composition on non-intrinsic roots | `applyTransitionModifiersRecursively` composes with existing `.offset`, wraps `.frame`/`.padding`/etc. in a stable-identity wrapper |
+| 6 | `withAnimation` completion callbacks | `AnimationBatchID` + `AnimationCompletionSink` + per-batch refcount; batch drains fire the closure exactly once |
+| 7 | `Transaction.animation` getter | `AnimationBox.unwrap(as:)` round-trips via the stored AnyHashable |
+| 8 | `CustomAnimation` evaluation | `CustomAnimationBox` retains a sendable closure; controller threads `AnimationState` per key |
+| 9 | `repeatCount`/`repeatForever`/`speed` | `Animation.evaluate` refactored into outer repeat-aware + inner single-iteration; `iterationDurationSeconds` per curve type |
+| 10 | Insertion/removal retargeting | `sampleCurrentValue` for insertions; `RemovalEntry.startOpacity` captured from mid-flight insertions |
+| 11 | `borderColor` extract + apply | Controller reads `drawMetadata.borderShapeStyle`, writes it via interpolated color |
+| 12 | `padding` edge animation | Independent `paddingTop`/`Leading`/`Bottom`/`Trailing` diff + apply, untouched edges preserved |
+| 13 | `flexibleFrame` extract | `extract` picks first finite dim per axis (max→ideal→min); `applyValue` writes back to the same slot, preserving other dimensions |
+| 14 | Tick frames inject dominant active request | `AnimationController.dominantActiveRequest()` consulted by `resolveContext(for:)` when the scheduled frame carries `.inherit` |
+| 15 | End-to-end integration tests | New `Animation end-to-end pipeline integration` suite covers full pipeline color animation + placed-level overlay injection |
+| 16 | `AnimationController.reset()` completeness | Every stored field cleared; regression test for mid-removal reset |
+| 17 | `didSet` recompute overhead on tick frames | `setChildrenPreservingDerivedState` + `setLayoutBehaviorPreservingDerivedState` bypass derived-state recomputes when the shape/variant is stable |
+| 18 | Post-graph-refactor verification | Full test sweep + gallery demo build, both green |
 
 ### What ships today
 
