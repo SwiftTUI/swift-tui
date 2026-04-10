@@ -446,6 +446,19 @@ package final class AnimationController {
     return result
   }
 
+  /// Marks every node in the subtree as transient so the semantic
+  /// extractor, focus tracker, and lifecycle coordinator skip the
+  /// overlay during routing even though it still flows through
+  /// layout + draw for the duration of the exit animation.
+  private func markTransient(_ node: inout ResolvedNode) {
+    node.isTransient = true
+    var children = node.children
+    for i in children.indices {
+      markTransient(&children[i])
+    }
+    node.setChildrenPreservingDerivedState(children)
+  }
+
   private func enqueueInsertionAnimation(
     identity: Identity,
     transition: AnyTransition,
@@ -930,8 +943,12 @@ package final class AnimationController {
       // Clone the subtree and apply the interpolated transition
       // modifiers recursively so leaf views (text, etc.) pick up the
       // fading opacity even if the transition was applied higher up
-      // in the subtree.
+      // in the subtree.  Mark every node in the cloned overlay as
+      // transient so the semantic extractor, focus tracker, and
+      // lifecycle coordinator skip them — the committed tree is
+      // still the authoritative source for routing.
       var subtreeCopy = entry.snapshot
+      markTransient(&subtreeCopy)
       applyTransitionModifiersRecursively(modifiers, to: &subtreeCopy)
       if let parentId = entry.parentIdentity {
         injectionsByParent[parentId, default: []].append(
@@ -1054,7 +1071,7 @@ package final class AnimationController {
       let wrapperIdentity = Identity(
         components: node.identity.components + ["__transitionOffset"]
       )
-      let wrapped = ResolvedNode(
+      var wrapped = ResolvedNode(
         identity: wrapperIdentity,
         kind: .view("TransitionOffset"),
         children: [node],
@@ -1062,6 +1079,9 @@ package final class AnimationController {
         transactionSnapshot: node.transactionSnapshot,
         layoutBehavior: .offset(x: offsetX, y: offsetY)
       )
+      // The wrapper inherits the wrapped root's transient flag so
+      // the whole overlay skips semantics / focus / lifecycle.
+      wrapped.isTransient = node.isTransient
       node = wrapped
     }
   }
