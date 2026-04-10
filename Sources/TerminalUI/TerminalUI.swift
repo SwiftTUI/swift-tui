@@ -74,6 +74,15 @@ public struct DefaultRenderer {
     animationController
   }
 
+  /// Package-only accessor exposing the renderer's internal
+  /// `ViewGraph.registrationAliasDiagnostics`.  Added for Item 7 of
+  /// ARCHITECTURE_NOTES.md to let tests measure the alias layer's
+  /// actual workload against the architecture doc's hypothesis.
+  @MainActor
+  package var debugRegistrationAliasDiagnostics: RegistrationAliasDiagnostics {
+    viewGraph.registrationAliasDiagnostics
+  }
+
   /// Renders `root` into complete frame artifacts.
   @MainActor
   public func render<V: View>(
