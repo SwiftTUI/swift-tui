@@ -128,6 +128,66 @@ struct LinearCustomAnimation: CustomAnimation {
 @Suite("Animation end-to-end pipeline integration")
 struct AnimationPipelineIntegrationTests {
   @Test(
+    "drawMetadata changes reach the placed tree across retained-layout reuse"
+  )
+  func drawMetadataChangesReachPlacedTreeAcrossRetainedReuse() throws {
+    // Regression for the gallery bug: the layout engine's retained-
+    // placement cache deliberately ignores drawMetadata in its
+    // equivalence check (so visual-only mutations don't invalidate
+    // layout reuse).  Before the fix the cached PlacedNode was
+    // returned wholesale with the PREVIOUS frame's drawMetadata,
+    // so animation-controller color interpolation never reached the
+    // raster pass.  After the fix refreshDrawMetadata copies visual
+    // metadata from the current resolved tree onto the cached
+    // placed node.
+    //
+    // This test drives two renders through DefaultRenderer with
+    // different `foregroundStyle` colors but otherwise identical
+    // view trees.  The second render should carry the NEW color in
+    // its placed tree — not the cached color from the first render.
+    let renderer = DefaultRenderer()
+    let rootIdentity = Identity(components: [.named("root")])
+
+    let frame1 = renderer.render(
+      Text("Hello").foregroundStyle(Color.red),
+      context: ResolveContext(identity: rootIdentity)
+    )
+    let frame1Color = Self.extractTextForegroundColor(frame1.placedTree)
+    #expect(
+      frame1Color == Color.red,
+      "frame 1 should render red, got \(String(describing: frame1Color))"
+    )
+
+    // Second render with blue.  Layout is unchanged (same Text,
+    // same string).  Before the fix, retainedPlacement returns the
+    // cached red placed node.  After the fix, refreshDrawMetadata
+    // copies blue from the current resolved tree.
+    let frame2 = renderer.render(
+      Text("Hello").foregroundStyle(Color.blue),
+      context: ResolveContext(identity: rootIdentity)
+    )
+    let frame2Color = Self.extractTextForegroundColor(frame2.placedTree)
+    #expect(
+      frame2Color == Color.blue,
+      "frame 2 should render blue after retained-reuse refresh, got \(String(describing: frame2Color))"
+    )
+  }
+
+  private static func extractTextForegroundColor(_ placed: PlacedNode) -> Color? {
+    if case .text = placed.drawPayload {
+      if case .color(let color) = placed.drawMetadata.baseStyle.foregroundStyle {
+        return color
+      }
+    }
+    for child in placed.children {
+      if let found = extractTextForegroundColor(child) {
+        return found
+      }
+    }
+    return nil
+  }
+
+  @Test(
     "foreground color interpolates at distinct timestamps across the full pipeline"
   )
   func foregroundColorInterpolatesAtDistinctTimestamps() throws {
