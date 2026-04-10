@@ -722,6 +722,41 @@ package final class ViewGraph {
     }
   }
 
+  /// Tears down `ViewNode` subtrees for children that existed in the last
+  /// committed frame but are absent from `resolved`.
+  ///
+  /// Reconciliation of the structural diff is deliberately split between
+  /// this function and the surrounding commit flow
+  /// (`finishEvaluation(node:resolved:accessedStateSlots:)` and
+  /// `recordReusedSubtree(_:invalidator:)`).  `diffChildren` produces four
+  /// kinds of ops — `.matched`, `.moved`, `.inserted`, `.removed` — but
+  /// this function only acts on `.removed`.  The other three are handled
+  /// implicitly by the caller, as follows:
+  ///
+  /// - `.matched` and `.moved`: the caller has already called
+  ///   `nodeForIdentity(for: child.identity)` for every new child, which
+  ///   returns the existing `ViewNode` for that identity.  Matched and
+  ///   moved children keep their prior `ViewNode` instance (and all its
+  ///   state slots, dependencies, registered handlers) because identity is
+  ///   stable across the diff.  `node.apply(resolved:children:)` then
+  ///   swaps the parent's `children` array to the new ordering.
+  ///   **Consequence:** `.moved` is currently a no-op at the reconciler
+  ///   level — structurally same as `.matched`.  If animation work later
+  ///   wants to visualize reorders, that's where to hook in.
+  /// - `.inserted`: `nodeForIdentity(for:)` constructs a fresh `ViewNode`
+  ///   when the identity is not yet in `nodesByIdentity`.  No explicit
+  ///   handling here.
+  /// - `.removed`: the old `ViewNode` is still parented to `node.children`
+  ///   at `oldIndex`, but the new `resolved.children` no longer contains
+  ///   its identity, so nothing in the commit flow would otherwise touch
+  ///   it.  This function finds those orphans and runs `removeSubtree` on
+  ///   them, which cancels tasks, fires disappear handlers, removes
+  ///   dependency edges, and drops the node from `nodesByIdentity`.
+  ///
+  /// Item 3 of `ARCHITECTURE_NOTES.md` discusses consolidating this
+  /// split-brain into a single reconciler (Option A).  That's a larger
+  /// refactor and is not yet justified by a concrete pain point — this
+  /// comment is the documented-fence version of the fix.
   private func applyStructuralChildDiff(
     for node: ViewNode,
     resolved: ResolvedNode
