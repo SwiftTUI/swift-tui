@@ -213,6 +213,55 @@ struct AnimationControllerPropertyTests {
   }
 
   @Test(
+    "injected removal overlay nodes are marked transient"
+  )
+  func removalOverlayIsMarkedTransient() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+    let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+
+    let leaf = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let root = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: [leaf]
+    )
+    controller.beginTransitionCollection()
+    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(root, transaction: .init(), timestamp: t0)
+
+    var frame2 = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: []
+    )
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    let t1 = t0.advanced(by: .milliseconds(100))
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t1)
+
+    _ = controller.applyInterpolations(
+      to: &frame2,
+      at: t1.advanced(by: .milliseconds(50))
+    )
+    let overlayLeaf = frame2.children.first { $0.identity == leafIdentity }
+    #expect(overlayLeaf != nil)
+    if let overlayLeaf {
+      #expect(
+        overlayLeaf.isTransient,
+        "removal overlay root must be marked transient so semantics/focus skip it"
+      )
+    }
+  }
+
+  @Test(
     "removal transition offset composes with an existing offset on the root"
   )
   func removalOffsetComposesWithExistingOffset() throws {

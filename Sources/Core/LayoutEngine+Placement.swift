@@ -557,7 +557,8 @@ extension LayoutEngine {
       drawMetadata: resolved.drawMetadata,
       semanticMetadata: resolved.semanticMetadata,
       lifecycleMetadata: resolved.lifecycleMetadata,
-      drawPayload: resolved.drawPayload
+      drawPayload: resolved.drawPayload,
+      isTransient: resolved.isTransient
     )
   }
 
@@ -699,7 +700,8 @@ extension LayoutEngine {
       drawMetadata: node.drawMetadata,
       semanticMetadata: node.semanticMetadata,
       lifecycleMetadata: node.lifecycleMetadata,
-      drawPayload: node.drawPayload
+      drawPayload: node.drawPayload,
+      isTransient: node.isTransient
     )
   }
 

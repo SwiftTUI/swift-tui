@@ -265,6 +265,18 @@ public struct ResolvedNode: Equatable, Sendable {
   package var preferenceValues: PreferenceValues
   package private(set) var subtreeNodeCount: Int
   public var supportsRetainedReuse: Bool
+  /// Marks the node (and transitively any node that inherits this
+  /// flag via the layout engine) as a non-semantic visual overlay.
+  /// The animation controller sets this on every node in a removal
+  /// overlay subtree it injects during a `.transition(...)` exit.
+  ///
+  /// Transient nodes flow through the draw/raster path normally, so
+  /// they stay visible for the duration of the exit animation, but
+  /// are skipped by the semantic extractor, focus tracker, lifecycle
+  /// coordinator, and interaction hit testing.  Anything sitting on
+  /// the "is the committed tree still the authoritative source for
+  /// routing?" axis must filter transient nodes out.
+  public var isTransient: Bool = false
 
   public init(
     identity: Identity,
@@ -594,6 +606,12 @@ public struct PlacedNode: Equatable, Sendable {
   public var lifecycleMetadata: LifecycleMetadata
   public var drawPayload: DrawPayload
   package private(set) var subtreeNodeCount: Int
+  /// Mirror of ``ResolvedNode/isTransient``.  Set by the animation
+  /// controller's removal-overlay injection path, propagated through
+  /// measure and place by the layout engine, and filtered out by the
+  /// semantic extractor and every other consumer whose state must
+  /// track only the committed tree.
+  public var isTransient: Bool = false
 
   public init(
     identity: Identity,
@@ -609,7 +627,8 @@ public struct PlacedNode: Equatable, Sendable {
     drawMetadata: DrawMetadata = DrawMetadata(),
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
-    drawPayload: DrawPayload = .none
+    drawPayload: DrawPayload = .none,
+    isTransient: Bool = false
   ) {
     self.identity = identity
     self.kind = kind
@@ -625,6 +644,7 @@ public struct PlacedNode: Equatable, Sendable {
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
+    self.isTransient = isTransient
     subtreeNodeCount = 1
     recomputeSubtreeNodeCount()
   }
@@ -638,6 +658,12 @@ public struct PlacedNode: Equatable, Sendable {
   ) {
     var stack: [PlacedNode] = [self]
     while let node = stack.popLast() {
+      // Transient (animation removal overlay) subtrees do not
+      // participate in the lifecycle coordinator.  Their onAppear /
+      // onDisappear / task closures already fired against the
+      // committed tree's lifetime, and the exit animation is a
+      // purely visual afterimage.
+      if node.isTransient { continue }
       if !node.lifecycleMetadata.isEmpty {
         nodes.append(
           LifecycleStateNode(

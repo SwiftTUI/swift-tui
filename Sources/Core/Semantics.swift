@@ -150,6 +150,11 @@ extension SemanticExtractor {
     ]
 
     while let frame = stack.popLast() {
+      // Transient nodes (animation removal overlays) render but do
+      // not contribute to semantics, focus, or interaction routing.
+      // Skip them and their entire subtree — the committed tree is
+      // the authoritative source for routing.
+      if frame.node.isTransient { continue }
       switch frame.phase {
       case .enter:
         let nodeScopePath =
