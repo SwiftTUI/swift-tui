@@ -33,6 +33,9 @@ struct AnimationsTab: View {
 
   // Matched geometry demo: which column the "hero" lives in.
   @State private var heroOnRight: Bool = false
+  // Namespace scoping the matched geometry key so the same "hero"
+  // string ID wouldn't collide with any other section's usage.
+  @Namespace private var heroNamespace
 
   // Completion demo: a counter ticked by the callback closure.
   @State private var completionRuns: Int = 0
@@ -261,16 +264,16 @@ struct AnimationsTab: View {
           }
         }
       }
-      // Two HStacks whose inner ordering swaps based on state.
-      // The Text("★ hero") is tagged with matchedGeometryEffect(id:)
-      // so the controller recognizes it as the same view across
-      // the swap and animates the translation between the two
-      // slots.
+      // Two HStack orderings swapped based on state.  The
+      // Text("★ hero") is tagged with matchedGeometryEffect(id:in:)
+      // scoped to the heroNamespace, so the controller recognizes
+      // it as the same view across the swap and animates the
+      // translation between the two slots.
       HStack(spacing: 3) {
         if !heroOnRight {
           Text("★ hero")
             .foregroundStyle(Color.yellow)
-            .matchedGeometryEffect(id: "hero")
+            .matchedGeometryEffect(id: "hero", in: heroNamespace)
           Text("(empty)")
             .foregroundStyle(.muted)
         } else {
@@ -278,7 +281,7 @@ struct AnimationsTab: View {
             .foregroundStyle(.muted)
           Text("★ hero")
             .foregroundStyle(Color.yellow)
-            .matchedGeometryEffect(id: "hero")
+            .matchedGeometryEffect(id: "hero", in: heroNamespace)
         }
       }
     }

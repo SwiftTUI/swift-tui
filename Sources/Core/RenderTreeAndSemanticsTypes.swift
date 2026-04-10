@@ -208,6 +208,26 @@ public struct MatchedGeometryKey: Hashable, Sendable {
   }
 }
 
+/// Per-view-instance configuration carried alongside a
+/// ``MatchedGeometryKey`` on a resolved/placed node.  Currently
+/// only the `isSource` flag is stored; future extensions (e.g.
+/// per-property opt-outs) land here.
+public struct MatchedGeometryConfig: Equatable, Sendable {
+  public var key: MatchedGeometryKey
+  /// Whether this view contributes its geometry as the "from"
+  /// source for the match.  When multiple views share the same
+  /// key in the same frame, the last depth-first walk wins as the
+  /// source; views marked `isSource: false` never contribute.
+  /// Matches SwiftUI's `matchedGeometryEffect(id:in:properties:anchor:isSource:)`
+  /// semantics for the `isSource` parameter.
+  public var isSource: Bool
+
+  public init(key: MatchedGeometryKey, isSource: Bool = true) {
+    self.key = key
+    self.isSource = isSource
+  }
+}
+
 /// A node produced by the resolve phase before measurement.
 public struct ResolvedNode: Equatable, Sendable {
   public var identity: Identity
@@ -301,13 +321,14 @@ public struct ResolvedNode: Equatable, Sendable {
   package var preferenceValues: PreferenceValues
   package private(set) var subtreeNodeCount: Int
   public var supportsRetainedReuse: Bool
-  /// Matched-geometry tag set by ``View/matchedGeometryEffect(id:in:)``.
-  /// When two views in different frames (typically behind an
-  /// `if`/`else` branch) share the same key, the animation
-  /// controller treats the swap as a single view moving from the
-  /// previous frame's placed bounds to the new frame's placed
-  /// bounds and animates the translation under `withAnimation`.
-  public var matchedGeometry: MatchedGeometryKey? = nil
+  /// Matched-geometry configuration set by
+  /// ``View/matchedGeometryEffect(id:in:isSource:)``.  When two
+  /// views in different frames (typically behind an `if`/`else`
+  /// branch) share the same key, the animation controller treats
+  /// the swap as a single view moving from the previous frame's
+  /// placed bounds to the new frame's placed bounds and animates
+  /// the translation under `withAnimation`.
+  public var matchedGeometry: MatchedGeometryConfig? = nil
   /// Marks the node (and transitively any node that inherits this
   /// flag via the layout engine) as a non-semantic visual overlay.
   /// The animation controller sets this on every node in a removal
@@ -659,7 +680,7 @@ public struct PlacedNode: Equatable, Sendable {
   /// the resolved tree by the layout engine so the animation
   /// controller can compute matched-geometry bounds during
   /// capture+diff.
-  public var matchedGeometry: MatchedGeometryKey?
+  public var matchedGeometry: MatchedGeometryConfig?
 
   public init(
     identity: Identity,
@@ -677,7 +698,7 @@ public struct PlacedNode: Equatable, Sendable {
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
     isTransient: Bool = false,
-    matchedGeometry: MatchedGeometryKey? = nil
+    matchedGeometry: MatchedGeometryConfig? = nil
   ) {
     self.identity = identity
     self.kind = kind

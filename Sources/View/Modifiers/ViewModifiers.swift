@@ -216,11 +216,15 @@ extension View {
   /// and animate the transition as if a single view moved from
   /// the old location to the new one.
   ///
-  /// Matches SwiftUI's `.matchedGeometryEffect(id:in:)` API shape,
-  /// minus the `@Namespace` property-wrapper ceremony: the
-  /// ``MatchedGeometryNamespace`` is a plain `Hashable` value that
-  /// defaults to a single global namespace.  Callers needing
-  /// scoping allocate distinct namespaces explicitly.
+  /// Matches SwiftUI's `.matchedGeometryEffect(id:in:isSource:)`
+  /// API shape.  Scope keys with `@Namespace` or pass a
+  /// ``MatchedGeometryNamespace`` value explicitly.
+  ///
+  /// `isSource: false` lets you have multiple views with the same
+  /// key where only the designated source view contributes its
+  /// geometry as the "from" reference — the non-source instances
+  /// still receive the match and are positioned at the source's
+  /// location when they appear.
   ///
   /// - Note: The current implementation interpolates position only,
   ///   not size.  A view that changes width between its source and
@@ -228,11 +232,15 @@ extension View {
   ///   throughout the animation and translate its origin smoothly.
   public func matchedGeometryEffect<ID: Hashable>(
     id: ID,
-    in namespace: MatchedGeometryNamespace = .default
+    in namespace: MatchedGeometryNamespace = .default,
+    isSource: Bool = true
   ) -> some View {
     MatchedGeometryView(
       content: self,
-      key: MatchedGeometryKey(namespace: namespace, id: id)
+      config: MatchedGeometryConfig(
+        key: MatchedGeometryKey(namespace: namespace, id: id),
+        isSource: isSource
+      )
     )
   }
 
@@ -825,18 +833,18 @@ package struct PositionView<Content: View>: View, ResolvableView {
 
 package struct MatchedGeometryView<Content: View>: View, ResolvableView {
   package var content: Content
-  package var key: MatchedGeometryKey
+  package var config: MatchedGeometryConfig
 
-  package init(content: Content, key: MatchedGeometryKey) {
+  package init(content: Content, config: MatchedGeometryConfig) {
     self.content = content
-    self.key = key
+    self.config = config
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let nodes = content.resolveElements(in: context)
     return nodes.map { node in
       var tagged = node
-      tagged.matchedGeometry = key
+      tagged.matchedGeometry = config
       return tagged
     }
   }

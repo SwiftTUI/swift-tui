@@ -188,6 +188,76 @@ struct AnimationPipelineIntegrationTests {
   }
 
   @Test(
+    "matchedGeometryEffect: isSource: false does not contribute bounds to the match"
+  )
+  func matchedGeometryIsSourceFalseDoesNotContribute() throws {
+    // When a view is tagged with isSource: false, the
+    // capturePlacedTree walker skips it and no bounds are recorded
+    // for the key.  A subsequent frame that inserts a different
+    // view with the same key has no source to animate from, so no
+    // match fires.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    AnimationRegistrationStorage.currentSink = controller
+    TransitionRegistrationStorage.currentSink = controller
+    defer {
+      AnimationRegistrationStorage.currentSink = nil
+      TransitionRegistrationStorage.currentSink = nil
+    }
+
+    let animation = Animation.linear(duration: .milliseconds(1_000_000))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+
+    // Frame 1: hero tagged isSource: false.  The controller
+    // should NOT record its bounds.
+    _ = renderer.render(
+      HStack(spacing: 1) {
+        Text("hero").matchedGeometryEffect(id: "hero", isSource: false)
+        Text("other")
+      },
+      context: ResolveContext(identity: rootIdentity),
+      proposal: ProposedSize(width: .finite(40), height: .finite(3))
+    )
+    #expect(
+      controller.previousMatchedGeometryKeyCount == 0,
+      "non-source view should not contribute bounds, got \(controller.previousMatchedGeometryKeyCount)"
+    )
+
+    // Frame 2: swap children.  No source bounds available → no
+    // match should fire.
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    _ = renderer.render(
+      HStack(spacing: 1) {
+        Text("other")
+        Text("hero").matchedGeometryEffect(id: "hero", isSource: false)
+      },
+      context: ResolveContext(identity: rootIdentity, transaction: transaction),
+      proposal: ProposedSize(width: .finite(40), height: .finite(3))
+    )
+    #expect(
+      controller.activeMatchedGeometryCount == 0,
+      "non-source swap should not enqueue a match, got \(controller.activeMatchedGeometryCount)"
+    )
+  }
+
+  @Test(
+    "matchedGeometryEffect: @Namespace allocates a stable ID per view instance"
+  )
+  func matchedGeometryNamespaceIsStableAcrossRenders() throws {
+    // Direct check of the Namespace allocator: two fresh Namespace
+    // values should have distinct IDs, mirroring how SwiftUI
+    // allocates a new namespace per @Namespace property.
+    let first = MatchedGeometryNamespaceAllocator.next()
+    let second = MatchedGeometryNamespaceAllocator.next()
+    #expect(first != second)
+    #expect(first.rawValue != 0, "allocator should not collide with .default")
+    #expect(second.rawValue != 0)
+  }
+
+  @Test(
     "matchedGeometryEffect: at progress 0 the new identity renders at the source bounds"
   )
   func matchedGeometryRendersAtSourceAtProgressZero() throws {
@@ -247,7 +317,7 @@ struct AnimationPipelineIntegrationTests {
     _ node: PlacedNode,
     keyID: String
   ) -> Rect? {
-    if let key = node.matchedGeometry, key.id == keyID {
+    if let config = node.matchedGeometry, config.key.id == keyID {
       return node.bounds
     }
     for child in node.children {
