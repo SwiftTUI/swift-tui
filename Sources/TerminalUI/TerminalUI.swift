@@ -16,8 +16,23 @@ private final class RetainedFrameStore {
     )
   }
 
-  func store(_ artifacts: FrameArtifacts) {
-    previousFrameIndex = .init(frame: artifacts)
+  /// Stores the frame's artifacts so the next frame's pipeline can
+  /// reuse cached layout.
+  ///
+  /// `baselinePlacedTree` is the **pre-overlay** placed tree — the
+  /// canonical layout result from `LayoutEngine.place`, before the
+  /// animation controller injected any transient removal overlays.
+  /// The retained-layout cache indexes this baseline so future tick
+  /// frames reuse stable bounds/identities rather than the
+  /// animation-decorated tree; overlays are re-injected from the
+  /// controller's own removal-entry state on each tick.
+  ///
+  /// When no overlays were injected this frame, pass the same
+  /// `placedTree` as baseline — the two are identical.
+  func store(_ artifacts: FrameArtifacts, baselinePlacedTree: PlacedNode) {
+    var indexable = artifacts
+    indexable.placedTree = baselinePlacedTree
+    previousFrameIndex = .init(frame: indexable)
     previousRasterSurface = artifacts.rasterSurface
   }
 }
@@ -218,6 +233,21 @@ public struct DefaultRenderer {
         passContext: layoutPassContext
       )
     }
+    // Cache the BASELINE placed tree (pre-overlay) for two things:
+    // 1. The animation controller's removal-snapshot lookup on the
+    //    next frame (capturePlacedTree).
+    // 2. The retained-layout store below, so future tick frames
+    //    reuse the canonical layout and not an animation-decorated
+    //    tree.
+    //
+    // If we stored the post-overlay placed tree, subsequent ticks
+    // would hit retainedPlacement and return the cached tree
+    // including the stale transient overlay — then applyPlacedOverlays
+    // would inject another overlay on top, growing the tree each
+    // tick and leaving ghosted artefacts visible after the animation
+    // completes.
+    let baselinePlaced = placed
+    animationController.capturePlacedTree(baselinePlaced)
     // Inject any pending removal overlays at placed level (draw-only,
     // no layout-shift on sibling containers).  Only applies to
     // entries whose placedSnapshot was captured in a previous frame
@@ -227,9 +257,6 @@ public struct DefaultRenderer {
       to: &placed,
       at: animationTimestamp
     )
-    // Cache this frame's placed tree so the NEXT frame's removal
-    // detection can look up frozen bounds without re-running layout.
-    animationController.capturePlacedTree(placed)
     let presentationDamage = presentationDamage(
       rootIdentity: resolveContext.identity,
       placed: placed,
@@ -302,7 +329,7 @@ public struct DefaultRenderer {
       diagnostics: diagnostics
     )
 
-    retainedFrames.store(artifacts)
+    retainedFrames.store(artifacts, baselinePlacedTree: baselinePlaced)
     return artifacts
   }
 
