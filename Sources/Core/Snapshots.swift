@@ -35,7 +35,7 @@ public struct SnapshotRenderer {
 
     if let cache = diagnostics.measurementCache {
       lines.append(
-        "measurementCache=generation:\(cache.generation) entries:\(cache.entries) lookups:\(cache.lookups) hits:\(cache.hits) misses:\(cache.misses) stores:\(cache.stores)"
+        "measurementCache=generation:\(cache.generation) entries:\(cache.entries) lookups:\(cache.lookups) hits:\(cache.hits) misses:\(cache.misses) invalidations:\(cache.invalidations) stores:\(cache.stores)"
       )
     } else {
       lines.append("measurementCache=nil")

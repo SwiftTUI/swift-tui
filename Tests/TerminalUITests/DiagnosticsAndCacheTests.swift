@@ -574,7 +574,13 @@ struct DiagnosticsAndCacheTests {
     #expect(secondMetrics.entries == 3)
     #expect(secondMetrics.lookups == 5)
     #expect(secondMetrics.hits == 0)
-    #expect(secondMetrics.misses == 5)
+    // Of the 5 lookups, 2 found a cached entry that failed
+    // `isEquivalentForMeasurement` (the invalidated Text subtree and its
+    // VStack ancestor whose content recursively changed) and are now
+    // reported as invalidations rather than misses.  The remaining 3 are
+    // true cold misses.
+    #expect(secondMetrics.misses == 3)
+    #expect(secondMetrics.invalidations == 2)
     #expect(secondMetrics.stores == 5)
     #expect(second.diagnostics.invalidatedIdentities == [testIdentity("Root", "VStack[1]")])
     #expect(second.diagnostics.resolvedNodesComputed == 2)

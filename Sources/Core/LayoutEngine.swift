@@ -29,6 +29,7 @@ public final class MeasurementCache: Sendable {
     var lookups = 0
     var hits = 0
     var misses = 0
+    var invalidations = 0
     var stores = 0
   }
 
@@ -51,6 +52,7 @@ public final class MeasurementCache: Sendable {
         lookups: storage.lookups,
         hits: storage.hits,
         misses: storage.misses,
+        invalidations: storage.invalidations,
         stores: storage.stores
       )
     }
@@ -75,6 +77,21 @@ public final class MeasurementCache: Sendable {
         return nil
       }
 
+      // Verify equivalence before touching LRU bookkeeping.  If the cached
+      // entry is stale we evict it here so subsequent lookups don't keep
+      // re-fetching and re-rejecting the same mismatching cache line.
+      guard cached.resolved.isEquivalentForMeasurement(to: resolved) else {
+        identityStorage.entries.removeValue(forKey: proposal)
+        storage.entryCount -= 1
+        if identityStorage.entries.isEmpty {
+          storage.entriesByIdentity.removeValue(forKey: resolved.identity)
+        } else {
+          storage.entriesByIdentity[resolved.identity] = identityStorage
+        }
+        storage.invalidations += 1
+        return nil
+      }
+
       let generation = nextGeneration(in: &storage)
       identityStorage.entries[proposal] = .init(
         resolved: cached.resolved,
@@ -84,10 +101,6 @@ public final class MeasurementCache: Sendable {
       identityStorage.order.append(.init(proposal: proposal, generation: generation))
       compactOrderIfNeeded(in: &identityStorage)
       storage.entriesByIdentity[resolved.identity] = identityStorage
-      guard cached.resolved.isEquivalentForMeasurement(to: resolved) else {
-        storage.misses += 1
-        return nil
-      }
       storage.hits += 1
       return cached.node
     }
@@ -145,6 +158,7 @@ public final class MeasurementCache: Sendable {
       storage.lookups = 0
       storage.hits = 0
       storage.misses = 0
+      storage.invalidations = 0
       storage.stores = 0
     }
   }
