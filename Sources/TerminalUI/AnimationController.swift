@@ -988,15 +988,19 @@ package final class AnimationController {
   }
 
   /// Applies transition modifiers recursively to every node in the
-  /// subtree.  Opacity cascades (since rasterizer reads per-node opacity
-  /// and text leaves need to see it), and offset is applied only to the
-  /// root of the removed subtree to avoid double-application.
+  /// subtree.  Opacity cascades (since rasterizer reads per-node
+  /// opacity and text leaves need to see it).  Offset is applied only
+  /// at the subtree root — either in place on an `.intrinsic` node,
+  /// composed into an existing `.offset` variant, or via a fresh
+  /// wrapping node when the root already carries a non-offset layout
+  /// (`.frame`, `.padding`, etc.).  The wrapping approach lets
+  /// transitions like `.move(edge:)` slide a framed or padded view.
   private func applyTransitionModifiersRecursively(
     _ modifiers: TransitionModifiers,
     to node: inout ResolvedNode
   ) {
-    // Opacity cascades down to every descendant so the text leaf (which
-    // actually renders) sees the faded value.
+    // Opacity cascades down to every descendant so the text leaf
+    // (which actually renders) sees the faded value.
     if let opacity = modifiers.opacity {
       var drawMetadata = node.drawMetadata
       // If the node already has an explicit opacity, multiply so the
@@ -1005,8 +1009,6 @@ package final class AnimationController {
       drawMetadata.baseStyle.explicitOpacity = base * opacity
       node.drawMetadata = drawMetadata
     }
-    // Offsets apply only at the subtree root.
-    // (Not yet recursed into children for offsets.)
 
     var children = node.children
     for i in children.indices {
@@ -1022,16 +1024,45 @@ package final class AnimationController {
     // normal children setter.
     node.setChildrenPreservingDerivedState(children)
 
-    // Apply offset to the root of the subtree only.  The layout
-    // variant changes from .intrinsic → .offset here, so the reuse
-    // bit may change — use the normal setter to keep derived state
-    // correct.
+    // Apply offset to the root of the subtree only.
     let offsetX = modifiers.offsetX ?? 0
     let offsetY = modifiers.offsetY ?? 0
-    if offsetX != 0 || offsetY != 0,
-      case .intrinsic = node.layoutBehavior
-    {
+    guard offsetX != 0 || offsetY != 0 else { return }
+
+    switch node.layoutBehavior {
+    case .intrinsic:
+      // Variant is changing .intrinsic → .offset; reuse bit may
+      // change, so use the normal setter.
       node.layoutBehavior = .offset(x: offsetX, y: offsetY)
+
+    case .offset(let existingX, let existingY):
+      // Compose with an existing offset by summation.  Variant
+      // unchanged → bypass derived-state recomputes.
+      node.setLayoutBehaviorPreservingDerivedState(
+        .offset(x: existingX + offsetX, y: existingY + offsetY)
+      )
+
+    default:
+      // Root already carries a non-offset layout (frame, padding,
+      // flexibleFrame, stack, etc.).  Wrap it in a fresh offset
+      // node so the transition offset composes with the authored
+      // layout instead of being silently dropped.
+      //
+      // The wrapper's identity is derived from the root by appending
+      // a private component so it is stable across ticks (same
+      // identity produces the same wrapping, no structural churn).
+      let wrapperIdentity = Identity(
+        components: node.identity.components + ["__transitionOffset"]
+      )
+      let wrapped = ResolvedNode(
+        identity: wrapperIdentity,
+        kind: .view("TransitionOffset"),
+        children: [node],
+        environmentSnapshot: node.environmentSnapshot,
+        transactionSnapshot: node.transactionSnapshot,
+        layoutBehavior: .offset(x: offsetX, y: offsetY)
+      )
+      node = wrapped
     }
   }
 
