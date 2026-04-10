@@ -48,7 +48,10 @@
       "Bash(git -c commit.gpgsign=false commit -m \"chore\\(gallery\\): drop unused swift-algorithms dep\")",
       "Bash(timeout 2 swift run --package-path Examples/gallery gallery-demo)",
       "Bash(echo \"---exit: $?\")",
-      "Bash(swift run:*)"
+      "Bash(swift run:*)",
+      "Read(//private/tmp/**)",
+      "Bash(rm -f gallery_repro_out gallery_repro_in)",
+      "Bash(mkfifo gallery_repro_in)"
     ]
   }
 }

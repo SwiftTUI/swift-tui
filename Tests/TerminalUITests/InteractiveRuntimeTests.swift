@@ -2477,6 +2477,72 @@ struct InteractiveRuntimeTests {
     )
   }
 
+  /// Gallery-parity regression: the real gallery doesn't pass an
+  /// explicit position binding to its ScrollView, so scroll state
+  /// lives in the ScrollView's own `@State private var internalPosition`.
+  /// The TabView above it owns its selection via a `@State` binding —
+  /// which triggers the code path that captures the ScrollView's
+  /// subtree into a `ResolvedContentView` and causes the ScrollView's
+  /// own ViewNode to be orphaned from the snapshot walk whenever
+  /// selective dirty evaluation runs only its evaluator.
+  ///
+  /// Before the fix, scroll-induced state changes on the ScrollView
+  /// never reached the rendered surface until some unrelated re-resolve
+  /// of the TabView body forced a full snapshot rebuild (e.g. a mouse
+  /// click anywhere in the console).
+  ///
+  /// This test uses scripted terminal input for determinism and
+  /// asserts the rendered surface advances after a single scroll
+  /// event, without any follow-up interaction.
+  @MainActor
+  @Test(
+    "scroll on TabView-hosted internal-@State ScrollView updates the rendered surface without a follow-up click"
+  )
+  func scrollOnTabViewHostedInternalStateScrollViewUpdatesRenderedSurface() async throws {
+    let terminalSize = Size(width: 60, height: 20)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("InternalStateTabScrollFixture")
+
+    let scrollRect = try #require(
+      renderedFirstScrollViewportRect(
+        in: TabHostedInternalStateGalleryFixture(),
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 0, deltaY: 3),
+            location: centerPoint(of: scrollRect)
+          ))
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { TabHostedInternalStateGalleryFixture() }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(terminal.frames.count >= 2)
+    let firstFrame = try #require(terminal.frames.first)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(
+      firstFrame.contains("Gallery row 0"),
+      "initial render should show the first row of scroll content"
+    )
+    #expect(
+      firstFrame != lastFrame,
+      "the rendered surface should differ after scrolling — a last frame that still matches the first means scroll state changes never reached the snapshot (the click-to-flush regression)"
+    )
+    #expect(
+      !lastFrame.contains("Gallery row 0"),
+      "scrolling 3 rows down should push the top-of-scroll row above the viewport"
+    )
+  }
+
   @Test("real InputReader scroll bursts update the visible gallery pane before any follow-up click")
   func realInputReaderScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick() async throws {
     var descriptors: [Int32] = [0, 0]
@@ -4556,6 +4622,27 @@ private func renderedInteractionRect<V: View>(
 }
 
 @MainActor
+private func renderedFirstScrollViewportRect<V: View>(
+  in view: V,
+  rootIdentity: Identity,
+  terminalSize: Size
+) -> Rect? {
+  var environmentValues = EnvironmentValues()
+  environmentValues.terminalSize = terminalSize
+
+  let artifacts = DefaultRenderer().render(
+    view,
+    context: .init(
+      identity: rootIdentity,
+      environmentValues: environmentValues
+    ),
+    proposal: .init(width: terminalSize.width, height: terminalSize.height)
+  )
+
+  return artifacts.semanticSnapshot.scrollRoutes.first?.viewportRect
+}
+
+@MainActor
 private func renderedScrollViewportRect<V: View>(
   for identity: Identity,
   in view: V,
@@ -4804,6 +4891,69 @@ private enum RegressionPhase: Equatable, Sendable {
     case .a: "A"
     case .b: "B"
     case .c: "C"
+    }
+  }
+}
+
+/// Mirrors the gallery animations tab's **state ownership** shape: the
+/// ScrollView receives no explicit `position` binding, so scroll state
+/// lives in the ScrollView's own `@State private var internalPosition`.
+/// The surrounding view also holds its own `@State` field to mimic the
+/// gallery's multiple-@State view shape.
+///
+/// The earlier gallery regression fixtures passed an *external*
+/// `LockedBox<ScrollPosition>` through a `Binding`, which bypasses the
+/// internal state-slot dirtying path.  This fixture exercises the
+/// internal-state path the gallery actually uses.
+private struct InternalStateGalleryShapedFixture: View {
+  @State private var unrelatedCounter: Int = 0
+
+  var body: some View {
+    ScrollView(.vertical) {
+      VStack(alignment: .leading, spacing: 1) {
+        PhaseAnimator([RegressionPhase.a, .b, .c]) { phase in
+          Text("Phase \(phase.label)")
+        } animation: { _ in
+          .linear(duration: .milliseconds(100))
+        }
+        ForEach(0..<40) { index in
+          Text("Gallery row \(index)")
+        }
+        // A hidden tap target so the outer @State field is reachable
+        // from input tests; the visible behaviour is identical whether
+        // it is present or not.  Keeping it ensures the state slot is
+        // actually authored.
+        Text("counter \(unrelatedCounter)")
+      }
+      .padding(1)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+}
+
+private struct TabHostedInternalStateGalleryFixture: View {
+  enum Tab: Hashable {
+    case controls
+    case animations
+  }
+
+  // Mirrors the real gallery: the selection is @State-owned (not a
+  // constant).  Even without navigating away first, a @State-backed
+  // TabView selection exercises a different code path from
+  // `.constant(...)` — the selection binding writes go through the
+  // parent view's state container, which re-resolves the entire TabView
+  // subtree on each write.
+  @State private var selection: Tab = .animations
+
+  var body: some View {
+    TabView(selection: $selection) {
+      Text("Controls")
+        .tabItem("Controls")
+        .tag(Tab.controls)
+
+      InternalStateGalleryShapedFixture()
+        .tabItem("Animations")
+        .tag(Tab.animations)
     }
   }
 }
