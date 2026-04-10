@@ -128,6 +128,103 @@ struct LinearCustomAnimation: CustomAnimation {
 @Suite("Animation end-to-end pipeline integration")
 struct AnimationPipelineIntegrationTests {
   @Test(
+    "probe: .offset(x:y:) animates when numeric args change under withAnimation"
+  )
+  func probeOffsetAnimationThroughPipeline() throws {
+    // Probe: does .offset(x:y:) animate when its numeric arguments
+    // change under withAnimation?  The controller's diff + applyValue
+    // path should enqueue offsetX/offsetY animations and the layout
+    // engine should reflow the child bounds every tick.
+    //
+    // End-to-end via DefaultRenderer so we catch any retained-reuse
+    // cache interaction.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let animation = Animation.linear(duration: .milliseconds(1_000_000))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+
+    // Frame 1: offset (0, 0) → baseline.
+    _ = renderer.render(
+      Text("hello").offset(x: 0, y: 0),
+      context: ResolveContext(identity: rootIdentity)
+    )
+
+    // Frame 2: offset (20, 0) under animate intent.
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    let frame2 = renderer.render(
+      Text("hello").offset(x: 20, y: 0),
+      context: ResolveContext(identity: rootIdentity, transaction: transaction)
+    )
+
+    // If the diff+applyValue path works, the controller should now
+    // hold an active offsetX animation.
+    #expect(
+      controller.activeAnimationCount > 0,
+      "frame 2 should enqueue an offsetX animation, got count=\(controller.activeAnimationCount)"
+    )
+    #expect(
+      controller.lastTickResult.hasActiveAnimations,
+      "frame 2 should report hasActiveAnimations after offset change"
+    )
+
+    // The placed tree should carry the interpolated offset (at
+    // progress ~0 it matches the previous offset, so the bounds
+    // should approximately equal frame 1's child bounds, not the
+    // new layout's (20, 0).  The key test is whether the interpolation
+    // machinery is engaged at all.
+    let frame2Offset = Self.findOffsetContainerChildBounds(frame2.placedTree)
+    #expect(frame2Offset != nil)
+    if let frame2Offset {
+      // At progress 0 with from=0, to=20, interpolated=0.
+      // Child origin should be at (0, 0), not (20, 0).
+      #expect(
+        frame2Offset.origin.x == 0,
+        "at progress 0, offset child should still be at x=0 (interpolated from=0), got \(frame2Offset.origin.x)"
+      )
+    }
+
+    // Frame 3: same tree as frame 2 (tick frame, no state change).
+    // The active animation should still be running and the bounds
+    // should still reflect the interpolated (not the final) offset.
+    let frame3 = renderer.render(
+      Text("hello").offset(x: 20, y: 0),
+      context: ResolveContext(identity: rootIdentity)
+    )
+    let frame3Offset = Self.findOffsetContainerChildBounds(frame3.placedTree)
+    #expect(frame3Offset != nil)
+    if let frame3Offset {
+      #expect(
+        frame3Offset.origin.x < 20,
+        "frame 3 tick should still be interpolating, not yet at 20 (got \(frame3Offset.origin.x))"
+      )
+    }
+    #expect(
+      controller.lastTickResult.hasActiveAnimations,
+      "frame 3 tick should still report active animation"
+    )
+    _ = frame3
+  }
+
+  /// Walks a placed tree looking for a node whose kind is "Offset"
+  /// and returns its single child's bounds.  Used by the offset
+  /// animation probe to verify the child has been placed at the
+  /// interpolated offset.
+  private static func findOffsetContainerChildBounds(_ placed: PlacedNode) -> Rect? {
+    if case .view(let name) = placed.kind, name == "Offset" {
+      return placed.children.first?.bounds
+    }
+    for child in placed.children {
+      if let found = findOffsetContainerChildBounds(child) {
+        return found
+      }
+    }
+    return nil
+  }
+
+  @Test(
     "insertion offset animation survives across tick frames and completes cleanly"
   )
   func insertionOffsetAnimationCompletes() throws {
