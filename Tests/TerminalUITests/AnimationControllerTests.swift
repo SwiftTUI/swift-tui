@@ -46,6 +46,21 @@ struct AnimationControllerSnapshotTests {
     )
   }
 
+  @Test("extracts borderColor from drawMetadata.borderShapeStyle")
+  func extractsBorderColor() throws {
+    var drawMetadata = DrawMetadata()
+    drawMetadata.borderShapeStyle = .color(Color.green)
+
+    let node = ResolvedNode(
+      identity: Identity(components: [.named("test")]),
+      kind: .view("Leaf"),
+      drawMetadata: drawMetadata
+    )
+
+    let snapshot = AnimatableSnapshot.extract(from: node)
+    #expect(snapshot.borderColor == Color.green)
+  }
+
   @Test("local drawMetadata takes priority over environment snapshot")
   func localDrawMetadataWinsOverEnvironment() throws {
     var style = StyleEnvironmentSnapshot()
@@ -64,6 +79,63 @@ struct AnimationControllerSnapshotTests {
 
     let snapshot = AnimatableSnapshot.extract(from: node)
     #expect(snapshot.foregroundColor == Color.red)
+  }
+}
+
+@MainActor
+@Suite("AnimationController property animations")
+struct AnimationControllerPropertyTests {
+  @Test(
+    "borderColor change under withAnimation is interpolated through the tree"
+  )
+  func borderColorAnimationIsInterpolated() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("leaf")])
+
+    var frame1Metadata = DrawMetadata()
+    frame1Metadata.borderShapeStyle = .color(Color.red)
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame1Metadata
+    )
+
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Frame 2: border shifts red → blue under withAnimation.
+    var frame2Metadata = DrawMetadata()
+    frame2Metadata.borderShapeStyle = .color(Color.blue)
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame2Metadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    // Apply halfway through the 200 ms linear curve.
+    let halfway = t0.advanced(by: .milliseconds(100))
+    let result = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    #expect(result.hasActiveAnimations)
+    #expect(result.affectedIdentities.contains(leafIdentity))
+
+    // The interpolated border should not equal either endpoint — if
+    // extraction or apply were broken it would snap to blue (the
+    // new value) because the diff would collapse to .inherit → snap.
+    guard case .color(let interpolated) = frame2.drawMetadata.borderShapeStyle else {
+      Issue.record("border shape style should still be a color after interpolation")
+      return
+    }
+    #expect(
+      interpolated != Color.red && interpolated != Color.blue,
+      "halfway interpolation should produce an intermediate color, not an endpoint"
+    )
   }
 }
 
