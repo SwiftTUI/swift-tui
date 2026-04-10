@@ -126,6 +126,11 @@ package struct ActiveAnimation: Sendable {
   package var to: AnimatableValue
   package var animationBox: AnimationBox
   package var startTime: MonotonicInstant
+  /// Per-key persistent state threaded into
+  /// ``CustomAnimation/animate(value:time:context:)`` on each tick.
+  /// Built-in bezier/spring curves ignore this; custom animations can
+  /// use it to persist bookkeeping across frames.
+  package var customState: AnimationState = .init()
 }
 
 /// Result of a tick: tells the runtime whether more frames are needed
@@ -679,7 +684,12 @@ package final class AnimationController {
         continue
       }
       let elapsed = animation.startTime.duration(to: timestamp)
-      guard let progress = anim.evaluate(elapsed: elapsed) else {
+      var state = animation.customState
+      let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
+      // Store the updated custom state back on the active animation so
+      // the next tick carries user bookkeeping forward.
+      activeAnimations[key]?.customState = state
+      guard let progress = evaluated else {
         // Animation complete — snap to final value and purge.
         interpolated[key.identity, default: [:]][key.property] = animation.to
         keysToRemove.append(key)
