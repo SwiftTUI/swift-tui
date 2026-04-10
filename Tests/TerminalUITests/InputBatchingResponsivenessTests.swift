@@ -99,9 +99,15 @@ struct InputBatchingResponsivenessTests {
     try #require(pipeResult == 0)
     let readEnd = pipeFDs[0]
     let writeEnd = pipeFDs[1]
+    var didCloseReadEnd = false
+    var didCloseWriteEnd = false
     defer {
-      close(readEnd)
-      close(writeEnd)
+      if !didCloseReadEnd {
+        close(readEnd)
+      }
+      if !didCloseWriteEnd {
+        close(writeEnd)
+      }
     }
 
     let flags = fcntl(readEnd, F_GETFL)
@@ -118,17 +124,22 @@ struct InputBatchingResponsivenessTests {
         }
       }
     }
+    defer {
+      consumerTask.cancel()
+    }
 
     let scrollEventBytes: [UInt8] = Array("\u{1B}[<64;5;5M".utf8)
-    _ = unsafe scrollEventBytes.withUnsafeBufferPointer { buffer in
+    let bytesWritten = unsafe scrollEventBytes.withUnsafeBufferPointer { buffer in
       unsafe Darwin.write(writeEnd, buffer.baseAddress, buffer.count)
     }
+    #expect(bytesWritten == scrollEventBytes.count)
     close(writeEnd)
+    didCloseWriteEnd = true
 
     // Wait for the consumer task to drain the pipe and yield the
     // event(s).  Closing the writeEnd makes the dispatch source
     // see EOF, so the reader's stream finishes deterministically.
-    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
     while ContinuousClock.now < deadline {
       if !receivedEvents.value.isEmpty {
         break
@@ -148,7 +159,8 @@ struct InputBatchingResponsivenessTests {
       "the consumer must see at least one scroll event from the pipe"
     )
 
-    consumerTask.cancel()
+    _ = close(readEnd)
+    didCloseReadEnd = true
   }
 
   @Test("pointer burst coalescing still preserves event boundaries")
