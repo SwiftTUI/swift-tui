@@ -20,6 +20,8 @@ package enum AnimatableProperty: Hashable, Sendable {
   case paddingTrailing
   case offsetX
   case offsetY
+  case positionX
+  case positionY
   case frameWidth
   case frameHeight
 }
@@ -41,6 +43,8 @@ package struct AnimatableSnapshot: Equatable, Sendable {
   package var padding: EdgeInsets?
   package var offsetX: Int?
   package var offsetY: Int?
+  package var positionX: Int?
+  package var positionY: Int?
   package var frameWidth: Int?
   package var frameHeight: Int?
 
@@ -76,6 +80,9 @@ package struct AnimatableSnapshot: Equatable, Sendable {
     case .offset(let x, let y):
       snapshot.offsetX = x
       snapshot.offsetY = y
+    case .position(let x, let y):
+      snapshot.positionX = x
+      snapshot.positionY = y
     case .frame(let width, let height, _):
       snapshot.frameWidth = width
       snapshot.frameHeight = height
@@ -997,6 +1004,28 @@ package final class AnimationController {
     )
     enqueueIfChanged(
       identity: identity,
+      property: .positionX,
+      previous: previous.positionX,
+      current: current.positionX,
+      toValue: AnimatableValue.integer,
+      fromValue: AnimatableValue.integer,
+      request: request,
+      batchID: batchID,
+      timestamp: timestamp
+    )
+    enqueueIfChanged(
+      identity: identity,
+      property: .positionY,
+      previous: previous.positionY,
+      current: current.positionY,
+      toValue: AnimatableValue.integer,
+      fromValue: AnimatableValue.integer,
+      request: request,
+      batchID: batchID,
+      timestamp: timestamp
+    )
+    enqueueIfChanged(
+      identity: identity,
       property: .frameWidth,
       previous: previous.frameWidth,
       current: current.frameWidth,
@@ -1489,6 +1518,16 @@ package final class AnimationController {
       if case .offset(_, let y) = node.layoutBehavior {
         // Variant unchanged (still .offset), only numeric values move.
         node.setLayoutBehaviorPreservingDerivedState(.offset(x: x, y: y))
+      }
+
+    case (.positionX, .integer(let x)):
+      if case .position(_, let y) = node.layoutBehavior {
+        node.setLayoutBehaviorPreservingDerivedState(.position(x: x, y: y))
+      }
+
+    case (.positionY, .integer(let y)):
+      if case .position(let x, _) = node.layoutBehavior {
+        node.setLayoutBehaviorPreservingDerivedState(.position(x: x, y: y))
       }
 
     case (.offsetY, .integer(let y)):

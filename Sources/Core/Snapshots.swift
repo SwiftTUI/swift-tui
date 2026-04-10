@@ -247,6 +247,8 @@ extension SnapshotRenderer {
       return "frame(\(widthDescription),\(heightDescription),\(alignment.rawValue))"
     case .offset(let x, let y):
       return "offset(\(x),\(y))"
+    case .position(let x, let y):
+      return "position(\(x),\(y))"
     case .flexibleFrame(
       let minW, let idealW, let maxW, let minH, let idealH, let maxH, let alignment):
       func desc(_ d: ProposedDimension?) -> String {

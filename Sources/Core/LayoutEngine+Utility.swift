@@ -49,7 +49,8 @@ extension LayoutEngine {
         return .unspecified
       }
       return effectiveProposal
-    case .stack, .lazyStack, .overlay, .padding, .offset, .decoration, .viewThatFits, .custom:
+    case .stack, .lazyStack, .overlay, .padding, .offset, .position, .decoration, .viewThatFits,
+      .custom:
       return .unspecified
     case .frame(let width, let height, _):
       return ProposedSize(

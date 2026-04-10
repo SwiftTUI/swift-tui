@@ -579,7 +579,7 @@ extension LayoutEngine {
         return min(1, mainDimension(of: idealMeasurement.measuredSize, for: axis))
       }
       return childMinimums.max() ?? 0
-    case .overlay, .offset, .decoration:
+    case .overlay, .offset, .position, .decoration:
       return childMinimums.max() ?? 0
     case .stack(
       axis: let stackAxis, let spacing,

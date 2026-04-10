@@ -453,7 +453,7 @@ public struct LayoutEngine: Sendable {
     passContext: LayoutPassContext?
   ) -> [MeasuredNode] {
     switch resolved.layoutBehavior {
-    case .intrinsic, .overlay, .offset:
+    case .intrinsic, .overlay, .offset, .position:
       return resolved.children.map { child in
         measure(child, proposal: parentProposal, passContext: passContext)
       }
@@ -727,6 +727,24 @@ public struct LayoutEngine: Sendable {
       )
     case .offset:
       return childMeasurements.first?.measuredSize ?? .zero
+    case .position:
+      // `.position` fills the proposed space so the parent reserves
+      // room for the absolute placement area.  Unspecified
+      // dimensions fall back to the child's measured size.
+      let contentSize = childMeasurements.first?.measuredSize ?? .zero
+      let width: Int =
+        switch proposal.width {
+        case .finite(let w): w
+        case .infinity: max(contentSize.width, 0)
+        case .unspecified: contentSize.width
+        }
+      let height: Int =
+        switch proposal.height {
+        case .finite(let h): h
+        case .infinity: max(contentSize.height, 0)
+        case .unspecified: contentSize.height
+        }
+      return Size(width: width, height: height)
     case .flexibleFrame(let minW, let idealW, let maxW, let minH, let idealH, let maxH, _):
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
       return Size(
