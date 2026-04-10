@@ -4,7 +4,40 @@ package final class ViewNode {
   package weak var invalidator: (any Invalidating)?
   package weak var ownerGraph: ViewGraph?
   package weak var parent: ViewNode?
-  package private(set) var resolvedIdentity: Identity
+
+  /// The most-recently-committed `ResolvedNode` for this node.
+  ///
+  /// This is the single source of truth for the per-node render-tree
+  /// state that used to live in ~14 scattered mirror fields (`kind`,
+  /// `layoutBehavior`, `drawMetadata`, and so on).  Those accessors still
+  /// exist as computed properties that forward to `committed`, so
+  /// external readers see the same API they did before Item 6.
+  ///
+  /// Two invariants to be aware of:
+  ///
+  /// 1. `committed.children` holds the child `ResolvedNode`s passed to
+  ///    the most recent `apply(resolved:children:)`.  It may go stale
+  ///    between commits — if a descendant is re-applied, the parent's
+  ///    `committed.children` is not automatically updated.
+  ///    `isCommittedSnapshotFresh` tracks that.
+  /// 2. `committed.identity` plays the role of the old
+  ///    `resolvedIdentity` field: it's the identity the resolved tree
+  ///    was built with, which may differ from `self.identity` when a
+  ///    registration alias remaps identity during resolve.
+  package private(set) var committed: ResolvedNode
+
+  /// Whether `committed.children` still reflects the current state of
+  /// descendant `ViewNode`s.
+  ///
+  /// Flipped `false` when any descendant is dirtied or re-applied (via
+  /// `invalidateCachedSnapshotUpward` / `invalidateAncestorCachedSnapshots`).
+  /// Flipped `true` by `apply(resolved:children:)` and by successful
+  /// `snapshot()` rebuilds.
+  ///
+  /// Also doubles as the "have I been committed at least once" flag —
+  /// `init` leaves it `false` until the first `apply`, so `canReuse`
+  /// correctly refuses to reuse an untouched node.
+  private var isCommittedSnapshotFresh: Bool
 
   package private(set) var children: [ViewNode]
   package private(set) var stateSlots: [Int: AnyStateSlot]
@@ -12,20 +45,6 @@ package final class ViewNode {
   package private(set) var lifecycleState: NodeLifecycleState
   package private(set) var registeredHandlers: NodeHandlers
 
-  package var kind: NodeKind
-  package var environmentSnapshot: EnvironmentSnapshot
-  package var transactionSnapshot: TransactionSnapshot
-  package var layoutBehavior: LayoutBehavior
-  package var layoutMetadata: LayoutMetadata
-  package var drawMetadata: DrawMetadata
-  package var semanticMetadata: SemanticMetadata
-  package var lifecycleMetadata: LifecycleMetadata
-  package var drawPayload: DrawPayload
-  package var intrinsicSize: Size?
-  package var indexedChildSource: (any IndexedChildSource)?
-  package var preferenceValues: PreferenceValues
-  package var supportsRetainedReuse: Bool
-  package var childDescriptors: [ChildDescriptor]
   package var isDirty: Bool
 
   package var wasPresentAtFrameStart: Bool
@@ -37,7 +56,6 @@ package final class ViewNode {
   package private(set) var pendingChangeHandlerIDs: [String]
 
   private let dependencyTracker: DependencyTracker
-  private var cachedResolvedNode: ResolvedNode?
   private var registrationCaptureDepth: Int
   private var evaluationDepth: Int
   private var hasCommittedPresence: Bool
@@ -50,26 +68,16 @@ package final class ViewNode {
     identity: Identity
   ) {
     self.identity = identity
-    resolvedIdentity = identity
+    committed = ResolvedNode(
+      identity: identity,
+      kind: .view("EmptyView")
+    )
+    isCommittedSnapshotFresh = false
     children = []
     stateSlots = [:]
     dependencies = .init()
     lifecycleState = .alive
     registeredHandlers = .init()
-    kind = .view("EmptyView")
-    environmentSnapshot = .init()
-    transactionSnapshot = .init()
-    layoutBehavior = .intrinsic
-    layoutMetadata = .init()
-    drawMetadata = .init()
-    semanticMetadata = .init()
-    lifecycleMetadata = .init()
-    drawPayload = .none
-    intrinsicSize = nil
-    indexedChildSource = nil
-    preferenceValues = .init()
-    supportsRetainedReuse = true
-    childDescriptors = []
     isDirty = true
     wasPresentAtFrameStart = false
     wasVisitedThisFrame = false
@@ -288,21 +296,8 @@ package final class ViewNode {
       child.parent = nil
     }
 
-    resolvedIdentity = resolved.identity
-    kind = resolved.kind
-    environmentSnapshot = resolved.environmentSnapshot
-    transactionSnapshot = resolved.transactionSnapshot
-    layoutBehavior = resolved.layoutBehavior
-    layoutMetadata = resolved.layoutMetadata
-    drawMetadata = resolved.drawMetadata
-    semanticMetadata = resolved.semanticMetadata
-    lifecycleMetadata = resolved.lifecycleMetadata
-    drawPayload = resolved.drawPayload
-    intrinsicSize = resolved.intrinsicSize
-    indexedChildSource = resolved.indexedChildSource
-    preferenceValues = resolved.preferenceValues
-    supportsRetainedReuse = resolved.supportsRetainedReuse
-    childDescriptors = resolved.children.map(ChildDescriptor.init)
+    committed = resolved
+    isCommittedSnapshotFresh = true
     self.children = children
     for child in children {
       guard child !== self else {
@@ -310,7 +305,6 @@ package final class ViewNode {
       }
       child.parent = self
     }
-    cachedResolvedNode = resolved
     invalidateAncestorCachedSnapshots()
   }
 
@@ -323,10 +317,10 @@ package final class ViewNode {
     return wasPresentAtFrameStart
       && !wasVisitedThisFrame
       && !isDirty
-      && supportsRetainedReuse
-      && cachedResolvedNode != nil
-      && environmentSnapshot == environment
-      && transactionSnapshot == transaction
+      && isCommittedSnapshotFresh
+      && committed.supportsRetainedReuse
+      && committed.environmentSnapshot == environment
+      && committed.transactionSnapshot == transaction
   }
 
   package var hasDirtyAncestor: Bool {
@@ -513,29 +507,23 @@ package final class ViewNode {
 
   /// Whether this node has a cached resolved snapshot available for reuse.
   package var hasCachedSnapshot: Bool {
-    cachedResolvedNode != nil
+    isCommittedSnapshotFresh
   }
 
   package func snapshot() -> ResolvedNode {
-    if let cachedResolvedNode {
-      return cachedResolvedNode
+    if isCommittedSnapshotFresh {
+      return committed
     }
 
-    return ResolvedNode(
-      identity: resolvedIdentity,
-      kind: kind,
-      children: children.map { $0.snapshot() },
-      environmentSnapshot: environmentSnapshot,
-      transactionSnapshot: transactionSnapshot,
-      layoutBehavior: layoutBehavior,
-      layoutMetadata: layoutMetadata,
-      drawMetadata: drawMetadata,
-      semanticMetadata: semanticMetadata,
-      lifecycleMetadata: lifecycleMetadata,
-      drawPayload: drawPayload,
-      intrinsicSize: intrinsicSize,
-      indexedChildSource: indexedChildSource
-    )
+    // Rebuild the whole-subtree snapshot by recursively pulling each
+    // child ViewNode's current snapshot.  The `didSet` on
+    // `ResolvedNode.children` then recomputes preferenceValues,
+    // subtreeNodeCount, and supportsRetainedReuse from the new children.
+    var rebuilt = committed
+    rebuilt.children = children.map { $0.snapshot() }
+    committed = rebuilt
+    isCommittedSnapshotFresh = true
+    return committed
   }
 
   private func invalidateCachedSnapshotUpward() {
@@ -547,7 +535,7 @@ package final class ViewNode {
       guard visited.insert(nodeID).inserted else {
         return
       }
-      node.cachedResolvedNode = nil
+      node.isCommittedSnapshotFresh = false
       current = node.parent
     }
   }
@@ -561,7 +549,7 @@ package final class ViewNode {
       guard visited.insert(nodeID).inserted else {
         return
       }
-      node.cachedResolvedNode = nil
+      node.isCommittedSnapshotFresh = false
       current = node.parent
     }
   }
@@ -569,7 +557,7 @@ package final class ViewNode {
   package var participatesInStructuralLifecycle: Bool {
     var ancestor = parent
     while let current = ancestor {
-      if current.indexedChildSource != nil {
+      if current.committed.indexedChildSource != nil {
         return false
       }
       ancestor = current.parent
@@ -614,5 +602,45 @@ package final class ViewNode {
     _ hasCommittedPresence: Bool
   ) {
     self.hasCommittedPresence = hasCommittedPresence
+  }
+}
+
+// MARK: - Committed-field forwarding accessors
+//
+// Prior to Item 6 of ARCHITECTURE_NOTES.md these were ~14 stored mirror
+// fields on ViewNode that were copied one-by-one out of each new
+// ResolvedNode during `apply(resolved:children:)`.  The mirror had two
+// problems:
+//
+// - drift risk: nothing enforced that the scattered fields stayed
+//   consistent with the most-recently-applied ResolvedNode.
+// - boilerplate: every new ResolvedNode field required touching
+//   `apply()`, `snapshot()`, and both inits.
+//
+// Now they're derived from `committed: ResolvedNode`, which is a single
+// stored field.  External readers see the same API they did before.
+// There are no setters: all writes must go through
+// `apply(resolved:children:)`.
+extension ViewNode {
+  package var resolvedIdentity: Identity { committed.identity }
+  package var kind: NodeKind { committed.kind }
+  package var environmentSnapshot: EnvironmentSnapshot { committed.environmentSnapshot }
+  package var transactionSnapshot: TransactionSnapshot { committed.transactionSnapshot }
+  package var layoutBehavior: LayoutBehavior { committed.layoutBehavior }
+  package var layoutMetadata: LayoutMetadata { committed.layoutMetadata }
+  package var drawMetadata: DrawMetadata { committed.drawMetadata }
+  package var semanticMetadata: SemanticMetadata { committed.semanticMetadata }
+  package var lifecycleMetadata: LifecycleMetadata { committed.lifecycleMetadata }
+  package var drawPayload: DrawPayload { committed.drawPayload }
+  package var intrinsicSize: Size? { committed.intrinsicSize }
+  package var indexedChildSource: (any IndexedChildSource)? { committed.indexedChildSource }
+  package var preferenceValues: PreferenceValues { committed.preferenceValues }
+  package var supportsRetainedReuse: Bool { committed.supportsRetainedReuse }
+
+  /// Derived on demand from `committed.children`.  Previously a stored
+  /// field that was set in `apply()`; now computed so it can never drift
+  /// from its source.
+  package var childDescriptors: [ChildDescriptor] {
+    committed.children.map(ChildDescriptor.init)
   }
 }
