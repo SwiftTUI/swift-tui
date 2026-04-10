@@ -213,6 +213,155 @@ struct AnimationControllerPropertyTests {
   }
 
   @Test(
+    "removal transition offset composes with an existing offset on the root"
+  )
+  func removalOffsetComposesWithExistingOffset() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+    let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+
+    // Leaf already has a .offset(x: 5, y: 0) layout.  The removal
+    // transition is .move(edge: .trailing) which adds offsetX=10.
+    // Expect the composed offset to be x=15.
+    let leaf = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .offset(x: 5, y: 0)
+    )
+    let root = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: [leaf]
+    )
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: leafIdentity,
+      transition: AnyTransition.move(edge: .trailing)
+    )
+    controller.finishTransitionCollection()
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(root, transaction: .init(), timestamp: t0)
+
+    // Frame 2: leaf gone.
+    var frame2 = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: []
+    )
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    let t1 = t0.advanced(by: .milliseconds(200))
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t1)
+
+    // Apply near the end of the removal — the transition progress
+    // should be near 1, which with .move(edge:.trailing) yields
+    // offsetX ≈ 10 for the transition modifier.  Composed with the
+    // leaf's existing offset of 5, the injected leaf's layoutBehavior
+    // should be .offset(x ≈ 15, y: 0).
+    let tEnd = t1.advanced(by: .milliseconds(180))
+    _ = controller.applyInterpolations(to: &frame2, at: tEnd)
+
+    let injectedLeaf = frame2.children.first { $0.identity == leafIdentity }
+    guard let injectedLeaf else {
+      Issue.record("injected removal leaf should still be in the tree before purge")
+      return
+    }
+    guard case .offset(let x, let y) = injectedLeaf.layoutBehavior else {
+      Issue.record(
+        "expected .offset layout on the injected leaf, got \(injectedLeaf.layoutBehavior)")
+      return
+    }
+    // At progress ~0.9, modifier offsetX = 10 * 0.9 = 9. Composed
+    // with the original 5 → 14.
+    #expect(
+      x >= 10, "composed offset should include the existing 5 and transition offset, got \(x)")
+    #expect(y == 0)
+  }
+
+  @Test(
+    "removal transition offset on a framed root wraps the root in an offset node"
+  )
+  func removalOffsetWrapsNonIntrinsicRoot() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+    let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+
+    let leaf = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .frame(width: 20, height: 10, alignment: .center)
+    )
+    let root = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: [leaf]
+    )
+
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: leafIdentity,
+      transition: AnyTransition.move(edge: .trailing)
+    )
+    controller.finishTransitionCollection()
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(root, transaction: .init(), timestamp: t0)
+
+    var frame2 = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: []
+    )
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    let t1 = t0.advanced(by: .milliseconds(200))
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t1)
+
+    let tMid = t1.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: tMid)
+
+    // The leaf's frame layout must be preserved, so the injected
+    // child should be an offset wrapper whose single child is the
+    // original framed leaf.
+    let injected = frame2.children.first
+    guard let injected else {
+      Issue.record("expected an injected wrapper child after removal")
+      return
+    }
+    guard case .offset = injected.layoutBehavior else {
+      Issue.record(
+        "expected the wrapper root to be .offset, got \(injected.layoutBehavior)"
+      )
+      return
+    }
+    guard injected.children.count == 1 else {
+      Issue.record("expected exactly one wrapped child, got \(injected.children.count)")
+      return
+    }
+    let wrappedLeaf = injected.children[0]
+    #expect(
+      wrappedLeaf.identity == leafIdentity,
+      "wrapped child should be the original leaf"
+    )
+    guard case .frame(let w, let h, _) = wrappedLeaf.layoutBehavior else {
+      Issue.record("leaf's frame layout should be preserved under the wrapper")
+      return
+    }
+    #expect(w == 20)
+    #expect(h == 10)
+  }
+
+  @Test(
     "removal interrupting a mid-flight insertion fades from the displayed opacity"
   )
   func removalRetargetsFromMidInsertionOpacity() throws {
