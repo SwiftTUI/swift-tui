@@ -80,6 +80,11 @@ public struct MeasurementCacheMetrics: Equatable, Sendable {
   public var lookups: Int
   public var hits: Int
   public var misses: Int
+  /// Count of lookups that found a cached entry but evicted it because the
+  /// cached `ResolvedNode` was no longer equivalent for measurement.  Kept
+  /// distinct from `misses` so observability can tell a cold miss apart
+  /// from a structural invalidation.
+  public var invalidations: Int
   public var stores: Int
 
   public init(
@@ -88,6 +93,7 @@ public struct MeasurementCacheMetrics: Equatable, Sendable {
     lookups: Int = 0,
     hits: Int = 0,
     misses: Int = 0,
+    invalidations: Int = 0,
     stores: Int = 0
   ) {
     self.generation = generation
@@ -95,6 +101,7 @@ public struct MeasurementCacheMetrics: Equatable, Sendable {
     self.lookups = lookups
     self.hits = hits
     self.misses = misses
+    self.invalidations = invalidations
     self.stores = stores
   }
 }

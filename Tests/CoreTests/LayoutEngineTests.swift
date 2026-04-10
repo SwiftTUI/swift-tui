@@ -113,6 +113,87 @@ struct LayoutEngineTests {
     #expect(afterPrunedMiss.entries == 3)
   }
 
+  @Test("measurement cache evicts stale entries on equivalence mismatch")
+  func measurementCacheEvictsStaleEntries() {
+    let cache = MeasurementCache()
+    let original = leaf("stale", size: .init(width: 10, height: 5))
+    let measured = MeasuredNode(
+      identity: original.identity,
+      proposal: .unspecified,
+      measuredSize: .init(width: 10, height: 5)
+    )
+    cache.store(measured, for: original)
+    #expect(cache.count == 1)
+
+    // Rebuild the resolved node with a different intrinsic size.  The
+    // identity is the same, so the cache will hit-find-mismatch and must
+    // evict the stale entry instead of silently leaving it in place.
+    let updated = leaf("stale", size: .init(width: 20, height: 5))
+
+    let result = cache.lookup(resolved: updated, proposal: .unspecified)
+
+    #expect(result == nil)
+    #expect(cache.count == 0)
+
+    let metrics = cache.metrics
+    // Stale evictions are distinct from cold misses — they report through
+    // the dedicated `invalidations` counter so observability dashboards can
+    // distinguish structural invalidation from true cache misses.
+    #expect(metrics.invalidations == 1)
+    #expect(metrics.misses == 0)
+    #expect(metrics.hits == 0)
+  }
+
+  @Test("stale cache eviction preserves other proposal variants for the same identity")
+  func staleCacheEvictionPreservesSiblingProposals() {
+    let cache = MeasurementCache()
+    let original = leaf("shared", size: .init(width: 10, height: 5))
+    let proposalA = ProposedSize.unspecified
+    let proposalB = ProposedSize(width: 4, height: nil)
+    let measuredA = MeasuredNode(
+      identity: original.identity,
+      proposal: proposalA,
+      measuredSize: .init(width: 10, height: 5)
+    )
+    let measuredB = MeasuredNode(
+      identity: original.identity,
+      proposal: proposalB,
+      measuredSize: .init(width: 4, height: 5)
+    )
+    cache.store(measuredA, for: original)
+    cache.store(measuredB, for: original)
+    #expect(cache.count == 2)
+
+    // Stale lookup at proposalA must evict only that variant, leaving the
+    // proposalB entry intact.
+    let updated = leaf("shared", size: .init(width: 20, height: 5))
+    _ = cache.lookup(resolved: updated, proposal: proposalA)
+
+    #expect(cache.count == 1)
+
+    let survivingHit = cache.lookup(resolved: original, proposal: proposalB)
+    #expect(survivingHit?.measuredSize == .init(width: 4, height: 5))
+  }
+
+  @Test("measurement cache reset clears the invalidations counter")
+  func measurementCacheResetClearsInvalidations() {
+    let cache = MeasurementCache()
+    let original = leaf("resettable", size: .init(width: 10, height: 5))
+    let measured = MeasuredNode(
+      identity: original.identity,
+      proposal: .unspecified,
+      measuredSize: .init(width: 10, height: 5)
+    )
+    cache.store(measured, for: original)
+
+    let updated = leaf("resettable", size: .init(width: 20, height: 5))
+    _ = cache.lookup(resolved: updated, proposal: .unspecified)
+    #expect(cache.metrics.invalidations == 1)
+
+    cache.reset()
+    #expect(cache.metrics.invalidations == 0)
+  }
+
   @Test("stack with spacers spreads remainder across the range")
   func stackWithSpacersSpreadsRemainderAcrossRange() {
     let engine = LayoutEngine()
