@@ -408,6 +408,15 @@ package struct DrawMetadataModifier<Content: View>: View, ResolvableView {
   }
 }
 
+extension DrawMetadataModifier: TransitionEffectContributing {
+  package func contributeTransitionEffects(into modifiers: inout TransitionModifiers) {
+    if let opacity = metadata.baseStyle.explicitOpacity {
+      modifiers.opacity = opacity
+    }
+  }
+  package var transitionChildForProbe: Any? { content }
+}
+
 package struct SemanticMetadataModifier<Content: View>: View, ResolvableView {
   package var content: Content
   package var metadata: SemanticMetadata
@@ -725,6 +734,14 @@ package struct OffsetView<Content: View>: View, ResolvableView {
       )
     ]
   }
+}
+
+extension OffsetView: TransitionEffectContributing {
+  package func contributeTransitionEffects(into modifiers: inout TransitionModifiers) {
+    modifiers.offsetX = x
+    modifiers.offsetY = y
+  }
+  package var transitionChildForProbe: Any? { content }
 }
 
 package struct FlexibleFrameView<Content: View>: View, ResolvableView {
