@@ -566,6 +566,46 @@ package final class AnimationController {
       request: request,
       timestamp: timestamp
     )
+    enqueueIfChanged(
+      identity: identity,
+      property: .paddingTop,
+      previous: previous.padding?.top,
+      current: current.padding?.top,
+      toValue: AnimatableValue.integer,
+      fromValue: AnimatableValue.integer,
+      request: request,
+      timestamp: timestamp
+    )
+    enqueueIfChanged(
+      identity: identity,
+      property: .paddingLeading,
+      previous: previous.padding?.leading,
+      current: current.padding?.leading,
+      toValue: AnimatableValue.integer,
+      fromValue: AnimatableValue.integer,
+      request: request,
+      timestamp: timestamp
+    )
+    enqueueIfChanged(
+      identity: identity,
+      property: .paddingBottom,
+      previous: previous.padding?.bottom,
+      current: current.padding?.bottom,
+      toValue: AnimatableValue.integer,
+      fromValue: AnimatableValue.integer,
+      request: request,
+      timestamp: timestamp
+    )
+    enqueueIfChanged(
+      identity: identity,
+      property: .paddingTrailing,
+      previous: previous.padding?.trailing,
+      current: current.padding?.trailing,
+      toValue: AnimatableValue.integer,
+      fromValue: AnimatableValue.integer,
+      request: request,
+      timestamp: timestamp
+    )
   }
 
   private func enqueueIfChanged<T: Equatable>(
@@ -929,6 +969,30 @@ package final class AnimationController {
         )
       default:
         break
+      }
+
+    case (.paddingTop, .integer(let value)):
+      if case .padding(var insets) = node.layoutBehavior {
+        insets.top = value
+        node.layoutBehavior = .padding(insets)
+      }
+
+    case (.paddingLeading, .integer(let value)):
+      if case .padding(var insets) = node.layoutBehavior {
+        insets.leading = value
+        node.layoutBehavior = .padding(insets)
+      }
+
+    case (.paddingBottom, .integer(let value)):
+      if case .padding(var insets) = node.layoutBehavior {
+        insets.bottom = value
+        node.layoutBehavior = .padding(insets)
+      }
+
+    case (.paddingTrailing, .integer(let value)):
+      if case .padding(var insets) = node.layoutBehavior {
+        insets.trailing = value
+        node.layoutBehavior = .padding(insets)
       }
 
     default:
