@@ -79,11 +79,32 @@ package struct AnimatableSnapshot: Equatable, Sendable {
     case .frame(let width, let height, _):
       snapshot.frameWidth = width
       snapshot.frameHeight = height
+    case .flexibleFrame(
+      let minWidth, let idealWidth, let maxWidth,
+      let minHeight, let idealHeight, let maxHeight,
+      _):
+      // Pick a representative finite dimension for each axis: prefer
+      // max, then ideal, then min.  Most user-authored animation targets
+      // either `.frame(maxWidth: X)` (stretching with a cap) or a
+      // single fixed `.frame(width: X)` — the latter already takes the
+      // `.frame` branch above.  Apply will update the same dimension
+      // this extract selected, keeping the other dimensions untouched.
+      snapshot.frameWidth = firstFiniteValue(of: [maxWidth, idealWidth, minWidth])
+      snapshot.frameHeight = firstFiniteValue(of: [maxHeight, idealHeight, minHeight])
     default:
       break
     }
 
     return snapshot
+  }
+
+  private static func firstFiniteValue(of dimensions: [ProposedDimension?]) -> Int? {
+    for dimension in dimensions {
+      if case .finite(let value) = dimension {
+        return value
+      }
+    }
+    return nil
   }
 
   private static func extractColor(from style: AnyShapeStyle?) -> Color? {
@@ -857,22 +878,83 @@ package final class AnimationController {
       }
 
     case (.frameWidth, .integer(let width)):
-      if case .frame(_, let height, let alignment) = node.layoutBehavior {
+      switch node.layoutBehavior {
+      case .frame(_, let height, let alignment):
         node.layoutBehavior = .frame(
           width: width, height: height, alignment: alignment
         )
+      case .flexibleFrame(
+        let minWidth, let idealWidth, let maxWidth,
+        let minHeight, let idealHeight, let maxHeight,
+        let alignment):
+        let (newMax, newIdeal, newMin) = Self.replaceFirstFinite(
+          width: width,
+          dimensions: (maxWidth, idealWidth, minWidth)
+        )
+        node.layoutBehavior = .flexibleFrame(
+          minWidth: newMin,
+          idealWidth: newIdeal,
+          maxWidth: newMax,
+          minHeight: minHeight,
+          idealHeight: idealHeight,
+          maxHeight: maxHeight,
+          alignment: alignment
+        )
+      default:
+        break
       }
 
     case (.frameHeight, .integer(let height)):
-      if case .frame(let width, _, let alignment) = node.layoutBehavior {
+      switch node.layoutBehavior {
+      case .frame(let width, _, let alignment):
         node.layoutBehavior = .frame(
           width: width, height: height, alignment: alignment
         )
+      case .flexibleFrame(
+        let minWidth, let idealWidth, let maxWidth,
+        let minHeight, let idealHeight, let maxHeight,
+        let alignment):
+        let (newMax, newIdeal, newMin) = Self.replaceFirstFinite(
+          width: height,
+          dimensions: (maxHeight, idealHeight, minHeight)
+        )
+        node.layoutBehavior = .flexibleFrame(
+          minWidth: minWidth,
+          idealWidth: idealWidth,
+          maxWidth: maxWidth,
+          minHeight: newMin,
+          idealHeight: newIdeal,
+          maxHeight: newMax,
+          alignment: alignment
+        )
+      default:
+        break
       }
 
     default:
       break
     }
+  }
+
+  /// Replaces the first `.finite(_)` dimension (searched in max → ideal
+  /// → min order) with the new integer value, leaving the others
+  /// untouched.  Used by ``applyValue`` to write interpolated frame
+  /// dimensions back to the same `.flexibleFrame` slot they were
+  /// extracted from.
+  private static func replaceFirstFinite(
+    width value: Int,
+    dimensions: (max: ProposedDimension?, ideal: ProposedDimension?, min: ProposedDimension?)
+  ) -> (max: ProposedDimension?, ideal: ProposedDimension?, min: ProposedDimension?) {
+    if case .finite = dimensions.max {
+      return (.finite(value), dimensions.ideal, dimensions.min)
+    }
+    if case .finite = dimensions.ideal {
+      return (dimensions.max, .finite(value), dimensions.min)
+    }
+    if case .finite = dimensions.min {
+      return (dimensions.max, dimensions.ideal, .finite(value))
+    }
+    return dimensions
   }
 
   private func sample(
