@@ -1161,6 +1161,7 @@ public struct LayoutEngine: Sendable {
     node.lifecycleMetadata = resolved.lifecycleMetadata
     node.environmentSnapshot = resolved.environmentSnapshot
     node.isTransient = resolved.isTransient
+    node.matchedGeometry = resolved.matchedGeometry
 
     guard node.children.count == resolved.children.count else {
       // Structural mismatch — should not happen because

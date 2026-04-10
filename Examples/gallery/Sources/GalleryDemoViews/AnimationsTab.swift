@@ -31,6 +31,9 @@ struct AnimationsTab: View {
   @State private var positionX: Int = 10
   @State private var positionY: Int = 2
 
+  // Matched geometry demo: which column the "hero" lives in.
+  @State private var heroOnRight: Bool = false
+
   // Completion demo: a counter ticked by the callback closure.
   @State private var completionRuns: Int = 0
   @State private var completionAccent: Bool = false
@@ -48,6 +51,8 @@ struct AnimationsTab: View {
       offsetSection
       Divider()
       positionSection
+      Divider()
+      matchedGeometrySection
       Divider()
       completionSection
       Spacer(minLength: 0)
@@ -243,11 +248,47 @@ struct AnimationsTab: View {
     .frame(height: 7)
   }
 
+  // MARK: - matchedGeometryEffect
+
+  private var matchedGeometrySection: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("6. matchedGeometryEffect — hero slides between two slots")
+        .foregroundStyle(.muted)
+      HStack(spacing: 2) {
+        Button(heroOnRight ? "move left" : "move right") {
+          withAnimation(.easeInOut(duration: .milliseconds(1500))) {
+            heroOnRight.toggle()
+          }
+        }
+      }
+      // Two HStacks whose inner ordering swaps based on state.
+      // The Text("★ hero") is tagged with matchedGeometryEffect(id:)
+      // so the controller recognizes it as the same view across
+      // the swap and animates the translation between the two
+      // slots.
+      HStack(spacing: 3) {
+        if !heroOnRight {
+          Text("★ hero")
+            .foregroundStyle(Color.yellow)
+            .matchedGeometryEffect(id: "hero")
+          Text("(empty)")
+            .foregroundStyle(.muted)
+        } else {
+          Text("(empty)")
+            .foregroundStyle(.muted)
+          Text("★ hero")
+            .foregroundStyle(Color.yellow)
+            .matchedGeometryEffect(id: "hero")
+        }
+      }
+    }
+  }
+
   // MARK: - withAnimation completion callback
 
   private var completionSection: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("6. withAnimation completion callback — fires once per batch drain")
+      Text("7. withAnimation completion callback — fires once per batch drain")
         .foregroundStyle(.muted)
       HStack(spacing: 2) {
         Button("run") {

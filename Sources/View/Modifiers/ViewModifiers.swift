@@ -210,6 +210,32 @@ extension View {
     )
   }
 
+  /// Tags this view with a matched-geometry key so the animation
+  /// controller can recognize it across conditional re-creation
+  /// (e.g. `if`/`else` branches that swap between two layouts)
+  /// and animate the transition as if a single view moved from
+  /// the old location to the new one.
+  ///
+  /// Matches SwiftUI's `.matchedGeometryEffect(id:in:)` API shape,
+  /// minus the `@Namespace` property-wrapper ceremony: the
+  /// ``MatchedGeometryNamespace`` is a plain `Hashable` value that
+  /// defaults to a single global namespace.  Callers needing
+  /// scoping allocate distinct namespaces explicitly.
+  ///
+  /// - Note: The current implementation interpolates position only,
+  ///   not size.  A view that changes width between its source and
+  ///   destination will appear at its natural destination size
+  ///   throughout the animation and translate its origin smoothly.
+  public func matchedGeometryEffect<ID: Hashable>(
+    id: ID,
+    in namespace: MatchedGeometryNamespace = .default
+  ) -> some View {
+    MatchedGeometryView(
+      content: self,
+      key: MatchedGeometryKey(namespace: namespace, id: id)
+    )
+  }
+
   public func focusable(
     _ isFocusable: Bool = true,
     interactions: FocusInteractions = .automatic
@@ -794,6 +820,25 @@ package struct PositionView<Content: View>: View, ResolvableView {
         layoutBehavior: .position(x: x, y: y)
       )
     ]
+  }
+}
+
+package struct MatchedGeometryView<Content: View>: View, ResolvableView {
+  package var content: Content
+  package var key: MatchedGeometryKey
+
+  package init(content: Content, key: MatchedGeometryKey) {
+    self.content = content
+    self.key = key
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let nodes = content.resolveElements(in: context)
+    return nodes.map { node in
+      var tagged = node
+      tagged.matchedGeometry = key
+      return tagged
+    }
   }
 }
 

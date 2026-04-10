@@ -199,6 +199,24 @@ package struct RemovalEntry: Sendable {
   package var placedSnapshot: PlacedNode? = nil
 }
 
+/// A matched-geometry animation tracked separately from the
+/// ``activeAnimations`` map so it can be applied at placed level
+/// after layout runs.
+///
+/// The "from" bounds are captured from the previous frame's placed
+/// tree at match-detection time; the "to" bounds are whatever the
+/// current frame's layout produced for the new identity.  At each
+/// tick the controller interpolates the translation delta between
+/// those two rectangles (position only — size is left at the
+/// destination's natural measurement).
+package struct MatchedGeometryAnimation: Sendable {
+  package var fromBounds: Rect
+  package var animationBox: AnimationBox
+  package var startTime: MonotonicInstant
+  package var batchID: AnimationBatchID?
+  package var customState: AnimationState = .init()
+}
+
 /// An insertion offset animation tracked separately from the
 /// ``activeAnimations`` map so it can be applied at placed level
 /// rather than via ``applyValue`` on the resolved tree.
@@ -235,6 +253,21 @@ package final class AnimationController {
   /// at placed level via ``applyPlacedOverlays`` alongside removal
   /// overlays — see ``InsertionOffsetAnimation``.
   private var insertionOffsetAnimations: [Identity: InsertionOffsetAnimation] = [:]
+  /// Active matched-geometry animations keyed by the NEW identity
+  /// (the one that just appeared).  The `fromBounds` on each entry
+  /// is the placed bounds of whatever identity previously held the
+  /// same matched-geometry key.  Applied at placed level by
+  /// ``applyPlacedOverlays``.
+  private var matchedGeometryAnimations: [Identity: MatchedGeometryAnimation] = [:]
+  /// Placed bounds for every matched-geometry key observed in the
+  /// previous frame's placed tree.  Seeded by ``capturePlacedTree``
+  /// and consulted by the next frame's match detection.
+  private var previousMatchedGeometryBounds: [MatchedGeometryKey: Rect] = [:]
+  /// Which identity held each matched-geometry key in the previous
+  /// frame.  A match fires when the current frame maps the same key
+  /// to a *different* identity — regardless of whether either
+  /// identity is newly inserted.
+  private var previousMatchedKeyIdentities: [MatchedGeometryKey: Identity] = [:]
   /// Parent identity, as walked from the previous frame's tree.
   private var previousParentByIdentity: [Identity: Identity] = [:]
   /// Child index within the previous parent's children list.
@@ -272,12 +305,55 @@ package final class AnimationController {
 
   /// Stores a snapshot of the placed tree at the end of the frame so
   /// the next frame's removal detection can find the disappearing
-  /// identity's frozen bounds without re-running layout.
+  /// identity's frozen bounds without re-running layout.  Also
+  /// collects matched-geometry bounds + identities so the next
+  /// frame can detect key → identity swaps and start matched
+  /// geometry animations.
   ///
   /// Called by the render pipeline after ``place`` runs.  When no
   /// removal overlays are pending this is a cheap reference copy.
   package func capturePlacedTree(_ placed: PlacedNode) {
     previousPlacedRoot = placed
+    var matchedBounds: [MatchedGeometryKey: Rect] = [:]
+    var matchedIdentities: [MatchedGeometryKey: Identity] = [:]
+    Self.collectMatchedGeometry(
+      placed,
+      bounds: &matchedBounds,
+      identities: &matchedIdentities
+    )
+    previousMatchedGeometryBounds = matchedBounds
+    previousMatchedKeyIdentities = matchedIdentities
+  }
+
+  /// Walks the placed tree and records the bounds and identity of
+  /// every node tagged with a ``MatchedGeometryKey``.  If multiple
+  /// nodes carry the same key in one frame (undefined in SwiftUI as
+  /// well) the last-walked entry wins.
+  private static func collectMatchedGeometry(
+    _ node: PlacedNode,
+    bounds: inout [MatchedGeometryKey: Rect],
+    identities: inout [MatchedGeometryKey: Identity]
+  ) {
+    if let key = node.matchedGeometry {
+      bounds[key] = node.bounds
+      identities[key] = node.identity
+    }
+    for child in node.children {
+      collectMatchedGeometry(child, bounds: &bounds, identities: &identities)
+    }
+  }
+
+  /// Number of matched-geometry animations currently in flight.
+  /// Test hook.
+  package var activeMatchedGeometryCount: Int {
+    matchedGeometryAnimations.count
+  }
+
+  /// Number of matched-geometry keys captured from the previous
+  /// frame's placed tree.  Test hook used to verify that
+  /// capturePlacedTree is observing the matched-geometry field.
+  package var previousMatchedGeometryKeyCount: Int {
+    previousMatchedGeometryBounds.count
   }
 
   /// Runs the placed-level animation pass after layout: injects any
@@ -377,6 +453,74 @@ package final class AnimationController {
         )
       }
     }
+
+    // 3. Apply matched-geometry translations.  At progress 0 the
+    //    new identity renders at the PREVIOUS frame's bounds; at
+    //    progress 1 it renders at its natural new bounds.
+    if !matchedGeometryAnimations.isEmpty {
+      var matchedDeltasByIdentity: [Identity: (dx: Int, dy: Int)] = [:]
+      var completedMatches: [Identity] = []
+
+      for (identity, entry) in matchedGeometryAnimations {
+        guard let anim = registeredAnimations[entry.animationBox] else {
+          completedMatches.append(identity)
+          continue
+        }
+        let elapsed = entry.startTime.duration(to: timestamp)
+        var state = entry.customState
+        let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
+        matchedGeometryAnimations[identity]?.customState = state
+
+        guard let progress = evaluated else {
+          completedMatches.append(identity)
+          continue
+        }
+
+        // Look up the new placed bounds for this identity in the
+        // current tree.  The translation delta is
+        //     (fromBounds.origin - toBounds.origin) * (1 - progress)
+        // so at progress 0 we land on fromBounds and at progress 1
+        // we land on the natural new position.
+        guard let toBounds = Self.findBounds(in: tree, identity: identity)
+        else { continue }
+        let deltaX =
+          Double(entry.fromBounds.origin.x - toBounds.origin.x)
+          * (1.0 - progress)
+        let deltaY =
+          Double(entry.fromBounds.origin.y - toBounds.origin.y)
+          * (1.0 - progress)
+        matchedDeltasByIdentity[identity] = (
+          dx: Int(deltaX.rounded()),
+          dy: Int(deltaY.rounded())
+        )
+      }
+
+      for identity in completedMatches {
+        if let entry = matchedGeometryAnimations.removeValue(forKey: identity) {
+          releaseBatch(entry.batchID)
+        }
+      }
+
+      if !matchedDeltasByIdentity.isEmpty {
+        tree = translatePlacedNodesByIdentity(
+          tree: tree,
+          offsets: matchedDeltasByIdentity
+        )
+      }
+    }
+  }
+
+  private static func findBounds(
+    in node: PlacedNode,
+    identity: Identity
+  ) -> Rect? {
+    if node.identity == identity { return node.bounds }
+    for child in node.children {
+      if let found = findBounds(in: child, identity: identity) {
+        return found
+      }
+    }
+    return nil
   }
 
   /// Walks the placed tree and translates the bounds of any node
@@ -588,6 +732,7 @@ package final class AnimationController {
     var newSnapshots: [Identity: AnimatableSnapshot] = [:]
     var newParentByIdentity: [Identity: Identity] = [:]
     var newChildIndexByIdentity: [Identity: Int] = [:]
+    var newMatchedKeysByIdentity: [Identity: MatchedGeometryKey] = [:]
     processNode(
       node,
       parentIdentity: nil,
@@ -596,7 +741,8 @@ package final class AnimationController {
       timestamp: timestamp,
       snapshotAccumulator: &newSnapshots,
       parentAccumulator: &newParentByIdentity,
-      childIndexAccumulator: &newChildIndexByIdentity
+      childIndexAccumulator: &newChildIndexByIdentity,
+      matchedKeyAccumulator: &newMatchedKeysByIdentity
     )
 
     // Detect insertions and removals by diffing identity sets.  Skip
@@ -608,8 +754,52 @@ package final class AnimationController {
     let insertedIdentities = newIdentities.subtracting(previousIdentities)
     let removedIdentities = liveIdentities.subtracting(newIdentities)
 
+    // Matched-geometry detection.  A match fires when the current
+    // frame's (identity, key) mapping differs from the previous
+    // frame's — regardless of whether either identity is newly
+    // inserted.  Both "swap via reorder" and "swap via if/else"
+    // cases are handled by comparing previous vs new key→identity
+    // maps.  Collect the set of keys that matched so the
+    // counterpart removal/transition can be skipped.
+    var matchedKeysConsumedByMatch: Set<MatchedGeometryKey> = []
+    for (identity, key) in newMatchedKeysByIdentity {
+      // Skip if the same identity held this key last frame — no
+      // swap, no translation.
+      if let previousIdentity = previousMatchedKeyIdentities[key],
+        previousIdentity == identity
+      {
+        continue
+      }
+      guard let fromBounds = previousMatchedGeometryBounds[key] else { continue }
+      guard case .animate(let box) = transaction.animationRequest else {
+        // Without withAnimation intent the match snaps to the new
+        // location immediately.
+        continue
+      }
+      let batchID = transaction.animationBatchID
+      if let existing = matchedGeometryAnimations[identity] {
+        releaseBatch(existing.batchID)
+      }
+      retainBatch(batchID)
+      matchedGeometryAnimations[identity] = MatchedGeometryAnimation(
+        fromBounds: fromBounds,
+        animationBox: box,
+        startTime: timestamp,
+        batchID: batchID
+      )
+      matchedKeysConsumedByMatch.insert(key)
+    }
+
     // Process insertions: kick off willAppear -> identity animations.
+    // Skip insertions that are part of a matched-geometry swap —
+    // those use the matched-geometry pathway and shouldn't fire a
+    // redundant willAppear transition.
     for identity in insertedIdentities {
+      if let key = newMatchedKeysByIdentity[identity],
+        matchedKeysConsumedByMatch.contains(key)
+      {
+        continue
+      }
       guard let transition = transitionsByIdentity[identity] else { continue }
       enqueueInsertionAnimation(
         identity: identity,
@@ -635,6 +825,17 @@ package final class AnimationController {
     // subtree to inject.  This way the entire wrapped unit fades out.
     for identity in removedIdentities {
       guard removingIdentities[identity] == nil else { continue }
+      // If the removed identity's matched-geometry key was
+      // consumed by a match on this frame, the counterpart insertion
+      // already owns the visual transition.  Skip the removal
+      // overlay so the old view just disappears.
+      if let previousRoot = previousTreeRoot,
+        let previousNode = findNode(in: previousRoot, identity: identity),
+        let removedKey = previousNode.matchedGeometry,
+        matchedKeysConsumedByMatch.contains(removedKey)
+      {
+        continue
+      }
       // Removal look-up uses the PREVIOUS frame's registrations: the
       // disappearing view's `.transition()` modifier isn't evaluated in
       // the current frame (its branch is gone), so `transitionsByIdentity`
@@ -744,6 +945,16 @@ package final class AnimationController {
       }
     }
     return nil
+  }
+
+  /// Convenience wrapper around ``findSubtree(in:identity:)`` used
+  /// by matched-geometry removal detection — same behavior, more
+  /// readable name at the call site.
+  private func findNode(
+    in root: ResolvedNode,
+    identity: Identity
+  ) -> ResolvedNode? {
+    findSubtree(in: root, identity: identity)
   }
 
   /// Recursively searches a placed tree for the subtree rooted at
@@ -865,7 +1076,8 @@ package final class AnimationController {
     timestamp: MonotonicInstant,
     snapshotAccumulator: inout [Identity: AnimatableSnapshot],
     parentAccumulator: inout [Identity: Identity],
-    childIndexAccumulator: inout [Identity: Int]
+    childIndexAccumulator: inout [Identity: Int],
+    matchedKeyAccumulator: inout [Identity: MatchedGeometryKey]
   ) {
     let snapshot = AnimatableSnapshot.extract(from: node)
     let previous = previousSnapshots[node.identity]
@@ -900,6 +1112,9 @@ package final class AnimationController {
       parentAccumulator[node.identity] = parentIdentity
     }
     childIndexAccumulator[node.identity] = childIndex
+    if let key = node.matchedGeometry {
+      matchedKeyAccumulator[node.identity] = key
+    }
 
     for (index, child) in node.children.enumerated() {
       processNode(
@@ -910,7 +1125,8 @@ package final class AnimationController {
         timestamp: timestamp,
         snapshotAccumulator: &snapshotAccumulator,
         parentAccumulator: &parentAccumulator,
-        childIndexAccumulator: &childIndexAccumulator
+        childIndexAccumulator: &childIndexAccumulator,
+        matchedKeyAccumulator: &matchedKeyAccumulator
       )
     }
   }
@@ -1179,6 +1395,7 @@ package final class AnimationController {
       !activeAnimations.isEmpty
         || !removingIdentities.isEmpty
         || !insertionOffsetAnimations.isEmpty
+        || !matchedGeometryAnimations.isEmpty
     else {
       lastTickResult = AnimationTickResult()
       return lastTickResult
@@ -1326,6 +1543,19 @@ package final class AnimationController {
         latestDeadline = timestamp.advanced(by: frameInterval)
       }
       for identity in insertionOffsetAnimations.keys {
+        affectedIdentities.insert(identity)
+      }
+    }
+
+    // Matched-geometry animations are also placed-level.  Same
+    // bookkeeping: mark pending so the run loop keeps ticking
+    // until they complete.
+    if !matchedGeometryAnimations.isEmpty {
+      hasPendingWork = true
+      if latestDeadline == timestamp {
+        latestDeadline = timestamp.advanced(by: frameInterval)
+      }
+      for identity in matchedGeometryAnimations.keys {
         affectedIdentities.insert(identity)
       }
     }
@@ -1691,6 +1921,9 @@ package final class AnimationController {
     previousParentByIdentity.removeAll(keepingCapacity: true)
     previousChildIndexByIdentity.removeAll(keepingCapacity: true)
     insertionOffsetAnimations.removeAll(keepingCapacity: true)
+    matchedGeometryAnimations.removeAll(keepingCapacity: true)
+    previousMatchedGeometryBounds.removeAll(keepingCapacity: true)
+    previousMatchedKeyIdentities.removeAll(keepingCapacity: true)
     activeAnimations.removeAll(keepingCapacity: true)
     registeredAnimations.removeAll(keepingCapacity: true)
     completionClosures.removeAll(keepingCapacity: true)

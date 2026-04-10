@@ -172,6 +172,42 @@ package protocol IndexedChildSource: Sendable {
   func child(at index: Int) -> ResolvedNode
 }
 
+/// An opaque namespace used to scope matched-geometry IDs so the
+/// same string-or-hashable key can refer to unrelated views in
+/// different parts of the hierarchy.
+///
+/// Mirrors SwiftUI's `Namespace.ID` shape but without the
+/// `@Namespace` property-wrapper ceremony — call sites either use
+/// ``default`` for a single global namespace or pass a distinct
+/// value per namespace.
+public struct MatchedGeometryNamespace: Hashable, Sendable {
+  public let rawValue: UInt64
+  public init(_ rawValue: UInt64) { self.rawValue = rawValue }
+  public static let `default` = MatchedGeometryNamespace(0)
+}
+
+/// A fully-qualified matched-geometry identifier — the namespace
+/// plus the user-provided hashable ID, erased to a string for
+/// cross-frame lookup.
+public struct MatchedGeometryKey: Hashable, Sendable {
+  public let namespace: MatchedGeometryNamespace
+  /// The erased string form of the caller's ID.  Two calls with
+  /// `Hashable` values whose `String(describing:)` output matches
+  /// will collide — callers needing stronger uniqueness should use
+  /// distinct namespaces.
+  public let id: String
+
+  public init(namespace: MatchedGeometryNamespace, id: String) {
+    self.namespace = namespace
+    self.id = id
+  }
+
+  public init<ID: Hashable>(namespace: MatchedGeometryNamespace = .default, id: ID) {
+    self.namespace = namespace
+    self.id = String(describing: id)
+  }
+}
+
 /// A node produced by the resolve phase before measurement.
 public struct ResolvedNode: Equatable, Sendable {
   public var identity: Identity
@@ -265,6 +301,13 @@ public struct ResolvedNode: Equatable, Sendable {
   package var preferenceValues: PreferenceValues
   package private(set) var subtreeNodeCount: Int
   public var supportsRetainedReuse: Bool
+  /// Matched-geometry tag set by ``View/matchedGeometryEffect(id:in:)``.
+  /// When two views in different frames (typically behind an
+  /// `if`/`else` branch) share the same key, the animation
+  /// controller treats the swap as a single view moving from the
+  /// previous frame's placed bounds to the new frame's placed
+  /// bounds and animates the translation under `withAnimation`.
+  public var matchedGeometry: MatchedGeometryKey? = nil
   /// Marks the node (and transitively any node that inherits this
   /// flag via the layout engine) as a non-semantic visual overlay.
   /// The animation controller sets this on every node in a removal
@@ -612,6 +655,11 @@ public struct PlacedNode: Equatable, Sendable {
   /// semantic extractor and every other consumer whose state must
   /// track only the committed tree.
   public var isTransient: Bool = false
+  /// Mirror of ``ResolvedNode/matchedGeometry``.  Propagated from
+  /// the resolved tree by the layout engine so the animation
+  /// controller can compute matched-geometry bounds during
+  /// capture+diff.
+  public var matchedGeometry: MatchedGeometryKey?
 
   public init(
     identity: Identity,
@@ -628,7 +676,8 @@ public struct PlacedNode: Equatable, Sendable {
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
-    isTransient: Bool = false
+    isTransient: Bool = false,
+    matchedGeometry: MatchedGeometryKey? = nil
   ) {
     self.identity = identity
     self.kind = kind
@@ -645,6 +694,7 @@ public struct PlacedNode: Equatable, Sendable {
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
     self.isTransient = isTransient
+    self.matchedGeometry = matchedGeometry
     subtreeNodeCount = 1
     recomputeSubtreeNodeCount()
   }

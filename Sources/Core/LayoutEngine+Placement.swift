@@ -583,7 +583,8 @@ extension LayoutEngine {
       semanticMetadata: resolved.semanticMetadata,
       lifecycleMetadata: resolved.lifecycleMetadata,
       drawPayload: resolved.drawPayload,
-      isTransient: resolved.isTransient
+      isTransient: resolved.isTransient,
+      matchedGeometry: resolved.matchedGeometry
     )
   }
 
@@ -733,7 +734,8 @@ extension LayoutEngine {
       semanticMetadata: node.semanticMetadata,
       lifecycleMetadata: node.lifecycleMetadata,
       drawPayload: node.drawPayload,
-      isTransient: node.isTransient
+      isTransient: node.isTransient,
+      matchedGeometry: node.matchedGeometry
     )
   }
 
