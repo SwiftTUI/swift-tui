@@ -48,7 +48,14 @@
       "Bash(git -c commit.gpgsign=false commit -m \"chore\\(gallery\\): drop unused swift-algorithms dep\")",
       "Bash(timeout 2 swift run --package-path Examples/gallery gallery-demo)",
       "Bash(echo \"---exit: $?\")",
-      "Bash(swift run:*)"
+      "Bash(swift run:*)",
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(ulimit -c unlimited)",
+      "Bash(/Users/adamz/Developer/repos/swift-terminal-ui/.build/arm64-apple-macosx/debug/swift-terminal-uiPackageTests.xctest/Contents/MacOS/swift-terminal-uiPackageTests --testing-library swift-testing)",
+      "Bash(xcrun xctest:*)",
+      "Bash(DYLD_FRAMEWORK_PATH=/Users/adamz/.local/share/mise/installs/swift/6.3/usr/lib/swift/macosx/testing DYLD_LIBRARY_PATH=/Users/adamz/.local/share/mise/installs/swift/6.3/usr/lib/swift/macosx/testing xcrun xctest /Users/adamz/Developer/repos/swift-terminal-ui/.build/arm64-apple-macosx/debug/swift-terminal-uiPackageTests.xctest)",
+      "Bash(git restore:*)"
     ]
   }
 }
