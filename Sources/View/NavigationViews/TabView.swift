@@ -431,12 +431,45 @@ private func tabItemLabel(
   return nil
 }
 
+/// Hosts a pre-resolved tab content subtree inside the `tabBody` view
+/// hierarchy without collapsing its own identity into the captured
+/// node.
+///
+/// If this view returned `[node]` directly, `normalizeResolvedElements`
+/// would unwrap the single-element array and hand the captured
+/// `ResolvedNode` straight back to the outer resolver.  That causes
+/// `finishEvaluation` to set this view's ViewNode's `committed` to the
+/// captured subtree's root (e.g. the ScrollView's resolved tree),
+/// *including its stale per-node fields and identity*.  The
+/// ScrollView's own ViewNode then becomes orphaned from the snapshot
+/// walk: when a scroll event re-evaluates just the ScrollView via the
+/// selective dirty plan, its updated `committed` never reaches the
+/// root snapshot — `ResolvedContentView`'s stale `committed` copy is
+/// used instead.  The visible symptom is a ScrollView whose scroll
+/// offset stays frozen until some unrelated interaction forces a full
+/// re-resolve of the tab body.
+///
+/// Wrapping the captured node as a **child** of an outer
+/// `ResolvedContentView`-identity node keeps this view's identity and
+/// committed snapshot distinct from the captured subtree's, so
+/// `finishEvaluation` installs the captured subtree's root as a
+/// child ViewNode under us.  The normal `snapshot()` walk then
+/// recurses into that child ViewNode and picks up its current
+/// committed state — including any per-frame re-evaluation.
 private struct ResolvedContentView: View, ResolvableView {
   let node: ResolvedNode
 
   package func resolveElements(
-    in _: ResolveContext
+    in context: ResolveContext
   ) -> [ResolvedNode] {
-    [node]
+    [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("ResolvedContent"),
+        children: [node],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction
+      )
+    ]
   }
 }
