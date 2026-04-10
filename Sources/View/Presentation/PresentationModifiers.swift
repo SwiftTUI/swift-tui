@@ -391,13 +391,10 @@ package struct PromptPresentationSurface: View {
       RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(surfaceBackground)
     }
     .overlay {
-      ZStack {
-        RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-          .terminalBorder(.accent),
-          style: .innerHalfBlock
-        )
-        joinedInsetChromeCorners
-      }
+      RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+        .terminalBorder(.accent),
+        style: .presentationChrome
+      )
     }
     .frame(
       minWidth: .finite(item.descriptor.minWidth),
@@ -490,23 +487,6 @@ package struct PromptPresentationSurface: View {
     .padding(.init(horizontal: 1, vertical: 0))
   }
 
-  private var joinedInsetChromeCorners: some View {
-    ZStack {
-      chromeCorner("▟", alignment: .topLeading)
-      chromeCorner("▙", alignment: .topTrailing)
-      chromeCorner("▜", alignment: .bottomLeading)
-      chromeCorner("▛", alignment: .bottomTrailing)
-    }
-  }
-
-  private func chromeCorner(
-    _ glyph: String,
-    alignment: Alignment
-  ) -> some View {
-    Text(glyph)
-      .foregroundStyle(.terminalBorder(.accent))
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
-  }
 }
 
 // MARK: - Toast / Transient Notification System

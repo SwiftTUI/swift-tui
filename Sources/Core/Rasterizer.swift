@@ -575,6 +575,7 @@ extension Rasterizer {
       for x in minX...maxX {
         writeStrokeGlyph(
           glyphs.top,
+          lineVariant: strokeStyle.lineVariant,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
           fallbackBackgroundSides: [.top],
@@ -588,6 +589,7 @@ extension Rasterizer {
         if maxY != minY {
           writeStrokeGlyph(
             glyphs.bottom,
+            lineVariant: strokeStyle.lineVariant,
             foregroundColorMode: foregroundColorMode,
             backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
             fallbackBackgroundSides: [.bottom],
@@ -605,6 +607,7 @@ extension Rasterizer {
         for y in (minY + 1)..<maxY {
           writeStrokeGlyph(
             glyphs.left,
+            lineVariant: strokeStyle.lineVariant,
             foregroundColorMode: foregroundColorMode,
             backgroundStyle: backgroundStyle?.backgroundStyle(for: .left),
             fallbackBackgroundSides: [.left],
@@ -618,6 +621,7 @@ extension Rasterizer {
           if maxX != minX {
             writeStrokeGlyph(
               glyphs.right,
+              lineVariant: strokeStyle.lineVariant,
               foregroundColorMode: foregroundColorMode,
               backgroundStyle: backgroundStyle?.backgroundStyle(for: .right),
               fallbackBackgroundSides: [.right],
@@ -634,6 +638,7 @@ extension Rasterizer {
 
       writeStrokeGlyph(
         glyphs.topLeading,
+        lineVariant: strokeStyle.lineVariant,
         foregroundColorMode: foregroundColorMode,
         backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
         fallbackBackgroundSides: [.top, .left],
@@ -647,6 +652,7 @@ extension Rasterizer {
       if maxX != minX {
         writeStrokeGlyph(
           glyphs.topTrailing,
+          lineVariant: strokeStyle.lineVariant,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
           fallbackBackgroundSides: [.top, .right],
@@ -661,6 +667,7 @@ extension Rasterizer {
       if maxY != minY {
         writeStrokeGlyph(
           glyphs.bottomLeading,
+          lineVariant: strokeStyle.lineVariant,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
           fallbackBackgroundSides: [.bottom, .left],
@@ -675,6 +682,7 @@ extension Rasterizer {
       if maxX != minX, maxY != minY {
         writeStrokeGlyph(
           glyphs.bottomTrailing,
+          lineVariant: strokeStyle.lineVariant,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
           fallbackBackgroundSides: [.bottom, .right],
@@ -721,6 +729,7 @@ extension Rasterizer {
       for x in bounds.origin.x..<(bounds.origin.x + bounds.size.width) {
         writeStrokeGlyph(
           glyphs.horizontal,
+          lineVariant: strokeStyle.lineVariant,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: nil,
           fallbackBackgroundSides: [],
@@ -737,6 +746,7 @@ extension Rasterizer {
       for y in bounds.origin.y..<(bounds.origin.y + bounds.size.height) {
         writeStrokeGlyph(
           glyphs.vertical,
+          lineVariant: strokeStyle.lineVariant,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: nil,
           fallbackBackgroundSides: [],
@@ -753,6 +763,7 @@ extension Rasterizer {
 
   private func writeStrokeGlyph(
     _ character: Character,
+    lineVariant: LineVariant,
     foregroundColorMode: ResolvedShapeColorMode,
     backgroundStyle: AnyShapeStyle?,
     fallbackBackgroundSides: [BorderSide],
@@ -771,6 +782,7 @@ extension Rasterizer {
         sampleY: y
       ),
       backgroundColor: resolvedStrokeBackgroundColor(
+        lineVariant: lineVariant,
         explicitBackgroundStyle: backgroundStyle,
         fallbackSides: fallbackBackgroundSides,
         environment: environment,
@@ -791,6 +803,7 @@ extension Rasterizer {
   }
 
   private func resolvedStrokeBackgroundColor(
+    lineVariant: LineVariant,
     explicitBackgroundStyle: AnyShapeStyle?,
     fallbackSides: [BorderSide],
     environment: StyleEnvironmentSnapshot,
@@ -807,6 +820,19 @@ extension Rasterizer {
         sampleX: x,
         sampleY: y
       )
+    }
+
+    if lineVariant == .presentationChrome {
+      for side in fallbackSides {
+        if let inferred = sampledBackgroundColor(
+          inside: side,
+          fromX: x,
+          y: y,
+          cells: cells
+        ) {
+          return inferred
+        }
+      }
     }
 
     for side in fallbackSides {
@@ -1234,6 +1260,8 @@ extension Rasterizer {
       return .outerHalfBlock
     case .innerHalfBlock:
       return .innerHalfBlock
+    case .presentationChrome:
+      return .presentationChrome
     case .hidden:
       return .hidden
     case .markdown:
@@ -1339,6 +1367,17 @@ extension Rasterizer {
     )
 
     static let innerHalfBlock = Self(
+      top: "▄",
+      bottom: "▀",
+      left: "▐",
+      right: "▌",
+      topLeading: "▗",
+      topTrailing: "▖",
+      bottomLeading: "▝",
+      bottomTrailing: "▘"
+    )
+
+    static let presentationChrome = Self(
       top: "▄",
       bottom: "▀",
       left: "▐",
