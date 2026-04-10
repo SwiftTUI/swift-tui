@@ -111,7 +111,8 @@ package func appendDeclaredChildNodes<V: View>(
     let resolvedNode = resolveView(view, in: childContext)
     context.viewGraph?.recordRegistrationAlias(
       from: childContext.identity,
-      to: resolvedNode.identity
+      to: resolvedNode.identity,
+      resolvedKind: resolvedNode.kind
     )
     if resolvedNode.identity == childContext.identity,
       resolvedNode.kind == .view("EmptyView")

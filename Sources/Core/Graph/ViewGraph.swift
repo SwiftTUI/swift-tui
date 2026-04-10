@@ -29,6 +29,13 @@ package final class ViewGraph {
   private var latestLifecycleEvents: [LifecycleEvent]
   private var registrationAliasesByIdentity: [Identity: Set<Identity>]
   private var registrationAliasTargets: [Identity: Identity]
+  /// Instrumentation added for Item 7 of ARCHITECTURE_NOTES.md.  Tracks
+  /// non-trivial `recordRegistrationAlias` calls so the alias layer's
+  /// actual workload can be measured against the architecture doc's
+  /// hypothesis that divergences come from a small, enumerable set of
+  /// view patterns.  Always on, bounded memory — safe to leave enabled
+  /// in production.
+  package private(set) var registrationAliasDiagnostics: RegistrationAliasDiagnostics
   private var stateSlotDependents: [StateSlotKey: Set<Identity>]
   private var environmentDependents: [ObjectIdentifier: Set<Identity>]
   private var observableDependents: [ObjectIdentifier: Set<Identity>]
@@ -52,6 +59,7 @@ package final class ViewGraph {
     latestLifecycleEvents = []
     registrationAliasesByIdentity = [:]
     registrationAliasTargets = [:]
+    registrationAliasDiagnostics = .init()
     stateSlotDependents = [:]
     environmentDependents = [:]
     observableDependents = [:]
@@ -146,7 +154,8 @@ package final class ViewGraph {
 
   package func recordRegistrationAlias(
     from aliasIdentity: Identity,
-    to identity: Identity
+    to identity: Identity,
+    resolvedKind: NodeKind
   ) {
     if let previousTarget = registrationAliasTargets[aliasIdentity],
       previousTarget != identity
@@ -165,6 +174,16 @@ package final class ViewGraph {
       }
       return
     }
+
+    // Instrumentation for Item 7: record the divergence so the alias
+    // layer's actual workload is observable.  This is the only place
+    // in the codebase that reaches the "from != to" branch, so it's
+    // the authoritative point of measurement.
+    registrationAliasDiagnostics.record(
+      from: aliasIdentity,
+      to: identity,
+      resolvedKind: resolvedKind
+    )
 
     registrationAliasTargets[aliasIdentity] = identity
     registrationAliasesByIdentity[identity, default: []].insert(aliasIdentity)

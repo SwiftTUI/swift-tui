@@ -773,18 +773,149 @@ isn't already indexing through the normal identity path.
 1. **Instrument.** Add a debug-only counter that increments every time
    `recordRegistrationAlias` is called with `from != to`. Run the full
    test suite and every example in `Examples/`. Report the non-trivial
-   alias call frequency.
+   alias call frequency. **✅ Done — see Findings below.**
 2. **Log the divergence.** For each non-trivial alias, print
    `(fromIdentity, toIdentity, viewType)` so you can see which views
    trigger the skew. This is the most valuable output — it tells you
    exactly which views need identity-transparent handling.
+   **✅ Done — see Findings below.**
 3. **Add characterization tests.** Write tests that exercise each observed
    divergence case, asserting the current behavior (`onAppear` fires,
    environment values propagate, etc.). These tests become the safety
-   net for any refactor.
+   net for any refactor. **✅ Partially done — count-pinning tests
+   landed; behavioral characterizations (onAppear etc.) still pending
+   if a refactor is attempted.**
 4. **Then and only then**, evaluate whether flattening at the context
    level can replace the alias layer. The answer might legitimately be
    "no, keep the alias layer but document what it's defending against."
+   **✅ Done — see Findings below.**
+
+#### Findings from the instrumentation
+
+`RegistrationAliasDiagnostics`
+(`Sources/Core/Graph/RegistrationAliasDiagnostics.swift`) tracks every
+non-trivial alias call on every `ViewGraph`.  A
+`RegistrationAliasFindingsTests` suite in `Tests/TerminalUITests/`
+drives `DefaultRenderer` over 10 view-shape scenarios and pins the
+observed divergence counts.
+
+**The original hypothesis was wrong.**  I speculated that `ForEach`
+inside `AnyView` would be the main divergence source because of the
+explicit-ID stamping in `ForEach.resolveElements`.  It isn't.  Here's
+what actually happens:
+
+1. `ForEach.resolveElements` iterates over its data and, for each
+   element, creates a child context with the explicit ID and resolves
+   the content into that context.  The per-element resolves happen
+   **directly** (the content closure calls `view.resolveElements(in:
+   elementContext)`), bypassing `appendDeclaredChildNodes` entirely.
+   So the per-element resolves never touch the alias path.
+2. `ForEach.resolveElements` returns the flat list of per-element
+   `ResolvedNode`s.  When `resolveView` wraps that list in a
+   `ResolvedNode` via `normalizeResolvedElements`
+   (`ViewFoundation.swift:235-259`), the multi-element case creates a
+   synthetic `Group` node whose identity is the **caller's** context
+   identity — not the element identities.  So the outer
+   `resolvedNode.identity == childContext.identity` and the alias call
+   at `ViewFoundation.swift:112-115` is trivial (`from == to`).
+3. Immediately after the trivial alias call, the Group short-circuit
+   at `ViewFoundation.swift:121-126` flattens `resolvedNode.children`
+   into the parent's resolved array, inlining the per-element
+   explicit-ID nodes without ever passing them back through
+   `appendDeclaredChildNodes`.  So the explicit-ID identities never
+   get a chance to trigger an alias recording either.
+
+The net effect: **standard composition primitives (VStack, HStack,
+Group, EmptyView, AnyView, ForEach, `if`, `if-else`) produce ZERO
+non-trivial aliases.**  I verified this against 8 separate
+characterization scenarios including "realistic composite tree
+exercising every control-flow shape in the view builder" — all zero.
+
+**The real divergence source is identity-remapping modifiers.** A
+`grep` for `replacingIdentity` across `Sources/View/` turned up
+exactly three call sites:
+
+- `IDView.resolveElements`
+  (`Sources/View/Modifiers/ViewModifiers.swift:365-377`) — the
+  internal type backing `.id(_:)`.  Calls `content.resolve(in:
+  context.replacingIdentity(with: identity))` and returns the
+  single-element result.  `normalizeResolvedElements` with count == 1
+  passes the element through unchanged, so the outer resolved node
+  has the replaced identity while `childContext.identity` is still
+  the positional path.  **This is the only common view API that
+  triggers the alias path.**
+- `PointerRouteView.resolveElements`
+  (`Sources/View/Controls/SelectionAndValueSupport.swift:717-739`) —
+  constructs a `ResolvedNode` with an explicit `identity` argument
+  instead of `context.identity`, and has the same divergence pattern
+  as `IDView` for the same reasons.  Used internally by pointer
+  routing; not directly author-facing.
+- `IndexedChildSources`
+  (`Sources/View/Collections/IndexedChildSources.swift:60`) —
+  replaces identity inside the lazy-child resolution path.  This one
+  runs inside an `IndexedChildSource` and goes through a different
+  resolve flow; my instrumentation doesn't currently cover it because
+  it bypasses `appendDeclaredChildNodes`.
+
+The `.id(_:)` test scenario produces exactly the divergences you'd
+expect:
+
+```
+nonTrivialCallCount = 2
+uniqueDivergenceCount = 2
+  [1] Root/VStack[0] → header [view(Text)]
+  [1] Root/VStack[2] → trailer [view(Text)]
+```
+
+(Only two, even with three additional `.id(_:)` calls inside a nested
+`ForEach`, because those inner `.id` uses are absorbed by the same
+`Group`-normalization path that eats `ForEach` divergences.)
+
+#### What this means for a potential refactor
+
+The architecture doc's original proposal was a marker protocol
+`IdentityTransparent` applied to `Group`/`EmptyView`/`AnyView` to
+flatten identity earlier.  The instrumentation shows that proposal
+**would have no effect** on the alias layer's workload, because the
+`Group`/`EmptyView`/`AnyView` path already produces trivial aliases
+today — the normalization wrapper absorbs the divergence.
+
+The real question is: **can `.id(_:)` be rewired to not go through
+the alias layer?**  Two paths:
+
+1. **Delete the alias layer and break `.id(_:)`.** Not acceptable;
+   `.id(_:)` is a public API and its runtime registrations need to
+   route correctly when identity is remapped.
+2. **Route `IDView.resolveElements` through a different bridge** that
+   doesn't need a global alias table.  For example, `IDView` could
+   directly register its runtime handlers against the replaced
+   identity inside its `resolveElements`, bypassing
+   `recordRegistrationAlias` entirely.  `PointerRouteView` could do
+   the same.
+
+Path 2 is doable but scoped more narrowly than the original
+"delete the alias layer" proposal.  The alias layer would still exist
+to handle any future identity-remapping view, or could be deleted
+entirely once `IDView` and `PointerRouteView` are rewired.  Either
+way, the decision no longer depends on a broad investigation — the
+instrumentation has pinned down exactly where the alias layer earns
+its keep.
+
+#### Recommendation after the investigation
+
+**Leave the alias layer in place and move on.**  The instrumentation
+revealed the workload is already narrow (2–5 calls per realistic
+frame, only from `.id(_:)`) and the complexity budget for a refactor
+isn't justified by the payoff.  The `RegistrationAliasDiagnostics`
+struct stays in the code as a tripwire — if a future change makes
+the alias count balloon, the characterization tests will fail and
+surface the regression before it becomes invisible work.
+
+If a refactor is ever attempted, path 2 above (rewire
+`IDView.resolveElements` to register runtime handlers directly) is
+the narrowest-blast-radius approach.  Don't delete
+`registrationAliasesByIdentity` without rewiring the `.id(_:)` path
+first.
 
 #### A proper fix, IF instrumentation shows the alias layer is always papering over flattening that could happen earlier
 
