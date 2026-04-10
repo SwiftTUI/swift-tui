@@ -1,19 +1,30 @@
 # Animation Implementation Plan
 
-**Date:** 2026-04-08 (plan) / 2026-04-09 (status update)
+**Date:** 2026-04-08 (plan) / 2026-04-10 (status update)
 **Status:** Phase 0–6 shipped and verified in the gallery demo; follow-up work in the "What's Next" section below
-**Branch:** `animation`
+**Branch:** `animation` (merged; development continues on `main`)
 **Supersedes:** `docs/COLOR_ANIMATION_IMPLEMENTATION_PLAN.md`
 
 ---
 
-## Current Status (2026-04-09)
+## Current Status (2026-04-10)
 
-Phases 0–6 of the original plan are shipped and green. 633 package tests pass
-(29 animation-specific, zero regressions). The gallery demo
+Phases 0–6 of the original plan are shipped and green. The full package test
+suite is 682/682 passing; `swift test --filter Animation` runs 20 animation-
+scoped tests across 5 suites, zero regressions. The gallery demo
 (`Examples/gallery`) exercises both `withAnimation` color animation
 (`color = color.rotatedHue(by:)`) and `.transition(.opacity)` insertion +
 removal of a wrapped `TextFigure`. Fades are smooth on truecolor terminals.
+
+> **Post-graph-refactor caveat:** the gallery verification predates
+> commit `d8d0a80` (2026-04-10, "fold ResolvedNode into ViewNode as single
+> source of truth"), which collapsed ViewNode's 14 mirror fields onto a
+> single `committed: ResolvedNode`. The animation controller still operates
+> on a local `ResolvedNode` returned by `viewGraph.snapshot()` and the
+> `Boxed<DrawMetadata>` copy-on-write wrapper protects the cached tree from
+> tick-frame mutation, so nothing should be broken — but the integration
+> has not been re-verified against the new graph architecture. See
+> "What's next → P0 post-refactor verification" below.
 
 ### What ships today
 
@@ -170,14 +181,14 @@ removal of a wrapped `TextFigure`. Fades are smooth on truecolor terminals.
 - Result: continuously smooth fades on truecolor terminals; nearest-palette
   shades on 256-color terminals
 
-### Tests (29 animation-specific, 633 total passing)
+### Tests (20 animation-scoped under `--filter Animation`, 682 total passing)
 
 | File | Tests | Scope |
 |---|---|---|
 | `Tests/CoreTests/AnimationSchedulerTests.swift` | 5 | `requestDeadline` wake, coalesced earlier deadline re-wake, animation request propagation, post-consume reset, explicit-beats-inherit coalescing |
 | `Tests/ViewTests/AnimationSolverTests.swift` | 9 | Spring under/over/critically damped, bezier linear/easeInOut S-curve/endpoints, linear animation evaluation, preset distinctness, delay postponement |
 | `Tests/TerminalUITests/AnimationControllerTests.swift` | 6 | Snapshot extraction (local, env fallback, priority); removal injection (direct parent, ancestor walk-up, purge-on-completion) |
-| `Tests/TerminalUITests/TextFigureSurfaceTests.swift` | +1 | `fractionalOpacityProducesDistinctForegroundColors` — regression guard against the binary-faint regression |
+| `Tests/TerminalUITests/TextFigureSurfaceTests.swift` | +1 | `fractionalOpacityProducesDistinctForegroundColors` — regression guard against the binary-faint regression (not matched by `--filter Animation`; counted separately) |
 
 Three pre-existing tests were updated to reflect the new smooth-opacity
 semantics (opacity is baked into the color and normalized to 1.0 on raster
@@ -222,10 +233,18 @@ style runs): `TextFigureSurfaceTests.genericViewStylingPropagatesToTextFigureOut
    real, either (a) walk the authored body's view tree at registration time
    to surface opacity/offset effects, or (b) expand `TransitionModifiers`
    and rebuild custom transitions from a richer effect palette.
-5. **Transition offset effects are applied to the subtree root only.**
+5. **Transition offset effects are applied to the subtree root only, and
+   are dropped when the root carries a non-intrinsic layout behavior.**
    `applyTransitionModifiersRecursively` cascades opacity through every
    descendant but applies offset only at the root. Nested offset-based
    transitions on children of an outer offset transition don't compose.
+   Additionally, the offset write only triggers when the removed subtree
+   root matches `case .intrinsic = node.layoutBehavior`
+   (`AnimationController.swift:763-767`); if the root already carries a
+   `.frame`, `.padding`, `.offset`, or `.flexibleFrame` layout behavior
+   the offset is silently dropped to avoid clobbering authored layout,
+   which means `.transition(.move(edge:))` on any view that is also
+   sized, padded, or offset will fall back to a snap instead of a slide.
 
 **API parity, not wired through**
 
@@ -251,10 +270,15 @@ style runs): `TextFigureSurfaceTests.genericViewStylingPropagatesToTextFigureOut
    controller needs to call the protocol's `animate(value:time:context:)`
    at tick time with a per-key `AnimationState`, and honor the
    return-nil-means-complete contract.
-9. **`repeatCount`/`repeatForever`/`speed` are no-ops.** `delay` works; the
-   other modifiers are stored on the `Animation` but not honored by
-   `evaluate`. Needs the evaluator to apply `speed` as a time scalar and
-   track a repeat index with optional autoreverse.
+9. **`repeatCount` and `repeatForever` are no-ops.** `delay` and `speed`
+   both work — `Animation.evaluate` runs elapsed time through
+   `adjustedTime(_:)` which applies `speedMultiplier` as a time scalar
+   (`Animation.swift:185-190`). What's still missing: `repeatBehavior`
+   is stored on the `Animation` struct but `evaluate` never consults it,
+   so `.repeatCount(_:autoreverses:)` and `.repeatForever()` complete
+   exactly once and then stop. Fix: the evaluator needs to track a
+   repeat index, optionally mirror `progress` for autoreverse, and
+   return `nil` only after the final iteration.
 10. **Insertion-path retargeting restarts from the declared `willAppear`
     values** instead of the currently displayed interpolated value, if the
     insertion is interrupted by an opposite toggle mid-fade. The
@@ -297,12 +321,61 @@ style runs): `TextFigureSurfaceTests.genericViewStylingPropagatesToTextFigureOut
     but drive-and-inspect across the tick sequence is missing. A harness
     exists in `InteractiveRuntimeTests` and could be extended.
 
+**State hygiene + performance (discovered during 2026-04-10 audit)**
+
+16. **`AnimationController.reset()` is incomplete.**
+    (`AnimationController.swift:899-904`.) It clears `previousSnapshots`,
+    `activeAnimations`, `registeredAnimations`, and `lastTickResult`, but
+    leaves nine other stored fields alive: `previousTreeRoot`,
+    `previousParentByIdentity`, `previousChildIndexByIdentity`,
+    `transitionsByIdentity`, `previousTransitionsByIdentity`,
+    `pendingTransitionsByIdentity`, `removingIdentities`, and
+    `previousIdentities`. Latent bug: if a renderer is reset while a
+    removal animation is mid-flight, the stale `removingIdentities`
+    entries will try to re-inject a subtree from the previous (now-stale)
+    `previousTreeRoot` on the next tick. Fix is one line per field.
+
+17. **Interpolation tick frames fire `didSet` hooks on every mutation.**
+    `ResolvedNode.children` and `.layoutBehavior` carry `didSet` hooks
+    (`RenderTreeAndSemanticsTypes.swift:195, :203`) that recompute
+    `subtreeNodeCount`, `preferenceValues`, and `supportsRetainedReuse`.
+    `AnimationController.applyValue` mutates `layoutBehavior` for
+    offset/frame animations, and `applyTransitionModifiersRecursively`
+    reassigns `node.children` on the removed subtree, so these
+    recomputes run on every single tick frame for any animation that
+    touches layout. For 30 FPS animation of a non-trivial subtree this
+    is pure waste. Not a correctness bug, but worth fixing before
+    landing items 12–13 (padding + flexibleFrame), which would make it
+    the common path instead of the edge case.
+
+18. **Post-graph-refactor verification has not been run.**
+    Commit `d8d0a80` (2026-04-10) landed *after* the gallery demo
+    verification the plan claims. The animation controller still
+    operates on a local `ResolvedNode` from `viewGraph.snapshot()` and
+    the `Boxed<DrawMetadata>` CoW wrapper protects the cached tree from
+    tick-frame mutation, so nothing should be broken — but the full
+    pipeline (`withAnimation { … }` → tick → raster bytes on the wire)
+    has not been re-exercised against the new graph architecture. This
+    is a verification gap, not a known regression.
+
 ### What's next — prioritized
+
+**P0 — post-refactor verification**
+- Item 18: re-run the gallery demo and the full animation test sweep
+  against the post-`d8d0a80` graph architecture; confirm tick-frame
+  mutation paths still allocate sanely and the Boxed CoW protects the
+  cached tree in practice, not just in principle
+
+**P0 — latent state hygiene**
+- Item 16: extend `AnimationController.reset()` to clear all stored
+  state (nine fields currently left alive)
 
 **P0 — finish what's declared**
 - Item 11: extract + apply `borderColor` animations
 - Item 12: extract + apply `padding` edge animations
 - Item 13: extract `.flexibleFrame` width/height
+- Item 17: address the `didSet` recompute overhead on layout-touching
+  tick frames *before* items 12–13 make it the common path
 
 These are small finishes that turn public-looking API into real features.
 
@@ -313,7 +386,8 @@ These are small finishes that turn public-looking API into real features.
 
 **P1 — animation features**
 - Item 8: evaluate `CustomAnimation` conformances in the controller
-- Item 9: `repeatCount`, `repeatForever`, `speed` honored by `evaluate`
+- Item 9: honor `repeatCount` / `repeatForever` in `evaluate` (`speed`
+  and `delay` already work)
 - Item 10: insertion/removal retargeting from the displayed value
 
 **P1 — API completeness**
@@ -326,7 +400,8 @@ These are small finishes that turn public-looking API into real features.
 - Item 1: removals as draw-only overlays with frozen placed bounds
 - Item 2: per-node transient flag or separate overlay channel
 - Item 3: per-cell blend target at raster time
-- Item 5: composable nested offset transitions
+- Item 5: composable nested offset transitions + offset on non-intrinsic
+  roots (slide + frame/padding/offset compositions)
 - Item 14: scheduler propagates active animation request on tick frames
 
 **P2 — testing**
