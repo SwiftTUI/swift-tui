@@ -22,7 +22,7 @@ declare global {
   }
 }
 
-const coiServiceWorkerUrl = new URL("./coi-serviceworker.js", import.meta.url);
+// const coiServiceWorkerUrl = new URL("./coi-serviceworker.js", import.meta.url);
 const terminalAppManifestUrl = new URL(terminalAppManifestPath, import.meta.url);
 const terminalAppWasmUrl = new URL(terminalAppWasmPath, import.meta.url);
 const minimumFrameWidth = 320;
@@ -216,14 +216,14 @@ async function ensureCrossOriginIsolation(): Promise<boolean> {
     quiet: true,
   };
 
-  await new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = coiServiceWorkerUrl.href;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("failed to load COI service worker helper"));
-    document.head.append(script);
-  });
+  // await new Promise<void>((resolve, reject) => {
+  //   const script = document.createElement("script");
+  //   script.src = coiServiceWorkerUrl.href;
+  //   script.async = true;
+  //   script.onload = () => resolve();
+  //   script.onerror = () => reject(new Error("failed to load COI service worker helper"));
+  //   document.head.append(script);
+  // });
 
   await new Promise((resolve) => window.setTimeout(resolve, 50));
   return window.crossOriginIsolated !== false;
