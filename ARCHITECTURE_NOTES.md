@@ -442,74 +442,112 @@ Migrate call sites incrementally from `kind: .view("Padding")` to
 Medium-cost changes. Each requires understanding a subsystem end-to-end and
 will touch multiple files, but the scope is contained.
 
-### 5. Make `ResolvedNode` truly immutable; kill `Boxed<DrawMetadata>`
+### 5. ~~Make `ResolvedNode` truly immutable; kill `Boxed<DrawMetadata>`~~ **RETRACTED**
 
-**File:** `Sources/Core/RenderTreeAndSemanticsTypes.swift:176-244`
-**Size:** small-medium, depends on how many consumers mutate `drawMetadata`
-through a shared box.
+This item was based on two misdiagnoses. Keeping the section (with a
+strike-through) so cross-references still resolve; do not execute it.
 
-Two distinct problems in one file:
+#### What the original item claimed
+
+1. **Problem A:** `didSet` on `ResolvedNode.children`
+   (`RenderTreeAndSemanticsTypes.swift:179-184`) creates O(n²) cost when
+   children are appended incrementally.
+2. **Problem B:** `Boxed<DrawMetadata>` on
+   `ResolvedNode._boxedDrawMetadata` is a "type-system lie" that breaks
+   value semantics via reference aliasing.
+
+#### Why both claims are wrong
+
+**On Problem B — the misdiagnosis:** I wrote that `Boxed` is "a
+reference cell sitting inside a value-semantic struct" that breaks
+`Equatable`. That is wrong. Look at `Sources/Core/Boxed.swift:11-33`:
 
 ```swift
-public var children: [ResolvedNode] {
-  didSet {
-    recomputePreferenceValues()      // O(children.count)
-    recomputeSubtreeNodeCount()       // O(children.count)
-    recomputeSupportsRetainedReuse()  // O(children.count)
+package struct Boxed<Value: Equatable>: Equatable {
+  private var _storage: _BoxStorage<Value>
+
+  package var value: Value {
+    _read { yield unsafe _storage.value }
+    _modify {
+      if !isKnownUniquelyReferenced(&_storage) {
+        _storage = unsafe _BoxStorage(_storage.value)
+      }
+      yield unsafe &_storage.value
+    }
+  }
+
+  package static func == (lhs: Self, rhs: Self) -> Bool {
+    unsafe lhs._storage === rhs._storage || lhs._storage.value == rhs._storage.value
   }
 }
-// …
-public var drawMetadata: DrawMetadata {
-  get { _boxedDrawMetadata.value }
-  set { _boxedDrawMetadata.value = newValue }
-}
-package var _boxedDrawMetadata: Boxed<DrawMetadata>
 ```
 
-**Problem A — quadratic construction.** Every `children` mutation triggers
-three O(n) recomputations. A loop that appends children one at a time pays
-O(n²). The hot call site in `normalizeResolvedElements`
-(`ViewFoundation.swift:235-259`) bulk-constructs children, so it's only hit
-once per node — but any code path that incrementally builds children pays
-quadratic cost silently, and nothing prevents the next contributor from
-writing such a loop.
+`Boxed` is a **proper copy-on-write wrapper** — exactly the pattern
+Swift's stdlib collections use. `_modify` checks
+`isKnownUniquelyReferenced` and allocates fresh storage on shared
+mutation. `==` falls back to value equality when storage references
+differ. Value semantics are preserved correctly. **There is no aliasing
+bug.**
 
-**Problem B — `Boxed<DrawMetadata>` is a type-system lie.**
-`Boxed` is a reference cell sitting inside a value-semantic struct so
-that "interior mutation" through the struct works. This breaks `ResolvedNode`'s
-`Equatable` conformance in a subtle way: two `ResolvedNode` values that
-share the same box compare equal for reference reasons, not value reasons.
-And mutating `drawMetadata` through one handle mutates every other handle
-that shares the box. This is the kind of bug that takes two hours to trace.
+The docstring on `Boxed.swift:1-5` is explicit: *"Use this to store
+value types that exceed ~200 bytes inline inside other value types. The
+box reduces inline size to a single pointer (8 bytes) while preserving
+value semantics through COW."* `DrawMetadata` is genuinely large
+(contains a nested `Boxed<HeavyFields>` plus `clipsToBounds`,
+`clipIdentifier`, `compositingHint`, `imagePreference`, `ruleStackAxis`
+— roughly 50-60 bytes). Embedding it unboxed in every `ResolvedNode`
+would meaningfully bloat inline footprint. **Removing the box would be
+a size regression, not a fix.**
 
-#### Proposal
+**On Problem A — the landmine that isn't stepped on:** Every post-init
+mutation of `ResolvedNode.children` in `Sources/` is a **bulk
+reassignment**, not an incremental append. I grepped:
 
-1. **Delete the `didSet` on `children`.** Make `children` `let` (or at
-   least, don't run logic on set). Compute `preferenceValues`,
-   `subtreeNodeCount`, and `supportsRetainedReuse` in `init` from the
-   fully-constructed children, and store as `let`.
-2. **Remove `Boxed<DrawMetadata>`.** Grep for `.drawMetadata =` against a
-   `ResolvedNode` — there won't be many call sites. Either (a) make those
-   sites construct a fresh `ResolvedNode`, or (b) if the mutation is truly
-   necessary for layout/draw feedback, move `drawMetadata` out of
-   `ResolvedNode` into a side table keyed by identity. Option (b) is
-   cleaner if `drawMetadata` is computed during layout/draw rather than
-   resolve.
+| Site | Pattern |
+|---|---|
+| `AnimationController.swift:756` | `node.children = children` after for-loop builds array |
+| `AnimationController.swift:791` | `node.children = children` after collecting injections |
+| `AnimationController.swift:805` | `node.children = node.children.map { … }` |
+| `MenuRendering.swift:80` | `disabled.children = disabled.children.map(disablingFocus)` |
 
-#### Risks
+Each assignment fires `didSet` exactly once per node, doing O(direct
+children) work — **linear in tree size, not quadratic**. The quadratic
+cost I described would only bite a hypothetical future caller doing
+`for child in … { node.children.append(child) }`, which no current code
+does.
 
-- **Finding the `Boxed` consumers is the main work.** If they're
-  pervasive, this becomes a larger refactor than it looks.
-- **`Equatable` behavior may be load-bearing.** If something in the
-  reuse path is relying on the current reference-based equality semantics
-  (reuse-or-not decisions), changing to value equality could change frame
-  behavior. Audit `reusableSnapshot` before touching.
+Killing the `didSet` is still defensible as a guard-against-landmine
+refactor, but the justification is weaker than the original write-up
+implied, and it costs more than "small-medium":
 
-#### Why this unblocks items 6 and 9
+- `ResolvedNode` has ~14 fields. Making `children` a `let` forces
+  animation-controller mutation sites to either reconstruct full nodes
+  or use a `withChildren(_:)` builder, both of which are noisier than
+  the current `node.children = …`.
+- Keeping `children` mutable but dropping `didSet` silently breaks
+  `preferenceValues` / `subtreeNodeCount` / `supportsRetainedReuse`
+  invariants — worse than the original design.
+- Making derived state computed-on-read degrades O(1) access to
+  O(subtree) at the root (each recursive access re-walks children).
 
-Item 6 (folding `ResolvedNode` into `ViewNode`) depends on `ResolvedNode`
-being a well-behaved value type. If it has interior mutability via `Boxed`,
-the fold is unsafe. Do this item first.
+#### What this means for Item 6
+
+The original Item 6 claimed it depends on Item 5 because "`ResolvedNode`
+must be truly immutable or the composed type will inherit `Boxed`'s
+bugs." Since `Boxed` has no bugs, **Item 6 no longer depends on Item
+5**. The real prerequisite for Item 6 is the mutation-site audit above,
+which is now done.
+
+#### What this means for Item 9
+
+Same story. Item 9's dependency on "items 5, 6" becomes just "item 6."
+
+#### If you ever want to revisit this
+
+The only defensible piece of the original item is the defensive
+killing of `didSet`. If a future caller starts doing incremental
+appends, reconsider then — not now. And if you do, the right scope is
+*just the `didSet`*, not the `Boxed` wrapper, which should stay.
 
 ---
 
@@ -517,7 +555,8 @@ the fold is unsafe. Do this item first.
 
 **Files:** `Sources/Core/Graph/ViewNode.swift:1-320`,
 `Sources/Core/RenderTreeAndSemanticsTypes.swift:176-244`
-**Size:** medium. Depends on item 5.
+**Size:** medium. No hard dependencies (Item 5 was retracted — see
+above — so this no longer depends on it).
 
 `ResolvedNode` and `ViewNode` are parallel representations of the same
 tree. Both carry: `identity`, `kind`, `environmentSnapshot`,
@@ -593,8 +632,12 @@ package func commit(resolved: ResolvedNode, children: [ViewNode]) {
 
 #### Risks
 
-- **Depends on item 5.** `ResolvedNode` must be truly immutable and
-  value-semantic first, or the composed type will inherit `Boxed`'s bugs.
+- **`ResolvedNode` must be audited for post-init mutation.** `Boxed<_>`
+  members are COW-safe (see Item 5 retraction), so value semantics
+  work correctly — but this refactor still needs to verify no caller
+  mutates a `ViewNode.committed` field through an unexpected path.
+  The mutation-site audit from the Item 5 investigation is the
+  prerequisite; it's already done and documented above.
 - **Accessor forwarding may churn call sites.** Every `viewNode.kind`
   read works unchanged because of Swift property forwarding via stored
   property, but any code doing `viewNode.layoutMetadata = newValue` (i.e.,
@@ -619,7 +662,7 @@ reproduced.
 This was originally billed as a "cheap win." After reading more of the
 code, it's not cheap. Treat this section as a **research task**, not a
 drop-in refactor. If you only have bandwidth for one item in Section 2,
-**skip this one** — do items 5 and 6 first.
+**skip this one** — do item 6 first.
 
 #### What the alias layer is
 
@@ -1046,30 +1089,35 @@ Ordered by rough clarity-per-unit-of-work. Ordering dependencies are noted.
 
 | # | Item | Cost | Depends on | Why |
 |---|------|------|------------|-----|
-| 1 | MeasurementCache eviction | Small | — | Real bug, 10-line fix. Do this regardless. |
-| 2 | CollectionDifference diff | Small | — | Smallest blast radius among the diff items. Unblocks future move-animation work. |
+| 1 | MeasurementCache eviction | Small | — | Real bug, 10-line fix. Do this regardless. ✅ Landed. |
+| 2 | CollectionDifference diff | Small | — | Smallest blast radius among the diff items. Unblocks future move-animation work. ✅ Landed. |
 | 3 | Consolidate `applyStructuralChildDiff` | Small | — (Option B excludes item 2) | Clarity. Pick Option A if keeping diffChildren (item 2), Option B otherwise. |
 | 4 | `typeDiscriminator` on `ChildDescriptor` | Small-med | ideally after item 2 | Perf + safety win. Lands cleanly on top of item 2's warm test surface. |
-| 5 | Immutable `ResolvedNode` + kill `Boxed` | Small-med | — | Unblocks items 6 and 9. Kills a quadratic construction cost and a real correctness trap. |
-| 6 | `ViewNode` contains `ResolvedNode` | Medium | **item 5** | Biggest clarity win. Don't start without item 5. |
+| 5 | ~~Immutable `ResolvedNode` + kill `Boxed`~~ | — | — | **Retracted.** Based on misdiagnosis of `Boxed<_>` (a proper COW wrapper) and a landmine nobody steps on. See the retraction note in section 5. |
+| 6 | `ViewNode` contains `ResolvedNode` | Medium | — | Biggest clarity win. Prerequisite is the post-init mutation audit (done, documented in Item 5 retraction). |
 | 7 | Investigate alias layer | Medium (research), large (code) | — | Start with **instrumentation only**. The code change, if any, should come after weeks of running instrumentation in dev. |
 | 8 | Decompose `ViewGraph` | Large | — | Only worth it if you want to unit-test invalidation in isolation. |
-| 9 | Dependency-aware re-evaluation | Large | **items 5, 6** | Only if profiling shows body re-evaluation as the hot path. |
+| 9 | Dependency-aware re-evaluation | Large | **item 6** | Only if profiling shows body re-evaluation as the hot path. |
 | 10 | Explicit context threading | Large | — | Only if you want off-main-thread rendering or hit a testability wall. |
 | 11 | `Identity` interning | Large | — | Only if profiling shows identity string allocation / comparison as a bottleneck. |
 
 ### Suggested landing order for the next few weeks
 
-1. **Item 1** (MeasurementCache). Mechanical. Land immediately.
-2. **Item 2** (CollectionDifference). Mechanical, self-contained. Land
-   second so the `StructuralDiff` test surface is warm.
-3. **Item 5** (immutable ResolvedNode). This is the unblock that makes
-   items 6 and 9 possible. Land third.
-4. **Item 4** (typeDiscriminator). Lands cleanly on top of items 2 and 5.
-5. **Item 3** (structural diff split-brain). Either Option A or a
-   documentation comment, depending on whether item 2 shipped.
+1. ✅ **Item 1** (MeasurementCache). Mechanical. **Landed in `24ada3d`.**
+2. ✅ **Item 2** (CollectionDifference). Mechanical, self-contained.
+   **Landed in `c077679`.**
+3. ~~**Item 5**~~ **Retracted.** Originally sequenced here as an Item 6
+   prerequisite. Investigation showed the premise was wrong; see the
+   retraction in section 5.
+4. **Item 4** (typeDiscriminator). Lands cleanly on top of item 2's
+   warm test surface.
+5. **Item 3** (structural diff split-brain). Item 2 shipped with
+   `diffChildren` intact, so Option B (delete StructuralDiff.swift) is
+   now off the table. Pick Option A (centralize reconciliation) or
+   just a documentation comment on `applyStructuralChildDiff`.
 6. **Item 6** (fold ResolvedNode into ViewNode). The biggest clarity
-   payoff in the document. Requires item 5.
+   payoff in the document. No longer depends on item 5 — the
+   mutation-site audit is the prerequisite and it's already done.
 7. **Item 7** (alias investigation). Start instrumentation in parallel
    with the above. The instrumentation is cheap; the code change, if any,
    comes later.
