@@ -326,17 +326,23 @@ package final class AnimationController {
   }
 
   /// Walks the placed tree and records the bounds and identity of
-  /// every node tagged with a ``MatchedGeometryKey``.  If multiple
-  /// nodes carry the same key in one frame (undefined in SwiftUI as
-  /// well) the last-walked entry wins.
+  /// every node tagged with a ``MatchedGeometryKey``.  Nodes whose
+  /// config is `isSource: false` never contribute their bounds —
+  /// they still receive match translations on frames where their
+  /// key is swapped to another identity, but a non-source instance
+  /// can't make another instance animate by disappearing.
+  ///
+  /// If multiple source-contributing nodes carry the same key in
+  /// one frame (undefined in SwiftUI as well) the last-walked
+  /// entry wins.
   private static func collectMatchedGeometry(
     _ node: PlacedNode,
     bounds: inout [MatchedGeometryKey: Rect],
     identities: inout [MatchedGeometryKey: Identity]
   ) {
-    if let key = node.matchedGeometry {
-      bounds[key] = node.bounds
-      identities[key] = node.identity
+    if let config = node.matchedGeometry, config.isSource {
+      bounds[config.key] = node.bounds
+      identities[config.key] = node.identity
     }
     for child in node.children {
       collectMatchedGeometry(child, bounds: &bounds, identities: &identities)
@@ -831,8 +837,8 @@ package final class AnimationController {
       // overlay so the old view just disappears.
       if let previousRoot = previousTreeRoot,
         let previousNode = findNode(in: previousRoot, identity: identity),
-        let removedKey = previousNode.matchedGeometry,
-        matchedKeysConsumedByMatch.contains(removedKey)
+        let removedConfig = previousNode.matchedGeometry,
+        matchedKeysConsumedByMatch.contains(removedConfig.key)
       {
         continue
       }
@@ -1112,8 +1118,8 @@ package final class AnimationController {
       parentAccumulator[node.identity] = parentIdentity
     }
     childIndexAccumulator[node.identity] = childIndex
-    if let key = node.matchedGeometry {
-      matchedKeyAccumulator[node.identity] = key
+    if let config = node.matchedGeometry {
+      matchedKeyAccumulator[node.identity] = config.key
     }
 
     for (index, child) in node.children.enumerated() {
