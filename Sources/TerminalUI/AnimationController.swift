@@ -913,11 +913,15 @@ package final class AnimationController {
       applyTransitionModifiersRecursively(childMods, to: &child)
       children[i] = child
     }
-    node.children = children
+    // Shape is unchanged (same count, just interpolated opacity on
+    // each child) so we bypass the derived-state recomputes on the
+    // normal children setter.
+    node.setChildrenPreservingDerivedState(children)
 
-    // Apply offset to the root of the subtree only.  Only wraps an
-    // intrinsic node — if the node already carries a layout behavior we
-    // leave it alone to avoid clobbering authored layout.
+    // Apply offset to the root of the subtree only.  The layout
+    // variant changes from .intrinsic → .offset here, so the reuse
+    // bit may change — use the normal setter to keep derived state
+    // correct.
     let offsetX = modifiers.offsetX ?? 0
     let offsetY = modifiers.offsetY ?? 0
     if offsetX != 0 || offsetY != 0,
@@ -962,9 +966,12 @@ package final class AnimationController {
         applyValue(&node, property: property, value: value)
       }
     }
-    node.children = node.children.map { child in
+    // Recursively apply interpolated values to children; the shape
+    // is unchanged so bypass the derived-state recomputes.
+    let interpolatedChildren = node.children.map { child in
       applyInterpolatedValues(tree: child, interpolated: interpolated)
     }
+    node.setChildrenPreservingDerivedState(interpolatedChildren)
     return node
   }
 
@@ -996,19 +1003,20 @@ package final class AnimationController {
 
     case (.offsetX, .integer(let x)):
       if case .offset(_, let y) = node.layoutBehavior {
-        node.layoutBehavior = .offset(x: x, y: y)
+        // Variant unchanged (still .offset), only numeric values move.
+        node.setLayoutBehaviorPreservingDerivedState(.offset(x: x, y: y))
       }
 
     case (.offsetY, .integer(let y)):
       if case .offset(let x, _) = node.layoutBehavior {
-        node.layoutBehavior = .offset(x: x, y: y)
+        node.setLayoutBehaviorPreservingDerivedState(.offset(x: x, y: y))
       }
 
     case (.frameWidth, .integer(let width)):
       switch node.layoutBehavior {
       case .frame(_, let height, let alignment):
-        node.layoutBehavior = .frame(
-          width: width, height: height, alignment: alignment
+        node.setLayoutBehaviorPreservingDerivedState(
+          .frame(width: width, height: height, alignment: alignment)
         )
       case .flexibleFrame(
         let minWidth, let idealWidth, let maxWidth,
@@ -1018,15 +1026,16 @@ package final class AnimationController {
           width: width,
           dimensions: (maxWidth, idealWidth, minWidth)
         )
-        node.layoutBehavior = .flexibleFrame(
-          minWidth: newMin,
-          idealWidth: newIdeal,
-          maxWidth: newMax,
-          minHeight: minHeight,
-          idealHeight: idealHeight,
-          maxHeight: maxHeight,
-          alignment: alignment
-        )
+        node.setLayoutBehaviorPreservingDerivedState(
+          .flexibleFrame(
+            minWidth: newMin,
+            idealWidth: newIdeal,
+            maxWidth: newMax,
+            minHeight: minHeight,
+            idealHeight: idealHeight,
+            maxHeight: maxHeight,
+            alignment: alignment
+          ))
       default:
         break
       }
@@ -1034,8 +1043,8 @@ package final class AnimationController {
     case (.frameHeight, .integer(let height)):
       switch node.layoutBehavior {
       case .frame(let width, _, let alignment):
-        node.layoutBehavior = .frame(
-          width: width, height: height, alignment: alignment
+        node.setLayoutBehaviorPreservingDerivedState(
+          .frame(width: width, height: height, alignment: alignment)
         )
       case .flexibleFrame(
         let minWidth, let idealWidth, let maxWidth,
@@ -1045,15 +1054,16 @@ package final class AnimationController {
           width: height,
           dimensions: (maxHeight, idealHeight, minHeight)
         )
-        node.layoutBehavior = .flexibleFrame(
-          minWidth: minWidth,
-          idealWidth: idealWidth,
-          maxWidth: maxWidth,
-          minHeight: newMin,
-          idealHeight: newIdeal,
-          maxHeight: newMax,
-          alignment: alignment
-        )
+        node.setLayoutBehaviorPreservingDerivedState(
+          .flexibleFrame(
+            minWidth: minWidth,
+            idealWidth: idealWidth,
+            maxWidth: maxWidth,
+            minHeight: newMin,
+            idealHeight: newIdeal,
+            maxHeight: newMax,
+            alignment: alignment
+          ))
       default:
         break
       }
@@ -1061,25 +1071,25 @@ package final class AnimationController {
     case (.paddingTop, .integer(let value)):
       if case .padding(var insets) = node.layoutBehavior {
         insets.top = value
-        node.layoutBehavior = .padding(insets)
+        node.setLayoutBehaviorPreservingDerivedState(.padding(insets))
       }
 
     case (.paddingLeading, .integer(let value)):
       if case .padding(var insets) = node.layoutBehavior {
         insets.leading = value
-        node.layoutBehavior = .padding(insets)
+        node.setLayoutBehaviorPreservingDerivedState(.padding(insets))
       }
 
     case (.paddingBottom, .integer(let value)):
       if case .padding(var insets) = node.layoutBehavior {
         insets.bottom = value
-        node.layoutBehavior = .padding(insets)
+        node.setLayoutBehaviorPreservingDerivedState(.padding(insets))
       }
 
     case (.paddingTrailing, .integer(let value)):
       if case .padding(var insets) = node.layoutBehavior {
         insets.trailing = value
-        node.layoutBehavior = .padding(insets)
+        node.setLayoutBehaviorPreservingDerivedState(.padding(insets))
       }
 
     default:
