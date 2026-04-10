@@ -18,6 +18,10 @@ public struct GalleryView: View {
       CalculatorTab()
         .tabItem("Calculator")
         .tag(Tab.calculator)
+
+      AnimationsTab()
+        .tabItem("Animations")
+        .tag(Tab.animations)
     }
   }
 }
@@ -27,5 +31,6 @@ extension GalleryView {
     case counter
     case todo
     case calculator
+    case animations
   }
 }
