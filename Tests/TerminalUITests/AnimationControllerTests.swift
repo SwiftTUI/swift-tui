@@ -128,6 +128,109 @@ struct LinearCustomAnimation: CustomAnimation {
 @Suite("Animation end-to-end pipeline integration")
 struct AnimationPipelineIntegrationTests {
   @Test(
+    "removal overlays do not accumulate across tick frames"
+  )
+  func removalOverlaysDoNotAccumulateAcrossTickFrames() throws {
+    // Regression for the "slide-out leaves render artefacts"
+    // gallery bug: `applyPlacedOverlays` used to mutate the placed
+    // tree in place, and `retainedFrames.store` committed the
+    // mutated tree to the retained cache.  Subsequent tick frames
+    // then reused that cached tree via `retainedPlacement` and
+    // `applyPlacedOverlays` injected ANOTHER overlay on top,
+    // growing the tree each tick and leaving ghosted artefacts
+    // visible after the animation completed.
+    //
+    // The fix stores the BASELINE (pre-overlay) placed tree into
+    // the retained frame store so future tick frames start from
+    // the canonical layout.  This test drives three consecutive
+    // renders through DefaultRenderer, manually installing the
+    // transition sink (RunLoop does this at startup; DefaultRenderer
+    // alone does not) and then asserts the placed tree's transient
+    // count stays bounded across renders.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+
+    // Manually install the sinks that RunLoop would install at
+    // startup — DefaultRenderer.render alone does not wire them.
+    AnimationRegistrationStorage.currentSink = controller
+    TransitionRegistrationStorage.currentSink = controller
+    defer {
+      AnimationRegistrationStorage.currentSink = nil
+      TransitionRegistrationStorage.currentSink = nil
+    }
+
+    let animation = Animation.linear(duration: .milliseconds(2000))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+
+    // Frame 1: show a single Text child with .transition(.opacity).
+    _ = renderer.render(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("hello").transition(.opacity)
+      },
+      context: ResolveContext(identity: rootIdentity)
+    )
+
+    // Frame 2: remove the child under an animate transaction.
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    let frame2 = renderer.render(
+      VStack(alignment: .leading, spacing: 0) {
+        // empty — Text removed
+      },
+      context: ResolveContext(identity: rootIdentity, transaction: transaction)
+    )
+    let frame2TransientCount = Self.countTransientNodes(frame2.placedTree)
+
+    // If the controller didn't capture any removal, skip the rest
+    // of the test — this suite's scope is just the retained-reuse
+    // accumulation bug, not transition registration reliability.
+    guard frame2TransientCount > 0 else {
+      Issue.record(
+        "removal detection did not produce a transient overlay; transition registration flow is not exercising this test case"
+      )
+      return
+    }
+
+    // Frame 3: same view tree (tick frame).  Without the fix, the
+    // retained cache contains frame 2's placed tree (including the
+    // transient overlay) and applyPlacedOverlays injects another
+    // overlay on top → transient count >= 2.
+    let frame3 = renderer.render(
+      VStack(alignment: .leading, spacing: 0) {
+      },
+      context: ResolveContext(identity: rootIdentity)
+    )
+    let frame3TransientCount = Self.countTransientNodes(frame3.placedTree)
+
+    // Frame 4: another tick — any accumulation bug compounds.
+    let frame4 = renderer.render(
+      VStack(alignment: .leading, spacing: 0) {
+      },
+      context: ResolveContext(identity: rootIdentity)
+    )
+    let frame4TransientCount = Self.countTransientNodes(frame4.placedTree)
+
+    #expect(
+      frame2TransientCount == frame3TransientCount,
+      "tick frame 3 should have the same transient count as frame 2, got \(frame3TransientCount) vs \(frame2TransientCount)"
+    )
+    #expect(
+      frame3TransientCount == frame4TransientCount,
+      "tick frame 4 should have the same transient count as frame 3, got \(frame4TransientCount) vs \(frame3TransientCount)"
+    )
+  }
+
+  private static func countTransientNodes(_ node: PlacedNode) -> Int {
+    var total = node.isTransient ? 1 : 0
+    for child in node.children {
+      total += countTransientNodes(child)
+    }
+    return total
+  }
+
+  @Test(
     "drawMetadata changes reach the placed tree across retained-layout reuse"
   )
   func drawMetadataChangesReachPlacedTreeAcrossRetainedReuse() throws {
@@ -605,6 +708,120 @@ struct AnimationControllerPropertyTests {
     #expect(
       x >= 10, "composed offset should include the existing 5 and transition offset, got \(x)")
     #expect(y == 0)
+  }
+
+  @Test(
+    "insertion transition offset translates placed bounds on intrinsic leaves"
+  )
+  func insertionOffsetTranslatesPlacedBounds() throws {
+    // Regression for the "slide-in is instantaneous" gallery bug:
+    // applyValue for offsetX/offsetY only mutates nodes whose
+    // layoutBehavior is already .offset, so .transition(.move(edge:))
+    // on a Text (or any intrinsic-layout leaf) silently did nothing.
+    // The fix routes insertion offsets through a placed-level pass
+    // that translates matching bounds regardless of layoutBehavior.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(1000))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+    let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+
+    // Frame 1: leaf present with .transition(.move(edge: .leading)).
+    controller.beginTransitionCollection()
+    controller.registerTransition(
+      for: leafIdentity,
+      transition: AnyTransition.move(edge: .leading)
+    )
+    controller.finishTransitionCollection()
+
+    let leaf = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let root = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: [leaf]
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(root, transaction: transaction, timestamp: t0)
+
+    // Build a synthetic placed tree that matches what LayoutEngine
+    // would produce: the leaf at bounds (0, 0, 5, 1), root at
+    // (0, 0, 20, 5).
+    var placed = PlacedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      bounds: Rect(origin: .zero, size: Size(width: 20, height: 5)),
+      children: [
+        PlacedNode(
+          identity: leafIdentity,
+          kind: .view("Leaf"),
+          bounds: Rect(origin: .zero, size: Size(width: 5, height: 1))
+        )
+      ]
+    )
+
+    // Apply placed overlays at t0.  The move(edge: .leading) transition
+    // declares offsetX = -10 as the `from` value.  At progress 0, the
+    // interpolated delta is -10.  The leaf's bounds should be
+    // translated by (-10, 0) → origin.x = -10.
+    controller.applyPlacedOverlays(to: &placed, at: t0)
+
+    let leafAtStart = placed.children.first
+    #expect(leafAtStart != nil)
+    #expect(
+      leafAtStart?.bounds.origin.x == -10,
+      "insertion at t=0 should translate leaf by the transition's initial offset, got \(String(describing: leafAtStart?.bounds.origin.x))"
+    )
+
+    // Halfway through the animation, delta should be -5.
+    var placedHalf = PlacedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      bounds: Rect(origin: .zero, size: Size(width: 20, height: 5)),
+      children: [
+        PlacedNode(
+          identity: leafIdentity,
+          kind: .view("Leaf"),
+          bounds: Rect(origin: .zero, size: Size(width: 5, height: 1))
+        )
+      ]
+    )
+    controller.applyPlacedOverlays(
+      to: &placedHalf,
+      at: t0.advanced(by: .milliseconds(500))
+    )
+    let leafAtHalf = placedHalf.children.first
+    #expect(
+      leafAtHalf?.bounds.origin.x ?? 0 == -5
+        || leafAtHalf?.bounds.origin.x ?? 0 == -4
+        || leafAtHalf?.bounds.origin.x ?? 0 == -6,
+      "insertion halfway should translate by approx -5, got \(String(describing: leafAtHalf?.bounds.origin.x))"
+    )
+
+    // Well past the animation end, delta should be 0 (final position).
+    var placedDone = PlacedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      bounds: Rect(origin: .zero, size: Size(width: 20, height: 5)),
+      children: [
+        PlacedNode(
+          identity: leafIdentity,
+          kind: .view("Leaf"),
+          bounds: Rect(origin: .zero, size: Size(width: 5, height: 1))
+        )
+      ]
+    )
+    controller.applyPlacedOverlays(
+      to: &placedDone,
+      at: t0.advanced(by: .milliseconds(1500))
+    )
+    let leafAtEnd = placedDone.children.first
+    #expect(
+      leafAtEnd?.bounds.origin.x == 0,
+      "insertion after end should translate to final position (no delta), got \(String(describing: leafAtEnd?.bounds.origin.x))"
+    )
   }
 
   @Test(

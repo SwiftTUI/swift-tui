@@ -192,6 +192,26 @@ package struct RemovalEntry: Sendable {
   package var placedSnapshot: PlacedNode? = nil
 }
 
+/// An insertion offset animation tracked separately from the
+/// ``activeAnimations`` map so it can be applied at placed level
+/// rather than via ``applyValue`` on the resolved tree.
+///
+/// ``applyValue`` for ``AnimatableProperty/offsetX`` only mutates
+/// nodes whose `layoutBehavior` is already ``LayoutBehavior/offset``
+/// — which is never true for intrinsic-layout leaves like `Text`.
+/// Wrapping those leaves in a new `.offset` layout doesn't work
+/// either because ``LayoutEngine``'s `.offset` variant requires a
+/// child.  Instead the controller tracks the insertion offset
+/// delta per identity and translates the matching placed node's
+/// bounds after layout runs.
+package struct InsertionOffsetAnimation: Sendable {
+  package var from: (x: Int, y: Int)
+  package var animationBox: AnimationBox
+  package var startTime: MonotonicInstant
+  package var batchID: AnimationBatchID?
+  package var customState: AnimationState = .init()
+}
+
 @MainActor
 package final class AnimationController {
   private var previousSnapshots: [Identity: AnimatableSnapshot] = [:]
@@ -204,6 +224,10 @@ package final class AnimationController {
   /// the overlay at placed level instead of routing it back through
   /// measure/place.
   private var previousPlacedRoot: PlacedNode?
+  /// Active insertion-offset animations keyed by identity.  Applied
+  /// at placed level via ``applyPlacedOverlays`` alongside removal
+  /// overlays — see ``InsertionOffsetAnimation``.
+  private var insertionOffsetAnimations: [Identity: InsertionOffsetAnimation] = [:]
   /// Parent identity, as walked from the previous frame's tree.
   private var previousParentByIdentity: [Identity: Identity] = [:]
   /// Child index within the previous parent's children list.
@@ -249,56 +273,123 @@ package final class AnimationController {
     previousPlacedRoot = placed
   }
 
-  /// Injects any removal overlays whose placedSnapshot was captured
-  /// into the placed tree, applying the current tick's interpolated
-  /// transition modifiers to them.  Runs between place and semantics
-  /// in the render pipeline.
+  /// Runs the placed-level animation pass after layout: injects any
+  /// pending removal overlays and translates any active insertion
+  /// offsets.  Called between place and semantics in the render
+  /// pipeline.
   ///
   /// Overlays injected this way never flow through measure or place,
   /// so sibling layout is not disturbed when the removed view lived
   /// inside a VStack or other flow container.  They carry the
   /// transient flag, so semantics/focus/lifecycle skip them.
+  ///
+  /// Insertion offsets translate the bounds of in-tree placed nodes
+  /// by an interpolated delta so `.transition(.move(edge:))` and
+  /// friends work on intrinsic-layout leaves (where `applyValue`
+  /// can't rewrite the layoutBehavior).
   package func applyPlacedOverlays(
     to tree: inout PlacedNode,
     at timestamp: MonotonicInstant
   ) {
-    guard !removingIdentities.isEmpty else { return }
+    // 1. Inject removal overlays.
+    if !removingIdentities.isEmpty {
+      var injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]] = [:]
 
-    var injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]] = [:]
-
-    for (identity, entry) in removingIdentities {
-      guard let placedSnapshot = entry.placedSnapshot,
-        let parentId = entry.parentIdentity
-      else {
-        continue  // No placed capture → resolved-level path handles it.
-      }
-
-      let modifiers: TransitionModifiers
-      if let box = entry.animationBox, let anim = registeredAnimations[box] {
-        let elapsed = entry.startTime.duration(to: timestamp)
-        if let progress = anim.evaluate(elapsed: elapsed) {
-          modifiers = interpolateRemovalModifiers(
-            from: entry.startOpacity,
-            to: entry.transition.removalModifiers(),
-            progress: progress
-          )
-        } else {
-          continue  // Completion handled in applyInterpolations.
+      for (identity, entry) in removingIdentities {
+        guard let placedSnapshot = entry.placedSnapshot,
+          let parentId = entry.parentIdentity
+        else {
+          continue  // No placed capture → resolved-level path handles it.
         }
-      } else {
-        continue
+
+        let modifiers: TransitionModifiers
+        if let box = entry.animationBox, let anim = registeredAnimations[box] {
+          let elapsed = entry.startTime.duration(to: timestamp)
+          if let progress = anim.evaluate(elapsed: elapsed) {
+            modifiers = interpolateRemovalModifiers(
+              from: entry.startOpacity,
+              to: entry.transition.removalModifiers(),
+              progress: progress
+            )
+          } else {
+            continue  // Completion handled in applyInterpolations.
+          }
+        } else {
+          continue
+        }
+
+        var clone = placedSnapshot
+        applyPlacedOverlayModifiers(modifiers, to: &clone)
+        injections[parentId, default: []].append(
+          (childIndex: entry.childIndex, snapshot: clone)
+        )
       }
 
-      var clone = placedSnapshot
-      applyPlacedOverlayModifiers(modifiers, to: &clone)
-      injections[parentId, default: []].append(
-        (childIndex: entry.childIndex, snapshot: clone)
-      )
+      if !injections.isEmpty {
+        tree = injectPlacedOverlays(tree: tree, injections: injections)
+      }
     }
 
-    if !injections.isEmpty {
-      tree = injectPlacedOverlays(tree: tree, injections: injections)
+    // 2. Translate placed nodes for insertion offset animations.
+    if !insertionOffsetAnimations.isEmpty {
+      var offsetsByIdentity: [Identity: (dx: Int, dy: Int)] = [:]
+      var completedInsertions: [Identity] = []
+
+      for (identity, entry) in insertionOffsetAnimations {
+        guard let anim = registeredAnimations[entry.animationBox] else {
+          completedInsertions.append(identity)
+          continue
+        }
+        let elapsed = entry.startTime.duration(to: timestamp)
+        var state = entry.customState
+        let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
+        insertionOffsetAnimations[identity]?.customState = state
+
+        guard let progress = evaluated else {
+          // Animation complete: delta is 0 (fully at final position).
+          completedInsertions.append(identity)
+          continue
+        }
+        // Insertion interpolates `from` → 0.
+        // At progress p, interpolated = from * (1 - p).
+        let dx = Int(Double(entry.from.x) * (1.0 - progress))
+        let dy = Int(Double(entry.from.y) * (1.0 - progress))
+        offsetsByIdentity[identity] = (dx: dx, dy: dy)
+      }
+
+      for identity in completedInsertions {
+        if let entry = insertionOffsetAnimations.removeValue(forKey: identity) {
+          releaseBatch(entry.batchID)
+        }
+      }
+
+      if !offsetsByIdentity.isEmpty {
+        tree = translatePlacedNodesByIdentity(
+          tree: tree,
+          offsets: offsetsByIdentity
+        )
+      }
     }
+  }
+
+  /// Walks the placed tree and translates the bounds of any node
+  /// whose identity is in `offsets`, along with the bounds of every
+  /// descendant (so children move with their parent).
+  private func translatePlacedNodesByIdentity(
+    tree: PlacedNode,
+    offsets: [Identity: (dx: Int, dy: Int)]
+  ) -> PlacedNode {
+    var node = tree
+    if let delta = offsets[node.identity] {
+      var translated = node
+      translateBounds(&translated, dx: delta.dx, dy: delta.dy)
+      return translated
+    }
+    let walked = node.children.map { child in
+      translatePlacedNodesByIdentity(tree: child, offsets: offsets)
+    }
+    node.children = walked
+    return node
   }
 
   /// Applies transition modifiers to a placed overlay subtree.
@@ -712,39 +803,25 @@ package final class AnimationController {
           batchID: batchID
         )
     }
-    if let startOffsetX = modifiers.offsetX {
-      let target = snapshot.offsetX ?? 0
-      let key = AnimationKey(identity: identity, property: .offsetX)
-      let effectiveFrom =
-        sampleCurrentValue(for: key, at: timestamp)
-        ?? .integer(startOffsetX)
-      if let existing = activeAnimations[key] { releaseBatch(existing.batchID) }
+    // Insertion offsets route through a separate placed-level path
+    // rather than activeAnimations, because applyValue can't
+    // translate intrinsic-layout leaves like Text (LayoutEngine's
+    // .offset variant requires `resolved.children.first`).  The
+    // placed-level path walks the post-layout tree and translates
+    // matching bounds directly.
+    if modifiers.offsetX != nil || modifiers.offsetY != nil {
+      let fromX = modifiers.offsetX ?? 0
+      let fromY = modifiers.offsetY ?? 0
+      if let existing = insertionOffsetAnimations[identity] {
+        releaseBatch(existing.batchID)
+      }
       retainBatch(batchID)
-      activeAnimations[key] =
-        ActiveAnimation(
-          from: effectiveFrom,
-          to: .integer(target),
-          animationBox: box,
-          startTime: timestamp,
-          batchID: batchID
-        )
-    }
-    if let startOffsetY = modifiers.offsetY {
-      let target = snapshot.offsetY ?? 0
-      let key = AnimationKey(identity: identity, property: .offsetY)
-      let effectiveFrom =
-        sampleCurrentValue(for: key, at: timestamp)
-        ?? .integer(startOffsetY)
-      if let existing = activeAnimations[key] { releaseBatch(existing.batchID) }
-      retainBatch(batchID)
-      activeAnimations[key] =
-        ActiveAnimation(
-          from: effectiveFrom,
-          to: .integer(target),
-          animationBox: box,
-          startTime: timestamp,
-          batchID: batchID
-        )
+      insertionOffsetAnimations[identity] = InsertionOffsetAnimation(
+        from: (x: fromX, y: fromY),
+        animationBox: box,
+        startTime: timestamp,
+        batchID: batchID
+      )
     }
   }
 
@@ -1194,6 +1271,19 @@ package final class AnimationController {
       tree = injectRemovals(tree: tree, injectionsByParent: injectionsByParent)
     }
 
+    // Insertion offset animations live on the placed side of the
+    // pipeline (applyPlacedOverlays) but they still need to keep
+    // the run loop ticking until they complete.
+    if !insertionOffsetAnimations.isEmpty {
+      hasPendingWork = true
+      if latestDeadline == timestamp {
+        latestDeadline = timestamp.advanced(by: frameInterval)
+      }
+      for identity in insertionOffsetAnimations.keys {
+        affectedIdentities.insert(identity)
+      }
+    }
+
     let result = AnimationTickResult(
       hasActiveAnimations: hasPendingWork,
       nextDeadline: hasPendingWork ? latestDeadline : nil,
@@ -1544,6 +1634,7 @@ package final class AnimationController {
     previousPlacedRoot = nil
     previousParentByIdentity.removeAll(keepingCapacity: true)
     previousChildIndexByIdentity.removeAll(keepingCapacity: true)
+    insertionOffsetAnimations.removeAll(keepingCapacity: true)
     activeAnimations.removeAll(keepingCapacity: true)
     registeredAnimations.removeAll(keepingCapacity: true)
     completionClosures.removeAll(keepingCapacity: true)
