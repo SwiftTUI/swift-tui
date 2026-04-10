@@ -224,8 +224,8 @@ struct PresentationSurfaceTests {
     #expect(alertIndex < paletteIndex)
   }
 
-  @Test("sheet shell uses a joined inner-edge unicode border over colored background content")
-  func sheetShellUsesAJoinedInnerEdgeUnicodeBorderOverColoredBackgroundContent() throws {
+  @Test("sheet shell uses presentation chrome that samples the interior background")
+  func sheetShellUsesPresentationChromeThatSamplesTheInteriorBackground() throws {
     let proposal = ProposedSize(width: .finite(48), height: .finite(14))
     let rootIdentity = testIdentity("Root")
 
@@ -251,13 +251,9 @@ struct PresentationSurfaceTests {
     let titleLocation = try #require(
       findSubstring("Inspector", in: artifacts.rasterSurface.lines)
     )
-    let bodyLocation = try #require(
-      findSubstring("Sheet body", in: artifacts.rasterSurface.lines)
-    )
-
     let topBorderCell = artifacts.rasterSurface.cells[titleLocation.y - 1][titleLocation.x]
     let topLeadingCorner = try #require(
-      findCharacter("▟", in: artifacts.rasterSurface.lines)
+      findCharacter("▗", in: artifacts.rasterSurface.lines)
     )
     let rightBorderLocation = try #require(
       findCharacter("▌", in: artifacts.rasterSurface.lines)
@@ -265,28 +261,41 @@ struct PresentationSurfaceTests {
     let rightBorderCell = artifacts.rasterSurface.cells[rightBorderLocation.y][
       rightBorderLocation.x]
     let bottomTrailingCorner = try #require(
-      findCharacter("▛", in: artifacts.rasterSurface.lines)
+      findCharacter("▘", in: artifacts.rasterSurface.lines)
     )
     let borderBackground = try #require(
       topBorderCell.style?.backgroundColor
     )
-    let contentBackground = try #require(
-      artifacts.rasterSurface.cells[bodyLocation.y][bodyLocation.x].style?.backgroundColor
+    let headerBackground = try #require(
+      artifacts.rasterSurface.cells[titleLocation.y][titleLocation.x].style?.backgroundColor
+    )
+    let rightBorderBackground = try #require(
+      rightBorderCell.style?.backgroundColor
+    )
+    let rightInteriorBackground = try #require(
+      artifacts.rasterSurface.cells[rightBorderLocation.y][rightBorderLocation.x - 1].style?
+        .backgroundColor
     )
     let underlyingBackground = try #require(
       backgroundOnly.rasterSurface.cells[titleLocation.y - 1][titleLocation.x].style?
         .backgroundColor
     )
+    let rightUnderlyingBackground = try #require(
+      backgroundOnly.rasterSurface.cells[rightBorderLocation.y][rightBorderLocation.x].style?
+        .backgroundColor
+    )
 
     #expect(topBorderCell.character == "▄")
-    #expect(artifacts.rasterSurface.cells[topLeadingCorner.y][topLeadingCorner.x].character == "▟")
+    #expect(artifacts.rasterSurface.cells[topLeadingCorner.y][topLeadingCorner.x].character == "▗")
     #expect(rightBorderCell.character == "▌")
     #expect(
       artifacts.rasterSurface.cells[bottomTrailingCorner.y][bottomTrailingCorner.x].character
-        == "▛"
+        == "▘"
     )
-    #expect(borderBackground == underlyingBackground)
-    #expect(borderBackground != contentBackground)
+    #expect(borderBackground == headerBackground)
+    #expect(borderBackground != underlyingBackground)
+    #expect(rightBorderBackground == rightInteriorBackground)
+    #expect(rightBorderBackground != rightUnderlyingBackground)
   }
 
   @Test("declarative reconciliation prunes stale overlays when the source subtree disappears")

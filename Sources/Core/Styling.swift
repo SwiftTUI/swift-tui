@@ -435,6 +435,7 @@ public enum LineVariant: String, Equatable, Sendable {
   case block
   case outerHalfBlock
   case innerHalfBlock
+  case presentationChrome
   case hidden
   case markdown
 }
@@ -467,6 +468,7 @@ extension StrokeStyle {
   public static var block: Self { .init(lineVariant: .block) }
   public static var outerHalfBlock: Self { .init(lineVariant: .outerHalfBlock) }
   public static var innerHalfBlock: Self { .init(lineVariant: .innerHalfBlock) }
+  public static var presentationChrome: Self { .init(lineVariant: .presentationChrome) }
   public static var hidden: Self { .init(lineVariant: .hidden) }
   public static var markdown: Self { .init(lineVariant: .markdown) }
 }
