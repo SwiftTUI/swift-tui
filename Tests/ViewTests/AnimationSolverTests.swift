@@ -128,4 +128,78 @@ struct AnimationFactoryTests {
     // Before the delay has elapsed, progress should be zero.
     if let p100 { #expect(p100 == 0.0) }
   }
+
+  @Test("speed modifier scales the elapsed time")
+  func speedModifierScalesTime() throws {
+    let base = Animation.linear(duration: .milliseconds(1000))
+    let doubleSpeed = base.speed(2.0)
+
+    // At t=250ms under 2× speed, effective elapsed is 500ms → progress 0.5.
+    let progress = doubleSpeed.evaluate(elapsed: .milliseconds(250))
+    #expect(progress != nil)
+    if let progress {
+      #expect(abs(progress - 0.5) < 0.02)
+    }
+
+    // At t=600ms under 2× speed, effective elapsed is 1200ms → nil (done).
+    let done = doubleSpeed.evaluate(elapsed: .milliseconds(600))
+    #expect(done == nil)
+  }
+
+  @Test("repeatCount runs the curve N times then completes")
+  func repeatCountFinite() throws {
+    let base = Animation.linear(duration: .milliseconds(100))
+    let repeating = base.repeatCount(3, autoreverses: false)
+
+    // Within each of 3 iterations, progress walks 0 → 1.
+    // After the 3rd iteration, evaluate returns nil.
+    let mid1 = repeating.evaluate(elapsed: .milliseconds(50))
+    #expect(mid1 != nil)
+    if let mid1 { #expect(abs(mid1 - 0.5) < 0.02) }
+
+    let start2 = repeating.evaluate(elapsed: .milliseconds(105))
+    #expect(start2 != nil)
+    if let start2 { #expect(start2 < 0.2) }
+
+    let mid3 = repeating.evaluate(elapsed: .milliseconds(250))
+    #expect(mid3 != nil)
+    if let mid3 { #expect(abs(mid3 - 0.5) < 0.02) }
+
+    // Past the 3rd iteration: done.
+    let done = repeating.evaluate(elapsed: .milliseconds(350))
+    #expect(done == nil)
+  }
+
+  @Test("repeatCount autoreverse flips odd iterations")
+  func repeatCountAutoreverse() throws {
+    let base = Animation.linear(duration: .milliseconds(100))
+    let repeating = base.repeatCount(2, autoreverses: true)
+
+    // Iteration 0 (forward): progress runs 0 → 1.
+    let fwd = repeating.evaluate(elapsed: .milliseconds(50))
+    #expect(fwd != nil)
+    if let fwd { #expect(abs(fwd - 0.5) < 0.02) }
+
+    // Iteration 1 (reversed): progress runs 1 → 0, so at local t=50ms
+    // the reported value should be 0.5.
+    let rev = repeating.evaluate(elapsed: .milliseconds(150))
+    #expect(rev != nil)
+    if let rev { #expect(abs(rev - 0.5) < 0.02) }
+
+    // At local t=75ms into the reversed iteration, progress should be
+    // near 0.25 (one quarter of the way back toward 0).
+    let revLate = repeating.evaluate(elapsed: .milliseconds(175))
+    #expect(revLate != nil)
+    if let revLate { #expect(abs(revLate - 0.25) < 0.02) }
+  }
+
+  @Test("repeatForever never returns nil")
+  func repeatForeverRunsIndefinitely() throws {
+    let base = Animation.linear(duration: .milliseconds(100))
+    let forever = base.repeatForever(autoreverses: false)
+
+    // A long time in, still reporting a finite progress.
+    let late = forever.evaluate(elapsed: .milliseconds(10_000))
+    #expect(late != nil)
+  }
 }
