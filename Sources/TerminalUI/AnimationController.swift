@@ -225,6 +225,25 @@ package final class AnimationController {
 
   package init() {}
 
+  /// Returns an animation request representative of whatever is
+  /// currently in flight, or nil if no animations are active.
+  ///
+  /// Used by the rendering pipeline to keep tick frames from
+  /// accidentally snapping: if an `@Observable` write lands on the
+  /// same frame as an animation tick the scheduler would normally
+  /// produce a transaction with `.inherit`, which the controller's
+  /// diff path treats as "snap immediately".  Injecting the dominant
+  /// active request lets value-change diffs inside that resolve
+  /// retarget the in-flight animation instead.
+  ///
+  /// Returns the first active animation's box — all active animations
+  /// in a batch share the same box, and cross-batch interleavings
+  /// resolve the same way a fresh `withAnimation` would be.
+  package func dominantActiveRequest() -> AnimationRequest? {
+    guard let first = activeAnimations.values.first else { return nil }
+    return .animate(first.animationBox)
+  }
+
   /// Called by the View layer at the start of resolve so the controller
   /// can collect up-to-date `.transition()` registrations.  The sink
   /// replaces the current map wholesale — any identity that was in the
