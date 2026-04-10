@@ -86,6 +86,91 @@ struct AnimationControllerSnapshotTests {
 @Suite("AnimationController property animations")
 struct AnimationControllerPropertyTests {
   @Test(
+    "flexibleFrame maxWidth animates via frameWidth + preserves other dimensions"
+  )
+  func flexibleFrameMaxWidthAnimates() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("leaf")])
+
+    // Frame 1: flexibleFrame with maxWidth=100, minWidth=20 (so both
+    // finite dimensions exist).  maxWidth takes priority.
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .flexibleFrame(
+        minWidth: .finite(20),
+        idealWidth: nil,
+        maxWidth: .finite(100),
+        minHeight: nil,
+        idealHeight: nil,
+        maxHeight: nil,
+        alignment: .center
+      )
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Extract sanity check.
+    let extracted = AnimatableSnapshot.extract(from: frame1)
+    #expect(
+      extracted.frameWidth == 100,
+      "maxWidth takes priority over minWidth in the extracted frameWidth"
+    )
+
+    // Frame 2: maxWidth → 200 under withAnimation.
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .flexibleFrame(
+        minWidth: .finite(20),
+        idealWidth: nil,
+        maxWidth: .finite(200),
+        minHeight: nil,
+        idealHeight: nil,
+        maxHeight: nil,
+        alignment: .center
+      )
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    // Apply halfway.
+    let halfway = t0.advanced(by: .milliseconds(100))
+    let result = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    #expect(result.hasActiveAnimations)
+
+    guard
+      case .flexibleFrame(
+        let newMin, _, let newMax,
+        _, _, _,
+        _
+      ) = frame2.layoutBehavior
+    else {
+      Issue.record("apply must preserve the flexibleFrame shape, not collapse to frame")
+      return
+    }
+
+    // minWidth must be preserved untouched.
+    #expect(newMin == .finite(20), "minWidth must be preserved across apply")
+
+    // maxWidth must be mid-interpolation: above 100, below 200, and not
+    // equal to either endpoint.
+    guard case .finite(let interpolatedMax) = newMax else {
+      Issue.record("maxWidth should still be finite after interpolation")
+      return
+    }
+    #expect(
+      interpolatedMax > 100 && interpolatedMax < 200,
+      "maxWidth should interpolate between endpoints, got \(interpolatedMax)"
+    )
+  }
+
+  @Test(
     "borderColor change under withAnimation is interpolated through the tree"
   )
   func borderColorAnimationIsInterpolated() throws {
