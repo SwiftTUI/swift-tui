@@ -128,6 +128,55 @@ struct LinearCustomAnimation: CustomAnimation {
 @Suite("Animation end-to-end pipeline integration")
 struct AnimationPipelineIntegrationTests {
   @Test(
+    "probe: composed .offset + .frame animate together under one withAnimation"
+  )
+  func probeComposedOffsetAndFrameAnimation() throws {
+    // Probe: can we animate BOTH offset and frame simultaneously
+    // via a single withAnimation state change?  Both OffsetView and
+    // FrameView/FlexibleFrameView produce distinct ResolvedNodes with
+    // distinct layoutBehavior variants, so the controller should
+    // enqueue animations on BOTH identities in the same batch.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let animation = Animation.linear(duration: .milliseconds(1_000_000))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+
+    // Frame 1: narrow frame at origin offset.
+    _ = renderer.render(
+      Text("hello")
+        .frame(maxWidth: .finite(10), alignment: .leading)
+        .offset(x: 0, y: 0),
+      context: ResolveContext(identity: rootIdentity)
+    )
+    #expect(
+      controller.activeAnimationCount == 0,
+      "no animations should be active before the animated state change"
+    )
+
+    // Frame 2: wider frame AND non-zero offset under one animate intent.
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    _ = renderer.render(
+      Text("hello")
+        .frame(maxWidth: .finite(40), alignment: .leading)
+        .offset(x: 20, y: 0),
+      context: ResolveContext(identity: rootIdentity, transaction: transaction)
+    )
+
+    // Should have enqueued at least 2 animations: frameWidth + offsetX.
+    #expect(
+      controller.activeAnimationCount >= 2,
+      "expected frameWidth + offsetX to both enqueue, got \(controller.activeAnimationCount)"
+    )
+    #expect(
+      controller.lastTickResult.hasActiveAnimations,
+      "frame 2 should report active animations"
+    )
+  }
+
+  @Test(
     "probe: .offset(x:y:) animates when numeric args change under withAnimation"
   )
   func probeOffsetAnimationThroughPipeline() throws {
