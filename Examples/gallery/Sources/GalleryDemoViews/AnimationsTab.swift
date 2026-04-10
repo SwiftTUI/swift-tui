@@ -24,6 +24,9 @@ struct AnimationsTab: View {
   // Frame demo: narrow↔wide width.
   @State private var wide: Bool = false
 
+  // Offset demo: target offset the text slides to.
+  @State private var offsetX: Int = 0
+
   // Completion demo: a counter ticked by the callback closure.
   @State private var completionRuns: Int = 0
   @State private var completionAccent: Bool = false
@@ -37,6 +40,8 @@ struct AnimationsTab: View {
       transitionSection
       Divider()
       frameSection
+      Divider()
+      offsetSection
       Divider()
       completionSection
       Spacer(minLength: 0)
@@ -154,11 +159,45 @@ struct AnimationsTab: View {
     }
   }
 
+  // MARK: - .offset animation via direct state mutation
+
+  private var offsetSection: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("4. .offset(x:y:) animation via withAnimation state change")
+        .foregroundStyle(.muted)
+      HStack(spacing: 2) {
+        Button("left") {
+          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+            offsetX = 0
+          }
+        }
+        Button("center") {
+          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+            offsetX = 15
+          }
+        }
+        Button("right") {
+          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+            offsetX = 30
+          }
+        }
+        Button("spring") {
+          withAnimation(.spring(duration: .milliseconds(1500), bounce: 0.4)) {
+            offsetX = offsetX == 0 ? 30 : 0
+          }
+        }
+      }
+      Text("▶ slide me")
+        .foregroundStyle(Color.magenta)
+        .offset(x: offsetX, y: 0)
+    }
+  }
+
   // MARK: - withAnimation completion callback
 
   private var completionSection: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("4. withAnimation completion callback — fires once per batch drain")
+      Text("5. withAnimation completion callback — fires once per batch drain")
         .foregroundStyle(.muted)
       HStack(spacing: 2) {
         Button("run") {
