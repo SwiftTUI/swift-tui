@@ -221,6 +221,35 @@ struct AppRuntimeTests {
   }
 
   @MainActor
+  @Test("dismissing a sheet restores focus to the previously focused base control")
+  func dismissingSheetRestoresFocusToThePreviouslyFocusedBaseControl() async throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 72, height: 14))
+
+    let result = try await runTestSceneSession(
+      scene: WindowGroup("Sheet Focus Restoration") {
+        SheetFocusRestorationWindow()
+      },
+      sessionName: "AppRuntimeTests.SheetFocusRestorationWindow",
+      terminalHost: terminal,
+      inputReader: ScriptedInputReader(events: [.return, .escape, .character("q")]),
+      signalReader: EmptySignalReader()
+    )
+
+    #expect(result.exitReason == .quitKey)
+    #expect(result.renderedFrames >= 3)
+
+    let firstFrame = try #require(terminal.frames.first)
+    let sheetFrame = try #require(
+      terminal.frames.first { $0.contains("Sheet focus active: true") }
+    )
+    let lastFrame = try #require(terminal.frames.last)
+
+    #expect(firstFrame.contains("Base focused: true"))
+    #expect(sheetFrame.contains("Sheet focus active: true"))
+    #expect(lastFrame.contains("Base focused: true"))
+  }
+
+  @MainActor
   @Test("runtime focus movement writes back into the rendered focus identity")
   func runtimeFocusMovementWritesBackIntoRenderedFocusIdentity() async throws {
     let terminal = RecordingTerminalHost()
@@ -646,6 +675,43 @@ private struct SheetPresentationWindow: View {
           .onAppear {
             titleFocused = true
           }
+      }
+    }
+  }
+}
+
+private struct SheetFocusRestorationWindow: View {
+  @State private var isSheetPresented = false
+  @State private var draft = ""
+  @FocusState private var presentFocused: Bool
+  @FocusState private var sheetFieldFocused: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Base focused: \(presentFocused)")
+      Button("Present") {
+        isSheetPresented = true
+      }
+      .id(testIdentity("SheetFocusRestoration", "Present"))
+      .focused($presentFocused)
+      .onAppear {
+        presentFocused = true
+      }
+    }
+    .sheet("Inspector", isPresented: $isSheetPresented) {
+      VStack(alignment: .leading, spacing: 1) {
+        EnvironmentReader(\.focusedIdentity) { focusedIdentity in
+          Text("Sheet focus active: \(focusedIdentity != nil)")
+        }
+        TextField("Draft", text: $draft)
+          .focused($sheetFieldFocused)
+          .onAppear {
+            sheetFieldFocused = true
+          }
+        Button("Close") {
+          isSheetPresented = false
+        }
+        .id(testIdentity("SheetFocusRestoration", "Close"))
       }
     }
   }

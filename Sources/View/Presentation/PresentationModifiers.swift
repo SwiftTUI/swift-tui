@@ -389,9 +389,10 @@ package struct PromptPresentationSurface: View {
       RoundedRectangle(cornerRadius: 1).fill(AnyShapeStyle(.terminalSurfaceBackground))
     }
     .overlay {
-      RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-        .terminalBorder(.accent)
-      )
+      RoundedRectangle(cornerRadius: 1).strokeBorder(.tint)
+    }
+    .background {
+      Rectangle().fill(Color.green)
     }
     .frame(
       minWidth: .finite(item.descriptor.minWidth),

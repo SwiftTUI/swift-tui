@@ -1055,42 +1055,48 @@ package struct PresentationHostingRoot<Content: View>: View, ResolvableView {
     let declarations = baseNode.preferenceValues[
       PresentationCoordinatorDeclarationPreferenceKey.self]
     hostState.reconcile(declarations.declarations)
-
-    let overlayEntries = hostState.overlayEntries()
-    guard !overlayEntries.isEmpty else {
-      return [baseNode]
-    }
-
-    let hostContext = context.child(component: .named("PresentationHost"))
-    let baseContext = hostContext.child(component: .named("base"))
-    let hostedBasePayload = DeferredViewPayload(
-      authoringContext: makeAuthoringContext(
-        for: contentContext,
-        viewNode: ViewNodeContext.current
-      )
-    ) {
-      content
-    }
-    var hostedBaseNode = hostedBasePayload.resolve(in: baseContext)
-    if hostState.disablesBaseInteraction {
-      hostedBaseNode.setEnabledRecursively(false)
-    }
-
-    let overlayNode = PresentationOverlayHost(entries: overlayEntries).resolve(
-      in: hostContext.child(component: .named("overlay"))
-    )
-
-    return [
-      ResolvedNode(
-        identity: hostContext.identity,
-        kind: .view("PresentationHost"),
-        children: [hostedBaseNode, overlayNode],
-        environmentSnapshot: hostContext.environment,
-        transactionSnapshot: hostContext.transaction,
-        layoutBehavior: .overlay(alignment: .topLeading)
-      )
-    ]
+    return [baseNode]
   }
+}
+
+@MainActor
+package func composePresentationHostTree(
+  baseNode: ResolvedNode,
+  hostState: PresentationHostState,
+  in context: ResolveContext
+) -> ResolvedNode {
+  let hostContext = context.child(component: .named("PresentationHost"))
+  let overlayEntries = hostState.overlayEntries()
+  let overlayContext = hostContext.child(component: .named("overlay"))
+  let existingOverlayHost = context.viewGraph?.nodeForIdentity(overlayContext.identity)
+  let needsOverlayTeardown = existingOverlayHost?.children.isEmpty == false
+
+  guard !overlayEntries.isEmpty || needsOverlayTeardown else {
+    return baseNode
+  }
+
+  let overlayNode = resolveView(
+    PresentationOverlayHost(entries: overlayEntries),
+    in: overlayContext
+  )
+
+  guard !overlayEntries.isEmpty else {
+    return baseNode
+  }
+
+  var hostedBaseNode = baseNode
+  if hostState.disablesBaseInteraction {
+    hostedBaseNode.setEnabledRecursively(false)
+  }
+
+  return ResolvedNode(
+    identity: hostContext.identity,
+    kind: .view("PresentationHost"),
+    children: [hostedBaseNode, overlayNode],
+    environmentSnapshot: hostContext.environment,
+    transactionSnapshot: hostContext.transaction,
+    layoutBehavior: .overlay(alignment: .topLeading)
+  )
 }
 
 private struct PresentationOverlayHost: View {

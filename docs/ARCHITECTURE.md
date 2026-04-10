@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: April 5, 2026
+Last updated: April 9, 2026
 
 ## Target Boundaries
 
@@ -61,6 +61,7 @@ That ordering is visible in `DefaultRenderer`, `FrameArtifacts`, `Pipeline`, and
 - Public `View` values are lowered into `ResolvedNode` trees through package-only lowering helpers
 - Structural views such as `Group`, `ForEach`, and conditionals affect the resolved child set
 - Environment and metadata are merged here
+- Root-hoisted presentations are declared during normal base resolution, then composed around the resolved base tree afterward so the displayed base subtree keeps its authored identity space
 - Reuse is conservative and keyed by identity, invalidation scope, and compatible context
 
 ### Measure
