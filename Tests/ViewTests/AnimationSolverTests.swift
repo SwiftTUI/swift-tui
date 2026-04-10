@@ -203,3 +203,56 @@ struct AnimationFactoryTests {
     #expect(late != nil)
   }
 }
+
+@Suite("Transaction.animation round-trip")
+struct TransactionAnimationGetterTests {
+  @Test("Transaction.animation getter returns the concrete set animation")
+  func transactionAnimationRoundTrip() throws {
+    var transaction = Transaction(request: .inherit)
+
+    // Initially nil (inherit → no concrete animation).
+    #expect(transaction.animation == nil)
+
+    // Set a concrete animation and read it back.
+    let authored = Animation.easeInOut(duration: .milliseconds(300))
+    transaction.animation = authored
+    #expect(transaction.animation == authored)
+
+    // Clearing routes to .disabled, which the getter reports as nil.
+    transaction.animation = nil
+    #expect(transaction.animation == nil)
+    #expect(transaction.disablesAnimations)
+  }
+
+  @Test("Transaction.animation round-trips a custom animation")
+  func transactionAnimationRoundTripsCustom() throws {
+    var transaction = Transaction(request: .inherit)
+    let authored = Animation(LinearRoundTripAnimation(id: "rt-test"))
+    transaction.animation = authored
+    // Custom animations hash via the wrapped conformance's hash so
+    // equality across the box round-trip should hold.
+    #expect(transaction.animation == authored)
+  }
+}
+
+/// Minimal CustomAnimation conformance used by the Transaction
+/// round-trip test.  Identical shape to the controller-side test's
+/// conformance but lives in the View test target to keep symbol
+/// visibility simple.
+struct LinearRoundTripAnimation: CustomAnimation {
+  let id: String
+
+  func animate<V: VectorArithmetic>(
+    value: V, time: Duration, context: inout AnimationContext<V>
+  ) -> V? {
+    value
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
+  }
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.id == rhs.id
+  }
+}

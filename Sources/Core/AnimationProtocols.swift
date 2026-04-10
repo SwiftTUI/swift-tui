@@ -29,6 +29,16 @@ package struct AnimationBox: Equatable, Hashable, Sendable {
   package init<H: Hashable & Sendable>(_ value: H) {
     storage = _SendableAnyHashable(value)
   }
+
+  /// Attempts to recover the original boxed value as type `H`.
+  ///
+  /// Returns `nil` if the box was constructed with a value of a
+  /// different concrete type.  Used by View-layer code to round-trip
+  /// an `AnimationBox` carried through a `TransactionSnapshot` back
+  /// into the concrete `Animation` value the caller originally passed.
+  package func unwrap<H: Hashable & Sendable>(as _: H.Type = H.self) -> H? {
+    unsafe storage.base as? H
+  }
 }
 
 /// Wrapper that asserts Sendable for AnyHashable values known to be
