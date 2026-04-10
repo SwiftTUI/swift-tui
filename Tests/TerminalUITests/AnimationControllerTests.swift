@@ -171,6 +171,55 @@ struct AnimationControllerPropertyTests {
   }
 
   @Test(
+    "padding edges animate independently and preserve untouched edges"
+  )
+  func paddingEdgesAnimateIndependently() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("leaf")])
+
+    // Frame 1: uniform padding of 4 on all sides.
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .padding(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Frame 2: top grows to 20, others unchanged.
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .padding(EdgeInsets(top: 20, leading: 4, bottom: 4, trailing: 4))
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    let result = controller.applyInterpolations(to: &frame2, at: halfway)
+    #expect(result.hasActiveAnimations)
+
+    guard case .padding(let insets) = frame2.layoutBehavior else {
+      Issue.record("apply must preserve the padding layoutBehavior")
+      return
+    }
+
+    // Top must be mid-interpolation.
+    #expect(
+      insets.top > 4 && insets.top < 20,
+      "top edge should interpolate between endpoints, got \(insets.top)"
+    )
+    // Leading/bottom/trailing must be untouched.
+    #expect(insets.leading == 4)
+    #expect(insets.bottom == 4)
+    #expect(insets.trailing == 4)
+  }
+
+  @Test(
     "borderColor change under withAnimation is interpolated through the tree"
   )
   func borderColorAnimationIsInterpolated() throws {
