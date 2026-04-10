@@ -37,6 +37,11 @@ struct AnimationsTab: View {
   // string ID wouldn't collide with any other section's usage.
   @Namespace private var heroNamespace
 
+  // Trigger-mode PhaseAnimator demo: each tap bumps the counter,
+  // which drives one full pass through the phase sequence back to
+  // rest.  The counter itself is the trigger value.
+  @State private var bounceTrigger: Int = 0
+
   // Completion demo: a counter ticked by the callback closure.
   @State private var completionRuns: Int = 0
   @State private var completionAccent: Bool = false
@@ -58,6 +63,8 @@ struct AnimationsTab: View {
       matchedGeometrySection
       Divider()
       phaseAnimatorSection
+      Divider()
+      triggerPhaseAnimatorSection
       Divider()
       completionSection
       Spacer(minLength: 0)
@@ -310,11 +317,43 @@ struct AnimationsTab: View {
     }
   }
 
+  // MARK: - PhaseAnimator trigger-driven demo
+
+  private var triggerPhaseAnimatorSection: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text(
+        "8. PhaseAnimator(trigger:) — one bounce per tap, then returns to rest"
+      )
+      .foregroundStyle(.muted)
+      HStack(spacing: 2) {
+        Button("bounce") {
+          bounceTrigger += 1
+        }
+        Text("taps: \(bounceTrigger)")
+          .foregroundStyle(.separator)
+      }
+      PhaseAnimator(
+        [BouncePhase.rest, .up, .down, .rest],
+        trigger: bounceTrigger
+      ) { phase in
+        Text("★ bounce ★")
+          .foregroundStyle(phase.color)
+          .offset(x: 0, y: phase.offsetY)
+      } animation: { phase in
+        switch phase {
+        case .rest: .easeInOut(duration: .milliseconds(400))
+        case .up: .spring(duration: .milliseconds(500), bounce: 0.4)
+        case .down: .easeInOut(duration: .milliseconds(400))
+        }
+      }
+    }
+  }
+
   // MARK: - withAnimation completion callback
 
   private var completionSection: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("8. withAnimation completion callback — fires once per batch drain")
+      Text("9. withAnimation completion callback — fires once per batch drain")
         .foregroundStyle(.muted)
       HStack(spacing: 2) {
         Button("run") {
@@ -364,6 +403,32 @@ enum PhaseDemoPhase: Equatable, Sendable {
     case .yellow: 10
     case .green: 20
     case .cyan: 10
+    }
+  }
+}
+
+/// Phase values for the trigger-driven PhaseAnimator demo.  The
+/// sequence `[rest, up, down, rest]` models a bounce that returns
+/// to a stable rest state so each tap produces a complete round
+/// trip before the next tap.
+enum BouncePhase: Equatable, Sendable {
+  case rest
+  case up
+  case down
+
+  var offsetY: Int {
+    switch self {
+    case .rest: 0
+    case .up: -1
+    case .down: 1
+    }
+  }
+
+  var color: Color {
+    switch self {
+    case .rest: .cyan
+    case .up: .yellow
+    case .down: .magenta
     }
   }
 }
