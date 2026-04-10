@@ -66,6 +66,7 @@ public struct Text: View, ResolvableView {
     let node = ResolvedNode(
       identity: context.identity,
       kind: .view("Text"),
+      typeDiscriminator: ObjectIdentifier(Text.self),
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
       layoutMetadata: .init(),

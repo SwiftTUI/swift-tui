@@ -176,6 +176,21 @@ package protocol IndexedChildSource: Sendable {
 public struct ResolvedNode: Equatable, Sendable {
   public var identity: Identity
   public var kind: NodeKind
+  /// Stable per-Swift-type discriminator carried alongside `kind`.
+  ///
+  /// `NodeKind.view(String)` is a human-readable role name (e.g. `"Text"`,
+  /// `"Padding"`) that any call site can produce.  When two unrelated views
+  /// happen to pick the same name — intentionally for modifier roles or by
+  /// accident for primitives — the string alone cannot tell them apart, and
+  /// a structural diff would fuse them.  A concrete primitive that
+  /// populates this field with `ObjectIdentifier(Self.self)` refines the
+  /// String identity with a type-level guarantee.
+  ///
+  /// Left `nil` by most call sites during the incremental migration.
+  /// `ChildDescriptor` equality treats `nil` as "compatible with either
+  /// side" so populated and legacy descriptors still match when their
+  /// names agree, keeping the migration churn-free.
+  package var typeDiscriminator: ObjectIdentifier?
   public var children: [ResolvedNode] {
     didSet {
       recomputePreferenceValues()
@@ -225,6 +240,7 @@ public struct ResolvedNode: Equatable, Sendable {
   ) {
     self.identity = identity
     self.kind = kind
+    self.typeDiscriminator = nil
     self.children = children
     self.environmentSnapshot = environmentSnapshot
     self.transactionSnapshot = transactionSnapshot
@@ -246,6 +262,7 @@ public struct ResolvedNode: Equatable, Sendable {
   package init(
     identity: Identity,
     kind: NodeKind,
+    typeDiscriminator: ObjectIdentifier? = nil,
     children: [ResolvedNode] = [],
     environmentSnapshot: EnvironmentSnapshot = .init(),
     transactionSnapshot: TransactionSnapshot = .init(),
@@ -260,6 +277,7 @@ public struct ResolvedNode: Equatable, Sendable {
   ) {
     self.identity = identity
     self.kind = kind
+    self.typeDiscriminator = typeDiscriminator
     self.children = children
     self.environmentSnapshot = environmentSnapshot
     self.transactionSnapshot = transactionSnapshot
@@ -424,6 +442,7 @@ public struct ResolvedNode: Equatable, Sendable {
   ) -> Bool {
     identity == other.identity
       && kind == other.kind
+      && Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator)
       && environmentSnapshot == other.environmentSnapshot
       && layoutBehavior.isEquivalentForMeasurement(to: other.layoutBehavior)
       && layoutMetadata == other.layoutMetadata
@@ -446,6 +465,7 @@ public struct ResolvedNode: Equatable, Sendable {
   ) -> Bool {
     identity == other.identity
       && kind == other.kind
+      && Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator)
       && environmentSnapshot == other.environmentSnapshot
       && layoutBehavior.isEquivalentForMeasurement(to: other.layoutBehavior)
       && layoutMetadata == other.layoutMetadata
@@ -457,12 +477,30 @@ public struct ResolvedNode: Equatable, Sendable {
         lhsChild.isEquivalentForPlacement(to: rhsChild)
       }
   }
+
+  /// Two discriminators are "compatible" for equivalence purposes when
+  /// either both match or at least one is `nil`.  This is the bridging
+  /// rule that lets migrated and un-migrated call sites coexist — a
+  /// typed descriptor still matches a legacy descriptor with the same
+  /// name, so partial migrations don't cause structural churn.
+  package static func typeDiscriminatorsCompatible(
+    _ lhs: ObjectIdentifier?,
+    _ rhs: ObjectIdentifier?
+  ) -> Bool {
+    switch (lhs, rhs) {
+    case (let l?, let r?):
+      return l == r
+    default:
+      return true
+    }
+  }
 }
 
 extension ResolvedNode {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.identity == rhs.identity
       && lhs.kind == rhs.kind
+      && Self.typeDiscriminatorsCompatible(lhs.typeDiscriminator, rhs.typeDiscriminator)
       && lhs.children == rhs.children
       && lhs.environmentSnapshot == rhs.environmentSnapshot
       && lhs.transactionSnapshot == rhs.transactionSnapshot
