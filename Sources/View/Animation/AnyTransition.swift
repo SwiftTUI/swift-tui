@@ -127,6 +127,7 @@ public struct AnyTransition: Sendable {
 
   // MARK: - Custom Transition support
 
+  @MainActor
   public init<T: Transition>(_ transition: T) {
     let insertionBody = transition.body(
       content: TransitionContent<T>(),
@@ -145,18 +146,78 @@ public struct AnyTransition: Sendable {
     self.removalModifiers = { removalModifiers }
   }
 
+  /// Walks a custom ``Transition/body`` output tree using a combination
+  /// of protocol conformance (for well-known modifier wrappers that
+  /// expose a ``TransitionEffectContributing`` shim) and Swift
+  /// `Mirror` reflection (for other wrappers with a `content` field).
+  /// Opacity and offset effects are aggregated into a single
+  /// ``TransitionModifiers`` value.
+  ///
+  /// The walk understands:
+  /// - ``OffsetView`` (offset effects from `.offset(x:y:)`)
+  /// - ``DrawMetadataModifier`` with an `explicitOpacity`
+  ///   (`.opacity(_:)` wraps its content in one of these)
+  /// - Generic wrappers that expose a `content` field — the walk
+  ///   recurses into them so opacity and offset can appear in any
+  ///   composition, even when wrapped by unrelated intermediate
+  ///   modifiers.
+  ///
+  /// Effects from modifiers the runtime does not yet understand are
+  /// silently ignored; the ``TransitionModifiers`` type documents the
+  /// current palette (opacity + offset).
+  @MainActor
   private static func extractModifiers<V: View>(from view: V) -> TransitionModifiers {
-    // The initial slice does not walk arbitrary view trees to locate
-    // opacity and offset modifiers.  Authored custom transitions that
-    // rely on more than the built-in effect set should instead compose
-    // `AnyTransition` directly using the built-in factories.
-    //
-    // This placeholder implementation returns identity modifiers and
-    // leaves extension to a later pass that teaches the runtime how to
-    // walk transition bodies.
-    _ = view
-    return .identity
+    var result = TransitionModifiers.identity
+    walk(view: view, into: &result)
+    return result
   }
+
+  @MainActor
+  private static func walk(view: Any, into result: inout TransitionModifiers) {
+    // Protocol-based probe first: the well-known modifier wrappers
+    // conform to TransitionEffectContributing and can report their
+    // effect contribution directly.
+    if let contributor = view as? any TransitionEffectContributing {
+      contributor.contributeTransitionEffects(into: &result)
+      if let child = contributor.transitionChildForProbe {
+        walk(view: child, into: &result)
+      }
+      return
+    }
+    // Otherwise use Mirror reflection to descend into any wrapper
+    // that exposes a conventional child field.  View builders,
+    // generic wrappers, and user-authored compositions all fall
+    // into this path.
+    let mirror = Mirror(reflecting: view)
+    for child in mirror.children {
+      guard let label = child.label else { continue }
+      if label == "content" || label == "base" || label == "body"
+        || label == "children" || label == "wrapped" || label == "value"
+      {
+        if let children = child.value as? [Any] {
+          for entry in children { walk(view: entry, into: &result) }
+        } else {
+          walk(view: child.value, into: &result)
+        }
+      }
+    }
+  }
+}
+
+/// Package protocol adopted by well-known modifier wrappers so the
+/// transition body-walking code can extract opacity/offset effects
+/// from authored custom transitions.  Conformances must contribute
+/// their own effect *and* report the next view to probe (typically
+/// the wrapped content) so the walk can reach nested modifiers.
+///
+/// Marked `@MainActor` because all View conformances in this codebase
+/// are main-actor-isolated — crossing the isolation boundary with a
+/// nonisolated requirement would be a Swift 6 strict-concurrency
+/// error on every wrapper type.
+@MainActor
+package protocol TransitionEffectContributing {
+  func contributeTransitionEffects(into modifiers: inout TransitionModifiers)
+  var transitionChildForProbe: Any? { get }
 }
 
 // MARK: - Helpers

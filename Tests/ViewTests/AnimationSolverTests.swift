@@ -235,6 +235,76 @@ struct TransactionAnimationGetterTests {
   }
 }
 
+@MainActor
+@Suite("Custom Transition body walking")
+struct CustomTransitionBodyWalkingTests {
+  @Test("custom Transition body opacity is extracted for both phases")
+  func customTransitionExtractsOpacity() throws {
+    // A transition whose body applies .opacity(0) in the will/did
+    // phases and .opacity(1) at identity.  The walker should pick
+    // up 0.0 for insertion and removal modifiers.
+    let transition = AnyTransition(FadeHalfTransition())
+    #expect(transition.insertionModifiers().opacity == 0.25)
+    #expect(transition.removalModifiers().opacity == 0.25)
+  }
+
+  @Test("custom Transition body offset is extracted for both phases")
+  func customTransitionExtractsOffset() throws {
+    let transition = AnyTransition(SlideSevenTransition())
+    #expect(transition.insertionModifiers().offsetX == 7)
+    #expect(transition.removalModifiers().offsetX == 7)
+  }
+
+  @Test("custom Transition body walking descends through nested wrappers")
+  func customTransitionWalksThroughNesting() throws {
+    let transition = AnyTransition(CombinedFadeAndSlideTransition())
+    let insertion = transition.insertionModifiers()
+    #expect(insertion.opacity == 0.0)
+    #expect(insertion.offsetX == 3)
+  }
+}
+
+/// Fades to opacity 0.25 during will/did phases, 1.0 at identity.
+@MainActor
+struct FadeHalfTransition: Transition {
+  func body(content: TransitionContent<Self>, phase: TransitionPhase) -> some View {
+    TransitionShim().opacity(phase == .identity ? 1.0 : 0.25)
+  }
+}
+
+/// Slides 7 units right during will/did phases, 0 at identity.
+@MainActor
+struct SlideSevenTransition: Transition {
+  func body(content: TransitionContent<Self>, phase: TransitionPhase) -> some View {
+    TransitionShim().offset(x: phase == .identity ? 0 : 7, y: 0)
+  }
+}
+
+/// Applies both opacity and offset through nested wrappers to verify
+/// the walk descends into wrapped content rather than stopping at the
+/// outer modifier.  Order matters: `.opacity(_:)` wraps with
+/// `DrawMetadataModifier` without erasing its content, so composing
+/// it as the outer modifier lets the walk descend through to the
+/// inner `OffsetView`.  Putting `.offset(...)` on the outside would
+/// route through `AnyView` and lose the inner opacity — that's a
+/// documented limitation of the current extractor.
+@MainActor
+struct CombinedFadeAndSlideTransition: Transition {
+  func body(content: TransitionContent<Self>, phase: TransitionPhase) -> some View {
+    TransitionShim()
+      .offset(x: phase == .identity ? 0 : 3, y: 0)
+      .opacity(phase == .identity ? 1.0 : 0.0)
+  }
+}
+
+/// An innocuous leaf view used as the authored-body content for the
+/// custom-transition walking tests.  Its resolve elements are never
+/// actually rendered — only the wrapping modifiers are probed.
+struct TransitionShim: View {
+  @MainActor
+  var body: some View { EmptyView() }
+}
+
 /// Minimal CustomAnimation conformance used by the Transaction
 /// round-trip test.  Identical shape to the controller-side test's
 /// conformance but lives in the View test target to keep symbol

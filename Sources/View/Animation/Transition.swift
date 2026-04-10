@@ -45,10 +45,16 @@ public struct TransitionContent<T: Transition>: Sendable {
 /// - Note: The current runtime palette is limited to opacity and offset
 ///   effects (see ``TransitionModifiers``).  Other modifiers applied
 ///   inside `body` are silently ignored until the palette is expanded.
+///
+/// Marked `@MainActor` for parity with `View` — user-authored
+/// transitions almost always compose main-actor-isolated view types
+/// like `.opacity(_:)` and `.offset(x:y:)`, so a nonisolated protocol
+/// would force every conformance to split across isolation boundaries.
+@MainActor
 public protocol Transition: Sendable {
   associatedtype Body: View
 
-  @ViewBuilder
+  @ViewBuilder @MainActor
   func body(
     content: TransitionContent<Self>,
     phase: TransitionPhase
