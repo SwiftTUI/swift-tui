@@ -201,6 +201,13 @@ extension LayoutEngine {
           height: measured.measuredSize.height
         )
       }
+    case .position:
+      // The wrapper takes the full measured size; alignment guides
+      // report against that area, not against the inner child.
+      baseDimensions = ViewDimensions(
+        width: measured.measuredSize.width,
+        height: measured.measuredSize.height
+      )
     case .decoration(let primaryIndex, _):
       if resolved.children.indices.contains(primaryIndex),
         measured.childMeasurements.indices.contains(primaryIndex)

@@ -191,6 +191,25 @@ extension View {
     )
   }
 
+  /// Positions the center of this view at `(x, y)` in its parent's
+  /// coordinate space.
+  ///
+  /// Unlike ``offset(x:y:)``, which translates the view without
+  /// affecting parent layout, `.position` wraps the view in a
+  /// container that takes the full proposed space so the parent
+  /// reserves room for the absolute placement area.  Matches
+  /// SwiftUI's `View.position(x:y:)` semantics.
+  public func position(
+    x: Int = 0,
+    y: Int = 0
+  ) -> some View {
+    PositionView(
+      content: erasedToAnyView,
+      x: x,
+      y: y
+    )
+  }
+
   public func focusable(
     _ isFocusable: Bool = true,
     interactions: FocusInteractions = .automatic
@@ -742,6 +761,40 @@ extension OffsetView: TransitionEffectContributing {
     modifiers.offsetY = y
   }
   package var transitionChildForProbe: Any? { content }
+}
+
+package struct PositionView<Content: View>: View, ResolvableView {
+  package var content: Content
+  package var x: Int
+  package var y: Int
+
+  package init(
+    content: Content,
+    x: Int,
+    y: Int
+  ) {
+    self.content = content
+    self.x = x
+    self.y = y
+  }
+
+  @inline(never)
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let contentNode = resolveWrapperContent(
+      content,
+      in: context.child(component: .named("content"))
+    )
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("Position"),
+        children: [contentNode],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        layoutBehavior: .position(x: x, y: y)
+      )
+    ]
+  }
 }
 
 package struct FlexibleFrameView<Content: View>: View, ResolvableView {

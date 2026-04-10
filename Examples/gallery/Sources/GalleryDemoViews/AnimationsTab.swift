@@ -27,6 +27,10 @@ struct AnimationsTab: View {
   // Offset demo: target offset the text slides to.
   @State private var offsetX: Int = 0
 
+  // Position demo: absolute target position the marker jumps to.
+  @State private var positionX: Int = 10
+  @State private var positionY: Int = 2
+
   // Completion demo: a counter ticked by the callback closure.
   @State private var completionRuns: Int = 0
   @State private var completionAccent: Bool = false
@@ -42,6 +46,8 @@ struct AnimationsTab: View {
       frameSection
       Divider()
       offsetSection
+      Divider()
+      positionSection
       Divider()
       completionSection
       Spacer(minLength: 0)
@@ -193,11 +199,55 @@ struct AnimationsTab: View {
     }
   }
 
+  // MARK: - .position animation via absolute placement
+
+  private var positionSection: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("5. .position(x:y:) absolute placement animated via withAnimation")
+        .foregroundStyle(.muted)
+      HStack(spacing: 2) {
+        Button("NW") {
+          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+            positionX = 10
+            positionY = 1
+          }
+        }
+        Button("NE") {
+          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+            positionX = 50
+            positionY = 1
+          }
+        }
+        Button("SW") {
+          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+            positionX = 10
+            positionY = 5
+          }
+        }
+        Button("SE") {
+          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+            positionX = 50
+            positionY = 5
+          }
+        }
+      }
+      // The marker gets absolutely positioned inside a fixed-height
+      // slot.  Without .frame(height:), .position would expand to
+      // fill the full proposed space of the outer VStack, shoving
+      // subsequent sections off the screen.
+      Text("◎")
+        .foregroundStyle(Color.cyan)
+        .position(x: positionX, y: positionY)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    .frame(height: 7)
+  }
+
   // MARK: - withAnimation completion callback
 
   private var completionSection: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("5. withAnimation completion callback — fires once per batch drain")
+      Text("6. withAnimation completion callback — fires once per batch drain")
         .foregroundStyle(.muted)
       HStack(spacing: 2) {
         Button("run") {

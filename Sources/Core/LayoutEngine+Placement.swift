@@ -182,6 +182,31 @@ extension LayoutEngine {
           passContext: passContext
         )
       ]
+    case .position(let x, let y):
+      // Place the child centered at (bounds.origin + x, bounds.origin
+      // + y).  Matches SwiftUI's `.position(x:y:)` semantics.  The
+      // wrapper itself takes the full proposed bounds (see `measure`),
+      // so `x`/`y` are interpreted relative to the wrapper's origin.
+      guard let childMeasurement = measured.childMeasurements.first,
+        let child = resolved.children.first
+      else {
+        return []
+      }
+      let childSize = childMeasurement.measuredSize
+      return [
+        place(
+          child,
+          measured: childMeasurement,
+          in: Rect(
+            origin: .init(
+              x: bounds.origin.x + x - childSize.width / 2,
+              y: bounds.origin.y + y - childSize.height / 2
+            ),
+            size: childSize
+          ),
+          passContext: passContext
+        )
+      ]
     case .decoration(let primaryIndex, let alignment):
       guard
         resolved.children.indices.contains(primaryIndex),
@@ -631,6 +656,13 @@ extension LayoutEngine {
         )
       }
       return bounds
+    case .position:
+      // `.position` reserves the full proposed bounds for its
+      // absolute placement area.  The content bounds are simply
+      // the wrapper's bounds — the child sits somewhere inside
+      // that area, but scroll views and parents should see the
+      // entire reserved region.
+      return bounds
     case .lazyStack(let axis, _, _, _):
       guard
         let snapshot = measured.containerAllocationSnapshot?.lazyStack,
@@ -669,8 +701,8 @@ extension LayoutEngine {
       return .control
     }
     switch resolved.layoutBehavior {
-    case .stack, .lazyStack, .overlay, .padding, .frame, .offset, .flexibleFrame, .decoration,
-      .viewThatFits, .custom:
+    case .stack, .lazyStack, .overlay, .padding, .frame, .offset, .position, .flexibleFrame,
+      .decoration, .viewThatFits, .custom:
       return .container
     case .intrinsic:
       return .generic

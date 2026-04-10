@@ -128,6 +128,91 @@ struct LinearCustomAnimation: CustomAnimation {
 @Suite("Animation end-to-end pipeline integration")
 struct AnimationPipelineIntegrationTests {
   @Test(
+    ".position(x:y:) places the child centered at the given point"
+  )
+  func positionPlacesCenterAtGivenPoint() throws {
+    // Verifies the new .position LayoutBehavior + modifier wires
+    // through the layout engine correctly: the wrapper takes the
+    // full proposed space and the child is placed centered at
+    // (x, y) within that space.
+    let renderer = DefaultRenderer()
+    let rootIdentity = Identity(components: [.named("root")])
+
+    let frame = renderer.render(
+      Text("hi").position(x: 20, y: 5),
+      context: ResolveContext(identity: rootIdentity),
+      proposal: ProposedSize(width: .finite(80), height: .finite(24))
+    )
+
+    // Walk the placed tree looking for the Position wrapper and
+    // verify its child is centered at (20, 5).
+    let positionChildBounds = Self.findPositionContainerChildBounds(
+      frame.placedTree
+    )
+    #expect(positionChildBounds != nil)
+    if let bounds = positionChildBounds {
+      // Text "hi" measures as 2x1, so its origin should be at
+      // (20 - 2/2, 5 - 1/2) = (19, 5).  Integer division floor.
+      let expectedX = 20 - bounds.size.width / 2
+      let expectedY = 5 - bounds.size.height / 2
+      #expect(
+        bounds.origin.x == expectedX,
+        "position child origin.x should be \(expectedX), got \(bounds.origin.x)"
+      )
+      #expect(
+        bounds.origin.y == expectedY,
+        "position child origin.y should be \(expectedY), got \(bounds.origin.y)"
+      )
+    }
+  }
+
+  private static func findPositionContainerChildBounds(_ placed: PlacedNode) -> Rect? {
+    if case .view(let name) = placed.kind, name == "Position" {
+      return placed.children.first?.bounds
+    }
+    for child in placed.children {
+      if let found = findPositionContainerChildBounds(child) {
+        return found
+      }
+    }
+    return nil
+  }
+
+  @Test(
+    ".position(x:y:) animates when coordinates change under withAnimation"
+  )
+  func positionAnimatesThroughPipeline() throws {
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let animation = Animation.linear(duration: .milliseconds(1_000_000))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+
+    // Frame 1: position at (10, 5).
+    _ = renderer.render(
+      Text("hi").position(x: 10, y: 5),
+      context: ResolveContext(identity: rootIdentity),
+      proposal: ProposedSize(width: .finite(80), height: .finite(24))
+    )
+    #expect(controller.activeAnimationCount == 0)
+
+    // Frame 2: position at (40, 15) under animate intent.
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    _ = renderer.render(
+      Text("hi").position(x: 40, y: 15),
+      context: ResolveContext(identity: rootIdentity, transaction: transaction),
+      proposal: ProposedSize(width: .finite(80), height: .finite(24))
+    )
+    #expect(
+      controller.activeAnimationCount >= 2,
+      "position change should enqueue positionX + positionY, got \(controller.activeAnimationCount)"
+    )
+    #expect(controller.lastTickResult.hasActiveAnimations)
+  }
+
+  @Test(
     "probe: composed .offset + .frame animate together under one withAnimation"
   )
   func probeComposedOffsetAndFrameAnimation() throws {

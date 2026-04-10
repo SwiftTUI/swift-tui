@@ -17,6 +17,13 @@ public enum LayoutBehavior: Sendable {
   case padding(EdgeInsets)
   case frame(width: Int?, height: Int?, alignment: Alignment)
   case offset(x: Int, y: Int)
+  /// Positions the content so its center lands at `(x, y)` in the
+  /// parent's coordinate space.  Unlike `.offset`, which translates
+  /// the content without affecting parent layout, `.position` takes
+  /// the full proposed size for its wrapper so the parent reserves
+  /// space for the absolute placement area.  Matches SwiftUI's
+  /// `View.position(x:y:)` semantics.
+  case position(x: Int, y: Int)
   case flexibleFrame(
     minWidth: ProposedDimension?, idealWidth: ProposedDimension?, maxWidth: ProposedDimension?,
     minHeight: ProposedDimension?, idealHeight: ProposedDimension?, maxHeight: ProposedDimension?,
@@ -60,6 +67,8 @@ extension LayoutBehavior: Equatable {
         && lhsHeight == rhsHeight
         && lhsAlignment == rhsAlignment
     case (.offset(let lhsX, let lhsY), .offset(let rhsX, let rhsY)):
+      return lhsX == rhsX && lhsY == rhsY
+    case (.position(let lhsX, let lhsY), .position(let rhsX, let rhsY)):
       return lhsX == rhsX && lhsY == rhsY
     case (
       .flexibleFrame(
