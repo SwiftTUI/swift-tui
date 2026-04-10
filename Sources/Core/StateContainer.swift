@@ -43,12 +43,14 @@ public final class StateContainer<State: Equatable & Sendable> {
 
   private func requestInvalidation() {
     let animationRequest = AnimationContextStorage.currentRequest
-    if animationRequest != .inherit,
+    let batchID = AnimationContextStorage.currentBatchID
+    if animationRequest != .inherit || batchID != nil,
       let animationAware = invalidator as? any AnimationAwareInvalidating
     {
       animationAware.requestInvalidation(
         of: invalidationIdentities,
-        animation: animationRequest
+        animation: animationRequest,
+        batchID: batchID
       )
     } else {
       invalidator?.requestInvalidation(of: invalidationIdentities)

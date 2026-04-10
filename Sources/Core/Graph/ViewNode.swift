@@ -195,12 +195,14 @@ package final class ViewNode {
         .init(identity: identity, ordinal: ordinal)
       )
       let animationRequest = AnimationContextStorage.currentRequest
-      if animationRequest != .inherit,
+      let batchID = AnimationContextStorage.currentBatchID
+      if animationRequest != .inherit || batchID != nil,
         let animationAware = invalidator as? any AnimationAwareInvalidating
       {
         animationAware.requestInvalidation(
           of: [identity],
-          animation: animationRequest
+          animation: animationRequest,
+          batchID: batchID
         )
       } else {
         invalidator?.requestInvalidation(of: [identity])

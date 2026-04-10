@@ -19,6 +19,20 @@ public struct AnimationCompletionCriteria: Equatable, Sendable {
   public static let removed = AnimationCompletionCriteria(kind: .removed)
 }
 
+/// Monotonic allocator for ``AnimationBatchID`` values.  Each call to
+/// `withAnimation` gets a fresh ID so the animation controller can
+/// associate every animation enqueued in that scope with a single
+/// completion closure.
+@MainActor
+enum AnimationBatchIDAllocator {
+  private static var counter: UInt64 = 0
+
+  static func next() -> AnimationBatchID {
+    counter &+= 1
+    return AnimationBatchID(counter)
+  }
+}
+
 /// Executes `body` with the specified animation applied to any state
 /// changes that occur during its execution.
 ///
@@ -55,9 +69,18 @@ public func withAnimation<Result>(
 /// Executes `body` with the specified animation and fires `completion`
 /// when the animation completes.
 ///
-/// Matches SwiftUI's completion-accepting overload.  Completion support
-/// is pinned to ``AnimationCompletionCriteria`` so the internal machinery
-/// can later distinguish between logical completion and visual removal.
+/// A fresh ``AnimationBatchID`` is allocated for the scope; every state
+/// write performed inside `body` travels through the scheduler tagged
+/// with that batch ID, and the animation controller fires `completion`
+/// once every animation and every removal overlay in the batch has
+/// drained.
+///
+/// `completionCriteria` is carried on the registration so the
+/// controller can distinguish `.logicallyComplete` (curve returned nil)
+/// from `.removed` (removal overlay purged).  The current controller
+/// treats both as "curve returned nil for every animation in the
+/// batch"; callers using `.removed` on a non-removing state change
+/// will fire at the same time as `.logicallyComplete`.
 @MainActor
 @discardableResult
 public func withAnimation<Result>(
@@ -66,11 +89,13 @@ public func withAnimation<Result>(
   _ body: () throws -> Result,
   completion: @escaping @Sendable () -> Void
 ) rethrows -> Result {
-  // Completion callbacks are accepted for API parity but not yet wired
-  // into the animation controller.  The closure is retained so callers
-  // that rely on a lifecycle reference do not see premature deallocation;
-  // a future change will route it through the controller.
-  _ = completionCriteria
-  _ = completion
-  return try withAnimation(animation, body)
+  _ = completionCriteria  // reserved for when logically/removed diverge
+  let batchID = AnimationBatchIDAllocator.next()
+  AnimationCompletionStorage.currentSink?.registerCompletion(
+    batchID: batchID,
+    closure: completion
+  )
+  return try AnimationContextStorage.$currentBatchID.withValue(batchID) {
+    try withAnimation(animation, body)
+  }
 }

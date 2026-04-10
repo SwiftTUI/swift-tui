@@ -62,8 +62,37 @@ private struct _SendableAnyHashable: Sendable, Hashable {
 package protocol AnimationAwareInvalidating: Invalidating {
   func requestInvalidation(
     of identities: Set<Identity>,
-    animation: AnimationRequest
+    animation: AnimationRequest,
+    batchID: AnimationBatchID?
   )
+}
+
+extension AnimationAwareInvalidating {
+  /// Back-compat shim for call sites that do not carry a batch ID.
+  package func requestInvalidation(
+    of identities: Set<Identity>,
+    animation: AnimationRequest
+  ) {
+    requestInvalidation(of: identities, animation: animation, batchID: nil)
+  }
+}
+
+// MARK: - AnimationBatchID
+
+/// Identifies one logical animation batch — every animation enqueued
+/// under the same ``withAnimation(_:_:completion:)`` scope shares the
+/// same batch ID, so the controller can fire one completion closure
+/// once the whole batch has settled.
+///
+/// Batch IDs are opaque and never exposed to user code.  They are
+/// allocated monotonically by whichever component creates the batch
+/// (in practice: ``withAnimation`` on the View side).
+package struct AnimationBatchID: Hashable, Sendable {
+  package let value: UInt64
+
+  package init(_ value: UInt64) {
+    self.value = value
+  }
 }
 
 // MARK: - VectorArithmetic

@@ -600,6 +600,7 @@ public struct FrameContext: Equatable, Sendable {
   package var invalidationSummary: InvalidationSummary
   public var timestamp: MonotonicInstant
   package var animationRequest: AnimationRequest
+  package var animationBatchID: AnimationBatchID?
 
   /// Creates a frame context.
   public init(
@@ -616,6 +617,7 @@ public struct FrameContext: Equatable, Sendable {
     )
     self.timestamp = timestamp
     self.animationRequest = .inherit
+    self.animationBatchID = nil
   }
 
   /// Creates a frame context with an animation request.
@@ -624,7 +626,8 @@ public struct FrameContext: Equatable, Sendable {
     transaction: TransactionSnapshot = .init(),
     invalidatedIdentities: Set<Identity> = [],
     timestamp: MonotonicInstant = .now(),
-    animationRequest: AnimationRequest
+    animationRequest: AnimationRequest,
+    animationBatchID: AnimationBatchID? = nil
   ) {
     self.environment = environment
     self.transaction = transaction
@@ -634,6 +637,7 @@ public struct FrameContext: Equatable, Sendable {
     )
     self.timestamp = timestamp
     self.animationRequest = animationRequest
+    self.animationBatchID = animationBatchID
   }
 
   /// Returns whether `identity` is directly invalidated in this frame.

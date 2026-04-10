@@ -131,6 +131,10 @@ package struct ActiveAnimation: Sendable {
   /// Built-in bezier/spring curves ignore this; custom animations can
   /// use it to persist bookkeeping across frames.
   package var customState: AnimationState = .init()
+  /// Batch identifier copied from ``TransactionSnapshot/animationBatchID``
+  /// at enqueue time.  Used to look up a registered completion closure
+  /// when every animation in the batch has drained.
+  package var batchID: AnimationBatchID?
 }
 
 /// Result of a tick: tells the runtime whether more frames are needed
@@ -185,6 +189,14 @@ package final class AnimationController {
   private var previousChildIndexByIdentity: [Identity: Int] = [:]
   private var activeAnimations: [AnimationKey: ActiveAnimation] = [:]
   private var registeredAnimations: [AnimationBox: Animation] = [:]
+  /// Completion closures registered by ``withAnimation`` overloads.
+  /// The controller fires and removes the entry once every animation
+  /// (and every removal overlay) tagged with the batch ID has drained.
+  private var completionClosures: [AnimationBatchID: @Sendable () -> Void] = [:]
+  /// Per-batch active-animation counts.  Incremented on enqueue;
+  /// decremented when an animation completes or is superseded.  When
+  /// a count hits zero, the matching completion closure fires.
+  private var batchRefCounts: [AnimationBatchID: Int] = [:]
   /// Registrations collected during the *current* frame's resolve pass.
   /// Used to look up transitions on INSERTION.
   private var transitionsByIdentity: [Identity: AnyTransition] = [:]
@@ -441,11 +453,18 @@ package final class AnimationController {
     )
 
     if let previous {
+      // A child transaction's .animate overrides inherit the parent's
+      // batch ID when its own is nil; that way `.animation(_:value:)`
+      // subtree overrides don't lose the `withAnimation` completion
+      // association.
+      let effectiveBatchID =
+        node.transactionSnapshot.animationBatchID ?? transaction.animationBatchID
       diffAndEnqueue(
         identity: node.identity,
         previous: previous,
         current: snapshot,
         request: effectiveRequest,
+        batchID: effectiveBatchID,
         timestamp: timestamp
       )
     }
@@ -489,6 +508,7 @@ package final class AnimationController {
     previous: AnimatableSnapshot,
     current: AnimatableSnapshot,
     request: AnimationRequest,
+    batchID: AnimationBatchID?,
     timestamp: MonotonicInstant
   ) {
     enqueueIfChanged(
@@ -499,6 +519,7 @@ package final class AnimationController {
       toValue: AnimatableValue.double,
       fromValue: AnimatableValue.double,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
     enqueueIfChanged(
@@ -509,6 +530,7 @@ package final class AnimationController {
       toValue: AnimatableValue.color,
       fromValue: AnimatableValue.color,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
     enqueueIfChanged(
@@ -519,6 +541,7 @@ package final class AnimationController {
       toValue: AnimatableValue.color,
       fromValue: AnimatableValue.color,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
     enqueueIfChanged(
@@ -529,6 +552,7 @@ package final class AnimationController {
       toValue: AnimatableValue.color,
       fromValue: AnimatableValue.color,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
     enqueueIfChanged(
@@ -539,6 +563,7 @@ package final class AnimationController {
       toValue: AnimatableValue.integer,
       fromValue: AnimatableValue.integer,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
     enqueueIfChanged(
@@ -549,6 +574,7 @@ package final class AnimationController {
       toValue: AnimatableValue.integer,
       fromValue: AnimatableValue.integer,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
     enqueueIfChanged(
@@ -559,6 +585,7 @@ package final class AnimationController {
       toValue: AnimatableValue.integer,
       fromValue: AnimatableValue.integer,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
     enqueueIfChanged(
@@ -569,6 +596,7 @@ package final class AnimationController {
       toValue: AnimatableValue.integer,
       fromValue: AnimatableValue.integer,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
     enqueueIfChanged(
@@ -579,6 +607,7 @@ package final class AnimationController {
       toValue: AnimatableValue.integer,
       fromValue: AnimatableValue.integer,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
     enqueueIfChanged(
@@ -589,6 +618,7 @@ package final class AnimationController {
       toValue: AnimatableValue.integer,
       fromValue: AnimatableValue.integer,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
     enqueueIfChanged(
@@ -599,6 +629,7 @@ package final class AnimationController {
       toValue: AnimatableValue.integer,
       fromValue: AnimatableValue.integer,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
     enqueueIfChanged(
@@ -609,6 +640,7 @@ package final class AnimationController {
       toValue: AnimatableValue.integer,
       fromValue: AnimatableValue.integer,
       request: request,
+      batchID: batchID,
       timestamp: timestamp
     )
   }
@@ -621,6 +653,7 @@ package final class AnimationController {
     toValue: (T) -> AnimatableValue,
     fromValue: (T) -> AnimatableValue,
     request: AnimationRequest,
+    batchID: AnimationBatchID?,
     timestamp: MonotonicInstant
   ) {
     guard previous != current else { return }
@@ -629,13 +662,18 @@ package final class AnimationController {
 
     switch request {
     case .inherit, .disabled:
-      // Snap immediately — clear any active animation for this key.
-      activeAnimations.removeValue(forKey: key)
+      // Snap immediately — clear any active animation for this key,
+      // including its batch reference count.
+      if let superseded = activeAnimations.removeValue(forKey: key) {
+        releaseBatch(superseded.batchID)
+      }
 
     case .animate(let box):
       guard let previousValue = previous, let currentValue = current else {
         // One side is nil — cannot interpolate.  Snap.
-        activeAnimations.removeValue(forKey: key)
+        if let superseded = activeAnimations.removeValue(forKey: key) {
+          releaseBatch(superseded.batchID)
+        }
         return
       }
 
@@ -646,16 +684,41 @@ package final class AnimationController {
         let sampled = sample(existing, at: timestamp)
       {
         effectiveFrom = sampled
+        // The old animation is being superseded — release its batch
+        // ref before we overwrite the slot.  The new animation may
+        // belong to the same batch (retain happens below) or to a
+        // different one.
+        releaseBatch(existing.batchID)
       } else {
         effectiveFrom = fromValue(previousValue)
       }
 
+      retainBatch(batchID)
       activeAnimations[key] = ActiveAnimation(
         from: effectiveFrom,
         to: toValue(currentValue),
         animationBox: box,
-        startTime: timestamp
+        startTime: timestamp,
+        batchID: batchID
       )
+    }
+  }
+
+  private func retainBatch(_ batchID: AnimationBatchID?) {
+    guard let batchID else { return }
+    batchRefCounts[batchID, default: 0] += 1
+  }
+
+  private func releaseBatch(_ batchID: AnimationBatchID?) {
+    guard let batchID, let count = batchRefCounts[batchID] else { return }
+    let newCount = count - 1
+    if newCount <= 0 {
+      batchRefCounts.removeValue(forKey: batchID)
+      if let closure = completionClosures.removeValue(forKey: batchID) {
+        closure()
+      }
+    } else {
+      batchRefCounts[batchID] = newCount
     }
   }
 
@@ -678,9 +741,16 @@ package final class AnimationController {
     // Build per-identity interpolated value maps for fast tree walk.
     var interpolated: [Identity: [AnimatableProperty: AnimatableValue]] = [:]
 
+    // Record the batches that completed animations belong to so we can
+    // release their ref counts in a second pass (after this iteration
+    // closes).  Releasing during the iteration would mutate
+    // activeAnimations and invalidate the dictionary traversal.
+    var completedBatches: [AnimationBatchID] = []
+
     for (key, animation) in activeAnimations {
       guard let anim = registeredAnimations[animation.animationBox] else {
         keysToRemove.append(key)
+        if let batchID = animation.batchID { completedBatches.append(batchID) }
         continue
       }
       let elapsed = animation.startTime.duration(to: timestamp)
@@ -693,6 +763,7 @@ package final class AnimationController {
         // Animation complete — snap to final value and purge.
         interpolated[key.identity, default: [:]][key.property] = animation.to
         keysToRemove.append(key)
+        if let batchID = animation.batchID { completedBatches.append(batchID) }
         affectedIdentities.insert(key.identity)
         continue
       }
@@ -710,6 +781,12 @@ package final class AnimationController {
     // Remove completed animations.
     for key in keysToRemove {
       activeAnimations.removeValue(forKey: key)
+    }
+    // Release the batch references for everything that completed.
+    // ``releaseBatch`` fires the matching completion closure when the
+    // ref count hits zero.
+    for batchID in completedBatches {
+      releaseBatch(batchID)
     }
 
     // Process removal entries: compute interpolated transition modifiers
@@ -1081,6 +1158,8 @@ package final class AnimationController {
     previousChildIndexByIdentity.removeAll(keepingCapacity: true)
     activeAnimations.removeAll(keepingCapacity: true)
     registeredAnimations.removeAll(keepingCapacity: true)
+    completionClosures.removeAll(keepingCapacity: true)
+    batchRefCounts.removeAll(keepingCapacity: true)
     transitionsByIdentity.removeAll(keepingCapacity: true)
     previousTransitionsByIdentity.removeAll(keepingCapacity: true)
     pendingTransitionsByIdentity.removeAll(keepingCapacity: true)
@@ -1098,6 +1177,19 @@ extension AnimationController: AnimationRegistrationSink {
     if let animation = payload as? Animation {
       registeredAnimations[box] = animation
     }
+  }
+}
+
+extension AnimationController: AnimationCompletionSink {
+  package func registerCompletion(
+    batchID: AnimationBatchID,
+    closure: @escaping @Sendable () -> Void
+  ) {
+    // Store the closure; it fires when the batch's ref count hits zero
+    // in ``releaseBatch``.  Registering a second closure for the same
+    // batch ID replaces the first, matching SwiftUI's last-writer-wins
+    // behavior when overlapping ``withAnimation`` calls collide.
+    completionClosures[batchID] = closure
   }
 }
 

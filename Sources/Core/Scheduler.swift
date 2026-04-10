@@ -16,6 +16,7 @@ public struct ScheduledFrame: Equatable, Sendable {
   public var triggeredDeadline: MonotonicInstant?
   public var nextDeadline: MonotonicInstant?
   package var animationRequest: AnimationRequest
+  package var animationBatchID: AnimationBatchID?
 
   public init(
     causes: Set<WakeCause>,
@@ -32,6 +33,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     self.triggeredDeadline = triggeredDeadline
     self.nextDeadline = nextDeadline
     self.animationRequest = .inherit
+    self.animationBatchID = nil
   }
 
   package init(
@@ -41,7 +43,8 @@ public struct ScheduledFrame: Equatable, Sendable {
     externalReasons: [String],
     triggeredDeadline: MonotonicInstant?,
     nextDeadline: MonotonicInstant?,
-    animationRequest: AnimationRequest
+    animationRequest: AnimationRequest,
+    animationBatchID: AnimationBatchID? = nil
   ) {
     self.causes = causes
     self.invalidatedIdentities = invalidatedIdentities
@@ -50,6 +53,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     self.triggeredDeadline = triggeredDeadline
     self.nextDeadline = nextDeadline
     self.animationRequest = animationRequest
+    self.animationBatchID = animationBatchID
   }
 }
 
@@ -82,6 +86,7 @@ public final class FrameScheduler: FrameScheduling {
   private var externalReasons: Set<String> = []
   private var nextDeadline: MonotonicInstant?
   private var pendingAnimationRequest: AnimationRequest = .inherit
+  private var pendingAnimationBatchID: AnimationBatchID?
   private let wakeHandlerLock = OSAllocatedUnfairLock<(@Sendable () -> Void)?>(uncheckedState: nil)
 
   public init() {}
@@ -153,7 +158,8 @@ public final class FrameScheduler: FrameScheduling {
       externalReasons: externalReasons.sorted(),
       triggeredDeadline: deadlineDue ? nextDeadline : nil,
       nextDeadline: deadlineDue ? nil : nextDeadline,
-      animationRequest: pendingAnimationRequest
+      animationRequest: pendingAnimationRequest,
+      animationBatchID: pendingAnimationBatchID
     )
 
     pendingCauses.removeAll(keepingCapacity: true)
@@ -161,6 +167,7 @@ public final class FrameScheduler: FrameScheduling {
     signalNames.removeAll(keepingCapacity: true)
     externalReasons.removeAll(keepingCapacity: true)
     pendingAnimationRequest = .inherit
+    pendingAnimationBatchID = nil
     if deadlineDue {
       nextDeadline = nil
     }
@@ -174,6 +181,7 @@ public final class FrameScheduler: FrameScheduling {
     signalNames.removeAll(keepingCapacity: true)
     externalReasons.removeAll(keepingCapacity: true)
     pendingAnimationRequest = .inherit
+    pendingAnimationBatchID = nil
     nextDeadline = nil
   }
 }
@@ -187,14 +195,20 @@ extension FrameScheduler: WakeNotifyingFrameScheduling {
 extension FrameScheduler: AnimationAwareInvalidating {
   package func requestInvalidation(
     of identities: Set<Identity>,
-    animation: AnimationRequest
+    animation: AnimationRequest,
+    batchID: AnimationBatchID?
   ) {
     pendingCauses.insert(.invalidation)
     invalidatedIdentities.formUnion(identities)
     // Coalescing rule: latest explicit request wins; `.inherit` never
-    // overrides an explicit pending request.
+    // overrides an explicit pending request.  Batch ID coalesces the
+    // same way — latest wins, a nil batch ID never overrides an
+    // explicit one.
     if animation != .inherit {
       pendingAnimationRequest = animation
+    }
+    if let batchID {
+      pendingAnimationBatchID = batchID
     }
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }

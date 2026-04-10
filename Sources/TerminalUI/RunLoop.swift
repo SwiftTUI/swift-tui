@@ -288,13 +288,16 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
 
     // Install the renderer's animation controller as the active
     // registration sink so `withAnimation` can hand concrete Animation
-    // values off to it, and `.transition()` can register per-identity
-    // transitions with it.
+    // values off to it, `.transition()` can register per-identity
+    // transitions with it, and the completion-accepting withAnimation
+    // overload can register batch completion closures.
     AnimationRegistrationStorage.currentSink = renderer.internalAnimationController
     TransitionRegistrationStorage.currentSink = renderer.internalAnimationController
+    AnimationCompletionStorage.currentSink = renderer.internalAnimationController
     defer {
       AnimationRegistrationStorage.currentSink = nil
       TransitionRegistrationStorage.currentSink = nil
+      AnimationCompletionStorage.currentSink = nil
     }
 
     scheduler.requestInvalidation(of: [rootIdentity])
