@@ -236,6 +236,18 @@ extension RunLoop {
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
     transactionSnapshot.animationRequest = scheduledFrame.animationRequest
     transactionSnapshot.animationBatchID = scheduledFrame.animationBatchID
+    // If the scheduled frame carries no explicit animation intent —
+    // typically a tick frame or a background-observable wake — but
+    // the animation controller has animations in flight, inject its
+    // dominant active request.  This keeps any value-change diffs
+    // that happen during this resolve from snapping the in-flight
+    // animation: they retarget instead.  The scheduler itself stays
+    // animation-unaware; all the state lives on the controller.
+    if transactionSnapshot.animationRequest == .inherit,
+      let active = renderer.internalAnimationController.dominantActiveRequest()
+    {
+      transactionSnapshot.animationRequest = active
+    }
     var context = ResolveContext(
       identity: rootIdentity,
       environment: environment,
