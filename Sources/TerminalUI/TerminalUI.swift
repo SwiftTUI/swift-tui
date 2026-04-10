@@ -1,6 +1,6 @@
 @_exported import Core
-@_exported import View
 @_exported import EmbeddedFonts
+@_exported import View
 
 @MainActor
 private final class RetainedFrameStore {
@@ -163,6 +163,11 @@ public struct DefaultRenderer {
     }
     animationController.finishTransitionCollection()
     var resolved = viewGraph.snapshot()
+    resolved = composePresentationHostTree(
+      baseNode: resolved,
+      hostState: presentationHostState,
+      in: resolveContext
+    )
 
     // Animation: capture from/to for changed animatable properties, then
     // apply interpolated values to the resolved tree before measure.

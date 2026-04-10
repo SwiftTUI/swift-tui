@@ -1,6 +1,6 @@
 # Runtime
 
-Last updated: March 29, 2026
+Last updated: April 9, 2026
 
 This document is the stable reference for runtime behavior. It captures the shipped lifecycle rules, state and observation model, input handling, and the current incremental delivery cost model.
 
@@ -15,6 +15,18 @@ resolve -> measure -> place -> semantics -> draw -> raster -> commit
 `RunLoop` integrates terminal I/O, invalidation scheduling, input, signals, lifecycle staging, and task reconciliation around that pure frame pipeline.
 
 For interactive sessions, the runtime owns the terminal alternate-screen buffer while running. That gives each `WindowGroup` a clean full-canvas presentation surface and restores the previous shell buffer on exit.
+
+## Root-Hoisted Presentations
+
+Built-in presentations such as alerts, confirmation dialogs, sheets, toasts,
+and the command palette are authored inside the base view tree but displayed at
+the root.
+
+- Base resolution collects presentation declarations during the ordinary resolve pass
+- Visible presentation payloads resolve as overlay roots after the base tree has already been resolved
+- The renderer composes the base root and any overlay roots for downstream measure, place, semantics, draw, raster, and commit work
+- Opening or dismissing a presentation does not re-resolve the displayed base subtree under a synthetic identity path
+- Modal overlays can still suppress base interaction through the composed frame's semantic state
 
 ## Input, Focus, And Interaction
 
