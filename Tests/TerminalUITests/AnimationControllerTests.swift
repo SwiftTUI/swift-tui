@@ -128,6 +128,85 @@ struct LinearCustomAnimation: CustomAnimation {
 @Suite("Animation end-to-end pipeline integration")
 struct AnimationPipelineIntegrationTests {
   @Test(
+    "insertion offset animation survives across tick frames and completes cleanly"
+  )
+  func insertionOffsetAnimationCompletes() throws {
+    // Regression for the "slide-in hitches and sticks partway
+    // through until you click" gallery bug.  The insertion offset
+    // animation state must survive across tick frames (no accidental
+    // purges) and progress monotonically toward zero delta.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+
+    AnimationRegistrationStorage.currentSink = controller
+    TransitionRegistrationStorage.currentSink = controller
+    defer {
+      AnimationRegistrationStorage.currentSink = nil
+      TransitionRegistrationStorage.currentSink = nil
+    }
+
+    // Very long duration so consecutive renderer.render calls at
+    // microsecond-apart real time produce different delta values.
+    let animation = Animation.linear(duration: .milliseconds(1_000_000))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+
+    // Frame 1: slide not shown.
+    _ = renderer.render(
+      VStack(alignment: .leading, spacing: 0) {
+      },
+      context: ResolveContext(identity: rootIdentity)
+    )
+
+    // Frame 2: slide appears under animate intent.  Insertion animation
+    // should be enqueued.
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    let frame2 = renderer.render(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("hello").transition(.slide)
+      },
+      context: ResolveContext(identity: rootIdentity, transaction: transaction)
+    )
+
+    // Verify the insertion animation was enqueued on frame 2.
+    let frame2Count = controller.activeInsertionOffsetCount
+    #expect(
+      frame2Count > 0,
+      "insertion offset animation should be enqueued after frame 2, got \(frame2Count)"
+    )
+
+    // Frame 3: same tree, no state change — this is a tick frame.
+    // The insertion animation state should persist.
+    let frame3 = renderer.render(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("hello").transition(.slide)
+      },
+      context: ResolveContext(identity: rootIdentity)
+    )
+    let frame3Count = controller.activeInsertionOffsetCount
+    #expect(
+      frame3Count > 0,
+      "insertion offset animation should still be in flight after frame 3, got \(frame3Count)"
+    )
+    // Even with insertionOffsetAnimations populated, the controller
+    // must report hasActiveAnimations via lastTickResult on tick
+    // frames — otherwise the run loop stops scheduling deadlines
+    // and the animation hitches partway through.
+    #expect(
+      controller.lastTickResult.hasActiveAnimations,
+      "frame 3 tick should report hasActiveAnimations=true while the insertion is still in flight"
+    )
+    #expect(
+      controller.lastTickResult.nextDeadline != nil,
+      "frame 3 tick should carry a nextDeadline for the in-flight insertion"
+    )
+    _ = frame2
+    _ = frame3
+  }
+
+  @Test(
     "removal overlays do not accumulate across tick frames"
   )
   func removalOverlaysDoNotAccumulateAcrossTickFrames() throws {

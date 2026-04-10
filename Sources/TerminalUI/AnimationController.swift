@@ -500,6 +500,19 @@ package final class AnimationController {
     return node
   }
 
+  /// Number of insertion-offset animations currently in flight.
+  /// Test hook so integration tests can pin the enqueue path
+  /// without exposing the entire private map.
+  package var activeInsertionOffsetCount: Int {
+    insertionOffsetAnimations.count
+  }
+
+  /// Number of in-tree (drawMetadata / layoutBehavior) animations
+  /// currently in flight.  Test hook.
+  package var activeAnimationCount: Int {
+    activeAnimations.count
+  }
+
   /// Returns an animation request representative of whatever is
   /// currently in flight, or nil if no animations are active.
   ///
@@ -1133,7 +1146,11 @@ package final class AnimationController {
     to tree: inout ResolvedNode,
     at timestamp: MonotonicInstant
   ) -> AnimationTickResult {
-    guard !activeAnimations.isEmpty || !removingIdentities.isEmpty else {
+    guard
+      !activeAnimations.isEmpty
+        || !removingIdentities.isEmpty
+        || !insertionOffsetAnimations.isEmpty
+    else {
       lastTickResult = AnimationTickResult()
       return lastTickResult
     }
