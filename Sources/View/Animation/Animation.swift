@@ -155,12 +155,29 @@ public struct Animation: Equatable, Hashable, Sendable {
   // MARK: - Evaluation
 
   /// Returns the progress value at elapsed time, or nil if complete.
+  ///
+  /// Stateless convenience overload — used by code paths that do not
+  /// carry per-key ``AnimationState`` (e.g. sample-for-retargeting).
+  /// Custom animations run with a fresh state buffer and therefore
+  /// cannot persist bookkeeping across ticks via this path.
   package func evaluate(elapsed: Duration) -> Double? {
+    var ephemeral = AnimationState()
+    return evaluate(elapsed: elapsed, state: &ephemeral)
+  }
+
+  /// Stateful progress evaluation used by the controller at tick time.
+  /// Built-in bezier/spring curves ignore `state`; custom curves thread
+  /// it through ``CustomAnimationBox/evaluate`` so user implementations
+  /// can persist bookkeeping across ticks.
+  package func evaluate(
+    elapsed: Duration,
+    state: inout AnimationState
+  ) -> Double? {
     let adjustedElapsed = adjustedTime(elapsed)
     guard adjustedElapsed >= .zero else { return 0.0 }
 
     guard let repeatBehavior else {
-      return evaluateSingleIteration(elapsed: adjustedElapsed)
+      return evaluateSingleIteration(elapsed: adjustedElapsed, state: &state)
     }
 
     // Repeats are modulo the iteration duration.  One iteration runs
@@ -168,7 +185,7 @@ public struct Animation: Equatable, Hashable, Sendable {
     // (the curve played backward).
     let iterationSecs = iterationDurationSeconds
     guard iterationSecs > 0 else {
-      return evaluateSingleIteration(elapsed: adjustedElapsed)
+      return evaluateSingleIteration(elapsed: adjustedElapsed, state: &state)
     }
 
     let totalSecs = Self.durationSeconds(adjustedElapsed)
@@ -192,7 +209,9 @@ public struct Animation: Equatable, Hashable, Sendable {
       return nil
     }
 
-    guard let rawProgress = evaluateSingleIteration(elapsed: localElapsed) else {
+    guard
+      let rawProgress = evaluateSingleIteration(elapsed: localElapsed, state: &state)
+    else {
       // We landed past the end of the single-iteration evaluator but
       // before the next iteration starts — clamp to the endpoint the
       // curve would have reached.
@@ -208,7 +227,10 @@ public struct Animation: Equatable, Hashable, Sendable {
   /// Evaluates a single iteration of the curve at `elapsed`.  Returns
   /// nil when the iteration has run to completion.  Repeat bookkeeping
   /// is handled by the outer ``evaluate`` wrapper.
-  private func evaluateSingleIteration(elapsed: Duration) -> Double? {
+  private func evaluateSingleIteration(
+    elapsed: Duration,
+    state: inout AnimationState
+  ) -> Double? {
     switch curve {
     case .bezier(let solver, let duration):
       let durationSecs = Self.durationSeconds(duration)
@@ -223,12 +245,8 @@ public struct Animation: Equatable, Hashable, Sendable {
       // Spring returns displacement (1 -> 0), convert to progress (0 -> 1)
       return 1.0 - displacement
 
-    case .custom:
-      // Custom animations evaluated via the CustomAnimation protocol
-      // at the controller level. Return linear fallback here.
-      let t = Self.durationSeconds(elapsed)
-      if t >= 2.0 { return nil }
-      return min(t / 0.5, 1.0)
+    case .custom(let box):
+      return box.evaluate(elapsed, &state)
     }
   }
 
@@ -291,14 +309,28 @@ enum RepeatBehavior: Equatable, Hashable, Sendable {
 }
 
 /// Type-erased wrapper for CustomAnimation conformances.
+///
+/// Retains a call-through closure so the animation controller can
+/// evaluate the user's curve at tick time.  The call-through uses
+/// `Double` as the `VectorArithmetic` value — the controller treats the
+/// returned Double as a progress scalar and does its own interpolation
+/// between `from` and `to`, so custom animations do not need to know
+/// about the controller's value types.
 struct CustomAnimationBox: Equatable, Hashable, Sendable {
   private let _hashValue: Int
   private let _isEqual: @Sendable (CustomAnimationBox) -> Bool
+  let evaluate: @Sendable (Duration, inout AnimationState) -> Double?
 
   init<A: CustomAnimation>(_ animation: A) {
     _hashValue = animation.hashValue
     _isEqual = { other in
       other._hashValue == animation.hashValue
+    }
+    evaluate = { time, state in
+      var context = AnimationContext<Double>(state: state)
+      let result = animation.animate(value: 1.0, time: time, context: &context)
+      state = context.state
+      return result
     }
   }
 

@@ -82,6 +82,35 @@ struct AnimationControllerSnapshotTests {
   }
 }
 
+/// A deterministic CustomAnimation used by the custom-evaluation
+/// tests.  `animate` returns `time_in_ms / 200` clamped to `[0, 1]`
+/// for the first 200 ms, then nil.  Works for any VectorArithmetic V
+/// because we only ever pass `Double` through the controller.
+struct LinearCustomAnimation: CustomAnimation {
+  let id: String
+
+  func animate<V: VectorArithmetic>(
+    value: V, time: Duration, context: inout AnimationContext<V>
+  ) -> V? {
+    let ms =
+      Double(time.components.seconds) * 1000.0
+      + Double(time.components.attoseconds) / 1e15
+    if ms >= 200.0 { return nil }
+    let progress = ms / 200.0
+    var scaled = value
+    scaled.scale(by: progress)
+    return scaled
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
+  }
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.id == rhs.id
+  }
+}
+
 @MainActor
 @Suite("AnimationController property animations")
 struct AnimationControllerPropertyTests {
@@ -168,6 +197,63 @@ struct AnimationControllerPropertyTests {
       interpolatedMax > 100 && interpolatedMax < 200,
       "maxWidth should interpolate between endpoints, got \(interpolatedMax)"
     )
+  }
+
+  @Test(
+    "CustomAnimation conformance drives interpolation via the controller"
+  )
+  func customAnimationIsEvaluatedByController() throws {
+    let controller = AnimationController()
+    let animation = Animation(LinearCustomAnimation(id: "test-linear"))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("leaf")])
+
+    // Frame 1: opacity 1.0.
+    var frame1Metadata = DrawMetadata()
+    frame1Metadata.baseStyle.explicitOpacity = 1.0
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame1Metadata
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Frame 2: opacity 0.0 under the custom animation.
+    var frame2Metadata = DrawMetadata()
+    frame2Metadata.baseStyle.explicitOpacity = 0.0
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame2Metadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    // Halfway through the custom animation's 200 ms window.
+    let halfway = t0.advanced(by: .milliseconds(100))
+    let result = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    #expect(result.hasActiveAnimations)
+    let opacity = frame2.drawMetadata.baseStyle.explicitOpacity
+    #expect(opacity != nil)
+    if let opacity {
+      // LinearCustomAnimation returns 0.5 at 100ms, so interpolated
+      // opacity = 1.0 + (0.0 - 1.0) * 0.5 = 0.5.
+      #expect(
+        abs(opacity - 0.5) < 0.05,
+        "custom animation should drive opacity halfway at t=100ms, got \(opacity)"
+      )
+    }
+
+    // After the custom animation's window closes, the controller should
+    // snap to the final value and mark the animation complete.
+    var frame3 = frame2
+    let past = t0.advanced(by: .milliseconds(300))
+    let finalResult = controller.applyInterpolations(to: &frame3, at: past)
+    #expect(!finalResult.hasActiveAnimations)
   }
 
   @Test(
