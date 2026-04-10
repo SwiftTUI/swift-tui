@@ -2128,6 +2128,232 @@ struct InteractiveRuntimeTests {
     #expect(terminal.frames.count >= 2)
   }
 
+  /// End-to-end regression: send pointer scroll events through the
+  /// real run loop and verify that the external position binding
+  /// actually advanced.  Existing scroll tests only assert that
+  /// `frames.count >= 2`, which can pass even when the rendered
+  /// surface never reflects the scroll (the "have to click before it
+  /// updates" symptom that recurs in the gallery).
+  @MainActor
+  @Test("pointer scroll advances external position binding through full run loop")
+  func pointerScrollAdvancesExternalBindingThroughFullRunLoop() async throws {
+    let terminalSize = Size(width: 30, height: 8)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("PointerScrollExternalBinding")
+    let scrollIdentity = testIdentity("PointerScrollExternalBinding", "Scroll")
+    let positionBox = LockedBox(ScrollPosition.zero)
+
+    let view = TallExternalBindingScrollFixture(
+      scrollIdentity: scrollIdentity,
+      positionBox: positionBox
+    )
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 0, deltaY: 1),
+            location: centerPoint(of: scrollRect)
+          )),
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 0, deltaY: 1),
+            location: centerPoint(of: scrollRect)
+          )),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(
+      positionBox.value.y >= 1,
+      "external scroll position should have advanced through the run loop"
+    )
+  }
+
+  /// Mirrors the gallery animations tab: a ScrollView wrapping a
+  /// view that contains a continuously-cycling `PhaseAnimator`.  The
+  /// animation pump and the pointer-scroll pump must both make
+  /// progress simultaneously — historically the animation pump's
+  /// continuous deadline-wakes have masked scroll invalidations,
+  /// so a scroll arrived at the runtime but never reached a render.
+  @MainActor
+  @Test("pointer scroll advances binding while a PhaseAnimator is cycling")
+  func pointerScrollAdvancesWhilePhaseAnimatorCycling() async throws {
+    let terminalSize = Size(width: 40, height: 12)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("PointerScrollWithAnimation")
+    let scrollIdentity = testIdentity("PointerScrollWithAnimation", "Scroll")
+    let positionBox = LockedBox(ScrollPosition.zero)
+
+    let view = AnimatingTallScrollFixture(
+      scrollIdentity: scrollIdentity,
+      positionBox: positionBox
+    )
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 0, deltaY: 1),
+            location: centerPoint(of: scrollRect)
+          )),
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 0, deltaY: 1),
+            location: centerPoint(of: scrollRect)
+          )),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(
+      positionBox.value.y >= 1,
+      "scroll should still advance while a PhaseAnimator is cycling"
+    )
+  }
+
+  /// Mirrors the gallery animations tab exactly: a ScrollView with
+  /// `.frame(maxWidth: .infinity, maxHeight: .infinity)` (instead of
+  /// a fixed `.frame(width:height:)`) wrapping content with
+  /// `.padding(1)` and a continuously cycling PhaseAnimator.  This
+  /// is the exact body shape that started failing when the user
+  /// wrapped the animations tab in a ScrollView.
+  @MainActor
+  @Test("gallery-shaped ScrollView (.frame maxWidth/.maxHeight) advances on pointer scroll")
+  func galleryShapedScrollViewAdvancesOnPointerScroll() async throws {
+    let terminalSize = Size(width: 60, height: 20)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("GalleryShapedScroll")
+    let scrollIdentity = testIdentity("GalleryShapedScroll", "Scroll")
+    let positionBox = LockedBox(ScrollPosition.zero)
+
+    let view = GalleryShapedAnimatingScrollFixture(
+      scrollIdentity: scrollIdentity,
+      positionBox: positionBox
+    )
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 0, deltaY: 1),
+            location: centerPoint(of: scrollRect)
+          )),
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 0, deltaY: 1),
+            location: centerPoint(of: scrollRect)
+          )),
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 0, deltaY: 1),
+            location: centerPoint(of: scrollRect)
+          )),
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(
+      positionBox.value.y >= 1,
+      "gallery-shaped ScrollView should advance on pointer scroll"
+    )
+  }
+
+  /// Verifies that pointer scrolling produces an observably
+  /// different rendered surface — not just an updated binding.
+  /// Without this assertion, a regression where the binding writes
+  /// land but the renderer never picks them up (the click-to-flush
+  /// bug) would pass binding-only checks.
+  @MainActor
+  @Test("pointer scroll causes a follow-up render that reflects the new offset")
+  func pointerScrollProducesObservableFollowUpFrame() async throws {
+    let terminalSize = Size(width: 30, height: 8)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("PointerScrollVisibleFrame")
+    let scrollIdentity = testIdentity("PointerScrollVisibleFrame", "Scroll")
+    let positionBox = LockedBox(ScrollPosition.zero)
+
+    let view = TallExternalBindingScrollFixture(
+      scrollIdentity: scrollIdentity,
+      positionBox: positionBox
+    )
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    let result = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: [
+        .mouse(
+          .init(
+            kind: .scrolled(deltaX: 0, deltaY: 3),
+            location: centerPoint(of: scrollRect)
+          ))
+      ],
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(positionBox.value.y >= 1)
+    #expect(
+      terminal.frames.count >= 2,
+      "scroll event should drive at least one follow-up frame"
+    )
+    let firstFrame = try #require(terminal.frames.first)
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(
+      firstFrame != lastFrame,
+      "the rendered surface should differ between pre- and post-scroll frames"
+    )
+  }
+
   @MainActor
   @Test(
     "handled pointer scrolling invalidates the scroll route even for external position bindings")
@@ -3885,6 +4111,107 @@ private struct StatefulImplicitPointerScrollFixture: View {
     }
     .id(testIdentity("ImplicitPointerStatefulScrollFixture", "Scroll"))
     .frame(width: 12, height: 5, alignment: .topLeading)
+  }
+}
+
+private struct TallExternalBindingScrollFixture: View {
+  let scrollIdentity: Identity
+  let positionBox: LockedBox<ScrollPosition>
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      position: Binding(
+        get: { positionBox.value },
+        set: { positionBox.value = $0 }
+      )
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        ForEach(0..<30) { index in
+          Text("Row \(index)")
+        }
+      }
+    }
+    .id(scrollIdentity)
+    .frame(width: 20, height: 6, alignment: .topLeading)
+  }
+}
+
+private struct AnimatingTallScrollFixture: View {
+  let scrollIdentity: Identity
+  let positionBox: LockedBox<ScrollPosition>
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      position: Binding(
+        get: { positionBox.value },
+        set: { positionBox.value = $0 }
+      )
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        PhaseAnimator([RegressionPhase.a, .b, .c]) { phase in
+          Text("Phase \(phase.label)")
+        } animation: { _ in
+          .linear(duration: .milliseconds(100))
+        }
+        ForEach(0..<25) { index in
+          Text("Row \(index)")
+        }
+      }
+    }
+    .id(scrollIdentity)
+    .frame(width: 24, height: 8, alignment: .topLeading)
+  }
+}
+
+/// Mirrors the actual gallery animations tab body shape: a
+/// `ScrollView` whose outer `.frame(maxWidth: .infinity, maxHeight:
+/// .infinity)` modifier expands the viewport to fill the proposed
+/// terminal area.  The other regression fixtures pin a tight
+/// `.frame(width:height:)` which produces a different layout
+/// proposal flow — this fixture exercises the gallery's exact
+/// proposal-flow shape.
+private struct GalleryShapedAnimatingScrollFixture: View {
+  let scrollIdentity: Identity
+  let positionBox: LockedBox<ScrollPosition>
+
+  var body: some View {
+    ScrollView(
+      .vertical,
+      position: Binding(
+        get: { positionBox.value },
+        set: { positionBox.value = $0 }
+      )
+    ) {
+      VStack(alignment: .leading, spacing: 1) {
+        PhaseAnimator([RegressionPhase.a, .b, .c]) { phase in
+          Text("Phase \(phase.label)")
+        } animation: { _ in
+          .linear(duration: .milliseconds(100))
+        }
+        ForEach(0..<40) { index in
+          Text("Gallery row \(index)")
+        }
+      }
+      .padding(1)
+    }
+    .id(scrollIdentity)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+}
+
+private enum RegressionPhase: Equatable, Sendable {
+  case a
+  case b
+  case c
+
+  var label: String {
+    switch self {
+    case .a: "A"
+    case .b: "B"
+    case .c: "C"
+    }
   }
 }
 

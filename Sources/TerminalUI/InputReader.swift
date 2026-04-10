@@ -148,6 +148,51 @@ enum InputReaderTiming {
   static let mouseEventFlushDelayMilliseconds = 1
 }
 
+/// Schedule-once-per-cluster state machine for the input reader's
+/// pending-mouse-event flush.  Extracted from the dispatch-source-
+/// based reader so the schedule invariant can be tested without
+/// driving the dispatch source.
+///
+/// **The invariant**: only the FIRST event in a cluster arms the
+/// flush timer.  Subsequent events appended while a flush is
+/// already pending must NOT re-arm.  This caps flush latency at
+/// `mouseEventFlushDelayMilliseconds` regardless of event rate.
+///
+/// The earlier reset-on-every-event behavior was the root cause
+/// of the gallery's "scroll does nothing until I click" bug: a
+/// continuous high-rate scroll burst kept pushing the flush
+/// deadline forward, so the consumer never received any events
+/// until the input stream went idle.
+package final class MouseEventCoalescingState {
+  package private(set) var pendingEvents: [InputEvent] = []
+  package private(set) var isFlushScheduled = false
+
+  package init() {}
+
+  /// Appends `event` to the pending buffer.  Returns `true` when
+  /// the caller is responsible for arming a flush timer (this
+  /// is the first event in a new cluster); returns `false` when
+  /// a flush is already scheduled and should be left alone.
+  @discardableResult
+  package func append(_ event: InputEvent) -> Bool {
+    pendingEvents.append(event)
+    guard !isFlushScheduled else {
+      return false
+    }
+    isFlushScheduled = true
+    return true
+  }
+
+  /// Drains the pending buffer and resets the scheduled-flush
+  /// flag so the next appended event arms a fresh cluster.
+  package func drain() -> [InputEvent] {
+    let drained = pendingEvents
+    pendingEvents.removeAll(keepingCapacity: true)
+    isFlushScheduled = false
+    return drained
+  }
+}
+
 /// Produces keyboard events from an input source.
 public protocol InputReading: AnyObject {
   func events() -> AsyncStream<KeyPress>
@@ -681,26 +726,34 @@ extension InputReader {
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
         var parser = TerminalInputParser()
         var controlParser = ControlMessageParser()
-        var pendingMouseEvents: [InputEvent] = []
+        let coalescingState = MouseEventCoalescingState()
         var scheduledFlush: DispatchWorkItem?
 
         let flushPendingMouseEvents = {
           scheduledFlush?.cancel()
           scheduledFlush = nil
 
-          guard !pendingMouseEvents.isEmpty else {
+          let drained = coalescingState.drain()
+          guard !drained.isEmpty else {
             return
           }
 
-          let flushedEvents = coalescedInputEvents(pendingMouseEvents)
-          pendingMouseEvents.removeAll(keepingCapacity: true)
+          let flushedEvents = coalescedInputEvents(drained)
           for event in flushedEvents {
             continuation.yield(event)
           }
         }
 
-        let scheduleFlush = {
-          scheduledFlush?.cancel()
+        let appendMouseEventAndArmFlushIfNeeded = { (event: InputEvent) in
+          // The coalescing state implements the
+          // schedule-once-per-cluster invariant.  See its docs for
+          // why this matters — TL;DR: rescheduling on every event
+          // pushes the flush deadline forward indefinitely under a
+          // continuous burst, which is the gallery's "scroll does
+          // nothing until I click" bug.
+          guard coalescingState.append(event) else {
+            return
+          }
           let workItem = DispatchWorkItem {
             flushPendingMouseEvents()
           }
@@ -749,8 +802,7 @@ extension InputReader {
             for event in parser.feed(filtered.payload) {
               switch event {
               case .mouse(let mouseEvent) where mouseEvent.isCoalescible:
-                pendingMouseEvents.append(.mouse(mouseEvent))
-                scheduleFlush()
+                appendMouseEventAndArmFlushIfNeeded(.mouse(mouseEvent))
               default:
                 flushPendingMouseEvents()
                 continuation.yield(event)
