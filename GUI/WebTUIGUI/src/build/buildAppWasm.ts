@@ -22,5 +22,18 @@ export async function buildAppWasm(
   await rm(packagedWasmPath, { force: true });
   await Bun.write(packagedWasmPath, await Bun.file(artifacts.wasmPath).arrayBuffer());
   await stripPackagedWasm(packagedWasmPath);
+  await validatePackagedWasm(packagedWasmPath);
   return artifacts;
+}
+
+async function validatePackagedWasm(
+  wasmPath: string
+): Promise<void> {
+  try {
+    // Validate against the same JS API the browser uses before we publish it.
+    await WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`generated wasm does not parse in browser WebAssembly (${wasmPath}): ${message}`);
+  }
 }
