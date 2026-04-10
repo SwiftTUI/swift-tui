@@ -113,9 +113,9 @@ package final class AuthoringOrdinalTracker {
 
 package enum StateSlotOrdinals {
   private static let authoredColumnBits = 16
-  private static let changeModifierBase = -1_000_000_000
-  private static let defaultFocusBase = -2_000_000_000
-  private static let valueAnimationOrdinal = -3_000_000_000
+  private static let changeModifierBase = -1_000_000
+  private static let defaultFocusBase = -2_000_000
+  private static let valueAnimationOrdinal = -3_000_000
 
   package static func authored(
     line: UInt,
