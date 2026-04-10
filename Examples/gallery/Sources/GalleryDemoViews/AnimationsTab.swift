@@ -47,29 +47,31 @@ struct AnimationsTab: View {
   @State private var completionAccent: Bool = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
-      header
-      Divider()
-      colorSection
-      Divider()
-      transitionSection
-      Divider()
-      frameSection
-      Divider()
-      offsetSection
-      Divider()
-      positionSection
-      Divider()
-      matchedGeometrySection
-      Divider()
-      phaseAnimatorSection
-      Divider()
-      triggerPhaseAnimatorSection
-      Divider()
-      completionSection
-      Spacer(minLength: 0)
+    ScrollView {
+      VStack(alignment: .leading, spacing: 1) {
+        header
+        Divider()
+        colorSection
+        Divider()
+        transitionSection
+        Divider()
+        frameSection
+        Divider()
+        offsetSection
+        Divider()
+        positionSection
+        Divider()
+        matchedGeometrySection
+        Divider()
+        phaseAnimatorSection
+        Divider()
+        triggerPhaseAnimatorSection
+        Divider()
+        completionSection
+        Spacer(minLength: 0)
+      }
+      .padding(1)
     }
-    .padding(1)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
