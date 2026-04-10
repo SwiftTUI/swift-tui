@@ -1090,7 +1090,15 @@ public struct LayoutEngine: Sendable {
       guard measurementMatches else {
         return nil
       }
-      return previousPlaced
+      // `isEquivalentForPlacement` deliberately ignores `drawMetadata`
+      // so that visual-only mutations — animation controller color
+      // interpolation in particular — don't invalidate layout reuse.
+      // But that means the cached `previousPlaced` carries the
+      // PREVIOUS frame's drawMetadata, which is wrong for any tick
+      // frame where the controller mutated colors/opacity/padding
+      // on the resolved tree.  Refresh the visual metadata from the
+      // current resolved tree while preserving the cached bounds.
+      return refreshDrawMetadata(placed: previousPlaced, from: resolved)
     }
 
     guard
@@ -1105,14 +1113,49 @@ public struct LayoutEngine: Sendable {
       x: bounds.origin.x - previousPlaced.bounds.origin.x,
       y: bounds.origin.y - previousPlaced.bounds.origin.y
     )
-    guard delta != .zero else {
-      return previousPlaced
+    if delta == .zero {
+      return refreshDrawMetadata(placed: previousPlaced, from: resolved)
     }
 
-    return translatedPlacement(
-      previousPlaced,
-      by: delta
+    return refreshDrawMetadata(
+      placed: translatedPlacement(previousPlaced, by: delta),
+      from: resolved
     )
+  }
+
+  /// Walks a reused placed subtree in parallel with the current
+  /// resolved subtree and copies visual metadata (drawMetadata,
+  /// semanticMetadata, lifecycleMetadata, environmentSnapshot,
+  /// isTransient) from the current resolved node onto the cached
+  /// placed node.  The trees are guaranteed structurally identical
+  /// by `isEquivalentForPlacement`, so we can zip them safely.
+  ///
+  /// This lets the layout engine reuse cached placement (bounds,
+  /// sizes) while still picking up tick-frame visual mutations from
+  /// the animation controller.
+  private func refreshDrawMetadata(
+    placed: PlacedNode,
+    from resolved: ResolvedNode
+  ) -> PlacedNode {
+    var node = placed
+    node.drawMetadata = resolved.drawMetadata
+    node.semanticMetadata = resolved.semanticMetadata
+    node.lifecycleMetadata = resolved.lifecycleMetadata
+    node.environmentSnapshot = resolved.environmentSnapshot
+    node.isTransient = resolved.isTransient
+
+    guard node.children.count == resolved.children.count else {
+      // Structural mismatch — should not happen because
+      // isEquivalentForPlacement gated on children.count, but play
+      // it safe and return the node without recursing further.
+      return node
+    }
+    let refreshedChildren = zip(node.children, resolved.children).map {
+      (placedChild, resolvedChild) in
+      refreshDrawMetadata(placed: placedChild, from: resolvedChild)
+    }
+    node.children = refreshedChildren
+    return node
   }
 
   private func isEquivalentForViewportTranslation(
