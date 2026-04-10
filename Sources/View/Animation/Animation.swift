@@ -159,16 +159,66 @@ public struct Animation: Equatable, Hashable, Sendable {
     let adjustedElapsed = adjustedTime(elapsed)
     guard adjustedElapsed >= .zero else { return 0.0 }
 
+    guard let repeatBehavior else {
+      return evaluateSingleIteration(elapsed: adjustedElapsed)
+    }
+
+    // Repeats are modulo the iteration duration.  One iteration runs
+    // the curve from 0 → 1; with autoreverse, odd iterations run 1 → 0
+    // (the curve played backward).
+    let iterationSecs = iterationDurationSeconds
+    guard iterationSecs > 0 else {
+      return evaluateSingleIteration(elapsed: adjustedElapsed)
+    }
+
+    let totalSecs = Self.durationSeconds(adjustedElapsed)
+    let rawIndex = totalSecs / iterationSecs
+    let iterationIndex = Int(rawIndex.rounded(.down))
+    let localTimeSecs = totalSecs - Double(iterationIndex) * iterationSecs
+    let localElapsed = Self.duration(seconds: localTimeSecs)
+
+    let autoreverses: Bool
+    let terminalIndex: Int?
+    switch repeatBehavior {
+    case .count(let count, let ar):
+      autoreverses = ar
+      terminalIndex = max(count, 0)
+    case .forever(let ar):
+      autoreverses = ar
+      terminalIndex = nil
+    }
+
+    if let terminalIndex, iterationIndex >= terminalIndex {
+      return nil
+    }
+
+    guard let rawProgress = evaluateSingleIteration(elapsed: localElapsed) else {
+      // We landed past the end of the single-iteration evaluator but
+      // before the next iteration starts — clamp to the endpoint the
+      // curve would have reached.
+      return autoreverses && !iterationIndex.isMultiple(of: 2) ? 0.0 : 1.0
+    }
+
+    if autoreverses && !iterationIndex.isMultiple(of: 2) {
+      return 1.0 - rawProgress
+    }
+    return rawProgress
+  }
+
+  /// Evaluates a single iteration of the curve at `elapsed`.  Returns
+  /// nil when the iteration has run to completion.  Repeat bookkeeping
+  /// is handled by the outer ``evaluate`` wrapper.
+  private func evaluateSingleIteration(elapsed: Duration) -> Double? {
     switch curve {
     case .bezier(let solver, let duration):
       let durationSecs = Self.durationSeconds(duration)
       guard durationSecs > 0 else { return nil }
-      let timeFraction = Self.durationSeconds(adjustedElapsed) / durationSecs
+      let timeFraction = Self.durationSeconds(elapsed) / durationSecs
       if timeFraction >= 1.0 { return nil }
       return solver.progress(for: timeFraction)
 
     case .spring(let solver):
-      let t = Self.durationSeconds(adjustedElapsed)
+      let t = Self.durationSeconds(elapsed)
       guard let displacement = solver.value(at: t) else { return nil }
       // Spring returns displacement (1 -> 0), convert to progress (0 -> 1)
       return 1.0 - displacement
@@ -176,10 +226,37 @@ public struct Animation: Equatable, Hashable, Sendable {
     case .custom:
       // Custom animations evaluated via the CustomAnimation protocol
       // at the controller level. Return linear fallback here.
-      let t = Self.durationSeconds(adjustedElapsed)
+      let t = Self.durationSeconds(elapsed)
       if t >= 2.0 { return nil }
       return min(t / 0.5, 1.0)
     }
+  }
+
+  /// The nominal duration of one full iteration, used by the repeat
+  /// bookkeeping in ``evaluate(elapsed:)``.
+  ///
+  /// - Bezier: the explicit duration parameter.
+  /// - Spring: an estimated settle time — amplitude decay of `e^(-6.9)`
+  ///   ≈ 0.1% — with a floor of one natural oscillation period so very
+  ///   lightly damped springs still produce a meaningful cycle.
+  /// - Custom: 2 seconds, matching the linear fallback's completion
+  ///   time in ``evaluateSingleIteration``.
+  private var iterationDurationSeconds: Double {
+    switch curve {
+    case .bezier(_, let duration):
+      return Self.durationSeconds(duration)
+    case .spring(let solver):
+      let timeConstant = solver.dampingRatio * solver.naturalFrequency
+      let settle = timeConstant > 0 ? 6.9 / timeConstant : 1.0
+      let period = 2.0 * .pi / max(solver.naturalFrequency, 0.001)
+      return max(settle, period)
+    case .custom:
+      return 2.0
+    }
+  }
+
+  private static func duration(seconds: Double) -> Duration {
+    .milliseconds(Int64((seconds * 1000.0).rounded()))
   }
 
   private func adjustedTime(_ elapsed: Duration) -> Duration {
