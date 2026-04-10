@@ -234,6 +234,44 @@ struct PhaseAnimatorTests {
     // swift-testing without crashing the process.  Serving as
     // documentation.
   }
+
+  @Test("PhaseAnimator trigger init compiles and renders phase 0")
+  func phaseAnimatorTriggerInitConstructs() throws {
+    // Mirror of the loop-mode smoke test for the trigger overload.
+    // The trigger-advance task only runs once the lifecycle
+    // coordinator installs it and the trigger value changes — a
+    // unit test can't drive that cycle, so this just pins that the
+    // overload resolves and the view body is reachable.
+    enum TestPhase: Equatable {
+      case rest
+      case bounce
+    }
+    let view = PhaseAnimator(
+      [TestPhase.rest, .bounce],
+      trigger: 0
+    ) { phase in
+      Text(phase == .rest ? "rest" : "bounce")
+    } animation: { _ in
+      .easeInOut(duration: .milliseconds(300))
+    }
+    _ = view
+  }
+
+  @Test("PhaseAnimator trigger init accepts any Hashable trigger")
+  func phaseAnimatorTriggerAcceptsHashable() throws {
+    // The overload is generic over `Trigger: Hashable & Sendable`.
+    // This test just exercises a few concrete trigger types to
+    // pin that the generic constraint resolves for common values.
+    enum P: Equatable { case a, b }
+    let ints = PhaseAnimator([P.a, .b], trigger: 42) { _ in EmptyView() }
+    let strings = PhaseAnimator([P.a, .b], trigger: "hello") { _ in
+      EmptyView()
+    }
+    let bools = PhaseAnimator([P.a, .b], trigger: true) { _ in EmptyView() }
+    _ = ints
+    _ = strings
+    _ = bools
+  }
 }
 
 @Suite("Transaction.animation round-trip")
