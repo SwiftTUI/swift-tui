@@ -125,6 +125,146 @@ struct LinearCustomAnimation: CustomAnimation {
 }
 
 @MainActor
+@Suite("Animation end-to-end pipeline integration")
+struct AnimationPipelineIntegrationTests {
+  @Test(
+    "withAnimation color mutation enqueues an active animation through the pipeline"
+  )
+  func colorAnimationEnqueuesThroughFullPipeline() throws {
+    // Exercises the full render pipeline for an animated color
+    // change: resolve → animation → measure → place →
+    // applyPlacedOverlays → capturePlacedTree → semantics → draw
+    // → raster. The test has no testable clock so it cannot pin
+    // an exact interpolated colour, but it can assert that the
+    // controller observed the diff and transitioned into an active
+    // state (dominantActiveRequest != nil) after frame 2.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+
+    let animation = Animation.linear(duration: .milliseconds(500))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+
+    // Frame 1: text with red foreground, no animation intent.
+    _ = renderer.render(
+      Text("Hello").foregroundStyle(Color.red),
+      context: ResolveContext(identity: rootIdentity)
+    )
+    #expect(
+      controller.dominantActiveRequest() == nil,
+      "no animations should be in flight before the animated mutation"
+    )
+
+    // Frame 2: text with blue foreground under an explicit animate
+    // transaction.  The controller's diff path should enqueue an
+    // active animation for the foreground colour.
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    _ = renderer.render(
+      Text("Hello").foregroundStyle(Color.blue),
+      context: ResolveContext(
+        identity: rootIdentity,
+        transaction: transaction
+      )
+    )
+    #expect(
+      controller.dominantActiveRequest() != nil,
+      "controller must hold an active animation after the animated colour change"
+    )
+  }
+
+  @Test(
+    "transition.opacity insertion + removal flows through applyPlacedOverlays"
+  )
+  func transitionRemovalIsInjectedAtPlacedLevel() throws {
+    // Verifies the placed-level injection path (gap item 1): after
+    // a transition-marked leaf is removed, the next frame should
+    // re-inject it into the placed tree as a transient overlay
+    // without the layout engine running on the removed subtree.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+
+    let animation = Animation.linear(duration: .milliseconds(500))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+    let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+
+    // Manually register the transition against the controller, then
+    // seed the controller with a prior frame state by calling
+    // processResolvedTree and capturePlacedTree directly — this
+    // avoids needing a full view-layer transition modifier setup.
+    controller.beginTransitionCollection()
+    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+
+    // Seed: leaf present in the prior resolved + placed trees.
+    let leafResolved = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let priorResolved = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: [leafResolved]
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(priorResolved, transaction: .init(), timestamp: t0)
+
+    let priorPlaced = PlacedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      bounds: Rect(origin: .zero, size: Size(width: 10, height: 1)),
+      children: [
+        PlacedNode(
+          identity: leafIdentity,
+          kind: .view("Leaf"),
+          bounds: Rect(origin: .zero, size: Size(width: 5, height: 1))
+        )
+      ]
+    )
+    controller.capturePlacedTree(priorPlaced)
+
+    // Now remove the leaf under an animation intent — this should
+    // capture the placed snapshot and schedule a placed-level overlay.
+    let nextResolved = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: []
+    )
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      nextResolved,
+      transaction: transaction,
+      timestamp: t0.advanced(by: .milliseconds(1))
+    )
+
+    // Apply placed overlays to a fresh placed tree (no leaf present).
+    var livePlaced = PlacedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      bounds: Rect(origin: .zero, size: Size(width: 10, height: 1)),
+      children: []
+    )
+    controller.applyPlacedOverlays(
+      to: &livePlaced,
+      at: t0.advanced(by: .milliseconds(100))
+    )
+
+    // The removed leaf should now be back under root as a transient
+    // child, with bounds matching the cached frozen placed snapshot.
+    let overlay = livePlaced.children.first { $0.identity == leafIdentity }
+    #expect(overlay != nil, "removed leaf should be re-injected at placed level")
+    if let overlay {
+      #expect(overlay.isTransient, "placed overlay must be transient")
+      #expect(overlay.bounds.size.width == 5)
+      #expect(overlay.bounds.size.height == 1)
+    }
+  }
+}
+
+@MainActor
 @Suite("AnimationController property animations")
 struct AnimationControllerPropertyTests {
   @Test(
