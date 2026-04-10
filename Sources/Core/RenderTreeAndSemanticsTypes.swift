@@ -191,19 +191,61 @@ public struct ResolvedNode: Equatable, Sendable {
   /// side" so populated and legacy descriptors still match when their
   /// names agree, keeping the migration churn-free.
   package var typeDiscriminator: ObjectIdentifier?
+  /// Backing storage for ``children``.  Direct access is
+  /// package-scoped so animation tick frames can replace interpolated
+  /// children in place via ``setChildrenPreservingDerivedState(_:)``
+  /// without paying for preference/node-count/reuse recomputes on
+  /// every frame.  All external writes must go through the public
+  /// ``children`` setter, which keeps the derived state correct.
+  package var _storedChildren: [ResolvedNode]
   public var children: [ResolvedNode] {
-    didSet {
+    get { _storedChildren }
+    set {
+      _storedChildren = newValue
       recomputePreferenceValues()
       recomputeSubtreeNodeCount()
       recomputeSupportsRetainedReuse()
     }
   }
+
+  /// Package-only write path that skips the derived-state recomputes
+  /// triggered by the normal ``children`` setter.  Intended for
+  /// animation tick frames, where each child is replaced with an
+  /// interpolated copy that has the same shape — so the derived
+  /// subtree node count, preference aggregate, and retained-reuse bit
+  /// cannot change.
+  ///
+  /// If the replacement changes the child count, preference set, or
+  /// support-retained-reuse bit, use the normal setter instead — this
+  /// method makes no correctness guarantee for structural changes.
+  package mutating func setChildrenPreservingDerivedState(_ newChildren: [ResolvedNode]) {
+    _storedChildren = newChildren
+  }
   public var environmentSnapshot: EnvironmentSnapshot
   public var transactionSnapshot: TransactionSnapshot
+  /// Backing storage for ``layoutBehavior``.  Direct access is
+  /// package-scoped so animation tick frames can overwrite the
+  /// layout behavior with an interpolated copy without paying for
+  /// the ``recomputeSupportsRetainedReuse`` recompute, which is a
+  /// no-op for animation tick frames that only change numeric
+  /// dimensions within the same layout variant.
+  package var _storedLayoutBehavior: LayoutBehavior
   public var layoutBehavior: LayoutBehavior {
-    didSet {
+    get { _storedLayoutBehavior }
+    set {
+      _storedLayoutBehavior = newValue
       recomputeSupportsRetainedReuse()
     }
+  }
+
+  /// Package-only write path that skips the
+  /// ``recomputeSupportsRetainedReuse`` call fired by the normal
+  /// ``layoutBehavior`` setter.  Intended for animation tick frames
+  /// that mutate numeric dimensions within the same layout variant
+  /// (e.g. updating `.frame(width:)` or `.padding(_:)` without
+  /// changing the variant itself), where the reuse bit is stable.
+  package mutating func setLayoutBehaviorPreservingDerivedState(_ newBehavior: LayoutBehavior) {
+    _storedLayoutBehavior = newBehavior
   }
   public var layoutMetadata: LayoutMetadata
   public var drawMetadata: DrawMetadata {
@@ -241,10 +283,14 @@ public struct ResolvedNode: Equatable, Sendable {
     self.identity = identity
     self.kind = kind
     self.typeDiscriminator = nil
-    self.children = children
+    // Assign the backing stores directly — the computed setters would
+    // touch the derived stored properties (preferenceValues, etc.)
+    // which are not yet initialized at this point.  We run the
+    // derived-state computation once at the end of init.
+    self._storedChildren = children
     self.environmentSnapshot = environmentSnapshot
     self.transactionSnapshot = transactionSnapshot
-    self.layoutBehavior = layoutBehavior
+    self._storedLayoutBehavior = layoutBehavior
     self.layoutMetadata = layoutMetadata
     self._boxedDrawMetadata = Boxed(drawMetadata)
     self.semanticMetadata = semanticMetadata
@@ -278,10 +324,10 @@ public struct ResolvedNode: Equatable, Sendable {
     self.identity = identity
     self.kind = kind
     self.typeDiscriminator = typeDiscriminator
-    self.children = children
+    self._storedChildren = children
     self.environmentSnapshot = environmentSnapshot
     self.transactionSnapshot = transactionSnapshot
-    self.layoutBehavior = layoutBehavior
+    self._storedLayoutBehavior = layoutBehavior
     self.layoutMetadata = layoutMetadata
     self._boxedDrawMetadata = Boxed(drawMetadata)
     self.semanticMetadata = semanticMetadata
