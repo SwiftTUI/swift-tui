@@ -57,6 +57,8 @@ struct AnimationsTab: View {
       Divider()
       matchedGeometrySection
       Divider()
+      phaseAnimatorSection
+      Divider()
       completionSection
       Spacer(minLength: 0)
     }
@@ -287,11 +289,32 @@ struct AnimationsTab: View {
     }
   }
 
+  // MARK: - PhaseAnimator auto-cycling demo
+
+  private var phaseAnimatorSection: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("7. PhaseAnimator — auto-cycles through phases on its own")
+        .foregroundStyle(.muted)
+      PhaseAnimator([PhaseDemoPhase.red, .yellow, .green, .cyan]) { phase in
+        Text("●●●●●●●●●●●●●●●●")
+          .foregroundStyle(phase.color)
+          .offset(x: phase.offsetX, y: 0)
+      } animation: { phase in
+        switch phase {
+        case .red: .linear(duration: .milliseconds(600))
+        case .yellow: .easeInOut(duration: .milliseconds(600))
+        case .green: .spring(duration: .milliseconds(800), bounce: 0.3)
+        case .cyan: .easeInOut(duration: .milliseconds(600))
+        }
+      }
+    }
+  }
+
   // MARK: - withAnimation completion callback
 
   private var completionSection: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("7. withAnimation completion callback — fires once per batch drain")
+      Text("8. withAnimation completion callback — fires once per batch drain")
         .foregroundStyle(.muted)
       HStack(spacing: 2) {
         Button("run") {
@@ -313,6 +336,34 @@ struct AnimationsTab: View {
         .foregroundStyle(.muted)
       Text("██████████████████████")
         .foregroundStyle(completionAccent ? Color.magenta : Color.green)
+    }
+  }
+}
+
+/// Phase values used by the PhaseAnimator demo section.  Each
+/// phase pairs a color with an x-offset so the marker visibly
+/// cycles color and position together.
+enum PhaseDemoPhase: Equatable, Sendable {
+  case red
+  case yellow
+  case green
+  case cyan
+
+  var color: Color {
+    switch self {
+    case .red: .red
+    case .yellow: .yellow
+    case .green: .green
+    case .cyan: .cyan
+    }
+  }
+
+  var offsetX: Int {
+    switch self {
+    case .red: 0
+    case .yellow: 10
+    case .green: 20
+    case .cyan: 10
     }
   }
 }
