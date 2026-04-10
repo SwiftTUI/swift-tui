@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import Core
@@ -79,6 +80,18 @@ struct AnimationControllerSnapshotTests {
 
     let snapshot = AnimatableSnapshot.extract(from: node)
     #expect(snapshot.foregroundColor == Color.red)
+  }
+}
+
+final class FireCounter: Sendable {
+  private let storage = Atomic<Int>(0)
+
+  var count: Int {
+    storage.load(ordering: .relaxed)
+  }
+
+  func increment() {
+    storage.wrappingAdd(1, ordering: .relaxed)
   }
 }
 
@@ -197,6 +210,63 @@ struct AnimationControllerPropertyTests {
       interpolatedMax > 100 && interpolatedMax < 200,
       "maxWidth should interpolate between endpoints, got \(interpolatedMax)"
     )
+  }
+
+  @Test(
+    "withAnimation completion closure fires once the batch drains"
+  )
+  func completionClosureFiresOnBatchDrain() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(100))
+    controller.register(animation)
+
+    let batchID = AnimationBatchID(42)
+    let fireCount = FireCounter()
+    controller.registerCompletion(batchID: batchID) {
+      fireCount.increment()
+    }
+
+    let leafIdentity = Identity(components: [.named("leaf")])
+
+    // Frame 1: opacity 1.0.
+    var frame1Metadata = DrawMetadata()
+    frame1Metadata.baseStyle.explicitOpacity = 1.0
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame1Metadata
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Frame 2: opacity 0.0 under a batched animation.
+    var frame2Metadata = DrawMetadata()
+    frame2Metadata.baseStyle.explicitOpacity = 0.0
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame2Metadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    transaction.animationBatchID = batchID
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    // Halfway — closure must NOT have fired yet.
+    let halfway = t0.advanced(by: .milliseconds(50))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+    #expect(fireCount.count == 0)
+
+    // Past the end — closure should fire exactly once.
+    let past = t0.advanced(by: .milliseconds(200))
+    var frame3 = frame2
+    _ = controller.applyInterpolations(to: &frame3, at: past)
+    #expect(fireCount.count == 1)
+
+    // Further ticks on the empty batch should not double-fire.
+    var frame4 = frame3
+    _ = controller.applyInterpolations(to: &frame4, at: past.advanced(by: .milliseconds(50)))
+    #expect(fireCount.count == 1)
   }
 
   @Test(

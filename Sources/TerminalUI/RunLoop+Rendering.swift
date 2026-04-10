@@ -235,6 +235,7 @@ extension RunLoop {
     }
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
     transactionSnapshot.animationRequest = scheduledFrame.animationRequest
+    transactionSnapshot.animationBatchID = scheduledFrame.animationBatchID
     var context = ResolveContext(
       identity: rootIdentity,
       environment: environment,
