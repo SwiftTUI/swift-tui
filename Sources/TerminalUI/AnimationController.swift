@@ -66,6 +66,8 @@ package struct AnimatableSnapshot: Equatable, Sendable {
       ?? extractColor(from: node.environmentSnapshot.style.foregroundStyle)
     snapshot.backgroundColor =
       extractColor(from: node.drawMetadata.baseStyle.backgroundStyle)
+    snapshot.borderColor =
+      extractColor(from: node.drawMetadata.borderShapeStyle)
 
     // Layout-derived animatables
     switch node.layoutBehavior {
@@ -495,6 +497,16 @@ package final class AnimationController {
     )
     enqueueIfChanged(
       identity: identity,
+      property: .borderColor,
+      previous: previous.borderColor,
+      current: current.borderColor,
+      toValue: AnimatableValue.color,
+      fromValue: AnimatableValue.color,
+      request: request,
+      timestamp: timestamp
+    )
+    enqueueIfChanged(
+      identity: identity,
       property: .offsetX,
       previous: previous.offsetX,
       current: current.offsetX,
@@ -827,6 +839,11 @@ package final class AnimationController {
     case (.backgroundColor, .color(let color)):
       var drawMetadata = node.drawMetadata
       drawMetadata.baseStyle.backgroundStyle = .color(color)
+      node.drawMetadata = drawMetadata
+
+    case (.borderColor, .color(let color)):
+      var drawMetadata = node.drawMetadata
+      drawMetadata.borderShapeStyle = .color(color)
       node.drawMetadata = drawMetadata
 
     case (.offsetX, .integer(let x)):
