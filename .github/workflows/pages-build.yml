@@ -76,6 +76,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
 
@@ -97,7 +98,8 @@ jobs:
         working-directory: Examples/WebExample
         run: |
           set -euo pipefail
-          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
           bun install --frozen-lockfile
           bun run build
