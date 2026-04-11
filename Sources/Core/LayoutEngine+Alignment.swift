@@ -264,7 +264,7 @@ extension LayoutEngine {
             return nil
           }
         }
-      case .image, .list, .table, .shape, .rule, .none:
+      case .image, .list, .table, .shape, .rule, .canvas, .none:
         baseDimensions
       }
 
