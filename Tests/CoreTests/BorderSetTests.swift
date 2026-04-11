@@ -27,13 +27,30 @@ func borderSetPlacementDefault() {
   #expect(set.placement == .outset)
 }
 
-@Test("BorderSet is Equatable and Sendable")
+@Test("BorderSet is Equatable")
 func borderSetEquatable() {
   let a = BorderSet(
     top: "─", bottom: "─", left: "│", right: "│",
     topLeading: "┌", topTrailing: "┐",
     bottomLeading: "└", bottomTrailing: "┘"
   )
-  let b = a
+  let b = BorderSet(
+    top: "─", bottom: "─", left: "│", right: "│",
+    topLeading: "┌", topTrailing: "┐",
+    bottomLeading: "└", bottomTrailing: "┘"
+  )
+  let differentTop = BorderSet(
+    top: "━", bottom: "─", left: "│", right: "│",
+    topLeading: "┌", topTrailing: "┐",
+    bottomLeading: "└", bottomTrailing: "┘"
+  )
+  let differentPlacement = BorderSet(
+    top: "─", bottom: "─", left: "│", right: "│",
+    topLeading: "┌", topTrailing: "┐",
+    bottomLeading: "└", bottomTrailing: "┘",
+    placement: .inset
+  )
   #expect(a == b)
+  #expect(a != differentTop)
+  #expect(a != differentPlacement)
 }
