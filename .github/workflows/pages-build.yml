@@ -63,13 +63,12 @@ jobs:
               Darwin)
                 curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
                 installer -pkg swiftly.pkg -target CurrentUserHomeDirectory && \
-                ~/.swiftly/bin/swiftly init --quiet-shell-followup && \
-                . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
-                hash -r
+                ~/.swiftly/bin/swiftly init --quiet-shell-followup
                 ;;
               Linux)
-                curl -O https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz
-                tar zxf swiftly-$(uname -m).tar.gz
+                
+                curl -O https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz && \
+                tar zxf swiftly-$(uname -m).tar.gz && \
                 ./swiftly init --quiet-shell-followup
                 ;;
               *)
@@ -79,14 +78,7 @@ jobs:
             esac
           fi
 
-          # Ensure env.sh exists before sourcing
-          ENV_SH="${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
-          if [ ! -f "$ENV_SH" ]; then
-            echo "Warning: $ENV_SH not found, creating swiftly environment..."
-            "$HOME/.swiftly/bin/swiftly" init --quiet-shell-followup || true
-          fi
-          
-          . "$ENV_SH"
+          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh" && \
           hash -r
 
           if ! swiftly list | grep -q "6.3.0"; then
@@ -95,18 +87,18 @@ jobs:
           swiftly use 6.3.0
           swiftly run swift --version
 
-            - name: Install wasm Swift SDK used by WebExample
-              shell: bash
-              run: |
-                set -euo pipefail
-                . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
-                hash -r
+      - name: Install wasm Swift SDK used by WebExample
+        shell: bash
+        run: |
+          set -euo pipefail
+          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+          hash -r
 
-                if ! swiftly run swift sdk list | grep -q "swift-6.3-RELEASE_wasm"; then
-                  swiftly run swift sdk install \
-                    https://download.swift.org/swift-6.3-release/wasm-sdk/swift-6.3-RELEASE/swift-6.3-RELEASE_wasm.artifactbundle.tar.gz \
-                    --checksum 9fa4016ee632c7e9e906608ec3b55cf13dfc4dff44e47574c5af58064dc33fd9
-                fi
+          if ! swiftly run swift sdk list | grep -q "swift-6.3-RELEASE_wasm"; then
+            swiftly run swift sdk install \
+            https://download.swift.org/swift-6.3-release/wasm-sdk/swift-6.3-RELEASE/swift-6.3-RELEASE_wasm.artifactbundle.tar.gz \
+            --checksum 9fa4016ee632c7e9e906608ec3b55cf13dfc4dff44e47574c5af58064dc33fd9
+          fi
 
       - name: Install Bun workspace deps
         shell: bash
