@@ -50,3 +50,15 @@ public struct BorderSet: Equatable, Sendable {
     self.placement = placement
   }
 }
+
+extension BorderSet {
+  public var topDisplayWidth: Int { Self.maxCellWidth(of: top) }
+  public var bottomDisplayWidth: Int { Self.maxCellWidth(of: bottom) }
+  public var leftDisplayWidth: Int { Self.maxCellWidth(of: left) }
+  public var rightDisplayWidth: Int { Self.maxCellWidth(of: right) }
+
+  private static func maxCellWidth(of edge: String) -> Int {
+    guard !edge.isEmpty else { return 0 }
+    return edge.reduce(0) { max($0, cellWidth(of: $1)) }
+  }
+}

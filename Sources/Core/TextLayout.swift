@@ -871,7 +871,7 @@ private func isWordLikeScalar(_ scalar: Unicode.Scalar) -> Bool {
   }
 }
 
-private func cellWidth(of character: Character) -> Int {
+package func cellWidth(of character: Character) -> Int {
   let scalars = Array(character.unicodeScalars)
   guard !scalars.isEmpty else {
     return 0
