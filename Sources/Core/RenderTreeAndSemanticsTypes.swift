@@ -929,11 +929,19 @@ public indirect enum DrawCommand: Equatable, Sendable {
   /// frame, including the reserved border rows/cols — the rasterizer
   /// inset this by the border set's per-side display widths to compute
   /// the interior (content) region that the border surrounds.
+  ///
+  /// When `blend` is non-nil the rasterizer ignores the per-side
+  /// `foreground` and instead samples a color for every perimeter cell
+  /// from ``BorderBlend/samplePerimeter(width:height:phase:)``, walking
+  /// the cells clockwise.  `blendPhase` rotates the gradient start
+  /// point around the perimeter for chasing-light animation.
   case border(
     bounds: Rect,
     set: BorderSet,
     foreground: BorderEdgeStyle?,
     background: BorderBackgroundStyle?,
+    blend: BorderBlend?,
+    blendPhase: Double,
     sides: Edge.Set
   )
   case clip(bounds: Rect, child: DrawCommand)

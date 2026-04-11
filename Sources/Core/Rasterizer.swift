@@ -453,12 +453,22 @@ extension Rasterizer {
           cells: &cells,
           clip: frame.clip
         )
-      case .border(let bounds, let set, let foreground, let background, let sides):
+      case .border(
+        let bounds,
+        let set,
+        let foreground,
+        let background,
+        let blend,
+        let blendPhase,
+        let sides
+      ):
         drawLayoutBorder(
           in: bounds,
           set: set,
           foreground: foreground,
           background: background,
+          blend: blend,
+          blendPhase: blendPhase,
           sides: sides,
           environment: environment,
           cells: &cells,
@@ -1058,6 +1068,8 @@ extension Rasterizer {
     set: BorderSet,
     foreground: BorderEdgeStyle?,
     background: BorderBackgroundStyle?,
+    blend: BorderBlend?,
+    blendPhase: Double,
     sides: Edge.Set,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
@@ -1079,9 +1091,25 @@ extension Rasterizer {
       return
     }
 
+    // Perimeter-sampled colors override per-side foregrounds when a
+    // ``BorderBlend`` is attached.  We sample once for the whole outer
+    // rect and look up by clockwise perimeter index per cell below.
+    let perimeterColors: [Color]?
+    if let blend {
+      let samples = blend.samplePerimeter(
+        width: outer.size.width,
+        height: outer.size.height,
+        phase: blendPhase
+      )
+      perimeterColors = samples.isEmpty ? nil : samples
+    } else {
+      perimeterColors = nil
+    }
+
     // Pre-resolve per-side foreground colors so we don't re-run the
     // shape-style resolver once per cell.  A nil per-side color falls
-    // back to the theme foreground at draw time.
+    // back to the theme foreground at draw time.  When a perimeter
+    // blend is active these are unused (the per-cell lookup wins).
     let topForeground = resolvedBorderSideColor(
       foreground?.foregroundStyle(for: .top),
       environment: environment,
@@ -1152,10 +1180,18 @@ extension Rasterizer {
         guard x + glyphWidth <= endX else {
           break
         }
+        let cellForeground =
+          perimeterColor(
+            atLocalX: x - outer.origin.x,
+            localY: y - outer.origin.y,
+            width: outer.size.width,
+            height: outer.size.height,
+            perimeter: perimeterColors
+          ) ?? topForeground ?? environment.theme.foreground
         writeBorderGlyph(
           character,
           width: glyphWidth,
-          foreground: topForeground ?? environment.theme.foreground,
+          foreground: cellForeground,
           background: topBackground,
           atX: x,
           y: y,
@@ -1182,10 +1218,18 @@ extension Rasterizer {
         guard x + glyphWidth <= endX else {
           break
         }
+        let cellForeground =
+          perimeterColor(
+            atLocalX: x - outer.origin.x,
+            localY: y - outer.origin.y,
+            width: outer.size.width,
+            height: outer.size.height,
+            perimeter: perimeterColors
+          ) ?? bottomForeground ?? environment.theme.foreground
         writeBorderGlyph(
           character,
           width: glyphWidth,
-          foreground: bottomForeground ?? environment.theme.foreground,
+          foreground: cellForeground,
           background: bottomBackground,
           atX: x,
           y: y,
@@ -1212,10 +1256,18 @@ extension Rasterizer {
         guard let character = set.leftGlyph(at: glyphIndex) else {
           break
         }
+        let cellForeground =
+          perimeterColor(
+            atLocalX: x - outer.origin.x,
+            localY: y - outer.origin.y,
+            width: outer.size.width,
+            height: outer.size.height,
+            perimeter: perimeterColors
+          ) ?? leftForeground ?? environment.theme.foreground
         writeBorderGlyph(
           character,
           width: leftWidth,
-          foreground: leftForeground ?? environment.theme.foreground,
+          foreground: cellForeground,
           background: leftBackground,
           atX: x,
           y: y,
@@ -1241,10 +1293,18 @@ extension Rasterizer {
         guard let character = set.rightGlyph(at: glyphIndex) else {
           break
         }
+        let cellForeground =
+          perimeterColor(
+            atLocalX: x - outer.origin.x,
+            localY: y - outer.origin.y,
+            width: outer.size.width,
+            height: outer.size.height,
+            perimeter: perimeterColors
+          ) ?? rightForeground ?? environment.theme.foreground
         writeBorderGlyph(
           character,
           width: rightWidth,
-          foreground: rightForeground ?? environment.theme.foreground,
+          foreground: cellForeground,
           background: rightBackground,
           atX: x,
           y: y,
@@ -1258,52 +1318,177 @@ extension Rasterizer {
 
     // Corner glyphs.  Lipgloss semantics: corners inherit the adjacent
     // horizontal edge's color (top for top corners, bottom for bottom
-    // corners).
+    // corners).  When a perimeter blend is active each corner instead
+    // takes the perimeter-array color for its cell position.
     if topWidth > 0 && leftWidth > 0 {
+      let cornerX = outer.origin.x
+      let cornerY = outer.origin.y
+      let cornerForeground =
+        perimeterColor(
+          atLocalX: cornerX - outer.origin.x,
+          localY: cornerY - outer.origin.y,
+          width: outer.size.width,
+          height: outer.size.height,
+          perimeter: perimeterColors
+        ) ?? topForeground ?? environment.theme.foreground
       writeBorderGlyphs(
         set.topLeading,
-        atX: outer.origin.x,
-        y: outer.origin.y,
-        foreground: topForeground ?? environment.theme.foreground,
+        atX: cornerX,
+        y: cornerY,
+        foreground: cornerForeground,
         background: topBackground,
         cells: &cells,
         clip: clip
       )
     }
     if topWidth > 0 && rightWidth > 0 {
+      let cornerX = outer.origin.x + outer.size.width - rightWidth
+      let cornerY = outer.origin.y
+      let cornerForeground =
+        perimeterColor(
+          atLocalX: cornerX - outer.origin.x,
+          localY: cornerY - outer.origin.y,
+          width: outer.size.width,
+          height: outer.size.height,
+          perimeter: perimeterColors
+        ) ?? topForeground ?? environment.theme.foreground
       writeBorderGlyphs(
         set.topTrailing,
-        atX: outer.origin.x + outer.size.width - rightWidth,
-        y: outer.origin.y,
-        foreground: topForeground ?? environment.theme.foreground,
+        atX: cornerX,
+        y: cornerY,
+        foreground: cornerForeground,
         background: topBackground,
         cells: &cells,
         clip: clip
       )
     }
     if bottomWidth > 0 && leftWidth > 0 {
+      let cornerX = outer.origin.x
+      let cornerY = outer.origin.y + outer.size.height - 1
+      let cornerForeground =
+        perimeterColor(
+          atLocalX: cornerX - outer.origin.x,
+          localY: cornerY - outer.origin.y,
+          width: outer.size.width,
+          height: outer.size.height,
+          perimeter: perimeterColors
+        ) ?? bottomForeground ?? environment.theme.foreground
       writeBorderGlyphs(
         set.bottomLeading,
-        atX: outer.origin.x,
-        y: outer.origin.y + outer.size.height - 1,
-        foreground: bottomForeground ?? environment.theme.foreground,
+        atX: cornerX,
+        y: cornerY,
+        foreground: cornerForeground,
         background: bottomBackground,
         cells: &cells,
         clip: clip
       )
     }
     if bottomWidth > 0 && rightWidth > 0 {
+      let cornerX = outer.origin.x + outer.size.width - rightWidth
+      let cornerY = outer.origin.y + outer.size.height - 1
+      let cornerForeground =
+        perimeterColor(
+          atLocalX: cornerX - outer.origin.x,
+          localY: cornerY - outer.origin.y,
+          width: outer.size.width,
+          height: outer.size.height,
+          perimeter: perimeterColors
+        ) ?? bottomForeground ?? environment.theme.foreground
       writeBorderGlyphs(
         set.bottomTrailing,
-        atX: outer.origin.x + outer.size.width - rightWidth,
-        y: outer.origin.y + outer.size.height - 1,
-        foreground: bottomForeground ?? environment.theme.foreground,
+        atX: cornerX,
+        y: cornerY,
+        foreground: cornerForeground,
         background: bottomBackground,
         cells: &cells,
         clip: clip
       )
     }
 
+  }
+
+  /// Maps a cell at local coordinates `(localX, localY)` inside an
+  /// `(width × height)` rectangle to its position in the clockwise
+  /// perimeter walk used by ``BorderBlend/samplePerimeter(width:height:phase:)``.
+  ///
+  /// The walk visits cells in this order:
+  ///   top edge L→R, right edge T→B (excluding the top-right corner),
+  ///   bottom edge R→L (excluding the bottom-right corner), left edge
+  ///   B→T (excluding the bottom-left and top-left corners).
+  ///
+  /// Returns nil for non-perimeter (interior) cells, for out-of-range
+  /// coordinates, or when no perimeter colors are available.
+  private func perimeterColor(
+    atLocalX localX: Int,
+    localY: Int,
+    width: Int,
+    height: Int,
+    perimeter: [Color]?
+  ) -> Color? {
+    guard let perimeter, !perimeter.isEmpty else {
+      return nil
+    }
+    guard
+      let index = perimeterIndex(
+        localX: localX,
+        localY: localY,
+        width: width,
+        height: height
+      )
+    else {
+      return nil
+    }
+    let total = perimeter.count
+    let normalized = ((index % total) + total) % total
+    return perimeter[normalized]
+  }
+
+  /// Returns the clockwise perimeter index for `(localX, localY)` in a
+  /// rectangle of size `(width × height)`, or nil if the cell is not on
+  /// the perimeter or the inputs are degenerate.
+  ///
+  /// Walk order (matching ``BorderBlend/samplePerimeter(width:height:phase:)``):
+  ///   1. Top edge L→R: indices `[0, width)`.
+  ///   2. Right column T→B (excluding TR corner): indices `[width, width + h - 1)`.
+  ///   3. Bottom row R→L (excluding BR corner): indices
+  ///      `[width + h - 1, 2*width + h - 2)`.
+  ///   4. Left column B→T (excluding BL and TL corners): indices
+  ///      `[2*width + h - 2, 2*width + 2*h - 4)`.
+  ///
+  /// Hand-traced against a 4×3 fixture (10 perimeter cells):
+  ///   (0,0)=0 (1,0)=1 (2,0)=2 (3,0)=3   ← top
+  ///   (3,1)=4 (3,2)=5                   ← right (excl. TR)
+  ///   (2,2)=6 (1,2)=7 (0,2)=8           ← bottom (excl. BR)
+  ///   (0,1)=9                           ← left (excl. BL+TL)
+  private func perimeterIndex(
+    localX: Int,
+    localY: Int,
+    width: Int,
+    height: Int
+  ) -> Int? {
+    guard width > 0, height > 0 else { return nil }
+    guard localX >= 0, localX < width, localY >= 0, localY < height else { return nil }
+    if width == 1 && height == 1 {
+      return 0
+    }
+    // Top edge wins for y == 0 (handles the height == 1 row case too).
+    if localY == 0 {
+      return localX
+    }
+    // Right column for x == width - 1, y >= 1.
+    if localX == width - 1 {
+      return width + (localY - 1)
+    }
+    // Bottom row R→L for y == height - 1, x < width - 1.
+    if localY == height - 1 {
+      return 2 * width + height - 3 - localX
+    }
+    // Left column B→T for x == 0, 1 <= y <= height - 2.
+    if localX == 0 {
+      return 2 * width + 2 * height - 4 - localY
+    }
+    // Interior cell — not on the perimeter.
+    return nil
   }
 
   /// Eagerly resolves a border side's foreground/background style into a
