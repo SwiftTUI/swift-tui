@@ -131,6 +131,33 @@ extension LayoutEngine {
           passContext: passContext
         )
       ]
+    case .border(let set, _, _, _, _, let sides):
+      guard let childMeasurement = measured.childMeasurements.first,
+        let child = resolved.children.first
+      else {
+        return []
+      }
+
+      let insets = borderLayoutInsets(set: set, sides: sides)
+      let childBounds = Rect(
+        origin: Point(
+          x: bounds.origin.x + insets.leading,
+          y: bounds.origin.y + insets.top
+        ),
+        size: Size(
+          width: max(0, bounds.size.width - insets.horizontal),
+          height: max(0, bounds.size.height - insets.vertical)
+        )
+      )
+
+      return [
+        place(
+          child,
+          measured: childMeasurement,
+          in: childBounds,
+          passContext: passContext
+        )
+      ]
     case .frame(_, _, let alignment), .flexibleFrame(_, _, _, _, _, _, let alignment):
       guard let childMeasurement = measured.childMeasurements.first,
         let child = resolved.children.first
@@ -702,8 +729,8 @@ extension LayoutEngine {
       return .control
     }
     switch resolved.layoutBehavior {
-    case .stack, .lazyStack, .overlay, .padding, .frame, .offset, .position, .flexibleFrame,
-      .decoration, .viewThatFits, .custom:
+    case .stack, .lazyStack, .overlay, .padding, .border, .frame, .offset, .position,
+      .flexibleFrame, .decoration, .viewThatFits, .custom:
       return .container
     case .intrinsic:
       return .generic

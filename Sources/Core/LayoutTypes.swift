@@ -15,6 +15,34 @@ public enum LayoutBehavior: Sendable {
   )
   case overlay(alignment: Alignment)
   case padding(EdgeInsets)
+  /// A border that reserves layout insets for its own glyphs.
+  ///
+  /// For `.outset` and `.decorative` placements the layout engine
+  /// treats this like a `.padding` whose insets are derived from the
+  /// border set's per-side display widths (masked by `sides`), so the
+  /// child's content is never occluded by border glyphs.  For `.inset`
+  /// placements the border contributes no layout space — glyphs will be
+  /// painted into the view's outermost cells by the rasterizer.
+  ///
+  /// The styling payload (`foreground`, `background`, `blend`,
+  /// `blendPhase`) passes through the layout pass untouched and is
+  /// consumed later by the rasterizer.  See §4.7 of
+  /// `SHAPE_AND_BORDER_APIS.md` for the full design.
+  ///
+  /// Marked `indirect` so the aggregate payload (BorderSet +
+  /// BorderEdgeStyle + BorderBackgroundStyle + BorderBlend + sides)
+  /// stays behind a single pointer inside the enum discriminant;
+  /// unboxed, this case would balloon ``LayoutBehavior`` past 1.6 kB
+  /// and overflow the stack during deep recursive tree traversals
+  /// (see the 1024-deep ResolvedNode regression tests).
+  indirect case border(
+    BorderSet,
+    foreground: BorderEdgeStyle?,
+    background: BorderBackgroundStyle?,
+    blend: BorderBlend?,
+    blendPhase: Double,
+    sides: Edge.Set
+  )
   case frame(width: Int?, height: Int?, alignment: Alignment)
   case offset(x: Int, y: Int)
   /// Positions the content so its center lands at `(x, y)` in the
@@ -59,6 +87,22 @@ extension LayoutBehavior: Equatable {
         && lhsVerticalAlignment == rhsVerticalAlignment
     case (.padding(let lhsInsets), .padding(let rhsInsets)):
       return lhsInsets == rhsInsets
+    case (
+      .border(
+        let lhsSet, let lhsFg, let lhsBg,
+        let lhsBlend, let lhsPhase, let lhsSides
+      ),
+      .border(
+        let rhsSet, let rhsFg, let rhsBg,
+        let rhsBlend, let rhsPhase, let rhsSides
+      )
+    ):
+      return lhsSet == rhsSet
+        && lhsFg == rhsFg
+        && lhsBg == rhsBg
+        && lhsBlend == rhsBlend
+        && lhsPhase == rhsPhase
+        && lhsSides == rhsSides
     case (
       .frame(let lhsWidth, let lhsHeight, let lhsAlignment),
       .frame(let rhsWidth, let rhsHeight, let rhsAlignment)
