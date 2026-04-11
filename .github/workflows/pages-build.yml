@@ -64,12 +64,13 @@ jobs:
         run: |
           set -euo pipefail
           if ! command -v swiftly >/dev/null 2>&1 && [ ! -x "$HOME/.swiftly/bin/swiftly" ]; then
-            curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
-            installer -pkg swiftly.pkg -target CurrentUserHomeDirectory && \
-            ~/.swiftly/bin/swiftly init --quiet-shell-followup
-            . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
-            hash -r
+                curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
+                installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
           fi
+
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup && \
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
+          hash -r
 
           if ! swiftly list | grep -q "6.3.0"; then
             swiftly install 6.3.0
@@ -81,11 +82,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v swiftly >/dev/null 2>&1 && [ ! -x "$HOME/.swiftly/bin/swiftly" ]; then
-            ~/.swiftly/bin/swiftly init --quiet-shell-followup
-            . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
-            hash -r
-          fi
+
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup && \
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
+          hash -r
 
           if ! swiftly run swift sdk list | grep -q "swift-6.3-RELEASE_wasm"; then
             swiftly run swift sdk install \
@@ -103,11 +103,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v swiftly >/dev/null 2>&1 && [ ! -x "$HOME/.swiftly/bin/swiftly" ]; then
-            ~/.swiftly/bin/swiftly init --quiet-shell-followup
-            . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
-            hash -r
-          fi
+
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup && \
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
+          hash -r
 
           echo "PATH=$PATH"
           uname -a
@@ -141,11 +140,11 @@ jobs:
         working-directory: Examples/WebExample
         run: |
           set -euo pipefail
-          if ! command -v swiftly >/dev/null 2>&1 && [ ! -x "$HOME/.swiftly/bin/swiftly" ]; then
-            ~/.swiftly/bin/swiftly init --quiet-shell-followup
-            . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
-            hash -r
-          fi
+
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup && \
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
+          hash -r
+
           bun install --frozen-lockfile
           bun run build
 
