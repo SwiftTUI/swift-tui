@@ -669,6 +669,27 @@ public struct PlacedNode: Equatable, Sendable {
   public var semanticMetadata: SemanticMetadata
   public var lifecycleMetadata: LifecycleMetadata
   public var drawPayload: DrawPayload
+  /// Mirror of ``ResolvedNode/layoutBehavior`` for cases that need to
+  /// flow through to the draw extractor / rasterizer (currently just
+  /// ``LayoutBehavior/border(_:foreground:background:blend:blendPhase:sides:)``).
+  ///
+  /// Boxed and optional on purpose — storing a bare `LayoutBehavior`
+  /// inline would grow ``PlacedNode`` by ~1.6 kB per node (because
+  /// `LayoutBehavior` has non-indirect large cases like `.stack` and
+  /// `.flexibleFrame`) and recursively destroying deep trees would
+  /// then overflow the thread stack.  `nil` is the common case: only
+  /// border wrappers actually populate this field.
+  package var _boxedLayoutBehavior: Boxed<LayoutBehavior>?
+  public var layoutBehavior: LayoutBehavior {
+    get { _boxedLayoutBehavior?.value ?? .intrinsic }
+    set {
+      if case .intrinsic = newValue {
+        _boxedLayoutBehavior = nil
+      } else {
+        _boxedLayoutBehavior = Boxed(newValue)
+      }
+    }
+  }
   package private(set) var subtreeNodeCount: Int
   /// Mirror of ``ResolvedNode/isTransient``.  Set by the animation
   /// controller's removal-overlay injection path, propagated through
@@ -697,6 +718,7 @@ public struct PlacedNode: Equatable, Sendable {
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
+    layoutBehavior: LayoutBehavior = .intrinsic,
     isTransient: Bool = false,
     matchedGeometry: MatchedGeometryConfig? = nil
   ) {
@@ -714,6 +736,11 @@ public struct PlacedNode: Equatable, Sendable {
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
+    if case .intrinsic = layoutBehavior {
+      _boxedLayoutBehavior = nil
+    } else {
+      _boxedLayoutBehavior = Boxed(layoutBehavior)
+    }
     self.isTransient = isTransient
     self.matchedGeometry = matchedGeometry
     subtreeNodeCount = 1
@@ -896,6 +923,27 @@ public indirect enum DrawCommand: Equatable, Sendable {
     backgroundStyle: BorderBackgroundStyle? = nil
   )
   case rule(bounds: Rect, style: AnyShapeStyle, strokeStyle: StrokeStyle, stackAxis: Axis?)
+  /// A layout-reserved border drawn by the rasterizer into the cells
+  /// that ``LayoutBehavior/border(_:foreground:background:blend:blendPhase:sides:)``
+  /// reserved during layout.  The outer `bounds` is the full wrapper
+  /// frame, including the reserved border rows/cols — the rasterizer
+  /// inset this by the border set's per-side display widths to compute
+  /// the interior (content) region that the border surrounds.
+  ///
+  /// When `blend` is non-nil the rasterizer ignores the per-side
+  /// `foreground` and instead samples a color for every perimeter cell
+  /// from ``BorderBlend/samplePerimeter(width:height:phase:)``, walking
+  /// the cells clockwise.  `blendPhase` rotates the gradient start
+  /// point around the perimeter for chasing-light animation.
+  case border(
+    bounds: Rect,
+    set: BorderSet,
+    foreground: BorderEdgeStyle?,
+    background: BorderBackgroundStyle?,
+    blend: BorderBlend?,
+    blendPhase: Double,
+    sides: Edge.Set
+  )
   case clip(bounds: Rect, child: DrawCommand)
 }
 
@@ -907,6 +955,12 @@ public struct DrawNode: Equatable, Sendable {
   public var clipBounds: Rect?
   public var metadata: DrawMetadata
   public var commands: [DrawCommand]
+  /// Commands that must paint **after** this node's children have been
+  /// fully painted.  Used by features that overdraw their children, such
+  /// as inset-placement borders whose edge glyphs occupy the outermost
+  /// cells of the child's frame and must therefore win the paint order
+  /// against the child's own content.  Most nodes leave this empty.
+  public var postCommands: [DrawCommand]
   public var children: [DrawNode] {
     didSet {
       recomputeSubtreeNodeCount()
@@ -921,6 +975,7 @@ public struct DrawNode: Equatable, Sendable {
     clipBounds: Rect? = nil,
     metadata: DrawMetadata = .init(),
     commands: [DrawCommand] = [],
+    postCommands: [DrawCommand] = [],
     children: [DrawNode] = []
   ) {
     self.identity = identity
@@ -929,6 +984,7 @@ public struct DrawNode: Equatable, Sendable {
     self.clipBounds = clipBounds
     self.metadata = metadata
     self.commands = commands
+    self.postCommands = postCommands
     self.children = children
     subtreeNodeCount = 1
     recomputeSubtreeNodeCount()

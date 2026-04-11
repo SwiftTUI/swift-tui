@@ -272,6 +272,39 @@ extension DrawExtractor {
       )
     }
 
+    // Inset-placement border commands must paint AFTER the child's own
+    // content, because their edge glyphs overdraw the outermost rows and
+    // columns of the child's frame.  Outset and decorative placements do
+    // not overlap the child (outset grows the outer frame, decorative
+    // draws on the outer frame which is outside the child's bounds) and
+    // can safely paint before children.  Route inset borders into
+    // `postCommands` so the rasterizer's paint walk visits them after
+    // the subtree has been fully drawn.
+    var postCommands: [DrawCommand] = []
+    if case .border(
+      let set,
+      let foreground,
+      let background,
+      let blend,
+      let blendPhase,
+      let sides
+    ) = placed.layoutBehavior {
+      let borderCommand: DrawCommand = .border(
+        bounds: bounds,
+        set: set,
+        foreground: foreground,
+        background: background,
+        blend: blend,
+        blendPhase: blendPhase,
+        sides: sides
+      )
+      if set.placement == .inset {
+        postCommands.append(borderCommand)
+      } else {
+        commands.append(borderCommand)
+      }
+    }
+
     return DrawNode(
       identity: identity,
       environmentSnapshot: environmentSnapshot,
@@ -284,6 +317,7 @@ extension DrawExtractor {
         inheritedBorderMask: inheritedBorderMask,
         isInBackgroundSubtree: isInBackgroundSubtree
       ),
+      postCommands: postCommands,
       children: childNodes
     )
   }

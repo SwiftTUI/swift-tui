@@ -111,41 +111,87 @@ extension View {
     }
   }
 
+  /// Draws a border around this view.
+  ///
+  /// The border lives **outside** the view's content frame for outset
+  /// and decorative border sets — the wrapped view grows by the border
+  /// set's per-side display widths so that content is never occluded.
+  /// For `.inset` border sets the frame stays the same and glyphs are
+  /// drawn into the outermost child cells.
   public func border<S: ShapeStyle>(
-    _ style: S,
-    width: Int = 1
+    _ style: S = SemanticShapeStyle.foreground,
+    set: BorderSet = .outerHalfBlock,
+    sides: Edge.Set = .all
   ) -> some View {
-    border(
-      style,
-      width: width,
-      background: nil as BorderBackgroundStyle?
+    borderModified(
+      set: set,
+      foreground: BorderEdgeStyle(AnyShapeStyle(style)),
+      background: nil,
+      blend: nil,
+      blendPhase: 0,
+      sides: sides
     )
   }
 
-  public func border<S: ShapeStyle, B: ShapeStyle>(
-    _ style: S,
-    width: Int = 1,
-    background backgroundStyle: B
+  /// Draws a border around this view using a per-side foreground style.
+  public func border(
+    _ style: BorderEdgeStyle,
+    set: BorderSet = .outerHalfBlock,
+    sides: Edge.Set = .all
   ) -> some View {
-    border(
-      style,
-      width: width,
-      background: BorderBackgroundStyle(backgroundStyle)
+    borderModified(
+      set: set,
+      foreground: style,
+      background: nil,
+      blend: nil,
+      blendPhase: 0,
+      sides: sides
     )
   }
 
-  public func border<S: ShapeStyle>(
-    _ style: S,
-    width: Int = 1,
-    background backgroundStyle: BorderBackgroundStyle?
+  /// Draws a border whose foreground color is sampled continuously
+  /// around the perimeter from a ``BorderBlend``.
+  ///
+  /// The blend's stops are interpolated as the rasterizer walks the
+  /// rectangle's edges clockwise (top L→R, right T→B, bottom R→L,
+  /// left B→T).  The `phase` parameter shifts the gradient start point
+  /// around the perimeter, enabling chasing-light animation: changing
+  /// `phase` inside `withAnimation { … }` drives the pipeline's
+  /// animation controller to interpolate the phase smoothly frame by
+  /// frame.
+  public func border(
+    blend: BorderBlend,
+    set: BorderSet = .outerHalfBlock,
+    sides: Edge.Set = .all,
+    phase: Double = 0
   ) -> some View {
-    overlay {
-      Rectangle().strokeBorder(
-        style,
-        style: .init(lineWidth: width),
-        background: backgroundStyle
-      )
-    }
+    borderModified(
+      set: set,
+      foreground: nil,
+      background: nil,
+      blend: blend,
+      blendPhase: phase,
+      sides: sides
+    )
+  }
+
+  private func borderModified(
+    set: BorderSet,
+    foreground: BorderEdgeStyle?,
+    background: BorderBackgroundStyle?,
+    blend: BorderBlend?,
+    blendPhase: Double,
+    sides: Edge.Set
+  ) -> some View {
+    BorderView(
+      content: erasedToAnyView,
+      set: set,
+      foreground: foreground,
+      background: background,
+      blend: blend,
+      blendPhase: blendPhase,
+      sides: sides
+    )
   }
 
   public func underline(

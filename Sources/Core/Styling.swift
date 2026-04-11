@@ -153,11 +153,52 @@ public struct LinearGradient: ShapeStyle, Equatable, Sendable {
   }
 }
 
+/// A radial gradient between a start and end radius, centered at a unit
+/// point in the shape's bounds.
+public struct RadialGradient: ShapeStyle, Equatable, Sendable {
+  public var gradient: Gradient
+  public var center: Alignment
+  public var startRadius: Double
+  public var endRadius: Double
+
+  public init(
+    gradient: Gradient,
+    center: Alignment,
+    startRadius: Double,
+    endRadius: Double
+  ) {
+    self.gradient = gradient
+    self.center = center
+    self.startRadius = startRadius
+    self.endRadius = endRadius
+  }
+
+  public init(
+    colors: [Color],
+    center: Alignment = .center,
+    startRadius: Double = 0,
+    endRadius: Double
+  ) {
+    self.init(
+      gradient: Gradient(colors: colors),
+      center: center,
+      startRadius: startRadius,
+      endRadius: endRadius
+    )
+  }
+
+  public func eraseToAnyShapeStyle() -> AnyShapeStyle {
+    .radialGradient(self)
+  }
+}
+
 /// Type-erased wrapper for any supported shape style.
 public enum AnyShapeStyle: Equatable, Sendable {
   case semantic(SemanticStyleRole)
   case color(Color)
   case linearGradient(LinearGradient)
+  case radialGradient(RadialGradient)
+  case patternFill(PatternFill)
   case terminalChrome(TerminalChromeStyle)
   indirect case opacity(AnyShapeStyle, Double)
 
@@ -187,6 +228,24 @@ extension ShapeStyle {
           gradient: .init(stops: fadedStops),
           startPoint: gradient.startPoint,
           endPoint: gradient.endPoint
+        ))
+    case .radialGradient(let gradient):
+      let fadedStops = gradient.gradient.stops.map {
+        Gradient.Stop(color: $0.color.opacity(clamped), location: $0.location)
+      }
+      return .radialGradient(
+        .init(
+          gradient: .init(stops: fadedStops),
+          center: gradient.center,
+          startRadius: gradient.startRadius,
+          endRadius: gradient.endRadius
+        ))
+    case .patternFill(let pattern):
+      return .patternFill(
+        PatternFill(
+          glyph: pattern.glyph,
+          foreground: pattern.foreground.opacity(clamped),
+          background: pattern.background.map { $0.opacity(clamped) }
         ))
     case let style:
       // Semantic/chrome styles can't carry alpha until resolved —
@@ -594,6 +653,9 @@ public enum ShapeFillMode: Equatable, Sendable {
 public enum ShapeGeometry: Equatable, Sendable {
   case rectangle
   case roundedRectangle(cornerRadius: Int)
+  case circle
+  case ellipse
+  case capsule
 }
 
 /// The draw operation applied to a shape geometry.
@@ -816,6 +878,16 @@ private func resolveStyleColorResult(
       return .failure(.emptyGradient)
     }
     return .success(firstColor)
+  case .radialGradient(let gradient):
+    guard let firstColor = gradient.gradient.stops.first?.color else {
+      return .failure(.emptyGradient)
+    }
+    return .success(firstColor)
+  case .patternFill(let pattern):
+    // The foreground color is the resolved scalar color for pattern
+    // fills — the rasterizer handles the glyph and optional
+    // background separately when painting.
+    return .success(pattern.foreground)
   case .terminalChrome(let chromeStyle):
     return resolveStyleColorResult(
       style: theme.resolvedStyle(

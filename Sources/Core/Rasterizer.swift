@@ -4,6 +4,8 @@ public struct Rasterizer {
   private enum ResolvedShapeColorMode {
     case constant(Color?)
     case sampled(LinearGradient)
+    case sampledRadial(RadialGradient)
+    case pattern(PatternFill)
   }
 
   public init() {}
@@ -128,53 +130,90 @@ extension Rasterizer {
     clip: Rect?,
     dirtyRows: Set<Int>?
   ) {
-    struct Frame {
-      let node: DrawNode
-      let clip: Rect?
+    // Two frame kinds.  A `.visit` frame paints the node's `commands`
+    // (pre-child commands) and then pushes its children plus, if the
+    // node has any `postCommands`, a `.post` frame on top of those
+    // children.  Because the stack is LIFO, the children pop first and
+    // the `.post` frame pops only after every descendant has been
+    // painted — giving us the "paint after children" semantics that
+    // inset-placement borders need to correctly overdraw the outermost
+    // cells of their subtree.
+    enum Frame {
+      case visit(node: DrawNode, clip: Rect?)
+      case post(
+        commands: [DrawCommand],
+        environment: StyleEnvironmentSnapshot,
+        clip: Rect?)
     }
 
-    var stack: [Frame] = [Frame(node: node, clip: clip)]
+    var stack: [Frame] = [.visit(node: node, clip: clip)]
 
     while let frame = stack.popLast() {
-      let effectiveClip = intersect(frame.clip, frame.node.clipBounds)
-      let visibleBounds: Rect
-      if let effectiveClip {
-        guard let clipped = intersect(frame.node.bounds, effectiveClip) else {
-          continue
-        }
-        visibleBounds = clipped
-      } else {
-        visibleBounds = frame.node.bounds
-      }
-
-      if let dirtyRows {
-        let nodeTop = max(0, visibleBounds.origin.y)
-        let nodeBottom = nodeTop + max(0, visibleBounds.size.height)
-        if nodeBottom > nodeTop {
-          var intersects = false
-          for row in dirtyRows {
-            if row >= nodeTop, row < nodeBottom {
-              intersects = true
-              break
-            }
-          }
-          if !intersects {
+      switch frame {
+      case .post(let commands, let environment, let clip):
+        paint(
+          commands: commands,
+          environment: environment,
+          cells: &cells,
+          imageAttachments: &imageAttachments,
+          clip: clip,
+          dirtyRows: dirtyRows
+        )
+      case .visit(let node, let frameClip):
+        let effectiveClip = intersect(frameClip, node.clipBounds)
+        let visibleBounds: Rect
+        if let effectiveClip {
+          guard let clipped = intersect(node.bounds, effectiveClip) else {
             continue
           }
+          visibleBounds = clipped
+        } else {
+          visibleBounds = node.bounds
         }
-      }
 
-      paint(
-        commands: frame.node.commands,
-        environment: frame.node.environmentSnapshot.style,
-        cells: &cells,
-        imageAttachments: &imageAttachments,
-        clip: effectiveClip,
-        dirtyRows: dirtyRows
-      )
+        if let dirtyRows {
+          let nodeTop = max(0, visibleBounds.origin.y)
+          let nodeBottom = nodeTop + max(0, visibleBounds.size.height)
+          if nodeBottom > nodeTop {
+            var intersects = false
+            for row in dirtyRows {
+              if row >= nodeTop, row < nodeBottom {
+                intersects = true
+                break
+              }
+            }
+            if !intersects {
+              continue
+            }
+          }
+        }
 
-      for child in frame.node.children.reversed() {
-        stack.append(Frame(node: child, clip: effectiveClip))
+        paint(
+          commands: node.commands,
+          environment: node.environmentSnapshot.style,
+          cells: &cells,
+          imageAttachments: &imageAttachments,
+          clip: effectiveClip,
+          dirtyRows: dirtyRows
+        )
+
+        // Schedule post-children commands first so they pop LAST
+        // (after all descendants of this node have been processed),
+        // then push children in reverse so they pop in declared
+        // order.  Skip the post frame entirely when there are no
+        // post commands to keep the common path allocation-free.
+        if !node.postCommands.isEmpty {
+          stack.append(
+            .post(
+              commands: node.postCommands,
+              environment: node.environmentSnapshot.style,
+              clip: effectiveClip
+            )
+          )
+        }
+        for child in node.children.reversed() {
+          stack.append(.visit(node: child, clip: effectiveClip))
+        }
       }
     }
   }
@@ -414,6 +453,27 @@ extension Rasterizer {
           cells: &cells,
           clip: frame.clip
         )
+      case .border(
+        let bounds,
+        let set,
+        let foreground,
+        let background,
+        let blend,
+        let blendPhase,
+        let sides
+      ):
+        drawLayoutBorder(
+          in: bounds,
+          set: set,
+          foreground: foreground,
+          background: background,
+          blend: blend,
+          blendPhase: blendPhase,
+          sides: sides,
+          environment: environment,
+          cells: &cells,
+          clip: frame.clip
+        )
       }
     }
   }
@@ -446,21 +506,71 @@ extension Rasterizer {
       return
     }
 
+    // Curved shapes normally use a Braille subpixel canvas so their
+    // edges antialias onto the 2x4 dot grid. Pattern fills are the
+    // exception: they need per-cell glyph writes, so they fall through
+    // to the general cell-walking loop below (which calls
+    // `shapeContains`, and that now knows about curved geometry).
+    switch geometry {
+    case .circle, .ellipse, .capsule:
+      if case .pattern = colorMode {
+        break
+      }
+      paintBrailleShape(
+        geometry: geometry,
+        shapeBounds: shapeBounds,
+        colorMode: colorMode,
+        stroke: false,
+        environment: environment,
+        cells: &cells,
+        clip: clip
+      )
+      return
+    case .rectangle, .roundedRectangle:
+      break
+    }
+
     // Detect whether this fill carries alpha for the tint path.
     let constantColor: Color?
     let isTranslucent: Bool
+    let patternFill: PatternFill?
     switch colorMode {
     case .constant(let color):
       constantColor = color
       isTranslucent = (color?.alpha ?? 0) < 1
-    case .sampled:
+      patternFill = nil
+    case .sampled, .sampledRadial:
       constantColor = nil
       // Sampled (gradient) fills may have per-stop alpha.
       isTranslucent = false
+      patternFill = nil
+    case .pattern(let pattern):
+      constantColor = nil
+      isTranslucent = false
+      patternFill = pattern
     }
 
+    // Pre-compute the glyph cell width for pattern fills once so we
+    // handle wide characters (e.g. emoji) correctly inside the inner
+    // loop without paying the cost per cell.
+    let patternGlyphWidth: Int = {
+      guard let patternFill else { return 1 }
+      return max(1, cellWidth(of: patternFill.glyph))
+    }()
+    // Per-cell style reused for every cell when the fill is a pattern.
+    let patternCellStyle: ResolvedTextStyle? = {
+      guard let patternFill else { return nil }
+      let resolved = ResolvedTextStyle(
+        foregroundColor: patternFill.foreground,
+        backgroundColor: patternFill.background
+      )
+      return resolved.isDefault ? nil : resolved
+    }()
+
     for y in shapeBounds.origin.y..<(shapeBounds.origin.y + shapeBounds.size.height) {
-      for x in shapeBounds.origin.x..<(shapeBounds.origin.x + shapeBounds.size.width) {
+      var x = shapeBounds.origin.x
+      let rowEnd = shapeBounds.origin.x + shapeBounds.size.width
+      while x < rowEnd {
         guard
           shapeContains(
             pointX: x,
@@ -470,6 +580,30 @@ extension Rasterizer {
             fillMode: mode
           )
         else {
+          x += 1
+          continue
+        }
+
+        if let patternFill {
+          // Pattern fill: overwrite the cell with the glyph using the
+          // pattern's foreground and optional background.
+          if x + patternGlyphWidth > rowEnd {
+            // Not enough horizontal room for a wide glyph (e.g. an
+            // emoji at the very right edge) — skip this cell rather
+            // than clipping the glyph in half.
+            x += 1
+            continue
+          }
+          write(
+            patternFill.glyph,
+            width: patternGlyphWidth,
+            style: patternCellStyle,
+            atX: x,
+            y: y,
+            cells: &cells,
+            clip: clip
+          )
+          x += patternGlyphWidth
           continue
         }
 
@@ -516,6 +650,193 @@ extension Rasterizer {
               clip: clip
             )
           }
+        }
+        x += 1
+      }
+    }
+  }
+
+  /// Rasterizes a curved shape (`.circle`, `.ellipse`, `.capsule`)
+  /// into the Braille subpixel canvas and writes each non-blank cell
+  /// into the raster buffer with the resolved foreground color.
+  ///
+  /// - Parameter stroke: When `true` draws the outline only; otherwise
+  ///   fills the interior.
+  private func paintBrailleShape(
+    geometry: ShapeGeometry,
+    shapeBounds: Rect,
+    colorMode: ResolvedShapeColorMode,
+    stroke: Bool,
+    environment: StyleEnvironmentSnapshot,
+    cells: inout [[RasterCell]],
+    clip: Rect?,
+    backgroundStyle: BorderBackgroundStyle? = nil
+  ) {
+    let cellW = shapeBounds.size.width
+    let cellH = shapeBounds.size.height
+    guard cellW > 0, cellH > 0 else {
+      return
+    }
+
+    var canvas = BrailleCanvas(width: cellW, height: cellH)
+    let subW = canvas.subpixelWidth
+    let subH = canvas.subpixelHeight
+    guard subW > 0, subH > 0 else {
+      return
+    }
+    // Center the shape in the subpixel grid.  `(subW - 1) / 2` keeps
+    // the anchor on an integer subpixel even for odd/even widths.
+    let cx = (subW - 1) / 2
+    let cy = (subH - 1) / 2
+
+    switch geometry {
+    case .circle:
+      // The largest circle fits inside the short axis.  Use (min-1)/2
+      // so the outline stays within the inclusive (0...sub-1) range.
+      let radius = max(0, (min(subW, subH) - 1) / 2)
+      if stroke {
+        canvas.strokeCircle(centerX: cx, centerY: cy, radius: radius)
+      } else {
+        canvas.fillCircle(centerX: cx, centerY: cy, radius: radius)
+      }
+    case .ellipse:
+      let rx = max(0, (subW - 1) / 2)
+      let ry = max(0, (subH - 1) / 2)
+      if stroke {
+        canvas.strokeEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+      } else {
+        canvas.fillEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+      }
+    case .capsule:
+      drawCapsule(into: &canvas, stroke: stroke)
+    case .rectangle, .roundedRectangle:
+      // Not reachable: the caller dispatches these to the cell-aligned
+      // paint path.  We still need the case for exhaustiveness.
+      return
+    }
+
+    // Walk each Braille cell and emit the glyph with the shape's
+    // resolved foreground color.  Empty cells (mask == 0) are skipped
+    // so we don't overwrite anything already on the surface.
+    let originX = shapeBounds.origin.x
+    let originY = shapeBounds.origin.y
+    let backgroundColor: Color? =
+      backgroundStyle
+      .flatMap { $0.backgroundStyle(for: .top) }
+      .flatMap { style in
+        resolveColor(
+          from: resolvedColorMode(from: style, environment: environment),
+          bounds: shapeBounds,
+          sampleX: originX,
+          sampleY: originY
+        )
+      }
+
+    for cellY in 0..<cellH {
+      for cellX in 0..<cellW {
+        let cell = canvas.cell(x: cellX, y: cellY)
+        guard cell.mask != 0 else {
+          continue
+        }
+        let targetX = originX + cellX
+        let targetY = originY + cellY
+        let foregroundColor = resolveColor(
+          from: colorMode,
+          bounds: shapeBounds,
+          sampleX: targetX,
+          sampleY: targetY
+        )
+        let resolved = ResolvedTextStyle(
+          foregroundColor: foregroundColor,
+          backgroundColor: backgroundColor
+        )
+        write(
+          cell.glyph,
+          style: resolved.isDefault ? nil : resolved,
+          atX: targetX,
+          y: targetY,
+          cells: &cells,
+          clip: clip
+        )
+      }
+    }
+  }
+
+  /// Draws a capsule into the Braille canvas. A wide capsule (subW >=
+  /// subH) has a rectangular body flanked by two half-circles at the
+  /// left and right short-axis ends; a tall capsule has its semicircles
+  /// at the top and bottom.
+  private func drawCapsule(
+    into canvas: inout BrailleCanvas,
+    stroke: Bool
+  ) {
+    let subW = canvas.subpixelWidth
+    let subH = canvas.subpixelHeight
+    guard subW > 0, subH > 0 else {
+      return
+    }
+    if subW == 1 || subH == 1 {
+      // Degenerate: just fill/stroke the whole strip.
+      canvas.fillRect(x: 0, y: 0, width: subW, height: subH)
+      return
+    }
+
+    if subW >= subH {
+      // Wide capsule: radius = short axis / 2.
+      let radius = max(0, (subH - 1) / 2)
+      let cy = (subH - 1) / 2
+      let leftCx = radius
+      let rightCx = subW - 1 - radius
+      if stroke {
+        // Two half-circles plus the two horizontal body edges.
+        canvas.strokeCircle(centerX: leftCx, centerY: cy, radius: radius)
+        canvas.strokeCircle(centerX: rightCx, centerY: cy, radius: radius)
+        // Top and bottom body edges between the two centers.
+        if rightCx > leftCx {
+          for x in leftCx...rightCx {
+            canvas.setPixel(x: x, y: cy - radius)
+            canvas.setPixel(x: x, y: cy + radius)
+          }
+        }
+      } else {
+        canvas.fillCircle(centerX: leftCx, centerY: cy, radius: radius)
+        canvas.fillCircle(centerX: rightCx, centerY: cy, radius: radius)
+        if rightCx > leftCx {
+          let bodyWidth = rightCx - leftCx + 1
+          canvas.fillRect(
+            x: leftCx,
+            y: max(0, cy - radius),
+            width: bodyWidth,
+            height: min(subH, 2 * radius + 1)
+          )
+        }
+      }
+    } else {
+      // Tall capsule: radius = short axis (subW) / 2.
+      let radius = max(0, (subW - 1) / 2)
+      let cx = (subW - 1) / 2
+      let topCy = radius
+      let bottomCy = subH - 1 - radius
+      if stroke {
+        canvas.strokeCircle(centerX: cx, centerY: topCy, radius: radius)
+        canvas.strokeCircle(centerX: cx, centerY: bottomCy, radius: radius)
+        if bottomCy > topCy {
+          for y in topCy...bottomCy {
+            canvas.setPixel(x: cx - radius, y: y)
+            canvas.setPixel(x: cx + radius, y: y)
+          }
+        }
+      } else {
+        canvas.fillCircle(centerX: cx, centerY: topCy, radius: radius)
+        canvas.fillCircle(centerX: cx, centerY: bottomCy, radius: radius)
+        if bottomCy > topCy {
+          let bodyHeight = bottomCy - topCy + 1
+          canvas.fillRect(
+            x: max(0, cx - radius),
+            y: topCy,
+            width: min(subW, 2 * radius + 1),
+            height: bodyHeight
+          )
         }
       }
     }
@@ -570,6 +891,26 @@ extension Rasterizer {
       from: style,
       environment: environment
     )
+
+    // Curved shapes draw their outline onto a Braille canvas so the
+    // stroke resolves to sub-cell precision.
+    switch geometry {
+    case .circle, .ellipse, .capsule:
+      paintBrailleShape(
+        geometry: geometry,
+        shapeBounds: shapeBounds,
+        colorMode: foregroundColorMode,
+        stroke: true,
+        environment: environment,
+        cells: &cells,
+        clip: clip,
+        backgroundStyle: backgroundStyle
+      )
+      return
+    case .rectangle, .roundedRectangle:
+      break
+    }
+
     let lineWidth = max(1, strokeStyle.lineWidth)
     for inset in 0..<lineWidth {
       let insetRect = insetBounds(shapeBounds, by: inset, strokeBorder: strokeBorder)
@@ -709,6 +1050,523 @@ extension Rasterizer {
           clip: clip
         )
       }
+    }
+  }
+
+  /// Paints a layout-reserved border into the cells that
+  /// ``LayoutBehavior/border(_:foreground:background:blend:blendPhase:sides:)``
+  /// reserved during the layout pass.
+  ///
+  /// The entry point for the new layout-aware `.border(...)` view
+  /// modifier.  For `.outset` and `.decorative` border sets the frame
+  /// grew by the per-side display widths and the glyphs are written
+  /// into those reserved outer cells without ever touching the child's
+  /// interior.  For `.inset` sets no frame insets were reserved and
+  /// the glyphs overdraw the view's outermost rows / cols.
+  private func drawLayoutBorder(
+    in outer: Rect,
+    set: BorderSet,
+    foreground: BorderEdgeStyle?,
+    background: BorderBackgroundStyle?,
+    blend: BorderBlend?,
+    blendPhase: Double,
+    sides: Edge.Set,
+    environment: StyleEnvironmentSnapshot,
+    cells: inout [[RasterCell]],
+    clip: Rect?
+  ) {
+    guard outer.size.width > 0, outer.size.height > 0 else {
+      return
+    }
+
+    // Resolved side widths, masked by the requested `sides` set.
+    // These match the layout insets reserved during the layout pass
+    // by `LayoutEngine.borderLayoutInsets(set:sides:)`.
+    let topWidth = sides.contains(.top) ? set.topDisplayWidth : 0
+    let bottomWidth = sides.contains(.bottom) ? set.bottomDisplayWidth : 0
+    let leftWidth = sides.contains(.leading) ? set.leftDisplayWidth : 0
+    let rightWidth = sides.contains(.trailing) ? set.rightDisplayWidth : 0
+
+    guard topWidth > 0 || bottomWidth > 0 || leftWidth > 0 || rightWidth > 0 else {
+      return
+    }
+
+    // Perimeter-sampled colors override per-side foregrounds when a
+    // ``BorderBlend`` is attached.  We sample once for the whole outer
+    // rect and look up by clockwise perimeter index per cell below.
+    let perimeterColors: [Color]?
+    if let blend {
+      let samples = blend.samplePerimeter(
+        width: outer.size.width,
+        height: outer.size.height,
+        phase: blendPhase
+      )
+      perimeterColors = samples.isEmpty ? nil : samples
+    } else {
+      perimeterColors = nil
+    }
+
+    // Pre-resolve per-side foreground colors so we don't re-run the
+    // shape-style resolver once per cell.  A nil per-side color falls
+    // back to the theme foreground at draw time.  When a perimeter
+    // blend is active these are unused (the per-cell lookup wins).
+    let topForeground = resolvedBorderSideColor(
+      foreground?.foregroundStyle(for: .top),
+      environment: environment,
+      bounds: outer
+    )
+    let bottomForeground = resolvedBorderSideColor(
+      foreground?.foregroundStyle(for: .bottom),
+      environment: environment,
+      bounds: outer
+    )
+    let leftForeground = resolvedBorderSideColor(
+      foreground?.foregroundStyle(for: .left),
+      environment: environment,
+      bounds: outer
+    )
+    let rightForeground = resolvedBorderSideColor(
+      foreground?.foregroundStyle(for: .right),
+      environment: environment,
+      bounds: outer
+    )
+
+    let topBackground = resolvedBorderSideColor(
+      background?.backgroundStyle(for: .top),
+      environment: environment,
+      bounds: outer
+    )
+    let bottomBackground = resolvedBorderSideColor(
+      background?.backgroundStyle(for: .bottom),
+      environment: environment,
+      bounds: outer
+    )
+    let leftBackground = resolvedBorderSideColor(
+      background?.backgroundStyle(for: .left),
+      environment: environment,
+      bounds: outer
+    )
+    let rightBackground = resolvedBorderSideColor(
+      background?.backgroundStyle(for: .right),
+      environment: environment,
+      bounds: outer
+    )
+
+    // For `.inset` placements the border draws into the view's
+    // outermost rows and columns (so the `inner` region equals the
+    // outer minus zero — the border overdraws the outer frame).  For
+    // `.outset` and `.decorative` placements the outer frame already
+    // grew by the per-side display widths, so the top/bottom/left/right
+    // sides lie entirely within the reserved inset and the content
+    // sits in the interior rectangle `[leftWidth..width-rightWidth,
+    // topWidth..height-bottomWidth]`.
+
+    // Top edge cells: the non-corner region is
+    // [outer.origin.x + leftWidth, outer.origin.x + width - rightWidth).
+    // The glyph index starts at 0 at the leftmost non-corner cell and
+    // cycles through the border set's top edge string for dashed
+    // patterns.
+    if topWidth > 0 {
+      let y = outer.origin.y
+      let startX = outer.origin.x + leftWidth
+      let endX = outer.origin.x + outer.size.width - rightWidth
+      var x = startX
+      var glyphIndex = 0
+      while x < endX {
+        guard let character = set.topGlyph(at: glyphIndex) else {
+          break
+        }
+        let glyphWidth = max(1, cellWidth(of: character))
+        guard x + glyphWidth <= endX else {
+          break
+        }
+        let cellForeground =
+          perimeterColor(
+            atLocalX: x - outer.origin.x,
+            localY: y - outer.origin.y,
+            width: outer.size.width,
+            height: outer.size.height,
+            perimeter: perimeterColors
+          ) ?? topForeground ?? environment.theme.foreground
+        writeBorderGlyph(
+          character,
+          width: glyphWidth,
+          foreground: cellForeground,
+          background: topBackground,
+          atX: x,
+          y: y,
+          cells: &cells,
+          clip: clip
+        )
+        x += glyphWidth
+        glyphIndex += 1
+      }
+    }
+
+    // Bottom edge cells: draw along y = outer bottom - 1.
+    if bottomWidth > 0 {
+      let y = outer.origin.y + outer.size.height - 1
+      let startX = outer.origin.x + leftWidth
+      let endX = outer.origin.x + outer.size.width - rightWidth
+      var x = startX
+      var glyphIndex = 0
+      while x < endX {
+        guard let character = set.bottomGlyph(at: glyphIndex) else {
+          break
+        }
+        let glyphWidth = max(1, cellWidth(of: character))
+        guard x + glyphWidth <= endX else {
+          break
+        }
+        let cellForeground =
+          perimeterColor(
+            atLocalX: x - outer.origin.x,
+            localY: y - outer.origin.y,
+            width: outer.size.width,
+            height: outer.size.height,
+            perimeter: perimeterColors
+          ) ?? bottomForeground ?? environment.theme.foreground
+        writeBorderGlyph(
+          character,
+          width: glyphWidth,
+          foreground: cellForeground,
+          background: bottomBackground,
+          atX: x,
+          y: y,
+          cells: &cells,
+          clip: clip
+        )
+        x += glyphWidth
+        glyphIndex += 1
+      }
+    }
+
+    // Left edge cells: draw along x = outer.origin.x, between the top
+    // and bottom edges (inclusive if those edges are not drawn).
+    if leftWidth > 0 {
+      let x = outer.origin.x
+      let topExclusive = topWidth > 0 ? outer.origin.y + topWidth : outer.origin.y
+      let bottomExclusive =
+        bottomWidth > 0
+        ? outer.origin.y + outer.size.height - bottomWidth
+        : outer.origin.y + outer.size.height
+      var y = topExclusive
+      var glyphIndex = 0
+      while y < bottomExclusive {
+        guard let character = set.leftGlyph(at: glyphIndex) else {
+          break
+        }
+        let cellForeground =
+          perimeterColor(
+            atLocalX: x - outer.origin.x,
+            localY: y - outer.origin.y,
+            width: outer.size.width,
+            height: outer.size.height,
+            perimeter: perimeterColors
+          ) ?? leftForeground ?? environment.theme.foreground
+        writeBorderGlyph(
+          character,
+          width: leftWidth,
+          foreground: cellForeground,
+          background: leftBackground,
+          atX: x,
+          y: y,
+          cells: &cells,
+          clip: clip
+        )
+        y += 1
+        glyphIndex += 1
+      }
+    }
+
+    // Right edge cells: draw along x = outer right - rightWidth.
+    if rightWidth > 0 {
+      let x = outer.origin.x + outer.size.width - rightWidth
+      let topExclusive = topWidth > 0 ? outer.origin.y + topWidth : outer.origin.y
+      let bottomExclusive =
+        bottomWidth > 0
+        ? outer.origin.y + outer.size.height - bottomWidth
+        : outer.origin.y + outer.size.height
+      var y = topExclusive
+      var glyphIndex = 0
+      while y < bottomExclusive {
+        guard let character = set.rightGlyph(at: glyphIndex) else {
+          break
+        }
+        let cellForeground =
+          perimeterColor(
+            atLocalX: x - outer.origin.x,
+            localY: y - outer.origin.y,
+            width: outer.size.width,
+            height: outer.size.height,
+            perimeter: perimeterColors
+          ) ?? rightForeground ?? environment.theme.foreground
+        writeBorderGlyph(
+          character,
+          width: rightWidth,
+          foreground: cellForeground,
+          background: rightBackground,
+          atX: x,
+          y: y,
+          cells: &cells,
+          clip: clip
+        )
+        y += 1
+        glyphIndex += 1
+      }
+    }
+
+    // Corner glyphs.  Lipgloss semantics: corners inherit the adjacent
+    // horizontal edge's color (top for top corners, bottom for bottom
+    // corners).  When a perimeter blend is active each corner instead
+    // takes the perimeter-array color for its cell position.
+    if topWidth > 0 && leftWidth > 0 {
+      let cornerX = outer.origin.x
+      let cornerY = outer.origin.y
+      let cornerForeground =
+        perimeterColor(
+          atLocalX: cornerX - outer.origin.x,
+          localY: cornerY - outer.origin.y,
+          width: outer.size.width,
+          height: outer.size.height,
+          perimeter: perimeterColors
+        ) ?? topForeground ?? environment.theme.foreground
+      writeBorderGlyphs(
+        set.topLeading,
+        atX: cornerX,
+        y: cornerY,
+        foreground: cornerForeground,
+        background: topBackground,
+        cells: &cells,
+        clip: clip
+      )
+    }
+    if topWidth > 0 && rightWidth > 0 {
+      let cornerX = outer.origin.x + outer.size.width - rightWidth
+      let cornerY = outer.origin.y
+      let cornerForeground =
+        perimeterColor(
+          atLocalX: cornerX - outer.origin.x,
+          localY: cornerY - outer.origin.y,
+          width: outer.size.width,
+          height: outer.size.height,
+          perimeter: perimeterColors
+        ) ?? topForeground ?? environment.theme.foreground
+      writeBorderGlyphs(
+        set.topTrailing,
+        atX: cornerX,
+        y: cornerY,
+        foreground: cornerForeground,
+        background: topBackground,
+        cells: &cells,
+        clip: clip
+      )
+    }
+    if bottomWidth > 0 && leftWidth > 0 {
+      let cornerX = outer.origin.x
+      let cornerY = outer.origin.y + outer.size.height - 1
+      let cornerForeground =
+        perimeterColor(
+          atLocalX: cornerX - outer.origin.x,
+          localY: cornerY - outer.origin.y,
+          width: outer.size.width,
+          height: outer.size.height,
+          perimeter: perimeterColors
+        ) ?? bottomForeground ?? environment.theme.foreground
+      writeBorderGlyphs(
+        set.bottomLeading,
+        atX: cornerX,
+        y: cornerY,
+        foreground: cornerForeground,
+        background: bottomBackground,
+        cells: &cells,
+        clip: clip
+      )
+    }
+    if bottomWidth > 0 && rightWidth > 0 {
+      let cornerX = outer.origin.x + outer.size.width - rightWidth
+      let cornerY = outer.origin.y + outer.size.height - 1
+      let cornerForeground =
+        perimeterColor(
+          atLocalX: cornerX - outer.origin.x,
+          localY: cornerY - outer.origin.y,
+          width: outer.size.width,
+          height: outer.size.height,
+          perimeter: perimeterColors
+        ) ?? bottomForeground ?? environment.theme.foreground
+      writeBorderGlyphs(
+        set.bottomTrailing,
+        atX: cornerX,
+        y: cornerY,
+        foreground: cornerForeground,
+        background: bottomBackground,
+        cells: &cells,
+        clip: clip
+      )
+    }
+
+  }
+
+  /// Maps a cell at local coordinates `(localX, localY)` inside an
+  /// `(width × height)` rectangle to its position in the clockwise
+  /// perimeter walk used by ``BorderBlend/samplePerimeter(width:height:phase:)``.
+  ///
+  /// The walk visits cells in this order:
+  ///   top edge L→R, right edge T→B (excluding the top-right corner),
+  ///   bottom edge R→L (excluding the bottom-right corner), left edge
+  ///   B→T (excluding the bottom-left and top-left corners).
+  ///
+  /// Returns nil for non-perimeter (interior) cells, for out-of-range
+  /// coordinates, or when no perimeter colors are available.
+  private func perimeterColor(
+    atLocalX localX: Int,
+    localY: Int,
+    width: Int,
+    height: Int,
+    perimeter: [Color]?
+  ) -> Color? {
+    guard let perimeter, !perimeter.isEmpty else {
+      return nil
+    }
+    guard
+      let index = perimeterIndex(
+        localX: localX,
+        localY: localY,
+        width: width,
+        height: height
+      )
+    else {
+      return nil
+    }
+    let total = perimeter.count
+    let normalized = ((index % total) + total) % total
+    return perimeter[normalized]
+  }
+
+  /// Returns the clockwise perimeter index for `(localX, localY)` in a
+  /// rectangle of size `(width × height)`, or nil if the cell is not on
+  /// the perimeter or the inputs are degenerate.
+  ///
+  /// Walk order (matching ``BorderBlend/samplePerimeter(width:height:phase:)``):
+  ///   1. Top edge L→R: indices `[0, width)`.
+  ///   2. Right column T→B (excluding TR corner): indices `[width, width + h - 1)`.
+  ///   3. Bottom row R→L (excluding BR corner): indices
+  ///      `[width + h - 1, 2*width + h - 2)`.
+  ///   4. Left column B→T (excluding BL and TL corners): indices
+  ///      `[2*width + h - 2, 2*width + 2*h - 4)`.
+  ///
+  /// Hand-traced against a 4×3 fixture (10 perimeter cells):
+  ///   (0,0)=0 (1,0)=1 (2,0)=2 (3,0)=3   ← top
+  ///   (3,1)=4 (3,2)=5                   ← right (excl. TR)
+  ///   (2,2)=6 (1,2)=7 (0,2)=8           ← bottom (excl. BR)
+  ///   (0,1)=9                           ← left (excl. BL+TL)
+  private func perimeterIndex(
+    localX: Int,
+    localY: Int,
+    width: Int,
+    height: Int
+  ) -> Int? {
+    guard width > 0, height > 0 else { return nil }
+    guard localX >= 0, localX < width, localY >= 0, localY < height else { return nil }
+    if width == 1 && height == 1 {
+      return 0
+    }
+    // Top edge wins for y == 0 (handles the height == 1 row case too).
+    if localY == 0 {
+      return localX
+    }
+    // Right column for x == width - 1, y >= 1.
+    if localX == width - 1 {
+      return width + (localY - 1)
+    }
+    // Bottom row R→L for y == height - 1, x < width - 1.
+    if localY == height - 1 {
+      return 2 * width + height - 3 - localX
+    }
+    // Left column B→T for x == 0, 1 <= y <= height - 2.
+    if localX == 0 {
+      return 2 * width + 2 * height - 4 - localY
+    }
+    // Interior cell — not on the perimeter.
+    return nil
+  }
+
+  /// Eagerly resolves a border side's foreground/background style into a
+  /// constant color.  Returns nil for gradient fills (which are not
+  /// supported on borders in M2.B) or for nil styles; callers fall back
+  /// to the theme defaults in that case.
+  private func resolvedBorderSideColor(
+    _ style: AnyShapeStyle?,
+    environment: StyleEnvironmentSnapshot,
+    bounds: Rect
+  ) -> Color? {
+    guard let style else {
+      return nil
+    }
+    return resolveColor(
+      from: style,
+      environment: environment,
+      bounds: bounds,
+      sampleX: bounds.origin.x,
+      sampleY: bounds.origin.y
+    )
+  }
+
+  /// Writes a single border glyph at the given cell coordinates,
+  /// applying the resolved foreground and optional background color.
+  private func writeBorderGlyph(
+    _ character: Character,
+    width: Int,
+    foreground: Color?,
+    background: Color?,
+    atX x: Int,
+    y: Int,
+    cells: inout [[RasterCell]],
+    clip: Rect?
+  ) {
+    var resolved = ResolvedTextStyle()
+    resolved.foregroundColor = foreground
+    resolved.backgroundColor = background
+    write(
+      character,
+      width: max(1, width),
+      style: resolved.isDefault ? nil : resolved,
+      atX: x,
+      y: y,
+      cells: &cells,
+      clip: clip
+    )
+  }
+
+  /// Writes a multi-character glyph string (used for corners, which are
+  /// stored as strings so they can be empty or multi-rune).  Advances
+  /// by each glyph's display width.
+  private func writeBorderGlyphs(
+    _ text: String,
+    atX x: Int,
+    y: Int,
+    foreground: Color?,
+    background: Color?,
+    cells: inout [[RasterCell]],
+    clip: Rect?
+  ) {
+    guard !text.isEmpty else {
+      return
+    }
+    var cursor = x
+    for character in text {
+      let glyphWidth = max(1, cellWidth(of: character))
+      writeBorderGlyph(
+        character,
+        width: glyphWidth,
+        foreground: foreground,
+        background: background,
+        atX: cursor,
+        y: y,
+        cells: &cells,
+        clip: clip
+      )
+      cursor += glyphWidth
     }
   }
 
@@ -889,6 +1747,13 @@ extension Rasterizer {
         && x < targetBounds.origin.x + targetBounds.size.width
         && y >= targetBounds.origin.y
         && y < targetBounds.origin.y + targetBounds.size.height
+    case .circle, .ellipse, .capsule:
+      return curvedShapeContains(
+        pointX: x,
+        pointY: y,
+        in: targetBounds,
+        geometry: geometry
+      )
     case .roundedRectangle(let cornerRadius):
       if case .interior = fillMode {
         return x >= targetBounds.origin.x
@@ -913,6 +1778,115 @@ extension Rasterizer {
       let isCorner =
         (x == minX || x == maxX) && (y == minY || y == maxY)
       return !isCorner
+    }
+  }
+
+  /// Tests whether the cell at `(x, y)` is inside a curved shape
+  /// (``ShapeGeometry/circle``, ``ShapeGeometry/ellipse``,
+  /// ``ShapeGeometry/capsule``) at cell resolution.
+  ///
+  /// The math mirrors the Braille subpixel renderer in
+  /// ``paintBrailleShape(geometry:shapeBounds:colorMode:stroke:environment:cells:clip:backgroundStyle:)``
+  /// so that a cell the test reports as "inside" is a cell the Braille
+  /// rasterizer would actually paint dots into.
+  ///
+  /// For each cell, the test projects the cell's visual center into the
+  /// canvas subpixel grid (every cell is 2 subpixels wide and 4 tall)
+  /// and evaluates the same parametric inequality that `fillCircle`,
+  /// `fillEllipse`, and `drawCapsule` use.
+  private func curvedShapeContains(
+    pointX x: Int,
+    pointY y: Int,
+    in bounds: Rect,
+    geometry: ShapeGeometry
+  ) -> Bool {
+    guard bounds.size.width > 0, bounds.size.height > 0 else {
+      return false
+    }
+    let cellRelX = x - bounds.origin.x
+    let cellRelY = y - bounds.origin.y
+    guard cellRelX >= 0, cellRelX < bounds.size.width,
+      cellRelY >= 0, cellRelY < bounds.size.height
+    else {
+      return false
+    }
+
+    // Project the cell's visual center onto the subpixel grid used by
+    // `paintBrailleShape`.  A cell is 2 subpixels wide and 4 tall, so
+    // the center of cell (cx, cy) in subpixel space is
+    // (cx*2 + 0.5, cy*4 + 1.5).  We compute `subW`, `subH`, and the
+    // per-shape center/radius in Int space to match `paintBrailleShape`
+    // exactly (which uses Int floor division), then convert to Double
+    // only for the parametric test.  This guarantees the pattern-fill
+    // silhouette matches the Braille disc silhouette cell-for-cell.
+    let subW = bounds.size.width * 2
+    let subH = bounds.size.height * 4
+    let px = Double(cellRelX * 2) + 0.5
+    let py = Double(cellRelY * 4) + 1.5
+
+    switch geometry {
+    case .circle:
+      // Matches `paintBrailleShape`'s circle case:
+      //   radius = (min(subW, subH) - 1) / 2  (Int floor)
+      //   cx = (subW - 1) / 2, cy = (subH - 1) / 2
+      let radius = Double(max(0, (min(subW, subH) - 1) / 2))
+      let cxSub = Double((subW - 1) / 2)
+      let cySub = Double((subH - 1) / 2)
+      let dx = px - cxSub
+      let dy = py - cySub
+      return dx * dx + dy * dy <= radius * radius
+    case .ellipse:
+      // Matches `paintBrailleShape`'s ellipse case.
+      let rx = max(0, (subW - 1) / 2)
+      let ry = max(0, (subH - 1) / 2)
+      guard rx > 0, ry > 0 else { return false }
+      let cxSub = Double((subW - 1) / 2)
+      let cySub = Double((subH - 1) / 2)
+      let dx = (px - cxSub) / Double(rx)
+      let dy = (py - cySub) / Double(ry)
+      return dx * dx + dy * dy <= 1
+    case .capsule:
+      // Matches `drawCapsule`: wide capsules get left/right semicircles
+      // joined by a horizontal body rect, tall capsules are transposed.
+      if subW == 1 || subH == 1 {
+        return true
+      }
+      if subW >= subH {
+        let radius = Double(max(0, (subH - 1) / 2))
+        let cySub = Double((subH - 1) / 2)
+        let leftCx = radius
+        let rightCx = Double(subW - 1) - radius
+        if px < leftCx {
+          let dx = px - leftCx
+          let dy = py - cySub
+          return dx * dx + dy * dy <= radius * radius
+        } else if px > rightCx {
+          let dx = px - rightCx
+          let dy = py - cySub
+          return dx * dx + dy * dy <= radius * radius
+        } else {
+          return py >= cySub - radius && py <= cySub + radius
+        }
+      } else {
+        let radius = Double(max(0, (subW - 1) / 2))
+        let cxSub = Double((subW - 1) / 2)
+        let topCy = radius
+        let bottomCy = Double(subH - 1) - radius
+        if py < topCy {
+          let dx = px - cxSub
+          let dy = py - topCy
+          return dx * dx + dy * dy <= radius * radius
+        } else if py > bottomCy {
+          let dx = px - cxSub
+          let dy = py - bottomCy
+          return dx * dx + dy * dy <= radius * radius
+        } else {
+          return px >= cxSub - radius && px <= cxSub + radius
+        }
+      }
+    case .rectangle, .roundedRectangle:
+      assertionFailure("curvedShapeContains called with non-curved geometry")
+      return false
     }
   }
 
@@ -1047,6 +2021,10 @@ extension Rasterizer {
       return .constant(color)
     case .linearGradient(let gradient):
       return .sampled(gradient)
+    case .radialGradient(let gradient):
+      return .sampledRadial(gradient)
+    case .patternFill(let pattern):
+      return .pattern(pattern)
     case .terminalChrome(let chromeStyle):
       return resolvedColorMode(
         from: environment.theme.resolvedStyle(
@@ -1097,6 +2075,24 @@ extension Rasterizer {
           endPoint: gradient.endPoint
         )
         return .sampled(faded)
+      case .sampledRadial(let gradient):
+        let faded = RadialGradient(
+          gradient: Gradient(
+            stops: gradient.gradient.stops.map {
+              .init(color: $0.color.opacity(amount), location: $0.location)
+            }),
+          center: gradient.center,
+          startRadius: gradient.startRadius,
+          endRadius: gradient.endRadius
+        )
+        return .sampledRadial(faded)
+      case .pattern(let pattern):
+        let faded = PatternFill(
+          glyph: pattern.glyph,
+          foreground: pattern.foreground.opacity(amount),
+          background: pattern.background.map { $0.opacity(amount) }
+        )
+        return .pattern(faded)
       }
     }
   }
@@ -1117,6 +2113,18 @@ extension Rasterizer {
         x: sampleX,
         y: sampleY
       )
+    case .sampledRadial(let gradient):
+      return sample(
+        gradient,
+        in: bounds,
+        x: sampleX,
+        y: sampleY
+      )
+    case .pattern(let pattern):
+      // Callers that reduce a pattern fill to a scalar color use
+      // the foreground — the per-cell glyph write path bypasses
+      // this helper and consults the ``PatternFill`` directly.
+      return pattern.foreground
     }
   }
 
@@ -1206,6 +2214,64 @@ extension Rasterizer {
         continue
       }
 
+      let range = max(0.0001, upper.location - lower.location)
+      let localT = (t - lower.location) / range
+      return lower.color.interpolated(to: upper.color, progress: localT)
+    }
+
+    return stops.last?.color
+  }
+
+  private func sample(
+    _ gradient: RadialGradient,
+    in bounds: Rect,
+    x: Int,
+    y: Int
+  ) -> Color? {
+    let stops = gradient.gradient.stops
+    guard let first = stops.first else {
+      return nil
+    }
+    guard stops.count > 1, bounds.size.width > 0, bounds.size.height > 0 else {
+      return first.color
+    }
+
+    // Center in cell-space coordinates (not normalized).
+    let centerUnit = unitCoordinates(for: gradient.center)
+    let center = (
+      x: Double(bounds.origin.x) + centerUnit.x * Double(bounds.size.width),
+      y: Double(bounds.origin.y) + centerUnit.y * Double(bounds.size.height)
+    )
+
+    // Distance from the sample cell's center to the gradient center
+    // in raw cell space (no aspect-ratio compensation — matches the
+    // linear gradient sampler's cell-space conventions).
+    let px = Double(x) + 0.5
+    let py = Double(y) + 0.5
+    let dx = px - center.x
+    let dy = py - center.y
+    let distance = (dx * dx + dy * dy).squareRoot()
+
+    // Normalize to [0, 1] using startRadius and endRadius.  Guard the
+    // degenerate case where endRadius == startRadius so we always pin
+    // to the end color without a divide-by-zero.
+    let denominator = max(0.0001, gradient.endRadius - gradient.startRadius)
+    let tRaw = (distance - gradient.startRadius) / denominator
+    let t = min(1, max(0, tRaw))
+
+    if t <= first.location {
+      return first.color
+    }
+    if let last = stops.last, t >= last.location {
+      return last.color
+    }
+
+    for index in 0..<(stops.count - 1) {
+      let lower = stops[index]
+      let upper = stops[index + 1]
+      guard t >= lower.location, t <= upper.location else {
+        continue
+      }
       let range = max(0.0001, upper.location - lower.location)
       let localT = (t - lower.location) / range
       return lower.color.interpolated(to: upper.color, progress: localT)
