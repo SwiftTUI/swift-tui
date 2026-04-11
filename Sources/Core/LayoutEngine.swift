@@ -605,6 +605,11 @@ public struct LayoutEngine: Sendable {
         )
       case .shape:
         return measuredShapeSize(for: proposal)
+      case .canvas:
+        // Canvas fills any proposed size, the same as a raw shape
+        // primitive: the drawing is always resolved to the final cell
+        // frame at paint time, so there's no intrinsic size.
+        return measuredShapeSize(for: proposal)
       case .rule:
         return measuredRuleSize(
           for: proposal,

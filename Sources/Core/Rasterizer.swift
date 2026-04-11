@@ -474,6 +474,15 @@ extension Rasterizer {
           cells: &cells,
           clip: frame.clip
         )
+      case .canvas(let bounds, let payload, let foregroundStyle):
+        paintCanvasDrawing(
+          in: bounds,
+          payload: payload,
+          foregroundStyle: foregroundStyle,
+          environment: environment,
+          cells: &cells,
+          clip: frame.clip
+        )
       }
     }
   }
@@ -652,6 +661,84 @@ extension Rasterizer {
           }
         }
         x += 1
+      }
+    }
+  }
+
+  /// Paints a ``Canvas`` view's drawing into the raster buffer.
+  ///
+  /// Canvas is the Braille-subpixel escape hatch that sits alongside
+  /// the shape pipeline: the layout engine reserves the cell frame,
+  /// and here we build a ``BrailleCanvas`` sized to those cells, hand
+  /// it to the user via a ``CanvasContext``, and copy the resulting
+  /// lit cells out. The context's final foreground/background values
+  /// are used for every lit cell — per-primitive colour tracking is
+  /// not part of M6.
+  private func paintCanvasDrawing(
+    in bounds: Rect,
+    payload: CanvasPayload,
+    foregroundStyle: AnyShapeStyle,
+    environment: StyleEnvironmentSnapshot,
+    cells: inout [[RasterCell]],
+    clip: Rect?
+  ) {
+    let cellW = bounds.size.width
+    let cellH = bounds.size.height
+    guard cellW > 0, cellH > 0 else {
+      return
+    }
+
+    let initialForeground =
+      resolveColor(
+        from: foregroundStyle,
+        environment: environment,
+        bounds: bounds,
+        sampleX: bounds.origin.x,
+        sampleY: bounds.origin.y
+      )
+      ?? environment.theme.foreground
+
+    var context = CanvasContext(
+      canvas: BrailleCanvas(width: cellW, height: cellH),
+      foreground: initialForeground,
+      background: nil
+    )
+    guard context.width > 0, context.height > 0 else {
+      return
+    }
+    payload.drawing.draw(into: &context)
+
+    // Walk the Braille canvas and emit a glyph for every cell the
+    // drawing touched.  The rasterizer uses the context's *final*
+    // foreground/background values for every lit cell — mutating
+    // `context.foreground` during drawing changes the terminal colour
+    // for the whole canvas, not per-primitive.  This keeps M6 simple
+    // and lets the drawing focus on "what dots to light up".
+    let finalForeground = context.foreground
+    let finalBackground = context.background
+    let resolvedStyle = ResolvedTextStyle(
+      foregroundColor: finalForeground,
+      backgroundColor: finalBackground
+    )
+    let styleToWrite: ResolvedTextStyle? =
+      resolvedStyle.isDefault ? nil : resolvedStyle
+
+    let originX = bounds.origin.x
+    let originY = bounds.origin.y
+    for cellY in 0..<cellH {
+      for cellX in 0..<cellW {
+        let cell = context.canvas.cell(x: cellX, y: cellY)
+        guard cell.mask != 0 else {
+          continue
+        }
+        write(
+          cell.glyph,
+          style: styleToWrite,
+          atX: originX + cellX,
+          y: originY + cellY,
+          cells: &cells,
+          clip: clip
+        )
       }
     }
   }

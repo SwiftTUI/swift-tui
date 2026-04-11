@@ -9,6 +9,7 @@ public indirect enum DrawPayload: Equatable, Sendable {
   case rule(StrokeStyle?)
   case list(ListPayload)
   case table(TablePayload)
+  case canvas(CanvasPayload)
 }
 
 /// Truncation strategy used when text exceeds its available width.

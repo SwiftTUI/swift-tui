@@ -344,7 +344,7 @@ extension SemanticExtractor {
         )
         nextHitTestOrder += 1
       }
-    case .none, .rule, .shape, .text, .image:
+    case .none, .rule, .shape, .text, .image, .canvas:
       break
     }
   }
