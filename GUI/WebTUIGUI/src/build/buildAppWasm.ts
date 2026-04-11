@@ -1,5 +1,6 @@
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { optimizePackagedWasm } from "./optimizePackagedWasm.ts";
 import { resolveSwiftArtifacts, type SwiftArtifactPaths } from "./resolveSwiftArtifacts.ts";
 import { stripPackagedWasm } from "./stripPackagedWasm.ts";
 import { formatWasmTypeDiagnostics } from "./wasmTypeDiagnostics.ts";
@@ -29,6 +30,7 @@ export async function buildAppWasm(
 }
 
 interface PackageBrowserValidatedWasmOptions {
+  optimize?: (wasmPath: string) => Promise<void>;
   sourceWasmPath: string;
   outputWasmPath: string;
   strip?: (wasmPath: string) => Promise<void>;
@@ -40,7 +42,31 @@ export async function packageBrowserValidatedWasm(
 ): Promise<void> {
   const sourceBytes = await Bun.file(options.sourceWasmPath).arrayBuffer();
   await Bun.write(options.outputWasmPath, sourceBytes);
-  await validateBrowserWasm(options.outputWasmPath, "generated wasm");
+
+  const optimize = options.optimize ?? optimizePackagedWasm;
+  try {
+    await optimize(options.outputWasmPath);
+    await validateBrowserWasm(options.outputWasmPath, "optimized wasm");
+  } catch (error) {
+    await Bun.write(options.outputWasmPath, sourceBytes);
+    const message = error instanceof Error ? error.message : String(error);
+
+    try {
+      await validateBrowserWasm(options.outputWasmPath, "generated wasm");
+    } catch (rawError) {
+      const rawMessage = rawError instanceof Error ? rawError.message : String(rawError);
+      throw new Error([
+        rawMessage,
+        `wasm optimization step failed: ${message}`,
+      ].join("\n"));
+    }
+
+    const warning = [
+      `warning: keeping unoptimized wasm at ${options.outputWasmPath}`,
+      `wasm optimization step failed or did not produce browser-parseable output: ${message}`,
+    ].join("\n");
+    (options.onWarning ?? console.warn)(warning);
+  }
 
   const strip = options.strip ?? stripPackagedWasm;
 

@@ -2,7 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$SCRIPT_DIR"
+REPO_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+REPO_BASENAME="$(basename "$REPO_DIR")"
 
 WASM_SDK_ID="${WASM_SDK_ID:-swift-6.3-RELEASE_wasm}"
 WASM_SDK_URL="${WASM_SDK_URL:-https://download.swift.org/swift-6.3-release/wasm-sdk/swift-6.3-RELEASE/swift-6.3-RELEASE_wasm.artifactbundle.tar.gz}"
@@ -12,7 +13,7 @@ CONTAINER_TOOL=""
 IMAGE="${LINUX_IMAGE:-swift:6.3}"
 IMAGE_SLUG="$(printf '%s' "$IMAGE" | tr '/:' '--')"
 CONTAINER_NAME="${LINUX_CONTAINER_NAME:-swift-terminal-ui-${IMAGE_SLUG}}"
-CONTAINER_DIR="${LINUX_CONTAINER_DIR:-/swift-terminal-ui-workspace}"
+CONTAINER_DIR="${LINUX_CONTAINER_DIR:-/home/runner/work/$REPO_BASENAME/$REPO_BASENAME}"
 SWIFTPM_HOME_VOLUME="${LINUX_SWIFTPM_HOME_VOLUME:-${CONTAINER_NAME}-swiftpm-home}"
 SWIFTPM_CACHE_VOLUME="${LINUX_SWIFTPM_CACHE_VOLUME:-${CONTAINER_NAME}-swiftpm-cache}"
 BUN_VOLUME="${LINUX_BUN_VOLUME:-${CONTAINER_NAME}-bun}"
@@ -170,16 +171,18 @@ ensure_bun() {
     export BUN_INSTALL=/root/.bun
     export PATH="$BUN_INSTALL/bin:$PATH"
 
-    if command -v bun >/dev/null 2>&1; then
+    if command -v bun >/dev/null 2>&1 && command -v wasm-opt >/dev/null 2>&1; then
       exit 0
     fi
 
-    if ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
+    if ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1 || ! command -v wasm-opt >/dev/null 2>&1; then
       apt-get update
-      DEBIAN_FRONTEND=noninteractive apt-get install -y curl unzip
+      DEBIAN_FRONTEND=noninteractive apt-get install -y curl unzip binaryen
     fi
 
-    curl -fsSL https://bun.sh/install | bash
+    if ! command -v bun >/dev/null 2>&1; then
+      curl -fsSL https://bun.sh/install | bash
+    fi
   '
 }
 
@@ -216,6 +219,11 @@ cmd_info() {
       bun --version
     else
       echo "bun: not installed"
+    fi
+    if command -v wasm-opt >/dev/null 2>&1; then
+      wasm-opt --version
+    else
+      echo "wasm-opt: not installed"
     fi
   '
 }

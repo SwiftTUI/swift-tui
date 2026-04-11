@@ -91,6 +91,12 @@ jobs:
             --checksum 9fa4016ee632c7e9e906608ec3b55cf13dfc4dff44e47574c5af58064dc33fd9
           fi
 
+      - name: Install Binaryen
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install binaryen
+
       - name: Log WebExample toolchain environment
         shell: bash
         run: |
@@ -108,8 +114,10 @@ jobs:
           echo "which swiftly: $(which swiftly)"
           echo "which swift: $(which swift)"
           echo "which wasm-ld: $(which wasm-ld)"
+          echo "which wasm-opt: $(which wasm-opt)"
           bun --version
           bun --revision
+          wasm-opt --version
           ~/.swiftly/bin/swiftly --version
           swiftly list
           swiftly run swift --version
