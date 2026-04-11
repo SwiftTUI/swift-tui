@@ -34,7 +34,7 @@ jobs:
         with:
           path: |
             ~/.swiftly
-          key: ${{ runner.os }}-swiftly-6.3.0-v1-
+          key: ${{ runner.os }}-swiftly-6.3.0-v2-
 
       - name: Cache SwiftPM
         uses: actions/cache@v4
