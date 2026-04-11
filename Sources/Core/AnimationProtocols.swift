@@ -51,20 +51,20 @@ private struct ConcreteHashableBox<T: Hashable & Sendable>: HashableBox {
   }
 }
 
-/// Wrapper that asserts Sendable for AnyHashable values known to be
-/// Sendable at construction time.
-public struct AnyHashableSendable: Hashable, Sendable {
+/// Wrapper that asserts Sendable for hashable values known to be
+/// sendable at construction time.
+package struct AnyHashableSendable: Hashable, Sendable {
   private let box: any HashableBox
 
-  public init<Item: Hashable & Sendable>(_ item: Item) {
+  package init<Item: Hashable & Sendable>(_ item: Item) {
     box = ConcreteHashableBox(value: item)
   }
 
-  public func hash(into hasher: inout Hasher) {
+  package func hash(into hasher: inout Hasher) {
     box.hash(into: &hasher)
   }
 
-  public static func == (lhs: Self, rhs: Self) -> Bool {
+  package static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.box.isEqual(to: rhs.box)
   }
 

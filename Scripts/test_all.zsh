@@ -11,7 +11,8 @@ usage() {
   cat <<'EOF'
 Usage: Scripts/test_all.zsh [--skip-bun-install]
 
-Runs the full checked-in repo test surface:
+Runs the full checked-in repo verification surface:
+  - checked-in policy hooks
   - root SwiftPM tests
   - Runners/TerminalUICLI tests
   - Runners/TerminalUIWASI tests
@@ -136,6 +137,16 @@ if [[ -f "$repo_root/package.json" && -f "$repo_root/bun.lock" && $skip_bun_inst
     "$repo_root" \
     bun install --frozen-lockfile
 fi
+
+run_step \
+  "Check public-surface policies" \
+  "$repo_root" \
+  ./Scripts/check_public_surface_policies.zsh
+
+run_step \
+  "Check concurrency-safety policies" \
+  "$repo_root" \
+  ./Scripts/check_concurrency_safety_policies.zsh
 
 run_step \
   "Run root SwiftPM tests" \
