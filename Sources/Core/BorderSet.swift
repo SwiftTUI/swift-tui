@@ -62,3 +62,92 @@ extension BorderSet {
     return edge.reduce(0) { max($0, cellWidth(of: $1)) }
   }
 }
+
+extension BorderSet {
+  public static let single = BorderSet(
+    top: "─", bottom: "─", left: "│", right: "│",
+    topLeading: "┌", topTrailing: "┐",
+    bottomLeading: "└", bottomTrailing: "┘",
+    middleLeading: "├", middleTrailing: "┤",
+    middle: "┼", middleTop: "┬", middleBottom: "┴")
+
+  public static let rounded = BorderSet(
+    top: "─", bottom: "─", left: "│", right: "│",
+    topLeading: "╭", topTrailing: "╮",
+    bottomLeading: "╰", bottomTrailing: "╯",
+    middleLeading: "├", middleTrailing: "┤",
+    middle: "┼", middleTop: "┬", middleBottom: "┴")
+
+  public static let double = BorderSet(
+    top: "═", bottom: "═", left: "║", right: "║",
+    topLeading: "╔", topTrailing: "╗",
+    bottomLeading: "╚", bottomTrailing: "╝",
+    middleLeading: "╠", middleTrailing: "╣",
+    middle: "╬", middleTop: "╦", middleBottom: "╩")
+
+  public static let heavy = BorderSet(
+    top: "━", bottom: "━", left: "┃", right: "┃",
+    topLeading: "┏", topTrailing: "┓",
+    bottomLeading: "┗", bottomTrailing: "┛",
+    middleLeading: "┣", middleTrailing: "┫",
+    middle: "╋", middleTop: "┳", middleBottom: "┻")
+
+  public static let block = BorderSet(
+    top: "█", bottom: "█", left: "█", right: "█",
+    topLeading: "█", topTrailing: "█",
+    bottomLeading: "█", bottomTrailing: "█")
+
+  public static let outerHalfBlock = BorderSet(
+    top: "▀", bottom: "▄", left: "▌", right: "▐",
+    topLeading: "▛", topTrailing: "▜",
+    bottomLeading: "▙", bottomTrailing: "▟",
+    placement: .decorative)
+
+  public static let innerHalfBlock = BorderSet(
+    top: "▄", bottom: "▀", left: "▐", right: "▌",
+    topLeading: "▗", topTrailing: "▖",
+    bottomLeading: "▝", bottomTrailing: "▘",
+    placement: .inset)
+
+  public static let singleDouble = BorderSet(
+    top: "─", bottom: "─", left: "║", right: "║",
+    topLeading: "╓", topTrailing: "╖",
+    bottomLeading: "╙", bottomTrailing: "╜")
+
+  public static let doubleSingle = BorderSet(
+    top: "═", bottom: "═", left: "│", right: "│",
+    topLeading: "╒", topTrailing: "╕",
+    bottomLeading: "╘", bottomTrailing: "╛")
+
+  public static let ascii = BorderSet(
+    top: "-", bottom: "-", left: "|", right: "|",
+    topLeading: "+", topTrailing: "+",
+    bottomLeading: "+", bottomTrailing: "+",
+    middleLeading: "+", middleTrailing: "+",
+    middle: "+", middleTop: "+", middleBottom: "+")
+
+  public static let hidden = BorderSet(
+    top: " ", bottom: " ", left: " ", right: " ",
+    topLeading: " ", topTrailing: " ",
+    bottomLeading: " ", bottomTrailing: " ")
+
+  public static let none = BorderSet(
+    top: "", bottom: "", left: "", right: "",
+    topLeading: "", topTrailing: "",
+    bottomLeading: "", bottomTrailing: "")
+
+  public static let dashed = BorderSet(
+    top: "─·", bottom: "─·", left: "│·", right: "│·",
+    topLeading: "┌", topTrailing: "┐",
+    bottomLeading: "└", bottomTrailing: "┘")
+
+  public static let dashedHeavy = BorderSet(
+    top: "━┅", bottom: "━┅", left: "┃┇", right: "┃┇",
+    topLeading: "┏", topTrailing: "┓",
+    bottomLeading: "┗", bottomTrailing: "┛")
+
+  public static let markdown = BorderSet(
+    top: "-", bottom: "-", left: "|", right: "|",
+    topLeading: "|", topTrailing: "|",
+    bottomLeading: "|", bottomTrailing: "|")
+}
