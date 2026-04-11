@@ -128,53 +128,90 @@ extension Rasterizer {
     clip: Rect?,
     dirtyRows: Set<Int>?
   ) {
-    struct Frame {
-      let node: DrawNode
-      let clip: Rect?
+    // Two frame kinds.  A `.visit` frame paints the node's `commands`
+    // (pre-child commands) and then pushes its children plus, if the
+    // node has any `postCommands`, a `.post` frame on top of those
+    // children.  Because the stack is LIFO, the children pop first and
+    // the `.post` frame pops only after every descendant has been
+    // painted — giving us the "paint after children" semantics that
+    // inset-placement borders need to correctly overdraw the outermost
+    // cells of their subtree.
+    enum Frame {
+      case visit(node: DrawNode, clip: Rect?)
+      case post(
+        commands: [DrawCommand],
+        environment: StyleEnvironmentSnapshot,
+        clip: Rect?)
     }
 
-    var stack: [Frame] = [Frame(node: node, clip: clip)]
+    var stack: [Frame] = [.visit(node: node, clip: clip)]
 
     while let frame = stack.popLast() {
-      let effectiveClip = intersect(frame.clip, frame.node.clipBounds)
-      let visibleBounds: Rect
-      if let effectiveClip {
-        guard let clipped = intersect(frame.node.bounds, effectiveClip) else {
-          continue
-        }
-        visibleBounds = clipped
-      } else {
-        visibleBounds = frame.node.bounds
-      }
-
-      if let dirtyRows {
-        let nodeTop = max(0, visibleBounds.origin.y)
-        let nodeBottom = nodeTop + max(0, visibleBounds.size.height)
-        if nodeBottom > nodeTop {
-          var intersects = false
-          for row in dirtyRows {
-            if row >= nodeTop, row < nodeBottom {
-              intersects = true
-              break
-            }
-          }
-          if !intersects {
+      switch frame {
+      case .post(let commands, let environment, let clip):
+        paint(
+          commands: commands,
+          environment: environment,
+          cells: &cells,
+          imageAttachments: &imageAttachments,
+          clip: clip,
+          dirtyRows: dirtyRows
+        )
+      case .visit(let node, let frameClip):
+        let effectiveClip = intersect(frameClip, node.clipBounds)
+        let visibleBounds: Rect
+        if let effectiveClip {
+          guard let clipped = intersect(node.bounds, effectiveClip) else {
             continue
           }
+          visibleBounds = clipped
+        } else {
+          visibleBounds = node.bounds
         }
-      }
 
-      paint(
-        commands: frame.node.commands,
-        environment: frame.node.environmentSnapshot.style,
-        cells: &cells,
-        imageAttachments: &imageAttachments,
-        clip: effectiveClip,
-        dirtyRows: dirtyRows
-      )
+        if let dirtyRows {
+          let nodeTop = max(0, visibleBounds.origin.y)
+          let nodeBottom = nodeTop + max(0, visibleBounds.size.height)
+          if nodeBottom > nodeTop {
+            var intersects = false
+            for row in dirtyRows {
+              if row >= nodeTop, row < nodeBottom {
+                intersects = true
+                break
+              }
+            }
+            if !intersects {
+              continue
+            }
+          }
+        }
 
-      for child in frame.node.children.reversed() {
-        stack.append(Frame(node: child, clip: effectiveClip))
+        paint(
+          commands: node.commands,
+          environment: node.environmentSnapshot.style,
+          cells: &cells,
+          imageAttachments: &imageAttachments,
+          clip: effectiveClip,
+          dirtyRows: dirtyRows
+        )
+
+        // Schedule post-children commands first so they pop LAST
+        // (after all descendants of this node have been processed),
+        // then push children in reverse so they pop in declared
+        // order.  Skip the post frame entirely when there are no
+        // post commands to keep the common path allocation-free.
+        if !node.postCommands.isEmpty {
+          stack.append(
+            .post(
+              commands: node.postCommands,
+              environment: node.environmentSnapshot.style,
+              clip: effectiveClip
+            )
+          )
+        }
+        for child in node.children.reversed() {
+          stack.append(.visit(node: child, clip: effectiveClip))
+        }
       }
     }
   }
@@ -812,7 +849,6 @@ extension Rasterizer {
     // sides lie entirely within the reserved inset and the content
     // sits in the interior rectangle `[leftWidth..width-rightWidth,
     // topWidth..height-bottomWidth]`.
-    let isInset = set.placement == .inset
 
     // Top edge cells: the non-corner region is
     // [outer.origin.x + leftWidth, outer.origin.x + width - rightWidth).
@@ -985,7 +1021,6 @@ extension Rasterizer {
       )
     }
 
-    _ = isInset  // reserved for future use by blend/phase paths (M5)
   }
 
   /// Eagerly resolves a border side's foreground/background style into a

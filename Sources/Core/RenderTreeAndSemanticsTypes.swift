@@ -947,6 +947,12 @@ public struct DrawNode: Equatable, Sendable {
   public var clipBounds: Rect?
   public var metadata: DrawMetadata
   public var commands: [DrawCommand]
+  /// Commands that must paint **after** this node's children have been
+  /// fully painted.  Used by features that overdraw their children, such
+  /// as inset-placement borders whose edge glyphs occupy the outermost
+  /// cells of the child's frame and must therefore win the paint order
+  /// against the child's own content.  Most nodes leave this empty.
+  public var postCommands: [DrawCommand]
   public var children: [DrawNode] {
     didSet {
       recomputeSubtreeNodeCount()
@@ -961,6 +967,7 @@ public struct DrawNode: Equatable, Sendable {
     clipBounds: Rect? = nil,
     metadata: DrawMetadata = .init(),
     commands: [DrawCommand] = [],
+    postCommands: [DrawCommand] = [],
     children: [DrawNode] = []
   ) {
     self.identity = identity
@@ -969,6 +976,7 @@ public struct DrawNode: Equatable, Sendable {
     self.clipBounds = clipBounds
     self.metadata = metadata
     self.commands = commands
+    self.postCommands = postCommands
     self.children = children
     subtreeNodeCount = 1
     recomputeSubtreeNodeCount()
