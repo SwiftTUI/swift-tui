@@ -158,7 +158,8 @@ private struct DynamicStateLocation<Value> {
 private final class StateBox<Value> {
   private let slotOrdinal: Int
   private var seedValue: Value
-  private var boundLocation: DynamicStateLocation<Value>?
+  private var boundLocationsByIdentity: [Identity: DynamicStateLocation<Value>]
+  private var lastBoundIdentity: Identity?
   private var retainedValuesByIdentity: [Identity: Value]
 
   init(
@@ -167,7 +168,8 @@ private final class StateBox<Value> {
   ) {
     self.slotOrdinal = slotOrdinal
     self.seedValue = seedValue
-    boundLocation = nil
+    boundLocationsByIdentity = [:]
+    lastBoundIdentity = nil
     retainedValuesByIdentity = [:]
   }
 
@@ -179,12 +181,29 @@ private final class StateBox<Value> {
     seedValue = newValue
   }
 
-  func remember(_ location: DynamicStateLocation<Value>) {
-    boundLocation = location
+  /// Stores `location` under the concrete view identity it targets so the
+  /// same box can serve multiple renderers of the same view struct without
+  /// overwriting each other's storage, and so callers whose task-local
+  /// authoring context doesn't include the @State's owning view (the classic
+  /// case: a closure captured inside a wrapper view) can still find a
+  /// valid location to mutate.
+  func remember(_ location: DynamicStateLocation<Value>, for identity: Identity) {
+    boundLocationsByIdentity[identity] = location
+    lastBoundIdentity = identity
   }
 
+  /// Looks up a previously-remembered location for exactly `identity`.
+  func rememberedLocation(for identity: Identity) -> DynamicStateLocation<Value>? {
+    boundLocationsByIdentity[identity]
+  }
+
+  /// The most recently remembered location across all identities — the
+  /// fallback used when the current task-local context doesn't resolve
+  /// to any known binding (e.g. the caller is a wrapper view whose
+  /// identity isn't the @State's owner).
   func currentLocation() -> DynamicStateLocation<Value>? {
-    boundLocation
+    guard let lastBoundIdentity else { return nil }
+    return boundLocationsByIdentity[lastBoundIdentity]
   }
 
   func retainedValue(
@@ -266,10 +285,30 @@ public struct State<Value> {
 
   private func activeLocation() -> DynamicStateLocation<Value>? {
     if let context = AuthoringContextStorage.current {
-      let location = makeLocation(for: context)
-      box.remember(location)
-      _ = location.getValue()
-      return location
+      // We're in a resolve pass (the current view's body is being
+      // evaluated). Build — or refresh — the location bound to that
+      // view's identity. Refreshing on every resolve is important
+      // because the same view struct can be hosted by several
+      // independent renderers/ViewGraphs concurrently, and each render
+      // pass in each graph needs to bind the @State to *its* ViewNode
+      // rather than whichever graph resolved last.
+      if ViewNodeContext.current != nil {
+        let location = makeLocation(for: context)
+        box.remember(location, for: context.viewIdentity)
+        _ = location.getValue()
+        return location
+      }
+      // Not in a resolve pass — we're inside an action or lifecycle
+      // callback. Look up the location bound to whichever view identity
+      // the task-local context is scoped to. If that identity never
+      // touched this @State directly (the classic case: a Button inside
+      // a wrapper view whose action closure captured `self` from the
+      // wrapper's *parent*), there will be no entry. Fall back to the
+      // most recently bound identity, which is the @State's true owning
+      // view.
+      if let existing = box.rememberedLocation(for: context.viewIdentity) {
+        return existing
+      }
     }
 
     return box.currentLocation()

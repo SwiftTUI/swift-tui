@@ -51,6 +51,19 @@ extension ShapeStyle where Self == SemanticShapeStyle {
   public static var muted: Self { .init(.muted) }
 }
 
+extension ShapeStyle where Self == Color {
+  public static var clear: Color { Color(red: 0, green: 0, blue: 0, alpha: 0, profile: .sRGB) }
+  public static var black: Color { Color(red: 0, green: 0, blue: 0, alpha: 1, profile: .sRGB) }
+  public static var white: Color { Color(red: 1, green: 1, blue: 1, alpha: 1, profile: .sRGB) }
+  public static var red: Color { try! Self(hex: "#E05757FF") }
+  public static var green: Color { try! Self(hex: "#61C67BFF") }
+  public static var blue: Color { try! Self(hex: "#5BA3FFFF") }
+  public static var yellow: Color { try! Self(hex: "#EBB33CFF") }
+  public static var magenta: Color { try! Self(hex: "#B46EFFFF") }
+  public static var cyan: Color { try! Self(hex: "#56B6C2FF") }
+  public static var gray: Color { try! Self(hex: "#8C92ACFF") }
+}
+
 extension Color: ShapeStyle {
   public func eraseToAnyShapeStyle() -> AnyShapeStyle {
     .color(self)

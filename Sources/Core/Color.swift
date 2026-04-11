@@ -1235,19 +1235,6 @@ public struct Color: Hashable, Sendable, Codable {
   }
 }
 
-extension Color {
-  public static let clear = Color(red: 0, green: 0, blue: 0, alpha: 0, profile: .sRGB)
-  public static let black = Color(red: 0, green: 0, blue: 0, alpha: 1, profile: .sRGB)
-  public static let white = Color(red: 1, green: 1, blue: 1, alpha: 1, profile: .sRGB)
-  public static let red = try! Self(hex: "#E05757")
-  public static let green = try! Self(hex: "#61C67B")
-  public static let blue = try! Self(hex: "#5BA3FF")
-  public static let yellow = try! Self(hex: "#EBB33C")
-  public static let magenta = try! Self(hex: "#B46EFF")
-  public static let cyan = try! Self(hex: "#56B6C2")
-  public static let gray = try! Self(hex: "#8C92AC")
-}
-
 // MARK: - Internal conversion helpers
 
 extension Color {

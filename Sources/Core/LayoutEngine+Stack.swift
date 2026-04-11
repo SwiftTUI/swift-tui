@@ -32,7 +32,61 @@ extension LayoutEngine {
     }
 
     guard case .finite(let proposedMain) = mainDimension(of: parentProposal, for: axis) else {
-      return idealMeasurements
+      // Parent did not propose a finite main dimension (the classic
+      // `.fixedSize()` case, or an unconstrained root).  SwiftUI's stack
+      // still reconciles the cross axis to the widest child's ideal and
+      // then re-measures every child with that cross width.  Without
+      // that re-measure, internal `Spacer`s and `frame(maxWidth: .infinity)`
+      // inside row children stay collapsed because the children only ever
+      // see `.unspecified` on their main axis.
+      //
+      // We only do this when the parent's cross axis is also unspecified,
+      // which is what distinguishes "fixedSize / unconstrained parent"
+      // from a parent that has already decided on a cross width.  For the
+      // already-finite-cross path we keep the existing (faster) behaviour.
+      guard case .unspecified = crossDimension(of: parentProposal, for: axis) else {
+        return idealMeasurements
+      }
+      let maxIdealCross = idealMeasurements.reduce(0) { partial, measurement in
+        max(partial, crossDimension(of: measurement.measuredSize, for: axis))
+      }
+      guard maxIdealCross > 0 else {
+        return idealMeasurements
+      }
+      // Fast path: if every child's ideal cross already matches the
+      // max, there is no slack for a flexible child (Spacer,
+      // frame(maxWidth:.infinity)) to claim, so re-measuring with a
+      // finite cross produces the same result.  Skipping the second
+      // pass keeps homogeneous stacks out of the measurement cache's
+      // resize-cost path.
+      let needsReconciliation = idealMeasurements.contains { measurement in
+        crossDimension(of: measurement.measuredSize, for: axis) < maxIdealCross
+      }
+      guard needsReconciliation else {
+        return idealMeasurements
+      }
+      // Only re-measure children that could actually adapt to the
+      // wider cross axis.  Children already at the max have no slack
+      // to claim, and rigid text-like leaves (Text, TextFigure,
+      // RichText, Rule) return the same measurement at any cross that
+      // is wider than their ideal.  Skipping them keeps the clean
+      // siblings of an asymmetric stack out of the re-measurement
+      // path so their placed tree can still be reused across frames.
+      return idealMeasurements.enumerated().map { index, ideal in
+        let idealCross = crossDimension(of: ideal.measuredSize, for: axis)
+        guard idealCross < maxIdealCross else {
+          return ideal
+        }
+        if stackChildRemeasurementIsNoop(children[index], parentStackAxis: axis) {
+          return ideal
+        }
+        let reProposal = stackProposal(
+          axis: axis,
+          main: .finite(mainDimension(of: ideal.measuredSize, for: axis)),
+          cross: .finite(maxIdealCross)
+        )
+        return measure(children[index], proposal: reProposal, passContext: passContext)
+      }
     }
 
     let spacingBudget = resolvedStackSpacings(
@@ -484,6 +538,18 @@ extension LayoutEngine {
     }
   }
 
+  package func crossDimension(
+    of size: Size,
+    for axis: Axis
+  ) -> Int {
+    switch axis {
+    case .horizontal:
+      return size.height
+    case .vertical:
+      return size.width
+    }
+  }
+
   package func mainDimension(
     of point: Point,
     for axis: Axis
@@ -511,6 +577,60 @@ extension LayoutEngine {
 
   package func isSpacer(_ child: ResolvedNode) -> Bool {
     child.kind == .view("Spacer")
+  }
+
+  /// Whether re-measuring `child` with a wider cross dimension (for
+  /// the fixedSize stack reconciliation pass in `measureStackChildren`)
+  /// is guaranteed to produce the same measurement as its ideal pass.
+  ///
+  /// The reconciliation pass only helps when the subtree contains
+  /// something that can actually claim the extra space along the
+  /// parent's cross axis — a `Spacer` inside a stack aligned to that
+  /// axis, or a `flexibleFrame` with a `.infinity` max along the
+  /// axis.  Subtrees of purely rigid views (Text, nested VStacks of
+  /// Texts, etc.) measure identically at any wider cross, so
+  /// re-measuring them is pure waste and also evicts their retained
+  /// placement cache across frames.
+  package func stackChildRemeasurementIsNoop(
+    _ child: ResolvedNode,
+    parentStackAxis: Axis
+  ) -> Bool {
+    let crossAxis: Axis =
+      switch parentStackAxis {
+      case .horizontal: .vertical
+      case .vertical: .horizontal
+      }
+    return !subtreeHasFlexibleContent(child, axis: crossAxis)
+  }
+
+  private func subtreeHasFlexibleContent(
+    _ node: ResolvedNode,
+    axis: Axis
+  ) -> Bool {
+    switch node.layoutBehavior {
+    case .flexibleFrame(let minW, _, let maxW, let minH, _, let maxH, _):
+      let (axisMin, axisMax): (ProposedDimension?, ProposedDimension?) =
+        switch axis {
+        case .horizontal: (minW, maxW)
+        case .vertical: (minH, maxH)
+        }
+      if case .infinity = axisMax {
+        return true
+      }
+      if case .finite(let lo) = axisMin ?? .finite(0),
+        case .finite(let hi) = axisMax ?? .finite(0),
+        hi > lo
+      {
+        return true
+      }
+    case .stack(let stackAxis, _, _, _), .lazyStack(let stackAxis, _, _, _):
+      if stackAxis == axis, node.children.contains(where: isSpacer) {
+        return true
+      }
+    default:
+      break
+    }
+    return node.children.contains { subtreeHasFlexibleContent($0, axis: axis) }
   }
 
   package func isFixedSize(
