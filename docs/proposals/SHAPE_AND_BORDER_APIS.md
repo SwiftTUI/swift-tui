@@ -67,14 +67,7 @@ This document proposes a new surface that:
 
 ## 2. What we already have (inventory)
 
-> **Historical note**: this section describes the surface as it existed
-> *before* the revamp landed. It is preserved so future maintainers can
-> trace why the redesign looks the way it does. The "before" types
-> referenced here — `LineVariant`, the inset-by-default `.border`, the
-> closed `BorderGlyphSet` tables — no longer exist in the codebase.
 
-For the design that follows it helps to be precise about the surface
-that existed before this revamp.
 
 **Shape protocol** (`Sources/View/Shapes/ShapeStyles.swift:4-11`)
 
@@ -330,10 +323,7 @@ widest grapheme in that edge*. So a CJK or emoji edge correctly reports
 ### 4.3 Built-in `BorderSet`s
 
 Replace the closed `LineVariant` enum with a set of static factories on
-`BorderSet`. **Landed**: `LineVariant` was deleted wholesale in M7; the
-rasterizer now reads glyphs from `BorderSet` directly (single-character
-edges come through a thin `BorderGlyphSet` adapter for the shape-stroke
-path and rule painter).
+
 
 ```swift
 extension BorderSet {
@@ -474,13 +464,7 @@ public struct Ellipse: InsettableShape { … }       // fits rect (warning: cell
 `Capsule`/`Circle`/`Ellipse` are new. They render via Braille subpixel
 glyphs (`⠀`–`⣿`, 2×4 pixels per cell) when stroked or filled, which gives
 real curves at typical sizes. At sub-Braille resolutions (e.g. a 5×3
-"circle") they fall back to half-block approximations.
 
-**Landed**: curved shape pattern fills (`Circle().fill(PatternFill.lightShade)`)
-work through per-cell containment checks in the rasterizer
-(`shapeContains` for `.circle`/`.ellipse`/`.capsule`) rather than through
-Braille subpixel sampling — Braille is still the primary stroke path,
-but fills are cell-accurate.
 
 **Rejected from the SwiftUI list:**
 
@@ -670,11 +654,6 @@ to play nicely with `fill`/`stroke`/`strokeBorder` and that algebra is
 not worth the complexity for arbitrary drawings. Borrowed straight from
 termui's canvas and Textual's `Canvas`.
 
-**Landed**: `Canvas<Drawing>`, `CanvasDrawing`, and `CanvasContext` all
-live in `Core` with a thin `Canvas<Drawing>: View` shell in the `View`
-layer so authoring code keeps the SwiftUI feel while the drawing
-primitives (pixels / lines / rects / text) are Core types that the
-rasterizer can consume directly.
 
 Common case (a sparkline):
 
@@ -705,12 +684,7 @@ The full list, summarized for reviewers:
    leave room for `.path([CanvasOp])` if anyone needs it).
 5. **`CanvasDrawing` is a public protocol.** Plot types, charts, ASCII
    art generators all conform without depending on framework internals.
-6. **Dashed borders ship via multi-rune `BorderSet` edges** (e.g.
-   `BorderSet.dashed` cycles `"─·"`). **Landed**: the originally
-   proposed `StrokeStyle.dashPattern: [Int]` field was dropped — the
-   multi-rune edge story is strictly more expressive and there was no
-   call site asking for the terser form. `StrokeStyle` stores only
-   `lineWidth` and `borderSet`.
+
 
 ### 4.10 What this looks like at the call site
 
@@ -765,7 +739,7 @@ A real circle:
 
 ```swift
 Circle()
-  .strokeBorder(.accent, style: .init(lineWidth: 1, borderSet: .single))
+
   .frame(width: 10, height: 5)   // Braille pixels make it readable
 ```
 
@@ -792,32 +766,7 @@ Why break it:
 - The mental model for new users is much cleaner: "a border lives around
   the box, not in it."
 
-Migration (landed):
 
-1. The `.border(...)` modifier flipped. Existing call sites that depended
-   on inset behavior get the new outset behavior automatically and their
-   layouts grow by 2 cells in each affected dimension.
-2. For users who *want* the old inset behavior, the explicit form is
-   `.border(set: .innerHalfBlock)` or any custom `BorderSet` with
-   `placement: .inset`.
-3. `Shape.stroke` / `Shape.strokeBorder` keep their SwiftUI-faithful
-   semantics. The `.border` modifier is no longer implemented as
-   `.overlay(Rectangle().strokeBorder(...))` — it goes through the new
-   layout-aware path.
-4. **`LineVariant` is deleted wholesale** (Milestone 7). No deprecation
-   shim — `StrokeStyle.lineVariant` is gone and callers use
-   `StrokeStyle(borderSet: .rounded)` / `.single` / `.heavy` / etc.
-   instead. The old `.automatic` "pick rounded corners on a rounded
-   rectangle" dispatch is preserved as a narrow internal helper in the
-   rasterizer so container chrome (Button, Picker, Menu, popovers) that
-   relied on the default `StrokeStyle()` keep their curved corners
-   without the call sites having to pass `.rounded` explicitly.
-5. The `BorderSet.presentationChrome` static is new, carrying the glyphs
-   the old `LineVariant.presentationChrome` case used to emit. It keeps
-   a distinct `.decorative` placement so the rasterizer can still
-   recognize it and sample the interior fill when resolving per-cell
-   backgrounds. External callers should usually prefer `.single` or
-   `.rounded`.
 
 There is no automatic source-compat shim for "give me the old default."
 Users get the new default; if they want the old one they ask for it.

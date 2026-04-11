@@ -115,23 +115,14 @@ extension Picker {
       triggerRow
 
       if isActiveNavigation {
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(0..<options.count) { index in
-            pickerRow(
-              label: options[index].label,
-              isSelected: index == selectedIndex,
-              isActiveNavigation: isActiveNavigation && showsFocusEffect,
-              isEnabled: isEnabled,
-              styleEnvironment: styleEnvironment,
-              lineWidth: nil,
-              routeIdentity: pickerOptionIdentity(
-                for: controlIdentity,
-                index: index
-              )
-            )
-          }
-        }
-        .padding(.init(leading: 1))
+        menuPickerOptionList(
+          controlIdentity: controlIdentity,
+          options: options,
+          selectedIndex: selectedIndex,
+          showsFocusEffect: showsFocusEffect,
+          isEnabled: isEnabled,
+          styleEnvironment: styleEnvironment
+        )
       }
     }
     .foregroundStyle(triggerChrome.foregroundStyle)
@@ -141,6 +132,33 @@ extension Picker {
         minimumHeight: 1 + 1 + (isActiveNavigation ? options.count : 0)
       )
     )
+  }
+
+  private func menuPickerOptionList(
+    controlIdentity: Identity,
+    options: [Option],
+    selectedIndex: Int?,
+    showsFocusEffect: Bool,
+    isEnabled: Bool,
+    styleEnvironment: StyleEnvironmentSnapshot
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(0..<options.count) { index in
+        pickerRow(
+          label: options[index].label,
+          isSelected: index == selectedIndex,
+          isActiveNavigation: showsFocusEffect,
+          isEnabled: isEnabled,
+          styleEnvironment: styleEnvironment,
+          lineWidth: nil,
+          routeIdentity: pickerOptionIdentity(
+            for: controlIdentity,
+            index: index
+          )
+        )
+      }
+    }
+    .padding(.init(leading: 1))
   }
 
   @ViewBuilder
@@ -376,35 +394,16 @@ extension Picker {
         .foregroundStyle(.terminalBorder(.accent))
       HStack(alignment: .center, spacing: 1) {
         ForEach(0..<options.count) { index in
-          let option = options[index]
-          let segmentChrome = styleEnvironment.controlChrome(
+          segmentedSegmentView(
+            option: options[index],
+            index: index,
+            controlIdentity: controlIdentity,
+            selectedIndex: selectedIndex,
+            isActiveNavigation: isActiveNavigation,
+            showsFocusEffect: showsFocusEffect,
             isEnabled: isEnabled,
-            isFocused: isActiveNavigation && showsFocusEffect && index == selectedIndex,
-            isSelected: index == selectedIndex
+            styleEnvironment: styleEnvironment
           )
-          let isSelected = index == selectedIndex
-          Text(option.label)
-            .lineLimit(1)
-            .background {
-              if isSelected {
-                Rectangle().fill(.tint)
-              } else if isActiveNavigation && showsFocusEffect {
-                Rectangle().inset(by: 1).fill(
-                  segmentChrome.backgroundStyle
-                )
-              }
-            }
-            .foregroundStyle(
-              isSelected ? segmentChrome.contentBackgroundStyle : segmentChrome.foregroundStyle
-            )
-            .drawMetadata(.init(opacity: segmentChrome.opacity))
-            .id(
-              pickerOptionIdentity(
-                for: controlIdentity,
-                index: index
-              )
-            )
-            .semanticMetadata(.init(participatesInPointerHitTesting: true))
           if index < options.count - 1 {
             Divider()
           }
@@ -424,6 +423,46 @@ extension Picker {
     }
     .foregroundStyle(containerChrome.foregroundStyle)
     .drawMetadata(.init(opacity: containerChrome.opacity))
+  }
+
+  private func segmentedSegmentView(
+    option: Option,
+    index: Int,
+    controlIdentity: Identity,
+    selectedIndex: Int?,
+    isActiveNavigation: Bool,
+    showsFocusEffect: Bool,
+    isEnabled: Bool,
+    styleEnvironment: StyleEnvironmentSnapshot
+  ) -> some View {
+    let isSelected = index == selectedIndex
+    let segmentChrome = styleEnvironment.controlChrome(
+      isEnabled: isEnabled,
+      isFocused: isActiveNavigation && showsFocusEffect && isSelected,
+      isSelected: isSelected
+    )
+    return Text(option.label)
+      .lineLimit(1)
+      .background {
+        if isSelected {
+          Rectangle().fill(.tint)
+        } else if isActiveNavigation && showsFocusEffect {
+          Rectangle().inset(by: 1).fill(
+            segmentChrome.backgroundStyle
+          )
+        }
+      }
+      .foregroundStyle(
+        isSelected ? segmentChrome.contentBackgroundStyle : segmentChrome.foregroundStyle
+      )
+      .drawMetadata(.init(opacity: segmentChrome.opacity))
+      .id(
+        pickerOptionIdentity(
+          for: controlIdentity,
+          index: index
+        )
+      )
+      .semanticMetadata(.init(participatesInPointerHitTesting: true))
   }
 
   @ViewBuilder

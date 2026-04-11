@@ -5,17 +5,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Test Commands
 
 ```bash
-swift build                  # Build all targets
-swift test                   # Run all tests
-swift test --filter TerminalUITests.SwiftUISurfaceTests  # Run a single test suite
-swift test --filter TerminalUITests.SwiftUISurfaceTests/testName  # Run a single test
+bun run test                             # Run the full repo test surface and environment checks
+swiftly run swift build                  # Build all targets
+swiftly run swift test                   # Run root package tests
+swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests  # Run a single test suite
+swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests/testName  # Run a single test
 swift format format -i --configuration .swift-format.json Sources/ Tests/  # Format all code
 ```
 
 ## Development Guidelines
 
 - When implementing a new feature that replaces or extends an existing constraint (e.g., single-scene → multi-scene), search for and remove ALL old guards/assertions that enforce the previous constraint.
-- When working with this Swift TUI framework, always run the full test suite (`swift test`) after making changes and confirm all tests pass before considering work complete.
+- When working with this Swift TUI framework, always run `bun run test` after changes that touch shared code, peer packages, or repo tooling, and confirm it passes before considering work complete.
 
 ## AnyView Policy
 
@@ -44,7 +45,7 @@ There is not currently a separate checked-in source-layout hook. Keep
 
 ## Swift Language Settings
 
-- Swift 6.2 with strict memory safety and Swift 6 language mode.
+- Swift 6.3 with strict memory safety and Swift 6 language mode.
 - Upcoming features enabled: `ExistentialAny`, `NonisolatedNonsendingByDefault`, `MemberImportVisibility`, `InternalImportsByDefault`, among others.
 - Platforms: macOS 15+, iOS 18+.
 
@@ -110,8 +111,10 @@ Fixture updates require explanation when they cross unrelated subsystems or alte
 Detailed design docs live in `/docs/`:
 - `ARCHITECTURE.md` -- target boundaries and pipeline
 - `RUNTIME.md` -- lifecycle, task semantics, incremental rendering model
+- `HOST_PACKAGES.md` -- runner-package and embedded-host packaging model
 - `SOURCE_LAYOUT.md` -- per-file ownership map
 - `PUBLIC_API_INVENTORY.md` -- public surface classification
 - `PUBLIC_SURFACE_POLICY.md` -- public API governance rules, including `AnyView` and type-erasure policy
 - `FOCUS.md` -- focus system design
 - `VISION.md` -- project philosophy and scope
+- `proposals/` -- active design notes that are still intentionally retained

@@ -60,7 +60,7 @@ test("falls back to the original wasm when stripping corrupts the artifact", asy
 });
 
 test("fails when the source wasm itself is not browser-parseable", async () => {
-  const fixture = await createFixture(new Uint8Array([0x00, 0x61, 0x73, 0x6d]));
+  const fixture = await createFixture(buildHugeFunctionTypeWasm(1001));
 
   await expect(
     packageBrowserValidatedWasm({
@@ -69,6 +69,20 @@ test("fails when the source wasm itself is not browser-parseable", async () => {
       strip: async () => {},
     })
   ).rejects.toThrow("generated wasm does not parse in browser WebAssembly");
+  await expect(
+    packageBrowserValidatedWasm({
+      sourceWasmPath: fixture.sourceWasmPath,
+      outputWasmPath: fixture.outputWasmPath,
+      strip: async () => {},
+    })
+  ).rejects.toThrow("maxTypeParameterCount=1001");
+  await expect(
+    packageBrowserValidatedWasm({
+      sourceWasmPath: fixture.sourceWasmPath,
+      outputWasmPath: fixture.outputWasmPath,
+      strip: async () => {},
+    })
+  ).rejects.toThrow("overBrowserLimitTypes=0");
 });
 
 async function createFixture(
@@ -85,4 +99,44 @@ async function createFixture(
     sourceWasmPath,
     outputWasmPath,
   };
+}
+
+function buildHugeFunctionTypeWasm(
+  parameterCount: number
+): Uint8Array {
+  const payload = [
+    ...encodeUnsignedLEB128(1),
+    0x60,
+    ...encodeUnsignedLEB128(parameterCount),
+    ...new Array<number>(parameterCount).fill(0x7f),
+    0x00,
+  ];
+
+  return new Uint8Array([
+    ...minimalWasmBytes,
+    0x01,
+    ...encodeUnsignedLEB128(payload.length),
+    ...payload,
+  ]);
+}
+
+function encodeUnsignedLEB128(
+  value: number
+): number[] {
+  if (value < 0) {
+    throw new Error("LEB128 values must be non-negative");
+  }
+
+  const bytes: number[] = [];
+  let remaining = value;
+  do {
+    let byte = remaining & 0x7f;
+    remaining >>>= 7;
+    if (remaining !== 0) {
+      byte |= 0x80;
+    }
+    bytes.push(byte);
+  } while (remaining !== 0);
+
+  return bytes;
 }

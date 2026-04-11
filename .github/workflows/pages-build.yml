@@ -13,9 +13,14 @@ jobs:
 
   build-web-example:
     name: Build WebExample
-    runs-on: macos-latest
+    runs-on: macos-26
 
     steps:
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.4'
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -85,6 +90,32 @@ jobs:
             https://download.swift.org/swift-6.3-release/wasm-sdk/swift-6.3-RELEASE/swift-6.3-RELEASE_wasm.artifactbundle.tar.gz \
             --checksum 9fa4016ee632c7e9e906608ec3b55cf13dfc4dff44e47574c5af58064dc33fd9
           fi
+
+      - name: Log WebExample toolchain environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
+          hash -r
+
+          echo "PATH=$PATH"
+          uname -a
+          sw_vers
+          arch
+          xcodebuild -version
+          echo "which bun: $(which bun)"
+          echo "which swiftly: $(which swiftly)"
+          echo "which swift: $(which swift)"
+          echo "which wasm-ld: $(which wasm-ld)"
+          bun --version
+          bun --revision
+          ~/.swiftly/bin/swiftly --version
+          swiftly list
+          swiftly run swift --version
+          swiftly run swift sdk list
+          ls -l "$HOME/.swiftly/bin/swift" "$HOME/.swiftly/bin/wasm-ld"
+          plutil -p "$HOME/Library/Developer/Toolchains/swift-6.3-RELEASE.xctoolchain/Info.plist" || true
 
       - name: Install Bun workspace deps
         shell: bash
