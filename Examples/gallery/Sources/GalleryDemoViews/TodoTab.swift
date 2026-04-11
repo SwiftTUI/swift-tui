@@ -1,4 +1,3 @@
-import Foundation
 import TerminalUI
 
 struct TodoTab: View {
