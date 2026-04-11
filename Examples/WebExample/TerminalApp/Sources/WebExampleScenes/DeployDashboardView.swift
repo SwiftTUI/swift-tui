@@ -64,25 +64,22 @@ struct DeployDashboardView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
       header
-      Divider()
+        .padding(1)
+      ScrollView {
+        ViewThatFits {
+          HStack(alignment: .top, spacing: 1) {
+            primaryColumn
+            secondaryColumn
+          }
 
-      ViewThatFits {
-        HStack(alignment: .top, spacing: 1) {
-          primaryColumn
-          secondaryColumn
+          VStack(alignment: .leading, spacing: 1) {
+            primaryColumn
+            secondaryColumn
+          }
         }
-
-        VStack(alignment: .leading, spacing: 1) {
-          primaryColumn
-          secondaryColumn
-        }
+        Spacer(minLength: 0)
       }
-
-      Spacer(minLength: 0)
-      Text("Resize the frame or switch scenes from the web host toolbar.")
-        .foregroundStyle(.separator)
     }
-    .padding(1)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
