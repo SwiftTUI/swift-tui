@@ -241,6 +241,14 @@ extension SnapshotRenderer {
       return "lazyStack(\(axis.rawValue),\(spacingDescription),\(alignmentDescription))"
     case .padding(let insets):
       return "padding(\(insets.top),\(insets.leading),\(insets.bottom),\(insets.trailing))"
+    case .border(_, _, _, _, _, let sides):
+      var names: [String] = []
+      if sides.contains(.top) { names.append("top") }
+      if sides.contains(.leading) { names.append("leading") }
+      if sides.contains(.bottom) { names.append("bottom") }
+      if sides.contains(.trailing) { names.append("trailing") }
+      let sidesDescription = names.isEmpty ? "none" : names.joined(separator: "+")
+      return "border(sides:\(sidesDescription))"
     case .frame(let width, let height, let alignment):
       let widthDescription = width.map { String($0) } ?? "nil"
       let heightDescription = height.map { String($0) } ?? "nil"
