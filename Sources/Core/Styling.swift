@@ -594,6 +594,9 @@ public enum ShapeFillMode: Equatable, Sendable {
 public enum ShapeGeometry: Equatable, Sendable {
   case rectangle
   case roundedRectangle(cornerRadius: Int)
+  case circle
+  case ellipse
+  case capsule
 }
 
 /// The draw operation applied to a shape geometry.

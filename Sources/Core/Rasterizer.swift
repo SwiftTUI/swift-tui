@@ -1274,7 +1274,13 @@ extension Rasterizer {
     }
 
     switch geometry {
-    case .rectangle:
+    case .rectangle, .circle, .ellipse, .capsule:
+      // Rectangle is a trivial bounding-box test. `.circle`, `.ellipse`,
+      // and `.capsule` are rendered via the Braille subpixel path and
+      // never actually reach `shapeContains` for their own hit-testing —
+      // they dispatch earlier in `paintFill`/`paintStroke`. We still
+      // return the bounding-box test here so the switch is exhaustive
+      // and any future cell-level sampling falls back gracefully.
       return x >= targetBounds.origin.x
         && x < targetBounds.origin.x + targetBounds.size.width
         && y >= targetBounds.origin.y
