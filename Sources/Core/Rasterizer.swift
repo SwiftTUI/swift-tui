@@ -1557,14 +1557,12 @@ extension Rasterizer {
         && y >= targetBounds.origin.y
         && y < targetBounds.origin.y + targetBounds.size.height
     case .circle, .ellipse, .capsule:
-      // Curved shapes render through `paintBrailleShape`, which
-      // short-circuits `paintFill`/`paintStroke` before reaching this
-      // per-cell test. Reaching this branch means someone added a new
-      // caller without routing curved shapes to the Braille path —
-      // assert loudly in debug, fall back to "not contained" in release.
-      assertionFailure(
-        "shapeContains called for curved geometry; should dispatch via paintBrailleShape")
-      return false
+      return curvedShapeContains(
+        pointX: x,
+        pointY: y,
+        in: targetBounds,
+        geometry: geometry
+      )
     case .roundedRectangle(let cornerRadius):
       if case .interior = fillMode {
         return x >= targetBounds.origin.x
@@ -1589,6 +1587,112 @@ extension Rasterizer {
       let isCorner =
         (x == minX || x == maxX) && (y == minY || y == maxY)
       return !isCorner
+    }
+  }
+
+  /// Tests whether the cell at `(x, y)` is inside a curved shape
+  /// (``ShapeGeometry/circle``, ``ShapeGeometry/ellipse``,
+  /// ``ShapeGeometry/capsule``) at cell resolution.
+  ///
+  /// The math mirrors the Braille subpixel renderer in
+  /// ``paintBrailleShape(geometry:shapeBounds:colorMode:stroke:environment:cells:clip:backgroundStyle:)``
+  /// so that a cell the test reports as "inside" is a cell the Braille
+  /// rasterizer would actually paint dots into.
+  ///
+  /// For each cell, the test projects the cell's visual center into the
+  /// canvas subpixel grid (every cell is 2 subpixels wide and 4 tall)
+  /// and evaluates the same parametric inequality that `fillCircle`,
+  /// `fillEllipse`, and `drawCapsule` use.
+  private func curvedShapeContains(
+    pointX x: Int,
+    pointY y: Int,
+    in bounds: Rect,
+    geometry: ShapeGeometry
+  ) -> Bool {
+    guard bounds.size.width > 0, bounds.size.height > 0 else {
+      return false
+    }
+    let cellRelX = x - bounds.origin.x
+    let cellRelY = y - bounds.origin.y
+    guard cellRelX >= 0, cellRelX < bounds.size.width,
+      cellRelY >= 0, cellRelY < bounds.size.height
+    else {
+      return false
+    }
+
+    // Project the cell's visual center onto the subpixel grid used by
+    // `paintBrailleShape`. A cell is 2 subpixels wide and 4 tall, so
+    // the center of cell (cx, cy) in subpixel space is
+    // (cx*2 + 0.5, cy*4 + 1.5).
+    let subW = Double(bounds.size.width * 2)
+    let subH = Double(bounds.size.height * 4)
+    let px = Double(cellRelX * 2) + 0.5
+    let py = Double(cellRelY * 4) + 1.5
+
+    switch geometry {
+    case .circle:
+      // Matches `paintBrailleShape`'s circle case:
+      //   radius = (min(subW, subH) - 1) / 2
+      //   cx = (subW - 1) / 2, cy = (subH - 1) / 2
+      let radius = max(0.0, (min(subW, subH) - 1) / 2)
+      let cxSub = (subW - 1) / 2
+      let cySub = (subH - 1) / 2
+      let dx = px - cxSub
+      let dy = py - cySub
+      return dx * dx + dy * dy <= radius * radius
+    case .ellipse:
+      // Matches `paintBrailleShape`'s ellipse case:
+      //   rx = (subW - 1) / 2, ry = (subH - 1) / 2
+      let rx = max(0.0, (subW - 1) / 2)
+      let ry = max(0.0, (subH - 1) / 2)
+      guard rx > 0, ry > 0 else { return false }
+      let cxSub = (subW - 1) / 2
+      let cySub = (subH - 1) / 2
+      let dx = (px - cxSub) / rx
+      let dy = (py - cySub) / ry
+      return dx * dx + dy * dy <= 1
+    case .capsule:
+      // Matches `drawCapsule`: wide capsules get left/right semicircles
+      // joined by a horizontal body rect, tall capsules are transposed.
+      if subW == 1 || subH == 1 {
+        return true
+      }
+      if subW >= subH {
+        let radius = max(0.0, (subH - 1) / 2)
+        let cySub = (subH - 1) / 2
+        let leftCx = radius
+        let rightCx = subW - 1 - radius
+        if px < leftCx {
+          let dx = px - leftCx
+          let dy = py - cySub
+          return dx * dx + dy * dy <= radius * radius
+        } else if px > rightCx {
+          let dx = px - rightCx
+          let dy = py - cySub
+          return dx * dx + dy * dy <= radius * radius
+        } else {
+          return py >= cySub - radius && py <= cySub + radius
+        }
+      } else {
+        let radius = max(0.0, (subW - 1) / 2)
+        let cxSub = (subW - 1) / 2
+        let topCy = radius
+        let bottomCy = subH - 1 - radius
+        if py < topCy {
+          let dx = px - cxSub
+          let dy = py - topCy
+          return dx * dx + dy * dy <= radius * radius
+        } else if py > bottomCy {
+          let dx = px - cxSub
+          let dy = py - bottomCy
+          return dx * dx + dy * dy <= radius * radius
+        } else {
+          return px >= cxSub - radius && px <= cxSub + radius
+        }
+      }
+    case .rectangle, .roundedRectangle:
+      assertionFailure("curvedShapeContains called with non-curved geometry")
+      return false
     }
   }
 
