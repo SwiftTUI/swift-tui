@@ -1,6 +1,6 @@
 # Status
 
-Last updated: April 8, 2026
+Last updated: April 11, 2026
 
 ## Product Status
 
@@ -14,12 +14,11 @@ The package is already usable for real terminal interfaces. The main gaps are
 not around the fundamental pipeline anymore; they are around breadth of surface
 area, app-shell ergonomics, and a few still-conservative runtime paths.
 
-The terminal-native roadmap work described in
-[TERMINAL_NATIVE_ROADMAP.md](TERMINAL_NATIVE_ROADMAP.md) is now substantially
-landed: automatic chrome has been reset, shell navigation primitives are
-canonical, multiline editing and indeterminate loading are public, and the
-command palette plus toast/sheet presentation surfaces now live in the main
-`View` module instead of only in prototype explorations.
+The 2026 terminal-native reset is substantially landed: automatic chrome has
+been reset, shell navigation primitives are canonical, multiline editing and
+indeterminate loading are public, and the command palette plus toast/sheet
+presentation surfaces now live in the main `View` module instead of only in
+prototype explorations.
 
 ## Shipped Surface
 
@@ -104,6 +103,7 @@ hypothesis before they graduate.
 
 - [ARCHITECTURE.md](ARCHITECTURE.md): target boundaries and frame pipeline
 - [RUNTIME.md](RUNTIME.md): runtime behavior, lifecycle semantics, and incremental rendering
+- [HOST_PACKAGES.md](HOST_PACKAGES.md): runner-package and embedded-host packaging model
 - [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md): current source ownership map
 - [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md): classified public surface inventory
 - [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md): future API governance rules

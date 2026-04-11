@@ -1,6 +1,6 @@
-# TUIGUI Design And Status
+# Host Packages
 
-Last updated: April 5, 2026
+Last updated: April 11, 2026
 
 ## Goal
 
@@ -122,9 +122,9 @@ new products in the root package.
 6. The web package keeps one wasm module instance per scene and one `ghostty-web` terminal per scene so scene state survives switches without a more complex protocol.
 7. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior and is now extended with paired render-style updates.
 
-## Verification
+## Verification Paths
 
-Verified on March 30, 2026:
+Relevant package-level verification lives in:
 
 ```bash
 swiftly run swift test
@@ -133,8 +133,8 @@ cd Runners/TerminalUIWASI && swiftly run swift test
 cd GUI/SwiftUITUIGUI && swiftly run swift test
 ```
 
-The root package plus peer executable runner and SwiftUI host packages succeed on the
-repo-default Swift 6.3.0 toolchain.
+Run the package-level tests above when host-package behavior or the shared
+manifest/session plumbing changes.
 
 ## Out Of Scope
 
