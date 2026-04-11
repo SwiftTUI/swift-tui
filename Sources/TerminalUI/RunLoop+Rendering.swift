@@ -19,6 +19,18 @@ package struct FocusSyncRerenderBudget: Equatable, Sendable {
 }
 
 extension RunLoop {
+  private enum AnimationWakeTiming {
+    // When a frame overruns its nominal 33 ms budget, the controller's
+    // requested deadline can already be in the past by the time the
+    // run loop reaches the scheduling site below. Re-queuing an already
+    // due deadline would make `renderPendingFrames` spin inside the same
+    // call; failing to schedule anything would stall the animation until
+    // unrelated input arrives. Clamp overdue deadlines slightly into the
+    // future so the next tick runs "as soon as possible" on the next
+    // event-loop turn without busy-looping in-place.
+    static var minimumLeadTime: Duration { .milliseconds(1) }
+  }
+
   package func renderPendingFrames(renderedFrames: inout Int) throws {
     observationBridge.attachInvalidator(scheduler)
 
@@ -163,7 +175,14 @@ extension RunLoop {
         let anyAffectedIdentityVisible = !animationTick.affectedIdentities
           .isDisjoint(with: artifacts.drawnIdentities)
         if anyAffectedIdentityVisible {
-          scheduler.requestDeadline(nextDeadline)
+          let now = MonotonicInstant.now()
+          let scheduledDeadline =
+            if nextDeadline > now {
+              nextDeadline
+            } else {
+              now.advanced(by: AnimationWakeTiming.minimumLeadTime)
+            }
+          scheduler.requestDeadline(scheduledDeadline)
         }
       }
       observationBridge.prune(

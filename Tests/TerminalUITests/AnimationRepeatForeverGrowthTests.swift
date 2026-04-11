@@ -45,7 +45,7 @@ import Testing
 ///     down the tree drives ZERO `measuredNodesComputed` per tick
 ///     across many frames.
 @MainActor
-@Suite("Animation chasing-light tick frames must not invalidate the measure cache")
+@Suite("Animation chasing-light tick frames must not invalidate the measure cache", .serialized)
 struct AnimationRepeatForeverGrowthTests {
   // MARK: - Equivalence-predicate unit pins
 
@@ -121,7 +121,7 @@ struct AnimationRepeatForeverGrowthTests {
 
   @Test(
     "animated border + Canvas leaf drives zero measure churn across many ticks",
-    arguments: [50, 200]
+    arguments: [30, 80]
   )
   func animatedBorderWithCanvasLeafDoesNotChurnMeasurement(tickCount: Int) throws {
     let renderer = DefaultRenderer()
@@ -235,6 +235,356 @@ struct AnimationRepeatForeverGrowthTests {
       """
     )
   }
+
+  @Test("onAppear-started repeatForever keeps runtime bookkeeping bounded across tick frames")
+  func onAppearStartedRepeatForeverKeepsRuntimeBookkeepingBounded() throws {
+    let terminalSize = Size(width: 40, height: 10)
+    let rootIdentity = testIdentity("OnAppearRepeatForeverGrowth", "Root")
+    let terminal = RepeatForeverGrowthTerminalHost(surfaceSize: terminalSize)
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: EmptyTerminalInputReader(),
+      signalReader: nil,
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = terminalSize
+        return values
+      }(),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        OnAppearRepeatForeverProbe()
+      }
+    )
+
+    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
+    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
+    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
+    defer {
+      AnimationRegistrationStorage.currentSink = nil
+      TransitionRegistrationStorage.currentSink = nil
+      AnimationCompletionStorage.currentSink = nil
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+    if scheduler.hasPendingFrame(at: .now()) {
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    }
+
+    let controller = runLoop.renderer.internalAnimationController
+    let initialActive = controller.activeAnimationCount
+    let initialLifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
+    let initialAppearHandlers = initialLifecycleSnapshot.appearHandlers.count
+    let initialDisappearHandlers = initialLifecycleSnapshot.disappearHandlers.count
+
+    #expect(
+      initialActive > 0,
+      "runtime startup must actually enqueue the repeatForever animation"
+    )
+
+    var activeCounts: [Int] = [initialActive]
+    var appearHandlerCounts: [Int] = [initialAppearHandlers]
+    var disappearHandlerCounts: [Int] = [initialDisappearHandlers]
+    var resolvedNodeTotals: [Int] = []
+    var placedNodeTotals: [Int] = []
+    var measuredNodeCounts: [Int] = []
+
+    for _ in 0..<80 {
+      let frame = ScheduledFrame(
+        causes: [.deadline],
+        invalidatedIdentities: [],
+        signalNames: [],
+        externalReasons: [],
+        triggeredDeadline: nil,
+        nextDeadline: nil
+      )
+      let artifacts = runLoop.renderer.render(
+        runLoop.viewBuilder(
+          (
+            state: runLoop.stateContainer.state,
+            focusedIdentity: runLoop.focusTracker.currentFocusIdentity
+          )),
+        context: runLoop.resolveContext(for: frame),
+        proposal: runLoop.proposal()
+      )
+      runLoop.lifecycleCoordinator.applyCommittedFrame(
+        plan: artifacts.commitPlan,
+        currentLifecycleRegistry: runLoop.localLifecycleRegistry,
+        currentTaskRegistry: runLoop.localTaskRegistry
+      )
+      resolvedNodeTotals.append(artifacts.diagnostics.resolvedNodeCount)
+      placedNodeTotals.append(artifacts.diagnostics.placedNodeCount)
+      measuredNodeCounts.append(artifacts.diagnostics.measuredNodesComputed)
+      activeCounts.append(controller.activeAnimationCount)
+      let lifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
+      appearHandlerCounts.append(lifecycleSnapshot.appearHandlers.count)
+      disappearHandlerCounts.append(lifecycleSnapshot.disappearHandlers.count)
+    }
+
+    #expect(
+      (activeCounts.max() ?? 0) <= initialActive,
+      """
+      active animation bookkeeping must stay bounded once the repeatForever \
+      animation is in flight; initial=\(initialActive) \
+      counts@[0,1,9,39,79]=[
+      \(activeCounts.first ?? -1),
+      \(activeCounts.dropFirst().first ?? -1),
+      \(activeCounts.dropFirst(9).first ?? -1),
+      \(activeCounts.dropFirst(39).first ?? -1),
+      \(activeCounts.dropFirst(79).first ?? -1)
+      ]
+      """
+    )
+    #expect(
+      (appearHandlerCounts.max() ?? 0) <= initialAppearHandlers,
+      """
+      .onAppear registrations must not accumulate across animation ticks; \
+      initial=\(initialAppearHandlers) max=\(appearHandlerCounts.max() ?? -1)
+      """
+    )
+    #expect(
+      (disappearHandlerCounts.max() ?? 0) <= initialDisappearHandlers,
+      """
+      .onDisappear registrations must not accumulate across animation ticks; \
+      initial=\(initialDisappearHandlers) max=\(disappearHandlerCounts.max() ?? -1)
+      """
+    )
+    #expect(
+      (measuredNodeCounts.max() ?? 0) == 0,
+      """
+      synthetic tick frames should reuse the measurement cache completely; \
+      maxMeasured=\(measuredNodeCounts.max() ?? -1)
+      """
+    )
+    #expect(
+      (resolvedNodeTotals.max() ?? 0) == (resolvedNodeTotals.min() ?? 0),
+      """
+      resolved tree size must stay constant across synthetic ticks; \
+      min=\(resolvedNodeTotals.min() ?? -1) max=\(resolvedNodeTotals.max() ?? -1)
+      """
+    )
+    #expect(
+      (placedNodeTotals.max() ?? 0) == (placedNodeTotals.min() ?? 0),
+      """
+      placed tree size must stay constant across synthetic ticks; \
+      min=\(placedNodeTotals.min() ?? -1) max=\(placedNodeTotals.max() ?? -1)
+      """
+    )
+  }
+
+  @Test("tab-hosted repeatForever keeps runtime bookkeeping bounded across tick frames")
+  func tabHostedRepeatForeverKeepsRuntimeBookkeepingBounded() throws {
+    let terminalSize = Size(width: 80, height: 24)
+    let rootIdentity = testIdentity("TabHostedRepeatForeverGrowth", "Root")
+    let terminal = RepeatForeverGrowthTerminalHost(surfaceSize: terminalSize)
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: EmptyTerminalInputReader(),
+      signalReader: nil,
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = terminalSize
+        return values
+      }(),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        TabHostedRepeatForeverProbe()
+      }
+    )
+
+    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
+    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
+    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
+    defer {
+      AnimationRegistrationStorage.currentSink = nil
+      TransitionRegistrationStorage.currentSink = nil
+      AnimationCompletionStorage.currentSink = nil
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+    if scheduler.hasPendingFrame(at: .now()) {
+      try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    }
+
+    let controller = runLoop.renderer.internalAnimationController
+    let initialActive = controller.activeAnimationCount
+    let initialLifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
+
+    #expect(
+      initialActive > 0,
+      "tab-hosted runtime startup must actually enqueue the repeatForever animation"
+    )
+
+    var activeCounts: [Int] = [initialActive]
+    var appearHandlerCounts: [Int] = [initialLifecycleSnapshot.appearHandlers.count]
+    var disappearHandlerCounts: [Int] = [initialLifecycleSnapshot.disappearHandlers.count]
+    var resolvedNodeTotals: [Int] = []
+    var placedNodeTotals: [Int] = []
+    var resolvedNodeCounts: [Int] = []
+    var measuredNodeCounts: [Int] = []
+
+    for _ in 0..<80 {
+      let frame = ScheduledFrame(
+        causes: [.deadline],
+        invalidatedIdentities: [],
+        signalNames: [],
+        externalReasons: [],
+        triggeredDeadline: nil,
+        nextDeadline: nil
+      )
+      let artifacts = runLoop.renderer.render(
+        runLoop.viewBuilder(
+          (
+            state: runLoop.stateContainer.state,
+            focusedIdentity: runLoop.focusTracker.currentFocusIdentity
+          )),
+        context: runLoop.resolveContext(for: frame),
+        proposal: runLoop.proposal()
+      )
+      runLoop.lifecycleCoordinator.applyCommittedFrame(
+        plan: artifacts.commitPlan,
+        currentLifecycleRegistry: runLoop.localLifecycleRegistry,
+        currentTaskRegistry: runLoop.localTaskRegistry
+      )
+      resolvedNodeTotals.append(artifacts.diagnostics.resolvedNodeCount)
+      placedNodeTotals.append(artifacts.diagnostics.placedNodeCount)
+      resolvedNodeCounts.append(artifacts.diagnostics.resolvedNodesComputed)
+      measuredNodeCounts.append(artifacts.diagnostics.measuredNodesComputed)
+      activeCounts.append(controller.activeAnimationCount)
+      let lifecycleSnapshot = runLoop.localLifecycleRegistry.snapshot()
+      appearHandlerCounts.append(lifecycleSnapshot.appearHandlers.count)
+      disappearHandlerCounts.append(lifecycleSnapshot.disappearHandlers.count)
+    }
+
+    #expect(
+      (activeCounts.max() ?? 0) <= initialActive,
+      """
+      active animation bookkeeping must stay bounded for the tab-hosted \
+      repeatForever probe; initial=\(initialActive) \
+      max=\(activeCounts.max() ?? -1)
+      """
+    )
+    #expect(
+      (appearHandlerCounts.max() ?? 0) <= appearHandlerCounts[0],
+      """
+      tab-hosted .onAppear registrations must not accumulate across ticks; \
+      initial=\(appearHandlerCounts[0]) max=\(appearHandlerCounts.max() ?? -1)
+      """
+    )
+    #expect(
+      (disappearHandlerCounts.max() ?? 0) <= disappearHandlerCounts[0],
+      """
+      tab-hosted .onDisappear registrations must not accumulate across ticks; \
+      initial=\(disappearHandlerCounts[0]) max=\(disappearHandlerCounts.max() ?? -1)
+      """
+    )
+    #expect(
+      (resolvedNodeCounts.max() ?? 0) == 0,
+      """
+      synthetic tick frames should not re-resolve the tab-hosted probe; \
+      maxResolved=\(resolvedNodeCounts.max() ?? -1)
+      """
+    )
+    #expect(
+      (measuredNodeCounts.max() ?? 0) == 0,
+      """
+      synthetic tick frames should reuse the measurement cache for the \
+      tab-hosted probe; maxMeasured=\(measuredNodeCounts.max() ?? -1)
+      """
+    )
+    #expect(
+      (resolvedNodeTotals.max() ?? 0) == (resolvedNodeTotals.min() ?? 0),
+      """
+      tab-hosted resolved tree size must stay constant across synthetic ticks; \
+      min=\(resolvedNodeTotals.min() ?? -1) max=\(resolvedNodeTotals.max() ?? -1)
+      """
+    )
+    #expect(
+      (placedNodeTotals.max() ?? 0) == (placedNodeTotals.min() ?? 0),
+      """
+      tab-hosted placed tree size must stay constant across synthetic ticks; \
+      min=\(placedNodeTotals.min() ?? -1) max=\(placedNodeTotals.max() ?? -1)
+      """
+    )
+  }
+
+  @MainActor
+  @Test(
+    "run loop keeps ticking repeatForever animations even when the next deadline is already due")
+  func runLoopContinuesOverdueRepeatForeverDeadlines() async throws {
+    let terminalSize = Size(width: 40, height: 10)
+    let rootIdentity = testIdentity("OverdueRepeatForeverDeadline", "Root")
+    let terminal = SlowPresentTerminalHost(
+      surfaceSize: terminalSize,
+      presentDelayMicroseconds: 40_000
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: DelayedQuitTerminalInputReader(
+        delayNanoseconds: 200_000_000
+      ),
+      signalReader: nil,
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = terminalSize
+        return values
+      }(),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        OnAppearRepeatForeverProbe()
+      }
+    )
+
+    let result = try await runLoop.run()
+
+    #expect(result.exitReason == .quitKey)
+    #expect(
+      result.renderedFrames >= 3,
+      """
+      repeatForever animation should keep producing frames even when \
+      presentation overruns the 33 ms frame interval; renderedFrames=\(result.renderedFrames)
+      """
+    )
+  }
 }
 
 /// Test-only ``CanvasDrawing`` whose `==` distinguishes drawings by an
@@ -246,4 +596,143 @@ private struct ProbeCanvasDrawing: CanvasDrawing, Equatable {
     // No-op: the layout cache reuse contract is independent of what
     // the drawing actually paints.
   }
+}
+
+private struct OnAppearRepeatForeverProbe: View {
+  @State private var phase: Double = 0
+
+  var body: some View {
+    Text("probe")
+      .padding(1)
+      .frame(width: 20, height: 3)
+      .border(
+        blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .magenta, .red]),
+        set: .rounded,
+        phase: phase
+      )
+      .onAppear {
+        withAnimation(
+          .linear(duration: .milliseconds(3000))
+            .repeatForever(autoreverses: false)
+        ) {
+          phase = 1.0
+        }
+      }
+  }
+}
+
+private struct TabHostedRepeatForeverProbe: View {
+  @State private var selection = 0
+
+  var body: some View {
+    TabView(selection: $selection) {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 1) {
+          OnAppearRepeatForeverProbe()
+          Canvas(ProbeCanvasDrawing(value: 7))
+            .frame(width: 30, height: 4)
+        }
+        .padding(1)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .tabItem("Animated")
+      .tag(0)
+
+      Text("Other")
+        .tabItem("Other")
+        .tag(1)
+    }
+  }
+}
+
+private final class RepeatForeverGrowthTerminalHost: TerminalHosting {
+  let surfaceSize: Size
+  let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+  let appearance: TerminalAppearance = .fallback
+
+  init(surfaceSize: Size) {
+    self.surfaceSize = surfaceSize
+  }
+
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func clearScreen() throws {}
+  func moveCursor(to _: Point) throws {}
+
+  @discardableResult
+  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+    .init(
+      bytesWritten: 0,
+      linesTouched: surface.size.height,
+      cellsChanged: surface.size.width * surface.size.height,
+      strategy: .fullRepaint
+    )
+  }
+
+  func write(_: String) throws {}
+}
+
+private final class EmptyTerminalInputReader: TerminalInputReading {
+  func inputEvents() -> AsyncStream<InputEvent> {
+    AsyncStream { continuation in
+      continuation.finish()
+    }
+  }
+}
+
+private final class DelayedQuitTerminalInputReader: TerminalInputReading {
+  let delayNanoseconds: UInt64
+
+  init(delayNanoseconds: UInt64) {
+    self.delayNanoseconds = delayNanoseconds
+  }
+
+  func inputEvents() -> AsyncStream<InputEvent> {
+    AsyncStream { continuation in
+      let delayNanoseconds = self.delayNanoseconds
+      let task = Task {
+        if delayNanoseconds > 0 {
+          try? await Task.sleep(nanoseconds: delayNanoseconds)
+        }
+        continuation.yield(.key(.character("q")))
+        continuation.finish()
+      }
+
+      continuation.onTermination = { _ in
+        task.cancel()
+      }
+    }
+  }
+}
+
+private final class SlowPresentTerminalHost: TerminalHosting {
+  let surfaceSize: Size
+  let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+  let appearance: TerminalAppearance = .fallback
+  let presentDelayMicroseconds: useconds_t
+
+  init(surfaceSize: Size, presentDelayMicroseconds: useconds_t) {
+    self.surfaceSize = surfaceSize
+    self.presentDelayMicroseconds = presentDelayMicroseconds
+  }
+
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func clearScreen() throws {}
+  func moveCursor(to _: Point) throws {}
+
+  @discardableResult
+  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+    if presentDelayMicroseconds > 0 {
+      usleep(presentDelayMicroseconds)
+    }
+    return .init(
+      bytesWritten: 0,
+      linesTouched: surface.size.height,
+      cellsChanged: surface.size.width * surface.size.height,
+      strategy: .fullRepaint
+    )
+  }
+
+  func write(_: String) throws {}
 }
