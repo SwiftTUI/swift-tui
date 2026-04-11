@@ -726,6 +726,8 @@ package struct BorderView<Content: View>: View, ResolvableView {
   package var set: BorderSet
   package var foreground: BorderEdgeStyle?
   package var background: BorderBackgroundStyle?
+  package var blend: BorderBlend?
+  package var blendPhase: Double
   package var sides: Edge.Set
 
   package init(
@@ -733,12 +735,16 @@ package struct BorderView<Content: View>: View, ResolvableView {
     set: BorderSet,
     foreground: BorderEdgeStyle?,
     background: BorderBackgroundStyle?,
+    blend: BorderBlend? = nil,
+    blendPhase: Double = 0,
     sides: Edge.Set
   ) {
     self.content = content
     self.set = set
     self.foreground = foreground
     self.background = background
+    self.blend = blend
+    self.blendPhase = blendPhase
     self.sides = sides
   }
 
@@ -759,8 +765,8 @@ package struct BorderView<Content: View>: View, ResolvableView {
           set,
           foreground: foreground,
           background: background,
-          blend: nil,
-          blendPhase: 0,
+          blend: blend,
+          blendPhase: blendPhase,
           sides: sides
         )
       )
