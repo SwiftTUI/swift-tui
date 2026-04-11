@@ -20,12 +20,11 @@ export async function resolveSwiftArtifacts(
     ...process.env
   };
 
-  // -Osize is required (not just a size tweak): the default -O release mode
-  // emits Swift-side merged outlined-copy helpers (e.g.
-  // `$s4Core15ListDisplayLineV4KindOWOyTm`) with ~1200 i32 parameters, which
-  // exceeds the WebAssembly JS API's 1000-parameter-per-function limit and
-  // causes `WebAssembly.Module doesn't parse` errors in every browser.
-  // `-Osize` keeps the max signature comfortably under the limit.
+  // The browser WebAssembly API rejects function types with more than 1000
+  // parameters. Swift's wasm release builds can trip that limit when LLVM's
+  // merge-functions pass combines large outlined-copy helpers. `-Osize` helps,
+  // but some Darwin CI runners still reproduce the failure unless we also
+  // disable that merge pass explicitly.
   const swiftBuildArgs = [
     "build",
     "--package-path",
@@ -36,6 +35,10 @@ export async function resolveSwiftArtifacts(
     "release",
     "-Xswiftc",
     "-Osize",
+    "-Xswiftc",
+    "-Xfrontend",
+    "-Xswiftc",
+    "-disable-llvm-merge-functions-pass",
     "-Xlinker",
     "--initial-memory=536870912",
     "-Xlinker",
