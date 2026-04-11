@@ -13,7 +13,7 @@ jobs:
 
   build-web-example:
     name: Build WebExample
-    runs-on: macos-latest
+    runs-on: macos-26
 
     steps:
       - name: Checkout
