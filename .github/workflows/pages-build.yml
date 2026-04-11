@@ -61,7 +61,7 @@ jobs:
       - name: Install/activate Swift 6.3.0 via swiftly
         shell: bash
         run: |
-          set -euo pipefail
+          set -euxo pipefail
 
           if [ ! -e "$HOME/.swiftly/env.sh" ]; then 
 
@@ -136,7 +136,7 @@ jobs:
         shell: bash
         working-directory: Examples/WebExample
         run: |
-          set -euxo pipefail
+          set -euo pipefail
 
           . "$HOME/.swiftly/env.sh" && hash -r
 
