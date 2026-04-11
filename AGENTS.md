@@ -5,10 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Test Commands
 
 ```bash
-swift build                  # Build all targets
-swift test                   # Run all tests
-swift test --filter TerminalUITests.SwiftUISurfaceTests  # Run a single test suite
-swift test --filter TerminalUITests.SwiftUISurfaceTests/testName  # Run a single test
+swiftly run swift build                  # Build all targets
+swiftly run swift test                   # Run all tests
+swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests  # Run a single test suite
+swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests/testName  # Run a single test
 swift format format -i --configuration .swift-format.json Sources/ Tests/  # Format all code
 ```
 
@@ -30,7 +30,7 @@ swift format format -i --configuration .swift-format.json Sources/ Tests/  # For
 - **swift-format**: Auto-formats staged `.swift` files on commit.
 - **no-foundation-in-library-products**: Blocks commits that add `import Foundation` or `public import Foundation` in the Foundation-free `Sources/Core`, `Sources/View`, and `Sources/TerminalUI` library layers.
 - **public-surface-policies**: Enforces public surface guardrails, prototype target packaging rules, and the docs that describe that policy.
-- **structured-concurrency-escape-hatches**: Blocks checked-in Swift sources from using `@unchecked Sendable` or `nonisolated(unsafe)`; use actor isolation, `Sendable` storage, or `Synchronization` primitives instead.
+- **structured-concurrency-escape-hatches**: Blocks checked-in Swift sources from using `@unchecked Sendable`; `nonisolated(unsafe)` remains disallowed by policy and should be treated as migration debt until the hook enforces it too.
 
 There is not currently a separate checked-in source-layout hook. Keep
 `docs/SOURCE_LAYOUT.md` aligned with file moves in ordinary review.
@@ -44,7 +44,7 @@ There is not currently a separate checked-in source-layout hook. Keep
 
 ## Swift Language Settings
 
-- Swift 6.2 with strict memory safety and Swift 6 language mode.
+- Swift 6.3 with strict memory safety and Swift 6 language mode.
 - Upcoming features enabled: `ExistentialAny`, `NonisolatedNonsendingByDefault`, `MemberImportVisibility`, `InternalImportsByDefault`, among others.
 - Platforms: macOS 15+, iOS 18+.
 
@@ -110,8 +110,10 @@ Fixture updates require explanation when they cross unrelated subsystems or alte
 Detailed design docs live in `/docs/`:
 - `ARCHITECTURE.md` -- target boundaries and pipeline
 - `RUNTIME.md` -- lifecycle, task semantics, incremental rendering model
+- `HOST_PACKAGES.md` -- runner-package and embedded-host packaging model
 - `SOURCE_LAYOUT.md` -- per-file ownership map
 - `PUBLIC_API_INVENTORY.md` -- public surface classification
 - `PUBLIC_SURFACE_POLICY.md` -- public API governance rules, including `AnyView` and type-erasure policy
 - `FOCUS.md` -- focus system design
 - `VISION.md` -- project philosophy and scope
+- `proposals/` -- active design notes that are still intentionally retained

@@ -224,7 +224,6 @@ cmd_examples() {
   run_shell_script "
     swift --version
     swift build --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/examples-gallery") --package-path Examples/gallery
-    swift build --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/examples-todoist") --package-path Examples/todoist
   "
 }
 

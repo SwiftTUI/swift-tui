@@ -4,7 +4,8 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
-/// Characterization test suite for Item 7 of ARCHITECTURE_NOTES.md.
+/// Characterization test suite for Item 7 of
+/// `docs/proposals/ARCHITECTURE_NOTES.md`.
 ///
 /// These tests don't exist to catch regressions in the traditional
 /// sense — they exist to **pin the current behavior** of the

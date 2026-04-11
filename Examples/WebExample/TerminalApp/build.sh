@@ -14,4 +14,8 @@ swift_args=(
   -Xlinker stack-size=1048576
 )
 
+printf 'WASM_BUILD_CONFIGURATION {"script":"build.sh","requiredFlags":"-Xswiftc -Osize -Xswiftc -Xfrontend -Xswiftc -disable-llvm-merge-functions-pass","command":"'
+printf '%q ' swiftly run swift build "${swift_args[@]}"
+printf '"}\n'
+
 swiftly run swift build "${swift_args[@]}"

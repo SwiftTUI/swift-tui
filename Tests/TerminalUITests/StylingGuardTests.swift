@@ -55,8 +55,7 @@ private func forbiddenStylingMatches(
   let fileManager = FileManager.default
   var matches: [String] = []
   let ignoredSuffixes = [
-    "/Tests/TerminalUITests/StylingGuardTests.swift",
-    "/docs/THEME_MIGRATION_PLAN.md",
+    "/Tests/TerminalUITests/StylingGuardTests.swift"
   ]
   let ignoredPathFragments = [
     "/.build/",

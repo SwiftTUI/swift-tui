@@ -12,6 +12,15 @@ export interface SwiftArtifactPaths {
   wasmPath: string;
 }
 
+export const requiredWasmSwiftFlags = [
+  "-Xswiftc",
+  "-Osize",
+  "-Xswiftc",
+  "-Xfrontend",
+  "-Xswiftc",
+  "-disable-llvm-merge-functions-pass",
+] as const;
+
 export async function resolveSwiftArtifacts(
   options: ResolveSwiftArtifactsOptions
 ): Promise<SwiftArtifactPaths> {
@@ -33,12 +42,7 @@ export async function resolveSwiftArtifacts(
     "swift-6.3-RELEASE_wasm",
     "-c",
     "release",
-    "-Xswiftc",
-    "-Osize",
-    "-Xswiftc",
-    "-Xfrontend",
-    "-Xswiftc",
-    "-disable-llvm-merge-functions-pass",
+    ...requiredWasmSwiftFlags,
     "-Xlinker",
     "--initial-memory=536870912",
     "-Xlinker",
@@ -49,21 +53,34 @@ export async function resolveSwiftArtifacts(
     "stack-size=1048576",
   ];
 
-  await runCommand([
+  confirmRequiredWasmFlags(swiftBuildArgs);
+
+  const buildCommand = [
     ...swiftCommandPrefix(),
     ...swiftBuildArgs,
     "--product",
     options.product,
-  ], {
+  ];
+  const showBinPathCommand = [
+    ...swiftCommandPrefix(),
+    ...swiftBuildArgs,
+    "--show-bin-path",
+  ];
+
+  logWasmBuildConfiguration({
+    packagePath: options.packagePath,
+    product: options.product,
+    swiftlyWorkingDirectory,
+    buildCommand,
+    showBinPathCommand,
+  });
+
+  await runCommand(buildCommand, {
     cwd: swiftlyWorkingDirectory,
     env: environment,
   });
 
-  const binPath = await runCommand([
-    ...swiftCommandPrefix(),
-    ...swiftBuildArgs,
-    "--show-bin-path",
-  ], {
+  const binPath = await runCommand(showBinPathCommand, {
     cwd: swiftlyWorkingDirectory,
     env: environment,
   });
@@ -73,6 +90,77 @@ export async function resolveSwiftArtifacts(
     binPath: binPath.trim(),
     wasmPath,
   };
+}
+
+interface WasmBuildConfigurationLog {
+  packagePath: string;
+  product: string;
+  swiftlyWorkingDirectory: string;
+  buildCommand: string[];
+  showBinPathCommand: string[];
+}
+
+export function hasRequiredWasmFlags(args: readonly string[]): boolean {
+  return containsSubsequence(args, requiredWasmSwiftFlags);
+}
+
+function confirmRequiredWasmFlags(args: readonly string[]): void {
+  if (hasRequiredWasmFlags(args)) {
+    return;
+  }
+
+  throw new Error(
+    `missing required wasm Swift flags: ${requiredWasmSwiftFlags.join(" ")}`
+  );
+}
+
+function logWasmBuildConfiguration(config: WasmBuildConfigurationLog): void {
+  console.error(
+    `WASM_BUILD_CONFIGURATION ${JSON.stringify({
+      packagePath: config.packagePath,
+      product: config.product,
+      swiftlyWorkingDirectory: config.swiftlyWorkingDirectory,
+      requiredFlags: [...requiredWasmSwiftFlags],
+      buildCommand: formatCommandForLogs(config.buildCommand),
+      showBinPathCommand: formatCommandForLogs(config.showBinPathCommand),
+    })}`
+  );
+}
+
+export function formatCommandForLogs(args: readonly string[]): string {
+  return args.map(shellQuote).join(" ");
+}
+
+function containsSubsequence(
+  args: readonly string[],
+  expected: readonly string[]
+): boolean {
+  if (expected.length == 0) {
+    return true;
+  }
+
+  for (let index = 0; index <= args.length - expected.length; index += 1) {
+    let matches = true;
+    for (let expectedIndex = 0; expectedIndex < expected.length; expectedIndex += 1) {
+      if (args[index + expectedIndex] !== expected[expectedIndex]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function shellQuote(arg: string): string {
+  if (/^[A-Za-z0-9_./:=+-]+$/.test(arg)) {
+    return arg;
+  }
+
+  return `'${arg.replaceAll("'", `'\\''`)}'`;
 }
 
 async function resolveSwiftlyWorkingDirectory(

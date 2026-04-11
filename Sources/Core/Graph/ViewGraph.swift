@@ -29,7 +29,8 @@ package final class ViewGraph {
   private var latestLifecycleEvents: [LifecycleEvent]
   private var registrationAliasesByIdentity: [Identity: Set<Identity>]
   private var registrationAliasTargets: [Identity: Identity]
-  /// Instrumentation added for Item 7 of ARCHITECTURE_NOTES.md.  Tracks
+  /// Instrumentation added for Item 7 of
+  /// `docs/proposals/ARCHITECTURE_NOTES.md`.  Tracks
   /// non-trivial `recordRegistrationAlias` calls so the alias layer's
   /// actual workload can be measured against the architecture doc's
   /// hypothesis that divergences come from a small, enumerable set of
@@ -772,7 +773,7 @@ package final class ViewGraph {
   ///   them, which cancels tasks, fires disappear handlers, removes
   ///   dependency edges, and drops the node from `nodesByIdentity`.
   ///
-  /// Item 3 of `ARCHITECTURE_NOTES.md` discusses consolidating this
+  /// Item 3 of `docs/proposals/ARCHITECTURE_NOTES.md` discusses consolidating this
   /// split-brain into a single reconciler (Option A).  That's a larger
   /// refactor and is not yet justified by a concrete pain point — this
   /// comment is the documented-fence version of the fix.

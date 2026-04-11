@@ -1,9 +1,9 @@
 # Animation Implementation Plan
 
 **Date:** 2026-04-08 (plan) / 2026-04-10 (full gap-closure pass)
-**Status:** Phases 0–7 shipped. All 18 audit gaps closed. 704 package tests passing.
+**Status:** Shipped. Retained as the April 10, 2026 implementation note for the animation rollout.
 **Branch:** `main`
-**Supersedes:** `docs/COLOR_ANIMATION_IMPLEMENTATION_PLAN.md`
+**Supersedes:** the deleted `COLOR_ANIMATION_IMPLEMENTATION_PLAN.md` draft
 
 ---
 
@@ -1876,10 +1876,9 @@ These are enabled by this architecture but not part of this plan:
 
 ### Repo context
 
-- [docs/COLOR_ANIMATION_IMPLEMENTATION_PLAN.md](docs/COLOR_ANIMATION_IMPLEMENTATION_PLAN.md)
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- [docs/RUNTIME.md](docs/RUNTIME.md)
-- [Sources/TerminalUI/TerminalUI.swift](Sources/TerminalUI/TerminalUI.swift)
-- [Sources/TerminalUI/RunLoop+Rendering.swift](Sources/TerminalUI/RunLoop+Rendering.swift)
-- [Sources/Core/Graph/ViewGraph.swift](Sources/Core/Graph/ViewGraph.swift)
-- [Sources/Core/Scheduler.swift](Sources/Core/Scheduler.swift)
+- [../ARCHITECTURE.md](../ARCHITECTURE.md)
+- [../RUNTIME.md](../RUNTIME.md)
+- [../../Sources/TerminalUI/TerminalUI.swift](../../Sources/TerminalUI/TerminalUI.swift)
+- [../../Sources/TerminalUI/RunLoop+Rendering.swift](../../Sources/TerminalUI/RunLoop+Rendering.swift)
+- [../../Sources/Core/Graph/ViewGraph.swift](../../Sources/Core/Graph/ViewGraph.swift)
+- [../../Sources/Core/Scheduler.swift](../../Sources/Core/Scheduler.swift)

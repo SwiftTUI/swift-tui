@@ -17,7 +17,7 @@ matches="$(
 
 if [[ -n "$matches" ]]; then
   print -u2 -- "Structured concurrency escape hatches are forbidden in checked-in Swift sources."
-  print -u2 -- "Replace @unchecked Sendable and nonisolated(unsafe) with actor isolation, Sendable-safe storage, or Synchronization primitives."
+  print -u2 -- "Replace @unchecked Sendable with actor isolation, Sendable-safe storage, or Synchronization primitives."
   print -u2 -- ""
   print -u2 -- "$matches"
   exit 1
