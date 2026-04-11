@@ -2,8 +2,8 @@
   "name": "swift-terminal-ui-web-workspace",
   "private": true,
   "scripts": {
-    "test": "zsh ./Scripts/test_all.zsh",
-    "test:all": "zsh ./Scripts/test_all.zsh"
+    "test": "sh ./Scripts/test_all.sh",
+    "test:all": "sh ./Scripts/test_all.sh"
   },
   "workspaces": [
     "GUI/WebTUIGUI",
