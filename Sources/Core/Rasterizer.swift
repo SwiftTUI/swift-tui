@@ -1498,17 +1498,20 @@ extension Rasterizer {
     }
 
     switch geometry {
-    case .rectangle, .circle, .ellipse, .capsule:
-      // Rectangle is a trivial bounding-box test. `.circle`, `.ellipse`,
-      // and `.capsule` are rendered via the Braille subpixel path and
-      // never actually reach `shapeContains` for their own hit-testing —
-      // they dispatch earlier in `paintFill`/`paintStroke`. We still
-      // return the bounding-box test here so the switch is exhaustive
-      // and any future cell-level sampling falls back gracefully.
+    case .rectangle:
       return x >= targetBounds.origin.x
         && x < targetBounds.origin.x + targetBounds.size.width
         && y >= targetBounds.origin.y
         && y < targetBounds.origin.y + targetBounds.size.height
+    case .circle, .ellipse, .capsule:
+      // Curved shapes render through `paintBrailleShape`, which
+      // short-circuits `paintFill`/`paintStroke` before reaching this
+      // per-cell test. Reaching this branch means someone added a new
+      // caller without routing curved shapes to the Braille path —
+      // assert loudly in debug, fall back to "not contained" in release.
+      assertionFailure(
+        "shapeContains called for curved geometry; should dispatch via paintBrailleShape")
+      return false
     case .roundedRectangle(let cornerRadius):
       if case .interior = fillMode {
         return x >= targetBounds.origin.x
