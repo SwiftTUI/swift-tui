@@ -1005,10 +1005,11 @@ extension Rasterizer {
         continue
       }
 
-      let glyphs = borderGlyphs(
+      let resolvedSet = resolvedStrokeBorderSet(
         for: geometry,
-        variant: strokeStyle.lineVariant
+        strokeStyle: strokeStyle
       )
+      let glyphs = BorderGlyphSet(borderSet: resolvedSet)
 
       let minX = insetRect.origin.x
       let maxX = insetRect.origin.x + insetRect.size.width - 1
@@ -1018,7 +1019,7 @@ extension Rasterizer {
       for x in minX...maxX {
         writeStrokeGlyph(
           glyphs.top,
-          lineVariant: strokeStyle.lineVariant,
+          borderSet: resolvedSet,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
           fallbackBackgroundSides: [.top],
@@ -1032,7 +1033,7 @@ extension Rasterizer {
         if maxY != minY {
           writeStrokeGlyph(
             glyphs.bottom,
-            lineVariant: strokeStyle.lineVariant,
+            borderSet: resolvedSet,
             foregroundColorMode: foregroundColorMode,
             backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
             fallbackBackgroundSides: [.bottom],
@@ -1050,7 +1051,7 @@ extension Rasterizer {
         for y in (minY + 1)..<maxY {
           writeStrokeGlyph(
             glyphs.left,
-            lineVariant: strokeStyle.lineVariant,
+            borderSet: resolvedSet,
             foregroundColorMode: foregroundColorMode,
             backgroundStyle: backgroundStyle?.backgroundStyle(for: .left),
             fallbackBackgroundSides: [.left],
@@ -1064,7 +1065,7 @@ extension Rasterizer {
           if maxX != minX {
             writeStrokeGlyph(
               glyphs.right,
-              lineVariant: strokeStyle.lineVariant,
+              borderSet: resolvedSet,
               foregroundColorMode: foregroundColorMode,
               backgroundStyle: backgroundStyle?.backgroundStyle(for: .right),
               fallbackBackgroundSides: [.right],
@@ -1081,7 +1082,7 @@ extension Rasterizer {
 
       writeStrokeGlyph(
         glyphs.topLeading,
-        lineVariant: strokeStyle.lineVariant,
+        borderSet: resolvedSet,
         foregroundColorMode: foregroundColorMode,
         backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
         fallbackBackgroundSides: [.top, .left],
@@ -1095,7 +1096,7 @@ extension Rasterizer {
       if maxX != minX {
         writeStrokeGlyph(
           glyphs.topTrailing,
-          lineVariant: strokeStyle.lineVariant,
+          borderSet: resolvedSet,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .top),
           fallbackBackgroundSides: [.top, .right],
@@ -1110,7 +1111,7 @@ extension Rasterizer {
       if maxY != minY {
         writeStrokeGlyph(
           glyphs.bottomLeading,
-          lineVariant: strokeStyle.lineVariant,
+          borderSet: resolvedSet,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
           fallbackBackgroundSides: [.bottom, .left],
@@ -1125,7 +1126,7 @@ extension Rasterizer {
       if maxX != minX, maxY != minY {
         writeStrokeGlyph(
           glyphs.bottomTrailing,
-          lineVariant: strokeStyle.lineVariant,
+          borderSet: resolvedSet,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: backgroundStyle?.backgroundStyle(for: .bottom),
           fallbackBackgroundSides: [.bottom, .right],
@@ -1674,7 +1675,11 @@ extension Rasterizer {
       from: style,
       environment: environment
     )
-    let glyphs = borderGlyphs(for: .rectangle, variant: strokeStyle.lineVariant)
+    let resolvedSet = resolvedStrokeBorderSet(
+      for: .rectangle,
+      strokeStyle: strokeStyle
+    )
+    let glyphs = BorderGlyphSet(borderSet: resolvedSet)
     let drawsHorizontal =
       switch stackAxis {
       case .vertical?:
@@ -1689,7 +1694,7 @@ extension Rasterizer {
       for x in bounds.origin.x..<(bounds.origin.x + bounds.size.width) {
         writeStrokeGlyph(
           glyphs.horizontal,
-          lineVariant: strokeStyle.lineVariant,
+          borderSet: resolvedSet,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: nil,
           fallbackBackgroundSides: [],
@@ -1706,7 +1711,7 @@ extension Rasterizer {
       for y in bounds.origin.y..<(bounds.origin.y + bounds.size.height) {
         writeStrokeGlyph(
           glyphs.vertical,
-          lineVariant: strokeStyle.lineVariant,
+          borderSet: resolvedSet,
           foregroundColorMode: foregroundColorMode,
           backgroundStyle: nil,
           fallbackBackgroundSides: [],
@@ -1723,7 +1728,7 @@ extension Rasterizer {
 
   private func writeStrokeGlyph(
     _ character: Character,
-    lineVariant: LineVariant,
+    borderSet: BorderSet,
     foregroundColorMode: ResolvedShapeColorMode,
     backgroundStyle: AnyShapeStyle?,
     fallbackBackgroundSides: [BorderSide],
@@ -1742,7 +1747,7 @@ extension Rasterizer {
         sampleY: y
       ),
       backgroundColor: resolvedStrokeBackgroundColor(
-        lineVariant: lineVariant,
+        borderSet: borderSet,
         explicitBackgroundStyle: backgroundStyle,
         fallbackSides: fallbackBackgroundSides,
         environment: environment,
@@ -1763,7 +1768,7 @@ extension Rasterizer {
   }
 
   private func resolvedStrokeBackgroundColor(
-    lineVariant: LineVariant,
+    borderSet: BorderSet,
     explicitBackgroundStyle: AnyShapeStyle?,
     fallbackSides: [BorderSide],
     environment: StyleEnvironmentSnapshot,
@@ -1782,7 +1787,11 @@ extension Rasterizer {
       )
     }
 
-    if lineVariant == .presentationChrome {
+    // Presentation chrome borders draw into the inset region of their
+    // owning container (popovers, toasts, menus), so their glyph cells
+    // should inherit the interior fill rather than the surrounding
+    // background.
+    if borderSet == .presentationChrome {
       for side in fallbackSides {
         if let inferred = sampledBackgroundColor(
           inside: side,
@@ -2430,48 +2439,33 @@ extension Rasterizer {
     )
   }
 
-  private func borderGlyphs(
+  /// Resolves the border set used to stroke `geometry` for `strokeStyle`.
+  ///
+  /// Preserves the legacy "single-line → rounded corners" auto-upgrade for
+  /// rounded rectangles: when the default ``StrokeStyle/normal``
+  /// (i.e. ``BorderSet/single``) is applied to a shape with a positive
+  /// corner radius, the rasterizer silently upgrades it to
+  /// ``BorderSet/rounded`` so container chrome (Button, Picker, Menu…)
+  /// keeps its curved corners without every call site needing to pass
+  /// `.rounded` explicitly.
+  private func resolvedStrokeBorderSet(
     for geometry: ShapeGeometry,
-    variant: LineVariant
-  ) -> BorderGlyphSet {
-    switch variant {
-    case .ascii:
-      return .ascii
-    case .single:
-      switch geometry {
-      case .roundedRectangle(let cornerRadius) where cornerRadius > 0:
-        return .rounded
-      default:
-        return .singleLine
-      }
-    case .rounded:
+    strokeStyle: StrokeStyle
+  ) -> BorderSet {
+    if strokeStyle.borderSet == .single,
+      case .roundedRectangle(let radius) = geometry,
+      radius > 0
+    {
       return .rounded
-    case .double:
-      return .doubleLine
-    case .heavy:
-      return .heavy
-    case .block:
-      return .block
-    case .outerHalfBlock:
-      return .outerHalfBlock
-    case .innerHalfBlock:
-      return .innerHalfBlock
-    case .presentationChrome:
-      return .presentationChrome
-    case .hidden:
-      return .hidden
-    case .markdown:
-      return .markdown
-    case .automatic:
-      switch geometry {
-      case .roundedRectangle(let cornerRadius) where cornerRadius > 0:
-        return .rounded
-      default:
-        return .singleLine
-      }
     }
+    return strokeStyle.borderSet
   }
 
+  /// Thin single-character adapter over ``BorderSet`` used by the
+  /// shape-stroke path and rule painter, which deal in single `Character`
+  /// values rather than the multi-rune edge strings that power the
+  /// layout-aware border path. Derived glyphs fall back to a space if the
+  /// underlying edge is empty (``BorderSet/none`` style).
   private struct BorderGlyphSet {
     let top: Character
     let bottom: Character
@@ -2485,126 +2479,16 @@ extension Rasterizer {
     var horizontal: Character { top }
     var vertical: Character { left }
 
-    static let ascii = Self(
-      top: "-",
-      bottom: "-",
-      left: "|",
-      right: "|",
-      topLeading: "+",
-      topTrailing: "+",
-      bottomLeading: "+",
-      bottomTrailing: "+"
-    )
-
-    static let singleLine = Self(
-      top: "─",
-      bottom: "─",
-      left: "│",
-      right: "│",
-      topLeading: "┌",
-      topTrailing: "┐",
-      bottomLeading: "└",
-      bottomTrailing: "┘"
-    )
-
-    static let rounded = Self(
-      top: "─",
-      bottom: "─",
-      left: "│",
-      right: "│",
-      topLeading: "╭",
-      topTrailing: "╮",
-      bottomLeading: "╰",
-      bottomTrailing: "╯"
-    )
-
-    static let doubleLine = Self(
-      top: "═",
-      bottom: "═",
-      left: "║",
-      right: "║",
-      topLeading: "╔",
-      topTrailing: "╗",
-      bottomLeading: "╚",
-      bottomTrailing: "╝"
-    )
-
-    static let heavy = Self(
-      top: "━",
-      bottom: "━",
-      left: "┃",
-      right: "┃",
-      topLeading: "┏",
-      topTrailing: "┓",
-      bottomLeading: "┗",
-      bottomTrailing: "┛"
-    )
-
-    static let block = Self(
-      top: "█",
-      bottom: "█",
-      left: "█",
-      right: "█",
-      topLeading: "█",
-      topTrailing: "█",
-      bottomLeading: "█",
-      bottomTrailing: "█"
-    )
-
-    static let outerHalfBlock = Self(
-      top: "▀",
-      bottom: "▄",
-      left: "▌",
-      right: "▐",
-      topLeading: "▛",
-      topTrailing: "▜",
-      bottomLeading: "▙",
-      bottomTrailing: "▟"
-    )
-
-    static let innerHalfBlock = Self(
-      top: "▄",
-      bottom: "▀",
-      left: "▐",
-      right: "▌",
-      topLeading: "▗",
-      topTrailing: "▖",
-      bottomLeading: "▝",
-      bottomTrailing: "▘"
-    )
-
-    static let presentationChrome = Self(
-      top: "▄",
-      bottom: "▀",
-      left: "▐",
-      right: "▌",
-      topLeading: "▗",
-      topTrailing: "▖",
-      bottomLeading: "▝",
-      bottomTrailing: "▘"
-    )
-
-    static let hidden = Self(
-      top: " ",
-      bottom: " ",
-      left: " ",
-      right: " ",
-      topLeading: " ",
-      topTrailing: " ",
-      bottomLeading: " ",
-      bottomTrailing: " "
-    )
-
-    static let markdown = Self(
-      top: "-",
-      bottom: "-",
-      left: "|",
-      right: "|",
-      topLeading: "|",
-      topTrailing: "|",
-      bottomLeading: "|",
-      bottomTrailing: "|"
-    )
+    init(borderSet: BorderSet) {
+      self.top = borderSet.top.first ?? " "
+      self.bottom = borderSet.bottom.first ?? " "
+      self.left = borderSet.left.first ?? " "
+      self.right = borderSet.right.first ?? " "
+      self.topLeading = borderSet.topLeading.first ?? " "
+      self.topTrailing = borderSet.topTrailing.first ?? " "
+      self.bottomLeading = borderSet.bottomLeading.first ?? " "
+      self.bottomTrailing = borderSet.bottomTrailing.first ?? " "
+    }
   }
 
   private func write(

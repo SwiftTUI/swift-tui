@@ -5089,7 +5089,7 @@ struct SwiftUISurfaceTests {
         .padding(1)
         .overlay {
           RoundedRectangle(cornerRadius: 1)
-            .stroke(.separator, style: .init(lineVariant: .rounded))
+            .stroke(.separator, style: .init(borderSet: .rounded))
         },
       context: .init(identity: testIdentity("Border"))
     )
@@ -5097,7 +5097,7 @@ struct SwiftUISurfaceTests {
       VStack(alignment: .leading, spacing: 0) {
         Divider(
           drawMetadata: .init(
-            borderStrokeStyle: .init(lineVariant: .heavy)
+            borderStrokeStyle: .init(borderSet: .heavy)
           )
         )
       },
@@ -5114,14 +5114,14 @@ struct SwiftUISurfaceTests {
     #expect(ruleArtifacts.rasterSurface.lines == ["━━━━"])
   }
 
-  @Test("additional border families lower through the shared line variant model")
-  func additionalBorderFamiliesLowerThroughSharedLineVariantModel() {
+  @Test("additional border families lower through the shared BorderSet model")
+  func additionalBorderFamiliesLowerThroughSharedBorderSetModel() {
     let blockArtifacts = DefaultRenderer().render(
       Text("Hi")
         .padding(1)
         .overlay {
           Rectangle()
-            .stroke(.separator, style: .init(lineVariant: .block))
+            .stroke(.separator, style: .init(borderSet: .block))
         },
       context: .init(identity: testIdentity("Block"))
     )
@@ -5130,7 +5130,7 @@ struct SwiftUISurfaceTests {
         .padding(1)
         .overlay {
           Rectangle()
-            .stroke(.separator, style: .init(lineVariant: .outerHalfBlock))
+            .stroke(.separator, style: .init(borderSet: .outerHalfBlock))
         },
       context: .init(identity: testIdentity("OuterHalfBlock"))
     )
@@ -5139,7 +5139,7 @@ struct SwiftUISurfaceTests {
         .padding(1)
         .overlay {
           Rectangle()
-            .stroke(.separator, style: .init(lineVariant: .innerHalfBlock))
+            .stroke(.separator, style: .init(borderSet: .innerHalfBlock))
         },
       context: .init(identity: testIdentity("InnerHalfBlock"))
     )
@@ -5148,7 +5148,7 @@ struct SwiftUISurfaceTests {
         .padding(1)
         .overlay {
           Rectangle()
-            .stroke(.separator, style: .init(lineVariant: .presentationChrome))
+            .stroke(.separator, style: .init(borderSet: .presentationChrome))
         },
       context: .init(identity: testIdentity("PresentationChrome"))
     )
@@ -5157,7 +5157,7 @@ struct SwiftUISurfaceTests {
         .padding(1)
         .overlay {
           Rectangle()
-            .stroke(.separator, style: .init(lineVariant: .hidden))
+            .stroke(.separator, style: .init(borderSet: .hidden))
         },
       context: .init(identity: testIdentity("Hidden"))
     )
@@ -5166,7 +5166,7 @@ struct SwiftUISurfaceTests {
         .padding(1)
         .overlay {
           Rectangle()
-            .stroke(.separator, style: .init(lineVariant: .markdown))
+            .stroke(.separator, style: .init(borderSet: .markdown))
         },
       context: .init(identity: testIdentity("Markdown"))
     )
