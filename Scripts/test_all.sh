@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-set -euo pipefail
+set -eu
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo_root"
@@ -51,8 +51,8 @@ for argument in "$@"; do
       exit 0
       ;;
     *)
-      2> echo "Unknown argument: $argument"
-      2> echo ""
+      >&2 echo "Unknown argument: $argument"
+      >&2 echo ""
       usage
       exit 1
       ;;
@@ -73,14 +73,14 @@ detect_swift_command() {
     return
   fi
 
-  2> echo "Missing required command: swiftly or swift"
+  >&2 echo "Missing required command: swiftly or swift"
   exit 1
 }
 
 require_command() {
   local name="$1"
   if ! command -v "$name" >/dev/null 2>&1; then
-    2> echo "Missing required command: $name"
+    >&2 echo "Missing required command: $name"
     exit 1
   fi
 }
@@ -99,7 +99,7 @@ run_step() {
   ); then
     echo "PASS: $title"
   else
-    2> echo "FAIL: $title"
+    >&2 echo "FAIL: $title"
     failures+=("$title")
   fi
 }
@@ -114,7 +114,7 @@ run_function_step() {
   if "$@"; then
     echo "PASS: $title"
   else
-    2> echo "FAIL: $title"
+    >&2 echo "FAIL: $title"
     failures+=("$title")
   fi
 }
@@ -134,9 +134,9 @@ check_swift_environment() {
   echo "$version_output"
 
   if [[ "$version_output" != *"Swift version 6.3"* && "$version_output" != *"Apple Swift version 6.3"* ]]; then
-    2> echo ""
-    2> echo "Expected Swift 6.3.x for this repository."
-    2> echo "Use 'swiftly run swift ...' directly, or make sure 'swift' resolves to the swiftly-managed toolchain."
+    >&2 echo ""
+    >&2 echo "Expected Swift 6.3.x for this repository."
+    >&2 echo "Use 'swiftly run swift ...' directly, or make sure 'swift' resolves to the swiftly-managed toolchain."
     return 1
   fi
 }
@@ -220,9 +220,9 @@ if (( ${#failures[@]} == 0 )); then
   exit 0
 fi
 
-2> echo "Repo test failures:"
+>&2 echo "Repo test failures:"
 for failure in "${failures[@]}"; do
-  2> echo "  - $failure"
+  >&2 echo "  - $failure"
 done
 
 exit 1
