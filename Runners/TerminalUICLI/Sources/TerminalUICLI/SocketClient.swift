@@ -13,7 +13,9 @@
     case unexpectedResponse(String)
     case connectionFailed(Int32)
     case sendFailed(Int32)
+    case sendTimedOut
     case readFailed(Int32)
+    case readTimedOut
   }
 
   // MARK: - InstanceInfo
@@ -121,8 +123,11 @@
     }
 
     /// Connects to a socket, sends a request line, reads the response.
-    static func sendRequest(socketPath: String, request: String) throws(SocketClientError) -> String
-    {
+    static func sendRequest(
+      socketPath: String,
+      request: String,
+      timeoutMilliseconds: Int32 = 500
+    ) throws(SocketClientError) -> String {
       let fd = sceneSocket()
       guard fd >= 0 else { throw .connectionFailed(errno) }
       defer { sceneClose(fd) }
@@ -138,6 +143,19 @@
         return unsafe sceneWrite(fd, ptr, byteCount)
       }
       guard sent > 0 else { throw .sendFailed(errno) }
+
+      var readDescriptor = pollfd(
+        fd: fd,
+        events: Int16(POLLIN),
+        revents: 0
+      )
+      let ready = unsafe poll(&readDescriptor, 1, timeoutMilliseconds)
+      guard ready > 0 else {
+        if ready == 0 {
+          throw .readTimedOut
+        }
+        throw .readFailed(errno)
+      }
 
       // Read response (up to 64 KB)
       var buffer = [UInt8](repeating: 0, count: 65536)

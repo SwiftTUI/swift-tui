@@ -170,7 +170,11 @@ private func uniqueAppName() -> String {
 private func waitForServer(at socketPath: String) async throws {
   try await waitUntilSocketCondition("server readiness") {
     do {
-      let response = try SocketClient.sendRequest(socketPath: socketPath, request: "LIST\n")
+      let response = try SocketClient.sendRequest(
+        socketPath: socketPath,
+        request: "LIST\n",
+        timeoutMilliseconds: 100
+      )
       return response.hasPrefix("OK ")
     } catch {
       return false

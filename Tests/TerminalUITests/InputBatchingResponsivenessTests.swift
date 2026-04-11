@@ -130,7 +130,7 @@ struct InputBatchingResponsivenessTests {
 
     let scrollEventBytes: [UInt8] = Array("\u{1B}[<64;5;5M".utf8)
     let bytesWritten = unsafe scrollEventBytes.withUnsafeBufferPointer { buffer in
-      unsafe Darwin.write(writeEnd, buffer.baseAddress, buffer.count)
+      unsafe write(writeEnd, buffer.baseAddress, buffer.count)
     }
     #expect(bytesWritten == scrollEventBytes.count)
     close(writeEnd)

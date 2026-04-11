@@ -25,6 +25,8 @@ struct SceneRuntimeTests {
     let invocationCount = Mutex<Int>(0)
     let attachmentEvents = Mutex<[Bool]>([])
     let firstSessionShouldEnd = Mutex<Bool>(false)
+    var firstClientFD: Int32 = -1
+    var secondClientFD: Int32 = -1
 
     let runtime = try SceneRuntime(
       selection: selection,
@@ -36,7 +38,10 @@ struct SceneRuntimeTests {
         }
 
         if invocation == 1 {
-          while !firstSessionShouldEnd.withLock({ $0 }) {
+          while !Task.isCancelled {
+            if firstSessionShouldEnd.withLock({ $0 }) {
+              break
+            }
             try? await Task.sleep(nanoseconds: 10_000_000)
           }
 
@@ -69,13 +74,26 @@ struct SceneRuntimeTests {
         }
       )
     }
+    defer {
+      firstSessionShouldEnd.withLock {
+        $0 = true
+      }
+      task.cancel()
+      if firstClientFD >= 0 {
+        sceneClose(firstClientFD)
+      }
+      if secondClientFD >= 0 {
+        sceneClose(secondClientFD)
+      }
+      runtime.shutdown()
+    }
 
     guard let slavePath = runtime.sceneInfo.ptyPath else {
       throw RuntimeTestError.missingSlavePath
     }
     #expect(runtime.lifecycle.state == .created)
 
-    var firstClientFD = sceneOpen(slavePath, O_RDWR | O_NOCTTY)
+    firstClientFD = sceneOpen(slavePath, O_RDWR | O_NOCTTY)
     #expect(firstClientFD >= 0)
 
     try await waitUntil("first attach") {
@@ -93,7 +111,7 @@ struct SceneRuntimeTests {
       runtime.lifecycle.state == .suspended
     }
 
-    var secondClientFD = sceneOpen(slavePath, O_RDWR | O_NOCTTY)
+    secondClientFD = sceneOpen(slavePath, O_RDWR | O_NOCTTY)
     #expect(secondClientFD >= 0)
 
     try await waitUntil("second attach") {
