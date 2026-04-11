@@ -1136,74 +1136,99 @@ private func stripEndMarker(from line: String, marker: Character) -> String {
   return String(characters)
 }
 
-private func fileExists(at path: String) -> Bool {
-  unsafe path.withCString { unsafe access($0, F_OK) == 0 }
-}
+#if canImport(WASILibc)
+  private let wasiExternalFontAccessError =
+    "external font files are unavailable in WASI builds; use FigletFontLibrary or EmbeddedFonts"
 
-private func isDirectory(at path: String) -> Bool {
-  guard let directory = unsafe opendir(path) else {
-    return false
+  private func fileExists(at path: String) -> Bool {
+    false
   }
-  unsafe closedir(directory)
-  return true
-}
 
-private func directoryEntries(at path: String) -> [String] {
-  guard let directory = unsafe opendir(path) else {
-    return []
+  private func isDirectory(at path: String) -> Bool {
+    false
   }
-  defer { unsafe closedir(directory) }
 
-  var entries: [String] = []
-  while let entryPointer = unsafe readdir(directory) {
-    let name = unsafe withUnsafePointer(to: &entryPointer.pointee.d_name) { pointer in
-      unsafe pointer.withMemoryRebound(
-        to: CChar.self, capacity: MemoryLayout.size(ofValue: entryPointer.pointee.d_name)
-      ) {
-        unsafe String(cString: $0)
+  private func directoryEntries(at path: String) -> [String] {
+    []
+  }
+
+  private func readUTF8File(at path: String) throws -> String {
+    throw FigletError.invalidConfiguration(wasiExternalFontAccessError)
+  }
+
+  private func environmentValue(named name: String) -> String? {
+    nil
+  }
+#else
+  private func fileExists(at path: String) -> Bool {
+    unsafe path.withCString { unsafe access($0, F_OK) == 0 }
+  }
+
+  private func isDirectory(at path: String) -> Bool {
+    guard let directory = unsafe opendir(path) else {
+      return false
+    }
+    unsafe closedir(directory)
+    return true
+  }
+
+  private func directoryEntries(at path: String) -> [String] {
+    guard let directory = unsafe opendir(path) else {
+      return []
+    }
+    defer { unsafe closedir(directory) }
+
+    var entries: [String] = []
+    while let entryPointer = unsafe readdir(directory) {
+      let name = unsafe withUnsafePointer(to: &entryPointer.pointee.d_name) { pointer in
+        unsafe pointer.withMemoryRebound(
+          to: CChar.self, capacity: MemoryLayout.size(ofValue: entryPointer.pointee.d_name)
+        ) {
+          unsafe String(cString: $0)
+        }
+      }
+
+      if name != "." && name != ".." {
+        entries.append(name)
       }
     }
 
-    if name != "." && name != ".." {
-      entries.append(name)
+    return entries
+  }
+
+  private func readUTF8File(at path: String) throws -> String {
+    guard let file = unsafe fopen(path, "rb") else {
+      throw FigletError.invalidFont("unable to read font at \(path)")
     }
+    defer { unsafe fclose(file) }
+
+    guard unsafe fseek(file, 0, SEEK_END) == 0 else {
+      throw FigletError.invalidFont("unable to read font at \(path)")
+    }
+
+    let size = unsafe ftell(file)
+    guard size >= 0 else {
+      throw FigletError.invalidFont("unable to read font at \(path)")
+    }
+
+    unsafe rewind(file)
+
+    var buffer = [UInt8](repeating: 0, count: Int(size))
+    let bufferCount = buffer.count
+    let bytesRead = unsafe buffer.withUnsafeMutableBytes { bytes in
+      unsafe fread(bytes.baseAddress, 1, bufferCount, file)
+    }
+
+    return String(decoding: buffer.prefix(bytesRead), as: UTF8.self)
   }
 
-  return entries
-}
-
-private func readUTF8File(at path: String) throws -> String {
-  guard let file = unsafe fopen(path, "rb") else {
-    throw FigletError.invalidFont("unable to read font at \(path)")
+  private func environmentValue(named name: String) -> String? {
+    guard let value = unsafe getenv(name) else {
+      return nil
+    }
+    return unsafe String(cString: value)
   }
-  defer { unsafe fclose(file) }
-
-  guard unsafe fseek(file, 0, SEEK_END) == 0 else {
-    throw FigletError.invalidFont("unable to read font at \(path)")
-  }
-
-  let size = unsafe ftell(file)
-  guard size >= 0 else {
-    throw FigletError.invalidFont("unable to read font at \(path)")
-  }
-
-  unsafe rewind(file)
-
-  var buffer = [UInt8](repeating: 0, count: Int(size))
-  let bufferCount = buffer.count
-  let bytesRead = unsafe buffer.withUnsafeMutableBytes { bytes in
-    unsafe fread(bytes.baseAddress, 1, bufferCount, file)
-  }
-
-  return String(decoding: buffer.prefix(bytesRead), as: UTF8.self)
-}
-
-private func environmentValue(named name: String) -> String? {
-  guard let value = unsafe getenv(name) else {
-    return nil
-  }
-  return unsafe String(cString: value)
-}
+#endif
 
 private func pathByAppending(_ base: String, _ component: String) -> String {
   if component.hasPrefix("/") {
