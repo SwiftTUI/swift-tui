@@ -63,7 +63,9 @@ func edgeWidthSingleLine() {
     bottomLeading: "└", bottomTrailing: "┘"
   )
   #expect(set.topDisplayWidth == 1)
+  #expect(set.bottomDisplayWidth == 1)
   #expect(set.leftDisplayWidth == 1)
+  #expect(set.rightDisplayWidth == 1)
 }
 
 @Test("Edge widths handle multi-rune cycling edges")
@@ -80,11 +82,28 @@ func edgeWidthMultiRune() {
 @Test("Edge widths handle wide graphemes")
 func edgeWidthWide() {
   let set = BorderSet(
-    top: "★", bottom: "★", left: "┃", right: "┃",
+    top: "界", bottom: "界", left: "┃", right: "┃",
     topLeading: "╔", topTrailing: "╗",
     bottomLeading: "╚", bottomTrailing: "╝"
   )
+  #expect(set.topDisplayWidth == 2)
+}
+
+@Test("Edge widths route each property to its own edge")
+func edgeWidthsRoutePerEdge() {
+  // Use a distinct width on each side so a wiring bug surfaces.
+  let set = BorderSet(
+    top: "─",  // width 1
+    bottom: "界",  // width 2
+    left: "│",  // width 1
+    right: "界",  // width 2
+    topLeading: "┌", topTrailing: "┐",
+    bottomLeading: "└", bottomTrailing: "┘"
+  )
   #expect(set.topDisplayWidth == 1)
+  #expect(set.bottomDisplayWidth == 2)
+  #expect(set.leftDisplayWidth == 1)
+  #expect(set.rightDisplayWidth == 2)
 }
 
 @Test("Empty edge contributes zero")
