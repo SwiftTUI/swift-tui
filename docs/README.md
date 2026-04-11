@@ -16,6 +16,7 @@ under `Sources/`.
 - [ARCHITECTURE.md](ARCHITECTURE.md): package boundaries and the end-to-end frame pipeline
 - [RUNTIME.md](RUNTIME.md): runtime, lifecycle, state, observation, and incremental rendering behavior
 - [TOOLCHAINS.md](TOOLCHAINS.md): the supported Swift, wasm, Bun, Xcode, and Android toolchain story
+- [../Scripts/test_all.zsh](../Scripts/test_all.zsh): the single repo-level test entrypoint, including Swift/Bun environment checks; also exposed as `bun run test` from the repo root
 
 ## Core References
 

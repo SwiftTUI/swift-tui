@@ -160,7 +160,15 @@ Use [docs/TOOLCHAINS.md](/Users/adamz/Developer/repos/swift-terminal-ui/docs/TOO
 ```bash
 swiftly run swift build
 swiftly run swift test
+Scripts/test_all.zsh
+bun run test
 ```
+
+`swiftly run swift test` covers the root package. `Scripts/test_all.zsh` is the
+single repo-level entrypoint for the full checked-in test surface across the
+runner packages, GUI packages, and example projects, and it verifies the Swift
+and Bun environment first. If you're already using the repo's root Bun
+workspace, `bun run test` is a thin entrypoint to the same script.
 
 ## Generate API Docs
 

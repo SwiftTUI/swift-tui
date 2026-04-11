@@ -115,7 +115,22 @@ function confirmRequiredWasmFlags(args: readonly string[]): void {
 }
 
 function logWasmBuildConfiguration(config: WasmBuildConfigurationLog): void {
-  console.error(
+  for (const line of wasmBuildConfigurationLogLines(config)) {
+    console.error(line);
+  }
+}
+
+export function wasmBuildConfigurationLogLines(
+  config: WasmBuildConfigurationLog
+): string[] {
+  return [
+    "WASM_REQUIRED_FLAGS_CONFIRMED=true",
+    `WASM_REQUIRED_FLAGS=${requiredWasmSwiftFlags.join(" ")}`,
+    `WASM_REQUIRED_FLAGS_JSON=${JSON.stringify([...requiredWasmSwiftFlags])}`,
+    `WASM_BUILD_COMMAND=${formatCommandForLogs(config.buildCommand)}`,
+    `WASM_BUILD_COMMAND_ARGS_JSON=${JSON.stringify(config.buildCommand)}`,
+    `WASM_SHOW_BIN_PATH_COMMAND=${formatCommandForLogs(config.showBinPathCommand)}`,
+    `WASM_SHOW_BIN_PATH_COMMAND_ARGS_JSON=${JSON.stringify(config.showBinPathCommand)}`,
     `WASM_BUILD_CONFIGURATION ${JSON.stringify({
       packagePath: config.packagePath,
       product: config.product,
@@ -123,8 +138,8 @@ function logWasmBuildConfiguration(config: WasmBuildConfigurationLog): void {
       requiredFlags: [...requiredWasmSwiftFlags],
       buildCommand: formatCommandForLogs(config.buildCommand),
       showBinPathCommand: formatCommandForLogs(config.showBinPathCommand),
-    })}`
-  );
+    })}`,
+  ];
 }
 
 export function formatCommandForLogs(args: readonly string[]): string {
