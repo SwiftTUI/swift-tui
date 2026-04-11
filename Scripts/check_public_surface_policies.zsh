@@ -151,7 +151,7 @@ for doc_file in "${anyview_policy_docs[@]}"; do
   fi
 done
 
-if [[ ! -f Tests/ViewTests/ActorIsolationSurfaceTests.swift ]]; then
+if [[ ! -f Tests/ViewTests/ActorIsolationSurfaceTests.swift && ! -f Tests/TerminalUITests/ActorIsolationSurfaceTests.swift ]]; then
   fail "Tests/ViewTests/ActorIsolationSurfaceTests.swift should exist to pin the actor-isolated surface."
 fi
 

@@ -1,11 +1,11 @@
 #if canImport(Darwin)
-  public import Darwin  // macOS, iOS, tvOS, watchOS
+  internal import Darwin  // macOS, iOS, tvOS, watchOS
 #elseif canImport(Glibc)
-  public import Glibc  // Linux, Android, some older Wasm
+  internal import Glibc  // Linux, Android, some older Wasm
 #elseif canImport(WASILibc)
-  public import WASILibc  // WebAssembly (WASI)
+  internal import WASILibc  // WebAssembly (WASI)
 #elseif canImport(ucrt)
-  public import ucrt  // Windows
+  internal import ucrt  // Windows
 #endif
 
 public func pow(_ base: Int, _ exponent: Int) -> Int? {
@@ -45,46 +45,46 @@ public func pow(_ base: Int, _ exponent: Int) -> Int? {
 
 @usableFromInline
 internal enum _PrismNumeric {
-  @inlinable static func clamp(_ value: Double, _ lower: Double, _ upper: Double) -> Double {
+  static func clamp(_ value: Double, _ lower: Double, _ upper: Double) -> Double {
     min(max(value, lower), upper)
   }
 
-  @inlinable static func lerp(_ a: Double, _ b: Double, _ t: Double) -> Double {
+  static func lerp(_ a: Double, _ b: Double, _ t: Double) -> Double {
     a + (b - a) * t
   }
 
-  @inlinable static func isFinite(_ values: Double...) -> Bool {
+  static func isFinite(_ values: Double...) -> Bool {
     values.allSatisfy { $0.isFinite }
   }
 
-  @inlinable static func positiveMod(_ value: Double, modulus: Double) -> Double {
+  static func positiveMod(_ value: Double, modulus: Double) -> Double {
     let result = value.truncatingRemainder(dividingBy: modulus)
     return result >= 0 ? result : result + modulus
   }
 
-  @inlinable static func wrapDegrees(_ degrees: Double) -> Double {
+  static func wrapDegrees(_ degrees: Double) -> Double {
     positiveMod(degrees, modulus: 360.0)
   }
 
-  @inlinable static func signedPower(_ value: Double, exponent: Double) -> Double {
+  static func signedPower(_ value: Double, exponent: Double) -> Double {
     if value == 0 { return 0 }
     let sign = value < 0 ? -1.0 : 1.0
     return sign * pow(abs(value), exponent)
   }
 
-  @inlinable static func cbrtSigned(_ value: Double) -> Double {
+  static func cbrtSigned(_ value: Double) -> Double {
     if value == 0 { return 0 }
     let sign = value < 0 ? -1.0 : 1.0
     return sign * pow(abs(value), 1.0 / 3.0)
   }
 
-  @inlinable static func approxEqual(_ lhs: Double, _ rhs: Double, tolerance: Double = 1e-12)
+  static func approxEqual(_ lhs: Double, _ rhs: Double, tolerance: Double = 1e-12)
     -> Bool
   {
     abs(lhs - rhs) <= tolerance
   }
 
-  @inlinable static func shortestHueDelta(from h1: Double, to h2: Double) -> Double {
+  static func shortestHueDelta(from h1: Double, to h2: Double) -> Double {
     let delta = wrapDegrees(h2 - h1)
     return delta > 180 ? delta - 360 : delta
   }
@@ -310,7 +310,7 @@ public enum TransferFunction: Hashable, Sendable, Codable {
   private enum CodingKeys: String, CodingKey { case kind, gamma }
   private enum Kind: String, Codable { case linear, gamma, sRGB, rec2020, proPhotoRGB }
 
-  @inlinable internal var isValid: Bool {
+  internal var isValid: Bool {
     switch self {
     case .linear, .sRGB, .rec2020, .proPhotoRGB:
       return true
@@ -856,12 +856,10 @@ public struct OklchColor: Hashable, Sendable, Codable {
 
 // MARK: - Matrix generation and adaptation
 
-@inlinable
 internal func _chromaticityToXYZ(_ c: Chromaticity) -> Vector3 {
   Vector3(x: c.x / c.y, y: 1.0, z: (1.0 - c.x - c.y) / c.y)
 }
 
-@inlinable
 internal func _makeRGBToXYZMatrix(primaries: RGBPrimaries, whitePoint: ReferenceWhite) -> Matrix3x3
 {
   let r = _chromaticityToXYZ(primaries.red)
@@ -881,7 +879,6 @@ internal func _makeRGBToXYZMatrix(primaries: RGBPrimaries, whitePoint: Reference
   )
 }
 
-@inlinable
 internal func _adaptationMatrix(_ method: ChromaticAdaptationMethod) -> Matrix3x3 {
   switch method {
   case .bradford:
@@ -924,7 +921,6 @@ public func adapt(
 
 // MARK: - Perceptual space conversions
 
-@inlinable
 internal func _xyzToLab(_ xyz: XYZColor, whitePoint: ReferenceWhite) -> LabColor {
   let adapted = xyz.whitePoint == whitePoint ? xyz : adapt(xyz, to: whitePoint)
   let white = whitePoint.xyz
@@ -951,7 +947,6 @@ internal func _xyzToLab(_ xyz: XYZColor, whitePoint: ReferenceWhite) -> LabColor
   )
 }
 
-@inlinable
 internal func _labToXYZ(_ lab: LabColor) -> XYZColor {
   let epsilon = 216.0 / 24389.0
   let kappa = 24389.0 / 27.0
@@ -977,14 +972,12 @@ internal func _labToXYZ(_ lab: LabColor) -> XYZColor {
   )
 }
 
-@inlinable
 internal func _labToLCh(_ lab: LabColor) -> LChColor {
   let c = sqrt(lab.a * lab.a + lab.b * lab.b)
   let h = _PrismNumeric.wrapDegrees(atan2(lab.b, lab.a) * 180.0 / .pi)
   return LChColor(l: lab.l, c: c, h: h, whitePoint: lab.whitePoint)
 }
 
-@inlinable
 internal func _lchToLab(_ lch: LChColor) -> LabColor {
   let radians = lch.h * .pi / 180.0
   return LabColor(
@@ -995,7 +988,6 @@ internal func _lchToLab(_ lch: LChColor) -> LabColor {
   )
 }
 
-@inlinable
 internal func _xyzD65ToOklab(_ xyz: XYZColor) -> OklabColor {
   precondition(xyz.whitePoint == .d65, "Oklab requires D65-referenced XYZ")
   let l = _PrismNumeric.cbrtSigned(
@@ -1011,7 +1003,6 @@ internal func _xyzD65ToOklab(_ xyz: XYZColor) -> OklabColor {
   )
 }
 
-@inlinable
 internal func _oklabToXYZD65(_ lab: OklabColor) -> XYZColor {
   let l = lab.l + 0.3963377774 * lab.a + 0.2158037573 * lab.b
   let m = lab.l - 0.1055613458 * lab.a - 0.0638541728 * lab.b
@@ -1027,20 +1018,17 @@ internal func _oklabToXYZD65(_ lab: OklabColor) -> XYZColor {
   )
 }
 
-@inlinable
 internal func _oklabToOklch(_ lab: OklabColor) -> OklchColor {
   let c = sqrt(lab.a * lab.a + lab.b * lab.b)
   let h = _PrismNumeric.wrapDegrees(atan2(lab.b, lab.a) * 180.0 / .pi)
   return OklchColor(l: lab.l, c: c, h: h)
 }
 
-@inlinable
 internal func _oklchToOklab(_ lch: OklchColor) -> OklabColor {
   let radians = lch.h * .pi / 180.0
   return OklabColor(l: lch.l, a: lch.c * cos(radians), b: lch.c * sin(radians))
 }
 
-@inlinable
 internal func _effectiveHue(chroma: Double, hue: Double, epsilon: Double = 1e-9) -> Double? {
   chroma < epsilon ? nil : _PrismNumeric.wrapDegrees(hue)
 }
@@ -1238,7 +1226,6 @@ public struct Color: Hashable, Sendable, Codable {
 // MARK: - Internal conversion helpers
 
 extension Color {
-  @inlinable
   internal var _linearRGB: Vector3 {
     Vector3(
       x: profile.transferFunction.decode(red),
@@ -1247,7 +1234,6 @@ extension Color {
     )
   }
 
-  @inlinable
   internal static func _fromLinearRGB(_ linear: Vector3, alpha: Double, profile: RGBColorProfile)
     -> Color
   {
@@ -1260,7 +1246,6 @@ extension Color {
     )
   }
 
-  @inlinable
   internal static func _fromXYZPreservingGamut(
     _ xyz: XYZColor, alpha: Double, profile: RGBColorProfile
   ) -> Color {
@@ -1269,12 +1254,10 @@ extension Color {
     return _fromLinearRGB(linear, alpha: alpha, profile: profile)
   }
 
-  @inlinable
   internal static func _fromLab(_ lab: LabColor, alpha: Double, profile: RGBColorProfile) -> Color {
     _fromXYZPreservingGamut(_labToXYZ(lab), alpha: alpha, profile: profile)
   }
 
-  @inlinable
   internal static func _fromOklab(_ lab: OklabColor, alpha: Double, profile: RGBColorProfile)
     -> Color
   {
@@ -1282,21 +1265,18 @@ extension Color {
     return _fromXYZPreservingGamut(xyz, alpha: alpha, profile: profile)
   }
 
-  @inlinable
   internal static func _fromOklch(_ lch: OklchColor, alpha: Double, profile: RGBColorProfile)
     -> Color
   {
     _fromOklab(_oklchToOklab(lch), alpha: alpha, profile: profile)
   }
 
-  @inlinable
   internal func _convertedPreservingGamut(to profile: RGBColorProfile) -> Color {
     if self.profile == profile { return self }
     let xyz = self.xyz()
     return Self._fromXYZPreservingGamut(xyz, alpha: alpha, profile: profile)
   }
 
-  @inlinable
   internal func _clippedChannels() -> Color {
     Color(
       red: _PrismNumeric.clamp(red, 0, 1),
@@ -1307,7 +1287,6 @@ extension Color {
     )
   }
 
-  @inlinable
   internal func _isInGamutEncoded(tolerance: Double = 1e-9) -> Bool {
     red >= -tolerance && red <= 1 + tolerance && green >= -tolerance && green <= 1 + tolerance
       && blue >= -tolerance && blue <= 1 + tolerance
@@ -1456,7 +1435,6 @@ extension Color {
 
 // MARK: - Delta E
 
-@inlinable
 internal func _deltaE76(_ lhs: LabColor, _ rhs: LabColor) -> Double {
   let dl = lhs.l - rhs.l
   let da = lhs.a - rhs.a
@@ -1464,7 +1442,6 @@ internal func _deltaE76(_ lhs: LabColor, _ rhs: LabColor) -> Double {
   return sqrt(dl * dl + da * da + db * db)
 }
 
-@inlinable
 internal func _deltaE94(_ lhs: LabColor, _ rhs: LabColor) -> Double {
   let kL = 1.0
   let kC = 1.0
@@ -1487,7 +1464,6 @@ internal func _deltaE94(_ lhs: LabColor, _ rhs: LabColor) -> Double {
   )
 }
 
-@inlinable
 internal func _deltaE2000(_ lhs: LabColor, _ rhs: LabColor) -> Double {
   let l1 = lhs.l
   let a1 = lhs.a

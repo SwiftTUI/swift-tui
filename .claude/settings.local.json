@@ -53,7 +53,13 @@
       "Bash(rm -f gallery_repro_out gallery_repro_in)",
       "Bash(mkfifo gallery_repro_in)",
       "Bash(sort -t= -k2 -rn)",
-      "Bash(sort -t'\\(' -k2 -rn)"
+      "Bash(sort -t'\\(' -k2 -rn)",
+      "Bash(sort -t'k' -k2 -rn)",
+      "Bash(sysctl -n hw.logicalcpu)",
+      "Bash(sysctl -n hw.physicalcpu)",
+      "Bash(awk '!seen[$0]++')",
+      "Bash(sed -n '70,120p' /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/Controls/PickerRendering.swift)",
+      "Bash(sed -n '355,410p' /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/Controls/PickerRendering.swift)"
     ]
   }
 }
