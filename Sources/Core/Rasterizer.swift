@@ -5,6 +5,7 @@ public struct Rasterizer {
     case constant(Color?)
     case sampled(LinearGradient)
     case sampledRadial(RadialGradient)
+    case pattern(PatternFill)
   }
 
   public init() {}
@@ -516,18 +517,44 @@ extension Rasterizer {
     // Detect whether this fill carries alpha for the tint path.
     let constantColor: Color?
     let isTranslucent: Bool
+    let patternFill: PatternFill?
     switch colorMode {
     case .constant(let color):
       constantColor = color
       isTranslucent = (color?.alpha ?? 0) < 1
+      patternFill = nil
     case .sampled, .sampledRadial:
       constantColor = nil
       // Sampled (gradient) fills may have per-stop alpha.
       isTranslucent = false
+      patternFill = nil
+    case .pattern(let pattern):
+      constantColor = nil
+      isTranslucent = false
+      patternFill = pattern
     }
 
+    // Pre-compute the glyph cell width for pattern fills once so we
+    // handle wide characters (e.g. emoji) correctly inside the inner
+    // loop without paying the cost per cell.
+    let patternGlyphWidth: Int = {
+      guard let patternFill else { return 1 }
+      return max(1, cellWidth(of: patternFill.glyph))
+    }()
+    // Per-cell style reused for every cell when the fill is a pattern.
+    let patternCellStyle: ResolvedTextStyle? = {
+      guard let patternFill else { return nil }
+      let resolved = ResolvedTextStyle(
+        foregroundColor: patternFill.foreground,
+        backgroundColor: patternFill.background
+      )
+      return resolved.isDefault ? nil : resolved
+    }()
+
     for y in shapeBounds.origin.y..<(shapeBounds.origin.y + shapeBounds.size.height) {
-      for x in shapeBounds.origin.x..<(shapeBounds.origin.x + shapeBounds.size.width) {
+      var x = shapeBounds.origin.x
+      let rowEnd = shapeBounds.origin.x + shapeBounds.size.width
+      while x < rowEnd {
         guard
           shapeContains(
             pointX: x,
@@ -537,6 +564,30 @@ extension Rasterizer {
             fillMode: mode
           )
         else {
+          x += 1
+          continue
+        }
+
+        if let patternFill {
+          // Pattern fill: overwrite the cell with the glyph using the
+          // pattern's foreground and optional background.
+          if x + patternGlyphWidth > rowEnd {
+            // Not enough horizontal room for a wide glyph (e.g. an
+            // emoji at the very right edge) — skip this cell rather
+            // than clipping the glyph in half.
+            x += 1
+            continue
+          }
+          write(
+            patternFill.glyph,
+            width: patternGlyphWidth,
+            style: patternCellStyle,
+            atX: x,
+            y: y,
+            cells: &cells,
+            clip: clip
+          )
+          x += patternGlyphWidth
           continue
         }
 
@@ -584,6 +635,7 @@ extension Rasterizer {
             )
           }
         }
+        x += 1
       }
     }
   }
@@ -1674,11 +1726,7 @@ extension Rasterizer {
     case .radialGradient(let gradient):
       return .sampledRadial(gradient)
     case .patternFill(let pattern):
-      // Commit 1 placeholder: resolve the pattern to its foreground
-      // color so the exhaustive switch is covered without changing
-      // the existing paintFill semantics.  Commit 2 replaces this
-      // with a per-cell glyph path.
-      return .constant(pattern.foreground)
+      return .pattern(pattern)
     case .terminalChrome(let chromeStyle):
       return resolvedColorMode(
         from: environment.theme.resolvedStyle(
@@ -1740,6 +1788,13 @@ extension Rasterizer {
           endRadius: gradient.endRadius
         )
         return .sampledRadial(faded)
+      case .pattern(let pattern):
+        let faded = PatternFill(
+          glyph: pattern.glyph,
+          foreground: pattern.foreground.opacity(amount),
+          background: pattern.background.map { $0.opacity(amount) }
+        )
+        return .pattern(faded)
       }
     }
   }
@@ -1767,6 +1822,11 @@ extension Rasterizer {
         x: sampleX,
         y: sampleY
       )
+    case .pattern(let pattern):
+      // Callers that reduce a pattern fill to a scalar color use
+      // the foreground — the per-cell glyph write path bypasses
+      // this helper and consults the ``PatternFill`` directly.
+      return pattern.foreground
     }
   }
 
