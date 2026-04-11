@@ -1255,7 +1255,9 @@ struct SwiftUISurfaceTests {
       EmptyView()
         .frame(width: 4, height: 3, alignment: .topLeading)
         .background(.background)
-        .border(Color.red),
+        .overlay {
+          Rectangle().strokeBorder(Color.red)
+        },
       context: .init(
         identity: testIdentity("BorderFill"),
         environmentValues: environmentValues

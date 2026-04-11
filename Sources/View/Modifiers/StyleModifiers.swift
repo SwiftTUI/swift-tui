@@ -111,41 +111,53 @@ extension View {
     }
   }
 
+  /// Draws a border around this view.
+  ///
+  /// The border lives **outside** the view's content frame for outset
+  /// and decorative border sets — the wrapped view grows by the border
+  /// set's per-side display widths so that content is never occluded.
+  /// For `.inset` border sets the frame stays the same and glyphs are
+  /// drawn into the outermost child cells.
   public func border<S: ShapeStyle>(
-    _ style: S,
-    width: Int = 1
+    _ style: S = SemanticShapeStyle.foreground,
+    set: BorderSet = .outerHalfBlock,
+    sides: Edge.Set = .all
   ) -> some View {
-    border(
-      style,
-      width: width,
-      background: nil as BorderBackgroundStyle?
+    borderModified(
+      set: set,
+      foreground: BorderEdgeStyle(AnyShapeStyle(style)),
+      background: nil,
+      sides: sides
     )
   }
 
-  public func border<S: ShapeStyle, B: ShapeStyle>(
-    _ style: S,
-    width: Int = 1,
-    background backgroundStyle: B
+  /// Draws a border around this view using a per-side foreground style.
+  public func border(
+    _ style: BorderEdgeStyle,
+    set: BorderSet = .outerHalfBlock,
+    sides: Edge.Set = .all
   ) -> some View {
-    border(
-      style,
-      width: width,
-      background: BorderBackgroundStyle(backgroundStyle)
+    borderModified(
+      set: set,
+      foreground: style,
+      background: nil,
+      sides: sides
     )
   }
 
-  public func border<S: ShapeStyle>(
-    _ style: S,
-    width: Int = 1,
-    background backgroundStyle: BorderBackgroundStyle?
+  private func borderModified(
+    set: BorderSet,
+    foreground: BorderEdgeStyle?,
+    background: BorderBackgroundStyle?,
+    sides: Edge.Set
   ) -> some View {
-    overlay {
-      Rectangle().strokeBorder(
-        style,
-        style: .init(lineWidth: width),
-        background: backgroundStyle
-      )
-    }
+    BorderView(
+      content: erasedToAnyView,
+      set: set,
+      foreground: foreground,
+      background: background,
+      sides: sides
+    )
   }
 
   public func underline(
