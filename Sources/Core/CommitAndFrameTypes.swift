@@ -673,6 +673,24 @@ public struct FrameArtifacts: Equatable, Sendable {
   public var drawTree: DrawNode
   public var rasterSurface: RasterSurface
   package var presentationDamage: PresentationDamage?
+  /// Identities whose ``DrawNode`` had a non-empty visible rect after
+  /// all ancestor clip bounds were applied during rasterization.
+  ///
+  /// The runtime uses this set to gate animation tick scheduling on
+  /// viewport visibility: if every identity affected by an in-flight
+  /// animation falls outside this set, the animation is conceptually
+  /// active but geometrically quiescent (its subtree is clipped by a
+  /// ``ScrollView``, an inactive tab, etc.), and scheduling another
+  /// deadline would only burn CPU.  When any non-animation invalidation
+  /// wakes the scheduler — scroll, resize, tab switch, state change —
+  /// the next frame re-evaluates this set and the tick loop resumes.
+  ///
+  /// Note: this is a geometric predicate (would the identity paint any
+  /// cells given the current clip), not an observation of incremental
+  /// repaint behavior.  An identity that is visible but happens to
+  /// fall outside ``presentationDamage`` for this particular frame is
+  /// still recorded here.
+  package var drawnIdentities: Set<Identity>
   public var commitPlan: CommitPlan
   public var diagnostics: FrameDiagnostics
 
@@ -694,6 +712,7 @@ public struct FrameArtifacts: Equatable, Sendable {
     self.drawTree = drawTree
     self.rasterSurface = rasterSurface
     presentationDamage = nil
+    drawnIdentities = []
     self.commitPlan = commitPlan
     self.diagnostics = diagnostics
   }
@@ -706,6 +725,7 @@ public struct FrameArtifacts: Equatable, Sendable {
     drawTree: DrawNode,
     rasterSurface: RasterSurface,
     presentationDamage: PresentationDamage?,
+    drawnIdentities: Set<Identity> = [],
     commitPlan: CommitPlan,
     diagnostics: FrameDiagnostics = .init()
   ) {
@@ -716,6 +736,7 @@ public struct FrameArtifacts: Equatable, Sendable {
     self.drawTree = drawTree
     self.rasterSurface = rasterSurface
     self.presentationDamage = presentationDamage
+    self.drawnIdentities = drawnIdentities
     self.commitPlan = commitPlan
     self.diagnostics = diagnostics
   }
