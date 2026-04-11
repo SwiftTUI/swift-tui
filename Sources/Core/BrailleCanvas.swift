@@ -296,7 +296,7 @@ public struct BrailleCanvas: Equatable, Sendable {
     // ellipses where the arithmetic bound would round down to something
     // too small to close the perimeter.
     let steps = max(32, 4 * (rx + ry))
-    let twoPi = 2.0 * 3.14159265358979323846
+    let twoPi = 2.0 * .pi
     let rxD = Double(rx)
     let ryD = Double(ry)
     for i in 0..<steps {
