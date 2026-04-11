@@ -16,7 +16,7 @@ struct CounterTab: View {
   var body: some View {
     VStack(alignment: .center, spacing: 1) {
       brandingHeader
-      Divider()  // FIXME: this should span the VStack's width.
+      Divider()
       Spacer(minLength: 1)
       HStack(alignment: .bottom) {
         mathButton(" - ", step, -)
@@ -40,7 +40,7 @@ struct CounterTab: View {
     .padding(.horizontal, 2)
     .border(.separator)
     .padding(2)
-    .fixedSize()  // FIXME: the cascade of the 'as small as possible' heuristic for the effect of fixed size STOPS at the node which can't be sized down further.
+    .fixedSize()
     .onChange(of: count) {
       withAnimation {
         color = color.rotatedHue(by: 30)

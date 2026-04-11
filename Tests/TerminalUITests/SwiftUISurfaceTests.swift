@@ -4974,8 +4974,14 @@ struct SwiftUISurfaceTests {
     #expect(surface.contains("Tail"))
   }
 
-  @Test("width-only flexible frames preserve intrinsic width in horizontal stacks")
+  @Test("flexible frames absorb extra horizontal slack in horizontal stacks")
   func widthOnlyFlexibleFramesPreserveIntrinsicWidthInHorizontalStacks() {
+    // SwiftUI-faithful behaviour: when a rigid `.frame(width:)` sibling
+    // leaves slack in an HStack, a `.frame(maxWidth: .infinity)` child
+    // absorbs the remaining main-axis room. Without this, a lone
+    // "submit"-style cell on a row of fixed-width siblings (the
+    // classic calculator `=` key pattern) stays stuck at its minWidth
+    // even though its explicit constraint says otherwise.
     let artifacts = DefaultRenderer().render(
       HStack(alignment: .top, spacing: 1) {
         Text("Nav")
@@ -4993,8 +4999,8 @@ struct SwiftUISurfaceTests {
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
 
-    #expect(artifacts.measuredTree.measuredSize == .init(width: 12, height: 2))
-    #expect(artifacts.measuredTree.childMeasurements[1].measuredSize.width == 7)
+    #expect(artifacts.measuredTree.measuredSize == .init(width: 24, height: 2))
+    #expect(artifacts.measuredTree.childMeasurements[1].measuredSize.width == 19)
     #expect(surface.contains("Latency"))
     #expect(surface.contains("Errors"))
   }
