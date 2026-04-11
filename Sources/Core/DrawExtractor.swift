@@ -285,8 +285,8 @@ extension DrawExtractor {
       let set,
       let foreground,
       let background,
-      _,
-      _,
+      let blend,
+      let blendPhase,
       let sides
     ) = placed.layoutBehavior {
       let borderCommand: DrawCommand = .border(
@@ -294,6 +294,8 @@ extension DrawExtractor {
         set: set,
         foreground: foreground,
         background: background,
+        blend: blend,
+        blendPhase: blendPhase,
         sides: sides
       )
       if set.placement == .inset {

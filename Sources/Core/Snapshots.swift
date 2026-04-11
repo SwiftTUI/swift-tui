@@ -432,7 +432,7 @@ extension SnapshotRenderer {
     case .rule(let bounds, let style, let strokeStyle, let stackAxis):
       return
         "rule[\(describe(bounds)) \(describe(strokeStyle)) style=\(describe(style)) stackAxis=\(stackAxis?.rawValue ?? "nil")]"
-    case .border(let bounds, _, _, _, let sides):
+    case .border(let bounds, _, _, _, _, _, let sides):
       var sideNames: [String] = []
       if sides.contains(.top) { sideNames.append("top") }
       if sides.contains(.leading) { sideNames.append("leading") }
