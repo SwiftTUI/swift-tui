@@ -5,37 +5,33 @@ import TerminalUI
 /// of the new API surface so the tab doubles as a visual smoke test
 /// for:
 ///
-///   1. The built-in ``BorderSet`` catalog — a grid of small bordered
-///      cards, one per built-in set, so every glyph family is visible.
-///   2. Per-side ``BorderEdgeStyle`` foregrounds — a traffic-light card
-///      and a CSS-shorthand two-color card.
-///   3. A chasing-light perimeter gradient driven by an animated
+///   1. A chasing-light perimeter gradient driven by an animated
 ///      ``BorderBlend`` phase via `withAnimation(.repeatForever)`.
+///   2. The built-in ``BorderSet`` catalog — a grid of small bordered
+///      cards, one per built-in set, so every glyph family is visible.
+///   3. Per-side ``BorderEdgeStyle`` foregrounds — a traffic-light card
+///      and a CSS-shorthand two-color card.
 ///   4. Curved shapes — ``Circle``, ``Ellipse``, and ``Capsule`` across
 ///      fill / strokeBorder / ``PatternFill`` variants.
 ///   5. A hand-drawn ``Canvas`` sparkline, the arbitrary-drawing
 ///      escape hatch alongside the shape fill/stroke algebra.
 struct BordersAndShapesTab: View {
-  // Phase value driving the BorderBlend chasing-light animation.
-  // Bumped once inside `withAnimation(.linear(duration:).repeatForever)`
-  // on .onAppear, so the animation controller continuously interpolates
-  // the phase and the pipeline re-samples the perimeter every frame.
   @State private var gradientPhase: Double = 0
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 1) {
-        header
-        Divider()
-        borderCatalogSection
-        Divider()
-        edgeStyleSection
+        BordersAndShapesHeader()
         Divider()
         chasingLightSection
         Divider()
-        curvedShapesSection
+        BordersAndShapesCatalogSection()
         Divider()
-        canvasSparklineSection
+        BordersAndShapesEdgeStyleSection()
+        Divider()
+        BordersAndShapesCurvedShapesSection()
+        Divider()
+        BordersAndShapesCanvasSection()
         Spacer(minLength: 0)
       }
       .padding(1)
@@ -43,26 +39,50 @@ struct BordersAndShapesTab: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 
-  // MARK: - Header
+  private var chasingLightSection: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("1. BorderBlend + animated phase — chasing-light perimeter")
+        .foregroundStyle(.muted)
+      Text("chasing light")
+        .padding(1)
+        .frame(width: 30, height: 3)
+        .border(
+          blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .magenta, .red]),
+          set: .rounded,
+          phase: gradientPhase
+        )
+        .onAppear {
+          withAnimation(
+            .linear(duration: .milliseconds(3000))
+              .repeatForever(autoreverses: false)
+          ) {
+            gradientPhase = 1.0
+          }
+        }
+    }
+  }
+}
 
-  private var header: some View {
+private struct BordersAndShapesHeader: View {
+  var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Borders & Shapes").foregroundStyle(.foreground)
       Text("BorderSet catalog, per-side colors, animated gradient, curved shapes, Canvas.")
         .foregroundStyle(.separator)
     }
   }
+}
 
-  // MARK: - 1. Built-in BorderSet catalog
+private struct BordersAndShapesCatalogSection: View {
+  private func borderCard(_ label: String, set: BorderSet) -> some View {
+    Text(label)
+      .padding(.horizontal, 1)
+      .border(set: set)
+  }
 
-  // Four cards per row so the grid fits inside the gallery's ~80-col
-  // terminal envelope without clipping. Each row is a VStack rendered
-  // side-by-side inside an HStack. Horizontal padding adds breathing
-  // room so short labels like "single" aren't cramped against the
-  // border glyphs.
-  private var borderCatalogSection: some View {
+  var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("1. Built-in BorderSet catalog").foregroundStyle(.muted)
+      Text("2. Built-in BorderSet catalog").foregroundStyle(.muted)
       VStack(alignment: .leading, spacing: 1) {
         HStack(spacing: 2) {
           borderCard("single", set: .single)
@@ -85,18 +105,12 @@ struct BordersAndShapesTab: View {
       }
     }
   }
+}
 
-  private func borderCard(_ label: String, set: BorderSet) -> some View {
-    Text(label)
-      .padding(.horizontal, 1)
-      .border(set: set)
-  }
-
-  // MARK: - 2. Per-side BorderEdgeStyle colors
-
-  private var edgeStyleSection: some View {
+private struct BordersAndShapesEdgeStyleSection: View {
+  var body: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("2. Per-side colors via BorderEdgeStyle").foregroundStyle(.muted)
+      Text("3. Per-side colors via BorderEdgeStyle").foregroundStyle(.muted)
       HStack(spacing: 3) {
         Text("traffic light")
           .padding(1)
@@ -113,39 +127,10 @@ struct BordersAndShapesTab: View {
       }
     }
   }
+}
 
-  // MARK: - 3. Chasing-light perimeter gradient
-
-  // A closed palette (red at both endpoints) so the phase wrap is
-  // visually seamless. `withAnimation(.linear(...).repeatForever)` on
-  // `.onAppear` drives the animation controller forever; the pipeline
-  // re-samples `BorderBlend.color(at:)` at every animated phase step.
-  private var chasingLightSection: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Text("3. BorderBlend + animated phase — chasing-light perimeter")
-        .foregroundStyle(.muted)
-      Text("chasing light")
-        .padding(1)
-        .frame(width: 30, height: 3)
-        .border(
-          blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .magenta, .red]),
-          set: .rounded,
-          phase: gradientPhase
-        )
-        .onAppear {
-          withAnimation(
-            .linear(duration: .milliseconds(3000))
-              .repeatForever(autoreverses: false)
-          ) {
-            gradientPhase = 1.0
-          }
-        }
-    }
-  }
-
-  // MARK: - 4. Curved shapes — Circle / Ellipse / Capsule
-
-  private var curvedShapesSection: some View {
+private struct BordersAndShapesCurvedShapesSection: View {
+  var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("4. Curved shapes — Circle, Ellipse, Capsule")
         .foregroundStyle(.muted)
@@ -187,10 +172,10 @@ struct BordersAndShapesTab: View {
       }
     }
   }
+}
 
-  // MARK: - 5. Canvas sparkline
-
-  private var canvasSparklineSection: some View {
+private struct BordersAndShapesCanvasSection: View {
+  var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("5. Canvas sparkline — 20 data points in a 30×4 frame")
         .foregroundStyle(.muted)
