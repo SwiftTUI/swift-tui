@@ -54,3 +54,45 @@ func borderSetEquatable() {
   #expect(a != differentTop)
   #expect(a != differentPlacement)
 }
+
+@Test("Edge widths are 1 for single-line glyphs")
+func edgeWidthSingleLine() {
+  let set = BorderSet(
+    top: "─", bottom: "─", left: "│", right: "│",
+    topLeading: "┌", topTrailing: "┐",
+    bottomLeading: "└", bottomTrailing: "┘"
+  )
+  #expect(set.topDisplayWidth == 1)
+  #expect(set.leftDisplayWidth == 1)
+}
+
+@Test("Edge widths handle multi-rune cycling edges")
+func edgeWidthMultiRune() {
+  let set = BorderSet(
+    top: "─·", bottom: "─·", left: "│·", right: "│·",
+    topLeading: "┌", topTrailing: "┐",
+    bottomLeading: "└", bottomTrailing: "┘"
+  )
+  // widest rune in "─·" is 1 cell wide; cycling doesn't change vertical contribution
+  #expect(set.topDisplayWidth == 1)
+}
+
+@Test("Edge widths handle wide graphemes")
+func edgeWidthWide() {
+  let set = BorderSet(
+    top: "★", bottom: "★", left: "┃", right: "┃",
+    topLeading: "╔", topTrailing: "╗",
+    bottomLeading: "╚", bottomTrailing: "╝"
+  )
+  #expect(set.topDisplayWidth == 1)
+}
+
+@Test("Empty edge contributes zero")
+func edgeWidthEmpty() {
+  let set = BorderSet(
+    top: "", bottom: "─", left: "│", right: "│",
+    topLeading: "", topTrailing: "",
+    bottomLeading: "└", bottomTrailing: "┘"
+  )
+  #expect(set.topDisplayWidth == 0)
+}
