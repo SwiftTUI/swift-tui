@@ -1627,35 +1627,38 @@ extension Rasterizer {
     }
 
     // Project the cell's visual center onto the subpixel grid used by
-    // `paintBrailleShape`. A cell is 2 subpixels wide and 4 tall, so
+    // `paintBrailleShape`.  A cell is 2 subpixels wide and 4 tall, so
     // the center of cell (cx, cy) in subpixel space is
-    // (cx*2 + 0.5, cy*4 + 1.5).
-    let subW = Double(bounds.size.width * 2)
-    let subH = Double(bounds.size.height * 4)
+    // (cx*2 + 0.5, cy*4 + 1.5).  We compute `subW`, `subH`, and the
+    // per-shape center/radius in Int space to match `paintBrailleShape`
+    // exactly (which uses Int floor division), then convert to Double
+    // only for the parametric test.  This guarantees the pattern-fill
+    // silhouette matches the Braille disc silhouette cell-for-cell.
+    let subW = bounds.size.width * 2
+    let subH = bounds.size.height * 4
     let px = Double(cellRelX * 2) + 0.5
     let py = Double(cellRelY * 4) + 1.5
 
     switch geometry {
     case .circle:
       // Matches `paintBrailleShape`'s circle case:
-      //   radius = (min(subW, subH) - 1) / 2
+      //   radius = (min(subW, subH) - 1) / 2  (Int floor)
       //   cx = (subW - 1) / 2, cy = (subH - 1) / 2
-      let radius = max(0.0, (min(subW, subH) - 1) / 2)
-      let cxSub = (subW - 1) / 2
-      let cySub = (subH - 1) / 2
+      let radius = Double(max(0, (min(subW, subH) - 1) / 2))
+      let cxSub = Double((subW - 1) / 2)
+      let cySub = Double((subH - 1) / 2)
       let dx = px - cxSub
       let dy = py - cySub
       return dx * dx + dy * dy <= radius * radius
     case .ellipse:
-      // Matches `paintBrailleShape`'s ellipse case:
-      //   rx = (subW - 1) / 2, ry = (subH - 1) / 2
-      let rx = max(0.0, (subW - 1) / 2)
-      let ry = max(0.0, (subH - 1) / 2)
+      // Matches `paintBrailleShape`'s ellipse case.
+      let rx = max(0, (subW - 1) / 2)
+      let ry = max(0, (subH - 1) / 2)
       guard rx > 0, ry > 0 else { return false }
-      let cxSub = (subW - 1) / 2
-      let cySub = (subH - 1) / 2
-      let dx = (px - cxSub) / rx
-      let dy = (py - cySub) / ry
+      let cxSub = Double((subW - 1) / 2)
+      let cySub = Double((subH - 1) / 2)
+      let dx = (px - cxSub) / Double(rx)
+      let dy = (py - cySub) / Double(ry)
       return dx * dx + dy * dy <= 1
     case .capsule:
       // Matches `drawCapsule`: wide capsules get left/right semicircles
@@ -1664,10 +1667,10 @@ extension Rasterizer {
         return true
       }
       if subW >= subH {
-        let radius = max(0.0, (subH - 1) / 2)
-        let cySub = (subH - 1) / 2
+        let radius = Double(max(0, (subH - 1) / 2))
+        let cySub = Double((subH - 1) / 2)
         let leftCx = radius
-        let rightCx = subW - 1 - radius
+        let rightCx = Double(subW - 1) - radius
         if px < leftCx {
           let dx = px - leftCx
           let dy = py - cySub
@@ -1680,10 +1683,10 @@ extension Rasterizer {
           return py >= cySub - radius && py <= cySub + radius
         }
       } else {
-        let radius = max(0.0, (subW - 1) / 2)
-        let cxSub = (subW - 1) / 2
+        let radius = Double(max(0, (subW - 1) / 2))
+        let cxSub = Double((subW - 1) / 2)
         let topCy = radius
-        let bottomCy = subH - 1 - radius
+        let bottomCy = Double(subH - 1) - radius
         if py < topCy {
           let dx = px - cxSub
           let dy = py - topCy
