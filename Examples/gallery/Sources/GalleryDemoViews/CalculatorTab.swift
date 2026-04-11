@@ -35,63 +35,51 @@ struct CalculatorTab: View {
 
   var body: some View {
     VStack(alignment: .center, spacing: 1) {
-      displayRow
-      Spacer(minLength: 1)
+      TextFigure(display, font: .future)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .foregroundStyle(Color.black)
       buttonGrid
-      Spacer(minLength: 0)
     }
-    .padding(1)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-  }
-
-  private var displayRow: some View {
-    Text(display)
-      .bold()
-      .frame(maxWidth: .infinity, alignment: .trailing)
-      .padding(.horizontal, 1)
+    .animation(.easeInOut, value: display)
+    .fixedSize()
+    .padding(2)
+    .background(Color.white)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
   }
 
   private var buttonGrid: some View {
-    VStack(alignment: .center, spacing: 0) {
-      HStack(spacing: 0) {
-        calcButton("AC") { clearAll() }
-        calcButton("+/−") { negate() }
-        calcButton("%") { percent() }
-        calcButton(CalculatorOp.div.glyph) { setOp(.div) }
+    VStack(alignment: .center, spacing: 1) {
+      HStack(spacing: 1) {
+        CalculatorButton("AC", type: .destroy) { clearAll() }
+        CalculatorButton("+/−", type: .op) { negate() }
+        CalculatorButton("%", type: .op) { percent() }
+        CalculatorButton(CalculatorOp.div.glyph, type: .op) { setOp(.div) }
       }
-      HStack(spacing: 0) {
-        calcButton("7") { enterDigit("7") }
-        calcButton("8") { enterDigit("8") }
-        calcButton("9") { enterDigit("9") }
-        calcButton(CalculatorOp.mul.glyph) { setOp(.mul) }
+      HStack(spacing: 1) {
+        CalculatorButton("7") { enterDigit("7") }
+        CalculatorButton("8") { enterDigit("8") }
+        CalculatorButton("9") { enterDigit("9") }
+        CalculatorButton(CalculatorOp.mul.glyph, type: .op) { setOp(.mul) }
       }
-      HStack(spacing: 0) {
-        calcButton("4") { enterDigit("4") }
-        calcButton("5") { enterDigit("5") }
-        calcButton("6") { enterDigit("6") }
-        calcButton(CalculatorOp.sub.glyph) { setOp(.sub) }
+      HStack(spacing: 1) {
+        CalculatorButton("4") { enterDigit("4") }
+        CalculatorButton("5") { enterDigit("5") }
+        CalculatorButton("6") { enterDigit("6") }
+        CalculatorButton(CalculatorOp.sub.glyph, type: .op) { setOp(.sub) }
       }
-      HStack(spacing: 0) {
-        calcButton("1") { enterDigit("1") }
-        calcButton("2") { enterDigit("2") }
-        calcButton("3") { enterDigit("3") }
-        calcButton(CalculatorOp.add.glyph) { setOp(.add) }
+      HStack(spacing: 1) {
+        CalculatorButton("1") { enterDigit("1") }
+        CalculatorButton("2") { enterDigit("2") }
+        CalculatorButton("3") { enterDigit("3") }
+        CalculatorButton(CalculatorOp.add.glyph, type: .op) { setOp(.add) }
       }
-      HStack(spacing: 0) {
-        calcButton("0") { enterDigit("0") }
-        calcButton(".") { enterDot() }
-        calcButton("=") { evaluate() }
-        Rectangle().fill(Color.clear).frame(width: 6, height: 3)
+      HStack(spacing: 1) {
+        CalculatorButton("0") { enterDigit("0") }
+        CalculatorButton(".", type: .num) { enterDot() }
+        Spacer()
+        CalculatorButton("=", type: .submit) { evaluate() }
       }
     }
-  }
-
-  private func calcButton(
-    _ label: String,
-    action: @escaping @MainActor @Sendable () -> Void
-  ) -> some View {
-    Button(label, action: action)
-      .frame(width: 6, height: 3)
   }
 
   // MARK: - State machine
@@ -184,5 +172,75 @@ struct CalculatorTab: View {
       return String(Int64(value))
     }
     return String(value)
+  }
+}
+
+struct CalculatorButton: View {
+  enum ButtonType {
+    case destroy
+    case submit
+    case num
+    case op
+
+    enum Features: Hashable {
+      case fg(Color)
+      case bg(Color)
+      case bold
+      case italic
+      case disabled
+      case underline
+      case strikethrough
+    }
+
+    var features: [Features] {
+      switch self {
+      case .destroy:
+        [.fg(.white), .bg(Color.red), .bold]
+      case .submit:
+        [.fg(.white), .bg(Color.green), .bold]
+      case .num:
+        [.fg(.black), .bg(Color.gray)]
+      case .op:
+        [.fg(.white), .bg(Color.blue), .italic]
+      }
+    }
+
+    var fg: Color {
+      features.compactMap({
+        if case .fg(let c) = $0 { c } else { nil }
+      }).first ?? Color.magenta
+    }
+
+    var bg: Color {
+      features.compactMap({
+        if case .bg(let c) = $0 { c } else { nil }
+      }).first ?? Color.magenta
+    }
+  }
+  init(_ text: String, type: ButtonType = .num, action: @escaping @MainActor @Sendable () -> Void) {
+    self.action = action
+    self.type = type
+    self.text = text
+  }
+  var text: String
+  var type: ButtonType
+  var action: @MainActor () -> Void
+  var body: some View {
+    Button(action: action) {
+      Text(text)
+        .bold(type.features.contains(.bold))
+        .underline(type.features.contains(.underline))
+        .italic(type.features.contains(.italic))
+        .strikethrough(type.features.contains(.strikethrough))
+    }
+    .buttonStyle(.plain)
+    .frame(minWidth: 5, maxWidth: type == .submit ? .infinity : 5, alignment: .center)
+    .foregroundStyle(type.fg)
+    .background {
+      Rectangle().fill(
+        type.bg
+      )
+    }
+    .disabled(type.features.contains(.disabled))
   }
 }

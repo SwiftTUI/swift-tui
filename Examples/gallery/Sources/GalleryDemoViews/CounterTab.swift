@@ -18,13 +18,11 @@ struct CounterTab: View {
     }
     .padding(1)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    .onChange(
-      of: count,
-      {
-        withAnimation {
-          color = color.rotatedHue(by: 30)
-        }
-      })
+    .onChange(of: count) {
+      withAnimation {
+        color = color.rotatedHue(by: 30)
+      }
+    }
   }
 
   private var brandingHeader: some View {
