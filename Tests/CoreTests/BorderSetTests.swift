@@ -115,3 +115,66 @@ func edgeWidthEmpty() {
   )
   #expect(set.topDisplayWidth == 0)
 }
+
+@Test("BorderSet.single uses ─ │ ┌ ┐ └ ┘")
+func builtinSingle() {
+  let s = BorderSet.single
+  #expect(s.top == "─")
+  #expect(s.left == "│")
+  #expect(s.topLeading == "┌")
+  #expect(s.bottomTrailing == "┘")
+  #expect(s.placement == .outset)
+}
+
+@Test("BorderSet.rounded uses ╭ ╮ ╰ ╯ corners")
+func builtinRounded() {
+  let s = BorderSet.rounded
+  #expect(s.topLeading == "╭")
+  #expect(s.topTrailing == "╮")
+  #expect(s.bottomLeading == "╰")
+  #expect(s.bottomTrailing == "╯")
+}
+
+@Test("BorderSet.outerHalfBlock uses ▀ ▄ ▌ ▐ ▛ ▜ ▙ ▟")
+func builtinOuterHalf() {
+  let s = BorderSet.outerHalfBlock
+  #expect(s.top == "▀")
+  #expect(s.bottom == "▄")
+  #expect(s.left == "▌")
+  #expect(s.right == "▐")
+  #expect(s.topLeading == "▛")
+  #expect(s.topTrailing == "▜")
+  #expect(s.bottomLeading == "▙")
+  #expect(s.bottomTrailing == "▟")
+  #expect(s.placement == .decorative)
+}
+
+@Test("BorderSet.dashed cycles ─· and │·")
+func builtinDashed() {
+  let s = BorderSet.dashed
+  #expect(s.top == "─·")
+  #expect(s.left == "│·")
+}
+
+@Test("BorderSet.singleDouble has single horizontals, double verticals")
+func builtinSingleDouble() {
+  let s = BorderSet.singleDouble
+  #expect(s.top == "─")
+  #expect(s.left == "║")
+  #expect(s.topLeading == "╓")
+  #expect(s.topTrailing == "╖")
+}
+
+@Test("BorderSet.none has zero frame contribution")
+func builtinNone() {
+  let s = BorderSet.none
+  #expect(s.topDisplayWidth == 0)
+  #expect(s.leftDisplayWidth == 0)
+}
+
+@Test("BorderSet.hidden has frame contribution but invisible glyphs")
+func builtinHidden() {
+  let s = BorderSet.hidden
+  #expect(s.topDisplayWidth == 1)
+  #expect(s.top == " ")
+}
