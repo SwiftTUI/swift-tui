@@ -61,9 +61,11 @@ jobs:
           if ! command -v swiftly >/dev/null 2>&1 && [ ! -x "$HOME/.swiftly/bin/swiftly" ]; then
             case "$(uname -s)" in
               Darwin)
-                curl -L -o swiftly.pkg https://download.swift.org/swiftly/darwin/swiftly.pkg
-                installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
-                "$HOME/.swiftly/bin/swiftly" init --quiet-shell-followup
+                curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
+                installer -pkg swiftly.pkg -target CurrentUserHomeDirectory && \
+                ~/.swiftly/bin/swiftly init --quiet-shell-followup && \
+                . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
+                hash -r
                 ;;
               Linux)
                 curl -O https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz
