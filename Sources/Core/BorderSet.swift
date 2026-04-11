@@ -70,7 +70,7 @@ extension BorderSet {
   public func rightGlyph(at index: Int) -> Character? { Self.cycle(right, at: index) }
 
   private static func cycle(_ edge: String, at index: Int) -> Character? {
-    guard !edge.isEmpty else { return nil }
+    guard index >= 0, !edge.isEmpty else { return nil }
     let chars = Array(edge)
     return chars[index % chars.count]
   }
