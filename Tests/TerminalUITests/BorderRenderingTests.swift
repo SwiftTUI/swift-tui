@@ -106,16 +106,34 @@ struct BorderRenderingTests {
     #expect(artifacts.rasterSurface.size.height == 1)
   }
 
-  @Test(".border foreground style applies to border cells")
+  @Test(".border foreground style applies to all four edges")
   func borderForegroundStyleApplies() {
     let artifacts = DefaultRenderer().render(
       Text("hi").border(Color.red, set: .single),
       context: .init(identity: testIdentity("BorderForegroundStyle"))
     )
 
-    let topLeft = artifacts.rasterSurface.cells[0][0]
-    #expect(topLeft.character == "┌")
-    #expect(topLeft.style?.foregroundColor == Color.red)
+    // All four corners and a cell on each of the four edges should carry
+    // the red foreground color.  Trimmed frame is 4x3 for "hi" + .single.
+    let cells = artifacts.rasterSurface.cells
+    // Corners
+    #expect(cells[0][0].character == "┌")
+    #expect(cells[0][0].style?.foregroundColor == Color.red)
+    #expect(cells[0][3].character == "┐")
+    #expect(cells[0][3].style?.foregroundColor == Color.red)
+    #expect(cells[2][0].character == "└")
+    #expect(cells[2][0].style?.foregroundColor == Color.red)
+    #expect(cells[2][3].character == "┘")
+    #expect(cells[2][3].style?.foregroundColor == Color.red)
+    // One cell per edge (non-corner)
+    #expect(cells[0][1].character == "─")  // top edge
+    #expect(cells[0][1].style?.foregroundColor == Color.red)
+    #expect(cells[2][1].character == "─")  // bottom edge
+    #expect(cells[2][1].style?.foregroundColor == Color.red)
+    #expect(cells[1][0].character == "│")  // left edge
+    #expect(cells[1][0].style?.foregroundColor == Color.red)
+    #expect(cells[1][3].character == "│")  // right edge
+    #expect(cells[1][3].style?.foregroundColor == Color.red)
   }
 
   @Test(".border with inset placement paints glyphs into a multi-row child")
