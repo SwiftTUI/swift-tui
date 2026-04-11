@@ -146,17 +146,26 @@ private struct ButtonPlainBody<Label: View>: View {
   var focusActive: Bool
 
   var body: some View {
-    controlFocusRow(
-      showsRail: focusActive,
-      railStyle: chrome.borderStyle,
+    // The focus rail is drawn as an overlay rather than an HStack
+    // sibling. If it lived inside `controlFocusRow` the button's
+    // bounds would grow by the rail width the moment focus arrives,
+    // shifting the row's layout out from under a pressed pointer and
+    // making mouseDown-followed-by-mouseUp miss the armed route so
+    // the action never dispatches. With the overlay, the button's
+    // bounds are stable across focus state changes.
+    highlightedControlRow(
+      label,
       isHighlighted: focusActive,
-      backgroundStyle: chrome.backgroundStyle,
-      reservesRailSpaceWhenHidden: false
-    ) {
-      label
-    }
+      backgroundStyle: chrome.backgroundStyle
+    )
     .foregroundStyle(chrome.foregroundStyle)
     .drawMetadata(.init(opacity: chrome.opacity))
+    .overlay(alignment: .leading) {
+      if focusActive {
+        Text(controlFocusRailGlyph)
+          .foregroundStyle(chrome.borderStyle)
+      }
+    }
   }
 }
 

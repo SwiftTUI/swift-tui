@@ -15,53 +15,78 @@ enum CalculatorOp: Hashable {
     }
   }
 
-  func apply(_ lhs: Double, _ rhs: Double) -> Double? {
+  func apply(_ lhs: Double, _ rhs: Double) -> Double {
     switch self {
     case .add: lhs + rhs
     case .sub: lhs - rhs
     case .mul: lhs * rhs
     case .div:
-      if rhs == 0 { nil } else { lhs / rhs }
+      lhs / rhs
     }
   }
 }
 
 struct CalculatorTab: View {
-  @State private var display: String = "0"
-  @State private var accumulator: Double? = nil
-  @State private var pendingOp: CalculatorOp? = nil
-  @State private var clearOnNextDigit: Bool = false
-  @State private var isError: Bool = false
+
+  @State private var display: String?
+  @State private var accumulator: Double?
+  @State private var pendingOp: CalculatorOp?
+  private var isError: Bool {
+    accumulator?.isFinite == false || displayValue.isFinite == false
+  }
 
   var body: some View {
-    VStack(alignment: .center, spacing: 1) {
-      TextFigure(display, font: .future)
-        .frame(maxWidth: .infinity, alignment: .trailing)
-        .foregroundStyle(Color.black)
+    VStack(spacing: 1) {
+      Rectangle().fill(Color.clear).overlay(alignment: .bottomTrailing) {
+        VStack {
+          Text(
+            "\(display == nil ? "" : accumulator.map { formatted($0) } ?? "")\(pendingOp?.glyph ?? "")"
+          )
+          .foregroundStyle(Color.gray)
+          ViewThatFits {
+            let text = isError ? "Error" : display ?? accumulator.map { formatted($0) } ?? " "
+            TextFigure(text, font: .future)
+            Text(text)
+          }.foregroundStyle(isError ? Color.red : Color.black)
+        }
+      }
+      .frame(height: 4)
+      .padding(1)
+      .frame(maxWidth: .infinity, alignment: .trailing)
+      .border(.black)
       buttonGrid
     }
-    .animation(.easeInOut, value: display)
     .fixedSize()
     .padding(2)
     .background(Color.white)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    .background {
+      Rectangle()
+        .fill(Color.gray)
+        .offset(x: 2, y: 1)
+    }
+    .frame(maxWidth: .infinity, alignment: .center)
+    .padding(1)
+    .animation(.easeInOut, value: display)
   }
 
   private var buttonGrid: some View {
     VStack(alignment: .center, spacing: 1) {
       HStack(spacing: 1) {
+
         CalculatorButton("AC", type: .destroy) { clearAll() }
         CalculatorButton("+/−", type: .op) { negate() }
         CalculatorButton("%", type: .op) { percent() }
         CalculatorButton(CalculatorOp.div.glyph, type: .op) { setOp(.div) }
       }
       HStack(spacing: 1) {
+
         CalculatorButton("7") { enterDigit("7") }
         CalculatorButton("8") { enterDigit("8") }
         CalculatorButton("9") { enterDigit("9") }
         CalculatorButton(CalculatorOp.mul.glyph, type: .op) { setOp(.mul) }
       }
       HStack(spacing: 1) {
+
         CalculatorButton("4") { enterDigit("4") }
         CalculatorButton("5") { enterDigit("5") }
         CalculatorButton("6") { enterDigit("6") }
@@ -76,95 +101,82 @@ struct CalculatorTab: View {
       HStack(spacing: 1) {
         CalculatorButton("0") { enterDigit("0") }
         CalculatorButton(".", type: .num) { enterDot() }
-        Spacer()
         CalculatorButton("=", type: .submit) { evaluate() }
       }
     }
+    .focusSection()
   }
 
   // MARK: - State machine
 
   private func enterDigit(_ d: String) {
-    if isError || clearOnNextDigit || display == "0" {
+    if display == "0" {
       display = d
-      clearOnNextDigit = false
-      isError = false
       return
     }
-    display += d
+    display = Double("\(display ?? "")\(d)").map(formatted)
   }
 
   private func enterDot() {
-    if isError || clearOnNextDigit {
+    if isError || display == nil {
       display = "0."
-      clearOnNextDigit = false
-      isError = false
       return
     }
-    if !display.contains(".") {
-      display += "."
+    if display?.contains(".") != true {
+      display = "\(display ?? "0")."
     }
   }
 
+  var displayValue: Double {
+    var d: String = display ?? "0"
+    if d.last == "." {
+      d.removeLast()
+    }
+    return Double(d) ?? 0.0
+  }
+
   private func setOp(_ op: CalculatorOp) {
-    if let lhs = accumulator, let pending = pendingOp, !clearOnNextDigit {
-      let rhs = Double(display) ?? 0
-      if let result = pending.apply(lhs, rhs) {
-        accumulator = result
-        display = formatted(result)
-      } else {
-        showError()
-      }
+    if let lhs = accumulator, let pending = pendingOp {
+      let result = pending.apply(lhs, displayValue)
+      accumulator = result
+      display = nil
     } else {
-      accumulator = Double(display) ?? 0
+      accumulator = displayValue
+      display = nil
     }
     pendingOp = op
-    clearOnNextDigit = true
   }
 
   private func evaluate() {
     guard let lhs = accumulator, let pending = pendingOp else {
       return
     }
-    let rhs = Double(display) ?? 0
-    if let result = pending.apply(lhs, rhs) {
-      display = formatted(result)
-      accumulator = result
-    } else {
-      showError()
-    }
+    let result = pending.apply(lhs, displayValue)
+    display = formatted(result)
+    accumulator = nil
     pendingOp = nil
-    clearOnNextDigit = true
   }
 
   private func clearAll() {
     display = "0"
     accumulator = nil
     pendingOp = nil
-    clearOnNextDigit = false
-    isError = false
   }
 
   private func negate() {
     guard !isError else { return }
-    if display.hasPrefix("-") {
-      display.removeFirst()
-    } else if display != "0" {
-      display = "-" + display
+    var d = display ?? "0"
+    if d.hasPrefix("-") {
+      d.removeFirst()
+    } else if d != "0" {
+      d = "-\(d)"
     }
+    display = d
   }
 
   private func percent() {
-    guard let value = Double(display) else { return }
+    guard let value = Double(display ?? "0") else { return }
     display = formatted(value / 100)
-  }
-
-  private func showError() {
-    display = "Error"
-    accumulator = nil
-    pendingOp = nil
-    clearOnNextDigit = true
-    isError = true
   }
 
   private func formatted(_ value: Double) -> String {
@@ -232,15 +244,13 @@ struct CalculatorButton: View {
         .underline(type.features.contains(.underline))
         .italic(type.features.contains(.italic))
         .strikethrough(type.features.contains(.strikethrough))
+        .frame(minWidth: 6, maxWidth: type == .submit ? .infinity : 6, alignment: .center)
+        .foregroundStyle(type.fg)
+        .background {
+          Rectangle().fill(type.bg)
+        }
     }
     .buttonStyle(.plain)
-    .frame(minWidth: 5, maxWidth: type == .submit ? .infinity : 5, alignment: .center)
-    .foregroundStyle(type.fg)
-    .background {
-      Rectangle().fill(
-        type.bg
-      )
-    }
     .disabled(type.features.contains(.disabled))
   }
 }
