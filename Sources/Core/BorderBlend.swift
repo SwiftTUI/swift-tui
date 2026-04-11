@@ -102,17 +102,16 @@ extension BorderBlend {
     colors.reserveCapacity(total)
     let phaseRemainder = phase.truncatingRemainder(dividingBy: 1)
     let normalizedPhase = phaseRemainder < 0 ? phaseRemainder + 1 : phaseRemainder
-    // For total == 1 we just sample at the (phase-rotated) zero point.
-    // For total >= 2 we map cells inclusively across `[0, 1]` so a
-    // closed palette (where the first and last colors match) produces
-    // an exact `samples.first == samples.last` round trip.  Phase
-    // rotation still wraps modularly because the gradient itself is
-    // treated as a circle: shifting by `1/(total - 1)` advances each
-    // cell by one slot.
-    let denominator = max(1, total - 1)
-    let denominatorD = Double(denominator)
+    // The perimeter is treated as a circle: cell 0 is at t = 0 and
+    // cell (total - 1) is at t = (total - 1) / total, one slot before
+    // wrapping back to cell 0. Spacing each cell by exactly `1 / total`
+    // gives uniform angular steps around the loop — required so that a
+    // phase shift of `1 / total` advances every cell by exactly one
+    // slot (chasing-light animation) and so that the cell immediately
+    // before the seam does not collide with the cell at the seam.
+    let totalD = Double(total)
     for i in 0..<total {
-      let raw = (Double(i) / denominatorD) + normalizedPhase
+      let raw = (Double(i) / totalD) + normalizedPhase
       var t = raw.truncatingRemainder(dividingBy: 1)
       if t < 0 { t += 1 }
       let sampled = color(at: t) ?? stops[0].color
