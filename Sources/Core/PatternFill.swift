@@ -12,13 +12,16 @@
 ///
 /// ## Supported shapes
 ///
-/// Pattern fills render their glyph on ``Rectangle`` and
-/// ``RoundedRectangle``.  On curved shapes (``Circle``, ``Ellipse``,
-/// ``Capsule``) the rasterizer currently falls back to rendering a
-/// solid-colored Braille disc using ``PatternFill/foreground`` — the
-/// glyph is not written.  This is a known limitation of the Braille
-/// subpixel renderer; a future milestone may extend curved-shape
-/// filling to honor pattern glyphs at cell resolution.
+/// Pattern fills write their glyph on every cell inside the shape's
+/// fill region — whether rectangular, rounded, or curved.  On
+/// ``Circle``, ``Ellipse``, and ``Capsule``, cell-level containment
+/// is tested at each cell's visual center (projected into the same
+/// Braille subpixel grid the curved-shape renderer uses), so the
+/// glyph is written at exactly the cells the curved-shape rasterizer
+/// would otherwise fill.  Because the test is per cell rather than per
+/// subpixel, the resulting outline is blocky (no subpixel
+/// antialiasing) — that trade-off is intrinsic to writing a
+/// whole-cell glyph instead of Braille dots.
 public struct PatternFill: ShapeStyle, Equatable, Sendable {
   /// The glyph painted at every cell inside the shape.
   public var glyph: Character
