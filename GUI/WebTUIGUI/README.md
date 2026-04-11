@@ -70,7 +70,9 @@ controller.setStyle({ cursorBlink: true, theme: { tint: "#79c0ff" } });
 The build flow is intentionally small:
 
 1. `build:manifest` captures `TUIGUI_MODE=manifest` output from the Swift app by invoking `swiftly run swift`.
-2. `build:wasm` copies the app's wasm artifact into `dist/assets/app.wasm`.
+2. `build:wasm` copies the app's wasm artifact into `dist/assets/app.wasm`,
+   validates it with the browser `WebAssembly` API, then keeps the stripped
+   artifact only if stripping still produces browser-parseable wasm.
 3. `build:web` bundles `index.html` and the browser entrypoint with Bun, then copies `ghostty-web`'s packaged `ghostty-vt.wasm` into `dist/`.
 
 ## Notes
