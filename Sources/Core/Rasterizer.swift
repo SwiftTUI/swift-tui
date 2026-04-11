@@ -494,6 +494,24 @@ extension Rasterizer {
       return
     }
 
+    // Curved shapes use a Braille subpixel canvas rather than per-cell
+    // hit testing so their edges antialias onto the 2x4 dot grid.
+    switch geometry {
+    case .circle, .ellipse, .capsule:
+      paintBrailleShape(
+        geometry: geometry,
+        shapeBounds: shapeBounds,
+        colorMode: colorMode,
+        stroke: false,
+        environment: environment,
+        cells: &cells,
+        clip: clip
+      )
+      return
+    case .rectangle, .roundedRectangle:
+      break
+    }
+
     // Detect whether this fill carries alpha for the tint path.
     let constantColor: Color?
     let isTranslucent: Bool
@@ -569,6 +587,192 @@ extension Rasterizer {
     }
   }
 
+  /// Rasterizes a curved shape (`.circle`, `.ellipse`, `.capsule`)
+  /// into the Braille subpixel canvas and writes each non-blank cell
+  /// into the raster buffer with the resolved foreground color.
+  ///
+  /// - Parameter stroke: When `true` draws the outline only; otherwise
+  ///   fills the interior.
+  private func paintBrailleShape(
+    geometry: ShapeGeometry,
+    shapeBounds: Rect,
+    colorMode: ResolvedShapeColorMode,
+    stroke: Bool,
+    environment: StyleEnvironmentSnapshot,
+    cells: inout [[RasterCell]],
+    clip: Rect?,
+    backgroundStyle: BorderBackgroundStyle? = nil
+  ) {
+    let cellW = shapeBounds.size.width
+    let cellH = shapeBounds.size.height
+    guard cellW > 0, cellH > 0 else {
+      return
+    }
+
+    var canvas = BrailleCanvas(width: cellW, height: cellH)
+    let subW = canvas.subpixelWidth
+    let subH = canvas.subpixelHeight
+    guard subW > 0, subH > 0 else {
+      return
+    }
+    // Center the shape in the subpixel grid.  `(subW - 1) / 2` keeps
+    // the anchor on an integer subpixel even for odd/even widths.
+    let cx = (subW - 1) / 2
+    let cy = (subH - 1) / 2
+
+    switch geometry {
+    case .circle:
+      // The largest circle fits inside the short axis.  Use (min-1)/2
+      // so the outline stays within the inclusive (0...sub-1) range.
+      let radius = max(0, (min(subW, subH) - 1) / 2)
+      if stroke {
+        canvas.strokeCircle(centerX: cx, centerY: cy, radius: radius)
+      } else {
+        canvas.fillCircle(centerX: cx, centerY: cy, radius: radius)
+      }
+    case .ellipse:
+      let rx = max(0, (subW - 1) / 2)
+      let ry = max(0, (subH - 1) / 2)
+      if stroke {
+        canvas.strokeEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+      } else {
+        canvas.fillEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
+      }
+    case .capsule:
+      drawCapsule(into: &canvas, stroke: stroke)
+    case .rectangle, .roundedRectangle:
+      // Not reachable: the caller dispatches these to the cell-aligned
+      // paint path.  We still need the case for exhaustiveness.
+      return
+    }
+
+    // Walk each Braille cell and emit the glyph with the shape's
+    // resolved foreground color.  Empty cells (mask == 0) are skipped
+    // so we don't overwrite anything already on the surface.
+    let originX = shapeBounds.origin.x
+    let originY = shapeBounds.origin.y
+    let backgroundColor: Color? =
+      backgroundStyle
+      .flatMap { $0.backgroundStyle(for: .top) }
+      .flatMap { style in
+        resolveColor(
+          from: resolvedColorMode(from: style, environment: environment),
+          bounds: shapeBounds,
+          sampleX: originX,
+          sampleY: originY
+        )
+      }
+
+    for cellY in 0..<cellH {
+      for cellX in 0..<cellW {
+        let cell = canvas.cell(x: cellX, y: cellY)
+        guard cell.mask != 0 else {
+          continue
+        }
+        let targetX = originX + cellX
+        let targetY = originY + cellY
+        let foregroundColor = resolveColor(
+          from: colorMode,
+          bounds: shapeBounds,
+          sampleX: targetX,
+          sampleY: targetY
+        )
+        let resolved = ResolvedTextStyle(
+          foregroundColor: foregroundColor,
+          backgroundColor: backgroundColor
+        )
+        write(
+          cell.glyph,
+          style: resolved.isDefault ? nil : resolved,
+          atX: targetX,
+          y: targetY,
+          cells: &cells,
+          clip: clip
+        )
+      }
+    }
+  }
+
+  /// Draws a capsule into the Braille canvas. A wide capsule (subW >=
+  /// subH) has a rectangular body flanked by two half-circles at the
+  /// left and right short-axis ends; a tall capsule has its semicircles
+  /// at the top and bottom.
+  private func drawCapsule(
+    into canvas: inout BrailleCanvas,
+    stroke: Bool
+  ) {
+    let subW = canvas.subpixelWidth
+    let subH = canvas.subpixelHeight
+    guard subW > 0, subH > 0 else {
+      return
+    }
+    if subW == 1 || subH == 1 {
+      // Degenerate: just fill/stroke the whole strip.
+      canvas.fillRect(x: 0, y: 0, width: subW, height: subH)
+      return
+    }
+
+    if subW >= subH {
+      // Wide capsule: radius = short axis / 2.
+      let radius = max(0, (subH - 1) / 2)
+      let cy = (subH - 1) / 2
+      let leftCx = radius
+      let rightCx = subW - 1 - radius
+      if stroke {
+        // Two half-circles plus the two horizontal body edges.
+        canvas.strokeCircle(centerX: leftCx, centerY: cy, radius: radius)
+        canvas.strokeCircle(centerX: rightCx, centerY: cy, radius: radius)
+        // Top and bottom body edges between the two centers.
+        if rightCx > leftCx {
+          for x in leftCx...rightCx {
+            canvas.setPixel(x: x, y: cy - radius)
+            canvas.setPixel(x: x, y: cy + radius)
+          }
+        }
+      } else {
+        canvas.fillCircle(centerX: leftCx, centerY: cy, radius: radius)
+        canvas.fillCircle(centerX: rightCx, centerY: cy, radius: radius)
+        if rightCx > leftCx {
+          let bodyWidth = rightCx - leftCx + 1
+          canvas.fillRect(
+            x: leftCx,
+            y: max(0, cy - radius),
+            width: bodyWidth,
+            height: min(subH, 2 * radius + 1)
+          )
+        }
+      }
+    } else {
+      // Tall capsule: radius = short axis (subW) / 2.
+      let radius = max(0, (subW - 1) / 2)
+      let cx = (subW - 1) / 2
+      let topCy = radius
+      let bottomCy = subH - 1 - radius
+      if stroke {
+        canvas.strokeCircle(centerX: cx, centerY: topCy, radius: radius)
+        canvas.strokeCircle(centerX: cx, centerY: bottomCy, radius: radius)
+        if bottomCy > topCy {
+          for y in topCy...bottomCy {
+            canvas.setPixel(x: cx - radius, y: y)
+            canvas.setPixel(x: cx + radius, y: y)
+          }
+        }
+      } else {
+        canvas.fillCircle(centerX: cx, centerY: topCy, radius: radius)
+        canvas.fillCircle(centerX: cx, centerY: bottomCy, radius: radius)
+        if bottomCy > topCy {
+          let bodyHeight = bottomCy - topCy + 1
+          canvas.fillRect(
+            x: max(0, cx - radius),
+            y: topCy,
+            width: min(subW, 2 * radius + 1),
+            height: bodyHeight
+          )
+        }
+      }
+    }
+  }
+
   private func tintCell(
     atX x: Int,
     y: Int,
@@ -618,6 +822,26 @@ extension Rasterizer {
       from: style,
       environment: environment
     )
+
+    // Curved shapes draw their outline onto a Braille canvas so the
+    // stroke resolves to sub-cell precision.
+    switch geometry {
+    case .circle, .ellipse, .capsule:
+      paintBrailleShape(
+        geometry: geometry,
+        shapeBounds: shapeBounds,
+        colorMode: foregroundColorMode,
+        stroke: true,
+        environment: environment,
+        cells: &cells,
+        clip: clip,
+        backgroundStyle: backgroundStyle
+      )
+      return
+    case .rectangle, .roundedRectangle:
+      break
+    }
+
     let lineWidth = max(1, strokeStyle.lineWidth)
     for inset in 0..<lineWidth {
       let insetRect = insetBounds(shapeBounds, by: inset, strokeBorder: strokeBorder)
