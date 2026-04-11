@@ -61,4 +61,25 @@ public struct TupleView<each Content: View>: View, ResolvableView, DeclaredChild
       )
     }
   }
+
+  package func enumerateDeclaredChildren(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    visitor: (
+      _ child: Any,
+      _ childContext: ResolveContext,
+      _ resolveOne: @escaping @MainActor () -> ResolvedNode
+    ) -> Void
+  ) {
+    for child in repeat each value {
+      enumerateDeclaredChildViews(
+        child,
+        in: context,
+        kindName: kindName,
+        nextIndex: &nextIndex,
+        visitor: visitor
+      )
+    }
+  }
 }

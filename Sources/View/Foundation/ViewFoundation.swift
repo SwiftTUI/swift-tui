@@ -48,6 +48,31 @@ package protocol DeclaredChildrenView {
   func appendDeferredDeclaredChildren(
     into children: inout [DeferredViewPayload]
   )
+
+  /// Enumerates declared children without resolving them, invoking
+  /// `visitor` for each child with:
+  /// - `child` — the raw typed view (boxed as `Any`), so the caller can
+  ///   inspect protocol conformances without triggering a resolve.
+  /// - `childContext` — the indexed child context that would be passed to
+  ///   `resolveView` if the caller chose to resolve this child.
+  /// - `resolveOne` — an escaping closure that captures the child's
+  ///   concrete static type and performs the full
+  ///   `resolveView(child, in: childContext)` when invoked.
+  ///
+  /// Implementations must use the same `indexedChild` identity scheme and
+  /// increment `nextIndex` the same way `appendDeclaredChildren` does, so
+  /// that the caller can choose between lazy per-child resolution and
+  /// bulk resolution interchangeably.
+  func enumerateDeclaredChildren(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    visitor: (
+      _ child: Any,
+      _ childContext: ResolveContext,
+      _ resolveOne: @escaping @MainActor () -> ResolvedNode
+    ) -> Void
+  )
 }
 
 /// Resolves authored views into resolved render trees.
@@ -150,6 +175,50 @@ package func resolveDeclaredChildren<V: View>(
     into: &resolved
   )
   return resolved
+}
+
+/// Walks the declared children of `view` using the same indexing scheme as
+/// `appendDeclaredChildNodes`, but invokes `visitor` with the raw typed
+/// child and a lazy resolve closure instead of resolving everything
+/// eagerly.
+///
+/// This is the "metadata-first, resolve-second" entry point used by
+/// container views (like `TabView`) that need to inspect child metadata
+/// cheaply before deciding which children actually need to be resolved.
+/// Only evaluating selected children avoids firing lifecycle handlers
+/// (`.onAppear`, `.task`) on subtrees that should not yet be live.
+@MainActor
+package func enumerateDeclaredChildViews<V: View>(
+  _ view: V,
+  in context: ResolveContext,
+  kindName: String,
+  nextIndex: inout Int,
+  visitor: (
+    _ child: Any,
+    _ childContext: ResolveContext,
+    _ resolveOne: @escaping @MainActor () -> ResolvedNode
+  ) -> Void
+) {
+  let erased: Any = view
+  if let structural = erased as? any DeclaredChildrenView {
+    structural.enumerateDeclaredChildren(
+      in: context,
+      kindName: kindName,
+      nextIndex: &nextIndex,
+      visitor: visitor
+    )
+    return
+  }
+
+  let childContext = context.indexedChild(
+    kind: .init(rawValue: kindName),
+    index: nextIndex
+  )
+  nextIndex += 1
+
+  visitor(view, childContext) {
+    resolveView(view, in: childContext)
+  }
 }
 
 @MainActor

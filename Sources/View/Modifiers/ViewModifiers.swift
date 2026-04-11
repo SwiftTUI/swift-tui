@@ -486,6 +486,19 @@ package struct SemanticMetadataModifier<Content: View>: View, ResolvableView {
   }
 }
 
+extension SemanticMetadataModifier: TabChildMetadataContributing {
+  package var tabChildMetadataContribution: PeekedTabChildMetadata {
+    PeekedTabChildMetadata(
+      label: metadata.tabItemLabel,
+      tag: metadata.selectionTag
+    )
+  }
+
+  package func withTabChildInnerContent<R>(_ body: (Any) -> R) -> R {
+    body(content)
+  }
+}
+
 private func lifecycleHandlerID(
   for identity: Identity,
   phase: String,
