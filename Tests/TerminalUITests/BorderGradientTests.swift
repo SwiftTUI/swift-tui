@@ -142,21 +142,37 @@ struct BorderGradientTests {
       return
     }
 
-    // The interpolated phase must be strictly between the endpoints
-    // at the midpoint of a linear curve — if extract or applyValue
-    // were broken the diff would collapse to .inherit → snap to 1.0.
+    // Linear animation from phase 0 to 1.0 at midpoint t=500ms should
+    // produce phase ≈ 0.5.  Allow ±0.02 for any floating-point noise
+    // or tiny scheduling offsets in the animation clock — a loose
+    // "strictly between 0 and 1" check would miss regressions that
+    // interpolate to 0.01 or 0.99.
     #expect(
-      interpolatedPhase > 0 && interpolatedPhase < 1,
-      "halfway interpolation should produce an intermediate phase, not an endpoint (got \(interpolatedPhase))"
+      abs(interpolatedPhase - 0.5) < 0.02,
+      "halfway interpolation of a linear 0→1 curve should be ≈ 0.5, got \(interpolatedPhase)"
     )
   }
 
-  @Test("BorderBlend phase animation produces different cells across frames")
-  func borderBlendPhaseAnimationDiffersBetweenFrames() throws {
-    // Stronger assertion: drive the controller's interpolation at two
-    // distinct timestamps and rasterize each.  The two raster outputs
-    // must differ in at least one perimeter cell, proving that phase
-    // actually drives per-cell color through the whole pipeline.
+  @Test("BorderBlend phase animation enqueues an active request")
+  func borderBlendPhaseAnimationEnqueuesActiveRequest() throws {
+    // End-to-end pipeline assertion: rendering a border with
+    // `phase: 1.0` under a `withAnimation` transaction — after a seed
+    // frame with `phase: 0` — must leave the controller holding an
+    // active animation request.  This pins the wiring from
+    //   .border(blend:set:phase:) modifier
+    //   → ResolvedNode.layoutBehavior.border(blendPhase:)
+    //   → AnimationController diff
+    //   → active animation queue
+    // through `DefaultRenderer.render`.
+    //
+    // The rasterized-cell-differs-with-phase invariant is covered by
+    // `borderBlendPhaseShiftsStart` above (static phase 0 vs phase
+    // 0.5 — equivalent to what a linear animation would produce at
+    // the midpoint).  We intentionally do NOT re-verify a raster diff
+    // here because `DefaultRenderer.render` uses
+    // `MonotonicInstant.now()` internally, so a second render at a
+    // "later" time can't be pinned from the test without restructuring
+    // the pipeline.
     let renderer = DefaultRenderer()
     let controller = renderer.internalAnimationController
     let animation = Animation.linear(duration: .milliseconds(1000))
