@@ -4,6 +4,7 @@ public struct Rasterizer {
   private enum ResolvedShapeColorMode {
     case constant(Color?)
     case sampled(LinearGradient)
+    case sampledRadial(RadialGradient)
   }
 
   public init() {}
@@ -519,7 +520,7 @@ extension Rasterizer {
     case .constant(let color):
       constantColor = color
       isTranslucent = (color?.alpha ?? 0) < 1
-    case .sampled:
+    case .sampled, .sampledRadial:
       constantColor = nil
       // Sampled (gradient) fills may have per-stop alpha.
       isTranslucent = false
@@ -1671,10 +1672,7 @@ extension Rasterizer {
     case .linearGradient(let gradient):
       return .sampled(gradient)
     case .radialGradient(let gradient):
-      // TODO: per-cell radial sampling is added in the rasterizer
-      // commit that follows.  Until then, resolve to the first stop
-      // so the build stays green and existing call sites don't break.
-      return .constant(gradient.gradient.stops.first?.color)
+      return .sampledRadial(gradient)
     case .terminalChrome(let chromeStyle):
       return resolvedColorMode(
         from: environment.theme.resolvedStyle(
@@ -1725,6 +1723,17 @@ extension Rasterizer {
           endPoint: gradient.endPoint
         )
         return .sampled(faded)
+      case .sampledRadial(let gradient):
+        let faded = RadialGradient(
+          gradient: Gradient(
+            stops: gradient.gradient.stops.map {
+              .init(color: $0.color.opacity(amount), location: $0.location)
+            }),
+          center: gradient.center,
+          startRadius: gradient.startRadius,
+          endRadius: gradient.endRadius
+        )
+        return .sampledRadial(faded)
       }
     }
   }
@@ -1739,6 +1748,13 @@ extension Rasterizer {
     case .constant(let color):
       return color
     case .sampled(let gradient):
+      return sample(
+        gradient,
+        in: bounds,
+        x: sampleX,
+        y: sampleY
+      )
+    case .sampledRadial(let gradient):
       return sample(
         gradient,
         in: bounds,
@@ -1834,6 +1850,64 @@ extension Rasterizer {
         continue
       }
 
+      let range = max(0.0001, upper.location - lower.location)
+      let localT = (t - lower.location) / range
+      return lower.color.interpolated(to: upper.color, progress: localT)
+    }
+
+    return stops.last?.color
+  }
+
+  private func sample(
+    _ gradient: RadialGradient,
+    in bounds: Rect,
+    x: Int,
+    y: Int
+  ) -> Color? {
+    let stops = gradient.gradient.stops
+    guard let first = stops.first else {
+      return nil
+    }
+    guard stops.count > 1, bounds.size.width > 0, bounds.size.height > 0 else {
+      return first.color
+    }
+
+    // Center in cell-space coordinates (not normalized).
+    let centerUnit = unitCoordinates(for: gradient.center)
+    let center = (
+      x: Double(bounds.origin.x) + centerUnit.x * Double(bounds.size.width),
+      y: Double(bounds.origin.y) + centerUnit.y * Double(bounds.size.height)
+    )
+
+    // Distance from the sample cell's center to the gradient center
+    // in raw cell space (no aspect-ratio compensation — matches the
+    // linear gradient sampler's cell-space conventions).
+    let px = Double(x) + 0.5
+    let py = Double(y) + 0.5
+    let dx = px - center.x
+    let dy = py - center.y
+    let distance = (dx * dx + dy * dy).squareRoot()
+
+    // Normalize to [0, 1] using startRadius and endRadius.  Guard the
+    // degenerate case where endRadius == startRadius so we always pin
+    // to the end color without a divide-by-zero.
+    let denominator = max(0.0001, gradient.endRadius - gradient.startRadius)
+    let tRaw = (distance - gradient.startRadius) / denominator
+    let t = min(1, max(0, tRaw))
+
+    if t <= first.location {
+      return first.color
+    }
+    if let last = stops.last, t >= last.location {
+      return last.color
+    }
+
+    for index in 0..<(stops.count - 1) {
+      let lower = stops[index]
+      let upper = stops[index + 1]
+      guard t >= lower.location, t <= upper.location else {
+        continue
+      }
       let range = max(0.0001, upper.location - lower.location)
       let localT = (t - lower.location) / range
       return lower.color.interpolated(to: upper.color, progress: localT)
