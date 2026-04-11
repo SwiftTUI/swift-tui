@@ -114,6 +114,17 @@ struct BordersAndShapesTab: View {
     }
   }
 
+  func shitAnimation(to: Double) {
+    withAnimation(.linear(duration: .seconds(0.3))) {
+      gradientPhase = to
+    } completion: {
+      Task { @MainActor in
+        try await Task.sleep(for: .seconds(0.3))
+        shitAnimation(to: to + 0.3)
+      }
+    }
+  }
+
   // MARK: - 3. Chasing-light perimeter gradient
 
   // A closed palette (red at both endpoints) so the phase wrap is
@@ -133,12 +144,7 @@ struct BordersAndShapesTab: View {
           phase: gradientPhase
         )
         .onAppear {
-          withAnimation(
-            .linear(duration: .milliseconds(3000))
-              .repeatForever(autoreverses: false)
-          ) {
-            gradientPhase = 1.0
-          }
+          shitAnimation(to: 0.3)
         }
     }
   }
