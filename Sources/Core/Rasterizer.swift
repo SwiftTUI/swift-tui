@@ -28,13 +28,43 @@ public struct Rasterizer {
     previousSurface: RasterSurface?,
     damage: PresentationDamage?
   ) -> RasterSurface {
+    rasterizeCollectingVisibleIdentities(
+      draw,
+      minimumSize: minimumSize,
+      previousSurface: previousSurface,
+      damage: damage
+    ).surface
+  }
+
+  /// Rasterizes ``draw`` and returns both the rendered ``RasterSurface``
+  /// and the set of identities whose draw nodes had non-empty visible
+  /// bounds after clipping.
+  ///
+  /// The identity set is the "drawn-set" the run loop uses to gate
+  /// animation tick scheduling on viewport visibility: if none of the
+  /// identities affected by an animation tick appear in this set, the
+  /// animation is painting into a clipped subtree and scheduling another
+  /// deadline burns CPU for no visible effect.
+  ///
+  /// Note: identities are recorded *before* the dirty-rows culling step,
+  /// so the set captures "would have painted cells if drawn from
+  /// scratch" rather than "actually repainted cells this frame."  The
+  /// distinction matters because dirty-rows is an incremental-repaint
+  /// optimization, while the visibility check we gate animations on is
+  /// a geometric predicate on the placed tree.
+  package func rasterizeCollectingVisibleIdentities(
+    _ draw: DrawNode,
+    minimumSize: Size,
+    previousSurface: RasterSurface?,
+    damage: PresentationDamage?
+  ) -> (surface: RasterSurface, visibleIdentities: Set<Identity>) {
     let extent = maximumExtent(for: draw, clip: nil)
     let surfaceSize = Size(
       width: max(extent.x, max(0, minimumSize.width)),
       height: max(extent.y, max(0, minimumSize.height))
     )
     guard surfaceSize.width > 0, surfaceSize.height > 0 else {
-      return RasterSurface()
+      return (RasterSurface(), [])
     }
 
     let dirtyRows: Set<Int>?
@@ -61,18 +91,24 @@ public struct Rasterizer {
       dirtyRows = nil
     }
 
+    var visibleIdentities: Set<Identity> = []
+
     paint(
       node: draw,
       cells: &cells,
       imageAttachments: &imageAttachments,
       clip: nil,
-      dirtyRows: dirtyRows
+      dirtyRows: dirtyRows,
+      visibleIdentities: &visibleIdentities
     )
 
-    return RasterSurface(
-      size: surfaceSize,
-      cells: cells,
-      imageAttachments: imageAttachments
+    return (
+      RasterSurface(
+        size: surfaceSize,
+        cells: cells,
+        imageAttachments: imageAttachments
+      ),
+      visibleIdentities
     )
   }
 }
@@ -128,7 +164,8 @@ extension Rasterizer {
     cells: inout [[RasterCell]],
     imageAttachments: inout [RasterImageAttachment],
     clip: Rect?,
-    dirtyRows: Set<Int>?
+    dirtyRows: Set<Int>?,
+    visibleIdentities: inout Set<Identity>
   ) {
     // Two frame kinds.  A `.visit` frame paints the node's `commands`
     // (pre-child commands) and then pushes its children plus, if the
@@ -169,6 +206,22 @@ extension Rasterizer {
           visibleBounds = clipped
         } else {
           visibleBounds = node.bounds
+        }
+
+        // Record visibility BEFORE the dirty-rows cull.  The animation
+        // tick-gating check treats this set as a geometric predicate
+        // ("would the identity paint cells given the current clip"),
+        // not as an observation of the incremental repaint behavior.
+        // If a node is currently clipped out entirely by a ScrollView
+        // viewport, it will `continue` above and never be recorded.
+        // If a node is inside an incremental-repaint skip window its
+        // subtree will not be walked (see below), matching the
+        // previous behavior; that's fine because every frame on which
+        // an animation ticks invalidates the animated identity which
+        // forces that subtree's bounds into dirtyRows, so the paint
+        // walk will still descend into it.
+        if visibleBounds.size.width > 0, visibleBounds.size.height > 0 {
+          visibleIdentities.insert(node.identity)
         }
 
         if let dirtyRows {

@@ -108,4 +108,123 @@ struct RasterizerTests {
     #expect(surface.lines.prefix(1) == ["ABC"])
     #expect(surface.lines.dropFirst(1).allSatisfy { $0.isEmpty })
   }
+
+  // MARK: - Visible-identity collection
+
+  @Test("visible identity collection records only identities not fully clipped")
+  func visibleIdentityCollectionRespectsClip() {
+    // This is the geometric predicate the run loop uses to gate
+    // animation tick scheduling: an identity whose placed bounds are
+    // entirely outside an ancestor's clipBounds must NOT appear in
+    // the "visible identities" set, so an animation that affects only
+    // that identity can be recognised as "quiescent against the clip"
+    // and skip requesting another tick deadline.
+    let rasterizer = Rasterizer()
+    let viewportIdentity = testIdentity("scrollViewport")
+    let visibleIdentity = testIdentity("scrollContent", "visibleRow")
+    let clippedIdentity = testIdentity("scrollContent", "clippedRow")
+    let viewportBounds = Rect(origin: .zero, size: .init(width: 3, height: 2))
+    let draw = DrawNode(
+      identity: viewportIdentity,
+      bounds: viewportBounds,
+      clipBounds: viewportBounds,
+      children: [
+        DrawNode(
+          identity: visibleIdentity,
+          bounds: .init(origin: .zero, size: .init(width: 3, height: 1)),
+          commands: [
+            .text(
+              bounds: .init(origin: .zero, size: .init(width: 3, height: 1)),
+              content: "ABC",
+              style: .init(),
+              lineLimit: nil,
+              truncationMode: .tail,
+              wrappingStrategy: .wordBoundary
+            )
+          ]
+        ),
+        DrawNode(
+          identity: clippedIdentity,
+          bounds: .init(origin: .init(x: 0, y: 4), size: .init(width: 3, height: 1)),
+          commands: [
+            .text(
+              bounds: .init(origin: .init(x: 0, y: 4), size: .init(width: 3, height: 1)),
+              content: "XYZ",
+              style: .init(),
+              lineLimit: nil,
+              truncationMode: .tail,
+              wrappingStrategy: .wordBoundary
+            )
+          ]
+        ),
+      ]
+    )
+
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      draw,
+      minimumSize: .zero,
+      previousSurface: nil,
+      damage: nil
+    )
+
+    #expect(result.visibleIdentities.contains(viewportIdentity))
+    #expect(result.visibleIdentities.contains(visibleIdentity))
+    #expect(!result.visibleIdentities.contains(clippedIdentity))
+  }
+
+  @Test("identity moves into visible set when ancestor clip expands")
+  func visibleIdentityReappearsWhenClipExpands() {
+    // When a scroll view is resized or scrolled so that content
+    // previously outside the viewport slides in, the next paint walk
+    // must include that identity in the visible set so the run loop
+    // can re-arm the animation tick deadline.
+    let rasterizer = Rasterizer()
+    let viewportIdentity = testIdentity("scrollViewport")
+    let movingIdentity = testIdentity("scrollContent", "movingRow")
+    func drawTree(clipHeight: Int) -> DrawNode {
+      let clip = Rect(origin: .zero, size: .init(width: 3, height: clipHeight))
+      return DrawNode(
+        identity: viewportIdentity,
+        bounds: clip,
+        clipBounds: clip,
+        children: [
+          DrawNode(
+            identity: movingIdentity,
+            bounds: .init(origin: .init(x: 0, y: 3), size: .init(width: 3, height: 1)),
+            commands: [
+              .text(
+                bounds: .init(origin: .init(x: 0, y: 3), size: .init(width: 3, height: 1)),
+                content: "XYZ",
+                style: .init(),
+                lineLimit: nil,
+                truncationMode: .tail,
+                wrappingStrategy: .wordBoundary
+              )
+            ]
+          )
+        ]
+      )
+    }
+
+    // Frame 1: viewport is 2 rows tall, movingRow sits at y=3 so it is
+    // outside the clip and must not be in the visible set.
+    let frame1 = rasterizer.rasterizeCollectingVisibleIdentities(
+      drawTree(clipHeight: 2),
+      minimumSize: .zero,
+      previousSurface: nil,
+      damage: nil
+    )
+    #expect(!frame1.visibleIdentities.contains(movingIdentity))
+
+    // Frame 2: viewport expands to 5 rows tall, movingRow is now in
+    // the clip and must appear in the visible set so the tick loop
+    // can resume.
+    let frame2 = rasterizer.rasterizeCollectingVisibleIdentities(
+      drawTree(clipHeight: 5),
+      minimumSize: .zero,
+      previousSurface: nil,
+      damage: nil
+    )
+    #expect(frame2.visibleIdentities.contains(movingIdentity))
+  }
 }

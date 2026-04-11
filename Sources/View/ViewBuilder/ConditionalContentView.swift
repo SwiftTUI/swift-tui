@@ -110,4 +110,39 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
       )
     }
   }
+
+  package func enumerateDeclaredChildren(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    visitor: (
+      _ child: Any,
+      _ childContext: ResolveContext,
+      _ resolveOne: @escaping @MainActor () -> ResolvedNode
+    ) -> Void
+  ) {
+    switch storage {
+    case .trueContent(let content):
+      let branchContext = context.child(component: .init(rawValue: "true"))
+      enumerateDeclaredChildViews(
+        content,
+        in: branchContext,
+        kindName: kindName,
+        nextIndex: &nextIndex,
+        visitor: visitor
+      )
+    case .falseContent(let content):
+      if collapsesImplicitEmptyFalseBranch, content is EmptyView {
+        return
+      }
+      let branchContext = context.child(component: .init(rawValue: "false"))
+      enumerateDeclaredChildViews(
+        content,
+        in: branchContext,
+        kindName: kindName,
+        nextIndex: &nextIndex,
+        visitor: visitor
+      )
+    }
+  }
 }

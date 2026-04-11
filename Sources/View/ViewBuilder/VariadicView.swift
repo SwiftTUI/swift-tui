@@ -61,4 +61,25 @@ public struct VariadicView<Content: View>: View, ResolvableView, DeclaredChildre
       )
     }
   }
+
+  package func enumerateDeclaredChildren(
+    in context: ResolveContext,
+    kindName: String,
+    nextIndex: inout Int,
+    visitor: (
+      _ child: Any,
+      _ childContext: ResolveContext,
+      _ resolveOne: @escaping @MainActor () -> ResolvedNode
+    ) -> Void
+  ) {
+    for element in content {
+      enumerateDeclaredChildViews(
+        element,
+        in: context,
+        kindName: kindName,
+        nextIndex: &nextIndex,
+        visitor: visitor
+      )
+    }
+  }
 }
