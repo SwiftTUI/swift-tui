@@ -537,6 +537,64 @@ struct AnimationRepeatForeverGrowthTests {
     )
   }
 
+  @Test("nested child-owned onAppear repeatForever enqueues the initial animation")
+  func nestedChildOwnedOnAppearRepeatForeverEnqueuesInitialAnimation() throws {
+    let terminalSize = Size(width: 40, height: 10)
+    let rootIdentity = testIdentity("NestedChildOwnedRepeatForever", "Root")
+    let terminal = RepeatForeverGrowthTerminalHost(surfaceSize: terminalSize)
+    let scheduler = FrameScheduler()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: EmptyTerminalInputReader(),
+      signalReader: nil,
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: {
+        var values = EnvironmentValues()
+        values.terminalAppearance = terminal.appearance
+        values.terminalSize = terminalSize
+        return values
+      }(),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        NestedChildOwnedRepeatForeverHost()
+      }
+    )
+
+    AnimationRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
+    TransitionRegistrationStorage.currentSink = runLoop.renderer.internalAnimationController
+    AnimationCompletionStorage.currentSink = runLoop.renderer.internalAnimationController
+    defer {
+      AnimationRegistrationStorage.currentSink = nil
+      TransitionRegistrationStorage.currentSink = nil
+      AnimationCompletionStorage.currentSink = nil
+    }
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    #expect(
+      renderedFrames >= 2,
+      "expected initial mount plus the onAppear-triggered follow-up frame"
+    )
+    #expect(
+      runLoop.renderer.internalAnimationController.activeAnimationCount > 0,
+      """
+      nested child-owned repeatForever should enqueue an active animation after \
+      the onAppear-triggered follow-up frame
+      """
+    )
+  }
+
   @MainActor
   @Test(
     "run loop keeps ticking repeatForever animations even when the next deadline is already due")
@@ -642,6 +700,38 @@ private struct TabHostedRepeatForeverProbe: View {
         .tabItem("Other")
         .tag(1)
     }
+  }
+}
+
+private struct NestedChildOwnedRepeatForeverHost: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("host")
+      NestedChildOwnedRepeatForeverCard()
+    }
+  }
+}
+
+private struct NestedChildOwnedRepeatForeverCard: View {
+  @State private var phase: Double = 0
+
+  var body: some View {
+    Text("nested probe")
+      .padding(1)
+      .frame(width: 20, height: 3)
+      .border(
+        blend: BorderBlend([.red, .yellow, .green, .cyan, .blue, .magenta, .red]),
+        set: .rounded,
+        phase: phase
+      )
+      .onAppear {
+        withAnimation(
+          .linear(duration: .milliseconds(3000))
+            .repeatForever(autoreverses: false)
+        ) {
+          phase = 1.0
+        }
+      }
   }
 }
 
