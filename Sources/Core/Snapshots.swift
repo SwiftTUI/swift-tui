@@ -537,6 +537,8 @@ extension SnapshotRenderer {
       return color.hexString(format: .rrggbbaa)
     case .linearGradient(let gradient):
       return "linearGradient(\(describe(gradient)))"
+    case .radialGradient(let gradient):
+      return "radialGradient(\(describe(gradient)))"
     case .terminalChrome(let chromeStyle):
       return describe(chromeStyle)
     case .opacity(let inner, let amount):
@@ -571,6 +573,14 @@ extension SnapshotRenderer {
       "\(stop.color.hexString(format: .rrggbbaa))@\(stop.location)"
     }.joined(separator: ",")
     return "\(gradient.startPoint.rawValue)->\(gradient.endPoint.rawValue):[\(stops)]"
+  }
+
+  private func describe(_ gradient: RadialGradient) -> String {
+    let stops = gradient.gradient.stops.map { stop in
+      "\(stop.color.hexString(format: .rrggbbaa))@\(stop.location)"
+    }.joined(separator: ",")
+    return
+      "center=\(gradient.center.rawValue),startRadius=\(gradient.startRadius),endRadius=\(gradient.endRadius):[\(stops)]"
   }
 
   private func describe(_ lineStyle: TextLineStyle) -> String {
