@@ -1670,6 +1670,11 @@ extension Rasterizer {
       return .constant(color)
     case .linearGradient(let gradient):
       return .sampled(gradient)
+    case .radialGradient(let gradient):
+      // TODO: per-cell radial sampling is added in the rasterizer
+      // commit that follows.  Until then, resolve to the first stop
+      // so the build stays green and existing call sites don't break.
+      return .constant(gradient.gradient.stops.first?.color)
     case .terminalChrome(let chromeStyle):
       return resolvedColorMode(
         from: environment.theme.resolvedStyle(

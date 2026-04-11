@@ -153,11 +153,51 @@ public struct LinearGradient: ShapeStyle, Equatable, Sendable {
   }
 }
 
+/// A radial gradient between a start and end radius, centered at a unit
+/// point in the shape's bounds.
+public struct RadialGradient: ShapeStyle, Equatable, Sendable {
+  public var gradient: Gradient
+  public var center: Alignment
+  public var startRadius: Double
+  public var endRadius: Double
+
+  public init(
+    gradient: Gradient,
+    center: Alignment,
+    startRadius: Double,
+    endRadius: Double
+  ) {
+    self.gradient = gradient
+    self.center = center
+    self.startRadius = startRadius
+    self.endRadius = endRadius
+  }
+
+  public init(
+    colors: [Color],
+    center: Alignment = .center,
+    startRadius: Double = 0,
+    endRadius: Double
+  ) {
+    self.init(
+      gradient: Gradient(colors: colors),
+      center: center,
+      startRadius: startRadius,
+      endRadius: endRadius
+    )
+  }
+
+  public func eraseToAnyShapeStyle() -> AnyShapeStyle {
+    .radialGradient(self)
+  }
+}
+
 /// Type-erased wrapper for any supported shape style.
 public enum AnyShapeStyle: Equatable, Sendable {
   case semantic(SemanticStyleRole)
   case color(Color)
   case linearGradient(LinearGradient)
+  case radialGradient(RadialGradient)
   case terminalChrome(TerminalChromeStyle)
   indirect case opacity(AnyShapeStyle, Double)
 
@@ -187,6 +227,17 @@ extension ShapeStyle {
           gradient: .init(stops: fadedStops),
           startPoint: gradient.startPoint,
           endPoint: gradient.endPoint
+        ))
+    case .radialGradient(let gradient):
+      let fadedStops = gradient.gradient.stops.map {
+        Gradient.Stop(color: $0.color.opacity(clamped), location: $0.location)
+      }
+      return .radialGradient(
+        .init(
+          gradient: .init(stops: fadedStops),
+          center: gradient.center,
+          startRadius: gradient.startRadius,
+          endRadius: gradient.endRadius
         ))
     case let style:
       // Semantic/chrome styles can't carry alpha until resolved —
@@ -815,6 +866,11 @@ private func resolveStyleColorResult(
   case .color(let color):
     return .success(color)
   case .linearGradient(let gradient):
+    guard let firstColor = gradient.gradient.stops.first?.color else {
+      return .failure(.emptyGradient)
+    }
+    return .success(firstColor)
+  case .radialGradient(let gradient):
     guard let firstColor = gradient.gradient.stops.first?.color else {
       return .failure(.emptyGradient)
     }
