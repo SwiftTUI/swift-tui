@@ -94,6 +94,15 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
 
   public var body: some View {
     if let triggerHash {
+      // Touch `didSeeInitialTrigger` in body so `State.remember(...)`
+      // registers a per-instance location for it during the normal
+      // `withAuthoringContext` body evaluation. Without this read, the
+      // only access to the property happens inside the `.task(id:)`
+      // closure — which runs after the body has already returned, so
+      // no authoring context is active and writes fall through to
+      // `updateSeedValue(...)` (global seed) instead of persisting on
+      // this PhaseAnimator instance.
+      _ = didSeeInitialTrigger
       content(currentPhase)
         .task(id: triggerHash) { @MainActor in
           // .task(id:) fires on initial appearance too, so skip the
