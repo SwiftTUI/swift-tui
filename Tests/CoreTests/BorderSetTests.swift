@@ -178,3 +178,26 @@ func builtinHidden() {
   #expect(s.topDisplayWidth == 1)
   #expect(s.top == " ")
 }
+
+@Test("Single-rune top edge returns the same glyph at every index")
+func cyclingSingleRune() {
+  let s = BorderSet.single
+  #expect(s.topGlyph(at: 0) == "─")
+  #expect(s.topGlyph(at: 1) == "─")
+  #expect(s.topGlyph(at: 99) == "─")
+}
+
+@Test("Two-rune top edge alternates")
+func cyclingTwoRune() {
+  let s = BorderSet.dashed
+  #expect(s.topGlyph(at: 0) == "─")
+  #expect(s.topGlyph(at: 1) == "·")
+  #expect(s.topGlyph(at: 2) == "─")
+  #expect(s.topGlyph(at: 3) == "·")
+}
+
+@Test("Empty edge returns nil")
+func cyclingEmpty() {
+  let s = BorderSet.none
+  #expect(s.topGlyph(at: 0) == nil)
+}
