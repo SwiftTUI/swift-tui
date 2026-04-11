@@ -198,6 +198,7 @@ public enum AnyShapeStyle: Equatable, Sendable {
   case color(Color)
   case linearGradient(LinearGradient)
   case radialGradient(RadialGradient)
+  case patternFill(PatternFill)
   case terminalChrome(TerminalChromeStyle)
   indirect case opacity(AnyShapeStyle, Double)
 
@@ -238,6 +239,13 @@ extension ShapeStyle {
           center: gradient.center,
           startRadius: gradient.startRadius,
           endRadius: gradient.endRadius
+        ))
+    case .patternFill(let pattern):
+      return .patternFill(
+        PatternFill(
+          glyph: pattern.glyph,
+          foreground: pattern.foreground.opacity(clamped),
+          background: pattern.background.map { $0.opacity(clamped) }
         ))
     case let style:
       // Semantic/chrome styles can't carry alpha until resolved —
@@ -875,6 +883,11 @@ private func resolveStyleColorResult(
       return .failure(.emptyGradient)
     }
     return .success(firstColor)
+  case .patternFill(let pattern):
+    // The foreground color is the resolved scalar color for pattern
+    // fills — the rasterizer handles the glyph and optional
+    // background separately when painting.
+    return .success(pattern.foreground)
   case .terminalChrome(let chromeStyle):
     return resolveStyleColorResult(
       style: theme.resolvedStyle(

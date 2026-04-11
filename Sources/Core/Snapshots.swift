@@ -539,11 +539,22 @@ extension SnapshotRenderer {
       return "linearGradient(\(describe(gradient)))"
     case .radialGradient(let gradient):
       return "radialGradient(\(describe(gradient)))"
+    case .patternFill(let pattern):
+      return "patternFill(\(describe(pattern)))"
     case .terminalChrome(let chromeStyle):
       return describe(chromeStyle)
     case .opacity(let inner, let amount):
       return "\(describe(inner)).opacity(\(amount))"
     }
+  }
+
+  private func describe(_ pattern: PatternFill) -> String {
+    let glyph = String(pattern.glyph)
+    let fg = pattern.foreground.hexString(format: .rrggbbaa)
+    if let background = pattern.background {
+      return "glyph=\(glyph),fg=\(fg),bg=\(background.hexString(format: .rrggbbaa))"
+    }
+    return "glyph=\(glyph),fg=\(fg)"
   }
 
   private func describe(_ style: TerminalChromeStyle) -> String {

@@ -1673,6 +1673,12 @@ extension Rasterizer {
       return .sampled(gradient)
     case .radialGradient(let gradient):
       return .sampledRadial(gradient)
+    case .patternFill(let pattern):
+      // Commit 1 placeholder: resolve the pattern to its foreground
+      // color so the exhaustive switch is covered without changing
+      // the existing paintFill semantics.  Commit 2 replaces this
+      // with a per-cell glyph path.
+      return .constant(pattern.foreground)
     case .terminalChrome(let chromeStyle):
       return resolvedColorMode(
         from: environment.theme.resolvedStyle(
