@@ -248,6 +248,14 @@ extension DrawExtractor {
           stackAxis: drawMetadata.ruleStackAxis
         )
       )
+    case .canvas(let payload):
+      commands.append(
+        .canvas(
+          bounds: bounds,
+          payload: payload,
+          foregroundStyle: drawMetadata.foregroundStyle ?? .semantic(.foreground)
+        )
+      )
     }
 
     commands.append(

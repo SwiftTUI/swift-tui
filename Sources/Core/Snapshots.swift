@@ -307,6 +307,8 @@ extension SnapshotRenderer {
     case .table(let payload):
       return
         "table(style=\(payload.style),rows=\(payload.rows.count),selected=\(payload.selectedRowIndex.map { String($0) } ?? "nil"))"
+    case .canvas(let payload):
+      return "canvas(drawing=\(type(of: payload.drawing)))"
     }
   }
 
@@ -440,6 +442,9 @@ extension SnapshotRenderer {
       if sides.contains(.trailing) { sideNames.append("trailing") }
       let sidesDescription = sideNames.isEmpty ? "none" : sideNames.joined(separator: "+")
       return "border[\(describe(bounds)) sides=\(sidesDescription)]"
+    case .canvas(let bounds, let payload, let foregroundStyle):
+      return
+        "canvas[\(describe(bounds)) drawing=\(type(of: payload.drawing)) style=\(describe(foregroundStyle))]"
     case .clip(let bounds, _):
       return "clip[\(describe(bounds))]"
     }

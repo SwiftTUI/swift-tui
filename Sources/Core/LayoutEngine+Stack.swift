@@ -643,10 +643,11 @@ extension LayoutEngine {
           return ruleStackAxis != axis
         }
         return false
-      case .shape:
-        // Raw shape primitives (Rectangle, RoundedRectangle, …) size
-        // to the proposal on every axis, so they will expand to any
-        // finite cross the reconciliation hands them.
+      case .shape, .canvas:
+        // Raw shape primitives (Rectangle, RoundedRectangle, …) and
+        // Canvas views size to the proposal on every axis, so they
+        // will expand to any finite cross the reconciliation hands
+        // them.
         return true
       default:
         break
