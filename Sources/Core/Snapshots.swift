@@ -590,6 +590,12 @@ extension SnapshotRenderer {
         "rectangle"
       case .roundedRectangle(let cornerRadius):
         "roundedRectangle(\(cornerRadius))"
+      case .circle:
+        "circle"
+      case .ellipse:
+        "ellipse"
+      case .capsule:
+        "capsule"
       }
     if insetAmount > 0 {
       return "\(base).inset(\(insetAmount))"
