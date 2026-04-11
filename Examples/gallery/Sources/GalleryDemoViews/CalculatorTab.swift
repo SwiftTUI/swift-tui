@@ -53,7 +53,6 @@ struct CalculatorTab: View {
       .frame(height: 4)
       .padding(1)
       .frame(maxWidth: .infinity, alignment: .trailing)
-      .border(.black)
       buttonGrid
     }
     .fixedSize()
