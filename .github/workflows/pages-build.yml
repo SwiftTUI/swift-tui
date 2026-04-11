@@ -17,9 +17,9 @@ jobs:
 
     steps:
 
-      - uses: swift-actions/setup-swift@v3
+      - uses: maxim-lobanov/setup-xcode@v1
         with:
-          swift-version: "6.3"
+          xcode-version: '26.4'
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,6 +28,13 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Cache swiftly toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.swiftly
+          key: ${{ runner.os }}-swiftly-6.3.0-v2-
 
       - name: Cache SwiftPM
         uses: actions/cache@v4
@@ -51,11 +58,36 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-webexample-
 
+      - name: Install/activate Swift 6.3.0 via swiftly
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          # Force reinstall if bin directory doesn't exist (corrupted cache)
+          if [ ! -d "$HOME/.swiftly/bin" ]; then
+            rm -rf "$HOME/.swiftly"
+          fi
+
+          if [ ! -e "$HOME/.swiftly/env.sh" ]; then 
+            curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
+            installer -pkg swiftly.pkg -target CurrentUserHomeDirectory && \
+            ~/.swiftly/bin/swiftly init --quiet-shell-followup
+          fi
+
+          . "$HOME/.swiftly/env.sh" && hash -r
+
+          if ! swiftly list | grep -q "6.3.0"; then
+            swiftly install 6.3.0
+          fi
+          swiftly use 6.3.0
+          swiftly run swift --version
 
       - name: Install wasm Swift SDK used by WebExample
         shell: bash
         run: |
           set -euo pipefail
+
+          . "$HOME/.swiftly/env.sh" && hash -r
 
           if ! swiftly run swift sdk list | grep -q "swift-6.3-RELEASE_wasm"; then
             swiftly run swift sdk install \
@@ -74,6 +106,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          . "$HOME/.swiftly/env.sh" && hash -r
           env
           echo "PATH=$PATH"
           uname -a
@@ -107,6 +140,8 @@ jobs:
         working-directory: Examples/WebExample
         run: |
           set -euo pipefail
+
+          . "$HOME/.swiftly/env.sh" && hash -r
 
           bun install --frozen-lockfile
           bun run build
