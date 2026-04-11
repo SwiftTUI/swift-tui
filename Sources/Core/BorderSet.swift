@@ -110,12 +110,16 @@ extension BorderSet {
     topLeading: "█", topTrailing: "█",
     bottomLeading: "█", bottomTrailing: "█")
 
+  /// A decorative half-block border drawn on the view's own frame edges,
+  /// overlaying content rather than reserving extra layout space.
   public static let outerHalfBlock = BorderSet(
     top: "▀", bottom: "▄", left: "▌", right: "▐",
     topLeading: "▛", topTrailing: "▜",
     bottomLeading: "▙", bottomTrailing: "▟",
     placement: .decorative)
 
+  /// An inset half-block border that draws into the view's outermost rows and
+  /// columns, trimming a cell off content on every side rather than expanding.
   public static let innerHalfBlock = BorderSet(
     top: "▄", bottom: "▀", left: "▐", right: "▌",
     topLeading: "▗", topTrailing: "▖",
@@ -139,11 +143,16 @@ extension BorderSet {
     middleLeading: "+", middleTrailing: "+",
     middle: "+", middleTop: "+", middleBottom: "+")
 
+  /// A border that contributes layout space (one cell per side) but draws
+  /// invisible space glyphs. Use when you want consistent sizing while
+  /// toggling border visibility.
   public static let hidden = BorderSet(
     top: " ", bottom: " ", left: " ", right: " ",
     topLeading: " ", topTrailing: " ",
     bottomLeading: " ", bottomTrailing: " ")
 
+  /// A border with zero frame contribution and no glyphs. The "no border"
+  /// value — **not** to be confused with `Optional<BorderSet>.none`.
   public static let none = BorderSet(
     top: "", bottom: "", left: "", right: "",
     topLeading: "", topTrailing: "",

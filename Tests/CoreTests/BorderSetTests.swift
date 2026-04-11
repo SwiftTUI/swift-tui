@@ -201,3 +201,31 @@ func cyclingEmpty() {
   let s = BorderSet.none
   #expect(s.topGlyph(at: 0) == nil)
 }
+
+@Test("Every built-in has a non-empty top glyph except .none")
+func builtinTopGlyphsNonEmpty() {
+  let allBuiltins: [(name: String, set: BorderSet, expectEmpty: Bool)] = [
+    ("single", BorderSet.single, false),
+    ("rounded", BorderSet.rounded, false),
+    ("double", BorderSet.double, false),
+    ("heavy", BorderSet.heavy, false),
+    ("block", BorderSet.block, false),
+    ("outerHalfBlock", BorderSet.outerHalfBlock, false),
+    ("innerHalfBlock", BorderSet.innerHalfBlock, false),
+    ("singleDouble", BorderSet.singleDouble, false),
+    ("doubleSingle", BorderSet.doubleSingle, false),
+    ("ascii", BorderSet.ascii, false),
+    ("hidden", BorderSet.hidden, false),
+    ("none", BorderSet.none, true),  // the only one that should be empty
+    ("dashed", BorderSet.dashed, false),
+    ("dashedHeavy", BorderSet.dashedHeavy, false),
+    ("markdown", BorderSet.markdown, false),
+  ]
+  for (name, set, expectEmpty) in allBuiltins {
+    if expectEmpty {
+      #expect(set.top.isEmpty, "\(name) should have an empty top")
+    } else {
+      #expect(!set.top.isEmpty, "\(name) should have a non-empty top")
+    }
+  }
+}
