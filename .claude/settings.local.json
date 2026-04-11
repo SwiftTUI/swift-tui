@@ -59,7 +59,16 @@
       "Bash(sysctl -n hw.physicalcpu)",
       "Bash(awk '!seen[$0]++')",
       "Bash(sed -n '70,120p' /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/Controls/PickerRendering.swift)",
-      "Bash(sed -n '355,410p' /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/Controls/PickerRendering.swift)"
+      "Bash(sed -n '355,410p' /Users/adamz/Developer/repos/swift-terminal-ui/Sources/View/Controls/PickerRendering.swift)",
+      "Bash(sh -n Scripts/check_concurrency_safety_policies.sh)",
+      "Bash(sh -n Scripts/check_rendered_text_fixture_matrix.sh)",
+      "Bash(sh -n Scripts/check_demo_builds.sh)",
+      "Bash(sh -n Scripts/check_public_surface_policies.sh)",
+      "Bash(command -v shellcheck)",
+      "Bash(./Scripts/check_concurrency_safety_policies.sh)",
+      "Bash(./Scripts/check_rendered_text_fixture_matrix.sh)",
+      "Bash(./Scripts/check_public_surface_policies.sh)",
+      "Bash(./Scripts/check_demo_builds.sh:*)"
     ]
   }
 }

@@ -1,34 +1,40 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env sh
 
-set -euo pipefail
+set -eu
 
-repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
 failures=0
 
 fail() {
-  print -u2 -- "$1"
+  >&2 echo "$1"
   failures=1
 }
 
-view_protocol_block="$(awk '
+view_protocol_block=$(awk '
   /public protocol View \{/ { collecting = 1 }
   /extension Never: View \{/ { collecting = 0 }
   collecting { print }
-' Sources/View/Foundation/ViewFoundation.swift)"
+' Sources/View/Foundation/ViewFoundation.swift)
 
-if [[ -z "$view_protocol_block" ]]; then
+if [ -z "$view_protocol_block" ]; then
   fail "Could not isolate the public View protocol block in Sources/View/Foundation/ViewFoundation.swift."
 else
-  [[ "$view_protocol_block" == *"associatedtype Body: View = Never"* ]] \
-    || fail "The public View protocol must keep associatedtype Body: View = Never."
-  [[ "$view_protocol_block" == *"var body: Body { get }"* ]] \
-    || fail "The public View protocol must stay body-only."
-  [[ "$view_protocol_block" != *"ViewNode"* ]] \
-    || fail "The public View protocol block must not expose ViewNode."
-  [[ "$view_protocol_block" != *"resolveElements"* ]] \
-    || fail "The public View protocol block must not expose resolveElements."
+  case "$view_protocol_block" in
+    *"associatedtype Body: View = Never"*) ;;
+    *) fail "The public View protocol must keep associatedtype Body: View = Never." ;;
+  esac
+  case "$view_protocol_block" in
+    *"var body: Body { get }"*) ;;
+    *) fail "The public View protocol must stay body-only." ;;
+  esac
+  case "$view_protocol_block" in
+    *"ViewNode"*) fail "The public View protocol block must not expose ViewNode." ;;
+  esac
+  case "$view_protocol_block" in
+    *"resolveElements"*) fail "The public View protocol block must not expose resolveElements." ;;
+  esac
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol View \{' \
@@ -113,27 +119,22 @@ then
   fail "OpenLinkAction must stay main-actor-aware."
 fi
 
-actor_isolation_docs=(
-  "README.md"
-  "docs/RUNTIME.md"
-  "docs/STATUS.md"
-  "docs/PUBLIC_API_INVENTORY.md"
-  "Sources/View/View.docc/Authoring-Views.md"
-  "Sources/TerminalUI/TerminalUI.docc/Running-Apps.md"
-)
-
-for doc_file in "${actor_isolation_docs[@]}"; do
+while IFS= read -r doc_file; do
+  [ -z "$doc_file" ] && continue
   if ! rg -n --fixed-strings --quiet -- '@MainActor' "$doc_file"; then
     fail "$doc_file should document the @MainActor authoring model."
   fi
-done
+done <<'EOF'
+README.md
+docs/RUNTIME.md
+docs/STATUS.md
+docs/PUBLIC_API_INVENTORY.md
+Sources/View/View.docc/Authoring-Views.md
+Sources/TerminalUI/TerminalUI.docc/Running-Apps.md
+EOF
 
-anyview_policy_docs=(
-  "AGENTS.md"
-  "docs/PUBLIC_SURFACE_POLICY.md"
-)
-
-for doc_file in "${anyview_policy_docs[@]}"; do
+while IFS= read -r doc_file; do
+  [ -z "$doc_file" ] && continue
   if ! rg -n --fixed-strings --quiet -- '## AnyView Policy' "$doc_file"; then
     fail "$doc_file should contain the AnyView policy heading."
   fi
@@ -149,28 +150,17 @@ for doc_file in "${anyview_policy_docs[@]}"; do
   if ! rg -n --fixed-strings --quiet -- 'scopedAnyView' "$doc_file"; then
     fail "$doc_file should mention scopedAnyView for deferred authored content."
   fi
-done
+done <<'EOF'
+AGENTS.md
+docs/PUBLIC_SURFACE_POLICY.md
+EOF
 
-if [[ ! -f Tests/ViewTests/ActorIsolationSurfaceTests.swift && ! -f Tests/TerminalUITests/ActorIsolationSurfaceTests.swift ]]; then
+if [ ! -f Tests/ViewTests/ActorIsolationSurfaceTests.swift ] && [ ! -f Tests/TerminalUITests/ActorIsolationSurfaceTests.swift ]; then
   fail "Tests/ViewTests/ActorIsolationSurfaceTests.swift should exist to pin the actor-isolated surface."
 fi
 
-public_surface_patterns=(
-  'public\s+typealias\s+[A-Za-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*=\s*(?:\n\s*)?\([^)]*\)\s*->\s*AnyView'
-  '@ViewBuilder\s+[A-Za-z_]+\s*:\s*\(\)\s*->\s*\[AnyView\]'
-  'public\s+(var|let)\s+[A-Za-z_]+\s*:\s*\[AnyView\]'
-  'public\s+(var|let)\s+[A-Za-z_]+\s*:\s*\([^)]*\)\s*->\s*AnyView'
-  'public\s+init\s*\([^)]*\[AnyView\]'
-  'public\s+init\s*\([^)]*@ViewBuilder[^)]*->\s*AnyView'
-  'public\s+init\s*\(\s*erasing:'
-  'public\s+init\s*\([^)]*localActionRegistry:'
-  'public\s+init\s*\([^)]*localKeyHandlerRegistry:'
-  'public\s+init\s*\([^)]*localLifecycleRegistry:'
-  'public\s+init\s*\([^)]*localTaskRegistry:'
-  'public\s+func\s+render\s*\([^)]*previousLifecycleState:'
-)
-
-for pattern in "${public_surface_patterns[@]}"; do
+while IFS= read -r pattern; do
+  [ -z "$pattern" ] && continue
   if rg -n -P \
     --glob '*.swift' \
     --glob '!Sources/Vendor/**' \
@@ -178,84 +168,101 @@ for pattern in "${public_surface_patterns[@]}"; do
   then
     fail "Unexpected public AnyView-array or node-erasure surface matched $pattern."
   fi
-done
+done <<'EOF'
+public\s+typealias\s+[A-Za-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*=\s*(?:\n\s*)?\([^)]*\)\s*->\s*AnyView
+@ViewBuilder\s+[A-Za-z_]+\s*:\s*\(\)\s*->\s*\[AnyView\]
+public\s+(var|let)\s+[A-Za-z_]+\s*:\s*\[AnyView\]
+public\s+(var|let)\s+[A-Za-z_]+\s*:\s*\([^)]*\)\s*->\s*AnyView
+public\s+init\s*\([^)]*\[AnyView\]
+public\s+init\s*\([^)]*@ViewBuilder[^)]*->\s*AnyView
+public\s+init\s*\(\s*erasing:
+public\s+init\s*\([^)]*localActionRegistry:
+public\s+init\s*\([^)]*localKeyHandlerRegistry:
+public\s+init\s*\([^)]*localLifecycleRegistry:
+public\s+init\s*\([^)]*localTaskRegistry:
+public\s+func\s+render\s*\([^)]*previousLifecycleState:
+EOF
 
-stored_anyview_matches="$(
+stored_anyview_matches=$(
   rg -n -P \
     --glob '*.swift' \
     --glob '!Sources/Vendor/**' \
     -- '^\s*(public|internal|package|private|fileprivate)?\s*(var|let)\s+[A-Za-z_][A-Za-z0-9_]*\s*:\s*(\[\s*AnyView\s*\]|AnyView\??|\([^)]*\)\s*->\s*AnyView)\s*(=\s*.+)?$' \
     Sources || true
-)"
+)
 
-if [[ -n "$stored_anyview_matches" ]]; then
-  matched_files=("${(@f)$(print -r -- "$stored_anyview_matches" | cut -d: -f1 | sort -u)}")
-  file=""
-  for file in "${matched_files[@]}"; do
+if [ -n "$stored_anyview_matches" ]; then
+  matched_files=$(
+    printf '%s\n' "$stored_anyview_matches" \
+      | cut -d: -f1 \
+      | LC_ALL=C sort -u
+  )
+  OLD_IFS=$IFS
+  IFS='
+'
+  for file in $matched_files; do
     if ! rg -n --fixed-strings --quiet -- 'AnyView policy:' "$file"; then
       fail "$file retains stored AnyView erasure but lacks an 'AnyView policy:' comment."
     fi
   done
+  IFS=$OLD_IFS
 fi
 
-non_public_seam_declarations=(
-  'public enum Package'
-  'public final class TaskRegistration'
-  'public final class LocalActionRegistry'
-  'public enum LocalKeyEvent'
-  'public final class LocalKeyHandlerRegistry'
-  'public struct LifecycleHandlerSnapshot'
-  'public final class LocalLifecycleRegistry'
-  'public final class LocalTaskRegistry'
-  'public struct IDView'
-  'public struct LayoutMetadataModifier'
-  'public struct DrawMetadataModifier'
-  'public struct SemanticMetadataModifier'
-  'public struct EnvironmentWritingModifier'
-  'public struct EnvironmentTransformModifier'
-  'public struct PaddingView'
-  'public struct FrameView'
-  'public struct OverlayView'
-  'public struct BackgroundView'
-)
-
-for declaration in "${non_public_seam_declarations[@]}"; do
+while IFS= read -r declaration; do
+  [ -z "$declaration" ] && continue
   if rg -n --fixed-strings --quiet -- "$declaration" Sources; then
     fail "Unexpected public API seam declaration found: $declaration."
   fi
-done
+done <<'EOF'
+public enum Package
+public final class TaskRegistration
+public final class LocalActionRegistry
+public enum LocalKeyEvent
+public final class LocalKeyHandlerRegistry
+public struct LifecycleHandlerSnapshot
+public final class LocalLifecycleRegistry
+public final class LocalTaskRegistry
+public struct IDView
+public struct LayoutMetadataModifier
+public struct DrawMetadataModifier
+public struct SemanticMetadataModifier
+public struct EnvironmentWritingModifier
+public struct EnvironmentTransformModifier
+public struct PaddingView
+public struct FrameView
+public struct OverlayView
+public struct BackgroundView
+EOF
 
-removed_runtime_factory_symbols=(
-  'makeViewResolver'
-  'makeNoOpRenderer'
-)
-
-for symbol in "${removed_runtime_factory_symbols[@]}"; do
+while IFS= read -r symbol; do
+  [ -z "$symbol" ] && continue
   if rg -n --glob '*.swift' --fixed-strings --quiet -- "$symbol" Sources; then
     fail "Unexpected runtime compatibility factory remains in source: $symbol."
   fi
-done
+done <<'EOF'
+makeViewResolver
+makeNoOpRenderer
+EOF
 
-retired_legacy_identifier_tokens=(
-  'foregroundStyle: String'
-  'backgroundStyle: String'
-  'borderStyle: String'
-  'emphasis: [String]'
-  'styleRawValue'
-  'RouteID.rawValue'
-  'ActionDispatcher'
-  'keyboardActionRole'
-  'pointerHitPolicy'
-  'actionRoutes'
-  'actionRole:'
-  'focusable(role:'
-)
-
-for token in "${retired_legacy_identifier_tokens[@]}"; do
+while IFS= read -r token; do
+  [ -z "$token" ] && continue
   if rg -n --glob '*.swift' --fixed-strings --quiet -- "$token" Sources; then
     fail "Retired legacy identifier surface reappeared in source: $token."
   fi
-done
+done <<'EOF'
+foregroundStyle: String
+backgroundStyle: String
+borderStyle: String
+emphasis: [String]
+styleRawValue
+RouteID.rawValue
+ActionDispatcher
+keyboardActionRole
+pointerHitPolicy
+actionRoutes
+actionRole:
+focusable(role:
+EOF
 
 if ! rg -n --fixed-strings --quiet -- 'Removed From The Public Surface' docs/PUBLIC_API_INVENTORY.md; then
   fail "docs/PUBLIC_API_INVENTORY.md should keep the 'Removed From The Public Surface' section."
@@ -270,19 +277,18 @@ if rg -n --fixed-strings --quiet -- 'These symbols remain public today' docs/PUB
 fi
 
 
-runtime_docs=(
-  "README.md"
-  "docs/ARCHITECTURE.md"
-  "docs/PUBLIC_API_INVENTORY.md"
-  "docs/PUBLIC_SURFACE_POLICY.md"
-  "docs/SOURCE_LAYOUT.md"
-)
-
-for doc_file in "${runtime_docs[@]}"; do
+while IFS= read -r doc_file; do
+  [ -z "$doc_file" ] && continue
   if rg -n -P --quiet -- '(?<!`)``(?!`)' "$doc_file"; then
     fail "$doc_file still contains an empty inline-code runtime placeholder."
   fi
-done
+done <<'EOF'
+README.md
+docs/ARCHITECTURE.md
+docs/PUBLIC_API_INVENTORY.md
+docs/PUBLIC_SURFACE_POLICY.md
+docs/SOURCE_LAYOUT.md
+EOF
 
 if ! rg -n --fixed-strings --quiet -- '`TerminalUI`' README.md; then
   fail "README.md should name TerminalUI explicitly."
@@ -316,6 +322,6 @@ if ! rg -n --fixed-strings --quiet -- 'they should not be exported as package pr
   fail "docs/PUBLIC_SURFACE_POLICY.md should keep the showcase export policy."
 fi
 
-if (( failures != 0 )); then
+if [ "$failures" -ne 0 ]; then
   exit 1
 fi

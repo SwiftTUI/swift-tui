@@ -24,7 +24,7 @@ hooks = [
   {
     id = "public-surface-policies",
     name = "enforce public surface and documentation guardrails",
-    entry = "./Scripts/check_public_surface_policies.zsh",
+    entry = "./Scripts/check_public_surface_policies.sh",
     language = "system",
     files = '^(Package\.swift|README\.md|docs/(RUNTIME|STATUS|PUBLIC_(API_INVENTORY|SURFACE_POLICY))\.md|Sources/.*\.swift|Sources/View/View\.docc/Authoring-Views\.md|Sources/TerminalUI/TerminalUI\.docc/Running-Apps\.md|Tests/ViewTests/ActorIsolationSurfaceTests\.swift|Tests/TerminalUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
     pass_filenames = false
@@ -32,7 +32,7 @@ hooks = [
   {
     id = "structured-concurrency-escape-hatches",
     name = "forbid unchecked concurrency escape hatches",
-    entry = "./Scripts/check_concurrency_safety_policies.zsh",
+    entry = "./Scripts/check_concurrency_safety_policies.sh",
     language = "system",
     files = '^(Package\.swift|(Sources|Tests|Runners|Examples)/.*\.swift)$',
     pass_filenames = false
