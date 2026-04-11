@@ -9,7 +9,10 @@ import {
   terminalAppManifestPath,
   terminalAppWasmPath,
 } from "./app-data.ts";
-import terminalShotUrl from "./assets/terminal-ui-capture.png";
+import terminalShotUrl from "./assets/terminal.png";
+import iPhoneShotUrl from "./assets/iPhone.png";
+import macOSShotUrl from "./assets/macOS.png";
+import webShotUrl from "./assets/web.png";
 import {
   createWasmSceneRuntimeFactory,
   type WasmSceneRuntimeHandle,
@@ -47,21 +50,25 @@ const platformFrames = [
     name: "Terminal",
     detail: "Alternate-screen, raw-mode, capability-aware output. The native runtime.",
     chrome: "platform-terminal",
-  },
-  {
-    name: "macOS",
-    detail: "SwiftUI host chrome via HostedSceneSession.",
-    chrome: "platform-macos",
+    snapshot: terminalShotUrl,
   },
   {
     name: "iOS",
-    detail: "Same surface, native app chrome, touch input.",
+    detail: "The same surface, with touch input, natively for iOS.",
     chrome: "platform-ios",
+    snapshot: iPhoneShotUrl
   },
   {
     name: "Web",
-    detail: "WASI build mounted in the browser via WebTUIGUI.",
+    detail: "WASI build mounted in the browser via the Web TUIGUI.",
     chrome: "platform-web",
+    snapshot: webShotUrl
+  },
+  {
+    name: "macOS",
+    detail: "The SwiftUI TUIGUI embedded in macOS chrome.",
+    chrome: "platform-macos",
+    snapshot: macOSShotUrl
   },
 ];
 
@@ -69,7 +76,7 @@ const parityPoints = [
   {
     title: "Same authoring surface",
     body:
-      "@State, @Binding, @FocusState, environment values, Layout protocol, Scene declarations. The types you already know.",
+      "@State, @Binding, @FocusState, @Observable, environment values, Layout protocol, Scene declarations. The types you already know.",
   },
   {
     title: "Same layout contract",
@@ -79,7 +86,7 @@ const parityPoints = [
   {
     title: "Same identity model",
     body:
-      "State keyed by tree identity + source location. View-local state survives rerenders exactly as SwiftUI authors expect.",
+      "State keyed by tree identity. View-local state survives rerenders. As faithful as it gets without corporate espionage.",
   },
   {
     title: "Terminal-native runtime",
@@ -296,7 +303,7 @@ async function bootstrap(): Promise<void> {
                 </p>
                 <h2>The real app, running in the browser.</h2>
                 <p class="hero-stage-note">
-                  This is the actual WASI binary. Resize it and interact with the curated wasm-safe scene.
+                  This is the actual WASI binary. Resize it and drive a curated release console built for the browser host.
                 </p>
               </div>
             </div>
@@ -505,13 +512,8 @@ function renderPlatformFrames(): string {
       (frame) => `
         <article class="platform-card" data-reveal>
           <div class="platform-visual ${frame.chrome}">
-            <div class="platform-chrome">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
             <img
-              src="${terminalShotUrl}"
+              src="${frame.snapshot}"
               alt="TerminalUI component gallery shown in ${frame.name} chrome"
             />
           </div>

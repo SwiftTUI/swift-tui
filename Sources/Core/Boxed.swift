@@ -1,14 +1,27 @@
+import Synchronization
+
 /// Copy-on-write heap-allocated box for large value types.
 ///
 /// Use this to store value types that exceed ~200 bytes inline inside other
-/// value types (structs, enums, tuples).  The box reduces inline size to a
+/// value types (structs, enums, tuples). The box reduces inline size to a
 /// single pointer (8 bytes) while preserving value semantics through COW.
-package final class _BoxStorage<Value>: Sendable {
-  package nonisolated(unsafe) var value: Value
-  package init(_ value: Value) { unsafe self.value = value }
+package final class _BoxStorage<Value: Equatable & Sendable>: Sendable {
+  private let state: Mutex<Value>
+
+  package init(_ value: sending Value) {
+    state = Mutex(value)
+  }
+
+  package func snapshot() -> Value {
+    state.withLock { $0 }
+  }
+
+  package func replace(with value: sending Value) {
+    state.withLock { $0 = value }
+  }
 }
 
-package struct Boxed<Value: Equatable>: Equatable {
+package struct Boxed<Value: Equatable & Sendable>: Equatable, Sendable {
   private var _storage: _BoxStorage<Value>
 
   package init(_ value: Value) {
@@ -17,17 +30,20 @@ package struct Boxed<Value: Equatable>: Equatable {
 
   package var value: Value {
     _read {
-      yield unsafe _storage.value
+      let value = _storage.snapshot()
+      yield value
     }
     _modify {
       if !isKnownUniquelyReferenced(&_storage) {
-        _storage = unsafe _BoxStorage(_storage.value)
+        _storage = _BoxStorage(_storage.snapshot())
       }
-      yield unsafe &_storage.value
+      var value = _storage.snapshot()
+      defer { _storage.replace(with: value) }
+      yield &value
     }
   }
 
   package static func == (lhs: Self, rhs: Self) -> Bool {
-    unsafe lhs._storage === rhs._storage || lhs._storage.value == rhs._storage.value
+    lhs._storage === rhs._storage || lhs._storage.snapshot() == rhs._storage.snapshot()
   }
 }

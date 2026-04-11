@@ -91,7 +91,7 @@ public struct DefaultRenderer {
 
   /// Package-only accessor exposing the renderer's internal
   /// `ViewGraph.registrationAliasDiagnostics`.  Added for Item 7 of
-  /// ARCHITECTURE_NOTES.md to let tests measure the alias layer's
+  /// `docs/proposals/ARCHITECTURE_NOTES.md` to let tests measure the alias layer's
   /// actual workload against the architecture doc's hypothesis.
   @MainActor
   package var debugRegistrationAliasDiagnostics: RegistrationAliasDiagnostics {

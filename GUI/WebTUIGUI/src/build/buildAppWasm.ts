@@ -2,6 +2,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { resolveSwiftArtifacts, type SwiftArtifactPaths } from "./resolveSwiftArtifacts.ts";
 import { stripPackagedWasm } from "./stripPackagedWasm.ts";
+import { formatWasmTypeDiagnostics } from "./wasmTypeDiagnostics.ts";
 
 export interface BuildAppWasmOptions {
   packagePath: string;
@@ -63,11 +64,15 @@ async function validateBrowserWasm(
   wasmPath: string,
   description: string
 ): Promise<void> {
+  const bytes = await Bun.file(wasmPath).bytes();
   try {
     // Validate against the same JS API the browser uses before we publish it.
-    await WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer());
+    await WebAssembly.compile(bytes);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`${description} does not parse in browser WebAssembly (${wasmPath}): ${message}`);
+    throw new Error([
+      `${description} does not parse in browser WebAssembly (${wasmPath}): ${message}`,
+      formatWasmTypeDiagnostics(bytes),
+    ].join("\n"));
   }
 }

@@ -609,7 +609,7 @@ package final class ViewNode {
 
 // MARK: - Committed-field forwarding accessors
 //
-// Prior to Item 6 of ARCHITECTURE_NOTES.md these were ~14 stored mirror
+// Prior to Item 6 of `docs/proposals/ARCHITECTURE_NOTES.md` these were ~14 stored mirror
 // fields on ViewNode that were copied one-by-one out of each new
 // ResolvedNode during `apply(resolved:children:)`.  The mirror had two
 // problems:

@@ -160,9 +160,17 @@ Use [docs/TOOLCHAINS.md](/Users/adamz/Developer/repos/swift-terminal-ui/docs/TOO
 ```bash
 swiftly run swift build
 swiftly run swift test
+Scripts/test_all.zsh
+bun run test
 ```
 
-## Documentation
+`swiftly run swift test` covers the root package. `Scripts/test_all.zsh` is the
+single repo-level entrypoint for the full checked-in test surface across the
+runner packages, GUI packages, and example projects, and it verifies the Swift
+and Bun environment first. If you're already using the repo's root Bun
+workspace, `bun run test` is a thin entrypoint to the same script.
+
+## Generate API Docs
 
 Generate per-module DocC archives with:
 
@@ -196,7 +204,10 @@ Peer host packaging lives outside the root package products:
 - [docs/STATUS.md](docs/STATUS.md): shipped surface, current constraints, and short-term gaps
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): target boundaries and frame pipeline
 - [docs/RUNTIME.md](docs/RUNTIME.md): runtime behavior, lifecycle semantics, and incremental-cost model
+- [docs/HOST_PACKAGES.md](docs/HOST_PACKAGES.md): runner-package and embedded-host packaging model
 - [docs/SOURCE_LAYOUT.md](docs/SOURCE_LAYOUT.md): source ownership map across targets and key files
 - [docs/PUBLIC_API_INVENTORY.md](docs/PUBLIC_API_INVENTORY.md): classified public-surface inventory
 - [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md): public API governance rules
+- [Examples/README.md](Examples/README.md): surviving example apps and what each one demonstrates
+- [docs/proposals/](docs/proposals): active design notes that are still intentionally retained
 - `*.docc` catalogs inside `Sources/*`: module landing pages and API-focused guides for `Core`, `View`, `TerminalUI`, and `TerminalUICharts`

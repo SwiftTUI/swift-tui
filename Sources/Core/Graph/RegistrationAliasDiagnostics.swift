@@ -1,4 +1,4 @@
-/// Instrumentation for Item 7 of ARCHITECTURE_NOTES.md — a bounded,
+/// Instrumentation for Item 7 of `docs/proposals/ARCHITECTURE_NOTES.md` — a bounded,
 /// low-overhead record of every non-trivial call to
 /// `ViewGraph.recordRegistrationAlias`.
 ///

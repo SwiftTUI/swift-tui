@@ -5,7 +5,7 @@ export const fallbackManifest: WebTUISceneManifest = {
   scenes: [
     {
       id: "main",
-      title: "Overview",
+      title: "Deploy Dashboard",
       isDefault: true,
     },
     {

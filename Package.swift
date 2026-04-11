@@ -146,7 +146,6 @@ let package = Package(
       dependencies: [
         "Core",
         "View",
-        "TerminalUI",
       ],
       swiftSettings: swiftSettings()
     ),
