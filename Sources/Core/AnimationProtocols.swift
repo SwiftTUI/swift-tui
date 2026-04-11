@@ -22,33 +22,54 @@ package enum AnimationRequest: Equatable, Sendable {
 ///
 /// The View module creates concrete instances; Core only stores and
 /// compares them by identity.
-package struct AnimationBox: Equatable, Hashable, Sendable {
-  // The wrapped value is Hashable & Sendable by construction
-  private let storage: _SendableAnyHashable
+package typealias AnimationBox = AnyHashableSendable
 
-  package init<H: Hashable & Sendable>(_ value: H) {
-    storage = _SendableAnyHashable(value)
+private protocol HashableBox: Sendable {
+  func hash(into hasher: inout Hasher)
+  func isEqual(to other: any HashableBox) -> Bool
+  func unwrap<H: Hashable & Sendable>(as _: H.Type) -> H?
+}
+
+private struct ConcreteHashableBox<T: Hashable & Sendable>: HashableBox {
+  let value: T
+
+  func hash(into hasher: inout Hasher) {
+    value.hash(into: &hasher)
   }
 
-  /// Attempts to recover the original boxed value as type `H`.
-  ///
-  /// Returns `nil` if the box was constructed with a value of a
-  /// different concrete type.  Used by View-layer code to round-trip
-  /// an `AnimationBox` carried through a `TransactionSnapshot` back
-  /// into the concrete `Animation` value the caller originally passed.
-  package func unwrap<H: Hashable & Sendable>(as _: H.Type = H.self) -> H? {
-    unsafe storage.base as? H
+  func isEqual(to other: any HashableBox) -> Bool {
+    guard let other = other as? ConcreteHashableBox<T> else { return false }
+    return value == other.value
+  }
+
+  func unwrap<H: Hashable & Sendable>(as _: H.Type) -> H? {
+    if let v = value as? H {
+      v
+    } else {
+      nil
+    }
   }
 }
 
 /// Wrapper that asserts Sendable for AnyHashable values known to be
 /// Sendable at construction time.
-private struct _SendableAnyHashable: Sendable, Hashable {
-  // pre-commit:ignore:next
-  nonisolated(unsafe) let base: AnyHashable
+public struct AnyHashableSendable: Hashable, Sendable {
+  private let box: any HashableBox
 
-  init(_ base: some Hashable & Sendable) {
-    unsafe self.base = base
+  public init<Item: Hashable & Sendable>(_ item: Item) {
+    box = ConcreteHashableBox(value: item)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    box.hash(into: &hasher)
+  }
+
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.box.isEqual(to: rhs.box)
+  }
+
+  package func unwrap<H: Hashable & Sendable>(as _: H.Type = H.self) -> H? {
+    box.unwrap(as: H.self)
   }
 }
 
