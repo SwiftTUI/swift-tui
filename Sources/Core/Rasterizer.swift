@@ -414,6 +414,17 @@ extension Rasterizer {
           cells: &cells,
           clip: frame.clip
         )
+      case .border(let bounds, let set, let foreground, let background, let sides):
+        drawLayoutBorder(
+          in: bounds,
+          set: set,
+          foreground: foreground,
+          background: background,
+          sides: sides,
+          environment: environment,
+          cells: &cells,
+          clip: frame.clip
+        )
       }
     }
   }
@@ -709,6 +720,350 @@ extension Rasterizer {
           clip: clip
         )
       }
+    }
+  }
+
+  /// Paints a layout-reserved border into the cells that
+  /// ``LayoutBehavior/border(_:foreground:background:blend:blendPhase:sides:)``
+  /// reserved during the layout pass.
+  ///
+  /// The entry point for the new layout-aware `.border(...)` view
+  /// modifier.  For `.outset` and `.decorative` border sets the frame
+  /// grew by the per-side display widths and the glyphs are written
+  /// into those reserved outer cells without ever touching the child's
+  /// interior.  For `.inset` sets no frame insets were reserved and
+  /// the glyphs overdraw the view's outermost rows / cols.
+  private func drawLayoutBorder(
+    in outer: Rect,
+    set: BorderSet,
+    foreground: BorderEdgeStyle?,
+    background: BorderBackgroundStyle?,
+    sides: Edge.Set,
+    environment: StyleEnvironmentSnapshot,
+    cells: inout [[RasterCell]],
+    clip: Rect?
+  ) {
+    guard outer.size.width > 0, outer.size.height > 0 else {
+      return
+    }
+
+    // Resolved side widths, masked by the requested `sides` set.
+    // These match the layout insets reserved during the layout pass
+    // by `LayoutEngine.borderLayoutInsets(set:sides:)`.
+    let topWidth = sides.contains(.top) ? set.topDisplayWidth : 0
+    let bottomWidth = sides.contains(.bottom) ? set.bottomDisplayWidth : 0
+    let leftWidth = sides.contains(.leading) ? set.leftDisplayWidth : 0
+    let rightWidth = sides.contains(.trailing) ? set.rightDisplayWidth : 0
+
+    guard topWidth > 0 || bottomWidth > 0 || leftWidth > 0 || rightWidth > 0 else {
+      return
+    }
+
+    // Pre-resolve per-side foreground colors so we don't re-run the
+    // shape-style resolver once per cell.  A nil per-side color falls
+    // back to the theme foreground at draw time.
+    let topForeground = resolvedBorderSideColor(
+      foreground?.foregroundStyle(for: .top),
+      environment: environment,
+      bounds: outer
+    )
+    let bottomForeground = resolvedBorderSideColor(
+      foreground?.foregroundStyle(for: .bottom),
+      environment: environment,
+      bounds: outer
+    )
+    let leftForeground = resolvedBorderSideColor(
+      foreground?.foregroundStyle(for: .left),
+      environment: environment,
+      bounds: outer
+    )
+    let rightForeground = resolvedBorderSideColor(
+      foreground?.foregroundStyle(for: .right),
+      environment: environment,
+      bounds: outer
+    )
+
+    let topBackground = resolvedBorderSideColor(
+      background?.backgroundStyle(for: .top),
+      environment: environment,
+      bounds: outer
+    )
+    let bottomBackground = resolvedBorderSideColor(
+      background?.backgroundStyle(for: .bottom),
+      environment: environment,
+      bounds: outer
+    )
+    let leftBackground = resolvedBorderSideColor(
+      background?.backgroundStyle(for: .left),
+      environment: environment,
+      bounds: outer
+    )
+    let rightBackground = resolvedBorderSideColor(
+      background?.backgroundStyle(for: .right),
+      environment: environment,
+      bounds: outer
+    )
+
+    // For `.inset` placements the border draws into the view's
+    // outermost rows and columns (so the `inner` region equals the
+    // outer minus zero — the border overdraws the outer frame).  For
+    // `.outset` and `.decorative` placements the outer frame already
+    // grew by the per-side display widths, so the top/bottom/left/right
+    // sides lie entirely within the reserved inset and the content
+    // sits in the interior rectangle `[leftWidth..width-rightWidth,
+    // topWidth..height-bottomWidth]`.
+    let isInset = set.placement == .inset
+
+    // Top edge cells: the non-corner region is
+    // [outer.origin.x + leftWidth, outer.origin.x + width - rightWidth).
+    // The glyph index starts at 0 at the leftmost non-corner cell and
+    // cycles through the border set's top edge string for dashed
+    // patterns.
+    if topWidth > 0 {
+      let y = outer.origin.y
+      let startX = outer.origin.x + leftWidth
+      let endX = outer.origin.x + outer.size.width - rightWidth
+      var x = startX
+      var glyphIndex = 0
+      while x < endX {
+        guard let character = set.topGlyph(at: glyphIndex) else {
+          break
+        }
+        let glyphWidth = max(1, cellWidth(of: character))
+        guard x + glyphWidth <= endX else {
+          break
+        }
+        writeBorderGlyph(
+          character,
+          width: glyphWidth,
+          foreground: topForeground ?? environment.theme.foreground,
+          background: topBackground,
+          atX: x,
+          y: y,
+          cells: &cells,
+          clip: clip
+        )
+        x += glyphWidth
+        glyphIndex += 1
+      }
+    }
+
+    // Bottom edge cells: draw along y = outer bottom - 1.
+    if bottomWidth > 0 {
+      let y = outer.origin.y + outer.size.height - 1
+      let startX = outer.origin.x + leftWidth
+      let endX = outer.origin.x + outer.size.width - rightWidth
+      var x = startX
+      var glyphIndex = 0
+      while x < endX {
+        guard let character = set.bottomGlyph(at: glyphIndex) else {
+          break
+        }
+        let glyphWidth = max(1, cellWidth(of: character))
+        guard x + glyphWidth <= endX else {
+          break
+        }
+        writeBorderGlyph(
+          character,
+          width: glyphWidth,
+          foreground: bottomForeground ?? environment.theme.foreground,
+          background: bottomBackground,
+          atX: x,
+          y: y,
+          cells: &cells,
+          clip: clip
+        )
+        x += glyphWidth
+        glyphIndex += 1
+      }
+    }
+
+    // Left edge cells: draw along x = outer.origin.x, between the top
+    // and bottom edges (inclusive if those edges are not drawn).
+    if leftWidth > 0 {
+      let x = outer.origin.x
+      let topExclusive = topWidth > 0 ? outer.origin.y + topWidth : outer.origin.y
+      let bottomExclusive =
+        bottomWidth > 0
+        ? outer.origin.y + outer.size.height - bottomWidth
+        : outer.origin.y + outer.size.height
+      var y = topExclusive
+      var glyphIndex = 0
+      while y < bottomExclusive {
+        guard let character = set.leftGlyph(at: glyphIndex) else {
+          break
+        }
+        writeBorderGlyph(
+          character,
+          width: leftWidth,
+          foreground: leftForeground ?? environment.theme.foreground,
+          background: leftBackground,
+          atX: x,
+          y: y,
+          cells: &cells,
+          clip: clip
+        )
+        y += 1
+        glyphIndex += 1
+      }
+    }
+
+    // Right edge cells: draw along x = outer right - rightWidth.
+    if rightWidth > 0 {
+      let x = outer.origin.x + outer.size.width - rightWidth
+      let topExclusive = topWidth > 0 ? outer.origin.y + topWidth : outer.origin.y
+      let bottomExclusive =
+        bottomWidth > 0
+        ? outer.origin.y + outer.size.height - bottomWidth
+        : outer.origin.y + outer.size.height
+      var y = topExclusive
+      var glyphIndex = 0
+      while y < bottomExclusive {
+        guard let character = set.rightGlyph(at: glyphIndex) else {
+          break
+        }
+        writeBorderGlyph(
+          character,
+          width: rightWidth,
+          foreground: rightForeground ?? environment.theme.foreground,
+          background: rightBackground,
+          atX: x,
+          y: y,
+          cells: &cells,
+          clip: clip
+        )
+        y += 1
+        glyphIndex += 1
+      }
+    }
+
+    // Corner glyphs.  Lipgloss semantics: corners inherit the adjacent
+    // horizontal edge's color (top for top corners, bottom for bottom
+    // corners).
+    if topWidth > 0 && leftWidth > 0 {
+      writeBorderGlyphs(
+        set.topLeading,
+        atX: outer.origin.x,
+        y: outer.origin.y,
+        foreground: topForeground ?? environment.theme.foreground,
+        background: topBackground,
+        cells: &cells,
+        clip: clip
+      )
+    }
+    if topWidth > 0 && rightWidth > 0 {
+      writeBorderGlyphs(
+        set.topTrailing,
+        atX: outer.origin.x + outer.size.width - rightWidth,
+        y: outer.origin.y,
+        foreground: topForeground ?? environment.theme.foreground,
+        background: topBackground,
+        cells: &cells,
+        clip: clip
+      )
+    }
+    if bottomWidth > 0 && leftWidth > 0 {
+      writeBorderGlyphs(
+        set.bottomLeading,
+        atX: outer.origin.x,
+        y: outer.origin.y + outer.size.height - 1,
+        foreground: bottomForeground ?? environment.theme.foreground,
+        background: bottomBackground,
+        cells: &cells,
+        clip: clip
+      )
+    }
+    if bottomWidth > 0 && rightWidth > 0 {
+      writeBorderGlyphs(
+        set.bottomTrailing,
+        atX: outer.origin.x + outer.size.width - rightWidth,
+        y: outer.origin.y + outer.size.height - 1,
+        foreground: bottomForeground ?? environment.theme.foreground,
+        background: bottomBackground,
+        cells: &cells,
+        clip: clip
+      )
+    }
+
+    _ = isInset  // reserved for future use by blend/phase paths (M5)
+  }
+
+  /// Eagerly resolves a border side's foreground/background style into a
+  /// constant color.  Returns nil for gradient fills (which are not
+  /// supported on borders in M2.B) or for nil styles; callers fall back
+  /// to the theme defaults in that case.
+  private func resolvedBorderSideColor(
+    _ style: AnyShapeStyle?,
+    environment: StyleEnvironmentSnapshot,
+    bounds: Rect
+  ) -> Color? {
+    guard let style else {
+      return nil
+    }
+    return resolveColor(
+      from: style,
+      environment: environment,
+      bounds: bounds,
+      sampleX: bounds.origin.x,
+      sampleY: bounds.origin.y
+    )
+  }
+
+  /// Writes a single border glyph at the given cell coordinates,
+  /// applying the resolved foreground and optional background color.
+  private func writeBorderGlyph(
+    _ character: Character,
+    width: Int,
+    foreground: Color?,
+    background: Color?,
+    atX x: Int,
+    y: Int,
+    cells: inout [[RasterCell]],
+    clip: Rect?
+  ) {
+    var resolved = ResolvedTextStyle()
+    resolved.foregroundColor = foreground
+    resolved.backgroundColor = background
+    write(
+      character,
+      width: max(1, width),
+      style: resolved.isDefault ? nil : resolved,
+      atX: x,
+      y: y,
+      cells: &cells,
+      clip: clip
+    )
+  }
+
+  /// Writes a multi-character glyph string (used for corners, which are
+  /// stored as strings so they can be empty or multi-rune).  Advances
+  /// by each glyph's display width.
+  private func writeBorderGlyphs(
+    _ text: String,
+    atX x: Int,
+    y: Int,
+    foreground: Color?,
+    background: Color?,
+    cells: inout [[RasterCell]],
+    clip: Rect?
+  ) {
+    guard !text.isEmpty else {
+      return
+    }
+    var cursor = x
+    for character in text {
+      let glyphWidth = max(1, cellWidth(of: character))
+      writeBorderGlyph(
+        character,
+        width: glyphWidth,
+        foreground: foreground,
+        background: background,
+        atX: cursor,
+        y: y,
+        cells: &cells,
+        clip: clip
+      )
+      cursor += glyphWidth
     }
   }
 

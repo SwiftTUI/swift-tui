@@ -923,6 +923,19 @@ public indirect enum DrawCommand: Equatable, Sendable {
     backgroundStyle: BorderBackgroundStyle? = nil
   )
   case rule(bounds: Rect, style: AnyShapeStyle, strokeStyle: StrokeStyle, stackAxis: Axis?)
+  /// A layout-reserved border drawn by the rasterizer into the cells
+  /// that ``LayoutBehavior/border(_:foreground:background:blend:blendPhase:sides:)``
+  /// reserved during layout.  The outer `bounds` is the full wrapper
+  /// frame, including the reserved border rows/cols — the rasterizer
+  /// inset this by the border set's per-side display widths to compute
+  /// the interior (content) region that the border surrounds.
+  case border(
+    bounds: Rect,
+    set: BorderSet,
+    foreground: BorderEdgeStyle?,
+    background: BorderBackgroundStyle?,
+    sides: Edge.Set
+  )
   case clip(bounds: Rect, child: DrawCommand)
 }
 
