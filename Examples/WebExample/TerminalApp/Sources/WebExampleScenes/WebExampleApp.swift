@@ -20,6 +20,7 @@ public struct WebExampleApp: App {
           Text("Resize updates flow through the synthetic SIGWINCH control message path.")
         }
         .padding(1)
+        .frame(maxHeight: .infinity)
       }
     }
   }
