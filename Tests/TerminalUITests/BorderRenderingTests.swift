@@ -117,4 +117,42 @@ struct BorderRenderingTests {
     #expect(topLeft.character == "┌")
     #expect(topLeft.style?.foregroundColor == Color.red)
   }
+
+  @Test(".border with inset placement paints glyphs into a multi-row child")
+  func innerHalfBlockPaintsMultiRowChild() {
+    // Use a multi-line child so the inset placement has visible space
+    // to paint into.  A VStack of three short texts gives us a 3x3
+    // surface where .innerHalfBlock overdraws the outer ring of cells
+    // with its corner and edge glyphs, leaving only the single interior
+    // cell (1,1) showing original content.
+    let artifacts = DefaultRenderer().render(
+      VStack(spacing: 0) {
+        Text("top")
+        Text("mid")
+        Text("bot")
+      }
+      .border(set: .innerHalfBlock),
+      context: .init(identity: testIdentity("BorderInsetMultiRow"))
+    )
+
+    // The frame does NOT grow — .innerHalfBlock is inset placement.
+    #expect(artifacts.rasterSurface.size.width == 3)
+    #expect(artifacts.rasterSurface.size.height == 3)
+
+    let cells = artifacts.rasterSurface.cells
+    // Top row: inset corner glyphs are ▗ / ▖ per
+    // BorderSet.innerHalfBlock and the top edge glyph is ▄.
+    #expect(cells[0][0].character == "▗")
+    #expect(cells[0][1].character == "▄")
+    #expect(cells[0][2].character == "▖")
+    // Middle row: left / right edge glyphs overdraw the outer cells,
+    // leaving only the single interior cell showing the "i" of "mid".
+    #expect(cells[1][0].character == "▐")
+    #expect(cells[1][1].character == "i")
+    #expect(cells[1][2].character == "▌")
+    // Bottom row: corner glyphs ▝ / ▘ and the bottom edge glyph ▀.
+    #expect(cells[2][0].character == "▝")
+    #expect(cells[2][1].character == "▀")
+    #expect(cells[2][2].character == "▘")
+  }
 }
