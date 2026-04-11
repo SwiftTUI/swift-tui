@@ -163,6 +163,23 @@ extension LayoutEngine {
           height: measured.measuredSize.height
         )
       }
+    case .border(let set, _, _, _, _, let sides):
+      let insets = borderLayoutInsets(set: set, sides: sides)
+      if let child = resolved.children.first,
+        let childMeasurement = measured.childMeasurements.first
+      {
+        baseDimensions = propagatedViewDimensions(
+          size: measured.measuredSize,
+          from: viewDimensions(for: child, measured: childMeasurement),
+          offsetX: insets.leading,
+          offsetY: insets.top
+        )
+      } else {
+        baseDimensions = ViewDimensions(
+          width: measured.measuredSize.width,
+          height: measured.measuredSize.height
+        )
+      }
     case .frame(_, _, let alignment), .flexibleFrame(_, _, _, _, _, _, let alignment):
       if let child = resolved.children.first,
         let childMeasurement = measured.childMeasurements.first
