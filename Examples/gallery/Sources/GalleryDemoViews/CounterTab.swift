@@ -5,19 +5,42 @@ struct CounterTab: View {
   @State private var step: Int = 1
   @State private var color: Color = .red
 
+  func mathButton(_ label: String, _ num: Int, _ act: @escaping (Int, Int) -> Int) -> some View {
+    Button(label) {
+      withAnimation(.default) {
+        count = act(count, num)
+      }
+    }.buttonStyle(.bordered)
+  }
+
   var body: some View {
     VStack(alignment: .center, spacing: 1) {
       brandingHeader
-      Divider()
+      Divider()  // FIXME: this should span the VStack's width.
       Spacer(minLength: 1)
-      countDisplay
+      HStack(alignment: .bottom) {
+        mathButton(" - ", step, -)
+        TextFigure("\(count)", font: .miniwi)
+          .frame(minWidth: 14, alignment: .center)
+        mathButton(" + ", step, +)
+      }
       Spacer(minLength: 1)
-      controls
-      Slider("Step", value: $step, in: 1...9, step: 1)
+      HStack(spacing: 2) {
+        Slider("Step", value: $step, in: 1...9, step: 1)
+        Button("Reset") {
+          withAnimation(.default) {
+            count = 0
+          }
+        }
+        .buttonStyle(.borderedProminent)
+      }
       Spacer(minLength: 0)
     }
-    .padding(1)
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .padding(2)
+    .padding(.horizontal, 2)
+    .border(.separator)
+    .padding(2)
+    .fixedSize()  // FIXME: the cascade of the 'as small as possible' heuristic for the effect of fixed size STOPS at the node which can't be sized down further.
     .onChange(of: count) {
       withAnimation {
         color = color.rotatedHue(by: 30)
@@ -35,29 +58,4 @@ struct CounterTab: View {
     .frame(maxWidth: .infinity, alignment: .center)
   }
 
-  private var countDisplay: some View {
-    TextFigure("\(count)", font: .smMono9)
-      .frame(maxWidth: .infinity, alignment: .center)
-  }
-
-  private var controls: some View {
-    HStack(spacing: 2) {
-      Button("−", role: .destructive) {
-        withAnimation(.default) {
-          count -= step
-        }
-      }
-      Button("Reset") {
-        withAnimation(.default) {
-          count = 0
-        }
-      }
-      Button("+") {
-        withAnimation(.default) {
-          count += step
-        }
-      }
-    }
-    .frame(maxWidth: .infinity, alignment: .center)
-  }
 }
