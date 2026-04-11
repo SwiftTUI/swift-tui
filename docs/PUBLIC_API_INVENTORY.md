@@ -1,6 +1,6 @@
 # Public API Inventory
 
-Last updated: April 9, 2026
+Last updated: April 11, 2026
 
 This page is the post-migration reference for the public surface of the package. It separates the canonical SwiftUI-shaped API and actor-isolation model from package-only seams that still exist in the codebase.
 
@@ -38,6 +38,25 @@ Important public-surface rules after the lowering migration:
 - Callback-bearing authoring APIs follow the same model: `Binding.init(get:set:)` and `.task(...)` use actor-inheriting closure signatures, while button actions, `OpenLinkAction` over typed `LinkDestination`s, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`. In ordinary authored view code those all still resolve to main-actor authoring because `View.body` is `@MainActor`.
 - `ViewBuilder` no longer exposes `[AnyView]` in public closure signatures.
 - `AnyView` remains public as `View` erasure, but `AnyView.init(erasing:)` is no longer public.
+
+### Shapes, borders, and styling
+
+The canonical shape / border / gradient surface as of the Milestone 7 shape-and-border revamp:
+
+- **Shape primitives** (`Core` + `View`): `Rectangle`, `RoundedRectangle`, `Capsule`, `Circle`, `Ellipse`, and the `Shape` / `InsettableShape` protocols. Custom shapes contribute by returning one of the `ShapeGeometry` cases (`.rectangle`, `.roundedRectangle(cornerRadius:)`, `.circle`, `.ellipse`, `.capsule`) or by dropping to `Canvas`.
+- **Stroke and fill**: `Shape.fill(_:)`, `Shape.stroke(_:style:)`, `Shape.stroke(_:style:background:)`, `Shape.strokeBorder(_:style:)`, `Shape.strokeBorder(_:style:background:)` — all accept `some ShapeStyle` for the paint. `StrokeStyle` stores `lineWidth: Int` and `borderSet: BorderSet`; the legacy `LineVariant` enum is gone.
+- **Static `StrokeStyle` presets**: `.normal`, `.rounded`, `.thick`, `.double`, `.ascii`, `.block`, `.outerHalfBlock`, `.innerHalfBlock`, `.presentationChrome`, `.hidden`, `.markdown` — each backed by the matching `BorderSet`.
+- **`BorderSet`** (`Core`): public struct with per-edge, per-corner, and per-join `String` fields plus a `Placement` axis (`.outset`, `.inset`, `.decorative`). Multi-rune edges give free dashed/patterned borders via per-cell cycling. Built-ins: `.single`, `.rounded`, `.double`, `.heavy`, `.block`, `.outerHalfBlock`, `.innerHalfBlock`, `.presentationChrome`, `.singleDouble`, `.doubleSingle`, `.ascii`, `.hidden`, `.none`, `.dashed`, `.dashedHeavy`, `.markdown`.
+- **`BorderEdgeStyle`** (`Core`): per-side foreground shape styles for borders (`top`, `right`, `bottom`, `left`) with CSS-shorthand initializers (1 / 2 / 3 / 4 values).
+- **`BorderBackgroundStyle`** (`Core`): per-side background shape styles for borders, with the same CSS-shorthand initializers.
+- **`BorderBlend`** (`Core`): perimeter 1D gradient sampled clockwise around a rectangle, with an animatable `phase` for chasing-light borders.
+- **`.border(...)` view modifiers**: three overloads — uniform style + `BorderSet`, per-side `BorderEdgeStyle` + `BorderSet`, and perimeter `BorderBlend` + `BorderSet` + animatable `phase`. All three route through the layout-aware border path so the border lives in reserved frame insets and never eats content.
+- **Gradient / pattern paints**: `LinearGradient` (unchanged), `RadialGradient` (new), `PatternFill` (new — `░ ▒ ▓` shading with optional background). All conform to `ShapeStyle` and are sampled per-cell at rasterization time.
+- **`Canvas<Drawing>`** and `CanvasDrawing` / `CanvasContext` (`Core` + `View`): arbitrary 2×4-Braille-subpixel drawing escape hatch for content the `Shape` algebra can't express (sparklines, plots, hand-drawn glyphs). The drawing primitives live in `Core` so the rasterizer can consume them directly; the authoring shell is a `View` in the `View` layer.
+
+Removed from the public surface in this revamp:
+
+- `LineVariant` — deleted wholesale, no deprecation shim. The rasterizer now reads glyphs from `BorderSet`. `StrokeStyle(lineVariant:)` is replaced by `StrokeStyle(borderSet:)`.
 
 ### `TerminalUI`
 
