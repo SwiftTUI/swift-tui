@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Test Commands
 
 ```bash
+bun run test                             # Run the full repo test surface and environment checks
 swiftly run swift build                  # Build all targets
-swiftly run swift test                   # Run all tests
+swiftly run swift test                   # Run root package tests
 swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests  # Run a single test suite
 swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests/testName  # Run a single test
 swift format format -i --configuration .swift-format.json Sources/ Tests/  # Format all code
@@ -15,7 +16,7 @@ swift format format -i --configuration .swift-format.json Sources/ Tests/  # For
 ## Development Guidelines
 
 - When implementing a new feature that replaces or extends an existing constraint (e.g., single-scene → multi-scene), search for and remove ALL old guards/assertions that enforce the previous constraint.
-- When working with this Swift TUI framework, always run the full test suite (`swift test`) after making changes and confirm all tests pass before considering work complete.
+- When working with this Swift TUI framework, always run `bun run test` after changes that touch shared code, peer packages, or repo tooling, and confirm it passes before considering work complete.
 
 ## AnyView Policy
 

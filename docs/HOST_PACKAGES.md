@@ -127,14 +127,14 @@ new products in the root package.
 Relevant package-level verification lives in:
 
 ```bash
-swiftly run swift test
-cd Runners/TerminalUICLI && swiftly run swift test
-cd Runners/TerminalUIWASI && swiftly run swift test
-cd GUI/SwiftUITUIGUI && swiftly run swift test
+Scripts/test_all.zsh
 ```
 
-Run the package-level tests above when host-package behavior or the shared
-manifest/session plumbing changes.
+`Scripts/test_all.zsh` is the canonical full-repo check. From the repo root you
+can also invoke the same flow with `bun run test`. The runner verifies the
+Swift and Bun environment first, then runs the root, runner-package,
+GUI-package, and example-project test suites that are checked into this
+repository.
 
 ## Out Of Scope
 
