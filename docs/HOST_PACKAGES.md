@@ -127,10 +127,10 @@ new products in the root package.
 Relevant package-level verification lives in:
 
 ```bash
-Scripts/test_all.zsh
+Scripts/test_all.sh
 ```
 
-`Scripts/test_all.zsh` is the canonical full-repo check. From the repo root you
+`Scripts/test_all.sh` is the canonical full-repo check. From the repo root you
 can also invoke the same flow with `bun run test`. The runner verifies the
 Swift and Bun environment first, then runs the root, runner-package,
 GUI-package, and example-project test suites that are checked into this

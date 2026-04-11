@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env sh
 
 set -euo pipefail
 
@@ -16,7 +16,7 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: Scripts/test_all.zsh [--skip-bun-install]
+Usage: Scripts/test_all.sh [--skip-bun-install]
 
 Runs the full checked-in repo verification surface:
   - checked-in policy hooks
@@ -51,8 +51,8 @@ for argument in "$@"; do
       exit 0
       ;;
     *)
-      print -u2 -- "Unknown argument: $argument"
-      print -u2 -- ""
+      2> echo "Unknown argument: $argument"
+      2> echo ""
       usage
       exit 1
       ;;
@@ -73,14 +73,14 @@ detect_swift_command() {
     return
   fi
 
-  print -u2 -- "Missing required command: swiftly or swift"
+  2> echo "Missing required command: swiftly or swift"
   exit 1
 }
 
 require_command() {
   local name="$1"
   if ! command -v "$name" >/dev/null 2>&1; then
-    print -u2 -- "Missing required command: $name"
+    2> echo "Missing required command: $name"
     exit 1
   fi
 }
@@ -90,16 +90,16 @@ run_step() {
   local workdir="$2"
   shift 2
 
-  print ""
-  print -- "==> $title"
+  echo ""
+  echo "==> $title"
 
   if (
     cd "$workdir"
     "$@"
   ); then
-    print -- "PASS: $title"
+    echo "PASS: $title"
   else
-    print -u2 -- "FAIL: $title"
+    2> echo "FAIL: $title"
     failures+=("$title")
   fi
 }
@@ -108,13 +108,13 @@ run_function_step() {
   local title="$1"
   shift
 
-  print ""
-  print -- "==> $title"
+  echo ""
+  echo "==> $title"
 
   if "$@"; then
-    print -- "PASS: $title"
+    echo "PASS: $title"
   else
-    print -u2 -- "FAIL: $title"
+    2> echo "FAIL: $title"
     failures+=("$title")
   fi
 }
@@ -123,20 +123,20 @@ skip_step() {
   local title="$1"
   local reason="$2"
 
-  print ""
-  print -- "==> $title"
-  print -- "SKIP: $title ($reason)"
+  echo ""
+  echo "==> $title"
+  echo "SKIP: $title ($reason)"
 }
 
 check_swift_environment() {
   local version_output
   version_output="$("${swift_command[@]}" --version 2>&1)"
-  print -- "$version_output"
+  echo "$version_output"
 
   if [[ "$version_output" != *"Swift version 6.3"* && "$version_output" != *"Apple Swift version 6.3"* ]]; then
-    print -u2 -- ""
-    print -u2 -- "Expected Swift 6.3.x for this repository."
-    print -u2 -- "Use 'swiftly run swift ...' directly, or make sure 'swift' resolves to the swiftly-managed toolchain."
+    2> echo ""
+    2> echo "Expected Swift 6.3.x for this repository."
+    2> echo "Use 'swiftly run swift ...' directly, or make sure 'swift' resolves to the swiftly-managed toolchain."
     return 1
   fi
 }
@@ -149,7 +149,7 @@ detect_swift_command
 require_command bun
 
 if (( is_linux )); then
-  print -- "Linux host detected; exporting DISABLE_EXPLICIT_PLATFORMS=1 and skipping Apple-only SwiftUI host tests."
+  echo "Linux host detected; exporting DISABLE_EXPLICIT_PLATFORMS=1 and skipping Apple-only SwiftUI host tests."
 fi
 
 run_function_step "Check Swift toolchain" check_swift_environment
@@ -213,16 +213,16 @@ run_step \
   "$repo_root/Examples/WebExample" \
   bun test
 
-print ""
+echo ""
 
 if (( ${#failures[@]} == 0 )); then
-  print -- "All repo tests succeeded."
+  echo "All repo tests succeeded."
   exit 0
 fi
 
-print -u2 -- "Repo test failures:"
+2> echo "Repo test failures:"
 for failure in "${failures[@]}"; do
-  print -u2 -- "  - $failure"
+  2> echo "  - $failure"
 done
 
 exit 1
