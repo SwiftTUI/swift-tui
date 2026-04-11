@@ -274,7 +274,7 @@ button:focus-visible {
 
 .hero-lede {
   margin: var(--space-2xl) 0 0;
-  max-width: 58ch;
+  max-width: 50ch;
   font-family: var(--font-body);
   font-size: 1.125rem;
   line-height: 1.55;
@@ -942,14 +942,6 @@ body.is-resizing-terminal * {
   border: 1px solid var(--border-visible);
 }
 
-.platform-macos .platform-chrome span,
-.platform-macos .platform-chrome span:nth-child(1),
-.platform-macos .platform-chrome span:nth-child(2),
-.platform-macos .platform-chrome span:nth-child(3) {
-  background: transparent;
-  border: 1px solid var(--border-visible);
-}
-
 .platform-ios .platform-chrome {
   justify-content: center;
   padding: var(--space-sm) var(--space-md);
@@ -973,7 +965,6 @@ body.is-resizing-terminal * {
   height: 100%;
   object-fit: cover;
   object-position: left top;
-  filter: grayscale(1) contrast(1.05) brightness(0.95);
 }
 
 .platform-terminal img,
