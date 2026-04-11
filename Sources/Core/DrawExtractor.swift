@@ -272,6 +272,25 @@ extension DrawExtractor {
       )
     }
 
+    if case .border(
+      let set,
+      let foreground,
+      let background,
+      _,
+      _,
+      let sides
+    ) = placed.layoutBehavior {
+      commands.append(
+        .border(
+          bounds: bounds,
+          set: set,
+          foreground: foreground,
+          background: background,
+          sides: sides
+        )
+      )
+    }
+
     return DrawNode(
       identity: identity,
       environmentSnapshot: environmentSnapshot,
