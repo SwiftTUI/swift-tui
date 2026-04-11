@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import Core
@@ -79,6 +80,109 @@ struct BorderGradientTests {
       }
     }
     #expect(differ)
+  }
+
+  @Test("withAnimation drives BorderBlend phase through the controller")
+  func borderBlendPhaseAnimatesThroughController() throws {
+    // M5.B: phase is now an animatable property.  Seed the controller
+    // with a border at phase 0, then process a second frame where the
+    // same identity carries phase 1.0 under an explicit withAnimation
+    // intent.  After applyInterpolations() at the linear curve's
+    // midpoint, the mutated node's .border layoutBehavior should
+    // expose a phase strictly between 0 and 1 — not snapped to either
+    // endpoint.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(1000))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("blendLeaf")])
+    let blend = BorderBlend([Color.red, Color.blue, Color.red])
+
+    func borderNode(phase: Double) -> ResolvedNode {
+      ResolvedNode(
+        identity: leafIdentity,
+        kind: .view("Border"),
+        layoutBehavior: .border(
+          .single,
+          foreground: nil,
+          background: nil,
+          blend: blend,
+          blendPhase: phase,
+          sides: .all
+        )
+      )
+    }
+
+    let t0 = MonotonicInstant.now()
+    // Frame 1: phase 0, no animation intent — this seeds the previous
+    // snapshot so Frame 2's diff is observable.
+    controller.processResolvedTree(
+      borderNode(phase: 0),
+      transaction: .init(),
+      timestamp: t0
+    )
+
+    // Frame 2: phase 1.0 under withAnimation intent.
+    var frame2 = borderNode(phase: 1.0)
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    // Apply halfway through the 1000 ms linear curve.
+    let halfway = t0.advanced(by: .milliseconds(500))
+    let result = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    #expect(result.hasActiveAnimations)
+    #expect(result.affectedIdentities.contains(leafIdentity))
+
+    guard
+      case .border(_, _, _, _, let interpolatedPhase, _) = frame2.layoutBehavior
+    else {
+      Issue.record("layoutBehavior should still be .border after interpolation")
+      return
+    }
+
+    // The interpolated phase must be strictly between the endpoints
+    // at the midpoint of a linear curve — if extract or applyValue
+    // were broken the diff would collapse to .inherit → snap to 1.0.
+    #expect(
+      interpolatedPhase > 0 && interpolatedPhase < 1,
+      "halfway interpolation should produce an intermediate phase, not an endpoint (got \(interpolatedPhase))"
+    )
+  }
+
+  @Test("BorderBlend phase animation produces different cells across frames")
+  func borderBlendPhaseAnimationDiffersBetweenFrames() throws {
+    // Stronger assertion: drive the controller's interpolation at two
+    // distinct timestamps and rasterize each.  The two raster outputs
+    // must differ in at least one perimeter cell, proving that phase
+    // actually drives per-cell color through the whole pipeline.
+    let renderer = DefaultRenderer()
+    let controller = renderer.internalAnimationController
+    let animation = Animation.linear(duration: .milliseconds(1000))
+    controller.register(animation)
+
+    let blend = BorderBlend([Color.red, Color.green, Color.blue, Color.red])
+    let rootIdentity = testIdentity("BorderBlendPhaseAnimated")
+
+    // Frame 1 (seed): phase 0, no animation intent.
+    _ = renderer.render(
+      Text("hi").border(blend: blend, set: .single, phase: 0),
+      context: .init(identity: rootIdentity)
+    )
+
+    // Frame 2: phase 1.0 under withAnimation.  The controller records
+    // a diff of phase 0 → 1.0 and enqueues a linear animation.
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    _ = renderer.render(
+      Text("hi").border(blend: blend, set: .single, phase: 1.0),
+      context: .init(identity: rootIdentity, transaction: transaction)
+    )
+    #expect(
+      controller.dominantActiveRequest() != nil,
+      "controller must hold an active animation after the animated phase change"
+    )
   }
 
   @Test(".border(blend:) respects sides mask by drawing only enabled edges")

@@ -155,9 +155,10 @@ extension View {
   /// The blend's stops are interpolated as the rasterizer walks the
   /// rectangle's edges clockwise (top L→R, right T→B, bottom R→L,
   /// left B→T).  The `phase` parameter shifts the gradient start point
-  /// around the perimeter, enabling chasing-light animation when the
-  /// animation pipeline drives the value (deferred to a later task).
-  /// `phase` is currently passed through as a static value.
+  /// around the perimeter, enabling chasing-light animation: changing
+  /// `phase` inside `withAnimation { … }` drives the pipeline's
+  /// animation controller to interpolate the phase smoothly frame by
+  /// frame.
   public func border(
     blend: BorderBlend,
     set: BorderSet = .outerHalfBlock,
