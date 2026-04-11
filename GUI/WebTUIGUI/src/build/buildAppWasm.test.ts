@@ -22,6 +22,7 @@ test("falls back to the original wasm when strip tooling throws", async () => {
   const warnings: string[] = [];
 
   await packageBrowserValidatedWasm({
+    optimize: async () => {},
     sourceWasmPath: fixture.sourceWasmPath,
     outputWasmPath: fixture.outputWasmPath,
     strip: async () => {
@@ -43,6 +44,7 @@ test("falls back to the original wasm when stripping corrupts the artifact", asy
   const warnings: string[] = [];
 
   await packageBrowserValidatedWasm({
+    optimize: async () => {},
     sourceWasmPath: fixture.sourceWasmPath,
     outputWasmPath: fixture.outputWasmPath,
     strip: async (wasmPath) => {
@@ -64,6 +66,7 @@ test("fails when the source wasm itself is not browser-parseable", async () => {
 
   await expect(
     packageBrowserValidatedWasm({
+      optimize: async () => {},
       sourceWasmPath: fixture.sourceWasmPath,
       outputWasmPath: fixture.outputWasmPath,
       strip: async () => {},
@@ -71,6 +74,7 @@ test("fails when the source wasm itself is not browser-parseable", async () => {
   ).rejects.toThrow("generated wasm does not parse in browser WebAssembly");
   await expect(
     packageBrowserValidatedWasm({
+      optimize: async () => {},
       sourceWasmPath: fixture.sourceWasmPath,
       outputWasmPath: fixture.outputWasmPath,
       strip: async () => {},
@@ -78,11 +82,43 @@ test("fails when the source wasm itself is not browser-parseable", async () => {
   ).rejects.toThrow("maxTypeParameterCount=1001");
   await expect(
     packageBrowserValidatedWasm({
+      optimize: async () => {},
       sourceWasmPath: fixture.sourceWasmPath,
       outputWasmPath: fixture.outputWasmPath,
       strip: async () => {},
     })
   ).rejects.toThrow("overBrowserLimitTypes=0");
+});
+
+test("uses optimized wasm when the raw compiler output is not browser-parseable", async () => {
+  const fixture = await createFixture(buildHugeFunctionTypeWasm(1001));
+
+  await packageBrowserValidatedWasm({
+    optimize: async (wasmPath) => {
+      await Bun.write(wasmPath, minimalWasmBytes);
+    },
+    sourceWasmPath: fixture.sourceWasmPath,
+    outputWasmPath: fixture.outputWasmPath,
+    strip: async () => {},
+  });
+
+  expect(await Bun.file(fixture.outputWasmPath).bytes())
+    .toEqual(minimalWasmBytes);
+});
+
+test("reports the optimization failure when the raw wasm is still invalid", async () => {
+  const fixture = await createFixture(buildHugeFunctionTypeWasm(1001));
+
+  await expect(
+    packageBrowserValidatedWasm({
+      optimize: async () => {
+        throw new Error("missing wasm-opt");
+      },
+      sourceWasmPath: fixture.sourceWasmPath,
+      outputWasmPath: fixture.outputWasmPath,
+      strip: async () => {},
+    })
+  ).rejects.toThrow("wasm optimization step failed: missing wasm-opt");
 });
 
 async function createFixture(
