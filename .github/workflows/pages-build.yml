@@ -136,10 +136,10 @@ jobs:
         shell: bash
         working-directory: Examples/WebExample
         run: |
-          set -euo pipefail
+          set -euxo pipefail
 
           . "$HOME/.swiftly/env.sh" && hash -r
-          
+
           bun install --frozen-lockfile
           bun run build
 
