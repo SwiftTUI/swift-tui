@@ -59,26 +59,11 @@ jobs:
         run: |
           set -euo pipefail
           if ! command -v swiftly >/dev/null 2>&1 && [ ! -x "$HOME/.swiftly/bin/swiftly" ]; then
-            case "$(uname -s)" in
-              Darwin)
                 curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
                 installer -pkg swiftly.pkg -target CurrentUserHomeDirectory && \
                 ~/.swiftly/bin/swiftly init --quiet-shell-followup
                 . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
                 hash -r
-                ;;
-              Linux)
-                curl -O https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz && \
-                tar zxf swiftly-$(uname -m).tar.gz && \
-                ./swiftly init --quiet-shell-followup
-                . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh" && \
-                hash -r
-                ;;
-              *)
-                echo "Unsupported platform: $(uname -s)" >&2
-                exit 1
-                ;;
-            esac
           fi
 
           if ! swiftly list | grep -q "6.3.0"; then
@@ -91,7 +76,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
 
           if ! swiftly run swift sdk list | grep -q "swift-6.3-RELEASE_wasm"; then
