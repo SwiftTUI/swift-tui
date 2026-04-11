@@ -1,15 +1,16 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env sh
 
-set -euo pipefail
+set -eu
 
-repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
 skip_clean=0
+failures=""
 
 usage() {
   cat <<'EOF'
-Usage: Scripts/check_demo_builds.zsh [--skip-clean]
+Usage: Scripts/check_demo_builds.sh [--skip-clean]
 
 Builds the repository's demo packages and host shells, then runs stack-safety
 input harnesses against the terminal examples:
@@ -26,6 +27,16 @@ build artifacts.
 EOF
 }
 
+add_failure() {
+  title=$1
+  if [ -z "$failures" ]; then
+    failures=$title
+  else
+    failures=$failures'
+'$title
+  fi
+}
+
 for argument in "$@"; do
   case "$argument" in
     --skip-clean)
@@ -36,8 +47,8 @@ for argument in "$@"; do
       exit 0
       ;;
     *)
-      print -u2 -- "Unknown argument: $argument"
-      print -u2 -- ""
+      >&2 echo "Unknown argument: $argument"
+      >&2 echo ""
       usage
       exit 1
       ;;
@@ -45,9 +56,9 @@ for argument in "$@"; do
 done
 
 require_command() {
-  local name="$1"
+  name=$1
   if ! command -v "$name" >/dev/null 2>&1; then
-    print -u2 -- "Missing required command: $name"
+    >&2 echo "Missing required command: $name"
     exit 1
   fi
 }
@@ -57,36 +68,31 @@ require_command bun
 require_command python3
 require_command xcodebuild
 
-typeset -a failures=()
-
 run_step() {
-  local title="$1"
-  local workdir="$2"
+  title=$1
+  workdir=$2
   shift 2
 
-  print ""
-  print -- "==> $title"
+  echo ""
+  echo "==> $title"
 
   if (
-    cd "$workdir"
+    cd "$workdir" &&
     "$@"
   ); then
-    print -- "PASS: $title"
+    echo "PASS: $title"
   else
-    print -u2 -- "FAIL: $title"
-    failures+=("$title")
+    >&2 echo "FAIL: $title"
+    add_failure "$title"
   fi
 }
 
-typeset -a cleanable_swift_packages=(
-  "Examples/gallery"
-  "Examples/SwiftUIExample/TerminalApp"
-  "Examples/WebExample/TerminalApp"
-  "GUI/SwiftUITUIGUI"
-)
-
-if (( skip_clean == 0 )); then
-  for package_path in "${cleanable_swift_packages[@]}"; do
+if [ "$skip_clean" -eq 0 ]; then
+  for package_path in \
+    "Examples/gallery" \
+    "Examples/SwiftUIExample/TerminalApp" \
+    "Examples/WebExample/TerminalApp" \
+    "GUI/SwiftUITUIGUI"; do
     run_step \
       "Clean $package_path" \
       "$repo_root" \
@@ -133,7 +139,7 @@ run_step \
   "$repo_root" \
   swift build --package-path GUI/SwiftUITUIGUI
 
-if (( skip_clean == 0 )); then
+if [ "$skip_clean" -eq 0 ]; then
   run_step \
     "Build Examples/SwiftUIExample macOS app" \
     "$repo_root" \
@@ -165,16 +171,20 @@ run_step \
   "$repo_root/GUI/WebTUIGUI" \
   bun run build -- --package-path ../../Examples/WebExample/TerminalApp --app WebExampleApp
 
-print ""
+echo ""
 
-if (( ${#failures[@]} == 0 )); then
-  print -- "All demo builds succeeded."
+if [ -z "$failures" ]; then
+  echo "All demo builds succeeded."
   exit 0
 fi
 
-print -u2 -- "Demo build failures:"
-for failure in "${failures[@]}"; do
-  print -u2 -- "  - $failure"
+>&2 echo "Demo build failures:"
+OLD_IFS=$IFS
+IFS='
+'
+for failure in $failures; do
+  >&2 echo "  - $failure"
 done
+IFS=$OLD_IFS
 
 exit 1

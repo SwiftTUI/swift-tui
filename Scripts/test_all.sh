@@ -2,14 +2,15 @@
 
 set -eu
 
-repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
 skip_bun_install=0
-host_os="$(uname -s)"
+host_os=$(uname -s)
 is_linux=0
+failures=""
 
-if [[ "$host_os" == "Linux" ]]; then
+if [ "$host_os" = "Linux" ]; then
   is_linux=1
   export DISABLE_EXPLICIT_PLATFORMS=1
 fi
@@ -41,6 +42,16 @@ Pass --skip-bun-install to reuse the existing Bun install state.
 EOF
 }
 
+add_failure() {
+  title=$1
+  if [ -z "$failures" ]; then
+    failures=$title
+  else
+    failures=$failures'
+'$title
+  fi
+}
+
 for argument in "$@"; do
   case "$argument" in
     --skip-bun-install)
@@ -59,26 +70,33 @@ for argument in "$@"; do
   esac
 done
 
-typeset -a failures=()
-typeset -a swift_command=()
+SWIFT_LAUNCHER=""
 
 detect_swift_command() {
   if command -v swiftly >/dev/null 2>&1; then
-    swift_command=(swiftly run swift)
-    return
+    SWIFT_LAUNCHER=swiftly
+    return 0
   fi
 
   if command -v swift >/dev/null 2>&1; then
-    swift_command=(swift)
-    return
+    SWIFT_LAUNCHER=swift
+    return 0
   fi
 
   >&2 echo "Missing required command: swiftly or swift"
   exit 1
 }
 
+run_swift() {
+  if [ "$SWIFT_LAUNCHER" = "swiftly" ]; then
+    swiftly run swift "$@"
+  else
+    swift "$@"
+  fi
+}
+
 require_command() {
-  local name="$1"
+  name=$1
   if ! command -v "$name" >/dev/null 2>&1; then
     >&2 echo "Missing required command: $name"
     exit 1
@@ -86,26 +104,26 @@ require_command() {
 }
 
 run_step() {
-  local title="$1"
-  local workdir="$2"
+  title=$1
+  workdir=$2
   shift 2
 
   echo ""
   echo "==> $title"
 
   if (
-    cd "$workdir"
+    cd "$workdir" &&
     "$@"
   ); then
     echo "PASS: $title"
   else
     >&2 echo "FAIL: $title"
-    failures+=("$title")
+    add_failure "$title"
   fi
 }
 
 run_function_step() {
-  local title="$1"
+  title=$1
   shift
 
   echo ""
@@ -115,13 +133,13 @@ run_function_step() {
     echo "PASS: $title"
   else
     >&2 echo "FAIL: $title"
-    failures+=("$title")
+    add_failure "$title"
   fi
 }
 
 skip_step() {
-  local title="$1"
-  local reason="$2"
+  title=$1
+  reason=$2
 
   echo ""
   echo "==> $title"
@@ -129,16 +147,20 @@ skip_step() {
 }
 
 check_swift_environment() {
-  local version_output
-  version_output="$("${swift_command[@]}" --version 2>&1)"
+  version_output=$(run_swift --version 2>&1)
   echo "$version_output"
 
-  if [[ "$version_output" != *"Swift version 6.3"* && "$version_output" != *"Apple Swift version 6.3"* ]]; then
-    >&2 echo ""
-    >&2 echo "Expected Swift 6.3.x for this repository."
-    >&2 echo "Use 'swiftly run swift ...' directly, or make sure 'swift' resolves to the swiftly-managed toolchain."
-    return 1
-  fi
+  case "$version_output" in
+    *"Swift version 6.3"*|*"Apple Swift version 6.3"*)
+      return 0
+      ;;
+    *)
+      >&2 echo ""
+      >&2 echo "Expected Swift 6.3.x for this repository."
+      >&2 echo "Use 'swiftly run swift ...' directly, or make sure 'swift' resolves to the swiftly-managed toolchain."
+      return 1
+      ;;
+  esac
 }
 
 check_bun_environment() {
@@ -148,14 +170,14 @@ check_bun_environment() {
 detect_swift_command
 require_command bun
 
-if (( is_linux )); then
+if [ "$is_linux" -eq 1 ]; then
   echo "Linux host detected; exporting DISABLE_EXPLICIT_PLATFORMS=1 and skipping Apple-only SwiftUI host tests."
 fi
 
 run_function_step "Check Swift toolchain" check_swift_environment
 run_function_step "Check Bun availability" check_bun_environment
 
-if [[ -f "$repo_root/package.json" && -f "$repo_root/bun.lock" && $skip_bun_install -eq 0 ]]; then
+if [ -f "$repo_root/package.json" ] && [ -f "$repo_root/bun.lock" ] && [ "$skip_bun_install" -eq 0 ]; then
   run_step \
     "Install Bun workspace dependencies" \
     "$repo_root" \
@@ -165,37 +187,33 @@ fi
 run_step \
   "Check public-surface policies" \
   "$repo_root" \
-  ./Scripts/check_public_surface_policies.zsh
+  ./Scripts/check_public_surface_policies.sh
 
 run_step \
   "Check concurrency-safety policies" \
   "$repo_root" \
-  ./Scripts/check_concurrency_safety_policies.zsh
+  ./Scripts/check_concurrency_safety_policies.sh
 
-run_step \
+run_function_step \
   "Run root SwiftPM tests" \
-  "$repo_root" \
-  "${swift_command[@]}" test
+  run_swift test
 
-run_step \
+run_function_step \
   "Run Runners/TerminalUICLI tests" \
-  "$repo_root" \
-  "${swift_command[@]}" test --package-path Runners/TerminalUICLI
+  run_swift test --package-path Runners/TerminalUICLI
 
-run_step \
+run_function_step \
   "Run Runners/TerminalUIWASI tests" \
-  "$repo_root" \
-  "${swift_command[@]}" test --package-path Runners/TerminalUIWASI
+  run_swift test --package-path Runners/TerminalUIWASI
 
-if (( is_linux )); then
+if [ "$is_linux" -eq 1 ]; then
   skip_step \
     "Run GUI/SwiftUITUIGUI tests" \
     "SwiftUI host package is only available on Apple platforms"
 else
-  run_step \
+  run_function_step \
     "Run GUI/SwiftUITUIGUI tests" \
-    "$repo_root" \
-    "${swift_command[@]}" test --package-path GUI/SwiftUITUIGUI
+    run_swift test --package-path GUI/SwiftUITUIGUI
 fi
 
 run_step \
@@ -203,10 +221,9 @@ run_step \
   "$repo_root/GUI/WebTUIGUI" \
   bun test
 
-run_step \
+run_function_step \
   "Run Examples/gallery tests" \
-  "$repo_root" \
-  "${swift_command[@]}" test --package-path Examples/gallery
+  run_swift test --package-path Examples/gallery
 
 run_step \
   "Run Examples/WebExample Bun tests" \
@@ -215,14 +232,18 @@ run_step \
 
 echo ""
 
-if (( ${#failures[@]} == 0 )); then
+if [ -z "$failures" ]; then
   echo "All repo tests succeeded."
   exit 0
 fi
 
 >&2 echo "Repo test failures:"
-for failure in "${failures[@]}"; do
+OLD_IFS=$IFS
+IFS='
+'
+for failure in $failures; do
   >&2 echo "  - $failure"
 done
+IFS=$OLD_IFS
 
 exit 1
