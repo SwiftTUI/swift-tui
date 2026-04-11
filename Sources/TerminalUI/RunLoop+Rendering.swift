@@ -135,13 +135,36 @@ extension RunLoop {
         postActionInvalidationIdentities.removeAll(keepingCapacity: true)
       }
       // After rendering, request the next animation frame deadline if
-      // any animations are still in flight.  This keeps the loop
-      // waking at 30 FPS until all animations complete.
+      // any animations are still in flight AND at least one of the
+      // identities affected by the tick is geometrically visible in
+      // this frame's rasterized output.  Skipping the deadline when
+      // every affected identity is clipped (e.g. ``ScrollView`` content
+      // below the viewport, or an inactive ``TabView`` tab) quiesces
+      // the tick loop so we don't burn CPU driving an animation into
+      // a subtree that produces zero visible cells.  The animation
+      // itself stays live on the controller; when any external
+      // invalidation wakes the scheduler — scroll, resize, tab
+      // switch, state change — the next frame's visibility check
+      // re-runs and, if the affected identity is now in
+      // ``drawnIdentities``, the tick loop resumes.
+      //
+      // This is a geometric predicate, not an observational one: we
+      // do NOT skip the deadline just because ``presentationDamage``
+      // happened to come out empty for one coincidental frame.  That
+      // would be a one-way trap — the only thing that could restart
+      // the loop is the next tick's damage, which requires a tick to
+      // find out.  Identity-in-viewport is a stable invariant that
+      // flips only when layout, clip, or state changes, and each of
+      // those paths already invalidates the scheduler.
       let animationTick = renderer.internalAnimationController.lastTickResult
       if animationTick.hasActiveAnimations,
         let nextDeadline = animationTick.nextDeadline
       {
-        scheduler.requestDeadline(nextDeadline)
+        let anyAffectedIdentityVisible = !animationTick.affectedIdentities
+          .isDisjoint(with: artifacts.drawnIdentities)
+        if anyAffectedIdentityVisible {
+          scheduler.requestDeadline(nextDeadline)
+        }
       }
       observationBridge.prune(
         keeping: renderer.liveIdentitySnapshot()

@@ -268,14 +268,16 @@ public struct DefaultRenderer {
     let (draw, drawDuration) = measurePhase {
       drawExtractor.extract(from: placed)
     }
-    let (raster, rasterDuration) = measurePhase {
-      rasterizer.rasterize(
+    let (rasterized, rasterDuration) = measurePhase {
+      rasterizer.rasterizeCollectingVisibleIdentities(
         draw,
         minimumSize: minimumRasterSurfaceSize(for: proposal),
         previousSurface: retainedFrames.previousRasterSurface,
         damage: presentationDamage
       )
     }
+    let raster = rasterized.surface
+    let drawnIdentities = rasterized.visibleIdentities
     let (commit, commitDuration) = measurePhase {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: resolveContext.identity,
@@ -325,6 +327,7 @@ public struct DefaultRenderer {
       drawTree: draw,
       rasterSurface: raster,
       presentationDamage: presentationDamage,
+      drawnIdentities: drawnIdentities,
       commitPlan: commit,
       diagnostics: diagnostics
     )
