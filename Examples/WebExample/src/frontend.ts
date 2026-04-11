@@ -296,7 +296,7 @@ async function bootstrap(): Promise<void> {
                 </p>
                 <h2>The real app, running in the browser.</h2>
                 <p class="hero-stage-note">
-                  This is the actual WASI binary. Resize it and interact with the curated wasm-safe scene.
+                  This is the actual WASI binary. Resize it and drive a curated release console built for the browser host.
                 </p>
               </div>
             </div>
