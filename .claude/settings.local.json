@@ -51,7 +51,9 @@
       "Bash(swift run:*)",
       "Read(//private/tmp/**)",
       "Bash(rm -f gallery_repro_out gallery_repro_in)",
-      "Bash(mkfifo gallery_repro_in)"
+      "Bash(mkfifo gallery_repro_in)",
+      "Bash(sort -t= -k2 -rn)",
+      "Bash(sort -t'\\(' -k2 -rn)"
     ]
   }
 }
