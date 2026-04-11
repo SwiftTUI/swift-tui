@@ -496,10 +496,16 @@ extension Rasterizer {
       return
     }
 
-    // Curved shapes use a Braille subpixel canvas rather than per-cell
-    // hit testing so their edges antialias onto the 2x4 dot grid.
+    // Curved shapes normally use a Braille subpixel canvas so their
+    // edges antialias onto the 2x4 dot grid. Pattern fills are the
+    // exception: they need per-cell glyph writes, so they fall through
+    // to the general cell-walking loop below (which calls
+    // `shapeContains`, and that now knows about curved geometry).
     switch geometry {
     case .circle, .ellipse, .capsule:
+      if case .pattern = colorMode {
+        break
+      }
       paintBrailleShape(
         geometry: geometry,
         shapeBounds: shapeBounds,
