@@ -1,0 +1,67 @@
+name: Run tests for Linux
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-examples:
+    name: Build ${{ matrix.example }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - gallery
+
+    steps:
+
+      - uses: swift-actions/setup-swift@v3
+        with:
+          swift-version: "6.3"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-${{ matrix.example }}-${{ hashFiles(format('Examples/{0}/Package.resolved', matrix.example)) }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-${{ matrix.example }}-
+
+      - name: Cache Bun deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+            GUI/WebTUIGUI/node_modules
+            Examples/WebExample/node_modules
+          key: ${{ runner.os }}-bun-webexample-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-webexample-
+
+      - name: Install Bun workspace deps
+        shell: bash
+        run: |
+          set -euo pipefail
+          hash -r
+          bun install --frozen-lockfile
+
+
+      - name: Test all linux-compatible packages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bun run test
