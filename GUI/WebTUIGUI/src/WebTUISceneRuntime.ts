@@ -38,6 +38,7 @@ export class WebTUISceneRuntime {
   private activePointerId?: number;
   private activePointerButton?: number;
   private activePointerLocation?: { col: number; row: number };
+  private isVisible = false;
 
   constructor(options: WebTUISceneRuntimeOptions) {
     this.descriptor = options.descriptor;
@@ -58,6 +59,7 @@ export class WebTUISceneRuntime {
 
     this.element.append(header, this.terminalMount);
     options.mount.appendChild(this.element);
+    this.applyVisibility();
   }
 
   async mount(): Promise<void> {
@@ -101,7 +103,8 @@ export class WebTUISceneRuntime {
   setVisible(
     visible: boolean
   ): void {
-    this.element.hidden = !visible;
+    this.isVisible = visible;
+    this.applyVisibility();
     if (visible) {
       this.fitAddon?.fit();
       this.terminal?.focus();
@@ -173,9 +176,17 @@ export class WebTUISceneRuntime {
     this.element.style.borderRadius = "16px";
     this.element.style.boxShadow = "0 20px 50px rgba(0, 0, 0, 0.28)";
     this.element.style.overflow = "hidden";
-    this.element.style.display = "grid";
     this.element.style.gap = "0.5rem";
     this.element.style.gridTemplateRows = "auto 1fr";
+  }
+
+  private applyVisibility(): void {
+    this.element.hidden = !this.isVisible;
+    this.element.style.setProperty(
+      "display",
+      this.isVisible ? "grid" : "none",
+      "important"
+    );
   }
 
   private installPointerTrackingFallback(): void {
