@@ -167,6 +167,51 @@ func brailleCanvasFillCircleCenter() {
   #expect(canvas.cell(x: 2, y: 1).mask & 0x20 != 0)
 }
 
+@Test("BrailleCanvas fillEllipse zero radii sets only the center pixel")
+func brailleCanvasFillEllipseZero() {
+  var canvas = BrailleCanvas(width: 1, height: 1)
+  canvas.fillEllipse(centerX: 1, centerY: 2, radiusX: 0, radiusY: 0)
+  // (1, 2) → cell (0, 0), dot (1, 2) → 0x20
+  #expect(canvas.cell(x: 0, y: 0).mask == 0x20)
+}
+
+@Test("BrailleCanvas fillEllipse fills cardinal points and center")
+func brailleCanvasFillEllipseCardinal() {
+  var canvas = BrailleCanvas(width: 6, height: 3)  // 12×12 subpixels
+  canvas.fillEllipse(centerX: 6, centerY: 6, radiusX: 5, radiusY: 4)
+  // Center pixel must be set.
+  let centerCell = canvas.cell(x: 3, y: 1)
+  #expect(centerCell.mask & 0x20 != 0)  // dot (1, 2) at (6, 6)
+  // Horizontal extremes: (1, 6) and (11, 6) — inside rx=5.
+  // (1, 6) → cell (0, 1) dot (1, 2) → 0x20
+  #expect(canvas.cell(x: 0, y: 1).mask & 0x20 != 0)
+  // (11, 6) → cell (5, 1) dot (1, 2) → 0x20
+  #expect(canvas.cell(x: 5, y: 1).mask & 0x20 != 0)
+  // Vertical extremes: (6, 2) and (6, 10) — inside ry=4.
+  // (6, 2) → cell (3, 0) dot (0, 2) → 0x04
+  #expect(canvas.cell(x: 3, y: 0).mask & 0x04 != 0)
+  // (6, 10) → cell (3, 2) dot (0, 2) → 0x04
+  #expect(canvas.cell(x: 3, y: 2).mask & 0x04 != 0)
+}
+
+@Test("BrailleCanvas strokeEllipse draws cardinal points but leaves center blank")
+func brailleCanvasStrokeEllipse() {
+  var canvas = BrailleCanvas(width: 6, height: 3)  // 12×12 subpixels
+  canvas.strokeEllipse(centerX: 6, centerY: 6, radiusX: 5, radiusY: 4)
+  // Center pixel must NOT be set.
+  let centerCell = canvas.cell(x: 3, y: 1)
+  #expect(centerCell.mask & 0x20 == 0)
+  // The four cardinal extremes should land on the outline.
+  // Leftmost: (1, 6) → cell (0, 1) dot (1, 2) → 0x20
+  #expect(canvas.cell(x: 0, y: 1).mask & 0x20 != 0)
+  // Rightmost: (11, 6) → cell (5, 1) dot (1, 2) → 0x20
+  #expect(canvas.cell(x: 5, y: 1).mask & 0x20 != 0)
+  // Top: (6, 2) → cell (3, 0) dot (0, 2) → 0x04
+  #expect(canvas.cell(x: 3, y: 0).mask & 0x04 != 0)
+  // Bottom: (6, 10) → cell (3, 2) dot (0, 2) → 0x04
+  #expect(canvas.cell(x: 3, y: 2).mask & 0x04 != 0)
+}
+
 @Test("BrailleCanvas out-of-range pixels are silently dropped")
 func brailleCanvasClipping() {
   var canvas = BrailleCanvas(width: 1, height: 1)  // 2×4 subpixels

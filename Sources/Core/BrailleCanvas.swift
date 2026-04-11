@@ -1,3 +1,13 @@
+#if canImport(Darwin)
+  public import Darwin  // macOS, iOS, tvOS, watchOS
+#elseif canImport(Glibc)
+  public import Glibc  // Linux, Android
+#elseif canImport(WASILibc)
+  public import WASILibc  // WebAssembly (WASI)
+#elseif canImport(ucrt)
+  public import ucrt  // Windows
+#endif
+
 /// A single Braille cell's 2×4 subpixel mask.
 ///
 /// Dots are addressed by (x, y) where `x ∈ {0, 1}` and `y ∈ {0, 1, 2, 3}`.
@@ -209,6 +219,91 @@ public struct BrailleCanvas: Equatable, Sendable {
       for x in (cx - dx)...(cx + dx) {
         setPixel(x: x, y: y)
       }
+    }
+  }
+
+  /// Fills an ellipse centered at `(cx, cy)` with x-radius `rx` and
+  /// y-radius `ry`, in subpixels.
+  ///
+  /// Uses a scanline fill driven by the parametric ellipse equation
+  /// `(x/rx)² + (y/ry)² ≤ 1`. Out-of-range dots are clipped by the
+  /// underlying `setPixel` call.
+  public mutating func fillEllipse(
+    centerX cx: Int,
+    centerY cy: Int,
+    radiusX rx: Int,
+    radiusY ry: Int
+  ) {
+    guard rx >= 0, ry >= 0 else { return }
+    if rx == 0 && ry == 0 {
+      setPixel(x: cx, y: cy)
+      return
+    }
+    if rx == 0 {
+      for dy in -ry...ry {
+        setPixel(x: cx, y: cy + dy)
+      }
+      return
+    }
+    if ry == 0 {
+      for dx in -rx...rx {
+        setPixel(x: cx + dx, y: cy)
+      }
+      return
+    }
+    let ryD = Double(ry)
+    let rxD = Double(rx)
+    for dy in -ry...ry {
+      let t = Double(dy) / ryD
+      let dxMax = Int((rxD * (1.0 - t * t).squareRoot()).rounded(.down))
+      let y = cy + dy
+      for dx in -dxMax...dxMax {
+        setPixel(x: cx + dx, y: y)
+      }
+    }
+  }
+
+  /// Draws the outline of an ellipse centered at `(cx, cy)` with
+  /// x-radius `rx` and y-radius `ry`, in subpixels.
+  ///
+  /// Samples the parametric form `(cx + rx·cos θ, cy + ry·sin θ)` with
+  /// enough steps that adjacent samples are at most one pixel apart.
+  public mutating func strokeEllipse(
+    centerX cx: Int,
+    centerY cy: Int,
+    radiusX rx: Int,
+    radiusY ry: Int
+  ) {
+    guard rx >= 0, ry >= 0 else { return }
+    if rx == 0 && ry == 0 {
+      setPixel(x: cx, y: cy)
+      return
+    }
+    if rx == 0 {
+      for dy in -ry...ry {
+        setPixel(x: cx, y: cy + dy)
+      }
+      return
+    }
+    if ry == 0 {
+      for dx in -rx...rx {
+        setPixel(x: cx + dx, y: cy)
+      }
+      return
+    }
+    // 4 · (rx + ry) samples is enough for a smooth closed curve on any
+    // reasonable canvas size; the minimum of 32 avoids gaps for tiny
+    // ellipses where the arithmetic bound would round down to something
+    // too small to close the perimeter.
+    let steps = max(32, 4 * (rx + ry))
+    let twoPi = 2.0 * 3.14159265358979323846
+    let rxD = Double(rx)
+    let ryD = Double(ry)
+    for i in 0..<steps {
+      let angle = twoPi * Double(i) / Double(steps)
+      let x = cx + Int((rxD * cos(angle)).rounded())
+      let y = cy + Int((ryD * sin(angle)).rounded())
+      setPixel(x: x, y: y)
     }
   }
 }
