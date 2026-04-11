@@ -314,12 +314,15 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     defer {
       eventPump.cancel()
     }
+    var iterator = eventPump.stream.makeAsyncIterator()
+
+    scheduleNextWakeIfNeeded(using: eventPump)
 
     if scheduler.hasPendingFrame(at: .now()) {
       try renderPendingFrames(renderedFrames: &renderedFrames)
+      scheduleNextWakeIfNeeded(using: eventPump)
     }
 
-    var iterator = eventPump.stream.makeAsyncIterator()
     while await iterator.next() != nil {
       let pendingEvents = await drainPendingEvents(from: eventPump)
       guard !pendingEvents.isEmpty else {
@@ -377,6 +380,22 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       renderedFrames: renderedFrames,
       exitReason: .inputEnded
     )
+  }
+
+  package func scheduleNextWakeIfNeeded(
+    using eventPump: EventPump
+  ) {
+    let now = MonotonicInstant.now()
+    guard let nextWake = scheduler.nextWakeInstant(after: now),
+      nextWake > now
+    else {
+      return
+    }
+
+    let sleepDuration = now.duration(to: nextWake)
+    if sleepDuration > .zero {
+      eventPump.scheduleDeadlineWake(sleepDuration)
+    }
   }
 }
 
