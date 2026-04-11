@@ -126,6 +126,18 @@ extension BorderSet {
     bottomLeading: "▝", bottomTrailing: "▘",
     placement: .inset)
 
+  /// An inset half-block border used internally for presentation chrome
+  /// (popovers, menus, toasts, sheets). Shares glyphs with
+  /// ``innerHalfBlock`` but keeps a distinct `.decorative` placement so the
+  /// rasterizer can sample the interior fill when resolving per-cell
+  /// backgrounds. External callers should usually prefer ``single`` or
+  /// ``rounded``.
+  public static let presentationChrome = BorderSet(
+    top: "▄", bottom: "▀", left: "▐", right: "▌",
+    topLeading: "▗", topTrailing: "▖",
+    bottomLeading: "▝", bottomTrailing: "▘",
+    placement: .decorative)
+
   public static let singleDouble = BorderSet(
     top: "─", bottom: "─", left: "║", right: "║",
     topLeading: "╓", topTrailing: "╖",

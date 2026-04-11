@@ -662,7 +662,31 @@ extension SnapshotRenderer {
   }
 
   private func describe(_ strokeStyle: StrokeStyle) -> String {
-    "width:\(strokeStyle.lineWidth),variant:\(strokeStyle.lineVariant.rawValue)"
+    "width:\(strokeStyle.lineWidth),set:\(describeBorderSetName(strokeStyle.borderSet))"
+  }
+
+  private func describeBorderSetName(_ set: BorderSet) -> String {
+    switch set {
+    case .single: return "single"
+    case .rounded: return "rounded"
+    case .double: return "double"
+    case .heavy: return "heavy"
+    case .block: return "block"
+    case .outerHalfBlock: return "outerHalfBlock"
+    case .innerHalfBlock: return "innerHalfBlock"
+    case .presentationChrome: return "presentationChrome"
+    case .singleDouble: return "singleDouble"
+    case .doubleSingle: return "doubleSingle"
+    case .ascii: return "ascii"
+    case .hidden: return "hidden"
+    case .none: return "none"
+    case .dashed: return "dashed"
+    case .dashedHeavy: return "dashedHeavy"
+    case .markdown: return "markdown"
+    default:
+      return
+        "custom(top:\(set.top),bottom:\(set.bottom),left:\(set.left),right:\(set.right))"
+    }
   }
 
   private func hexadecimal(_ component: Int) -> String {

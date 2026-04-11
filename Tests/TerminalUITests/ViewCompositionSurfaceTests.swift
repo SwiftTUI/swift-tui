@@ -32,7 +32,7 @@ struct ViewCompositionSurfaceTests {
       .drawMetadata(
         .init(
           borderShapeStyle: .semantic(.separator),
-          borderStrokeStyle: .init(lineVariant: .rounded)
+          borderStrokeStyle: .init(borderSet: .rounded)
         )
       )
       .layoutMetadata(
@@ -50,7 +50,7 @@ struct ViewCompositionSurfaceTests {
     #expect(resolved.layoutMetadata.alignmentKeys == ["center"])
     #expect(resolved.drawMetadata.foregroundStyle == .semantic(.foreground))
     #expect(resolved.drawMetadata.borderShapeStyle == .semantic(.separator))
-    #expect(resolved.drawMetadata.borderStrokeStyle == .init(lineVariant: .rounded))
+    #expect(resolved.drawMetadata.borderStrokeStyle == .init(borderSet: .rounded))
     #expect(resolved.semanticMetadata.participatesInPointerHitTesting)
     #expect(resolved.semanticMetadata.isFocusable == true)
     #expect(resolved.semanticMetadata.presentationRole == .button)

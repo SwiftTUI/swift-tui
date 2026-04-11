@@ -115,7 +115,7 @@ extension DrawExtractor {
           .rule(
             bounds: lineBounds,
             style: style,
-            strokeStyle: .init(lineVariant: .single),
+            strokeStyle: .init(borderSet: .single),
             stackAxis: nil
           )
         )
@@ -147,7 +147,7 @@ extension DrawExtractor {
         geometry: .roundedRectangle(cornerRadius: 1),
         insetAmount: 0,
         style: payload.borderStyle ?? .semantic(.separator),
-        strokeStyle: .init(lineVariant: .rounded),
+        strokeStyle: .init(borderSet: .rounded),
         strokeBorder: true,
         backgroundStyle: nil
       ),

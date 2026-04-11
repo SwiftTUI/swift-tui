@@ -496,53 +496,39 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
   }
 }
 
-/// The border or rule glyph family used when stroking shapes.
-public enum LineVariant: String, Equatable, Sendable {
-  case automatic
-  case ascii
-  case single
-  case rounded
-  case double
-  case heavy
-  case block
-  case outerHalfBlock
-  case innerHalfBlock
-  case presentationChrome
-  case hidden
-  case markdown
-}
-
-extension LineVariant {
-  public static var normal: Self { .single }
-  public static var thick: Self { .heavy }
-}
-
 /// Stroke settings used when drawing outlines and rules.
+///
+/// `StrokeStyle` pairs a numeric line width with a ``BorderSet`` whose glyph
+/// table drives the rasterizer. The default (``single``) produces
+/// single-line box-drawing glyphs. When the default is used against a
+/// shape with a positive corner radius the rasterizer upgrades it to
+/// ``BorderSet/rounded`` so container chrome keeps its curved corners
+/// without callers having to pass `.rounded` explicitly.
 public struct StrokeStyle: Equatable, Sendable {
   public var lineWidth: Int
-  public var lineVariant: LineVariant
+  public var borderSet: BorderSet
 
   public init(
     lineWidth: Int = 1,
-    lineVariant: LineVariant = .automatic
+    borderSet: BorderSet = .single
   ) {
     self.lineWidth = max(1, lineWidth)
-    self.lineVariant = lineVariant
+    self.borderSet = borderSet
   }
 }
 
 extension StrokeStyle {
-  public static var normal: Self { .init(lineVariant: .normal) }
-  public static var rounded: Self { .init(lineVariant: .rounded) }
-  public static var thick: Self { .init(lineVariant: .thick) }
-  public static var double: Self { .init(lineVariant: .double) }
-  public static var ascii: Self { .init(lineVariant: .ascii) }
-  public static var block: Self { .init(lineVariant: .block) }
-  public static var outerHalfBlock: Self { .init(lineVariant: .outerHalfBlock) }
-  public static var innerHalfBlock: Self { .init(lineVariant: .innerHalfBlock) }
-  public static var presentationChrome: Self { .init(lineVariant: .presentationChrome) }
-  public static var hidden: Self { .init(lineVariant: .hidden) }
-  public static var markdown: Self { .init(lineVariant: .markdown) }
+  public static let normal = StrokeStyle(borderSet: .single)
+  public static let rounded = StrokeStyle(borderSet: .rounded)
+  public static let thick = StrokeStyle(borderSet: .heavy)
+  public static let double = StrokeStyle(borderSet: .double)
+  public static let ascii = StrokeStyle(borderSet: .ascii)
+  public static let block = StrokeStyle(borderSet: .block)
+  public static let outerHalfBlock = StrokeStyle(borderSet: .outerHalfBlock)
+  public static let innerHalfBlock = StrokeStyle(borderSet: .innerHalfBlock)
+  public static let presentationChrome = StrokeStyle(borderSet: .presentationChrome)
+  public static let hidden = StrokeStyle(borderSet: .hidden)
+  public static let markdown = StrokeStyle(borderSet: .markdown)
 }
 
 /// Per-edge background styling used behind stroked borders.
