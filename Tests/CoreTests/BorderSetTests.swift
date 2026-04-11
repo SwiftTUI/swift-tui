@@ -202,6 +202,15 @@ func cyclingEmpty() {
   #expect(s.topGlyph(at: 0) == nil)
 }
 
+@Test("Negative index returns nil instead of trapping")
+func cyclingNegativeIndex() {
+  let s = BorderSet.single
+  #expect(s.topGlyph(at: -1) == nil)
+  #expect(s.bottomGlyph(at: -5) == nil)
+  #expect(s.leftGlyph(at: -99) == nil)
+  #expect(s.rightGlyph(at: -1) == nil)
+}
+
 @Test("Every built-in has a non-empty top glyph except .none")
 func builtinTopGlyphsNonEmpty() {
   let allBuiltins: [(name: String, set: BorderSet, expectEmpty: Bool)] = [
