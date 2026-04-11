@@ -312,6 +312,22 @@ public struct TagValueView<Content: View, Value: Hashable & Sendable>: View, Res
   }
 }
 
+extension TagValueView: TabChildMetadataContributing {
+  package var tabChildMetadataContribution: PeekedTabChildMetadata {
+    PeekedTabChildMetadata(
+      label: nil,
+      tag: SelectionTag(
+        value: tag,
+        includeOptional: includeOptional
+      )
+    )
+  }
+
+  package func withTabChildInnerContent<R>(_ body: (Any) -> R) -> R {
+    body(content)
+  }
+}
+
 extension View {
   package func pickerViewportLineCount(
     _ count: Int?

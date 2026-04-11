@@ -25,7 +25,7 @@ extension TabView {
   private struct TabOption: Sendable {
     var tag: SelectionTag
     var label: TabItemLabel
-    var node: ResolvedNode
+    var node: ResolvedNode?
   }
 
   private func resolvedNode(
@@ -120,21 +120,72 @@ extension TabView {
   private func resolvedOptions(
     in context: ResolveContext
   ) -> [TabOption] {
-    resolveDeclaredChildren(
+    // Phase 1: walk declared children and peek metadata (tabItem + tag)
+    // off each without resolving. We capture a lazy `resolveOne` closure
+    // per child so that only the active tab actually enters the resolve
+    // pipeline — inactive tabs never call `beginEvaluation`, so their
+    // `.onAppear` / `.task` handlers do not fire until the user first
+    // selects them (which is the moment a new ViewNode is created for
+    // that child and `finishEvaluation` emits the structural appear).
+    var peekedEntries: [PeekedTabChildMetadata] = []
+    var resolveClosures: [() -> ResolvedNode] = []
+    var nextIndex = 0
+    // Match the old resolveDeclaredChildren(...) double-scoping so
+    // per-tab ViewNode identities are preserved across this refactor.
+    let childContext = context.child(component: .named("TabOptions"))
+    enumerateDeclaredChildViews(
       content,
-      in: context.child(component: .named("TabOptions")),
-      kindName: "Tab"
-    )
-    .enumerated()
-    .compactMap { index, node in
-      guard let tag = tabSelectionTag(in: node) else {
+      in: childContext,
+      kindName: "Tab",
+      nextIndex: &nextIndex
+    ) { child, _, resolveOne in
+      peekedEntries.append(peekTabChildMetadata(from: child))
+      resolveClosures.append(resolveOne)
+    }
+
+    // Phase 2: determine the active tab by matching tags.
+    let selectedIndex =
+      peekedEntries.firstIndex { entry in
+        guard let tag = entry.tag else { return false }
+        return pickerSelectionMatches(tag, selection: selection.wrappedValue)
+      }
+      ?? peekedEntries.indices.first { peekedEntries[$0].tag != nil }
+
+    // Phase 3: resolve ONLY the active tab. Inactive tabs return a
+    // TabOption with `node: nil` — they contribute only a label +
+    // selection tag to the tab strip, and nothing to the committed
+    // ViewNode tree.
+    return peekedEntries.enumerated().compactMap { index, entry in
+      guard let tag = entry.tag else {
         return nil
       }
-      let fallbackTitle = resolvedNodeLabelText(from: node)
-      let label =
-        tabItemLabel(in: node)
-        ?? TabItemLabel(fallbackTitle.isEmpty ? "Tab \(index + 1)" : fallbackTitle)
-      return .init(tag: tag, label: label, node: node)
+      let isActive = (index == selectedIndex)
+      let resolvedNodeIfActive = isActive ? resolveClosures[index]() : nil
+
+      // Prefer the statically peeked label; fall back to introspecting
+      // the active resolved tree (for composed content that exposes its
+      // label lazily); otherwise default to "Tab N".
+      let label: TabItemLabel
+      if let peekedLabel = entry.label {
+        label = peekedLabel
+      } else if let resolved = resolvedNodeIfActive,
+        let derived = tabItemLabel(in: resolved)
+      {
+        label = derived
+      } else if let resolved = resolvedNodeIfActive {
+        let fallbackTitle = resolvedNodeLabelText(from: resolved)
+        label = TabItemLabel(
+          fallbackTitle.isEmpty ? "Tab \(index + 1)" : fallbackTitle
+        )
+      } else {
+        label = TabItemLabel("Tab \(index + 1)")
+      }
+
+      return TabOption(
+        tag: tag,
+        label: label,
+        node: resolvedNodeIfActive
+      )
     }
   }
 
@@ -193,8 +244,8 @@ extension TabView {
             .fill(AnyShapeStyle(.terminalSurface(activeTone)))
         }
       }
-      if options.indices.contains(activeIndex) {
-        ResolvedContentView(node: options[activeIndex].node)
+      if options.indices.contains(activeIndex), let activeNode = options[activeIndex].node {
+        ResolvedContentView(node: activeNode)
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       } else {
         EmptyView()
@@ -429,6 +480,57 @@ private func tabItemLabel(
     }
   }
   return nil
+}
+
+// MARK: - Metadata peeking
+
+/// Metadata peeled statically off a declared TabView child without
+/// triggering a resolve pass. Tab children typically wrap their body in
+/// `.tabItem(...)` and `.tag(...)` modifiers — both of which are
+/// metadata-only wrappers that can be inspected structurally.
+package struct PeekedTabChildMetadata {
+  package var label: TabItemLabel?
+  package var tag: SelectionTag?
+
+  package init(label: TabItemLabel? = nil, tag: SelectionTag? = nil) {
+    self.label = label
+    self.tag = tag
+  }
+}
+
+/// A view wrapper whose body does not need to be resolved in order to
+/// extract its tab metadata contribution. Conforming types carry their
+/// metadata on the wrapper struct itself and expose their inner content
+/// so the walker can continue peeling modifier layers.
+@MainActor
+package protocol TabChildMetadataContributing {
+  /// The metadata contributed by this single wrapper layer.
+  var tabChildMetadataContribution: PeekedTabChildMetadata { get }
+  /// Forwards the inner content to `body` so the walker can continue
+  /// peeling subsequent metadata wrappers without resolving them.
+  func withTabChildInnerContent<R>(_ body: (Any) -> R) -> R
+}
+
+/// Recursively peels metadata-only modifier layers off `view`, returning
+/// the accumulated `TabItemLabel` + `SelectionTag`. Stops at the first
+/// view that does not conform to `TabChildMetadataContributing`, which
+/// means any non-metadata wrapper (state, gestures, layout) on an
+/// inactive tab is NEVER touched — its body is never read.
+@MainActor
+package func peekTabChildMetadata(from view: Any) -> PeekedTabChildMetadata {
+  var result = PeekedTabChildMetadata()
+  var current: Any = view
+  while let provider = current as? any TabChildMetadataContributing {
+    let contribution = provider.tabChildMetadataContribution
+    if let label = contribution.label, result.label == nil {
+      result.label = label
+    }
+    if let tag = contribution.tag, result.tag == nil {
+      result.tag = tag
+    }
+    current = provider.withTabChildInnerContent { $0 }
+  }
+  return result
 }
 
 /// Hosts a pre-resolved tab content subtree inside the `tabBody` view
