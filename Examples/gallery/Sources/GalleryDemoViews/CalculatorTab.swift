@@ -44,7 +44,7 @@ struct CalculatorTab: View {
           )
           .foregroundStyle(Color.gray)
           ViewThatFits {
-            let text = isError ? "Error" : display ?? accumulator.map { formatted($0) } ?? " "
+            let text = isError ? "Error" : display ?? accumulator.map { formatted($0) } ?? "0"
             TextFigure(text, font: .future)
             Text(text)
           }.foregroundStyle(isError ? Color.red : Color.black)
