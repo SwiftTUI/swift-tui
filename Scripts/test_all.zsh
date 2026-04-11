@@ -6,6 +6,13 @@ repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo_root"
 
 skip_bun_install=0
+host_os="$(uname -s)"
+is_linux=0
+
+if [[ "$host_os" == "Linux" ]]; then
+  is_linux=1
+  export DISABLE_EXPLICIT_PLATFORMS=1
+fi
 
 usage() {
   cat <<'EOF'
@@ -25,6 +32,10 @@ The script also checks required environment dependencies up front:
   - Swift 6.3.x via `swiftly` when available, otherwise `swift`
   - Bun availability
   - Bun workspace dependencies via `bun install --frozen-lockfile` at the repo root
+
+On Linux, the script also:
+  - exports `DISABLE_EXPLICIT_PLATFORMS=1` for repo package resolution
+  - skips `GUI/SwiftUITUIGUI` tests because the SwiftUI host package is Apple-only
 
 Pass --skip-bun-install to reuse the existing Bun install state.
 EOF
@@ -108,6 +119,15 @@ run_function_step() {
   fi
 }
 
+skip_step() {
+  local title="$1"
+  local reason="$2"
+
+  print ""
+  print -- "==> $title"
+  print -- "SKIP: $title ($reason)"
+}
+
 check_swift_environment() {
   local version_output
   version_output="$("${swift_command[@]}" --version 2>&1)"
@@ -127,6 +147,10 @@ check_bun_environment() {
 
 detect_swift_command
 require_command bun
+
+if (( is_linux )); then
+  print -- "Linux host detected; exporting DISABLE_EXPLICIT_PLATFORMS=1 and skipping Apple-only SwiftUI host tests."
+fi
 
 run_function_step "Check Swift toolchain" check_swift_environment
 run_function_step "Check Bun availability" check_bun_environment
@@ -163,10 +187,16 @@ run_step \
   "$repo_root" \
   "${swift_command[@]}" test --package-path Runners/TerminalUIWASI
 
-run_step \
-  "Run GUI/SwiftUITUIGUI tests" \
-  "$repo_root" \
-  "${swift_command[@]}" test --package-path GUI/SwiftUITUIGUI
+if (( is_linux )); then
+  skip_step \
+    "Run GUI/SwiftUITUIGUI tests" \
+    "SwiftUI host package is only available on Apple platforms"
+else
+  run_step \
+    "Run GUI/SwiftUITUIGUI tests" \
+    "$repo_root" \
+    "${swift_command[@]}" test --package-path GUI/SwiftUITUIGUI
+fi
 
 run_step \
   "Run GUI/WebTUIGUI Bun tests" \
