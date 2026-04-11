@@ -100,9 +100,10 @@ extension LayoutEngine {
     let idealMainTotal = idealMainSizes.reduce(0, +)
 
     if idealMainTotal < availableMain {
-      distributeExtraSpaceToSpacers(
+      distributeExtraSpaceToFlexibleChildren(
         children,
         into: &allocatedMainSizes,
+        axis: axis,
         extraSpace: availableMain - idealMainTotal
       )
     } else if idealMainTotal > availableMain {
@@ -357,9 +358,23 @@ extension LayoutEngine {
     }
   }
 
-  package func distributeExtraSpaceToSpacers(
+  /// Hands extra main-axis space to any children that can absorb it.
+  ///
+  /// `Spacer` is the dedicated "eat all the space" primitive, so when
+  /// a row contains at least one Spacer the surplus goes there. When
+  /// there's no Spacer, fall back to any non-Spacer child whose
+  /// subtree exposes flexible content on the main axis — e.g. a
+  /// `Button` whose label uses `.frame(maxWidth: .infinity)`. Without
+  /// this second fallback, a lone "submit"-style button on a row of
+  /// fixed-width siblings (the classic calculator `=` key) would
+  /// round out at its minWidth even though it's explicitly unbounded
+  /// on the right, producing the "over-cascading min-size" symptom
+  /// where the stack hands every child its smallest possible size
+  /// and never redistributes the slack.
+  package func distributeExtraSpaceToFlexibleChildren(
     _ children: [ResolvedNode],
     into allocatedMainSizes: inout [Int],
+    axis: Axis,
     extraSpace: Int
   ) {
     guard extraSpace > 0 else {
@@ -367,14 +382,22 @@ extension LayoutEngine {
     }
 
     let spacerIndices = children.indices.filter { isSpacer(children[$0]) }
-    guard !spacerIndices.isEmpty else {
+    let targetIndices: [Int]
+    if !spacerIndices.isEmpty {
+      targetIndices = spacerIndices
+    } else {
+      targetIndices = children.indices.filter { index in
+        subtreeHasFlexibleContent(children[index], axis: axis)
+      }
+    }
+    guard !targetIndices.isEmpty else {
       return
     }
 
-    let baseShare = extraSpace / spacerIndices.count
-    let remainder = extraSpace % spacerIndices.count
+    let baseShare = extraSpace / targetIndices.count
+    let remainder = extraSpace % targetIndices.count
 
-    for index in spacerIndices {
+    for index in targetIndices {
       allocatedMainSizes[index] += baseShare
     }
 
@@ -383,10 +406,10 @@ extension LayoutEngine {
     }
 
     for offset in evenlyDistributedOffsets(
-      count: spacerIndices.count,
+      count: targetIndices.count,
       picks: remainder
     ) {
-      allocatedMainSizes[spacerIndices[offset]] += 1
+      allocatedMainSizes[targetIndices[offset]] += 1
     }
   }
 
@@ -608,6 +631,26 @@ extension LayoutEngine {
     axis: Axis
   ) -> Bool {
     switch node.layoutBehavior {
+    case .intrinsic:
+      switch node.drawPayload {
+      case .rule:
+        // A Divider/Rule fills the cross axis of its enclosing stack
+        // (stored in `drawMetadata.ruleStackAxis`). A rule inside a
+        // VStack expands horizontally; a rule inside an HStack
+        // expands vertically. It counts as flexible on any axis that
+        // isn't its own stack axis.
+        if let ruleStackAxis = node.drawMetadata.ruleStackAxis {
+          return ruleStackAxis != axis
+        }
+        return false
+      case .shape:
+        // Raw shape primitives (Rectangle, RoundedRectangle, …) size
+        // to the proposal on every axis, so they will expand to any
+        // finite cross the reconciliation hands them.
+        return true
+      default:
+        break
+      }
     case .flexibleFrame(let minW, _, let maxW, let minH, _, let maxH, _):
       let (axisMin, axisMax): (ProposedDimension?, ProposedDimension?) =
         switch axis {
@@ -623,10 +666,40 @@ extension LayoutEngine {
       {
         return true
       }
+    case .frame(let width, let height, _):
+      // A fixed-size frame pins its axis regardless of child
+      // flexibility, so that axis is not flexible. The other axis
+      // still passes through to the child.
+      let explicit: Int? =
+        switch axis {
+        case .horizontal: width
+        case .vertical: height
+        }
+      if explicit != nil {
+        return false
+      }
     case .stack(let stackAxis, _, _, _), .lazyStack(let stackAxis, _, _, _):
       if stackAxis == axis, node.children.contains(where: isSpacer) {
         return true
       }
+    case .decoration(let primaryIndex, _):
+      // A decoration (background/overlay) sizes its non-primary
+      // children to match the primary child, so only the primary
+      // contributes flexibility. Walking into background Rectangles
+      // would otherwise spuriously mark Text-with-background as
+      // flexible on every axis.
+      guard node.children.indices.contains(primaryIndex) else {
+        return false
+      }
+      return subtreeHasFlexibleContent(node.children[primaryIndex], axis: axis)
+    case .overlay:
+      // Overlay's first child is the content; additional children
+      // are overlays pinned to the content's size. Only the content
+      // contributes flexibility.
+      guard let content = node.children.first else {
+        return false
+      }
+      return subtreeHasFlexibleContent(content, axis: axis)
     default:
       break
     }
