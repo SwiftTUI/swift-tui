@@ -512,6 +512,29 @@ extension LayoutBehavior {
       return true
     }
 
+    // `.border` measurement only depends on the chosen ``BorderSet`` and
+    // the active ``Edge.Set`` — both feed ``borderLayoutInsets``, the
+    // single function the layout engine consults at lines 489 and 733
+    // of ``LayoutEngine``.  The other payload fields (foreground colour,
+    // background colour, blend, blendPhase) are draw-time concerns:
+    // the rasterizer reads them when painting glyphs, but they never
+    // change a node's measured size or its child proposal.
+    //
+    // Treating two borders that differ only in those cosmetic fields as
+    // measurement-equivalent lets the layout cache reuse measurements
+    // across animation ticks that interpolate ``blendPhase``: each
+    // tick mutates the phase on the resolved tree, and without this
+    // carve-out the cache (and the retained-layout cache, which routes
+    // through this same predicate via
+    // ``ResolvedNode.isEquivalentForPlacement``) would invalidate on
+    // every frame.  That cascades up the ancestor chain because each
+    // ancestor's ``isEquivalentForMeasurement`` walks its children.
+    if case .border(let lhsSet, _, _, _, _, let lhsSides) = self,
+      case .border(let rhsSet, _, _, _, _, let rhsSides) = other
+    {
+      return lhsSet == rhsSet && lhsSides == rhsSides
+    }
+
     guard case .custom(let lhsHandle) = self,
       case .custom(let rhsHandle) = other,
       let lhsSignature = lhsHandle.measurementReuseSignature,

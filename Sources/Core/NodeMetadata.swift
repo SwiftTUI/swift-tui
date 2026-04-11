@@ -146,6 +146,23 @@ extension DrawPayload {
       return true
     case (.rule, .rule):
       return true
+    case (.canvas, .canvas):
+      // ``Canvas`` is the arbitrary-drawing escape hatch.  The layout
+      // engine reserves a cell frame and the rasterizer calls the user
+      // closure on the surface — the drawing's content has zero
+      // influence on the parent's proposed size or its own measured
+      // size, exactly the way ``.shape`` and ``.rule`` work.  Treating
+      // two canvases as measurement-equivalent unconditionally lets
+      // the layout cache reuse them across animation tick frames.
+      //
+      // Without this carve-out the catch-all ``default: false`` below
+      // forces every animation tick to invalidate the measurement
+      // cache for the canvas leaf, and that cascades up the entire
+      // ancestor spine via the recursive
+      // ``ResolvedNode.isEquivalentForMeasurement`` walk — pegging the
+      // run loop on any view tree that pairs an animated property
+      // with a ``Canvas`` further down the same scroll content.
+      return true
     case (.list(let lhsPayload), .list(let rhsPayload)):
       return lhsPayload.isEquivalentForMeasurement(to: rhsPayload)
     case (.table(let lhsPayload), .table(let rhsPayload)):
