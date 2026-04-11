@@ -1173,6 +1173,7 @@ public struct LayoutEngine: Sendable {
     node.semanticMetadata = resolved.semanticMetadata
     node.lifecycleMetadata = resolved.lifecycleMetadata
     node.environmentSnapshot = resolved.environmentSnapshot
+    node.layoutBehavior = resolved.layoutBehavior
     node.isTransient = resolved.isTransient
     node.matchedGeometry = resolved.matchedGeometry
 

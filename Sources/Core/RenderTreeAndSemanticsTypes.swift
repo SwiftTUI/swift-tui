@@ -669,6 +669,27 @@ public struct PlacedNode: Equatable, Sendable {
   public var semanticMetadata: SemanticMetadata
   public var lifecycleMetadata: LifecycleMetadata
   public var drawPayload: DrawPayload
+  /// Mirror of ``ResolvedNode/layoutBehavior`` for cases that need to
+  /// flow through to the draw extractor / rasterizer (currently just
+  /// ``LayoutBehavior/border(_:foreground:background:blend:blendPhase:sides:)``).
+  ///
+  /// Boxed and optional on purpose — storing a bare `LayoutBehavior`
+  /// inline would grow ``PlacedNode`` by ~1.6 kB per node (because
+  /// `LayoutBehavior` has non-indirect large cases like `.stack` and
+  /// `.flexibleFrame`) and recursively destroying deep trees would
+  /// then overflow the thread stack.  `nil` is the common case: only
+  /// border wrappers actually populate this field.
+  package var _boxedLayoutBehavior: Boxed<LayoutBehavior>?
+  public var layoutBehavior: LayoutBehavior {
+    get { _boxedLayoutBehavior?.value ?? .intrinsic }
+    set {
+      if case .intrinsic = newValue {
+        _boxedLayoutBehavior = nil
+      } else {
+        _boxedLayoutBehavior = Boxed(newValue)
+      }
+    }
+  }
   package private(set) var subtreeNodeCount: Int
   /// Mirror of ``ResolvedNode/isTransient``.  Set by the animation
   /// controller's removal-overlay injection path, propagated through
@@ -697,6 +718,7 @@ public struct PlacedNode: Equatable, Sendable {
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
+    layoutBehavior: LayoutBehavior = .intrinsic,
     isTransient: Bool = false,
     matchedGeometry: MatchedGeometryConfig? = nil
   ) {
@@ -714,6 +736,11 @@ public struct PlacedNode: Equatable, Sendable {
     self.semanticMetadata = semanticMetadata
     self.lifecycleMetadata = lifecycleMetadata
     self.drawPayload = drawPayload
+    if case .intrinsic = layoutBehavior {
+      _boxedLayoutBehavior = nil
+    } else {
+      _boxedLayoutBehavior = Boxed(layoutBehavior)
+    }
     self.isTransient = isTransient
     self.matchedGeometry = matchedGeometry
     subtreeNodeCount = 1

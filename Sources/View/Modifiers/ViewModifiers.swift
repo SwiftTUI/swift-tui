@@ -718,6 +718,56 @@ package struct PaddingView<Content: View>: View, ResolvableView {
   }
 }
 
+/// Wrapper that installs a ``LayoutBehavior/border`` on its child so the
+/// layout engine reserves frame space for the border glyphs and the
+/// rasterizer paints them into the reserved cells.
+package struct BorderView<Content: View>: View, ResolvableView {
+  package var content: Content
+  package var set: BorderSet
+  package var foreground: BorderEdgeStyle?
+  package var background: BorderBackgroundStyle?
+  package var sides: Edge.Set
+
+  package init(
+    content: Content,
+    set: BorderSet,
+    foreground: BorderEdgeStyle?,
+    background: BorderBackgroundStyle?,
+    sides: Edge.Set
+  ) {
+    self.content = content
+    self.set = set
+    self.foreground = foreground
+    self.background = background
+    self.sides = sides
+  }
+
+  @inline(never)
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let contentNode = resolveWrapperContent(
+      content,
+      in: context.child(component: .named("content"))
+    )
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("Border"),
+        children: [contentNode],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        layoutBehavior: .border(
+          set,
+          foreground: foreground,
+          background: background,
+          blend: nil,
+          blendPhase: 0,
+          sides: sides
+        )
+      )
+    ]
+  }
+}
+
 package struct FrameView<Content: View>: View, ResolvableView {
   package var content: Content
   package var width: Int?
