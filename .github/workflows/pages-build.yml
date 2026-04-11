@@ -63,12 +63,15 @@ jobs:
         run: |
           set -euxo pipefail
 
-          if [ ! -e "$HOME/.swiftly/env.sh" ]; then 
+          # Force reinstall if bin directory doesn't exist (corrupted cache)
+          if [ ! -d "$HOME/.swiftly/bin" ]; then
+            rm -rf "$HOME/.swiftly"
+          fi
 
+          if [ ! -e "$HOME/.swiftly/env.sh" ]; then 
             curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
             installer -pkg swiftly.pkg -target CurrentUserHomeDirectory && \
             ~/.swiftly/bin/swiftly init --quiet-shell-followup
-
           fi
 
           . "$HOME/.swiftly/env.sh" && hash -r
