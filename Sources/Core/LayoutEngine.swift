@@ -486,6 +486,12 @@ public struct LayoutEngine: Sendable {
       return resolved.children.map { child in
         measure(child, proposal: childProposal, passContext: passContext)
       }
+    case .border(let set, _, _, _, _, let sides):
+      let insets = borderLayoutInsets(set: set, sides: sides)
+      let childProposal = inset(parentProposal, by: insets)
+      return resolved.children.map { child in
+        measure(child, proposal: childProposal, passContext: passContext)
+      }
     case .frame(let width, let height, _):
       let childProposal = ProposedSize(
         width: width.map(ProposedDimension.finite) ?? parentProposal.width,
@@ -714,6 +720,13 @@ public struct LayoutEngine: Sendable {
         height: crossMetrics.leading + crossMetrics.trailing
       )
     case .padding(let insets):
+      let contentSize = childMeasurements.first?.measuredSize ?? .zero
+      return Size(
+        width: contentSize.width + insets.horizontal,
+        height: contentSize.height + insets.vertical
+      )
+    case .border(let set, _, _, _, _, let sides):
+      let insets = borderLayoutInsets(set: set, sides: sides)
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
       return Size(
         width: contentSize.width + insets.horizontal,
@@ -1160,6 +1173,7 @@ public struct LayoutEngine: Sendable {
     node.semanticMetadata = resolved.semanticMetadata
     node.lifecycleMetadata = resolved.lifecycleMetadata
     node.environmentSnapshot = resolved.environmentSnapshot
+    node.layoutBehavior = resolved.layoutBehavior
     node.isTransient = resolved.isTransient
     node.matchedGeometry = resolved.matchedGeometry
 
@@ -1244,5 +1258,27 @@ public struct LayoutEngine: Sendable {
     case .finite(let value):
       return .finite(max(0, value - amount))
     }
+  }
+
+  /// The per-side layout insets a border contributes to its owner's frame.
+  ///
+  /// For `.inset` placements the border occupies the content's own
+  /// outermost rows and columns and therefore adds zero layout insets;
+  /// the rasterizer will draw border glyphs into those existing cells.
+  /// For `.outset` (and `.decorative`) placements the insets reserve
+  /// frame cells around the content so no glyph ever lands on the
+  /// child's drawable area.  `sides` masks the result so callers can
+  /// request borders on a subset of edges (e.g. top only).
+  package func borderLayoutInsets(
+    set: BorderSet,
+    sides: Edge.Set
+  ) -> EdgeInsets {
+    guard set.placement != .inset else { return EdgeInsets() }
+    return EdgeInsets(
+      top: sides.contains(.top) ? set.topDisplayWidth : 0,
+      leading: sides.contains(.leading) ? set.leftDisplayWidth : 0,
+      bottom: sides.contains(.bottom) ? set.bottomDisplayWidth : 0,
+      trailing: sides.contains(.trailing) ? set.rightDisplayWidth : 0
+    )
   }
 }

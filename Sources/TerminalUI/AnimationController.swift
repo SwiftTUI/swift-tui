@@ -14,6 +14,7 @@ package enum AnimatableProperty: Hashable, Sendable {
   case foregroundColor
   case backgroundColor
   case borderColor
+  case borderBlendPhase
   case paddingTop
   case paddingLeading
   case paddingBottom
@@ -40,6 +41,12 @@ package struct AnimatableSnapshot: Equatable, Sendable {
   package var foregroundColor: Color?
   package var backgroundColor: Color?
   package var borderColor: Color?
+  /// Phase of the ``BorderBlend`` attached to this node's border layout
+  /// behavior, in units where `1.0` corresponds to a full rotation
+  /// around the perimeter.  Populated only when the node carries a
+  /// `.border(..., blend: non-nil, ...)` layout behavior so that
+  /// non-border nodes cannot snap through a phantom zero.
+  package var borderBlendPhase: Double?
   package var padding: EdgeInsets?
   package var offsetX: Int?
   package var offsetY: Int?
@@ -86,6 +93,15 @@ package struct AnimatableSnapshot: Equatable, Sendable {
     case .frame(let width, let height, _):
       snapshot.frameWidth = width
       snapshot.frameHeight = height
+    case .border(_, _, _, let blend, let blendPhase, _):
+      // Only populate the phase slot when a ``BorderBlend`` is attached.
+      // `.border` layouts without a blend have nothing to animate here —
+      // the static zero default would otherwise create a phantom
+      // "identity → 0" diff on any border that ever transitioned from
+      // a blend to a plain foreground.
+      if blend != nil {
+        snapshot.borderBlendPhase = blendPhase
+      }
     case .flexibleFrame(
       let minWidth, let idealWidth, let maxWidth,
       let minHeight, let idealHeight, let maxHeight,
@@ -1204,6 +1220,17 @@ package final class AnimationController {
     )
     enqueueIfChanged(
       identity: identity,
+      property: .borderBlendPhase,
+      previous: previous.borderBlendPhase,
+      current: current.borderBlendPhase,
+      toValue: AnimatableValue.double,
+      fromValue: AnimatableValue.double,
+      request: request,
+      batchID: batchID,
+      timestamp: timestamp
+    )
+    enqueueIfChanged(
+      identity: identity,
       property: .offsetX,
       previous: previous.offsetX,
       current: current.offsetX,
@@ -1749,6 +1776,31 @@ package final class AnimationController {
       var drawMetadata = node.drawMetadata
       drawMetadata.borderShapeStyle = .color(color)
       node.drawMetadata = drawMetadata
+
+    case (.borderBlendPhase, .double(let phase)):
+      // Replace only the phase; all other border fields (set, fg, bg,
+      // blend, sides) stay identical.  Uses the
+      // preserving-derived-state helper because the shape/variant is
+      // unchanged — we just rotate the gradient start.
+      if case .border(
+        let set,
+        let foreground,
+        let background,
+        let blend,
+        _,
+        let sides
+      ) = node.layoutBehavior {
+        node.setLayoutBehaviorPreservingDerivedState(
+          .border(
+            set,
+            foreground: foreground,
+            background: background,
+            blend: blend,
+            blendPhase: phase,
+            sides: sides
+          )
+        )
+      }
 
     case (.offsetX, .integer(let x)):
       if case .offset(_, let y) = node.layoutBehavior {

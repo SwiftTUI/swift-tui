@@ -241,6 +241,14 @@ extension SnapshotRenderer {
       return "lazyStack(\(axis.rawValue),\(spacingDescription),\(alignmentDescription))"
     case .padding(let insets):
       return "padding(\(insets.top),\(insets.leading),\(insets.bottom),\(insets.trailing))"
+    case .border(_, _, _, _, _, let sides):
+      var names: [String] = []
+      if sides.contains(.top) { names.append("top") }
+      if sides.contains(.leading) { names.append("leading") }
+      if sides.contains(.bottom) { names.append("bottom") }
+      if sides.contains(.trailing) { names.append("trailing") }
+      let sidesDescription = names.isEmpty ? "none" : names.joined(separator: "+")
+      return "border(sides:\(sidesDescription))"
     case .frame(let width, let height, let alignment):
       let widthDescription = width.map { String($0) } ?? "nil"
       let heightDescription = height.map { String($0) } ?? "nil"
@@ -424,6 +432,14 @@ extension SnapshotRenderer {
     case .rule(let bounds, let style, let strokeStyle, let stackAxis):
       return
         "rule[\(describe(bounds)) \(describe(strokeStyle)) style=\(describe(style)) stackAxis=\(stackAxis?.rawValue ?? "nil")]"
+    case .border(let bounds, _, _, _, _, _, let sides):
+      var sideNames: [String] = []
+      if sides.contains(.top) { sideNames.append("top") }
+      if sides.contains(.leading) { sideNames.append("leading") }
+      if sides.contains(.bottom) { sideNames.append("bottom") }
+      if sides.contains(.trailing) { sideNames.append("trailing") }
+      let sidesDescription = sideNames.isEmpty ? "none" : sideNames.joined(separator: "+")
+      return "border[\(describe(bounds)) sides=\(sidesDescription)]"
     case .clip(let bounds, _):
       return "clip[\(describe(bounds))]"
     }
@@ -521,11 +537,24 @@ extension SnapshotRenderer {
       return color.hexString(format: .rrggbbaa)
     case .linearGradient(let gradient):
       return "linearGradient(\(describe(gradient)))"
+    case .radialGradient(let gradient):
+      return "radialGradient(\(describe(gradient)))"
+    case .patternFill(let pattern):
+      return "patternFill(\(describe(pattern)))"
     case .terminalChrome(let chromeStyle):
       return describe(chromeStyle)
     case .opacity(let inner, let amount):
       return "\(describe(inner)).opacity(\(amount))"
     }
+  }
+
+  private func describe(_ pattern: PatternFill) -> String {
+    let glyph = String(pattern.glyph)
+    let fg = pattern.foreground.hexString(format: .rrggbbaa)
+    if let background = pattern.background {
+      return "glyph=\(glyph),fg=\(fg),bg=\(background.hexString(format: .rrggbbaa))"
+    }
+    return "glyph=\(glyph),fg=\(fg)"
   }
 
   private func describe(_ style: TerminalChromeStyle) -> String {
@@ -557,6 +586,14 @@ extension SnapshotRenderer {
     return "\(gradient.startPoint.rawValue)->\(gradient.endPoint.rawValue):[\(stops)]"
   }
 
+  private func describe(_ gradient: RadialGradient) -> String {
+    let stops = gradient.gradient.stops.map { stop in
+      "\(stop.color.hexString(format: .rrggbbaa))@\(stop.location)"
+    }.joined(separator: ",")
+    return
+      "center=\(gradient.center.rawValue),startRadius=\(gradient.startRadius),endRadius=\(gradient.endRadius):[\(stops)]"
+  }
+
   private func describe(_ lineStyle: TextLineStyle) -> String {
     if let color = lineStyle.color {
       return "\(lineStyle.pattern.rawValue):\(color.hexString(format: .rrggbbaa))"
@@ -574,6 +611,12 @@ extension SnapshotRenderer {
         "rectangle"
       case .roundedRectangle(let cornerRadius):
         "roundedRectangle(\(cornerRadius))"
+      case .circle:
+        "circle"
+      case .ellipse:
+        "ellipse"
+      case .capsule:
+        "capsule"
       }
     if insetAmount > 0 {
       return "\(base).inset(\(insetAmount))"

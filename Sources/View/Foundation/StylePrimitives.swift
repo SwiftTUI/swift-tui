@@ -65,3 +65,49 @@ extension ShapeStyle where Self == LinearGradient {
     )
   }
 }
+
+extension RadialGradient {
+  public init(
+    stops: [Gradient.Stop],
+    center: UnitPoint = .center,
+    startRadius: Double = 0,
+    endRadius: Double
+  ) {
+    self.init(
+      gradient: Gradient(stops: stops),
+      center: center,
+      startRadius: startRadius,
+      endRadius: endRadius
+    )
+  }
+}
+
+extension ShapeStyle where Self == RadialGradient {
+  public static func radialGradient(
+    colors: [Color],
+    center: UnitPoint = .center,
+    startRadius: Double = 0,
+    endRadius: Double
+  ) -> Self {
+    .init(
+      colors: colors,
+      center: center,
+      startRadius: startRadius,
+      endRadius: endRadius
+    )
+  }
+
+  public static func radialGradient(
+    stops: [Gradient.Stop],
+    center: UnitPoint = .center,
+    startRadius: Double = 0,
+    endRadius: Double
+  ) -> Self {
+    .init(
+      stops: stops,
+      center: center,
+      startRadius: startRadius,
+      endRadius: endRadius
+    )
+  }
+}

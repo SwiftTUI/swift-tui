@@ -805,6 +805,10 @@ extension LayoutEngine {
     case .padding(let insets):
       let contentMinimum = childMinimums.first ?? 0
       return contentMinimum + (axis == .horizontal ? insets.horizontal : insets.vertical)
+    case .border(let set, _, _, _, _, let sides):
+      let insets = borderLayoutInsets(set: set, sides: sides)
+      let contentMinimum = childMinimums.first ?? 0
+      return contentMinimum + (axis == .horizontal ? insets.horizontal : insets.vertical)
     case .frame(let width, let height, _):
       let explicit =
         switch axis {
