@@ -127,6 +127,8 @@ extension View {
       set: set,
       foreground: BorderEdgeStyle(AnyShapeStyle(style)),
       background: nil,
+      blend: nil,
+      blendPhase: 0,
       sides: sides
     )
   }
@@ -141,6 +143,33 @@ extension View {
       set: set,
       foreground: style,
       background: nil,
+      blend: nil,
+      blendPhase: 0,
+      sides: sides
+    )
+  }
+
+  /// Draws a border whose foreground color is sampled continuously
+  /// around the perimeter from a ``BorderBlend``.
+  ///
+  /// The blend's stops are interpolated as the rasterizer walks the
+  /// rectangle's edges clockwise (top L→R, right T→B, bottom R→L,
+  /// left B→T).  The `phase` parameter shifts the gradient start point
+  /// around the perimeter, enabling chasing-light animation when the
+  /// animation pipeline drives the value (deferred to a later task).
+  /// `phase` is currently passed through as a static value.
+  public func border(
+    blend: BorderBlend,
+    set: BorderSet = .outerHalfBlock,
+    sides: Edge.Set = .all,
+    phase: Double = 0
+  ) -> some View {
+    borderModified(
+      set: set,
+      foreground: nil,
+      background: nil,
+      blend: blend,
+      blendPhase: phase,
       sides: sides
     )
   }
@@ -149,6 +178,8 @@ extension View {
     set: BorderSet,
     foreground: BorderEdgeStyle?,
     background: BorderBackgroundStyle?,
+    blend: BorderBlend?,
+    blendPhase: Double,
     sides: Edge.Set
   ) -> some View {
     BorderView(
@@ -156,6 +187,8 @@ extension View {
       set: set,
       foreground: foreground,
       background: background,
+      blend: blend,
+      blendPhase: blendPhase,
       sides: sides
     )
   }
