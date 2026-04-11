@@ -9,6 +9,16 @@
 /// ``RadialGradient``, a pattern fill writes a non-space character
 /// into each cell the shape covers; the rasterizer handles the per-
 /// cell walk and shape masking.
+///
+/// ## Supported shapes
+///
+/// Pattern fills render their glyph on ``Rectangle`` and
+/// ``RoundedRectangle``.  On curved shapes (``Circle``, ``Ellipse``,
+/// ``Capsule``) the rasterizer currently falls back to rendering a
+/// solid-colored Braille disc using ``PatternFill/foreground`` — the
+/// glyph is not written.  This is a known limitation of the Braille
+/// subpixel renderer; a future milestone may extend curved-shape
+/// filling to honor pattern glyphs at cell resolution.
 public struct PatternFill: ShapeStyle, Equatable, Sendable {
   /// The glyph painted at every cell inside the shape.
   public var glyph: Character
