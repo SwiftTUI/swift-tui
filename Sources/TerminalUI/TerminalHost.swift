@@ -1105,6 +1105,7 @@ extension TerminalHosting {
       let column = max(1, point.x + 1)
       return "\u{001B}[\(row);\(column)H"
     }
+
   }
 #else
   public final class WebTerminalHost: TerminalHosting, Sendable {

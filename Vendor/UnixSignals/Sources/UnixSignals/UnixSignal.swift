@@ -44,6 +44,9 @@ public struct UnixSignal: Hashable, Sendable, CustomStringConvertible {
     case sigalrm
     case sigquit
     case sigwinch
+    case sigbus
+    case sigfpe
+    case sigtrap
     case sigcont
     case sigpipe
   }
@@ -80,6 +83,12 @@ public struct UnixSignal: Hashable, Sendable, CustomStringConvertible {
   public static let sigalrm = Self(.sigalrm)
   /// Signal when the window is resized.
   public static let sigwinch = Self(.sigwinch)
+  /// Issued when the process causes a bus error (misaligned memory access or nonexistent physical address).
+  public static let sigbus = Self(.sigbus)
+  /// Issued when the process performs an erroneous arithmetic operation (division by zero, overflow).
+  public static let sigfpe = Self(.sigfpe)
+  /// Issued when a trap instruction or debugger breakpoint is hit.
+  public static let sigtrap = Self(.sigtrap)
   public static let sigcont = Self(.sigcont)
   /// Signal when a write is performed on a closed fd
   public static let sigpipe = Self(.sigpipe)
@@ -113,6 +122,12 @@ extension UnixSignal.Wrapped: CustomStringConvertible {
       return "SIGALRM"
     case .sigwinch:
       return "SIGWINCH"
+    case .sigbus:
+      return "SIGBUS"
+    case .sigfpe:
+      return "SIGFPE"
+    case .sigtrap:
+      return "SIGTRAP"
     case .sigcont:
       return "SIGCONT"
     case .sigpipe:
@@ -149,6 +164,12 @@ extension UnixSignal.Wrapped {
         return SIGALRM
       case .sigwinch:
         return SIGWINCH
+      case .sigbus:
+        return SIGBUS
+      case .sigfpe:
+        return SIGFPE
+      case .sigtrap:
+        return SIGTRAP
       case .sigcont:
         return SIGCONT
       case .sigpipe:

@@ -1,4 +1,5 @@
 @_spi(Runners) import TerminalUI
+import UnixSignals
 
 #if canImport(Darwin)
   import Darwin
@@ -91,6 +92,8 @@ final class SceneRuntime {
     onAttachmentChanged: @escaping @Sendable (Bool) -> Void = { _ in }
   ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
     if isPrimary {
+      installCrashGuard()
+      defer { CrashSignalHandler.uninstall() }
       return try await sessionRunner(self, sessionName)
     }
 
@@ -123,6 +126,41 @@ final class SceneRuntime {
 
   func shutdown() {
     ptyPair?.close()
+  }
+
+  // ---------------------------------------------------------------------------
+  // MARK: - Crash guard
+  // ---------------------------------------------------------------------------
+
+  /// Installs the crash signal handler so that fatal signals (SIGABRT, SIGSEGV,
+  /// etc.) reset the terminal before the process dies.
+  ///
+  /// Only meaningful for the primary scene, which owns the real tty via stdio.
+  private func installCrashGuard() {
+    // Read the current terminal attributes before the session enters raw mode.
+    // These are the attributes we want to restore on crash.
+    var savedTermios = termios()
+    let hasTermios = unsafe tcgetattr(STDIN_FILENO, &savedTermios) == 0
+
+    // Build the reset sequence: disable mouse reporting, show cursor,
+    // reset style, exit alternate screen.
+    let resetSequence =
+      "\u{1B}[?1002l\u{1B}[?1006l"  // disable mouse reporting
+      + "\u{1B}[?25h"  // show cursor
+      + "\u{1B}[0m"  // reset style
+      + "\u{1B}[?1049l"  // exit alternate screen
+    let resetBytes = Array(resetSequence.utf8)
+
+    let resetAction = CrashSignalHandler.ResetAction(
+      outputFileDescriptor: STDOUT_FILENO,
+      resetBytes: resetBytes,
+      termiosFileDescriptor: hasTermios ? STDIN_FILENO : nil,
+      savedTermios: hasTermios ? savedTermios : nil
+    )
+    CrashSignalHandler.install(
+      for: CrashSignalHandler.fatalSignals,
+      reset: resetAction
+    )
   }
 
   private func runSceneSession(

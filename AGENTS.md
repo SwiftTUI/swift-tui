@@ -87,6 +87,11 @@ resolve -> measure -> place -> semantics -> draw -> raster -> commit
 - **Incremental rendering**: Measurement cache, retained layout sessions, cursor-addressed presentation updates. A second idle frame should reuse all work and write zero bytes.
 - **State keyed by identity path + source location**: `@State` persistence uses view identity in the tree, not reference identity.
 
+## Test Framework
+
+- Prefer Swift Testing (`import Testing`, `@Test`, `#expect`) for new tests.
+- Existing XCTest suites may remain, but new test files should use Swift Testing.
+
 ## Test Organization
 
 Tests are now split by layer:
