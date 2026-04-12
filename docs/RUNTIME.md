@@ -169,6 +169,32 @@ The standing runtime checks are deterministic scenario tests rather than wall-cl
 - Any host that relies on the default `TerminalHosting.present(_:)` implementation instead of `TerminalHost`
 - The current `ScrollView` viewport-shift benchmark path
 
+## Crash Recovery
+
+When the process crashes (SIGABRT from `fatalError`/`preconditionFailure`, SIGSEGV from null dereference or stack overflow, SIGBUS, SIGILL, SIGFPE, SIGTRAP), a synchronous signal handler resets the terminal before the process dies.
+
+The CLI runner (`TerminalUICLI`) installs the crash guard in `SceneRuntime` for the primary scene before the session enters raw mode. It uses `CrashSignalHandler` from the vendored `UnixSignals` package. The guard:
+
+- Captures the pre-raw-mode termios from stdin
+- Writes a pre-encoded reset escape sequence (disable mouse reporting, show cursor, reset style, exit alternate screen) to stdout using `write(2)` (async-signal-safe)
+- Restores the saved termios via `tcsetattr` (practically safe on Darwin and Linux)
+- Re-raises the signal with the default handler so the process terminates normally with a core dump
+
+The crash guard is removed when the session ends normally.
+
+This lives in the CLI runner rather than in `TerminalUI` because `TerminalUI` is also used in the WASM build where signals do not exist. Runner packages that own a real tty are responsible for installing the crash guard.
+
+The crash guard is process-global. Signal handlers are inherently process-scoped, so only one scene can own the guard at a time. This matches the expected deployment: the primary scene owns the real tty.
+
+An alternate signal stack (`sigaltstack`) is installed so that SIGSEGV from stack overflow can still run the handler.
+
+Limitations:
+
+- SIGKILL and OOM-kill cannot be caught — the kernel terminates the process immediately
+- `tcsetattr` is not officially async-signal-safe per POSIX, though it is safe in practice on Darwin and Linux
+- The crash guard does not cover WASI (no signals) or Windows
+- Other runner packages (e.g. embedded hosts) would need their own crash guard installation if they own a real tty
+
 ## Coverage Anchors
 
 Key suites that pin this document:
