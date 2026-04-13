@@ -245,7 +245,7 @@ extension ShapeStyle {
         PatternFill(
           glyph: pattern.glyph,
           foreground: pattern.foreground.opacity(clamped),
-          background: pattern.background.map { $0.opacity(clamped) }
+          background: pattern.background?.opacity(clamped)
         ))
     case let style:
       // Semantic/chrome styles can't carry alpha until resolved —
@@ -870,10 +870,14 @@ private func resolveStyleColorResult(
     }
     return .success(firstColor)
   case .patternFill(let pattern):
-    // The foreground color is the resolved scalar color for pattern
-    // fills — the rasterizer handles the glyph and optional
+    // A pattern fill reduces to the representative color of its
+    // foreground paint (its flat color, or the gradient's first
+    // stop).  The rasterizer handles the glyph and optional
     // background separately when painting.
-    return .success(pattern.foreground)
+    guard let fg = pattern.foreground.representativeColor else {
+      return .failure(.emptyGradient)
+    }
+    return .success(fg)
   case .terminalChrome(let chromeStyle):
     return resolveStyleColorResult(
       style: theme.resolvedStyle(

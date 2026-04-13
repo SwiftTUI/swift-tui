@@ -555,11 +555,22 @@ extension SnapshotRenderer {
 
   private func describe(_ pattern: PatternFill) -> String {
     let glyph = String(pattern.glyph)
-    let fg = pattern.foreground.hexString(format: .rrggbbaa)
+    let fg = describe(pattern.foreground)
     if let background = pattern.background {
-      return "glyph=\(glyph),fg=\(fg),bg=\(background.hexString(format: .rrggbbaa))"
+      return "glyph=\(glyph),fg=\(fg),bg=\(describe(background))"
     }
     return "glyph=\(glyph),fg=\(fg)"
+  }
+
+  private func describe(_ paint: PatternFill.Paint) -> String {
+    switch paint {
+    case .color(let color):
+      return color.hexString(format: .rrggbbaa)
+    case .linearGradient(let gradient):
+      return "linearGradient(\(describe(gradient)))"
+    case .radialGradient(let gradient):
+      return "radialGradient(\(describe(gradient)))"
+    }
   }
 
   private func describe(_ style: TerminalChromeStyle) -> String {
