@@ -625,15 +625,6 @@ extension Rasterizer {
       guard let patternFill else { return 1 }
       return max(1, cellWidth(of: patternFill.glyph))
     }()
-    // Per-cell style reused for every cell when the fill is a pattern.
-    let patternCellStyle: ResolvedTextStyle? = {
-      guard let patternFill else { return nil }
-      let resolved = ResolvedTextStyle(
-        foregroundColor: patternFill.foreground,
-        backgroundColor: patternFill.background
-      )
-      return resolved.isDefault ? nil : resolved
-    }()
 
     for y in shapeBounds.origin.y..<(shapeBounds.origin.y + shapeBounds.size.height) {
       var x = shapeBounds.origin.x
@@ -654,7 +645,8 @@ extension Rasterizer {
 
         if let patternFill {
           // Pattern fill: overwrite the cell with the glyph using the
-          // pattern's foreground and optional background.
+          // pattern's foreground and optional background, resolved
+          // per cell so gradient paints sample at the current point.
           if x + patternGlyphWidth > rowEnd {
             // Not enough horizontal room for a wide glyph (e.g. an
             // emoji at the very right edge) — skip this cell rather
@@ -665,7 +657,12 @@ extension Rasterizer {
           write(
             patternFill.glyph,
             width: patternGlyphWidth,
-            style: patternCellStyle,
+            style: resolvedPatternCellStyle(
+              patternFill,
+              bounds: shapeBounds,
+              sampleX: x,
+              sampleY: y
+            ),
             atX: x,
             y: y,
             cells: &cells,
@@ -2245,7 +2242,7 @@ extension Rasterizer {
         let faded = PatternFill(
           glyph: pattern.glyph,
           foreground: pattern.foreground.opacity(amount),
-          background: pattern.background.map { $0.opacity(amount) }
+          background: pattern.background?.opacity(amount)
         )
         return .pattern(faded)
       }
@@ -2277,9 +2274,48 @@ extension Rasterizer {
       )
     case .pattern(let pattern):
       // Callers that reduce a pattern fill to a scalar color use
-      // the foreground — the per-cell glyph write path bypasses
-      // this helper and consults the ``PatternFill`` directly.
-      return pattern.foreground
+      // the foreground's representative color — the per-cell glyph
+      // write path bypasses this helper and consults the
+      // ``PatternFill`` directly via ``resolvedPatternCellStyle``.
+      return pattern.foreground.representativeColor
+    }
+  }
+
+  private func resolvedPatternCellStyle(
+    _ pattern: PatternFill,
+    bounds: Rect,
+    sampleX: Int,
+    sampleY: Int
+  ) -> ResolvedTextStyle? {
+    let fg = resolvePaint(
+      pattern.foreground,
+      bounds: bounds,
+      sampleX: sampleX,
+      sampleY: sampleY
+    )
+    let bg = pattern.background.flatMap {
+      resolvePaint($0, bounds: bounds, sampleX: sampleX, sampleY: sampleY)
+    }
+    let resolved = ResolvedTextStyle(
+      foregroundColor: fg,
+      backgroundColor: bg
+    )
+    return resolved.isDefault ? nil : resolved
+  }
+
+  private func resolvePaint(
+    _ paint: PatternFill.Paint,
+    bounds: Rect,
+    sampleX: Int,
+    sampleY: Int
+  ) -> Color? {
+    switch paint {
+    case .color(let color):
+      return color
+    case .linearGradient(let gradient):
+      return sample(gradient, in: bounds, x: sampleX, y: sampleY)
+    case .radialGradient(let gradient):
+      return sample(gradient, in: bounds, x: sampleX, y: sampleY)
     }
   }
 

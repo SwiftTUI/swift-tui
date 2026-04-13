@@ -10,6 +10,11 @@
 /// into each cell the shape covers; the rasterizer handles the per-
 /// cell walk and shape masking.
 ///
+/// Both ``foreground`` and ``background`` are typed as ``Paint``, so a
+/// pattern fill's per-cell color may itself be a gradient — the
+/// rasterizer resolves the gradient at each cell's position before
+/// writing the glyph.
+///
 /// ## Supported shapes
 ///
 /// Pattern fills write their glyph on every cell inside the shape's
@@ -23,17 +28,40 @@
 /// antialiasing) — that trade-off is intrinsic to writing a
 /// whole-cell glyph instead of Braille dots.
 public struct PatternFill: ShapeStyle, Equatable, Sendable {
+  /// Where a ``PatternFill`` sources its color: a flat color, or a
+  /// gradient the rasterizer samples per cell inside the shape's
+  /// fill region.
+  public enum Paint: Equatable, Sendable {
+    case color(Color)
+    case linearGradient(LinearGradient)
+    case radialGradient(RadialGradient)
+  }
+
   /// The glyph painted at every cell inside the shape.
   public var glyph: Character
-  /// The foreground color used for ``glyph``.
-  public var foreground: Color
-  /// Optional cell background color painted behind ``glyph``.
-  public var background: Color?
+  /// The paint used for ``glyph``.
+  public var foreground: Paint
+  /// Optional cell background paint painted behind ``glyph``.
+  public var background: Paint?
 
+  /// Convenience initializer for the common flat-color case.  Kept so
+  /// call sites that predate ``Paint`` compile unchanged.
   public init(
     glyph: Character,
     foreground: Color,
     background: Color? = nil
+  ) {
+    self.glyph = glyph
+    self.foreground = .color(foreground)
+    self.background = background.map(Paint.color)
+  }
+
+  /// Initializer for pattern fills whose foreground or background is a
+  /// gradient (or any supported ``Paint``).
+  public init(
+    glyph: Character,
+    foreground: Paint,
+    background: Paint? = nil
   ) {
     self.glyph = glyph
     self.foreground = foreground
@@ -42,6 +70,50 @@ public struct PatternFill: ShapeStyle, Equatable, Sendable {
 
   public func eraseToAnyShapeStyle() -> AnyShapeStyle {
     .patternFill(self)
+  }
+}
+
+extension PatternFill.Paint {
+  /// Fade every color component of the paint by `amount`.
+  public func opacity(_ amount: Double) -> PatternFill.Paint {
+    switch self {
+    case .color(let color):
+      return .color(color.opacity(amount))
+    case .linearGradient(let gradient):
+      let stops = gradient.gradient.stops.map {
+        Gradient.Stop(color: $0.color.opacity(amount), location: $0.location)
+      }
+      return .linearGradient(
+        LinearGradient(
+          gradient: Gradient(stops: stops),
+          startPoint: gradient.startPoint,
+          endPoint: gradient.endPoint))
+    case .radialGradient(let gradient):
+      let stops = gradient.gradient.stops.map {
+        Gradient.Stop(color: $0.color.opacity(amount), location: $0.location)
+      }
+      return .radialGradient(
+        RadialGradient(
+          gradient: Gradient(stops: stops),
+          center: gradient.center,
+          startRadius: gradient.startRadius,
+          endRadius: gradient.endRadius))
+    }
+  }
+
+  /// A representative scalar color — the first stop of a gradient, or
+  /// the flat color.  Used by call sites that can't evaluate a gradient
+  /// spatially (snapshot debug dumps, the one-color fallback in
+  /// ``resolveStyleColorResult``).
+  public var representativeColor: Color? {
+    switch self {
+    case .color(let color):
+      return color
+    case .linearGradient(let gradient):
+      return gradient.gradient.stops.first?.color
+    case .radialGradient(let gradient):
+      return gradient.gradient.stops.first?.color
+    }
   }
 }
 

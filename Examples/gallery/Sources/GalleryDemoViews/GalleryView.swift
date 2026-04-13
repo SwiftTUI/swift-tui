@@ -26,6 +26,10 @@ public struct GalleryView: View {
       AnimationsTab()
         .tabItem("Animations")
         .tag(Tab.animations)
+
+      FullScreenTab()
+        .tabItem("Full Screen")
+        .tag(Tab.fullScreen)
     }
     .tabViewStyle(.literalTabs)
   }
@@ -38,5 +42,6 @@ extension GalleryView {
     case calculator
     case bordersAndShapes
     case animations
+    case fullScreen
   }
 }

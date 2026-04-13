@@ -170,6 +170,26 @@ private struct BordersAndShapesCurvedShapesSection: View {
           .fill(PatternFill.heavyShade)
           .frame(width: 16, height: 3)
       }
+      HStack(spacing: 2) {
+        Rectangle()
+          .fill(PatternFill(glyph: "/", foreground: .yellow))
+          .frame(width: 5, height: 5)
+        Rectangle()
+          .fill(
+            PatternFill(
+              glyph: "/",
+              foreground: .linearGradient(
+                .linearGradient(
+                  colors: [.white, .red], startPoint: .topLeading, endPoint: .bottomTrailing)),
+              background: .linearGradient(
+                .linearGradient(
+                  colors: [.red, .white], startPoint: .topLeading, endPoint: .bottomTrailing)))
+          )
+          .frame(width: 5, height: 5)
+        Rectangle()
+          .fill(PatternFill.dots)
+          .frame(width: 5, height: 5)
+      }
     }
   }
 }
