@@ -282,7 +282,7 @@ extension TabView {
         isSelected: isSelected,
         tone: tone
       )
-    case .rounded:
+    case .literalTabs:
       roundedTabItem(
         label: label,
         isSelected: isSelected,
@@ -334,7 +334,7 @@ extension TabView {
         isFocused: isFocused,
         tone: tone
       )
-    case .rounded:
+    case .literalTabs:
       roundedRuleSegment(
         label: label,
         isSelected: isSelected,
@@ -374,13 +374,13 @@ extension TabView {
     isSelected: Bool,
     tone: TerminalTone
   ) -> some View {
-    let prefix = isSelected ? "╭" : " "
-    let suffix = isSelected ? "╮" : " "
+    let interiorWidth = tabLabelCellWidth(label) + 2
+    let topText = "╭" + String(repeating: "─", count: interiorWidth) + "╮"
     let foreground: AnyShapeStyle =
       isSelected
       ? AnyShapeStyle(.terminalAccent(tone))
-      : .semantic(.muted)
-    return Text("\(prefix)\(label)\(suffix)")
+      : .semantic(.separator)
+    return Text(topText)
       .lineLimit(1)
       .foregroundStyle(foreground)
       .background {
@@ -388,6 +388,7 @@ extension TabView {
           Rectangle().fill(AnyShapeStyle(.terminalTab(tone, isSelected: true)))
         }
       }
+      .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.8))
   }
 
   private func roundedRuleSegment(
@@ -396,22 +397,21 @@ extension TabView {
     isFocused: Bool,
     tone: TerminalTone
   ) -> some View {
-    let width = tabLabelCellWidth(label)
-    let glyph: Character =
-      if isSelected && isFocused { "▄" } else if isSelected || isFocused { "▂" } else { "▁" }
     let text =
-      if isSelected {
-        "╰" + String(repeating: glyph, count: width) + "╯"
-      } else {
-        " " + String(repeating: glyph, count: width) + " "
-      }
+      "│ \(label) │"
     let foreground: AnyShapeStyle =
       isSelected
       ? AnyShapeStyle(.terminalAccent(tone))
-      : .semantic(.separator)
+      : isFocused ? .semantic(.separator) : .semantic(.separator)
     return Text(text)
       .lineLimit(1)
       .foregroundStyle(foreground)
+      .background {
+        if isSelected {
+          Rectangle().fill(AnyShapeStyle(.terminalTab(tone, isSelected: true)))
+        }
+      }
+      .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.8))
       .frame(height: 1, alignment: .leading)
   }
 

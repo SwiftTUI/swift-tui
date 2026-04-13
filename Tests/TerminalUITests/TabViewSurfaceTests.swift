@@ -108,7 +108,7 @@ struct TabViewSurfaceTests {
   @Test("focused tabs keep tab label text and add a strip-level focus wash")
   func focusedTabsUseStripLevelFocusWash() {
     let focusedUnderlineArtifacts = renderTabArtifacts(style: .underline, focused: true)
-    let focusedRoundedArtifacts = renderTabArtifacts(style: .rounded, focused: true)
+    let focusedRoundedArtifacts = renderTabArtifacts(style: .literalTabs, focused: true)
     let focusedPowerlineArtifacts = renderTabArtifacts(style: .powerline, focused: true)
 
     // Tab labels must still be present (underlines may change weight when focused)
@@ -122,7 +122,7 @@ struct TabViewSurfaceTests {
     #expect(
       hasFillCommand(in: focusedUnderlineArtifacts.drawTree, bounds: stripBounds(for: .underline)))
     #expect(
-      hasFillCommand(in: focusedRoundedArtifacts.drawTree, bounds: stripBounds(for: .rounded)))
+      hasFillCommand(in: focusedRoundedArtifacts.drawTree, bounds: stripBounds(for: .literalTabs)))
     #expect(
       hasFillCommand(
         in: focusedPowerlineArtifacts.drawTree,
@@ -134,7 +134,7 @@ struct TabViewSurfaceTests {
   @Test("tabs do not prepend a focused marker into the selected label")
   func tabsDoNotShowFocusMarker() {
     let underlineSurface = renderTabView(style: .underline, focused: true)
-    let roundedSurface = renderTabView(style: .rounded, focused: true)
+    let roundedSurface = renderTabView(style: .literalTabs, focused: true)
     let powerlineSurface = renderTabView(style: .powerline, focused: true)
 
     #expect(!underlineSurface.contains("▌Home · 3"))
@@ -145,11 +145,11 @@ struct TabViewSurfaceTests {
   @Test("unfocused tabs do not draw the strip-level focus wash")
   func unfocusedTabsDoNotDrawStripFocusWash() {
     let underlineArtifacts = renderTabArtifacts(style: .underline, focused: false)
-    let roundedArtifacts = renderTabArtifacts(style: .rounded, focused: false)
+    let roundedArtifacts = renderTabArtifacts(style: .literalTabs, focused: false)
     let powerlineArtifacts = renderTabArtifacts(style: .powerline, focused: false)
 
     #expect(!hasFillCommand(in: underlineArtifacts.drawTree, bounds: stripBounds(for: .underline)))
-    #expect(!hasFillCommand(in: roundedArtifacts.drawTree, bounds: stripBounds(for: .rounded)))
+    #expect(!hasFillCommand(in: roundedArtifacts.drawTree, bounds: stripBounds(for: .literalTabs)))
     #expect(!hasFillCommand(in: powerlineArtifacts.drawTree, bounds: stripBounds(for: .powerline)))
   }
 
@@ -190,6 +190,23 @@ struct TabViewSurfaceTests {
         == [
           "Controls Collections Layout Appearance Charts",
           "▁▁▁▁▁▁▁▁ ▁▁▁▁▁▁▁▁▁▁▁ ▂▂▂▂▂▂ ▁▁▁▁▁▁▁▁▁▁ ▁▁▁▁▁▁",
+        ]
+    )
+  }
+
+  @Test("literal tabs use traditional outlined tab chrome")
+  func literalTabsUseTraditionalOutline() {
+    let lines = renderTabView(style: .literalTabs, focused: false, selection: "settings")
+      .split(separator: "\n", omittingEmptySubsequences: false)
+      .prefix(2)
+      .map(String.init)
+      .map(trimTrailingSpaces)
+
+    #expect(
+      Array(lines)
+        == [
+          "╭──────────╮╭──────────╮╭──────╮",
+          "│ Home · 3 ││ Settings ││ Logs │",
         ]
     )
   }
