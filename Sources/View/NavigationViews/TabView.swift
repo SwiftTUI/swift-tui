@@ -204,6 +204,15 @@ extension TabView {
     let focusActive = isFocused && showsFocusEffect
 
     let hasRule = tabStyle != .powerline
+    let hasLiteralTabEdgeRow = tabStyle == .literalTabs
+    let stripHeight =
+      if hasLiteralTabEdgeRow {
+        3
+      } else if hasRule {
+        2
+      } else {
+        1
+      }
     VStack(alignment: .leading, spacing: 0) {
       HStack(alignment: .top, spacing: 0) {
         ForEach(options.indices, id: \.self) { index in
@@ -239,7 +248,16 @@ extension TabView {
                   isSelected: isSelected,
                   isFocused: focusActive,
                   tone: activeTone,
-                  style: tabStyle
+                  style: tabStyle,
+                  styleEnvironment: styleEnvironment
+                )
+              }
+              if hasLiteralTabEdgeRow {
+                literalTabBottomSegment(
+                  label: option.label.displayText,
+                  isSelected: isSelected,
+                  tone: activeTone,
+                  styleEnvironment: styleEnvironment
                 )
               }
             }
@@ -247,7 +265,7 @@ extension TabView {
         }
         Spacer(minLength: 0)
       }
-      .frame(height: hasRule ? 2 : 1, alignment: .leading)
+      .frame(height: stripHeight, alignment: .leading)
       .background {
         if focusActive {
           Rectangle()
@@ -286,7 +304,8 @@ extension TabView {
       roundedTabItem(
         label: label,
         isSelected: isSelected,
-        tone: tone
+        tone: tone,
+        styleEnvironment: styleEnvironment
       )
     case .powerline:
       powerlineTabItem(
@@ -323,7 +342,8 @@ extension TabView {
     isSelected: Bool,
     isFocused: Bool,
     tone: TerminalTone,
-    style: TabViewStyle
+    style: TabViewStyle,
+    styleEnvironment: StyleEnvironmentSnapshot
   ) -> some View {
     let resolvedStyle = style == .automatic ? TabViewStyle.underline : style
     switch resolvedStyle {
@@ -339,7 +359,8 @@ extension TabView {
         label: label,
         isSelected: isSelected,
         isFocused: isFocused,
-        tone: tone
+        tone: tone,
+        styleEnvironment: styleEnvironment
       )
     case .powerline:
       EmptyView()
@@ -372,20 +393,25 @@ extension TabView {
   private func roundedTabItem(
     label: String,
     isSelected: Bool,
-    tone: TerminalTone
+    tone: TerminalTone,
+    styleEnvironment: StyleEnvironmentSnapshot
   ) -> some View {
     let interiorWidth = tabLabelCellWidth(label) + 2
     let topText = "╭" + String(repeating: "─", count: interiorWidth) + "╮"
+    let selectedBackgroundColor = powerlineSelectedBackgroundColor(
+      tone: tone,
+      styleEnvironment: styleEnvironment
+    )
     let foreground: AnyShapeStyle =
       isSelected
-      ? AnyShapeStyle(.terminalAccent(tone))
+      ? AnyShapeStyle(contrastingForegroundColor(on: selectedBackgroundColor))
       : .semantic(.separator)
     return Text(topText)
       .lineLimit(1)
       .foregroundStyle(foreground)
       .background {
         if isSelected {
-          Rectangle().fill(AnyShapeStyle(.terminalTab(tone, isSelected: true)))
+          Rectangle().fill(AnyShapeStyle(selectedBackgroundColor))
         }
       }
       .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.8))
@@ -395,20 +421,58 @@ extension TabView {
     label: String,
     isSelected: Bool,
     isFocused: Bool,
-    tone: TerminalTone
+    tone: TerminalTone,
+    styleEnvironment: StyleEnvironmentSnapshot
   ) -> some View {
     let text =
       "│ \(label) │"
+    let selectedBackgroundColor = powerlineSelectedBackgroundColor(
+      tone: tone,
+      styleEnvironment: styleEnvironment
+    )
     let foreground: AnyShapeStyle =
       isSelected
-      ? AnyShapeStyle(.terminalAccent(tone))
-      : isFocused ? .semantic(.separator) : .semantic(.separator)
+      ? AnyShapeStyle(contrastingForegroundColor(on: selectedBackgroundColor))
+      : .semantic(.separator)
     return Text(text)
       .lineLimit(1)
       .foregroundStyle(foreground)
       .background {
         if isSelected {
-          Rectangle().fill(AnyShapeStyle(.terminalTab(tone, isSelected: true)))
+          Rectangle().fill(AnyShapeStyle(selectedBackgroundColor))
+        }
+      }
+      .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.8))
+      .frame(height: 1, alignment: .leading)
+  }
+
+  private func literalTabBottomSegment(
+    label: String,
+    isSelected: Bool,
+    tone: TerminalTone,
+    styleEnvironment: StyleEnvironmentSnapshot
+  ) -> some View {
+    let interiorWidth = tabLabelCellWidth(label) + 2
+    let text =
+      if isSelected {
+        "│" + String(repeating: " ", count: interiorWidth) + "│"
+      } else {
+        "╰" + String(repeating: "─", count: interiorWidth) + "╯"
+      }
+    let selectedBackgroundColor = powerlineSelectedBackgroundColor(
+      tone: tone,
+      styleEnvironment: styleEnvironment
+    )
+    let foreground: AnyShapeStyle =
+      isSelected
+      ? AnyShapeStyle(contrastingForegroundColor(on: selectedBackgroundColor))
+      : .semantic(.separator)
+    return Text(text)
+      .lineLimit(1)
+      .foregroundStyle(foreground)
+      .background {
+        if isSelected {
+          Rectangle().fill(AnyShapeStyle(selectedBackgroundColor))
         }
       }
       .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.8))
