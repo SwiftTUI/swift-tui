@@ -816,9 +816,26 @@ package final class AnimationController {
     // Skip insertions that are part of a matched-geometry swap —
     // those use the matched-geometry pathway and shouldn't fire a
     // redundant willAppear transition.
+    //
+    // Also skip structural first-appearances: when an identity's
+    // parent was also just inserted, the whole subtree appeared
+    // because a container was mounted (e.g. tab switch), NOT because
+    // a conditional toggled inside withAnimation.  Playing insertion
+    // transitions for these would cause spurious fade-ins whenever a
+    // PhaseAnimator or other continuous animation shares the frame
+    // transaction.  This matches SwiftUI, which only fires
+    // .transition() when the view's conditional presence changes.
     for identity in insertedIdentities {
       if let key = newMatchedKeysByIdentity[identity],
         matchedKeysConsumedByMatch.contains(key)
+      {
+        continue
+      }
+      // Structural first-appearance guard: if the parent identity is
+      // also freshly inserted, this view appeared as part of a bulk
+      // mount, not a conditional toggle.
+      if let parent = newParentByIdentity[identity],
+        insertedIdentities.contains(parent)
       {
         continue
       }
