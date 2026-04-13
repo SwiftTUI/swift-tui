@@ -207,26 +207,28 @@ struct TabViewSurfaceTests {
         == [
           "╭──────────╮╭──────────╮╭──────╮",
           "│ Home · 3 ││ Settings ││ Logs │",
-          "╰──────────╯│          │╰──────╯",
+          "┴──────────┴┘          └┴──────┴────────",
           "Settings content",
         ]
     )
   }
 
-  @Test("selected literal tab fills its chrome with the accent color")
-  func selectedLiteralTabFillsWithAccent() throws {
+  @Test("selected literal tab uses foreground chrome without filling its background")
+  func selectedLiteralTabUsesForegroundChromeWithoutFill() throws {
     let artifacts = renderTabArtifacts(
       style: .literalTabs,
       focused: false,
       selection: "settings"
     )
     let cells = artifacts.rasterSurface.cells
-    let expectedBackground = TerminalAppearance.fallback.tintColor
+    let expectedAccent = TerminalAppearance.fallback.tintColor
+    let expectedForeground = TerminalAppearance.fallback.foregroundColor
 
     // Rows 0-2 are the tab chrome (top edge, label, lower edges).
     // Row 3 is the content area. Find the label cells for
-    // "Settings" in row 1 and confirm the entire tab chrome for that
-    // tab is filled with the accent color on all three rows.
+    // "Settings" in row 1 and confirm the selected tab keeps a
+    // foreground-colored outline, an accent-colored label, and no
+    // filled background on any chrome row.
     let labelRow = try #require(cells.indices.contains(1) ? cells[1] : nil)
     let settingsStart = try #require(labelRow.firstIndex { $0.character == "S" })
     // The interior of a rounded tab includes `│ ` before the label and
@@ -239,23 +241,45 @@ struct TabViewSurfaceTests {
     }
 
     for x in tabStart...tabEnd {
-      #expect(cells[0][x].style?.backgroundColor == expectedBackground)
-      #expect(cells[1][x].style?.backgroundColor == expectedBackground)
-      #expect(cells[2][x].style?.backgroundColor == expectedBackground)
+      #expect(cells[0][x].style?.backgroundColor != expectedAccent)
+      #expect(cells[1][x].style?.backgroundColor != expectedAccent)
+      #expect(cells[2][x].style?.backgroundColor != expectedAccent)
     }
+    #expect(cells[0][tabStart].style?.foregroundColor == expectedForeground)
+    #expect(cells[1][tabStart].style?.foregroundColor == expectedForeground)
+    #expect(cells[1][settingsStart].style?.foregroundColor == expectedAccent)
+    #expect(cells[1][tabEnd].style?.foregroundColor == expectedForeground)
+    #expect(cells[2][tabStart].style?.foregroundColor == expectedForeground)
 
-    // The unselected tabs should not carry the accent background.
+    // Unselected labels stay muted, while their outline chrome and the
+    // shared bottom rail use the foreground color.
     let homeStart = try #require(labelRow.firstIndex { $0.character == "H" })
-    #expect(cells[1][homeStart].style?.backgroundColor != expectedBackground)
+    let homeTabStart = homeStart - 2
+    var homeTabEnd = homeStart
+    while homeTabEnd < labelRow.count, labelRow[homeTabEnd].character != "│" {
+      homeTabEnd += 1
+    }
+    #expect(cells[1][homeStart].style?.foregroundColor != expectedAccent)
+    #expect(cells[1][homeTabStart].style?.foregroundColor == expectedForeground)
+    #expect(cells[1][homeTabEnd].style?.foregroundColor == expectedForeground)
     let bottomRow = try #require(cells.indices.contains(2) ? cells[2] : nil)
-    #expect(bottomRow[0].character == "╰")
-    #expect(bottomRow[11].character == "╯")
+    #expect(bottomRow[0].character == "┴")
+    #expect(bottomRow[11].character == "┴")
+    #expect(bottomRow[12].character == "┘")
+    #expect(bottomRow[23].character == "└")
+    #expect(bottomRow[24].character == "┴")
+    #expect(bottomRow[31].character == "┴")
+    #expect(bottomRow[39].character == "─")
+    #expect(bottomRow[0].style?.foregroundColor == expectedForeground)
+    #expect(bottomRow[12].style?.foregroundColor == expectedForeground)
+    #expect(bottomRow[24].style?.foregroundColor == expectedForeground)
+    #expect(bottomRow[39].style?.foregroundColor == expectedForeground)
 
     // The content row should start immediately after the tab chrome
     // without an extra underline strip between them.
     let contentRow = try #require(cells.indices.contains(3) ? cells[3] : nil)
     #expect(String(contentRow.prefix(16).map(\.character)).contains("Settings content"))
-    #expect(contentRow[tabStart].style?.backgroundColor != expectedBackground)
+    #expect(contentRow[tabStart].style?.backgroundColor != expectedAccent)
   }
 
   @Test("powerline tabs use unicode slant separators between items")
