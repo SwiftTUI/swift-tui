@@ -1768,6 +1768,181 @@ struct AnimationControllerPropertyTests {
   }
 
   @Test(
+    "withAnimation completion fires after duration even when no tracked property changes"
+  )
+  func completionClosureFiresAfterDurationForStrandedBatch() throws {
+    // Regression guard for the stranded-completion bug: when a
+    // `withAnimation(...) { } completion: {}` scope wraps changes the
+    // controller doesn't track as an ``AnimatableProperty`` (e.g.
+    // gradient internals, pattern fills, untracked shape styles),
+    // the batch still needs to fire its completion on time —
+    // otherwise ``PhaseAnimator`` stalls awaiting a continuation
+    // that never resumes.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(100))
+    controller.register(animation)
+
+    let batchID = AnimationBatchID(7_010)
+    let fireCount = FireCounter()
+    controller.registerCompletion(batchID: batchID) {
+      fireCount.increment()
+    }
+
+    // Frame 1: a bare leaf with no animatable properties populated.
+    let leafIdentity = Identity(components: [.named("untracked-leaf")])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf")
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Frame 2: same leaf, same (empty) animatable snapshot — but
+    // the transaction carries a batched animation intent.  Nothing
+    // about this frame bumps any ``AnimatableProperty`` slot, so
+    // the batch is stranded the instant it is opened.
+    var frame2 = frame1
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    transaction.animationBatchID = batchID
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    // Halfway through the 100 ms duration: completion must not have
+    // fired yet.  This is the distinguishing assertion — prior to
+    // the drain fix, the completion never fires at all; we must
+    // also make sure the drain does not fire *eagerly* at t0.
+    let halfway = t0.advanced(by: .milliseconds(50))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+    #expect(fireCount.count == 0)
+
+    // Past the duration: the drain fires exactly once.
+    let past = t0.advanced(by: .milliseconds(200))
+    var frame3 = frame2
+    _ = controller.applyInterpolations(to: &frame3, at: past)
+    #expect(fireCount.count == 1)
+
+    // Subsequent ticks must not re-fire — the drained entry has to
+    // be removed from both ``pendingEmptyBatchCompletions`` and
+    // ``completionClosures`` in a single pass.
+    var frame4 = frame3
+    _ = controller.applyInterpolations(to: &frame4, at: past.advanced(by: .milliseconds(50)))
+    #expect(fireCount.count == 1)
+  }
+
+  @Test(
+    "withAnimation(nil) completion fires immediately for stranded batch"
+  )
+  func completionClosureFiresImmediatelyForDisabledStrandedBatch() throws {
+    // `withAnimation(nil) { ... } completion: { ... }` disables
+    // animation but still expects the completion to fire once the
+    // body returns.  The drain path treats `.disabled` as zero
+    // duration so the completion fires on the next tick.
+    let controller = AnimationController()
+    let batchID = AnimationBatchID(7_011)
+    let fireCount = FireCounter()
+    controller.registerCompletion(batchID: batchID) {
+      fireCount.increment()
+    }
+
+    let leafIdentity = Identity(components: [.named("disabled-leaf")])
+    let frame1 = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Frame 2: disabled animation request, same empty snapshot.
+    var frame2 = frame1
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .disabled
+    transaction.animationBatchID = batchID
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    // Tick at t0 itself should drain the zero-duration entry — the
+    // deadline equals the timestamp, so the first tick fires the
+    // completion.
+    _ = controller.applyInterpolations(to: &frame2, at: t0)
+    #expect(fireCount.count == 1)
+  }
+
+  @Test(
+    "stranded batch drain surfaces a nextDeadline with empty affectedIdentities"
+  )
+  func strandedBatchDrainSurfacesWakeupDeadline() throws {
+    // Contract pin: a pure-drain tick must carry
+    // `hasActiveAnimations = true` and a concrete `nextDeadline` so
+    // the run loop can reschedule itself — but its
+    // `affectedIdentities` set will be empty because the drain
+    // isn't tied to any visible view.  The run loop's wake-up logic
+    // at ``RunLoop+Rendering.swift`` must treat an empty
+    // ``affectedIdentities`` as "schedule unconditionally" for the
+    // drain to actually drive itself forward in a real render loop.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(500))
+    controller.register(animation)
+
+    let batchID = AnimationBatchID(7_013)
+    controller.registerCompletion(batchID: batchID) {}
+
+    let leafIdentity = Identity(components: [.named("drain-surface-leaf")])
+    let frame1 = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    let frame2 = frame1
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    transaction.animationBatchID = batchID
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    // Tick well before the drain's deadline: the result must carry
+    // pending work + a nextDeadline, and affectedIdentities must be
+    // empty because the drain doesn't belong to any view.
+    var working = frame2
+    let tick = controller.applyInterpolations(
+      to: &working,
+      at: t0.advanced(by: .milliseconds(50))
+    )
+    #expect(tick.hasActiveAnimations)
+    #expect(tick.nextDeadline != nil)
+    #expect(tick.affectedIdentities.isEmpty)
+  }
+
+  @Test(
+    "withAnimation(.repeatForever) stranded batch never fires completion"
+  )
+  func completionClosureSuppressedForForeverStrandedBatch() throws {
+    // SwiftUI never fires completions for `.repeatForever` — the
+    // drain must treat infinite animations as a hard no-fire.  We
+    // also verify the closure is dropped from
+    // ``completionClosures`` so it doesn't leak indefinitely.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(100)).repeatForever()
+    controller.register(animation)
+
+    let batchID = AnimationBatchID(7_012)
+    let fireCount = FireCounter()
+    controller.registerCompletion(batchID: batchID) {
+      fireCount.increment()
+    }
+
+    let leafIdentity = Identity(components: [.named("forever-leaf")])
+    let frame1 = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    let frame2 = frame1
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    transaction.animationBatchID = batchID
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    // Walk far into the future — the closure must never fire.
+    let past = t0.advanced(by: .milliseconds(10_000))
+    var frame3 = frame2
+    _ = controller.applyInterpolations(to: &frame3, at: past)
+    #expect(fireCount.count == 0)
+  }
+
+  @Test(
     "CustomAnimation conformance drives interpolation via the controller"
   )
   func customAnimationIsEvaluatedByController() throws {
