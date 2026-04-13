@@ -1,11 +1,11 @@
 #if canImport(Darwin)
-  public import Darwin  // macOS, iOS, tvOS, watchOS
+  import Darwin  // macOS, iOS, tvOS, watchOS
 #elseif canImport(Glibc)
-  public import Glibc  // Linux, Android
+  import Glibc  // Linux, Android
 #elseif canImport(WASILibc)
-  public import WASILibc  // WebAssembly (WASI)
+  import WASILibc  // WebAssembly (WASI)
 #elseif canImport(ucrt)
-  public import ucrt  // Windows
+  import ucrt  // Windows
 #endif
 
 /// A single Braille cell's 2×4 subpixel mask.

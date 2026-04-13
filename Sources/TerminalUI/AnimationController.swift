@@ -400,7 +400,7 @@ package final class AnimationController {
     if !removingIdentities.isEmpty {
       var injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]] = [:]
 
-      for (identity, entry) in removingIdentities {
+      for entry in removingIdentities.values {
         guard let placedSnapshot = entry.placedSnapshot,
           let parentId = entry.parentIdentity
         else {

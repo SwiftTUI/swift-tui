@@ -1658,7 +1658,7 @@ struct AnimationControllerPropertyTests {
     // The transition registration is NOT re-emitted because the
     // branch is gone, so the controller must use the previous frame's
     // transition map to detect the removal.
-    var frame2 = ResolvedNode(
+    let frame2 = ResolvedNode(
       identity: rootIdentity,
       kind: .view("Root"),
       children: []
@@ -1947,7 +1947,7 @@ struct AnimationControllerRemovalTests {
       identity: leafIdentity,
       kind: .view("Leaf")
     )
-    var root = ResolvedNode(
+    let root = ResolvedNode(
       identity: Identity(components: [.named("root")]),
       kind: .view("Root"),
       children: [leaf]
@@ -2038,7 +2038,7 @@ struct AnimationControllerRemovalTests {
       kind: .view("Padding"),
       children: [leaf]
     )
-    var overlay = ResolvedNode(
+    let overlay = ResolvedNode(
       identity: overlayIdentity,
       kind: .view("Overlay"),
       children: [padding]
@@ -2162,7 +2162,7 @@ struct AnimationControllerRemovalTests {
 
     // Frame 1: leaf present.
     let leaf = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
-    var root = ResolvedNode(
+    let root = ResolvedNode(
       identity: Identity(components: [.named("root")]),
       kind: .view("Root"),
       children: [leaf]
@@ -2172,7 +2172,7 @@ struct AnimationControllerRemovalTests {
 
     // Frame 2: leaf removed with animation intent.  No re-registration
     // because the branch is gone from the resolved tree.
-    var root2 = ResolvedNode(
+    let root2 = ResolvedNode(
       identity: Identity(components: [.named("root")]),
       kind: .view("Root"),
       children: []
