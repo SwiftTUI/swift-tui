@@ -1010,6 +1010,115 @@ struct AnimationPipelineIntegrationTests {
       #expect(overlay.bounds.size.height == 1)
     }
   }
+
+  @Test(
+    "structural first-appearance does not fire insertion transition"
+  )
+  func structuralFirstAppearanceSkipsInsertionTransition() throws {
+    // When a parent and child appear together (e.g. tab switch),
+    // the child's .transition(.opacity) must NOT fire — the whole
+    // subtree is a structural mount, not a conditional toggle.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(500))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+    let parentIdentity = Identity(components: [.named("root"), .named("parent")])
+    let leafIdentity = Identity(
+      components: [.named("root"), .named("parent"), .named("leaf")]
+    )
+
+    // Frame 1: only root exists (simulates a different tab active).
+    let frame1 = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: []
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Frame 2: parent + leaf appear together under an animate
+    // transaction.  Register a .opacity transition on the leaf.
+    controller.beginTransitionCollection()
+    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+
+    let leafNode = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let parentNode = ResolvedNode(
+      identity: parentIdentity,
+      kind: .view("Parent"),
+      children: [leafNode]
+    )
+    let frame2 = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: [parentNode]
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      frame2,
+      transaction: transaction,
+      timestamp: t0.advanced(by: .milliseconds(1))
+    )
+
+    // No insertion animation should have been enqueued for the leaf
+    // because its parent was also freshly inserted.
+    #expect(
+      controller.activeAnimationCount == 0,
+      "structural first-appearance must not enqueue insertion animations, got \(controller.activeAnimationCount)"
+    )
+  }
+
+  @Test(
+    "conditional toggle still fires insertion transition when parent is stable"
+  )
+  func conditionalToggleFiresInsertionTransition() throws {
+    // When only the child is inserted (parent already present),
+    // the insertion animation must fire — this is the normal
+    // withAnimation { showFigure.toggle() } path.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(500))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+    let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
+
+    // Frame 1: root exists, leaf absent.
+    let frame1 = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: []
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Frame 2: leaf appears under root with an animate transaction.
+    controller.beginTransitionCollection()
+    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+
+    let leafNode = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let frame2 = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: [leafNode]
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      frame2,
+      transaction: transaction,
+      timestamp: t0.advanced(by: .milliseconds(1))
+    )
+
+    // The insertion animation must fire because only the leaf is new
+    // (root was already present).
+    #expect(
+      controller.activeAnimationCount > 0,
+      "conditional toggle must enqueue an insertion animation"
+    )
+  }
 }
 
 @MainActor
@@ -1238,7 +1347,18 @@ struct AnimationControllerPropertyTests {
     let rootIdentity = Identity(components: [.named("root")])
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
 
-    // Frame 1: leaf present with .transition(.move(edge: .leading)).
+    // Frame 0: root alone — seeds previousIdentities so the leaf
+    // insertion on frame 1 is a conditional toggle, not a structural
+    // first-appearance.
+    let seedRoot = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: []
+    )
+    let tSeed = MonotonicInstant.now()
+    controller.processResolvedTree(seedRoot, transaction: .init(), timestamp: tSeed)
+
+    // Frame 1: leaf appears with .transition(.move(edge: .leading)).
     controller.beginTransitionCollection()
     controller.registerTransition(
       for: leafIdentity,
@@ -1254,7 +1374,7 @@ struct AnimationControllerPropertyTests {
     )
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(animation.animationBox)
-    let t0 = MonotonicInstant.now()
+    let t0 = tSeed.advanced(by: .milliseconds(1))
     controller.processResolvedTree(root, transaction: transaction, timestamp: t0)
 
     // Build a synthetic placed tree that matches what LayoutEngine
@@ -1428,6 +1548,17 @@ struct AnimationControllerPropertyTests {
     let rootIdentity = Identity(components: [.named("root")])
     let leafIdentity = Identity(components: [.named("root"), .named("leaf")])
 
+    // Frame 0: root alone — seeds previousIdentities so the leaf
+    // insertion on frame 1 is a conditional toggle, not a structural
+    // first-appearance.
+    let seedRoot = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: []
+    )
+    let tSeed = MonotonicInstant.now()
+    controller.processResolvedTree(seedRoot, transaction: .init(), timestamp: tSeed)
+
     // Frame 1: leaf inserted with .opacity transition under
     // withAnimation intent → starts the fade-in.
     controller.beginTransitionCollection()
@@ -1441,7 +1572,7 @@ struct AnimationControllerPropertyTests {
     )
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(animation.animationBox)
-    let t0 = MonotonicInstant.now()
+    let t0 = tSeed.advanced(by: .milliseconds(1))
     controller.processResolvedTree(frame1, transaction: transaction, timestamp: t0)
 
     // Frame 2: at t=100ms (midway), the leaf disappears.
