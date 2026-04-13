@@ -167,119 +167,134 @@
         uninstall()
       }
 
+      unsafe installImpl(for: signals, reset: reset)
+    }
+
+    @unsafe
+    private static func installImpl(
+      for signals: [UnixSignal],
+      reset: ResetAction
+    ) {
       // Store reset state in globals.
-      crashResetFD = reset.outputFileDescriptor
+      unsafe crashResetFD = reset.outputFileDescriptor
       let byteCount = min(reset.resetBytes.count, crashResetMaxBytes)
       for i in 0..<byteCount {
-        crashResetBuffer[i] = reset.resetBytes[i]
+        (unsafe crashResetBuffer)[i] = reset.resetBytes[i]
       }
-      crashResetByteCount = byteCount
+      unsafe crashResetByteCount = byteCount
 
       if let savedTermios = reset.savedTermios,
         let termiosFD = reset.termiosFileDescriptor
       {
-        crashSavedTermios = savedTermios
-        crashTermiosFD = termiosFD
-        crashRestoreTermios = true
+        unsafe crashSavedTermios = savedTermios
+        unsafe crashTermiosFD = termiosFD
+        unsafe crashRestoreTermios = true
       } else {
-        crashRestoreTermios = false
-        crashTermiosFD = -1
+        unsafe crashRestoreTermios = false
+        unsafe crashTermiosFD = -1
       }
 
       // Set up alternate signal stack for SIGSEGV from stack overflow.
-      installAlternateStack()
+      unsafe installAlternateStack()
 
       // Install sigaction handlers.
       let uniqueSignals = Array(Set(signals.map(\.rawValue)))
       let signalCount = min(uniqueSignals.count, crashMaxSignals)
-      crashHandledSignalCount = signalCount
+      unsafe crashHandledSignalCount = signalCount
 
       for i in 0..<signalCount {
         let sig = uniqueSignals[i]
-        crashHandledSignals[i] = sig
+        (unsafe crashHandledSignals)[i] = sig
 
         var action = sigaction()
         #if canImport(Darwin)
-          action.__sigaction_u.__sa_handler = crashSignalHandler
+          unsafe action.__sigaction_u.__sa_handler = crashSignalHandler
         #elseif canImport(Glibc) || canImport(Musl) || canImport(Android)
-          action.__sigaction_handler = .init(sa_handler: crashSignalHandler)
+          unsafe action.__sigaction_handler = .init(sa_handler: crashSignalHandler)
         #endif
         action.sa_flags = Int32(SA_RESETHAND | SA_ONSTACK)
         unsafe sigemptyset(&action.sa_mask)
 
         var previousAction = sigaction()
         unsafe sigaction(sig, &action, &previousAction)
-        crashPreviousActions[i] = previousAction
+        (unsafe crashPreviousActions)[i] = previousAction
       }
 
-      crashGuardActive = true
+      unsafe crashGuardActive = true
     }
 
     /// Removes the crash signal handlers and restores the previous handlers.
     public static func uninstall() {
-      guard crashGuardActive else {
+      guard unsafe crashGuardActive else {
         return
       }
 
+      unsafe uninstallImpl()
+    }
+
+    @unsafe
+    private static func uninstallImpl() {
       // Restore previous signal handlers.
-      for i in 0..<crashHandledSignalCount {
-        let sig = crashHandledSignals[i]
-        var previousAction = crashPreviousActions[i]
+      for i in 0..<(unsafe crashHandledSignalCount) {
+        let sig = (unsafe crashHandledSignals)[i]
+        var previousAction = (unsafe crashPreviousActions)[i]
         unsafe sigaction(sig, &previousAction, nil)
       }
-      crashHandledSignalCount = 0
+      unsafe crashHandledSignalCount = 0
 
       // Tear down alternate stack.
-      uninstallAlternateStack()
+      unsafe uninstallAlternateStack()
 
       // Clear global state.
-      crashResetFD = -1
-      crashResetByteCount = 0
-      crashRestoreTermios = false
-      crashTermiosFD = -1
-      crashGuardActive = false
+      unsafe crashResetFD = -1
+      unsafe crashResetByteCount = 0
+      unsafe crashRestoreTermios = false
+      unsafe crashTermiosFD = -1
+      unsafe crashGuardActive = false
     }
 
     /// Whether the crash guard is currently installed.
     public static var isInstalled: Bool {
-      crashGuardActive
+      unsafe crashGuardActive
     }
 
     // -------------------------------------------------------------------------
     // MARK: - Alternate signal stack
     // -------------------------------------------------------------------------
 
+    @unsafe
     private static func installAlternateStack() {
-      guard crashAltStackBuffer == nil else {
+      guard unsafe crashAltStackBuffer == nil else {
         return
       }
 
-      let buffer = unsafe UnsafeMutableRawPointer.allocate(
+      let buffer = UnsafeMutableRawPointer.allocate(
         byteCount: crashAltStackSize,
         alignment: 16
       )
-      crashAltStackBuffer = buffer
+      unsafe crashAltStackBuffer = unsafe buffer
 
       var stack = unsafe stack_t()
-      stack.ss_sp = unsafe buffer
-      stack.ss_size = crashAltStackSize
-      stack.ss_flags = 0
+      unsafe stack.ss_sp = unsafe buffer
+      unsafe stack.ss_size = crashAltStackSize
+      unsafe stack.ss_flags = 0
       unsafe sigaltstack(&stack, nil)
     }
 
+    @unsafe
     private static func uninstallAlternateStack() {
-      guard let buffer = crashAltStackBuffer else {
+      guard let buffer = unsafe crashAltStackBuffer else {
         return
       }
 
       var stack = unsafe stack_t()
-      stack.ss_flags = Int32(SS_DISABLE)
-      stack.ss_size = crashAltStackSize
-      stack.ss_sp = unsafe buffer
+      unsafe stack.ss_flags = Int32(SS_DISABLE)
+      unsafe stack.ss_size = crashAltStackSize
+      unsafe stack.ss_sp = unsafe buffer
       unsafe sigaltstack(&stack, nil)
 
       unsafe buffer.deallocate()
-      crashAltStackBuffer = nil
+      unsafe crashAltStackBuffer = nil
     }
   }
 

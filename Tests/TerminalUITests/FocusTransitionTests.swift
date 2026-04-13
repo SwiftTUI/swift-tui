@@ -271,7 +271,7 @@ struct FocusTransitionTests {
       viewBuilder: { _, _ in Self.tabViewWithPicker() }
     )
 
-    focusTracker.invalidator = runLoop.scheduler as? (any Invalidating)
+    focusTracker.invalidator = runLoop.scheduler
 
     // Initial render — TabView gets focus by default
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
@@ -348,7 +348,7 @@ struct FocusTransitionTests {
       viewBuilder: { _, _ in Self.tabViewWithPicker() }
     )
 
-    focusTracker.invalidator = runLoop.scheduler as? (any Invalidating)
+    focusTracker.invalidator = runLoop.scheduler
 
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
@@ -416,7 +416,7 @@ struct FocusTransitionTests {
       viewBuilder: { _, _ in Self.tabViewWithPicker() }
     )
 
-    focusTracker.invalidator = runLoop.scheduler as? (any Invalidating)
+    focusTracker.invalidator = runLoop.scheduler
 
     // Initial render
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
@@ -478,7 +478,7 @@ struct FocusTransitionTests {
       viewBuilder: { _, _ in Self.statefulTabSelectionView() }
     )
 
-    focusTracker.invalidator = runLoop.scheduler as? (any Invalidating)
+    focusTracker.invalidator = runLoop.scheduler
 
     runLoop.scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
