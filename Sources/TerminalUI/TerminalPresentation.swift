@@ -181,9 +181,20 @@ public struct TerminalSurfaceRenderer {
 
   /// Renders a full raster surface into terminal text.
   public func render(_ surface: RasterSurface) -> String {
-    surface.cells.enumerated().map { _, row in
+    let rowStrings = surface.cells.map { row in
       renderRow(row)
-    }.joined(separator: "\r\n")
+    }
+    // Pre-size: each row contributes its character count plus a \r\n separator.
+    let estimatedSize = rowStrings.reduce(0) { $0 + $1.utf8.count + 2 }
+    var result = ""
+    result.reserveCapacity(estimatedSize)
+    for (index, row) in rowStrings.enumerated() {
+      if index > 0 {
+        result += "\r\n"
+      }
+      result += row
+    }
+    return result
   }
 
   func renderRow(
@@ -404,7 +415,12 @@ extension TerminalSurfaceRenderer {
       )
     }
 
+    // Reserve capacity: ~2 bytes per cell for characters, plus ~16 bytes
+    // per style transition for escape sequences.  Overestimates slightly
+    // but avoids repeated String reallocations.
+    let cellCount = max(0, end - start)
     var result = ""
+    result.reserveCapacity(cellCount * 3)
     var activeStyle: ResolvedTextStyle?
     var activeHyperlink: String?
     var renderedWidth = 0
@@ -429,7 +445,7 @@ extension TerminalSurfaceRenderer {
 
       if style != activeStyle {
         if activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
-          result += escapeSequence(forCodes: [0])
+          result += "\u{001B}[0m"
         }
         if let style,
           capabilityProfile.emitsStyleEscapeSequences,
@@ -448,7 +464,7 @@ extension TerminalSurfaceRenderer {
       result += closeHyperlinkSequence()
     }
     if activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
-      result += escapeSequence(forCodes: [0])
+      result += "\u{001B}[0m"
     }
 
     if let width {
@@ -588,137 +604,129 @@ extension TerminalSurfaceRenderer {
     return String(cell.character)
   }
 
+  /// Builds the SGR escape sequence for `style` directly into a String,
+  /// avoiding intermediate `[String]` / `[Int]` arrays.
   private func styleSequence(
     for style: ResolvedTextStyle
   ) -> String? {
-    var codes: [String] = []
-    codes.append(contentsOf: emphasisCodes(for: style))
+    // Build the sequence by appending SGR codes directly into a String.
+    // The escape prefix and `m` suffix are added once at the edges.
+    var seq = "\u{001B}["
+    var hasCodes = false
 
-    if let foregroundColor = style.foregroundColor,
-      let foregroundCodes = colorCodes(
-        color: foregroundColor,
-        isBackground: false
-      )
-    {
-      codes.append(contentsOf: foregroundCodes.map(String.init))
+    @inline(__always)
+    func appendCode(_ code: String) {
+      if hasCodes { seq += ";" }
+      seq += code
+      hasCodes = true
     }
 
-    if let backgroundColor = style.backgroundColor,
-      let backgroundCodes = colorCodes(
-        color: backgroundColor,
-        isBackground: true
-      )
-    {
-      codes.append(contentsOf: backgroundCodes.map(String.init))
+    @inline(__always)
+    func appendIntCode(_ code: Int) {
+      if hasCodes { seq += ";" }
+      seq += String(code)
+      hasCodes = true
     }
 
-    if let underlineColor = style.underlineStyle?.color,
-      let underlineColorCodes = underlineColorCodes(for: underlineColor)
-    {
-      codes.append(contentsOf: underlineColorCodes)
-    }
-
-    guard !codes.isEmpty else {
-      return nil
-    }
-
-    return escapeSequence(forCodeStrings: codes)
-  }
-
-  private func emphasisCodes(
-    for style: ResolvedTextStyle
-  ) -> [String] {
-    var codes: [String] = []
-
-    if style.emphasis.contains(.bold) {
-      codes.append("1")
-    }
-    if style.emphasis.contains(.faint) || style.opacity < 1 {
-      codes.append("2")
-    }
-    if style.emphasis.contains(.italic) {
-      codes.append("3")
-    }
+    // Emphasis codes (inlined from former emphasisCodes(for:)).
+    if style.emphasis.contains(.bold) { appendCode("1") }
+    if style.emphasis.contains(.faint) || style.opacity < 1 { appendCode("2") }
+    if style.emphasis.contains(.italic) { appendCode("3") }
     if let underlineStyle = style.underlineStyle {
-      codes.append(underlineCode(for: underlineStyle))
+      switch underlineStyle.pattern {
+      case .solid: appendCode("4")
+      case .double: appendCode("4:2")
+      case .curly: appendCode("4:3")
+      case .dot: appendCode("4:4")
+      case .dash, .dashDot, .dashDotDot: appendCode("4:5")
+      }
     }
-    if style.emphasis.contains(.blink) {
-      codes.append("5")
-    }
-    if style.emphasis.contains(.reverse) {
-      codes.append("7")
-    }
-    if style.strikethroughStyle != nil {
-      codes.append("9")
+    if style.emphasis.contains(.blink) { appendCode("5") }
+    if style.emphasis.contains(.reverse) { appendCode("7") }
+    if style.strikethroughStyle != nil { appendCode("9") }
+
+    // Foreground color codes (inlined from former colorCodes).
+    if let fg = style.foregroundColor {
+      appendColorCodes(for: fg, isBackground: false, into: &seq, hasCodes: &hasCodes)
     }
 
-    return codes
-  }
-
-  private func underlineCode(
-    for style: TextLineStyle
-  ) -> String {
-    switch style.pattern {
-    case .solid:
-      return "4"
-    case .double:
-      return "4:2"
-    case .curly:
-      return "4:3"
-    case .dot:
-      return "4:4"
-    case .dash, .dashDot, .dashDotDot:
-      return "4:5"
+    // Background color codes.
+    if let bg = style.backgroundColor {
+      appendColorCodes(for: bg, isBackground: true, into: &seq, hasCodes: &hasCodes)
     }
-  }
 
-  private func underlineColorCodes(
-    for color: Color
-  ) -> [String]? {
-    guard capabilityProfile.colorLevel != .none else {
+    // Underline color.
+    if let underlineColor = style.underlineStyle?.color {
+      appendUnderlineColorCodes(for: underlineColor, into: &seq, hasCodes: &hasCodes)
+    }
+
+    guard hasCodes else {
       return nil
     }
 
-    switch capabilityProfile.colorLevel {
-    case .none, .ansi16:
-      return nil
-    case .ansi256:
-      return ["58", "5", String(ansi256Code(for: color))]
-    case .trueColor:
-      return [
-        "58",
-        "2",
-        String(Int(color.red * 255)),
-        String(Int(color.green * 255)),
-        String(Int(color.blue * 255)),
-      ]
-    }
+    seq += "m"
+    return seq
   }
 
-  private func colorCodes(
-    color: Color,
-    isBackground: Bool
-  ) -> [Int]? {
-    guard capabilityProfile.colorLevel != .none else {
-      return nil
+  /// Appends SGR color codes for `color` directly into `seq`.
+  private func appendColorCodes(
+    for color: Color,
+    isBackground: Bool,
+    into seq: inout String,
+    hasCodes: inout Bool
+  ) {
+    @inline(__always)
+    func appendCode(_ code: Int) {
+      if hasCodes { seq += ";" }
+      seq += String(code)
+      hasCodes = true
     }
 
     switch capabilityProfile.colorLevel {
     case .none:
-      return nil
+      break
     case .ansi16:
       let code = closestANSI16ForegroundCode(for: color)
-      return [isBackground ? backgroundCode(forForegroundCode: code) : code]
+      appendCode(isBackground ? backgroundCode(forForegroundCode: code) : code)
     case .ansi256:
-      return [isBackground ? 48 : 38, 5, ansi256Code(for: color)]
+      appendCode(isBackground ? 48 : 38)
+      appendCode(5)
+      appendCode(ansi256Code(for: color))
     case .trueColor:
-      return [
-        isBackground ? 48 : 38,
-        2,
-        Int(color.red * 255),
-        Int(color.green * 255),
-        Int(color.blue * 255),
-      ]
+      appendCode(isBackground ? 48 : 38)
+      appendCode(2)
+      appendCode(Int(color.red * 255))
+      appendCode(Int(color.green * 255))
+      appendCode(Int(color.blue * 255))
+    }
+  }
+
+  /// Appends underline color SGR codes directly into `seq`.
+  private func appendUnderlineColorCodes(
+    for color: Color,
+    into seq: inout String,
+    hasCodes: inout Bool
+  ) {
+    @inline(__always)
+    func appendCode(_ code: String) {
+      if hasCodes { seq += ";" }
+      seq += code
+      hasCodes = true
+    }
+
+    switch capabilityProfile.colorLevel {
+    case .none, .ansi16:
+      break
+    case .ansi256:
+      appendCode("58")
+      appendCode("5")
+      appendCode(String(ansi256Code(for: color)))
+    case .trueColor:
+      appendCode("58")
+      appendCode("2")
+      appendCode(String(Int(color.red * 255)))
+      appendCode(String(Int(color.green * 255)))
+      appendCode(String(Int(color.blue * 255)))
     }
   }
 
@@ -807,24 +815,64 @@ extension TerminalSurfaceRenderer {
     code + 10
   }
 
+  /// Cache for recent ANSI16 color lookups.  The deltaE computation is
+  /// expensive; apps typically use a small set of colors so a tiny cache
+  /// eliminates almost all redundant work across a frame.
+  private static let ansi16Cache = ANSI16Cache()
+
+  private final class ANSI16Cache: Sendable {
+    private struct Storage {
+      // Fixed-size ring of the last 8 mappings.
+      var entries: [(color: Color, code: Int)] = []
+      var cursor: Int = 0
+    }
+
+    private let storage = OSAllocatedUnfairLock<Storage>(uncheckedState: .init())
+
+    func lookup(for color: Color) -> Int? {
+      storage.withLock { storage in
+        storage.entries.first(where: { $0.color == color })?.code
+      }
+    }
+
+    func store(color: Color, code: Int) {
+      storage.withLock { storage in
+        if storage.entries.count < 8 {
+          storage.entries.append((color, code))
+        } else {
+          storage.entries[storage.cursor] = (color, code)
+          storage.cursor = (storage.cursor + 1) % 8
+        }
+      }
+    }
+  }
+
+  private static let ansi16Palette: [(Int, Color)] = [
+    (30, .init(hexRGB: 0x000000)),
+    (91, .init(hexRGB: 0xFF5555)),
+    (92, .init(hexRGB: 0x50C878)),
+    (93, .init(hexRGB: 0xFFD700)),
+    (94, .init(hexRGB: 0x6495ED)),
+    (95, .init(hexRGB: 0xDA70D6)),
+    (96, .init(hexRGB: 0x40E0D0)),
+    (97, .init(hexRGB: 0xF5F5F5)),
+    (90, .init(hexRGB: 0x808080)),
+  ]
+
   private func closestANSI16ForegroundCode(
     for color: Color
   ) -> Int {
-    let palette: [(Int, Color)] = [
-      (30, .init(hexRGB: 0x000000)),
-      (91, .init(hexRGB: 0xFF5555)),
-      (92, .init(hexRGB: 0x50C878)),
-      (93, .init(hexRGB: 0xFFD700)),
-      (94, .init(hexRGB: 0x6495ED)),
-      (95, .init(hexRGB: 0xDA70D6)),
-      (96, .init(hexRGB: 0x40E0D0)),
-      (97, .init(hexRGB: 0xF5F5F5)),
-      (90, .init(hexRGB: 0x808080)),
-    ]
+    if let cached = Self.ansi16Cache.lookup(for: color) {
+      return cached
+    }
 
-    return palette.min {
-      color.deltaE(to: $0.1) < color.deltaE(to: $1.1)
-    }?.0 ?? 97
+    let code =
+      Self.ansi16Palette.min {
+        color.deltaE(to: $0.1) < color.deltaE(to: $1.1)
+      }?.0 ?? 97
+
+    Self.ansi16Cache.store(color: color, code: code)
+    return code
   }
 
   private func ansi256Code(
