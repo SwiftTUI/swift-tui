@@ -254,10 +254,10 @@ extension TabView {
               }
               if hasLiteralTabEdgeRow {
                 literalTabBottomSegment(
+                  index: index,
                   label: option.label.displayText,
                   isSelected: isSelected,
-                  tone: activeTone,
-                  styleEnvironment: styleEnvironment
+                  tone: activeTone
                 )
               }
             }
@@ -267,9 +267,23 @@ extension TabView {
       }
       .frame(height: stripHeight, alignment: .leading)
       .background {
-        if focusActive {
-          Rectangle()
-            .fill(AnyShapeStyle(.terminalSurface(activeTone)))
+        ZStack(alignment: .topLeading) {
+          if focusActive {
+            Rectangle()
+              .fill(AnyShapeStyle(.terminalSurface(activeTone)))
+          }
+          if hasLiteralTabEdgeRow {
+            VStack(alignment: .leading, spacing: 0) {
+              Spacer(minLength: 0)
+                .frame(height: stripHeight - 1)
+              Divider(
+                drawMetadata: .init(
+                  foregroundStyle: .semantic(.foreground)
+                )
+              )
+              .frame(maxWidth: .infinity, minHeight: 1, maxHeight: 1, alignment: .leading)
+            }
+          }
         }
       }
       if options.indices.contains(activeIndex), let activeNode = options[activeIndex].node {
@@ -301,11 +315,10 @@ extension TabView {
         tone: tone
       )
     case .literalTabs:
-      roundedTabItem(
+      literalTabItem(
         label: label,
         isSelected: isSelected,
-        tone: tone,
-        styleEnvironment: styleEnvironment
+        tone: tone
       )
     case .powerline:
       powerlineTabItem(
@@ -359,8 +372,7 @@ extension TabView {
         label: label,
         isSelected: isSelected,
         isFocused: isFocused,
-        tone: tone,
-        styleEnvironment: styleEnvironment
+        tone: tone
       )
     case .powerline:
       EmptyView()
@@ -390,92 +402,67 @@ extension TabView {
 
   // MARK: - Rounded style (unicode tab shapes)
 
-  private func roundedTabItem(
+  private func literalTabItem(
     label: String,
     isSelected: Bool,
-    tone: TerminalTone,
-    styleEnvironment: StyleEnvironmentSnapshot
+    tone: TerminalTone
   ) -> some View {
     let interiorWidth = tabLabelCellWidth(label) + 2
     let topText = "╭" + String(repeating: "─", count: interiorWidth) + "╮"
-    let selectedBackgroundColor = powerlineSelectedBackgroundColor(
-      tone: tone,
-      styleEnvironment: styleEnvironment
-    )
-    let foreground: AnyShapeStyle =
-      isSelected
-      ? AnyShapeStyle(contrastingForegroundColor(on: selectedBackgroundColor))
-      : .semantic(.separator)
+    let chromeForeground = AnyShapeStyle(.foreground)
     return Text(topText)
       .lineLimit(1)
-      .foregroundStyle(foreground)
-      .background {
-        if isSelected {
-          Rectangle().fill(AnyShapeStyle(selectedBackgroundColor))
-        }
-      }
-      .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.8))
+      .foregroundStyle(chromeForeground)
+      .drawMetadata(.init(opacity: 1.0))
   }
 
   private func roundedRuleSegment(
     label: String,
     isSelected: Bool,
     isFocused: Bool,
-    tone: TerminalTone,
-    styleEnvironment: StyleEnvironmentSnapshot
+    tone: TerminalTone
   ) -> some View {
-    let text =
-      "│ \(label) │"
-    let selectedBackgroundColor = powerlineSelectedBackgroundColor(
-      tone: tone,
-      styleEnvironment: styleEnvironment
-    )
-    let foreground: AnyShapeStyle =
+    let chromeForeground = AnyShapeStyle(.foreground)
+    let labelForeground: AnyShapeStyle =
       isSelected
-      ? AnyShapeStyle(contrastingForegroundColor(on: selectedBackgroundColor))
+      ? AnyShapeStyle(.terminalAccent(tone))
       : .semantic(.separator)
-    return Text(text)
-      .lineLimit(1)
-      .foregroundStyle(foreground)
-      .background {
-        if isSelected {
-          Rectangle().fill(AnyShapeStyle(selectedBackgroundColor))
-        }
-      }
-      .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.8))
-      .frame(height: 1, alignment: .leading)
+    return HStack(alignment: .top, spacing: 0) {
+      Text("│ ")
+        .lineLimit(1)
+        .foregroundStyle(chromeForeground)
+        .drawMetadata(.init(opacity: 1.0))
+      Text(label)
+        .lineLimit(1)
+        .foregroundStyle(labelForeground)
+        .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.8))
+      Text(" │")
+        .lineLimit(1)
+        .foregroundStyle(chromeForeground)
+        .drawMetadata(.init(opacity: 1.0))
+    }
+    .frame(height: 1, alignment: .leading)
   }
 
   private func literalTabBottomSegment(
+    index: Int,
     label: String,
     isSelected: Bool,
-    tone: TerminalTone,
-    styleEnvironment: StyleEnvironmentSnapshot
+    tone: TerminalTone
   ) -> some View {
     let interiorWidth = tabLabelCellWidth(label) + 2
+    let inactiveLeadingGlyph = "┴"
+    let chromeForeground = AnyShapeStyle(.foreground)
     let text =
       if isSelected {
-        "│" + String(repeating: " ", count: interiorWidth) + "│"
+        "┘" + String(repeating: " ", count: interiorWidth) + "└"
       } else {
-        "╰" + String(repeating: "─", count: interiorWidth) + "╯"
+        inactiveLeadingGlyph + String(repeating: "─", count: interiorWidth) + "┴"
       }
-    let selectedBackgroundColor = powerlineSelectedBackgroundColor(
-      tone: tone,
-      styleEnvironment: styleEnvironment
-    )
-    let foreground: AnyShapeStyle =
-      isSelected
-      ? AnyShapeStyle(contrastingForegroundColor(on: selectedBackgroundColor))
-      : .semantic(.separator)
     return Text(text)
       .lineLimit(1)
-      .foregroundStyle(foreground)
-      .background {
-        if isSelected {
-          Rectangle().fill(AnyShapeStyle(selectedBackgroundColor))
-        }
-      }
-      .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.8))
+      .foregroundStyle(chromeForeground)
+      .drawMetadata(.init(opacity: 1.0))
       .frame(height: 1, alignment: .leading)
   }
 
