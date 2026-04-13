@@ -250,6 +250,34 @@ public struct Animation: Equatable, Hashable, Sendable {
     }
   }
 
+  /// The total wall-clock duration of this animation — including
+  /// ``delayDuration``, ``speedMultiplier``, and any bounded repeat
+  /// count.
+  ///
+  /// Returns `nil` for animations that repeat forever: an infinite
+  /// animation has no logical completion time, and the animation
+  /// controller uses `nil` as a sentinel to skip stranded-batch
+  /// drains for those animations (matching SwiftUI's behavior of
+  /// never firing `withAnimation` completions for `.repeatForever`
+  /// scopes).
+  package var totalDuration: Duration? {
+    let iterationCount: Int
+    switch repeatBehavior {
+    case .forever:
+      return nil
+    case .count(let n, _):
+      iterationCount = max(0, n)
+    case nil:
+      iterationCount = 1
+    }
+    let singleSecs = iterationDurationSeconds
+    let adjustedSingleSecs =
+      speedMultiplier > 0 ? singleSecs / speedMultiplier : singleSecs
+    let totalSecs = adjustedSingleSecs * Double(iterationCount)
+    let totalNanos = Int64((totalSecs * 1_000_000_000).rounded())
+    return delayDuration + .nanoseconds(totalNanos)
+  }
+
   /// The nominal duration of one full iteration, used by the repeat
   /// bookkeeping in ``evaluate(elapsed:)``.
   ///

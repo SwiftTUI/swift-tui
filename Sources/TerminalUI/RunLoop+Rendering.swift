@@ -172,9 +172,21 @@ extension RunLoop {
       if animationTick.hasActiveAnimations,
         let nextDeadline = animationTick.nextDeadline
       {
+        // Schedule the next animation tick when either: some
+        // geometrically-visible identity is still animating, OR the
+        // tick carries pending work that isn't tied to any identity
+        // at all.  The second case covers stranded-batch drains
+        // fired by ``scheduleStrandedBatchDrains`` — they're
+        // identity-agnostic (a logical `withAnimation` batch, not a
+        // visible view), and the viewport predicate would otherwise
+        // trap them: ``Set<Identity>().isDisjoint(with: any)`` is
+        // always `true`, so an empty ``affectedIdentities`` would
+        // skip the reschedule and the completion would never fire
+        // until some unrelated external event woke the loop.
         let anyAffectedIdentityVisible = !animationTick.affectedIdentities
           .isDisjoint(with: artifacts.drawnIdentities)
-        if anyAffectedIdentityVisible {
+        let isIdentityAgnosticTick = animationTick.affectedIdentities.isEmpty
+        if anyAffectedIdentityVisible || isIdentityAgnosticTick {
           let now = MonotonicInstant.now()
           let scheduledDeadline =
             if nextDeadline > now {

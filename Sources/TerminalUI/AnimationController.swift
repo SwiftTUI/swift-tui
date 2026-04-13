@@ -298,6 +298,21 @@ package final class AnimationController {
   /// decremented when an animation completes or is superseded.  When
   /// a count hits zero, the matching completion closure fires.
   private var batchRefCounts: [AnimationBatchID: Int] = [:]
+  /// Batches whose `withAnimation { ... } completion: { ... }` scope
+  /// registered a completion closure but produced zero retained
+  /// animations during their resolve pass — e.g. because the only
+  /// changes in the body touched a shape style the controller doesn't
+  /// track (gradients, pattern fills) or a property not in
+  /// ``AnimatableProperty``.
+  ///
+  /// Each entry stores the absolute time the controller should fire
+  /// the completion.  ``applyInterpolations`` walks this map on every
+  /// tick and drains entries whose deadline has elapsed, keeping
+  /// stranded completions from leaking indefinitely.  A SwiftUI-shaped
+  /// guarantee: every `withAnimation` completion eventually fires,
+  /// even when the body changed nothing the controller can
+  /// interpolate.
+  private var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant] = [:]
   /// Registrations collected during the *current* frame's resolve pass.
   /// Used to look up transitions on INSERTION.
   private var transitionsByIdentity: [Identity: AnyTransition] = [:]
@@ -1007,6 +1022,92 @@ package final class AnimationController {
     previousTreeRoot = node
     previousParentByIdentity = newParentByIdentity
     previousChildIndexByIdentity = newChildIndexByIdentity
+
+    // Drain stranded completions.  Any batch that has a registered
+    // completion closure but no live ref count (no property, no
+    // removal, no insertion, no matched-geometry retained it) will
+    // otherwise leak forever — and any `withAnimation` caller that
+    // await-ed on its completion (like ``PhaseAnimator``) would hang.
+    // Schedule a drain for each such batch here; the drain fires
+    // after the animation's nominal duration in ``applyInterpolations``.
+    scheduleStrandedBatchDrains(
+      transaction: transaction,
+      timestamp: timestamp
+    )
+  }
+
+  /// Records a delayed completion firing when the current resolve
+  /// pass opens a batch that never gets retained.  Called at the end
+  /// of ``processResolvedTree`` once every retain path has had a
+  /// chance to bump ``batchRefCounts``.
+  ///
+  /// Only acts on the batch carried by the incoming transaction —
+  /// that is, the batch *this* `withAnimation` scope just opened.
+  /// Completions for other batches (e.g. registered but not yet
+  /// brought through a resolve pass) are left alone so they can be
+  /// handled by their own home frame.
+  ///
+  /// The drain delay matches the animation's nominal wall-clock
+  /// duration, so callers that asked for a 500 ms animation still
+  /// observe a 500 ms delay before their completion fires — even
+  /// when the body changed nothing the controller can interpolate.
+  /// An animation with ``RepeatBehavior/forever`` has no logical
+  /// completion time and is skipped entirely, matching SwiftUI's
+  /// behavior of never firing `withAnimation` completions for
+  /// `.repeatForever` scopes.
+  private func scheduleStrandedBatchDrains(
+    transaction: TransactionSnapshot,
+    timestamp: MonotonicInstant
+  ) {
+    // Find the one batch this resolve pass was opened for.  A single
+    // ``withAnimation`` scope opens exactly one batch per top-level
+    // call; nested `.animation(_:value:)` modifiers don't register
+    // completions, so we only ever have at most one stranded batch
+    // to consider per pass.
+    guard let batchID = transaction.animationBatchID else { return }
+    // A batch already tracked by ``batchRefCounts`` has at least
+    // one retained animation that will release it via the normal
+    // path — leave it alone.
+    guard batchRefCounts[batchID] == nil else { return }
+    // Only act on batches that registered a completion closure.  A
+    // plain `withAnimation(anim) { ... }` (no completion overload)
+    // never calls ``registerCompletion``, so there's nothing to
+    // drain even when the body changes nothing tracked.
+    guard completionClosures[batchID] != nil else { return }
+    // Don't reschedule a drain that's already pending from a
+    // previous resolve pass.
+    guard pendingEmptyBatchCompletions[batchID] == nil else { return }
+
+    let drainDelay: Duration?
+    switch transaction.animationRequest {
+    case .animate(let box):
+      if let animation = registeredAnimations[box] {
+        // ``totalDuration`` is `nil` for `.repeatForever`.
+        drainDelay = animation.totalDuration
+      } else {
+        // Box without registration — fire immediately.  The
+        // registration usually happens at withAnimation-time, so
+        // a missing entry means the caller wanted a snap or
+        // constructed the transaction manually.
+        drainDelay = .zero
+      }
+    case .disabled, .inherit:
+      // `withAnimation(nil, body, completion)` routes through here:
+      // no animation was requested, so the completion is logically
+      // complete as soon as the body returns.
+      drainDelay = .zero
+    }
+
+    guard let drainDelay else {
+      // Infinite animation — don't fire the completion, matching
+      // SwiftUI.  Drop the closure so it doesn't leak indefinitely
+      // as every subsequent frame would revisit it.
+      completionClosures.removeValue(forKey: batchID)
+      return
+    }
+
+    pendingEmptyBatchCompletions[batchID] =
+      timestamp.advanced(by: drainDelay)
   }
 
   /// Recursively searches a resolved tree for the subtree rooted at
@@ -1484,6 +1585,7 @@ package final class AnimationController {
         || !removingIdentities.isEmpty
         || !insertionOffsetAnimations.isEmpty
         || !matchedGeometryAnimations.isEmpty
+        || !pendingEmptyBatchCompletions.isEmpty
     else {
       lastTickResult = AnimationTickResult()
       return lastTickResult
@@ -1645,6 +1747,36 @@ package final class AnimationController {
       }
       for identity in matchedGeometryAnimations.keys {
         affectedIdentities.insert(identity)
+      }
+    }
+
+    // Drain stranded `withAnimation` completions whose target time
+    // has elapsed.  Any batch whose resolve pass found no animatable
+    // property to retain was parked here by
+    // ``scheduleStrandedBatchDrains``; we fire its completion once
+    // the wall-clock has caught up to the animation's nominal
+    // duration.  The closure is removed in a single pass so the same
+    // drain can't double-fire across subsequent ticks.
+    if !pendingEmptyBatchCompletions.isEmpty {
+      var drainedBatchIDs: [AnimationBatchID] = []
+      for (batchID, deadline) in pendingEmptyBatchCompletions {
+        if deadline <= timestamp {
+          drainedBatchIDs.append(batchID)
+          continue
+        }
+        // Still in flight — keep the run loop ticking until its
+        // deadline arrives.  Adopt the earliest still-pending drain
+        // deadline so the scheduler wakes exactly when needed.
+        hasPendingWork = true
+        if latestDeadline == timestamp || deadline < latestDeadline {
+          latestDeadline = deadline
+        }
+      }
+      for batchID in drainedBatchIDs {
+        pendingEmptyBatchCompletions.removeValue(forKey: batchID)
+        if let closure = completionClosures.removeValue(forKey: batchID) {
+          closure()
+        }
       }
     }
 
@@ -2041,6 +2173,7 @@ package final class AnimationController {
     registeredAnimations.removeAll(keepingCapacity: true)
     completionClosures.removeAll(keepingCapacity: true)
     batchRefCounts.removeAll(keepingCapacity: true)
+    pendingEmptyBatchCompletions.removeAll(keepingCapacity: true)
     transitionsByIdentity.removeAll(keepingCapacity: true)
     previousTransitionsByIdentity.removeAll(keepingCapacity: true)
     pendingTransitionsByIdentity.removeAll(keepingCapacity: true)
