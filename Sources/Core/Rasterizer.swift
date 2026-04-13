@@ -93,12 +93,22 @@ public struct Rasterizer {
 
     var visibleIdentities: Set<Identity> = []
 
+    // Pre-compute the dirty-row range once so the per-node culling check
+    // in `paint(node:...)` is O(1) instead of O(|dirtyRows|).
+    let dirtyRowRange: (min: Int, max: Int)?
+    if let dirtyRows, let lo = dirtyRows.min(), let hi = dirtyRows.max() {
+      dirtyRowRange = (min: lo, max: hi)
+    } else {
+      dirtyRowRange = nil
+    }
+
     paint(
       node: draw,
       cells: &cells,
       imageAttachments: &imageAttachments,
       clip: nil,
       dirtyRows: dirtyRows,
+      dirtyRowRange: dirtyRowRange,
       visibleIdentities: &visibleIdentities
     )
 
@@ -165,6 +175,7 @@ extension Rasterizer {
     imageAttachments: inout [RasterImageAttachment],
     clip: Rect?,
     dirtyRows: Set<Int>?,
+    dirtyRowRange: (min: Int, max: Int)?,
     visibleIdentities: inout Set<Identity>
   ) {
     // Two frame kinds.  A `.visit` frame paints the node's `commands`
@@ -224,20 +235,15 @@ extension Rasterizer {
           visibleIdentities.insert(node.identity)
         }
 
-        if let dirtyRows {
+        if let dirtyRowRange {
           let nodeTop = max(0, visibleBounds.origin.y)
           let nodeBottom = nodeTop + max(0, visibleBounds.size.height)
-          if nodeBottom > nodeTop {
-            var intersects = false
-            for row in dirtyRows {
-              if row >= nodeTop, row < nodeBottom {
-                intersects = true
-                break
-              }
-            }
-            if !intersects {
-              continue
-            }
+          // O(1) range-overlap check: skip subtree when its row span
+          // is entirely outside the dirty-row range.
+          if nodeBottom > nodeTop,
+            nodeBottom <= dirtyRowRange.min || nodeTop > dirtyRowRange.max
+          {
+            continue
           }
         }
 
@@ -364,7 +370,7 @@ extension Rasterizer {
         }
 
         for (lineIndex, line) in lines.prefix(bounds.size.height).enumerated() {
-          let clusters = layoutText(for: line, width: nil).lines.first?.clusters ?? []
+          let clusters = clusterize(line)
           var x = bounds.origin.x
           for cluster in clusters {
             guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {

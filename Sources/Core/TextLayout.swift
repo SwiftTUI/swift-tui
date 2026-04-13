@@ -267,6 +267,18 @@ public func layoutText(
   )
 }
 
+/// Maps a single line of text directly to clusters without going through
+/// the ``TextLayoutCache`` or the wrapping/truncation pipeline.  Intended
+/// for preformatted text that is known to be a single, unwrapped line.
+package func clusterize(_ line: String) -> [TextCluster] {
+  line.map { character in
+    TextCluster(
+      character: character,
+      cellWidth: cellWidth(of: character)
+    )
+  }
+}
+
 package func layoutRichText(
   for payload: RichTextPayload,
   options: TextLayoutOptions
@@ -872,33 +884,56 @@ private func isWordLikeScalar(_ scalar: Unicode.Scalar) -> Bool {
 }
 
 package func cellWidth(of character: Character) -> Int {
-  let scalars = Array(character.unicodeScalars)
-  guard !scalars.isEmpty else {
+  let scalars = character.unicodeScalars
+
+  // Fast path: single ASCII scalar covers ~95% of terminal text and
+  // avoids touching Unicode property lookups entirely.
+  let first = scalars.first
+  guard let first else {
     return 0
   }
-
-  let containsEmojiPresentation = scalars.contains {
-    $0.properties.isEmojiPresentation
+  if first.value < 0x80, scalars.dropFirst().isEmpty {
+    return first.value == 0 ? 0 : 1
   }
-  let containsEmojiCluster =
-    scalars.count > 1
-    && scalars.contains {
-      $0.properties.isEmoji
+
+  // Multi-scalar or non-ASCII: check emoji presentation, VS16,
+  // wide CJK ranges, and zero-width marks.
+  var scalarCount = 0
+  var containsEmojiPresentation = false
+  var containsEmoji = false
+  var containsVS16 = false
+  var containsWide = false
+  var allZeroWidth = true
+
+  for scalar in scalars {
+    scalarCount += 1
+    if scalar.properties.isEmojiPresentation {
+      containsEmojiPresentation = true
     }
-  if containsEmojiPresentation || containsEmojiCluster {
-    return 2
+    if scalar.properties.isEmoji {
+      containsEmoji = true
+    }
+    if scalar.value == 0xFE0F {
+      containsVS16 = true
+    }
+    if isWideScalar(scalar) {
+      containsWide = true
+    }
+    if !isZeroWidthScalar(scalar) {
+      allZeroWidth = false
+    }
   }
 
-  let containsVS16 = scalars.contains { $0.value == 0xFE0F }
-  if containsVS16 && scalars.contains(where: { $0.properties.isEmoji }) {
+  if containsEmojiPresentation || (scalarCount > 1 && containsEmoji) {
     return 2
   }
-
-  if scalars.contains(where: isWideScalar) {
+  if containsVS16 && containsEmoji {
     return 2
   }
-
-  if scalars.allSatisfy(isZeroWidthScalar) {
+  if containsWide {
+    return 2
+  }
+  if allZeroWidth {
     return 0
   }
 
