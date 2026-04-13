@@ -27,7 +27,7 @@ public struct GalleryView: View {
         .tabItem("Animations")
         .tag(Tab.animations)
     }
-    .tabViewStyle(.powerline)
+    .tabViewStyle(.literalTabs)
   }
 }
 
