@@ -5,6 +5,7 @@ public import Core
 public struct TabView<SelectionValue: Hashable, Content: View>: View, ResolvableView {
   public var selection: Binding<SelectionValue>
   private var content: Content
+  private let authoringScope: AuthoringContext?
 
   public init(
     selection: Binding<SelectionValue>,
@@ -12,12 +13,16 @@ public struct TabView<SelectionValue: Hashable, Content: View>: View, Resolvable
   ) {
     self.selection = selection
     self.content = content()
+    authoringScope = currentAuthoringContext()
   }
 
   package func resolveElements(
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    [resolvedNode(in: context)]
+    let dynamicPropertyScope = dynamicPropertyAuthoringContext(for: context)
+    return withAuthoringContext(dynamicPropertyScope) {
+      [resolvedNode(in: context)]
+    }
   }
 }
 
@@ -35,39 +40,84 @@ extension TabView {
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
+    let ownerNode = context.viewGraph?.nodeForIdentity(context.identity)
     let options = resolvedOptions(in: context.child(component: .named("TabOptions")))
     let selectedIndex =
       options.firstIndex { option in
         pickerSelectionMatches(option.tag, selection: selection.wrappedValue)
       }
       ?? options.indices.first
+    let focusedIndex: Int? =
+      if isFocused {
+        resolvedFocusedTabIndex(
+          storedIndex: storedFocusedTabIndex(in: ownerNode),
+          selectedIndex: selectedIndex,
+          optionCount: options.count
+        )
+      } else {
+        nil
+      }
 
     if isEnabled {
       let binding = selection
-      let dynamicPropertyScope = currentAuthoringContext()
-      context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
-        let delta: Int?
-        switch event {
-        case .arrowLeft:
-          delta = -1
-        case .arrowRight:
-          delta = 1
-        default:
-          delta = nil
-        }
+      let orderedTags = options.map(\.tag)
+      let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
+      context.localKeyHandlerRegistry?.register(
+        identity: context.identity,
+        keyPressHandler: {
+          keyPress in
+          guard !options.isEmpty else {
+            return false
+          }
 
-        guard let delta, !options.isEmpty else {
-          return false
-        }
-
-        return withAuthoringContext(dynamicPropertyScope) {
-          stepBoundSelection(
-            binding,
-            orderedTags: options.map(\.tag),
-            delta: delta
-          )
-        }
-      }
+          return withAuthoringContext(dynamicPropertyScope) {
+            switch keyPress {
+            case KeyPress(.arrowLeft, modifiers: []):
+              moveStoredTabFocus(
+                ownerNode: ownerNode,
+                selectedIndex: selectedIndex,
+                optionCount: options.count,
+                delta: -1
+              )
+              return true
+            case KeyPress(.arrowRight, modifiers: []):
+              moveStoredTabFocus(
+                ownerNode: ownerNode,
+                selectedIndex: selectedIndex,
+                optionCount: options.count,
+                delta: 1
+              )
+              return true
+            case KeyPress(.home, modifiers: []):
+              setStoredFocusedTabIndex(0, in: ownerNode)
+              return true
+            case KeyPress(.end, modifiers: []):
+              setStoredFocusedTabIndex(max(0, options.count - 1), in: ownerNode)
+              return true
+            case KeyPress(.arrowUp, modifiers: []), KeyPress(.arrowDown, modifiers: []):
+              return true
+            case KeyPress(.tab, modifiers: []), KeyPress(.tab, modifiers: .shift):
+              setStoredFocusedTabIndex(nil, in: ownerNode)
+              return false
+            default:
+              return false
+            }
+          }
+        })
+      context.localActionRegistry?.register(
+        identity: context.identity,
+        handler: {
+          withAuthoringContext(dynamicPropertyScope) {
+            activateBoundTabSelection(
+              binding,
+              focusedIndexOwnerNode: ownerNode,
+              orderedTags: orderedTags,
+              selectedIndex: selectedIndex
+            )
+          }
+        },
+        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+      )
 
       for index in options.indices {
         let routeID = primaryRouteID(
@@ -82,7 +132,8 @@ extension TabView {
           }
 
           return withAuthoringContext(dynamicPropertyScope) {
-            setBoundSelection(binding, to: options[index].tag)
+            setStoredFocusedTabIndex(index, in: ownerNode)
+            return setBoundSelection(binding, to: options[index].tag)
           }
         }
       }
@@ -95,6 +146,7 @@ extension TabView {
         controlIdentity: context.identity,
         options: options,
         selectedIndex: selectedIndex,
+        focusedIndex: focusedIndex,
         isFocused: isFocused,
         showsFocusEffect: showsFocusEffect,
         styleEnvironment: styleEnvironment,
@@ -111,7 +163,7 @@ extension TabView {
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
         isFocusable: true,
-        focusInteractions: .edit,
+        focusInteractions: .activate,
         presentationRole: .tabView
       )
     )
@@ -194,6 +246,7 @@ extension TabView {
     controlIdentity: Identity,
     options: [TabOption],
     selectedIndex: Int?,
+    focusedIndex: Int?,
     isFocused: Bool,
     showsFocusEffect: Bool,
     styleEnvironment: StyleEnvironmentSnapshot,
@@ -218,6 +271,7 @@ extension TabView {
         ForEach(options.indices, id: \.self) { index in
           let option = options[index]
           let isSelected = index == activeIndex
+          let isTabFocused = focusActive && index == focusedIndex
 
           PointerRouteView(
             identity: tabItemIdentity(
@@ -236,6 +290,7 @@ extension TabView {
               tabItemView(
                 label: option.label.displayText,
                 isSelected: isSelected,
+                isFocused: isTabFocused,
                 showsTrailingSeparator: index < options.count - 1,
                 trailingSeparatorStyle: trailingSeparatorStyle,
                 tone: activeTone,
@@ -246,7 +301,7 @@ extension TabView {
                 tabItemRuleSegment(
                   label: option.label.displayText,
                   isSelected: isSelected,
-                  isFocused: focusActive,
+                  isFocused: isTabFocused,
                   tone: activeTone,
                   style: tabStyle,
                   styleEnvironment: styleEnvironment
@@ -261,28 +316,28 @@ extension TabView {
                 )
               }
             }
+            .background {
+              if isTabFocused {
+                Rectangle()
+                  .fill(AnyShapeStyle(.terminalSurface(activeTone)))
+              }
+            }
           )
         }
         Spacer(minLength: 0)
       }
       .frame(height: stripHeight, alignment: .leading)
       .background {
-        ZStack(alignment: .topLeading) {
-          if focusActive {
-            Rectangle()
-              .fill(AnyShapeStyle(.terminalSurface(activeTone)))
-          }
-          if hasLiteralTabEdgeRow {
-            VStack(alignment: .leading, spacing: 0) {
-              Spacer(minLength: 0)
-                .frame(height: stripHeight - 1)
-              Divider(
-                drawMetadata: .init(
-                  foregroundStyle: .semantic(.foreground)
-                )
+        if hasLiteralTabEdgeRow {
+          VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+              .frame(height: stripHeight - 1)
+            Divider(
+              drawMetadata: .init(
+                foregroundStyle: .semantic(.foreground)
               )
-              .frame(maxWidth: .infinity, minHeight: 1, maxHeight: 1, alignment: .leading)
-            }
+            )
+            .frame(maxWidth: .infinity, minHeight: 1, maxHeight: 1, alignment: .leading)
           }
         }
       }
@@ -301,6 +356,7 @@ extension TabView {
   private func tabItemView(
     label: String,
     isSelected: Bool,
+    isFocused: Bool,
     showsTrailingSeparator: Bool,
     trailingSeparatorStyle: PowerlineSeparatorStyle,
     tone: TerminalTone,
@@ -312,18 +368,21 @@ extension TabView {
       underlineTabItem(
         label: label,
         isSelected: isSelected,
+        isFocused: isFocused,
         tone: tone
       )
     case .literalTabs:
       literalTabItem(
         label: label,
         isSelected: isSelected,
+        isFocused: isFocused,
         tone: tone
       )
     case .powerline:
       powerlineTabItem(
         label: label,
         isSelected: isSelected,
+        isFocused: isFocused,
         showsTrailingSeparator: showsTrailingSeparator,
         trailingSeparatorStyle: trailingSeparatorStyle,
         tone: tone,
@@ -337,16 +396,21 @@ extension TabView {
   private func underlineTabItem(
     label: String,
     isSelected: Bool,
+    isFocused: Bool,
     tone: TerminalTone
   ) -> some View {
     let foreground: AnyShapeStyle =
-      isSelected
-      ? AnyShapeStyle(.terminalAccent(tone))
-      : .semantic(.muted)
+      if isSelected {
+        AnyShapeStyle(.terminalAccent(tone))
+      } else if isFocused {
+        .semantic(.foreground)
+      } else {
+        .semantic(.muted)
+      }
     return Text("\(label) ")
       .lineLimit(1)
       .foregroundStyle(foreground)
-      .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.4))
+      .drawMetadata(.init(opacity: isSelected || isFocused ? 1.0 : 0.4))
   }
 
   @ViewBuilder
@@ -389,9 +453,13 @@ extension TabView {
     let glyph: Character =
       if isSelected && isFocused { "▄" } else if isSelected || isFocused { "▂" } else { "▁" }
     let foreground: AnyShapeStyle =
-      isSelected
-      ? AnyShapeStyle(.terminalAccent(tone))
-      : .semantic(.separator)
+      if isSelected {
+        AnyShapeStyle(.terminalAccent(tone))
+      } else if isFocused {
+        .semantic(.foreground)
+      } else {
+        .semantic(.separator)
+      }
     let text =
       "\(String(repeating: glyph, count: width)) "
     return Text(text)
@@ -405,6 +473,7 @@ extension TabView {
   private func literalTabItem(
     label: String,
     isSelected: Bool,
+    isFocused: Bool,
     tone: TerminalTone
   ) -> some View {
     let interiorWidth = tabLabelCellWidth(label) + 2
@@ -424,9 +493,13 @@ extension TabView {
   ) -> some View {
     let chromeForeground = AnyShapeStyle(.foreground)
     let labelForeground: AnyShapeStyle =
-      isSelected
-      ? AnyShapeStyle(.terminalAccent(tone))
-      : .semantic(.separator)
+      if isSelected {
+        AnyShapeStyle(.terminalAccent(tone))
+      } else if isFocused {
+        .semantic(.foreground)
+      } else {
+        .semantic(.separator)
+      }
     return HStack(alignment: .top, spacing: 0) {
       Text("│ ")
         .lineLimit(1)
@@ -435,7 +508,7 @@ extension TabView {
       Text(label)
         .lineLimit(1)
         .foregroundStyle(labelForeground)
-        .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.8))
+        .drawMetadata(.init(opacity: isSelected || isFocused ? 1.0 : 0.8))
       Text(" │")
         .lineLimit(1)
         .foregroundStyle(chromeForeground)
@@ -471,6 +544,7 @@ extension TabView {
   private func powerlineTabItem(
     label: String,
     isSelected: Bool,
+    isFocused: Bool,
     showsTrailingSeparator: Bool,
     trailingSeparatorStyle: PowerlineSeparatorStyle,
     tone: TerminalTone,
@@ -485,9 +559,13 @@ extension TabView {
       contrastingForegroundColor(on: selectedBackgroundColor)
     )
     let foreground: AnyShapeStyle =
-      isSelected
-      ? selectedForegroundStyle
-      : .semantic(.muted)
+      if isSelected {
+        selectedForegroundStyle
+      } else if isFocused {
+        .semantic(.foreground)
+      } else {
+        .semantic(.muted)
+      }
     let separatorGlyph = trailingSeparatorStyle.glyph
     let separatorForeground: AnyShapeStyle =
       trailingSeparatorStyle == .plain
@@ -502,7 +580,7 @@ extension TabView {
             Rectangle().fill(selectedBackgroundStyle)
           }
         }
-        .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.6))
+        .drawMetadata(.init(opacity: isSelected || isFocused ? 1.0 : 0.6))
       if showsTrailingSeparator {
         Text(separatorGlyph)
           .lineLimit(1)
@@ -571,6 +649,93 @@ private func tabLabelCellWidth(
   _ label: String
 ) -> Int {
   layoutText(for: label, width: nil).size.width
+}
+
+@MainActor
+private func resolvedFocusedTabIndex(
+  storedIndex: Int?,
+  selectedIndex: Int?,
+  optionCount: Int
+) -> Int? {
+  guard optionCount > 0 else {
+    return nil
+  }
+  if let storedIndex, (0..<optionCount).contains(storedIndex) {
+    return storedIndex
+  }
+  if let selectedIndex, (0..<optionCount).contains(selectedIndex) {
+    return selectedIndex
+  }
+  return 0
+}
+
+@MainActor
+private func moveStoredTabFocus(
+  ownerNode: Core.ViewNode?,
+  selectedIndex: Int?,
+  optionCount: Int,
+  delta: Int
+) {
+  guard let direction = delta == 0 ? nil : delta.signum(), optionCount > 0 else {
+    return
+  }
+
+  let currentIndex =
+    resolvedFocusedTabIndex(
+      storedIndex: storedFocusedTabIndex(in: ownerNode),
+      selectedIndex: selectedIndex,
+      optionCount: optionCount
+    )
+    ?? (direction > 0 ? -1 : optionCount)
+  let nextIndex = min(
+    max(currentIndex + direction, 0),
+    optionCount - 1
+  )
+  setStoredFocusedTabIndex(nextIndex, in: ownerNode)
+}
+
+@MainActor
+private func activateBoundTabSelection<SelectionValue: Hashable>(
+  _ selectionBinding: Binding<SelectionValue>,
+  focusedIndexOwnerNode: Core.ViewNode?,
+  orderedTags: [SelectionTag],
+  selectedIndex: Int?
+) -> Bool {
+  guard
+    let index = resolvedFocusedTabIndex(
+      storedIndex: storedFocusedTabIndex(in: focusedIndexOwnerNode),
+      selectedIndex: selectedIndex,
+      optionCount: orderedTags.count
+    ),
+    orderedTags.indices.contains(index)
+  else {
+    return false
+  }
+  setStoredFocusedTabIndex(index, in: focusedIndexOwnerNode)
+  return setBoundSelection(selectionBinding, to: orderedTags[index])
+}
+
+private let tabFocusedIndexStateSlot = -4_000_001
+
+@MainActor
+private func storedFocusedTabIndex(
+  in ownerNode: Core.ViewNode?
+) -> Int? {
+  ownerNode?.stateSlot(
+    ordinal: tabFocusedIndexStateSlot,
+    seed: nil as Int?
+  ) ?? nil
+}
+
+@MainActor
+private func setStoredFocusedTabIndex(
+  _ index: Int?,
+  in ownerNode: Core.ViewNode?
+) {
+  ownerNode?.setStateSlot(
+    ordinal: tabFocusedIndexStateSlot,
+    value: index
+  )
 }
 
 extension View {

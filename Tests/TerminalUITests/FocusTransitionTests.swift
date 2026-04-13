@@ -31,6 +31,10 @@ struct FocusTransitionTests {
     .id(testIdentity("Tabs"))
   }
 
+  private static func statefulTabSelectionView() -> some View {
+    StatefulTabSelectionView()
+  }
+
   private func renderArtifacts(
     focusedIdentity: Identity? = nil
   ) -> FrameArtifacts {
@@ -203,8 +207,8 @@ struct FocusTransitionTests {
     #expect(hasHeavy, "Focused bordered button should use heavy border")
   }
 
-  @Test("focused TabView promotes tab underlines to heavy")
-  func focusedTabViewPromotesUnderlines() {
+  @Test("focused TabView emphasizes only the focused tab underline")
+  func focusedTabViewEmphasizesOnlyTheFocusedTabUnderline() {
     var env = EnvironmentValues()
     env.focusedIdentity = testIdentity("Tabs")
 
@@ -231,13 +235,14 @@ struct FocusTransitionTests {
       unfocusedLines.contains { $0.contains("▂") },
       "Unfocused selected tab should use lower quarter block (▂)")
 
-    // Focused: selected tab uses ▄, unselected tabs use ▂
+    // Focused: only the focused tab is promoted; unfocused tabs keep
+    // their resting underline weight.
     #expect(
       focusedLines.contains { $0.contains("▄") },
       "Focused selected tab should use lower half block (▄)")
     #expect(
-      focusedLines.contains { $0.contains("▂") },
-      "Focused unselected tabs should use lower quarter block (▂)")
+      focusedLines.contains { $0.contains("▁") },
+      "Focused unselected tabs should keep lower one-eighth block (▁)")
   }
 
   // MARK: - RunLoop integration tests
@@ -448,6 +453,64 @@ struct FocusTransitionTests {
       afterShiftTabStyles != afterTabStyles,
       "Shift-Tab frame should differ from Tab frame (focus moved back)")
   }
+
+  @Test("TabView arrow navigation moves focus without auto-selecting and Enter commits selection")
+  func tabViewArrowNavigationSeparatesFocusFromSelection() throws {
+    let terminalSize = Size(width: 50, height: 8)
+    let terminal = FocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("TabbedSelection")
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalAppearance = terminal.appearance
+    environmentValues.terminalSize = terminalSize
+
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: FocusTestInputReader(events: []),
+      signalReader: FocusTestSignalReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: focusTracker,
+      environmentValues: environmentValues,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in Self.statefulTabSelectionView() }
+    )
+
+    focusTracker.invalidator = runLoop.scheduler as? (any Invalidating)
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+
+    let initialLines = terminal.latestSurface!.lines
+    #expect(focusTracker.currentFocusIdentity == testIdentity("Tabs"))
+    #expect(initialLines.contains { $0.contains("Demo body") })
+    #expect(!initialLines.contains { $0.contains("Other body") })
+
+    _ = runLoop.handleKeyPress(KeyPress(.arrowRight))
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let afterArrowLines = terminal.latestSurface!.lines
+    #expect(
+      focusTracker.currentFocusIdentity == testIdentity("Tabs"),
+      "Arrow navigation should keep focus on the tab strip")
+    #expect(
+      afterArrowLines.contains { $0.contains("Demo body") },
+      "Moving tab focus should not auto-select the newly focused tab")
+    #expect(!afterArrowLines.contains { $0.contains("Other body") })
+
+    _ = runLoop.handleKeyPress(KeyPress(.return))
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let afterReturnLines = terminal.latestSurface!.lines
+    #expect(
+      afterReturnLines.contains { $0.contains("Other body") },
+      "Enter should select the focused tab")
+    #expect(!afterReturnLines.contains { $0.contains("Demo body") })
+  }
 }
 
 // MARK: - Test support types
@@ -506,4 +569,21 @@ private final class FocusTestInputReader: TerminalInputReading {
 
 private final class FocusTestSignalReader: SignalReading {
   func events() -> AsyncStream<String> { AsyncStream { $0.finish() } }
+}
+
+private struct StatefulTabSelectionView: View {
+  @State private var selection = "demo"
+
+  var body: some View {
+    TabView(selection: $selection) {
+      Text("Demo body")
+        .tabItem("Demo")
+        .tag("demo")
+
+      Text("Other body")
+        .tabItem("Other")
+        .tag("other")
+    }
+    .id(testIdentity("Tabs"))
+  }
 }

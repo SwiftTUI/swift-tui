@@ -105,8 +105,128 @@ struct TabViewSurfaceTests {
     #expect(artifacts.resolvedTree.semanticMetadata.presentationRole == .tabView)
   }
 
-  @Test("focused tabs keep tab label text and add a strip-level focus wash")
-  func focusedTabsUseStripLevelFocusWash() {
+  @Test("TabView arrow navigation preserves selection until activation")
+  func tabViewArrowNavigationPreservesSelectionUntilActivation() {
+    let keyRegistry = LocalKeyHandlerRegistry()
+    let actionRegistry = LocalActionRegistry()
+
+    final class SelectionBox {
+      var value = "home"
+    }
+
+    let selectionBox = SelectionBox()
+    let selection = Binding(
+      get: { selectionBox.value },
+      set: { selectionBox.value = $0 }
+    )
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = testIdentity("Tabs")
+
+    _ = DefaultRenderer().render(
+      TabView(selection: selection) {
+        Text("Home content")
+          .tabItem("Home")
+          .tag("home")
+
+        Text("Settings content")
+          .tabItem("Settings")
+          .tag("settings")
+      }
+      .id(testIdentity("Tabs")),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        localActionRegistry: actionRegistry,
+        localKeyHandlerRegistry: keyRegistry,
+        applyEnvironmentValues: true
+      ),
+      proposal: .init(width: 32, height: 4)
+    )
+
+    #expect(keyRegistry.hasHandler(identity: testIdentity("Tabs")))
+    #expect(actionRegistry.hasHandler(identity: testIdentity("Tabs")))
+    #expect(keyRegistry.dispatch(identity: testIdentity("Tabs"), keyPress: KeyPress(.arrowRight)))
+    #expect(selectionBox.value == "home")
+    #expect(actionRegistry.dispatch(identity: testIdentity("Tabs")))
+    #expect(selectionBox.value == "settings")
+  }
+
+  @Test("TabView focused tab survives a rerender before activation")
+  func tabViewFocusedTabSurvivesRerenderBeforeActivation() {
+    let keyRegistry = LocalKeyHandlerRegistry()
+    let actionRegistry = LocalActionRegistry()
+    let invalidator = RecordingInvalidator()
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
+    let renderer = DefaultRenderer()
+
+    final class SelectionBox {
+      var value = "home"
+    }
+
+    let selectionBox = SelectionBox()
+    let selection = Binding(
+      get: { selectionBox.value },
+      set: { selectionBox.value = $0 }
+    )
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = testIdentity("Tabs")
+
+    var context = ResolveContext(
+      identity: testIdentity("Root"),
+      environmentValues: environmentValues,
+      localActionRegistry: actionRegistry,
+      localKeyHandlerRegistry: keyRegistry,
+      applyEnvironmentValues: true
+    )
+    context.invalidationProxy = invalidationProxy
+
+    _ = renderer.render(
+      TabView(selection: selection) {
+        Text("Home content")
+          .tabItem("Home")
+          .tag("home")
+
+        Text("Settings content")
+          .tabItem("Settings")
+          .tag("settings")
+      }
+      .id(testIdentity("Tabs")),
+      context: context,
+      proposal: .init(width: 32, height: 4)
+    )
+
+    #expect(keyRegistry.dispatch(identity: testIdentity("Tabs"), keyPress: KeyPress(.arrowRight)))
+    let invalidatedIdentities = invalidator.requests.reduce(into: Set<Identity>()) {
+      partial, request in
+      partial.formUnion(request)
+    }
+    #expect(invalidatedIdentities.contains(testIdentity("Tabs")))
+
+    var updatedContext = context
+    updatedContext.invalidatedIdentities = invalidatedIdentities
+    _ = renderer.render(
+      TabView(selection: selection) {
+        Text("Home content")
+          .tabItem("Home")
+          .tag("home")
+
+        Text("Settings content")
+          .tabItem("Settings")
+          .tag("settings")
+      }
+      .id(testIdentity("Tabs")),
+      context: updatedContext,
+      proposal: .init(width: 32, height: 4)
+    )
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("Tabs")))
+    #expect(selectionBox.value == "settings")
+  }
+
+  @Test("focused tabs keep tab label text without a strip-level focus wash")
+  func focusedTabsDoNotUseStripLevelFocusWash() {
     let focusedUnderlineArtifacts = renderTabArtifacts(style: .underline, focused: true)
     let focusedRoundedArtifacts = renderTabArtifacts(style: .literalTabs, focused: true)
     let focusedPowerlineArtifacts = renderTabArtifacts(style: .powerline, focused: true)
@@ -120,11 +240,11 @@ struct TabViewSurfaceTests {
     #expect(focusedPowerlineText.contains("Home · 3"))
 
     #expect(
-      hasFillCommand(in: focusedUnderlineArtifacts.drawTree, bounds: stripBounds(for: .underline)))
+      !hasFillCommand(in: focusedUnderlineArtifacts.drawTree, bounds: stripBounds(for: .underline)))
     #expect(
-      hasFillCommand(in: focusedRoundedArtifacts.drawTree, bounds: stripBounds(for: .literalTabs)))
+      !hasFillCommand(in: focusedRoundedArtifacts.drawTree, bounds: stripBounds(for: .literalTabs)))
     #expect(
-      hasFillCommand(
+      !hasFillCommand(
         in: focusedPowerlineArtifacts.drawTree,
         bounds: stripBounds(for: .powerline)
       )
@@ -151,6 +271,88 @@ struct TabViewSurfaceTests {
     #expect(!hasFillCommand(in: underlineArtifacts.drawTree, bounds: stripBounds(for: .underline)))
     #expect(!hasFillCommand(in: roundedArtifacts.drawTree, bounds: stripBounds(for: .literalTabs)))
     #expect(!hasFillCommand(in: powerlineArtifacts.drawTree, bounds: stripBounds(for: .powerline)))
+  }
+
+  @Test("TabView focus background only follows the focused tab")
+  func tabViewFocusBackgroundOnlyFollowsFocusedTab() throws {
+    let keyRegistry = LocalKeyHandlerRegistry()
+    let actionRegistry = LocalActionRegistry()
+    let invalidator = RecordingInvalidator()
+    let invalidationProxy = ResolveInvalidationProxy(invalidator: invalidator)
+    let renderer = DefaultRenderer()
+
+    final class SelectionBox {
+      var value = "home"
+    }
+
+    let selectionBox = SelectionBox()
+    let selection = Binding(
+      get: { selectionBox.value },
+      set: { selectionBox.value = $0 }
+    )
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = testIdentity("Tabs")
+
+    var context = ResolveContext(
+      identity: testIdentity("Root"),
+      environmentValues: environmentValues,
+      localActionRegistry: actionRegistry,
+      localKeyHandlerRegistry: keyRegistry,
+      applyEnvironmentValues: true
+    )
+    context.invalidationProxy = invalidationProxy
+
+    func makeView() -> some View {
+      TabView(selection: selection) {
+        Text("Home content")
+          .tabItem("Home")
+          .tag("home")
+
+        Text("Settings content")
+          .tabItem("Settings")
+          .tag("settings")
+
+        Text("Logs content")
+          .tabItem("Logs")
+          .tag("logs")
+      }
+      .tabViewStyle(.underline)
+      .id(testIdentity("Tabs"))
+    }
+
+    _ = renderer.render(
+      makeView(),
+      context: context,
+      proposal: .init(width: 40, height: 4)
+    )
+
+    #expect(keyRegistry.dispatch(identity: testIdentity("Tabs"), keyPress: KeyPress(.arrowRight)))
+    #expect(selectionBox.value == "home")
+
+    var updatedContext = context
+    updatedContext.invalidatedIdentities = invalidator.requests.reduce(into: Set<Identity>()) {
+      partial, request in
+      partial.formUnion(request)
+    }
+    let updatedArtifacts = renderer.render(
+      makeView(),
+      context: updatedContext,
+      proposal: .init(width: 40, height: 4)
+    )
+
+    let firstRow = try #require(updatedArtifacts.rasterSurface.cells.first)
+    let homeIndex = try #require(firstRow.firstIndex { $0.character == "H" })
+    let settingsIndex = try #require(firstRow.firstIndex { $0.character == "S" })
+    let logsIndex = try #require(firstRow.firstIndex { $0.character == "L" })
+
+    #expect(firstRow[homeIndex].style?.backgroundColor == nil)
+    #expect(firstRow[settingsIndex].style?.backgroundColor != nil)
+    #expect(firstRow[logsIndex].style?.backgroundColor == nil)
+    #expect(
+      !hasFillCommand(in: updatedArtifacts.drawTree, bounds: stripBounds(for: .underline))
+    )
+    #expect(normalizedVisibleText(updatedArtifacts.rasterSurface.lines).contains("Home content"))
   }
 
   @Test("underline tabs keep their rules aligned with the label edge")
@@ -369,5 +571,13 @@ private func hasFillCommand(
     return hasFillCommand(child, bounds: bounds)
   default:
     return false
+  }
+}
+
+private final class RecordingInvalidator: Invalidating {
+  var requests: [Set<Identity>] = []
+
+  func requestInvalidation(of identities: Set<Identity>) {
+    requests.append(identities)
   }
 }
