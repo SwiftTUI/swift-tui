@@ -19,7 +19,7 @@ struct AnimationsTab: View {
 
   // Transition demo: two independent toggles.
   @State private var showOpacityFigure: Bool = true
-  @State private var showSlideFigure: Bool = false
+  @State private var showSlideFigure: Bool = true
 
   // Frame demo: narrow↔wide width.
   @State private var wide: Bool = false
@@ -89,9 +89,10 @@ struct AnimationsTab: View {
     VStack(alignment: .leading, spacing: 0) {
       Text("1. withAnimation foreground color — curve: \(curveLabel)")
         .foregroundStyle(.muted)
-      // Full-block row so the colour change is unmistakable.
       Text("████████████████████████████")
         .foregroundStyle(colorBlue ? Color.blue : Color.red)
+        .padding(1)
+        .border(set: .single)
       HStack(spacing: 1) {
         Button("linear") {
           withAnimation(.linear(duration: .milliseconds(1500))) {
@@ -123,36 +124,55 @@ struct AnimationsTab: View {
 
   // MARK: - Opacity + move transitions
 
+  @ViewBuilder
   private var transitionSection: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("2. .transition(...) insertion & removal")
         .foregroundStyle(.muted)
       HStack(spacing: 2) {
-        Button(showOpacityFigure ? "fade out" : "fade in") {
-          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
-            showOpacityFigure.toggle()
+        VStack {
+          Button(showOpacityFigure ? "fade out" : "fade in") {
+            withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+              showOpacityFigure.toggle()
+            }
           }
+          // Opacity transition — a large TextFigure fades in/out via the
+          // pre-composited cell-background blend.
+          TextFigure("FADE", font: .smMono9)
+            .opacity(0)
+            .overlay {
+              if showOpacityFigure {
+                TextFigure("FADE", font: .smMono9)
+                  .foregroundStyle(Color.cyan)
+                  .transition(.opacity)
+              }
+            }
+            .padding(1)
+            .clipped()
+            .border(set: .double)
         }
-        Button(showSlideFigure ? "slide out" : "slide in") {
-          withAnimation(.easeInOut(duration: .milliseconds(1200))) {
-            showSlideFigure.toggle()
+        VStack {
+          Button(showSlideFigure ? "slide out" : "slide in") {
+            withAnimation(.easeInOut(duration: .milliseconds(1200))) {
+              showSlideFigure.toggle()
+            }
           }
+          // Slide transition — uses .transition(.slide), which is an
+          // asymmetric move(edge: .leading) → move(edge: .trailing) that
+          // exercises the placed-level overlay injection path.
+          TextFigure("SLIDE", font: .smMono9)
+            .opacity(0)
+            .overlay {
+              if showSlideFigure {
+                TextFigure("SLIDE", font: .smMono9)
+                  .foregroundStyle(Color.yellow)
+                  .transition(.slide)
+              }
+            }
+            .padding(1)
+            .clipped()
+            .border(set: .double)
         }
-      }
-      // Opacity transition — a large TextFigure fades in/out via the
-      // pre-composited cell-background blend.
-      if showOpacityFigure {
-        TextFigure("FADE", font: .smMono9)
-          .foregroundStyle(Color.cyan)
-          .transition(.opacity)
-      }
-      // Slide transition — uses .transition(.slide), which is an
-      // asymmetric move(edge: .leading) → move(edge: .trailing) that
-      // exercises the placed-level overlay injection path.
-      if showSlideFigure {
-        TextFigure("SLIDE", font: .smMono9)
-          .foregroundStyle(Color.yellow)
-          .transition(.slide)
       }
     }
   }

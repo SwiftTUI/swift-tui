@@ -1071,6 +1071,85 @@ struct AnimationPipelineIntegrationTests {
   }
 
   @Test(
+    "structural bulk-unmount does not fire removal transition"
+  )
+  func structuralBulkUnmountSkipsRemovalTransition() throws {
+    // When a multi-child container and its descendants disappear
+    // together (e.g. tab switch), the descendant’s .transition()
+    // removal must NOT fire — the whole subtree was unmounted, not
+    // a conditional toggle.  The walk-up stops at the multi-child
+    // container and the guard rejects it because the container is
+    // not a surviving identity.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(500))
+    controller.register(animation)
+
+    let rootIdentity = Identity(components: [.named("root")])
+    let containerIdentity = Identity(components: [.named("root"), .named("container")])
+    let leafIdentity = Identity(
+      components: [.named("root"), .named("container"), .named("leaf")]
+    )
+    let siblingIdentity = Identity(
+      components: [.named("root"), .named("container"), .named("sibling")]
+    )
+
+    // Frame 1: root → container(2 children: leaf + sibling).
+    // Register .opacity transition on the leaf.
+    controller.beginTransitionCollection()
+    controller.registerTransition(for: leafIdentity, transition: AnyTransition.opacity)
+    controller.finishTransitionCollection()
+
+    let leafNode = ResolvedNode(identity: leafIdentity, kind: .view("Leaf"))
+    let siblingNode = ResolvedNode(identity: siblingIdentity, kind: .view("Sibling"))
+    let containerNode = ResolvedNode(
+      identity: containerIdentity,
+      kind: .view("Container"),
+      children: [leafNode, siblingNode]
+    )
+    let frame1 = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: [containerNode]
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Frame 2: container + all children gone (bulk unmount) under
+    // an animate transaction.  No removal overlay should be created.
+    controller.beginTransitionCollection()
+    controller.finishTransitionCollection()
+
+    let frame2 = ResolvedNode(
+      identity: rootIdentity,
+      kind: .view("Root"),
+      children: []
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      frame2,
+      transaction: transaction,
+      timestamp: t0.advanced(by: .milliseconds(1))
+    )
+
+    // The removal overlay map should be empty — the walk-up stopped
+    // at the multi-child container and the guard rejected it.
+    var tree = frame2
+    let result = controller.applyInterpolations(
+      to: &tree,
+      at: t0.advanced(by: .milliseconds(50))
+    )
+    #expect(
+      tree.children.isEmpty,
+      "bulk unmount must not inject a removal overlay, got \(tree.children.count) children"
+    )
+    #expect(
+      !result.hasActiveAnimations,
+      "no animations should be in flight after a bulk unmount"
+    )
+  }
+
+  @Test(
     "conditional toggle still fires insertion transition when parent is stable"
   )
   func conditionalToggleFiresInsertionTransition() throws {

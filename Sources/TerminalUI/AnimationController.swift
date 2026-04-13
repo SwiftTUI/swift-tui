@@ -706,19 +706,29 @@ package final class AnimationController {
   }
 
   /// Called by the View layer at the start of resolve so the controller
-  /// can collect up-to-date `.transition()` registrations.  The sink
-  /// replaces the current map wholesale — any identity that was in the
-  /// previous frame but is not re-registered this frame loses its
-  /// transition association — but the PREVIOUS frame's registrations
-  /// are preserved so removal detection can still find transitions for
-  /// views whose branches are gone.
+  /// can collect up-to-date `.transition()` registrations.
+  ///
+  /// The PREVIOUS frame's registrations are preserved so removal
+  /// detection can still find transitions for views whose branches are
+  /// gone.  Registrations for identities whose subtrees are not
+  /// re-evaluated this frame survive in `transitionsByIdentity` via a
+  /// merge in ``finishTransitionCollection()``; stale entries for
+  /// identities that leave the tree are pruned at the end of
+  /// ``processResolvedTree(_:transaction:timestamp:)``.
   package func beginTransitionCollection() {
     previousTransitionsByIdentity = transitionsByIdentity
     pendingTransitionsByIdentity.removeAll(keepingCapacity: true)
   }
 
   package func finishTransitionCollection() {
-    transitionsByIdentity = pendingTransitionsByIdentity
+    // Merge newly registered transitions into the existing map so
+    // that registrations for non-re-evaluated subtrees survive
+    // across selective-evaluation frames.  Without this, a
+    // PhaseAnimator-only tick would wipe every other subtree's
+    // transition and the next removal couldn't find it.
+    for (identity, transition) in pendingTransitionsByIdentity {
+      transitionsByIdentity[identity] = transition
+    }
   }
 
   /// Registers a concrete animation so the controller can re-hydrate it
@@ -887,14 +897,33 @@ package final class AnimationController {
       // Walk up: injectionTarget is the deepest ancestor that is ALSO
       // gone from the new tree.  injectionParent is the first surviving
       // ancestor (or nil if none exists, in which case we can't inject).
+      //
+      // The walk ONLY passes through single-child wrapper nodes
+      // (.padding, .frame, .offset, etc.).  When a removed ancestor
+      // has multiple children in the previous tree it is a structural
+      // container (VStack, HStack, ScrollView, …) — climbing past it
+      // would capture an entire unrelated subtree as the removal
+      // overlay, which is what happens during a tab switch where the
+      // PhaseAnimator’s frame-level .animate leaks to the transition.
+      // Stopping here means injectionParent might still be a removed
+      // identity, which the guard below converts into a skip.
       var injectionTarget = identity
       var injectionParent = previousParentByIdentity[identity]
       while let parent = injectionParent, !newIdentities.contains(parent) {
+        // Stop before climbing through a multi-child container.
+        if let parentNode = findNode(in: previousRoot, identity: parent),
+          parentNode.children.count > 1
+        {
+          break
+        }
         injectionTarget = parent
         injectionParent = previousParentByIdentity[parent]
       }
 
-      guard injectionParent != nil,
+      // injectionParent must be a surviving identity in the new tree.
+      // If the walk-up stopped at a multi-child container (break),
+      // injectionParent may still be a removed identity — skip.
+      guard let injectionParent, newIdentities.contains(injectionParent),
         let subtree = findSubtree(in: previousRoot, identity: injectionTarget)
       else { continue }
 
@@ -962,6 +991,15 @@ package final class AnimationController {
         startOpacity: initialOpacity,
         placedSnapshot: placedSnapshot
       )
+    }
+
+    // Prune transition registrations for identities that are no
+    // longer in the live tree.  Their registration was already
+    // copied into previousTransitionsByIdentity at the start of
+    // this frame, so any removal that needed it has already found
+    // it.  Pruning prevents unbounded growth of the map.
+    transitionsByIdentity = transitionsByIdentity.filter { key, _ in
+      newIdentities.contains(key)
     }
 
     previousSnapshots = newSnapshots
