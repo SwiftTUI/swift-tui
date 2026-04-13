@@ -25,7 +25,8 @@ extension ResolvedNode {
 struct TabViewSurfaceTests {
   private func renderTabArtifacts(
     style: TabViewStyle = .automatic,
-    focused: Bool = false
+    focused: Bool = false,
+    selection: String = "home"
   ) -> FrameArtifacts {
     var environmentValues = EnvironmentValues()
     if focused {
@@ -33,7 +34,7 @@ struct TabViewSurfaceTests {
     }
 
     return DefaultRenderer().render(
-      TabView(selection: .constant("home")) {
+      TabView(selection: .constant(selection)) {
         Text("Home content")
           .tabItem(TabItemLabel("Home", detail: "3"))
           .tag("home")
@@ -58,9 +59,10 @@ struct TabViewSurfaceTests {
 
   private func renderTabView(
     style: TabViewStyle = .automatic,
-    focused: Bool = false
+    focused: Bool = false,
+    selection: String = "home"
   ) -> String {
-    renderTabArtifacts(style: style, focused: focused)
+    renderTabArtifacts(style: style, focused: focused, selection: selection)
       .rasterSurface.lines.joined(separator: "\n")
   }
 
@@ -190,6 +192,56 @@ struct TabViewSurfaceTests {
           "▁▁▁▁▁▁▁▁ ▁▁▁▁▁▁▁▁▁▁▁ ▂▂▂▂▂▂ ▁▁▁▁▁▁▁▁▁▁ ▁▁▁▁▁▁",
         ]
     )
+  }
+
+  @Test("powerline tabs use unicode slant separators between items")
+  func powerlineTabsUseUnicodeSlants() throws {
+    let firstLine = try #require(
+      renderTabView(style: .powerline, focused: false, selection: "settings")
+        .split(separator: "\n", omittingEmptySubsequences: false)
+        .first
+        .map(String.init)
+    )
+
+    #expect(firstLine.contains("◢"))
+    #expect(firstLine.contains("◤"))
+    #expect(firstLine.contains("Home · 3"))
+    #expect(firstLine.contains("Settings"))
+    #expect(firstLine.contains("Logs"))
+  }
+
+  @Test("selected powerline tabs fill the full segment with the accent color")
+  func selectedPowerlineTabsUseFullAccentFill() throws {
+    let artifacts = renderTabArtifacts(
+      style: .powerline,
+      focused: false,
+      selection: "settings"
+    )
+    let firstRow = try #require(artifacts.rasterSurface.cells.first)
+    let expectedBackground = TerminalAppearance.fallback.tintColor
+    let wedgeIndices = firstRow.enumerated().compactMap { index, cell in
+      switch cell.character {
+      case "◢", "◤":
+        index
+      default:
+        nil
+      }
+    }
+
+    #expect(wedgeIndices.count == 2)
+    #expect(firstRow[wedgeIndices[0]].character == "◢")
+    #expect(firstRow[wedgeIndices[1]].character == "◤")
+
+    let settingsStart = try #require(firstRow.firstIndex { $0.character == "S" })
+    let settingsEnd = wedgeIndices[1]
+
+    for x in settingsStart..<settingsEnd {
+      #expect(firstRow[x].style?.backgroundColor == expectedBackground)
+    }
+
+    #expect(firstRow[wedgeIndices[0]].style?.backgroundColor == nil)
+    #expect(firstRow[wedgeIndices[1]].style?.backgroundColor == nil)
+    #expect(firstRow[settingsStart].style?.backgroundColor == expectedBackground)
   }
 }
 
