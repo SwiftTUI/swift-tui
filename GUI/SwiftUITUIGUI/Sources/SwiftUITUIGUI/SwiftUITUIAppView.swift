@@ -18,13 +18,11 @@ public struct SwiftUITUIAppView<A: TerminalUI.App>: SwiftUI.View {
         ) { sceneID in
           state.selectScene(sceneID)
         }
-
-        Divider()
       }
-
       SceneTerminalSurface(host: state.currentSceneHost)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+    .ignoresSafeArea(.container, edges: .bottom)
     .task {
       state.start()
     }
@@ -95,7 +93,7 @@ private struct SceneSwitcherBar: SwiftUI.View {
 
   var body: some SwiftUI.View {
     ScrollView(.horizontal, showsIndicators: false) {
-      HStack(spacing: 8) {
+      HStack(spacing: 0) {
         ForEach(scenes) { scene in
           Button {
             onSelect(scene.id)
@@ -104,12 +102,13 @@ private struct SceneSwitcherBar: SwiftUI.View {
 
             Text(scene.title ?? scene.id.rawValue)
               .lineLimit(1)
+              .monospaced()
               .fontWeight(isSelected ? .semibold : .regular)
               .foregroundStyle(isSelected ? SwiftUI.Color.accentColor : SwiftUI.Color.primary)
-              .padding(.horizontal, 10)
-              .padding(.vertical, 6)
+              .padding(.horizontal, 6)
+              .padding(.vertical, 3)
               .background {
-                Capsule(style: .continuous)
+                Rectangle()
                   .fill(
                     isSelected
                       ? SwiftUI.Color.accentColor.opacity(0.18)
@@ -121,8 +120,7 @@ private struct SceneSwitcherBar: SwiftUI.View {
           .accessibilityLabel(scene.title ?? scene.id.rawValue)
         }
       }
-      .padding(.horizontal, 12)
-      .padding(.vertical, 10)
+      .padding(.top, 10)
     }
   }
 }
