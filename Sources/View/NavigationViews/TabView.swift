@@ -216,9 +216,19 @@ extension TabView {
               index: index
             ),
             content: VStack(alignment: .leading, spacing: 0) {
+              let trailingSeparatorStyle: PowerlineSeparatorStyle =
+                if index == activeIndex {
+                  .selectedTrailing
+                } else if index + 1 == activeIndex {
+                  .selectedLeading
+                } else {
+                  .plain
+                }
               tabItemView(
                 label: option.label.displayText,
                 isSelected: isSelected,
+                showsTrailingSeparator: index < options.count - 1,
+                trailingSeparatorStyle: trailingSeparatorStyle,
                 tone: activeTone,
                 style: tabStyle,
                 styleEnvironment: styleEnvironment
@@ -259,6 +269,8 @@ extension TabView {
   private func tabItemView(
     label: String,
     isSelected: Bool,
+    showsTrailingSeparator: Bool,
+    trailingSeparatorStyle: PowerlineSeparatorStyle,
     tone: TerminalTone,
     style: TabViewStyle,
     styleEnvironment: StyleEnvironmentSnapshot
@@ -280,6 +292,8 @@ extension TabView {
       powerlineTabItem(
         label: label,
         isSelected: isSelected,
+        showsTrailingSeparator: showsTrailingSeparator,
+        trailingSeparatorStyle: trailingSeparatorStyle,
         tone: tone,
         styleEnvironment: styleEnvironment
       )
@@ -406,23 +420,100 @@ extension TabView {
   private func powerlineTabItem(
     label: String,
     isSelected: Bool,
+    showsTrailingSeparator: Bool,
+    trailingSeparatorStyle: PowerlineSeparatorStyle,
     tone: TerminalTone,
     styleEnvironment: StyleEnvironmentSnapshot
   ) -> some View {
+    let selectedBackgroundColor = powerlineSelectedBackgroundColor(
+      tone: tone,
+      styleEnvironment: styleEnvironment
+    )
+    let selectedBackgroundStyle = AnyShapeStyle(selectedBackgroundColor)
+    let selectedForegroundStyle = AnyShapeStyle(
+      contrastingForegroundColor(on: selectedBackgroundColor)
+    )
     let foreground: AnyShapeStyle =
       isSelected
-      ? styleEnvironment.resolvedStyle(for: .foreground)
+      ? selectedForegroundStyle
       : .semantic(.muted)
-    return Text("\(label) ")
-      .lineLimit(1)
-      .foregroundStyle(foreground)
-      .background {
-        if isSelected {
-          Rectangle().fill(AnyShapeStyle(.terminalTab(tone, isSelected: true)))
+    let separatorGlyph = trailingSeparatorStyle.glyph
+    let separatorForeground: AnyShapeStyle =
+      trailingSeparatorStyle == .plain
+      ? .semantic(.separator)
+      : selectedBackgroundStyle
+    return HStack(alignment: .top, spacing: 0) {
+      Text("\(label) ")
+        .lineLimit(1)
+        .foregroundStyle(foreground)
+        .background {
+          if isSelected {
+            Rectangle().fill(selectedBackgroundStyle)
+          }
         }
+        .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.6))
+      if showsTrailingSeparator {
+        Text(separatorGlyph)
+          .lineLimit(1)
+          .foregroundStyle(separatorForeground)
+          .drawMetadata(.init(opacity: trailingSeparatorStyle.opacity))
       }
-      .drawMetadata(.init(opacity: isSelected ? 1.0 : 0.6))
+    }
   }
+}
+
+private enum PowerlineSeparatorStyle {
+  case plain
+  case selectedLeading
+  case selectedTrailing
+
+  var glyph: String {
+    switch self {
+    case .plain:
+      "╱"
+    case .selectedLeading:
+      "◢"
+    case .selectedTrailing:
+      "◤"
+    }
+  }
+
+  var opacity: Double {
+    switch self {
+    case .plain:
+      0.6
+    case .selectedLeading, .selectedTrailing:
+      1.0
+    }
+  }
+}
+
+private func powerlineSelectedBackgroundColor(
+  tone: TerminalTone,
+  styleEnvironment: StyleEnvironmentSnapshot
+) -> Color {
+  switch tone {
+  case .accent:
+    styleEnvironment.appearance.tintColor
+  case .info:
+    styleEnvironment.theme.color(for: .info)
+  case .success:
+    styleEnvironment.theme.color(for: .success)
+  case .warning:
+    styleEnvironment.theme.color(for: .warning)
+  case .danger:
+    styleEnvironment.theme.color(for: .danger)
+  case .neutral:
+    styleEnvironment.theme.color(for: .selection)
+  }
+}
+
+private func contrastingForegroundColor(
+  on backgroundColor: Color
+) -> Color {
+  let whiteContrast = Color.white.contrastRatio(to: backgroundColor)
+  let blackContrast = Color.black.contrastRatio(to: backgroundColor)
+  return whiteContrast >= blackContrast ? .white : .black
 }
 
 private func tabLabelCellWidth(

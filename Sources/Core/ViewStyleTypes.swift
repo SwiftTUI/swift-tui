@@ -58,7 +58,7 @@ public enum TabViewStyle: Hashable, Sendable {
   case underline
   /// Unicode box-drawing tab shapes.
   case rounded
-  /// Powerline-inspired background fills with angled separators.
+  /// Powerline-inspired segments with Unicode slant separators.
   case powerline
 }
 
