@@ -8,7 +8,7 @@ public protocol LayoutValueKey {
 
 private struct LayoutSubviewPlacementRecord {
   var position: LayoutPoint
-  var anchor: UnitPoint
+  var anchor: Alignment
   var proposal: ProposedViewSize
   var viewportContext: ScrollViewportContext?
 }
@@ -84,7 +84,7 @@ public struct LayoutSubview {
   /// Places the child at `position` using `anchor` and `proposal`.
   public func place(
     at position: LayoutPoint,
-    anchor: UnitPoint = .topLeading,
+    anchor: Alignment = .topLeading,
     proposal: ProposedViewSize
   ) {
     place(
@@ -97,7 +97,7 @@ public struct LayoutSubview {
 
   package func place(
     at position: LayoutPoint,
-    anchor: UnitPoint = .topLeading,
+    anchor: Alignment = .topLeading,
     proposal: ProposedViewSize,
     viewportContext: ScrollViewportContext?
   ) {
@@ -934,7 +934,7 @@ private func defaultPlacement(
 private func placedOrigin(
   for childSize: LayoutSize,
   at position: LayoutPoint,
-  anchor: UnitPoint
+  anchor: Alignment
 ) -> LayoutPoint {
   let dimensions = ViewDimensions(width: childSize.width, height: childSize.height)
   let xOffset =

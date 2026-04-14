@@ -599,7 +599,9 @@ extension SnapshotRenderer {
     let stops = gradient.gradient.stops.map { stop in
       "\(stop.color.hexString(format: .rrggbbaa))@\(stop.location)"
     }.joined(separator: ",")
-    return "\(gradient.startPoint.rawValue)->\(gradient.endPoint.rawValue):[\(stops)]"
+    return
+      "start=(\(gradient.startPoint.x),\(gradient.startPoint.y))"
+      + "->end=(\(gradient.endPoint.x),\(gradient.endPoint.y)):[\(stops)]"
   }
 
   private func describe(_ gradient: RadialGradient) -> String {
@@ -607,7 +609,8 @@ extension SnapshotRenderer {
       "\(stop.color.hexString(format: .rrggbbaa))@\(stop.location)"
     }.joined(separator: ",")
     return
-      "center=\(gradient.center.rawValue),startRadius=\(gradient.startRadius),endRadius=\(gradient.endRadius):[\(stops)]"
+      "center=(\(gradient.center.x),\(gradient.center.y)),"
+      + "startRadius=\(gradient.startRadius),endRadius=\(gradient.endRadius):[\(stops)]"
   }
 
   private func describe(_ lineStyle: TextLineStyle) -> String {
