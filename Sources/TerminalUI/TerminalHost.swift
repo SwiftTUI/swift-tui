@@ -954,17 +954,22 @@ extension TerminalHosting {
         return capabilities
       }
 
-      // FIXME: Kitty image protocol support does not function.
-      // let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
-      // if let kittyResponse = try? performGraphicsQuery(.kittySupport(id: kittyQueryID)),
-      //   parseKittySupportResponse(in: kittyResponse, id: kittyQueryID) == true,
-      //   !capabilities.supportedProtocols.contains(.kitty)
-      // {
-      //   capabilities.supportedProtocols.append(.kitty)
-      // }
+      // Single combined probe: the kitty query escape sequence already
+      // piggybacks `\e[c`, so non-kitty terminals will still respond with
+      // their device attributes. We harvest kitty support and the DA
+      // attributes from the same buffer instead of paying for a second
+      // round trip.
+      let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
+      let combinedProbeBuffer: [UInt8] =
+        (try? performGraphicsQuery(.kittySupport(id: kittyQueryID))) ?? []
 
-      if let deviceAttributesResponse = try? performGraphicsQuery(.primaryDeviceAttributes),
-        let attributes = parsePrimaryDeviceAttributes(from: deviceAttributesResponse),
+      if parseKittySupportResponse(in: combinedProbeBuffer, id: kittyQueryID) == true,
+        !capabilities.supportedProtocols.contains(.kitty)
+      {
+        capabilities.supportedProtocols.append(.kitty)
+      }
+
+      if let attributes = parsePrimaryDeviceAttributes(from: combinedProbeBuffer),
         attributes.contains(4)
       {
         if !capabilities.supportedProtocols.contains(.sixel) {
@@ -1038,8 +1043,13 @@ extension TerminalHosting {
         buffer.append(contentsOf: bytes)
 
         switch query {
-        case .kittySupport(let id):
-          if parseKittySupportResponse(in: buffer, id: id) != nil {
+        case .kittySupport:
+          // The kitty probe request piggybacks a `\e[c` (primary device
+          // attributes) query after the kitty query so non-kitty terminals
+          // still produce a response we can synchronize on. We wait for the
+          // DA response before returning so the caller can harvest both
+          // the kitty result and the DA attributes from a single round trip.
+          if parsePrimaryDeviceAttributes(from: buffer) != nil {
             return buffer
           }
         case .primaryDeviceAttributes:
