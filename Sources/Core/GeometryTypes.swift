@@ -84,6 +84,72 @@ public struct EdgeInsets: Equatable, Sendable {
   }
 }
 
+/// A normalized point in a shape's bounds where `(0, 0)` is the
+/// top-leading corner and `(1, 1)` is the bottom-trailing corner.
+///
+/// Used by gradient start/end points where interpolation requires
+/// continuous unit coordinates — ``Alignment`` identifies named
+/// layout slots via `AlignmentID`-keyed guides, while ``UnitPoint``
+/// is a concrete `(x, y)` pair that can be interpolated element-wise
+/// by the animation pipeline.  The named static constants
+/// (``topLeading``, ``center``, etc.) mirror ``Alignment``'s named
+/// constants so most gradient call sites compile unchanged.
+public struct UnitPoint: Equatable, Hashable, Sendable {
+  public var x: Double
+  public var y: Double
+
+  public init(x: Double, y: Double) {
+    self.x = x
+    self.y = y
+  }
+
+  public static let zero = UnitPoint(x: 0, y: 0)
+
+  public static let topLeading = UnitPoint(x: 0, y: 0)
+  public static let top = UnitPoint(x: 0.5, y: 0)
+  public static let topTrailing = UnitPoint(x: 1, y: 0)
+
+  public static let leading = UnitPoint(x: 0, y: 0.5)
+  public static let center = UnitPoint(x: 0.5, y: 0.5)
+  public static let trailing = UnitPoint(x: 1, y: 0.5)
+
+  public static let bottomLeading = UnitPoint(x: 0, y: 1)
+  public static let bottom = UnitPoint(x: 0.5, y: 1)
+  public static let bottomTrailing = UnitPoint(x: 1, y: 1)
+}
+
+extension UnitPoint: Animatable {
+  public var animatableData: AnimatablePair<Double, Double> {
+    get { .init(x, y) }
+    set {
+      x = newValue.first
+      y = newValue.second
+    }
+  }
+}
+
+extension EdgeInsets: Animatable {
+  public typealias AnimatableData = AnimatablePair<
+    AnimatablePair<Int, Int>,
+    AnimatablePair<Int, Int>
+  >
+
+  public var animatableData: AnimatableData {
+    get {
+      AnimatablePair(
+        AnimatablePair(top, leading),
+        AnimatablePair(bottom, trailing)
+      )
+    }
+    set {
+      top = newValue.first.first
+      leading = newValue.first.second
+      bottom = newValue.second.first
+      trailing = newValue.second.second
+    }
+  }
+}
+
 /// A combined horizontal and vertical alignment.
 public struct Alignment: Equatable, Hashable, Sendable {
   public let horizontal: HorizontalAlignment
