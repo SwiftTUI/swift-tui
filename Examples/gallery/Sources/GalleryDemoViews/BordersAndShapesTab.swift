@@ -12,9 +12,18 @@ import TerminalUI
 ///   3. Per-side ``BorderEdgeStyle`` foregrounds — a traffic-light card
 ///      and a CSS-shorthand two-color card.
 ///   4. Curved shapes — ``Circle``, ``Ellipse``, and ``Capsule`` across
-///      fill / strokeBorder / ``PatternFill`` variants.
+///      fill / strokeBorder / ``PatternFill`` variants, including a
+///      ``PhaseAnimator``-driven gradient that smoothly rotates
+///      through the four corner orientations (the payoff for the
+///      Animatable-protocol migration in
+///      ``docs/proposals/ANIMATABLE_PROTOCOL_MIGRATION.md``).
 ///   5. A hand-drawn ``Canvas`` sparkline, the arbitrary-drawing
 ///      escape hatch alongside the shape fill/stroke algebra.
+///   6. A direct ``withAnimation`` gradient rotation demo: tap a
+///      button and the linear gradient interpolates its start and
+///      end points to a new orientation, exercising
+///      ``LinearGradient`` 's `Animatable` conformance through a real
+///      run loop.
 struct BordersAndShapesTab: View {
   @State private var gradientPhase: Double = 0
 
@@ -32,6 +41,8 @@ struct BordersAndShapesTab: View {
         BordersAndShapesCurvedShapesSection()
         Divider()
         BordersAndShapesCanvasSection()
+        Divider()
+        BordersAndShapesAnimatedGradientsSection()
         Spacer(minLength: 0)
       }
       .padding(1)
@@ -170,22 +181,38 @@ private struct BordersAndShapesCurvedShapesSection: View {
           .fill(PatternFill.heavyShade)
           .frame(width: 16, height: 3)
       }
+      // PhaseAnimator-driven PatternFill with a linear-gradient
+      // foreground.  Pre-Animatable-protocol migration this row froze
+      // on phase 0 (gradients had no diff signal) or, post-stranded-
+      // completion fix, snapped between corners every 500 ms.  After
+      // the migration, the start and end points interpolate
+      // continuously across the 500 ms window so the diagonal sweep
+      // visibly rotates through topLeading → topTrailing →
+      // bottomTrailing → bottomLeading and back.
+      Text("Animated gradient pattern fill — rotates smoothly via PhaseAnimator")
+        .foregroundStyle(.separator)
       HStack(spacing: 2) {
         Rectangle()
           .fill(PatternFill(glyph: "/", foreground: .yellow))
           .frame(width: 5, height: 5)
-        Rectangle()
-          .fill(
-            PatternFill(
-              glyph: "/",
-              foreground: .linearGradient(
-                .linearGradient(
-                  colors: [.white, .red], startPoint: .topLeading, endPoint: .bottomTrailing)),
-              background: .linearGradient(
-                .linearGradient(
-                  colors: [.red, .white], startPoint: .topLeading, endPoint: .bottomTrailing)))
-          )
-          .frame(width: 5, height: 5)
+        PhaseAnimator(GradientRotationPhase.allCases) { phase in
+          Rectangle()
+            .fill(
+              PatternFill(
+                glyph: "/",
+                foreground: .linearGradient(
+                  LinearGradient(
+                    colors: [.white, .red],
+                    startPoint: phase.startPoint,
+                    endPoint: phase.endPoint
+                  )
+                )
+              )
+            )
+            .frame(width: 5, height: 5)
+        } animation: { _ in
+          .linear(duration: .milliseconds(500))
+        }
         Rectangle()
           .fill(PatternFill.dots)
           .frame(width: 5, height: 5)
@@ -209,6 +236,109 @@ private struct BordersAndShapesCanvasSection: View {
       )
       .foregroundStyle(Color.cyan)
       .frame(width: 30, height: 4)
+    }
+  }
+}
+
+/// Direct ``withAnimation`` gradient-rotation demo.  Tapping the
+/// button advances the gradient direction one step around the
+/// `GradientDirection` ring under an `easeInOut` 800 ms animation,
+/// so the bar's color sweep rotates smoothly between orientations.
+/// Exercises ``LinearGradient``'s `Animatable` conformance through a
+/// real run loop end-to-end (resolve → snapshot diff → controller
+/// interpolation → raster).
+private struct BordersAndShapesAnimatedGradientsSection: View {
+  @State private var gradientDirection: GradientDirection = .horizontal
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("6. Direct withAnimation — tap to rotate gradient")
+        .foregroundStyle(.muted)
+      Button("rotate") {
+        withAnimation(.easeInOut(duration: .milliseconds(800))) {
+          gradientDirection = gradientDirection.next
+        }
+      }
+      Rectangle()
+        .fill(
+          LinearGradient(
+            colors: [.red, .yellow, .green, .blue],
+            startPoint: gradientDirection.startPoint,
+            endPoint: gradientDirection.endPoint
+          )
+        )
+        .frame(width: 30, height: 5)
+    }
+  }
+}
+
+/// Phase values for the PhaseAnimator-driven gradient rotation in
+/// ``BordersAndShapesCurvedShapesSection``.  Each case names a
+/// corner; the gradient's `startPoint` sits at the named corner and
+/// the `endPoint` sits at the diagonally opposite corner so every
+/// transition is a 90° rotation and the animation interpolates the
+/// endpoints continuously through the midpoint of the square.
+private enum GradientRotationPhase: Hashable, CaseIterable {
+  case topLeading
+  case topTrailing
+  case bottomTrailing
+  case bottomLeading
+
+  var startPoint: UnitPoint {
+    switch self {
+    case .topLeading: return .topLeading
+    case .topTrailing: return .topTrailing
+    case .bottomTrailing: return .bottomTrailing
+    case .bottomLeading: return .bottomLeading
+    }
+  }
+
+  var endPoint: UnitPoint {
+    switch self {
+    case .topLeading: return .bottomTrailing
+    case .topTrailing: return .bottomLeading
+    case .bottomTrailing: return .topLeading
+    case .bottomLeading: return .topTrailing
+    }
+  }
+}
+
+/// Direction states for ``BordersAndShapesAnimatedGradientsSection``.
+/// Cycling through `.horizontal → .diagonal → .vertical →
+/// .antidiagonal → .horizontal` walks the gradient through every 45°
+/// orientation, and `withAnimation` interpolates `startPoint` and
+/// `endPoint` independently so the sweep visibly rotates instead of
+/// snapping.
+private enum GradientDirection: Hashable, CaseIterable {
+  case horizontal
+  case diagonal
+  case vertical
+  case antidiagonal
+
+  var next: GradientDirection {
+    switch self {
+    case .horizontal: return .diagonal
+    case .diagonal: return .vertical
+    case .vertical: return .antidiagonal
+    case .antidiagonal: return .horizontal
+    }
+  }
+
+  var startPoint: UnitPoint {
+    switch self {
+    case .horizontal: return .leading
+    case .diagonal: return .topLeading
+    case .vertical: return .top
+    case .antidiagonal: return .topTrailing
+    }
+  }
+
+  var endPoint: UnitPoint {
+    switch self {
+    case .horizontal: return .trailing
+    case .diagonal: return .bottomTrailing
+    case .vertical: return .bottom
+    case .antidiagonal: return .bottomLeading
     }
   }
 }
