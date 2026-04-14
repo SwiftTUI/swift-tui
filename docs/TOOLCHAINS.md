@@ -1,6 +1,6 @@
 # Toolchains
 
-Last updated: March 30, 2026
+Last updated: April 14, 2026
 
 This repository uses more than one build tool, but the default Swift workflow
 for package development and verification is `swiftly` with Swift `6.3.0`.
@@ -89,7 +89,8 @@ bun run build -- --app <AppProduct>
 Xcode remains a valid native build path.
 
 In particular, the outer macOS or iOS app build still works fine in Xcode when
-a consumer embeds `GUI/SwiftUITUIGUI` in an application target.
+a consumer embeds `GUI/SwiftUITUIGUI` or `GUI/SwiftTermTUIGUI` in an
+application target.
 
 That does not change the package-development rule for this repository:
 

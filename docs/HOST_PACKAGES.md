@@ -1,13 +1,14 @@
 # Host Packages
 
-Last updated: April 11, 2026
+Last updated: April 14, 2026
 
 ## Goal
 
-Make TerminalUI apps shippable outside a local terminal in two peer embedded
+Make TerminalUI apps shippable outside a local terminal in three peer embedded
 host packages:
 
-- `GUI/SwiftUITUIGUI`: an SPM package that lets a macOS or iOS app host a TerminalUI scene inside SwiftUI
+- `GUI/SwiftUITUIGUI`: a Ghostty-backed SPM package that lets a macOS or iOS app host a TerminalUI scene inside SwiftUI
+- `GUI/SwiftTermTUIGUI`: a SwiftTerm-backed SPM package that lets a macOS or iOS app host a TerminalUI scene inside SwiftUI
 - `GUI/WebTUIGUI`: a Bun-based package that lets a TerminalUI app ship in the browser on top of `ghostty-web`
 
 The authoring story stays the same:
@@ -44,7 +45,7 @@ The host-facing root work is landed:
 
 ### `GUI/SwiftUITUIGUI`
 
-The SwiftUI host package is landed as a standalone SPM package:
+The Ghostty-backed SwiftUI host package is landed as a standalone SPM package:
 
 - package root: `GUI/SwiftUITUIGUI`
 - dependencies:
@@ -58,6 +59,31 @@ The SwiftUI host package is landed as a standalone SPM package:
   - `SwiftUITUITerminalStyle.swift`
 - SwiftUI styles now expose explicit light and dark theme variants, each pairing
   Ghostty palette state with TerminalUI semantic theme tokens
+- verification:
+  - `SceneRetentionTests.swift`
+  - `ResizeBridgeTests.swift`
+  - `StyleMappingTests.swift`
+
+### `GUI/SwiftTermTUIGUI`
+
+The SwiftTerm-backed SwiftUI host package is also landed as a standalone SPM
+package:
+
+- package root: `GUI/SwiftTermTUIGUI`
+- dependencies:
+  - local path dependency on the root package
+  - published `SwiftTerm`
+- key runtime files:
+  - `SwiftTermTUIAppState.swift`
+  - `SwiftTermTUIAppView.swift`
+  - `SwiftTermTUISceneHost.swift`
+  - `SwiftTermTUISceneBridge.swift`
+  - `SwiftTermTUITerminalStyle.swift`
+- the package keeps one persistent `SwiftTerm.TerminalView` per hosted scene so
+  the underlying terminal buffer and emulation state survive scene switches
+- SwiftUI styles continue to expose explicit light and dark theme variants,
+  each pairing SwiftTerm-native palette state with TerminalUI semantic theme
+  tokens
 - verification:
   - `SceneRetentionTests.swift`
   - `ResizeBridgeTests.swift`
@@ -119,8 +145,9 @@ new products in the root package.
 3. Each scene gets its own retained runtime session. Switching scenes changes which hosted session is visible; it does not rebuild the app body from scratch.
 4. Scene switching is host-managed. It is not a new terminal escape-sequence protocol.
 5. Terminal style is host-owned. The Swift package and the Bun package expose mirrored style concepts, not a shared cross-language source file, and host packages choose the active theme variant.
-6. The web package keeps one wasm module instance per scene and one `ghostty-web` terminal per scene so scene state survives switches without a more complex protocol.
-7. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior and is now extended with paired render-style updates.
+6. The Apple host packages intentionally remain backend-specific peer packages rather than one backend-abstracted package. `GUI/SwiftUITUIGUI` owns Ghostty integration and `GUI/SwiftTermTUIGUI` owns SwiftTerm integration.
+7. The web package keeps one wasm module instance per scene and one `ghostty-web` terminal per scene so scene state survives switches without a more complex protocol.
+8. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior and is now extended with paired render-style updates.
 
 ## Verification Paths
 
@@ -140,5 +167,6 @@ repository.
 
 - generating an Xcode project
 - building custom desktop or mobile chrome beyond a terminal surface and scene/style control APIs
-- replacing `ghostty-web` or `libghostty-spm` with a custom terminal implementation
+- replacing `ghostty-web` with a custom browser terminal implementation
+- collapsing the Ghostty-backed and SwiftTerm-backed Apple hosts into a single backend-abstracted package
 - adding tabs, split panes, or session persistence beyond in-memory retained scene sessions

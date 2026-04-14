@@ -73,6 +73,7 @@ For host-managed embedding, keep the authored `App` in `TerminalUI`, then let a
 peer host package build `TerminalUISceneManifest` values and retain one or more
 `HostedSceneSession` values.
 
-`GUI/SwiftUITUIGUI` uses that path to embed TerminalUI scenes inside a SwiftUI
-app on Apple platforms. `GUI/WebTUIGUI` uses the same authored scene model for
-browser hosting on top of a `TerminalUIWASI` build.
+`GUI/SwiftUITUIGUI` and `GUI/SwiftTermTUIGUI` use that path to embed
+TerminalUI scenes inside a SwiftUI app on Apple platforms. `GUI/WebTUIGUI`
+uses the same authored scene model for browser hosting on top of a
+`TerminalUIWASI` build.

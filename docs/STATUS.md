@@ -1,6 +1,6 @@
 # Status
 
-Last updated: April 11, 2026
+Last updated: April 14, 2026
 
 ## Product Status
 
@@ -61,7 +61,7 @@ prototype explorations.
 
 - The core `TerminalUI` runtime still renders one active scene into one active host per session, but it no longer decides that an authored app must declare exactly one scene.
 - `TerminalUI` is now library-only. Platform integration splits between executable runner packages in `Runners/` and embedded host packages in `GUI/`.
-- Embedded GUI host packages now use `TerminalUI` scene manifests plus `HostedSceneSession`, and the repository includes peer host packages at `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`. Those packages still own their own platform shell integration, scene switching chrome, and style surfaces.
+- Embedded GUI host packages now use `TerminalUI` scene manifests plus `HostedSceneSession`, and the repository includes peer host packages at `GUI/SwiftUITUIGUI`, `GUI/SwiftTermTUIGUI`, and `GUI/WebTUIGUI`. Those packages still own their own platform shell integration, scene switching chrome, and style surfaces.
 - Embedded GUI host packages own one active host style object at a time and
   can swap it at runtime; the root TUI app continues to render semantic tokens
   without knowing which host theme is active.
