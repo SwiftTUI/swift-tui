@@ -7,6 +7,52 @@
 
 ---
 
+## Superseding plan
+
+The enum-dispatch value-interpolation model this document describes
+(`AnimatableProperty` + `AnimatableValue` + `AnimatableSnapshot` fields)
+is superseded by the SwiftUI-shaped `Animatable` protocol pipeline
+documented in
+[`ANIMATABLE_PROTOCOL_MIGRATION.md`](./ANIMATABLE_PROTOCOL_MIGRATION.md),
+shipped in Phases 0–5 between April 11 and April 13, 2026 on
+`feature/animatable-protocol-migration`. The rest of this document —
+transaction/batch bookkeeping, completion sinks, transition insertion
+and removal, matched geometry, spring/bezier curves, the run-loop tick
+contract — remains accurate and has not been replaced.
+
+What changed concretely:
+
+- `AnimatableProperty` and `AnimatableValue` (the enum-dispatch
+  surface) are deleted. Per-property registration via fixed
+  `AnimatableSnapshot` fields is replaced by SwiftUI-shaped
+  `Animatable` protocol conformance and an `AnyAnimatable` /
+  `AnimatableSlot` dispatch table inside the controller.
+- `Color`, `EdgeInsets`, `UnitPoint`, `Gradient.Stop`, `Gradient`,
+  `LinearGradient`, `RadialGradient`, and `PatternFill` (variant-aware)
+  now conform to `Animatable` directly and round-trip through the
+  controller's interpolation path.
+- `LinearGradient.startPoint` / `endPoint` and `RadialGradient.center`
+  swapped from `Alignment` to `UnitPoint` so the diff signal the
+  controller sees is a continuous unit-square coordinate that can
+  actually be interpolated. See `SHAPE_AND_BORDER_APIS.md` §4.6 for
+  the rationale.
+- `AnimationTickResult` had its parallel side-channel maps unified and
+  its `affectedIdentities` / `hasActiveAnimations` fields renamed to
+  `redrawIdentities` / `hasPendingWork` to match what the runtime
+  actually wants from a tick.
+
+The visible payoff lands in
+`Examples/gallery/Sources/GalleryDemoViews/BordersAndShapesTab.swift`
+section 4 (a `PhaseAnimator`-driven gradient that smoothly rotates
+through four corner orientations) and section 6 (a direct
+`withAnimation`-driven gradient rotation). Pre-migration the same
+`PhaseAnimator` froze on phase 0 because the controller had no diff
+signal to observe — gradients were opaque to it. Phase 3's controller
+rewrite teaches it to interpolate the gradient interior via
+`Animatable`, and Phase 5's gallery demo proves the end-to-end path.
+
+---
+
 ## Current Status (2026-04-10)
 
 Phases 0–6 of the original plan and every gap item surfaced by the

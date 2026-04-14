@@ -587,6 +587,37 @@ view.border(blend: BorderBlend([.red, .yellow, .blue, .red]),
 `phase` is a 0…1 rotation around the perimeter. Driving it with the
 existing animation pipeline gets you a chasing-light border for free.
 
+> **Update (April 13, 2026 — Animatable-protocol migration).**
+> `LinearGradient.startPoint` / `endPoint` and `RadialGradient.center`
+> are now typed as `UnitPoint`, not `Alignment`. The original draft
+> above, written before the migration, used `Alignment` for both
+> roles because `Alignment` already exposed the named-corner
+> constants (`.topLeading`, `.bottomTrailing`, etc.) the gradient
+> endpoints want to read. Two reasons drove the type change:
+>
+> 1. `Alignment` is a *named-slot* type — it picks one of a discrete
+>    set of layout positions and is consumed by the stack/grid
+>    layout engines that map a name to a placement. There is no
+>    coordinate arithmetic on it. `UnitPoint`, by contrast, is a
+>    continuous unit-square coordinate (`x ∈ [0, 1]`, `y ∈ [0, 1]`)
+>    with the same named constants exposed as static initializers.
+>    Gradient endpoints need the *coordinates*, not the slot identity.
+> 2. Animation requires linear interpolation between two endpoint
+>    values. Interpolating between two named slots is meaningless;
+>    interpolating between two `UnitPoint`s is the obvious componentwise
+>    blend. Phase 0 of the migration added an `Animatable` conformance
+>    on `UnitPoint`, and Phase 1 swapped the gradient property types
+>    so the controller could see the diff.
+>
+> `Alignment` itself stays unchanged and remains the authoring type
+> for stack/overlay/background alignment parameters (`VStack`, `HStack`,
+> `ZStack`, `.frame(alignment:)`, etc.). The two types coexist; the
+> rule is "named slot for layout, continuous coordinate for paint."
+>
+> See `docs/proposals/ANIMATABLE_PROTOCOL_MIGRATION.md` for the full
+> migration plan and the rationale for the `Animatable`-protocol
+> pipeline that consumes the new `UnitPoint` properties.
+
 ### 4.7 Layout integration: borders are part of the frame
 
 The current rasterizer-side trick of "inset by 1 inside the frame" goes

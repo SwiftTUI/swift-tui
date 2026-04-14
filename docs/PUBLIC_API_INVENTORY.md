@@ -1,6 +1,6 @@
 # Public API Inventory
 
-Last updated: April 11, 2026
+Last updated: April 13, 2026
 
 This page is the post-migration reference for the public surface of the package. It separates the canonical SwiftUI-shaped API and actor-isolation model from package-only seams that still exist in the codebase.
 
@@ -51,8 +51,23 @@ The canonical shape / border / gradient surface as of the Milestone 7 shape-and-
 - **`BorderBackgroundStyle`** (`Core`): per-side background shape styles for borders, with the same CSS-shorthand initializers.
 - **`BorderBlend`** (`Core`): perimeter 1D gradient sampled clockwise around a rectangle, with an animatable `phase` for chasing-light borders.
 - **`.border(...)` view modifiers**: three overloads — uniform style + `BorderSet`, per-side `BorderEdgeStyle` + `BorderSet`, and perimeter `BorderBlend` + `BorderSet` + animatable `phase`. All three route through the layout-aware border path so the border lives in reserved frame insets and never eats content.
-- **Gradient / pattern paints**: `LinearGradient` (unchanged), `RadialGradient` (new), `PatternFill` (new — `░ ▒ ▓` shading with optional background). All conform to `ShapeStyle` and are sampled per-cell at rasterization time.
+- **Gradient / pattern paints**: `LinearGradient`, `RadialGradient`, `PatternFill` (`░ ▒ ▓` shading with optional background). All conform to `ShapeStyle` and are sampled per-cell at rasterization time. As of the April 13, 2026 Animatable-protocol migration `LinearGradient.startPoint` / `endPoint` and `RadialGradient.center` are typed as `UnitPoint` instead of `Alignment` (see below).
 - **`Canvas<Drawing>`** and `CanvasDrawing` / `CanvasContext` (`Core` + `View`): arbitrary 2×4-Braille-subpixel drawing escape hatch for content the `Shape` algebra can't express (sparklines, plots, hand-drawn glyphs). The drawing primitives live in `Core` so the rasterizer can consume them directly; the authoring shell is a `View` in the `View` layer.
+
+### Animation primitives and `Animatable` conformance
+
+The animation pipeline now follows the SwiftUI-shaped `Animatable`-protocol model (see `docs/proposals/ANIMATABLE_PROTOCOL_MIGRATION.md`). The new public surface is:
+
+- **`Animatable`** (`Core`): the SwiftUI-shaped protocol that exposes an `animatableData: AnimatableData` round-trip for any type that wants to participate in interpolation. Built-in conformances cover all paint and geometry types the controller needs to interpolate.
+- **`AnimatablePair<First, Second>`** (`Core`): the standard pair combinator for composing two `Animatable` values into a single `animatableData` round-trip.
+- **`AnimatableArray<Element>`** (`Core`): an ordered, fixed-length array of `Animatable` elements that itself conforms to `Animatable`, used by gradients to interpolate their stops list and by any other variable-arity collection of animatable values. Length mismatches between the source and target snap to the target rather than interpolating, matching SwiftUI's behavior.
+- **`UnitPoint`** (`Core`): continuous unit-square coordinate (`x ∈ [0, 1]`, `y ∈ [0, 1]`) with named-corner static initializers (`.topLeading`, `.center`, `.bottomTrailing`, etc.). Used by `LinearGradient.startPoint`, `LinearGradient.endPoint`, and `RadialGradient.center`. Conforms to `Animatable` so gradient orientations interpolate continuously under `withAnimation`. Coexists with `Alignment`, which remains the named-slot type for stack/overlay/background alignment parameters.
+- **`EdgeInsets`** (`Core`): now conforms to `Animatable`, so `.padding(...)` and frame-inset values interpolate componentwise.
+- **`Color`** (`Core`): conforms to `Animatable` via OKLab interpolation, so `.foregroundStyle(color)` and any other `Color`-typed value interpolates perceptually.
+- **`Gradient.Stop`, `Gradient`, `LinearGradient`, `RadialGradient`** (`Core`): all conform to `Animatable`. Compound conformance flows through `AnimatablePair` and `AnimatableArray` so gradient stops, locations, colors, and endpoints all interpolate together.
+- **`PatternFill`** (`Core`): variant-aware `Animatable` participation through helper functions on `PatternFill.Paint` so a pattern fill whose foreground or background is a gradient animates the interior of that gradient continuously, while pattern fills that change variant (e.g. flat color → gradient) snap.
+
+The animation authoring surface (`Animation`, `withAnimation`, `PhaseAnimator`, `.transition`, `matchedGeometryEffect`, completion closures) is unchanged and continues to live in `View`.
 
 Removed from the public surface in this revamp:
 
