@@ -155,4 +155,190 @@ struct GradientAnimationIntegrationTests {
     #expect(abs(gradient.endPoint.x - 0.5) < 0.05)
     #expect(abs(gradient.endPoint.y - 1) < 0.05)
   }
+
+  // MARK: - Shape.fill path (drawPayload.shape.operation)
+  //
+  // The two tests above pin the `.foregroundStyle(_:)` modifier path
+  // (which writes to `drawMetadata.baseStyle.foregroundStyle`).  The
+  // tests below pin the `Shape.fill(_:)` / `.stroke(_:)` path, which
+  // writes to `drawPayload.shape.operation.fill.style` — a completely
+  // different storage location.  Both slots must animate through the
+  // same `AnyAnimatable` interpolation pipeline; the Phase 5 migration
+  // originally shipped with the shape-payload extraction missing, so
+  // `Rectangle().fill(LinearGradient(...))` in the gallery demos
+  // snapped instead of rotating.  These regression tests pin the
+  // shape-payload path end-to-end.
+
+  @Test("Shape fill LinearGradient animates through drawPayload path")
+  func shapeFillLinearGradientAnimates() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    _ = controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("shape-fill-leaf")])
+
+    // Frame 1: Rectangle().fill(LinearGradient(.topLeading → .bottomTrailing)).
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Rectangle"),
+      drawPayload: .shape(
+        ShapePayload(
+          geometry: .rectangle,
+          insetAmount: 0,
+          operation: .fill(
+            style: .linearGradient(
+              LinearGradient(
+                colors: [.red, .blue],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+              )
+            ),
+            mode: .full
+          )
+        )
+      )
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Frame 2: gradient rotated 90° under an explicit animation request.
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Rectangle"),
+      drawPayload: .shape(
+        ShapePayload(
+          geometry: .rectangle,
+          insetAmount: 0,
+          operation: .fill(
+            style: .linearGradient(
+              LinearGradient(
+                colors: [.red, .blue],
+                startPoint: .topTrailing,
+                endPoint: .bottomLeading
+              )
+            ),
+            mode: .full
+          )
+        )
+      )
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    // Unwrap the interpolated shape payload's fill style.
+    guard case .shape(let shapePayload) = frame2.drawPayload,
+      case .fill(let interpolatedStyle, _) = shapePayload.operation,
+      let style = interpolatedStyle,
+      case .linearGradient(let gradient) = style
+    else {
+      Issue.record(
+        "expected interpolated linear gradient inside drawPayload.shape.operation.fill"
+      )
+      return
+    }
+    // Same midpoint assertion as the .foregroundStyle path.  Without
+    // Phase 5's shape-payload extraction bug fix, the `applyValue`
+    // writeback would leave the shape payload at frame 1's start/end
+    // points and this test would read back (0, 0) / (1, 1) instead.
+    #expect(abs(gradient.startPoint.x - 0.5) < 0.05)
+    #expect(abs(gradient.startPoint.y - 0) < 0.05)
+    #expect(abs(gradient.endPoint.x - 0.5) < 0.05)
+    #expect(abs(gradient.endPoint.y - 1) < 0.05)
+  }
+
+  @Test("Shape fill PatternFill gradient foreground animates through drawPayload path")
+  func shapeFillPatternFillGradientForegroundAnimates() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    _ = controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("shape-fill-pattern-leaf")])
+
+    // Frame 1: Rectangle().fill(PatternFill(foreground: linear gradient)).
+    // This matches the BordersAndShapesCurvedShapesSection PhaseAnimator
+    // demo's exact shape.
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Rectangle"),
+      drawPayload: .shape(
+        ShapePayload(
+          geometry: .rectangle,
+          insetAmount: 0,
+          operation: .fill(
+            style: .patternFill(
+              PatternFill(
+                glyph: "/",
+                foreground: .linearGradient(
+                  LinearGradient(
+                    colors: [.white, .red],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                  )
+                )
+              )
+            ),
+            mode: .full
+          )
+        )
+      )
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Rectangle"),
+      drawPayload: .shape(
+        ShapePayload(
+          geometry: .rectangle,
+          insetAmount: 0,
+          operation: .fill(
+            style: .patternFill(
+              PatternFill(
+                glyph: "/",
+                foreground: .linearGradient(
+                  LinearGradient(
+                    colors: [.white, .red],
+                    startPoint: .topTrailing,
+                    endPoint: .bottomLeading
+                  )
+                )
+              )
+            ),
+            mode: .full
+          )
+        )
+      )
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .shape(let shapePayload) = frame2.drawPayload,
+      case .fill(let interpolatedStyle, _) = shapePayload.operation,
+      let style = interpolatedStyle,
+      case .patternFill(let pattern) = style,
+      case .linearGradient(let gradient) = pattern.foreground
+    else {
+      Issue.record(
+        "expected interpolated PatternFill with gradient foreground inside drawPayload.shape.operation.fill"
+      )
+      return
+    }
+    #expect(abs(gradient.startPoint.x - 0.5) < 0.05)
+    #expect(abs(gradient.startPoint.y - 0) < 0.05)
+    #expect(abs(gradient.endPoint.x - 0.5) < 0.05)
+    #expect(abs(gradient.endPoint.y - 1) < 0.05)
+    // Glyph must survive interpolation — PatternFill's glyph field is
+    // identity-preserved by the `PatternFill.interpolated(to:progress:)`
+    // helper.
+    #expect(pattern.glyph == "/")
+  }
 }

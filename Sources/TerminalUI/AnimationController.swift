@@ -5,10 +5,35 @@ package import View
 /// slot maps to a specific writeback destination in ``applyValue``.
 ///
 /// Compound slots (``foregroundShapeStyle``, ``backgroundShapeStyle``,
-/// ``borderShapeStyle``) carry heterogeneous animatable values — the
-/// slot identifies the destination but the wrapped ``AnyAnimatable``
-/// determines the concrete type (Color, LinearGradient, RadialGradient,
-/// PatternFill).
+/// ``borderShapeStyle``, ``shapeFillStyle``, ``shapeStrokeStyle``) carry
+/// heterogeneous animatable values — the slot identifies the
+/// destination but the wrapped ``AnyAnimatable`` determines the concrete
+/// type (Color, LinearGradient, RadialGradient, PatternFill).
+///
+/// **Where is the slot stored on `ResolvedNode`?** Two separate paths
+/// reach the rasterizer:
+///
+/// - **`.foregroundShapeStyle` / `.backgroundShapeStyle` /
+///   `.borderShapeStyle`** — style set by a `.foregroundStyle(_:)` /
+///   `.background(_:)` / `.border(_:)` modifier.  Stored on
+///   `node.drawMetadata.baseStyle.foregroundStyle` (and friends), or
+///   inherited through the environment.  Leaf views like `Text` and
+///   `TextFigure` resolve these at paint time.
+/// - **`.shapeFillStyle` / `.shapeStrokeStyle`** — style set by a
+///   `Shape.fill(_:)` / `Shape.stroke(_:)` / `Shape.strokeBorder(_:)`
+///   modifier.  Stored *inside* `node.drawPayload` as
+///   `.shape(ShapePayload(operation: .fill(style:mode:)))` (or
+///   `.stroke(...)`).  The rasterizer reads this directly and never
+///   consults `baseStyle.foregroundStyle` when the shape operation
+///   carries a non-nil style.
+///
+/// These are two independent storage locations for what SwiftUI
+/// conceptually treats as "the fill of a shape", and animations
+/// targeting one must NOT be confused for the other.  A
+/// `Rectangle().fill(LinearGradient(...))` writes to `.shapeFillStyle`;
+/// a `Rectangle().foregroundStyle(LinearGradient(...))` writes to
+/// `.foregroundShapeStyle`.  Both extract and apply paths here are
+/// slot-specific so the two writeback destinations stay separate.
 package enum AnimatableSlot: Hashable, Sendable {
   case opacity
   case foregroundShapeStyle
@@ -20,6 +45,8 @@ package enum AnimatableSlot: Hashable, Sendable {
   case position
   case frameWidth
   case frameHeight
+  case shapeFillStyle
+  case shapeStrokeStyle
 }
 
 /// Keyed identifier for a single active animation.  Carries the view
@@ -112,6 +139,28 @@ package struct AnimatableSnapshot: Sendable {
       from: node.drawMetadata.borderShapeStyle
     ) {
       snapshot[.borderShapeStyle] = border
+    }
+
+    // Shape draw payloads.  `Rectangle().fill(LinearGradient(...))` and
+    // friends write their style into ``DrawPayload/shape(_:)``'s
+    // ``ShapePayload/operation``, NOT into `baseStyle.foregroundStyle`.
+    // Extract those styles into dedicated slots so Shape.fill / .stroke
+    // animations flow through the same interpolation pipeline as the
+    // `.foregroundStyle(_:)` modifier path.  A nil operation style
+    // means the shape inherits from `baseStyle.foregroundStyle` at
+    // paint time — in that case the .foregroundShapeStyle extraction
+    // above already covers it.
+    if case .shape(let shapePayload) = node.drawPayload {
+      switch shapePayload.operation {
+      case .fill(let style, _):
+        if let fill = extractAnimatableShapeStyle(from: style) {
+          snapshot[.shapeFillStyle] = fill
+        }
+      case .stroke(let style, _, _, _):
+        if let stroke = extractAnimatableShapeStyle(from: style) {
+          snapshot[.shapeStrokeStyle] = stroke
+        }
+      }
     }
 
     // Layout-derived slots.
@@ -1970,6 +2019,42 @@ package final class AnimationController {
     case .frameHeight:
       guard let height = value.unwrap(as: Int.self) else { return }
       applyFrameHeight(height, to: &node)
+
+    case .shapeFillStyle:
+      guard let style = unwrapShapeStyle(value) else { return }
+      guard case .shape(let shapePayload) = node.drawPayload,
+        case .fill(_, let mode) = shapePayload.operation
+      else {
+        return
+      }
+      node.drawPayload = .shape(
+        ShapePayload(
+          geometry: shapePayload.geometry,
+          insetAmount: shapePayload.insetAmount,
+          operation: .fill(style: style, mode: mode)
+        )
+      )
+
+    case .shapeStrokeStyle:
+      guard let style = unwrapShapeStyle(value) else { return }
+      guard case .shape(let shapePayload) = node.drawPayload,
+        case .stroke(_, let strokeStyle, let strokeBorder, let backgroundStyle) =
+          shapePayload.operation
+      else {
+        return
+      }
+      node.drawPayload = .shape(
+        ShapePayload(
+          geometry: shapePayload.geometry,
+          insetAmount: shapePayload.insetAmount,
+          operation: .stroke(
+            style: style,
+            strokeStyle: strokeStyle,
+            strokeBorder: strokeBorder,
+            backgroundStyle: backgroundStyle
+          )
+        )
+      )
     }
   }
 
