@@ -25,6 +25,7 @@ Runs the full checked-in repo verification surface:
   - Runners/TerminalUICLI tests
   - Runners/TerminalUIWASI tests
   - GUI/SwiftUITUIGUI tests
+  - GUI/SwiftTermTUIGUI tests
   - GUI/WebTUIGUI Bun tests
   - Examples/gallery tests
   - Examples/WebExample Bun tests
@@ -36,7 +37,7 @@ The script also checks required environment dependencies up front:
 
 On Linux, the script also:
   - exports `DISABLE_EXPLICIT_PLATFORMS=1` for repo package resolution
-  - skips `GUI/SwiftUITUIGUI` tests because the SwiftUI host package is Apple-only
+  - skips `GUI/SwiftUITUIGUI` and `GUI/SwiftTermTUIGUI` tests because the SwiftUI host packages are Apple-only
 
 Pass --skip-bun-install to reuse the existing Bun install state.
 EOF
@@ -214,6 +215,16 @@ else
   run_function_step \
     "Run GUI/SwiftUITUIGUI tests" \
     run_swift test --package-path GUI/SwiftUITUIGUI
+fi
+
+if [ "$is_linux" -eq 1 ]; then
+  skip_step \
+    "Run GUI/SwiftTermTUIGUI tests" \
+    "SwiftUI host package is only available on Apple platforms"
+else
+  run_function_step \
+    "Run GUI/SwiftTermTUIGUI tests" \
+    run_swift test --package-path GUI/SwiftTermTUIGUI
 fi
 
 run_step \

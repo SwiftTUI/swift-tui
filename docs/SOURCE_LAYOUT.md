@@ -1,6 +1,6 @@
 # Source Layout
 
-Last updated: April 9, 2026
+Last updated: April 14, 2026
 
 This is the current ownership map for the codebase. It documents where
 subsystems live after the March 2026 source split and should stay aligned with
@@ -34,6 +34,7 @@ future file moves.
     - `Runners/TerminalUIWASI`
   - embedded host packages:
     - `GUI/SwiftUITUIGUI`
+    - `GUI/SwiftTermTUIGUI`
     - `GUI/WebTUIGUI`
 
 - Vendored local packages:
@@ -92,7 +93,8 @@ library product. Downstream package consumers reach those types through
 
 ## Embedded Host Packages
 
-- `GUI/SwiftUITUIGUI`: SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
+- `GUI/SwiftUITUIGUI`: Ghostty-backed SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
+- `GUI/SwiftTermTUIGUI`: SwiftTerm-backed SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
 - `GUI/WebTUIGUI`: Bun-based web host that consumes a `TerminalUIWASI` build and manifest
 
 ## `Core`

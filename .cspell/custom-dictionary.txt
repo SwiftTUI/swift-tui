@@ -26,6 +26,8 @@ smush
 smushed
 subview
 subviews
+SwiftTerm
+SwiftTermTUIGUI
 SwiftUITUIGUI
 TUIGUI
 UICLI

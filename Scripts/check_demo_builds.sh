@@ -6,11 +6,12 @@ repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
 skip_clean=0
+skip_bun_install=0
 failures=""
 
 usage() {
   cat <<'EOF'
-Usage: Scripts/check_demo_builds.sh [--skip-clean]
+Usage: Scripts/check_demo_builds.sh [--skip-clean] [--skip-bun-install]
 
 Builds the repository's demo packages and host shells, then runs stack-safety
 input harnesses against the terminal examples:
@@ -18,12 +19,20 @@ input harnesses against the terminal examples:
   - Examples/SwiftUIExample/TerminalApp
   - Examples/WebExample/TerminalApp
   - GUI/SwiftUITUIGUI
+  - GUI/SwiftTermTUIGUI
   - Examples/SwiftUIExample/SwiftUIExample.xcodeproj
   - Examples/WebExample (Bun build)
   - GUI/WebTUIGUI against WebExampleApp
 
+The script also checks required environment dependencies up front:
+  - Swift availability
+  - Bun availability
+  - Python 3 availability
+  - Xcode availability
+  - Bun workspace dependencies via `bun install --frozen-lockfile` at the repo root
+
 By default the script runs fresh builds. Pass --skip-clean to reuse existing
-build artifacts.
+build artifacts, or --skip-bun-install to reuse the existing Bun install state.
 EOF
 }
 
@@ -41,6 +50,9 @@ for argument in "$@"; do
   case "$argument" in
     --skip-clean)
       skip_clean=1
+      ;;
+    --skip-bun-install)
+      skip_bun_install=1
       ;;
     -h|--help)
       usage
@@ -87,12 +99,20 @@ run_step() {
   fi
 }
 
+if [ -f "$repo_root/package.json" ] && [ -f "$repo_root/bun.lock" ] && [ "$skip_bun_install" -eq 0 ]; then
+  run_step \
+    "Install Bun workspace dependencies" \
+    "$repo_root" \
+    bun install --frozen-lockfile
+fi
+
 if [ "$skip_clean" -eq 0 ]; then
   for package_path in \
     "Examples/gallery" \
     "Examples/SwiftUIExample/TerminalApp" \
     "Examples/WebExample/TerminalApp" \
-    "GUI/SwiftUITUIGUI"; do
+    "GUI/SwiftUITUIGUI" \
+    "GUI/SwiftTermTUIGUI"; do
     run_step \
       "Clean $package_path" \
       "$repo_root" \
@@ -138,6 +158,11 @@ run_step \
   "Build GUI/SwiftUITUIGUI" \
   "$repo_root" \
   swift build --package-path GUI/SwiftUITUIGUI
+
+run_step \
+  "Build GUI/SwiftTermTUIGUI" \
+  "$repo_root" \
+  swift build --package-path GUI/SwiftTermTUIGUI
 
 if [ "$skip_clean" -eq 0 ]; then
   run_step \

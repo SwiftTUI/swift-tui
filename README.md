@@ -77,7 +77,8 @@ execution modes:
 
 - terminal-native execution via the executable runner package `Runners/TerminalUICLI`
 - WASI execution via the executable runner package `Runners/TerminalUIWASI`
-- host-managed embedding via the embedded host packages `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`
+- host-managed embedding via the embedded host packages `GUI/SwiftUITUIGUI`,
+  `GUI/SwiftTermTUIGUI`, and `GUI/WebTUIGUI`
 
 `TerminalUI` on its own is library-only. It provides the shared runtime,
 `TerminalUISceneManifest`, and `HostedSceneSession`, but it does not provide an
@@ -90,7 +91,7 @@ executable product or default `App.main()`.
 - Controls and content: `Text`, `TextFigure`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `GroupBox`, `ControlGroup`, `TabView`, and terminal-native alert or confirmation presentation backed by embedded FIGlet fonts rather than external font files
 - Presentation and workflow surfaces: `alert`, `confirmationDialog`, `sheet`, `toast`, command registration through `.command(...)`, and command discovery through `CommandPalette` / `.commandPalette(...)`
 - Runtime integration: `Resolver`, `DefaultRenderer`, `RunLoop`, terminal input parsing, signal handling, alternate-screen ownership, capability-aware presentation, and lifecycle or task staging
-- Platform integration packages: executable runners `Runners/TerminalUICLI` and `Runners/TerminalUIWASI`, plus embedded hosts `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`
+- Platform integration packages: executable runners `Runners/TerminalUICLI` and `Runners/TerminalUIWASI`, plus embedded hosts `GUI/SwiftUITUIGUI`, `GUI/SwiftTermTUIGUI`, and `GUI/WebTUIGUI`
 - Compact metrics and charts: `ProgressView`, `BarChart`, `ColumnChart`, `ComparisonChart`, `Sparkline`, `Timeline`, `ThresholdGauge`, and related support types in `TerminalUICharts`
 
 ## Package Products
@@ -131,7 +132,8 @@ another app or runtime lifecycle.
   - `Runners/TerminalUICLI`: terminal-native executable runner, scene discovery, ptys, and attach flows
   - `Runners/TerminalUIWASI`: WASI executable runner plus manifest mode
 - embedded host packages:
-  - `GUI/SwiftUITUIGUI`: SwiftUI host package for macOS and iOS
+  - `GUI/SwiftUITUIGUI`: Ghostty-backed SwiftUI host package for macOS and iOS
+  - `GUI/SwiftTermTUIGUI`: SwiftTerm-backed SwiftUI host package for macOS and iOS
   - `GUI/WebTUIGUI`: Bun-only browser host that consumes a `TerminalUIWASI` build
 
 ## Requirements
@@ -169,8 +171,9 @@ single repo-level entrypoint for the full checked-in test surface across the
 runner packages, GUI packages, and example projects, and it verifies the Swift
 and Bun environment first. On Linux, it exports
 `DISABLE_EXPLICIT_PLATFORMS=1` and skips the Apple-only
-`GUI/SwiftUITUIGUI` SwiftUI host tests. If you're already using the repo's
-root Bun workspace, `bun run test` is a thin entrypoint to the same script.
+`GUI/SwiftUITUIGUI` and `GUI/SwiftTermTUIGUI` SwiftUI host tests. If you're
+already using the repo's root Bun workspace, `bun run test` is a thin
+entrypoint to the same script.
 
 ## Generate API Docs
 
@@ -184,7 +187,8 @@ swiftly run swift package generate-documentation --target TerminalUI
 
 Peer host packaging lives outside the root package products:
 
-- `GUI/SwiftUITUIGUI`: SwiftUI host package for macOS and iOS, built on `TerminalUI` scene manifests and `HostedSceneSession`
+- `GUI/SwiftUITUIGUI`: Ghostty-backed SwiftUI host package for macOS and iOS, built on `TerminalUI` scene manifests and `HostedSceneSession`
+- `GUI/SwiftTermTUIGUI`: SwiftTerm-backed SwiftUI host package for macOS and iOS, built on `TerminalUI` scene manifests and `HostedSceneSession`
 - `GUI/WebTUIGUI`: Bun-based web host package that builds a TerminalUI wasm app bundle and hosts it in the browser
 
 ## Current Constraints

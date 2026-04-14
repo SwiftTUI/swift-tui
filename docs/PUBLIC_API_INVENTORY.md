@@ -1,6 +1,6 @@
 # Public API Inventory
 
-Last updated: April 13, 2026
+Last updated: April 14, 2026
 
 This page is the post-migration reference for the public surface of the package. It separates the canonical SwiftUI-shaped API and actor-isolation model from package-only seams that still exist in the codebase.
 
@@ -96,7 +96,8 @@ package surface:
   - `Runners/TerminalUICLI` exposes `TerminalCLIAppRunner` plus the default terminal-native `App.main()` story
   - `Runners/TerminalUIWASI` exposes `TerminalWASIAppRunner` plus the default WASI `App.main()` story
 - embedded host packages:
-  - `GUI/SwiftUITUIGUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell
+  - `GUI/SwiftUITUIGUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on top of Ghostty
+  - `GUI/SwiftTermTUIGUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on top of SwiftTerm
   - `GUI/WebTUIGUI` hosts a `TerminalUIWASI` build in the browser using the same manifest and hosted-session story
 
 These are supported peer packages, but they are not root library products in
