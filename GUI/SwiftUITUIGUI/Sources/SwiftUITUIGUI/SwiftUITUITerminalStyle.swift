@@ -1,4 +1,4 @@
-import GhosttyTerminal
+import Ghostty
 import TerminalUI
 
 public enum SwiftUITUICursorStyle: String, Sendable, Hashable {

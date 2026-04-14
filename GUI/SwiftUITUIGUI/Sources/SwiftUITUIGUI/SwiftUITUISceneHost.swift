@@ -1,4 +1,4 @@
-import GhosttyTerminal
+import Ghostty
 import Observation
 import SwiftUI
 import TerminalUI
