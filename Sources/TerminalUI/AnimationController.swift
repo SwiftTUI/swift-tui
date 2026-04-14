@@ -22,12 +22,38 @@ package enum AnimatableSlot: Hashable, Sendable {
   case frameHeight
 }
 
-/// Keyed identifier for a single active animation: the view
-/// ``Identity`` plus the ``AnimatableSlot`` being animated.  Every
-/// slot on a given identity can be in flight independently.
+/// Keyed identifier for a single active animation.  Carries the view
+/// ``Identity`` plus a ``Scope`` discriminator that selects between
+/// the per-property slot path, the placed-level insertion offset
+/// path, and the placed-level matched-geometry path.  Every (identity,
+/// scope) pairing can be in flight independently.
 package struct AnimationKey: Hashable, Sendable {
+  /// Discriminates the per-key payload that lives on ``ActiveAnimation``
+  /// and selects which apply path consumes it.
+  package enum Scope: Hashable, Sendable {
+    /// A property animation against a specific ``AnimatableSlot``.
+    case property(AnimatableSlot)
+    /// A transition-driven insertion offset animation (placed level).
+    case insertionOffset
+    /// A matched-geometry translation animation (placed level).
+    case matchedGeometry
+  }
+
   package var identity: Identity
-  package var slot: AnimatableSlot
+  package var scope: Scope
+
+  package init(identity: Identity, scope: Scope) {
+    self.identity = identity
+    self.scope = scope
+  }
+
+  /// Convenience initializer for the property scope, preserving the
+  /// pre-Phase-4 call shape `AnimationKey(identity:slot:)` at every
+  /// historic call site.
+  package init(identity: Identity, slot: AnimatableSlot) {
+    self.identity = identity
+    self.scope = .property(slot)
+  }
 }
 
 /// Snapshot of every tracked animatable slot's value for one view
@@ -194,10 +220,32 @@ package struct AnimatableSnapshot: Sendable {
   }
 }
 
-/// An animation currently in flight for one (identity, slot) key.
+/// Per-kind payload carried on ``ActiveAnimation``.  The case selects
+/// how the animation is sampled and how its output is applied to the
+/// resolved/placed tree.
+package enum AnimationKind: Sendable {
+  /// A property animation on a specific ``AnimatableSlot``.  The
+  /// `from`/`to` values are interpolated and written back through
+  /// ``AnimationController/applyValue``.
+  case property(from: AnyAnimatable, to: AnyAnimatable)
+  /// A transition-driven insertion offset animation applied at
+  /// placed level (cannot route through the slot path because it
+  /// operates on intrinsic-layout leaves).  The `from` tuple holds
+  /// the starting (x, y) delta; the animation interpolates from
+  /// `from` toward (0, 0).
+  case insertionOffset(from: (x: Int, y: Int))
+  /// A matched-geometry translation animation between two placed
+  /// bounds.  At progress 0 the target identity renders at
+  /// `fromBounds`; at progress 1 it renders at its natural new
+  /// bounds (looked up in the current placed tree).
+  case matchedGeometry(fromBounds: Rect)
+}
+
+/// An animation currently in flight for one ``AnimationKey``.
 package struct ActiveAnimation: Sendable {
-  package var from: AnyAnimatable
-  package var to: AnyAnimatable
+  /// The per-kind payload.  Selects how this animation is sampled
+  /// and applied to the tree.
+  package var kind: AnimationKind
   package var animationBox: AnimationBox
   package var startTime: MonotonicInstant
   /// Per-key persistent state threaded into
@@ -213,19 +261,39 @@ package struct ActiveAnimation: Sendable {
 
 /// Result of a tick: tells the runtime whether more frames are needed
 /// and when the next one should arrive.
+///
+/// Phase 4 split the previously overloaded ``hasActiveAnimations`` /
+/// ``affectedIdentities`` fields:
+///
+/// - ``hasPendingWork`` is the scheduling signal — `true` whenever the
+///   tick produced any work that needs another frame, including
+///   identity-agnostic stranded-batch drains.
+/// - ``redrawIdentities`` is the visibility signal — the set of view
+///   identities whose rendered cells must be redrawn this frame.  May
+///   be empty even when ``hasPendingWork`` is `true` (the drain case),
+///   so the run loop must not gate the wake-up on this set being
+///   non-empty.
 package struct AnimationTickResult: Sendable {
-  package var hasActiveAnimations: Bool
+  /// `true` when the tick produced pending work and the scheduler
+  /// should wake up again before ``nextDeadline``.
+  package var hasPendingWork: Bool
+  /// The absolute time by which the scheduler must wake for the
+  /// next tick.  `nil` when no wake-up is needed.
   package var nextDeadline: MonotonicInstant?
-  package var affectedIdentities: Set<Identity>
+  /// Identities whose rendered cells need to be redrawn this frame.
+  /// Used by the render pipeline's incremental presentation diff to
+  /// decide which subtrees need re-rasterizing — NOT by the run loop
+  /// to decide whether to schedule another tick.
+  package var redrawIdentities: Set<Identity>
 
   package init(
-    hasActiveAnimations: Bool = false,
+    hasPendingWork: Bool = false,
     nextDeadline: MonotonicInstant? = nil,
-    affectedIdentities: Set<Identity> = []
+    redrawIdentities: Set<Identity> = []
   ) {
-    self.hasActiveAnimations = hasActiveAnimations
+    self.hasPendingWork = hasPendingWork
     self.nextDeadline = nextDeadline
-    self.affectedIdentities = affectedIdentities
+    self.redrawIdentities = redrawIdentities
   }
 }
 
@@ -272,44 +340,6 @@ package struct RemovalEntry: Sendable {
   package var customState: AnimationState = .init()
 }
 
-/// A matched-geometry animation tracked separately from the
-/// ``activeAnimations`` map so it can be applied at placed level
-/// after layout runs.
-///
-/// The "from" bounds are captured from the previous frame's placed
-/// tree at match-detection time; the "to" bounds are whatever the
-/// current frame's layout produced for the new identity.  At each
-/// tick the controller interpolates the translation delta between
-/// those two rectangles (position only — size is left at the
-/// destination's natural measurement).
-package struct MatchedGeometryAnimation: Sendable {
-  package var fromBounds: Rect
-  package var animationBox: AnimationBox
-  package var startTime: MonotonicInstant
-  package var batchID: AnimationBatchID?
-  package var customState: AnimationState = .init()
-}
-
-/// An insertion offset animation tracked separately from the
-/// ``activeAnimations`` map so it can be applied at placed level
-/// rather than via ``applyValue`` on the resolved tree.
-///
-/// ``applyValue`` for ``AnimatableSlot/offset`` only mutates
-/// nodes whose `layoutBehavior` is already ``LayoutBehavior/offset``
-/// — which is never true for intrinsic-layout leaves like `Text`.
-/// Wrapping those leaves in a new `.offset` layout doesn't work
-/// either because ``LayoutEngine``'s `.offset` variant requires a
-/// child.  Instead the controller tracks the insertion offset
-/// delta per identity and translates the matching placed node's
-/// bounds after layout runs.
-package struct InsertionOffsetAnimation: Sendable {
-  package var from: (x: Int, y: Int)
-  package var animationBox: AnimationBox
-  package var startTime: MonotonicInstant
-  package var batchID: AnimationBatchID?
-  package var customState: AnimationState = .init()
-}
-
 @MainActor
 package final class AnimationController {
   private var previousSnapshots: [Identity: AnimatableSnapshot] = [:]
@@ -322,16 +352,6 @@ package final class AnimationController {
   /// the overlay at placed level instead of routing it back through
   /// measure/place.
   private var previousPlacedRoot: PlacedNode?
-  /// Active insertion-offset animations keyed by identity.  Applied
-  /// at placed level via ``applyPlacedOverlays`` alongside removal
-  /// overlays — see ``InsertionOffsetAnimation``.
-  private var insertionOffsetAnimations: [Identity: InsertionOffsetAnimation] = [:]
-  /// Active matched-geometry animations keyed by the NEW identity
-  /// (the one that just appeared).  The `fromBounds` on each entry
-  /// is the placed bounds of whatever identity previously held the
-  /// same matched-geometry key.  Applied at placed level by
-  /// ``applyPlacedOverlays``.
-  private var matchedGeometryAnimations: [Identity: MatchedGeometryAnimation] = [:]
   /// Placed bounds for every matched-geometry key observed in the
   /// previous frame's placed tree.  Seeded by ``capturePlacedTree``
   /// and consulted by the next frame's match detection.
@@ -439,7 +459,7 @@ package final class AnimationController {
   /// Number of matched-geometry animations currently in flight.
   /// Test hook.
   package var activeMatchedGeometryCount: Int {
-    matchedGeometryAnimations.count
+    activeAnimations.keys.lazy.filter { $0.scope == .matchedGeometry }.count
   }
 
   /// Number of matched-geometry keys captured from the previous
@@ -513,99 +533,103 @@ package final class AnimationController {
     }
 
     // 2. Translate placed nodes for insertion offset animations.
-    if !insertionOffsetAnimations.isEmpty {
-      var offsetsByIdentity: [Identity: (dx: Int, dy: Int)] = [:]
-      var completedInsertions: [Identity] = []
+    //    Filter the unified active map down to the .insertionOffset
+    //    scope; everything else (property + matchedGeometry) is
+    //    ignored on this pass.
+    var insertionOffsetsByIdentity: [Identity: (dx: Int, dy: Int)] = [:]
+    var completedInsertionKeys: [AnimationKey] = []
 
-      for (identity, entry) in insertionOffsetAnimations {
-        guard let anim = registeredAnimations[entry.animationBox] else {
-          completedInsertions.append(identity)
-          continue
-        }
-        let elapsed = entry.startTime.duration(to: timestamp)
-        var state = entry.customState
-        let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
-        insertionOffsetAnimations[identity]?.customState = state
-
-        guard let progress = evaluated else {
-          // Animation complete: delta is 0 (fully at final position).
-          completedInsertions.append(identity)
-          continue
-        }
-        // Insertion interpolates `from` → 0.
-        // At progress p, interpolated = from * (1 - p).
-        let dx = Int(Double(entry.from.x) * (1.0 - progress))
-        let dy = Int(Double(entry.from.y) * (1.0 - progress))
-        offsetsByIdentity[identity] = (dx: dx, dy: dy)
+    for (key, entry) in activeAnimations {
+      guard key.scope == .insertionOffset else { continue }
+      guard case .insertionOffset(let from) = entry.kind else { continue }
+      guard let anim = registeredAnimations[entry.animationBox] else {
+        completedInsertionKeys.append(key)
+        continue
       }
+      let elapsed = entry.startTime.duration(to: timestamp)
+      var state = entry.customState
+      let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
+      activeAnimations[key]?.customState = state
 
-      for identity in completedInsertions {
-        if let entry = insertionOffsetAnimations.removeValue(forKey: identity) {
-          releaseBatch(entry.batchID)
-        }
+      guard let progress = evaluated else {
+        // Animation complete: delta is 0 (fully at final position).
+        completedInsertionKeys.append(key)
+        continue
       }
+      // Insertion interpolates `from` → 0.
+      // At progress p, interpolated = from * (1 - p).
+      let dx = Int(Double(from.x) * (1.0 - progress))
+      let dy = Int(Double(from.y) * (1.0 - progress))
+      insertionOffsetsByIdentity[key.identity] = (dx: dx, dy: dy)
+    }
 
-      if !offsetsByIdentity.isEmpty {
-        tree = translatePlacedNodesByIdentity(
-          tree: tree,
-          offsets: offsetsByIdentity
-        )
+    for key in completedInsertionKeys {
+      if let entry = activeAnimations.removeValue(forKey: key) {
+        releaseBatch(entry.batchID)
       }
+    }
+
+    if !insertionOffsetsByIdentity.isEmpty {
+      tree = translatePlacedNodesByIdentity(
+        tree: tree,
+        offsets: insertionOffsetsByIdentity
+      )
     }
 
     // 3. Apply matched-geometry translations.  At progress 0 the
     //    new identity renders at the PREVIOUS frame's bounds; at
-    //    progress 1 it renders at its natural new bounds.
-    if !matchedGeometryAnimations.isEmpty {
-      var matchedDeltasByIdentity: [Identity: (dx: Int, dy: Int)] = [:]
-      var completedMatches: [Identity] = []
+    //    progress 1 it renders at its natural new bounds.  Same
+    //    filter pattern: only .matchedGeometry-scoped keys.
+    var matchedDeltasByIdentity: [Identity: (dx: Int, dy: Int)] = [:]
+    var completedMatchedKeys: [AnimationKey] = []
 
-      for (identity, entry) in matchedGeometryAnimations {
-        guard let anim = registeredAnimations[entry.animationBox] else {
-          completedMatches.append(identity)
-          continue
-        }
-        let elapsed = entry.startTime.duration(to: timestamp)
-        var state = entry.customState
-        let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
-        matchedGeometryAnimations[identity]?.customState = state
+    for (key, entry) in activeAnimations {
+      guard key.scope == .matchedGeometry else { continue }
+      guard case .matchedGeometry(let fromBounds) = entry.kind else { continue }
+      guard let anim = registeredAnimations[entry.animationBox] else {
+        completedMatchedKeys.append(key)
+        continue
+      }
+      let elapsed = entry.startTime.duration(to: timestamp)
+      var state = entry.customState
+      let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
+      activeAnimations[key]?.customState = state
 
-        guard let progress = evaluated else {
-          completedMatches.append(identity)
-          continue
-        }
-
-        // Look up the new placed bounds for this identity in the
-        // current tree.  The translation delta is
-        //     (fromBounds.origin - toBounds.origin) * (1 - progress)
-        // so at progress 0 we land on fromBounds and at progress 1
-        // we land on the natural new position.
-        guard let toBounds = Self.findBounds(in: tree, identity: identity)
-        else { continue }
-        let deltaX =
-          Double(entry.fromBounds.origin.x - toBounds.origin.x)
-          * (1.0 - progress)
-        let deltaY =
-          Double(entry.fromBounds.origin.y - toBounds.origin.y)
-          * (1.0 - progress)
-        matchedDeltasByIdentity[identity] = (
-          dx: Int(deltaX.rounded()),
-          dy: Int(deltaY.rounded())
-        )
+      guard let progress = evaluated else {
+        completedMatchedKeys.append(key)
+        continue
       }
 
-      for identity in completedMatches {
-        if let entry = matchedGeometryAnimations.removeValue(forKey: identity) {
-          releaseBatch(entry.batchID)
-        }
-      }
+      // Look up the new placed bounds for this identity in the
+      // current tree.  The translation delta is
+      //     (fromBounds.origin - toBounds.origin) * (1 - progress)
+      // so at progress 0 we land on fromBounds and at progress 1
+      // we land on the natural new position.
+      guard let toBounds = Self.findBounds(in: tree, identity: key.identity)
+      else { continue }
+      let deltaX =
+        Double(fromBounds.origin.x - toBounds.origin.x)
+        * (1.0 - progress)
+      let deltaY =
+        Double(fromBounds.origin.y - toBounds.origin.y)
+        * (1.0 - progress)
+      matchedDeltasByIdentity[key.identity] = (
+        dx: Int(deltaX.rounded()),
+        dy: Int(deltaY.rounded())
+      )
+    }
 
-      if !matchedDeltasByIdentity.isEmpty {
-        tree = translatePlacedNodesByIdentity(
-          tree: tree,
-          offsets: matchedDeltasByIdentity
-        )
+    for key in completedMatchedKeys {
+      if let entry = activeAnimations.removeValue(forKey: key) {
+        releaseBatch(entry.batchID)
       }
+    }
+
+    if !matchedDeltasByIdentity.isEmpty {
+      tree = translatePlacedNodesByIdentity(
+        tree: tree,
+        offsets: matchedDeltasByIdentity
+      )
     }
   }
 
@@ -754,32 +778,18 @@ package final class AnimationController {
   /// Test hook so integration tests can pin the enqueue path
   /// without exposing the entire private map.
   package var activeInsertionOffsetCount: Int {
-    insertionOffsetAnimations.count
+    activeAnimations.keys.lazy.filter { $0.scope == .insertionOffset }.count
   }
 
   /// Number of in-tree (drawMetadata / layoutBehavior) animations
-  /// currently in flight.  Test hook.
+  /// currently in flight.  Test hook.  Counts only ``.property``
+  /// scopes so the meaning matches the pre-Phase-4 contract — placed
+  /// overlay scopes have their own counters above.
   package var activeAnimationCount: Int {
-    activeAnimations.count
-  }
-
-  /// Returns an animation request representative of whatever is
-  /// currently in flight, or nil if no animations are active.
-  ///
-  /// Used by the rendering pipeline to keep tick frames from
-  /// accidentally snapping: if an `@Observable` write lands on the
-  /// same frame as an animation tick the scheduler would normally
-  /// produce a transaction with `.inherit`, which the controller's
-  /// diff path treats as "snap immediately".  Injecting the dominant
-  /// active request lets value-change diffs inside that resolve
-  /// retarget the in-flight animation instead.
-  ///
-  /// Returns the first active animation's box — all active animations
-  /// in a batch share the same box, and cross-batch interleavings
-  /// resolve the same way a fresh `withAnimation` would be.
-  package func dominantActiveRequest() -> AnimationRequest? {
-    guard let first = activeAnimations.values.first else { return nil }
-    return .animate(first.animationBox)
+    activeAnimations.keys.lazy.filter {
+      if case .property = $0.scope { return true }
+      return false
+    }.count
   }
 
   /// Called by the View layer at the start of resolve so the controller
@@ -886,12 +896,15 @@ package final class AnimationController {
         continue
       }
       let batchID = transaction.animationBatchID
-      if let existing = matchedGeometryAnimations[identity] {
+      let matchedKey = AnimationKey(
+        identity: identity, scope: .matchedGeometry
+      )
+      if let existing = activeAnimations[matchedKey] {
         releaseBatch(existing.batchID)
       }
       retainBatch(batchID)
-      matchedGeometryAnimations[identity] = MatchedGeometryAnimation(
-        fromBounds: fromBounds,
+      activeAnimations[matchedKey] = ActiveAnimation(
+        kind: .matchedGeometry(fromBounds: fromBounds),
         animationBox: box,
         startTime: timestamp,
         batchID: batchID
@@ -1030,11 +1043,21 @@ package final class AnimationController {
         }
       }
 
-      // Now clear in-flight active animations for every identity in
-      // the injected subtree — the exit animation supersedes them.
-      // (Batch refcounts from those superseded animations are released
-      // below in a follow-up pass so the completion closure sees the
-      // exit animation replace the insertion cleanly.)
+      // Supersede any in-flight animations on identities that are being
+      // re-injected from the removed subtree.  The unified activeAnimations
+      // map means this filter is scope-agnostic: property animations,
+      // insertion-offset animations, and matched-geometry animations are
+      // all swept together.  Any withAnimation completion closures ref-
+      // counted by these entries fire immediately here (via releaseBatch
+      // below), rather than at each animation's natural curve completion —
+      // matching SwiftUI's interrupt semantics where a removal supersedes
+      // any in-progress insertion or matched-geometry transition.
+      //
+      // Pre-Phase-4, insertion-offset and matched-geometry animations
+      // lived in separate side-channel maps and were not touched by this
+      // filter, so they would tick to natural completion (or be purged
+      // later by the placed-overlay loop's "registration missing" path)
+      // even after the exit animation started.
       let supersededEntries = activeAnimations.filter {
         injectedIdentities.contains($0.key.identity)
       }
@@ -1265,30 +1288,32 @@ package final class AnimationController {
         ?? AnyAnimatable(startOpacity)
       if let existing = activeAnimations[key] { releaseBatch(existing.batchID) }
       retainBatch(batchID)
-      activeAnimations[key] =
-        ActiveAnimation(
+      activeAnimations[key] = ActiveAnimation(
+        kind: .property(
           from: effectiveFrom,
-          to: AnyAnimatable(target),
-          animationBox: box,
-          startTime: timestamp,
-          batchID: batchID
-        )
+          to: AnyAnimatable(target)
+        ),
+        animationBox: box,
+        startTime: timestamp,
+        batchID: batchID
+      )
     }
-    // Insertion offsets route through a separate placed-level path
-    // rather than activeAnimations, because applyValue can't
-    // translate intrinsic-layout leaves like Text (LayoutEngine's
-    // .offset variant requires `resolved.children.first`).  The
-    // placed-level path walks the post-layout tree and translates
-    // matching bounds directly.
+    // Insertion offsets route through a placed-level scope rather
+    // than the property path, because applyValue can't translate
+    // intrinsic-layout leaves like Text (LayoutEngine's .offset
+    // variant requires `resolved.children.first`).  The placed-level
+    // path walks the post-layout tree and translates matching
+    // bounds directly.
     if modifiers.offsetX != nil || modifiers.offsetY != nil {
       let fromX = modifiers.offsetX ?? 0
       let fromY = modifiers.offsetY ?? 0
-      if let existing = insertionOffsetAnimations[identity] {
+      let offsetKey = AnimationKey(identity: identity, scope: .insertionOffset)
+      if let existing = activeAnimations[offsetKey] {
         releaseBatch(existing.batchID)
       }
       retainBatch(batchID)
-      insertionOffsetAnimations[identity] = InsertionOffsetAnimation(
-        from: (x: fromX, y: fromY),
+      activeAnimations[offsetKey] = ActiveAnimation(
+        kind: .insertionOffset(from: (x: fromX, y: fromY)),
         animationBox: box,
         startTime: timestamp,
         batchID: batchID
@@ -1454,8 +1479,7 @@ package final class AnimationController {
 
       retainBatch(batchID)
       activeAnimations[key] = ActiveAnimation(
-        from: effectiveFrom,
-        to: current,
+        kind: .property(from: effectiveFrom, to: current),
         animationBox: box,
         startTime: timestamp,
         batchID: batchID
@@ -1490,8 +1514,6 @@ package final class AnimationController {
     guard
       !activeAnimations.isEmpty
         || !removingIdentities.isEmpty
-        || !insertionOffsetAnimations.isEmpty
-        || !matchedGeometryAnimations.isEmpty
         || !pendingEmptyBatchCompletions.isEmpty
     else {
       lastTickResult = AnimationTickResult()
@@ -1499,7 +1521,7 @@ package final class AnimationController {
     }
 
     var keysToRemove: [AnimationKey] = []
-    var affectedIdentities: Set<Identity> = []
+    var redrawIdentities: Set<Identity> = []
     var latestDeadline: MonotonicInstant = timestamp
     var hasPendingWork = false
 
@@ -1512,35 +1534,58 @@ package final class AnimationController {
     // activeAnimations and invalidate the dictionary traversal.
     var completedBatches: [AnimationBatchID] = []
 
+    // Walk every active animation regardless of scope.  Property
+    // scopes are sampled here and write into ``interpolated`` for
+    // application by ``applyInterpolatedValues`` below.  Placed-level
+    // scopes (insertion offset, matched geometry) only need the run
+    // loop to keep ticking on this pass — their actual evaluation +
+    // translation runs inside ``applyPlacedOverlays``, and we must
+    // not double-evaluate stateful CustomAnimation curves here.
     for (key, animation) in activeAnimations {
-      guard let anim = registeredAnimations[animation.animationBox] else {
-        keysToRemove.append(key)
-        if let batchID = animation.batchID { completedBatches.append(batchID) }
-        continue
+      switch animation.kind {
+      case .property(let from, let to):
+        guard let anim = registeredAnimations[animation.animationBox] else {
+          keysToRemove.append(key)
+          if let batchID = animation.batchID { completedBatches.append(batchID) }
+          continue
+        }
+        let elapsed = animation.startTime.duration(to: timestamp)
+        var state = animation.customState
+        let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
+        // Store the updated custom state back on the active animation
+        // so the next tick carries user bookkeeping forward.
+        activeAnimations[key]?.customState = state
+
+        guard let progress = evaluated else {
+          // Animation complete — snap to final value and purge.
+          interpolated[key.identity, default: [:]][propertySlot(for: key)] = to
+          keysToRemove.append(key)
+          if let batchID = animation.batchID { completedBatches.append(batchID) }
+          redrawIdentities.insert(key.identity)
+          continue
+        }
+        let value = interpolate(from: from, to: to, progress: progress)
+        interpolated[key.identity, default: [:]][propertySlot(for: key)] = value
+        redrawIdentities.insert(key.identity)
+        latestDeadline = timestamp.advanced(by: frameInterval)
+        hasPendingWork = true
+
+      case .insertionOffset, .matchedGeometry:
+        // Placed-level scopes don't read or write the resolved tree
+        // here.  Their kind payload only mutates the placed tree
+        // inside ``applyPlacedOverlays``, which advances the
+        // animation's custom state and releases the entry on
+        // completion.  This pass simply marks the loop as having
+        // pending work so the scheduler keeps ticking.  Don't call
+        // ``evaluate(elapsed:state:)`` on the registered Animation
+        // here — that would double-evaluate stateful CustomAnimation
+        // curves once per frame (this loop + applyPlacedOverlays).
+        hasPendingWork = true
+        if latestDeadline == timestamp {
+          latestDeadline = timestamp.advanced(by: frameInterval)
+        }
+        redrawIdentities.insert(key.identity)
       }
-      let elapsed = animation.startTime.duration(to: timestamp)
-      var state = animation.customState
-      let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
-      // Store the updated custom state back on the active animation so
-      // the next tick carries user bookkeeping forward.
-      activeAnimations[key]?.customState = state
-      guard let progress = evaluated else {
-        // Animation complete — snap to final value and purge.
-        interpolated[key.identity, default: [:]][key.slot] = animation.to
-        keysToRemove.append(key)
-        if let batchID = animation.batchID { completedBatches.append(batchID) }
-        affectedIdentities.insert(key.identity)
-        continue
-      }
-      let value = interpolate(
-        from: animation.from,
-        to: animation.to,
-        progress: progress
-      )
-      interpolated[key.identity, default: [:]][key.slot] = value
-      affectedIdentities.insert(key.identity)
-      latestDeadline = timestamp.advanced(by: frameInterval)
-      hasPendingWork = true
     }
 
     // Remove completed animations.
@@ -1594,7 +1639,7 @@ package final class AnimationController {
 
       if animationComplete {
         removalsToPurge.append(identity)
-        affectedIdentities.insert(identity)
+        redrawIdentities.insert(identity)
         continue
       }
 
@@ -1620,7 +1665,7 @@ package final class AnimationController {
           )
         }
       }
-      affectedIdentities.insert(identity)
+      redrawIdentities.insert(identity)
       latestDeadline = timestamp.advanced(by: frameInterval)
       hasPendingWork = true
     }
@@ -1635,32 +1680,6 @@ package final class AnimationController {
     // Inject removal overlays at their previous parent/index.
     if !injectionsByParent.isEmpty {
       tree = injectRemovals(tree: tree, injectionsByParent: injectionsByParent)
-    }
-
-    // Insertion offset animations live on the placed side of the
-    // pipeline (applyPlacedOverlays) but they still need to keep
-    // the run loop ticking until they complete.
-    if !insertionOffsetAnimations.isEmpty {
-      hasPendingWork = true
-      if latestDeadline == timestamp {
-        latestDeadline = timestamp.advanced(by: frameInterval)
-      }
-      for identity in insertionOffsetAnimations.keys {
-        affectedIdentities.insert(identity)
-      }
-    }
-
-    // Matched-geometry animations are also placed-level.  Same
-    // bookkeeping: mark pending so the run loop keeps ticking
-    // until they complete.
-    if !matchedGeometryAnimations.isEmpty {
-      hasPendingWork = true
-      if latestDeadline == timestamp {
-        latestDeadline = timestamp.advanced(by: frameInterval)
-      }
-      for identity in matchedGeometryAnimations.keys {
-        affectedIdentities.insert(identity)
-      }
     }
 
     // Drain stranded `withAnimation` completions whose target time
@@ -1694,12 +1713,25 @@ package final class AnimationController {
     }
 
     let result = AnimationTickResult(
-      hasActiveAnimations: hasPendingWork,
+      hasPendingWork: hasPendingWork,
       nextDeadline: hasPendingWork ? latestDeadline : nil,
-      affectedIdentities: affectedIdentities
+      redrawIdentities: redrawIdentities
     )
     lastTickResult = result
     return result
+  }
+
+  /// Extracts the ``AnimatableSlot`` from a property-scoped key.
+  /// Traps when called on a non-property scope — every caller filters
+  /// on ``AnimationKind.property`` first, so a non-property key
+  /// reaching this helper is a controller bug.
+  private func propertySlot(for key: AnimationKey) -> AnimatableSlot {
+    guard case .property(let slot) = key.scope else {
+      preconditionFailure(
+        "propertySlot(for:) called on non-property key scope=\(key.scope)"
+      )
+    }
+    return slot
   }
 
   /// Interpolates from a starting opacity (typically 1.0 = identity,
@@ -2036,23 +2068,34 @@ package final class AnimationController {
     return dimensions
   }
 
+  /// Samples the current interpolated value of a property-scoped
+  /// animation at `timestamp`.  Returns `nil` for non-property kinds —
+  /// the placed-level scopes (insertion offset, matched geometry)
+  /// produce translation deltas rather than ``AnyAnimatable`` values
+  /// and don't participate in the property retarget path.
+  ///
+  /// The custom-state writeback is intentionally discarded: the only
+  /// caller (``sampleCurrentValue(for:at:)`` from the retarget /
+  /// insertion paths) immediately releases the existing animation
+  /// after sampling, so the advanced state would be thrown away on
+  /// the next line anyway.  If a future caller needs to keep the
+  /// animation alive after sampling, this helper should be split.
   private func sample(
     _ animation: ActiveAnimation,
     at timestamp: MonotonicInstant
   ) -> AnyAnimatable? {
+    guard case .property(let from, let to) = animation.kind else {
+      return nil
+    }
     guard let anim = registeredAnimations[animation.animationBox] else {
       return nil
     }
     let elapsed = animation.startTime.duration(to: timestamp)
     var state = animation.customState
     guard let progress = anim.evaluate(elapsed: elapsed, state: &state) else {
-      return animation.to
+      return to
     }
-    return interpolate(
-      from: animation.from,
-      to: animation.to,
-      progress: progress
-    )
+    return interpolate(from: from, to: to, progress: progress)
   }
 
   private func interpolate(
@@ -2080,8 +2123,6 @@ package final class AnimationController {
     previousPlacedRoot = nil
     previousParentByIdentity.removeAll(keepingCapacity: true)
     previousChildIndexByIdentity.removeAll(keepingCapacity: true)
-    insertionOffsetAnimations.removeAll(keepingCapacity: true)
-    matchedGeometryAnimations.removeAll(keepingCapacity: true)
     previousMatchedGeometryBounds.removeAll(keepingCapacity: true)
     previousMatchedKeyIdentities.removeAll(keepingCapacity: true)
     activeAnimations.removeAll(keepingCapacity: true)

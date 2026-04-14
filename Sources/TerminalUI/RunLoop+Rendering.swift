@@ -146,56 +146,33 @@ extension RunLoop {
         scheduler.requestInvalidation(of: postActionInvalidationIdentities)
         postActionInvalidationIdentities.removeAll(keepingCapacity: true)
       }
-      // After rendering, request the next animation frame deadline if
-      // any animations are still in flight AND at least one of the
-      // identities affected by the tick is geometrically visible in
-      // this frame's rasterized output.  Skipping the deadline when
-      // every affected identity is clipped (e.g. ``ScrollView`` content
-      // below the viewport, or an inactive ``TabView`` tab) quiesces
-      // the tick loop so we don't burn CPU driving an animation into
-      // a subtree that produces zero visible cells.  The animation
-      // itself stays live on the controller; when any external
-      // invalidation wakes the scheduler — scroll, resize, tab
-      // switch, state change — the next frame's visibility check
-      // re-runs and, if the affected identity is now in
-      // ``drawnIdentities``, the tick loop resumes.
+      // After rendering, request the next animation frame deadline
+      // whenever the tick reported pending work.  Phase 4 split the
+      // tick result so ``hasPendingWork`` is the unambiguous "schedule
+      // another frame" signal — including for stranded-batch drains
+      // that aren't tied to any visible identity.
       //
-      // This is a geometric predicate, not an observational one: we
-      // do NOT skip the deadline just because ``presentationDamage``
-      // happened to come out empty for one coincidental frame.  That
-      // would be a one-way trap — the only thing that could restart
-      // the loop is the next tick's damage, which requires a tick to
-      // find out.  Identity-in-viewport is a stable invariant that
-      // flips only when layout, clip, or state changes, and each of
-      // those paths already invalidates the scheduler.
+      // The viewport gate that used to guard this path
+      // (``redrawIdentities.isDisjoint(with: drawnIdentities)``) is
+      // gone: its purpose was to quiesce ticks driving animations into
+      // clipped subtrees, but the gate had a one-way trap — once a
+      // tick produced an empty redraw set the only thing that could
+      // restart the loop was another tick.  ``redrawIdentities`` is
+      // still consulted by the incremental presentation diff for
+      // dirty-region calculation; only the wake-up decision is
+      // unconditional now.
       let animationTick = renderer.internalAnimationController.lastTickResult
-      if animationTick.hasActiveAnimations,
+      if animationTick.hasPendingWork,
         let nextDeadline = animationTick.nextDeadline
       {
-        // Schedule the next animation tick when either: some
-        // geometrically-visible identity is still animating, OR the
-        // tick carries pending work that isn't tied to any identity
-        // at all.  The second case covers stranded-batch drains
-        // fired by ``scheduleStrandedBatchDrains`` — they're
-        // identity-agnostic (a logical `withAnimation` batch, not a
-        // visible view), and the viewport predicate would otherwise
-        // trap them: ``Set<Identity>().isDisjoint(with: any)`` is
-        // always `true`, so an empty ``affectedIdentities`` would
-        // skip the reschedule and the completion would never fire
-        // until some unrelated external event woke the loop.
-        let anyAffectedIdentityVisible = !animationTick.affectedIdentities
-          .isDisjoint(with: artifacts.drawnIdentities)
-        let isIdentityAgnosticTick = animationTick.affectedIdentities.isEmpty
-        if anyAffectedIdentityVisible || isIdentityAgnosticTick {
-          let now = MonotonicInstant.now()
-          let scheduledDeadline =
-            if nextDeadline > now {
-              nextDeadline
-            } else {
-              now.advanced(by: AnimationWakeTiming.minimumLeadTime)
-            }
-          scheduler.requestDeadline(scheduledDeadline)
-        }
+        let now = MonotonicInstant.now()
+        let scheduledDeadline =
+          if nextDeadline > now {
+            nextDeadline
+          } else {
+            now.advanced(by: AnimationWakeTiming.minimumLeadTime)
+          }
+        scheduler.requestDeadline(scheduledDeadline)
       }
       observationBridge.prune(
         keeping: renderer.liveIdentitySnapshot()
@@ -290,18 +267,17 @@ extension RunLoop {
     var transactionSnapshot = TransactionSnapshot(debugSignature: causeSummary)
     transactionSnapshot.animationRequest = scheduledFrame.animationRequest
     transactionSnapshot.animationBatchID = scheduledFrame.animationBatchID
-    // If the scheduled frame carries no explicit animation intent —
-    // typically a tick frame or a background-observable wake — but
-    // the animation controller has animations in flight, inject its
-    // dominant active request.  This keeps any value-change diffs
-    // that happen during this resolve from snapping the in-flight
-    // animation: they retarget instead.  The scheduler itself stays
-    // animation-unaware; all the state lives on the controller.
-    if transactionSnapshot.animationRequest == .inherit,
-      let active = renderer.internalAnimationController.dominantActiveRequest()
-    {
-      transactionSnapshot.animationRequest = active
-    }
+    // Phase 3's ``diffAndEnqueue`` retargets in-flight animations
+    // correctly via ``sample(existing, at:)`` + ``effectiveFrom``, so
+    // the previous re-injection of the controller's "dominant active
+    // request" on tick frames is no longer required.  A `.inherit`
+    // tick frame whose resolve diffs an unchanged property won't
+    // touch the running animation (the diff bails on ``previous ==
+    // current``); a tick frame whose resolve diffs a CHANGED property
+    // under `.inherit` correctly purges the obsolete animation, which
+    // matches SwiftUI's "untracked write snaps" semantics.  The
+    // scheduler stays animation-unaware; all retarget state lives on
+    // the controller.
     var context = ResolveContext(
       identity: rootIdentity,
       environment: environment,

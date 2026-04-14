@@ -190,15 +190,19 @@ struct AnimationRepeatForeverGrowthTests {
 
     // Drive `tickCount` tick frames.  Each tick constructs the same
     // view (phase unchanged at the @State level — the animation
-    // controller is what drives the per-frame interpolation) and
-    // routes the controller's dominantActiveRequest back in as the
-    // transaction, mirroring `RunLoop.resolveContext(for:)` exactly.
+    // controller is what drives the per-frame interpolation) with a
+    // bare `.inherit` transaction.  Phase 4 stopped injecting the
+    // controller's "dominant active request" on tick frames — the
+    // controller's diff path correctly leaves an in-flight animation
+    // alone when the next frame's snapshot matches its target value
+    // (the early `previous == current` guard in
+    // `enqueueSlotChangeIfNeeded`), so tick frames don't need to
+    // re-announce the animation intent.
     var measureCounts: [Int] = []
     var activeAnimationCounts: [Int] = []
     for _ in 0..<tickCount {
       var tickTransaction = TransactionSnapshot()
-      tickTransaction.animationRequest =
-        controller.dominantActiveRequest() ?? .inherit
+      tickTransaction.animationRequest = .inherit
       let artifacts = renderer.render(
         body(phase: 1.0),
         context: ResolveContext(
