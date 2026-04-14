@@ -123,13 +123,13 @@ public struct Gradient: Equatable, Sendable {
 /// A linear gradient between two unit points.
 public struct LinearGradient: ShapeStyle, Equatable, Sendable {
   public var gradient: Gradient
-  public var startPoint: Alignment
-  public var endPoint: Alignment
+  public var startPoint: UnitPoint
+  public var endPoint: UnitPoint
 
   public init(
     gradient: Gradient,
-    startPoint: Alignment,
-    endPoint: Alignment
+    startPoint: UnitPoint,
+    endPoint: UnitPoint
   ) {
     self.gradient = gradient
     self.startPoint = startPoint
@@ -138,8 +138,8 @@ public struct LinearGradient: ShapeStyle, Equatable, Sendable {
 
   public init(
     colors: [Color],
-    startPoint: Alignment,
-    endPoint: Alignment
+    startPoint: UnitPoint,
+    endPoint: UnitPoint
   ) {
     self.init(
       gradient: Gradient(colors: colors),
@@ -157,13 +157,13 @@ public struct LinearGradient: ShapeStyle, Equatable, Sendable {
 /// point in the shape's bounds.
 public struct RadialGradient: ShapeStyle, Equatable, Sendable {
   public var gradient: Gradient
-  public var center: Alignment
+  public var center: UnitPoint
   public var startRadius: Double
   public var endRadius: Double
 
   public init(
     gradient: Gradient,
-    center: Alignment,
+    center: UnitPoint,
     startRadius: Double,
     endRadius: Double
   ) {
@@ -175,7 +175,7 @@ public struct RadialGradient: ShapeStyle, Equatable, Sendable {
 
   public init(
     colors: [Color],
-    center: Alignment = .center,
+    center: UnitPoint = .center,
     startRadius: Double = 0,
     endRadius: Double
   ) {

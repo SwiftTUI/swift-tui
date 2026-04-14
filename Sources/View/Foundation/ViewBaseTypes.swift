@@ -1,8 +1,6 @@
 public import Core
 public import Observation
 
-/// A normalized point within a rectangle, used for layout anchors.
-public typealias UnitPoint = Alignment
 /// A proposed size passed into layout and rendering operations.
 public typealias ProposedViewSize = ProposedSize
 /// A layout-space point.

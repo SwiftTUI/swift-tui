@@ -2364,8 +2364,8 @@ extension Rasterizer {
       return first.color
     }
 
-    let start = unitCoordinates(for: gradient.startPoint)
-    let end = unitCoordinates(for: gradient.endPoint)
+    let start = (x: gradient.startPoint.x, y: gradient.startPoint.y)
+    let end = (x: gradient.endPoint.x, y: gradient.endPoint.y)
     let point = (
       x: Double(x - bounds.origin.x) + 0.5,
       y: Double(y - bounds.origin.y) + 0.5
@@ -2428,10 +2428,9 @@ extension Rasterizer {
     }
 
     // Center in cell-space coordinates (not normalized).
-    let centerUnit = unitCoordinates(for: gradient.center)
     let center = (
-      x: Double(bounds.origin.x) + centerUnit.x * Double(bounds.size.width),
-      y: Double(bounds.origin.y) + centerUnit.y * Double(bounds.size.height)
+      x: Double(bounds.origin.x) + gradient.center.x * Double(bounds.size.width),
+      y: Double(bounds.origin.y) + gradient.center.y * Double(bounds.size.height)
     )
 
     // Distance from the sample cell's center to the gradient center
@@ -2469,36 +2468,6 @@ extension Rasterizer {
     }
 
     return stops.last?.color
-  }
-
-  private func unitCoordinates(
-    for alignment: Alignment
-  ) -> (x: Double, y: Double) {
-    let x: Double =
-      switch alignment.horizontal {
-      case .leading:
-        0
-      case .center:
-        0.5
-      case .trailing:
-        1
-      default:
-        0.5
-      }
-
-    let y: Double =
-      switch alignment.vertical {
-      case .top:
-        0
-      case .center:
-        0.5
-      case .bottom, .firstTextBaseline, .lastTextBaseline:
-        1
-      default:
-        0.5
-      }
-
-    return (x, y)
   }
 
   private func intersect(
