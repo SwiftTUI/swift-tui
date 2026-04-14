@@ -128,3 +128,26 @@ extension PatternFill {
     )
   }
 }
+
+/// Bridge conformance so ``PatternFill`` can be wrapped by
+/// ``AnyAnimatable``.  The animatable data is deliberately empty:
+/// ``PatternFill`` is variant-based (color vs gradient vs gradient
+/// shape), so cross-variant values have no single well-formed
+/// `animatableData`.  The animation controller's type-erased
+/// interpolation path intercepts ``PatternFill`` values before
+/// invoking the generic `animatableData` arithmetic and routes them
+/// through ``PatternFill/interpolated(to:progress:)`` instead — the
+/// variant-aware helper defined above.
+///
+/// If a caller ever reaches the generic path with a ``PatternFill``
+/// (e.g. by wrapping one in ``AnyAnimatable`` and then asking for
+/// `animatableData` directly), interpolation becomes a no-op that
+/// returns the source value: ``EmptyAnimatableData`` arithmetic
+/// has nothing to carry.  The controller's special-case path
+/// ensures that never happens in practice.
+extension PatternFill: Animatable {
+  public var animatableData: EmptyAnimatableData {
+    get { EmptyAnimatableData() }
+    set { /* intentionally unused */  }
+  }
+}

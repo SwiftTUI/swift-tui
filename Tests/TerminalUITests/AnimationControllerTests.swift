@@ -95,6 +95,82 @@ final class FireCounter: Sendable {
   }
 }
 
+// MARK: - AnyAnimatable type erasure
+
+@MainActor
+@Suite("AnyAnimatable type erasure")
+struct AnyAnimatableTests {
+
+  @Test("Wraps a Double and round-trips the value")
+  func wrapsDouble() {
+    let wrapped = AnyAnimatable(Double(1.5))
+    #expect(wrapped.unwrap(as: Double.self) == 1.5)
+  }
+
+  @Test("Equality holds when wrapped types and values match")
+  func equalitySameTypeSameValue() {
+    #expect(AnyAnimatable(Double(1.0)) == AnyAnimatable(Double(1.0)))
+    #expect(AnyAnimatable(Color.red) == AnyAnimatable(Color.red))
+  }
+
+  @Test("Equality is false when wrapped types differ")
+  func equalityDifferentTypes() {
+    #expect(AnyAnimatable(Double(1.0)) != AnyAnimatable(Int(1)))
+  }
+
+  @Test("Equality is false when values differ")
+  func equalityDifferentValues() {
+    #expect(AnyAnimatable(Double(1.0)) != AnyAnimatable(Double(2.0)))
+  }
+
+  @Test("interpolated between same-type values produces intermediate value")
+  func interpolateSameType() {
+    let from = AnyAnimatable(Double(0.0))
+    let to = AnyAnimatable(Double(10.0))
+    let halfway = from.interpolated(to: to, progress: 0.5)
+    #expect(halfway?.unwrap(as: Double.self) == 5.0)
+  }
+
+  @Test("interpolated returns nil when wrapped types mismatch")
+  func interpolateTypeMismatch() {
+    let from = AnyAnimatable(Double(0.0))
+    let to = AnyAnimatable(Int(10))
+    let halfway = from.interpolated(to: to, progress: 0.5)
+    #expect(halfway == nil)
+  }
+
+  @Test("Wraps a Color and interpolation uses OKLab perceptual path")
+  func colorInterpolation() {
+    let from = AnyAnimatable(Color.red)
+    let to = AnyAnimatable(Color.blue)
+    let halfway = from.interpolated(to: to, progress: 0.5)
+    let unwrapped = halfway?.unwrap(as: Color.self)
+    #expect(unwrapped != nil)
+    let expected = Color.red.interpolated(to: .blue, progress: 0.5, method: .perceptual)
+    if let c = unwrapped {
+      #expect(abs(c.red - expected.red) < 0.001)
+      #expect(abs(c.green - expected.green) < 0.001)
+      #expect(abs(c.blue - expected.blue) < 0.001)
+    }
+  }
+
+  @Test("Wraps a LinearGradient and interpolates endpoints + stops")
+  func linearGradientInterpolation() {
+    let from = AnyAnimatable(
+      LinearGradient(colors: [.red, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)
+    )
+    let to = AnyAnimatable(
+      LinearGradient(colors: [.blue, .red], startPoint: .topTrailing, endPoint: .bottomLeading)
+    )
+    let halfway = from.interpolated(to: to, progress: 0.5)
+    let g = halfway?.unwrap(as: LinearGradient.self)
+    #expect(g != nil)
+    if let g {
+      #expect(abs(g.startPoint.x - 0.5) < 0.001)
+    }
+  }
+}
+
 /// A deterministic CustomAnimation used by the custom-evaluation
 /// tests.  `animate` returns `time_in_ms / 200` clamped to `[0, 1]`
 /// for the first 200 ms, then nil.  Works for any VectorArithmetic V
@@ -110,6 +186,71 @@ struct LinearCustomAnimation: CustomAnimation {
       + Double(time.components.attoseconds) / 1e15
     if ms >= 200.0 { return nil }
     let progress = ms / 200.0
+    var scaled = value
+    scaled.scale(by: progress)
+    return scaled
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
+  }
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.id == rhs.id
+  }
+}
+
+/// Records observations from a stateful CustomAnimation so tests can
+/// pin the call-path through `sample()` during retarget.  Class with
+/// reference identity so a single instance is shared across every
+/// invocation of the animation, regardless of how many copies of the
+/// CustomAnimation struct the controller makes.
+final class StateRecorder: Sendable {
+  private let observed = Atomic<Int>(0)
+  private let calls = Atomic<Int>(0)
+
+  /// Most recent counter value the CustomAnimation read from
+  /// `context.state` BEFORE incrementing it.
+  var lastObserved: Int {
+    observed.load(ordering: .relaxed)
+  }
+
+  /// Total number of times the CustomAnimation's `animate(...)` was
+  /// invoked.
+  var callCount: Int {
+    calls.load(ordering: .relaxed)
+  }
+
+  func record(observed value: Int) {
+    self.observed.store(value, ordering: .relaxed)
+    calls.wrappingAdd(1, ordering: .relaxed)
+  }
+}
+
+/// CustomAnimation that increments a counter in `context.state` on
+/// every call and reports the counter it observed (before
+/// incrementing) to a shared ``StateRecorder``.  Used by the retarget
+/// state-survival test to verify the controller threads
+/// `customState` through `sample(_:at:)`.
+struct RecordingCustomAnimation: CustomAnimation {
+  static let counterKey = "RecordingCustomAnimation.counter"
+
+  let id: String
+  let recorder: StateRecorder
+
+  func animate<V: VectorArithmetic>(
+    value: V, time: Duration, context: inout AnimationContext<V>
+  ) -> V? {
+    let current: Int = context.state[Self.counterKey] ?? 0
+    recorder.record(observed: current)
+    context.state[Self.counterKey] = current + 1
+
+    let ms =
+      Double(time.components.seconds) * 1000.0
+      + Double(time.components.attoseconds) / 1e15
+    // Long window so retargets land well inside the active phase.
+    if ms >= 1_000.0 { return nil }
+    let progress = ms / 1_000.0
     var scaled = value
     scaled.scale(by: progress)
     return scaled
@@ -407,8 +548,8 @@ struct AnimationPipelineIntegrationTests {
       proposal: ProposedSize(width: .finite(80), height: .finite(24))
     )
     #expect(
-      controller.activeAnimationCount >= 2,
-      "position change should enqueue positionX + positionY, got \(controller.activeAnimationCount)"
+      controller.activeAnimationCount >= 1,
+      "position change should enqueue at least one slot animation, got \(controller.activeAnimationCount)"
     )
     #expect(controller.lastTickResult.hasActiveAnimations)
   }
@@ -2000,6 +2141,115 @@ struct AnimationControllerPropertyTests {
   }
 
   @Test(
+    "CustomAnimation state survives retarget through sample()"
+  )
+  func customAnimationStateSurvivesRetarget() throws {
+    // Pin the call path that the controller's `sample(_:at:)` helper
+    // uses when an animation is interrupted mid-flight: the existing
+    // animation's `customState` MUST be threaded through
+    // `anim.evaluate(elapsed:state:)` so a stateful
+    // ``CustomAnimation`` sees the bookkeeping it accumulated on the
+    // previous tick instead of a fresh empty state.
+    //
+    // The recorder captures every counter value the CustomAnimation
+    // observes via `context.state`; the test then asserts that the
+    // sample-time call (issued during retarget) saw a value > 0 —
+    // proving state was carried forward rather than reset.
+    let recorder = StateRecorder()
+    let animation = Animation(
+      RecordingCustomAnimation(id: "retarget-pin", recorder: recorder)
+    )
+    let controller = AnimationController()
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("retarget-leaf")])
+
+    // Frame 1: opacity 1.0 (baseline snapshot, no animation yet).
+    var frame1Metadata = DrawMetadata()
+    frame1Metadata.baseStyle.explicitOpacity = 1.0
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame1Metadata
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Frame 2: opacity 0.0 under the recording custom animation.
+    // This enqueues the active animation.
+    var frame2Metadata = DrawMetadata()
+    frame2Metadata.baseStyle.explicitOpacity = 0.0
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame2Metadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    // Tick 1: drive the animation so the CustomAnimation accumulates
+    // counter == 1 in its state, and the controller writes it back to
+    // the active animation's `customState`.
+    let tick1 = t0.advanced(by: .milliseconds(60))
+    var tickFrame1 = frame2
+    _ = controller.applyInterpolations(to: &tickFrame1, at: tick1)
+    let observedAfterTick1 = recorder.lastObserved
+    let callsAfterTick1 = recorder.callCount
+
+    // Sanity: at least one call landed and counter advanced past 0.
+    #expect(callsAfterTick1 >= 1)
+    #expect(observedAfterTick1 == 0, "first call observes empty state")
+
+    // Tick 2: drive again so state is well-populated.
+    let tick2 = t0.advanced(by: .milliseconds(80))
+    var tickFrame2 = tickFrame1
+    _ = controller.applyInterpolations(to: &tickFrame2, at: tick2)
+    let observedAfterTick2 = recorder.lastObserved
+    #expect(
+      observedAfterTick2 >= 1,
+      "second call must see counter incremented by the first tick — \(observedAfterTick2)"
+    )
+
+    // Frame 3 — RETARGET: same identity, NEW target opacity, NEW
+    // animation request.  This forces `sample(existing, at:)` to run
+    // because the slot already has an in-flight animation.  At sample
+    // time, the controller must thread the existing customState into
+    // `anim.evaluate(elapsed:state:)` — if it doesn't, the recording
+    // CustomAnimation sees a fresh empty state and the recorder's
+    // observation drops back to 0.
+    let observationsBeforeRetarget = recorder.lastObserved
+    var frame3Metadata = DrawMetadata()
+    frame3Metadata.baseStyle.explicitOpacity = 0.5
+    let frame3 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame3Metadata
+    )
+    let retargetAt = t0.advanced(by: .milliseconds(100))
+    var retargetTransaction = TransactionSnapshot()
+    retargetTransaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(
+      frame3,
+      transaction: retargetTransaction,
+      timestamp: retargetAt
+    )
+
+    // The retarget path calls sample() once on the in-flight
+    // animation.  The recorder's most-recent observation must reflect
+    // the carried-forward counter from tick 2 (>= observationsBeforeRetarget),
+    // not a fresh zero.
+    #expect(
+      recorder.lastObserved >= observationsBeforeRetarget,
+      "sample() during retarget must thread customState — observed \(recorder.lastObserved), expected >= \(observationsBeforeRetarget)"
+    )
+    #expect(
+      recorder.callCount > callsAfterTick1,
+      "sample() must invoke the CustomAnimation during retarget"
+    )
+  }
+
+  @Test(
     "padding edges animate independently and preserve untouched edges"
   )
   func paddingEdgesAnimateIndependently() throws {
@@ -2371,5 +2621,545 @@ struct AnimationControllerRemovalTests {
       !treeCopy.children.contains(where: { $0.identity == leafIdentity }),
       "purged removal should not be re-injected after the animation completes"
     )
+  }
+}
+
+// MARK: - Phase 3 parity with the pre-rewrite enum-dispatch model
+
+/// Pins the Phase 3 AnimatableSlot + AnyAnimatable rewrite against the
+/// pre-rewrite AnimatableProperty + AnimatableValue enum-dispatch
+/// model.  Each test sets up a simple two-frame animation scenario on
+/// a single slot, runs the controller halfway through a 200 ms linear
+/// curve, and asserts that the interpolated value lands on the
+/// expected midpoint — same assertion style, same tolerance, same
+/// scenarios as the old tests.
+@MainActor
+@Suite("Phase 3 parity: value interpolation")
+struct Phase3ParityTests {
+
+  @Test(
+    "Phase 3 parity: opacity animation produces the same interpolated values as the pre-rewrite enum-dispatch model"
+  )
+  func phase3OpacityParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-leaf")])
+    var frame1Metadata = DrawMetadata()
+    frame1Metadata.baseStyle.explicitOpacity = 1.0
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame1Metadata
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2Metadata = DrawMetadata()
+    frame2Metadata.baseStyle.explicitOpacity = 0.0
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame2Metadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+    let opacity = frame2.drawMetadata.baseStyle.explicitOpacity
+    #expect(opacity != nil)
+    if let opacity {
+      #expect(abs(opacity - 0.5) < 0.05)
+    }
+  }
+
+  @Test(
+    "Phase 3 parity: foreground color animation produces the same interpolated values as the pre-rewrite enum-dispatch model"
+  )
+  func phase3ColorParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-leaf")])
+    var frame1Metadata = DrawMetadata()
+    frame1Metadata.baseStyle.foregroundStyle = .color(Color.red)
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame1Metadata
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2Metadata = DrawMetadata()
+    frame2Metadata.baseStyle.foregroundStyle = .color(Color.blue)
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame2Metadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .color(let interpolated) = frame2.drawMetadata.baseStyle.foregroundStyle
+    else {
+      Issue.record("apply must preserve the foreground color variant")
+      return
+    }
+    // Perceptual OKLab halfway between red and blue — matches the old
+    // pre-Phase-3 controller's interpolation method.
+    let expected = Color.red.interpolated(to: .blue, progress: 0.5, method: .perceptual)
+    #expect(abs(interpolated.red - expected.red) < 0.05)
+    #expect(abs(interpolated.green - expected.green) < 0.05)
+    #expect(abs(interpolated.blue - expected.blue) < 0.05)
+  }
+
+  @Test(
+    "Phase 3 parity: padding animation interpolates all four edges at once and matches the old per-edge enum-dispatch model"
+  )
+  func phase3PaddingParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-leaf")])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .padding(EdgeInsets(top: 20, leading: 20, bottom: 20, trailing: 20))
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .padding(let insets) = frame2.layoutBehavior else {
+      Issue.record("apply must preserve the padding layoutBehavior")
+      return
+    }
+    // Integer truncation means 0 → 20 at halfway lands on 10.
+    #expect(abs(insets.top - 10) <= 1)
+    #expect(abs(insets.leading - 10) <= 1)
+    #expect(abs(insets.bottom - 10) <= 1)
+    #expect(abs(insets.trailing - 10) <= 1)
+  }
+
+  @Test(
+    "Phase 3 parity: offset animation interpolates both axes via a single AnimatablePair slot"
+  )
+  func phase3OffsetParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-leaf")])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .offset(x: 0, y: 0)
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .offset(x: 20, y: 40)
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .offset(let x, let y) = frame2.layoutBehavior else {
+      Issue.record("apply must preserve the offset layoutBehavior")
+      return
+    }
+    #expect(abs(x - 10) <= 1)
+    #expect(abs(y - 20) <= 1)
+  }
+
+  @Test(
+    "Phase 3 parity: position animation interpolates both axes via a single AnimatablePair slot"
+  )
+  func phase3PositionParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-leaf")])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .position(x: 0, y: 0)
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .position(x: 20, y: 40)
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .position(let x, let y) = frame2.layoutBehavior else {
+      Issue.record("apply must preserve the position layoutBehavior")
+      return
+    }
+    #expect(abs(x - 10) <= 1)
+    #expect(abs(y - 20) <= 1)
+  }
+
+  @Test("Phase 3 parity: offset X-only change halfway")
+  func phase3OffsetXOnlyParity() throws {
+    // High-risk regression class after the offset slot collapse
+    // (two int slots → one AnimatablePair<Int, Int> slot): a single-axis
+    // change must drive ONLY the changing axis and leave the other
+    // exactly at its starting value.  The unchanged-axis assertion uses
+    // exact equality so any drift is caught immediately.
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-offset-x-leaf")])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .offset(x: 0, y: 10)
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Change ONLY x.
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .offset(x: 20, y: 10)
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .offset(let x, let y) = frame2.layoutBehavior else {
+      Issue.record("expected offset layout behavior")
+      return
+    }
+    // X should be halfway between 0 and 20 (~10).
+    #expect(abs(x - 10) <= 1)
+    // Y should remain at 10 (unchanged) — exact equality on purpose.
+    #expect(y == 10)
+  }
+
+  @Test("Phase 3 parity: offset Y-only change halfway")
+  func phase3OffsetYOnlyParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-offset-y-leaf")])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .offset(x: 10, y: 0)
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    // Change ONLY y.
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .offset(x: 10, y: 40)
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .offset(let x, let y) = frame2.layoutBehavior else {
+      Issue.record("expected offset layout behavior")
+      return
+    }
+    // X should remain at 10 (unchanged) — exact equality on purpose.
+    #expect(x == 10)
+    // Y should be halfway between 0 and 40 (~20).
+    #expect(abs(y - 20) <= 1)
+  }
+
+  @Test("Phase 3 parity: position X-only change halfway")
+  func phase3PositionXOnlyParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-position-x-leaf")])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .position(x: 0, y: 10)
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .position(x: 20, y: 10)
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .position(let x, let y) = frame2.layoutBehavior else {
+      Issue.record("expected position layout behavior")
+      return
+    }
+    #expect(abs(x - 10) <= 1)
+    #expect(y == 10)
+  }
+
+  @Test("Phase 3 parity: position Y-only change halfway")
+  func phase3PositionYOnlyParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-position-y-leaf")])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .position(x: 10, y: 0)
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .position(x: 10, y: 40)
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .position(let x, let y) = frame2.layoutBehavior else {
+      Issue.record("expected position layout behavior")
+      return
+    }
+    #expect(x == 10)
+    #expect(abs(y - 20) <= 1)
+  }
+
+  @Test(
+    "Phase 3 parity: frame width animation interpolates the int slot without disturbing the height slot"
+  )
+  func phase3FrameWidthParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-leaf")])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .frame(width: 10, height: 5, alignment: .center)
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .frame(width: 30, height: 5, alignment: .center)
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .frame(let width, let height, _) = frame2.layoutBehavior else {
+      Issue.record("apply must preserve the frame layoutBehavior")
+      return
+    }
+    #expect(width != nil)
+    if let width {
+      #expect(abs(width - 20) <= 1)
+    }
+    #expect(height == 5, "height must not drift when only width animates")
+  }
+
+  @Test(
+    "Phase 3 parity: frame height animation interpolates the int slot without disturbing the width slot"
+  )
+  func phase3FrameHeightParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-leaf")])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .frame(width: 10, height: 0, alignment: .center)
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .frame(width: 10, height: 20, alignment: .center)
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .frame(let width, let height, _) = frame2.layoutBehavior else {
+      Issue.record("apply must preserve the frame layoutBehavior")
+      return
+    }
+    #expect(width == 10, "width must not drift when only height animates")
+    #expect(height != nil)
+    if let height {
+      #expect(abs(height - 10) <= 1)
+    }
+  }
+
+  @Test(
+    "Phase 3 parity: border color animation produces the same interpolated values as the pre-rewrite enum-dispatch model"
+  )
+  func phase3BorderColorParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-leaf")])
+    var frame1Metadata = DrawMetadata()
+    frame1Metadata.borderShapeStyle = .color(Color.red)
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame1Metadata
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2Metadata = DrawMetadata()
+    frame2Metadata.borderShapeStyle = .color(Color.blue)
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame2Metadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard case .color(let interpolated) = frame2.drawMetadata.borderShapeStyle else {
+      Issue.record("apply must preserve the border color variant")
+      return
+    }
+    let expected = Color.red.interpolated(to: .blue, progress: 0.5, method: .perceptual)
+    #expect(abs(interpolated.red - expected.red) < 0.05)
+    #expect(abs(interpolated.green - expected.green) < 0.05)
+    #expect(abs(interpolated.blue - expected.blue) < 0.05)
+  }
+
+  @Test(
+    "Phase 3 parity: border blend phase animation interpolates the double slot as before"
+  )
+  func phase3BorderBlendPhaseParity() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(200))
+    controller.register(animation)
+
+    let leafIdentity = Identity(components: [.named("parity-leaf")])
+    let blend = BorderBlend([.red, .blue])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .border(
+        BorderSet.single,
+        foreground: nil,
+        background: nil,
+        blend: blend,
+        blendPhase: 0.0,
+        sides: .all
+      )
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      layoutBehavior: .border(
+        BorderSet.single,
+        foreground: nil,
+        background: nil,
+        blend: blend,
+        blendPhase: 1.0,
+        sides: .all
+      )
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let halfway = t0.advanced(by: .milliseconds(100))
+    _ = controller.applyInterpolations(to: &frame2, at: halfway)
+
+    guard
+      case .border(_, _, _, _, let interpolatedPhase, _) = frame2.layoutBehavior
+    else {
+      Issue.record("apply must preserve the border layoutBehavior")
+      return
+    }
+    #expect(abs(interpolatedPhase - 0.5) < 0.05)
   }
 }

@@ -1,98 +1,104 @@
 package import Core
 package import View
 
-/// Identifies a specific animatable property on a specific view identity.
-package struct AnimationKey: Hashable, Sendable {
-  package var identity: Identity
-  package var property: AnimatableProperty
-}
-
-/// Enumeration of properties the animation controller knows how to
-/// interpolate.
-package enum AnimatableProperty: Hashable, Sendable {
+/// Identifies a logical animatable slot on a ``ResolvedNode``.  Each
+/// slot maps to a specific writeback destination in ``applyValue``.
+///
+/// Compound slots (``foregroundShapeStyle``, ``backgroundShapeStyle``,
+/// ``borderShapeStyle``) carry heterogeneous animatable values — the
+/// slot identifies the destination but the wrapped ``AnyAnimatable``
+/// determines the concrete type (Color, LinearGradient, RadialGradient,
+/// PatternFill).
+package enum AnimatableSlot: Hashable, Sendable {
   case opacity
-  case foregroundColor
-  case backgroundColor
-  case borderColor
+  case foregroundShapeStyle
+  case backgroundShapeStyle
+  case borderShapeStyle
   case borderBlendPhase
-  case paddingTop
-  case paddingLeading
-  case paddingBottom
-  case paddingTrailing
-  case offsetX
-  case offsetY
-  case positionX
-  case positionY
+  case padding
+  case offset
+  case position
   case frameWidth
   case frameHeight
 }
 
-/// A concrete animatable value tagged by type for cheap interpolation
-/// dispatch.
-package enum AnimatableValue: Sendable, Equatable {
-  case double(Double)
-  case integer(Int)
-  case color(Color)
+/// Keyed identifier for a single active animation: the view
+/// ``Identity`` plus the ``AnimatableSlot`` being animated.  Every
+/// slot on a given identity can be in flight independently.
+package struct AnimationKey: Hashable, Sendable {
+  package var identity: Identity
+  package var slot: AnimatableSlot
 }
 
-/// Snapshot of animatable properties for one identity after resolve.
-package struct AnimatableSnapshot: Equatable, Sendable {
-  package var opacity: Double?
-  package var foregroundColor: Color?
-  package var backgroundColor: Color?
-  package var borderColor: Color?
-  /// Phase of the ``BorderBlend`` attached to this node's border layout
-  /// behavior, in units where `1.0` corresponds to a full rotation
-  /// around the perimeter.  Populated only when the node carries a
-  /// `.border(..., blend: non-nil, ...)` layout behavior so that
-  /// non-border nodes cannot snap through a phantom zero.
-  package var borderBlendPhase: Double?
-  package var padding: EdgeInsets?
-  package var offsetX: Int?
-  package var offsetY: Int?
-  package var positionX: Int?
-  package var positionY: Int?
-  package var frameWidth: Int?
-  package var frameHeight: Int?
+/// Snapshot of every tracked animatable slot's value for one view
+/// ``Identity`` after a resolve pass.  Stored per-identity in
+/// ``AnimationController/previousSnapshots`` and diffed against the
+/// next frame's snapshot to detect changes.
+package struct AnimatableSnapshot: Sendable {
+  package var values: [AnimatableSlot: AnyAnimatable]
 
-  package init() {}
+  package init(values: [AnimatableSlot: AnyAnimatable] = [:]) {
+    self.values = values
+  }
 
+  package subscript(slot: AnimatableSlot) -> AnyAnimatable? {
+    get { values[slot] }
+    set { values[slot] = newValue }
+  }
+
+  /// Extracts every animatable slot from the given resolved node.
+  /// Slots whose source value is missing or not-Animatable are
+  /// simply absent from the result dictionary.
   package static func extract(from node: ResolvedNode) -> AnimatableSnapshot {
     var snapshot = AnimatableSnapshot()
 
-    // Opacity
-    if let explicit = node.drawMetadata.baseStyle.explicitOpacity {
-      snapshot.opacity = explicit
+    // Opacity (Double)
+    if let opacity = node.drawMetadata.baseStyle.explicitOpacity {
+      snapshot[.opacity] = AnyAnimatable(opacity)
     }
 
-    // Foreground/background colors.  `.foregroundStyle(color)` on a
-    // generic view writes to the environment rather than to the node's
-    // own draw metadata; leaf views such as `TextFigure` pick it up from
-    // the environment at rasterize time.  Prefer the node's local draw
-    // metadata (set by text-specific modifiers) and fall back to the
-    // environment snapshot so environment-carried colors are still
-    // animated.
-    snapshot.foregroundColor =
-      extractColor(from: node.drawMetadata.baseStyle.foregroundStyle)
-      ?? extractColor(from: node.environmentSnapshot.style.foregroundStyle)
-    snapshot.backgroundColor =
-      extractColor(from: node.drawMetadata.baseStyle.backgroundStyle)
-    snapshot.borderColor =
-      extractColor(from: node.drawMetadata.borderShapeStyle)
+    // Foreground/background/border shape styles.  `.foregroundStyle(color)`
+    // on a generic view writes to the environment rather than to the
+    // node's own draw metadata; leaf views such as `TextFigure` pick it
+    // up from the environment at rasterize time.  Prefer the node's
+    // local draw metadata and fall back to the environment snapshot so
+    // environment-carried styles are still animated.  Note this is a
+    // coalesce — an untracked local style (e.g. `.semantic`) still
+    // falls through to the environment, matching the pre-Phase-3
+    // extractColor behaviour.
+    if let fg = extractAnimatableShapeStyle(
+      from: node.drawMetadata.baseStyle.foregroundStyle
+    )
+      ?? extractAnimatableShapeStyle(
+        from: node.environmentSnapshot.style.foregroundStyle
+      )
+    {
+      snapshot[.foregroundShapeStyle] = fg
+    }
 
-    // Layout-derived animatables
+    if let bg = extractAnimatableShapeStyle(
+      from: node.drawMetadata.baseStyle.backgroundStyle
+    ) {
+      snapshot[.backgroundShapeStyle] = bg
+    }
+
+    if let border = extractAnimatableShapeStyle(
+      from: node.drawMetadata.borderShapeStyle
+    ) {
+      snapshot[.borderShapeStyle] = border
+    }
+
+    // Layout-derived slots.
     switch node.layoutBehavior {
     case .padding(let insets):
-      snapshot.padding = insets
+      snapshot[.padding] = AnyAnimatable(insets)
     case .offset(let x, let y):
-      snapshot.offsetX = x
-      snapshot.offsetY = y
+      snapshot[.offset] = AnyAnimatable(AnimatablePair(x, y))
     case .position(let x, let y):
-      snapshot.positionX = x
-      snapshot.positionY = y
+      snapshot[.position] = AnyAnimatable(AnimatablePair(x, y))
     case .frame(let width, let height, _):
-      snapshot.frameWidth = width
-      snapshot.frameHeight = height
+      if let width { snapshot[.frameWidth] = AnyAnimatable(width) }
+      if let height { snapshot[.frameHeight] = AnyAnimatable(height) }
     case .border(_, _, _, let blend, let blendPhase, _):
       // Only populate the phase slot when a ``BorderBlend`` is attached.
       // `.border` layouts without a blend have nothing to animate here —
@@ -100,7 +106,7 @@ package struct AnimatableSnapshot: Equatable, Sendable {
       // "identity → 0" diff on any border that ever transitioned from
       // a blend to a plain foreground.
       if blend != nil {
-        snapshot.borderBlendPhase = blendPhase
+        snapshot[.borderBlendPhase] = AnyAnimatable(blendPhase)
       }
     case .flexibleFrame(
       let minWidth, let idealWidth, let maxWidth,
@@ -112,13 +118,70 @@ package struct AnimatableSnapshot: Equatable, Sendable {
       // single fixed `.frame(width: X)` — the latter already takes the
       // `.frame` branch above.  Apply will update the same dimension
       // this extract selected, keeping the other dimensions untouched.
-      snapshot.frameWidth = firstFiniteValue(of: [maxWidth, idealWidth, minWidth])
-      snapshot.frameHeight = firstFiniteValue(of: [maxHeight, idealHeight, minHeight])
+      if let w = firstFiniteValue(of: [maxWidth, idealWidth, minWidth]) {
+        snapshot[.frameWidth] = AnyAnimatable(w)
+      }
+      if let h = firstFiniteValue(of: [maxHeight, idealHeight, minHeight]) {
+        snapshot[.frameHeight] = AnyAnimatable(h)
+      }
     default:
       break
     }
 
     return snapshot
+  }
+
+  /// Back-compat shim: a lot of pre-Phase-3 tests assert on
+  /// `snapshot.foregroundColor` directly.  Expose a computed accessor
+  /// that unwraps the ``.foregroundShapeStyle`` slot when it happens to
+  /// carry a plain `Color`, so the assertion set doesn't have to move
+  /// wholesale to the new subscript form.
+  package var foregroundColor: Color? {
+    self[.foregroundShapeStyle]?.unwrap(as: Color.self)
+  }
+
+  package var backgroundColor: Color? {
+    self[.backgroundShapeStyle]?.unwrap(as: Color.self)
+  }
+
+  package var borderColor: Color? {
+    self[.borderShapeStyle]?.unwrap(as: Color.self)
+  }
+
+  package var opacity: Double? {
+    self[.opacity]?.unwrap(as: Double.self)
+  }
+
+  package var frameWidth: Int? {
+    self[.frameWidth]?.unwrap(as: Int.self)
+  }
+
+  package var frameHeight: Int? {
+    self[.frameHeight]?.unwrap(as: Int.self)
+  }
+
+  /// Unwraps an ``AnyShapeStyle`` to a concrete animatable value
+  /// the controller can interpolate.  Returns `nil` for shape
+  /// styles that can't be reduced to a single animatable
+  /// conformance (semantic tokens, terminal chrome, etc.).
+  private static func extractAnimatableShapeStyle(
+    from style: AnyShapeStyle?
+  ) -> AnyAnimatable? {
+    guard let style else { return nil }
+    switch style {
+    case .color(let color):
+      return AnyAnimatable(color)
+    case .linearGradient(let gradient):
+      return AnyAnimatable(gradient)
+    case .radialGradient(let gradient):
+      return AnyAnimatable(gradient)
+    case .patternFill(let pattern):
+      return AnyAnimatable(pattern)
+    case .opacity(let inner, _):
+      return extractAnimatableShapeStyle(from: inner)
+    case .terminalChrome, .semantic:
+      return nil
+    }
   }
 
   private static func firstFiniteValue(of dimensions: [ProposedDimension?]) -> Int? {
@@ -129,24 +192,12 @@ package struct AnimatableSnapshot: Equatable, Sendable {
     }
     return nil
   }
-
-  private static func extractColor(from style: AnyShapeStyle?) -> Color? {
-    guard let style else { return nil }
-    switch style {
-    case .color(let color):
-      return color
-    case .opacity(let inner, _):
-      return extractColor(from: inner)
-    default:
-      return nil
-    }
-  }
 }
 
-/// An animation currently in flight for one (identity, property) key.
+/// An animation currently in flight for one (identity, slot) key.
 package struct ActiveAnimation: Sendable {
-  package var from: AnimatableValue
-  package var to: AnimatableValue
+  package var from: AnyAnimatable
+  package var to: AnyAnimatable
   package var animationBox: AnimationBox
   package var startTime: MonotonicInstant
   /// Per-key persistent state threaded into
@@ -213,6 +264,12 @@ package struct RemovalEntry: Sendable {
   /// cached), the controller falls back to the resolved-level
   /// injection path — see ``applyInterpolations(to:at:)``.
   package var placedSnapshot: PlacedNode? = nil
+  /// Per-key persistent state threaded into the removal animation's
+  /// ``CustomAnimation/animate(value:time:context:)`` on each tick.
+  /// Built-in bezier/spring curves ignore this; custom animations can
+  /// use it to persist bookkeeping across the frames of an exit
+  /// transition (e.g. a spring that accumulates velocity).
+  package var customState: AnimationState = .init()
 }
 
 /// A matched-geometry animation tracked separately from the
@@ -237,7 +294,7 @@ package struct MatchedGeometryAnimation: Sendable {
 /// ``activeAnimations`` map so it can be applied at placed level
 /// rather than via ``applyValue`` on the resolved tree.
 ///
-/// ``applyValue`` for ``AnimatableProperty/offsetX`` only mutates
+/// ``applyValue`` for ``AnimatableSlot/offset`` only mutates
 /// nodes whose `layoutBehavior` is already ``LayoutBehavior/offset``
 /// — which is never true for intrinsic-layout leaves like `Text`.
 /// Wrapping those leaves in a new `.offset` layout doesn't work
@@ -301,9 +358,8 @@ package final class AnimationController {
   /// Batches whose `withAnimation { ... } completion: { ... }` scope
   /// registered a completion closure but produced zero retained
   /// animations during their resolve pass — e.g. because the only
-  /// changes in the body touched a shape style the controller doesn't
-  /// track (gradients, pattern fills) or a property not in
-  /// ``AnimatableProperty``.
+  /// changes in the body touched a property the controller doesn't
+  /// expose as an ``AnimatableSlot``.
   ///
   /// Each entry stores the absolute time the controller should fire
   /// the completion.  ``applyInterpolations`` walks this map on every
@@ -415,7 +471,7 @@ package final class AnimationController {
     if !removingIdentities.isEmpty {
       var injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]] = [:]
 
-      for entry in removingIdentities.values {
+      for (identity, entry) in removingIdentities {
         guard let placedSnapshot = entry.placedSnapshot,
           let parentId = entry.parentIdentity
         else {
@@ -425,7 +481,13 @@ package final class AnimationController {
         let modifiers: TransitionModifiers
         if let box = entry.animationBox, let anim = registeredAnimations[box] {
           let elapsed = entry.startTime.duration(to: timestamp)
-          if let progress = anim.evaluate(elapsed: elapsed) {
+          var state = entry.customState
+          let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
+          // Write the updated custom state back so the next tick of
+          // the exit transition carries user bookkeeping forward
+          // (matches the active-animation tick loop pattern).
+          removingIdentities[identity]?.customState = state
+          if let progress = evaluated {
             modifiers = interpolateRemovalModifiers(
               from: entry.startOpacity,
               to: entry.transition.removalModifiers(),
@@ -949,18 +1011,18 @@ package final class AnimationController {
       // snapping back to 1.0.  Must run before the filter below.
       let injectedIdentities = collectIdentities(in: subtree)
       var initialOpacity: Double = 1.0
-      let keyOnTarget = AnimationKey(identity: identity, property: .opacity)
+      let keyOnTarget = AnimationKey(identity: identity, slot: .opacity)
       if let existing = activeAnimations[keyOnTarget],
         let sampled = sample(existing, at: timestamp),
-        case .double(let value) = sampled
+        let value = sampled.unwrap(as: Double.self)
       {
         initialOpacity = value
       } else {
         for sid in injectedIdentities {
-          let k = AnimationKey(identity: sid, property: .opacity)
+          let k = AnimationKey(identity: sid, slot: .opacity)
           if let existing = activeAnimations[k],
             let sampled = sample(existing, at: timestamp),
-            case .double(let value) = sampled
+            let value = sampled.unwrap(as: Double.self)
           {
             initialOpacity = value
             break
@@ -1197,16 +1259,16 @@ package final class AnimationController {
     // `willAppear` value.
     if let startOpacity = modifiers.opacity {
       let target = snapshot.opacity ?? 1.0
-      let key = AnimationKey(identity: identity, property: .opacity)
-      let effectiveFrom =
+      let key = AnimationKey(identity: identity, slot: .opacity)
+      let effectiveFrom: AnyAnimatable =
         sampleCurrentValue(for: key, at: timestamp)
-        ?? .double(startOpacity)
+        ?? AnyAnimatable(startOpacity)
       if let existing = activeAnimations[key] { releaseBatch(existing.batchID) }
       retainBatch(batchID)
       activeAnimations[key] =
         ActiveAnimation(
           from: effectiveFrom,
-          to: .double(target),
+          to: AnyAnimatable(target),
           animationBox: box,
           startTime: timestamp,
           batchID: batchID
@@ -1241,7 +1303,7 @@ package final class AnimationController {
   private func sampleCurrentValue(
     for key: AnimationKey,
     at timestamp: MonotonicInstant
-  ) -> AnimatableValue? {
+  ) -> AnyAnimatable? {
     guard let existing = activeAnimations[key] else { return nil }
     return sample(existing, at: timestamp)
   }
@@ -1330,199 +1392,47 @@ package final class AnimationController {
     batchID: AnimationBatchID?,
     timestamp: MonotonicInstant
   ) {
-    enqueueIfChanged(
-      identity: identity,
-      property: .opacity,
-      previous: previous.opacity,
-      current: current.opacity,
-      toValue: AnimatableValue.double,
-      fromValue: AnimatableValue.double,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .foregroundColor,
-      previous: previous.foregroundColor,
-      current: current.foregroundColor,
-      toValue: AnimatableValue.color,
-      fromValue: AnimatableValue.color,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .backgroundColor,
-      previous: previous.backgroundColor,
-      current: current.backgroundColor,
-      toValue: AnimatableValue.color,
-      fromValue: AnimatableValue.color,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .borderColor,
-      previous: previous.borderColor,
-      current: current.borderColor,
-      toValue: AnimatableValue.color,
-      fromValue: AnimatableValue.color,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .borderBlendPhase,
-      previous: previous.borderBlendPhase,
-      current: current.borderBlendPhase,
-      toValue: AnimatableValue.double,
-      fromValue: AnimatableValue.double,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .offsetX,
-      previous: previous.offsetX,
-      current: current.offsetX,
-      toValue: AnimatableValue.integer,
-      fromValue: AnimatableValue.integer,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .offsetY,
-      previous: previous.offsetY,
-      current: current.offsetY,
-      toValue: AnimatableValue.integer,
-      fromValue: AnimatableValue.integer,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .positionX,
-      previous: previous.positionX,
-      current: current.positionX,
-      toValue: AnimatableValue.integer,
-      fromValue: AnimatableValue.integer,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .positionY,
-      previous: previous.positionY,
-      current: current.positionY,
-      toValue: AnimatableValue.integer,
-      fromValue: AnimatableValue.integer,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .frameWidth,
-      previous: previous.frameWidth,
-      current: current.frameWidth,
-      toValue: AnimatableValue.integer,
-      fromValue: AnimatableValue.integer,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .frameHeight,
-      previous: previous.frameHeight,
-      current: current.frameHeight,
-      toValue: AnimatableValue.integer,
-      fromValue: AnimatableValue.integer,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .paddingTop,
-      previous: previous.padding?.top,
-      current: current.padding?.top,
-      toValue: AnimatableValue.integer,
-      fromValue: AnimatableValue.integer,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .paddingLeading,
-      previous: previous.padding?.leading,
-      current: current.padding?.leading,
-      toValue: AnimatableValue.integer,
-      fromValue: AnimatableValue.integer,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .paddingBottom,
-      previous: previous.padding?.bottom,
-      current: current.padding?.bottom,
-      toValue: AnimatableValue.integer,
-      fromValue: AnimatableValue.integer,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
-    enqueueIfChanged(
-      identity: identity,
-      property: .paddingTrailing,
-      previous: previous.padding?.trailing,
-      current: current.padding?.trailing,
-      toValue: AnimatableValue.integer,
-      fromValue: AnimatableValue.integer,
-      request: request,
-      batchID: batchID,
-      timestamp: timestamp
-    )
+    // Union of slot keys from both snapshots — a slot that appears
+    // in only one snapshot is a "one side nil" change and snaps.
+    var slots = Set(previous.values.keys)
+    slots.formUnion(current.values.keys)
+
+    for slot in slots {
+      enqueueSlotChangeIfNeeded(
+        identity: identity,
+        slot: slot,
+        previous: previous[slot],
+        current: current[slot],
+        request: request,
+        batchID: batchID,
+        timestamp: timestamp
+      )
+    }
   }
 
-  private func enqueueIfChanged<T: Equatable>(
+  private func enqueueSlotChangeIfNeeded(
     identity: Identity,
-    property: AnimatableProperty,
-    previous: T?,
-    current: T?,
-    toValue: (T) -> AnimatableValue,
-    fromValue: (T) -> AnimatableValue,
+    slot: AnimatableSlot,
+    previous: AnyAnimatable?,
+    current: AnyAnimatable?,
     request: AnimationRequest,
     batchID: AnimationBatchID?,
     timestamp: MonotonicInstant
   ) {
+    // No change → nothing to do.
     guard previous != current else { return }
 
-    let key = AnimationKey(identity: identity, property: property)
+    let key = AnimationKey(identity: identity, slot: slot)
 
     switch request {
     case .inherit, .disabled:
-      // Snap immediately — clear any active animation for this key,
-      // including its batch reference count.
       if let superseded = activeAnimations.removeValue(forKey: key) {
         releaseBatch(superseded.batchID)
       }
 
     case .animate(let box):
-      guard let previousValue = previous, let currentValue = current else {
-        // One side is nil — cannot interpolate.  Snap.
+      guard let previous, let current else {
+        // One side nil — cannot interpolate, snap.
         if let superseded = activeAnimations.removeValue(forKey: key) {
           releaseBatch(superseded.batchID)
         }
@@ -1530,25 +1440,22 @@ package final class AnimationController {
       }
 
       // Retarget: if an animation already exists, sample its current
-      // value and use it as the new `from`.
-      let effectiveFrom: AnimatableValue
+      // value and use it as the new `from` — matches the existing
+      // mid-flight retarget behavior.
+      let effectiveFrom: AnyAnimatable
       if let existing = activeAnimations[key],
         let sampled = sample(existing, at: timestamp)
       {
         effectiveFrom = sampled
-        // The old animation is being superseded — release its batch
-        // ref before we overwrite the slot.  The new animation may
-        // belong to the same batch (retain happens below) or to a
-        // different one.
         releaseBatch(existing.batchID)
       } else {
-        effectiveFrom = fromValue(previousValue)
+        effectiveFrom = previous
       }
 
       retainBatch(batchID)
       activeAnimations[key] = ActiveAnimation(
         from: effectiveFrom,
-        to: toValue(currentValue),
+        to: current,
         animationBox: box,
         startTime: timestamp,
         batchID: batchID
@@ -1597,7 +1504,7 @@ package final class AnimationController {
     var hasPendingWork = false
 
     // Build per-identity interpolated value maps for fast tree walk.
-    var interpolated: [Identity: [AnimatableProperty: AnimatableValue]] = [:]
+    var interpolated: [Identity: [AnimatableSlot: AnyAnimatable]] = [:]
 
     // Record the batches that completed animations belong to so we can
     // release their ref counts in a second pass (after this iteration
@@ -1619,7 +1526,7 @@ package final class AnimationController {
       activeAnimations[key]?.customState = state
       guard let progress = evaluated else {
         // Animation complete — snap to final value and purge.
-        interpolated[key.identity, default: [:]][key.property] = animation.to
+        interpolated[key.identity, default: [:]][key.slot] = animation.to
         keysToRemove.append(key)
         if let batchID = animation.batchID { completedBatches.append(batchID) }
         affectedIdentities.insert(key.identity)
@@ -1630,7 +1537,7 @@ package final class AnimationController {
         to: animation.to,
         progress: progress
       )
-      interpolated[key.identity, default: [:]][key.property] = value
+      interpolated[key.identity, default: [:]][key.slot] = value
       affectedIdentities.insert(key.identity)
       latestDeadline = timestamp.advanced(by: frameInterval)
       hasPendingWork = true
@@ -1658,7 +1565,13 @@ package final class AnimationController {
 
       if let box = entry.animationBox, let anim = registeredAnimations[box] {
         let elapsed = entry.startTime.duration(to: timestamp)
-        if let progress = anim.evaluate(elapsed: elapsed) {
+        var state = entry.customState
+        let evaluated = anim.evaluate(elapsed: elapsed, state: &state)
+        // Write the updated custom state back so the next tick of
+        // the exit transition carries user bookkeeping forward
+        // (matches the active-animation tick loop pattern).
+        removingIdentities[identity]?.customState = state
+        if let progress = evaluated {
           // Interpolate from the entry's captured starting opacity
           // (normally 1.0 = identity, but may be lower if this
           // removal interrupted a mid-flight insertion) toward the
@@ -1921,12 +1834,12 @@ package final class AnimationController {
 
   private func applyInterpolatedValues(
     tree: ResolvedNode,
-    interpolated: [Identity: [AnimatableProperty: AnimatableValue]]
+    interpolated: [Identity: [AnimatableSlot: AnyAnimatable]]
   ) -> ResolvedNode {
     var node = tree
     if let values = interpolated[node.identity] {
-      for (property, value) in values {
-        applyValue(&node, property: property, value: value)
+      for (slot, value) in values {
+        applyValue(&node, slot: slot, value: value)
       }
     }
     // Recursively apply interpolated values to children; the shape
@@ -1940,31 +1853,36 @@ package final class AnimationController {
 
   private func applyValue(
     _ node: inout ResolvedNode,
-    property: AnimatableProperty,
-    value: AnimatableValue
+    slot: AnimatableSlot,
+    value: AnyAnimatable
   ) {
-    switch (property, value) {
-    case (.opacity, .double(let opacity)):
+    switch slot {
+    case .opacity:
+      guard let opacity = value.unwrap(as: Double.self) else { return }
       var drawMetadata = node.drawMetadata
       drawMetadata.baseStyle.explicitOpacity = opacity
       node.drawMetadata = drawMetadata
 
-    case (.foregroundColor, .color(let color)):
+    case .foregroundShapeStyle:
+      guard let style = unwrapShapeStyle(value) else { return }
       var drawMetadata = node.drawMetadata
-      drawMetadata.baseStyle.foregroundStyle = .color(color)
+      drawMetadata.baseStyle.foregroundStyle = style
       node.drawMetadata = drawMetadata
 
-    case (.backgroundColor, .color(let color)):
+    case .backgroundShapeStyle:
+      guard let style = unwrapShapeStyle(value) else { return }
       var drawMetadata = node.drawMetadata
-      drawMetadata.baseStyle.backgroundStyle = .color(color)
+      drawMetadata.baseStyle.backgroundStyle = style
       node.drawMetadata = drawMetadata
 
-    case (.borderColor, .color(let color)):
+    case .borderShapeStyle:
+      guard let style = unwrapShapeStyle(value) else { return }
       var drawMetadata = node.drawMetadata
-      drawMetadata.borderShapeStyle = .color(color)
+      drawMetadata.borderShapeStyle = style
       node.drawMetadata = drawMetadata
 
-    case (.borderBlendPhase, .double(let phase)):
+    case .borderBlendPhase:
+      guard let phase = value.unwrap(as: Double.self) else { return }
       // Replace only the phase; all other border fields (set, fg, bg,
       // blend, sides) stay identical.  Uses the
       // preserving-derived-state helper because the shape/variant is
@@ -1989,107 +1907,109 @@ package final class AnimationController {
         )
       }
 
-    case (.offsetX, .integer(let x)):
-      if case .offset(_, let y) = node.layoutBehavior {
-        // Variant unchanged (still .offset), only numeric values move.
-        node.setLayoutBehaviorPreservingDerivedState(.offset(x: x, y: y))
-      }
-
-    case (.positionX, .integer(let x)):
-      if case .position(_, let y) = node.layoutBehavior {
-        node.setLayoutBehaviorPreservingDerivedState(.position(x: x, y: y))
-      }
-
-    case (.positionY, .integer(let y)):
-      if case .position(let x, _) = node.layoutBehavior {
-        node.setLayoutBehaviorPreservingDerivedState(.position(x: x, y: y))
-      }
-
-    case (.offsetY, .integer(let y)):
-      if case .offset(let x, _) = node.layoutBehavior {
-        node.setLayoutBehaviorPreservingDerivedState(.offset(x: x, y: y))
-      }
-
-    case (.frameWidth, .integer(let width)):
-      switch node.layoutBehavior {
-      case .frame(_, let height, let alignment):
-        node.setLayoutBehaviorPreservingDerivedState(
-          .frame(width: width, height: height, alignment: alignment)
-        )
-      case .flexibleFrame(
-        let minWidth, let idealWidth, let maxWidth,
-        let minHeight, let idealHeight, let maxHeight,
-        let alignment):
-        let (newMax, newIdeal, newMin) = Self.replaceFirstFinite(
-          width: width,
-          dimensions: (maxWidth, idealWidth, minWidth)
-        )
-        node.setLayoutBehaviorPreservingDerivedState(
-          .flexibleFrame(
-            minWidth: newMin,
-            idealWidth: newIdeal,
-            maxWidth: newMax,
-            minHeight: minHeight,
-            idealHeight: idealHeight,
-            maxHeight: maxHeight,
-            alignment: alignment
-          ))
-      default:
-        break
-      }
-
-    case (.frameHeight, .integer(let height)):
-      switch node.layoutBehavior {
-      case .frame(let width, _, let alignment):
-        node.setLayoutBehaviorPreservingDerivedState(
-          .frame(width: width, height: height, alignment: alignment)
-        )
-      case .flexibleFrame(
-        let minWidth, let idealWidth, let maxWidth,
-        let minHeight, let idealHeight, let maxHeight,
-        let alignment):
-        let (newMax, newIdeal, newMin) = Self.replaceFirstFinite(
-          width: height,
-          dimensions: (maxHeight, idealHeight, minHeight)
-        )
-        node.setLayoutBehaviorPreservingDerivedState(
-          .flexibleFrame(
-            minWidth: minWidth,
-            idealWidth: idealWidth,
-            maxWidth: maxWidth,
-            minHeight: newMin,
-            idealHeight: newIdeal,
-            maxHeight: newMax,
-            alignment: alignment
-          ))
-      default:
-        break
-      }
-
-    case (.paddingTop, .integer(let value)):
-      if case .padding(var insets) = node.layoutBehavior {
-        insets.top = value
+    case .padding:
+      guard let insets = value.unwrap(as: EdgeInsets.self) else { return }
+      if case .padding = node.layoutBehavior {
         node.setLayoutBehaviorPreservingDerivedState(.padding(insets))
       }
 
-    case (.paddingLeading, .integer(let value)):
-      if case .padding(var insets) = node.layoutBehavior {
-        insets.leading = value
-        node.setLayoutBehaviorPreservingDerivedState(.padding(insets))
+    case .offset:
+      guard let pair = value.unwrap(as: AnimatablePair<Int, Int>.self)
+      else { return }
+      if case .offset = node.layoutBehavior {
+        node.setLayoutBehaviorPreservingDerivedState(
+          .offset(x: pair.first, y: pair.second)
+        )
       }
 
-    case (.paddingBottom, .integer(let value)):
-      if case .padding(var insets) = node.layoutBehavior {
-        insets.bottom = value
-        node.setLayoutBehaviorPreservingDerivedState(.padding(insets))
+    case .position:
+      guard let pair = value.unwrap(as: AnimatablePair<Int, Int>.self)
+      else { return }
+      if case .position = node.layoutBehavior {
+        node.setLayoutBehaviorPreservingDerivedState(
+          .position(x: pair.first, y: pair.second)
+        )
       }
 
-    case (.paddingTrailing, .integer(let value)):
-      if case .padding(var insets) = node.layoutBehavior {
-        insets.trailing = value
-        node.setLayoutBehaviorPreservingDerivedState(.padding(insets))
-      }
+    case .frameWidth:
+      guard let width = value.unwrap(as: Int.self) else { return }
+      applyFrameWidth(width, to: &node)
 
+    case .frameHeight:
+      guard let height = value.unwrap(as: Int.self) else { return }
+      applyFrameHeight(height, to: &node)
+    }
+  }
+
+  private func unwrapShapeStyle(_ value: AnyAnimatable) -> AnyShapeStyle? {
+    if let color = value.unwrap(as: Color.self) {
+      return .color(color)
+    }
+    if let linear = value.unwrap(as: LinearGradient.self) {
+      return .linearGradient(linear)
+    }
+    if let radial = value.unwrap(as: RadialGradient.self) {
+      return .radialGradient(radial)
+    }
+    if let pattern = value.unwrap(as: PatternFill.self) {
+      return .patternFill(pattern)
+    }
+    return nil
+  }
+
+  private func applyFrameWidth(_ width: Int, to node: inout ResolvedNode) {
+    switch node.layoutBehavior {
+    case .frame(_, let height, let alignment):
+      node.setLayoutBehaviorPreservingDerivedState(
+        .frame(width: width, height: height, alignment: alignment)
+      )
+    case .flexibleFrame(
+      let minWidth, let idealWidth, let maxWidth,
+      let minHeight, let idealHeight, let maxHeight,
+      let alignment):
+      let (newMax, newIdeal, newMin) = Self.replaceFirstFinite(
+        width: width,
+        dimensions: (maxWidth, idealWidth, minWidth)
+      )
+      node.setLayoutBehaviorPreservingDerivedState(
+        .flexibleFrame(
+          minWidth: newMin,
+          idealWidth: newIdeal,
+          maxWidth: newMax,
+          minHeight: minHeight,
+          idealHeight: idealHeight,
+          maxHeight: maxHeight,
+          alignment: alignment
+        ))
+    default:
+      break
+    }
+  }
+
+  private func applyFrameHeight(_ height: Int, to node: inout ResolvedNode) {
+    switch node.layoutBehavior {
+    case .frame(let width, _, let alignment):
+      node.setLayoutBehaviorPreservingDerivedState(
+        .frame(width: width, height: height, alignment: alignment)
+      )
+    case .flexibleFrame(
+      let minWidth, let idealWidth, let maxWidth,
+      let minHeight, let idealHeight, let maxHeight,
+      let alignment):
+      let (newMax, newIdeal, newMin) = Self.replaceFirstFinite(
+        width: height,
+        dimensions: (maxHeight, idealHeight, minHeight)
+      )
+      node.setLayoutBehaviorPreservingDerivedState(
+        .flexibleFrame(
+          minWidth: minWidth,
+          idealWidth: idealWidth,
+          maxWidth: maxWidth,
+          minHeight: newMin,
+          idealHeight: newIdeal,
+          maxHeight: newMax,
+          alignment: alignment
+        ))
     default:
       break
     }
@@ -2119,12 +2039,13 @@ package final class AnimationController {
   private func sample(
     _ animation: ActiveAnimation,
     at timestamp: MonotonicInstant
-  ) -> AnimatableValue? {
+  ) -> AnyAnimatable? {
     guard let anim = registeredAnimations[animation.animationBox] else {
       return nil
     }
     let elapsed = animation.startTime.duration(to: timestamp)
-    guard let progress = anim.evaluate(elapsed: elapsed) else {
+    var state = animation.customState
+    guard let progress = anim.evaluate(elapsed: elapsed, state: &state) else {
       return animation.to
     }
     return interpolate(
@@ -2135,21 +2056,15 @@ package final class AnimationController {
   }
 
   private func interpolate(
-    from: AnimatableValue,
-    to: AnimatableValue,
+    from: AnyAnimatable,
+    to: AnyAnimatable,
     progress: Double
-  ) -> AnimatableValue {
-    switch (from, to) {
-    case (.double(let a), .double(let b)):
-      return .double(a + (b - a) * progress)
-    case (.integer(let a), .integer(let b)):
-      let delta = Double(b - a) * progress
-      return .integer(a + Int(delta))
-    case (.color(let a), .color(let b)):
-      return .color(a.interpolated(to: b, progress: progress, method: .perceptual))
-    default:
-      return to
-    }
+  ) -> AnyAnimatable {
+    // Snap to target on type mismatch — the controller should never
+    // produce a slot animation where the types differ
+    // (``diffAndEnqueue`` doesn't enqueue in that case), but
+    // belt-and-suspenders here.
+    from.interpolated(to: to, progress: progress) ?? to
   }
 
   /// Resets all per-identity state.  Used when the renderer is disposed
