@@ -5,36 +5,25 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
-/// Regression pins for the animation tick-gating fix.
+/// Property pins for ``AnimationTickResult.redrawIdentities``.
 ///
 /// Background: a `.border(blend:)` whose phase is driven by
-/// `withAnimation(.linear.repeatForever)` schedules a 30 FPS tick.  If
-/// the animated view sits below a `ScrollView` viewport (or inside an
-/// inactive `TabView` tab, or behind an opaque overlay) the animation
-/// ticks against a subtree whose `DrawNode` bounds are fully clipped.
-/// The rasterizer produces identical cells frame-to-frame, damage is
-/// empty, and the terminal sees 0 bytes written — but the animation
-/// controller keeps saying `hasActiveAnimations = true` and returns a
-/// `nextDeadline`, so the scheduler keeps waking and pinning CPU.
+/// `withAnimation(.linear.repeatForever)` schedules a 30 FPS tick.
+/// `redrawIdentities` describes which view identities the tick
+/// touched, which downstream consumers (the incremental presentation
+/// diff in the render pipeline) use to decide which subtrees to
+/// re-rasterize.
 ///
-/// Fix: after each render, compare
-/// `animationTick.affectedIdentities` against
-/// `artifacts.drawnIdentities` (the set of identities whose placed
-/// bounds survived ancestor clipping during the paint walk).  If the
-/// intersection is empty the animation is "quiescent against the
-/// clip" and the run loop skips `requestDeadline(_:)`.  When any
-/// external invalidation — scroll, resize, tab switch, state change —
-/// wakes the scheduler, the next frame's visibility check re-runs and
-/// the tick loop resumes.
-///
-/// These tests pin the geometric predicate end-to-end: they drive the
-/// `DefaultRenderer` through a seed frame and an animated frame,
-/// confirm the animation controller records an active tick, and then
-/// assert whether the affected identity actually appears in the
-/// frame's `drawnIdentities`.  The run loop uses
-/// `affectedIdentities.isDisjoint(with: drawnIdentities)` to decide
-/// whether to call `requestDeadline`, so this intersection is the
-/// exact invariant that separates "burn CPU" from "quiesce".
+/// Phase 4 removed the wake-up gate that used to skip
+/// `requestDeadline(_:)` when `redrawIdentities.isDisjoint(with:
+/// drawnIdentities)` — the gate had a one-way trap with stranded
+/// drains and was replaced with the explicit ``hasPendingWork``
+/// signal.  These tests still pin the descriptive property: when the
+/// animated view sits below a clipped viewport the affected identity
+/// must NOT appear in the frame's `drawnIdentities`, and when the
+/// view is visible it MUST appear.  Even though no production code
+/// gates on this disjointness anymore, the invariant remains a
+/// useful pin on the placed-tree clip walk.
 @MainActor
 struct AnimationTickVisibilityTests {
   @Test("animated border clipped by ScrollView viewport is NOT in drawnIdentities")
@@ -97,7 +86,7 @@ struct AnimationTickVisibilityTests {
     // The controller must be holding an active animation: the phase
     // change 0 → 1.0 under withAnimation must have been captured.
     #expect(
-      controller.dominantActiveRequest() != nil,
+      controller.activeAnimationCount > 0,
       "controller must have an active animation after the phase change"
     )
 
@@ -110,11 +99,11 @@ struct AnimationTickVisibilityTests {
     )
 
     #expect(
-      tick.hasActiveAnimations,
+      tick.hasPendingWork,
       "tick result must report active animations while repeatForever is in flight"
     )
     #expect(
-      !tick.affectedIdentities.isEmpty,
+      !tick.redrawIdentities.isEmpty,
       "tick must identify at least one affected identity"
     )
 
@@ -124,12 +113,12 @@ struct AnimationTickVisibilityTests {
     // The run loop's `isDisjoint(with:)` check therefore returns
     // true and `requestDeadline` is NOT called.
     #expect(
-      tick.affectedIdentities.isDisjoint(with: animatedArtifacts.drawnIdentities),
+      tick.redrawIdentities.isDisjoint(with: animatedArtifacts.drawnIdentities),
       """
       Expected every affected animation identity to be geometrically clipped \
       by the ScrollView viewport, so the run loop can skip requestDeadline. \
-      affectedIdentities=\(tick.affectedIdentities) \
-      drawnIdentities∩affected=\(tick.affectedIdentities.intersection(animatedArtifacts.drawnIdentities))
+      redrawIdentities=\(tick.redrawIdentities) \
+      drawnIdentities∩redraw=\(tick.redrawIdentities.intersection(animatedArtifacts.drawnIdentities))
       """
     )
   }
@@ -138,7 +127,7 @@ struct AnimationTickVisibilityTests {
   func animatedBorderInsideViewportKeepsTicking() throws {
     // Same tree shape, but the viewport is tall enough to include
     // the animated border.  The fix must not break the normal case:
-    // affectedIdentities ∩ drawnIdentities must be non-empty so the
+    // redrawIdentities ∩ drawnIdentities must be non-empty so the
     // run loop schedules the next deadline.
     let renderer = DefaultRenderer()
     let controller = renderer.internalAnimationController
@@ -187,19 +176,19 @@ struct AnimationTickVisibilityTests {
       at: .now().advanced(by: .milliseconds(100))
     )
 
-    #expect(tick.hasActiveAnimations)
-    #expect(!tick.affectedIdentities.isEmpty)
+    #expect(tick.hasPendingWork)
+    #expect(!tick.redrawIdentities.isEmpty)
 
     // Regression guard: the affected identity set MUST intersect the
     // drawn set when the border is inside the viewport.  If this ever
     // flips, the fix has quiesced a legitimate animation and the
     // gallery's chasing-light demo will stop animating on first paint.
     #expect(
-      !tick.affectedIdentities.isDisjoint(with: animatedArtifacts.drawnIdentities),
+      !tick.redrawIdentities.isDisjoint(with: animatedArtifacts.drawnIdentities),
       """
       Expected at least one affected animation identity to be in the frame's \
       drawnIdentities when the border is visible. \
-      affectedIdentities=\(tick.affectedIdentities) \
+      redrawIdentities=\(tick.redrawIdentities) \
       drawnIdentities.count=\(animatedArtifacts.drawnIdentities.count)
       """
     )

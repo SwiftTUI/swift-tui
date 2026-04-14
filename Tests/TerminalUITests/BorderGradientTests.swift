@@ -132,8 +132,8 @@ struct BorderGradientTests {
     let halfway = t0.advanced(by: .milliseconds(500))
     let result = controller.applyInterpolations(to: &frame2, at: halfway)
 
-    #expect(result.hasActiveAnimations)
-    #expect(result.affectedIdentities.contains(leafIdentity))
+    #expect(result.hasPendingWork)
+    #expect(result.redrawIdentities.contains(leafIdentity))
 
     guard
       case .border(_, _, _, _, let interpolatedPhase, _) = frame2.layoutBehavior
@@ -196,7 +196,7 @@ struct BorderGradientTests {
       context: .init(identity: rootIdentity, transaction: transaction)
     )
     #expect(
-      controller.dominantActiveRequest() != nil,
+      controller.activeAnimationCount > 0,
       "controller must hold an active animation after the animated phase change"
     )
   }

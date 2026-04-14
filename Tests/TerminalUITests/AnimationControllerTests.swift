@@ -323,7 +323,7 @@ struct AnimationPipelineIntegrationTests {
       "matched geometry animation should be enqueued after the swap, got \(controller.activeMatchedGeometryCount)"
     )
     #expect(
-      controller.lastTickResult.hasActiveAnimations,
+      controller.lastTickResult.hasPendingWork,
       "frame 2 should report active animation"
     )
   }
@@ -551,7 +551,7 @@ struct AnimationPipelineIntegrationTests {
       controller.activeAnimationCount >= 1,
       "position change should enqueue at least one slot animation, got \(controller.activeAnimationCount)"
     )
-    #expect(controller.lastTickResult.hasActiveAnimations)
+    #expect(controller.lastTickResult.hasPendingWork)
   }
 
   @Test(
@@ -598,7 +598,7 @@ struct AnimationPipelineIntegrationTests {
       "expected frameWidth + offsetX to both enqueue, got \(controller.activeAnimationCount)"
     )
     #expect(
-      controller.lastTickResult.hasActiveAnimations,
+      controller.lastTickResult.hasPendingWork,
       "frame 2 should report active animations"
     )
   }
@@ -642,8 +642,8 @@ struct AnimationPipelineIntegrationTests {
       "frame 2 should enqueue an offsetX animation, got count=\(controller.activeAnimationCount)"
     )
     #expect(
-      controller.lastTickResult.hasActiveAnimations,
-      "frame 2 should report hasActiveAnimations after offset change"
+      controller.lastTickResult.hasPendingWork,
+      "frame 2 should report hasPendingWork after offset change"
     )
 
     // The placed tree should carry the interpolated offset (at
@@ -678,7 +678,7 @@ struct AnimationPipelineIntegrationTests {
       )
     }
     #expect(
-      controller.lastTickResult.hasActiveAnimations,
+      controller.lastTickResult.hasPendingWork,
       "frame 3 tick should still report active animation"
     )
     _ = frame3
@@ -763,13 +763,14 @@ struct AnimationPipelineIntegrationTests {
       frame3Count > 0,
       "insertion offset animation should still be in flight after frame 3, got \(frame3Count)"
     )
-    // Even with insertionOffsetAnimations populated, the controller
-    // must report hasActiveAnimations via lastTickResult on tick
-    // frames — otherwise the run loop stops scheduling deadlines
-    // and the animation hitches partway through.
+    // Even with insertion-offset entries populated in the unified
+    // activeAnimations map, the controller must report hasPendingWork
+    // via lastTickResult on tick frames — otherwise the run loop
+    // stops scheduling deadlines and the animation hitches partway
+    // through.
     #expect(
-      controller.lastTickResult.hasActiveAnimations,
-      "frame 3 tick should report hasActiveAnimations=true while the insertion is still in flight"
+      controller.lastTickResult.hasPendingWork,
+      "frame 3 tick should report hasPendingWork=true while the insertion is still in flight"
     )
     #expect(
       controller.lastTickResult.nextDeadline != nil,
@@ -1026,7 +1027,7 @@ struct AnimationPipelineIntegrationTests {
     // → raster. The test has no testable clock so it cannot pin
     // an exact interpolated colour, but it can assert that the
     // controller observed the diff and transitioned into an active
-    // state (dominantActiveRequest != nil) after frame 2.
+    // state (activeAnimationCount > 0) after frame 2.
     let renderer = DefaultRenderer()
     let controller = renderer.internalAnimationController
 
@@ -1041,7 +1042,7 @@ struct AnimationPipelineIntegrationTests {
       context: ResolveContext(identity: rootIdentity)
     )
     #expect(
-      controller.dominantActiveRequest() == nil,
+      controller.activeAnimationCount == 0,
       "no animations should be in flight before the animated mutation"
     )
 
@@ -1058,7 +1059,7 @@ struct AnimationPipelineIntegrationTests {
       )
     )
     #expect(
-      controller.dominantActiveRequest() != nil,
+      controller.activeAnimationCount > 0,
       "controller must hold an active animation after the animated colour change"
     )
   }
@@ -1285,7 +1286,7 @@ struct AnimationPipelineIntegrationTests {
       "bulk unmount must not inject a removal overlay, got \(tree.children.count) children"
     )
     #expect(
-      !result.hasActiveAnimations,
+      !result.hasPendingWork,
       "no animations should be in flight after a bulk unmount"
     )
   }
@@ -1401,7 +1402,7 @@ struct AnimationControllerPropertyTests {
     let halfway = t0.advanced(by: .milliseconds(100))
     let result = controller.applyInterpolations(to: &frame2, at: halfway)
 
-    #expect(result.hasActiveAnimations)
+    #expect(result.hasPendingWork)
 
     guard
       case .flexibleFrame(
@@ -2005,16 +2006,16 @@ struct AnimationControllerPropertyTests {
   }
 
   @Test(
-    "stranded batch drain surfaces a nextDeadline with empty affectedIdentities"
+    "stranded batch drain surfaces a nextDeadline with empty redrawIdentities"
   )
   func strandedBatchDrainSurfacesWakeupDeadline() throws {
     // Contract pin: a pure-drain tick must carry
-    // `hasActiveAnimations = true` and a concrete `nextDeadline` so
+    // `hasPendingWork = true` and a concrete `nextDeadline` so
     // the run loop can reschedule itself — but its
-    // `affectedIdentities` set will be empty because the drain
+    // `redrawIdentities` set will be empty because the drain
     // isn't tied to any visible view.  The run loop's wake-up logic
     // at ``RunLoop+Rendering.swift`` must treat an empty
-    // ``affectedIdentities`` as "schedule unconditionally" for the
+    // ``redrawIdentities`` as "schedule unconditionally" for the
     // drain to actually drive itself forward in a real render loop.
     let controller = AnimationController()
     let animation = Animation.linear(duration: .milliseconds(500))
@@ -2035,16 +2036,16 @@ struct AnimationControllerPropertyTests {
     controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
 
     // Tick well before the drain's deadline: the result must carry
-    // pending work + a nextDeadline, and affectedIdentities must be
+    // pending work + a nextDeadline, and redrawIdentities must be
     // empty because the drain doesn't belong to any view.
     var working = frame2
     let tick = controller.applyInterpolations(
       to: &working,
       at: t0.advanced(by: .milliseconds(50))
     )
-    #expect(tick.hasActiveAnimations)
+    #expect(tick.hasPendingWork)
     #expect(tick.nextDeadline != nil)
-    #expect(tick.affectedIdentities.isEmpty)
+    #expect(tick.redrawIdentities.isEmpty)
   }
 
   @Test(
@@ -2120,7 +2121,7 @@ struct AnimationControllerPropertyTests {
     let halfway = t0.advanced(by: .milliseconds(100))
     let result = controller.applyInterpolations(to: &frame2, at: halfway)
 
-    #expect(result.hasActiveAnimations)
+    #expect(result.hasPendingWork)
     let opacity = frame2.drawMetadata.baseStyle.explicitOpacity
     #expect(opacity != nil)
     if let opacity {
@@ -2137,7 +2138,7 @@ struct AnimationControllerPropertyTests {
     var frame3 = frame2
     let past = t0.advanced(by: .milliseconds(300))
     let finalResult = controller.applyInterpolations(to: &frame3, at: past)
-    #expect(!finalResult.hasActiveAnimations)
+    #expect(!finalResult.hasPendingWork)
   }
 
   @Test(
@@ -2280,7 +2281,7 @@ struct AnimationControllerPropertyTests {
 
     let halfway = t0.advanced(by: .milliseconds(100))
     let result = controller.applyInterpolations(to: &frame2, at: halfway)
-    #expect(result.hasActiveAnimations)
+    #expect(result.hasPendingWork)
 
     guard case .padding(let insets) = frame2.layoutBehavior else {
       Issue.record("apply must preserve the padding layoutBehavior")
@@ -2335,8 +2336,8 @@ struct AnimationControllerPropertyTests {
     let halfway = t0.advanced(by: .milliseconds(100))
     let result = controller.applyInterpolations(to: &frame2, at: halfway)
 
-    #expect(result.hasActiveAnimations)
-    #expect(result.affectedIdentities.contains(leafIdentity))
+    #expect(result.hasPendingWork)
+    #expect(result.redrawIdentities.contains(leafIdentity))
 
     // The interpolated border should not equal either endpoint — if
     // extraction or apply were broken it would snap to blue (the
@@ -2411,7 +2412,7 @@ struct AnimationControllerRemovalTests {
     // At t0 the apply pass should inject the removed leaf back into
     // the tree (it's still mid-animation).
     let tickResult = controller.applyInterpolations(to: &root2, at: t0)
-    #expect(tickResult.hasActiveAnimations)
+    #expect(tickResult.hasPendingWork)
 
     let injectedChildren = root2.children
     #expect(
@@ -2488,7 +2489,7 @@ struct AnimationControllerRemovalTests {
     controller.processResolvedTree(overlay2, transaction: transaction, timestamp: t0)
 
     let result = controller.applyInterpolations(to: &overlay2, at: t0)
-    #expect(result.hasActiveAnimations)
+    #expect(result.hasPendingWork)
 
     // Overlay should now have the padding subtree back as a child,
     // with the leaf inside it — NOT just the bare leaf.
@@ -2550,7 +2551,7 @@ struct AnimationControllerRemovalTests {
     transaction.animationRequest = .animate(animation.animationBox)
     controller.processResolvedTree(root2, transaction: transaction, timestamp: t0)
     let preResetTick = controller.applyInterpolations(to: &root2, at: t0)
-    #expect(preResetTick.hasActiveAnimations)
+    #expect(preResetTick.hasPendingWork)
 
     // Reset while the removal is still in flight.
     controller.reset()
@@ -2562,7 +2563,7 @@ struct AnimationControllerRemovalTests {
     controller.processResolvedTree(fresh, transaction: .init(), timestamp: t0)
     let result = controller.applyInterpolations(to: &fresh, at: t0)
 
-    #expect(!result.hasActiveAnimations)
+    #expect(!result.hasPendingWork)
     #expect(
       !containsIdentity(fresh, leafIdentity),
       "pre-reset removal state must not leak into the post-reset tree"
@@ -2615,7 +2616,7 @@ struct AnimationControllerRemovalTests {
     var treeCopy = root2
     let result = controller.applyInterpolations(to: &treeCopy, at: past)
 
-    #expect(!result.hasActiveAnimations)
+    #expect(!result.hasPendingWork)
     #expect(result.nextDeadline == nil)
     #expect(
       !treeCopy.children.contains(where: { $0.identity == leafIdentity }),
