@@ -74,7 +74,7 @@ swiftly install --use 6.3
 
 ## Bun
 
-`GUI/WebTUIGUI` uses Bun for all package management, test, and bundling work.
+`GUI/WebTUIGUI`, `GUI/XtermWebTUIGUI`, and `Examples/XtermWebExample` use Bun for all package management, test, and bundling work.
 
 Examples:
 
@@ -82,6 +82,14 @@ Examples:
 cd GUI/WebTUIGUI
 bun test
 bun run build -- --app <AppProduct>
+
+cd GUI/XtermWebTUIGUI
+bun test
+bun run build -- --app <AppProduct>
+
+cd Examples/XtermWebExample
+bun test
+bun run build
 ```
 
 ## Xcode

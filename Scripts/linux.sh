@@ -39,7 +39,7 @@ Interactive:
 Repo-aware:
   test              Run \`swift test\`
   examples          Build the Linux example packages
-  web               Build WebExample after installing Bun and the Wasm SDK
+  web               Build the browser examples after installing Bun and the Wasm SDK
   workflow          Mirror the Examples Linux workflow: examples + web
   full              Run \`swift test\`, then \`workflow\`
 
@@ -250,6 +250,10 @@ cmd_web() {
     export PATH=\"\$BUN_INSTALL/bin:\$PATH\"
 
     cd Examples/WebExample
+    bun install --frozen-lockfile
+    bun run build
+
+    cd ../XtermWebExample
     bun install --frozen-lockfile
     bun run build
   "

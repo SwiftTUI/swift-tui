@@ -31,7 +31,7 @@ Last updated: April 14, 2026
 ### Platform integration packages
 
 - executable runner packages `Runners/TerminalUICLI` and `Runners/TerminalUIWASI` build top-level execution layers on top of `TerminalUI`
-- embedded host packages `GUI/SwiftUITUIGUI`, `GUI/SwiftTermTUIGUI`, and `GUI/WebTUIGUI` host the same authored `TerminalUI` apps inside platform-managed shells
+- embedded host packages `GUI/SwiftUITUIGUI`, `GUI/SwiftTermTUIGUI`, `GUI/WebTUIGUI`, and `GUI/XtermWebTUIGUI` host the same authored `TerminalUI` apps inside platform-managed shells
 
 The conceptual model is:
 
@@ -127,7 +127,7 @@ Those integration layers now serve three execution modes:
 
 - terminal-native executable execution via `TerminalCLIAppRunner.run(MyApp.self)` or the default `App.main()` provided by `Runners/TerminalUICLI`
 - WASI executable execution and manifest generation via `TerminalWASIAppRunner` in `Runners/TerminalUIWASI`
-- host-managed embedding via `TerminalUISceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`, as used by `GUI/SwiftUITUIGUI`, `GUI/SwiftTermTUIGUI`, and `GUI/WebTUIGUI`
+- host-managed embedding via `TerminalUISceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`, as used by `GUI/SwiftUITUIGUI`, `GUI/SwiftTermTUIGUI`, `GUI/WebTUIGUI`, and `GUI/XtermWebTUIGUI`
 
 CLI scene management is executable-runner policy rather than an authored-scene
 rule. A one-window app and a multi-window app now share the same runner story,
