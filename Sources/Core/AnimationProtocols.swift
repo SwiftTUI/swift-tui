@@ -234,7 +234,27 @@ extension Double: VectorArithmetic {
 
 // MARK: - Int + VectorArithmetic
 
-/// Integer interpolation truncates: `from + Int(Double(to - from) * progress)`.
+/// Integer scaling truncates toward zero: `scale(by: t)` computes
+/// `self = Int(Double(self) * t)`.  This has two notable quirks for
+/// animation call sites:
+///
+/// 1. **Sub-unit deltas are lost.** A delta of `1` scaled by
+///    `t = 0.4` produces `Int(0.4) = 0`, so small integer deltas
+///    animate as a single jump at the end of the curve rather than
+///    a smooth per-frame step.  Acceptable for terminal cell
+///    coordinates (which are inherently integer-quantized), but
+///    callers that need sub-cell precision should use `Double`
+///    instead.
+///
+/// 2. **Asymmetric rounding.** Truncation toward zero means `-1`
+///    scaled by `0.5` yields `0`, while `+1` scaled by `0.5` also
+///    yields `0`.  Both are off-by-one from round-to-nearest, but
+///    symmetrically so — no sign-dependent drift.
+///
+/// The composed interpolation primitive used by the animation
+/// controller produces `from + (to - from).scaled(by: progress)` at
+/// the ``VectorArithmetic`` level; the `scale`-then-add sequence is
+/// what matters for rounding analysis.
 extension Int: VectorArithmetic {
   public mutating func scale(by rhs: Double) {
     self = Int(Double(self) * rhs)
@@ -242,5 +262,35 @@ extension Int: VectorArithmetic {
 
   public var magnitudeSquared: Double {
     Double(self * self)
+  }
+}
+
+// MARK: - Animatable bridges for primitive VectorArithmetic types
+
+/// A ``VectorArithmetic`` value is trivially ``Animatable`` — its own
+/// value is its animatable data.  SwiftUI exposes the same identity on
+/// `Double`/`CGFloat`/`Float` so `AnyAnimatable(1.5)` works at the
+/// type-erased wrapper level.
+extension Double: Animatable {
+  public var animatableData: Double {
+    get { self }
+    set { self = newValue }
+  }
+}
+
+extension Int: Animatable {
+  public var animatableData: Int {
+    get { self }
+    set { self = newValue }
+  }
+}
+
+/// ``AnimatablePair`` is trivially ``Animatable``: its animatable data
+/// is itself.  This lets the controller wrap pair-valued slots (offset,
+/// position) in ``AnyAnimatable`` directly.
+extension AnimatablePair: Animatable {
+  public var animatableData: AnimatablePair<First, Second> {
+    get { self }
+    set { self = newValue }
   }
 }
