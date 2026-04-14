@@ -221,31 +221,6 @@ private struct BordersAndShapesCurvedShapesSection: View {
   }
 }
 
-enum PhaseBackgroundFill: Hashable, CaseIterable {
-  case topLeading
-  case topTrailing
-  case bottomTrailing
-  case bottomLeading
-
-  var inverse: PhaseBackgroundFill {
-    switch self {
-    case .bottomLeading: .topTrailing
-    case .bottomTrailing: .topLeading
-    case .topLeading: .bottomTrailing
-    case .topTrailing: .bottomLeading
-    }
-  }
-
-  var unitPoint: UnitPoint {
-    switch self {
-    case .bottomLeading: .bottomLeading
-    case .bottomTrailing: .bottomTrailing
-    case .topLeading: .topLeading
-    case .topTrailing: .topTrailing
-    }
-  }
-}
-
 private struct BordersAndShapesCanvasSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
