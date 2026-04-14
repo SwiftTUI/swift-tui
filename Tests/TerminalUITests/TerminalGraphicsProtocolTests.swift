@@ -14,7 +14,7 @@ import Testing
 @Suite
 struct TerminalGraphicsProtocolTests {
   @Test(
-    "terminal host emits Kitty direct RGBA payloads when Kitty graphics are available", .disabled())
+    "terminal host emits Kitty PNG payloads when Kitty graphics are available")
   func terminalHostEmitsKittyPayloads() throws {
     let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
     let controller = GraphicsProtocolMockTerminalController(
@@ -44,13 +44,13 @@ struct TerminalGraphicsProtocolTests {
       ]
     )
     let surface = RasterSurface(
-      size: .init(width: 2, height: 1),
-      lines: ["  "],
+      size: .init(width: 4, height: 2),
+      lines: ["    ", "    "],
       imageAttachments: [
         makeRasterImageAttachment(
           pngBytes: pngBytes,
           pixelSize: .init(width: 2, height: 2),
-          bounds: .init(origin: .zero, size: .init(width: 1, height: 1))
+          bounds: .init(origin: .zero, size: .init(width: 3, height: 2))
         )
       ]
     )
@@ -64,24 +64,24 @@ struct TerminalGraphicsProtocolTests {
       }
     )
 
-    #expect(
-      kittyWrite.contains("_Ga=T,q=2,t=d,f=32,C=1")
-    )
-    #expect(
-      kittyWrite.contains(",s=8,v=16,S=512,")
-    )
-    #expect(
-      !kittyWrite.contains("z=-1")
-    )
-    #expect(
-      !kittyWrite.contains(",p=")
-    )
-    #expect(
-      !kittyWrite.contains(",c=")
-    )
-    #expect(
-      !kittyWrite.contains(",r=")
-    )
+    // Transmit-and-display header: action T, quiet mode 2, direct transmission,
+    // PNG format, cursor pinned, with explicit cell rectangle and image id.
+    #expect(kittyWrite.contains("_Ga=T,q=2,t=d,f=100,C=1,"))
+    #expect(kittyWrite.contains(",c=3,r=2,"))
+    // The image id is derived from the source reference.
+    #expect(kittyWrite.contains(",i="))
+    // Single-chunk transmissions must terminate with m=0.
+    #expect(kittyWrite.contains(",m=0;"))
+    // The raw RGBA direct path should no longer be used.
+    #expect(!kittyWrite.contains("f=32"))
+    #expect(!kittyWrite.contains(",S="))
+    #expect(!kittyWrite.contains("z=-1"))
+    #expect(!kittyWrite.contains(",p="))
+    // Confirm we move the cursor to the attachment origin before placing the image.
+    #expect(kittyWrite.contains("\u{001B}7"))
+    #expect(kittyWrite.contains("\u{001B}[1;1H"))
+    #expect(kittyWrite.contains("\u{001B}8"))
+    // And that Sixel was not emitted instead.
     #expect(
       !controller.writes.contains { write in
         write.contains("\u{001B}P0;1;0q")
@@ -89,8 +89,8 @@ struct TerminalGraphicsProtocolTests {
     )
   }
 
-  @Test("terminal host chunks larger Kitty payloads for scaled image placements", .disabled())
-  func terminalHostChunksLargeScaledKittyPayloads() throws {
+  @Test("terminal host chunks Kitty PNG payloads that exceed the single-chunk limit")
+  func terminalHostChunksLargeKittyPayloads() throws {
     let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
@@ -108,6 +108,8 @@ struct TerminalGraphicsProtocolTests {
       capabilityProfile: .trueColor
     )
 
+    // Noise-filled 128x128 image: entropy defeats PNG compression so the
+    // encoded payload is reliably larger than one 4 KiB chunk.
     var pixels: [PNG.RGBA<UInt8>] = []
     pixels.reserveCapacity(128 * 128)
     for y in 0..<128 {
@@ -143,21 +145,30 @@ struct TerminalGraphicsProtocolTests {
     _ = try host.present(surface)
     try host.drainPendingPresentation()
 
-    let kittyWrites = controller.writes.filter { write in
-      write.contains("\u{001B}_G")
-    }
+    let output = controller.writes.joined()
 
-    #expect(
-      kittyWrites.contains { write in
-        write.contains("_Ga=T,q=2,t=d,f=32,C=1,s=320,v=320,S=409600")
-          && write.contains(",m=1;")
+    // The first chunk must carry the full control data including the PNG
+    // format key and the 40x20 cell rectangle.
+    #expect(output.contains("_Ga=T,q=2,t=d,f=100,C=1,c=40,r=20,"))
+    // The first chunk must advertise that more chunks follow (m=1).
+    #expect(output.contains(",m=1;"))
+    // Continuation chunks must use only the `m` key.
+    #expect(output.contains("\u{001B}_Gm=1;"))
+    // The final chunk must close the stream with m=0.
+    #expect(output.contains("\u{001B}_Gm=0;"))
+
+    // Every graphics chunk must fit inside the 4096-byte payload limit that
+    // the Kitty spec sets on the base64 data per escape code.
+    let graphicsChunks = chunksForKittyProtocol(in: output)
+    #expect(graphicsChunks.count >= 2)
+    for (index, chunk) in graphicsChunks.enumerated() {
+      let payload = payloadForKittyChunk(chunk)
+      #expect(payload.count <= 4096, "chunk payload exceeded 4096 bytes: \(payload.count)")
+      let isLastChunk = index == graphicsChunks.count - 1
+      if !isLastChunk {
+        #expect(payload.count % 4 == 0, "non-final chunk payload must be a multiple of 4")
       }
-    )
-    #expect(
-      kittyWrites.contains { write in
-        write.contains("\u{001B}_Gm=0;")
-      }
-    )
+    }
   }
 
   @Test("terminal host emits Sixel payloads when Kitty is unavailable but Sixel is supported")
@@ -406,6 +417,62 @@ struct TerminalGraphicsProtocolTests {
     }
     #expect(fullRowBgWrites.isEmpty)
   }
+}
+
+/// Extracts every `ESC _G ... ESC \` escape sequence from a flattened terminal
+/// write stream.
+private func chunksForKittyProtocol(in output: String) -> [String] {
+  let startMarker: [Character] = ["\u{001B}", "_", "G"]
+  let endMarker: [Character] = ["\u{001B}", "\\"]
+  let characters = Array(output)
+  var results: [String] = []
+  var index = 0
+  while index < characters.count {
+    guard hasPrefix(characters, at: index, prefix: startMarker) else {
+      index += 1
+      continue
+    }
+    var scan = index + startMarker.count
+    while scan < characters.count, !hasPrefix(characters, at: scan, prefix: endMarker) {
+      scan += 1
+    }
+    guard scan < characters.count else {
+      break
+    }
+    let endIndex = scan + endMarker.count
+    results.append(String(characters[index..<endIndex]))
+    index = endIndex
+  }
+  return results
+}
+
+private func hasPrefix(
+  _ characters: [Character],
+  at offset: Int,
+  prefix: [Character]
+) -> Bool {
+  guard offset + prefix.count <= characters.count else {
+    return false
+  }
+  for i in 0..<prefix.count where characters[offset + i] != prefix[i] {
+    return false
+  }
+  return true
+}
+
+/// Returns the payload portion (between `;` and `ESC \`) of a Kitty escape code.
+private func payloadForKittyChunk(_ chunk: String) -> String {
+  guard let semicolon = chunk.firstIndex(of: ";") else {
+    return ""
+  }
+  // Drop the trailing `ESC \` terminator, which is always the last two chars.
+  let payloadStart = chunk.index(after: semicolon)
+  let trailerLength = 2
+  guard chunk.distance(from: payloadStart, to: chunk.endIndex) >= trailerLength else {
+    return ""
+  }
+  let payloadEnd = chunk.index(chunk.endIndex, offsetBy: -trailerLength)
+  return String(chunk[payloadStart..<payloadEnd])
 }
 
 private final class GraphicsProtocolMockTerminalController:
