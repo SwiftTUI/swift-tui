@@ -40,11 +40,10 @@ private struct RasterImageOverlay: Sendable {
 }
 
 private struct KittyPayload: Sendable {
+  /// Base64-encoded image payload.
   var encodedData: String
+  /// Kitty graphics protocol format key (`f`). 100 for PNG, 32 for RGBA, 24 for RGB.
   var format: Int
-  var dataWidth: Int
-  var dataHeight: Int
-  var dataSize: Int
 }
 
 final class TerminalImageRenderer: Sendable {
@@ -140,33 +139,30 @@ final class TerminalImageRenderer: Sendable {
 
       switch graphicsProtocol {
       case .kitty:
-        let outputPixelSize = kittyOutputPixelSize(
-          for: attachment,
-          image: image,
-          cellPixelSize: graphicsCapabilities.cellPixelSize
-        )
-        let imageID = kittyImageID(
-          reference: reference,
-          outputPixelSize: outputPixelSize
-        )
+        let cellColumns = max(1, attachment.bounds.size.width)
+        let cellRows = max(1, attachment.bounds.size.height)
+        let imageID = kittyImageID(reference: reference)
         writeSteps.append(terminalSaveCursorSequence())
         writeSteps.append(terminalCursorSequence(to: attachment.bounds.origin))
 
         if transmittedKittyImages.contains(imageID) {
           writeSteps.append(
             kittyPlacementCommand(
-              imageID: imageID
+              imageID: imageID,
+              cellColumns: cellColumns,
+              cellRows: cellRows
             )
           )
         } else if let payload = kittyPayload(
           for: reference,
-          image: image,
-          outputPixelSize: outputPixelSize
+          image: image
         ) {
           writeSteps.append(
             contentsOf: kittyTransmitAndPlaceCommands(
               payload: payload,
-              imageID: imageID
+              imageID: imageID,
+              cellColumns: cellColumns,
+              cellRows: cellRows
             )
           )
           transmittedKittyImages.insert(imageID)
@@ -284,13 +280,19 @@ final class TerminalImageRenderer: Sendable {
 
   private func kittyPayload(
     for reference: ImageAssetReference,
-    image: DecodedPNGImage,
-    outputPixelSize: Size
+    image: DecodedPNGImage
   ) -> KittyPayload? {
+    // Transmit the original PNG bytes with `f=100`. Kitty decodes and scales
+    // natively, which is both smaller on the wire than raw RGBA and avoids
+    // any software-scaling artifacts.
+    guard !image.pngBytes.isEmpty else {
+      return nil
+    }
+
     let key = TerminalImageVariantKey(
       reference: reference,
       mode: .kitty,
-      outputSize: outputPixelSize,
+      outputSize: image.pixelSize,
       paletteSize: 0
     )
 
@@ -298,28 +300,9 @@ final class TerminalImageRenderer: Sendable {
       return cached
     }
 
-    let pixels: [RGBAImagePixel]
-    if outputPixelSize == image.pixelSize {
-      pixels = image.pixels
-    } else {
-      pixels = scaledPixelsPreservingAlpha(
-        from: image,
-        outputSize: outputPixelSize
-      )
-    }
-    guard pixels.count == outputPixelSize.width * outputPixelSize.height else {
-      return nil
-    }
-
-    let data = kittyRGBABytes(
-      from: pixels
-    )
     let payload = KittyPayload(
-      encodedData: base64Encoded(data),
-      format: 32,
-      dataWidth: max(1, outputPixelSize.width),
-      dataHeight: max(1, outputPixelSize.height),
-      dataSize: data.count
+      encodedData: base64Encoded(image.pngBytes),
+      format: 100
     )
 
     storage.withLockUnchecked { storage in
@@ -720,64 +703,6 @@ private func scaledPixels(
   return output
 }
 
-private func scaledPixelsPreservingAlpha(
-  from image: DecodedPNGImage,
-  outputSize: Size
-) -> [RGBAImagePixel] {
-  guard
-    outputSize.width > 0,
-    outputSize.height > 0,
-    image.pixelSize.width > 0,
-    image.pixelSize.height > 0
-  else {
-    return []
-  }
-
-  var output: [RGBAImagePixel] = Array(
-    repeating: .init(red: 0, green: 0, blue: 0, alpha: 0),
-    count: outputSize.width * outputSize.height
-  )
-
-  for y in 0..<outputSize.height {
-    let sourceY = min(
-      image.pixelSize.height - 1,
-      Int(
-        (Double((y * 2) + 1) * Double(image.pixelSize.height))
-          / Double(outputSize.height * 2)
-      )
-    )
-
-    for x in 0..<outputSize.width {
-      let sourceX = min(
-        image.pixelSize.width - 1,
-        Int(
-          (Double((x * 2) + 1) * Double(image.pixelSize.width))
-            / Double(outputSize.width * 2)
-        )
-      )
-      output[(y * outputSize.width) + x] = image.pixels[(sourceY * image.pixelSize.width) + sourceX]
-    }
-  }
-
-  return output
-}
-
-private func kittyRGBABytes(
-  from pixels: [RGBAImagePixel]
-) -> [UInt8] {
-  var bytes: [UInt8] = []
-  bytes.reserveCapacity(pixels.count * 4)
-
-  for pixel in pixels {
-    bytes.append(UInt8(clamping: pixel.red))
-    bytes.append(UInt8(clamping: pixel.green))
-    bytes.append(UInt8(clamping: pixel.blue))
-    bytes.append(UInt8(clamping: pixel.alpha))
-  }
-
-  return bytes
-}
-
 private func floydSteinbergQuantizedIndices(
   pixels: [RGBAImagePixel?],
   size: Size,
@@ -1175,31 +1100,15 @@ private func encodedSixelLine(
   return result
 }
 
-private func kittyOutputPixelSize(
-  for attachment: RasterImageAttachment,
-  image: DecodedPNGImage,
-  cellPixelSize: Size?
-) -> Size {
-  guard
-    let cellPixelSize,
-    cellPixelSize.width > 0,
-    cellPixelSize.height > 0,
-    attachment.bounds.size.width > 0,
-    attachment.bounds.size.height > 0
-  else {
-    return image.pixelSize
-  }
-
-  return .init(
-    width: max(1, attachment.bounds.size.width * cellPixelSize.width),
-    height: max(1, attachment.bounds.size.height * cellPixelSize.height)
-  )
-}
-
 private func kittyTransmitAndPlaceCommands(
   payload: KittyPayload,
-  imageID: UInt32
+  imageID: UInt32,
+  cellColumns: Int,
+  cellRows: Int
 ) -> [String] {
+  // Kitty requires payload chunks no larger than 4096 bytes of base64 data,
+  // and every chunk except the last must be a multiple of 4 bytes so the
+  // receiver can reassemble base64 boundaries.
   let chunkSize = 4096
   let chunks = stride(from: 0, to: payload.encodedData.count, by: chunkSize).map { index in
     let start = payload.encodedData.index(payload.encodedData.startIndex, offsetBy: index)
@@ -1219,26 +1128,37 @@ private func kittyTransmitAndPlaceCommands(
   return chunks.enumerated().map { index, chunk in
     let hasMore = index + 1 < chunks.count ? 1 : 0
     if index == 0 {
+      // First chunk carries the full control data:
+      //   a=T  transmit and display
+      //   q=2  suppress all responses (we already probed for support)
+      //   t=d  direct transmission (payload is base64 in this escape code)
+      //   f    pixel format (100 for PNG, 32 for RGBA, 24 for RGB)
+      //   C=1  do not advance the cursor after placement
+      //   c,r  display rectangle in terminal cells (Kitty scales to fit)
+      //   i    stable image id so we can re-place the image by id later
+      //   m    1 if more chunks follow, 0 otherwise
       return
-        "\u{001B}_Ga=T,q=2,t=d,f=\(payload.format),C=1,s=\(payload.dataWidth),v=\(payload.dataHeight),S=\(payload.dataSize),i=\(imageID),m=\(hasMore);\(chunk)\u{001B}\\"
+        "\u{001B}_Ga=T,q=2,t=d,f=\(payload.format),C=1,c=\(cellColumns),r=\(cellRows),i=\(imageID),m=\(hasMore);\(chunk)\u{001B}\\"
     }
+    // Continuation chunks may only carry the `m` (and optionally `q`) key.
     return "\u{001B}_Gm=\(hasMore);\(chunk)\u{001B}\\"
   }
 }
 
 private func kittyPlacementCommand(
-  imageID: UInt32
+  imageID: UInt32,
+  cellColumns: Int,
+  cellRows: Int
 ) -> String {
-  "\u{001B}_Ga=p,i=\(imageID),C=1,q=2\u{001B}\\"
+  // Re-place a previously transmitted image at the current cursor position
+  // using the same cell rectangle. `a=p` does not re-transmit the image data.
+  "\u{001B}_Ga=p,q=2,C=1,c=\(cellColumns),r=\(cellRows),i=\(imageID)\u{001B}\\"
 }
 
 private func kittyImageID(
-  reference: ImageAssetReference,
-  outputPixelSize: Size
+  reference: ImageAssetReference
 ) -> UInt32 {
-  var bytes = stableBytes(for: reference)
-  bytes.append(contentsOf: Array("size:\(outputPixelSize.width)x\(outputPixelSize.height)".utf8))
-  return stableIdentifier(from: bytes)
+  stableIdentifier(from: stableBytes(for: reference))
 }
 
 private func stableBytes(
