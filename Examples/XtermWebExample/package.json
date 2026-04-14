@@ -1,0 +1,21 @@
+{
+  "name": "xterm-web-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:terminal": "bun run src/build-terminal.ts",
+    "dev": "bun run build:terminal && bun --watch src/index.ts",
+    "build": "bun run build:terminal && bun build ./src/index.html --outdir=dist --sourcemap --target=browser --minify && bun build ./src/wasm-scene-worker.ts --outfile=dist/wasm-scene-worker.js --target=browser --format=esm --minify && bun run src/build-pages.ts",
+    "start": "bun src/start.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@bjorn3/browser_wasi_shim": "^0.4.2",
+    "@xterm/xterm": "6.0.0",
+    "xterm-webtuigui": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

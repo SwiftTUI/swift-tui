@@ -28,7 +28,8 @@ packages build on.
 Scene declarations such as ``App`` and ``WindowGroup`` also live here, but
 platform integration lives in peer packages: executable runner packages
 `Runners/TerminalUICLI` and `Runners/TerminalUIWASI`, plus embedded host
-packages `GUI/SwiftUITUIGUI`, `GUI/SwiftTermTUIGUI`, and `GUI/WebTUIGUI`.
+packages `GUI/SwiftUITUIGUI`, `GUI/SwiftTermTUIGUI`, `GUI/WebTUIGUI`, and
+`GUI/XtermWebTUIGUI`.
 `TerminalUI` itself is library-only.
 
 ## Topics

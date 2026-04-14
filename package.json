@@ -7,6 +7,8 @@
   },
   "workspaces": [
     "GUI/WebTUIGUI",
-    "Examples/WebExample"
+    "GUI/XtermWebTUIGUI",
+    "Examples/WebExample",
+    "Examples/XtermWebExample"
   ]
 }

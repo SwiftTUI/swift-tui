@@ -99,6 +99,7 @@ package surface:
   - `GUI/SwiftUITUIGUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on top of Ghostty
   - `GUI/SwiftTermTUIGUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on top of SwiftTerm
   - `GUI/WebTUIGUI` hosts a `TerminalUIWASI` build in the browser using the same manifest and hosted-session story
+  - `GUI/XtermWebTUIGUI` hosts a `TerminalUIWASI` build in the browser using the same manifest and hosted-session story on top of xterm.js
 
 These are supported peer packages, but they are not root library products in
 `Package.swift`.

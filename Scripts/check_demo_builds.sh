@@ -23,6 +23,8 @@ input harnesses against the terminal examples:
   - Examples/SwiftUIExample/SwiftUIExample.xcodeproj
   - Examples/WebExample (Bun build)
   - GUI/WebTUIGUI against WebExampleApp
+  - Examples/XtermWebExample (Bun build)
+  - GUI/XtermWebTUIGUI against WebExampleApp
 
 The script also checks required environment dependencies up front:
   - Swift availability
@@ -194,6 +196,16 @@ run_step \
 run_step \
   "Build GUI/WebTUIGUI host with WebExampleApp" \
   "$repo_root/GUI/WebTUIGUI" \
+  bun run build -- --package-path ../../Examples/WebExample/TerminalApp --app WebExampleApp
+
+run_step \
+  "Build Examples/XtermWebExample web demo" \
+  "$repo_root/Examples/XtermWebExample" \
+  bun run build
+
+run_step \
+  "Build GUI/XtermWebTUIGUI host with WebExampleApp" \
+  "$repo_root/GUI/XtermWebTUIGUI" \
   bun run build -- --package-path ../../Examples/WebExample/TerminalApp --app WebExampleApp
 
 echo ""
