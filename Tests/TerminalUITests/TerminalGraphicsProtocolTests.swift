@@ -89,6 +89,77 @@ struct TerminalGraphicsProtocolTests {
     )
   }
 
+  @Test("kitty image placement clips scrolled image bounds before emitting graphics commands")
+  func kittyImagePlacementClipsScrolledBounds() throws {
+    let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [
+        Array("\u{001B}_Gi=\(kittyQueryID);OK\u{001B}\\".utf8),
+        [],
+      ],
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 20, height: 5),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    let pngBytes = try makePNGBytes(
+      width: 4,
+      height: 4,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 255, blue: 255), count: 16)
+    )
+
+    final class ScrollBox {
+      var position = ScrollPosition.zero
+    }
+
+    let box = ScrollBox()
+    let view = ScrollView(
+      .vertical,
+      showsIndicators: false,
+      position: Binding(
+        get: { box.position },
+        set: { box.position = $0 }
+      )
+    ) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Top ")
+        Image(pngData: pngBytes)
+          .resizable()
+          .frame(width: 4, height: 4)
+        Text("Tail")
+      }
+    }
+    .frame(width: 4, height: 3, alignment: .topLeading)
+
+    box.position.scrollBy(y: 2)
+    let artifacts = DefaultRenderer().render(
+      view,
+      context: .init(identity: testIdentity("Root"))
+    )
+    let attachment = try #require(artifacts.rasterSurface.imageAttachments.first)
+
+    #expect(attachment.bounds == .init(origin: .zero, size: .init(width: 4, height: 3)))
+
+    _ = try host.present(artifacts.rasterSurface)
+    try host.drainPendingPresentation()
+
+    let kittyWrite = try #require(
+      controller.writes.first { write in
+        write.contains("_Ga=T")
+      }
+    )
+
+    #expect(kittyWrite.contains("\u{001B}[1;1H"))
+    #expect(kittyWrite.contains(",c=4,r=3,"))
+    #expect(!kittyWrite.contains(",c=4,r=4,"))
+  }
+
   @Test("terminal host chunks Kitty PNG payloads that exceed the single-chunk limit")
   func terminalHostChunksLargeKittyPayloads() throws {
     let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
