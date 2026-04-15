@@ -46,40 +46,6 @@ struct CounterTab: View {
         color = color.rotatedHue(by: 30)
       }
     }
-    // View-level scoped command: only registered while the Counter
-    // tab is focused, so the help strip recomposes when the user
-    // switches tabs. Keyless commands stay discoverable in the help
-    // sheet but do not appear in the strip.
-    .command(
-      id: "increment",
-      title: "Increment",
-      key: KeyPress(.character("+")),
-      group: "Counter"
-    ) {
-      withAnimation(.default) {
-        count += step
-      }
-    }
-    .command(
-      id: "reset-counter",
-      title: "Reset",
-      key: .ctrl("r"),
-      group: "Counter"
-    ) {
-      withAnimation(.default) {
-        count = 0
-      }
-    }
-    // Demonstrates the §4.6 three-lane bottom-row layout:
-    //   .status (left)        — live mode/state badge
-    //   .primaryAction (right) — pulls glyph + title from the
-    //     "reset-counter" command registration above.
-    .toolbar {
-      ToolbarItem(placement: .status) {
-        Text("Count: \(count)")
-      }
-      ToolbarItem(.primaryAction, command: "reset-counter")
-    }
   }
 
   private var brandingHeader: some View {
