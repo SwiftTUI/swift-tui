@@ -471,21 +471,24 @@ extension Rasterizer {
         // can't partially paint it without cropping the source pixel
         // rectangle, which the current attachment model doesn't express.
         //
-        // Minimum correctness for scroll viewports: drop the attachment
-        // entirely when it doesn't intersect the clip rect at all. Keep
-        // it (unclipped) otherwise. This prevents the bug where a scrolled
-        // image renders at a clamped negative-origin cursor position —
-        // which previously looked like the image "jumping to the top" or
-        // "disappearing" as the user scrolled past it.
+        // Minimum correctness for scroll viewports: clamp the attachment
+        // to the current clip rect, and drop it entirely when nothing
+        // remains visible. This preserves the terminal-space placement
+        // even though true pixel-space cropping would require extra
+        // source-rect metadata in the attachment model.
+        let clippedBounds: Rect
         if let clip = frame.clip {
-          if intersect(bounds, clip) == nil {
+          guard let visibleBounds = intersect(bounds, clip) else {
             continue
           }
+          clippedBounds = visibleBounds
+        } else {
+          clippedBounds = bounds
         }
         imageAttachments.append(
           RasterImageAttachment(
             identity: identity,
-            bounds: bounds,
+            bounds: clippedBounds,
             source: payload.source,
             resolvedReference: payload.resolvedAsset?.reference,
             pixelSize: payload.resolvedAsset?.pixelSize,
