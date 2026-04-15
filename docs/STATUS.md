@@ -18,7 +18,7 @@ The 2026 terminal-native reset is substantially landed: automatic chrome has
 been reset, shell navigation primitives are canonical, multiline editing and
 indeterminate loading are public, and the command palette plus toast/sheet
 presentation surfaces now live in the main `View` module instead of only in
-prototype explorations.
+earlier exploratory work.
 
 ## Shipped Surface
 
@@ -75,7 +75,7 @@ prototype explorations.
   - anchor-based preference APIs such as `anchorPreference(...)` and `transformAnchorPreference(...)` until local coordinate spaces and anchor resolution ship
 - Some higher-level workflow surfaces are still unsettled:
   - richer multiline editing behaviors beyond the current `TextEditor`
-  - a long-term home for prototype help-strip and launcher-like shell workflows beyond the command-palette APIs
+  - a long-term home for launcher-like shell workflows beyond the command-palette APIs
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
   - `ResolvableView`

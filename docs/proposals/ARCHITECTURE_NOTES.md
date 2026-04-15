@@ -367,7 +367,7 @@ comment.
 > stay on the legacy path and can migrate incrementally.
 >
 > **Surprise during the landing:** the first full-suite run segfaulted
-> in `PrototypeUIComponentsTests`. Root cause was stale build artifacts
+> in a repo-local prototype test target. Root cause was stale build artifacts
 > — the test binary was linked against the pre-change `ResolvedNode`
 > layout and crashed when it loaded my new module. `swift package clean
 > && swift test` resolved it. Worth remembering: SwiftPM's incremental
