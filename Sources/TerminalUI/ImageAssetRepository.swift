@@ -149,7 +149,8 @@ final class ImageAssetRepository: Sendable {
       intrinsicCellSize: intrinsicCellSize(
         pixelSize: image.pixelSize,
         cellPixelSize: cellPixelSize
-      )
+      ),
+      cellPixelSize: cellPixelSize
     )
 
     storage.withLockUnchecked { storage in

@@ -130,27 +130,40 @@ struct ImageSurfaceTests {
 
   @Test("scaledToFit and scaledToFill preserve image aspect ratios during layout")
   func scaledToFitAndFillPreserveAspectRatios() throws {
+    // 32x32 pixels is a multiple of the 8x16 default cell grid, so the
+    // pixel-space aspect math used for .scaledToFit() / .scaledToFill()
+    // produces exact integer cell counts with no rounding drift.
+    //
+    // In terminal pixels the source is square (32x32), and we lay it out
+    // in a 6x2 frame that measures 48x32 pixels. That frame is 3:2 in
+    // pixels, so a fit collapses to the height axis and a fill expands
+    // beyond the width axis.
     let pngBytes = try makePNGBytes(
-      width: 20,
-      height: 10,
-      pixels: Array(repeating: rgbaPixel(red: 255, green: 255, blue: 255), count: 200)
+      width: 32,
+      height: 32,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 255, blue: 255), count: 32 * 32)
     )
 
     let fitArtifacts = DefaultRenderer().render(
       Image(pngData: pngBytes)
         .scaledToFit()
-        .frame(width: 6, height: 4)
+        .frame(width: 6, height: 2)
     )
     let fillArtifacts = DefaultRenderer().render(
       Image(pngData: pngBytes)
         .scaledToFill()
-        .frame(width: 6, height: 4)
+        .frame(width: 6, height: 2)
     )
 
     let fitAttachment = try #require(fitArtifacts.rasterSurface.imageAttachments.first)
     let fillAttachment = try #require(fillArtifacts.rasterSurface.imageAttachments.first)
 
-    #expect(fitAttachment.bounds.size == .init(width: 6, height: 3))
-    #expect(fillAttachment.bounds.size == .init(width: 8, height: 4))
+    // Fit: 32x32 pixels into 48x32 pixel frame → min(1.5, 1.0) = 1.0 →
+    // 32x32 target pixels → 4x2 cells. Letterboxed horizontally.
+    #expect(fitAttachment.bounds.size == .init(width: 4, height: 2))
+    // Fill: max(1.5, 1.0) = 1.5 → 48x48 target pixels → 6x3 cells.
+    // Overflows the frame vertically (the extra cell row is clipped by
+    // the parent frame).
+    #expect(fillAttachment.bounds.size == .init(width: 6, height: 3))
   }
 }

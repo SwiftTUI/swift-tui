@@ -24,15 +24,22 @@ public struct ResolvedImageAsset: Equatable, Sendable {
   public var reference: ImageAssetReference
   public var pixelSize: Size
   public var intrinsicCellSize: Size
+  /// Pixel dimensions of a single terminal cell at the time of resolution.
+  /// Carried here so the layout engine can reconcile pixel-space aspect
+  /// ratios (source image) with cell-space frames (parent proposals) when
+  /// measuring `.scaledToFit()` / `.scaledToFill()` images.
+  public var cellPixelSize: Size
 
   public init(
     reference: ImageAssetReference,
     pixelSize: Size,
-    intrinsicCellSize: Size
+    intrinsicCellSize: Size,
+    cellPixelSize: Size
   ) {
     self.reference = reference
     self.pixelSize = pixelSize
     self.intrinsicCellSize = intrinsicCellSize
+    self.cellPixelSize = cellPixelSize
   }
 }
 
