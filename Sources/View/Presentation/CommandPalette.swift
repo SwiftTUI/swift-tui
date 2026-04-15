@@ -70,6 +70,15 @@ public struct Command: Hashable, Sendable, Identifiable {
   public var keywords: [String]
   public var kind: Kind
   public var isDisabled: Bool
+  /// Canonical key binding for this command, when present. Supplying a key
+  /// through the view-level ``View/command(id:title:key:…)`` modifier also
+  /// registers a focus-independent hotkey binding that dispatches to the
+  /// command's action.
+  public var key: KeyPress?
+  /// Help-display grouping for this command (e.g. "Document", "View"). The
+  /// group is propagated into the ``HotkeyBinding`` stored in the registry
+  /// so help surfaces can section commands.
+  public var group: String?
 
   public init(
     id: String,
@@ -77,7 +86,9 @@ public struct Command: Hashable, Sendable, Identifiable {
     detail: String? = nil,
     keywords: [String] = [],
     kind: Kind = .action,
-    isDisabled: Bool = false
+    isDisabled: Bool = false,
+    key: KeyPress? = nil,
+    group: String? = nil
   ) {
     self.id = id
     self.title = title
@@ -85,6 +96,8 @@ public struct Command: Hashable, Sendable, Identifiable {
     self.keywords = keywords
     self.kind = kind
     self.isDisabled = isDisabled
+    self.key = key
+    self.group = group
   }
 }
 
@@ -206,14 +219,14 @@ public struct CommandCatalog: Sendable {
 
 // MARK: - Preference Key
 
-private struct CommandRegistration: Sendable,
+package struct CommandRegistration: Sendable,
   CustomStringConvertible,
   CustomDebugStringConvertible
 {
-  var command: Command
-  var action: (@MainActor @Sendable () -> Void)?
+  package var command: Command
+  package var action: (@MainActor @Sendable () -> Void)?
 
-  init(
+  package init(
     command: Command,
     action: (@MainActor @Sendable () -> Void)? = nil
   ) {
@@ -221,38 +234,72 @@ private struct CommandRegistration: Sendable,
     self.action = action
   }
 
-  var description: String {
+  package var description: String {
     debugDescription
   }
 
-  var debugDescription: String {
+  package var debugDescription: String {
     "CommandRegistration(id: \(String(reflecting: command.id)), hasAction: \(action != nil))"
   }
 }
 
-private struct CommandPreferenceValue: Sendable,
+package struct CommandPreferenceValue: Sendable,
   CustomStringConvertible,
   CustomDebugStringConvertible
 {
-  var registrations: [CommandRegistration] = []
+  package var registrations: [CommandRegistration] = []
 
-  var description: String {
+  package init(registrations: [CommandRegistration] = []) {
+    self.registrations = registrations
+  }
+
+  package var description: String {
     debugDescription
   }
 
-  var debugDescription: String {
+  package var debugDescription: String {
     registrations.map(\.command.title).joined(separator: ", ")
   }
 }
 
-private enum CommandPreferenceKey: PreferenceKey {
-  static let defaultValue = CommandPreferenceValue()
+package enum CommandPreferenceKey: PreferenceKey {
+  package static let defaultValue = CommandPreferenceValue()
 
-  static func reduce(
+  package static func reduce(
     value: inout CommandPreferenceValue,
     nextValue: () -> CommandPreferenceValue
   ) {
     value.registrations.append(contentsOf: nextValue().registrations)
+  }
+}
+
+// MARK: - Scene-Level Command Environment
+
+/// Environment key carrying the scene-level command registrations
+/// declared via ``Scene/commands(_:)``.
+///
+/// Preferences in this framework flow bottom-up: by the time the
+/// outermost ``SceneCommandsInjection`` could merge scene-level items
+/// into the preference value, downstream modifiers like
+/// ``View/help(_:overflow:)`` have already resolved and cannot see the
+/// newly-merged items. To keep scene-level commands visible to those
+/// downstream lenses, ``SceneCommandsInjection`` *also* writes the same
+/// registrations into this environment value *before* resolving its
+/// content, so the help strip (which resolves beneath it) can merge
+/// view-level and scene-level registrations in a single pass.
+///
+/// This key is package-internal — it exists only to route data from
+/// Stage-2's scene injection into Stage-3's help surfaces. View-level
+/// ``CommandPreferenceKey`` remains the canonical source of truth for
+/// commands declared beneath the reader.
+package enum SceneCommandRegistrationsKey: EnvironmentKey {
+  package static let defaultValue: [CommandRegistration] = []
+}
+
+extension EnvironmentValues {
+  package var sceneCommandRegistrations: [CommandRegistration] {
+    get { self[SceneCommandRegistrationsKey.self] }
+    set { self[SceneCommandRegistrationsKey.self] = newValue }
   }
 }
 
@@ -274,7 +321,8 @@ extension View {
     detail: String? = nil,
     keywords: [String] = [],
     kind: Command.Kind = .action,
-    isDisabled: Bool = false
+    isDisabled: Bool = false,
+    group: String? = nil
   ) -> some View {
     CommandModifier(
       content: self,
@@ -285,21 +333,26 @@ extension View {
           detail: detail,
           keywords: keywords,
           kind: kind,
-          isDisabled: isDisabled
+          isDisabled: isDisabled,
+          key: nil,
+          group: group
         )
       )
     )
   }
 
   /// Registers a command with an action closure for discovery and execution in
-  /// the command palette.
+  /// the command palette, optionally bound to a focus-independent hotkey.
   ///
   /// Use this when the command does not correspond to a currently rendered
-  /// focusable view, but should still be searchable and invokable.
+  /// focusable view, but should still be searchable and invokable. When
+  /// `key:` is supplied and the command is not disabled, the modifier also
+  /// registers a ``HotkeyBinding`` so the key press dispatches to `action`
+  /// regardless of which view is focused (within the command's scope).
   ///
   /// ```swift
   /// ContentView()
-  ///   .command(id: "new-window", title: "New Window") {
+  ///   .command(id: "new-window", title: "New Window", key: .ctrl("n")) {
   ///     openNewWindow()
   ///   }
   /// ```
@@ -310,6 +363,8 @@ extension View {
     keywords: [String] = [],
     kind: Command.Kind = .action,
     isDisabled: Bool = false,
+    key: KeyPress? = nil,
+    group: String? = nil,
     action: @escaping @MainActor @Sendable () -> Void
   ) -> some View {
     CommandModifier(
@@ -321,7 +376,9 @@ extension View {
           detail: detail,
           keywords: keywords,
           kind: kind,
-          isDisabled: isDisabled
+          isDisabled: isDisabled,
+          key: key,
+          group: group
         ),
         action: action
       )
@@ -332,14 +389,24 @@ extension View {
 private struct CommandModifier<Content: View>: View, ResolvableView {
   var content: Content
   var registration: CommandRegistration
+  private let authoringScope: AuthoringContext?
+
+  init(
+    content: Content,
+    registration: CommandRegistration
+  ) {
+    self.content = content
+    self.registration = registration
+    authoringScope = currentAuthoringContext()
+  }
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let dynamicPropertyScope = currentAuthoringContext()
+    let capturedAuthoringScope = authoringScope
     let resolvedAction = registration.action.map { action in
       { @MainActor in
-        if let dynamicPropertyScope {
-          withAuthoringContext(dynamicPropertyScope) {
+        if let capturedAuthoringScope {
+          withAuthoringContext(capturedAuthoringScope) {
             action()
           }
         } else {
@@ -358,6 +425,41 @@ private struct CommandModifier<Content: View>: View, ResolvableView {
         ]
       )
     )
+
+    // Only register a focus-independent hotkey when the command declares a
+    // key binding, is not disabled, and carries an action to fire. Hotkeys
+    // without a command action have no semantic meaning; authors should use
+    // `.onKeyPress(...)` for raw key handling.
+    if let key = registration.command.key,
+      !registration.command.isDisabled,
+      let originalAction = registration.action
+    {
+      let binding = HotkeyBinding(
+        key: key,
+        label: registration.command.title,
+        group: registration.command.group,
+        commandID: registration.command.id
+      )
+      context.hotkeyRegistry?.register(identity: context.identity, binding: binding) {
+        localKeyPress in
+        // The HotkeyRegistry dispatch loop iterates all handlers and stops at
+        // the first one that returns true, so each handler must filter by its
+        // own binding's key. See OnKeyPressModifier and CommandPaletteModifier
+        // for the matching pattern.
+        guard localKeyPress == key else {
+          return false
+        }
+        if let capturedAuthoringScope {
+          withAuthoringContext(capturedAuthoringScope) {
+            originalAction()
+          }
+        } else {
+          originalAction()
+        }
+        return true
+      }
+    }
+
     return [node]
   }
 }

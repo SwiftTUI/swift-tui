@@ -246,6 +246,54 @@ If the goal is Lip Gloss parity rather than loose visual similarity, the closest
 | `Draw(...)`, `Render()` | `Canvas { context, size in ... }` or `body` | `Canvas` is the closest imperative drawing surface. |
 | `Hit(x, y)` | Gestures plus geometry-based hit testing, optionally with `contentShape(...)` | SwiftUI hit testing is view-based; custom scene-graph hit testing lives in your own model. |
 
+## Commands, Help, and Toolbar Chrome
+
+> Updated for the Milestone 8 Commands & Chrome landing. TerminalUI
+> ships a unified `Command` data model that feeds three lenses
+> (toolbar, help, command palette) so authors register a command once
+> with an optional key and group, and every surface picks it up
+> automatically. See
+> [`docs/proposals/COMMAND_AND_CHROME_APIS.md`](proposals/COMMAND_AND_CHROME_APIS.md)
+> for the design intent.
+
+### Charm `bubbles` (Bubble Tea)
+
+| Charm API | TerminalUI / SwiftUI equivalent | Notes |
+| --- | --- | --- |
+| `bubbles/key.Binding`, `key.NewBinding`, `key.WithKeys`, `key.WithHelp` | `.command(id:title:key:group:, action:)` (`View`) | Direct. The `.command(...)` modifier carries the action, the `KeyPress`, the `group` label, and the human-readable title — Charm splits these across `key.Binding` and a separate handler; TerminalUI keeps them on a single registration. |
+| `bubbles/help.Model` + `help.KeyMap` + `ShortHelp()` / `FullHelp()` | `.help()` + `.helpSheet()` (`View`) | TerminalUI does not require the author to implement a `KeyMap` interface or split the model into a "short" and "full" view. The strip and sheet are both auto-derived from the same command preference value, so adding a new `.command(..., key:)` automatically updates both surfaces. This matches Textual more than Charm. |
+| `bubbles/help.View()` rendered by the parent model | `.help()` modifier on the host view | TerminalUI composes the strip into a bottom row of an implicit toolbar host at any `WindowGroup` root, so authors do not need to thread a `help.Model` through their own `View()` function. |
+| `lipgloss` glyph rendering of bracketed shortcuts in custom footers | `KeyGlyphView(keyPress)` (`View`) | The same display string used by the help strip, help sheet, and command-palette rows is exposed as a public renderer for ad-hoc placement (e.g. inside a status bar custom view). |
+
+### Textual (Python)
+
+| Textual API | TerminalUI / SwiftUI equivalent | Notes |
+| --- | --- | --- |
+| `App.BINDINGS = [Binding("ctrl+s", "save", "Save")]` | `Scene.commands { CommandItem(id: "save", title: "Save", key: .ctrl("s"), group: "File") { save() } }` (`TerminalUI`) | Direct. Scene-level commands are the primary registration site for always-on app actions (Quit, Save, Toggle Theme, Command Palette). |
+| `Screen.BINDINGS = [Binding("escape", "back", "Back")]` | `.command(id: "back", title: "Back", key: .escape, group: "Navigation") { ... }` (`View`) | Direct. View-level `.command(...)` is the scoped escape hatch — the binding only dispatches while that subtree is in the tree. The innermost-wins dedup the help strip applies matches Textual's `Screen.BINDINGS` overrides. |
+| `Footer` widget that auto-derives its rows from `screen.active_bindings` | `.help()` (`View`) | Direct. The Textual footer reads the union of `App.BINDINGS` and the focused screen's `BINDINGS`; TerminalUI's `.help()` does the same by reducing the `CommandPreferenceKey` plus the scene-commands environment channel. Auto-derived, no manual list to keep in sync. |
+| `Footer` `show_command_palette` row (`ctrl+p`) | `.commandPalette(isPresented:)` (`View`) | TerminalUI's command palette already shipped before Milestone 8; under the unified model it auto-populates from the same `Command` records the help system reads. |
+| Textual command palette (`ctrl+p`, fuzzy-searchable) | `.commandPalette(isPresented:)` (`View`) | Direct. The palette consumes the unified `Command` value — including its title, detail, keywords, kind, and key glyph — so a single `.command(...)` registration shows up in the help strip, the help sheet, and the palette without the author wiring three surfaces. |
+| `Binding(key, action, description, show=False)` (palette-only / strip-hidden bindings) | `.command(...)` without a `key:` plus the existing `kind` / `isDisabled` parameters | TerminalUI's strip auto-omits commands without a `KeyPress` binding (no glyph to render), so a keyless registration is palette-and-sheet-only. A dedicated `helpHidden:` flag is a Stage-5.1 follow-up. |
+| Textual cheatsheet popover triggered by `f1` | `.helpSheet(triggeredBy:)` (`View`) | Direct. The sheet groups commands by `Command.group`, mirroring the Textual cheatsheet layout with one section per non-nil group plus a trailing "Other" section for ungrouped entries. |
+
+### SwiftUI
+
+| SwiftUI API | TerminalUI equivalent | Notes |
+| --- | --- | --- |
+| `.toolbar { ToolbarItem(placement: .primaryAction) { Button("Save") { ... } } }` | `.toolbar { ToolbarItem(.primaryAction) { Text("Save") } }` (`View`) | Direct, with the same result-builder shape and the same `ToolbarItem` / `ToolbarItemGroup` / `ToolbarSpacer` types. The placement set is pruned to the cases that have a meaningful TUI interpretation; placements referring to chrome the framework does not render are dropped (proposal §4.7). |
+| `.toolbar { ToolbarItem { ... } }` carrying its own `.keyboardShortcut(...)` | `.command(id:title:key:group:, action:)` registers the binding; `ToolbarItem(.primaryAction, command: "save")` references it by id | **Deliberate divergence.** TerminalUI does not let `ToolbarItem` carry a `key:` parameter. Keys are the command system's job; the toolbar is a placement system. A command-bound `ToolbarItem` pulls *only presentation data* (title, glyph, disabled state) from the registered command record. See proposal §4.3. |
+| `.keyboardShortcut(_:modifiers:)` on a `Button` | `.command(id:title:key:group:, action:)` plus `KeyGlyphView` | **Deliberate divergence.** SwiftUI attaches shortcuts to individual button views; TerminalUI surfaces shortcuts as registrations on the unified command model. Authors get the help strip, help sheet, and palette discoverability for free; SwiftUI authors need additional menu/help-bar wiring to expose the same shortcuts to users. |
+| `Toolbar` visibility via `.toolbar(_:for:)` | `.toolbar(_:for:)` (`View`, capture-only in v1) | API-shape match. The modifier writes the authored intent into a package-internal preference channel; the rendering consumer is a Stage-5 follow-up. |
+| `.toolbarBackground(_:for:)` | `.toolbarBackground(_:for:)` (`View`, capture-only in v1) | API-shape match. Same capture-only caveat. |
+| Scene-level `.commands { CommandMenu(...) }` (macOS) | `Scene.commands { CommandItem(...) }` (`TerminalUI`) | The shape echoes SwiftUI's `Scene.commands(_:)` slot but uses a flat `CommandItem` builder rather than a nested `Commands` / `CommandMenu` / `CommandGroup` hierarchy, since TerminalUI does not render a menu bar. |
+
+### helix / vim "which-key"
+
+| Pattern | TerminalUI equivalent | Notes |
+| --- | --- | --- |
+| `which-key` style popover that discloses the available next-key options after a prefix is pressed | Partially addressed via `.helpSheet(triggeredBy:)`; full prefix-tree disclosure deferred | The help sheet groups commands by `Command.group`, so authors can model "leader-key submenus" by giving related commands the same group label. A first-class prefix-tree disclosure surface (with a continuously-updated popover after the leader key) is a v1.1 follow-up. |
+
 ## Source Coverage
 
 This document was derived from the upstream [Lip Gloss](https://github.com/charmbracelet/lipgloss) source files:
