@@ -8,8 +8,8 @@ future file moves.
 
 ## Repository Layout
 
-- `Sources/`: root Swift package targets (`Core`, `View`, `TerminalUICharts`, and `TerminalUI`)
-- `Tests/`: root Swift package tests for the package products
+- `Sources/`: root Swift package targets (`Core`, `View`, `PrototypeUIComponents`, `TerminalUICharts`, and `TerminalUI`)
+- `Tests/`: root Swift package tests for the package products plus prototype regressions
 - `Runners/`: peer SwiftPM executable runner packages for terminal-native CLI launch and WASI launch
 - `GUI/`: peer embedded host packages for SwiftUI hosting and Bun/browser hosting
 - `Examples/`: sibling example apps and example-specific package manifests
@@ -26,6 +26,7 @@ future file moves.
   - `TerminalUICharts`
 - Internal support targets:
   - `Core`
+  - `PrototypeUIComponents`
 
 - Peer platform integration packages:
   - executable runner packages:
@@ -49,8 +50,6 @@ library product. Downstream package consumers reach those types through
 
 - `TerminalUI.swift`: `DefaultRenderer` plus retained-frame, resolve-reuse, and post-resolve presentation composition plumbing
 - `App.swift`: `App`, `Scene`, `SceneBuilder`, `WindowGroup`, `AnyScene`, and typed scene builder artifacts
-- `SceneCommands.swift`: `Scene.commands { … }` modifier, `CommandsModifiedScene`, the `SceneCommandItemsStorage` task-local carrier, and the `SceneCommandsInjection` resolvable view that publishes scene-level command items into `CommandPreferenceKey` and the `\.sceneCommandRegistrations` environment channel
-- `CommandItem.swift`: the `CommandItem` declarative record and the `CommandsBuilder` result builder used inside `Scene.commands { … }`
 - `SceneTraversal.swift`: typed scene traversal, descriptor collection, and window-scene selection helpers
 - `SceneManifest.swift`: `TerminalUISceneDescriptor`, `TerminalUISceneManifest`, and manifest generation from authored scenes
 - `HostedSceneSession.swift`: retained hosted scene runtime for GUI host packages and other non-terminal hosts
@@ -135,10 +134,13 @@ library product. Downstream package consumers reach those types through
 - `Primitives/*.swift` and `Shapes/*.swift`: text/image primitives including `TextFigure`, labeled containers, tile backgrounds, and basic shapes
 - `Controls/*.swift`: control surfaces, rendering helpers, and shared control support
 - `Presentation/PresentationCoordinator.swift`, `Presentation/PresentationModifiers.swift`, and `Presentation/CommandPalette.swift`: shared presentation host, single-pass overlay composition, family coordinators, package-only declaration reconciliation, built-in alert/confirmation-dialog/sheet/toast surfaces, command registration, and the canonical command-palette surface
-- `Presentation/HelpStrip.swift`, `Presentation/HelpSheet.swift`, `Presentation/HelpStyles.swift`, and `Presentation/KeyGlyphView.swift`: the auto-derived help system from the Milestone 8 Commands & Chrome landing — `.help()` and `.helpSheet()` modifiers, `HelpStripStyle` / `HelpStripOverflow` enums, and the shared `KeyGlyphView` renderer
-- `Presentation/Toolbar.swift`, `Presentation/ToolbarContent.swift`, `Presentation/ToolbarPrimitives.swift`, and `Presentation/ToolbarPlacements.swift`: the SwiftUI-shaped `.toolbar { ToolbarContent }` surface — `ToolbarContent` protocol, `ToolbarContentBuilder`, `ToolbarItem` / `ToolbarItemGroup` / `ToolbarSpacer` primitives, pruned `ToolbarItemPlacement` and `ToolbarPlacement` enums, and the implicit toolbar host's bottom-row composition
 - `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifiers and the package-only wrapper views that back them
 - `View.docc/`: module landing page and authoring guides
+
+## `PrototypeUIComponents`
+
+- `PrototypeModels.swift`: keybinding groups, prototype command models, and search helpers for experimental terminal-native workflow surfaces
+- `PrototypeSurfaces.swift`: repo-local help-strip and simplified command-surface views used for exploration and regression coverage
 
 ## `TerminalUICharts`
 
@@ -155,6 +157,7 @@ library product. Downstream package consumers reach those types through
 - `Tests/TerminalUITests`: runtime, rendering, fixture, and end-to-end behavioral tests
 - `Runners/TerminalUICLI/Tests/TerminalUICLITests`: terminal-native runner, attach, pty, and CLI-scene-management tests
 - `Runners/TerminalUIWASI/Tests/TerminalUIWASITests`: WASI runner and manifest-mode tests
+- `Tests/PrototypeUIComponentsTests`: prototype-surface regression coverage
 - `Fixtures/Transport`: shared transport fixtures for terminal render-style encoding/decoding tests across Swift and web hosts
 
 ## Reliability Rules

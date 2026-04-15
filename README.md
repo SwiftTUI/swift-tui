@@ -105,12 +105,11 @@ executable product or default `App.main()`.
 `Core` remains the shared pipeline and data-model target that powers these
 products, but it is not shipped as a separate library product today.
 
-Prototype and showcase code may still live in this repository as sibling
-example packages, but it is intentionally not part of the supported package
-product surface. The former `PrototypeUIComponents` target was retired in the
-Milestone 8 Commands & Chrome landing — its help-strip and command-launcher
-experiments are now subsumed by the canonical `.command(...)`, `.help()`,
-`.helpSheet()`, and `.toolbar { }` surface in `View` / `TerminalUI`.
+Prototype and showcase code still lives in this repository, but it is
+intentionally not part of the supported package product surface. In
+particular, `PrototypeUIComponents` remains a repo-local target for help-strip
+and other exploratory workflow surfaces plus regression coverage rather than a
+downstream import.
 
 ## Platform Integration Model
 
@@ -198,7 +197,7 @@ Peer host packaging lives outside the root package products:
 
 - The core `TerminalUI` runtime is still intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
 - Platform integration now lives outside the root package. Use executable runner packages for terminal-native or WASI execution, and embedded host packages for SwiftUI or browser embedding.
-- Command registration, sheets, toasts, the command palette, the unified `.command(..., key:, group:)` surface, scene-level `Scene.commands { CommandItem(...) }`, the auto-derived `.help()` / `.helpSheet()` system, and the SwiftUI-shaped `.toolbar { ToolbarContent }` surface are all part of the supported `View` / `TerminalUI` API after the Milestone 8 Commands & Chrome landing.
+- Command registration, sheets, toasts, and the command palette are now part of the supported `View` surface. Prototype help-strip exploration still lives in `PrototypeUIComponents` while broader launcher-like shell workflows remain unsettled.
 
 ## Upcoming Work
 

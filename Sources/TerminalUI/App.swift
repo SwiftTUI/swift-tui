@@ -166,11 +166,6 @@ public struct AnyScene: Scene {
   @_spi(Runners) public var identifier: WindowIdentifier
   @_spi(Runners) public var title: String?
   @_spi(Runners) public var rootIdentity: Identity
-  /// Scene-level commands authored via `Scene.commands(_:)`. These are
-  /// wrapped around the scene's root view each time it is materialized
-  /// so they register through the same ``CommandPreferenceKey`` and
-  /// ``HotkeyRegistry`` path as view-level ``View/command(id:title:key:…)``.
-  @_spi(Runners) public var sceneCommandItems: [CommandItem]
 
   private let makeScopedRootViewClosure: @MainActor () -> ScopedBuilder<Content>
 
@@ -178,48 +173,21 @@ public struct AnyScene: Scene {
     identifier: WindowIdentifier,
     title: String?,
     rootIdentity: Identity,
-    sceneCommandItems: [CommandItem] = [],
     makeRootView: @escaping @MainActor () -> ScopedBuilder<Content>
   ) {
     self.identifier = identifier
     self.title = title
     self.rootIdentity = rootIdentity
-    self.sceneCommandItems = sceneCommandItems
     makeScopedRootViewClosure = makeRootView
   }
 
-  @_spi(Runners) @MainActor public func makeRootView() -> AnyView {
-    let scoped = makeScopedRootViewClosure()
-    if sceneCommandItems.isEmpty {
-      return AnyView(scoped.build())
-    }
-    return AnyView(
-      SceneCommandsInjection(
-        content: scoped.build(),
-        items: sceneCommandItems
-      )
-    )
+  @_spi(Runners) @MainActor public func makeRootView() -> Content {
+    makeScopedRootViewClosure().build()
   }
 
   @MainActor
-  package func makeScopedRootView() -> ScopedBuilder<AnyView> {
-    let inner = makeScopedRootViewClosure()
-    if sceneCommandItems.isEmpty {
-      return ScopedBuilder(
-        scoped: AnyView(inner.build()),
-        authoringContext: currentAuthoringContext()
-      )
-    }
-    let capturedItems = sceneCommandItems
-    let authoringContext = currentAuthoringContext()
-    return ScopedBuilder(authoringContext: authoringContext) {
-      AnyView(
-        SceneCommandsInjection(
-          content: inner.build(),
-          items: capturedItems
-        )
-      )
-    }
+  package func makeScopedRootView() -> ScopedBuilder<Content> {
+    makeScopedRootViewClosure()
   }
 }
 
@@ -406,18 +374,10 @@ public struct WindowGroup<Content: View>: Scene {
   }
 
   package func windowSceneConfiguration() -> WindowSceneConfiguration<Content> {
-    // Scene-level `.commands { … }` modifiers stash their items into
-    // `SceneCommandItemsStorage.current` for the duration of the
-    // traversal pass that produced this call. When empty, this is a
-    // plain `WindowGroup` with no scene-level commands; when non-empty,
-    // the items flow into the configuration and are spliced around the
-    // root view in `makeRootView()` / `makeScopedRootView()` via the
-    // existing view-level command-registration path.
     WindowSceneConfiguration(
       identifier: id,
       title: title,
       rootIdentity: rootIdentity,
-      sceneCommandItems: SceneCommandItemsStorage.current,
       makeRootView: { contentBuilder }
     )
   }
