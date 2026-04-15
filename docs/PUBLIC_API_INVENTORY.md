@@ -170,11 +170,10 @@ Prototype and showcase code may still live in the repository as sibling example 
 
 Current rule:
 
-- `PrototypeUIComponents` is a package target used by experiments and tests, not a library product that downstream packages should import as a supported API surface
-- the current prototype target still hosts help-strip and simplified command-surface experiments such as `PrototypeHelpSurface` and `PrototypeCommandPalette`
-- canonical command registration and command-palette APIs now live in `View`, so prototype widgets should be documented as exploratory variants rather than as the primary workflow surface
-- README and architecture-facing docs should describe prototype code as exploratory or showcase-only when it appears at all
-- terminal-native interaction surfaces that are still being shaped, such as command palettes or launcher-like flows, should land here first rather than forcing premature API commitments onto `View`
+- sibling example packages and demos may exist for experiments or regression coverage, but they are not supported package products
+- canonical command registration and command-palette APIs live in `View`, so app-facing docs should use those supported surfaces as the primary workflow story
+- README and architecture-facing docs should describe showcase code as secondary when it appears at all
+- terminal-native interaction surfaces that are still being shaped should not force premature API commitments onto `View`
 
 ## Policy Summary
 

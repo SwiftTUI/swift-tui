@@ -117,12 +117,6 @@ let package = Package(
     ),
 
     .target(
-      name: "PrototypeUIComponents",
-      dependencies: ["View"],
-      swiftSettings: swiftSettings()
-    ),
-
-    .target(
       name: "TerminalUICharts",
       dependencies: ["Core", "View"],
       swiftSettings: swiftSettings()
@@ -146,14 +140,6 @@ let package = Package(
       dependencies: [
         "Core",
         "View",
-      ],
-      swiftSettings: swiftSettings()
-    ),
-    .testTarget(
-      name: "PrototypeUIComponentsTests",
-      dependencies: [
-        "PrototypeUIComponents",
-        "TerminalUI",
       ],
       swiftSettings: swiftSettings()
     ),

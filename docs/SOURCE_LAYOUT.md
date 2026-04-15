@@ -8,8 +8,8 @@ future file moves.
 
 ## Repository Layout
 
-- `Sources/`: root Swift package targets (`Core`, `View`, `PrototypeUIComponents`, `TerminalUICharts`, and `TerminalUI`)
-- `Tests/`: root Swift package tests for the package products plus prototype regressions
+- `Sources/`: root Swift package targets (`Core`, `View`, `TerminalUICharts`, and `TerminalUI`)
+- `Tests/`: root Swift package tests for the package products
 - `Runners/`: peer SwiftPM executable runner packages for terminal-native CLI launch and WASI launch
 - `GUI/`: peer embedded host packages for SwiftUI hosting and Bun/browser hosting
 - `Examples/`: sibling example apps and example-specific package manifests
@@ -26,7 +26,6 @@ future file moves.
   - `TerminalUICharts`
 - Internal support targets:
   - `Core`
-  - `PrototypeUIComponents`
 
 - Peer platform integration packages:
   - executable runner packages:
@@ -137,11 +136,6 @@ library product. Downstream package consumers reach those types through
 - `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifiers and the package-only wrapper views that back them
 - `View.docc/`: module landing page and authoring guides
 
-## `PrototypeUIComponents`
-
-- `PrototypeModels.swift`: keybinding groups, prototype command models, and search helpers for experimental terminal-native workflow surfaces
-- `PrototypeSurfaces.swift`: repo-local help-strip and simplified command-surface views used for exploration and regression coverage
-
 ## `TerminalUICharts`
 
 - chart files such as `BarChart.swift`, `BulletChart.swift`, `ColumnChart.swift`, `ComparisonChart.swift`, `HeatStrip.swift`, `Legend.swift`, `Meter.swift`, `Sparkline.swift`, `StackedBarChart.swift`, `ThresholdGauge.swift`, and `Timeline.swift`: compact chart and metric views
@@ -157,7 +151,6 @@ library product. Downstream package consumers reach those types through
 - `Tests/TerminalUITests`: runtime, rendering, fixture, and end-to-end behavioral tests
 - `Runners/TerminalUICLI/Tests/TerminalUICLITests`: terminal-native runner, attach, pty, and CLI-scene-management tests
 - `Runners/TerminalUIWASI/Tests/TerminalUIWASITests`: WASI runner and manifest-mode tests
-- `Tests/PrototypeUIComponentsTests`: prototype-surface regression coverage
 - `Fixtures/Transport`: shared transport fixtures for terminal render-style encoding/decoding tests across Swift and web hosts
 
 ## Reliability Rules

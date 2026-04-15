@@ -105,11 +105,8 @@ executable product or default `App.main()`.
 `Core` remains the shared pipeline and data-model target that powers these
 products, but it is not shipped as a separate library product today.
 
-Prototype and showcase code still lives in this repository, but it is
-intentionally not part of the supported package product surface. In
-particular, `PrototypeUIComponents` remains a repo-local target for help-strip
-and other exploratory workflow surfaces plus regression coverage rather than a
-downstream import.
+Showcase code may still live in this repository through example packages, but
+it is intentionally not part of the supported package product surface.
 
 ## Platform Integration Model
 
@@ -197,7 +194,7 @@ Peer host packaging lives outside the root package products:
 
 - The core `TerminalUI` runtime is still intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
 - Platform integration now lives outside the root package. Use executable runner packages for terminal-native or WASI execution, and embedded host packages for SwiftUI or browser embedding.
-- Command registration, sheets, toasts, and the command palette are now part of the supported `View` surface. Prototype help-strip exploration still lives in `PrototypeUIComponents` while broader launcher-like shell workflows remain unsettled.
+- Command registration, sheets, toasts, and the command palette are now part of the supported `View` surface. Broader launcher-like shell workflows remain unsettled.
 
 ## Upcoming Work
 
