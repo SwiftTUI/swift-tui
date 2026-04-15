@@ -1019,9 +1019,11 @@ public struct LayoutEngine: Sendable {
       )
     case .fit, .fill:
       guard
-        let pixelSize = payload.resolvedAsset?.pixelSize,
-        pixelSize.width > 0,
-        pixelSize.height > 0
+        let resolvedAsset = payload.resolvedAsset,
+        resolvedAsset.pixelSize.width > 0,
+        resolvedAsset.pixelSize.height > 0,
+        resolvedAsset.cellPixelSize.width > 0,
+        resolvedAsset.cellPixelSize.height > 0
       else {
         return Size(
           width: proposedWidth ?? intrinsicSize.width,
@@ -1029,22 +1031,47 @@ public struct LayoutEngine: Sendable {
         )
       }
 
-      let aspectRatio = Double(pixelSize.width) / Double(pixelSize.height)
+      // Aspect math has to happen in pixel space: the parent proposes a
+      // frame in terminal cells, but terminal cells are rarely square
+      // (typically 8x16 pixels), so a naïve `cells / pixels` scale factor
+      // mixes units and distorts the image. Convert the proposed frame
+      // into pixels, fit/fill against the source's pixel dimensions, and
+      // then convert the result back to cells.
+      let pixelSize = resolvedAsset.pixelSize
+      let cellPixelWidth = Double(resolvedAsset.cellPixelSize.width)
+      let cellPixelHeight = Double(resolvedAsset.cellPixelSize.height)
+      let pixelAspect = Double(pixelSize.width) / Double(pixelSize.height)
+      // Cell aspect of the source is what the frame proposer thinks the
+      // image "looks like" — it folds the non-square cell ratio into the
+      // aspect. Used for single-axis proposals.
+      let cellAspect = pixelAspect * cellPixelHeight / cellPixelWidth
+
+      // Fit rounds DOWN so the image fits strictly inside the frame;
+      // fill rounds UP so the image fully covers it.
+      let rounding: FloatingPointRoundingRule =
+        payload.scalingMode == .fit ? .down : .up
+      func cellsFromPixels(_ value: Double, per cellPixel: Double) -> Int {
+        max(1, Int((value / cellPixel).rounded(rounding)))
+      }
 
       switch (proposedWidth, proposedHeight) {
       case (let width?, let height?):
         guard width > 0, height > 0 else {
           return .zero
         }
-        let widthScale = Double(width) / Double(pixelSize.width)
-        let heightScale = Double(height) / Double(pixelSize.height)
+        let framePixelWidth = Double(width) * cellPixelWidth
+        let framePixelHeight = Double(height) * cellPixelHeight
+        let widthScale = framePixelWidth / Double(pixelSize.width)
+        let heightScale = framePixelHeight / Double(pixelSize.height)
         let scale =
           payload.scalingMode == .fit
           ? min(widthScale, heightScale)
           : max(widthScale, heightScale)
+        let targetPixelWidth = Double(pixelSize.width) * scale
+        let targetPixelHeight = Double(pixelSize.height) * scale
         return Size(
-          width: max(1, Int((Double(pixelSize.width) * scale).rounded(.up))),
-          height: max(1, Int((Double(pixelSize.height) * scale).rounded(.up)))
+          width: cellsFromPixels(targetPixelWidth, per: cellPixelWidth),
+          height: cellsFromPixels(targetPixelHeight, per: cellPixelHeight)
         )
       case (let width?, nil):
         guard width > 0 else {
@@ -1052,14 +1079,14 @@ public struct LayoutEngine: Sendable {
         }
         return Size(
           width: width,
-          height: max(1, Int((Double(width) / aspectRatio).rounded(.up)))
+          height: max(1, Int((Double(width) / cellAspect).rounded(rounding)))
         )
       case (nil, let height?):
         guard height > 0 else {
           return .zero
         }
         return Size(
-          width: max(1, Int((Double(height) * aspectRatio).rounded(.up))),
+          width: max(1, Int((Double(height) * cellAspect).rounded(rounding))),
           height: height
         )
       case (nil, nil):

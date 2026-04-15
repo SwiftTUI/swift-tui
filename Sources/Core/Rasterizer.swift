@@ -465,6 +465,23 @@ extension Rasterizer {
           }
         }
       case .image(let bounds, let identity, let payload):
+        // Unlike text cells — which paint cell-by-cell through `write(...)`
+        // and respect `frame.clip` per cell — an image attachment is a
+        // single atomic placement handed to the graphics protocol. We
+        // can't partially paint it without cropping the source pixel
+        // rectangle, which the current attachment model doesn't express.
+        //
+        // Minimum correctness for scroll viewports: drop the attachment
+        // entirely when it doesn't intersect the clip rect at all. Keep
+        // it (unclipped) otherwise. This prevents the bug where a scrolled
+        // image renders at a clamped negative-origin cursor position —
+        // which previously looked like the image "jumping to the top" or
+        // "disappearing" as the user scrolled past it.
+        if let clip = frame.clip {
+          if intersect(bounds, clip) == nil {
+            continue
+          }
+        }
         imageAttachments.append(
           RasterImageAttachment(
             identity: identity,
