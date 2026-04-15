@@ -784,6 +784,12 @@ extension TerminalHosting {
 
       switch plan.strategy {
       case .fullRepaint:
+        // A terminal full repaint clears the previous screen contents. Kitty
+        // image ids cannot be assumed to remain displayable after that, so
+        // force the current frame to retransmit any images before placement.
+        if graphicsCapabilities.preferredProtocol == .kitty {
+          presentationSession.transmittedKittyImages.removeAll()
+        }
         append(clearScreenSequence())
         append(cursorSequence(to: origin))
 
@@ -811,6 +817,21 @@ extension TerminalHosting {
             )
           )
           append(spanUpdate.renderedSpan)
+        }
+        // Kitty images can be obscured by later cell writes. Re-place the
+        // currently visible attachments after incremental text spans so
+        // scroll and text updates keep the image attached to the viewport.
+        if graphicsCapabilities.preferredProtocol == .kitty,
+          !preparedSurface.imageAttachments.isEmpty
+        {
+          for writeStep in imageRenderer.graphicsWriteSteps(
+            for: preparedSurface,
+            capabilityProfile: capabilityProfile,
+            graphicsCapabilities: graphicsCapabilities,
+            transmittedKittyImages: &presentationSession.transmittedKittyImages
+          ) {
+            append(writeStep)
+          }
         }
       }
 

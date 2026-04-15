@@ -46,6 +46,20 @@ private struct KittyPayload: Sendable {
   var format: Int
 }
 
+private struct KittySourceRect: Sendable, Equatable {
+  var x: Int
+  var y: Int
+  var width: Int
+  var height: Int
+}
+
+private struct KittyPlacement: Sendable, Equatable {
+  var origin: Point
+  var cellColumns: Int
+  var cellRows: Int
+  var sourceRect: KittySourceRect?
+}
+
 final class TerminalImageRenderer: Sendable {
   private struct Storage {
     var kittyPayloads: [TerminalImageVariantKey: KittyPayload] = [:]
@@ -80,7 +94,7 @@ final class TerminalImageRenderer: Sendable {
       var prepared = surface
       for attachment in prepared.imageAttachments {
         clearCellStyles(
-          in: attachment.bounds,
+          in: attachment.visibleBounds,
           from: &prepared.cells,
           surfaceSize: prepared.size
         )
@@ -139,18 +153,25 @@ final class TerminalImageRenderer: Sendable {
 
       switch graphicsProtocol {
       case .kitty:
-        let cellColumns = max(1, attachment.bounds.size.width)
-        let cellRows = max(1, attachment.bounds.size.height)
+        guard
+          let placement = kittyPlacement(
+            for: attachment,
+            imagePixelSize: image.pixelSize
+          )
+        else {
+          continue
+        }
         let imageID = kittyImageID(reference: reference)
         writeSteps.append(terminalSaveCursorSequence())
-        writeSteps.append(terminalCursorSequence(to: attachment.bounds.origin))
+        writeSteps.append(terminalCursorSequence(to: placement.origin))
 
         if transmittedKittyImages.contains(imageID) {
           writeSteps.append(
             kittyPlacementCommand(
               imageID: imageID,
-              cellColumns: cellColumns,
-              cellRows: cellRows
+              cellColumns: placement.cellColumns,
+              cellRows: placement.cellRows,
+              sourceRect: placement.sourceRect
             )
           )
         } else if let payload = kittyPayload(
@@ -161,8 +182,9 @@ final class TerminalImageRenderer: Sendable {
             contentsOf: kittyTransmitAndPlaceCommands(
               payload: payload,
               imageID: imageID,
-              cellColumns: cellColumns,
-              cellRows: cellRows
+              cellColumns: placement.cellColumns,
+              cellRows: placement.cellRows,
+              sourceRect: placement.sourceRect
             )
           )
           transmittedKittyImages.insert(imageID)
@@ -183,7 +205,7 @@ final class TerminalImageRenderer: Sendable {
         }
 
         writeSteps.append(terminalSaveCursorSequence())
-        writeSteps.append(terminalCursorSequence(to: attachment.bounds.origin))
+        writeSteps.append(terminalCursorSequence(to: attachment.visibleBounds.origin))
         writeSteps.append(payload)
         writeSteps.append(terminalRestoreCursorSequence())
       }
@@ -323,8 +345,8 @@ final class TerminalImageRenderer: Sendable {
 
     let cellPixelSize = graphicsCapabilities.cellPixelSize ?? .init(width: 8, height: 16)
     let pixelSize = Size(
-      width: max(1, attachment.bounds.size.width * max(1, cellPixelSize.width)),
-      height: max(1, attachment.bounds.size.height * max(1, cellPixelSize.height))
+      width: max(1, attachment.visibleBounds.size.width * max(1, cellPixelSize.width)),
+      height: max(1, attachment.visibleBounds.size.height * max(1, cellPixelSize.height))
     )
     let paletteBudget = sixelPaletteBudget(
       capabilityProfile: capabilityProfile,
@@ -649,13 +671,86 @@ private func compareImageAttachments(
   lhs: RasterImageAttachment,
   rhs: RasterImageAttachment
 ) -> Bool {
-  if lhs.bounds.origin.y != rhs.bounds.origin.y {
-    return lhs.bounds.origin.y < rhs.bounds.origin.y
+  if lhs.visibleBounds.origin.y != rhs.visibleBounds.origin.y {
+    return lhs.visibleBounds.origin.y < rhs.visibleBounds.origin.y
   }
-  if lhs.bounds.origin.x != rhs.bounds.origin.x {
-    return lhs.bounds.origin.x < rhs.bounds.origin.x
+  if lhs.visibleBounds.origin.x != rhs.visibleBounds.origin.x {
+    return lhs.visibleBounds.origin.x < rhs.visibleBounds.origin.x
   }
   return lhs.identity < rhs.identity
+}
+
+private func kittyPlacement(
+  for attachment: RasterImageAttachment,
+  imagePixelSize: Size
+) -> KittyPlacement? {
+  let logicalBounds = attachment.bounds
+  let visibleBounds = attachment.visibleBounds
+  guard logicalBounds.size.width > 0, logicalBounds.size.height > 0,
+    visibleBounds.size.width > 0, visibleBounds.size.height > 0
+  else {
+    return nil
+  }
+
+  let hiddenLeft = max(0, visibleBounds.origin.x - logicalBounds.origin.x)
+  let hiddenTop = max(0, visibleBounds.origin.y - logicalBounds.origin.y)
+
+  let placement = KittyPlacement(
+    origin: .init(
+      x: logicalBounds.origin.x + hiddenLeft,
+      y: logicalBounds.origin.y + hiddenTop
+    ),
+    cellColumns: max(1, logicalBounds.size.width - hiddenLeft),
+    cellRows: max(1, logicalBounds.size.height - hiddenTop),
+    sourceRect: kittySourceRect(
+      hiddenLeftCells: hiddenLeft,
+      hiddenTopCells: hiddenTop,
+      logicalCellSize: logicalBounds.size,
+      imagePixelSize: imagePixelSize
+    )
+  )
+  return placement.cellColumns > 0 && placement.cellRows > 0 ? placement : nil
+}
+
+private func kittySourceRect(
+  hiddenLeftCells: Int,
+  hiddenTopCells: Int,
+  logicalCellSize: Size,
+  imagePixelSize: Size
+) -> KittySourceRect? {
+  guard hiddenLeftCells > 0 || hiddenTopCells > 0 else {
+    return nil
+  }
+
+  let sourceX = proportionalPixelOffset(
+    hiddenCells: hiddenLeftCells,
+    totalCells: logicalCellSize.width,
+    totalPixels: imagePixelSize.width
+  )
+  let sourceY = proportionalPixelOffset(
+    hiddenCells: hiddenTopCells,
+    totalCells: logicalCellSize.height,
+    totalPixels: imagePixelSize.height
+  )
+  return KittySourceRect(
+    x: sourceX,
+    y: sourceY,
+    width: max(1, imagePixelSize.width - sourceX),
+    height: max(1, imagePixelSize.height - sourceY)
+  )
+}
+
+private func proportionalPixelOffset(
+  hiddenCells: Int,
+  totalCells: Int,
+  totalPixels: Int
+) -> Int {
+  guard hiddenCells > 0, totalCells > 0, totalPixels > 0 else {
+    return 0
+  }
+  let numerator = Int64(hiddenCells) * Int64(totalPixels)
+  let rounded = (numerator + Int64(totalCells / 2)) / Int64(totalCells)
+  return min(totalPixels - 1, max(0, Int(rounded)))
 }
 
 private func scaledPixels(
@@ -1104,7 +1199,8 @@ private func kittyTransmitAndPlaceCommands(
   payload: KittyPayload,
   imageID: UInt32,
   cellColumns: Int,
-  cellRows: Int
+  cellRows: Int,
+  sourceRect: KittySourceRect?
 ) -> [String] {
   // Kitty requires payload chunks no larger than 4096 bytes of base64 data,
   // and every chunk except the last must be a multiple of 4 bytes so the
@@ -1137,8 +1233,15 @@ private func kittyTransmitAndPlaceCommands(
       //   c,r  display rectangle in terminal cells (Kitty scales to fit)
       //   i    stable image id so we can re-place the image by id later
       //   m    1 if more chunks follow, 0 otherwise
-      return
-        "\u{001B}_Ga=T,q=2,t=d,f=\(payload.format),C=1,c=\(cellColumns),r=\(cellRows),i=\(imageID),m=\(hasMore);\(chunk)\u{001B}\\"
+      var controlData =
+        "_Ga=T,q=2,t=d,f=\(payload.format),C=1,c=\(cellColumns),r=\(cellRows),i=\(imageID)"
+      if let sourceRect {
+        controlData.append(
+          ",x=\(sourceRect.x),y=\(sourceRect.y),w=\(sourceRect.width),h=\(sourceRect.height)"
+        )
+      }
+      controlData.append(",m=\(hasMore)")
+      return "\u{001B}\(controlData);\(chunk)\u{001B}\\"
     }
     // Continuation chunks may only carry the `m` (and optionally `q`) key.
     return "\u{001B}_Gm=\(hasMore);\(chunk)\u{001B}\\"
@@ -1148,11 +1251,18 @@ private func kittyTransmitAndPlaceCommands(
 private func kittyPlacementCommand(
   imageID: UInt32,
   cellColumns: Int,
-  cellRows: Int
+  cellRows: Int,
+  sourceRect: KittySourceRect?
 ) -> String {
   // Re-place a previously transmitted image at the current cursor position
   // using the same cell rectangle. `a=p` does not re-transmit the image data.
-  "\u{001B}_Ga=p,q=2,C=1,c=\(cellColumns),r=\(cellRows),i=\(imageID)\u{001B}\\"
+  var controlData = "_Ga=p,q=2,C=1,c=\(cellColumns),r=\(cellRows),i=\(imageID)"
+  if let sourceRect {
+    controlData.append(
+      ",x=\(sourceRect.x),y=\(sourceRect.y),w=\(sourceRect.width),h=\(sourceRect.height)"
+    )
+  }
+  return "\u{001B}\(controlData)\u{001B}\\"
 }
 
 private func kittyImageID(
