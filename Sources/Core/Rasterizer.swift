@@ -465,30 +465,20 @@ extension Rasterizer {
           }
         }
       case .image(let bounds, let identity, let payload):
-        // Unlike text cells — which paint cell-by-cell through `write(...)`
-        // and respect `frame.clip` per cell — an image attachment is a
-        // single atomic placement handed to the graphics protocol. We
-        // can't partially paint it without cropping the source pixel
-        // rectangle, which the current attachment model doesn't express.
-        //
-        // Minimum correctness for scroll viewports: clamp the attachment
-        // to the current clip rect, and drop it entirely when nothing
-        // remains visible. This preserves the terminal-space placement
-        // even though true pixel-space cropping would require extra
-        // source-rect metadata in the attachment model.
-        let clippedBounds: Rect
+        let visibleBounds: Rect
         if let clip = frame.clip {
-          guard let visibleBounds = intersect(bounds, clip) else {
+          guard let clippedBounds = intersect(bounds, clip) else {
             continue
           }
-          clippedBounds = visibleBounds
+          visibleBounds = clippedBounds
         } else {
-          clippedBounds = bounds
+          visibleBounds = bounds
         }
         imageAttachments.append(
           RasterImageAttachment(
             identity: identity,
-            bounds: clippedBounds,
+            bounds: bounds,
+            visibleBounds: visibleBounds,
             source: payload.source,
             resolvedReference: payload.resolvedAsset?.reference,
             pixelSize: payload.resolvedAsset?.pixelSize,

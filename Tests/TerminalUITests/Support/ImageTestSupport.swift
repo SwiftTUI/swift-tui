@@ -32,11 +32,13 @@ func makeRasterImageAttachment(
   pngBytes: [UInt8],
   pixelSize: Size,
   bounds: Rect,
+  visibleBounds: Rect? = nil,
   identity: Identity = testIdentity("Root", "Image")
 ) -> RasterImageAttachment {
   RasterImageAttachment(
     identity: identity,
     bounds: bounds,
+    visibleBounds: visibleBounds,
     source: .pngData(pngBytes),
     resolvedReference: .embeddedPNG(pngBytes),
     pixelSize: pixelSize,

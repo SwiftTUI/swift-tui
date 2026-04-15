@@ -109,8 +109,8 @@ struct RasterizerTests {
     #expect(surface.lines.dropFirst(1).allSatisfy { $0.isEmpty })
   }
 
-  @Test("image attachments clip their bounds to ancestor clip rects")
-  func imageAttachmentsClipToAncestorBounds() throws {
+  @Test("image attachments preserve logical bounds and record visible clip rects")
+  func imageAttachmentsPreserveLogicalBoundsAndVisibleClipRects() throws {
     let rasterizer = Rasterizer()
     let viewportBounds = Rect(origin: .zero, size: .init(width: 4, height: 3))
     let imageIdentity = testIdentity("scrollContent", "image")
@@ -138,7 +138,8 @@ struct RasterizerTests {
     let attachment = try #require(surface.imageAttachments.first)
 
     #expect(surface.imageAttachments.count == 1)
-    #expect(attachment.bounds == Rect(origin: .zero, size: .init(width: 4, height: 3)))
+    #expect(attachment.bounds == imageBounds)
+    #expect(attachment.visibleBounds == Rect(origin: .zero, size: .init(width: 4, height: 3)))
   }
 
   // MARK: - Visible-identity collection

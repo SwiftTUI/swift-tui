@@ -69,8 +69,11 @@ public struct ImagePayload: Equatable, Sendable {
 
 /// A raster-time image placement that the host may present natively.
 public struct RasterImageAttachment: Equatable, Sendable {
+  /// The full logical destination rect in terminal cells before viewport clipping.
   public var identity: Identity
   public var bounds: Rect
+  /// The portion of ``bounds`` currently visible after ancestor clipping.
+  public var visibleBounds: Rect
   public var source: ImageSource
   public var resolvedReference: ImageAssetReference?
   public var pixelSize: Size?
@@ -80,6 +83,7 @@ public struct RasterImageAttachment: Equatable, Sendable {
   public init(
     identity: Identity,
     bounds: Rect,
+    visibleBounds: Rect? = nil,
     source: ImageSource,
     resolvedReference: ImageAssetReference? = nil,
     pixelSize: Size? = nil,
@@ -88,6 +92,7 @@ public struct RasterImageAttachment: Equatable, Sendable {
   ) {
     self.identity = identity
     self.bounds = bounds
+    self.visibleBounds = visibleBounds ?? bounds
     self.source = source
     self.resolvedReference = resolvedReference
     self.pixelSize = pixelSize

@@ -89,8 +89,8 @@ struct TerminalGraphicsProtocolTests {
     )
   }
 
-  @Test("kitty image placement clips scrolled image bounds before emitting graphics commands")
-  func kittyImagePlacementClipsScrolledBounds() throws {
+  @Test("kitty image placement crops source pixels for negative scroll offsets")
+  func kittyImagePlacementCropsSourcePixelsForNegativeScrollOffsets() throws {
     let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
@@ -144,7 +144,9 @@ struct TerminalGraphicsProtocolTests {
     )
     let attachment = try #require(artifacts.rasterSurface.imageAttachments.first)
 
-    #expect(attachment.bounds == .init(origin: .zero, size: .init(width: 4, height: 3)))
+    #expect(
+      attachment.bounds == .init(origin: .init(x: 0, y: -1), size: .init(width: 4, height: 4)))
+    #expect(attachment.visibleBounds == .init(origin: .zero, size: .init(width: 4, height: 3)))
 
     _ = try host.present(artifacts.rasterSurface)
     try host.drainPendingPresentation()
@@ -158,6 +160,7 @@ struct TerminalGraphicsProtocolTests {
     #expect(kittyWrite.contains("\u{001B}[1;1H"))
     #expect(kittyWrite.contains(",c=4,r=3,"))
     #expect(!kittyWrite.contains(",c=4,r=4,"))
+    #expect(kittyWrite.contains(",x=0,y=1,w=4,h=3,"))
   }
 
   @Test("terminal host chunks Kitty PNG payloads that exceed the single-chunk limit")
@@ -341,8 +344,8 @@ struct TerminalGraphicsProtocolTests {
     )
   }
 
-  @Test("stable image attachments preserve incremental text updates")
-  func stableImageAttachmentsPreserveIncrementalTextUpdates() throws {
+  @Test("stable Kitty image attachments are re-placed after incremental text updates")
+  func stableKittyImageAttachmentsAreReplacedAfterIncrementalTextUpdates() throws {
     let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
@@ -394,18 +397,133 @@ struct TerminalGraphicsProtocolTests {
     try host.drainPendingPresentation()
     let incrementalWrites = Array(controller.writes.dropFirst(writesBeforeIncrementalUpdate))
 
-    #expect(
-      incrementalWrites == [
-        "\u{001B}[1;2HO"
-      ]
-    )
+    #expect(incrementalWrites.count == 1)
+    let incrementalWrite = try #require(incrementalWrites.first)
+    #expect(incrementalWrite.contains("\u{001B}[1;2HO"))
     #expect(metrics.strategy == .incremental)
     #expect(metrics.cellsChanged == 1)
-    #expect(
-      !incrementalWrites.contains { write in
-        write.contains("_Ga=") || write.contains("\u{001B}P0;1;0q")
+    #expect(incrementalWrite.contains("\u{001B}_Ga=p,q=2,C=1,c=1,r=1,i="))
+    #expect(!incrementalWrite.contains("_Ga=T"))
+    #expect(!incrementalWrite.contains("\u{001B}P0;1;0q"))
+  }
+
+  @Test("Kitty full repaints retransmit images when attachment bounds change")
+  func kittyFullRepaintsRetransmitImagesWhenAttachmentBoundsChange() throws {
+    let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [
+        Array("\u{001B}_Gi=\(kittyQueryID);OK\u{001B}\\".utf8),
+        [],
+      ],
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 10, height: 4),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    let pngBytes = try makePNGBytes(
+      width: 2,
+      height: 2,
+      pixels: [
+        rgbaPixel(red: 255, green: 255, blue: 255),
+        rgbaPixel(red: 255, green: 255, blue: 255),
+        rgbaPixel(red: 255, green: 255, blue: 255),
+        rgbaPixel(red: 255, green: 255, blue: 255),
+      ]
+    )
+    let initialAttachment = makeRasterImageAttachment(
+      pngBytes: pngBytes,
+      pixelSize: .init(width: 2, height: 2),
+      bounds: .init(origin: .zero, size: .init(width: 1, height: 1))
+    )
+    let movedAttachment = makeRasterImageAttachment(
+      pngBytes: pngBytes,
+      pixelSize: .init(width: 2, height: 2),
+      bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 1, height: 1))
+    )
+    let initialSurface = RasterSurface(
+      size: .init(width: 4, height: 2),
+      lines: ["    ", "    "],
+      imageAttachments: [initialAttachment]
+    )
+    let updatedSurface = RasterSurface(
+      size: .init(width: 4, height: 2),
+      lines: ["    ", "    "],
+      imageAttachments: [movedAttachment]
+    )
+
+    _ = try host.present(initialSurface)
+    try host.drainPendingPresentation()
+    let writesBeforeFullRepaintUpdate = controller.writes.count
+
+    let metrics = try host.present(updatedSurface)
+    try host.drainPendingPresentation()
+    let updateWrites = Array(controller.writes.dropFirst(writesBeforeFullRepaintUpdate))
+
+    #expect(metrics.strategy == .fullRepaint)
+    #expect(updateWrites.count == 1)
+    let updateWrite = try #require(updateWrites.first)
+    #expect(updateWrite.contains("\u{001B}[2J"))
+    #expect(updateWrite.contains("_Ga=T,q=2,t=d,f=100,C=1,"))
+    #expect(!updateWrite.contains("_Ga=p,q=2,C=1,c=1,r=1,i="))
+  }
+
+  @Test("kitty image placement preserves bottom overflow instead of shrinking to the viewport")
+  func kittyImagePlacementPreservesBottomOverflow() throws {
+    let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [
+        Array("\u{001B}_Gi=\(kittyQueryID);OK\u{001B}\\".utf8),
+        [],
+      ],
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 10, height: 4),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    let pngBytes = try makePNGBytes(
+      width: 4,
+      height: 4,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 255, blue: 255), count: 16)
+    )
+    let surface = RasterSurface(
+      size: .init(width: 4, height: 3),
+      lines: ["    ", "    ", "    "],
+      imageAttachments: [
+        makeRasterImageAttachment(
+          pngBytes: pngBytes,
+          pixelSize: .init(width: 4, height: 4),
+          bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 4, height: 4)),
+          visibleBounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 4, height: 2))
+        )
+      ]
+    )
+
+    _ = try host.present(surface)
+    try host.drainPendingPresentation()
+
+    let kittyWrite = try #require(
+      controller.writes.first { write in
+        write.contains("_Ga=T")
       }
     )
+
+    #expect(kittyWrite.contains("\u{001B}[2;1H"))
+    #expect(kittyWrite.contains(",c=4,r=4,"))
+    #expect(!kittyWrite.contains(",c=4,r=2,"))
+    #expect(!kittyWrite.contains(",x="))
+    #expect(!kittyWrite.contains(",y="))
   }
 
   @Test("graphics protocols clear background colors in image area cells")
