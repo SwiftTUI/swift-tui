@@ -97,6 +97,101 @@ import Synchronization
   }
 #endif
 
+#if !canImport(WASILibc)
+  package struct TerminalProcessExitResetAction: Sendable {
+    package let inputFileDescriptor: Int32
+    package let outputFileDescriptor: Int32
+    package let inputFileStatusFlags: Int32
+    package let savedAttributes: termios
+    package let resetBytes: [UInt8]
+
+    package func perform() {
+      if !resetBytes.isEmpty {
+        unsafe resetBytes.withUnsafeBytes { bytes in
+          guard let baseAddress = bytes.baseAddress else {
+            return
+          }
+
+          var offset = 0
+          while offset < bytes.count {
+            let written = unsafe platformWrite(
+              outputFileDescriptor,
+              unsafe baseAddress.advanced(by: offset),
+              bytes.count - offset
+            )
+            guard written > 0 else {
+              break
+            }
+            offset += written
+          }
+        }
+      }
+
+      _ = fcntl(inputFileDescriptor, F_SETFL, inputFileStatusFlags)
+      var attributes = savedAttributes
+      _ = unsafe tcsetattr(inputFileDescriptor, TCSAFLUSH, &attributes)
+    }
+  }
+
+  package enum TerminalProcessExitCleanupRegistry {
+    private struct State {
+      var didInstallHandler = false
+      var nextToken: UInt64 = 0
+      var actions: [(token: UInt64, action: TerminalProcessExitResetAction)] = []
+    }
+
+    private static let state = Mutex(State())
+
+    package static func register(
+      _ action: TerminalProcessExitResetAction
+    ) -> UInt64? {
+      state.withLock { state in
+        if !state.didInstallHandler {
+          guard atexit(runTerminalProcessExitCleanup) == 0 else {
+            return nil
+          }
+          state.didInstallHandler = true
+        }
+
+        let token = state.nextToken
+        state.nextToken += 1
+        state.actions.append((token: token, action: action))
+        return token
+      }
+    }
+
+    package static func unregister(
+      _ token: UInt64?
+    ) {
+      guard let token else {
+        return
+      }
+
+      state.withLock { state in
+        state.actions.removeAll { $0.token == token }
+      }
+    }
+
+    package static func runForTesting() {
+      let actions = state.withLock { state in
+        let actions = state.actions
+          .sorted { lhs, rhs in lhs.token > rhs.token }
+          .map(\.action)
+        state.actions.removeAll()
+        return actions
+      }
+
+      for action in actions {
+        action.perform()
+      }
+    }
+  }
+
+  private func runTerminalProcessExitCleanup() {
+    TerminalProcessExitCleanupRegistry.runForTesting()
+  }
+#endif
+
 /// Errors thrown while configuring or writing to a terminal-backed host.
 public enum TerminalHostError: Error {
   case notATTY(fileDescriptor: Int32)
@@ -579,6 +674,7 @@ extension TerminalHosting {
 
     private var savedAttributes: termios?
     private var savedInputFileStatusFlags: Int32?
+    private var processExitCleanupToken: UInt64?
     private var rawModeEnabled = false
     private var capabilityProbe = CapabilityProbeState()
     private var presentationSession = PresentationSession()
@@ -649,12 +745,27 @@ extension TerminalHosting {
       )
       savedAttributes = currentAttributes
       savedInputFileStatusFlags = currentFileStatusFlags
+      #if !canImport(WASILibc)
+        processExitCleanupToken = TerminalProcessExitCleanupRegistry.register(
+          .init(
+            inputFileDescriptor: inputFileDescriptor,
+            outputFileDescriptor: outputFileDescriptor,
+            inputFileStatusFlags: currentFileStatusFlags,
+            savedAttributes: currentAttributes,
+            resetBytes: Array(processExitResetSequence().utf8)
+          )
+        )
+      #endif
       rawModeEnabled = true
       presentationSession.reset()
 
       var shouldRestoreOnFailure = true
       defer {
         if shouldRestoreOnFailure {
+          #if !canImport(WASILibc)
+            TerminalProcessExitCleanupRegistry.unregister(processExitCleanupToken)
+            processExitCleanupToken = nil
+          #endif
           let savedInputFileStatusFlags = self.savedInputFileStatusFlags
           savedAttributes = nil
           self.savedInputFileStatusFlags = nil
@@ -686,6 +797,10 @@ extension TerminalHosting {
       let presentationWriter = presentationSession.writer
       let savedAttributes = self.savedAttributes
       let savedInputFileStatusFlags = self.savedInputFileStatusFlags
+      #if !canImport(WASILibc)
+        TerminalProcessExitCleanupRegistry.unregister(processExitCleanupToken)
+        processExitCleanupToken = nil
+      #endif
       self.savedAttributes = nil
       self.savedInputFileStatusFlags = nil
       rawModeEnabled = false
@@ -1125,6 +1240,17 @@ extension TerminalHosting {
 
     private func disableMouseReportingSequence() -> String {
       "\u{001B}[?1002l\u{001B}[?1006l"
+    }
+
+    private func processExitResetSequence() -> String {
+      var reset = ""
+      if capabilityProfile.supportsMouseReporting {
+        reset += disableMouseReportingSequence()
+      }
+      reset += showCursorSequence()
+      reset += resetStyleSequence()
+      reset += exitAlternateScreenSequence()
+      return reset
     }
 
     private func resetStyleSequence() -> String {
