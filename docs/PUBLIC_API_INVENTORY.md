@@ -27,7 +27,7 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `FocusInteractions`, `LinkDestination`, and `OpenLinkAction`
 - image-source environment configuration such as `EnvironmentValues.imageResourceRoots`
 - `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and repo-owned `@Bindable`
-- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.offset(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.clipped()`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.onChange(of:initial:_:)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.toast(...)`, `.command(...)`, and `.commandPalette(...)`
+- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.offset(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.clipped()`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.onChange(of:initial:_:)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.toast(...)`, `.command(...)`, `.commandPalette(...)`, `.help(...)`, `.helpSheet(...)`, `.toolbar { ToolbarContent }`, `.toolbar(_:for:)`, and `.toolbarBackground(_:for:)`
 - `Resolver` and the public `ResolveContext` configuration surface for low-level rendering entry points
 
 Important public-surface rules after the lowering migration:
@@ -53,6 +53,134 @@ The canonical shape / border / gradient surface as of the Milestone 7 shape-and-
 - **`.border(...)` view modifiers**: three overloads — uniform style + `BorderSet`, per-side `BorderEdgeStyle` + `BorderSet`, and perimeter `BorderBlend` + `BorderSet` + animatable `phase`. All three route through the layout-aware border path so the border lives in reserved frame insets and never eats content.
 - **Gradient / pattern paints**: `LinearGradient`, `RadialGradient`, `PatternFill` (`░ ▒ ▓` shading with optional background). All conform to `ShapeStyle` and are sampled per-cell at rasterization time. As of the April 13, 2026 Animatable-protocol migration `LinearGradient.startPoint` / `endPoint` and `RadialGradient.center` are typed as `UnitPoint` instead of `Alignment` (see below).
 - **`Canvas<Drawing>`** and `CanvasDrawing` / `CanvasContext` (`Core` + `View`): arbitrary 2×4-Braille-subpixel drawing escape hatch for content the `Shape` algebra can't express (sparklines, plots, hand-drawn glyphs). The drawing primitives live in `Core` so the rasterizer can consume them directly; the authoring shell is a `View` in the `View` layer.
+
+### Commands, help, and toolbar surface
+
+The canonical command / help / toolbar surface as of the Milestone 8
+Commands & Chrome landing (see
+[`docs/proposals/COMMAND_AND_CHROME_APIS.md`](proposals/COMMAND_AND_CHROME_APIS.md)).
+One model — `Command` — feeds three lenses (toolbar, help, command
+palette). Authors register a command once with an optional key binding
+and group, and every lens picks it up automatically:
+
+- **`Command`** (`View`, extended): the existing `Command` value type
+  now carries `key: KeyPress?` and `group: String?` fields alongside
+  `id`, `title`, `detail`, `keywords`, `kind`, and `isDisabled`. The
+  same record drives the help strip glyph, the help sheet section
+  grouping, the command palette row, and any toolbar item that
+  references the command by id.
+- **`View.command(id:title:detail:keywords:kind:isDisabled:key:group:action:)`** (`View`):
+  the existing view-level command modifier now accepts the new `key:`
+  and `group:` parameters. When `key` is non-nil and the command is
+  not disabled, the modifier registers a focus-independent
+  `HotkeyBinding` so the key dispatches to `action` regardless of
+  which view is focused inside the command's scope. The legacy
+  no-action `.command(id:title:detail:keywords:kind:isDisabled:group:)`
+  overload remains for declarative-only registrations.
+- **`KeyPress` shorthand factories** (`Core`): `KeyPress.ctrl(_:)`,
+  `KeyPress.alt(_:)`, and `KeyPress.shift(_:)` produce single-modifier
+  character key presses such as `.ctrl("s")`. Named-key statics
+  `KeyPress.escape`, `KeyPress.return`, `KeyPress.space`, and
+  `KeyPress.tab` cover the unmodified non-character keys most TUIs
+  reach for.
+- **`Scene.commands(_:)`** (`TerminalUI`): scene-level command slot.
+  The result builder `CommandsBuilder` accepts a list of `CommandItem`
+  values; the runtime injects an invisible `SceneCommandsInjection`
+  view at the scene root so scene-level items reuse the same
+  `CommandPreferenceKey` and `HotkeyRegistry` path as view-level
+  `.command(...)`. Items declared here have scene-lifetime — they are
+  always part of the help strip, help sheet, and command palette
+  regardless of which views are focused. Conditional declarations are
+  expressible at scene-body granularity via `buildOptional` /
+  `buildEither`.
+- **`CommandItem`** (`TerminalUI`): the declarative record used inside
+  `.commands { … }`. Carries the same semantic fields as `Command`
+  plus a required `action: @MainActor @Sendable () -> Void`. A
+  command-bound key dispatches the action through the same hotkey
+  registry view-level `.command(..., action:)` writes to.
+- **`CommandsBuilder`** (`TerminalUI`): the result builder used by
+  `Scene.commands(_:)`. Supports `buildBlock(_:...)`, `buildOptional`,
+  `buildEither(first:)`/`buildEither(second:)`, and
+  `buildLimitedAvailability` so authored literals support variadic,
+  optional, conditional, and availability-gated declarations.
+- **`KeyGlyphView`** (`View`): public renderer for a single keyboard
+  shortcut. Renders a bracketed glyph like `[^S]` or `[⏎]` as a single
+  bold `Text` run. The same display string is the source of truth used
+  by the help strip, help sheet, and command-palette rows.
+- **`View.help(_:overflow:)`** (`View`): attaches an auto-derived help
+  strip to the subtree. The strip reads the subtree's
+  `CommandPreferenceKey` reduction plus any scene-level commands from
+  the environment channel, filters to commands with a `KeyPress`
+  binding, dedupes by id with innermost wins, and renders each as a
+  `[key] title` token. v1 implements only `HelpStripStyle.bottomBar`
+  and `HelpStripOverflow.truncate`; the other style and overflow
+  cases are accepted at the public API and silently fall back.
+- **`View.helpSheet(triggeredBy:)`** (`View`): attaches an expandable
+  help sheet to the subtree. Reads the same command preference value
+  the strip reads, groups surviving commands by `Command.group` with
+  a trailing "Other" section for ungrouped entries, and renders each
+  row as `[key] Title` plus a trailing detail string. The trigger key
+  defaults to `?` and Escape dismisses the sheet.
+- **`HelpStripStyle`** (`View`): the style enum — `.bottomBar` (the
+  only fully implemented case), `.inline`, and `.dismissible`. The
+  non-`bottomBar` cases silently fall back to bottom-bar rendering.
+- **`HelpStripOverflow`** (`View`): the overflow enum — `.truncate`
+  (the only fully implemented case), `.scroll`, and `.wrap(maxRows:)`
+  (with the `.wrap` shorthand defaulting to two rows). Non-`truncate`
+  cases silently fall back to truncation.
+- **`View.toolbar(content:)`** (`View`): the SwiftUI-shaped toolbar
+  result-builder modifier. Items inside `content` are flattened into a
+  flat record list, written into a package-internal preference
+  channel, and rendered in the implicit toolbar host's bottom row.
+  The default host is implicit at every `WindowGroup` root, so
+  authors do not need to wrap content in an explicit host. When both
+  `.toolbar { … }` and `.help(...)` are applied to the same subtree,
+  the outermost of the two owns the bottom-row composition; the inner
+  one contributes only via the preference channel.
+- **`View.toolbar(_:for:)`** (`View`): visibility modifier that takes a
+  `Visibility` value and one or more `ToolbarPlacement` bars. v1 is
+  capture-only — the modifier writes the authored intent into a
+  package-internal preference channel, but the default host does not
+  yet apply it at render time.
+- **`View.toolbarBackground(_:for:)`** (`View`): background modifier
+  taking a `ShapeStyle` and one or more `ToolbarPlacement` bars. v1
+  is capture-only — the modifier writes the authored intent into a
+  package-internal preference channel, but the default host does not
+  yet consume it.
+- **`ToolbarContent`** (`View`): the `@MainActor` declarative protocol
+  for items attached to a toolbar host. Mirrors SwiftUI's protocol
+  shape; `Never` conforms so primitive shapes can declare
+  `typealias Body = Never`.
+- **`ToolbarContentBuilder`** (`View`): the `@resultBuilder` for
+  toolbar content. Supports a single item, variadic blocks via
+  parameter packs, `if`/`else` branches, and limited availability.
+- **`ToolbarItem`** (`View`): a single item in a toolbar, with three
+  initializers — free-form `init(placement:content:)` for arbitrary
+  view content; command-bound `init(placement:command:content:)` for
+  a richer label; and the `Text`-specialized
+  `init(_ placement:command:)` that pulls the title and key glyph
+  from the registered command at composition time.
+- **`ToolbarItemGroup`** (`View`): a collection of toolbar items
+  sharing a single placement. The labeled disclosable-menu overload
+  from SwiftUI is intentionally dropped (see proposal §4.4).
+- **`ToolbarSpacer`** (`View`): a flexible or fixed-width spacer in a
+  toolbar row, with `Sizing.flexible` and `Sizing.fixed(Int)`.
+- **`ToolbarItemPlacement`** (`View`): pruned placement enum — `.automatic`,
+  `.primaryAction`, `.secondaryAction`, `.status`, `.bottomBar`,
+  `.confirmationAction`, `.cancellationAction`, `.destructiveAction`,
+  and `.title`. Cases dropped from the SwiftUI superset refer to
+  chrome the framework does not render (see proposal §4.7).
+- **`ToolbarPlacement`** (`View`): bar-namespace enum used by
+  `.toolbar(_:for:)` and `.toolbarBackground(_:for:)` — `.automatic`,
+  `.bottomBar`, `.statusBar`, and `.titleBar`. Distinct from
+  `ToolbarItemPlacement`, which is the item-namespace enum.
+- **`EmptyToolbarContent`**, **`TupleToolbarContent`**,
+  **`OptionalToolbarContent`**, **`ConditionalToolbarContent`** (`View`):
+  primitive `ToolbarContent` shapes produced by
+  `ToolbarContentBuilder`. They expose the standard
+  `typealias Body = Never` and are intentionally part of the public
+  surface so authored builder literals type-check, but authors should
+  not construct them directly.
 
 ### Animation primitives and `Animatable` conformance
 
@@ -134,6 +262,7 @@ These migration-era APIs are no longer public:
 - concrete wrapper-view implementation types such as `IDView`, `LayoutMetadataModifier`, `DrawMetadataModifier`, `SemanticMetadataModifier`, `EnvironmentWritingModifier`, `EnvironmentTransformModifier`, `PaddingView`, `FrameView`, `OverlayView`, and `BackgroundView`
 - runtime registry and replay types such as `LocalActionRegistry`, `LocalKeyHandlerRegistry`, `LocalLifecycleRegistry`, `LocalTaskRegistry`, `TaskRegistration`, `LifecycleHandlerSnapshot`, and `LocalKeyEvent`
 - keyboard-help compatibility APIs such as `KeyboardShortcut`, `KeyboardShortcutGroup`, `KeyboardShortcutHelpView`, `.keyboardShortcut(...)`, and `.keyboardShortcutHelp(...)`
+- the entire `PrototypeUIComponents` target, including `PrototypeHelpSurface`, `PrototypeCommandPalette`, `PrototypeKeyBinding`, `PrototypeKeyBindingGroup`, `PrototypeCommand`, and `PrototypeCommandCatalog`. Their coverage is now provided by the canonical `Command` / `.command(..., key:, group:)` / `Scene.commands { CommandItem(...) }` / `.help()` / `.helpSheet()` / `.toolbar { }` surface shipped in Milestone 8.
 - generic presentation coordination surface such as `PresentationFamilyID`, `PresentationLaneID`, `PresentationFamilySelectionPolicy`, `PresentationLaneOrdering`, `PresentationLaneVisibilityPolicy`, `PresentationBackgroundInteraction`, `PresentationFamilyPolicy`, `PresentationLanePolicy`, `PresentationCoordinatorConfiguration`, `PresentationPlacementContext`, `.presentationCoordinator(...)`, and `.presentation(...)`
 
 ### Removed Public Styling Compatibility
@@ -170,11 +299,9 @@ Prototype and showcase code may still live in the repository as sibling example 
 
 Current rule:
 
-- `PrototypeUIComponents` is a package target used by experiments and tests, not a library product that downstream packages should import as a supported API surface
-- the current prototype target still hosts help-strip and simplified command-surface experiments such as `PrototypeHelpSurface` and `PrototypeCommandPalette`
-- canonical command registration and command-palette APIs now live in `View`, so prototype widgets should be documented as exploratory variants rather than as the primary workflow surface
-- README and architecture-facing docs should describe prototype code as exploratory or showcase-only when it appears at all
-- terminal-native interaction surfaces that are still being shaped, such as command palettes or launcher-like flows, should land here first rather than forcing premature API commitments onto `View`
+- the canonical command registration, command-palette, help, and toolbar APIs all live in `View` / `TerminalUI` after the Milestone 8 Commands & Chrome landing; the former `PrototypeUIComponents` target has been retired now that its help-strip and command-launcher experiments are subsumed by the public surface
+- new terminal-native interaction surfaces that are still being shaped should land in a sibling experimental package rather than forcing premature API commitments onto `View`
+- README and architecture-facing docs should describe any future prototype code as exploratory or showcase-only when it appears at all
 
 ## Policy Summary
 

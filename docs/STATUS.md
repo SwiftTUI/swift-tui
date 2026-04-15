@@ -30,6 +30,7 @@ prototype explorations.
 - PNG-backed `Image` with named-resource, local-file-URL, and embedded-byte sources plus `.resizable()`, `.scaledToFit()`, and `.scaledToFill()`
 - Environment, observation, and focus including `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`, `@FocusedValue`, `@FocusedBinding`, `PreferenceKey`, subtree preference readers, `OpenLinkAction`, actor-context-aware `.task(...)`, and default-focus modifiers
 - Presentation and workflow surfaces including terminal-native `alert`, `confirmationDialog`, `sheet`, `toast`, `.command(...)`, `CommandPalette`, and `.commandPalette(...)`
+- Unified Commands & Chrome surface from the Milestone 8 landing: the `.command(id:title:key:group:, action:)` modifier wires a single registration into the focus-independent `HotkeyRegistry`, the help strip, the help sheet, and the command palette; `Scene.commands { CommandItem(...) }` is the scene-level slot for always-on actions; `.help()` and `.helpSheet(triggeredBy:)` auto-derive a discoverability surface from the command preference value; `.toolbar { ToolbarContent }` ships the SwiftUI-shaped result-builder toolbar with `ToolbarItem`, `ToolbarItemGroup`, `ToolbarSpacer`, and a pruned `ToolbarItemPlacement` set, plus capture-only `.toolbar(_:for:)` and `.toolbarBackground(_:for:)`. `KeyGlyphView` exposes the shared key-glyph renderer for ad-hoc placement.
 
 ### Runtime surface
 
@@ -75,7 +76,6 @@ prototype explorations.
   - anchor-based preference APIs such as `anchorPreference(...)` and `transformAnchorPreference(...)` until local coordinate spaces and anchor resolution ship
 - Some higher-level workflow surfaces are still unsettled:
   - richer multiline editing behaviors beyond the current `TextEditor`
-  - a long-term home for prototype help-strip and launcher-like shell workflows beyond the command-palette APIs
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
   - `ResolvableView`
