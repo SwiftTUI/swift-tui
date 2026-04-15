@@ -68,7 +68,16 @@
       "Bash(./Scripts/check_concurrency_safety_policies.sh)",
       "Bash(./Scripts/check_rendered_text_fixture_matrix.sh)",
       "Bash(./Scripts/check_public_surface_policies.sh)",
-      "Bash(./Scripts/check_demo_builds.sh:*)"
+      "Bash(./Scripts/check_demo_builds.sh:*)",
+      "Bash(command -v python3)",
+      "Bash(command -v sips)",
+      "Bash(command *)",
+      "Bash(/opt/homebrew/bin/pngquant --force --speed 1 --quality 60-90 --output /tmp/brn96q.png /tmp/brn96.png)",
+      "Bash(/opt/homebrew/bin/pngquant --force --speed 1 --quality 60-90 --output /tmp/brn128q.png /tmp/brn128.png)",
+      "Bash(awk '/^    \"[A-Za-z0-9+\\\\/=]+\",?$/ {gsub\\(/[\",]/, \"\"\\); gsub\\(/^ +/, \"\"\\); print}' /Users/adamz/Developer/repos/swift-terminal-ui/Examples/gallery/Sources/GalleryDemoViews/ImagesTab.swift)",
+      "Bash(md5 -q /tmp/brn128q.b64lines)",
+      "Bash(awk ' *)",
+      "Bash(awk '/^    \"[A-Za-z0-9+\\\\/=]+\",?$/ {gsub\\(/[\",]/, \"\"\\); gsub\\(/^ +/, \"\"\\); printf \"%s\", $0}')"
     ]
   }
 }
