@@ -108,21 +108,28 @@ struct TerminalGraphicsProtocolTests {
       capabilityProfile: .trueColor
     )
 
-    // Noise-filled 128x128 image: entropy defeats PNG compression so the
-    // encoded payload is reliably larger than one 4 KiB chunk.
+    // Noise-filled 128x128 image: genuine PRNG entropy defeats PNG filters
+    // (Sub/Up/Paeth) so the compressed payload is reliably large enough to
+    // span at least three 4 KiB base64 chunks — first, at least one `m=1`
+    // continuation, and the `m=0` terminator.
+    var rng: UInt64 = 0x9E37_79B9_7F4A_7C15
+    func nextByte() -> UInt8 {
+      rng ^= rng &<< 13
+      rng ^= rng &>> 7
+      rng ^= rng &<< 17
+      return UInt8(truncatingIfNeeded: rng)
+    }
     var pixels: [PNG.RGBA<UInt8>] = []
     pixels.reserveCapacity(128 * 128)
-    for y in 0..<128 {
-      for x in 0..<128 {
-        pixels.append(
-          rgbaPixel(
-            red: UInt8((x * 17 + y * 31) % 256),
-            green: UInt8((x * 43 + y * 29) % 256),
-            blue: UInt8((x * 61 + y * 47) % 256),
-            alpha: 255
-          )
+    for _ in 0..<(128 * 128) {
+      pixels.append(
+        rgbaPixel(
+          red: nextByte(),
+          green: nextByte(),
+          blue: nextByte(),
+          alpha: 255
         )
-      }
+      )
     }
 
     let pngBytes = try makePNGBytes(
