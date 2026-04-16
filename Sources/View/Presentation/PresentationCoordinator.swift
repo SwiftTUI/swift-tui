@@ -609,43 +609,6 @@ package final class ToastPresentationCoordinator:
   }
 }
 
-@MainActor
-package final class CommandPalettePresentationCoordinator:
-  StoredPresentationCoordinator<PromptPresentationItem>,
-  ManagedPresentationCoordinator
-{
-  package static let zIndex = 300
-  package static let disablesBaseInteractionWhenActive = true
-  package static let overlayKindName = "CommandPalettePresentation"
-
-  @ViewBuilder
-  package func makeBody() -> some View {
-    if let latestItem {
-      HostedPromptPresentation(item: latestItem)
-    }
-  }
-
-  package func present(
-    _ item: PromptPresentationItem
-  ) {
-    super.present(
-      item,
-      message:
-        "CommandPalettePresentationCoordinator.present(_:) must not be called during view update."
-    )
-  }
-
-  package func dismiss(
-    id: String
-  ) {
-    super.dismiss(
-      id: id,
-      message:
-        "CommandPalettePresentationCoordinator.dismiss(id:) must not be called during view update."
-    )
-  }
-}
-
 // MARK: - Environment Handles
 
 private enum AlertPresentationCoordinatorHandleKey: EnvironmentKey {
@@ -672,12 +635,6 @@ private enum ToastPresentationCoordinatorHandleKey: EnvironmentKey {
   )
 }
 
-private enum CommandPalettePresentationCoordinatorHandleKey: EnvironmentKey {
-  static let defaultValue = PresentationCoordinatorHandle<PromptPresentationItem>.unavailable(
-    "CommandPalettePresentationCoordinatorHandle"
-  )
-}
-
 extension EnvironmentValues {
   package var alertPresentationCoordinator: PresentationCoordinatorHandle<PromptPresentationItem> {
     get { self[AlertPresentationCoordinatorHandleKey.self] }
@@ -701,12 +658,6 @@ extension EnvironmentValues {
     set { self[ToastPresentationCoordinatorHandleKey.self] = newValue }
   }
 
-  package var commandPalettePresentationCoordinator:
-    PresentationCoordinatorHandle<PromptPresentationItem>
-  {
-    get { self[CommandPalettePresentationCoordinatorHandleKey.self] }
-    set { self[CommandPalettePresentationCoordinatorHandleKey.self] = newValue }
-  }
 }
 
 // MARK: - Coordinator Registry
@@ -872,14 +823,11 @@ package final class PresentationCoordinatorRegistry {
   >()
   package let sheet = PresentationCoordinatorBox<SheetPresentationCoordinator>()
   package let toast = PresentationCoordinatorBox<ToastPresentationCoordinator>()
-  package let commandPalette = PresentationCoordinatorBox<CommandPalettePresentationCoordinator>()
-
   private lazy var allBoxes = [
     AnyPresentationCoordinatorBox(alert),
     AnyPresentationCoordinatorBox(confirmationDialog),
     AnyPresentationCoordinatorBox(sheet),
     AnyPresentationCoordinatorBox(toast),
-    AnyPresentationCoordinatorBox(commandPalette),
   ]
 
   package init() {}
@@ -906,11 +854,6 @@ package final class PresentationCoordinatorRegistry {
       hostIdentity: hostIdentity,
       invalidator: invalidator
     )
-    environmentValues.commandPalettePresentationCoordinator =
-      commandPalette.handle(
-        hostIdentity: hostIdentity,
-        invalidator: invalidator
-      )
   }
 
   package func reconcile(

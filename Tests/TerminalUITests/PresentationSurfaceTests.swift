@@ -7,28 +7,6 @@ import Testing
 @MainActor
 @Suite
 struct PresentationSurfaceTests {
-  @Test("command palette backdrop spans the full terminal canvas")
-  func commandPaletteBackdropSpansTheFullTerminalCanvas() {
-    let proposal = Size(width: 40, height: 10)
-    let artifacts = DefaultRenderer().render(
-      Text("Workspace")
-        .command(
-          id: "open-file",
-          title: "Open File"
-        )
-        .frame(width: 12, height: 1, alignment: .leading)
-        .commandPalette(isPresented: .constant(true)),
-      context: .init(identity: testIdentity("Root")),
-      proposal: .init(width: proposal.width, height: proposal.height)
-    )
-
-    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
-    let expectedBounds = Rect(origin: .zero, size: proposal)
-
-    #expect(surface.contains("Command Palette"))
-    #expect(hasFillCommand(in: artifacts.drawTree, bounds: expectedBounds))
-  }
-
   @Test("alert renders an overlay surface and suppresses background focus")
   func alertRendersAndSuppressesBackgroundFocus() throws {
     let artifacts = DefaultRenderer().render(
@@ -181,47 +159,6 @@ struct PresentationSurfaceTests {
     #expect(kinds.contains("ToastPresentation"))
     #expect(kinds.contains("AlertPresentation"))
     #expect(toastIndex < alertIndex)
-  }
-
-  @Test("command palette stays above the other built-in presentation families")
-  func commandPaletteUsesTopmostFamilyLayer() throws {
-    let artifacts = DefaultRenderer().render(
-      Text("Workspace")
-        .command(id: "open-file", title: "Open File")
-        .toast(
-          "Saved successfully",
-          isPresented: .constant(true),
-          style: .success,
-          duration: nil
-        )
-        .sheet("Inspector", isPresented: .constant(true)) {
-          Text("Sheet body")
-        }
-        .alert(
-          "Delete project",
-          isPresented: .constant(true),
-          actions: {
-            Button("Delete") {}
-          },
-          message: {
-            Text("This cannot be undone.")
-          }
-        )
-        .frame(width: 48, height: 14, alignment: .topLeading)
-        .commandPalette(isPresented: .constant(true)),
-      context: .init(identity: testIdentity("Root")),
-      proposal: .init(width: 48, height: 14)
-    )
-
-    let kinds = viewKindNames(in: artifacts.resolvedTree)
-    let toastIndex = try #require(kinds.firstIndex(of: "ToastPresentation"))
-    let sheetIndex = try #require(kinds.firstIndex(of: "SheetPresentation"))
-    let alertIndex = try #require(kinds.firstIndex(of: "AlertPresentation"))
-    let paletteIndex = try #require(kinds.firstIndex(of: "CommandPalettePresentation"))
-
-    #expect(toastIndex < sheetIndex)
-    #expect(sheetIndex < alertIndex)
-    #expect(alertIndex < paletteIndex)
   }
 
   @Test("sheet shell uses presentation chrome that samples the interior background")
