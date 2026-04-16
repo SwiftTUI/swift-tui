@@ -604,6 +604,7 @@ This aligns with the existing project vision:
 - explicit `.focusable(...)` modifiers should be authoritative
 - containers should not become focus stops accidentally
 - focused values and focus state are part of SwiftUI-faithful runtime semantics, not convenience extras
+- focused values are load-bearing infrastructure for the toolbar/command hypothesis: scene-level commands bridge to focused-view state via `@FocusedValue`, making the command always registered while the state stays local to the view that owns it (see [STATUS.md](STATUS.md) for the full hypothesis)
 
 ## 10. Sources
 

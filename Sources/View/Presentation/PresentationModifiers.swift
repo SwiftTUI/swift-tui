@@ -101,20 +101,6 @@ package func sheetPromptPresentationSpec(
   )
 }
 
-package func commandPalettePromptPresentationSpec() -> PromptPresentationSpec {
-  let baseSpec = sheetPromptPresentationSpec(backdropOpacity: 0.7)
-  return PromptPresentationSpec(
-    token: "commandPalette",
-    descriptor: baseSpec.descriptor,
-    reconcile: { registry, sourceIdentity, item in
-      registry.commandPalette.sync(
-        sourceIdentity: sourceIdentity,
-        items: [item]
-      )
-    }
-  )
-}
-
 extension View {
   public func alert<S: StringProtocol>(
     _ title: S,

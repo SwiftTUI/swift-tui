@@ -76,10 +76,15 @@ Deferred items:
 - `NavigationStack`
 - popover-style presentation beyond the current sheet support
 
-Prototype-first items:
+Hypothesis-stage items (design model exists, implementation not yet started):
 
-- terminal-native help and keybinding surfaces
-- launcher-style action pickers beyond the shipped command palette
+- **Toolbar, commands, and keybinding surfaces.** The design hypothesis is that
+  navigation chrome (toolbar/nav bar) is the correct keybinding registration
+  surface — scoped by the navigation/presentation stack, bridged to focused
+  state via `@FocusedValue`, and visible to the user as a discoverability
+  surface. This is the terminal analogue of the macOS menu bar. An earlier
+  implementation was reverted because it preceded this understanding. See
+  [STATUS.md](STATUS.md) for the full hypothesis statement.
 
 These should not be implemented just because terminal frameworks often have
 analogous surfaces. They should land only once the terminal-specific interaction

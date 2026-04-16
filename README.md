@@ -89,7 +89,7 @@ executable product or default `App.main()`.
 - Layout and containers: `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `ViewThatFits`, and custom `Layout`
 - State and focus: `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, focused values, focus effect controls, and default-focus modifiers
 - Controls and content: `Text`, `TextFigure`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `GroupBox`, `ControlGroup`, `TabView`, and terminal-native alert or confirmation presentation backed by embedded FIGlet fonts rather than external font files
-- Presentation and workflow surfaces: `alert`, `confirmationDialog`, `sheet`, `toast`, command registration through `.command(...)`, and command discovery through `CommandPalette` / `.commandPalette(...)`
+- Presentation and workflow surfaces: `alert`, `confirmationDialog`, `sheet`, `toast`
 - Runtime integration: `Resolver`, `DefaultRenderer`, `RunLoop`, terminal input parsing, signal handling, alternate-screen ownership, capability-aware presentation, and lifecycle or task staging
 - Platform integration packages: executable runners `Runners/TerminalUICLI` and `Runners/TerminalUIWASI`, plus embedded hosts `GUI/SwiftUITUIGUI`, `GUI/SwiftTermTUIGUI`, `GUI/WebTUIGUI`, and `GUI/XtermWebTUIGUI`
 - Compact metrics and charts: `ProgressView`, `BarChart`, `ColumnChart`, `ComparisonChart`, `Sparkline`, `Timeline`, `ThresholdGauge`, and related support types in `TerminalUICharts`

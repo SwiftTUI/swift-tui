@@ -16,9 +16,8 @@ area, app-shell ergonomics, and a few still-conservative runtime paths.
 
 The 2026 terminal-native reset is substantially landed: automatic chrome has
 been reset, shell navigation primitives are canonical, multiline editing and
-indeterminate loading are public, and the command palette plus toast/sheet
-presentation surfaces now live in the main `View` module instead of only in
-earlier exploratory work.
+indeterminate loading are public, and toast/sheet presentation surfaces now
+live in the main `View` module instead of only in earlier exploratory work.
 
 ## Shipped Surface
 
@@ -29,7 +28,7 @@ earlier exploratory work.
 - Controls and primitives including `Text`, proposal-aware `TextFigure` backed by embedded FIGlet fonts, rich `Text` interpolation, `Link`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, determinate and indeterminate `ProgressView`, `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `Spacer`, `Divider`, and shapes
 - PNG-backed `Image` with named-resource, local-file-URL, and embedded-byte sources plus `.resizable()`, `.scaledToFit()`, and `.scaledToFill()`
 - Environment, observation, and focus including `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`, `@FocusedValue`, `@FocusedBinding`, `PreferenceKey`, subtree preference readers, `OpenLinkAction`, actor-context-aware `.task(...)`, and default-focus modifiers
-- Presentation and workflow surfaces including terminal-native `alert`, `confirmationDialog`, `sheet`, `toast`, `.command(...)`, `CommandPalette`, and `.commandPalette(...)`
+- Presentation and workflow surfaces including terminal-native `alert`, `confirmationDialog`, `sheet`, `toast`
 
 ### Runtime surface
 
@@ -75,7 +74,7 @@ earlier exploratory work.
   - anchor-based preference APIs such as `anchorPreference(...)` and `transformAnchorPreference(...)` until local coordinate spaces and anchor resolution ship
 - Some higher-level workflow surfaces are still unsettled:
   - richer multiline editing behaviors beyond the current `TextEditor`
-  - a long-term home for launcher-like shell workflows beyond the command-palette APIs
+  - toolbar, command, and keybinding surfaces (see hypothesis below)
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
   - `ResolvableView`
@@ -92,6 +91,36 @@ The project now treats terminal-native reinterpretation as a first-class design
 rule. The remaining gaps are therefore prioritized around terminal workspaces,
 deeper scroll control, and navigation surfaces that still need a stronger
 hypothesis before they graduate.
+
+### Commands, Keybindings, and Toolbar Hypothesis
+
+An earlier toolbar/command-palette/help-sheet implementation was reverted
+because it preceded a clear design model. The current hypothesis:
+
+**Navigation chrome (toolbar/nav bar) is the correct keybinding surface.**
+The toolbar is always rendered while its context is on screen, scoped by the
+navigation/presentation stack, and visible to the user as a discoverability
+surface. This is the terminal analogue of the macOS menu bar.
+
+The design rests on four requirements that must be satisfied simultaneously:
+
+- **Lifetime** — the toolbar is always resolved while its context is on screen, so bindings don't silently vanish
+- **Locality** — shortcuts are declared alongside toolbar content, the natural co-location point
+- **Composability** — the navigation/presentation stack provides scoping and shadowing (push adds, pop restores, modal overrides)
+- **Discoverability** — the toolbar IS the visible hint of what's available
+
+SwiftUI solves this with `commands { }` at scene level, `@FocusedValue` for
+bridging state from focused views, and the menu bar as persistent chrome. In
+a terminal UI, the navigation bar serves the same structural role as the menu
+bar — it is the chrome of the current context.
+
+`.onKeyPress()` remains as a low-level escape hatch for "handle this key
+while this specific view is rendered." It is not the primary keybinding API.
+
+This hypothesis has not yet been implemented. The framework currently has
+`.onKeyPress()` (global hotkey registry, tree-lifetime-dependent) and the
+`LocalKeyHandlerRegistry` (focus-dependent, package-internal, used by built-in
+controls). Neither satisfies all four requirements above.
 
 ## Documentation Status
 
