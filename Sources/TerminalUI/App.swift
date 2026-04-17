@@ -249,11 +249,16 @@ package struct WindowHostView<Content: View>: View {
     self.content = content
   }
 
+  // The scene's root node is a focus-scope boundary so that every
+  // focus region produced underneath this window carries the
+  // window's identity on its `scopePath`. This is the invariant
+  // `ActionScope` (see `WindowGroup: ActionScope`) relies on.
   package var body: some View {
     WindowHostLayout {
       content
     }
     .clipped()
+    .focusScope()
   }
 }
 
