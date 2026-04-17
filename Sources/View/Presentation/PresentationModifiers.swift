@@ -347,13 +347,38 @@ package struct HostedPromptPresentation: View {
   }
 }
 
-package struct PromptPresentationSurface: View {
+/// The root view of a presented sheet/alert/confirmation-dialog
+/// subtree.
+///
+/// `PromptPresentationSurface` is the presented content root: when a
+/// `.sheet(...)`, `.alert(...)`, or `.confirmationDialog(...)` is
+/// active, this view appears as the root of that presentation's
+/// subtree in the rendered tree, wrapped in the presentation host
+/// overlay. Its resolved node carries `focusScopeBoundary: true` via
+/// the `.focusScope()` modifier applied in its body, so every focus
+/// region emitted underneath a presentation carries the
+/// presentation's identity on its `scopePath`.
+///
+/// Conforming to `ActionScope` makes the presentation a first-class
+/// scope in the `ActionScope` world: commands scoped to the
+/// presentation become active exactly when the presentation's scope
+/// identity is on the focus chain.
+package struct PromptPresentationSurface: View, ActionScope {
+  package typealias ID = String
+
   package var item: PromptPresentationItem
 
   package init(
     item: PromptPresentationItem
   ) {
     self.item = item
+  }
+
+  /// The presentation's identity is the item's attachment id — a
+  /// stable `String` derived from the source identity and the
+  /// presentation token (see `presentationAttachmentID`).
+  package nonisolated var id: String {
+    item.id
   }
 
   package var body: some View {
