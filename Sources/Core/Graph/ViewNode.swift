@@ -408,12 +408,6 @@ package final class ViewNode {
     registeredHandlers.recordFocusedValues(registration)
   }
 
-  package func recordHotkeyRegistration(
-    _ registration: HotkeyRegistrationSnapshot
-  ) {
-    registeredHandlers.recordHotkey(registration)
-  }
-
   package func recordLifecycleAppearRegistration(
     handlerID: String,
     handler: @escaping LocalLifecycleRegistry.Handler

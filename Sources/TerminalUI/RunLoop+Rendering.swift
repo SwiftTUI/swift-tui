@@ -294,7 +294,6 @@ extension RunLoop {
     context.localFocusBindingRegistry = localFocusBindingRegistry
     context.localFocusedValuesRegistry = localFocusedValuesRegistry
     context.localPreferenceObservationRegistry = localPreferenceObservationRegistry
-    context.hotkeyRegistry = hotkeyRegistry
     context.invalidationProxy = .init(invalidator: scheduler)
     context.observationBridge = observationBridge
     return context

@@ -737,61 +737,6 @@ struct DiagnosticsAndCacheTests {
     )
   }
 
-  @Test("selective dirty frames do not duplicate reused hotkey registrations")
-  func selectiveDirtyFramesDoNotDuplicateReusedHotkeys() {
-    let hotkeyRegistry = HotkeyRegistry()
-    let renderer = DefaultRenderer(
-      layoutEngine: .init(cache: MeasurementCache())
-    )
-    var recordedPresses: [KeyPress] = []
-
-    func makeRoot(secondLine: String) -> some View {
-      VStack(alignment: .leading, spacing: 1) {
-        Text("Stable")
-          .id(testIdentity("StableHotkey"))
-          .onKeyPress { keyPress in
-            recordedPresses.append(keyPress)
-            return .handled
-          }
-        Text(secondLine)
-      }
-    }
-
-    var initialContext = ResolveContext(
-      identity: testIdentity("Root")
-    )
-    initialContext.hotkeyRegistry = hotkeyRegistry
-
-    _ = renderer.render(
-      makeRoot(secondLine: "World"),
-      context: initialContext
-    )
-
-    #expect(hotkeyRegistry.registeredBindings().count == 1)
-    #expect(hotkeyRegistry.dispatch(KeyPress(.character("x"))))
-    #expect(recordedPresses == [KeyPress(.character("x"))])
-
-    var updatedContext = ResolveContext(
-      identity: testIdentity("Root"),
-      invalidatedIdentities: [testIdentity("Root", "VStack[1]")]
-    )
-    updatedContext.hotkeyRegistry = hotkeyRegistry
-
-    _ = renderer.render(
-      makeRoot(secondLine: "Planet!"),
-      context: updatedContext
-    )
-
-    #expect(hotkeyRegistry.registeredBindings().count == 1)
-    #expect(hotkeyRegistry.dispatch(KeyPress(.character("x"))))
-    #expect(
-      recordedPresses == [
-        KeyPress(.character("x")),
-        KeyPress(.character("x")),
-      ]
-    )
-  }
-
   @Test("focused value publishers on the same control merge into one focused value set")
   func focusedValuePublishersMergeForTheSameControl() {
     let focusedValuesRegistry = LocalFocusedValuesRegistry()

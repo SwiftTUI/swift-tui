@@ -107,7 +107,6 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let localFocusedValuesRegistry = LocalFocusedValuesRegistry()
   package let localPreferenceObservationRegistry = LocalPreferenceObservationRegistry()
   package let localKeyHandlerRegistry = LocalKeyHandlerRegistry()
-  package let hotkeyRegistry = HotkeyRegistry()
   package let localLifecycleRegistry = LocalLifecycleRegistry()
   package let localTaskRegistry = LocalTaskRegistry()
   package let lifecycleCoordinator = LifecycleCoordinator()
@@ -120,7 +119,6 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       pointerHandlerRegistry: localPointerHandlerRegistry,
       focusBindingRegistry: localFocusBindingRegistry,
       focusedValuesRegistry: localFocusedValuesRegistry,
-      hotkeyRegistry: hotkeyRegistry,
       lifecycleRegistry: localLifecycleRegistry,
       taskRegistry: localTaskRegistry,
       preferenceObservationRegistry: localPreferenceObservationRegistry

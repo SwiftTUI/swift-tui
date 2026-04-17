@@ -211,7 +211,6 @@ public struct ResolveContext: Equatable, Sendable {
   package var localFocusedValuesRegistry: LocalFocusedValuesRegistry?
   package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry?
   package var localKeyHandlerRegistry: LocalKeyHandlerRegistry?
-  package var hotkeyRegistry: HotkeyRegistry?
   package var localLifecycleRegistry: LocalLifecycleRegistry?
   package var localTaskRegistry: LocalTaskRegistry?
   package var invalidationProxy: ResolveInvalidationProxy?
@@ -228,7 +227,6 @@ public struct ResolveContext: Equatable, Sendable {
       pointerHandlerRegistry: localPointerHandlerRegistry,
       focusBindingRegistry: localFocusBindingRegistry,
       focusedValuesRegistry: localFocusedValuesRegistry,
-      hotkeyRegistry: hotkeyRegistry,
       lifecycleRegistry: localLifecycleRegistry,
       taskRegistry: localTaskRegistry,
       preferenceObservationRegistry: localPreferenceObservationRegistry
@@ -275,7 +273,6 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.localFocusBindingRegistry = localFocusBindingRegistry
     childContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     childContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
-    childContext.hotkeyRegistry = hotkeyRegistry
     childContext.invalidationProxy = invalidationProxy
     childContext.observationBridge = observationBridge
     childContext.viewGraph = viewGraph
@@ -312,7 +309,6 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.localFocusBindingRegistry = localFocusBindingRegistry
     replacedContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     replacedContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
-    replacedContext.hotkeyRegistry = hotkeyRegistry
     replacedContext.invalidationProxy = invalidationProxy
     replacedContext.observationBridge = observationBridge
     replacedContext.viewGraph = viewGraph
@@ -489,7 +485,6 @@ extension ResolveContext {
       && lhs.localFocusedValuesRegistry == rhs.localFocusedValuesRegistry
       && lhs.localPreferenceObservationRegistry == rhs.localPreferenceObservationRegistry
       && lhs.localKeyHandlerRegistry == rhs.localKeyHandlerRegistry
-      && lhs.hotkeyRegistry == rhs.hotkeyRegistry
       && lhs.localLifecycleRegistry == rhs.localLifecycleRegistry
       && lhs.localTaskRegistry == rhs.localTaskRegistry
       && lhs.observationBridge == rhs.observationBridge

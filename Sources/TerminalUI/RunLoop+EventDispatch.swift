@@ -37,12 +37,7 @@ extension RunLoop {
   ) -> RunLoopExitReason? {
     let keyEvent = keyPress.key
 
-    // Focus-independent hotkeys fire first, allowing apps to override quit.
-    if hotkeyRegistry.dispatch(keyPress) {
-      return nil
-    }
-
-    // Default quit behavior — overridable by registering a hotkey for the same key.
+    // Default quit behavior.
     switch keyEvent {
     case .character("q") where keyPress.modifiers.isEmpty:
       return .quitKey

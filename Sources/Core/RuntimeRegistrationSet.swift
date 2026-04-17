@@ -5,7 +5,6 @@ package struct RuntimeRegistrationSet {
   package let pointerHandlerRegistry: LocalPointerHandlerRegistry?
   package let focusBindingRegistry: LocalFocusBindingRegistry?
   package let focusedValuesRegistry: LocalFocusedValuesRegistry?
-  package let hotkeyRegistry: HotkeyRegistry?
   package let lifecycleRegistry: LocalLifecycleRegistry?
   package let taskRegistry: LocalTaskRegistry?
   package let preferenceObservationRegistry: LocalPreferenceObservationRegistry?
@@ -16,7 +15,6 @@ package struct RuntimeRegistrationSet {
     pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
     focusBindingRegistry: LocalFocusBindingRegistry? = nil,
     focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
-    hotkeyRegistry: HotkeyRegistry? = nil,
     lifecycleRegistry: LocalLifecycleRegistry? = nil,
     taskRegistry: LocalTaskRegistry? = nil,
     preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
@@ -26,7 +24,6 @@ package struct RuntimeRegistrationSet {
     self.pointerHandlerRegistry = pointerHandlerRegistry
     self.focusBindingRegistry = focusBindingRegistry
     self.focusedValuesRegistry = focusedValuesRegistry
-    self.hotkeyRegistry = hotkeyRegistry
     self.lifecycleRegistry = lifecycleRegistry
     self.taskRegistry = taskRegistry
     self.preferenceObservationRegistry = preferenceObservationRegistry
@@ -38,7 +35,6 @@ package struct RuntimeRegistrationSet {
     pointerHandlerRegistry?.reset()
     focusBindingRegistry?.reset()
     focusedValuesRegistry?.reset()
-    hotkeyRegistry?.reset()
     lifecycleRegistry?.reset()
     taskRegistry?.reset()
     preferenceObservationRegistry?.reset()
@@ -56,7 +52,6 @@ package struct RuntimeRegistrationSet {
     pointerHandlerRegistry?.removeSubtrees(rootedAt: roots)
     focusBindingRegistry?.removeSubtrees(rootedAt: roots)
     focusedValuesRegistry?.removeSubtrees(rootedAt: roots)
-    hotkeyRegistry?.removeSubtrees(rootedAt: roots)
     lifecycleRegistry?.removeSubtrees(rootedAt: roots)
     taskRegistry?.removeSubtrees(rootedAt: roots)
     preferenceObservationRegistry?.removeSubtrees(rootedAt: roots)
@@ -73,7 +68,6 @@ package struct RuntimeRegistrationSet {
     pointerHandlerRegistry?.restore(handlers.pointerHandlerRegistrations)
     focusBindingRegistry?.restore(handlers.focusBindingRegistrations)
     focusedValuesRegistry?.restore(handlers.focusedValuesRegistrations)
-    hotkeyRegistry?.restore(handlers.hotkeyRegistrations)
     lifecycleRegistry?.restore(handlers.lifecycleRegistrations)
     taskRegistry?.restore(handlers.taskRegistrations)
     preferenceObservationRegistry?.restore(
