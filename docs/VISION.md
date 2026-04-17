@@ -78,13 +78,17 @@ Deferred items:
 
 Hypothesis-stage items (design model exists, implementation not yet started):
 
-- **Toolbar, commands, and keybinding surfaces.** The design hypothesis is that
-  navigation chrome (toolbar/nav bar) is the correct keybinding registration
-  surface — scoped by the navigation/presentation stack, bridged to focused
-  state via `@FocusedValue`, and visible to the user as a discoverability
-  surface. This is the terminal analogue of the macOS menu bar. An earlier
-  implementation was reverted because it preceded this understanding. See
-  [STATUS.md](STATUS.md) for the full hypothesis statement.
+- **Commands, keybindings, and scopes.** The design hypothesis is that
+  commands belong to **scopes** — a superset abstraction over navigation,
+  sub-hierarchies, and modal modes. A scope is a tree-authored command set
+  with an activation predicate; the predicate is focus-chain membership. Ship
+  with a curated small set of scope kinds (App, Screen, Presentation, Input,
+  Selection), each with a natural DSL anchor and a UI correspondent (visible
+  chrome or a discoverability path). Toolbars, nav bars, and help overlays
+  are UI correspondents of specific scope kinds, not the load-bearing
+  abstraction. An earlier toolbar/command-palette implementation was reverted
+  because it preceded this understanding. See [STATUS.md](STATUS.md) for the
+  full hypothesis.
 
 These should not be implemented just because terminal frameworks often have
 analogous surfaces. They should land only once the terminal-specific interaction
