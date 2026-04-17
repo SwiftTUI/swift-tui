@@ -35,6 +35,12 @@ public struct SemanticMetadata: Equatable, Sendable {
   private var explicitFocusability: Bool?
   package var focusScopeBoundary: Bool
   package var focusSectionBoundary: Bool
+  /// When `true`, focusable descendants of this node are suppressed
+  /// during semantic extraction — the node itself remains focusable
+  /// (if its other metadata marks it so) but its descendants do not
+  /// appear in the focus region list. Set by
+  /// `Panel.focusContainment(.sealed)`.
+  package var sealsFocusDescendants: Bool
   public var focusInteractions: FocusInteractions
   public var participatesInPointerHitTesting: Bool
   public var allowsHitTesting: Bool
@@ -75,6 +81,7 @@ public struct SemanticMetadata: Equatable, Sendable {
       isFocusable: isFocusable,
       focusScopeBoundary: false,
       focusSectionBoundary: false,
+      sealsFocusDescendants: false,
       focusInteractions: focusInteractions,
       participatesInPointerHitTesting: participatesInPointerHitTesting,
       allowsHitTesting: allowsHitTesting,
@@ -90,6 +97,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     isFocusable: Bool? = nil,
     focusScopeBoundary: Bool = false,
     focusSectionBoundary: Bool = false,
+    sealsFocusDescendants: Bool = false,
     focusInteractions: FocusInteractions = .automatic,
     participatesInPointerHitTesting: Bool = false,
     allowsHitTesting: Bool = true,
@@ -102,6 +110,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     explicitFocusability = isFocusable
     self.focusScopeBoundary = focusScopeBoundary
     self.focusSectionBoundary = focusSectionBoundary
+    self.sealsFocusDescendants = sealsFocusDescendants
     self.focusInteractions = focusInteractions
     self.participatesInPointerHitTesting = participatesInPointerHitTesting
     self.allowsHitTesting = allowsHitTesting
@@ -117,6 +126,7 @@ public struct SemanticMetadata: Equatable, Sendable {
       isFocusable: other.explicitFocusability ?? explicitFocusability,
       focusScopeBoundary: other.focusScopeBoundary || focusScopeBoundary,
       focusSectionBoundary: other.focusSectionBoundary || focusSectionBoundary,
+      sealsFocusDescendants: other.sealsFocusDescendants || sealsFocusDescendants,
       focusInteractions: other.focusInteractions == .automatic
         ? focusInteractions
         : other.focusInteractions,

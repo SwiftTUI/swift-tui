@@ -20,6 +20,7 @@ public struct SemanticExtractor {
         sectionIdentity,
         clipRect,
         order,
+        sealingParentOnChain,
         nextHitTestOrder
         in
         let isEnabled = node.environmentSnapshot.style.isEnabled
@@ -28,7 +29,7 @@ public struct SemanticExtractor {
 
         let participatesInTopLevelFocus = node.participatesInTopLevelFocus
 
-        if participatesInTopLevelFocus, isEnabled, hitsAllowed {
+        if participatesInTopLevelFocus, isEnabled, hitsAllowed, !sealingParentOnChain {
           focusRegions.append(
             FocusRegion(
               identity: node.identity,
@@ -89,21 +90,24 @@ public struct SemanticExtractor {
         scopePath,
         sectionIdentity,
         clipRect,
+        sealingParentOnChain,
         nextHitTestOrder
         in
         guard node.environmentSnapshot.style.isEnabled else {
           return
         }
 
-        appendScrollIndicatorSemantics(
-          for: node,
-          scopePath: scopePath,
-          sectionIdentity: sectionIdentity,
-          clippedTo: clipRect,
-          interactionRegions: &interactionRegions,
-          focusRegions: &focusRegions,
-          nextHitTestOrder: &nextHitTestOrder
-        )
+        if !sealingParentOnChain {
+          appendScrollIndicatorSemantics(
+            for: node,
+            scopePath: scopePath,
+            sectionIdentity: sectionIdentity,
+            clippedTo: clipRect,
+            interactionRegions: &interactionRegions,
+            focusRegions: &focusRegions,
+            nextHitTestOrder: &nextHitTestOrder
+          )
+        }
       }
     )
 
@@ -123,8 +127,8 @@ extension SemanticExtractor {
     sectionIdentity: Identity? = nil,
     clipRect: Rect? = nil,
     hitTestOrder: inout Int,
-    preVisit: (PlacedNode, [Identity], Identity?, Rect?, Int, inout Int) -> Void,
-    postVisit: (PlacedNode, [Identity], Identity?, Rect?, inout Int) -> Void
+    preVisit: (PlacedNode, [Identity], Identity?, Rect?, Int, Bool, inout Int) -> Void,
+    postVisit: (PlacedNode, [Identity], Identity?, Rect?, Bool, inout Int) -> Void
   ) {
     enum Phase {
       case enter
@@ -136,6 +140,11 @@ extension SemanticExtractor {
       let scopePath: [Identity]
       let sectionIdentity: Identity?
       let clipRect: Rect?
+      /// `true` when an ancestor on the current walk chain is marked
+      /// `sealsFocusDescendants`. Propagated to descendants so focus
+      /// region emission can skip them even though the sealing node
+      /// itself is emitted normally.
+      let sealingParentOnChain: Bool
       let phase: Phase
     }
 
@@ -145,6 +154,7 @@ extension SemanticExtractor {
         scopePath: scopePath,
         sectionIdentity: sectionIdentity,
         clipRect: clipRect,
+        sealingParentOnChain: false,
         phase: .enter
       )
     ]
@@ -178,6 +188,7 @@ extension SemanticExtractor {
           nodeSectionIdentity,
           nodeClipRect,
           nodeHitTestOrder,
+          frame.sealingParentOnChain,
           &hitTestOrder
         )
 
@@ -187,10 +198,14 @@ extension SemanticExtractor {
             scopePath: nodeScopePath,
             sectionIdentity: nodeSectionIdentity,
             clipRect: nodeClipRect,
+            sealingParentOnChain: frame.sealingParentOnChain,
             phase: .exit
           )
         )
 
+        let childSealingParentOnChain =
+          frame.sealingParentOnChain
+          || frame.node.semanticMetadata.sealsFocusDescendants
         for child in frame.node.children.reversed() {
           stack.append(
             Frame(
@@ -198,6 +213,7 @@ extension SemanticExtractor {
               scopePath: nodeScopePath,
               sectionIdentity: nodeSectionIdentity,
               clipRect: nodeClipRect,
+              sealingParentOnChain: childSealingParentOnChain,
               phase: .enter
             )
           )
@@ -208,6 +224,7 @@ extension SemanticExtractor {
           frame.scopePath,
           frame.sectionIdentity,
           frame.clipRect,
+          frame.sealingParentOnChain,
           &hitTestOrder
         )
       }
