@@ -114,6 +114,96 @@ struct CommandRegistryTests {
     )
     #expect(consumed == false)
   }
+
+  @Test("Empty scopePath returns false from dispatch")
+  func dispatchEmptyScopePath() {
+    let registry = CommandRegistry()
+    let consumed = registry.dispatch(
+      key: .init(key: .character("s"), modifiers: .ctrl),
+      along: []
+    )
+    #expect(consumed == false)
+  }
+
+  @Test("Duplicate identity in scopePath dispatches at first occurrence only")
+  func dispatchHandlesDuplicateIdentityInPath() {
+    let registry = CommandRegistry()
+    let scope = Identity(components: ["shared"])
+    let fired = Counter()
+    registry.registerKeyCommand(
+      at: scope,
+      binding: .init(key: .character("s"), modifiers: .ctrl),
+      description: "Shared",
+      isEnabled: true,
+      action: { fired.increment() }
+    )
+    let consumed = registry.dispatch(
+      key: .init(key: .character("s"), modifiers: .ctrl),
+      along: [scope, scope, scope]
+    )
+    #expect(consumed == true)
+    #expect(fired.count == 1)
+  }
+
+  @Test("Re-registering the same (scope, binding) replaces the earlier command")
+  func registerReplacesExistingBinding() {
+    let registry = CommandRegistry()
+    let scope = Identity(components: ["a"])
+    let first = Counter()
+    let second = Counter()
+    registry.registerKeyCommand(
+      at: scope,
+      binding: .init(key: .character("s"), modifiers: .ctrl),
+      description: "First",
+      isEnabled: true,
+      action: { first.increment() }
+    )
+    registry.registerKeyCommand(
+      at: scope,
+      binding: .init(key: .character("s"), modifiers: .ctrl),
+      description: "Second",
+      isEnabled: true,
+      action: { second.increment() }
+    )
+    _ = registry.dispatch(
+      key: .init(key: .character("s"), modifiers: .ctrl),
+      along: [scope]
+    )
+    #expect(first.count == 0)
+    #expect(second.count == 1)
+  }
+
+  @Test("Palette commands register, read back, and accumulate shallowest-first along a chain")
+  func paletteCommandsRegisterAndAccumulate() {
+    let registry = CommandRegistry()
+    let shallow = Identity(components: ["shallow"])
+    let deep = Identity(components: ["shallow", "deep"])
+    registry.registerPaletteCommand(
+      at: shallow,
+      command: RegisteredPaletteCommand(
+        name: "Shallow",
+        description: nil,
+        isEnabled: true,
+        action: {}
+      )
+    )
+    registry.registerPaletteCommand(
+      at: deep,
+      command: RegisteredPaletteCommand(
+        name: "Deep",
+        description: "deeper",
+        isEnabled: false,
+        action: {}
+      )
+    )
+    let atShallow = registry.paletteCommands(at: shallow)
+    let atDeep = registry.paletteCommands(at: deep)
+    #expect(atShallow.map(\.name) == ["Shallow"])
+    #expect(atDeep.map(\.name) == ["Deep"])
+
+    let visible = registry.paletteCommands(along: [shallow, deep])
+    #expect(visible.map(\.name) == ["Shallow", "Deep"])
+  }
 }
 
 @MainActor

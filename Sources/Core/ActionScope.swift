@@ -24,12 +24,18 @@ public protocol ActionScope: Identifiable {
 ///
 /// Consumers supply their own `Hashable & Sendable` values through
 /// `.panel(id:)` rather than constructing `AnyID` directly.
+///
+/// The initializer is `package`-scoped: framework code constructs
+/// `AnyID` from derived identities, while consumers supply their own
+/// `Hashable & Sendable` values through `.panel(id:)`.
+// `AnyID` is intentionally distinct from `AnyHashableSendable`. They both wrap
+// Hashable & Sendable values, but `AnyHashableSendable` exposes `unwrap` for
+// animation-value access; `AnyID` is an opaque identity tag with no unwrap
+// surface. Keeping them separate preserves the intent at each call site.
 public struct AnyID: Hashable, Sendable {
-  @usableFromInline
-  internal let box: any AnyIDBox
+  private let box: any AnyIDBox
 
-  @inlinable
-  public init<Value: Hashable & Sendable>(_ value: Value) {
+  package init<Value: Hashable & Sendable>(_ value: Value) {
     self.box = AnyIDConcreteBox(value: value)
   }
 
@@ -42,28 +48,22 @@ public struct AnyID: Hashable, Sendable {
   }
 }
 
-@usableFromInline
 internal protocol AnyIDBox: Sendable {
   func hash(into hasher: inout Hasher)
   func isEqual(to other: any AnyIDBox) -> Bool
 }
 
-@usableFromInline
 internal struct AnyIDConcreteBox<Value: Hashable & Sendable>: AnyIDBox {
-  @usableFromInline
   let value: Value
 
-  @usableFromInline
   init(value: Value) {
     self.value = value
   }
 
-  @usableFromInline
   func hash(into hasher: inout Hasher) {
     value.hash(into: &hasher)
   }
 
-  @usableFromInline
   func isEqual(to other: any AnyIDBox) -> Bool {
     guard let other = other as? AnyIDConcreteBox<Value> else {
       return false

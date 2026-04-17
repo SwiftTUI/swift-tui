@@ -1,4 +1,12 @@
-/// A key + modifier combination used as a `keyCommand` binding.
+/// A `(KeyEvent, EventModifiers)` pair used as a command-registration
+/// lookup key in `CommandRegistry`.
+///
+/// Distinct from the public `KeyPress` input-event type in
+/// `LocalKeyHandlerRegistry.swift`. `KeyPress` represents a key event
+/// arriving from the runtime; `KeyBinding` is the registration key a
+/// command claims. Phase 4's `keyCommand` dispatch adapter translates
+/// `KeyPress` → `KeyBinding` at the dispatch boundary, so consolidation
+/// would destroy the intentional role separation.
 package struct KeyBinding: Equatable, Hashable, Sendable {
   package var key: KeyEvent
   package var modifiers: EventModifiers
