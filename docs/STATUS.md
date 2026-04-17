@@ -18,8 +18,8 @@ indeterminate loading are public, and `alert`/`confirmationDialog`/`sheet`/
 `toast` presentation surfaces live in the main `View` module. The
 ActionScope/commands rollout (see
 [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md))
-is partially landed: the scope scaffolding is in place, the consumer-facing
-command and toolbar modifiers are still in progress.
+is fully landed: the scope scaffolding, `.keyCommand`, `.paletteCommand`, and
+`.toolbar` + `.toolbarItem` are all part of the public `View` surface.
 
 ## Shipped Surface
 
@@ -76,7 +76,6 @@ command and toolbar modifiers are still in progress.
   - anchor-based preference APIs such as `anchorPreference(...)` and `transformAnchorPreference(...)` until local coordinate spaces and anchor resolution ship
 - Some higher-level workflow surfaces are still unsettled:
   - richer multiline editing behaviors beyond the current `TextEditor`
-  - toolbar, command, and keybinding surfaces (see hypothesis below)
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
   - `ResolvableView`
@@ -141,10 +140,12 @@ Landed:
   runtime captures the commands visible along the current focus chain and
   exposes them (ordered shallowest-first) through the environment so
   consumer-authored palette surfaces can query them.
-
-Pending:
-
-- `.toolbar(style:)` on scopes plus `.toolbarItem(...)` hoisting from any view
+- `.toolbar(style:)` on any `ActionScope & View`, plus the `.toolbarItem(...)`
+  hoisting preference that lets any descendant view contribute an item to the
+  nearest enclosing toolbar. `ToolbarStyle` plus `DefaultTopToolbarStyle` and
+  `DefaultBottomToolbarStyle` control the strip's layout and placement;
+  contributions bubble past intermediate scopes until absorbed, and render as
+  a horizontal strip above or below the scope's content.
 
 Framework-owned single-key dispatch continues through `LocalKeyHandlerRegistry`
 for built-in controls.

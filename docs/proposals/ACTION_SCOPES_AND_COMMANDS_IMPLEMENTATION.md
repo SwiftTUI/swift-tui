@@ -22,9 +22,9 @@ The plan has six phases. Each phase ends with a committable, buildable, testable
 - **Phase 3** ✅ — `Scene` and presentation-modifier `ActionScope` conformances
 - **Phase 4** ✅ — `.keyCommand(...)` + dispatch wiring
 - **Phase 5** ✅ — `.paletteCommand(...)` + environment value for consumers to query
-- **Phase 6** ⏳ — `.toolbar(style:)` + `.toolbarItem(...)` (hoisted via preference keys)
+- **Phase 6** ✅ — `.toolbar(style:)` + `.toolbarItem(...)` (hoisted via preference keys)
 
-Phase status as of current `main`: Phases 0–5 landed; Phase 6 pending.
+Phase status as of current `main`: All phases (0–6) landed.
 
 ---
 

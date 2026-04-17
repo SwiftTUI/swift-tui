@@ -71,14 +71,13 @@ Removed from the public surface in this revamp:
 
 - `LineVariant` — deleted wholesale, no deprecation shim. The rasterizer now reads glyphs from `BorderSet`. `StrokeStyle(lineVariant:)` is replaced by `StrokeStyle(borderSet:)`.
 
-### Action scopes and commands (partially landed)
+### Action scopes and commands
 
-The scaffolding for the ActionScope/commands rollout is public. The
-consumer-facing command and toolbar modifiers are still pending; see
+The full ActionScope/commands rollout is public; see
 [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)
 and
 [proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md](proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md)
-for the full plan and phase status.
+for the model and the implementation record.
 
 - `ActionScope` protocol (`Core`) with `AnyID` type-erased identity
 - `CommandRegistry` runtime hook (`Core`), wired into `RunLoop`
@@ -88,9 +87,13 @@ for the full plan and phase status.
 - `.alert` / `.confirmationDialog` / `.sheet` presentation modifiers conform to `ActionScope`
 - `.keyCommand(_:key:modifiers:isEnabled:action:)` on `ActionScope where Self: View & Sendable`, with shallowest-wins dispatch along the current focus chain (modifier-less bindings are framework-reserved and silently dropped)
 - `.paletteCommand(name:description:isEnabled:action:)` on `ActionScope where Self: View & Sendable` plus `ActivePaletteCommand` and `EnvironmentValues.activePaletteCommands` for consumer-authored palette query surfaces. The captured list is refreshed after each frame from the current focus chain.
-
-Still to land: `.toolbar(style:)`, `.toolbarItem(...)`,
-`ToolbarItemConfig`, and `ToolbarStyle`.
+- `.toolbar(style:)` on `ActionScope where Self: View & Sendable`, plus
+  `ToolbarStyle` protocol, `ToolbarPlacement` enum, and the
+  `DefaultTopToolbarStyle` / `DefaultBottomToolbarStyle` default styles
+- `.toolbarItem(_:)` on any `View`, plus the `@ViewBuilder`-based
+  `.toolbarItem(position:isEnabled:action:label:icon:)` overload, backed by
+  `ToolbarItemConfig` and the hoisting preference contract that bubbles item
+  contributions up to the nearest enclosing `.toolbar(style:)` modifier
 
 ### `TerminalUI`
 
@@ -153,7 +156,7 @@ These migration-era APIs are no longer public:
 - concrete wrapper-view implementation types such as `IDView`, `LayoutMetadataModifier`, `DrawMetadataModifier`, `SemanticMetadataModifier`, `EnvironmentWritingModifier`, `EnvironmentTransformModifier`, `PaddingView`, `FrameView`, `OverlayView`, and `BackgroundView`
 - runtime registry and replay types such as `LocalActionRegistry`, `LocalKeyHandlerRegistry`, `LocalLifecycleRegistry`, `LocalTaskRegistry`, `TaskRegistration`, `LifecycleHandlerSnapshot`, and `LocalKeyEvent`
 - keyboard-help compatibility APIs such as `KeyboardShortcut`, `KeyboardShortcutGroup`, `KeyboardShortcutHelpView`, `.keyboardShortcut(...)`, and `.keyboardShortcutHelp(...)`
-- the global hotkey registration seam: `.onKeyPress(...)` view modifier, `HotkeyRegistry`, `HotkeyBinding`, and `HotkeyRegistrationSnapshot`. Consumers now bind keys through the ActionScope-based commands surface (see [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)); the `.keyCommand` / `.paletteCommand` / `.toolbar` modifiers that replace `.onKeyPress` are still landing
+- the global hotkey registration seam: `.onKeyPress(...)` view modifier, `HotkeyRegistry`, `HotkeyBinding`, and `HotkeyRegistrationSnapshot`. Consumers now bind keys through the ActionScope-based commands surface (see [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)); the replacements — `.keyCommand`, `.paletteCommand`, `.toolbar`, and `.toolbarItem` — ship on the public `View` surface.
 - generic presentation coordination surface such as `PresentationFamilyID`, `PresentationLaneID`, `PresentationFamilySelectionPolicy`, `PresentationLaneOrdering`, `PresentationLaneVisibilityPolicy`, `PresentationBackgroundInteraction`, `PresentationFamilyPolicy`, `PresentationLanePolicy`, `PresentationCoordinatorConfiguration`, `PresentationPlacementContext`, `.presentationCoordinator(...)`, and `.presentation(...)`
 
 ### Removed Public Styling Compatibility
