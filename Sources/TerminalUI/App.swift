@@ -397,6 +397,14 @@ public struct WindowGroup<Content: View>: Scene {
   }
 }
 
+/// A `WindowGroup` is an `ActionScope` — the scene identity is the root
+/// of every focus chain rooted in that window. The scope becomes active
+/// whenever the scene's rootIdentity appears on the current focus
+/// region's `scopePath`.
+extension WindowGroup: ActionScope {
+  public typealias ID = WindowIdentifier
+}
+
 /// A terminal application declaration composed of scenes.
 @MainActor
 public protocol App {
