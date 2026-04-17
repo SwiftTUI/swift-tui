@@ -56,4 +56,54 @@ struct ToolbarTests {
     let items = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
     #expect(items.first?.title == "Copy")
   }
+
+  @Test("Panel with toolbar absorbs toolbar items from its subtree")
+  func toolbarAbsorbsItems() {
+    let panel =
+      Panel(id: "outer") {
+        Text("content").toolbarItem(
+          .init(
+            title: "Save",
+            icon: nil,
+            position: .top,
+            isEnabled: true,
+            action: {}
+          )
+        )
+      }
+      .toolbar(style: DefaultTopToolbarStyle())
+
+    let context = ResolveContext(identity: testIdentity("toolbar-root"))
+    let resolved = Resolver().resolve(AnyView(panel), in: context)
+    // After the toolbar modifier consumes the preference, the outer
+    // preferenceValues should NOT still contain the toolbar item.
+    let leakedItems = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
+    #expect(leakedItems.isEmpty)
+  }
+
+  @Test(
+    "Toolbar items bubble past a non-toolbar scope and land at the next ancestor with a toolbar")
+  func toolbarItemsBubblePastScopeWithoutToolbar() {
+    let view =
+      Panel(id: "outer") {
+        Panel(id: "inner") {
+          Text("content").toolbarItem(
+            .init(
+              title: "Save",
+              icon: nil,
+              position: .top,
+              isEnabled: true,
+              action: {}
+            )
+          )
+        }
+      }
+      .toolbar(style: DefaultTopToolbarStyle())
+
+    let context = ResolveContext(identity: testIdentity("toolbar-root"))
+    let resolved = Resolver().resolve(AnyView(view), in: context)
+    let leakedItems = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
+    // Absorbed at outer Panel because inner Panel has no toolbar.
+    #expect(leakedItems.isEmpty)
+  }
 }
