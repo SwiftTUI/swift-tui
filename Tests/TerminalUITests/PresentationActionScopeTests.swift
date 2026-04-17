@@ -128,6 +128,63 @@ struct PresentationActionScopeTests {
 
     #expect(actionRegion.scopePath.contains(surfaceIdentity))
   }
+
+  @Test(
+    """
+    Leaf inside a sheet within a WindowHostView has scene identity first \
+    and sheet identity later on scopePath
+    """
+  )
+  func sheetScopePathOrderedWithSceneAtRoot() throws {
+    let sceneIdentity = testIdentity("App", "test-window")
+    let sheetLeafIdentity = testIdentity("SheetLeaf")
+
+    let artifacts = DefaultRenderer().render(
+      WindowHostView(
+        content: Text("Base")
+          .sheet(
+            "Inspector",
+            isPresented: .constant(true)
+          ) {
+            Text("Sheet body")
+              .focusable(true)
+              .id(sheetLeafIdentity)
+          }
+      ),
+      context: .init(identity: sceneIdentity),
+      proposal: .init(width: 40, height: 10)
+    )
+
+    let sheetSurfaceIdentity = try #require(
+      presentationSurfaceIdentity(
+        in: artifacts.resolvedTree,
+        containing: sheetLeafIdentity
+      ),
+      "No focus-scope-boundary ancestor found above the sheet content leaf."
+    )
+
+    let leafRegion = try #require(
+      artifacts.semanticSnapshot.focusRegions.first { region in
+        region.identity == sheetLeafIdentity
+      },
+      "Sheet leaf produced no focus region."
+    )
+
+    // Scene identity must land BEFORE the sheet identity: a
+    // scene-level `keyCommand` must be reachable from the sheet's
+    // leaf `scopePath` for shallowest-wins resolution to route it.
+    #expect(leafRegion.scopePath.first == sceneIdentity)
+
+    let sceneIndex = try #require(
+      leafRegion.scopePath.firstIndex(of: sceneIdentity),
+      "Scene identity missing from sheet leaf scopePath."
+    )
+    let sheetIndex = try #require(
+      leafRegion.scopePath.firstIndex(of: sheetSurfaceIdentity),
+      "Sheet surface identity missing from sheet leaf scopePath."
+    )
+    #expect(sceneIndex < sheetIndex)
+  }
 }
 
 /// Walks the resolved tree searching for the nearest ancestor of

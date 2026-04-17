@@ -1031,14 +1031,32 @@ package func composePresentationHostTree(
   if hostState.disablesBaseInteraction {
     hostedBaseNode.setEnabledRecursively(false)
   }
+  // The scene's focus-scope boundary lives on `baseNode` (the
+  // `WindowHostView` root). Once we wrap it alongside the overlay
+  // subtree, the overlay is a SIBLING of `baseNode` — so the scene's
+  // identity never lands on any focus region inside the overlay's
+  // `scopePath`. That breaks the "shallowest-wins" scope hypothesis
+  // for scene-level commands while a presentation is active.
+  //
+  // Fix: lift the scene's boundary up onto this synthesized wrapper
+  // so it becomes the nearest `focusScopeBoundary` ancestor of BOTH
+  // the hosted base content AND the overlay, stamping the scene's
+  // identity onto every descendant's `scopePath`. We clear the
+  // boundary from the inner base node to avoid a duplicate entry on
+  // regions rooted in the scene's own content.
+  hostedBaseNode.semanticMetadata.focusScopeBoundary = false
+
+  var hostSemantics = SemanticMetadata()
+  hostSemantics.focusScopeBoundary = true
 
   return ResolvedNode(
-    identity: hostContext.identity,
+    identity: context.identity,
     kind: .view("PresentationHost"),
     children: [hostedBaseNode, overlayNode],
     environmentSnapshot: hostContext.environment,
     transactionSnapshot: hostContext.transaction,
-    layoutBehavior: .overlay(alignment: .topLeading)
+    layoutBehavior: .overlay(alignment: .topLeading),
+    semanticMetadata: hostSemantics
   )
 }
 
