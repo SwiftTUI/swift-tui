@@ -51,6 +51,13 @@ public struct Panel<ID: Hashable & Sendable, Content: View>: View, ActionScope {
   }
 }
 
+extension Panel {
+  /// Configures focus containment for this Panel.
+  public func focusContainment(_ mode: FocusContainment) -> Panel<ID, Content> {
+    Panel(id: id, containment: mode, content: content)
+  }
+}
+
 private struct PanelBody<ID: Hashable & Sendable, Content: View>: View, ResolvableView {
   let id: ID
   let containment: FocusContainment
@@ -60,6 +67,9 @@ private struct PanelBody<ID: Hashable & Sendable, Content: View>: View, Resolvab
     let childNode = content.resolve(in: context.child(component: .named("content")))
     var metadata = focusStructureMetadata(scopeBoundary: true)
     metadata.isFocusable = true
+    if containment == .sealed {
+      metadata.sealsFocusDescendants = true
+    }
     return [
       ResolvedNode(
         identity: context.identity,

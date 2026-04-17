@@ -39,6 +39,34 @@ struct PanelTests {
     // source-location structure. Compare whichever is stable.
     #expect(view1.id == view2.id)
   }
+
+  @Test(".focusContainment(.sealed) prevents descendant focus regions from being reachable")
+  func sealedPanelBlocksDescendantFocus() {
+    // A sealed Panel containing a focusable leaf should, after
+    // semantic extraction, produce exactly one focus region — the
+    // Panel's own. Descendant focusables inside a sealed panel do not
+    // appear in the focus region list.
+    let sealedPanel = Panel(id: "outer") {
+      Text("inner").focusable(true)
+    }
+    .focusContainment(.sealed)
+
+    let regions = extractFocusRegionsForTest(sealedPanel)
+    #expect(regions.count == 1)
+  }
+}
+
+/// Extracts the focus regions produced for `view` under the full render
+/// pipeline. Uses `DefaultRenderer` so that semantic extraction runs
+/// over a concretely placed tree, matching the runtime's behavior.
+@MainActor
+private func extractFocusRegionsForTest<V: View>(_ view: V) -> [FocusRegion] {
+  let artifacts = DefaultRenderer().render(
+    view,
+    context: .init(identity: testIdentity("panel-focus-root")),
+    proposal: .init(width: 20, height: 5)
+  )
+  return artifacts.semanticSnapshot.focusRegions
 }
 
 /// Resolves `view` by running it through the full resolver once and
