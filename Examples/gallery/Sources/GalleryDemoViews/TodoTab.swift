@@ -32,6 +32,25 @@ struct TodoTab: View {
     .sheet("New task", isPresented: $isPresentingNew) {
       newTaskSheetBody
     }
+    .toolbarItem(
+      .init(
+        title: "New task",
+        action: {
+          draftTitle = ""
+          draftPriority = .normal
+          isPresentingNew = true
+        }
+      )
+    )
+    .toolbarItem(
+      .init(
+        title: "Clear done",
+        isEnabled: items.contains(where: \.done),
+        action: {
+          items.removeAll { $0.done }
+        }
+      )
+    )
   }
 
   private var header: some View {
