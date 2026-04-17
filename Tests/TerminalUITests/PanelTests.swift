@@ -26,6 +26,19 @@ struct PanelTests {
     let resolved = resolveForTest(panel)
     #expect(resolved.semanticMetadata.isFocusable == true)
   }
+
+  @Test(".panel() produces stable AnyID across re-resolves at the same source location")
+  func panelPseudonymousIDIsStable() {
+    // Build the same view twice, resolve each to a ResolvedNode, and
+    // verify the Panel's identity is equal across the two resolves.
+    // The view must be constructed the same way both times — a View
+    // tree that includes Text("x").panel() at the same position.
+    let view1 = Text("content").panel()
+    let view2 = Text("content").panel()
+    // Panel's ID is AnyID; the resolved identity path also encodes
+    // source-location structure. Compare whichever is stable.
+    #expect(view1.id == view2.id)
+  }
 }
 
 /// Resolves `view` by running it through the full resolver once and

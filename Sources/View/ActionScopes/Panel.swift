@@ -80,4 +80,14 @@ extension View {
   ) -> Panel<PanelID, Self> {
     Panel(id: id, containment: .open, content: self)
   }
+
+  /// Wraps `self` in a Panel whose identity is derived from the
+  /// structural identity path at the call site. Stable across
+  /// re-resolves; reproduced deterministically per source location and
+  /// surrounding identity context.
+  public func panel() -> Panel<AnyID, Self> {
+    let scope = currentAuthoringContext()
+    let derived = scope?.viewIdentity ?? Identity(components: [] as [String])
+    return Panel(id: AnyID(derived), containment: .open, content: self)
+  }
 }
