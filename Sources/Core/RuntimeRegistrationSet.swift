@@ -8,6 +8,7 @@ package struct RuntimeRegistrationSet {
   package let lifecycleRegistry: LocalLifecycleRegistry?
   package let taskRegistry: LocalTaskRegistry?
   package let preferenceObservationRegistry: LocalPreferenceObservationRegistry?
+  package let commandRegistry: CommandRegistry?
 
   package init(
     actionRegistry: LocalActionRegistry? = nil,
@@ -17,7 +18,8 @@ package struct RuntimeRegistrationSet {
     focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
     lifecycleRegistry: LocalLifecycleRegistry? = nil,
     taskRegistry: LocalTaskRegistry? = nil,
-    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil
+    preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil,
+    commandRegistry: CommandRegistry? = nil
   ) {
     self.actionRegistry = actionRegistry
     self.keyHandlerRegistry = keyHandlerRegistry
@@ -27,6 +29,7 @@ package struct RuntimeRegistrationSet {
     self.lifecycleRegistry = lifecycleRegistry
     self.taskRegistry = taskRegistry
     self.preferenceObservationRegistry = preferenceObservationRegistry
+    self.commandRegistry = commandRegistry
   }
 
   package func resetAll() {
@@ -38,6 +41,7 @@ package struct RuntimeRegistrationSet {
     lifecycleRegistry?.reset()
     taskRegistry?.reset()
     preferenceObservationRegistry?.reset()
+    commandRegistry?.reset()
   }
 
   package func removeSubtrees(

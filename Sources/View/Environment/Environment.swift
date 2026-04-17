@@ -213,6 +213,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var localKeyHandlerRegistry: LocalKeyHandlerRegistry?
   package var localLifecycleRegistry: LocalLifecycleRegistry?
   package var localTaskRegistry: LocalTaskRegistry?
+  package var commandRegistry: CommandRegistry?
   package var invalidationProxy: ResolveInvalidationProxy?
   package var observationBridge: ObservationBridge?
   package var viewGraph: ViewGraph?
@@ -229,7 +230,8 @@ public struct ResolveContext: Equatable, Sendable {
       focusedValuesRegistry: localFocusedValuesRegistry,
       lifecycleRegistry: localLifecycleRegistry,
       taskRegistry: localTaskRegistry,
-      preferenceObservationRegistry: localPreferenceObservationRegistry
+      preferenceObservationRegistry: localPreferenceObservationRegistry,
+      commandRegistry: commandRegistry
     )
   }
 
@@ -273,6 +275,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.localFocusBindingRegistry = localFocusBindingRegistry
     childContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     childContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
+    childContext.commandRegistry = commandRegistry
     childContext.invalidationProxy = invalidationProxy
     childContext.observationBridge = observationBridge
     childContext.viewGraph = viewGraph
@@ -309,6 +312,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.localFocusBindingRegistry = localFocusBindingRegistry
     replacedContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     replacedContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
+    replacedContext.commandRegistry = commandRegistry
     replacedContext.invalidationProxy = invalidationProxy
     replacedContext.observationBridge = observationBridge
     replacedContext.viewGraph = viewGraph
@@ -456,6 +460,7 @@ extension ResolveContext {
     self.localKeyHandlerRegistry = localKeyHandlerRegistry
     self.localLifecycleRegistry = localLifecycleRegistry
     self.localTaskRegistry = localTaskRegistry
+    commandRegistry = nil
     invalidationProxy = nil
     observationBridge = nil
     viewGraph = nil
@@ -487,6 +492,7 @@ extension ResolveContext {
       && lhs.localKeyHandlerRegistry == rhs.localKeyHandlerRegistry
       && lhs.localLifecycleRegistry == rhs.localLifecycleRegistry
       && lhs.localTaskRegistry == rhs.localTaskRegistry
+      && lhs.commandRegistry == rhs.commandRegistry
       && lhs.observationBridge == rhs.observationBridge
   }
 }

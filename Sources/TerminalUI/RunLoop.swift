@@ -109,6 +109,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let localKeyHandlerRegistry = LocalKeyHandlerRegistry()
   package let localLifecycleRegistry = LocalLifecycleRegistry()
   package let localTaskRegistry = LocalTaskRegistry()
+  package let commandRegistry = CommandRegistry()
   package let lifecycleCoordinator = LifecycleCoordinator()
   package let observationBridge = ObservationBridge()
 
@@ -121,7 +122,8 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       focusedValuesRegistry: localFocusedValuesRegistry,
       lifecycleRegistry: localLifecycleRegistry,
       taskRegistry: localTaskRegistry,
-      preferenceObservationRegistry: localPreferenceObservationRegistry
+      preferenceObservationRegistry: localPreferenceObservationRegistry,
+      commandRegistry: commandRegistry
     )
   }
 
