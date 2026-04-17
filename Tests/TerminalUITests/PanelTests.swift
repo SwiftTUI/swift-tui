@@ -90,6 +90,43 @@ struct PanelTests {
     let regions = extractFocusRegionsForTest(sealedPanel)
     #expect(regions.count == 1)
   }
+
+  @Test(
+    ".focusContainment(.sealed) suppresses link focus regions emitted from rich-text payload semantics"
+  )
+  func sealedPanelBlocksRichTextLinkFocusRegions() {
+    // A Text with an interpolated inline Link carries a richText draw
+    // payload whose runs are tagged with a `linkIdentifier`. The
+    // semantic extractor's rich-text path (`appendRichTextSemantics`)
+    // emits one focus region per distinct link identifier. Inside a
+    // sealed Panel those descendant focus regions must be suppressed
+    // — only the Panel's own focus region may remain.
+    let sealedPanel = Panel(id: "outer") {
+      Text("see \(Link("docs", destination: "https://example.com")) now")
+    }
+    .focusContainment(.sealed)
+
+    let regions = extractFocusRegionsForTest(sealedPanel)
+    #expect(regions.count == 1)
+  }
+
+  @Test(".focusContainment(.sealed) suppresses descendant focus regions from list children")
+  func sealedPanelBlocksListDescendantFocusRegions() {
+    // A sealed Panel containing a List with focusable row content
+    // should still yield a single focus region (the Panel). The List
+    // itself and any focusable row content live under a sealed
+    // ancestor and must not contribute focus regions.
+    let sealedPanel = Panel(id: "outer") {
+      List(selection: .constant(0)) {
+        Text("row 0").focusable(true).tag(0)
+        Text("row 1").focusable(true).tag(1)
+      }
+    }
+    .focusContainment(.sealed)
+
+    let regions = extractFocusRegionsForTest(sealedPanel)
+    #expect(regions.count == 1)
+  }
 }
 
 /// A probe view whose body constructs `Text("x").panel()` during each

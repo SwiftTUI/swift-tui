@@ -66,6 +66,7 @@ public struct SemanticExtractor {
             scopePath: scopePath,
             sectionIdentity: sectionIdentity,
             clippedTo: clipRect,
+            sealingParentOnChain: sealingParentOnChain,
             interactionRegions: &interactionRegions,
             focusRegions: &focusRegions,
             nextHitTestOrder: &nextHitTestOrder
@@ -262,6 +263,7 @@ extension SemanticExtractor {
     scopePath: [Identity],
     sectionIdentity: Identity?,
     clippedTo clipRect: Rect?,
+    sealingParentOnChain: Bool,
     interactionRegions: inout [InteractionRegion],
     focusRegions: inout [FocusRegion],
     nextHitTestOrder: inout Int
@@ -276,6 +278,7 @@ extension SemanticExtractor {
         scopePath: scopePath,
         sectionIdentity: sectionIdentity,
         clippedTo: clipRect,
+        sealingParentOnChain: sealingParentOnChain,
         interactionRegions: &interactionRegions,
         focusRegions: &focusRegions,
         nextHitTestOrder: &nextHitTestOrder
@@ -372,6 +375,7 @@ extension SemanticExtractor {
     scopePath: [Identity],
     sectionIdentity: Identity?,
     clippedTo clipRect: Rect?,
+    sealingParentOnChain: Bool,
     interactionRegions: inout [InteractionRegion],
     focusRegions: inout [FocusRegion],
     nextHitTestOrder: inout Int
@@ -426,6 +430,14 @@ extension SemanticExtractor {
           )
         )
         nextHitTestOrder += 1
+
+        // Suppress descendant focus region emission when an ancestor
+        // on the current walk chain sealed its focus descendants. The
+        // sealing node itself is emitted normally by the pre-visit —
+        // only its descendants are suppressed here.
+        guard !sealingParentOnChain else {
+          return
+        }
 
         if let existingIndex = focusRegionIndices[fragmentIdentity] {
           focusRegions[existingIndex].rect = union(
