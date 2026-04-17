@@ -435,6 +435,13 @@ extension SemanticExtractor {
         // on the current walk chain sealed its focus descendants. The
         // sealing node itself is emitted normally by the pre-visit —
         // only its descendants are suppressed here.
+        //
+        // Focus regions from descendants are suppressed when the parent
+        // seals focus (`Panel.focusContainment(.sealed)`). Interaction
+        // regions are intentionally not sealed: sealing affects
+        // keyboard/focus routing, not pointer hit-testing. A sealed
+        // Panel's interior is still clickable if the consumer wires a
+        // mouse handler; only Tab traversal is blocked.
         guard !sealingParentOnChain else {
           return
         }
