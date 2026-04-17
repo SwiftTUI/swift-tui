@@ -110,6 +110,38 @@ struct PanelTests {
     #expect(regions.count == 1)
   }
 
+  @Test(".panel() inside ForEach assigns distinct, per-iteration-stable identities")
+  func panelInForEachProducesDistinctStableIDs() {
+    // Resolve a view containing ForEach with `.panel()` inside its
+    // row body. The structural identity at each iteration must differ
+    // (so three rows yield three distinct Panel AnyIDs), and re-
+    // resolving the same hierarchy must produce pairwise-equal ids at
+    // each iteration position (structural identity is stable).
+    let capture1 = PanelIDCapture()
+    let capture2 = PanelIDCapture()
+
+    let tree1 = ForEachPanelProbe(capture: capture1)
+    let tree2 = ForEachPanelProbe(capture: capture2)
+
+    let resolver = Resolver()
+    _ = resolver.resolve(
+      AnyView(tree1),
+      in: ResolveContext(identity: testIdentity("foreach-panel-root"))
+    )
+    _ = resolver.resolve(
+      AnyView(tree2),
+      in: ResolveContext(identity: testIdentity("foreach-panel-root"))
+    )
+
+    // Three iterations, three distinct ids on the first resolve.
+    #expect(capture1.ids.count == 3)
+    #expect(Set(capture1.ids).count == 3)
+
+    // Second resolve: three ids pairwise equal to the first.
+    #expect(capture2.ids.count == 3)
+    #expect(capture1.ids == capture2.ids)
+  }
+
   @Test(".focusContainment(.sealed) suppresses descendant focus regions from list children")
   func sealedPanelBlocksListDescendantFocusRegions() {
     // A sealed Panel containing a List with focusable row content
@@ -147,6 +179,21 @@ private struct PseudonymousPanelProbe: View {
 @MainActor
 private final class PanelIDCapture {
   var ids: [AnyID] = []
+}
+
+/// A probe view that runs `.panel()` inside a `ForEach` body. Each
+/// iteration appends the resulting Panel's `AnyID` to `capture`, so a
+/// single resolve produces one id per element.
+private struct ForEachPanelProbe: View {
+  let capture: PanelIDCapture
+
+  var body: some View {
+    ForEach([0, 1, 2], id: \.self) { _ in
+      let panel = Text("row").panel()
+      capture.ids.append(panel.id)
+      return panel
+    }
+  }
 }
 
 /// Traverses `root` to find the resolved node produced by a `Panel`.

@@ -2,10 +2,40 @@ package import Core
 
 @MainActor
 package struct AuthoringContext {
+  /// Owner identity — used for invalidation routing, `@State` ownership,
+  /// and follow-up identity captured by control action closures. Stable
+  /// across per-iteration content expansion inside containers like
+  /// `ForEach`; identifies the view struct currently authoring, not the
+  /// structural position of a repeated child.
   var viewIdentity: Identity
+  /// Structural identity — the authoring "position" in the view tree.
+  /// Identity-deriving modifiers such as `.panel()` read this so they
+  /// can distinguish per-iteration instances inside a `ForEach`. At the
+  /// outermost authoring scope this equals `viewIdentity`; container
+  /// iteration (e.g. `ForEach`) is the only context that diverges them.
+  var structuralIdentity: Identity
   var focusedValues: FocusedValues
   var viewNode: Core.ViewNode?
   var ordinalTracker: AuthoringOrdinalTracker = .init()
+
+  /// Primary initializer. `structuralIdentity` defaults to `viewIdentity`
+  /// so non-iterating construction sites (the common case) need not
+  /// distinguish the two — they're equal. `ForEach` is the only writer
+  /// that currently diverges them by supplying a per-iteration
+  /// `structuralIdentity`.
+  init(
+    viewIdentity: Identity,
+    structuralIdentity: Identity? = nil,
+    focusedValues: FocusedValues,
+    viewNode: Core.ViewNode? = nil,
+    ordinalTracker: AuthoringOrdinalTracker = .init()
+  ) {
+    self.viewIdentity = viewIdentity
+    self.structuralIdentity = structuralIdentity ?? viewIdentity
+    self.focusedValues = focusedValues
+    self.viewNode = viewNode
+    self.ordinalTracker = ordinalTracker
+  }
 }
 
 package enum AuthoringContextStorage {

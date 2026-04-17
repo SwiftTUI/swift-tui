@@ -18,6 +18,7 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
   private let id: KeyPath<Data.Element, ID>
   private let content: @MainActor (Data.Element) -> Content
   private let childContext: ResolveContext
+  private let authoringScope: AuthoringContext?
   private var cache: [Int: ResolvedNode] = [:]
 
   package init(
@@ -30,6 +31,7 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
     self.id = id
     self.content = content
     self.childContext = childContext
+    authoringScope = currentAuthoringContext()
     identityRootStorage = childContext.identity
     countStorage = data.count
     measurementSignatureStorage = data.map {
@@ -60,10 +62,28 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
       let elementContext = childContext.replacingIdentity(
         with: childContext.identity.explicitID(element[keyPath: id])
       )
-      let view = elementContext.trackingObservableAccess {
-        content(element)
+      // Mirror `ForEach.resolveElements`: diverge structural identity
+      // per iteration so identity-deriving modifiers (`.panel()`) see
+      // a distinct position per element, while `viewIdentity` stays
+      // pinned to the outer authoring scope so owner-semantics callers
+      // (controls, @State) remain stable.
+      let perIterationScope = authoringScope.map { scope in
+        AuthoringContext(
+          viewIdentity: scope.viewIdentity,
+          structuralIdentity: elementContext.identity,
+          focusedValues: scope.focusedValues,
+          viewNode: scope.viewNode,
+          ordinalTracker: scope.ordinalTracker
+        )
       }
-      let elements = resolveViewElements(view, in: elementContext)
+      let view = withAuthoringContext(perIterationScope) {
+        elementContext.trackingObservableAccess {
+          content(element)
+        }
+      }
+      let elements = withAuthoringContext(perIterationScope) {
+        resolveViewElements(view, in: elementContext)
+      }
       elementContext.recordResolvedComputation(count: elements.count)
       let normalized = normalizeResolvedElements(elements, in: elementContext)
       cache[index] = normalized
