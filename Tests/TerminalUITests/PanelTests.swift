@@ -29,15 +29,51 @@ struct PanelTests {
 
   @Test(".panel() produces stable AnyID across re-resolves at the same source location")
   func panelPseudonymousIDIsStable() {
-    // Build the same view twice, resolve each to a ResolvedNode, and
-    // verify the Panel's identity is equal across the two resolves.
-    // The view must be constructed the same way both times — a View
-    // tree that includes Text("x").panel() at the same position.
-    let view1 = Text("content").panel()
-    let view2 = Text("content").panel()
-    // Panel's ID is AnyID; the resolved identity path also encodes
-    // source-location structure. Compare whichever is stable.
-    #expect(view1.id == view2.id)
+    // Drive a full resolve pass twice over the same view hierarchy
+    // (`Text("x").panel()` nested inside a parent view body). During
+    // body evaluation `withAuthoringContext` is set up by the resolver,
+    // so `.panel()` exercises the `scope?.viewIdentity` branch rather
+    // than falling back to `Identity(components: [])`. Each resolve
+    // records the Panel's synthesised `AnyID` and the Panel's
+    // `ResolvedNode.identity` via a side-effecting probe; both must be
+    // equal across resolves for stability to hold.
+    let capture1 = PanelIDCapture()
+    let capture2 = PanelIDCapture()
+
+    let tree1 = PseudonymousPanelProbe(capture: capture1)
+    let tree2 = PseudonymousPanelProbe(capture: capture2)
+
+    let resolver = Resolver()
+    let resolved1 = resolver.resolve(
+      AnyView(tree1),
+      in: ResolveContext(identity: testIdentity("panel-stability-root"))
+    )
+    let resolved2 = resolver.resolve(
+      AnyView(tree2),
+      in: ResolveContext(identity: testIdentity("panel-stability-root"))
+    )
+
+    // Each resolve must have actually run the probe's body and
+    // captured a non-fallback AnyID (i.e. the authoring context was
+    // populated). The fallback would be derived from an empty Identity.
+    let emptyFallback = AnyID(Identity(components: [] as [String]))
+    #expect(capture1.ids.count == 1)
+    #expect(capture2.ids.count == 1)
+    #expect(capture1.ids.first != emptyFallback)
+    #expect(capture2.ids.first != emptyFallback)
+
+    // Stability: the same source location resolved twice yields the
+    // same pseudonymous AnyID (exercising `scope?.viewIdentity`).
+    #expect(capture1.ids.first == capture2.ids.first)
+
+    // Stability at the resolved-tree level: find the Panel in each
+    // resolved tree and compare its identity. Panel nodes are marked
+    // with `focusScopeBoundary == true` and `kind == .view("Panel")`.
+    let panel1 = findPanelNode(in: resolved1)
+    let panel2 = findPanelNode(in: resolved2)
+    #expect(panel1 != nil)
+    #expect(panel2 != nil)
+    #expect(panel1?.identity == panel2?.identity)
   }
 
   @Test(".focusContainment(.sealed) prevents descendant focus regions from being reachable")
@@ -54,6 +90,41 @@ struct PanelTests {
     let regions = extractFocusRegionsForTest(sealedPanel)
     #expect(regions.count == 1)
   }
+}
+
+/// A probe view whose body constructs `Text("x").panel()` during each
+/// resolve pass. The probe runs inside `withAuthoringContext` (set up by
+/// `resolveView`), so `.panel()` takes the `scope?.viewIdentity` branch.
+/// The probe captures the Panel's `AnyID` into `capture` so tests can
+/// assert pseudonymous-ID stability across re-resolves.
+private struct PseudonymousPanelProbe: View {
+  let capture: PanelIDCapture
+
+  var body: some View {
+    let panel = Text("content").panel()
+    capture.ids.append(panel.id)
+    return panel
+  }
+}
+
+@MainActor
+private final class PanelIDCapture {
+  var ids: [AnyID] = []
+}
+
+/// Traverses `root` to find the resolved node produced by a `Panel`.
+/// Panels set `kind == .view("Panel")` and mark themselves as focus
+/// scope boundaries; either predicate uniquely identifies the node.
+@MainActor
+private func findPanelNode(in root: ResolvedNode) -> ResolvedNode? {
+  var stack: [ResolvedNode] = [root]
+  while let node = stack.popLast() {
+    if case .view(let name) = node.kind, name == "Panel" {
+      return node
+    }
+    stack.append(contentsOf: node.children)
+  }
+  return nil
 }
 
 /// Extracts the focus regions produced for `view` under the full render
