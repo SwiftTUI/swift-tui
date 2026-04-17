@@ -46,6 +46,16 @@ struct CounterTab: View {
         color = color.rotatedHue(by: 30)
       }
     }
+    .toolbarItem(
+      .init(
+        title: "Reset counter",
+        action: {
+          withAnimation(.default) {
+            count = 0
+          }
+        }
+      )
+    )
   }
 
   private var brandingHeader: some View {

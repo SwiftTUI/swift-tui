@@ -59,6 +59,7 @@ package struct RuntimeRegistrationSet {
     lifecycleRegistry?.removeSubtrees(rootedAt: roots)
     taskRegistry?.removeSubtrees(rootedAt: roots)
     preferenceObservationRegistry?.removeSubtrees(rootedAt: roots)
+    commandRegistry?.removeSubtrees(rootedAt: roots)
   }
 
   package func restore(

@@ -66,6 +66,12 @@ struct CalculatorTab: View {
     .frame(maxWidth: .infinity, alignment: .center)
     .padding(1)
     .animation(.easeInOut, value: display)
+    .toolbarItem(
+      .init(
+        title: "Clear",
+        action: { clearAll() }
+      )
+    )
   }
 
   private var buttonGrid: some View {

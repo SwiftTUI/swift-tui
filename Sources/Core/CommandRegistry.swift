@@ -151,4 +151,37 @@ package final class CommandRegistry: Equatable {
     keyCommandsByScope.removeAll(keepingCapacity: true)
     paletteCommandsByScope.removeAll(keepingCapacity: true)
   }
+
+  /// Debug-only: snapshot of {scope identity → count of palette
+  /// commands at that scope}. Intended for diagnostics and tests; do
+  /// not rely on this from production code.
+  package func paletteCommandCountsByScope() -> [Identity: Int] {
+    paletteCommandsByScope.mapValues(\.count)
+  }
+
+  /// Removes every key-command and palette-command registered at any
+  /// identity whose path is rooted at one of `roots`. Call this when a
+  /// subtree is about to re-resolve in a partial invalidation pass, so
+  /// re-registrations don't duplicate stale entries and abandoned
+  /// scopes don't linger in dispatch/palette lookups.
+  package func removeSubtrees(rootedAt roots: [Identity]) {
+    guard !roots.isEmpty else { return }
+    for identity in keyCommandsByScope.keys
+    where commandRegistryIdentityMatchesAnySubtreeRoot(identity, roots: roots) {
+      keyCommandsByScope.removeValue(forKey: identity)
+    }
+    for identity in paletteCommandsByScope.keys
+    where commandRegistryIdentityMatchesAnySubtreeRoot(identity, roots: roots) {
+      paletteCommandsByScope.removeValue(forKey: identity)
+    }
+  }
+}
+
+private func commandRegistryIdentityMatchesAnySubtreeRoot(
+  _ identity: Identity,
+  roots: [Identity]
+) -> Bool {
+  roots.contains { root in
+    identity == root || identity.isDescendant(of: root)
+  }
 }
