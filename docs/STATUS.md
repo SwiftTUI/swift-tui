@@ -1,7 +1,5 @@
 # Status
 
-Last updated: April 14, 2026
-
 ## Product Status
 
 The core terminal UI stack is implemented and regression-tested across the full frame pipeline:
@@ -16,8 +14,12 @@ area, app-shell ergonomics, and a few still-conservative runtime paths.
 
 The 2026 terminal-native reset is substantially landed: automatic chrome has
 been reset, shell navigation primitives are canonical, multiline editing and
-indeterminate loading are public, and toast/sheet presentation surfaces now
-live in the main `View` module instead of only in earlier exploratory work.
+indeterminate loading are public, and `alert`/`confirmationDialog`/`sheet`/
+`toast` presentation surfaces live in the main `View` module. The
+ActionScope/commands rollout (see
+[proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md))
+is partially landed: the scope scaffolding is in place, the consumer-facing
+command and toolbar modifiers are still in progress.
 
 ## Shipped Surface
 
@@ -92,119 +94,71 @@ rule. The remaining gaps are therefore prioritized around terminal workspaces,
 deeper scroll control, and navigation surfaces that still need a stronger
 hypothesis before they graduate.
 
-### Commands, Keybindings, and Scope Hypothesis
+### Commands, Keybindings, and Scopes
 
 An earlier toolbar/command-palette/help-sheet implementation was reverted
-because it preceded a clear design model. The current hypothesis operates at
-a deeper level than toolbars or commands specifically.
+because it preceded a clear design model. The replacement is the ActionScope
+model described in
+[proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)
+and tracked by
+[proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md](proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md).
+The core model operates at a deeper level than toolbars or commands specifically.
 
 **Commands belong to scopes. A scope is a tree-authored command set with an
 activation predicate. The activation predicate is focus-chain membership.**
 
-#### The abstraction: App Navigation ⊂ Modal App Behavior ⊂ Scopes
+See
+[proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)
+for the full model: the scope-kind taxonomy (`Scene`, `Presentation`, `Panel`),
+shallowest-wins dispatch precedence, the scope-root-only command surface, the
+hoisted toolbar-item preference contract, and the discoverability invariant.
 
-Users don't think "which view is rendering?" They think "what can I do right
-now?" What they can do changes when they push a screen, open a modal, switch
-tabs, enter a mode (vim-style), select something, or the app suppresses
-interaction.
+#### Landed vs pending
 
-All of these are mode changes. Navigation is one disciplined kind of mode —
-one that carries spatial visualization, stack-like nesting, and reversibility.
-But navigation is not the primitive; modes are. And "mode" is a subset of a
-more general abstraction: **scopes**.
+The rollout follows the phased plan in
+[proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md](proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md).
 
-#### The focus chain is the activation predicate
+Landed:
 
-Every scope has an anchor node in the view tree. Tree presence is a
-prerequisite — a scope whose anchor isn't resolved can't fire — but presence
-alone isn't activation. A resolved-but-unreachable node (background tab,
-severed focus path) is philosophically silent.
+- `.onKeyPress(...)` and the global `HotkeyRegistry` have been removed. The
+  consumer-facing keybinding surface is now the ActionScope-based commands
+  plan rather than a view modifier that writes into a global registry.
+- `ActionScope` protocol, `AnyID`, and a scope-identity-keyed `CommandRegistry`
+  are in place and wired into the runtime.
+- `Panel` primitive plus `.panel(id:)` / `.panel()` / `.focusContainment(_:)`
+  are part of the public `View` surface.
+- `Scene`-conforming types and the `.alert` / `.confirmationDialog` / `.sheet`
+  presentation modifiers conform to `ActionScope`, and presentation overlays
+  scope-inherit scene identity.
+- `.keyCommand(...)` with shallowest-wins focus-chain dispatch. Consumer-
+  registered `(key, modifiers)` bindings on any `ActionScope & View` fire
+  when the scope is on the current focus chain; modifier-less registrations
+  are silently dropped (single-key dispatch is framework-reserved for typing,
+  arrow navigation, Tab, Enter, and Escape); a disabled match consumes the
+  event without firing and blocks deeper matches.
 
-The actual activation predicate: **the anchor node is on the current focus
-chain.** There is always a focus chain from the app root down to whichever
-leaf currently owns focus. Every node on the chain is reachable by input;
-every node off the chain is silent.
+Pending:
 
-#### Candidate scope kinds
+- `.paletteCommand(...)` and the `@Environment(\.activePaletteCommands)` query
+  API for consumer-authored palette surfaces
+- `.toolbar(style:)` on scopes plus `.toolbarItem(...)` hoisting from any view
 
-| Scope | Anchor predicate | UI correspondent |
-|---|---|---|
-| **App** | root is on chain (trivially always) | help overlay / `?` menu |
-| **Screen** | current screen node is on chain | title/nav bar |
-| **Presentation** | modal node is on chain (tail) | the modal itself |
-| **Input** | named focus region is on chain | focus indicator |
-| **Selection** | orthogonal state predicate | selection chrome |
-
-All five differ only in *which node's chain-membership they predicate about*.
-Modal shadowing falls out naturally: the modal node becomes the tail; the
-parent is still on the chain above it, so parent scope is still active — the
-modal's bindings just have priority on collisions (deeper wins).
-
-Ship with a curated small set. The friction of adding a sixth kind is the
-feature — it prevents ad-hoc scope proliferation.
-
-#### Four requirements, reframed via the focus chain
-
-- **Lifetime** — anchor node stays on the focus chain long enough to be useful
-- **Locality** — author the command near the state it operates on; ensure that node is on the chain when the command should fire
-- **Composability** — the focus chain is a stack; scopes compose by stacking
-- **Discoverability** — the chain is knowable; the framework can enumerate active scopes
-
-#### Discoverability invariant
-
-Every active scope must have either a persistent chrome surface or a
-discoverability path. Scopes without chrome still have to answer "how would
-the user know?" This is what distinguishes a scope from a hidden mode — the
-failure case we're escaping.
-
-#### What `.onKeyPress()` becomes
-
-A low-level escape hatch for "handle this key while this specific view is on
-the focus chain." Not the primary keybinding API. The primary API is
-scope-declaration at natural DSL boundaries (App, NavigationStack levels,
-TabView, `.sheet()`, focus regions, selection state).
-
-#### Current state and constraints
-
-This hypothesis has not yet been implemented. The framework currently has:
-
-- `.onKeyPress()` → global `HotkeyRegistry`, tree-lifetime-dependent, fragile
-- `LocalKeyHandlerRegistry` → focus-identity-keyed, package-internal, used by built-in controls
-
-Neither corresponds to the scope model. Both operate below the abstraction
-we want.
+Framework-owned single-key dispatch continues through `LocalKeyHandlerRegistry`
+for built-in controls.
 
 #### Open design questions
 
-- **Precedence on collisions.** If Selection-scope and Screen-scope both bind `d`, who wins? Depth on the chain is one ordering; scope-kind priority (Selection > Presentation > Screen > App) is another. Probably some combination.
-- **State-predicated scopes still tree-author.** Selection state lives on some node; its anchor is that node. What's different is the activation predicate, not the authoring site.
-- **Escape-hatch risk.** Someone will want a scope that doesn't fit the five. A generic condition-scope would become a dumping ground. Resist until a real case proves the curated set insufficient.
+The following are tracked alongside the remaining implementation phases:
+
+- **Precedence on collisions.** If two scopes on the same chain both bind the same `(key, modifiers)` pair, shallowest wins per the landed plan. Cross-scope-kind priority beyond pure chain depth is still open.
+- **State-predicated scopes still tree-author.** Selection-like state lives on some node; the anchor is that node. What differs is the activation predicate, not the authoring site.
+- **Escape-hatch risk.** A generic condition-scope would become a dumping ground. Resist a new scope kind until a real case proves the curated set insufficient.
 - **Modes aren't always navigation.** Vim-style modes (insert/normal/visual) are state-predicated scopes that don't correspond to tree transitions. The model handles this, but the DSL needs state-predicate scopes as first-class, not just structural ones.
 
-#### Design sequence
+## See Also
 
-When designing scope, command, and keybinding APIs:
-
-1. Start from scope kinds — what are the activation predicates users care about?
-2. For each scope kind, identify the anchor node type in the DSL
-3. For each scope kind, identify the UI correspondent (or the discoverability path if not visibly chromed)
-4. Define precedence for collisions across scopes
-5. Only then: design the authoring API
-
-Do not start from the authoring API. Starting there is what produced `.onKeyPress()`.
-
-## Documentation Status
-
-- Public module DocC catalogs now exist per target and should be treated as the public API guide
-- The repository `README.md` is the public landing page
-- The Markdown files in `docs/` remain the source of truth for architecture, runtime behavior, and API governance
-
-## Reference Docs
-
-- [ARCHITECTURE.md](ARCHITECTURE.md): target boundaries and frame pipeline
-- [RUNTIME.md](RUNTIME.md): runtime behavior, lifecycle semantics, and incremental rendering
-- [HOST_PACKAGES.md](HOST_PACKAGES.md): runner-package and embedded-host packaging model
-- [SOURCE_LAYOUT.md](SOURCE_LAYOUT.md): current source ownership map
-- [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md): classified public surface inventory
-- [PUBLIC_SURFACE_POLICY.md](PUBLIC_SURFACE_POLICY.md): future API governance rules
-- [TESTING_AND_FIXTURE_POLICY.md](TESTING_AND_FIXTURE_POLICY.md): fixture and regression policy
+The repository [README.md](../README.md) is the public landing page; this
+document and the rest of `docs/` are the source of truth for architecture,
+runtime behavior, and API governance. Per-target DocC catalogs under
+`Sources/*/*.docc` are the public API guide. [docs/README.md](README.md) is
+the full doc index.

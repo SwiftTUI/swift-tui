@@ -37,6 +37,19 @@ extension RunLoop {
   ) -> RunLoopExitReason? {
     let keyEvent = keyPress.key
 
+    // Scope-based keyCommand dispatch for modifier-bearing keys.
+    // Walks the current focus chain shallowest-first; a matching
+    // keyCommand consumes the event (or blocks dispatch if disabled)
+    // before the framework's default quit behavior runs — so a
+    // consumer-registered Ctrl+C command takes precedence over the
+    // default exit.
+    if !keyPress.modifiers.isEmpty {
+      let binding = KeyBinding(key: keyPress.key, modifiers: keyPress.modifiers)
+      if commandRegistry.dispatch(key: binding, along: currentFocusScopePath()) {
+        return nil
+      }
+    }
+
     // Default quit behavior.
     switch keyEvent {
     case .character("q") where keyPress.modifiers.isEmpty:
@@ -140,5 +153,19 @@ extension RunLoop {
     default:
       return .exit(.signal(name))
     }
+  }
+
+  /// Returns the scope path for the currently focused region, or an
+  /// empty array when nothing is focused. The path is ordered
+  /// shallowest-first and includes the focused node's own identity
+  /// when that node is itself a scope boundary — so a focused Panel
+  /// sees its own commands as claimable.
+  package func currentFocusScopePath() -> [Identity] {
+    guard let focusedIdentity = focusTracker.currentFocusIdentity else {
+      return []
+    }
+    return latestSemanticSnapshot.focusRegions
+      .first(where: { $0.identity == focusedIdentity })?
+      .scopePath ?? []
   }
 }

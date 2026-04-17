@@ -139,21 +139,10 @@ another app or runtime lifecycle.
 - macOS 15+ for local package development on Apple platforms
 - Swift 6.3.0 managed through `swiftly`
 
-This repo pins Swift `6.3.0` in [`.swift-version`](/Users/adamz/Developer/repos/swift-terminal-ui/.swift-version).
-Use `swiftly` by default for repo-local SwiftPM work.
-
-Verify before building:
-
-```bash
-swiftly run swift --version
-```
-
-The shorter `swift ...` form is also fine when your shell already resolves
-`swift` through the `swiftly`-managed Swift 6.3.0 toolchain. Native-only builds
-should also work fine in Xcode, but the default documented path in this repo is
-still `swiftly`.
-
-Use [docs/TOOLCHAINS.md](/Users/adamz/Developer/repos/swift-terminal-ui/docs/TOOLCHAINS.md) as the source of truth for native, wasm, Bun, Xcode, and Android toolchain expectations.
+The repo pins Swift `6.3.0` in [`.swift-version`](.swift-version) and uses
+`swiftly` as the default SwiftPM driver. See
+[docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) for the full native, wasm, Bun, Xcode,
+and Android toolchain story.
 
 ## Build And Test
 
@@ -181,38 +170,29 @@ Generate per-module DocC archives with:
 swiftly run swift package generate-documentation --target TerminalUI
 ```
 
-## Embedded Host Packages
-
-Peer host packaging lives outside the root package products:
-
-- `GUI/SwiftUITUIGUI`: Ghostty-backed SwiftUI host package for macOS and iOS, built on `TerminalUI` scene manifests and `HostedSceneSession`
-- `GUI/SwiftTermTUIGUI`: SwiftTerm-backed SwiftUI host package for macOS and iOS, built on `TerminalUI` scene manifests and `HostedSceneSession`
-- `GUI/WebTUIGUI`: Bun-based web host package that builds a TerminalUI wasm app bundle and hosts it in the browser with `ghostty-web`
-- `GUI/XtermWebTUIGUI`: Bun-based web host package that builds a TerminalUI wasm app bundle and hosts it in the browser with xterm.js
-
 ## Current Constraints
 
 - The core `TerminalUI` runtime is still intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
 - Platform integration now lives outside the root package. Use executable runner packages for terminal-native or WASI execution, and embedded host packages for SwiftUI or browser embedding.
-- Command registration, sheets, toasts, and the command palette are now part of the supported `View` surface. Broader launcher-like shell workflows remain unsettled.
+- Presentation surfaces (`alert`, `confirmationDialog`, `sheet`, `toast`) are part of the supported `View` surface. The scope-and-commands authoring surface (`ActionScope`, `Panel`, `FocusContainment`, `keyCommand`) has landed with shallowest-wins focus-chain dispatch; `paletteCommand` and toolbar surfaces are still landing against the plan in [docs/proposals/ACTION_SCOPES_AND_COMMANDS.md](docs/proposals/ACTION_SCOPES_AND_COMMANDS.md).
 
 ## Upcoming Work
 
+- Remaining phases of the ActionScope/commands rollout: `paletteCommand`, `toolbar`, and `toolbarItem`
 - `NavigationStack` and richer popover-style presentation beyond the current sheet support
-- richer focus ergonomics and scroll control
+- Richer focus ergonomics and scroll control
 
 ## Documentation
 
-- [README](README.md): public overview, product map, and getting-started entry point
-- [docs/README.md](docs/README.md): internal documentation index and maintenance notes
-- [docs/VISION.md](docs/VISION.md): project philosophy, scope, and deferred work
-- [docs/STATUS.md](docs/STATUS.md): shipped surface, current constraints, and short-term gaps
+Start with [docs/README.md](docs/README.md) — it is the canonical index for every
+design doc, active proposal, and background note in this repository. Per-module
+API reference lives in the `*.docc` catalogs under `Sources/`, generated with
+the DocC command above.
+
+Common entry points:
+
+- [docs/STATUS.md](docs/STATUS.md): shipped surface and current constraints
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): target boundaries and frame pipeline
-- [docs/RUNTIME.md](docs/RUNTIME.md): runtime behavior, lifecycle semantics, and incremental-cost model
-- [docs/HOST_PACKAGES.md](docs/HOST_PACKAGES.md): runner-package and embedded-host packaging model
-- [docs/SOURCE_LAYOUT.md](docs/SOURCE_LAYOUT.md): source ownership map across targets and key files
-- [docs/PUBLIC_API_INVENTORY.md](docs/PUBLIC_API_INVENTORY.md): classified public-surface inventory
-- [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md): public API governance rules
-- [Examples/README.md](Examples/README.md): surviving example apps and what each one demonstrates
-- [docs/proposals/](docs/proposals): active design notes that are still intentionally retained
-- `*.docc` catalogs inside `Sources/*`: module landing pages and API-focused guides for `Core`, `View`, `TerminalUI`, and `TerminalUICharts`
+- [docs/RUNTIME.md](docs/RUNTIME.md): lifecycle, state, and incremental rendering behavior
+- [docs/VISION.md](docs/VISION.md): philosophy, scope, and deferred work
+- [Examples/README.md](Examples/README.md): maintained example apps

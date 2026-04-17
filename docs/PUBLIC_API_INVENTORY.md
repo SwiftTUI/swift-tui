@@ -1,7 +1,5 @@
 # Public API Inventory
 
-Last updated: April 14, 2026
-
 This page is the post-migration reference for the public surface of the package. It separates the canonical SwiftUI-shaped API and actor-isolation model from package-only seams that still exist in the codebase.
 
 ## How To Read This
@@ -73,6 +71,27 @@ Removed from the public surface in this revamp:
 
 - `LineVariant` — deleted wholesale, no deprecation shim. The rasterizer now reads glyphs from `BorderSet`. `StrokeStyle(lineVariant:)` is replaced by `StrokeStyle(borderSet:)`.
 
+### Action scopes and commands (partially landed)
+
+The scaffolding for the ActionScope/commands rollout is public. The
+consumer-facing command and toolbar modifiers are still pending; see
+[proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)
+and
+[proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md](proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md)
+for the full plan and phase status.
+
+- `ActionScope` protocol (`Core`) with `AnyID` type-erased identity
+- `CommandRegistry` runtime hook (`Core`), wired into `RunLoop`
+- `Panel<ID, Content>` primitive plus `.panel(id:)` and `.panel()` modifiers (`View`)
+- `FocusContainment` enum plus `.focusContainment(_:)` on `Panel`
+- `Scene`-conforming types conform to `ActionScope`
+- `.alert` / `.confirmationDialog` / `.sheet` presentation modifiers conform to `ActionScope`
+- `.keyCommand(_:key:modifiers:isEnabled:action:)` on `ActionScope where Self: View`, with shallowest-wins dispatch along the current focus chain (modifier-less bindings are framework-reserved and silently dropped)
+
+Still to land: `.paletteCommand(...)`,
+`@Environment(\.activePaletteCommands)`, `.toolbar(style:)`,
+`.toolbarItem(...)`, `ToolbarItemConfig`, and `ToolbarStyle`.
+
 ### `TerminalUI`
 
 The runtime-facing public surface is also canonical:
@@ -134,6 +153,7 @@ These migration-era APIs are no longer public:
 - concrete wrapper-view implementation types such as `IDView`, `LayoutMetadataModifier`, `DrawMetadataModifier`, `SemanticMetadataModifier`, `EnvironmentWritingModifier`, `EnvironmentTransformModifier`, `PaddingView`, `FrameView`, `OverlayView`, and `BackgroundView`
 - runtime registry and replay types such as `LocalActionRegistry`, `LocalKeyHandlerRegistry`, `LocalLifecycleRegistry`, `LocalTaskRegistry`, `TaskRegistration`, `LifecycleHandlerSnapshot`, and `LocalKeyEvent`
 - keyboard-help compatibility APIs such as `KeyboardShortcut`, `KeyboardShortcutGroup`, `KeyboardShortcutHelpView`, `.keyboardShortcut(...)`, and `.keyboardShortcutHelp(...)`
+- the global hotkey registration seam: `.onKeyPress(...)` view modifier, `HotkeyRegistry`, `HotkeyBinding`, and `HotkeyRegistrationSnapshot`. Consumers now bind keys through the ActionScope-based commands surface (see [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)); the `.keyCommand` / `.paletteCommand` / `.toolbar` modifiers that replace `.onKeyPress` are still landing
 - generic presentation coordination surface such as `PresentationFamilyID`, `PresentationLaneID`, `PresentationFamilySelectionPolicy`, `PresentationLaneOrdering`, `PresentationLaneVisibilityPolicy`, `PresentationBackgroundInteraction`, `PresentationFamilyPolicy`, `PresentationLanePolicy`, `PresentationCoordinatorConfiguration`, `PresentationPlacementContext`, `.presentationCoordinator(...)`, and `.presentation(...)`
 
 ### Removed Public Styling Compatibility
@@ -171,7 +191,6 @@ Prototype and showcase code may still live in the repository as sibling example 
 Current rule:
 
 - sibling example packages and demos may exist for experiments or regression coverage, but they are not supported package products
-- canonical command registration and command-palette APIs live in `View`, so app-facing docs should use those supported surfaces as the primary workflow story
 - README and architecture-facing docs should describe showcase code as secondary when it appears at all
 - terminal-native interaction surfaces that are still being shaped should not force premature API commitments onto `View`
 
