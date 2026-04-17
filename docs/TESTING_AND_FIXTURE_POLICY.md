@@ -1,7 +1,5 @@
 # Testing And Fixture Policy
 
-Last updated: April 11, 2026
-
 This policy keeps reliability work predictable in the current decomposed
 codebase.
 

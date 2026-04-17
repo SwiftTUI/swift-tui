@@ -1,7 +1,5 @@
 # Runtime
 
-Last updated: April 9, 2026
-
 This document is the stable reference for runtime behavior. It captures the shipped lifecycle rules, state and observation model, input handling, and the current incremental delivery cost model.
 
 ## Runtime Shape
@@ -18,9 +16,8 @@ For interactive sessions, the runtime owns the terminal alternate-screen buffer 
 
 ## Root-Hoisted Presentations
 
-Built-in presentations such as alerts, confirmation dialogs, sheets, toasts,
-and the command palette are authored inside the base view tree but displayed at
-the root.
+Built-in presentations — `alert`, `confirmationDialog`, `sheet`, and `toast` —
+are authored inside the base view tree but displayed at the root.
 
 - Base resolution collects presentation declarations during the ordinary resolve pass
 - Visible presentation payloads resolve as overlay roots after the base tree has already been resolved

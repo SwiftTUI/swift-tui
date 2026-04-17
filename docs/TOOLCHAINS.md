@@ -1,7 +1,5 @@
 # Toolchains
 
-Last updated: April 14, 2026
-
 This repository uses more than one build tool, but the default Swift workflow
 for package development and verification is `swiftly` with Swift `6.3.0`.
 

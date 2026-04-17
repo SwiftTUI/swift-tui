@@ -1,123 +1,112 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code and other agentic assistants working in this
+repository. Keep this file concise — the detailed design documents in
+[`docs/`](docs/README.md) are the source of truth. Update them there, not here.
 
 ## Build & Test Commands
 
 ```bash
-bun run test                             # Run the full repo test surface and environment checks
-swiftly run swift build                  # Build all targets
-swiftly run swift test                   # Run root package tests
-swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests  # Run a single test suite
-swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests/testName  # Run a single test
-swift format format -i --configuration .swift-format.json Sources/ Tests/  # Format all code
+bun run test                                       # Full repo test surface + environment checks
+swiftly run swift build                            # Build all root-package targets
+swiftly run swift test                             # Run root-package tests
+swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests             # One test suite
+swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests/testName    # One test
+swift format format -i --configuration .swift-format.json Sources/ Tests/       # Format
 ```
 
-## Development Guidelines
+Always run `bun run test` after changes that touch shared code, peer packages,
+or repo tooling, and confirm it passes before considering work complete.
 
-- When implementing a new feature that replaces or extends an existing constraint (e.g., single-scene → multi-scene), search for and remove ALL old guards/assertions that enforce the previous constraint.
-- When working with this Swift TUI framework, always run `bun run test` after changes that touch shared code, peer packages, or repo tooling, and confirm it passes before considering work complete.
+See [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) for the canonical toolchain story
+(`swiftly`, wasm SDK, Bun, Xcode, Android NDK).
 
-## AnyView Policy
-
-- Prefer typed `@ViewBuilder` closures and generic `Content: View` storage.
-- Treat `AnyView` as an escape hatch, not as a default container type.
-- Do not introduce public APIs that expose `[AnyView]`, builder closures returning `AnyView`, or node-erasure seams.
-- If authored content is stored for later evaluation, capture it with `scopedAnyView(...)`, not plain `AnyView(...)`.
-- Add a nearby `AnyView policy:` comment when introducing new stored `AnyView`, `[AnyView]`, or closure-returning-`AnyView` members.
-
-## Pre-commit Hooks (prek)
-
-- **swift-format**: Auto-formats staged `.swift` files on commit.
-- **no-foundation-in-library-products**: Blocks commits that add `import Foundation` or `public import Foundation` in the Foundation-free `Sources/Core`, `Sources/View`, and `Sources/TerminalUI` library layers.
-- **public-surface-policies**: Enforces public surface guardrails and the docs that describe that policy.
-- **structured-concurrency-escape-hatches**: Blocks checked-in Swift sources from using `@unchecked Sendable` or `nonisolated(unsafe)`; use actor isolation, `Sendable` storage, or `Synchronization` primitives instead.
-
-There is not currently a separate checked-in source-layout hook. Keep
-`docs/SOURCE_LAYOUT.md` aligned with file moves in ordinary review.
-
-## Code Style
-
-- 2-space indentation, 100-character line length.
-- `private` (not `fileprivate`) for file-scoped declarations.
-- Ordered imports. No block comments. No void return on function signatures.
-- Full config in `.swift-format.json`.
-
-## Swift Language Settings
-
-- Swift 6.3 with strict memory safety and Swift 6 language mode.
-- Upcoming features enabled: `ExistentialAny`, `NonisolatedNonsendingByDefault`, `MemberImportVisibility`, `InternalImportsByDefault`, among others.
-- Platforms: macOS 15+, iOS 18+.
-
-## Architecture
-
-### Target Dependency Chain
+## Architecture (one-page summary)
 
 ```
 TerminalUI  ->  View  ->  Core
 ```
 
-- **Core** -- Pure, terminal-IO-free pipeline: geometry, styling, layout engine, semantic extraction, draw extraction, rasterizer, scheduler, commit planner.
-- **View** -- SwiftUI-shaped authoring surface: `View` protocol, `@State`/`@Binding`/`@FocusState`, containers (`VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `Table`), controls (`Button`, `Toggle`, `TextField`, etc.), environment, and focus system.
-- **TerminalUI** -- Terminal runtime: `RunLoop`, `TerminalHost`, input parsing, signal handling, alternate-screen management, lifecycle coordination. Re-exports View and Core.
-- **TerminalUICharts** -- Separate track for compact chart/metric views (not core roadmap).
+- **Core** — pure, terminal-IO-free pipeline
+- **View** — SwiftUI-shaped authoring surface
+- **TerminalUI** — terminal runtime; re-exports View and Core via `@_exported import`
+- **TerminalUICharts** — compact chart/metric track; separate product
 
-Each layer re-exports its dependency via `@_exported import`, so importing `TerminalUI` gives you everything.
-
-### Frame Pipeline
-
-Every render frame flows through seven strict phases:
+Every frame flows through seven strict phases:
 
 ```
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-- **Resolve**: Public `View` values lowered into `ResolvedNode` tree. Environment merged, structural views (Group, ForEach, conditionals) expand children.
-- **Measure**: `LayoutEngine` probes nodes under size proposals. Produces cacheable `MeasuredNode` tree. Parent proposes, child chooses (SwiftUI layout model).
-- **Place**: Measured nodes placed into final geometry (`PlacedNode`). Authoritative source for interaction regions and scroll content.
-- **Semantics**: Focus regions, action routes, selection routes extracted from placed tree.
-- **Draw**: Placed nodes lowered into draw commands (styling, text, shapes, clipping).
-- **Raster**: Draw commands converted to 2D cell grid (`RasterSurface`).
-- **Commit**: Lifecycle diffs (appear/disappear/task start/cancel), handler packaging.
+Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
+[docs/RUNTIME.md](docs/RUNTIME.md). Per-file ownership map in
+[docs/SOURCE_LAYOUT.md](docs/SOURCE_LAYOUT.md).
 
-### Key Design Rules
+## Development Guidelines
 
-- **SwiftUI-faithful layout**: Recursive parent-child negotiation, not global constraint solving. Modifier order matters.
-- **No terminal I/O in Core**: All terminal interaction is isolated to TerminalUI.
-- **Incremental rendering**: Measurement cache, retained layout sessions, cursor-addressed presentation updates. A second idle frame should reuse all work and write zero bytes.
-- **State keyed by identity path + source location**: `@State` persistence uses view identity in the tree, not reference identity.
+- When a new feature replaces or extends an existing constraint (e.g.
+  single-scene → multi-scene), search for and remove **all** old
+  guards/assertions that enforce the previous constraint. Don't leave stale
+  invariants behind.
+- New files should belong to one subsystem. Keep
+  [docs/SOURCE_LAYOUT.md](docs/SOURCE_LAYOUT.md) aligned with file moves.
+- Treat fixture changes as evidence, not housekeeping. See
+  [docs/TESTING_AND_FIXTURE_POLICY.md](docs/TESTING_AND_FIXTURE_POLICY.md).
 
-## Test Framework
+## Code Style
 
-- Prefer Swift Testing (`import Testing`, `@Test`, `#expect`) for new tests.
-- Existing XCTest suites may remain, but new test files should use Swift Testing.
+- 2-space indentation, 100-character line length
+- `private` (not `fileprivate`) for file-scoped declarations
+- Ordered imports, no block comments, no void return on function signatures
+- Full config in `.swift-format.json`
 
-## Test Organization
+## Swift Language Settings
 
-Tests are now split by layer:
+- Swift 6.3 with strict memory safety and Swift 6 language mode
+- Upcoming features enabled: `ExistentialAny`, `NonisolatedNonsendingByDefault`,
+  `MemberImportVisibility`, `InternalImportsByDefault`, and others
+- Platforms: macOS 15+, iOS 18+
 
-- `Tests/CoreTests/` -- pipeline, layout, raster, and focus infrastructure
-- `Tests/ViewTests/` -- authoring-surface, environment, and actor-isolation behavior
-- `Tests/TerminalUITests/` -- runtime, rendering, fixtures, and end-to-end behavioral coverage
-- `Runners/TerminalUICLI/Tests/TerminalUICLITests/` -- terminal-native runner, socket, pty, attach, and CLI-scene-management behavior
-- `Runners/TerminalUIWASI/Tests/TerminalUIWASITests/` -- WASI runner and manifest-mode behavior
-Repository-shape and policy regressions that do not require execution are enforced in `prek`
-hooks under `Scripts/`.
+## AnyView Policy
 
-Rendered-text fixture matrix completeness is currently verified in the Swift
-test suite rather than through a separate pre-commit hook.
+- Prefer typed `@ViewBuilder` closures and generic `Content: View` storage
+- Treat `AnyView` / `AnyScene` as escape hatches, not default container types
+- Do not add public APIs that expose `[AnyView]`, `[AnyScene]`, builder
+  closures returning `AnyView`, or node-erasure seams
+- If authored content is captured for later evaluation, use
+  `scopedAnyView(...)`, not plain `AnyView(...)`
+- Add a nearby `AnyView policy:` comment when introducing a new stored
+  `AnyView`, `[AnyView]`, or closure-returning-`AnyView` member
 
-Fixture updates require explanation when they cross unrelated subsystems or alter previously-stable scenarios. See `docs/TESTING_AND_FIXTURE_POLICY.md`.
+Full policy in [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md).
+
+## Pre-commit Hooks (prek)
+
+- **swift-format** — auto-formats staged `.swift` files
+- **no-foundation-in-library-products** — blocks `import Foundation` in the
+  Foundation-free `Core`, `View`, and `TerminalUI` library layers
+- **public-surface-policies** — enforces the guardrails in
+  [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md)
+- **structured-concurrency-escape-hatches** — blocks `@unchecked Sendable` and
+  `nonisolated(unsafe)`. Prefer explicit actor isolation, `Sendable` generic
+  constraints, or `Synchronization` primitives instead.
+
+## Tests
+
+Test suites are split by layer:
+
+- `Tests/CoreTests/` — pipeline, layout, raster, focus infrastructure
+- `Tests/ViewTests/` — authoring-surface, environment, actor-isolation
+- `Tests/TerminalUITests/` — runtime, rendering, fixtures, end-to-end behavior
+- `Runners/TerminalUICLI/Tests/TerminalUICLITests/` — CLI runner, socket, pty,
+  attach, scene-management behavior
+- `Runners/TerminalUIWASI/Tests/TerminalUIWASITests/` — WASI runner and
+  manifest-mode behavior
+
+Prefer Swift Testing (`import Testing`, `@Test`, `#expect`) for new tests.
+Existing XCTest suites may remain.
 
 ## Documentation
 
-Detailed design docs live in `/docs/`:
-- `ARCHITECTURE.md` -- target boundaries and pipeline
-- `RUNTIME.md` -- lifecycle, task semantics, incremental rendering model
-- `HOST_PACKAGES.md` -- runner-package and embedded-host packaging model
-- `SOURCE_LAYOUT.md` -- per-file ownership map
-- `PUBLIC_API_INVENTORY.md` -- public surface classification
-- `PUBLIC_SURFACE_POLICY.md` -- public API governance rules, including `AnyView` and type-erasure policy
-- `FOCUS.md` -- focus system design
-- `VISION.md` -- project philosophy and scope
-- `proposals/` -- active design notes that are still intentionally retained
+[docs/README.md](docs/README.md) is the canonical index — follow it for
+architecture, runtime, API governance, proposals, and background material.

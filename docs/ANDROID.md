@@ -1,30 +1,9 @@
 # Android Build
 
 This repo can be cross-compiled for Android with Swift 6.3 using the open-source
-Swift toolchain managed by Swiftly.
-
-This follows the repo-wide default described in [TOOLCHAINS.md](TOOLCHAINS.md):
-use `swiftly` by default for SwiftPM work, even on native Apple platforms.
-Xcode should still work for native-only builds, but Android cross-compilation is
-entirely on the `swiftly` path.
-
-## Toolchain
-
-The repo pins Swiftly to `6.3.0` via [`.swift-version`](../.swift-version).
-Use `swiftly run swift ...` so builds use the matching open-source toolchain
-instead of Xcode's `/usr/bin/swift`.
-
-Verify:
-
-```bash
-swiftly run swift --version
-```
-
-Expected:
-
-```text
-Apple Swift version 6.3 (swift-6.3-RELEASE)
-```
+Swift toolchain managed by Swiftly. Android cross-compilation is entirely on
+the `swiftly` path; see [TOOLCHAINS.md](TOOLCHAINS.md) for the canonical
+toolchain rules.
 
 ## Install the Android SDK
 

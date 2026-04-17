@@ -1,7 +1,5 @@
 # Host Packages
 
-Last updated: April 14, 2026
-
 ## Goal
 
 Make TerminalUI apps shippable outside a local terminal in four peer embedded
@@ -20,9 +18,7 @@ The authoring story stays the same:
 - resize and host style changes must continue to flow through the same runtime invalidation path as terminal `SIGWINCH`
 
 All Swift build commands in this document assume the repo-default `swiftly`
-toolchain story. Use `swiftly run swift ...` directly, or the shorter `swift`
-form only from a shell where `swift` already resolves to the `swiftly`-managed
-Swift 6.3.0 toolchain.
+toolchain story; see [TOOLCHAINS.md](TOOLCHAINS.md) for the full rules.
 
 ## Shipped Architecture
 
@@ -156,8 +152,7 @@ new products in the root package.
     ptys, and attach flows
   - `Runners/TerminalUIWASI` still executes one selected scene per wasm process
 - Host packages still own scene switching UI and style surfaces. The root package exposes scene manifests and hosted sessions, not a full cross-platform app shell.
-- `GUI/WebTUIGUI` build scripts prefer `swiftly run swift` when `swiftly` is installed and fall back to plain `swift` otherwise, so Bun-driven builds still need either the repo-default `swiftly` setup or a shell where `swift` already resolves to the matching Swift 6.3.0 toolchain.
-- `GUI/XtermWebTUIGUI` follows the same Swift toolchain requirement and shares the repo Bun workspace for builds and tests.
+- `GUI/WebTUIGUI` and `GUI/XtermWebTUIGUI` build scripts drive the repo-default `swiftly` toolchain (falling back to plain `swift` when available). See [TOOLCHAINS.md](TOOLCHAINS.md) for the toolchain requirement. Both packages share the repo Bun workspace for builds and tests.
 - Executable runner packages and embedded host packages are intentionally outside the root package products. Consumers opt into them separately.
 
 ## Non-Negotiable Decisions
