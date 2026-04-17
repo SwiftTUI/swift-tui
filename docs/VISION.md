@@ -76,19 +76,20 @@ Deferred items:
 - `NavigationStack`
 - popover-style presentation beyond the current sheet support
 
-Hypothesis-stage items (design model exists, implementation not yet started):
+Partially landed items (scaffolding shipped, consumer-facing surface in progress):
 
-- **Commands, keybindings, and scopes.** The design hypothesis is that
-  commands belong to **scopes** — a superset abstraction over navigation,
-  sub-hierarchies, and modal modes. A scope is a tree-authored command set
-  with an activation predicate; the predicate is focus-chain membership. Ship
-  with a curated small set of scope kinds (App, Screen, Presentation, Input,
-  Selection), each with a natural DSL anchor and a UI correspondent (visible
-  chrome or a discoverability path). Toolbars, nav bars, and help overlays
-  are UI correspondents of specific scope kinds, not the load-bearing
-  abstraction. An earlier toolbar/command-palette implementation was reverted
-  because it preceded this understanding. See [STATUS.md](STATUS.md) for the
-  full hypothesis.
+- **Commands, keybindings, and scopes.** Commands belong to **scopes** — a
+  superset abstraction over navigation, sub-hierarchies, and modal modes. A
+  scope is a tree-authored command set with an activation predicate; the
+  predicate is focus-chain membership. The `ActionScope` protocol, the `Panel`
+  primitive, `FocusContainment`, the scope conformances on `Scene` and the
+  `.alert` / `.confirmationDialog` / `.sheet` presentation modifiers, and
+  `.keyCommand(...)` with shallowest-wins focus-chain dispatch have shipped.
+  The remaining consumer-facing surface (`paletteCommand`, `toolbar`,
+  `toolbarItem`) is still in progress; see
+  [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)
+  for the full design and
+  [STATUS.md](STATUS.md#commands-keybindings-and-scopes) for phase tracking.
 
 These should not be implemented just because terminal frameworks often have
 analogous surfaces. They should land only once the terminal-specific interaction

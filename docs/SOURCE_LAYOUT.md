@@ -1,7 +1,5 @@
 # Source Layout
 
-Last updated: April 14, 2026
-
 This is the current ownership map for the codebase. It documents where
 subsystems live after the March 2026 source split and should stay aligned with
 future file moves.
@@ -119,6 +117,7 @@ library product. Downstream package consumers reach those types through
 - `Appearance.swift`, `Styling.swift`, `TerminalChromeStyle.swift`, and `ViewStyleTypes.swift`: styling and appearance support
 - `TextLayout.swift`, `RichText.swift`, `ImageTypes.swift`, `RasterTypes.swift`, `ScrollIndicatorSupport.swift`, `TableSupport.swift`, and `TableDrawSupport.swift`: supporting model types
 - `LocalActionRegistry.swift`, `LocalFocusBindingRegistry.swift`, `LocalFocusedValuesRegistry.swift`, `LocalKeyHandlerRegistry.swift`, `LocalLifecycleRegistry.swift`, `LocalPointerHandlerRegistry.swift`, `LocalPreferenceObservationRegistry.swift`, and `LocalTaskRegistry.swift`: package-only runtime registries
+- `ActionScope.swift` and `CommandRegistry.swift`: ActionScope scaffolding and the scope-identity-keyed command registry wired into the runtime (see [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md))
 - `MonotonicInstant.swift`, `PlatformLock.swift`, `PlatformMath.swift`, and `StringUtilities.swift`: low-level support helpers
 - `Core.docc/`: target-level pipeline guides
 
@@ -130,6 +129,7 @@ library product. Downstream package consumers reach those types through
 - `Environment/Environment.swift`, `Environment/ImageEnvironment.swift`, `Environment/Observation.swift`, and `Environment/StyleEnvironment.swift`: environment storage, repo-owned `@Bindable`, image resource roots, and style environment plumbing
 - `Focus/DefaultFocus.swift`: default-focus modifiers and focus defaults
 - `Layout/Layout.swift`, `Stacks/*.swift`, `ScrollView/*.swift`, `GeometryReading/*.swift`, `Collections/*.swift`, and `NavigationViews/*.swift`: layout, stack, scroll, geometry, collection, and navigation surfaces
+- `ActionScopes/Panel.swift` and `ActionScopes/KeyCommandModifier.swift`: the `Panel` primitive with `.panel(id:)` / `.panel()` / `FocusContainment`, and the `.keyCommand(...)` modifier for shallowest-wins keybindings. See [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md); palette-command and toolbar modifiers are still landing.
 - `Primitives/*.swift` and `Shapes/*.swift`: text/image primitives including `TextFigure`, labeled containers, tile backgrounds, and basic shapes
 - `Controls/*.swift`: control surfaces, rendering helpers, and shared control support
 - `Presentation/PresentationCoordinator.swift` and `Presentation/PresentationModifiers.swift`: shared presentation host, single-pass overlay composition, family coordinators, package-only declaration reconciliation, and built-in alert/confirmation-dialog/sheet/toast surfaces
