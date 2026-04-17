@@ -26,12 +26,28 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
       let elementContext = context.replacingIdentity(
         with: context.identity.explicitID(element[keyPath: id])
       )
-      let view = withAuthoringContext(dynamicPropertyScope) {
+      // Diverge structural identity per iteration so identity-deriving
+      // modifiers such as `.panel()` (which reads
+      // `scope.structuralIdentity`) see distinct positions for each
+      // element, while `viewIdentity` keeps pointing at the outer
+      // authoring view — this preserves invalidation routing and
+      // `@State` ownership for any closures that captured the scope
+      // (Button/Menu/Link/Picker/Stepper/TabView/value controls).
+      let perIterationScope = dynamicPropertyScope.map { scope in
+        AuthoringContext(
+          viewIdentity: scope.viewIdentity,
+          structuralIdentity: elementContext.identity,
+          focusedValues: scope.focusedValues,
+          viewNode: scope.viewNode,
+          ordinalTracker: scope.ordinalTracker
+        )
+      }
+      let view = withAuthoringContext(perIterationScope) {
         elementContext.trackingObservableAccess {
           content(element)
         }
       }
-      let elements = withAuthoringContext(dynamicPropertyScope) {
+      let elements = withAuthoringContext(perIterationScope) {
         view.resolveElements(in: elementContext)
       }
       resolved.append(contentsOf: elements)
