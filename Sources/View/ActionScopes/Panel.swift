@@ -22,7 +22,7 @@ public enum FocusContainment: Sendable {
 ///
 /// Pair with `.keyCommand(...)`, `.paletteCommand(...)`, or
 /// `.focusContainment(_:)` to configure.
-public struct Panel<ID: Hashable & Sendable, Content: View>: View, ActionScope {
+public struct Panel<ID: Hashable & Sendable, Content: View>: View, ActionScope, ResolvableView {
   public let id: ID
   package let containment: FocusContainment
   package let content: Content
@@ -46,24 +46,7 @@ public struct Panel<ID: Hashable & Sendable, Content: View>: View, ActionScope {
     self.content = content
   }
 
-  public var body: some View {
-    PanelBody(id: id, containment: containment, content: content)
-  }
-}
-
-extension Panel {
-  /// Configures focus containment for this Panel.
-  public func focusContainment(_ mode: FocusContainment) -> Panel<ID, Content> {
-    Panel(id: id, containment: mode, content: content)
-  }
-}
-
-private struct PanelBody<ID: Hashable & Sendable, Content: View>: View, ResolvableView {
-  let id: ID
-  let containment: FocusContainment
-  let content: Content
-
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let childNode = content.resolve(in: context.child(component: .named("content")))
     var metadata = focusStructureMetadata(scopeBoundary: true)
     metadata.isFocusable = true
@@ -83,6 +66,13 @@ private struct PanelBody<ID: Hashable & Sendable, Content: View>: View, Resolvab
   }
 }
 
+extension Panel {
+  /// Configures focus containment for this Panel.
+  public func focusContainment(_ mode: FocusContainment) -> Panel<ID, Content> {
+    Panel(id: id, containment: mode, content: content)
+  }
+}
+
 extension View {
   /// Wraps `self` in a Panel with an explicit identity.
   public func panel<PanelID: Hashable & Sendable>(
@@ -92,12 +82,20 @@ extension View {
   }
 
   /// Wraps `self` in a Panel whose identity is derived from the
-  /// structural identity path at the call site. Stable across
-  /// re-resolves; reproduced deterministically per source location and
-  /// surrounding identity context.
+  /// structural identity path at the call site. Derived from the
+  /// structural-identity path at the call site; stable across
+  /// re-resolves of the same view hierarchy.
+  ///
+  /// Use when Panel identity can be derived from structural position
+  /// rather than a user-meaningful value. For identity that survives
+  /// view-tree refactoring or refers to domain data, prefer
+  /// `.panel(id:)`.
   public func panel() -> Panel<AnyID, Self> {
-    let scope = currentAuthoringContext()
-    let derived = scope?.viewIdentity ?? Identity(components: [] as [String])
-    return Panel(id: AnyID(derived), containment: .open, content: self)
+    guard let scope = currentAuthoringContext() else {
+      preconditionFailure(
+        ".panel() requires an authoring context — call it inside a View's body, or use .panel(id:) with an explicit identity."
+      )
+    }
+    return Panel(id: AnyID(scope.viewIdentity), containment: .open, content: self)
   }
 }
