@@ -59,11 +59,15 @@ package struct RegisteredPaletteCommand: Sendable {
 /// matching binding. If that match is disabled, the event is consumed
 /// but no action fires — strict shallowest-wins semantics.
 @MainActor
-package final class CommandRegistry {
+package final class CommandRegistry: Equatable {
   private var keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]] = [:]
   private var paletteCommandsByScope: [Identity: [RegisteredPaletteCommand]] = [:]
 
   package init() {}
+
+  nonisolated package static func == (lhs: CommandRegistry, rhs: CommandRegistry) -> Bool {
+    lhs === rhs
+  }
 
   /// Registers (or replaces) a key command at the given scope identity.
   package func registerKeyCommand(
