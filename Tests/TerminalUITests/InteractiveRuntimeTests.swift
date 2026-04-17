@@ -87,92 +87,6 @@ struct InteractiveRuntimeTests {
     #expect(invalidator.requests.count == 4)
   }
 
-  @MainActor
-  @Test("generic onKeyPress registers a focus-independent hotkey handler")
-  func genericOnKeyPressRegistersHotkeyHandler() {
-    let recorder = KeyPressRecorder()
-    let hotkeyRegistry = HotkeyRegistry()
-    var context = ResolveContext(
-      identity: testIdentity("OnKeyPressProbe"),
-      applyEnvironmentValues: true
-    )
-    context.hotkeyRegistry = hotkeyRegistry
-
-    _ = Text("Probe")
-      .onKeyPress { keyPress in
-        recorder.presses.append(keyPress)
-        return .handled
-      }
-      .resolve(in: context)
-
-    #expect(hotkeyRegistry.registeredBindings().count == 1)
-    #expect(hotkeyRegistry.dispatch(KeyPress(.character("x"))))
-    #expect(recorder.presses == [KeyPress(.character("x"))])
-  }
-
-  @MainActor
-  @Test("generic onKeyPress handles runtime key input across frames")
-  func genericOnKeyPressHandlesRuntimeKeyInputAcrossFrames() async throws {
-    let terminalSize = Size(width: 24, height: 4)
-    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
-    let result = try await runTerminalInputHarness(
-      terminal: terminal,
-      events: [.key(.character("o")), .key(.escape)],
-      rootIdentity: testIdentity("OnKeyPressRuntimeProbe"),
-      terminalSize: terminalSize
-    ) {
-      OnKeyPressRuntimeProbe()
-    }
-
-    #expect(result.exitReason == .inputEnded)
-    let lastFrame = try #require(terminal.frames.last)
-    #expect(lastFrame.contains("Text: o"))
-    #expect(lastFrame.contains("State: closed"))
-  }
-
-  @MainActor
-  @Test("run loop retains generic onKeyPress handlers after initial render")
-  func runLoopRetainsGenericOnKeyPressHandlersAfterInitialRender() throws {
-    let terminalSize = Size(width: 24, height: 4)
-    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
-    let rootIdentity = testIdentity("OnKeyPressRuntimeProbe")
-    let runLoop = RunLoop(
-      rootIdentity: rootIdentity,
-      terminalHost: terminal,
-      terminalInputReader: ScriptedTerminalInputReader(events: []),
-      signalReader: EmptySignalReader(),
-      scheduler: FrameScheduler(),
-      stateContainer: StateContainer(
-        initialState: 0,
-        invalidationIdentities: [rootIdentity]
-      ),
-      focusTracker: FocusTracker(
-        invalidationIdentities: [rootIdentity]
-      ),
-      environmentValues: {
-        var values = EnvironmentValues()
-        values.terminalAppearance = terminal.appearance
-        values.terminalSize = terminalSize
-        return values
-      }(),
-      proposal: .init(width: terminalSize.width, height: terminalSize.height),
-      viewBuilder: { _, _ in
-        OnKeyPressRuntimeProbe()
-      }
-    )
-
-    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
-    var renderedFrames = 0
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-
-    #expect(runLoop.hotkeyRegistry.registeredBindings().count == 1)
-    #expect(runLoop.hotkeyRegistry.dispatch(KeyPress(.character("o"))))
-
-    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    let lastFrame = try #require(terminal.frames.last)
-    #expect(lastFrame.contains("Text: o"))
-  }
-
   @Test(
     "focus tracker falls back to the first remaining region when the focused identity disappears")
   func focusTrackerFallsBackWhenFocusedRegionDisappears() {
@@ -4267,39 +4181,6 @@ private struct ImperativeAlertPresentationHarnessView: View {
             )
           )
         }
-    }
-  }
-}
-
-private final class KeyPressRecorder {
-  var presses: [KeyPress] = []
-}
-
-private struct OnKeyPressRuntimeProbe: View {
-  @State private var text = ""
-  @State private var isClosed = false
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
-      Text("Text: \(text.isEmpty ? "<empty>" : text)")
-      Text("State: \(isClosed ? "closed" : "open")")
-    }
-    .onKeyPress { keyPress in
-      switch keyPress.key {
-      case .escape:
-        isClosed = true
-        return .handled
-      case .character, .space, .backspace:
-        _ = mutateTextEntryBinding(
-          $text,
-          event: keyPress.key,
-          allowsNewlines: false,
-          scrollPosition: nil
-        )
-        return .handled
-      default:
-        return .ignored
-      }
     }
   }
 }

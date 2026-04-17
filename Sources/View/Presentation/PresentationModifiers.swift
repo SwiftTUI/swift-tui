@@ -344,10 +344,6 @@ package struct HostedPromptPresentation: View {
         )
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .onKeyPress(.escape) {
-      item.dismiss()
-      return .handled
-    }
   }
 }
 

@@ -5,7 +5,6 @@ package struct NodeHandlers {
   package var pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler]
   package var focusBindingRegistrations: [FocusBindingRegistrationSnapshot]
   package var focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot]
-  package var hotkeyRegistrations: [HotkeyRegistrationSnapshot]
   package var lifecycleRegistrations: LifecycleHandlerSnapshot
   package var taskRegistrations: [Identity: TaskRegistration]
   package var preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot]
@@ -17,7 +16,6 @@ package struct NodeHandlers {
     pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
     focusBindingRegistrations: [FocusBindingRegistrationSnapshot] = [],
     focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot] = [],
-    hotkeyRegistrations: [HotkeyRegistrationSnapshot] = [],
     lifecycleRegistrations: LifecycleHandlerSnapshot = .init(),
     taskRegistrations: [Identity: TaskRegistration] = [:],
     preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot] = []
@@ -28,7 +26,6 @@ package struct NodeHandlers {
     self.pointerHandlerRegistrations = pointerHandlerRegistrations
     self.focusBindingRegistrations = focusBindingRegistrations
     self.focusedValuesRegistrations = focusedValuesRegistrations
-    self.hotkeyRegistrations = hotkeyRegistrations
     self.lifecycleRegistrations = lifecycleRegistrations
     self.taskRegistrations = taskRegistrations
     self.preferenceObservationRegistrations = preferenceObservationRegistrations
@@ -89,12 +86,6 @@ package struct NodeHandlers {
     } else {
       focusedValuesRegistrations.append(registration)
     }
-  }
-
-  package mutating func recordHotkey(
-    _ registration: HotkeyRegistrationSnapshot
-  ) {
-    hotkeyRegistrations.append(registration)
   }
 
   package mutating func recordLifecycleAppear(
