@@ -26,7 +26,7 @@ struct SceneActionScopeTests {
   }
 
   @Test("Scene-rooted focus regions include the scene identity at index 0 of scopePath")
-  func sceneIsOnScopePath() {
+  func sceneIsOnScopePath() throws {
     let rootIdentity = testIdentity("App", "test-window")
     let artifacts = DefaultRenderer().render(
       WindowHostView(content: Text("body").focusable(true)),
@@ -39,7 +39,7 @@ struct SceneActionScopeTests {
     let leaf = regions.first { region in
       region.identity != rootIdentity
     }
-    let leafRegion = try? #require(leaf)
-    #expect(leafRegion?.scopePath.first == rootIdentity)
+    let leafRegion = try #require(leaf)
+    #expect(leafRegion.scopePath.first == rootIdentity)
   }
 }
