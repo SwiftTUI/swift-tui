@@ -83,10 +83,11 @@ Partially landed items (scaffolding shipped, consumer-facing surface in progress
   scope is a tree-authored command set with an activation predicate; the
   predicate is focus-chain membership. The `ActionScope` protocol, the `Panel`
   primitive, `FocusContainment`, the scope conformances on `Scene` and the
-  `.alert` / `.confirmationDialog` / `.sheet` presentation modifiers, and
-  `.keyCommand(...)` with shallowest-wins focus-chain dispatch have shipped.
-  The remaining consumer-facing surface (`paletteCommand`, `toolbar`,
-  `toolbarItem`) is still in progress; see
+  `.alert` / `.confirmationDialog` / `.sheet` presentation modifiers,
+  `.keyCommand(...)` with shallowest-wins focus-chain dispatch, and
+  `.paletteCommand(...)` with `EnvironmentValues.activePaletteCommands` have
+  shipped. The remaining surface (`toolbar`, `toolbarItem`) is still in
+  progress; see
   [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)
   for the full design and
   [STATUS.md](STATUS.md#commands-keybindings-and-scopes) for phase tracking.

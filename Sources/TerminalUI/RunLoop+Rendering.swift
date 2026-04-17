@@ -65,6 +65,17 @@ extension RunLoop {
 
         let focusChanged = focusTracker.updateRegions(
           renderedArtifacts.semanticSnapshot.focusRegions)
+        latestActivePaletteCommands =
+          commandRegistry
+          .paletteCommands(along: currentFocusScopePath())
+          .map { command in
+            ActivePaletteCommand(
+              name: command.name,
+              description: command.description,
+              isEnabled: command.isEnabled,
+              action: command.action
+            )
+          }
         let desiredFocusRequest = localFocusBindingRegistry.desiredFocusRequest(
           allowedIdentities: Set(renderedArtifacts.semanticSnapshot.focusRegions.map(\.identity))
         )
@@ -261,6 +272,7 @@ extension RunLoop {
     effectiveEnvironmentValues.focusedIdentity = focusTracker.currentFocusIdentity
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
+    effectiveEnvironmentValues.activePaletteCommands = latestActivePaletteCommands
     if effectiveEnvironmentValues.openLinkAction.isPlaceholder {
       effectiveEnvironmentValues.openLinkAction = systemOpenLinkAction()
     }

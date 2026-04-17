@@ -2,10 +2,11 @@
 
 **Status:** Partially landed. The scope scaffolding (`ActionScope`, `AnyID`,
 `CommandRegistry`, `Panel` + `.panel(id:)` / `.panel()` / `.focusContainment(_:)`,
-`Scene` conformance, presentation-modifier conformances) and
-`.keyCommand(...)` with shallowest-wins focus-chain dispatch have shipped on
-`main`. `.paletteCommand(...)`, `.toolbar(style:)`, and `.toolbarItem(...)`
-are pending — see
+`Scene` conformance, presentation-modifier conformances),
+`.keyCommand(...)` with shallowest-wins focus-chain dispatch, and
+`.paletteCommand(...)` with `EnvironmentValues.activePaletteCommands` have
+shipped on `main`. `.toolbar(style:)` and `.toolbarItem(...)` are pending —
+see
 [ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md](ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md)
 for phase tracking.
 **Supersedes:** the reverted toolbar/command-palette/help-sheet system (commit `112d98f`, reverted in `076d3e3`)

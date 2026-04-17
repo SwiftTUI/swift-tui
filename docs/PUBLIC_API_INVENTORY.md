@@ -86,11 +86,11 @@ for the full plan and phase status.
 - `FocusContainment` enum plus `.focusContainment(_:)` on `Panel`
 - `Scene`-conforming types conform to `ActionScope`
 - `.alert` / `.confirmationDialog` / `.sheet` presentation modifiers conform to `ActionScope`
-- `.keyCommand(_:key:modifiers:isEnabled:action:)` on `ActionScope where Self: View`, with shallowest-wins dispatch along the current focus chain (modifier-less bindings are framework-reserved and silently dropped)
+- `.keyCommand(_:key:modifiers:isEnabled:action:)` on `ActionScope where Self: View & Sendable`, with shallowest-wins dispatch along the current focus chain (modifier-less bindings are framework-reserved and silently dropped)
+- `.paletteCommand(name:description:isEnabled:action:)` on `ActionScope where Self: View & Sendable` plus `ActivePaletteCommand` and `EnvironmentValues.activePaletteCommands` for consumer-authored palette query surfaces. The captured list is refreshed after each frame from the current focus chain.
 
-Still to land: `.paletteCommand(...)`,
-`@Environment(\.activePaletteCommands)`, `.toolbar(style:)`,
-`.toolbarItem(...)`, `ToolbarItemConfig`, and `ToolbarStyle`.
+Still to land: `.toolbar(style:)`, `.toolbarItem(...)`,
+`ToolbarItemConfig`, and `ToolbarStyle`.
 
 ### `TerminalUI`
 

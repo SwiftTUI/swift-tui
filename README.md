@@ -174,11 +174,11 @@ swiftly run swift package generate-documentation --target TerminalUI
 
 - The core `TerminalUI` runtime is still intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
 - Platform integration now lives outside the root package. Use executable runner packages for terminal-native or WASI execution, and embedded host packages for SwiftUI or browser embedding.
-- Presentation surfaces (`alert`, `confirmationDialog`, `sheet`, `toast`) are part of the supported `View` surface. The scope-and-commands authoring surface (`ActionScope`, `Panel`, `FocusContainment`, `keyCommand`) has landed with shallowest-wins focus-chain dispatch; `paletteCommand` and toolbar surfaces are still landing against the plan in [docs/proposals/ACTION_SCOPES_AND_COMMANDS.md](docs/proposals/ACTION_SCOPES_AND_COMMANDS.md).
+- Presentation surfaces (`alert`, `confirmationDialog`, `sheet`, `toast`) are part of the supported `View` surface. The scope-and-commands authoring surface (`ActionScope`, `Panel`, `FocusContainment`, `keyCommand`, `paletteCommand` with `EnvironmentValues.activePaletteCommands`) has landed with shallowest-wins focus-chain dispatch; toolbar surfaces are still landing against the plan in [docs/proposals/ACTION_SCOPES_AND_COMMANDS.md](docs/proposals/ACTION_SCOPES_AND_COMMANDS.md).
 
 ## Upcoming Work
 
-- Remaining phases of the ActionScope/commands rollout: `paletteCommand`, `toolbar`, and `toolbarItem`
+- Remaining phases of the ActionScope/commands rollout: `toolbar` and `toolbarItem`
 - `NavigationStack` and richer popover-style presentation beyond the current sheet support
 - Richer focus ergonomics and scroll control
 

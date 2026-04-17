@@ -136,11 +136,14 @@ Landed:
   are silently dropped (single-key dispatch is framework-reserved for typing,
   arrow navigation, Tab, Enter, and Escape); a disabled match consumes the
   event without firing and blocks deeper matches.
+- `.paletteCommand(...)` plus `EnvironmentValues.activePaletteCommands`.
+  Palette commands register at their scope's identity; after each frame the
+  runtime captures the commands visible along the current focus chain and
+  exposes them (ordered shallowest-first) through the environment so
+  consumer-authored palette surfaces can query them.
 
 Pending:
 
-- `.paletteCommand(...)` and the `@Environment(\.activePaletteCommands)` query
-  API for consumer-authored palette surfaces
 - `.toolbar(style:)` on scopes plus `.toolbarItem(...)` hoisting from any view
 
 Framework-owned single-key dispatch continues through `LocalKeyHandlerRegistry`
