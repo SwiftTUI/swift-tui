@@ -43,4 +43,17 @@ struct ToolbarTests {
     #expect(items.map(\.title).contains("Item A"))
     #expect(items.map(\.title).contains("Item B"))
   }
+
+  @Test("Builder toolbarItem variant registers its label text as the title")
+  func builderVariantRegisters() {
+    let view = Text("X").toolbarItem(action: {}) {
+      Text("Copy")
+    } icon: {
+      EmptyView()
+    }
+    let context = ResolveContext(identity: testIdentity("toolbar-root"))
+    let resolved = Resolver().resolve(AnyView(view), in: context)
+    let items = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
+    #expect(items.first?.title == "Copy")
+  }
 }

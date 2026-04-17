@@ -72,3 +72,45 @@ private struct ToolbarItemContribution<Content: View>: View, ResolvableView {
     return [node]
   }
 }
+
+extension View {
+  /// Contributes a toolbar item whose label and icon are supplied as
+  /// view builders. The contributed item is delivered to the nearest
+  /// enclosing ActionScope with a `.toolbar(style:)` modifier.
+  ///
+  /// The current implementation stores a text title extracted from the
+  /// label builder. A richer label/icon render path lands once toolbar
+  /// rendering grows beyond a plain-text strip.
+  @MainActor
+  public func toolbarItem<Label: View, Icon: View>(
+    position: ToolbarItemConfig.Position = .automatic,
+    isEnabled: Bool = true,
+    action: @escaping @MainActor @Sendable () -> Void,
+    @ViewBuilder label: () -> Label,
+    @ViewBuilder icon: () -> Icon
+  ) -> some View {
+    let labelText = extractPrimaryText(from: label()) ?? ""
+    _ = icon()
+    return toolbarItem(
+      ToolbarItemConfig(
+        title: labelText,
+        position: position,
+        isEnabled: isEnabled,
+        action: action
+      )
+    )
+  }
+}
+
+/// Best-effort title extraction from a label view. Handles a plain
+/// `Text` directly; returns nil for anything else. The builder variant
+/// of `.toolbarItem` falls back to an empty string when extraction
+/// fails, which is acceptable until the toolbar render path plumbs
+/// full label views through.
+@MainActor
+private func extractPrimaryText<Label: View>(from label: Label) -> String? {
+  if let text = label as? Text {
+    return text.content
+  }
+  return nil
+}

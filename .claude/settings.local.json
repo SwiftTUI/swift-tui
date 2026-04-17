@@ -77,7 +77,8 @@
       "Bash(awk '/^    \"[A-Za-z0-9+\\\\/=]+\",?$/ {gsub\\(/[\",]/, \"\"\\); gsub\\(/^ +/, \"\"\\); print}' /Users/adamz/Developer/repos/swift-terminal-ui/Examples/gallery/Sources/GalleryDemoViews/ImagesTab.swift)",
       "Bash(md5 -q /tmp/brn128q.b64lines)",
       "Bash(awk ' *)",
-      "Bash(awk '/^    \"[A-Za-z0-9+\\\\/=]+\",?$/ {gsub\\(/[\",]/, \"\"\\); gsub\\(/^ +/, \"\"\\); printf \"%s\", $0}')"
+      "Bash(awk '/^    \"[A-Za-z0-9+\\\\/=]+\",?$/ {gsub\\(/[\",]/, \"\"\\); gsub\\(/^ +/, \"\"\\); printf \"%s\", $0}')",
+      "Bash(swift format *)"
     ]
   }
 }
