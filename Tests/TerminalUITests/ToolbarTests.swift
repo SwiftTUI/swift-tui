@@ -1,6 +1,7 @@
 import Testing
 
 @testable import Core
+@testable import TerminalUI
 @testable import View
 
 @MainActor
@@ -105,5 +106,71 @@ struct ToolbarTests {
     let leakedItems = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
     // Absorbed at outer Panel because inner Panel has no toolbar.
     #expect(leakedItems.isEmpty)
+  }
+
+  @Test("Panel with top toolbar renders item titles in a horizontal strip above the content")
+  func toolbarRendersAboveContent() {
+    let panel =
+      Panel(id: "outer") {
+        Text("body")
+          .toolbarItem(
+            .init(
+              title: "Save",
+              icon: nil,
+              position: .top,
+              isEnabled: true,
+              action: {}
+            )
+          )
+      }
+      .toolbar(style: DefaultTopToolbarStyle())
+      .frame(width: 20, height: 5)
+
+    let artifacts = DefaultRenderer().render(
+      panel,
+      context: .init(identity: testIdentity("toolbar-render-root"))
+    )
+    let lines = artifacts.rasterSurface.lines
+    let saveRow = lines.firstIndex { $0.contains("Save") }
+    let bodyRow = lines.firstIndex { $0.contains("body") }
+    #expect(saveRow != nil)
+    #expect(bodyRow != nil)
+    if let saveRow, let bodyRow {
+      // Top-placement: toolbar strip must appear above the content.
+      #expect(saveRow < bodyRow)
+    }
+  }
+
+  @Test("Panel with bottom toolbar renders item titles below the content")
+  func toolbarRendersBelowContent() {
+    let panel =
+      Panel(id: "outer") {
+        Text("body")
+          .toolbarItem(
+            .init(
+              title: "Close",
+              icon: nil,
+              position: .bottom,
+              isEnabled: true,
+              action: {}
+            )
+          )
+      }
+      .toolbar(style: DefaultBottomToolbarStyle())
+      .frame(width: 20, height: 5)
+
+    let artifacts = DefaultRenderer().render(
+      panel,
+      context: .init(identity: testIdentity("toolbar-render-bottom-root"))
+    )
+    let lines = artifacts.rasterSurface.lines
+    let bodyRow = lines.firstIndex { $0.contains("body") }
+    let closeRow = lines.firstIndex { $0.contains("Close") }
+    #expect(bodyRow != nil)
+    #expect(closeRow != nil)
+    if let bodyRow, let closeRow {
+      // Bottom-placement: toolbar strip must appear below the content.
+      #expect(bodyRow < closeRow)
+    }
   }
 }

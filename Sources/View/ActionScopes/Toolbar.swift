@@ -71,13 +71,85 @@ public struct ToolbarHost<Content: View & Sendable, S: ToolbarStyle>: View, Reso
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    var base = content.resolve(in: context)
-    // At this scope boundary, clear the toolbar-items preference so
-    // ancestor toolbar hosts do not re-absorb the same contributions.
-    // Rendering is layered on in a follow-up task — this commit proves
-    // the hoisting/absorption contract.
-    base.preferenceValues[ToolbarItemsPreferenceKey.self] = []
-    return [base]
+    let baseContext = context.child(component: .named("content"))
+    let base = content.resolve(in: baseContext)
+    let items = base.preferenceValues[ToolbarItemsPreferenceKey.self]
+
+    guard !items.isEmpty else {
+      // No contributions — preserve the base node unchanged, but still
+      // clear the preference so ancestor hosts do not re-absorb any
+      // stray items. (Empty in practice, but the clear is cheap and
+      // keeps the invariant uniform.)
+      var passthrough = base
+      passthrough.preferenceValues[ToolbarItemsPreferenceKey.self] = []
+      return [passthrough]
+    }
+
+    let stripView = ToolbarItemsStrip(items: items, style: style)
+    let stripNode = stripView.resolve(
+      in: context.child(component: .named("toolbar-strip"))
+    )
+
+    let orderedChildren: [ResolvedNode] =
+      switch style.placement {
+      case .top: [stripNode, base]
+      case .bottom: [base, stripNode]
+      }
+
+    var composed = ResolvedNode(
+      identity: context.identity,
+      kind: .view("ToolbarHost"),
+      children: orderedChildren,
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction,
+      layoutBehavior: .stack(
+        axis: .vertical,
+        spacing: 0,
+        horizontalAlignment: .center,
+        verticalAlignment: .center
+      )
+    )
+    // Clear the preference at this scope boundary so absorbed items
+    // do not re-bubble to ancestor toolbar hosts.
+    composed.preferenceValues[ToolbarItemsPreferenceKey.self] = []
+    return [composed]
+  }
+}
+
+/// Arranges the contributed toolbar items using the style's item
+/// layout. Each item is rendered as a Button whose label is the item
+/// title; when an icon is present, the title is prefixed by the icon
+/// with a single-cell gap.
+private struct ToolbarItemsStrip<S: ToolbarStyle>: View, ResolvableView {
+  let items: [ToolbarItemConfig]
+  let style: S
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let layout = style.itemLayout
+    let content = layout {
+      ForEach(items.indices, id: \.self) { index in
+        ToolbarItemButton(config: items[index])
+      }
+    }
+    return [content.resolve(in: context)]
+  }
+}
+
+private struct ToolbarItemButton: View {
+  let config: ToolbarItemConfig
+
+  var body: some View {
+    Button(action: config.action) {
+      if let icon = config.icon {
+        HStack(spacing: 1) {
+          icon
+          Text(config.title)
+        }
+      } else {
+        Text(config.title)
+      }
+    }
+    .disabled(!config.isEnabled)
   }
 }
 
