@@ -1,6 +1,6 @@
 public import Core
 
-extension ActionScope where Self: View {
+extension ActionScope where Self: View & Sendable {
   /// Declares a keyboard-shortcut command at this scope's root.
   ///
   /// Fires only when this scope is on the current focus chain and no
@@ -18,7 +18,7 @@ extension ActionScope where Self: View {
     modifiers: EventModifiers,
     isEnabled: Bool = true,
     action: @escaping @MainActor @Sendable () -> Void
-  ) -> some View {
+  ) -> KeyCommandModifier<Self> {
     KeyCommandModifier(
       content: self,
       binding: KeyBinding(key: key, modifiers: modifiers),
@@ -29,14 +29,28 @@ extension ActionScope where Self: View {
   }
 }
 
-private struct KeyCommandModifier<Content: View>: View, ResolvableView {
-  let content: Content
+public struct KeyCommandModifier<Content: View & Sendable>: View, ResolvableView {
+  nonisolated let content: Content
   let binding: KeyBinding
   let description: String
   let isEnabled: Bool
   let action: @MainActor @Sendable () -> Void
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  init(
+    content: Content,
+    binding: KeyBinding,
+    description: String,
+    isEnabled: Bool,
+    action: @escaping @MainActor @Sendable () -> Void
+  ) {
+    self.content = content
+    self.binding = binding
+    self.description = description
+    self.isEnabled = isEnabled
+    self.action = action
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     let node = content.resolve(in: context)
     guard !binding.modifiers.isEmpty else {
       // Modifier-less registrations are framework-reserved for typing,
@@ -54,3 +68,13 @@ private struct KeyCommandModifier<Content: View>: View, ResolvableView {
     return [node]
   }
 }
+
+// Forward the inner scope's identity so chained `.keyCommand` and
+// `.paletteCommand` calls keep compiling: after the modifier, the
+// wrapped view is still an ActionScope whose id equals the content's.
+extension KeyCommandModifier: Identifiable where Content: ActionScope {
+  public typealias ID = Content.ID
+  nonisolated public var id: Content.ID { content.id }
+}
+
+extension KeyCommandModifier: ActionScope where Content: ActionScope {}

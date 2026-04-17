@@ -128,6 +128,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   }
 
   package var latestSemanticSnapshot = SemanticSnapshot()
+  package var latestActivePaletteCommands: [ActivePaletteCommand] = []
   package var currentFocusedValues = FocusedValues()
   package var previousPreferenceObservations: [PreferenceObservationRegistrationSnapshot] = []
   package var pressedIdentity: Identity?
