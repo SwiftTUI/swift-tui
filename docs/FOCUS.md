@@ -604,7 +604,7 @@ This aligns with the existing project vision:
 - explicit `.focusable(...)` modifiers should be authoritative
 - containers should not become focus stops accidentally
 - focused values and focus state are part of SwiftUI-faithful runtime semantics, not convenience extras
-- focused values are load-bearing infrastructure for the toolbar/command hypothesis: scene-level commands bridge to focused-view state via `@FocusedValue`, making the command always registered while the state stays local to the view that owns it (see [STATUS.md](STATUS.md) for the full hypothesis)
+- **the focus chain is load-bearing for the scope hypothesis.** Commands belong to scopes, and a scope's activation predicate is that its anchor node is on the current focus chain. Tree presence is a prerequisite but not sufficient — a resolved-but-unreachable node is philosophically silent. This elevates focus from "keyboard routing" to "the primary reachability primitive" — every command availability decision the framework makes bottoms out in focus-chain membership. See [STATUS.md](STATUS.md) for the full scope hypothesis.
 
 ## 10. Sources
 

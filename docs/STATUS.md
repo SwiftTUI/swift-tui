@@ -92,35 +92,106 @@ rule. The remaining gaps are therefore prioritized around terminal workspaces,
 deeper scroll control, and navigation surfaces that still need a stronger
 hypothesis before they graduate.
 
-### Commands, Keybindings, and Toolbar Hypothesis
+### Commands, Keybindings, and Scope Hypothesis
 
 An earlier toolbar/command-palette/help-sheet implementation was reverted
-because it preceded a clear design model. The current hypothesis:
+because it preceded a clear design model. The current hypothesis operates at
+a deeper level than toolbars or commands specifically.
 
-**Navigation chrome (toolbar/nav bar) is the correct keybinding surface.**
-The toolbar is always rendered while its context is on screen, scoped by the
-navigation/presentation stack, and visible to the user as a discoverability
-surface. This is the terminal analogue of the macOS menu bar.
+**Commands belong to scopes. A scope is a tree-authored command set with an
+activation predicate. The activation predicate is focus-chain membership.**
 
-The design rests on four requirements that must be satisfied simultaneously:
+#### The abstraction: App Navigation ⊂ Modal App Behavior ⊂ Scopes
 
-- **Lifetime** — the toolbar is always resolved while its context is on screen, so bindings don't silently vanish
-- **Locality** — shortcuts are declared alongside toolbar content, the natural co-location point
-- **Composability** — the navigation/presentation stack provides scoping and shadowing (push adds, pop restores, modal overrides)
-- **Discoverability** — the toolbar IS the visible hint of what's available
+Users don't think "which view is rendering?" They think "what can I do right
+now?" What they can do changes when they push a screen, open a modal, switch
+tabs, enter a mode (vim-style), select something, or the app suppresses
+interaction.
 
-SwiftUI solves this with `commands { }` at scene level, `@FocusedValue` for
-bridging state from focused views, and the menu bar as persistent chrome. In
-a terminal UI, the navigation bar serves the same structural role as the menu
-bar — it is the chrome of the current context.
+All of these are mode changes. Navigation is one disciplined kind of mode —
+one that carries spatial visualization, stack-like nesting, and reversibility.
+But navigation is not the primitive; modes are. And "mode" is a subset of a
+more general abstraction: **scopes**.
 
-`.onKeyPress()` remains as a low-level escape hatch for "handle this key
-while this specific view is rendered." It is not the primary keybinding API.
+#### The focus chain is the activation predicate
 
-This hypothesis has not yet been implemented. The framework currently has
-`.onKeyPress()` (global hotkey registry, tree-lifetime-dependent) and the
-`LocalKeyHandlerRegistry` (focus-dependent, package-internal, used by built-in
-controls). Neither satisfies all four requirements above.
+Every scope has an anchor node in the view tree. Tree presence is a
+prerequisite — a scope whose anchor isn't resolved can't fire — but presence
+alone isn't activation. A resolved-but-unreachable node (background tab,
+severed focus path) is philosophically silent.
+
+The actual activation predicate: **the anchor node is on the current focus
+chain.** There is always a focus chain from the app root down to whichever
+leaf currently owns focus. Every node on the chain is reachable by input;
+every node off the chain is silent.
+
+#### Candidate scope kinds
+
+| Scope | Anchor predicate | UI correspondent |
+|---|---|---|
+| **App** | root is on chain (trivially always) | help overlay / `?` menu |
+| **Screen** | current screen node is on chain | title/nav bar |
+| **Presentation** | modal node is on chain (tail) | the modal itself |
+| **Input** | named focus region is on chain | focus indicator |
+| **Selection** | orthogonal state predicate | selection chrome |
+
+All five differ only in *which node's chain-membership they predicate about*.
+Modal shadowing falls out naturally: the modal node becomes the tail; the
+parent is still on the chain above it, so parent scope is still active — the
+modal's bindings just have priority on collisions (deeper wins).
+
+Ship with a curated small set. The friction of adding a sixth kind is the
+feature — it prevents ad-hoc scope proliferation.
+
+#### Four requirements, reframed via the focus chain
+
+- **Lifetime** — anchor node stays on the focus chain long enough to be useful
+- **Locality** — author the command near the state it operates on; ensure that node is on the chain when the command should fire
+- **Composability** — the focus chain is a stack; scopes compose by stacking
+- **Discoverability** — the chain is knowable; the framework can enumerate active scopes
+
+#### Discoverability invariant
+
+Every active scope must have either a persistent chrome surface or a
+discoverability path. Scopes without chrome still have to answer "how would
+the user know?" This is what distinguishes a scope from a hidden mode — the
+failure case we're escaping.
+
+#### What `.onKeyPress()` becomes
+
+A low-level escape hatch for "handle this key while this specific view is on
+the focus chain." Not the primary keybinding API. The primary API is
+scope-declaration at natural DSL boundaries (App, NavigationStack levels,
+TabView, `.sheet()`, focus regions, selection state).
+
+#### Current state and constraints
+
+This hypothesis has not yet been implemented. The framework currently has:
+
+- `.onKeyPress()` → global `HotkeyRegistry`, tree-lifetime-dependent, fragile
+- `LocalKeyHandlerRegistry` → focus-identity-keyed, package-internal, used by built-in controls
+
+Neither corresponds to the scope model. Both operate below the abstraction
+we want.
+
+#### Open design questions
+
+- **Precedence on collisions.** If Selection-scope and Screen-scope both bind `d`, who wins? Depth on the chain is one ordering; scope-kind priority (Selection > Presentation > Screen > App) is another. Probably some combination.
+- **State-predicated scopes still tree-author.** Selection state lives on some node; its anchor is that node. What's different is the activation predicate, not the authoring site.
+- **Escape-hatch risk.** Someone will want a scope that doesn't fit the five. A generic condition-scope would become a dumping ground. Resist until a real case proves the curated set insufficient.
+- **Modes aren't always navigation.** Vim-style modes (insert/normal/visual) are state-predicated scopes that don't correspond to tree transitions. The model handles this, but the DSL needs state-predicate scopes as first-class, not just structural ones.
+
+#### Design sequence
+
+When designing scope, command, and keybinding APIs:
+
+1. Start from scope kinds — what are the activation predicates users care about?
+2. For each scope kind, identify the anchor node type in the DSL
+3. For each scope kind, identify the UI correspondent (or the discoverability path if not visibly chromed)
+4. Define precedence for collisions across scopes
+5. Only then: design the authoring API
+
+Do not start from the authoring API. Starting there is what produced `.onKeyPress()`.
 
 ## Documentation Status
 
