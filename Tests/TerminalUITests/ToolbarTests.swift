@@ -13,4 +13,34 @@ struct ToolbarTests {
     #expect(top.placement == .top)
     #expect(bottom.placement == .bottom)
   }
+
+  @Test("toolbarItem contributions accumulate up the tree via preference key")
+  func toolbarItemsAccumulate() {
+    let view = VStack {
+      Text("A").toolbarItem(
+        .init(
+          title: "Item A",
+          icon: nil,
+          position: .top,
+          isEnabled: true,
+          action: {}
+        )
+      )
+      Text("B").toolbarItem(
+        .init(
+          title: "Item B",
+          icon: nil,
+          position: .top,
+          isEnabled: true,
+          action: {}
+        )
+      )
+    }
+    let context = ResolveContext(identity: testIdentity("toolbar-root"))
+    let resolved = Resolver().resolve(AnyView(view), in: context)
+    let items = resolved.preferenceValues[ToolbarItemsPreferenceKey.self]
+    #expect(items.count == 2)
+    #expect(items.map(\.title).contains("Item A"))
+    #expect(items.map(\.title).contains("Item B"))
+  }
 }
