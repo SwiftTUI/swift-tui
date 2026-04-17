@@ -1,7 +1,5 @@
 # SwiftUI Focus
 
-Last updated: March 24, 2026
-
 This document is a high-level, implementation-oriented explanation of how SwiftUI focus works. It treats focus as a runtime model, not just a bag of modifiers, and it tries to separate the distinct jobs that SwiftUI's focus APIs perform:
 
 - deciding which view receives non-pointing input

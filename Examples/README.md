@@ -1,11 +1,10 @@
 # Examples
 
-Last updated: April 14, 2026
-
-This directory now keeps only the maintained example apps and package shells.
+This directory keeps the maintained example apps and package shells.
 
 - `gallery`: the primary terminal-native demo package and regression sandbox for the supported `View` surface
-- `SwiftUIExample`: a host app plus terminal package that demonstrates embedding TerminalUI scenes in SwiftUI via `GUI/SwiftUITUIGUI`; `GUI/SwiftTermTUIGUI` now provides the same retained-scene host model on top of SwiftTerm as an alternate Apple host package
+- `SwiftUIExample`: a host app plus terminal package that demonstrates embedding TerminalUI scenes in SwiftUI via `GUI/SwiftUITUIGUI` (Ghostty-backed)
+- `SwiftTermUIExample`: the same retained-scene host model on top of `GUI/SwiftTermTUIGUI` (SwiftTerm-backed) as an alternate Apple host package
 - `WebExample`: a host app plus terminal package that demonstrates the Bun + WASI browser path used by `GUI/WebTUIGUI`
 - `XtermWebExample`: a Bun + WASI browser example that uses the xterm.js host package `GUI/XtermWebTUIGUI`
 

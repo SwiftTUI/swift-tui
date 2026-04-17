@@ -1,7 +1,5 @@
 # Type Erasure Deferral Plan
 
-Last updated: April 5, 2026
-
 ## Goal
 
 Move `AnyView` and `[AnyView]` from "default internal storage" to "rare escape hatch".

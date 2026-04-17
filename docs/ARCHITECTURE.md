@@ -1,7 +1,5 @@
 # Architecture
 
-Last updated: April 14, 2026
-
 ## Target Boundaries
 
 ### `Core`

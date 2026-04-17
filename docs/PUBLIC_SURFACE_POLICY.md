@@ -1,7 +1,5 @@
 # Public Surface Policy
 
-Last updated: April 6, 2026
-
 This note defines how the package should think about its public API shape after the public-surface consolidation.
 
 ## Principle
