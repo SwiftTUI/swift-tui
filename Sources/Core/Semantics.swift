@@ -55,7 +55,8 @@ public struct SemanticExtractor {
               identity: node.identity,
               rect: interactionRect(for: node, clippedTo: clipRect) ?? node.bounds,
               routeID: routeID,
-              hitTestOrder: order
+              hitTestOrder: order,
+              captureOnPress: node.semanticMetadata.captureOnPress
             )
           )
         }
@@ -534,7 +535,8 @@ extension SemanticExtractor {
           identity: identity,
           rect: clippedRect,
           routeID: primaryRouteID(for: identity),
-          hitTestOrder: nextHitTestOrder
+          hitTestOrder: nextHitTestOrder,
+          captureOnPress: true
         )
       )
       nextHitTestOrder += 1

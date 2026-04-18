@@ -586,7 +586,7 @@ extension Slider {
     let trackView = Text(track)
       .foregroundStyle(trackStyle)
       .id(sliderTrackIdentity(for: controlIdentity))
-      .semanticMetadata(.init(participatesInPointerHitTesting: true))
+      .semanticMetadata(.init(participatesInPointerHitTesting: true, captureOnPress: true))
     let controls = HStack(alignment: .center, spacing: 1) {
       trackView
       Text(formattedControlValue(value, bounds: bounds, step: step))

@@ -384,18 +384,7 @@ extension RunLoop {
   package func shouldCapturePointer(
     routeID: RouteID
   ) -> Bool {
-    routeIDHasTerminalComponent(
-      routeID,
-      hasTerminalComponent: BuiltinPointerRouteComponent.sliderTrack
-    )
-      || routeIDHasTerminalComponent(
-        routeID,
-        hasTerminalComponent: BuiltinPointerRouteComponent.verticalScrollIndicator
-      )
-      || routeIDHasTerminalComponent(
-        routeID,
-        hasTerminalComponent: BuiltinPointerRouteComponent.horizontalScrollIndicator
-      )
+    interactionRegion(routeID: routeID)?.captureOnPress ?? false
   }
 
   package func updateArmedPointerState(
