@@ -349,7 +349,8 @@ struct TerminalPresentationPlanner {
           currentSurface.size.width,
           previousRow.count,
           currentRow.count
-        )
+        ),
+        limitingTo: damage?.columnRanges(for: row)
       )
 
       for span in rowSpans {
@@ -472,15 +473,53 @@ extension TerminalSurfaceRenderer {
   func diffSpans(
     previousRow: [RasterCell],
     currentRow: [RasterCell],
-    width: Int
+    width: Int,
+    limitingTo candidateRanges: [Range<Int>]? = nil
   ) -> [Range<Int>] {
     guard width > 0 else {
       return []
     }
 
+    if let candidateRanges, !candidateRanges.isEmpty {
+      var spans: [Range<Int>] = []
+      for candidateRange in candidateRanges {
+        appendDiffSpans(
+          in: candidateRange,
+          previousRow: previousRow,
+          currentRow: currentRow,
+          width: width,
+          to: &spans
+        )
+      }
+      return spans
+    }
+
     var spans: [Range<Int>] = []
-    var index = 0
-    while index < width {
+    appendDiffSpans(
+      in: 0..<width,
+      previousRow: previousRow,
+      currentRow: currentRow,
+      width: width,
+      to: &spans
+    )
+    return spans
+  }
+
+  private func appendDiffSpans(
+    in candidateRange: Range<Int>,
+    previousRow: [RasterCell],
+    currentRow: [RasterCell],
+    width: Int,
+    to spans: inout [Range<Int>]
+  ) {
+    let lowerBound = max(0, min(width, candidateRange.lowerBound))
+    let upperBound = max(lowerBound, min(width, candidateRange.upperBound))
+    guard lowerBound < upperBound else {
+      return
+    }
+
+    var index = lowerBound
+    while index < upperBound {
       guard cell(at: index, in: previousRow) != cell(at: index, in: currentRow) else {
         index += 1
         continue
@@ -488,7 +527,7 @@ extension TerminalSurfaceRenderer {
 
       let rawStart = index
       index += 1
-      while index < width,
+      while index < upperBound,
         cell(at: index, in: previousRow) != cell(at: index, in: currentRow)
       {
         index += 1
@@ -509,8 +548,6 @@ extension TerminalSurfaceRenderer {
         spans.append(normalized)
       }
     }
-
-    return spans
   }
 
   func normalizeSpan(
