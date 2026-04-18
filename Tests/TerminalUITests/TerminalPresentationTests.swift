@@ -394,6 +394,62 @@ struct TerminalPresentationTests {
     }
   }
 
+  @Test("presentation damage normalizes overlapping row ranges")
+  func presentationDamageNormalizesOverlappingRowRanges() {
+    let damage = PresentationDamage(
+      textRows: [
+        .init(row: 2, columnRanges: [0..<2, 1..<4]),
+        .init(row: 2, columnRanges: [4..<6]),
+        .init(row: 2, columnRanges: [7..<9]),
+      ]
+    )
+
+    #expect(
+      damage.textRows == [
+        .init(row: 2, columnRanges: [0..<6, 7..<9])
+      ]
+    )
+    #expect(damage.dirtyRows == [2])
+  }
+
+  @Test("presentation planner accepts range-aware damage hints while staying row compatible")
+  func presentationPlannerAcceptsRangeAwareDamageHints() {
+    let planner = TerminalPresentationPlanner(
+      capabilityProfile: .previewUnicode
+    )
+    let previousSurface = RasterSurface(
+      size: .init(width: 8, height: 3),
+      lines: ["alpha", "bravo", "charlie"]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 8, height: 3),
+      lines: ["alpXa", "bravo", "charlXe"]
+    )
+    let damage = PresentationDamage(
+      textRows: [
+        .init(row: 2, columnRanges: [5..<6])
+      ]
+    )
+
+    #expect(damage.columnRanges(for: 2) == [5..<6])
+    #expect(damage.dirtyRows == [2])
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface,
+      damage: damage
+    )
+
+    #expect(plan.strategy == .incremental)
+    #expect(
+      plan.spanUpdates == [
+        .init(row: 2, column: 5, renderedSpan: "X", cellsChanged: 1)
+      ]
+    )
+    #expect(plan.linesTouched == 1)
+    #expect(plan.cellsChanged == 1)
+  }
+
   @Test("presentation planner emits a narrow span for a mid-row edit")
   func presentationPlannerEmitsNarrowSpanForMidRowEdit() {
     let planner = TerminalPresentationPlanner(
