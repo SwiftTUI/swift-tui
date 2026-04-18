@@ -109,6 +109,7 @@ package protocol ManagedPresentationCoordinator: PresentationCoordinator {
   static var overlayKindName: String { get }
 
   var isActive: Bool { get }
+  var latestItem: Item? { get }
 
   func beginSynchronizing()
   func sync(sourceIdentity: Identity, items: [Item])
@@ -689,6 +690,10 @@ where C.Item.ID: Sendable {
     coordinator?.isActive ?? false
   }
 
+  package var latestItem: C.Item? {
+    coordinator?.latestItem
+  }
+
   package func beginSynchronizing() {
     coordinator?.beginSynchronizing()
   }
@@ -890,6 +895,24 @@ package final class PresentationCoordinatorRegistry {
         return lhs.kindName < rhs.kindName
       }
   }
+
+  /// Returns the dismiss action for the topmost Escape-dismissible
+  /// presentation currently active, or nil if none is active. Precedence
+  /// is by zIndex: `alert` > `confirmationDialog` > `sheet`. Toasts are
+  /// non-interactive and are never dismissed by Escape; they auto-expire
+  /// on their own timer.
+  package func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
+    if let item = alert.latestItem {
+      return item.dismiss
+    }
+    if let item = confirmationDialog.latestItem {
+      return item.dismiss
+    }
+    if let item = sheet.latestItem {
+      return item.dismiss
+    }
+    return nil
+  }
 }
 
 @MainActor
@@ -922,6 +945,11 @@ package final class PresentationHostState {
 
   package func overlayEntries() -> [PresentationOverlayEntry] {
     registry.overlayEntries()
+  }
+
+  /// See `PresentationCoordinatorRegistry.topmostEscapeDismissAction`.
+  package func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
+    registry.topmostEscapeDismissAction()
   }
 }
 

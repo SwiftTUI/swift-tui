@@ -220,6 +220,40 @@ struct AppRuntimeTests {
     #expect(lastFrame.contains("Sheet body"))
   }
 
+  @MainActor
+  @Test("Pressing Escape dismisses an active sheet")
+  func pressingEscapeDismissesActiveSheet() async throws {
+    let terminal = RecordingTerminalHost(surfaceSize: .init(width: 40, height: 12))
+
+    // Script: Enter presses the "Present" button (sheet opens), then
+    // Escape dismisses, then `q` quits. The last rendered frame must not
+    // contain the sheet body — the framework's Escape path has taken it
+    // down, even though focus was inside the sheet's TextField (edit
+    // interactions) at the time the key fired.
+    let result = try await runTestSceneSession(
+      scene: WindowGroup("Sheet Window") {
+        SheetPresentationWindow()
+      },
+      sessionName: "AppRuntimeTests.SheetPresentationWindow.Escape",
+      terminalHost: terminal,
+      inputReader: ScriptedInputReader(events: [.return, .escape, .character("q")]),
+      signalReader: EmptySignalReader()
+    )
+
+    #expect(result.exitReason == .quitKey)
+
+    let openedFrame = try #require(
+      terminal.frames.first { $0.contains("Sheet body") },
+      "Sheet never opened — Enter on Present should have raised it."
+    )
+    _ = openedFrame
+
+    let lastFrame = try #require(terminal.frames.last)
+    #expect(!lastFrame.contains("Sheet body"))
+    // Parent state is preserved across the sheet lifecycle.
+    #expect(lastFrame.contains("Count 1"))
+  }
+
   // Disabled during Phase 0 of the ActionScopes rewrite. This test pressed
   // `.escape` to dismiss the sheet, which relied on the now-removed
   // `.onKeyPress(.escape)` handler inside `HostedPromptPresentation`. Escape-

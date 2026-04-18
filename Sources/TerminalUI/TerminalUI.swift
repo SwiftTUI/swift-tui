@@ -89,6 +89,15 @@ public struct DefaultRenderer {
     animationController
   }
 
+  /// Package-only accessor so the run loop can route framework-reserved
+  /// single-key events (currently Escape) to the active presentation
+  /// coordinator stack. Returns the dismiss closure of the topmost
+  /// Escape-dismissible presentation, or nil when none is active.
+  @MainActor
+  package func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
+    presentationHostState.topmostEscapeDismissAction()
+  }
+
   /// Package-only accessor exposing the renderer's internal
   /// `ViewGraph.registrationAliasDiagnostics`.  Added for Item 7 of
   /// `docs/proposals/ARCHITECTURE_NOTES.md` to let tests measure the alias layer's
