@@ -674,6 +674,7 @@ extension TerminalHosting {
     private let fallbackSize: Size
     private let controller: any TerminalControlling
     private let environment: [String: String]
+    private let usesTerminalEditOperations: Bool
     private let imageRenderer: TerminalImageRenderer
 
     private var savedAttributes: termios?
@@ -688,7 +689,8 @@ extension TerminalHosting {
       outputFileDescriptor: Int32 = 1,
       fallbackSize: Size = .init(width: 80, height: 24),
       capabilityProfile: TerminalCapabilityProfile? = nil,
-      environment: [String: String]? = nil
+      environment: [String: String]? = nil,
+      usesTerminalEditOperations: Bool? = nil
     ) {
       self.init(
         inputFileDescriptor: inputFileDescriptor,
@@ -696,7 +698,8 @@ extension TerminalHosting {
         fallbackSize: fallbackSize,
         controller: POSIXTerminalController(),
         capabilityProfile: capabilityProfile,
-        environment: environment ?? currentProcessEnvironment()
+        environment: environment ?? currentProcessEnvironment(),
+        usesTerminalEditOperations: usesTerminalEditOperations
       )
     }
 
@@ -706,7 +709,8 @@ extension TerminalHosting {
       fallbackSize: Size,
       controller: any TerminalControlling,
       capabilityProfile: TerminalCapabilityProfile? = nil,
-      environment: [String: String]? = nil
+      environment: [String: String]? = nil,
+      usesTerminalEditOperations: Bool? = nil
     ) {
       let environment = environment ?? currentProcessEnvironment()
       self.inputFileDescriptor = inputFileDescriptor
@@ -714,6 +718,8 @@ extension TerminalHosting {
       self.fallbackSize = fallbackSize
       self.controller = controller
       self.environment = environment
+      self.usesTerminalEditOperations =
+        usesTerminalEditOperations ?? controller.isATTY(outputFileDescriptor)
       imageRenderer = .init(repository: sharedImageAssetRepository)
       self.capabilityProfile =
         capabilityProfile
@@ -932,12 +938,22 @@ extension TerminalHosting {
 
       case .incremental:
         for rowBatch in plan.rowBatches {
+          let rowOutput =
+            if usesTerminalEditOperations,
+              rowBatch.canLowerToEraseToEndOfLine(
+                surfaceWidth: preparedSurface.size.width
+              )
+            {
+              eraseToEndOfLineSequence()
+            } else {
+              rowBatch.renderedBatch
+            }
           append(
             cursorSequence(
               to: .init(x: rowBatch.anchorColumn, y: rowBatch.row)
             )
           )
-          append(rowBatch.renderedBatch)
+          append(rowOutput)
         }
         if graphicsCapabilities.preferredProtocol == .kitty {
           switch plan.graphicsReplay.scope {
@@ -1240,6 +1256,10 @@ extension TerminalHosting {
 
     private func clearScreenSequence() -> String {
       "\u{001B}[2J"
+    }
+
+    private func eraseToEndOfLineSequence() -> String {
+      "\u{001B}[K"
     }
 
     private func deleteVisibleKittyPlacementsSequence() -> String {

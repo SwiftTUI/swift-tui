@@ -162,6 +162,71 @@ struct TerminalHostPresentationBatchingTests {
     #expect(incrementalWrites == ["\u{001B}[2;3HX"])
   }
 
+  @Test("terminal host lowers trailing tail clears into erase-to-end-of-line when enabled")
+  func trailingTailClearsLowerIntoEraseToEndOfLineWhenEnabled() throws {
+    let controller = PresentationWriteCountingController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .previewUnicode
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 1),
+        lines: ["alphabet"]
+      )
+    )
+    try host.drainPendingPresentation()
+    let writesBeforeUpdate = controller.writes.count
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 1),
+        lines: ["alph"]
+      )
+    )
+    try host.drainPendingPresentation()
+
+    let incrementalWrites = Array(controller.writes.dropFirst(writesBeforeUpdate))
+    #expect(incrementalWrites == ["\u{001B}[1;5H\u{001B}[K"])
+  }
+
+  @Test("terminal host keeps literal tail clears when edit-op lowering is disabled")
+  func trailingTailClearsStayLiteralWhenEditOpLoweringIsDisabled() throws {
+    let controller = PresentationWriteCountingController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .previewUnicode,
+      usesTerminalEditOperations: false
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 1),
+        lines: ["alphabet"]
+      )
+    )
+    try host.drainPendingPresentation()
+    let writesBeforeUpdate = controller.writes.count
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 1),
+        lines: ["alph"]
+      )
+    )
+    try host.drainPendingPresentation()
+
+    let incrementalWrites = Array(controller.writes.dropFirst(writesBeforeUpdate))
+    #expect(incrementalWrites == ["\u{001B}[1;5H    "])
+  }
+
   @Test("terminal host drops stale pending frames and forces a full repaint on recovery")
   func droppedPendingFramesForceFullRepaintRecovery() throws {
     let controller = BlockingPresentationWriteController(isTTY: true)

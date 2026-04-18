@@ -155,6 +155,25 @@ struct Phase1PresentationIntegrationTests {
     #expect(result.metrics.bytesWritten < result.fullRepaintMetrics.bytesWritten)
   }
 
+  @Test("trailing tail shrinks lower to erase-to-end-of-line and stay smaller than a full repaint")
+  func trailingTailShrinksLowerToEraseToEndOfLine() throws {
+    let result = try presentScenario(
+      previous: .init(
+        size: .init(width: 8, height: 1),
+        lines: ["alphabet"]
+      ),
+      current: .init(
+        size: .init(width: 8, height: 1),
+        lines: ["alph"]
+      )
+    )
+
+    #expect(result.metrics.strategy == .incremental)
+    #expect(result.metrics.cellsChanged == 4)
+    #expect(result.metrics.bytesWritten < result.fullRepaintMetrics.bytesWritten)
+    #expect(result.incrementalWrites == ["\u{001B}[1;5H\u{001B}[K"])
+  }
+
   @Test("resize still triggers a safe full repaint fallback")
   func resizeTriggersSafeFullRepaintFallback() throws {
     let controller = PresentationController()

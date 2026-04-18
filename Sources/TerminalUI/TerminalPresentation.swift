@@ -287,6 +287,23 @@ struct TerminalPresentationPlan: Sendable {
     var cellsChanged: Int {
       spanUpdates.reduce(0) { $0 + $1.cellsChanged }
     }
+
+    func canLowerToEraseToEndOfLine(
+      surfaceWidth: Int
+    ) -> Bool {
+      guard
+        spanUpdates.count == 1,
+        let span = spanUpdates.first,
+        renderedBatch == span.renderedSpan,
+        span.column == anchorColumn,
+        span.column + span.cellsChanged >= surfaceWidth,
+        !span.renderedSpan.isEmpty
+      else {
+        return false
+      }
+
+      return span.renderedSpan.allSatisfy { $0 == " " }
+    }
   }
 
   enum Strategy: String, Equatable, Sendable {
