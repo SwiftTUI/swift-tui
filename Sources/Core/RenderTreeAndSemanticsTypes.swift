@@ -43,6 +43,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   package var sealsFocusDescendants: Bool
   public var focusInteractions: FocusInteractions
   public var participatesInPointerHitTesting: Bool
+  public var captureOnPress: Bool
   public var allowsHitTesting: Bool
   public var scrollRole: ScrollRole?
   public var sectionRole: SectionRole?
@@ -70,6 +71,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     isFocusable: Bool? = nil,
     focusInteractions: FocusInteractions = .automatic,
     participatesInPointerHitTesting: Bool = false,
+    captureOnPress: Bool = false,
     allowsHitTesting: Bool = true,
     scrollRole: ScrollRole? = nil,
     sectionRole: SectionRole? = nil,
@@ -84,6 +86,7 @@ public struct SemanticMetadata: Equatable, Sendable {
       sealsFocusDescendants: false,
       focusInteractions: focusInteractions,
       participatesInPointerHitTesting: participatesInPointerHitTesting,
+      captureOnPress: captureOnPress,
       allowsHitTesting: allowsHitTesting,
       scrollRole: scrollRole,
       sectionRole: sectionRole,
@@ -100,6 +103,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     sealsFocusDescendants: Bool = false,
     focusInteractions: FocusInteractions = .automatic,
     participatesInPointerHitTesting: Bool = false,
+    captureOnPress: Bool = false,
     allowsHitTesting: Bool = true,
     scrollRole: ScrollRole? = nil,
     sectionRole: SectionRole? = nil,
@@ -113,6 +117,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.sealsFocusDescendants = sealsFocusDescendants
     self.focusInteractions = focusInteractions
     self.participatesInPointerHitTesting = participatesInPointerHitTesting
+    self.captureOnPress = captureOnPress
     self.allowsHitTesting = allowsHitTesting
     self.scrollRole = scrollRole
     self.sectionRole = sectionRole
@@ -132,6 +137,7 @@ public struct SemanticMetadata: Equatable, Sendable {
         : other.focusInteractions,
       participatesInPointerHitTesting: other.participatesInPointerHitTesting
         || participatesInPointerHitTesting,
+      captureOnPress: other.captureOnPress || captureOnPress,
       allowsHitTesting: other.allowsHitTesting && allowsHitTesting,
       scrollRole: other.scrollRole ?? scrollRole,
       sectionRole: other.sectionRole ?? sectionRole,
@@ -796,17 +802,20 @@ public struct InteractionRegion: Equatable, Sendable {
   public var rect: Rect
   public var routeID: RouteID
   public var hitTestOrder: Int
+  public var captureOnPress: Bool
 
   public init(
     identity: Identity,
     rect: Rect,
     routeID: RouteID,
-    hitTestOrder: Int = 0
+    hitTestOrder: Int = 0,
+    captureOnPress: Bool = false
   ) {
     self.identity = identity
     self.rect = rect
     self.routeID = routeID
     self.hitTestOrder = hitTestOrder
+    self.captureOnPress = captureOnPress
   }
 }
 
