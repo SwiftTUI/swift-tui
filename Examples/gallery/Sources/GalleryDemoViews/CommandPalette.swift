@@ -13,20 +13,31 @@ import TerminalUI
 /// at the moment the palette opens and passes that snapshot through
 /// — so the list reflects "what was visible when the user invoked
 /// the palette", which is the right UX for a command palette.
+/// Important: this view must NOT declare its own `@State` or
+/// `@FocusState` wrappers. Sheet content is resolved inside the
+/// parent view's authoring context (see `View.resolveBody` in
+/// `State.swift:383` and `ScopedBuilder` — deferred payloads inherit
+/// the sheet-creating view's context). Local property wrappers here
+/// would route state-slot lookups through the PARENT's viewNode,
+/// colliding with its real `@State` slots by source-line ordinal and
+/// triggering `ViewNode.stateSlot` type-mismatch fatalError. All
+/// mutable palette state (query text, focus binding) lives on
+/// `GalleryView` and is threaded here as `Binding`s.
 struct CommandPaletteList: View {
   let commands: [ActivePaletteCommand]
+  let query: Binding<String>
+  let isQueryFocused: FocusState<Bool>.Binding
   let dismiss: @MainActor @Sendable () -> Void
 
-  @State private var query: String = ""
-
   private var matches: [(command: ActivePaletteCommand, score: Int)] {
-    if query.isEmpty {
+    let queryText = query.wrappedValue
+    if queryText.isEmpty {
       return commands.enumerated().map { ($0.element, $0.offset) }
     }
     return
       commands
       .compactMap { command in
-        fuzzyMatchScore(query: query, against: command.name)
+        fuzzyMatchScore(query: queryText, against: command.name)
           .map { (command: command, score: $0) }
       }
       .sorted { $0.score < $1.score }
@@ -36,9 +47,20 @@ struct CommandPaletteList: View {
     VStack(alignment: .leading, spacing: 0) {
       header
       Divider()
-      TextField("Filter commands…", text: $query)
+      diagnosticRow
+      TextField("Filter commands…", text: query)
+        .focused(isQueryFocused)
+        .onAppear {
+          // Belt-and-braces: parent already sets
+          // `isPaletteQueryFocused = true` in `openPalette()`, but
+          // if the user re-presents the same sheet without going
+          // through that path, this onAppear still grabs focus.
+          isQueryFocused.wrappedValue = true
+        }
       Divider()
       matchList
+      Divider()
+      footer
     }
     .padding(1)
     .frame(minWidth: 44, alignment: .leading)
@@ -48,8 +70,39 @@ struct CommandPaletteList: View {
     HStack(spacing: 2) {
       Text("Command palette").bold()
       Spacer()
-      Text("Tab + Enter to run · Esc to close")
+      Text("Tab + Enter to run")
         .foregroundStyle(.separator)
+    }
+  }
+
+  // Visible diagnostic row. Remove once the palette is working
+  // end-to-end in the gallery; kept for now so the user can see at a
+  // glance whether the snapshot reached the sheet and whether the
+  // text field is holding focus.
+  private var diagnosticRow: some View {
+    HStack(spacing: 2) {
+      Text("debug:")
+      Text("cmds=\(commands.count)")
+      Text("match=\(matches.count)")
+      Text("focus=\(isQueryFocused.wrappedValue ? "yes" : "no")")
+      Spacer()
+    }
+    .foregroundStyle(.separator)
+  }
+
+  // Footer with an explicit Close button. The framework's Esc-closes-
+  // presentation behavior was removed in Phase 0 of the ActionScopes
+  // rewrite and has not yet been reinstated (see
+  // Tests/TerminalUITests/AppRuntimeTests.swift:225 — "Escape-owned
+  // presentation dismissal returns in Phase 3"). Until the framework
+  // gap closes, an explicit Cancel button is the reliable dismissal
+  // affordance.
+  private var footer: some View {
+    HStack(spacing: 2) {
+      Spacer()
+      Button("Cancel", role: .cancel) {
+        dismiss()
+      }
     }
   }
 

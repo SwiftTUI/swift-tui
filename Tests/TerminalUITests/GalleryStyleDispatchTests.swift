@@ -152,6 +152,82 @@ struct GalleryStyleDispatchTests {
     #expect(fired.count == 1)
   }
 
+  @Test(
+    "Gallery-exact flow: ⌃K keyCommand snapshots non-empty activePaletteCommands via the env closure capture"
+  )
+  func galleryExactFlowKeyCommandSnapshotsNonEmptyCommands() throws {
+    GallerySimulator.reset()
+
+    let runLoop = makeRunLoopLocal {
+      GallerySimulator()
+    }
+    try renderInitial(runLoop)
+
+    // Drive additional frames so env propagation has time to deliver
+    // palette commands to the reader's closure capture.
+    for _ in 0..<3 {
+      runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+    }
+
+    // Simulate the user pressing ⌃K.
+    _ = runLoop.handleKeyPress(KeyPress(.character("k"), modifiers: .ctrl))
+
+    // After firing, one more render to settle state.
+    runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
+    var rendered = 0
+    try runLoop.renderPendingFrames(renderedFrames: &rendered)
+
+    let snapshot = GallerySimulator.snapshotAtKeyPress.value
+    #expect(
+      snapshot.count == 3,
+      "Expected keyCommand action to have captured 3 palette commands at the moment ⌃K fired; got \(snapshot.count)"
+    )
+  }
+
+  @Test(
+    "activePaletteCommands captured via env reader reflects Panel commands when a .toolbar wraps the Panel"
+  )
+  func toolbarWrappedPanelSurfacesActivePaletteCommandsViaEnv() throws {
+    let capturedCounts = LockedBoxLocal<[Int]>(initial: [])
+
+    let runLoop = makeRunLoopLocal {
+      EnvironmentReader(\.activePaletteCommands) { commands in
+        capturedCounts.append(commands.count)
+        return
+          TabView(selection: .constant(0)) {
+            Text("body").focusable(true).tag(0)
+          }
+          .tabViewStyle(.literalTabs)
+          .toolbarItem(.init(title: "Palette", action: {}))
+          .panel(id: "gallery")
+          .paletteCommand(name: "A", action: {})
+          .paletteCommand(name: "B", action: {})
+          .paletteCommand(name: "C", action: {})
+          .toolbar(style: DefaultBottomToolbarStyle())
+      }
+    }
+    try renderInitial(runLoop)
+
+    // Drive a few more frames so any pending focus/env updates settle.
+    for _ in 0..<3 {
+      runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
+      var rendered = 0
+      try runLoop.renderPendingFrames(renderedFrames: &rendered)
+    }
+
+    let seen = capturedCounts.value
+    // This is the EXACT failure mode the user reports: with a toolbar
+    // wrapping the Panel, the env reader never sees the palette
+    // commands, so the gallery's snapshot-capture path hands [] into
+    // the sheet.
+    #expect(
+      seen.contains(3),
+      "Expected to observe 3 palette commands at some render, got: \(seen)"
+    )
+  }
+
   @Test("activePaletteCommands arrives via environment after a render cycle")
   func activePaletteCommandsFlowsIntoEnvironment() throws {
     let capturedCounts = LockedBoxLocal<[Int]>(initial: [])
@@ -198,6 +274,53 @@ private final class LockedBoxLocal<T> {
 extension LockedBoxLocal where T == [Int] {
   func append(_ element: Int) {
     update { $0.append(element) }
+  }
+}
+
+@MainActor
+private struct GallerySimulator: View {
+  static let snapshotAtKeyPress = LockedBoxLocal<[ActivePaletteCommand]>(initial: [])
+  static let lastSeenEnvCount = LockedBoxLocal<Int>(initial: -1)
+
+  static func reset() {
+    snapshotAtKeyPress.update { $0 = [] }
+    lastSeenEnvCount.update { $0 = -1 }
+  }
+
+  @State private var isPaletteOpen: Bool = false
+
+  var body: some View {
+    EnvironmentReader(\.activePaletteCommands) { commands in
+      Self.lastSeenEnvCount.update { $0 = commands.count }
+      return galleryBody(commands: commands)
+    }
+  }
+
+  private func galleryBody(
+    commands: [ActivePaletteCommand]
+  ) -> some View {
+    TabView(selection: .constant(0)) {
+      Text("body").focusable(true).tag(0)
+    }
+    .tabViewStyle(.literalTabs)
+    .toolbarItem(.init(title: "⌃K Palette", action: {}))
+    .panel(id: "gallery")
+    .keyCommand(
+      "Command palette",
+      key: .character("k"),
+      modifiers: .ctrl,
+      action: {
+        Self.snapshotAtKeyPress.update { $0 = commands }
+        isPaletteOpen = true
+      }
+    )
+    .paletteCommand(name: "A", action: {})
+    .paletteCommand(name: "B", action: {})
+    .paletteCommand(name: "C", action: {})
+    .toolbar(style: DefaultBottomToolbarStyle())
+    .sheet("Command palette", isPresented: .constant(isPaletteOpen)) {
+      Text("palette sheet")
+    }
   }
 }
 

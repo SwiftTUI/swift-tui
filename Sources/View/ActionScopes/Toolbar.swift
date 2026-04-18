@@ -90,24 +90,33 @@ public struct ToolbarHost<Content: View & Sendable, S: ToolbarStyle>: View, Reso
       in: context.child(component: .named("toolbar-strip"))
     )
 
-    let orderedChildren: [ResolvedNode] =
+    // Inject the strip as a child of `base` (the underlying
+    // ActionScope, typically a Panel) so that focus on any
+    // toolbar-strip button inherits the scope's identity on its
+    // scopePath. Wrapping `base` and the strip as siblings under a
+    // fresh outer node would leave the strip *outside* the scope
+    // boundary — palette and key commands registered at the scope
+    // would be invisible to toolbar focus, breaking the whole
+    // authoring contract that `.toolbar(style:)` attaches "to" the
+    // scope.
+    //
+    // Reuse `base`'s identity and semanticMetadata so the composed
+    // node IS the scope (same focusScopeBoundary flag, same identity
+    // that commands were registered against) — only children and
+    // layoutBehavior change.
+    let updatedChildren: [ResolvedNode] =
       switch style.placement {
-      case .top: [stripNode, base]
-      case .bottom: [base, stripNode]
+      case .top: [stripNode] + base.children
+      case .bottom: base.children + [stripNode]
       }
 
-    var composed = ResolvedNode(
-      identity: context.identity,
-      kind: .view("ToolbarHost"),
-      children: orderedChildren,
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      layoutBehavior: .stack(
-        axis: .vertical,
-        spacing: 0,
-        horizontalAlignment: .center,
-        verticalAlignment: .center
-      )
+    var composed = base
+    composed.children = updatedChildren
+    composed.layoutBehavior = .stack(
+      axis: .vertical,
+      spacing: 0,
+      horizontalAlignment: .center,
+      verticalAlignment: .center
     )
     // Clear the preference at this scope boundary so absorbed items
     // do not re-bubble to ancestor toolbar hosts.
