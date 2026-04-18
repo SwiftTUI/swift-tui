@@ -77,6 +77,11 @@ public struct Transaction: Sendable {
 
   package var request: AnimationRequest
 
+  /// Creates a default transaction with inherited animation intent.
+  public init() {
+    self.request = .inherit
+  }
+
   package init(request: AnimationRequest) {
     self.request = request
   }

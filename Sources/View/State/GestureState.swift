@@ -35,7 +35,7 @@ public final class GestureStateBox<Value> {
   /// Reads the current value. When bound to a ViewNode, goes through
   /// the slot (dependency-tracked). Otherwise falls back to the local
   /// seed-initialized value.
-  fileprivate func currentValue() -> Value {
+  public func currentValue() -> Value {
     if let location = currentLocation() {
       return location.getValue()
     }
@@ -44,7 +44,7 @@ public final class GestureStateBox<Value> {
 
   /// Writes a new value. When bound to a ViewNode, writes through
   /// setStateSlot (queues invalidation + respects AnimationContext).
-  fileprivate func setValue(_ newValue: Value) {
+  public func setValue(_ newValue: Value) {
     if let location = currentLocation() {
       location.setValue(newValue)
     } else {
@@ -54,7 +54,7 @@ public final class GestureStateBox<Value> {
 
   /// Resets to the initial seed. Used by the recognizer on gesture end
   /// and by the registry on subtree teardown.
-  fileprivate func resetToSeed() {
+  public func resetToSeed() {
     setValue(seed)
   }
 
@@ -86,12 +86,6 @@ public final class GestureStateBox<Value> {
     )
   }
 
-  /// Test-only -- reads the local/bound value without requiring an
-  /// authoring context.
-  public func currentValueForTests() -> Value { currentValue() }
-
-  /// Test-only -- writes without requiring an authoring context.
-  public func setForTests(_ newValue: Value) { setValue(newValue) }
 }
 
 /// Narrow binding type accepted by `Gesture.updating(_:body:)`.
