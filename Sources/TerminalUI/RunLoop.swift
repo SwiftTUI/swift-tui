@@ -103,6 +103,8 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let proposalOverride: ProposedSize?
   package let localActionRegistry = LocalActionRegistry()
   package let localPointerHandlerRegistry = LocalPointerHandlerRegistry()
+  package let localGestureRegistry = LocalGestureRegistry()
+  package let localGestureStateRegistry = LocalGestureStateRegistry()
   package let localFocusBindingRegistry = LocalFocusBindingRegistry()
   package let localFocusedValuesRegistry = LocalFocusedValuesRegistry()
   package let localPreferenceObservationRegistry = LocalPreferenceObservationRegistry()
@@ -118,6 +120,8 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       actionRegistry: localActionRegistry,
       keyHandlerRegistry: localKeyHandlerRegistry,
       pointerHandlerRegistry: localPointerHandlerRegistry,
+      gestureRegistry: localGestureRegistry,
+      gestureStateRegistry: localGestureStateRegistry,
       focusBindingRegistry: localFocusBindingRegistry,
       focusedValuesRegistry: localFocusedValuesRegistry,
       lifecycleRegistry: localLifecycleRegistry,

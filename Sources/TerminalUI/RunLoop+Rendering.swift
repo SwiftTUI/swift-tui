@@ -36,6 +36,14 @@ extension RunLoop {
 
     let hasDiagnosticsLogger = diagnosticsLogger != nil
     while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+      // Drain gesture recognizer deadlines before rendering so that
+      // recognizers that transition on this wake see their new phase
+      // reflected in the upcoming render pass.
+      if scheduledFrame.causes.contains(.deadline),
+        let triggeredDeadline = scheduledFrame.triggeredDeadline
+      {
+        drainGestureDeadlines(at: triggeredDeadline)
+      }
       var rerenderedForFocusSync = false
       var focusSyncBudget = FocusSyncRerenderBudget()
       var focusSyncBudgetExceeded = false
@@ -303,12 +311,17 @@ extension RunLoop {
       applyEnvironmentValues: true
     )
     context.localPointerHandlerRegistry = localPointerHandlerRegistry
+    context.localGestureRegistry = localGestureRegistry
+    context.localGestureStateRegistry = localGestureStateRegistry
     context.localFocusBindingRegistry = localFocusBindingRegistry
     context.localFocusedValuesRegistry = localFocusedValuesRegistry
     context.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     context.commandRegistry = commandRegistry
     context.invalidationProxy = .init(invalidator: scheduler)
     context.observationBridge = observationBridge
+    context.requestDeadline = { [weak scheduler] instant in
+      scheduler?.requestDeadline(instant)
+    }
     return context
   }
 
