@@ -206,6 +206,8 @@ public struct ResolveContext: Equatable, Sendable {
   package var invalidationSummary: InvalidationSummary
   package var resolveWorkTracker: ResolveWorkTracker?
   package var localActionRegistry: LocalActionRegistry?
+  package var localGestureRegistry: LocalGestureRegistry?
+  package var localGestureStateRegistry: LocalGestureStateRegistry?
   package var localPointerHandlerRegistry: LocalPointerHandlerRegistry?
   package var localFocusBindingRegistry: LocalFocusBindingRegistry?
   package var localFocusedValuesRegistry: LocalFocusedValuesRegistry?
@@ -226,6 +228,8 @@ public struct ResolveContext: Equatable, Sendable {
       actionRegistry: localActionRegistry,
       keyHandlerRegistry: localKeyHandlerRegistry,
       pointerHandlerRegistry: localPointerHandlerRegistry,
+      gestureRegistry: localGestureRegistry,
+      gestureStateRegistry: localGestureStateRegistry,
       focusBindingRegistry: localFocusBindingRegistry,
       focusedValuesRegistry: localFocusedValuesRegistry,
       lifecycleRegistry: localLifecycleRegistry,
@@ -271,6 +275,8 @@ public struct ResolveContext: Equatable, Sendable {
       localTaskRegistry: localTaskRegistry,
       applyEnvironmentValues: false
     )
+    childContext.localGestureRegistry = localGestureRegistry
+    childContext.localGestureStateRegistry = localGestureStateRegistry
     childContext.localPointerHandlerRegistry = localPointerHandlerRegistry
     childContext.localFocusBindingRegistry = localFocusBindingRegistry
     childContext.localFocusedValuesRegistry = localFocusedValuesRegistry
@@ -308,6 +314,8 @@ public struct ResolveContext: Equatable, Sendable {
       localTaskRegistry: localTaskRegistry,
       applyEnvironmentValues: false
     )
+    replacedContext.localGestureRegistry = localGestureRegistry
+    replacedContext.localGestureStateRegistry = localGestureStateRegistry
     replacedContext.localPointerHandlerRegistry = localPointerHandlerRegistry
     replacedContext.localFocusBindingRegistry = localFocusBindingRegistry
     replacedContext.localFocusedValuesRegistry = localFocusedValuesRegistry
@@ -453,6 +461,8 @@ extension ResolveContext {
       ?? .init(invalidatedIdentities: invalidatedIdentities)
     resolveWorkTracker = .init()
     self.localActionRegistry = localActionRegistry
+    self.localGestureRegistry = nil
+    self.localGestureStateRegistry = nil
     self.localPointerHandlerRegistry = nil
     self.localFocusBindingRegistry = nil
     self.localFocusedValuesRegistry = localFocusedValuesRegistry
