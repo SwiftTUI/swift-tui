@@ -141,6 +141,49 @@ struct ToolbarTests {
     }
   }
 
+  @Test(
+    "Toolbar-strip buttons inherit the Panel's scope path so commands registered at the Panel are visible from toolbar focus"
+  )
+  func toolbarStripInheritsPanelScope() {
+    let panel =
+      Panel(id: "outer") {
+        Text("body")
+          .toolbarItem(
+            .init(
+              title: "Save",
+              icon: nil,
+              position: .top,
+              isEnabled: true,
+              action: {}
+            )
+          )
+      }
+      .toolbar(style: DefaultTopToolbarStyle())
+
+    let context = ResolveContext(identity: testIdentity("toolbar-scope-root"))
+    let resolved = Resolver().resolve(AnyView(panel), in: context)
+
+    // Find the Panel node and confirm the toolbar strip sits inside
+    // it (not as a sibling). A toolbar whose strip is a sibling of
+    // the Panel would leave toolbar-button focus outside the scope
+    // boundary — palette/key commands registered at the Panel would
+    // then be invisible to toolbar focus.
+    guard let panelNode = findNode(in: resolved, where: { isKind($0.kind, named: "Panel") })
+    else {
+      Issue.record("Panel node not found in resolved tree")
+      return
+    }
+    let hasButtonInsidePanel =
+      findNode(
+        in: panelNode,
+        where: { isKind($0.kind, named: "Button") }
+      ) != nil
+    #expect(
+      hasButtonInsidePanel,
+      "expected a Button (toolbar-item button) somewhere inside the Panel subtree"
+    )
+  }
+
   @Test("Panel with bottom toolbar renders item titles below the content")
   func toolbarRendersBelowContent() {
     let panel =
@@ -173,4 +216,23 @@ struct ToolbarTests {
       #expect(bodyRow < closeRow)
     }
   }
+}
+
+@MainActor
+private func findNode(
+  in root: ResolvedNode,
+  where predicate: (ResolvedNode) -> Bool
+) -> ResolvedNode? {
+  var stack: [ResolvedNode] = [root]
+  while let node = stack.popLast() {
+    if predicate(node) { return node }
+    stack.append(contentsOf: node.children)
+  }
+  return nil
+}
+
+@MainActor
+private func isKind(_ kind: NodeKind, named name: String) -> Bool {
+  if case .view(let n) = kind, n == name { return true }
+  return false
 }
