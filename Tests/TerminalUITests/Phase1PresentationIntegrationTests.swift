@@ -189,10 +189,9 @@ private func presentScenario(
   let metrics = try host.present(current)
   try host.drainPendingPresentation()
   let incrementalWrites = Array(controller.writes.dropFirst(writesBeforeUpdate))
-  let renderer = TerminalSurfaceRenderer(capabilityProfile: .previewUnicode)
   let fullRepaintMetrics = TerminalPresentationMetrics.fullRepaint(
     for: current,
-    renderedOutput: renderer.render(current)
+    capabilityProfile: .previewUnicode
   )
 
   return PresentationScenarioResult(

@@ -323,9 +323,6 @@ struct TerminalPresentationTests {
     let planner = TerminalPresentationPlanner(
       capabilityProfile: .previewUnicode
     )
-    let renderer = TerminalSurfaceRenderer(
-      capabilityProfile: .previewUnicode
-    )
     let previousSurface = RasterSurface(
       size: .init(width: 8, height: 2),
       lines: ["alpha", "bravo"],
@@ -391,7 +388,6 @@ struct TerminalPresentationTests {
       )
 
       #expect(plan.strategy == .fullRepaint)
-      #expect(plan.renderedOutput == renderer.render(surface))
       #expect(plan.spanUpdates.isEmpty)
       #expect(plan.linesTouched == surface.size.height)
       #expect(plan.cellsChanged == max(0, surface.size.width) * max(0, surface.size.height))
@@ -422,7 +418,6 @@ struct TerminalPresentationTests {
       plan.spanUpdates == [
         .init(row: 0, column: 3, renderedSpan: "X", cellsChanged: 1)
       ])
-    #expect(plan.renderedOutput.isEmpty)
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 1)
   }
@@ -684,7 +679,7 @@ struct TerminalPresentationTests {
     )
 
     #expect(plan.strategy == .fullRepaint)
-    #expect(!plan.renderedOutput.isEmpty)
+    #expect(plan.spanUpdates.isEmpty)
   }
 
   @Test("terminal host presents styled surfaces through the capability-aware renderer")
