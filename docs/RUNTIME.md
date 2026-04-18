@@ -130,6 +130,9 @@ The runtime is materially incremental in common steady-state paths, but it is no
 ### Resolve
 
 - Invalidated identities are visible in `ResolveContext`, `FrameContext`, and `FrameDiagnostics`
+- `FrameDiagnostics.presentationDamage` records the refined paint candidate that survived raster
+  narrowing: dirty row count, range-aware row count, span count, candidate cell count, and whether
+  the frame escalated to full-text or full-graphics fallback
 - Localized dirty frames can reuse clean resolved subtrees when subtree identity, environment, and transaction still match
 - Resolve reuse is conservative: root-invalidated frames and fully cold frames still resolve normally
 
@@ -146,7 +149,12 @@ The runtime is materially incremental in common steady-state paths, but it is no
 - `TerminalPresentationPlanner` emits row-batched incremental text updates when the previous and current surfaces are compatible
 - Kitty-backed image presentation is planned separately from text diffing: dirty text rows trigger targeted re-placement, while attachment-layout changes fall back to a graphics-only full replay without forcing a text full repaint
 - Row batches preserve logical span metadata, normalize around continuation cells, and share style/hyperlink state across disjoint edits on the same row
+- Tail-only text shrink can lower to terminal-native erase-to-end-of-line when the host is running on
+  a real terminal; the host keeps a local disable path and otherwise falls back to literal spaces
 - Full repaints are wrapped in synchronized-output envelopes when the terminal capability profile marks that support as safe
+- `TerminalPresentationMetrics` records the final write shape: strategy, bytes, touched lines/cells,
+  synchronized-output usage, graphics replay scope, replayed attachment count, and any terminal edit
+  op lowering that was actually applied
 - `SIGWINCH` schedules a fresh frame and re-reads terminal size without exiting the run loop
 
 ### Deterministic Scenario Checks
@@ -157,6 +165,8 @@ The standing runtime checks are deterministic scenario tests rather than wall-cl
 - Localized subtree update: work stays concentrated on the dirty path and reused siblings stay clean
 - Focused button press: the second frame remains incremental and smaller than the initial full repaint
 - Single-character text input: the second frame remains incremental, though a cursor-bearing insertion can still widen to a 2-cell span
+- Trailing tail shrink: the second frame remains incremental, keeps narrow candidate damage, and
+  prefers erase-to-end-of-line over literal trailing spaces when the host can prove it is safe
 - Single-step scroll movement: still a documented conservative path and not yet a guaranteed incremental case
 
 ### Known Full-Repaint Fallbacks

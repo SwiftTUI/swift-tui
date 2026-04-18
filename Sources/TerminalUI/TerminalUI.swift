@@ -323,6 +323,8 @@ public struct DefaultRenderer {
         invalidatedIdentities: frameContext.invalidatedIdentities,
         resolveWork: resolveContext.resolveWorkTracker?.snapshot,
         layoutWork: layoutPassContext.workMetrics,
+        presentationDamage: refinedPresentationDamage,
+        presentationSurfaceWidth: raster.size.width,
         phaseTimings: phaseTimings,
         measurementCache: layoutEngine.cache?.metrics
       )

@@ -151,7 +151,8 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   ) throws -> TerminalPresentationMetrics {
     let previousSurface = state.withLock(\.lastSubmittedSurface)
     let plan = TerminalPresentationPlanner(
-      capabilityProfile: capabilityProfile
+      capabilityProfile: capabilityProfile,
+      graphicsCapabilities: graphicsCapabilities
     ).plan(
       previousSurface: previousSurface,
       currentSurface: surface,
@@ -177,6 +178,10 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
       }
     }
 
+    let usedSynchronizedOutput =
+      !output.isEmpty
+      && plan.strategy == .fullRepaint
+      && capabilityProfile.supportsSynchronizedOutput
     output = wrappedPresentationOutput(
       output,
       strategy: plan.strategy
@@ -194,7 +199,8 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
       bytesWritten: output.utf8.count,
       linesTouched: plan.linesTouched,
       cellsChanged: plan.cellsChanged,
-      strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental
+      strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental,
+      usedSynchronizedOutput: usedSynchronizedOutput
     )
   }
 

@@ -27,8 +27,31 @@ struct Phase5ReliabilityGatesTests {
     #expect(second.presentation.bytesWritten == 0)
     #expect(second.presentation.linesTouched == 0)
     #expect(second.presentation.cellsChanged == 0)
+    #expect(!second.presentation.usedSynchronizedOutput)
+    #expect(second.presentation.graphicsReplayScope == .none)
+    #expect(second.presentation.editOperationLowering == .none)
+    #expect(second.presentation.editOperationCount == 0)
     #expect(second.diagnostics.measuredNodesReused > 0)
     #expect(second.diagnostics.placedNodesReused > 0)
+  }
+
+  @MainActor
+  @Test("full repaint metrics report synchronized framing when the capability profile supports it")
+  func synchronizedFullRepaintMetricsAreVisible() throws {
+    let harness = Phase5PresentationHarness(
+      capabilityProfile: synchronizedPreviewCapabilityProfile()
+    )
+
+    let first = try harness.render(
+      Phase5StableTextView(),
+      context: .init(identity: testIdentity("Phase5", "SyncRoot"))
+    )
+
+    #expect(first.presentation.strategy == .fullRepaint)
+    #expect(first.presentation.usedSynchronizedOutput)
+    #expect(first.presentation.graphicsReplayScope == .none)
+    #expect(first.presentation.editOperationLowering == .none)
+    #expect(first.presentation.editOperationCount == 0)
   }
 }
 
@@ -39,16 +62,23 @@ private struct Phase5PresentationFrame {
 
 @MainActor
 private final class Phase5PresentationHarness {
-  private let renderer = DefaultRenderer(
-    layoutEngine: .init(cache: MeasurementCache())
-  )
-  private let host = TerminalHost(
-    inputFileDescriptor: 0,
-    outputFileDescriptor: 1,
-    fallbackSize: .init(width: 16, height: 2),
-    controller: Phase5PresentationController(),
-    capabilityProfile: .previewUnicode
-  )
+  private let renderer: DefaultRenderer
+  private let host: TerminalHost
+
+  init(
+    capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+  ) {
+    renderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 16, height: 2),
+      controller: Phase5PresentationController(),
+      capabilityProfile: capabilityProfile
+    )
+  }
 
   func render<V: View>(
     _ view: V,
@@ -99,4 +129,15 @@ private struct Phase5StableTextView: View {
       Text("Ready")
     }
   }
+}
+
+private func synchronizedPreviewCapabilityProfile() -> TerminalCapabilityProfile {
+  .init(
+    glyphLevel: .unicode,
+    colorLevel: .none,
+    emitsStyleEscapeSequences: false,
+    supportsHyperlinks: false,
+    supportsMouseReporting: false,
+    supportsSynchronizedOutput: true
+  )
 }

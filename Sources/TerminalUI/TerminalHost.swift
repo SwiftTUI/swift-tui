@@ -211,21 +211,47 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
     case incremental
   }
 
+  public enum GraphicsReplayScope: String, Equatable, Sendable {
+    case none
+    case targeted
+    case full
+  }
+
+  public enum EditOperationLowering: String, Equatable, Sendable {
+    case none
+    case eraseToEndOfLine
+  }
+
   public var bytesWritten: Int
   public var linesTouched: Int
   public var cellsChanged: Int
   public var strategy: Strategy
+  public var usedSynchronizedOutput: Bool
+  public var graphicsReplayScope: GraphicsReplayScope
+  public var graphicsAttachmentsReplayed: Int
+  public var editOperationLowering: EditOperationLowering
+  public var editOperationCount: Int
 
   public init(
     bytesWritten: Int = 0,
     linesTouched: Int = 0,
     cellsChanged: Int = 0,
-    strategy: Strategy = .fullRepaint
+    strategy: Strategy = .fullRepaint,
+    usedSynchronizedOutput: Bool = false,
+    graphicsReplayScope: GraphicsReplayScope = .none,
+    graphicsAttachmentsReplayed: Int = 0,
+    editOperationLowering: EditOperationLowering = .none,
+    editOperationCount: Int = 0
   ) {
     self.bytesWritten = max(0, bytesWritten)
     self.linesTouched = max(0, linesTouched)
     self.cellsChanged = max(0, cellsChanged)
     self.strategy = strategy
+    self.usedSynchronizedOutput = usedSynchronizedOutput
+    self.graphicsReplayScope = graphicsReplayScope
+    self.graphicsAttachmentsReplayed = max(0, graphicsAttachmentsReplayed)
+    self.editOperationLowering = editOperationLowering
+    self.editOperationCount = max(0, editOperationCount)
   }
 
   public var usedFullRepaint: Bool {
@@ -242,15 +268,23 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
       for: surface,
       capabilityProfile: capabilityProfile
     )
+    var bytesWritten = fullRepaintBytesWritten(
+      writeSteps: writeSteps,
+      origin: origin
+    )
+    if capabilityProfile.supportsSynchronizedOutput, bytesWritten > 0 {
+      bytesWritten += "\u{001B}[?2026h".utf8.count
+      bytesWritten += "\u{001B}[?2026l".utf8.count
+    }
 
     return Self(
-      bytesWritten: fullRepaintBytesWritten(
-        writeSteps: writeSteps,
-        origin: origin
-      ),
+      bytesWritten: bytesWritten,
       linesTouched: max(0, surface.size.height),
       cellsChanged: cellCount,
-      strategy: .fullRepaint
+      strategy: .fullRepaint,
+      usedSynchronizedOutput: capabilityProfile.supportsSynchronizedOutput,
+      graphicsReplayScope: surface.imageAttachments.isEmpty ? .none : .full,
+      graphicsAttachmentsReplayed: surface.imageAttachments.count
     )
   }
 }
@@ -902,6 +936,10 @@ extension TerminalHosting {
       var bytesWritten = 0
       let origin = Point.zero
       var bufferedOutput = String()
+      var graphicsReplayScope = TerminalPresentationMetrics.GraphicsReplayScope.none
+      var graphicsAttachmentsReplayed = 0
+      var editOperationLowering = TerminalPresentationMetrics.EditOperationLowering.none
+      var editOperationCount = 0
 
       func append(_ output: String) {
         bufferedOutput.append(output)
@@ -915,6 +953,10 @@ extension TerminalHosting {
         // force the current frame to retransmit any images before placement.
         if graphicsCapabilities.preferredProtocol == .kitty {
           presentationSession.transmittedKittyImages.removeAll()
+        }
+        if !preparedSurface.imageAttachments.isEmpty {
+          graphicsReplayScope = .full
+          graphicsAttachmentsReplayed = preparedSurface.imageAttachments.count
         }
         append(clearScreenSequence())
         append(cursorSequence(to: origin))
@@ -938,16 +980,18 @@ extension TerminalHosting {
 
       case .incremental:
         for rowBatch in plan.rowBatches {
-          let rowOutput =
-            if usesTerminalEditOperations,
-              rowBatch.canLowerToEraseToEndOfLine(
-                surfaceWidth: preparedSurface.size.width
-              )
-            {
-              eraseToEndOfLineSequence()
-            } else {
-              rowBatch.renderedBatch
-            }
+          let rowOutput: String
+          if usesTerminalEditOperations,
+            rowBatch.canLowerToEraseToEndOfLine(
+              surfaceWidth: preparedSurface.size.width
+            )
+          {
+            editOperationLowering = .eraseToEndOfLine
+            editOperationCount += 1
+            rowOutput = eraseToEndOfLineSequence()
+          } else {
+            rowOutput = rowBatch.renderedBatch
+          }
           append(
             cursorSequence(
               to: .init(x: rowBatch.anchorColumn, y: rowBatch.row)
@@ -960,6 +1004,8 @@ extension TerminalHosting {
           case .none:
             break
           case .targeted:
+            graphicsReplayScope = .targeted
+            graphicsAttachmentsReplayed = plan.graphicsReplay.attachmentsToReplay.count
             for writeStep in imageRenderer.graphicsWriteSteps(
               for: plan.graphicsReplay.attachmentsToReplay,
               capabilityProfile: capabilityProfile,
@@ -969,6 +1015,8 @@ extension TerminalHosting {
               append(writeStep)
             }
           case .full:
+            graphicsReplayScope = .full
+            graphicsAttachmentsReplayed = plan.graphicsReplay.attachmentsToReplay.count
             append(deleteVisibleKittyPlacementsSequence())
             for writeStep in imageRenderer.graphicsWriteSteps(
               for: plan.graphicsReplay.attachmentsToReplay,
@@ -982,6 +1030,10 @@ extension TerminalHosting {
         }
       }
 
+      let usedSynchronizedOutput =
+        !bufferedOutput.isEmpty
+        && plan.strategy == .fullRepaint
+        && capabilityProfile.supportsSynchronizedOutput
       bufferedOutput = wrappedPresentationOutput(
         bufferedOutput,
         strategy: plan.strategy
@@ -1004,7 +1056,12 @@ extension TerminalHosting {
         cellsChanged: plan.cellsChanged,
         strategy: plan.strategy == TerminalPresentationPlan.Strategy.fullRepaint
           ? TerminalPresentationMetrics.Strategy.fullRepaint
-          : TerminalPresentationMetrics.Strategy.incremental
+          : TerminalPresentationMetrics.Strategy.incremental,
+        usedSynchronizedOutput: usedSynchronizedOutput,
+        graphicsReplayScope: graphicsReplayScope,
+        graphicsAttachmentsReplayed: graphicsAttachmentsReplayed,
+        editOperationLowering: editOperationLowering,
+        editOperationCount: editOperationCount
       )
     }
 

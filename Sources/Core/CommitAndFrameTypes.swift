@@ -525,6 +525,70 @@ public struct FramePhaseTimings: Equatable, Sendable {
 }
 
 /// Diagnostic counters and summaries for one rendered frame.
+public struct PresentationDamageDiagnostics: Equatable, Sendable {
+  public var textRowCount: Int
+  public var rangeAwareTextRowCount: Int
+  public var textSpanCount: Int
+  public var textCellCount: Int
+  public var graphicsInvalidationCount: Int
+  public var requiresFullTextRepaint: Bool
+  public var requiresFullGraphicsReplay: Bool
+
+  public init(
+    textRowCount: Int = 0,
+    rangeAwareTextRowCount: Int = 0,
+    textSpanCount: Int = 0,
+    textCellCount: Int = 0,
+    graphicsInvalidationCount: Int = 0,
+    requiresFullTextRepaint: Bool = false,
+    requiresFullGraphicsReplay: Bool = false
+  ) {
+    self.textRowCount = max(0, textRowCount)
+    self.rangeAwareTextRowCount = max(0, rangeAwareTextRowCount)
+    self.textSpanCount = max(0, textSpanCount)
+    self.textCellCount = max(0, textCellCount)
+    self.graphicsInvalidationCount = max(0, graphicsInvalidationCount)
+    self.requiresFullTextRepaint = requiresFullTextRepaint
+    self.requiresFullGraphicsReplay = requiresFullGraphicsReplay
+  }
+}
+
+extension PresentationDamageDiagnostics {
+  package init(
+    damage: PresentationDamage,
+    surfaceWidth: Int
+  ) {
+    let clampedSurfaceWidth = max(0, surfaceWidth)
+    var rangeAwareTextRowCount = 0
+    var textSpanCount = 0
+    var textCellCount = 0
+
+    for textRow in damage.textRows {
+      if textRow.columnRanges.isEmpty {
+        textSpanCount += 1
+        textCellCount += clampedSurfaceWidth
+        continue
+      }
+
+      rangeAwareTextRowCount += 1
+      textSpanCount += textRow.columnRanges.count
+      textCellCount += textRow.columnRanges.reduce(0) { partial, range in
+        partial + max(0, range.upperBound - range.lowerBound)
+      }
+    }
+
+    self.init(
+      textRowCount: damage.textRows.count,
+      rangeAwareTextRowCount: rangeAwareTextRowCount,
+      textSpanCount: textSpanCount,
+      textCellCount: textCellCount,
+      graphicsInvalidationCount: damage.graphicsInvalidation.count,
+      requiresFullTextRepaint: damage.requiresFullTextRepaint,
+      requiresFullGraphicsReplay: damage.requiresFullGraphicsReplay
+    )
+  }
+}
+
 public struct FrameDiagnostics: Equatable, Sendable {
   public var proposal: ProposedSize
   public var invalidatedIdentities: Set<Identity>
@@ -542,6 +606,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var focusRegionCount: Int
   public var scrollRouteCount: Int
   public var selectionRouteCount: Int
+  public var presentationDamage: PresentationDamageDiagnostics?
   public var phaseTimings: FramePhaseTimings?
   public var measurementCache: MeasurementCacheMetrics?
 
@@ -562,6 +627,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     focusRegionCount: Int = 0,
     scrollRouteCount: Int = 0,
     selectionRouteCount: Int = 0,
+    presentationDamage: PresentationDamageDiagnostics? = nil,
     phaseTimings: FramePhaseTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil
   ) {
@@ -581,6 +647,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     self.focusRegionCount = focusRegionCount
     self.scrollRouteCount = scrollRouteCount
     self.selectionRouteCount = selectionRouteCount
+    self.presentationDamage = presentationDamage
     self.phaseTimings = phaseTimings
     self.measurementCache = measurementCache
   }
@@ -857,6 +924,8 @@ extension FrameDiagnostics {
     invalidatedIdentities: Set<Identity> = [],
     resolveWork: ResolveWorkMetrics? = nil,
     layoutWork: LayoutWorkMetrics? = nil,
+    presentationDamage: PresentationDamage? = nil,
+    presentationSurfaceWidth: Int = 0,
     phaseTimings: FramePhaseTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil
   ) -> Self {
@@ -877,6 +946,12 @@ extension FrameDiagnostics {
       focusRegionCount: semantics.focusRegions.count,
       scrollRouteCount: semantics.scrollRoutes.count,
       selectionRouteCount: semantics.selectionRoutes.count,
+      presentationDamage: presentationDamage.map {
+        .init(
+          damage: $0,
+          surfaceWidth: presentationSurfaceWidth
+        )
+      },
       phaseTimings: phaseTimings,
       measurementCache: measurementCache
     )

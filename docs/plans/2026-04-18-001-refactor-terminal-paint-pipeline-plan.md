@@ -253,7 +253,7 @@ principle is to keep the runtime shippable after every wave:
 
 ### Execution Waves
 
-- [ ] **Wave 0: Baseline characterization and guardrails**
+- [x] **Wave 0: Baseline characterization and guardrails**
 
 **Objective:** Freeze current behavior around text diffs, dropped-frame recovery, and graphics
 placement before changing internals.
@@ -283,7 +283,7 @@ placement before changing internals.
 **Rollback stance:**
 - Safe to revert independently; no runtime changes.
 
-- [ ] **Wave 1: Planner/host boundary cleanup**
+- [x] **Wave 1: Planner/host boundary cleanup**
 
 **Objective:** Remove duplicated full-repaint rendering and make full repaint ownership explicit.
 
@@ -311,7 +311,7 @@ placement before changing internals.
 **Rollback stance:**
 - Revertable as one PR; no dependency on later waves.
 
-- [ ] **Wave 2: Damage model expansion at the renderer boundary**
+- [x] **Wave 2: Damage model expansion at the renderer boundary**
 
 **Objective:** Replace row-only damage with a richer, still-conservative package-level model.
 
@@ -343,7 +343,7 @@ placement before changing internals.
 - If unstable, revert before Wave 3. Do not stack row-batched encoding on top of an uncertain damage
   model.
 
-- [ ] **Wave 3: Raster refinement and actual touched-span reporting**
+- [x] **Wave 3: Raster refinement and actual touched-span reporting**
 
 **Objective:** Let the rasterizer refine candidate damage into what it truly repainted so the
 presentation planner no longer has to rediscover narrow spans from wide row hints.
@@ -373,7 +373,7 @@ presentation planner no longer has to rediscover narrow spans from wide row hint
 - If actual touched-span reporting proves too invasive, keep the richer candidate-damage model from
   Wave 2 and defer refinement to a later iteration.
 
-- [ ] **Wave 4: Row-batched, stateful text encoding**
+- [x] **Wave 4: Row-batched, stateful text encoding**
 
 **Objective:** Reduce repeated escape-sequence and cursor-addressing overhead by encoding
 incremental text as row-oriented batches.
@@ -405,7 +405,7 @@ incremental text as row-oriented batches.
 **Rollback stance:**
 - If style/hyperlink stability is not yet solid, keep the richer damage model and defer batching.
 
-- [ ] **Wave 5: Synchronized repaint framing**
+- [x] **Wave 5: Synchronized repaint framing**
 
 **Objective:** Add synchronized-output envelopes around repaints and any future large incremental
 batches where warranted.
@@ -436,7 +436,7 @@ batches where warranted.
 - Revert independently if terminal compatibility is worse than expected; no other wave should depend
   on synchronized-output support.
 
-- [ ] **Wave 6: Graphics/text planning split**
+- [x] **Wave 6: Graphics/text planning split**
 
 **Objective:** Keep text diffing incremental even when graphics placement changes and reduce
 unnecessary image replay.
@@ -466,7 +466,7 @@ unnecessary image replay.
 - If targeted replay is not yet trustworthy, keep the text/graphics split but widen graphics replay
   back to the current all-visible-attachments behavior.
 
-- [ ] **Wave 7: Terminal-native edit-op lowering**
+- [x] **Wave 7: Terminal-native edit-op lowering**
 
 **Objective:** Add a bounded optimization tier for common mutations after the core model is stable.
 
@@ -492,7 +492,7 @@ unnecessary image replay.
 **Rollback stance:**
 - Fully optional. Defer rather than forcing it into the critical-path refactor.
 
-- [ ] **Wave 8: Diagnostics, docs, and steady-state hardening**
+- [x] **Wave 8: Diagnostics, docs, and steady-state hardening**
 
 **Objective:** Make the new paint path legible, measurable, and maintainable once the behavior has
 settled.
@@ -573,7 +573,7 @@ If a hold point is hit, prefer:
 
 ## Implementation Units
 
-- [ ] **Unit 1: Unify full-repaint ownership and simplify presentation planning**
+- [x] **Unit 1: Unify full-repaint ownership and simplify presentation planning**
 
 **Goal:** Remove duplicated full-repaint rendering work and make the plan/host boundary represent
 what the host will actually write.
@@ -614,7 +614,7 @@ what the host will actually write.
 - Full repaint tests pass with unchanged visible output expectations unless intentionally updated for
   a new single-owner encoding shape.
 
-- [ ] **Unit 2: Replace row-only `PresentationDamage` with a richer damage model**
+- [x] **Unit 2: Replace row-only `PresentationDamage` with a richer damage model**
 
 **Goal:** Preserve more locality from invalidation and placement into the paint tail so the
   presentation stage does not need to rediscover narrow changes from full-width row scans.
@@ -673,7 +673,7 @@ PresentationDamage
 - Previously passing incremental tests still pass, and new benchmark assertions show equal or lower
   `cellsChanged` and `bytesWritten` for localized updates.
 
-- [ ] **Unit 3: Introduce row-batched, stateful incremental text encoding**
+- [x] **Unit 3: Introduce row-batched, stateful incremental text encoding**
 
 **Goal:** Reduce terminal bytes and repeated escape-sequence churn by encoding incremental text
 updates as row-oriented batches with shared style state rather than isolated span strings.
@@ -726,7 +726,7 @@ IncrementalTextRowBatch
   shape.
 - Existing correctness tests for styles, hyperlinks, and wide glyphs continue to pass.
 
-- [ ] **Unit 4: Add capability-gated synchronized output framing**
+- [x] **Unit 4: Add capability-gated synchronized output framing**
 
 **Goal:** Prevent repaint tearing on terminals that support synchronized output, especially on full
 repaints and dropped-frame recovery.
@@ -767,7 +767,7 @@ repaints and dropped-frame recovery.
 - Repaint writes are framed exactly once when synchronized output is enabled.
 - Proposal and runtime documentation agree on the implemented behavior.
 
-- [ ] **Unit 5: Separate text planning from graphics placement planning**
+- [x] **Unit 5: Separate text planning from graphics placement planning**
 
 **Goal:** Prevent graphics attachment changes from unnecessarily forcing text full repaints and limit
 graphics replay to affected attachments.
@@ -814,7 +814,7 @@ placement correctness is easier to regress than plain text diffing.
 - Planner compatibility logic distinguishes text and graphics concerns.
 - Graphics protocol tests continue to pass with narrower write scopes where expected.
 
-- [ ] **Unit 6: Add optional terminal-native edit-op lowering**
+- [x] **Unit 6: Add optional terminal-native edit-op lowering**
 
 **Goal:** Introduce a second-stage optimization tier for common terminal mutations such as tail clears
 or row insertion/deletion once the richer damage and batched encoding model is in place.
@@ -852,7 +852,7 @@ or row insertion/deletion once the richer damage and batched encoding model is i
 - The optimization can be disabled without affecting correctness.
 - Incremental write size decreases measurably for the targeted patterns.
 
-- [ ] **Unit 7: Expand diagnostics, benchmarks, and documentation around paint-path behavior**
+- [x] **Unit 7: Expand diagnostics, benchmarks, and documentation around paint-path behavior**
 
 **Goal:** Make regressions in paint precision visible and keep the intended behavior legible to
 future contributors.

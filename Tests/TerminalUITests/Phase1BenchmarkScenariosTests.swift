@@ -130,6 +130,9 @@ struct Phase1BenchmarkScenariosTests {
     #expect(second.presentation.cellsChanged == 1)
     #expect(second.presentation.bytesWritten > 0)
     #expect(second.presentation.bytesWritten < first.presentation.bytesWritten)
+    #expect(second.presentation.graphicsReplayScope == .none)
+    #expect(second.presentation.editOperationLowering == .none)
+    #expect(second.presentation.editOperationCount == 0)
   }
 
   @Test(
@@ -251,6 +254,41 @@ struct Phase1BenchmarkScenariosTests {
     #expect(lazySecond.presentation.strategy == .incremental)
     #expect(lazySecond.diagnostics.resolvedNodeCount < stableSecond.diagnostics.resolvedNodeCount)
     #expect(lazySecond.diagnostics.measuredNodeCount < stableSecond.diagnostics.measuredNodeCount)
+  }
+
+  @Test("trailing tail shrink lowers through erase-to-end-of-line without widening the damage")
+  @MainActor
+  func trailingTailShrinkScenario() throws {
+    let harness = BenchmarkHarness()
+    let row = TextBox()
+
+    row.value = "alphabet"
+    let first = try harness.render(
+      FixedWidthSingleRowEditBenchmarkView(
+        text: row,
+        width: 8
+      ),
+      context: .init(identity: Phase1BenchmarkIdentity.root)
+    )
+
+    row.value = "alph"
+    let second = try harness.render(
+      FixedWidthSingleRowEditBenchmarkView(
+        text: row,
+        width: 8
+      ),
+      context: .init(identity: Phase1BenchmarkIdentity.root)
+    )
+
+    #expect(first.presentation.strategy == .fullRepaint)
+    #expect(second.presentation.strategy == .incremental)
+    #expect(second.presentation.linesTouched == 1)
+    #expect(second.presentation.cellsChanged == 4)
+    #expect(second.presentation.bytesWritten > 0)
+    #expect(second.presentation.bytesWritten < first.presentation.bytesWritten)
+    #expect(second.presentation.graphicsReplayScope == .none)
+    #expect(second.presentation.editOperationLowering == .eraseToEndOfLine)
+    #expect(second.presentation.editOperationCount == 1)
   }
 }
 
@@ -404,6 +442,18 @@ private struct SingleRowEditBenchmarkView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
       Text(text.value)
+    }
+  }
+}
+
+private struct FixedWidthSingleRowEditBenchmarkView: View {
+  let text: TextBox
+  let width: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text(text.value)
+        .frame(width: width, alignment: .leading)
     }
   }
 }
