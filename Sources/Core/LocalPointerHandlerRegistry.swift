@@ -30,17 +30,20 @@ package struct LocalPointerEvent: Equatable, Sendable {
   package var location: Point
   package var targetRect: Rect
   package var scrollContext: LocalPointerScrollContext?
+  package var timestamp: MonotonicInstant
 
   package init(
     kind: Kind,
     location: Point,
     targetRect: Rect,
-    scrollContext: LocalPointerScrollContext? = nil
+    scrollContext: LocalPointerScrollContext? = nil,
+    timestamp: MonotonicInstant = .now()
   ) {
     self.kind = kind
     self.location = location
     self.targetRect = targetRect
     self.scrollContext = scrollContext
+    self.timestamp = timestamp
   }
 }
 
