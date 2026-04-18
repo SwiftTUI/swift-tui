@@ -70,6 +70,7 @@ When updating fixtures:
 - Keep deterministic benchmark scenarios as standing checks for idle, control-state, and input-update paths.
 - Treat a new full repaint in a previously incremental scenario as a regression unless [RUNTIME.md](RUNTIME.md) explicitly calls out a fallback case.
 - Keep performance gates deterministic. They should assert work volume and presentation shape, not wall-clock timing.
+- When paint-path work changes, prefer explicit write-shape assertions (`linesTouched`, `cellsChanged`, emitted cursor/script shape, graphics replay scope) over broad "smaller than before" checks alone.
 - The standing enforcement lives in `Phase5ReliabilityGatesTests` and the targeted scenario suites.
 
 ## Architecture Gates
