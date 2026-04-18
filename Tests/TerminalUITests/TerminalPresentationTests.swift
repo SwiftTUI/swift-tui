@@ -423,7 +423,7 @@ struct TerminalPresentationTests {
     )
     let currentSurface = RasterSurface(
       size: .init(width: 8, height: 3),
-      lines: ["alpXa", "bravo", "charlXe"]
+      lines: ["alpXa", "bravo", "chZrlXe"]
     )
     let damage = PresentationDamage(
       textRows: [

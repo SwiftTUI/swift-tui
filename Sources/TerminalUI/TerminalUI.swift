@@ -287,6 +287,7 @@ public struct DefaultRenderer {
     }
     let raster = rasterized.surface
     let drawnIdentities = rasterized.visibleIdentities
+    let refinedPresentationDamage = rasterized.presentationDamage
     let (commit, commitDuration) = measurePhase {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: resolveContext.identity,
@@ -335,7 +336,7 @@ public struct DefaultRenderer {
       semanticSnapshot: semantics,
       drawTree: draw,
       rasterSurface: raster,
-      presentationDamage: presentationDamage,
+      presentationDamage: refinedPresentationDamage,
       drawnIdentities: drawnIdentities,
       commitPlan: commit,
       diagnostics: diagnostics

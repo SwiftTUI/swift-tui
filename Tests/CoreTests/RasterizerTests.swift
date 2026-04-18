@@ -142,6 +142,102 @@ struct RasterizerTests {
     #expect(attachment.visibleBounds == Rect(origin: .zero, size: .init(width: 4, height: 3)))
   }
 
+  @Test("incremental raster reuse refines row damage to actual changed spans")
+  func incrementalRasterReuseRefinesDamageToActualChangedSpans() {
+    let rasterizer = Rasterizer()
+    let rowBounds = Rect(origin: .zero, size: .init(width: 10, height: 1))
+    let previousDraw = DrawNode(
+      identity: testIdentity("row"),
+      bounds: rowBounds,
+      commands: [
+        .text(
+          bounds: rowBounds,
+          content: "0123456789",
+          style: .init(),
+          lineLimit: nil,
+          truncationMode: .tail,
+          wrappingStrategy: .wordBoundary
+        )
+      ]
+    )
+    let previousSurface = rasterizer.rasterize(previousDraw)
+    let draw = DrawNode(
+      identity: testIdentity("row"),
+      bounds: rowBounds,
+      commands: [
+        .text(
+          bounds: rowBounds,
+          content: "0123X56789",
+          style: .init(),
+          lineLimit: nil,
+          truncationMode: .tail,
+          wrappingStrategy: .wordBoundary
+        )
+      ]
+    )
+
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      draw,
+      minimumSize: .zero,
+      previousSurface: previousSurface,
+      damage: .init(textRows: [.init(row: 0, columnRanges: [4..<5])])
+    )
+
+    #expect(result.surface.lines == ["0123X56789"])
+    #expect(
+      result.presentationDamage?.textRows == [
+        .init(row: 0, columnRanges: [4..<5])
+      ])
+  }
+
+  @Test("incremental raster reuse preserves clears inside refined damage spans")
+  func incrementalRasterReusePreservesClearRanges() {
+    let rasterizer = Rasterizer()
+    let rowBounds = Rect(origin: .zero, size: .init(width: 4, height: 1))
+    let previousDraw = DrawNode(
+      identity: testIdentity("row"),
+      bounds: rowBounds,
+      commands: [
+        .text(
+          bounds: rowBounds,
+          content: "ABCD",
+          style: .init(),
+          lineLimit: nil,
+          truncationMode: .tail,
+          wrappingStrategy: .wordBoundary
+        )
+      ]
+    )
+    let previousSurface = rasterizer.rasterize(previousDraw)
+    let draw = DrawNode(
+      identity: testIdentity("row"),
+      bounds: rowBounds,
+      commands: [
+        .text(
+          bounds: rowBounds,
+          content: "ABX",
+          style: .init(),
+          lineLimit: nil,
+          truncationMode: .tail,
+          wrappingStrategy: .wordBoundary
+        )
+      ]
+    )
+
+    let result = rasterizer.rasterizeCollectingVisibleIdentities(
+      draw,
+      minimumSize: .zero,
+      previousSurface: previousSurface,
+      damage: .init(textRows: [.init(row: 0, columnRanges: [2..<4])])
+    )
+
+    #expect(result.surface.lines == ["ABX"])
+    #expect(
+      result.presentationDamage?.textRows == [
+        .init(row: 0, columnRanges: [2..<4])
+      ])
+  }
+
   // MARK: - Visible-identity collection
 
   @Test("visible identity collection records only identities not fully clipped")
