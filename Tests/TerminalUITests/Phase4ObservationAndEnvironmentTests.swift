@@ -1613,7 +1613,7 @@ private final class Phase4RecordingTerminalHost: TerminalHosting {
       case .fullRepaint:
         TerminalPresentationMetrics.fullRepaint(
           for: surface,
-          renderedOutput: rendered
+          capabilityProfile: capabilityProfile
         ).bytesWritten
       case .incremental:
         plan.spanUpdates.reduce(0) { partial, update in
@@ -1674,7 +1674,7 @@ private final class Phase4MutableAppearanceTerminalHost: TerminalHosting {
       case .fullRepaint:
         TerminalPresentationMetrics.fullRepaint(
           for: surface,
-          renderedOutput: rendered
+          capabilityProfile: capabilityProfile
         ).bytesWritten
       case .incremental:
         plan.spanUpdates.reduce(0) { partial, update in

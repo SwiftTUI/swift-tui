@@ -258,17 +258,14 @@ struct TerminalPresentationPlan: Sendable {
   }
 
   var strategy: Strategy
-  var renderedOutput: String
   var spanUpdates: [SpanUpdate]
   var surfaceSize: Size
 
   static func fullRepaint(
-    renderedOutput: String,
     surfaceSize: Size
   ) -> Self {
     Self(
       strategy: .fullRepaint,
-      renderedOutput: renderedOutput,
       spanUpdates: [],
       surfaceSize: surfaceSize
     )
@@ -280,7 +277,6 @@ struct TerminalPresentationPlan: Sendable {
   ) -> Self {
     Self(
       strategy: .incremental,
-      renderedOutput: "",
       spanUpdates: spanUpdates,
       surfaceSize: surfaceSize
     )
@@ -313,10 +309,6 @@ struct TerminalPresentationPlanner {
     currentSurface: RasterSurface,
     damage: PresentationDamage? = nil
   ) -> TerminalPresentationPlan {
-    let renderer = TerminalSurfaceRenderer(
-      capabilityProfile: capabilityProfile
-    )
-
     guard let previousSurface,
       previousSurface.size == currentSurface.size,
       previousSurface.attachments == currentSurface.attachments,
@@ -324,10 +316,13 @@ struct TerminalPresentationPlanner {
       previousSurface.metadata == currentSurface.metadata
     else {
       return .fullRepaint(
-        renderedOutput: renderer.render(currentSurface),
         surfaceSize: currentSurface.size
       )
     }
+
+    let renderer = TerminalSurfaceRenderer(
+      capabilityProfile: capabilityProfile
+    )
 
     let rowCount = max(
       max(previousSurface.cells.count, currentSurface.cells.count),

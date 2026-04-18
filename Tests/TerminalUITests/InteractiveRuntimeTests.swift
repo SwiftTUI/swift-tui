@@ -3115,7 +3115,7 @@ private final class RecordingTerminalHost: TerminalHosting {
       case .fullRepaint:
         TerminalPresentationMetrics.fullRepaint(
           for: surface,
-          renderedOutput: rendered
+          capabilityProfile: capabilityProfile
         ).bytesWritten
       case .incremental:
         plan.spanUpdates.reduce(0) { partial, update in

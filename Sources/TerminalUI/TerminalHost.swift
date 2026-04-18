@@ -234,16 +234,20 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
 
   static func fullRepaint(
     for surface: RasterSurface,
-    renderedOutput: String,
+    capabilityProfile: TerminalCapabilityProfile,
     origin: Point = .zero
   ) -> Self {
-    let clearSequence = "\u{001B}[2J"
-    let cursorSequence = "\u{001B}[\(max(1, origin.y + 1));\(max(1, origin.x + 1))H"
     let cellCount = max(0, surface.size.width) * max(0, surface.size.height)
+    let writeSteps = fullRepaintWriteSteps(
+      for: surface,
+      capabilityProfile: capabilityProfile
+    )
 
     return Self(
-      bytesWritten: clearSequence.utf8.count + cursorSequence.utf8.count
-        + renderedOutput.utf8.count,
+      bytesWritten: fullRepaintBytesWritten(
+        writeSteps: writeSteps,
+        origin: origin
+      ),
       linesTouched: max(0, surface.size.height),
       cellsChanged: cellCount,
       strategy: .fullRepaint
@@ -908,10 +912,11 @@ extension TerminalHosting {
         append(clearScreenSequence())
         append(cursorSequence(to: origin))
 
-        for writeStep in fullRepaintWriteSteps(
+        let writeSteps = fullRepaintWriteSteps(
           for: preparedSurface,
           capabilityProfile: capabilityProfile
-        ) {
+        )
+        for writeStep in writeSteps {
           append(writeStep)
         }
 
@@ -1450,7 +1455,7 @@ extension TerminalHosting {
   }
 #endif
 
-private func fullRepaintWriteSteps(
+func fullRepaintWriteSteps(
   for surface: RasterSurface,
   capabilityProfile: TerminalCapabilityProfile
 ) -> [String] {
@@ -1477,17 +1482,47 @@ private func fullRepaintWriteSteps(
   return writeSteps
 }
 
-private func fullRepaintBytesWritten(
+func fullRepaintOutput(
+  for surface: RasterSurface,
+  capabilityProfile: TerminalCapabilityProfile,
+  origin: Point = .zero
+) -> String {
+  let writeSteps = fullRepaintWriteSteps(
+    for: surface,
+    capabilityProfile: capabilityProfile
+  )
+  var output = ""
+  output.reserveCapacity(
+    fullRepaintBytesWritten(
+      writeSteps: writeSteps,
+      origin: origin
+    )
+  )
+  output += "\u{001B}[2J"
+  output += fullRepaintCursorSequence(to: origin)
+  for writeStep in writeSteps {
+    output += writeStep
+  }
+  return output
+}
+
+func fullRepaintBytesWritten(
   writeSteps: [String],
   origin: Point
 ) -> Int {
   let clearSequence = "\u{001B}[2J"
-  let cursorSequence = "\u{001B}[\(max(1, origin.y + 1));\(max(1, origin.x + 1))H"
+  let cursorSequence = fullRepaintCursorSequence(to: origin)
   return clearSequence.utf8.count
     + cursorSequence.utf8.count
     + writeSteps.reduce(0) { partial, writeStep in
       partial + writeStep.utf8.count
     }
+}
+
+func fullRepaintCursorSequence(
+  to point: Point
+) -> String {
+  "\u{001B}[\(max(1, point.y + 1));\(max(1, point.x + 1))H"
 }
 
 package func currentProcessEnvironment() -> [String: String] {
