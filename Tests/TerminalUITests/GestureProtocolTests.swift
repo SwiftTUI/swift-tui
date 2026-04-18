@@ -15,7 +15,7 @@ struct GestureProtocolTests {
 
       var body: Never { neverBody() }
 
-      package func _makeRecognizer(context: GestureRecognizerBuildContext) -> AnyGestureRecognizer {
+      func _makeRecognizer(context: GestureRecognizerBuildContext) -> AnyGestureRecognizer {
         AnyGestureRecognizer(NoopRecognizer())
       }
     }

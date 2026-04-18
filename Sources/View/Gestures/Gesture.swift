@@ -34,9 +34,17 @@ public func neverBody() -> Never {
   fatalError("A primitive Gesture has no body — _makeRecognizer was not called.")
 }
 
-// `Never` already conforms to `View` in ViewFoundation.swift, providing
-// `typealias Body = Never` and `var body: Never`. The same witnesses satisfy
+// `Never` already conforms to `View` in ViewFoundation.swift, which declares
+// `typealias Body = Never` and `var body: Never`. Those witnesses also satisfy
 // `Gesture`'s `body` and `Body` requirements.
+//
+// We cannot redeclare `typealias Body = Never` here because Swift rejects
+// duplicate typealias declarations for the same type in the same module
+// (even when the RHS matches). The `View` conformance's witness IS the
+// explicit `Body = Never` witness for `Gesture` as well — it is not a
+// silent cross-protocol dependency: both protocols share the same module and
+// their `Never` extensions are co-located, so any future change to one is
+// immediately visible to the other.
 //
 // `Never.Value = Never` makes `Body.Value == Value` vacuously true for the
 // recursive `Never: Gesture` conformance. Primitives that declare
@@ -45,6 +53,9 @@ public func neverBody() -> Never {
 // must — and do — provide their own implementation.
 extension Never: Gesture {
   public typealias Value = Never
+  // `Body = Never` is provided by the `Never: View` extension in
+  // ViewFoundation.swift and satisfies this protocol's requirement too.
+  // An explicit redeclaration here would be a compile error (duplicate typealias).
 
   public func _makeRecognizer(
     context: GestureRecognizerBuildContext
