@@ -57,6 +57,8 @@ public struct DragGesture: Gesture {
     self.coordinateSpace = coordinateSpace
   }
 
+  public static var _needsPointerCapture: Bool { true }
+
   public var body: Never { neverBody() }
 
   public func _makeRecognizer(

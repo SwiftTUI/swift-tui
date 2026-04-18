@@ -15,6 +15,8 @@ public struct TapGesture: Gesture {
     self.count = count
   }
 
+  public static var _needsPointerCapture: Bool { false }
+
   public var body: Never { neverBody() }
 
   public func _makeRecognizer(

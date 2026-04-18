@@ -27,6 +27,8 @@ public struct LongPressGesture: Gesture {
     self.maximumDistance = maximumDistance
   }
 
+  public static var _needsPointerCapture: Bool { true }
+
   public var body: Never { neverBody() }
 
   public func _makeRecognizer(

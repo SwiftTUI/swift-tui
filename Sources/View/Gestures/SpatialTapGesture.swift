@@ -25,6 +25,8 @@ public struct SpatialTapGesture: Gesture {
     self.coordinateSpace = coordinateSpace
   }
 
+  public static var _needsPointerCapture: Bool { false }
+
   public var body: Never { neverBody() }
 
   public func _makeRecognizer(

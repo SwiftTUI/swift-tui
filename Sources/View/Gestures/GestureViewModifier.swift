@@ -61,8 +61,7 @@ struct _AttachGestureModifier<Content: View, G: Gesture>: View, ResolvableView {
     }
 
     // Stamp semantic metadata: must hit-test; captureOnPress when the
-    // gesture needs drag continuation (temporary heuristic — Task 19
-    // replaces this with a static protocol hook).
+    // gesture needs drag continuation (resolved via static protocol hook).
     let capture = gestureNeedsCapture(gesture)
     node.semanticMetadata = node.semanticMetadata.merging(
       SemanticMetadata(
@@ -147,22 +146,9 @@ extension View {
   }
 }
 
-// MARK: - Gesture capture heuristic
+// MARK: - Gesture capture lookup
 
-/// Temporary heuristic — Task 19 replaces this with
-/// `G._needsPointerCapture`.
-///
-/// `TapGesture` and `SpatialTapGesture` (and all their decorator wrappers
-/// such as `.onEnded`, `.onChanged`, `.map`, `.updating`) do not require
-/// pointer capture. Everything else defaults to `true` (conservative).
+@MainActor
 private func gestureNeedsCapture<G: Gesture>(_ gesture: G) -> Bool {
-  let typeName = String(describing: type(of: gesture))
-  if typeName.contains("TapGesture") {
-    return false
-  }
-  if typeName.contains("SpatialTapGesture") {
-    return false
-  }
-  // Conservative default for everything else.
-  return true
+  G._needsPointerCapture
 }
