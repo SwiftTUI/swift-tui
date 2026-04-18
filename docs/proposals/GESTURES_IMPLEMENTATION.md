@@ -668,7 +668,7 @@ import Core
 @MainActor
 public protocol Gesture<Value> {
   associatedtype Value
-  associatedtype Body: Gesture where Body.Value == Value
+  associatedtype Body: Gesture
 
   @GestureBuilder var body: Body { get }
 

@@ -35,7 +35,13 @@ public enum GestureRecognizerEventDisposition: Equatable, Sendable {
 }
 
 /// Environment used by `Gesture._makeRecognizer` to wire the recognizer
-/// to runtime services. Opaque to authors.
+/// to runtime services.
+///
+/// The type is `public` so it appears in the `_makeRecognizer` signature
+/// of `public` gesture types, but its stored fields and initializer are
+/// `package` — only the TerminalUI runtime constructs this. External
+/// gesture authors receive it as a parameter and forward it to child
+/// gestures; they never construct it directly.
 public struct GestureRecognizerBuildContext: Sendable {
   public let attachingIdentity: Identity
   package let gestureStateRegistry: LocalGestureStateRegistry?
