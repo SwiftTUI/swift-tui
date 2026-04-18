@@ -409,6 +409,9 @@ struct TerminalGraphicsProtocolTests {
     #expect(incrementalWrite.contains("\u{001B}[1;2HO"))
     #expect(metrics.strategy == .incremental)
     #expect(metrics.cellsChanged == 1)
+    #expect(metrics.graphicsReplayScope == .targeted)
+    #expect(metrics.graphicsAttachmentsReplayed == 1)
+    #expect(metrics.editOperationLowering == .none)
     #expect(countOccurrences(of: "_Ga=p,q=2,C=1,c=1,r=1,i=", in: incrementalWrite) == 1)
     #expect(incrementalWrite.contains("\u{001B}[1;1H"))
     #expect(!incrementalWrite.contains("\u{001B}[2;4H"))
@@ -478,6 +481,8 @@ struct TerminalGraphicsProtocolTests {
     let updateWrites = Array(controller.writes.dropFirst(writesBeforeFullRepaintUpdate))
 
     #expect(metrics.strategy == .incremental)
+    #expect(metrics.graphicsReplayScope == .full)
+    #expect(metrics.graphicsAttachmentsReplayed == 1)
     #expect(updateWrites.count == 1)
     let updateWrite = try #require(updateWrites.first)
     #expect(!updateWrite.contains("\u{001B}[2J"))
@@ -540,6 +545,8 @@ struct TerminalGraphicsProtocolTests {
 
     #expect(metrics.strategy == .incremental)
     #expect(metrics.cellsChanged == 0)
+    #expect(metrics.graphicsReplayScope == .full)
+    #expect(metrics.graphicsAttachmentsReplayed == 0)
     #expect(updateWrites.count == 1)
     let updateWrite = try #require(updateWrites.first)
     #expect(updateWrite == "\u{001B}_Ga=d,q=2\u{001B}\\")
