@@ -103,6 +103,23 @@ struct _ContentShapeModifier<Content: View>: View, ResolvableView {
   }
 }
 
+// MARK: - View.onTapGesture(count:perform:)
+
+extension View {
+  /// Adds a tap gesture recognizer that fires `action` after the
+  /// requested number of consecutive taps lands on the view.
+  ///
+  /// Equivalent to `.gesture(TapGesture(count: count).onEnded { _ in action() })`.
+  /// Use TapGesture directly if you need to compose with other
+  /// gesture modifiers.
+  public func onTapGesture(
+    count: Int = 1,
+    perform action: @escaping @MainActor () -> Void
+  ) -> some View {
+    gesture(TapGesture(count: count).onEnded { _ in action() })
+  }
+}
+
 // MARK: - Gesture capture heuristic
 
 /// Temporary heuristic — Task 19 replaces this with
