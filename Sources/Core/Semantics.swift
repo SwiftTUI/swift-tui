@@ -318,7 +318,8 @@ extension SemanticExtractor {
             identity: identity,
             rect: clippedRect,
             routeID: primaryRouteID(for: identity),
-            hitTestOrder: nextHitTestOrder
+            hitTestOrder: nextHitTestOrder,
+            captureOnPress: node.semanticMetadata.captureOnPress
           )
         )
         nextHitTestOrder += 1
@@ -360,7 +361,8 @@ extension SemanticExtractor {
             identity: identity,
             rect: clippedRect,
             routeID: primaryRouteID(for: identity),
-            hitTestOrder: nextHitTestOrder
+            hitTestOrder: nextHitTestOrder,
+            captureOnPress: node.semanticMetadata.captureOnPress
           )
         )
         nextHitTestOrder += 1
@@ -427,7 +429,8 @@ extension SemanticExtractor {
             identity: fragmentIdentity,
             rect: clippedRect,
             routeID: primaryRouteID(for: fragmentIdentity),
-            hitTestOrder: nextHitTestOrder
+            hitTestOrder: nextHitTestOrder,
+            captureOnPress: node.semanticMetadata.captureOnPress
           )
         )
         nextHitTestOrder += 1
