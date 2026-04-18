@@ -255,6 +255,22 @@ public struct TerminalSurfaceRenderer {
 }
 
 struct TerminalPresentationPlan: Sendable {
+  struct GraphicsReplayPlan: Equatable, Sendable {
+    enum Scope: String, Equatable, Sendable {
+      case none
+      case targeted
+      case full
+    }
+
+    var scope: Scope
+    var attachmentsToReplay: [RasterImageAttachment]
+
+    static let none = Self(
+      scope: .none,
+      attachmentsToReplay: []
+    )
+  }
+
   struct SpanUpdate: Equatable, Sendable {
     var row: Int
     var column: Int
@@ -280,6 +296,7 @@ struct TerminalPresentationPlan: Sendable {
 
   var strategy: Strategy
   var rowBatches: [RowBatch]
+  var graphicsReplay: GraphicsReplayPlan
   var surfaceSize: Size
 
   static func fullRepaint(
@@ -288,17 +305,20 @@ struct TerminalPresentationPlan: Sendable {
     Self(
       strategy: .fullRepaint,
       rowBatches: [],
+      graphicsReplay: .none,
       surfaceSize: surfaceSize
     )
   }
 
   static func incremental(
     rowBatches: [RowBatch],
+    graphicsReplay: GraphicsReplayPlan,
     surfaceSize: Size
   ) -> Self {
     Self(
       strategy: .incremental,
       rowBatches: rowBatches,
+      graphicsReplay: graphicsReplay,
       surfaceSize: surfaceSize
     )
   }
@@ -328,6 +348,15 @@ struct TerminalPresentationPlan: Sendable {
 
 struct TerminalPresentationPlanner {
   let capabilityProfile: TerminalCapabilityProfile
+  let graphicsCapabilities: TerminalGraphicsCapabilities
+
+  init(
+    capabilityProfile: TerminalCapabilityProfile,
+    graphicsCapabilities: TerminalGraphicsCapabilities = .none
+  ) {
+    self.capabilityProfile = capabilityProfile
+    self.graphicsCapabilities = graphicsCapabilities
+  }
 
   func plan(
     previousSurface: RasterSurface?,
@@ -337,9 +366,17 @@ struct TerminalPresentationPlanner {
     guard let previousSurface,
       previousSurface.size == currentSurface.size,
       previousSurface.attachments == currentSurface.attachments,
-      previousSurface.imageAttachments == currentSurface.imageAttachments,
       previousSurface.metadata == currentSurface.metadata
     else {
+      return .fullRepaint(
+        surfaceSize: currentSurface.size
+      )
+    }
+
+    let supportsIncrementalGraphicsReplay = graphicsCapabilities.preferredProtocol == .kitty
+    if previousSurface.imageAttachments != currentSurface.imageAttachments,
+      !supportsIncrementalGraphicsReplay
+    {
       return .fullRepaint(
         surfaceSize: currentSurface.size
       )
@@ -387,10 +424,69 @@ struct TerminalPresentationPlanner {
       }
     }
 
+    let graphicsReplay = graphicsReplayPlan(
+      previousAttachments: previousSurface.imageAttachments,
+      currentAttachments: currentSurface.imageAttachments,
+      dirtyRows: Set(rowBatches.map(\.row)),
+      supportsIncrementalGraphicsReplay: supportsIncrementalGraphicsReplay
+    )
+
     return .incremental(
       rowBatches: rowBatches,
+      graphicsReplay: graphicsReplay,
       surfaceSize: currentSurface.size
     )
+  }
+
+  private func graphicsReplayPlan(
+    previousAttachments: [RasterImageAttachment],
+    currentAttachments: [RasterImageAttachment],
+    dirtyRows: Set<Int>,
+    supportsIncrementalGraphicsReplay: Bool
+  ) -> TerminalPresentationPlan.GraphicsReplayPlan {
+    guard supportsIncrementalGraphicsReplay else {
+      return .none
+    }
+    guard !previousAttachments.isEmpty || !currentAttachments.isEmpty else {
+      return .none
+    }
+
+    if previousAttachments != currentAttachments {
+      return .init(
+        scope: .full,
+        attachmentsToReplay: currentAttachments
+      )
+    }
+
+    let attachmentsToReplay = currentAttachments.filter { attachment in
+      attachment.visibleBoundsIntersectsAnyDirtyRow(dirtyRows)
+    }
+    guard !attachmentsToReplay.isEmpty else {
+      return .none
+    }
+
+    return .init(
+      scope: .targeted,
+      attachmentsToReplay: attachmentsToReplay
+    )
+  }
+}
+
+extension RasterImageAttachment {
+  fileprivate func visibleBoundsIntersectsAnyDirtyRow(_ dirtyRows: Set<Int>) -> Bool {
+    guard !dirtyRows.isEmpty else {
+      return false
+    }
+
+    let lowerRow = visibleBounds.origin.y
+    let upperRow = visibleBounds.origin.y + visibleBounds.size.height
+    guard lowerRow < upperRow else {
+      return false
+    }
+
+    return dirtyRows.contains { dirtyRow in
+      dirtyRow >= lowerRow && dirtyRow < upperRow
+    }
   }
 }
 

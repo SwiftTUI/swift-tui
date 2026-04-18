@@ -134,8 +134,22 @@ final class TerminalImageRenderer: Sendable {
     graphicsCapabilities: TerminalGraphicsCapabilities,
     transmittedKittyImages: inout Set<UInt32>
   ) -> [String] {
+    graphicsWriteSteps(
+      for: surface.imageAttachments,
+      capabilityProfile: capabilityProfile,
+      graphicsCapabilities: graphicsCapabilities,
+      transmittedKittyImages: &transmittedKittyImages
+    )
+  }
+
+  func graphicsWriteSteps(
+    for attachments: [RasterImageAttachment],
+    capabilityProfile: TerminalCapabilityProfile,
+    graphicsCapabilities: TerminalGraphicsCapabilities,
+    transmittedKittyImages: inout Set<UInt32>
+  ) -> [String] {
     guard
-      !surface.imageAttachments.isEmpty,
+      !attachments.isEmpty,
       let graphicsProtocol = graphicsCapabilities.preferredProtocol
     else {
       return []
@@ -143,7 +157,7 @@ final class TerminalImageRenderer: Sendable {
 
     var writeSteps: [String] = []
 
-    for attachment in surface.imageAttachments.sorted(by: compareImageAttachments) {
+    for attachment in attachments.sorted(by: compareImageAttachments) {
       guard
         let reference = attachment.resolvedReference,
         let image = repository.decodedImage(for: reference)

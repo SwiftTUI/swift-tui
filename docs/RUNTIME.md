@@ -144,6 +144,7 @@ The runtime is materially incremental in common steady-state paths, but it is no
 - `WindowGroup` roots render through a full-canvas window host that sizes itself to the current terminal proposal and clips drawing to terminal bounds
 - `TerminalHost` keeps the previous `RasterSurface`
 - `TerminalPresentationPlanner` emits row-batched incremental text updates when the previous and current surfaces are compatible
+- Kitty-backed image presentation is planned separately from text diffing: dirty text rows trigger targeted re-placement, while attachment-layout changes fall back to a graphics-only full replay without forcing a text full repaint
 - Row batches preserve logical span metadata, normalize around continuation cells, and share style/hyperlink state across disjoint edits on the same row
 - Full repaints are wrapped in synchronized-output envelopes when the terminal capability profile marks that support as safe
 - `SIGWINCH` schedules a fresh frame and re-reads terminal size without exiting the run loop

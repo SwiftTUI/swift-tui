@@ -457,23 +457,6 @@ struct TerminalPresentationTests {
         imageAttachments: previousSurface.imageAttachments,
         metadata: ["theme": "dark"]
       ),
-      .init(
-        size: .init(width: 8, height: 2),
-        lines: ["alpha", "bravo"],
-        attachments: ["asset-a"],
-        imageAttachments: [
-          .init(
-            identity: testIdentity("Root", "Image"),
-            bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
-            source: .named("asset-b.png"),
-            resolvedReference: .filePath("/tmp/asset-b.png"),
-            pixelSize: .init(width: 8, height: 8),
-            isResizable: false,
-            scalingMode: .stretch
-          )
-        ],
-        metadata: ["theme": "light"]
-      ),
     ]
 
     for surface in variants {
@@ -487,6 +470,113 @@ struct TerminalPresentationTests {
       #expect(plan.linesTouched == surface.size.height)
       #expect(plan.cellsChanged == max(0, surface.size.width) * max(0, surface.size.height))
     }
+  }
+
+  @Test("kitty graphics mismatches keep text planning incremental and request a graphics replay")
+  func kittyGraphicsMismatchesKeepTextPlanningIncremental() {
+    let planner = TerminalPresentationPlanner(
+      capabilityProfile: .previewUnicode,
+      graphicsCapabilities: .init(
+        supportedProtocols: [.kitty],
+        preferredProtocol: .kitty
+      )
+    )
+    let previousSurface = RasterSurface(
+      size: .init(width: 8, height: 2),
+      lines: ["alpha", "bravo"],
+      imageAttachments: [
+        .init(
+          identity: testIdentity("Root", "Image"),
+          bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+          source: .named("asset-a.png"),
+          resolvedReference: .filePath("/tmp/asset-a.png"),
+          pixelSize: .init(width: 8, height: 8),
+          isResizable: false,
+          scalingMode: .stretch
+        )
+      ]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 8, height: 2),
+      lines: ["alpha", "bravo"],
+      imageAttachments: [
+        .init(
+          identity: testIdentity("Root", "Image"),
+          bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 1, height: 1)),
+          source: .named("asset-a.png"),
+          resolvedReference: .filePath("/tmp/asset-a.png"),
+          pixelSize: .init(width: 8, height: 8),
+          isResizable: false,
+          scalingMode: .stretch
+        )
+      ]
+    )
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface
+    )
+
+    #expect(plan.strategy == .incremental)
+    #expect(plan.rowBatches.isEmpty)
+    #expect(
+      plan.graphicsReplay
+        == .init(
+          scope: .full,
+          attachmentsToReplay: currentSurface.imageAttachments
+        )
+    )
+    #expect(plan.linesTouched == 0)
+    #expect(plan.cellsChanged == 0)
+  }
+
+  @Test("non-kitty graphics mismatches still fall back to a full repaint")
+  func nonKittyGraphicsMismatchesStillFallBackToFullRepaint() {
+    let planner = TerminalPresentationPlanner(
+      capabilityProfile: .previewUnicode,
+      graphicsCapabilities: .init(
+        supportedProtocols: [.sixel],
+        preferredProtocol: .sixel
+      )
+    )
+    let previousSurface = RasterSurface(
+      size: .init(width: 8, height: 2),
+      lines: ["alpha", "bravo"],
+      imageAttachments: [
+        .init(
+          identity: testIdentity("Root", "Image"),
+          bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+          source: .named("asset-a.png"),
+          resolvedReference: .filePath("/tmp/asset-a.png"),
+          pixelSize: .init(width: 8, height: 8),
+          isResizable: false,
+          scalingMode: .stretch
+        )
+      ]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 8, height: 2),
+      lines: ["alpha", "bravo"],
+      imageAttachments: [
+        .init(
+          identity: testIdentity("Root", "Image"),
+          bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 1, height: 1)),
+          source: .named("asset-a.png"),
+          resolvedReference: .filePath("/tmp/asset-a.png"),
+          pixelSize: .init(width: 8, height: 8),
+          isResizable: false,
+          scalingMode: .stretch
+        )
+      ]
+    )
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface
+    )
+
+    #expect(plan.strategy == .fullRepaint)
+    #expect(plan.graphicsReplay == .none)
   }
 
   @Test("presentation damage normalizes overlapping row ranges")

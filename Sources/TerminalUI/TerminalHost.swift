@@ -884,7 +884,8 @@ extension TerminalHosting {
         graphicsCapabilities: graphicsCapabilities
       )
       let plan = TerminalPresentationPlanner(
-        capabilityProfile: capabilityProfile
+        capabilityProfile: capabilityProfile,
+        graphicsCapabilities: graphicsCapabilities
       ).plan(
         previousSurface: presentationSession.previousSurface,
         currentSurface: preparedSurface,
@@ -938,19 +939,29 @@ extension TerminalHosting {
           )
           append(rowBatch.renderedBatch)
         }
-        // Kitty images can be obscured by later cell writes. Re-place the
-        // currently visible attachments after incremental text spans so
-        // scroll and text updates keep the image attached to the viewport.
-        if graphicsCapabilities.preferredProtocol == .kitty,
-          !preparedSurface.imageAttachments.isEmpty
-        {
-          for writeStep in imageRenderer.graphicsWriteSteps(
-            for: preparedSurface,
-            capabilityProfile: capabilityProfile,
-            graphicsCapabilities: graphicsCapabilities,
-            transmittedKittyImages: &presentationSession.transmittedKittyImages
-          ) {
-            append(writeStep)
+        if graphicsCapabilities.preferredProtocol == .kitty {
+          switch plan.graphicsReplay.scope {
+          case .none:
+            break
+          case .targeted:
+            for writeStep in imageRenderer.graphicsWriteSteps(
+              for: plan.graphicsReplay.attachmentsToReplay,
+              capabilityProfile: capabilityProfile,
+              graphicsCapabilities: graphicsCapabilities,
+              transmittedKittyImages: &presentationSession.transmittedKittyImages
+            ) {
+              append(writeStep)
+            }
+          case .full:
+            append(deleteVisibleKittyPlacementsSequence())
+            for writeStep in imageRenderer.graphicsWriteSteps(
+              for: plan.graphicsReplay.attachmentsToReplay,
+              capabilityProfile: capabilityProfile,
+              graphicsCapabilities: graphicsCapabilities,
+              transmittedKittyImages: &presentationSession.transmittedKittyImages
+            ) {
+              append(writeStep)
+            }
           }
         }
       }
@@ -975,7 +986,9 @@ extension TerminalHosting {
         bytesWritten: bytesWritten,
         linesTouched: plan.linesTouched,
         cellsChanged: plan.cellsChanged,
-        strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental
+        strategy: plan.strategy == TerminalPresentationPlan.Strategy.fullRepaint
+          ? TerminalPresentationMetrics.Strategy.fullRepaint
+          : TerminalPresentationMetrics.Strategy.incremental
       )
     }
 
@@ -1227,6 +1240,10 @@ extension TerminalHosting {
 
     private func clearScreenSequence() -> String {
       "\u{001B}[2J"
+    }
+
+    private func deleteVisibleKittyPlacementsSequence() -> String {
+      "\u{001B}_Ga=d,q=2\u{001B}\\"
     }
 
     private func beginSynchronizedOutputSequence() -> String {
