@@ -45,20 +45,21 @@ public struct SemanticExtractor {
           && hitsAllowed
           && (participatesInTopLevelFocus
             || node.semanticMetadata.participatesInPointerHitTesting)
-          && interactionRect(
-            for: node,
-            clippedTo: clipRect
-          ) != nil
         {
-          interactionRegions.append(
-            InteractionRegion(
-              identity: node.identity,
-              rect: interactionRect(for: node, clippedTo: clipRect) ?? node.bounds,
-              routeID: routeID,
-              hitTestOrder: order,
-              captureOnPress: node.semanticMetadata.captureOnPress
+          let computedRect = interactionRect(for: node, clippedTo: clipRect)
+          let finalRect =
+            node.semanticMetadata.explicitInteractionRect ?? computedRect
+          if let finalRect {
+            interactionRegions.append(
+              InteractionRegion(
+                identity: node.identity,
+                rect: finalRect,
+                routeID: routeID,
+                hitTestOrder: order,
+                captureOnPress: node.semanticMetadata.captureOnPress
+              )
             )
-          )
+          }
         }
 
         if isEnabled {
