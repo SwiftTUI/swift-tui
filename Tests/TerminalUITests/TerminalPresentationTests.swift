@@ -748,6 +748,34 @@ struct TerminalPresentationTests {
     #expect(plan.cellsChanged == 4)
   }
 
+  @Test("row batches lower trailing tail clears into erase-to-end-of-line safely")
+  func rowBatchesLowerTrailingTailClearsIntoEraseToEndOfLineSafely() {
+    let trailingClearBatch = TerminalPresentationPlan.RowBatch(
+      row: 0,
+      anchorColumn: 4,
+      renderedBatch: "    ",
+      spanUpdates: [
+        .init(row: 0, column: 4, renderedSpan: "    ", cellsChanged: 4)
+      ]
+    )
+    let disjointBatch = TerminalPresentationPlan.RowBatch(
+      row: 0,
+      anchorColumn: 2,
+      renderedBatch: "X\u{001B}[2CY",
+      spanUpdates: [
+        .init(row: 0, column: 2, renderedSpan: "X", cellsChanged: 1),
+        .init(row: 0, column: 5, renderedSpan: "Y", cellsChanged: 1),
+      ]
+    )
+
+    #expect(
+      trailingClearBatch.canLowerToEraseToEndOfLine(surfaceWidth: 8)
+    )
+    #expect(
+      !disjointBatch.canLowerToEraseToEndOfLine(surfaceWidth: 8)
+    )
+  }
+
   @Test("presentation planner widens continuation cell diffs to glyph boundaries")
   func presentationPlannerWidensContinuationCellDiffs() {
     let planner = TerminalPresentationPlanner(
