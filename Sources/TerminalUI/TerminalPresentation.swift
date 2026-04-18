@@ -252,13 +252,24 @@ struct TerminalPresentationPlan: Sendable {
     var cellsChanged: Int
   }
 
+  struct RowBatch: Equatable, Sendable {
+    var row: Int
+    var anchorColumn: Int
+    var renderedBatch: String
+    var spanUpdates: [SpanUpdate]
+
+    var cellsChanged: Int {
+      spanUpdates.reduce(0) { $0 + $1.cellsChanged }
+    }
+  }
+
   enum Strategy: String, Equatable, Sendable {
     case fullRepaint
     case incremental
   }
 
   var strategy: Strategy
-  var spanUpdates: [SpanUpdate]
+  var rowBatches: [RowBatch]
   var surfaceSize: Size
 
   static func fullRepaint(
@@ -266,20 +277,24 @@ struct TerminalPresentationPlan: Sendable {
   ) -> Self {
     Self(
       strategy: .fullRepaint,
-      spanUpdates: [],
+      rowBatches: [],
       surfaceSize: surfaceSize
     )
   }
 
   static func incremental(
-    spanUpdates: [SpanUpdate],
+    rowBatches: [RowBatch],
     surfaceSize: Size
   ) -> Self {
     Self(
       strategy: .incremental,
-      spanUpdates: spanUpdates,
+      rowBatches: rowBatches,
       surfaceSize: surfaceSize
     )
+  }
+
+  var spanUpdates: [SpanUpdate] {
+    rowBatches.flatMap(\.spanUpdates)
   }
 
   var linesTouched: Int {
@@ -287,7 +302,7 @@ struct TerminalPresentationPlan: Sendable {
     case .fullRepaint:
       surfaceSize.height
     case .incremental:
-      Set(spanUpdates.map(\.row)).count
+      Set(rowBatches.map(\.row)).count
     }
   }
 
@@ -296,7 +311,7 @@ struct TerminalPresentationPlan: Sendable {
     case .fullRepaint:
       max(0, surfaceSize.width) * max(0, surfaceSize.height)
     case .incremental:
-      spanUpdates.reduce(0) { $0 + $1.cellsChanged }
+      rowBatches.reduce(0) { $0 + $1.cellsChanged }
     }
   }
 }
@@ -336,7 +351,7 @@ struct TerminalPresentationPlanner {
       } else {
         Array(0..<rowCount)
       }
-    var spanUpdates: [TerminalPresentationPlan.SpanUpdate] = []
+    var rowBatches: [TerminalPresentationPlan.RowBatch] = []
 
     for row in rowsToDiff {
       let previousRow = row < previousSurface.cells.count ? previousSurface.cells[row] : []
@@ -353,34 +368,28 @@ struct TerminalPresentationPlanner {
         limitingTo: damage?.columnRanges(for: row)
       )
 
-      for span in rowSpans {
-        spanUpdates.append(
-          .init(
-            row: row,
-            column: span.lowerBound,
-            renderedSpan: renderer.renderSpan(
-              currentRow,
-              from: span.lowerBound,
-              to: span.upperBound
-            ),
-            cellsChanged: renderer.cellsChanged(
-              in: currentRow,
-              from: span.lowerBound,
-              to: span.upperBound
-            )
-          )
-        )
+      if let rowBatch = renderer.renderRowBatch(
+        row: row,
+        currentRow: currentRow,
+        spans: rowSpans
+      ) {
+        rowBatches.append(rowBatch)
       }
     }
 
     return .incremental(
-      spanUpdates: spanUpdates,
+      rowBatches: rowBatches,
       surfaceSize: currentSurface.size
     )
   }
 }
 
 extension TerminalSurfaceRenderer {
+  private struct RenderState {
+    var activeStyle: ResolvedTextStyle?
+    var activeHyperlink: String?
+  }
+
   private func renderCells(
     in row: [RasterCell],
     from start: Int,
@@ -417,57 +426,88 @@ extension TerminalSurfaceRenderer {
     let cellCount = max(0, end - start)
     var result = ""
     result.reserveCapacity(cellCount * 3)
-    var activeStyle: ResolvedTextStyle?
-    var activeHyperlink: String?
-    var renderedWidth = 0
-
-    for index in start..<max(start, end) {
-      let cell = cell(at: index, in: row)
-      guard !cell.isContinuation else {
-        continue
-      }
-      let style = cell.style
-      let hyperlink = cell.hyperlink
-
-      if hyperlink != activeHyperlink {
-        if activeHyperlink != nil, capabilityProfile.supportsHyperlinks {
-          result += closeHyperlinkSequence()
-        }
-        if let hyperlink, capabilityProfile.supportsHyperlinks {
-          result += openHyperlinkSequence(for: .init(hyperlink))
-        }
-        activeHyperlink = hyperlink
-      }
-
-      if style != activeStyle {
-        if activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
-          result += "\u{001B}[0m"
-        }
-        if let style,
-          capabilityProfile.emitsStyleEscapeSequences,
-          let sequence = styleSequence(for: style)
-        {
-          result += sequence
-        }
-        activeStyle = style
-      }
-
-      result += renderedCharacter(for: cell)
-      renderedWidth += max(1, cell.spanWidth)
-    }
-
-    if activeHyperlink != nil, capabilityProfile.supportsHyperlinks {
-      result += closeHyperlinkSequence()
-    }
-    if activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
-      result += "\u{001B}[0m"
-    }
+    var state = RenderState()
+    let renderedWidth = appendRenderedCells(
+      in: row,
+      from: start,
+      to: max(start, end),
+      into: &result,
+      state: &state
+    )
+    closeRenderState(&state, into: &result)
 
     if let width {
       result += String(repeating: " ", count: max(0, width - renderedWidth))
     }
 
     return result
+  }
+
+  func renderRowBatch(
+    row: Int,
+    currentRow: [RasterCell],
+    spans: [Range<Int>]
+  ) -> TerminalPresentationPlan.RowBatch? {
+    let orderedSpans =
+      spans
+      .filter { !$0.isEmpty }
+      .sorted { lhs, rhs in
+        lhs.lowerBound < rhs.lowerBound
+      }
+    guard let firstSpan = orderedSpans.first else {
+      return nil
+    }
+
+    var renderedBatch = ""
+    renderedBatch.reserveCapacity(
+      orderedSpans.reduce(0) { partial, span in
+        partial + max(0, span.upperBound - span.lowerBound) * 3
+      }
+    )
+    var state = RenderState()
+    var cursorColumn = firstSpan.lowerBound
+    var spanUpdates: [TerminalPresentationPlan.SpanUpdate] = []
+
+    for span in orderedSpans {
+      if span.lowerBound > cursorColumn {
+        renderedBatch += cursorForwardSequence(span.lowerBound - cursorColumn)
+        cursorColumn = span.lowerBound
+      }
+
+      var renderedSpan = ""
+      renderedSpan.reserveCapacity(max(0, span.upperBound - span.lowerBound) * 3)
+      _ = appendRenderedCells(
+        in: currentRow,
+        from: span.lowerBound,
+        to: span.upperBound,
+        into: &renderedSpan,
+        state: &state
+      )
+      renderedBatch += renderedSpan
+
+      spanUpdates.append(
+        .init(
+          row: row,
+          column: span.lowerBound,
+          renderedSpan: renderedSpan,
+          cellsChanged: cellsChanged(
+            in: currentRow,
+            from: span.lowerBound,
+            to: span.upperBound
+          )
+        )
+      )
+      cursorColumn = span.upperBound
+    }
+
+    closeRenderState(&state, into: &renderedBatch)
+
+    return .init(
+      row: row,
+      anchorColumn: firstSpan.lowerBound,
+      renderedBatch: renderedBatch,
+      spanUpdates: spanUpdates
+    )
   }
 
   func diffSpans(
@@ -622,6 +662,88 @@ extension TerminalSurfaceRenderer {
       total += max(1, cell.spanWidth)
     }
     return total
+  }
+
+  @discardableResult
+  private func appendRenderedCells(
+    in row: [RasterCell],
+    from start: Int,
+    to end: Int,
+    into result: inout String,
+    state: inout RenderState
+  ) -> Int {
+    var renderedWidth = 0
+
+    for index in start..<max(start, end) {
+      let cell = cell(at: index, in: row)
+      guard !cell.isContinuation else {
+        continue
+      }
+
+      transitionRenderState(
+        style: cell.style,
+        hyperlink: cell.hyperlink,
+        state: &state,
+        into: &result
+      )
+      result += renderedCharacter(for: cell)
+      renderedWidth += max(1, cell.spanWidth)
+    }
+
+    return renderedWidth
+  }
+
+  private func transitionRenderState(
+    style: ResolvedTextStyle?,
+    hyperlink: String?,
+    state: inout RenderState,
+    into result: inout String
+  ) {
+    if hyperlink != state.activeHyperlink {
+      if state.activeHyperlink != nil, capabilityProfile.supportsHyperlinks {
+        result += closeHyperlinkSequence()
+      }
+      if let hyperlink, capabilityProfile.supportsHyperlinks {
+        result += openHyperlinkSequence(for: .init(hyperlink))
+      }
+      state.activeHyperlink = hyperlink
+    }
+
+    if style != state.activeStyle {
+      if state.activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
+        result += "\u{001B}[0m"
+      }
+      if let style,
+        capabilityProfile.emitsStyleEscapeSequences,
+        let sequence = styleSequence(for: style)
+      {
+        result += sequence
+      }
+      state.activeStyle = style
+    }
+  }
+
+  private func closeRenderState(
+    _ state: inout RenderState,
+    into result: inout String
+  ) {
+    if state.activeHyperlink != nil, capabilityProfile.supportsHyperlinks {
+      result += closeHyperlinkSequence()
+      state.activeHyperlink = nil
+    }
+    if state.activeStyle != nil, capabilityProfile.emitsStyleEscapeSequences {
+      result += "\u{001B}[0m"
+      state.activeStyle = nil
+    }
+  }
+
+  private func cursorForwardSequence(
+    _ count: Int
+  ) -> String {
+    guard count > 0 else {
+      return ""
+    }
+    return "\u{001B}[\(count)C"
   }
 
   private func renderedCharacter(

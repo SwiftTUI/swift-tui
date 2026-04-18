@@ -105,6 +105,30 @@ struct Phase1PresentationIntegrationTests {
     )
   }
 
+  @Test("same-row disjoint edits share one incremental row batch")
+  func sameRowDisjointEditsShareOneIncrementalRowBatch() throws {
+    let result = try presentScenario(
+      previous: .init(
+        size: .init(width: 8, height: 1),
+        lines: [
+          "abcd1234"
+        ]
+      ),
+      current: .init(
+        size: .init(width: 8, height: 1),
+        lines: [
+          "abXd12Y4"
+        ]
+      )
+    )
+
+    #expect(result.metrics.strategy == .incremental)
+    #expect(result.metrics.linesTouched == 1)
+    #expect(result.metrics.cellsChanged == 2)
+    #expect(result.metrics.bytesWritten < result.fullRepaintMetrics.bytesWritten)
+    #expect(result.incrementalWrites == ["\u{001B}[1;3HX\u{001B}[3CY"])
+  }
+
   @Test("scroll steps stay incremental and smaller than a full repaint")
   func scrollStepsStayIncremental() throws {
     let result = try presentScenario(

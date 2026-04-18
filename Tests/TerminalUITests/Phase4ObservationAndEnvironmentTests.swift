@@ -1616,9 +1616,9 @@ private final class Phase4RecordingTerminalHost: TerminalHosting {
           capabilityProfile: capabilityProfile
         ).bytesWritten
       case .incremental:
-        plan.spanUpdates.reduce(0) { partial, update in
+        plan.rowBatches.reduce(0) { partial, rowBatch in
           partial
-            + update.renderedSpan.utf8.count
+            + rowBatch.renderedBatch.utf8.count
         }
       }
 
@@ -1677,9 +1677,9 @@ private final class Phase4MutableAppearanceTerminalHost: TerminalHosting {
           capabilityProfile: capabilityProfile
         ).bytesWritten
       case .incremental:
-        plan.spanUpdates.reduce(0) { partial, update in
+        plan.rowBatches.reduce(0) { partial, rowBatch in
           partial
-            + update.renderedSpan.utf8.count
+            + rowBatch.renderedBatch.utf8.count
         }
       }
 

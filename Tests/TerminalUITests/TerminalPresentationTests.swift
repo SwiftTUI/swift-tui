@@ -298,6 +298,61 @@ struct TerminalPresentationTests {
     )
   }
 
+  @Test("renderer carries style and hyperlink state across row batches")
+  func rendererCarriesStyleAndHyperlinkStateAcrossRowBatches() {
+    let renderer = TerminalSurfaceRenderer(
+      capabilityProfile: .ansi16
+    )
+    let row = [
+      RasterCell(
+        character: "X",
+        style: .init(foregroundColor: .cyan),
+        hyperlink: "https://one.example"
+      ),
+      RasterCell(character: " "),
+      RasterCell(
+        character: "Y",
+        style: .init(foregroundColor: .magenta),
+        hyperlink: "https://two.example"
+      ),
+    ]
+
+    let batch = renderer.renderRowBatch(
+      row: 0,
+      currentRow: row,
+      spans: [0..<1, 2..<3]
+    )
+
+    #expect(
+      batch
+        == .init(
+          row: 0,
+          anchorColumn: 0,
+          renderedBatch:
+            "\u{001B}]8;;https://one.example\u{001B}\\\u{001B}[96mX"
+            + "\u{001B}[1C"
+            + "\u{001B}]8;;\u{001B}\\\u{001B}]8;;https://two.example\u{001B}\\"
+            + "\u{001B}[0m\u{001B}[95mY\u{001B}]8;;\u{001B}\\\u{001B}[0m",
+          spanUpdates: [
+            .init(
+              row: 0,
+              column: 0,
+              renderedSpan: "\u{001B}]8;;https://one.example\u{001B}\\\u{001B}[96mX",
+              cellsChanged: 1
+            ),
+            .init(
+              row: 0,
+              column: 2,
+              renderedSpan:
+                "\u{001B}]8;;\u{001B}\\\u{001B}]8;;https://two.example\u{001B}\\"
+                + "\u{001B}[0m\u{001B}[95mY",
+              cellsChanged: 1
+            ),
+          ]
+        )
+    )
+  }
+
   @Test("renderer omits hyperlink escapes when hyperlink support is disabled")
   func rendererOmitsHyperlinksWhenUnsupported() {
     let renderer = TerminalSurfaceRenderer(
@@ -388,7 +443,7 @@ struct TerminalPresentationTests {
       )
 
       #expect(plan.strategy == .fullRepaint)
-      #expect(plan.spanUpdates.isEmpty)
+      #expect(plan.rowBatches.isEmpty)
       #expect(plan.linesTouched == surface.size.height)
       #expect(plan.cellsChanged == max(0, surface.size.width) * max(0, surface.size.height))
     }
@@ -442,8 +497,15 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 2, column: 5, renderedSpan: "X", cellsChanged: 1)
+      plan.rowBatches == [
+        .init(
+          row: 2,
+          anchorColumn: 5,
+          renderedBatch: "X",
+          spanUpdates: [
+            .init(row: 2, column: 5, renderedSpan: "X", cellsChanged: 1)
+          ]
+        )
       ]
     )
     #expect(plan.linesTouched == 1)
@@ -471,8 +533,15 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 0, column: 3, renderedSpan: "X", cellsChanged: 1)
+      plan.rowBatches == [
+        .init(
+          row: 0,
+          anchorColumn: 3,
+          renderedBatch: "X",
+          spanUpdates: [
+            .init(row: 0, column: 3, renderedSpan: "X", cellsChanged: 1)
+          ]
+        )
       ])
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 1)
@@ -500,8 +569,15 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 2, column: 5, renderedSpan: "X", cellsChanged: 1)
+      plan.rowBatches == [
+        .init(
+          row: 2,
+          anchorColumn: 5,
+          renderedBatch: "X",
+          spanUpdates: [
+            .init(row: 2, column: 5, renderedSpan: "X", cellsChanged: 1)
+          ]
+        )
       ])
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 1)
@@ -528,8 +604,15 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 0, column: 4, renderedSpan: "    ", cellsChanged: 4)
+      plan.rowBatches == [
+        .init(
+          row: 0,
+          anchorColumn: 4,
+          renderedBatch: "    ",
+          spanUpdates: [
+            .init(row: 0, column: 4, renderedSpan: "    ", cellsChanged: 4)
+          ]
+        )
       ])
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 4)
@@ -588,8 +671,15 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 0, column: 1, renderedSpan: "界", cellsChanged: 2)
+      plan.rowBatches == [
+        .init(
+          row: 0,
+          anchorColumn: 1,
+          renderedBatch: "界",
+          spanUpdates: [
+            .init(row: 0, column: 1, renderedSpan: "界", cellsChanged: 2)
+          ]
+        )
       ])
     #expect(plan.cellsChanged == 2)
   }
@@ -648,8 +738,15 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 0, column: 1, renderedSpan: "界", cellsChanged: 2)
+      plan.rowBatches == [
+        .init(
+          row: 0,
+          anchorColumn: 1,
+          renderedBatch: "界",
+          spanUpdates: [
+            .init(row: 0, column: 1, renderedSpan: "界", cellsChanged: 2)
+          ]
+        )
       ])
     #expect(plan.cellsChanged == 2)
   }
@@ -675,9 +772,16 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 0, column: 2, renderedSpan: "X", cellsChanged: 1),
-        .init(row: 0, column: 6, renderedSpan: "Y", cellsChanged: 1),
+      plan.rowBatches == [
+        .init(
+          row: 0,
+          anchorColumn: 2,
+          renderedBatch: "X\u{001B}[3CY",
+          spanUpdates: [
+            .init(row: 0, column: 2, renderedSpan: "X", cellsChanged: 1),
+            .init(row: 0, column: 6, renderedSpan: "Y", cellsChanged: 1),
+          ]
+        )
       ])
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 2)
@@ -705,8 +809,15 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 1, column: 2, renderedSpan: "X", cellsChanged: 1)
+      plan.rowBatches == [
+        .init(
+          row: 1,
+          anchorColumn: 2,
+          renderedBatch: "X",
+          spanUpdates: [
+            .init(row: 1, column: 2, renderedSpan: "X", cellsChanged: 1)
+          ]
+        )
       ])
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 1)
@@ -735,7 +846,7 @@ struct TerminalPresentationTests {
     )
 
     #expect(plan.strategy == .fullRepaint)
-    #expect(plan.spanUpdates.isEmpty)
+    #expect(plan.rowBatches.isEmpty)
   }
 
   @Test("terminal host presents styled surfaces through the capability-aware renderer")
