@@ -60,6 +60,8 @@ package struct RuntimeRegistrationSet {
     actionRegistry?.removeSubtrees(rootedAt: roots)
     keyHandlerRegistry?.removeSubtrees(rootedAt: roots)
     pointerHandlerRegistry?.removeSubtrees(rootedAt: roots)
+    gestureRegistry?.removeSubtrees(rootedAt: roots)
+    gestureStateRegistry?.removeSubtrees(rootedAt: roots)
     focusBindingRegistry?.removeSubtrees(rootedAt: roots)
     focusedValuesRegistry?.removeSubtrees(rootedAt: roots)
     lifecycleRegistry?.removeSubtrees(rootedAt: roots)

@@ -76,6 +76,16 @@ extension RunLoop {
 
         latestSemanticSnapshot = renderedArtifacts.semanticSnapshot
 
+        // Release pointer capture if the captured region disappeared from
+        // the rendered tree (e.g. a view with an active gesture was removed
+        // mid-interaction).
+        if let capturedID = capturedPointerRouteID,
+          interactionRegion(routeID: capturedID) == nil
+        {
+          capturedPointerRouteID = nil
+          armedPointerRouteID = nil
+        }
+
         let focusChanged = focusTracker.updateRegions(
           renderedArtifacts.semanticSnapshot.focusRegions)
         latestActivePaletteCommands =
