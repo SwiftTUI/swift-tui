@@ -10,6 +10,10 @@ where First.Value == Second.Value {
   public typealias Value = First.Value
   public typealias Body = Never
 
+  public static var _needsPointerCapture: Bool {
+    First._needsPointerCapture || Second._needsPointerCapture
+  }
+
   public let first: First
   public let second: Second
 

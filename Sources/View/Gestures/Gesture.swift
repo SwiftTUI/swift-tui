@@ -19,6 +19,16 @@ public protocol Gesture<Value> {
   func _makeRecognizer(
     context: GestureRecognizerBuildContext
   ) -> AnyGestureRecognizer
+
+  /// Whether attaching this gesture should request pointer capture on
+  /// press. Primitives that receive drag events after the initial .down
+  /// return `true`; tap-only primitives return `false`. Combinators
+  /// propagate by OR-ing their children. The default is `false`.
+  static var _needsPointerCapture: Bool { get }
+}
+
+extension Gesture {
+  public static var _needsPointerCapture: Bool { false }
 }
 
 extension Gesture where Body: Gesture, Body.Value == Value {

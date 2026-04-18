@@ -6,6 +6,8 @@ public struct _EndedGesture<Child: Gesture>: Gesture {
   public typealias Value = Child.Value
   public typealias Body = Never
 
+  public static var _needsPointerCapture: Bool { Child._needsPointerCapture }
+
   public let child: Child
   public let action: @MainActor (Child.Value) -> Void
 
@@ -82,6 +84,8 @@ public struct _ChangedGesture<Child: Gesture>: Gesture where Child.Value: Equata
   public typealias Value = Child.Value
   public typealias Body = Never
 
+  public static var _needsPointerCapture: Bool { Child._needsPointerCapture }
+
   public let child: Child
   public let action: @MainActor (Child.Value) -> Void
 
@@ -157,6 +161,8 @@ public struct _MapGesture<Child: Gesture, NewValue>: Gesture {
   public typealias Value = NewValue
   public typealias Body = Never
 
+  public static var _needsPointerCapture: Bool { Child._needsPointerCapture }
+
   public let child: Child
   public let transform: @MainActor (Child.Value) -> NewValue
 
@@ -222,6 +228,8 @@ final class MapDecorator<From, To>: GestureRecognizer {
 public struct GestureStateGesture<Child: Gesture, State>: Gesture {
   public typealias Value = Child.Value
   public typealias Body = Never
+
+  public static var _needsPointerCapture: Bool { Child._needsPointerCapture }
 
   public let child: Child
   public let state: GestureStateBinding<State>

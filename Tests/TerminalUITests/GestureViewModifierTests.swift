@@ -63,6 +63,60 @@ struct GestureViewModifierTests {
     #expect(box.count == 1)
   }
 
+  @Test(".gesture(DragGesture()) sets captureOnPress on the region")
+  func dragCaptures() throws {
+    let root = Identity(components: [IdentityComponent(rawValue: "r")])
+    var env = EnvironmentValues()
+    env.terminalSize = Size(width: 10, height: 3)
+
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let gestureRegistry = LocalGestureRegistry()
+    let gestureStateRegistry = LocalGestureStateRegistry()
+
+    var ctx = ResolveContext(identity: root, environmentValues: env)
+    ctx.localPointerHandlerRegistry = pointerRegistry
+    ctx.localGestureRegistry = gestureRegistry
+    ctx.localGestureStateRegistry = gestureStateRegistry
+
+    let artifacts = DefaultRenderer().render(
+      Text("Drag")
+        .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
+        .gesture(DragGesture().onEnded { _ in }),
+      context: ctx,
+      proposal: .init(width: 10, height: 3)
+    )
+
+    let region = try #require(artifacts.semanticSnapshot.interactionRegions.first)
+    #expect(region.captureOnPress == true)
+  }
+
+  @Test(".gesture(LongPressGesture()) sets captureOnPress on the region")
+  func longPressCaptures() throws {
+    let root = Identity(components: [IdentityComponent(rawValue: "r")])
+    var env = EnvironmentValues()
+    env.terminalSize = Size(width: 10, height: 3)
+
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let gestureRegistry = LocalGestureRegistry()
+    let gestureStateRegistry = LocalGestureStateRegistry()
+
+    var ctx = ResolveContext(identity: root, environmentValues: env)
+    ctx.localPointerHandlerRegistry = pointerRegistry
+    ctx.localGestureRegistry = gestureRegistry
+    ctx.localGestureStateRegistry = gestureStateRegistry
+
+    let artifacts = DefaultRenderer().render(
+      Text("Hold")
+        .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
+        .gesture(LongPressGesture().onEnded { _ in }),
+      context: ctx,
+      proposal: .init(width: 10, height: 3)
+    )
+
+    let region = try #require(artifacts.semanticSnapshot.interactionRegions.first)
+    #expect(region.captureOnPress == true)
+  }
+
   @Test(".gesture(_:including: .subviews) does not register at this view")
   func gestureMaskExcludesGesture() throws {
     @MainActor final class Box { var count = 0 }
