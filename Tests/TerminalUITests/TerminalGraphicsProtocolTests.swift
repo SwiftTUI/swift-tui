@@ -344,8 +344,8 @@ struct TerminalGraphicsProtocolTests {
     )
   }
 
-  @Test("stable Kitty image attachments are re-placed after incremental text updates")
-  func stableKittyImageAttachmentsAreReplacedAfterIncrementalTextUpdates() throws {
+  @Test("stable Kitty image attachments are all re-placed after incremental text updates")
+  func stableKittyImageAttachmentsAreAllReplacedAfterIncrementalTextUpdates() throws {
     let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
@@ -373,7 +373,12 @@ struct TerminalGraphicsProtocolTests {
         rgbaPixel(red: 255, green: 255, blue: 255),
       ]
     )
-    let attachment = makeRasterImageAttachment(
+    let leadingAttachment = makeRasterImageAttachment(
+      pngBytes: pngBytes,
+      pixelSize: .init(width: 2, height: 2),
+      bounds: .init(origin: .init(x: 0, y: 0), size: .init(width: 1, height: 1))
+    )
+    let trailingAttachment = makeRasterImageAttachment(
       pngBytes: pngBytes,
       pixelSize: .init(width: 2, height: 2),
       bounds: .init(origin: .init(x: 3, y: 0), size: .init(width: 1, height: 1))
@@ -381,12 +386,12 @@ struct TerminalGraphicsProtocolTests {
     let initialSurface = RasterSurface(
       size: .init(width: 4, height: 1),
       lines: ["foo "],
-      imageAttachments: [attachment]
+      imageAttachments: [leadingAttachment, trailingAttachment]
     )
     let updatedSurface = RasterSurface(
       size: .init(width: 4, height: 1),
       lines: ["fOo "],
-      imageAttachments: [attachment]
+      imageAttachments: [leadingAttachment, trailingAttachment]
     )
 
     _ = try host.present(initialSurface)
@@ -402,7 +407,9 @@ struct TerminalGraphicsProtocolTests {
     #expect(incrementalWrite.contains("\u{001B}[1;2HO"))
     #expect(metrics.strategy == .incremental)
     #expect(metrics.cellsChanged == 1)
-    #expect(incrementalWrite.contains("\u{001B}_Ga=p,q=2,C=1,c=1,r=1,i="))
+    #expect(countOccurrences(of: "_Ga=p,q=2,C=1,c=1,r=1,i=", in: incrementalWrite) == 2)
+    #expect(incrementalWrite.contains("\u{001B}[1;1H"))
+    #expect(incrementalWrite.contains("\u{001B}[1;4H"))
     #expect(!incrementalWrite.contains("_Ga=T"))
     #expect(!incrementalWrite.contains("\u{001B}P0;1;0q"))
   }
@@ -669,6 +676,26 @@ private func payloadForKittyChunk(_ chunk: String) -> String {
   }
   let payloadEnd = chunk.index(chunk.endIndex, offsetBy: -trailerLength)
   return String(chunk[payloadStart..<payloadEnd])
+}
+
+private func countOccurrences(of needle: String, in haystack: String) -> Int {
+  guard !needle.isEmpty else {
+    return 0
+  }
+
+  let needleCharacters = Array(needle)
+  let haystackCharacters = Array(haystack)
+  guard haystackCharacters.count >= needleCharacters.count else {
+    return 0
+  }
+
+  var count = 0
+  for start in 0...(haystackCharacters.count - needleCharacters.count) {
+    if hasPrefix(haystackCharacters, at: start, prefix: needleCharacters) {
+      count += 1
+    }
+  }
+  return count
 }
 
 private final class GraphicsProtocolMockTerminalController:

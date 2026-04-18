@@ -106,6 +106,32 @@ struct Phase1BenchmarkScenariosTests {
     #expect(second.diagnostics.placedNodesReused > 0)
   }
 
+  @Test("single-cell row edit preserves a one-line one-cell incremental update")
+  @MainActor
+  func singleCellRowEditScenario() throws {
+    let harness = BenchmarkHarness()
+    let row = TextBox()
+
+    row.value = "same"
+    let first = try harness.render(
+      SingleRowEditBenchmarkView(text: row),
+      context: .init(identity: Phase1BenchmarkIdentity.root)
+    )
+
+    row.value = "sXme"
+    let second = try harness.render(
+      SingleRowEditBenchmarkView(text: row),
+      context: .init(identity: Phase1BenchmarkIdentity.root)
+    )
+
+    #expect(first.presentation.strategy == .fullRepaint)
+    #expect(second.presentation.strategy == .incremental)
+    #expect(second.presentation.linesTouched == 1)
+    #expect(second.presentation.cellsChanged == 1)
+    #expect(second.presentation.bytesWritten > 0)
+    #expect(second.presentation.bytesWritten < first.presentation.bytesWritten)
+  }
+
   @Test(
     "single-step scroll movement reuses measurement work and translates eager placement incrementally"
   )
@@ -368,6 +394,16 @@ private struct TextInputBenchmarkView: View {
       )
       .id(Phase1BenchmarkIdentity.inputField)
       Text("Echo: \(text.value)")
+    }
+  }
+}
+
+private struct SingleRowEditBenchmarkView: View {
+  let text: TextBox
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text(text.value)
     }
   }
 }
