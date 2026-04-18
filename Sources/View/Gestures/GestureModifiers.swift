@@ -129,25 +129,26 @@ final class OnChangedDecorator<V: Equatable>: GestureRecognizer {
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     let disposition = inner.handle(event: event)
-    if let value: V = inner.currentValue(as: V.self), value != lastValue {
-      action(value)
-      lastValue = value
-    }
+    fireIfNeeded()
     return disposition
   }
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
     let didTerminate = inner.handleDeadline(at: instant)
-    if let value: V = inner.currentValue(as: V.self), value != lastValue {
-      action(value)
-      lastValue = value
-    }
+    fireIfNeeded()
     return didTerminate
   }
 
   func currentValue() -> V? { inner.currentValue(as: V.self) }
 
   func tearDown() { inner.tearDown() }
+
+  private func fireIfNeeded() {
+    if let value: V = inner.currentValue(as: V.self), value != lastValue {
+      action(value)
+      lastValue = value
+    }
+  }
 }
 
 // MARK: - .map

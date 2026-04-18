@@ -50,16 +50,19 @@ struct GestureModifiersTests {
     #expect(fired == 0)
   }
 
-  @Test(".updating writes to the bound GestureState during events")
+  @Test(".updating invokes the updater closure during events")
   func updatingWrites() {
     let box = GestureStateBox<Int>(seed: 0, slotOrdinal: 0)
     let binding = GestureStateBinding(box: box)
-    let g = TapGesture().updating(binding) { _, state, _ in state = 99 }
+    var invocations = 0
+    let g = TapGesture().updating(binding) { _, state, _ in
+      invocations += 1
+      state = 99
+    }
     let rec = g._makeRecognizer(context: ctx())
     _ = rec.handle(event: event(.down(.primary)))
     _ = rec.handle(event: event(.up(.primary)))
-    // After terminal phase, UpdatingDecorator resets to seed.
-    #expect(box.currentValue() == 0)
+    #expect(invocations >= 1)  // updater was actually called during the gesture
   }
 
   @Test(".updating resets state on end")
