@@ -930,13 +930,13 @@ extension TerminalHosting {
         }
 
       case .incremental:
-        for spanUpdate in plan.spanUpdates {
+        for rowBatch in plan.rowBatches {
           append(
             cursorSequence(
-              to: .init(x: spanUpdate.column, y: spanUpdate.row)
+              to: .init(x: rowBatch.anchorColumn, y: rowBatch.row)
             )
           )
-          append(spanUpdate.renderedSpan)
+          append(rowBatch.renderedBatch)
         }
         // Kitty images can be obscured by later cell writes. Re-place the
         // currently visible attachments after incremental text spans so

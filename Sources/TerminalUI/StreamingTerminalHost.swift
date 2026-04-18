@@ -166,12 +166,14 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
         capabilityProfile: capabilityProfile
       )
     case .incremental:
-      let estimatedSize = plan.spanUpdates.reduce(0) { $0 + 16 + $1.renderedSpan.utf8.count }
+      let estimatedSize = plan.rowBatches.reduce(0) { partial, rowBatch in
+        partial + 16 + rowBatch.renderedBatch.utf8.count
+      }
       output = ""
       output.reserveCapacity(estimatedSize)
-      for spanUpdate in plan.spanUpdates {
-        output += "\u{001B}[\(max(1, spanUpdate.row + 1));\(max(1, spanUpdate.column + 1))H"
-        output += spanUpdate.renderedSpan
+      for rowBatch in plan.rowBatches {
+        output += "\u{001B}[\(max(1, rowBatch.row + 1));\(max(1, rowBatch.anchorColumn + 1))H"
+        output += rowBatch.renderedBatch
       }
     }
 

@@ -68,6 +68,39 @@ struct TerminalHostPresentationBatchingTests {
     #expect(incrementalWrites == ["\u{001B}[1;4HX"])
   }
 
+  @Test("terminal host batches multi-span row updates behind one row anchor")
+  func multiSpanRowUpdatesBatchBehindOneAnchor() throws {
+    let controller = PresentationWriteCountingController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .previewUnicode
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 1),
+        lines: ["abcd1234"]
+      )
+    )
+    try host.drainPendingPresentation()
+    let writesBeforeUpdate = controller.writes.count
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 8, height: 1),
+        lines: ["abXd12Y4"]
+      )
+    )
+    try host.drainPendingPresentation()
+
+    let incrementalWrites = Array(controller.writes.dropFirst(writesBeforeUpdate))
+
+    #expect(incrementalWrites == ["\u{001B}[1;3HX\u{001B}[3CY"])
+  }
+
   @Test("terminal host damage-aware presentation batches only hinted rows")
   func damageAwareUpdatesBatchOnlyHintedRows() throws {
     let controller = PresentationWriteCountingController(isTTY: true)
