@@ -3,6 +3,8 @@ package struct RuntimeRegistrationSet {
   package let actionRegistry: LocalActionRegistry?
   package let keyHandlerRegistry: LocalKeyHandlerRegistry?
   package let pointerHandlerRegistry: LocalPointerHandlerRegistry?
+  package let gestureRegistry: LocalGestureRegistry?
+  package let gestureStateRegistry: LocalGestureStateRegistry?
   package let focusBindingRegistry: LocalFocusBindingRegistry?
   package let focusedValuesRegistry: LocalFocusedValuesRegistry?
   package let lifecycleRegistry: LocalLifecycleRegistry?
@@ -14,6 +16,8 @@ package struct RuntimeRegistrationSet {
     actionRegistry: LocalActionRegistry? = nil,
     keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
     pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
+    gestureRegistry: LocalGestureRegistry? = nil,
+    gestureStateRegistry: LocalGestureStateRegistry? = nil,
     focusBindingRegistry: LocalFocusBindingRegistry? = nil,
     focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
     lifecycleRegistry: LocalLifecycleRegistry? = nil,
@@ -24,6 +28,8 @@ package struct RuntimeRegistrationSet {
     self.actionRegistry = actionRegistry
     self.keyHandlerRegistry = keyHandlerRegistry
     self.pointerHandlerRegistry = pointerHandlerRegistry
+    self.gestureRegistry = gestureRegistry
+    self.gestureStateRegistry = gestureStateRegistry
     self.focusBindingRegistry = focusBindingRegistry
     self.focusedValuesRegistry = focusedValuesRegistry
     self.lifecycleRegistry = lifecycleRegistry
