@@ -37,11 +37,13 @@ struct _AttachGestureModifier<Content: View, G: Gesture>: View, ResolvableView {
     }
 
     // Build the recognizer tree.
-    // No deadline scheduling is available from the resolve context at this
-    // stage — gesture recognizers that require timers (e.g. long-press) will
-    // obtain a scheduler when the runtime is live. For now the closure is a
-    // no-op; Task 19 will wire a live scheduler reference here.
-    let requestDeadline: @MainActor @Sendable (MonotonicInstant) -> Void = { _ in }
+    // Forward deadline requests to the frame scheduler when one is present
+    // in the resolve context. This closure is populated at runtime by the
+    // RunLoop so that gestures like LongPressGesture can schedule timed wakes.
+    let scheduleDeadline = context.requestDeadline
+    let requestDeadline: @MainActor @Sendable (MonotonicInstant) -> Void = { instant in
+      scheduleDeadline?(instant)
+    }
 
     let buildContext = GestureRecognizerBuildContext(
       attachingIdentity: node.identity,

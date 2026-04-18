@@ -221,6 +221,9 @@ public struct ResolveContext: Equatable, Sendable {
   package var viewGraph: ViewGraph?
   package var imageAssetResolver: ImageAssetResolver?
   package var frameState: FrameResolveState?
+  /// Forwards deadline requests to the frame scheduler.
+  /// Stored as a closure to avoid Sendable constraints on `FrameScheduling`.
+  package var requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)?
 
   @MainActor
   package var runtimeRegistrations: RuntimeRegistrationSet {
@@ -289,6 +292,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.focusedValues = focusedValues
     childContext.imageAssetResolver = imageAssetResolver
     childContext.frameState = frameState
+    childContext.requestDeadline = requestDeadline
     return childContext
   }
 
@@ -328,6 +332,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.focusedValues = focusedValues
     replacedContext.imageAssetResolver = imageAssetResolver
     replacedContext.frameState = frameState
+    replacedContext.requestDeadline = requestDeadline
     return replacedContext
   }
 
@@ -475,6 +480,7 @@ extension ResolveContext {
     observationBridge = nil
     viewGraph = nil
     imageAssetResolver = nil
+    requestDeadline = nil
   }
 }
 
