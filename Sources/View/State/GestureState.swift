@@ -81,8 +81,8 @@ public final class GestureStateBox<Value> {
   public func eraseToAnyBinding() -> AnyGestureStateBinding {
     AnyGestureStateBinding(
       valueType: Value.self,
-      setValue: { [weak self] value in self?.setValue(value) },
-      reset: { [weak self] in self?.resetToSeed() }
+      setValue: { value in self.setValue(value) },
+      reset: { self.resetToSeed() }
     )
   }
 
@@ -145,8 +145,7 @@ public struct GestureState<Value> {
   }
 
   public var wrappedValue: Value {
-    _ = activeLocation()  // lazy-bind side effect
-    return box.currentValue()
+    activeLocation()?.getValue() ?? box.currentValue()
   }
 
   public var projectedValue: GestureStateBinding<Value> {
@@ -195,8 +194,8 @@ public struct GestureState<Value> {
       // e.g. body called outside a full resolve pipeline).
       return GestureStateLocation(
         getValue: { [weak box] in box?.currentValue() ?? trueSeed },
-        setValue: { [weak box] newValue in box?.setForTests(newValue) },
-        resetToSeed: { [weak box] in box?.setForTests(trueSeed) }
+        setValue: { [weak box] newValue in box?.setValue(newValue) },
+        resetToSeed: { [weak box] in box?.setValue(trueSeed) }
       )
     }
 
