@@ -92,12 +92,18 @@ public final class AnyGestureRecognizer {
   private let _handleEvent: (LocalPointerEvent) -> GestureRecognizerEventDisposition
   private let _handleDeadline: (MonotonicInstant) -> Bool
   private let _tearDown: () -> Void
+  /// Boxes the recognizer's currentValue() — callers cast to their
+  /// expected type via `currentValue(as:)`.
+  private let _currentValue: () -> Any?
+  public let valueType: Any.Type
 
   package init<R: GestureRecognizer>(_ recognizer: R) {
     self._phase = { recognizer.phase }
     self._handleEvent = { recognizer.handle(event: $0) }
     self._handleDeadline = { recognizer.handleDeadline(at: $0) }
     self._tearDown = { recognizer.tearDown() }
+    self._currentValue = { recognizer.currentValue() }
+    self.valueType = R.Value.self
   }
 
   public var phase: GestureRecognizerPhase { _phase() }
@@ -112,5 +118,11 @@ public final class AnyGestureRecognizer {
 
   package func tearDown() {
     _tearDown()
+  }
+
+  /// Reads the inner recognizer's `currentValue()` and casts to `T`.
+  /// Returns `nil` if the inner value is nil or the type doesn't match.
+  public func currentValue<T>(as type: T.Type = T.self) -> T? {
+    _currentValue() as? T
   }
 }

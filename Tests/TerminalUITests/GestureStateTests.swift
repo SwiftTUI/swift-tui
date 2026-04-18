@@ -25,9 +25,9 @@ struct GestureStateTests {
     let box = GestureStateBox<Int>(seed: 0, slotOrdinal: 0)
     let binding = box.eraseToAnyBinding()
     binding.setValueErased(42)
-    #expect(box.currentValueForTests() == 42)
+    #expect(box.currentValue() == 42)
     binding.resetToSeed()
-    #expect(box.currentValueForTests() == 0)
+    #expect(box.currentValue() == 0)
   }
 
   @Test("LocalGestureStateRegistry drains bindings on subtree removal")
@@ -35,11 +35,11 @@ struct GestureStateTests {
     let registry = LocalGestureStateRegistry()
     let identity = Identity(components: ["r"])
     let box = GestureStateBox<Int>(seed: 0, slotOrdinal: 0)
-    // Set a non-seed value through the test helper so the box has something to reset.
-    box.setForTests(99)
+    // Set a non-seed value so the box has something to reset.
+    box.setValue(99)
     registry.register(identity: identity, binding: box.eraseToAnyBinding())
     registry.removeSubtrees(rootedAt: [identity])
-    #expect(box.currentValueForTests() == 0)  // reset fired during removal
+    #expect(box.currentValue() == 0)  // reset fired during removal
   }
 
   @Test("LocalGestureStateRegistry bindings(for:) returns registered bindings")
