@@ -91,28 +91,35 @@ public struct ToolbarHost<Content: View & Sendable, S: ToolbarStyle>: View, Reso
     )
 
     // Inject the strip as a child of `base` (the underlying
-    // ActionScope, typically a Panel) so that focus on any
-    // toolbar-strip button inherits the scope's identity on its
-    // scopePath. Wrapping `base` and the strip as siblings under a
-    // fresh outer node would leave the strip *outside* the scope
-    // boundary — palette and key commands registered at the scope
-    // would be invisible to toolbar focus, breaking the whole
-    // authoring contract that `.toolbar(style:)` attaches "to" the
-    // scope.
+    // ActionScope, typically a Panel) so focus on any toolbar-strip
+    // button inherits the scope's identity on its scopePath:
+    // palette/key commands registered at the scope stay visible to
+    // toolbar focus. Then wrap the reformed scope in a passthrough
+    // outer node at `context.identity` so the resolved node's
+    // identity matches the identity `resolveView` registered in the
+    // ViewGraph at the start of this evaluation.
     //
-    // Reuse `base`'s identity and semanticMetadata so the composed
-    // node IS the scope (same focusScopeBoundary flag, same identity
-    // that commands were registered against) — only children and
-    // layoutBehavior change.
+    // A previous version of this method collapsed the outer wrapper
+    // entirely and returned `base` with its identity unchanged. That
+    // left the graph holding a node at `context.identity` whose
+    // `committed` resolved snapshot had `base.identity`, and
+    // `finishEvaluation` re-parented `base`'s subtree under the
+    // ToolbarHost's graph node — overwriting the parent pointer that
+    // Panel's own graph node had just set. State-change invalidations
+    // that walk up via `invalidateAncestorCachedSnapshots` skipped
+    // the Panel node, so subsequently-cached ancestor snapshots went
+    // stale. The visible symptom was pointer scrolling updating the
+    // scroll state internally but the rendered surface only catching
+    // up on the next non-scroll event (a click, a keypress, etc.).
     let updatedChildren: [ResolvedNode] =
       switch style.placement {
       case .top: [stripNode] + base.children
       case .bottom: base.children + [stripNode]
       }
 
-    var composed = base
-    composed.children = updatedChildren
-    composed.layoutBehavior = .stack(
+    var scopeWithStrip = base
+    scopeWithStrip.children = updatedChildren
+    scopeWithStrip.layoutBehavior = .stack(
       axis: .vertical,
       spacing: 0,
       horizontalAlignment: .center,
@@ -120,8 +127,17 @@ public struct ToolbarHost<Content: View & Sendable, S: ToolbarStyle>: View, Reso
     )
     // Clear the preference at this scope boundary so absorbed items
     // do not re-bubble to ancestor toolbar hosts.
-    composed.preferenceValues[ToolbarItemsPreferenceKey.self] = []
-    return [composed]
+    scopeWithStrip.preferenceValues[ToolbarItemsPreferenceKey.self] = []
+
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("ToolbarHost"),
+        children: [scopeWithStrip],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction
+      )
+    ]
   }
 }
 
