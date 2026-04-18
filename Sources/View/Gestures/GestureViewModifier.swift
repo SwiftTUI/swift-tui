@@ -73,6 +73,38 @@ struct _AttachGestureModifier<Content: View, G: Gesture>: View, ResolvableView {
   }
 }
 
+// MARK: - View.contentShape(_:)
+
+extension View {
+  /// Overrides the hit-test region for gesture recognition.
+  /// Pass `nil` to use the view's natural bounds.
+  public func contentShape(_ rect: Rect?) -> some View {
+    _ContentShapeModifier(content: self, explicitRect: rect)
+  }
+}
+
+@MainActor
+struct _ContentShapeModifier<Content: View>: View, ResolvableView {
+  let content: Content
+  let explicitRect: Rect?
+
+  var body: Never { neverBody() }
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    var node = content.resolve(in: context)
+    guard let explicitRect else { return [node] }
+    node.semanticMetadata = node.semanticMetadata.merging(
+      SemanticMetadata(
+        participatesInPointerHitTesting: true,
+        explicitInteractionRect: explicitRect
+      )
+    )
+    return [node]
+  }
+}
+
+// MARK: - Gesture capture heuristic
+
 /// Temporary heuristic — Task 19 replaces this with
 /// `G._needsPointerCapture`.
 ///

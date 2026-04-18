@@ -50,6 +50,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var presentationRole: PresentationRole?
   public var selectionTag: SelectionTag?
   public var tabItemLabel: TabItemLabel?
+  public var explicitInteractionRect: Rect?
 
   public var isFocusable: Bool {
     get { explicitFocusability ?? false }
@@ -77,7 +78,8 @@ public struct SemanticMetadata: Equatable, Sendable {
     sectionRole: SectionRole? = nil,
     presentationRole: PresentationRole? = nil,
     selectionTag: SelectionTag? = nil,
-    tabItemLabel: TabItemLabel? = nil
+    tabItemLabel: TabItemLabel? = nil,
+    explicitInteractionRect: Rect? = nil
   ) {
     self.init(
       isFocusable: isFocusable,
@@ -92,7 +94,8 @@ public struct SemanticMetadata: Equatable, Sendable {
       sectionRole: sectionRole,
       presentationRole: presentationRole,
       selectionTag: selectionTag,
-      tabItemLabel: tabItemLabel
+      tabItemLabel: tabItemLabel,
+      explicitInteractionRect: explicitInteractionRect
     )
   }
 
@@ -109,7 +112,8 @@ public struct SemanticMetadata: Equatable, Sendable {
     sectionRole: SectionRole? = nil,
     presentationRole: PresentationRole? = nil,
     selectionTag: SelectionTag? = nil,
-    tabItemLabel: TabItemLabel? = nil
+    tabItemLabel: TabItemLabel? = nil,
+    explicitInteractionRect: Rect? = nil
   ) {
     explicitFocusability = isFocusable
     self.focusScopeBoundary = focusScopeBoundary
@@ -124,6 +128,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.presentationRole = presentationRole
     self.selectionTag = selectionTag
     self.tabItemLabel = tabItemLabel
+    self.explicitInteractionRect = explicitInteractionRect
   }
 
   public func merging(_ other: Self) -> Self {
@@ -143,7 +148,8 @@ public struct SemanticMetadata: Equatable, Sendable {
       sectionRole: other.sectionRole ?? sectionRole,
       presentationRole: other.presentationRole ?? presentationRole,
       selectionTag: other.selectionTag ?? selectionTag,
-      tabItemLabel: other.tabItemLabel ?? tabItemLabel
+      tabItemLabel: other.tabItemLabel ?? tabItemLabel,
+      explicitInteractionRect: other.explicitInteractionRect ?? explicitInteractionRect
     )
   }
 }
