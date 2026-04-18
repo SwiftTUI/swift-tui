@@ -122,6 +122,31 @@ extension View {
   }
 }
 
+// MARK: - View.onLongPressGesture(minimumDuration:maximumDistance:perform:)
+
+extension View {
+  /// Adds a long-press gesture that fires `action` after the user
+  /// holds the view for at least `minimumDuration`.
+  ///
+  /// Equivalent to
+  /// `.gesture(LongPressGesture(minimumDuration: minimumDuration,
+  ///                            maximumDistance: maximumDistance)
+  ///           .onEnded { _ in action() })`.
+  public func onLongPressGesture(
+    minimumDuration: Duration = .milliseconds(500),
+    maximumDistance: Int = 0,
+    perform action: @escaping @MainActor () -> Void
+  ) -> some View {
+    gesture(
+      LongPressGesture(
+        minimumDuration: minimumDuration,
+        maximumDistance: maximumDistance
+      )
+      .onEnded { _ in action() }
+    )
+  }
+}
+
 // MARK: - Gesture capture heuristic
 
 /// Temporary heuristic — Task 19 replaces this with
