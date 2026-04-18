@@ -85,4 +85,32 @@ struct LongPressGestureTests {
       ))
     #expect(rec.phase == .failed)
   }
+
+  @Test("handleDeadline returns false and keeps phase .possible when instant is before deadline")
+  func handleDeadlineBeforeTarget() throws {
+    var scheduledDeadline: MonotonicInstant?
+    let ctx = GestureRecognizerBuildContext(
+      attachingIdentity: identity("r"),
+      gestureStateRegistry: nil,
+      requestDeadline: { scheduledDeadline = $0 }
+    )
+    let g = LongPressGesture(minimumDuration: .seconds(10))
+    let rec = g._makeRecognizer(context: ctx)
+    let t0 = MonotonicInstant.now()
+    _ = rec.handle(
+      event: .init(
+        kind: .down(.primary),
+        location: .zero,
+        targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1)),
+        timestamp: t0
+      ))
+    let scheduled = try #require(scheduledDeadline)
+
+    // An instant before the scheduled deadline should not transition.
+    let early = t0.advanced(by: .milliseconds(100))
+    #expect(early < scheduled)
+    let didTerminate = rec.handleDeadline(at: early)
+    #expect(didTerminate == false)
+    #expect(rec.phase == .possible)
+  }
 }
