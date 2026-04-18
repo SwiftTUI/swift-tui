@@ -955,6 +955,12 @@ extension TerminalHosting {
         }
       }
 
+      bufferedOutput = wrappedPresentationOutput(
+        bufferedOutput,
+        strategy: plan.strategy
+      )
+      bytesWritten = bufferedOutput.utf8.count
+
       if !bufferedOutput.isEmpty {
         presentationWriterIfNeeded().submit(
           .init(
@@ -1223,6 +1229,14 @@ extension TerminalHosting {
       "\u{001B}[2J"
     }
 
+    private func beginSynchronizedOutputSequence() -> String {
+      "\u{001B}[?2026h"
+    }
+
+    private func endSynchronizedOutputSequence() -> String {
+      "\u{001B}[?2026l"
+    }
+
     private func enterAlternateScreenSequence() -> String {
       "\u{001B}[?1049h"
     }
@@ -1266,6 +1280,22 @@ extension TerminalHosting {
       let row = max(1, point.y + 1)
       let column = max(1, point.x + 1)
       return "\u{001B}[\(row);\(column)H"
+    }
+
+    private func wrappedPresentationOutput(
+      _ output: String,
+      strategy: TerminalPresentationPlan.Strategy
+    ) -> String {
+      guard !output.isEmpty,
+        strategy == .fullRepaint,
+        capabilityProfile.supportsSynchronizedOutput
+      else {
+        return output
+      }
+
+      return beginSynchronizedOutputSequence()
+        + output
+        + endSynchronizedOutputSequence()
     }
 
   }

@@ -21,6 +21,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
   public var emitsStyleEscapeSequences: Bool
   public var supportsHyperlinks: Bool
   public var supportsMouseReporting: Bool
+  public var supportsSynchronizedOutput: Bool
 
   /// Creates a terminal capability profile explicitly.
   public init(
@@ -28,13 +29,15 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     colorLevel: ColorLevel,
     emitsStyleEscapeSequences: Bool,
     supportsHyperlinks: Bool = false,
-    supportsMouseReporting: Bool = false
+    supportsMouseReporting: Bool = false,
+    supportsSynchronizedOutput: Bool = false
   ) {
     self.glyphLevel = glyphLevel
     self.colorLevel = colorLevel
     self.emitsStyleEscapeSequences = emitsStyleEscapeSequences
     self.supportsHyperlinks = supportsHyperlinks
     self.supportsMouseReporting = supportsMouseReporting
+    self.supportsSynchronizedOutput = supportsSynchronizedOutput
   }
 
   public static let previewUnicode = Self(
@@ -125,7 +128,8 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
       colorLevel: colorLevel,
       emitsStyleEscapeSequences: colorLevel != .none,
       supportsHyperlinks: supportsHyperlinks(term: term),
-      supportsMouseReporting: supportsMouseReporting(term: term)
+      supportsMouseReporting: supportsMouseReporting(term: term),
+      supportsSynchronizedOutput: supportsSynchronizedOutput(term: term)
     )
   }
 
@@ -136,6 +140,12 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
   }
 
   private static func supportsMouseReporting(
+    term: String
+  ) -> Bool {
+    supportsRichTerminalFeatures(term: term)
+  }
+
+  private static func supportsSynchronizedOutput(
     term: String
   ) -> Bool {
     supportsRichTerminalFeatures(term: term)

@@ -177,6 +177,11 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
       }
     }
 
+    output = wrappedPresentationOutput(
+      output,
+      strategy: plan.strategy
+    )
+
     if !output.isEmpty {
       try write(output)
     }
@@ -191,5 +196,19 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
       cellsChanged: plan.cellsChanged,
       strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental
     )
+  }
+
+  private func wrappedPresentationOutput(
+    _ output: String,
+    strategy: TerminalPresentationPlan.Strategy
+  ) -> String {
+    guard !output.isEmpty,
+      strategy == .fullRepaint,
+      capabilityProfile.supportsSynchronizedOutput
+    else {
+      return output
+    }
+
+    return "\u{001B}[?2026h" + output + "\u{001B}[?2026l"
   }
 }

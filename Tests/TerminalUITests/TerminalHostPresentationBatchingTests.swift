@@ -35,6 +35,33 @@ struct TerminalHostPresentationBatchingTests {
     #expect(controller.writes.first == "\u{001B}[2J\u{001B}[1;1HABCD\u{001B}[2;1HEFGH")
   }
 
+  @Test("terminal host wraps full repaints in synchronized output when supported")
+  func fullRepaintUsesSynchronizedOutputWhenSupported() throws {
+    let controller = PresentationWriteCountingController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .init(
+        glyphLevel: .unicode,
+        colorLevel: .none,
+        emitsStyleEscapeSequences: false,
+        supportsSynchronizedOutput: true
+      )
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["ABCD"]
+      )
+    )
+    try host.drainPendingPresentation()
+
+    #expect(controller.writes == ["\u{001B}[?2026h\u{001B}[2J\u{001B}[1;1HABCD\u{001B}[?2026l"])
+  }
+
   @Test("terminal host batches incremental spans into one write")
   func incrementalUpdatesBatchedIntoOneWrite() throws {
     let controller = PresentationWriteCountingController(isTTY: true)
@@ -188,6 +215,60 @@ struct TerminalHostPresentationBatchingTests {
     #expect(metrics.strategy == .fullRepaint)
     #expect(
       controller.writes.last == "\u{001B}[2J\u{001B}[1;1HWXYZ"
+    )
+  }
+
+  @Test("drop recovery full repaints stay synchronized when the terminal supports it")
+  func dropRecoveryFullRepaintsStaySynchronized() throws {
+    let controller = BlockingPresentationWriteController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .init(
+        glyphLevel: .unicode,
+        colorLevel: .none,
+        emitsStyleEscapeSequences: false,
+        supportsSynchronizedOutput: true
+      )
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["AAAA"]
+      )
+    )
+    #expect(controller.waitForBlockedWriteToStart())
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["BAAA"]
+      )
+    )
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["ABAA"]
+      )
+    )
+
+    controller.unblockWrite()
+    try host.drainPendingPresentation()
+
+    let metrics = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["WXYZ"]
+      )
+    )
+    try host.drainPendingPresentation()
+
+    #expect(metrics.strategy == .fullRepaint)
+    #expect(
+      controller.writes.last == "\u{001B}[?2026h\u{001B}[2J\u{001B}[1;1HWXYZ\u{001B}[?2026l"
     )
   }
 }

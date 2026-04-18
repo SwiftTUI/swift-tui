@@ -24,7 +24,17 @@ struct TerminalPresentationTests {
       isTTY: true
     )
 
-    #expect(profile == .trueColor)
+    #expect(
+      profile
+        == .init(
+          glyphLevel: .unicode,
+          colorLevel: .trueColor,
+          emitsStyleEscapeSequences: true,
+          supportsHyperlinks: true,
+          supportsMouseReporting: true,
+          supportsSynchronizedOutput: true
+        )
+    )
   }
 
   @Test("capability detection disables styling for no-color and non-tty outputs")
@@ -52,7 +62,8 @@ struct TerminalPresentationTests {
           colorLevel: .none,
           emitsStyleEscapeSequences: false,
           supportsHyperlinks: true,
-          supportsMouseReporting: true
+          supportsMouseReporting: true,
+          supportsSynchronizedOutput: true
         )
     )
     #expect(
@@ -121,6 +132,35 @@ struct TerminalPresentationTests {
     #expect(supported.supportsHyperlinks)
     #expect(!dumb.supportsHyperlinks)
     #expect(!redirected.supportsHyperlinks)
+  }
+
+  @Test("capability detection enables synchronized output only for supported tty terminals")
+  func capabilityDetectionTracksSynchronizedOutputSupport() {
+    let supported = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "xterm-256color",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: true
+    )
+    let dumb = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "dumb",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: true
+    )
+    let redirected = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "xterm-256color",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: false
+    )
+
+    #expect(supported.supportsSynchronizedOutput)
+    #expect(!dumb.supportsSynchronizedOutput)
+    #expect(!redirected.supportsSynchronizedOutput)
   }
 
   @Test("appearance detection derives defaults from COLORFGBG heuristics")
