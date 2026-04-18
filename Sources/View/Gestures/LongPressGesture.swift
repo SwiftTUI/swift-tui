@@ -6,6 +6,12 @@ public import Core
 /// to `.ended` when the deadline fires while the pointer is still pressed,
 /// and `.failed` when the pointer lifts early or moves beyond
 /// `maximumDistance`.
+///
+/// ## Terminal-faithful defaults
+///
+/// `maximumDistance` defaults to `0` cells. Unlike SwiftUI's 10-point
+/// default (continuous coordinates), any cell movement fails the
+/// gesture. Pass a positive value to allow pointer drift.
 public struct LongPressGesture: Gesture {
   public typealias Value = Bool
   public typealias Body = Never

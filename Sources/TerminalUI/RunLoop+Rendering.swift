@@ -39,10 +39,15 @@ extension RunLoop {
       // Drain gesture recognizer deadlines before rendering so that
       // recognizers that transition on this wake see their new phase
       // reflected in the upcoming render pass.
-      if scheduledFrame.causes.contains(.deadline),
-        let triggeredDeadline = scheduledFrame.triggeredDeadline
-      {
-        drainGestureDeadlines(at: triggeredDeadline)
+      if scheduledFrame.causes.contains(.deadline) {
+        if let triggeredDeadline = scheduledFrame.triggeredDeadline {
+          drainGestureDeadlines(at: triggeredDeadline)
+        } else {
+          assertionFailure(
+            "FrameScheduler produced .deadline cause without a triggeredDeadline; "
+              + "gesture deadlines will not drain this frame."
+          )
+        }
       }
       var rerenderedForFocusSync = false
       var focusSyncBudget = FocusSyncRerenderBudget()
