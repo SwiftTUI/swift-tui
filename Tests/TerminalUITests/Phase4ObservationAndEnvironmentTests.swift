@@ -1613,12 +1613,12 @@ private final class Phase4RecordingTerminalHost: TerminalHosting {
       case .fullRepaint:
         TerminalPresentationMetrics.fullRepaint(
           for: surface,
-          renderedOutput: rendered
+          capabilityProfile: capabilityProfile
         ).bytesWritten
       case .incremental:
-        plan.spanUpdates.reduce(0) { partial, update in
+        plan.rowBatches.reduce(0) { partial, rowBatch in
           partial
-            + update.renderedSpan.utf8.count
+            + rowBatch.renderedBatch.utf8.count
         }
       }
 
@@ -1674,12 +1674,12 @@ private final class Phase4MutableAppearanceTerminalHost: TerminalHosting {
       case .fullRepaint:
         TerminalPresentationMetrics.fullRepaint(
           for: surface,
-          renderedOutput: rendered
+          capabilityProfile: capabilityProfile
         ).bytesWritten
       case .incremental:
-        plan.spanUpdates.reduce(0) { partial, update in
+        plan.rowBatches.reduce(0) { partial, rowBatch in
           partial
-            + update.renderedSpan.utf8.count
+            + rowBatch.renderedBatch.utf8.count
         }
       }
 

@@ -58,8 +58,12 @@ library product. Downstream package consumers reach those types through
 - `RunLoop+Rendering.swift`: render scheduling, resolve-context assembly, and focus application
 - `LifecycleCoordinator.swift`: post-present lifecycle staging
 - `TaskRunner.swift`: lifecycle-owned task execution and cancellation
-- `TerminalHost.swift`: fd-backed terminal host plus the WASI-facing `WebTerminalHost`
+- `TerminalHost.swift`: fd-backed terminal host plus the WASI-facing `WebTerminalHost`, including
+  final paint metrics for synchronized framing, graphics replay scope, and terminal edit-op
+  lowering
 - `StreamingTerminalHost.swift`: host-facing terminal host that emits presentation output through a closure
+- `FrameDiagnosticsLogger.swift`: tab-separated per-frame diagnostics sink that joins pipeline
+  counters with presentation metrics
 - `TerminalPresentation.swift`: capability-aware surface diffing and text presentation
 - `TerminalAppearanceDetection.swift`: appearance probing
 - `TerminalGraphicsCapabilities.swift`: Kitty, Sixel, and cell-pixel capability detection
@@ -100,7 +104,8 @@ library product. Downstream package consumers reach those types through
 
 - `GeometryTypes.swift`, `EnvironmentAndNodeTypes.swift`, and `LayoutTypes.swift`: geometry, proposals, placement, layout metadata, and node infrastructure
 - `RenderTreeAndSemanticsTypes.swift`: resolved-tree, semantic snapshot, and draw-tree data types, including `TextFigure` draw payload support
-- `CommitAndFrameTypes.swift`: commit plans, diagnostics, retained resolve frames, and frame artifacts
+- `CommitAndFrameTypes.swift`: commit plans, refined presentation-damage diagnostics, retained
+  resolve frames, and frame artifacts
 - `NodeMetadata.swift`: grouped node metadata used by measurement and refactor follow-up work
 - `LayoutEngine.swift` plus `LayoutEngine+Alignment.swift`, `LayoutEngine+List.swift`, `LayoutEngine+Placement.swift`, `LayoutEngine+Stack.swift`, `LayoutEngine+Table.swift`, and `LayoutEngine+Utility.swift`: decomposed measurement and placement engine
 - `Semantics.swift`: semantic extraction and route generation

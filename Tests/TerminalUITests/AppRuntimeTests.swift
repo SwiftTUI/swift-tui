@@ -1062,13 +1062,13 @@ private final class RecordingTerminalHost: TerminalHosting {
       case .fullRepaint:
         TerminalPresentationMetrics.fullRepaint(
           for: surface,
-          renderedOutput: rendered
+          capabilityProfile: capabilityProfile
         ).bytesWritten
       case .incremental:
-        plan.spanUpdates.reduce(0) { partial, update in
+        plan.rowBatches.reduce(0) { partial, rowBatch in
           partial
-            + cursorSequence(row: update.row, column: update.column).utf8.count
-            + update.renderedSpan.utf8.count
+            + cursorSequence(row: rowBatch.row, column: rowBatch.anchorColumn).utf8.count
+            + rowBatch.renderedBatch.utf8.count
         }
       }
     let metrics = TerminalPresentationMetrics(

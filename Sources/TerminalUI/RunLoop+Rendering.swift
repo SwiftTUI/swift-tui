@@ -215,6 +215,7 @@ extension RunLoop {
 
       if let diagnosticsLogger {
         let diag = artifacts.diagnostics
+        let damageDiagnostics = diag.presentationDamage
         let cacheMetrics = diag.measurementCache
         let cacheHitRate: Double? =
           if let cacheMetrics, cacheMetrics.lookups > 0 {
@@ -250,7 +251,20 @@ extension RunLoop {
             presentationLinesTouched: presentationMetrics.linesTouched,
             presentationCellsChanged: presentationMetrics.cellsChanged,
             presentationDuration: presentationDuration,
-            damageRowCount: presentationDamage.map(\.dirtyRows.count),
+            damageRowCount: damageDiagnostics?.textRowCount,
+            damageRangeAwareRowCount: damageDiagnostics?.rangeAwareTextRowCount,
+            damageTextSpanCount: damageDiagnostics?.textSpanCount,
+            damageTextCellCount: damageDiagnostics?.textCellCount,
+            damageGraphicsInvalidationCount: damageDiagnostics?.graphicsInvalidationCount,
+            damageRequiresFullTextRepaint: damageDiagnostics?.requiresFullTextRepaint ?? false,
+            damageRequiresFullGraphicsReplay: damageDiagnostics?.requiresFullGraphicsReplay
+              ?? false,
+            presentationUsedSynchronizedOutput: presentationMetrics.usedSynchronizedOutput,
+            presentationGraphicsReplayScope: presentationMetrics.graphicsReplayScope.rawValue,
+            presentationGraphicsAttachmentsReplayed: presentationMetrics
+              .graphicsAttachmentsReplayed,
+            presentationEditOperationLowering: presentationMetrics.editOperationLowering.rawValue,
+            presentationEditOperationCount: presentationMetrics.editOperationCount,
             measurementCacheHitRate: cacheHitRate,
             totalFrameDuration: pipelineTotal + presentationDuration
           )

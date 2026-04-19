@@ -105,6 +105,30 @@ struct Phase1PresentationIntegrationTests {
     )
   }
 
+  @Test("same-row disjoint edits share one incremental row batch")
+  func sameRowDisjointEditsShareOneIncrementalRowBatch() throws {
+    let result = try presentScenario(
+      previous: .init(
+        size: .init(width: 8, height: 1),
+        lines: [
+          "abcd1234"
+        ]
+      ),
+      current: .init(
+        size: .init(width: 8, height: 1),
+        lines: [
+          "abXd12Y4"
+        ]
+      )
+    )
+
+    #expect(result.metrics.strategy == .incremental)
+    #expect(result.metrics.linesTouched == 1)
+    #expect(result.metrics.cellsChanged == 2)
+    #expect(result.metrics.bytesWritten < result.fullRepaintMetrics.bytesWritten)
+    #expect(result.incrementalWrites == ["\u{001B}[1;3HX\u{001B}[3CY"])
+  }
+
   @Test("scroll steps stay incremental and smaller than a full repaint")
   func scrollStepsStayIncremental() throws {
     let result = try presentScenario(
@@ -129,6 +153,25 @@ struct Phase1PresentationIntegrationTests {
     #expect(result.metrics.strategy == .incremental)
     #expect(result.metrics.cellsChanged == 3)
     #expect(result.metrics.bytesWritten < result.fullRepaintMetrics.bytesWritten)
+  }
+
+  @Test("trailing tail shrinks lower to erase-to-end-of-line and stay smaller than a full repaint")
+  func trailingTailShrinksLowerToEraseToEndOfLine() throws {
+    let result = try presentScenario(
+      previous: .init(
+        size: .init(width: 8, height: 1),
+        lines: ["alphabet"]
+      ),
+      current: .init(
+        size: .init(width: 8, height: 1),
+        lines: ["alph"]
+      )
+    )
+
+    #expect(result.metrics.strategy == .incremental)
+    #expect(result.metrics.cellsChanged == 4)
+    #expect(result.metrics.bytesWritten < result.fullRepaintMetrics.bytesWritten)
+    #expect(result.incrementalWrites == ["\u{001B}[1;5H\u{001B}[K"])
   }
 
   @Test("resize still triggers a safe full repaint fallback")
@@ -189,10 +232,9 @@ private func presentScenario(
   let metrics = try host.present(current)
   try host.drainPendingPresentation()
   let incrementalWrites = Array(controller.writes.dropFirst(writesBeforeUpdate))
-  let renderer = TerminalSurfaceRenderer(capabilityProfile: .previewUnicode)
   let fullRepaintMetrics = TerminalPresentationMetrics.fullRepaint(
     for: current,
-    renderedOutput: renderer.render(current)
+    capabilityProfile: .previewUnicode
   )
 
   return PresentationScenarioResult(

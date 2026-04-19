@@ -151,7 +151,8 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   ) throws -> TerminalPresentationMetrics {
     let previousSurface = state.withLock(\.lastSubmittedSurface)
     let plan = TerminalPresentationPlanner(
-      capabilityProfile: capabilityProfile
+      capabilityProfile: capabilityProfile,
+      graphicsCapabilities: graphicsCapabilities
     ).plan(
       previousSurface: previousSurface,
       currentSurface: surface,
@@ -161,19 +162,30 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     var output: String
     switch plan.strategy {
     case .fullRepaint:
-      let rendered = TerminalSurfaceRenderer(
+      output = fullRepaintOutput(
+        for: surface,
         capabilityProfile: capabilityProfile
-      ).render(surface)
-      output = "\u{001B}[2J\u{001B}[1;1H\(rendered)"
+      )
     case .incremental:
-      let estimatedSize = plan.spanUpdates.reduce(0) { $0 + 16 + $1.renderedSpan.utf8.count }
+      let estimatedSize = plan.rowBatches.reduce(0) { partial, rowBatch in
+        partial + 16 + rowBatch.renderedBatch.utf8.count
+      }
       output = ""
       output.reserveCapacity(estimatedSize)
-      for spanUpdate in plan.spanUpdates {
-        output += "\u{001B}[\(max(1, spanUpdate.row + 1));\(max(1, spanUpdate.column + 1))H"
-        output += spanUpdate.renderedSpan
+      for rowBatch in plan.rowBatches {
+        output += "\u{001B}[\(max(1, rowBatch.row + 1));\(max(1, rowBatch.anchorColumn + 1))H"
+        output += rowBatch.renderedBatch
       }
     }
+
+    let usedSynchronizedOutput =
+      !output.isEmpty
+      && plan.strategy == .fullRepaint
+      && capabilityProfile.supportsSynchronizedOutput
+    output = wrappedPresentationOutput(
+      output,
+      strategy: plan.strategy
+    )
 
     if !output.isEmpty {
       try write(output)
@@ -187,7 +199,22 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
       bytesWritten: output.utf8.count,
       linesTouched: plan.linesTouched,
       cellsChanged: plan.cellsChanged,
-      strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental
+      strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental,
+      usedSynchronizedOutput: usedSynchronizedOutput
     )
+  }
+
+  private func wrappedPresentationOutput(
+    _ output: String,
+    strategy: TerminalPresentationPlan.Strategy
+  ) -> String {
+    guard !output.isEmpty,
+      strategy == .fullRepaint,
+      capabilityProfile.supportsSynchronizedOutput
+    else {
+      return output
+    }
+
+    return "\u{001B}[?2026h" + output + "\u{001B}[?2026l"
   }
 }

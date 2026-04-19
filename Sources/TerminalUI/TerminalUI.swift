@@ -287,6 +287,7 @@ public struct DefaultRenderer {
     }
     let raster = rasterized.surface
     let drawnIdentities = rasterized.visibleIdentities
+    let refinedPresentationDamage = rasterized.presentationDamage
     let (commit, commitDuration) = measurePhase {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: resolveContext.identity,
@@ -322,6 +323,8 @@ public struct DefaultRenderer {
         invalidatedIdentities: frameContext.invalidatedIdentities,
         resolveWork: resolveContext.resolveWorkTracker?.snapshot,
         layoutWork: layoutPassContext.workMetrics,
+        presentationDamage: refinedPresentationDamage,
+        presentationSurfaceWidth: raster.size.width,
         phaseTimings: phaseTimings,
         measurementCache: layoutEngine.cache?.metrics
       )
@@ -335,7 +338,7 @@ public struct DefaultRenderer {
       semanticSnapshot: semantics,
       drawTree: draw,
       rasterSurface: raster,
-      presentationDamage: presentationDamage,
+      presentationDamage: refinedPresentationDamage,
       drawnIdentities: drawnIdentities,
       commitPlan: commit,
       diagnostics: diagnostics
@@ -380,7 +383,7 @@ public struct DefaultRenderer {
     var currentPlacedByIdentity: [Identity: PlacedNode] = [:]
     indexPlacedNodes(placed, into: &currentPlacedByIdentity)
 
-    var dirtyRows: Set<Int> = []
+    var textRowRanges: [Int: [Range<Int>]] = [:]
     for identity in directlyInvalidated {
       guard previousFrameIndex.resolvedNode(for: identity) != nil else {
         return nil
@@ -405,14 +408,21 @@ public struct DefaultRenderer {
       let currentPlaced = currentPath.last
 
       if let previousBounds = previousPlaced?.bounds {
-        rows(for: previousBounds, into: &dirtyRows)
+        textRows(for: previousBounds, into: &textRowRanges)
       }
       if let currentBounds = currentPlaced?.bounds {
-        rows(for: currentBounds, into: &dirtyRows)
+        textRows(for: currentBounds, into: &textRowRanges)
       }
     }
 
-    return .init(dirtyRows: dirtyRows)
+    return .init(
+      textRows: textRowRanges.keys.sorted().map { row in
+        .init(
+          row: row,
+          columnRanges: textRowRanges[row] ?? []
+        )
+      }
+    )
   }
 
   private func placedPath(
@@ -475,18 +485,24 @@ public struct DefaultRenderer {
     }
   }
 
-  private func rows(
+  private func textRows(
     for bounds: Rect,
-    into dirtyRows: inout Set<Int>
+    into textRowRanges: inout [Int: [Range<Int>]]
   ) {
-    guard bounds.size.height > 0 else {
+    guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
     }
 
     let lowerBound = max(0, bounds.origin.y)
     let upperBound = max(lowerBound, bounds.origin.y + bounds.size.height)
+    let leadingColumn = max(0, bounds.origin.x)
+    let trailingColumn = max(leadingColumn, bounds.origin.x + bounds.size.width)
+    guard leadingColumn < trailingColumn else {
+      return
+    }
+
     for row in lowerBound..<upperBound {
-      dirtyRows.insert(row)
+      textRowRanges[row, default: []].append(leadingColumn..<trailingColumn)
     }
   }
 

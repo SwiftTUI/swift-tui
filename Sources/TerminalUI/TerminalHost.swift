@@ -211,21 +211,47 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
     case incremental
   }
 
+  public enum GraphicsReplayScope: String, Equatable, Sendable {
+    case none
+    case targeted
+    case full
+  }
+
+  public enum EditOperationLowering: String, Equatable, Sendable {
+    case none
+    case eraseToEndOfLine
+  }
+
   public var bytesWritten: Int
   public var linesTouched: Int
   public var cellsChanged: Int
   public var strategy: Strategy
+  public var usedSynchronizedOutput: Bool
+  public var graphicsReplayScope: GraphicsReplayScope
+  public var graphicsAttachmentsReplayed: Int
+  public var editOperationLowering: EditOperationLowering
+  public var editOperationCount: Int
 
   public init(
     bytesWritten: Int = 0,
     linesTouched: Int = 0,
     cellsChanged: Int = 0,
-    strategy: Strategy = .fullRepaint
+    strategy: Strategy = .fullRepaint,
+    usedSynchronizedOutput: Bool = false,
+    graphicsReplayScope: GraphicsReplayScope = .none,
+    graphicsAttachmentsReplayed: Int = 0,
+    editOperationLowering: EditOperationLowering = .none,
+    editOperationCount: Int = 0
   ) {
     self.bytesWritten = max(0, bytesWritten)
     self.linesTouched = max(0, linesTouched)
     self.cellsChanged = max(0, cellsChanged)
     self.strategy = strategy
+    self.usedSynchronizedOutput = usedSynchronizedOutput
+    self.graphicsReplayScope = graphicsReplayScope
+    self.graphicsAttachmentsReplayed = max(0, graphicsAttachmentsReplayed)
+    self.editOperationLowering = editOperationLowering
+    self.editOperationCount = max(0, editOperationCount)
   }
 
   public var usedFullRepaint: Bool {
@@ -234,19 +260,31 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
 
   static func fullRepaint(
     for surface: RasterSurface,
-    renderedOutput: String,
+    capabilityProfile: TerminalCapabilityProfile,
     origin: Point = .zero
   ) -> Self {
-    let clearSequence = "\u{001B}[2J"
-    let cursorSequence = "\u{001B}[\(max(1, origin.y + 1));\(max(1, origin.x + 1))H"
     let cellCount = max(0, surface.size.width) * max(0, surface.size.height)
+    let writeSteps = fullRepaintWriteSteps(
+      for: surface,
+      capabilityProfile: capabilityProfile
+    )
+    var bytesWritten = fullRepaintBytesWritten(
+      writeSteps: writeSteps,
+      origin: origin
+    )
+    if capabilityProfile.supportsSynchronizedOutput, bytesWritten > 0 {
+      bytesWritten += "\u{001B}[?2026h".utf8.count
+      bytesWritten += "\u{001B}[?2026l".utf8.count
+    }
 
     return Self(
-      bytesWritten: clearSequence.utf8.count + cursorSequence.utf8.count
-        + renderedOutput.utf8.count,
+      bytesWritten: bytesWritten,
       linesTouched: max(0, surface.size.height),
       cellsChanged: cellCount,
-      strategy: .fullRepaint
+      strategy: .fullRepaint,
+      usedSynchronizedOutput: capabilityProfile.supportsSynchronizedOutput,
+      graphicsReplayScope: surface.imageAttachments.isEmpty ? .none : .full,
+      graphicsAttachmentsReplayed: surface.imageAttachments.count
     )
   }
 }
@@ -670,6 +708,7 @@ extension TerminalHosting {
     private let fallbackSize: Size
     private let controller: any TerminalControlling
     private let environment: [String: String]
+    private let usesTerminalEditOperations: Bool
     private let imageRenderer: TerminalImageRenderer
 
     private var savedAttributes: termios?
@@ -684,7 +723,8 @@ extension TerminalHosting {
       outputFileDescriptor: Int32 = 1,
       fallbackSize: Size = .init(width: 80, height: 24),
       capabilityProfile: TerminalCapabilityProfile? = nil,
-      environment: [String: String]? = nil
+      environment: [String: String]? = nil,
+      usesTerminalEditOperations: Bool? = nil
     ) {
       self.init(
         inputFileDescriptor: inputFileDescriptor,
@@ -692,7 +732,8 @@ extension TerminalHosting {
         fallbackSize: fallbackSize,
         controller: POSIXTerminalController(),
         capabilityProfile: capabilityProfile,
-        environment: environment ?? currentProcessEnvironment()
+        environment: environment ?? currentProcessEnvironment(),
+        usesTerminalEditOperations: usesTerminalEditOperations
       )
     }
 
@@ -702,7 +743,8 @@ extension TerminalHosting {
       fallbackSize: Size,
       controller: any TerminalControlling,
       capabilityProfile: TerminalCapabilityProfile? = nil,
-      environment: [String: String]? = nil
+      environment: [String: String]? = nil,
+      usesTerminalEditOperations: Bool? = nil
     ) {
       let environment = environment ?? currentProcessEnvironment()
       self.inputFileDescriptor = inputFileDescriptor
@@ -710,6 +752,8 @@ extension TerminalHosting {
       self.fallbackSize = fallbackSize
       self.controller = controller
       self.environment = environment
+      self.usesTerminalEditOperations =
+        usesTerminalEditOperations ?? controller.isATTY(outputFileDescriptor)
       imageRenderer = .init(repository: sharedImageAssetRepository)
       self.capabilityProfile =
         capabilityProfile
@@ -880,7 +924,8 @@ extension TerminalHosting {
         graphicsCapabilities: graphicsCapabilities
       )
       let plan = TerminalPresentationPlanner(
-        capabilityProfile: capabilityProfile
+        capabilityProfile: capabilityProfile,
+        graphicsCapabilities: graphicsCapabilities
       ).plan(
         previousSurface: presentationSession.previousSurface,
         currentSurface: preparedSurface,
@@ -891,6 +936,10 @@ extension TerminalHosting {
       var bytesWritten = 0
       let origin = Point.zero
       var bufferedOutput = String()
+      var graphicsReplayScope = TerminalPresentationMetrics.GraphicsReplayScope.none
+      var graphicsAttachmentsReplayed = 0
+      var editOperationLowering = TerminalPresentationMetrics.EditOperationLowering.none
+      var editOperationCount = 0
 
       func append(_ output: String) {
         bufferedOutput.append(output)
@@ -905,13 +954,18 @@ extension TerminalHosting {
         if graphicsCapabilities.preferredProtocol == .kitty {
           presentationSession.transmittedKittyImages.removeAll()
         }
+        if !preparedSurface.imageAttachments.isEmpty {
+          graphicsReplayScope = .full
+          graphicsAttachmentsReplayed = preparedSurface.imageAttachments.count
+        }
         append(clearScreenSequence())
         append(cursorSequence(to: origin))
 
-        for writeStep in fullRepaintWriteSteps(
+        let writeSteps = fullRepaintWriteSteps(
           for: preparedSurface,
           capabilityProfile: capabilityProfile
-        ) {
+        )
+        for writeStep in writeSteps {
           append(writeStep)
         }
 
@@ -925,30 +979,66 @@ extension TerminalHosting {
         }
 
       case .incremental:
-        for spanUpdate in plan.spanUpdates {
+        for rowBatch in plan.rowBatches {
+          let rowOutput: String
+          if usesTerminalEditOperations,
+            rowBatch.canLowerToEraseToEndOfLine(
+              surfaceWidth: preparedSurface.size.width
+            )
+          {
+            editOperationLowering = .eraseToEndOfLine
+            editOperationCount += 1
+            rowOutput = eraseToEndOfLineSequence()
+          } else {
+            rowOutput = rowBatch.renderedBatch
+          }
           append(
             cursorSequence(
-              to: .init(x: spanUpdate.column, y: spanUpdate.row)
+              to: .init(x: rowBatch.anchorColumn, y: rowBatch.row)
             )
           )
-          append(spanUpdate.renderedSpan)
+          append(rowOutput)
         }
-        // Kitty images can be obscured by later cell writes. Re-place the
-        // currently visible attachments after incremental text spans so
-        // scroll and text updates keep the image attached to the viewport.
-        if graphicsCapabilities.preferredProtocol == .kitty,
-          !preparedSurface.imageAttachments.isEmpty
-        {
-          for writeStep in imageRenderer.graphicsWriteSteps(
-            for: preparedSurface,
-            capabilityProfile: capabilityProfile,
-            graphicsCapabilities: graphicsCapabilities,
-            transmittedKittyImages: &presentationSession.transmittedKittyImages
-          ) {
-            append(writeStep)
+        if graphicsCapabilities.preferredProtocol == .kitty {
+          switch plan.graphicsReplay.scope {
+          case .none:
+            break
+          case .targeted:
+            graphicsReplayScope = .targeted
+            graphicsAttachmentsReplayed = plan.graphicsReplay.attachmentsToReplay.count
+            for writeStep in imageRenderer.graphicsWriteSteps(
+              for: plan.graphicsReplay.attachmentsToReplay,
+              capabilityProfile: capabilityProfile,
+              graphicsCapabilities: graphicsCapabilities,
+              transmittedKittyImages: &presentationSession.transmittedKittyImages
+            ) {
+              append(writeStep)
+            }
+          case .full:
+            graphicsReplayScope = .full
+            graphicsAttachmentsReplayed = plan.graphicsReplay.attachmentsToReplay.count
+            append(deleteVisibleKittyPlacementsSequence())
+            for writeStep in imageRenderer.graphicsWriteSteps(
+              for: plan.graphicsReplay.attachmentsToReplay,
+              capabilityProfile: capabilityProfile,
+              graphicsCapabilities: graphicsCapabilities,
+              transmittedKittyImages: &presentationSession.transmittedKittyImages
+            ) {
+              append(writeStep)
+            }
           }
         }
       }
+
+      let usedSynchronizedOutput =
+        !bufferedOutput.isEmpty
+        && plan.strategy == .fullRepaint
+        && capabilityProfile.supportsSynchronizedOutput
+      bufferedOutput = wrappedPresentationOutput(
+        bufferedOutput,
+        strategy: plan.strategy
+      )
+      bytesWritten = bufferedOutput.utf8.count
 
       if !bufferedOutput.isEmpty {
         presentationWriterIfNeeded().submit(
@@ -964,7 +1054,14 @@ extension TerminalHosting {
         bytesWritten: bytesWritten,
         linesTouched: plan.linesTouched,
         cellsChanged: plan.cellsChanged,
-        strategy: plan.strategy == .fullRepaint ? .fullRepaint : .incremental
+        strategy: plan.strategy == TerminalPresentationPlan.Strategy.fullRepaint
+          ? TerminalPresentationMetrics.Strategy.fullRepaint
+          : TerminalPresentationMetrics.Strategy.incremental,
+        usedSynchronizedOutput: usedSynchronizedOutput,
+        graphicsReplayScope: graphicsReplayScope,
+        graphicsAttachmentsReplayed: graphicsAttachmentsReplayed,
+        editOperationLowering: editOperationLowering,
+        editOperationCount: editOperationCount
       )
     }
 
@@ -1218,6 +1315,22 @@ extension TerminalHosting {
       "\u{001B}[2J"
     }
 
+    private func eraseToEndOfLineSequence() -> String {
+      "\u{001B}[K"
+    }
+
+    private func deleteVisibleKittyPlacementsSequence() -> String {
+      "\u{001B}_Ga=d,q=2\u{001B}\\"
+    }
+
+    private func beginSynchronizedOutputSequence() -> String {
+      "\u{001B}[?2026h"
+    }
+
+    private func endSynchronizedOutputSequence() -> String {
+      "\u{001B}[?2026l"
+    }
+
     private func enterAlternateScreenSequence() -> String {
       "\u{001B}[?1049h"
     }
@@ -1261,6 +1374,22 @@ extension TerminalHosting {
       let row = max(1, point.y + 1)
       let column = max(1, point.x + 1)
       return "\u{001B}[\(row);\(column)H"
+    }
+
+    private func wrappedPresentationOutput(
+      _ output: String,
+      strategy: TerminalPresentationPlan.Strategy
+    ) -> String {
+      guard !output.isEmpty,
+        strategy == .fullRepaint,
+        capabilityProfile.supportsSynchronizedOutput
+      else {
+        return output
+      }
+
+      return beginSynchronizedOutputSequence()
+        + output
+        + endSynchronizedOutputSequence()
     }
 
   }
@@ -1450,7 +1579,7 @@ extension TerminalHosting {
   }
 #endif
 
-private func fullRepaintWriteSteps(
+func fullRepaintWriteSteps(
   for surface: RasterSurface,
   capabilityProfile: TerminalCapabilityProfile
 ) -> [String] {
@@ -1477,17 +1606,47 @@ private func fullRepaintWriteSteps(
   return writeSteps
 }
 
-private func fullRepaintBytesWritten(
+func fullRepaintOutput(
+  for surface: RasterSurface,
+  capabilityProfile: TerminalCapabilityProfile,
+  origin: Point = .zero
+) -> String {
+  let writeSteps = fullRepaintWriteSteps(
+    for: surface,
+    capabilityProfile: capabilityProfile
+  )
+  var output = ""
+  output.reserveCapacity(
+    fullRepaintBytesWritten(
+      writeSteps: writeSteps,
+      origin: origin
+    )
+  )
+  output += "\u{001B}[2J"
+  output += fullRepaintCursorSequence(to: origin)
+  for writeStep in writeSteps {
+    output += writeStep
+  }
+  return output
+}
+
+func fullRepaintBytesWritten(
   writeSteps: [String],
   origin: Point
 ) -> Int {
   let clearSequence = "\u{001B}[2J"
-  let cursorSequence = "\u{001B}[\(max(1, origin.y + 1));\(max(1, origin.x + 1))H"
+  let cursorSequence = fullRepaintCursorSequence(to: origin)
   return clearSequence.utf8.count
     + cursorSequence.utf8.count
     + writeSteps.reduce(0) { partial, writeStep in
       partial + writeStep.utf8.count
     }
+}
+
+func fullRepaintCursorSequence(
+  to point: Point
+) -> String {
+  "\u{001B}[\(max(1, point.y + 1));\(max(1, point.x + 1))H"
 }
 
 package func currentProcessEnvironment() -> [String: String] {

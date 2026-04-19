@@ -388,9 +388,10 @@ After a frame drop, the next frame is a full repaint. If the repaint is
 large, the terminal may briefly show a partially-written frame (tearing).
 
 **Mitigation:** This already happens today for surface resizes. The
-`TerminalPresentationPlanner` already wraps full repaints with synchronized
-output sequences (`DCS` begin/end) when the terminal supports them, which
-prevents tearing on supporting terminals.
+`TerminalHost` now wraps full repaint payloads in capability-gated
+synchronized-output envelopes (`CSI ? 2026 h` / `CSI ? 2026 l`) when the
+terminal supports them, which prevents tearing on supporting terminals
+without changing incremental write semantics.
 
 ### Risk: actor hop latency
 

@@ -344,8 +344,8 @@ struct TerminalGraphicsProtocolTests {
     )
   }
 
-  @Test("stable Kitty image attachments are re-placed after incremental text updates")
-  func stableKittyImageAttachmentsAreReplacedAfterIncrementalTextUpdates() throws {
+  @Test("stable Kitty image attachments replay only the rows touched by incremental text")
+  func stableKittyImageAttachmentsReplayOnlyTheRowsTouchedByIncrementalText() throws {
     let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
@@ -373,20 +373,27 @@ struct TerminalGraphicsProtocolTests {
         rgbaPixel(red: 255, green: 255, blue: 255),
       ]
     )
-    let attachment = makeRasterImageAttachment(
+    let leadingAttachment = makeRasterImageAttachment(
       pngBytes: pngBytes,
       pixelSize: .init(width: 2, height: 2),
-      bounds: .init(origin: .init(x: 3, y: 0), size: .init(width: 1, height: 1))
+      bounds: .init(origin: .init(x: 0, y: 0), size: .init(width: 1, height: 1)),
+      identity: testIdentity("Root", "LeadingImage")
+    )
+    let trailingAttachment = makeRasterImageAttachment(
+      pngBytes: pngBytes,
+      pixelSize: .init(width: 2, height: 2),
+      bounds: .init(origin: .init(x: 3, y: 1), size: .init(width: 1, height: 1)),
+      identity: testIdentity("Root", "TrailingImage")
     )
     let initialSurface = RasterSurface(
-      size: .init(width: 4, height: 1),
-      lines: ["foo "],
-      imageAttachments: [attachment]
+      size: .init(width: 4, height: 2),
+      lines: ["foo ", "bar "],
+      imageAttachments: [leadingAttachment, trailingAttachment]
     )
     let updatedSurface = RasterSurface(
-      size: .init(width: 4, height: 1),
-      lines: ["fOo "],
-      imageAttachments: [attachment]
+      size: .init(width: 4, height: 2),
+      lines: ["fOo ", "bar "],
+      imageAttachments: [leadingAttachment, trailingAttachment]
     )
 
     _ = try host.present(initialSurface)
@@ -402,13 +409,19 @@ struct TerminalGraphicsProtocolTests {
     #expect(incrementalWrite.contains("\u{001B}[1;2HO"))
     #expect(metrics.strategy == .incremental)
     #expect(metrics.cellsChanged == 1)
-    #expect(incrementalWrite.contains("\u{001B}_Ga=p,q=2,C=1,c=1,r=1,i="))
+    #expect(metrics.graphicsReplayScope == .targeted)
+    #expect(metrics.graphicsAttachmentsReplayed == 1)
+    #expect(metrics.editOperationLowering == .none)
+    #expect(countOccurrences(of: "_Ga=p,q=2,C=1,c=1,r=1,i=", in: incrementalWrite) == 1)
+    #expect(incrementalWrite.contains("\u{001B}[1;1H"))
+    #expect(!incrementalWrite.contains("\u{001B}[2;4H"))
     #expect(!incrementalWrite.contains("_Ga=T"))
     #expect(!incrementalWrite.contains("\u{001B}P0;1;0q"))
   }
 
-  @Test("Kitty full repaints retransmit images when attachment bounds change")
-  func kittyFullRepaintsRetransmitImagesWhenAttachmentBoundsChange() throws {
+  @Test(
+    "Kitty graphics full replay preserves incremental text planning when attachment bounds change")
+  func kittyGraphicsFullReplayPreservesIncrementalTextPlanningWhenAttachmentBoundsChange() throws {
     let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
@@ -439,12 +452,14 @@ struct TerminalGraphicsProtocolTests {
     let initialAttachment = makeRasterImageAttachment(
       pngBytes: pngBytes,
       pixelSize: .init(width: 2, height: 2),
-      bounds: .init(origin: .zero, size: .init(width: 1, height: 1))
+      bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+      identity: testIdentity("Root", "Image")
     )
     let movedAttachment = makeRasterImageAttachment(
       pngBytes: pngBytes,
       pixelSize: .init(width: 2, height: 2),
-      bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 1, height: 1))
+      bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 1, height: 1)),
+      identity: testIdentity("Root", "Image")
     )
     let initialSurface = RasterSurface(
       size: .init(width: 4, height: 2),
@@ -465,12 +480,76 @@ struct TerminalGraphicsProtocolTests {
     try host.drainPendingPresentation()
     let updateWrites = Array(controller.writes.dropFirst(writesBeforeFullRepaintUpdate))
 
-    #expect(metrics.strategy == .fullRepaint)
+    #expect(metrics.strategy == .incremental)
+    #expect(metrics.graphicsReplayScope == .full)
+    #expect(metrics.graphicsAttachmentsReplayed == 1)
     #expect(updateWrites.count == 1)
     let updateWrite = try #require(updateWrites.first)
-    #expect(updateWrite.contains("\u{001B}[2J"))
-    #expect(updateWrite.contains("_Ga=T,q=2,t=d,f=100,C=1,"))
-    #expect(!updateWrite.contains("_Ga=p,q=2,C=1,c=1,r=1,i="))
+    #expect(!updateWrite.contains("\u{001B}[2J"))
+    #expect(updateWrite.contains("\u{001B}_Ga=d,q=2\u{001B}\\"))
+    #expect(updateWrite.contains("_Ga=p,q=2,C=1,c=1,r=1,i="))
+  }
+
+  @Test("Kitty graphics full replay deletes removed attachments without forcing a text repaint")
+  func kittyGraphicsFullReplayDeletesRemovedAttachmentsWithoutTextRepaint() throws {
+    let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [
+        Array("\u{001B}_Gi=\(kittyQueryID);OK\u{001B}\\".utf8),
+        [],
+      ],
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 10, height: 4),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    let pngBytes = try makePNGBytes(
+      width: 2,
+      height: 2,
+      pixels: [
+        rgbaPixel(red: 255, green: 255, blue: 255),
+        rgbaPixel(red: 255, green: 255, blue: 255),
+        rgbaPixel(red: 255, green: 255, blue: 255),
+        rgbaPixel(red: 255, green: 255, blue: 255),
+      ]
+    )
+    let attachment = makeRasterImageAttachment(
+      pngBytes: pngBytes,
+      pixelSize: .init(width: 2, height: 2),
+      bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+      identity: testIdentity("Root", "Image")
+    )
+    let initialSurface = RasterSurface(
+      size: .init(width: 4, height: 1),
+      lines: ["    "],
+      imageAttachments: [attachment]
+    )
+    let updatedSurface = RasterSurface(
+      size: .init(width: 4, height: 1),
+      lines: ["    "]
+    )
+
+    _ = try host.present(initialSurface)
+    try host.drainPendingPresentation()
+    let writesBeforeUpdate = controller.writes.count
+
+    let metrics = try host.present(updatedSurface)
+    try host.drainPendingPresentation()
+    let updateWrites = Array(controller.writes.dropFirst(writesBeforeUpdate))
+
+    #expect(metrics.strategy == .incremental)
+    #expect(metrics.cellsChanged == 0)
+    #expect(metrics.graphicsReplayScope == .full)
+    #expect(metrics.graphicsAttachmentsReplayed == 0)
+    #expect(updateWrites.count == 1)
+    let updateWrite = try #require(updateWrites.first)
+    #expect(updateWrite == "\u{001B}_Ga=d,q=2\u{001B}\\")
   }
 
   @Test("kitty image placement preserves bottom overflow instead of shrinking to the viewport")
@@ -669,6 +748,26 @@ private func payloadForKittyChunk(_ chunk: String) -> String {
   }
   let payloadEnd = chunk.index(chunk.endIndex, offsetBy: -trailerLength)
   return String(chunk[payloadStart..<payloadEnd])
+}
+
+private func countOccurrences(of needle: String, in haystack: String) -> Int {
+  guard !needle.isEmpty else {
+    return 0
+  }
+
+  let needleCharacters = Array(needle)
+  let haystackCharacters = Array(haystack)
+  guard haystackCharacters.count >= needleCharacters.count else {
+    return 0
+  }
+
+  var count = 0
+  for start in 0...(haystackCharacters.count - needleCharacters.count) {
+    if hasPrefix(haystackCharacters, at: start, prefix: needleCharacters) {
+      count += 1
+    }
+  }
+  return count
 }
 
 private final class GraphicsProtocolMockTerminalController:

@@ -24,7 +24,17 @@ struct TerminalPresentationTests {
       isTTY: true
     )
 
-    #expect(profile == .trueColor)
+    #expect(
+      profile
+        == .init(
+          glyphLevel: .unicode,
+          colorLevel: .trueColor,
+          emitsStyleEscapeSequences: true,
+          supportsHyperlinks: true,
+          supportsMouseReporting: true,
+          supportsSynchronizedOutput: true
+        )
+    )
   }
 
   @Test("capability detection disables styling for no-color and non-tty outputs")
@@ -52,7 +62,8 @@ struct TerminalPresentationTests {
           colorLevel: .none,
           emitsStyleEscapeSequences: false,
           supportsHyperlinks: true,
-          supportsMouseReporting: true
+          supportsMouseReporting: true,
+          supportsSynchronizedOutput: true
         )
     )
     #expect(
@@ -121,6 +132,35 @@ struct TerminalPresentationTests {
     #expect(supported.supportsHyperlinks)
     #expect(!dumb.supportsHyperlinks)
     #expect(!redirected.supportsHyperlinks)
+  }
+
+  @Test("capability detection enables synchronized output only for supported tty terminals")
+  func capabilityDetectionTracksSynchronizedOutputSupport() {
+    let supported = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "xterm-256color",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: true
+    )
+    let dumb = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "dumb",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: true
+    )
+    let redirected = TerminalCapabilityProfile.detect(
+      environment: [
+        "TERM": "xterm-256color",
+        "LANG": "en_US.UTF-8",
+      ],
+      isTTY: false
+    )
+
+    #expect(supported.supportsSynchronizedOutput)
+    #expect(!dumb.supportsSynchronizedOutput)
+    #expect(!redirected.supportsSynchronizedOutput)
   }
 
   @Test("appearance detection derives defaults from COLORFGBG heuristics")
@@ -298,6 +338,61 @@ struct TerminalPresentationTests {
     )
   }
 
+  @Test("renderer carries style and hyperlink state across row batches")
+  func rendererCarriesStyleAndHyperlinkStateAcrossRowBatches() {
+    let renderer = TerminalSurfaceRenderer(
+      capabilityProfile: .ansi16
+    )
+    let row = [
+      RasterCell(
+        character: "X",
+        style: .init(foregroundColor: .cyan),
+        hyperlink: "https://one.example"
+      ),
+      RasterCell(character: " "),
+      RasterCell(
+        character: "Y",
+        style: .init(foregroundColor: .magenta),
+        hyperlink: "https://two.example"
+      ),
+    ]
+
+    let batch = renderer.renderRowBatch(
+      row: 0,
+      currentRow: row,
+      spans: [0..<1, 2..<3]
+    )
+
+    #expect(
+      batch
+        == .init(
+          row: 0,
+          anchorColumn: 0,
+          renderedBatch:
+            "\u{001B}]8;;https://one.example\u{001B}\\\u{001B}[96mX"
+            + "\u{001B}[1C"
+            + "\u{001B}]8;;\u{001B}\\\u{001B}]8;;https://two.example\u{001B}\\"
+            + "\u{001B}[0m\u{001B}[95mY\u{001B}]8;;\u{001B}\\\u{001B}[0m",
+          spanUpdates: [
+            .init(
+              row: 0,
+              column: 0,
+              renderedSpan: "\u{001B}]8;;https://one.example\u{001B}\\\u{001B}[96mX",
+              cellsChanged: 1
+            ),
+            .init(
+              row: 0,
+              column: 2,
+              renderedSpan:
+                "\u{001B}]8;;\u{001B}\\\u{001B}]8;;https://two.example\u{001B}\\"
+                + "\u{001B}[0m\u{001B}[95mY",
+              cellsChanged: 1
+            ),
+          ]
+        )
+    )
+  }
+
   @Test("renderer omits hyperlink escapes when hyperlink support is disabled")
   func rendererOmitsHyperlinksWhenUnsupported() {
     let renderer = TerminalSurfaceRenderer(
@@ -321,9 +416,6 @@ struct TerminalPresentationTests {
   @Test("presentation planner falls back to full repaint when size attachments or metadata differ")
   func presentationPlannerFallsBackOnSurfaceMismatch() {
     let planner = TerminalPresentationPlanner(
-      capabilityProfile: .previewUnicode
-    )
-    let renderer = TerminalSurfaceRenderer(
       capabilityProfile: .previewUnicode
     )
     let previousSurface = RasterSurface(
@@ -365,23 +457,6 @@ struct TerminalPresentationTests {
         imageAttachments: previousSurface.imageAttachments,
         metadata: ["theme": "dark"]
       ),
-      .init(
-        size: .init(width: 8, height: 2),
-        lines: ["alpha", "bravo"],
-        attachments: ["asset-a"],
-        imageAttachments: [
-          .init(
-            identity: testIdentity("Root", "Image"),
-            bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
-            source: .named("asset-b.png"),
-            resolvedReference: .filePath("/tmp/asset-b.png"),
-            pixelSize: .init(width: 8, height: 8),
-            isResizable: false,
-            scalingMode: .stretch
-          )
-        ],
-        metadata: ["theme": "light"]
-      ),
     ]
 
     for surface in variants {
@@ -391,11 +466,180 @@ struct TerminalPresentationTests {
       )
 
       #expect(plan.strategy == .fullRepaint)
-      #expect(plan.renderedOutput == renderer.render(surface))
-      #expect(plan.spanUpdates.isEmpty)
+      #expect(plan.rowBatches.isEmpty)
       #expect(plan.linesTouched == surface.size.height)
       #expect(plan.cellsChanged == max(0, surface.size.width) * max(0, surface.size.height))
     }
+  }
+
+  @Test("kitty graphics mismatches keep text planning incremental and request a graphics replay")
+  func kittyGraphicsMismatchesKeepTextPlanningIncremental() {
+    let planner = TerminalPresentationPlanner(
+      capabilityProfile: .previewUnicode,
+      graphicsCapabilities: .init(
+        supportedProtocols: [.kitty],
+        preferredProtocol: .kitty
+      )
+    )
+    let previousSurface = RasterSurface(
+      size: .init(width: 8, height: 2),
+      lines: ["alpha", "bravo"],
+      imageAttachments: [
+        .init(
+          identity: testIdentity("Root", "Image"),
+          bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+          source: .named("asset-a.png"),
+          resolvedReference: .filePath("/tmp/asset-a.png"),
+          pixelSize: .init(width: 8, height: 8),
+          isResizable: false,
+          scalingMode: .stretch
+        )
+      ]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 8, height: 2),
+      lines: ["alpha", "bravo"],
+      imageAttachments: [
+        .init(
+          identity: testIdentity("Root", "Image"),
+          bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 1, height: 1)),
+          source: .named("asset-a.png"),
+          resolvedReference: .filePath("/tmp/asset-a.png"),
+          pixelSize: .init(width: 8, height: 8),
+          isResizable: false,
+          scalingMode: .stretch
+        )
+      ]
+    )
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface
+    )
+
+    #expect(plan.strategy == .incremental)
+    #expect(plan.rowBatches.isEmpty)
+    #expect(
+      plan.graphicsReplay
+        == .init(
+          scope: .full,
+          attachmentsToReplay: currentSurface.imageAttachments
+        )
+    )
+    #expect(plan.linesTouched == 0)
+    #expect(plan.cellsChanged == 0)
+  }
+
+  @Test("non-kitty graphics mismatches still fall back to a full repaint")
+  func nonKittyGraphicsMismatchesStillFallBackToFullRepaint() {
+    let planner = TerminalPresentationPlanner(
+      capabilityProfile: .previewUnicode,
+      graphicsCapabilities: .init(
+        supportedProtocols: [.sixel],
+        preferredProtocol: .sixel
+      )
+    )
+    let previousSurface = RasterSurface(
+      size: .init(width: 8, height: 2),
+      lines: ["alpha", "bravo"],
+      imageAttachments: [
+        .init(
+          identity: testIdentity("Root", "Image"),
+          bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
+          source: .named("asset-a.png"),
+          resolvedReference: .filePath("/tmp/asset-a.png"),
+          pixelSize: .init(width: 8, height: 8),
+          isResizable: false,
+          scalingMode: .stretch
+        )
+      ]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 8, height: 2),
+      lines: ["alpha", "bravo"],
+      imageAttachments: [
+        .init(
+          identity: testIdentity("Root", "Image"),
+          bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 1, height: 1)),
+          source: .named("asset-a.png"),
+          resolvedReference: .filePath("/tmp/asset-a.png"),
+          pixelSize: .init(width: 8, height: 8),
+          isResizable: false,
+          scalingMode: .stretch
+        )
+      ]
+    )
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface
+    )
+
+    #expect(plan.strategy == .fullRepaint)
+    #expect(plan.graphicsReplay == .none)
+  }
+
+  @Test("presentation damage normalizes overlapping row ranges")
+  func presentationDamageNormalizesOverlappingRowRanges() {
+    let damage = PresentationDamage(
+      textRows: [
+        .init(row: 2, columnRanges: [0..<2, 1..<4]),
+        .init(row: 2, columnRanges: [4..<6]),
+        .init(row: 2, columnRanges: [7..<9]),
+      ]
+    )
+
+    #expect(
+      damage.textRows == [
+        .init(row: 2, columnRanges: [0..<6, 7..<9])
+      ]
+    )
+    #expect(damage.dirtyRows == [2])
+  }
+
+  @Test("presentation planner accepts range-aware damage hints while staying row compatible")
+  func presentationPlannerAcceptsRangeAwareDamageHints() {
+    let planner = TerminalPresentationPlanner(
+      capabilityProfile: .previewUnicode
+    )
+    let previousSurface = RasterSurface(
+      size: .init(width: 8, height: 3),
+      lines: ["alpha", "bravo", "charlie"]
+    )
+    let currentSurface = RasterSurface(
+      size: .init(width: 8, height: 3),
+      lines: ["alpXa", "bravo", "chZrlXe"]
+    )
+    let damage = PresentationDamage(
+      textRows: [
+        .init(row: 2, columnRanges: [5..<6])
+      ]
+    )
+
+    #expect(damage.columnRanges(for: 2) == [5..<6])
+    #expect(damage.dirtyRows == [2])
+
+    let plan = planner.plan(
+      previousSurface: previousSurface,
+      currentSurface: currentSurface,
+      damage: damage
+    )
+
+    #expect(plan.strategy == .incremental)
+    #expect(
+      plan.rowBatches == [
+        .init(
+          row: 2,
+          anchorColumn: 5,
+          renderedBatch: "X",
+          spanUpdates: [
+            .init(row: 2, column: 5, renderedSpan: "X", cellsChanged: 1)
+          ]
+        )
+      ]
+    )
+    #expect(plan.linesTouched == 1)
+    #expect(plan.cellsChanged == 1)
   }
 
   @Test("presentation planner emits a narrow span for a mid-row edit")
@@ -419,10 +663,16 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 0, column: 3, renderedSpan: "X", cellsChanged: 1)
+      plan.rowBatches == [
+        .init(
+          row: 0,
+          anchorColumn: 3,
+          renderedBatch: "X",
+          spanUpdates: [
+            .init(row: 0, column: 3, renderedSpan: "X", cellsChanged: 1)
+          ]
+        )
       ])
-    #expect(plan.renderedOutput.isEmpty)
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 1)
   }
@@ -449,8 +699,15 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 2, column: 5, renderedSpan: "X", cellsChanged: 1)
+      plan.rowBatches == [
+        .init(
+          row: 2,
+          anchorColumn: 5,
+          renderedBatch: "X",
+          spanUpdates: [
+            .init(row: 2, column: 5, renderedSpan: "X", cellsChanged: 1)
+          ]
+        )
       ])
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 1)
@@ -477,11 +734,46 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 0, column: 4, renderedSpan: "    ", cellsChanged: 4)
+      plan.rowBatches == [
+        .init(
+          row: 0,
+          anchorColumn: 4,
+          renderedBatch: "    ",
+          spanUpdates: [
+            .init(row: 0, column: 4, renderedSpan: "    ", cellsChanged: 4)
+          ]
+        )
       ])
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 4)
+  }
+
+  @Test("row batches lower trailing tail clears into erase-to-end-of-line safely")
+  func rowBatchesLowerTrailingTailClearsIntoEraseToEndOfLineSafely() {
+    let trailingClearBatch = TerminalPresentationPlan.RowBatch(
+      row: 0,
+      anchorColumn: 4,
+      renderedBatch: "    ",
+      spanUpdates: [
+        .init(row: 0, column: 4, renderedSpan: "    ", cellsChanged: 4)
+      ]
+    )
+    let disjointBatch = TerminalPresentationPlan.RowBatch(
+      row: 0,
+      anchorColumn: 2,
+      renderedBatch: "X\u{001B}[2CY",
+      spanUpdates: [
+        .init(row: 0, column: 2, renderedSpan: "X", cellsChanged: 1),
+        .init(row: 0, column: 5, renderedSpan: "Y", cellsChanged: 1),
+      ]
+    )
+
+    #expect(
+      trailingClearBatch.canLowerToEraseToEndOfLine(surfaceWidth: 8)
+    )
+    #expect(
+      !disjointBatch.canLowerToEraseToEndOfLine(surfaceWidth: 8)
+    )
   }
 
   @Test("presentation planner widens continuation cell diffs to glyph boundaries")
@@ -537,8 +829,15 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 0, column: 1, renderedSpan: "界", cellsChanged: 2)
+      plan.rowBatches == [
+        .init(
+          row: 0,
+          anchorColumn: 1,
+          renderedBatch: "界",
+          spanUpdates: [
+            .init(row: 0, column: 1, renderedSpan: "界", cellsChanged: 2)
+          ]
+        )
       ])
     #expect(plan.cellsChanged == 2)
   }
@@ -597,8 +896,15 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 0, column: 1, renderedSpan: "界", cellsChanged: 2)
+      plan.rowBatches == [
+        .init(
+          row: 0,
+          anchorColumn: 1,
+          renderedBatch: "界",
+          spanUpdates: [
+            .init(row: 0, column: 1, renderedSpan: "界", cellsChanged: 2)
+          ]
+        )
       ])
     #expect(plan.cellsChanged == 2)
   }
@@ -624,9 +930,16 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 0, column: 2, renderedSpan: "X", cellsChanged: 1),
-        .init(row: 0, column: 6, renderedSpan: "Y", cellsChanged: 1),
+      plan.rowBatches == [
+        .init(
+          row: 0,
+          anchorColumn: 2,
+          renderedBatch: "X\u{001B}[3CY",
+          spanUpdates: [
+            .init(row: 0, column: 2, renderedSpan: "X", cellsChanged: 1),
+            .init(row: 0, column: 6, renderedSpan: "Y", cellsChanged: 1),
+          ]
+        )
       ])
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 2)
@@ -654,8 +967,15 @@ struct TerminalPresentationTests {
 
     #expect(plan.strategy == .incremental)
     #expect(
-      plan.spanUpdates == [
-        .init(row: 1, column: 2, renderedSpan: "X", cellsChanged: 1)
+      plan.rowBatches == [
+        .init(
+          row: 1,
+          anchorColumn: 2,
+          renderedBatch: "X",
+          spanUpdates: [
+            .init(row: 1, column: 2, renderedSpan: "X", cellsChanged: 1)
+          ]
+        )
       ])
     #expect(plan.linesTouched == 1)
     #expect(plan.cellsChanged == 1)
@@ -684,7 +1004,7 @@ struct TerminalPresentationTests {
     )
 
     #expect(plan.strategy == .fullRepaint)
-    #expect(!plan.renderedOutput.isEmpty)
+    #expect(plan.rowBatches.isEmpty)
   }
 
   @Test("terminal host presents styled surfaces through the capability-aware renderer")
