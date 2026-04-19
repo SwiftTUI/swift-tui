@@ -241,6 +241,12 @@ extension SnapshotRenderer {
       return "lazyStack(\(axis.rawValue),\(spacingDescription),\(alignmentDescription))"
     case .padding(let insets):
       return "padding(\(insets.top),\(insets.leading),\(insets.bottom),\(insets.trailing))"
+    case .safeAreaIgnoring(let insets):
+      return
+        "safeAreaIgnoring(\(insets.top),\(insets.leading),\(insets.bottom),\(insets.trailing))"
+    case .safeAreaInset(let edge, let alignment, let spacing, let safeArea):
+      return
+        "safeAreaInset(\(edge),\(alignment.rawValue),spacing:\(spacing),safeArea:\(safeArea.top),\(safeArea.leading),\(safeArea.bottom),\(safeArea.trailing))"
     case .border(_, _, _, _, _, let sides):
       var names: [String] = []
       if sides.contains(.top) { names.append("top") }

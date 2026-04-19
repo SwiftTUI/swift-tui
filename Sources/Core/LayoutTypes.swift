@@ -15,6 +15,12 @@ public enum LayoutBehavior: Sendable {
   )
   case overlay(alignment: Alignment)
   case padding(EdgeInsets)
+  /// Expands child layout back into the container safe area reserved by an
+  /// ancestor wrapper while leaving the wrapper's own measured size unchanged.
+  case safeAreaIgnoring(EdgeInsets)
+  /// Inserts a secondary child along one safe-area edge and shifts the primary
+  /// child inward only when the inset content exceeds the reclaimed safe area.
+  case safeAreaInset(edge: Edge, alignment: Alignment, spacing: Int, safeArea: EdgeInsets)
   /// A border that reserves layout insets for its own glyphs.
   ///
   /// For `.outset` and `.decorative` placements the layout engine
@@ -87,6 +93,26 @@ extension LayoutBehavior: Equatable {
         && lhsVerticalAlignment == rhsVerticalAlignment
     case (.padding(let lhsInsets), .padding(let rhsInsets)):
       return lhsInsets == rhsInsets
+    case (.safeAreaIgnoring(let lhsInsets), .safeAreaIgnoring(let rhsInsets)):
+      return lhsInsets == rhsInsets
+    case (
+      .safeAreaInset(
+        edge: let lhsEdge,
+        alignment: let lhsAlignment,
+        spacing: let lhsSpacing,
+        safeArea: let lhsSafeArea
+      ),
+      .safeAreaInset(
+        edge: let rhsEdge,
+        alignment: let rhsAlignment,
+        spacing: let rhsSpacing,
+        safeArea: let rhsSafeArea
+      )
+    ):
+      return lhsEdge == rhsEdge
+        && lhsAlignment == rhsAlignment
+        && lhsSpacing == rhsSpacing
+        && lhsSafeArea == rhsSafeArea
     case (
       .border(
         let lhsSet, let lhsFg, let lhsBg,

@@ -163,6 +163,47 @@ extension LayoutEngine {
           height: measured.measuredSize.height
         )
       }
+    case .safeAreaIgnoring(let insets):
+      if let child = resolved.children.first,
+        let childMeasurement = measured.childMeasurements.first
+      {
+        baseDimensions = propagatedViewDimensions(
+          size: measured.measuredSize,
+          from: viewDimensions(for: child, measured: childMeasurement),
+          offsetX: -insets.leading,
+          offsetY: -insets.top
+        )
+      } else {
+        baseDimensions = ViewDimensions(
+          width: measured.measuredSize.width,
+          height: measured.measuredSize.height
+        )
+      }
+    case .safeAreaInset(let edge, _, let spacing, let safeArea):
+      if let base = resolved.children.first,
+        let baseMeasurement = measured.childMeasurements.first
+      {
+        let insetMeasurement = measured.childMeasurements.dropFirst().first
+        let insetSize = insetMeasurement?.measuredSize ?? .zero
+        let consumed =
+          switch edge {
+          case .top, .bottom:
+            max(0, insetSize.height + spacing - safeArea.value(for: edge))
+          case .leading, .trailing:
+            max(0, insetSize.width + spacing - safeArea.value(for: edge))
+          }
+        baseDimensions = propagatedViewDimensions(
+          size: measured.measuredSize,
+          from: viewDimensions(for: base, measured: baseMeasurement),
+          offsetX: edge == .leading ? consumed : 0,
+          offsetY: edge == .top ? consumed : 0
+        )
+      } else {
+        baseDimensions = ViewDimensions(
+          width: measured.measuredSize.width,
+          height: measured.measuredSize.height
+        )
+      }
     case .border(let set, _, _, _, _, let sides):
       let insets = borderLayoutInsets(set: set, sides: sides)
       if let child = resolved.children.first,

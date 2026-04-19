@@ -131,6 +131,149 @@ extension LayoutEngine {
           passContext: passContext
         )
       ]
+    case .safeAreaIgnoring(let insets):
+      guard let childMeasurement = measured.childMeasurements.first,
+        let child = resolved.children.first
+      else {
+        return []
+      }
+
+      let childBounds = Rect(
+        origin: Point(
+          x: bounds.origin.x - insets.leading,
+          y: bounds.origin.y - insets.top
+        ),
+        size: Size(
+          width: bounds.size.width + insets.horizontal,
+          height: bounds.size.height + insets.vertical
+        )
+      )
+
+      return [
+        place(
+          child,
+          measured: childMeasurement,
+          in: childBounds,
+          passContext: passContext
+        )
+      ]
+    case .safeAreaInset(let edge, let alignment, let spacing, let safeArea):
+      guard resolved.children.count >= 2, measured.childMeasurements.count >= 2 else {
+        return measured.childMeasurements.enumerated().compactMap { index, childMeasurement in
+          guard resolved.children.indices.contains(index) else { return nil }
+          return place(
+            resolved.children[index],
+            measured: childMeasurement,
+            in: Rect(origin: bounds.origin, size: childMeasurement.measuredSize),
+            passContext: passContext
+          )
+        }
+      }
+
+      let base = resolved.children[0]
+      let inset = resolved.children[1]
+      let baseMeasurement = measured.childMeasurements[0]
+      let insetMeasurement = measured.childMeasurements[1]
+      let insetLength =
+        switch edge {
+        case .top, .bottom:
+          insetMeasurement.measuredSize.height
+        case .leading, .trailing:
+          insetMeasurement.measuredSize.width
+        }
+      let consumed = max(0, insetLength + spacing - safeArea.value(for: edge))
+
+      let baseBounds: Rect =
+        switch edge {
+        case .top:
+          Rect(
+            origin: Point(x: bounds.origin.x, y: bounds.origin.y + consumed),
+            size: Size(width: bounds.size.width, height: max(0, bounds.size.height - consumed))
+          )
+        case .leading:
+          Rect(
+            origin: Point(x: bounds.origin.x + consumed, y: bounds.origin.y),
+            size: Size(width: max(0, bounds.size.width - consumed), height: bounds.size.height)
+          )
+        case .bottom:
+          Rect(
+            origin: bounds.origin,
+            size: Size(width: bounds.size.width, height: max(0, bounds.size.height - consumed))
+          )
+        case .trailing:
+          Rect(
+            origin: bounds.origin,
+            size: Size(width: max(0, bounds.size.width - consumed), height: bounds.size.height)
+          )
+        }
+
+      let insetOrigin: Point =
+        switch edge {
+        case .top:
+          Point(
+            x: simpleAlignedCoordinate(
+              childSize: insetMeasurement.measuredSize.width,
+              availableSize: bounds.size.width,
+              origin: bounds.origin.x,
+              alignment: alignment.horizontal,
+              hasExplicitGuide: false
+            ) ?? bounds.origin.x,
+            y: bounds.origin.y - safeArea.top
+          )
+        case .bottom:
+          Point(
+            x: simpleAlignedCoordinate(
+              childSize: insetMeasurement.measuredSize.width,
+              availableSize: bounds.size.width,
+              origin: bounds.origin.x,
+              alignment: alignment.horizontal,
+              hasExplicitGuide: false
+            ) ?? bounds.origin.x,
+            y: bounds.maxY - insetMeasurement.measuredSize.height + safeArea.bottom
+          )
+        case .leading:
+          Point(
+            x: bounds.origin.x - safeArea.leading,
+            y: simpleAlignedCoordinate(
+              childSize: insetMeasurement.measuredSize.height,
+              availableSize: bounds.size.height,
+              origin: bounds.origin.y,
+              alignment: alignment.vertical,
+              hasExplicitGuide: false
+            ) ?? bounds.origin.y
+          )
+        case .trailing:
+          Point(
+            x: bounds.maxX - insetMeasurement.measuredSize.width + safeArea.trailing,
+            y: simpleAlignedCoordinate(
+              childSize: insetMeasurement.measuredSize.height,
+              availableSize: bounds.size.height,
+              origin: bounds.origin.y,
+              alignment: alignment.vertical,
+              hasExplicitGuide: false
+            ) ?? bounds.origin.y
+          )
+        }
+
+      let insetBounds = Rect(
+        origin: insetOrigin,
+        size: insetMeasurement.measuredSize
+      )
+
+      return [
+        place(
+          base,
+          measured: baseMeasurement,
+          in: baseBounds,
+          passContext: passContext
+        ),
+        place(
+          inset,
+          measured: insetMeasurement,
+          in: insetBounds,
+          passContext: passContext
+        ),
+      ]
     case .border(let set, _, _, _, _, let sides):
       guard let childMeasurement = measured.childMeasurements.first,
         let child = resolved.children.first
@@ -730,8 +873,8 @@ extension LayoutEngine {
       return .control
     }
     switch resolved.layoutBehavior {
-    case .stack, .lazyStack, .overlay, .padding, .border, .frame, .offset, .position,
-      .flexibleFrame, .decoration, .viewThatFits, .custom:
+    case .stack, .lazyStack, .overlay, .padding, .safeAreaIgnoring, .safeAreaInset, .border,
+      .frame, .offset, .position, .flexibleFrame, .decoration, .viewThatFits, .custom:
       return .container
     case .intrinsic:
       return .generic

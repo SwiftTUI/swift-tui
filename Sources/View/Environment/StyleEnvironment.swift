@@ -20,6 +20,10 @@ private enum TerminalSizeKey: EnvironmentKey {
   static let defaultValue = Size(width: 80, height: 24)
 }
 
+private enum SafeAreaInsetsKey: EnvironmentKey {
+  static let defaultValue = EdgeInsets.zero
+}
+
 private enum ControlProminenceKey: EnvironmentKey {
   static let defaultValue = ControlProminence.standard
 }
@@ -93,6 +97,11 @@ extension EnvironmentValues {
   public var terminalSize: Size {
     get { self[TerminalSizeKey.self] }
     set { self[TerminalSizeKey.self] = newValue }
+  }
+
+  public var safeAreaInsets: EdgeInsets {
+    get { self[SafeAreaInsetsKey.self] }
+    set { self[SafeAreaInsetsKey.self] = newValue }
   }
 
   public var colorSchemeContrast: ColorSchemeContrast {
