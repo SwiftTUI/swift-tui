@@ -701,6 +701,11 @@ extension LayoutEngine {
         return false
       }
       return subtreeHasFlexibleContent(content, axis: axis)
+    case .safeAreaInset:
+      guard let base = node.children.first else {
+        return false
+      }
+      return subtreeHasFlexibleContent(base, axis: axis)
     default:
       break
     }
@@ -773,8 +778,25 @@ extension LayoutEngine {
         return min(1, mainDimension(of: idealMeasurement.measuredSize, for: axis))
       }
       return childMinimums.max() ?? 0
-    case .overlay, .offset, .position, .decoration:
+    case .overlay, .offset, .position, .decoration, .safeAreaIgnoring:
       return childMinimums.max() ?? 0
+    case .safeAreaInset(let edge, _, let spacing, let safeArea):
+      let baseMinimum = childMinimums.first ?? 0
+      let insetMinimum = childMinimums.dropFirst().first ?? 0
+      let safeAreaAllowance = safeArea.value(for: edge)
+      let consumed = max(0, insetMinimum + spacing - safeAreaAllowance)
+      switch edge {
+      case .top, .bottom:
+        if axis == .vertical {
+          return baseMinimum + consumed
+        }
+        return max(baseMinimum, insetMinimum)
+      case .leading, .trailing:
+        if axis == .horizontal {
+          return baseMinimum + consumed
+        }
+        return max(baseMinimum, insetMinimum)
+      }
     case .stack(
       axis: let stackAxis, let spacing,
       horizontalAlignment: _,

@@ -486,6 +486,40 @@ public struct LayoutEngine: Sendable {
       return resolved.children.map { child in
         measure(child, proposal: childProposal, passContext: passContext)
       }
+    case .safeAreaIgnoring(let insets):
+      let childProposal = outset(parentProposal, by: insets)
+      return resolved.children.map { child in
+        measure(child, proposal: childProposal, passContext: passContext)
+      }
+    case .safeAreaInset(let edge, _, let spacing, let safeArea):
+      guard resolved.children.count >= 2 else {
+        return resolved.children.map { child in
+          measure(child, proposal: parentProposal, passContext: passContext)
+        }
+      }
+
+      let insetProposal = safeAreaInsetAdornmentProposal(
+        parentProposal,
+        edge: edge
+      )
+      let insetMeasurement = measure(
+        resolved.children[1],
+        proposal: insetProposal,
+        passContext: passContext
+      )
+      let consumedInsets = safeAreaInsetConsumedInsets(
+        edge: edge,
+        contentSize: insetMeasurement.measuredSize,
+        spacing: spacing,
+        safeArea: safeArea
+      )
+      let baseProposal = inset(parentProposal, by: consumedInsets)
+      let baseMeasurement = measure(
+        resolved.children[0],
+        proposal: baseProposal,
+        passContext: passContext
+      )
+      return [baseMeasurement, insetMeasurement]
     case .border(let set, _, _, _, _, let sides):
       let insets = borderLayoutInsets(set: set, sides: sides)
       let childProposal = inset(parentProposal, by: insets)
@@ -730,6 +764,39 @@ public struct LayoutEngine: Sendable {
         width: contentSize.width + insets.horizontal,
         height: contentSize.height + insets.vertical
       )
+    case .safeAreaIgnoring:
+      let contentSize = childMeasurements.first?.measuredSize ?? .zero
+      return Size(
+        width: measuredDimension(
+          proposal.width,
+          fallback: contentSize.width
+        ),
+        height: measuredDimension(
+          proposal.height,
+          fallback: contentSize.height
+        )
+      )
+    case .safeAreaInset(let edge, _, let spacing, let safeArea):
+      let baseSize = childMeasurements.first?.measuredSize ?? .zero
+      let insetSize = childMeasurements.dropFirst().first?.measuredSize ?? .zero
+      let consumed = safeAreaInsetConsumedAmount(
+        edge: edge,
+        contentSize: insetSize,
+        spacing: spacing,
+        safeArea: safeArea
+      )
+      switch edge {
+      case .top, .bottom:
+        return Size(
+          width: max(baseSize.width, insetSize.width),
+          height: baseSize.height + consumed
+        )
+      case .leading, .trailing:
+        return Size(
+          width: baseSize.width + consumed,
+          height: max(baseSize.height, insetSize.height)
+        )
+      }
     case .border(let set, _, _, _, _, let sides):
       let insets = borderLayoutInsets(set: set, sides: sides)
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
@@ -1289,6 +1356,100 @@ public struct LayoutEngine: Sendable {
       return .infinity
     case .finite(let value):
       return .finite(max(0, value - amount))
+    }
+  }
+
+  private func outset(
+    _ proposal: ProposedSize,
+    by insets: EdgeInsets
+  ) -> ProposedSize {
+    ProposedSize(
+      width: outset(proposal.width, by: insets.horizontal),
+      height: outset(proposal.height, by: insets.vertical)
+    )
+  }
+
+  private func outset(
+    _ dimension: ProposedDimension,
+    by amount: Int
+  ) -> ProposedDimension {
+    switch dimension {
+    case .unspecified:
+      return .unspecified
+    case .infinity:
+      return .infinity
+    case .finite(let value):
+      return .finite(max(0, value + amount))
+    }
+  }
+
+  private func measuredDimension(
+    _ proposal: ProposedDimension,
+    fallback: Int
+  ) -> Int {
+    switch proposal {
+    case .finite(let value):
+      max(0, value)
+    case .unspecified, .infinity:
+      fallback
+    }
+  }
+
+  private func safeAreaInsetAdornmentProposal(
+    _ parentProposal: ProposedSize,
+    edge: Edge
+  ) -> ProposedSize {
+    switch edge {
+    case .top, .bottom:
+      return ProposedSize(
+        width: parentProposal.width,
+        height: .unspecified
+      )
+    case .leading, .trailing:
+      return ProposedSize(
+        width: .unspecified,
+        height: parentProposal.height
+      )
+    }
+  }
+
+  private func safeAreaInsetConsumedAmount(
+    edge: Edge,
+    contentSize: Size,
+    spacing: Int,
+    safeArea: EdgeInsets
+  ) -> Int {
+    let contentLength =
+      switch edge {
+      case .top, .bottom:
+        contentSize.height
+      case .leading, .trailing:
+        contentSize.width
+      }
+    return max(0, contentLength + max(0, spacing) - safeArea.value(for: edge))
+  }
+
+  private func safeAreaInsetConsumedInsets(
+    edge: Edge,
+    contentSize: Size,
+    spacing: Int,
+    safeArea: EdgeInsets
+  ) -> EdgeInsets {
+    let consumed = safeAreaInsetConsumedAmount(
+      edge: edge,
+      contentSize: contentSize,
+      spacing: spacing,
+      safeArea: safeArea
+    )
+    switch edge {
+    case .top:
+      return EdgeInsets(top: consumed)
+    case .leading:
+      return EdgeInsets(leading: consumed)
+    case .bottom:
+      return EdgeInsets(bottom: consumed)
+    case .trailing:
+      return EdgeInsets(trailing: consumed)
     }
   }
 

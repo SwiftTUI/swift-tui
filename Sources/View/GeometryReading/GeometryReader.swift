@@ -6,9 +6,14 @@ public import Core
 /// environment rather than a per-container local coordinate space.
 public struct GeometryProxy: Equatable, Sendable {
   public var size: Size
+  public var safeAreaInsets: EdgeInsets
 
-  public init(size: Size) {
+  public init(
+    size: Size,
+    safeAreaInsets: EdgeInsets = .zero
+  ) {
     self.size = size
+    self.safeAreaInsets = safeAreaInsets
   }
 }
 
@@ -26,7 +31,10 @@ public struct GeometryReader<Content: View>: View, ResolvableView {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let proxy = context.trackingObservableAccess {
-      GeometryProxy(size: context.environmentValues.terminalSize)
+      GeometryProxy(
+        size: context.environmentValues.terminalSize,
+        safeAreaInsets: context.environmentValues.safeAreaInsets
+      )
     }
     let view = context.trackingObservableAccess {
       content(proxy)

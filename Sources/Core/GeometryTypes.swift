@@ -82,6 +82,64 @@ public struct EdgeInsets: Equatable, Sendable {
   public var vertical: Int {
     top + bottom
   }
+
+  public static let zero = Self()
+
+  public var isZero: Bool {
+    top == 0 && leading == 0 && bottom == 0 && trailing == 0
+  }
+
+  public func value(for edge: Edge) -> Int {
+    switch edge {
+    case .top:
+      top
+    case .leading:
+      leading
+    case .bottom:
+      bottom
+    case .trailing:
+      trailing
+    }
+  }
+
+  public func masked(to edges: Edge.Set) -> Self {
+    Self(
+      top: edges.contains(.top) ? top : 0,
+      leading: edges.contains(.leading) ? leading : 0,
+      bottom: edges.contains(.bottom) ? bottom : 0,
+      trailing: edges.contains(.trailing) ? trailing : 0
+    )
+  }
+
+  public func zeroing(_ edges: Edge.Set) -> Self {
+    Self(
+      top: edges.contains(.top) ? 0 : top,
+      leading: edges.contains(.leading) ? 0 : leading,
+      bottom: edges.contains(.bottom) ? 0 : bottom,
+      trailing: edges.contains(.trailing) ? 0 : trailing
+    )
+  }
+
+  public func adding(_ other: Self) -> Self {
+    Self(
+      top: top + other.top,
+      leading: leading + other.leading,
+      bottom: bottom + other.bottom,
+      trailing: trailing + other.trailing
+    )
+  }
+
+  public func adding(
+    _ amount: Int,
+    to edges: Edge.Set
+  ) -> Self {
+    Self(
+      top: top + (edges.contains(.top) ? amount : 0),
+      leading: leading + (edges.contains(.leading) ? amount : 0),
+      bottom: bottom + (edges.contains(.bottom) ? amount : 0),
+      trailing: trailing + (edges.contains(.trailing) ? amount : 0)
+    )
+  }
 }
 
 /// A normalized point in a shape's bounds where `(0, 0)` is the

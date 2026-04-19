@@ -201,6 +201,10 @@ public struct DefaultRenderer {
       hostState: presentationHostState,
       in: resolveContext
     )
+    resolved = wrapInContainerSafeArea(
+      resolved,
+      context: resolveContext
+    )
 
     // Animation: capture from/to for changed animatable properties, then
     // apply interpolated values to the resolved tree before measure.
@@ -346,6 +350,25 @@ public struct DefaultRenderer {
 
     retainedFrames.store(artifacts, baselinePlacedTree: baselinePlaced)
     return artifacts
+  }
+
+  private func wrapInContainerSafeArea(
+    _ resolved: ResolvedNode,
+    context: ResolveContext
+  ) -> ResolvedNode {
+    let safeAreaInsets = context.environmentValues.safeAreaInsets
+    guard !safeAreaInsets.isZero else {
+      return resolved
+    }
+
+    return ResolvedNode(
+      identity: resolved.identity.child(.named("ContainerSafeArea")),
+      kind: .view("ContainerSafeArea"),
+      children: [resolved],
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction,
+      layoutBehavior: .padding(safeAreaInsets)
+    )
   }
 
   private func minimumRasterSurfaceSize(

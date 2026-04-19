@@ -299,6 +299,57 @@ extension View {
     )
   }
 
+  public func safeAreaPadding(
+    _ edges: Edge.Set = .all
+  ) -> some View {
+    SafeAreaPaddingView(
+      content: erasedToAnyView,
+      edges: edges,
+      additional: 0
+    )
+  }
+
+  public func safeAreaPadding(
+    _ amount: Int
+  ) -> some View {
+    safeAreaPadding(.all, amount)
+  }
+
+  public func safeAreaPadding(
+    _ edges: Edge.Set,
+    _ amount: Int
+  ) -> some View {
+    SafeAreaPaddingView(
+      content: erasedToAnyView,
+      edges: edges,
+      additional: amount
+    )
+  }
+
+  public func ignoresSafeArea(
+    _ edges: Edge.Set = .all
+  ) -> some View {
+    IgnoreSafeAreaView(
+      content: erasedToAnyView,
+      edges: edges
+    )
+  }
+
+  public func safeAreaInset<Inset: View>(
+    edge: Edge,
+    alignment: Alignment = .center,
+    spacing: Int = 0,
+    @ViewBuilder content: () -> Inset
+  ) -> some View {
+    SafeAreaInsetView(
+      base: self,
+      inset: content(),
+      edge: edge,
+      alignment: alignment,
+      spacing: spacing
+    )
+  }
+
   public func frame(
     width: Int? = nil,
     height: Int? = nil,
@@ -726,6 +777,100 @@ package struct PaddingView<Content: View>: View, ResolvableView {
         environmentSnapshot: context.environment,
         transactionSnapshot: context.transaction,
         layoutBehavior: .padding(insets)
+      )
+    ]
+  }
+}
+
+package struct SafeAreaPaddingView<Content: View>: View, ResolvableView {
+  package var content: Content
+  package var edges: Edge.Set
+  package var additional: Int
+
+  @inline(never)
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let safeAreaInsets = context.environmentValues.safeAreaInsets.masked(to: edges)
+    let appliedInsets = safeAreaInsets.adding(
+      max(0, additional),
+      to: edges
+    )
+    let contentContext =
+      context
+      .child(component: .named("content"))
+      .transformingEnvironment(\.safeAreaInsets) { safeAreaInsets in
+        safeAreaInsets = safeAreaInsets.adding(appliedInsets)
+      }
+    let contentNode = resolveWrapperContent(content, in: contentContext)
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("SafeAreaPadding"),
+        children: [contentNode],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        layoutBehavior: .padding(appliedInsets)
+      )
+    ]
+  }
+}
+
+package struct IgnoreSafeAreaView<Content: View>: View, ResolvableView {
+  package var content: Content
+  package var edges: Edge.Set
+
+  @inline(never)
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let reclaimedInsets = context.environmentValues.safeAreaInsets.masked(to: edges)
+    let contentContext =
+      context
+      .child(component: .named("content"))
+      .transformingEnvironment(\.safeAreaInsets) { safeAreaInsets in
+        safeAreaInsets = safeAreaInsets.zeroing(edges)
+      }
+    let contentNode = resolveWrapperContent(content, in: contentContext)
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("IgnoreSafeArea"),
+        children: [contentNode],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        layoutBehavior: .safeAreaIgnoring(reclaimedInsets)
+      )
+    ]
+  }
+}
+
+package struct SafeAreaInsetView<Base: View, Inset: View>: View, ResolvableView {
+  package var base: Base
+  package var inset: Inset
+  package var edge: Edge
+  package var alignment: Alignment
+  package var spacing: Int
+
+  @inline(never)
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let baseNode = resolveWrapperContent(
+      base,
+      in: context.child(component: .named("base"))
+    )
+    let insetNode = resolveWrapperContent(
+      inset,
+      in: context.child(component: .named("inset"))
+    )
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("SafeAreaInset"),
+        children: [baseNode, insetNode],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        layoutBehavior: .safeAreaInset(
+          edge: edge,
+          alignment: alignment,
+          spacing: max(0, spacing),
+          safeArea: context.environmentValues.safeAreaInsets
+        )
       )
     ]
   }
