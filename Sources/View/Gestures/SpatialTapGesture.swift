@@ -58,6 +58,10 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
     self.coordinateSpace = coordinateSpace
   }
 
+  var isActive: Bool {
+    pressStart != nil && !phase.isTerminal
+  }
+
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     guard !phase.isTerminal else { return .ignored }
     switch event.kind {

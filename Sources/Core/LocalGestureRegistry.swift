@@ -18,8 +18,25 @@ package final class LocalGestureRegistry: Equatable {
     identity: Identity,
     recognizer: AnyGestureRecognizer
   ) {
-    if let existing = recognizers[identity], existing !== recognizer {
-      existing.tearDown()
+    if let existing = recognizers[identity] {
+      // If the existing recognizer is mid-interaction (e.g. a
+      // DragGesture has captured `.down` but hasn't seen a `.dragged`
+      // yet), keep it and discard the incoming replacement. Without
+      // this, any view re-resolve between `.down` and the first
+      // `.dragged` — triggered by `setPressedIdentity`, a parent
+      // state change, or any other invalidation — tears down the
+      // active recognizer and destroys the state it just captured;
+      // subsequent pointer events see a fresh recognizer with no
+      // `startLocation` and are silently ignored.
+      if existing.isActive {
+        if existing !== recognizer {
+          recognizer.tearDown()
+        }
+        return
+      }
+      if existing !== recognizer {
+        existing.tearDown()
+      }
     }
     recognizers[identity] = recognizer
     ViewNodeContext.current?.recordGestureRegistration(
@@ -33,10 +50,25 @@ package final class LocalGestureRegistry: Equatable {
   }
 
   package func reset() {
-    for recognizer in recognizers.values {
-      recognizer.tearDown()
+    // `RuntimeRegistrationSet.resetAll()` fires on every full-resolve
+    // frame (TerminalUI.swift:188). Without an in-flight guard, a
+    // `.down` event that lands between two full-resolve frames would
+    // register its captured state on a recognizer that is then
+    // silently torn down — the next `.dragged` arrives at a fresh
+    // recognizer with no `startLocation` and is ignored forever.
+    //
+    // Preserve active recognizers across reset; tear down the rest.
+    // Subtree teardown (`removeSubtrees`) remains aggressive: if the
+    // owning view genuinely disappears, its recognizer should die.
+    var preserved: [Identity: AnyGestureRecognizer] = [:]
+    for (identity, recognizer) in recognizers {
+      if recognizer.isActive {
+        preserved[identity] = recognizer
+      } else {
+        recognizer.tearDown()
+      }
     }
-    recognizers.removeAll(keepingCapacity: true)
+    recognizers = preserved
   }
 
   package func removeSubtrees(

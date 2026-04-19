@@ -66,6 +66,9 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
     return first.phase
   }
 
+  /// Either child being active keeps the composite active.
+  var isActive: Bool { first.isActive || second.isActive }
+
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     // Deliver to first unless it's already terminal.
     if !first.phase.isTerminal {
