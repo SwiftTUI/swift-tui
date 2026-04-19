@@ -520,18 +520,17 @@ private struct LayoutContainer<Content: View>: View, ResolvableView {
   var content: Content
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    // AnyView policy: layout containers flatten their declared children into
-    // per-child scoped leaves so selective reevaluation preserves the original
-    // authoring scope without introducing wrapper identities.
-    let children = withAuthoringContext(authoringScope) {
-      erasedDeclaredBuilderChildren(from: content)
-    }
-    let resolvedChildren = children.enumerated().map { index, child in
-      child.resolve(
-        in: context.indexedChild(
-          kind: .named("Layout"),
-          index: index
-        )
+    // AnyView policy: layout containers must flatten builder output at the
+    // `resolveElements` layer, not after `normalizeResolvedElements`. If we
+    // resolved each authored child as a single node, any direct child that
+    // produces multiple elements (for example `ForEach`) would be collapsed
+    // into an implicit `Group`, and the layout would see one overlapping
+    // subview instead of distinct siblings.
+    let resolvedChildren = withAuthoringContext(authoringScope) {
+      resolveDeclaredChildren(
+        content,
+        in: context,
+        kindName: "Layout"
       )
     }
 

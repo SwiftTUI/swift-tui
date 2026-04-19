@@ -5928,6 +5928,35 @@ struct SwiftUISurfaceTests {
       ])
   }
 
+  @Test("AnyLayout flattens direct ForEach output into sibling layout subviews")
+  func anyLayoutFlattensForEachChildren() {
+    let root = AnyLayout(HStackLayout(spacing: 1)) {
+      Text("A")
+      ForEach(["B", "C"], id: \.self) { value in
+        Text(value)
+      }
+    }
+
+    let resolved = Resolver().resolve(
+      root,
+      in: .init(identity: testIdentity("Root"))
+    )
+    let artifacts = DefaultRenderer().render(
+      root,
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    #expect(resolved.kind == .view("HStackLayout"))
+    #expect(resolved.children.map(resolvedNodeLabelText(from:)) == ["A", "B", "C"])
+    #expect(
+      artifacts.placedTree.children.map(\.bounds.origin) == [
+        .init(x: 0, y: 0),
+        .init(x: 2, y: 0),
+        .init(x: 4, y: 0),
+      ])
+    #expect(artifacts.rasterSurface.lines == ["A B C"])
+  }
+
   @Test("custom Layout reads layout values and places subviews explicitly")
   func customLayoutReadsLayoutValuesAndPlacesSubviews() {
     let artifacts = DefaultRenderer().render(

@@ -252,6 +252,44 @@ struct ToolbarTests {
     }
   }
 
+  @Test("Toolbar strip lays out multiple items as distinct siblings")
+  func toolbarRendersMultipleItemsWithoutOverlap() {
+    let panel =
+      Panel(id: "outer") {
+        Text("body")
+          .toolbarItem(
+            .init(
+              title: "Reset counter",
+              icon: nil,
+              position: .bottom,
+              isEnabled: true,
+              action: {}
+            )
+          )
+          .toolbarItem(
+            .init(
+              title: "⌃K Palette",
+              icon: nil,
+              position: .bottom,
+              isEnabled: true,
+              action: {}
+            )
+          )
+      }
+      .toolbar(style: DefaultBottomToolbarStyle())
+      .frame(width: 40, height: 6)
+
+    let artifacts = DefaultRenderer().render(
+      panel,
+      context: .init(identity: testIdentity("toolbar-multi-item-root"))
+    )
+    let lineContainingBoth = artifacts.rasterSurface.lines.first {
+      $0.contains("Reset counter") && $0.contains("⌃K Palette")
+    }
+
+    #expect(lineContainingBoth != nil)
+  }
+
   @Test("Bottom toolbar reclaims the container's bottom safe area")
   func bottomToolbarUsesBottomSafeArea() {
     let panel =
