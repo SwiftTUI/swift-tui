@@ -29,6 +29,17 @@ public struct FrameDiagnosticRecord: Sendable {
   public var presentationCellsChanged: Int
   public var presentationDuration: Duration
   public var damageRowCount: Int?
+  public var damageRangeAwareRowCount: Int?
+  public var damageTextSpanCount: Int?
+  public var damageTextCellCount: Int?
+  public var damageGraphicsInvalidationCount: Int?
+  public var damageRequiresFullTextRepaint: Bool
+  public var damageRequiresFullGraphicsReplay: Bool
+  public var presentationUsedSynchronizedOutput: Bool
+  public var presentationGraphicsReplayScope: String
+  public var presentationGraphicsAttachmentsReplayed: Int
+  public var presentationEditOperationLowering: String
+  public var presentationEditOperationCount: Int
   public var measurementCacheHitRate: Double?
   public var totalFrameDuration: Duration
 }
@@ -94,6 +105,10 @@ public final class FrameDiagnosticsLogger {
         return "\(pct / 10).\(pct % 10)%"
       } ?? "-"
     let damageRows = record.damageRowCount.map(String.init) ?? "full"
+    let damageRangeAwareRows = record.damageRangeAwareRowCount.map(String.init) ?? "-"
+    let damageSpans = record.damageTextSpanCount.map(String.init) ?? "-"
+    let damageCells = record.damageTextCellCount.map(String.init) ?? "-"
+    let damageGraphics = record.damageGraphicsInvalidationCount.map(String.init) ?? "-"
 
     let fields: [String] = [
       String(record.frameNumber),
@@ -125,6 +140,17 @@ public final class FrameDiagnosticsLogger {
       String(record.presentationLinesTouched),
       String(record.presentationCellsChanged),
       damageRows,
+      damageRangeAwareRows,
+      damageSpans,
+      damageCells,
+      damageGraphics,
+      record.damageRequiresFullTextRepaint ? "1" : "0",
+      record.damageRequiresFullGraphicsReplay ? "1" : "0",
+      record.presentationUsedSynchronizedOutput ? "1" : "0",
+      record.presentationGraphicsReplayScope,
+      String(record.presentationGraphicsAttachmentsReplayed),
+      record.presentationEditOperationLowering,
+      String(record.presentationEditOperationCount),
       // cache
       cacheHit,
       // total
@@ -160,6 +186,17 @@ public final class FrameDiagnosticsLogger {
       "present_lines",
       "present_cells",
       "damage_rows",
+      "damage_range_rows",
+      "damage_spans",
+      "damage_cells",
+      "damage_graphics",
+      "damage_full_text",
+      "damage_full_graphics",
+      "present_sync",
+      "present_graphics_scope",
+      "present_graphics_attachments",
+      "present_edit_op",
+      "present_edit_ops",
       "cache_hit",
       "total_ms",
     ]
