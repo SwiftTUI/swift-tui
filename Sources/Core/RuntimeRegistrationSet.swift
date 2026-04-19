@@ -42,6 +42,8 @@ package struct RuntimeRegistrationSet {
     actionRegistry?.reset()
     keyHandlerRegistry?.reset()
     pointerHandlerRegistry?.reset()
+    gestureRegistry?.reset()
+    gestureStateRegistry?.reset()
     focusBindingRegistry?.reset()
     focusedValuesRegistry?.reset()
     lifecycleRegistry?.reset()
@@ -79,6 +81,8 @@ package struct RuntimeRegistrationSet {
       handlers.keyPressHandlerRegistrations
     )
     pointerHandlerRegistry?.restore(handlers.pointerHandlerRegistrations)
+    gestureRegistry?.restore(handlers.gestureRegistrations)
+    gestureStateRegistry?.restore(handlers.gestureStateRegistrations)
     focusBindingRegistry?.restore(handlers.focusBindingRegistrations)
     focusedValuesRegistry?.restore(handlers.focusedValuesRegistrations)
     lifecycleRegistry?.restore(handlers.lifecycleRegistrations)

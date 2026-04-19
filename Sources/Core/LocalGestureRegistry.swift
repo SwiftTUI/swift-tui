@@ -22,6 +22,10 @@ package final class LocalGestureRegistry: Equatable {
       existing.tearDown()
     }
     recognizers[identity] = recognizer
+    ViewNodeContext.current?.recordGestureRegistration(
+      identity: identity,
+      recognizer: recognizer
+    )
   }
 
   package func recognizer(for identity: Identity) -> AnyGestureRecognizer? {
@@ -43,6 +47,16 @@ package final class LocalGestureRegistry: Equatable {
       identityMatchesAnySubtreeRoot($0, roots: roots)
     }) {
       recognizers.removeValue(forKey: identity)?.tearDown()
+    }
+  }
+
+  /// Re-populates the registry from a snapshot captured by `NodeHandlers`.
+  /// Used during cache-hit frames where resolve doesn't run but
+  /// registrations must still be live.
+  package func restore(_ snapshot: [Identity: AnyGestureRecognizer]) {
+    guard !snapshot.isEmpty else { return }
+    for (identity, recognizer) in snapshot {
+      recognizers[identity] = recognizer
     }
   }
 
