@@ -86,6 +86,39 @@ struct LongPressGestureTests {
     #expect(rec.phase == .failed)
   }
 
+  @Test("Succeeds on release after minimumDuration even if deadline drain is late")
+  func succeedsOnLateDeadlineDrain() throws {
+    var scheduledDeadline: MonotonicInstant?
+    let ctx = GestureRecognizerBuildContext(
+      attachingIdentity: identity("r"),
+      gestureStateRegistry: nil,
+      requestDeadline: { scheduledDeadline = $0 }
+    )
+    let g = LongPressGesture(minimumDuration: .milliseconds(20))
+    let rec = g._makeRecognizer(context: ctx)
+    let t0 = MonotonicInstant.now()
+    _ = rec.handle(
+      event: .init(
+        kind: .down(.primary),
+        location: .zero,
+        targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1)),
+        timestamp: t0
+      ))
+    let scheduled = try #require(scheduledDeadline)
+
+    _ = rec.handle(
+      event: .init(
+        kind: .up(.primary),
+        location: .zero,
+        targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1)),
+        timestamp: scheduled.advanced(by: .milliseconds(1))
+      ))
+
+    #expect(rec.phase == .ended)
+    let value: Bool? = rec.currentValue()
+    #expect(value == true)
+  }
+
   @Test("handleDeadline returns false and keeps phase .possible when instant is before deadline")
   func handleDeadlineBeforeTarget() throws {
     var scheduledDeadline: MonotonicInstant?

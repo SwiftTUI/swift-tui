@@ -89,12 +89,22 @@ final class LongPressGestureRecognizer: GestureRecognizer {
       }
       return .handled
     case .up(.primary):
-      // Released before deadline fired (phase stayed .possible).
-      if phase == .possible {
-        phase = .failed
-        return .failed
+      guard phase == .possible else {
+        return .ignored
       }
-      return .ignored
+
+      // Deadline wakes are scheduler-driven, so a legitimate long press can
+      // still release before the runtime drains the pending deadline frame.
+      // Honor the timestamp on the release event and finalize here when the
+      // hold duration already crossed the scheduled threshold.
+      if let deadline, event.timestamp >= deadline {
+        phase = .ended
+        endedValue = true
+        return .handled
+      }
+
+      phase = .failed
+      return .failed
     default:
       return .ignored
     }

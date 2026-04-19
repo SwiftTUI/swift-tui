@@ -138,6 +138,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var pressedIdentity: Identity?
   package var transientPressedIdentity: Identity?
   package var armedPointerRouteID: RouteID?
+  package var armedPointerRouteUsesPointerHandler = false
   package var capturedPointerRouteID: RouteID?
   package var postActionInvalidationIdentities: Set<Identity> = []
   package var previousRenderedState: State?
