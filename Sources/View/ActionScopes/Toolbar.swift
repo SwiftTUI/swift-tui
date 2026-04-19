@@ -71,8 +71,12 @@ public struct ToolbarHost<Content: View & Sendable, S: ToolbarStyle>: View, Reso
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let baseContext = context.child(component: .named("content"))
-    let base = content.resolve(in: baseContext)
+    // Resolve the wrapped ActionScope at the ToolbarHost's own
+    // identity. The scope root must remain the real graph node so
+    // retained snapshot rebuilds recurse through the current
+    // scope-root commit instead of a stale child snapshot that never
+    // learned about the toolbar strip.
+    let base = content.resolve(in: context)
     let items = base.preferenceValues[ToolbarItemsPreferenceKey.self]
 
     guard !items.isEmpty else {
@@ -90,57 +94,31 @@ public struct ToolbarHost<Content: View & Sendable, S: ToolbarStyle>: View, Reso
       in: context.child(component: .named("toolbar-strip"))
     )
 
-    // Inject the strip as a child of `base` (the underlying
-    // ActionScope, typically a Panel) so focus on any toolbar-strip
-    // button inherits the scope's identity on its scopePath:
-    // palette/key commands registered at the scope stay visible to
-    // toolbar focus. Then wrap the reformed scope in a passthrough
-    // outer node at `context.identity` so the resolved node's
-    // identity matches the identity `resolveView` registered in the
-    // ViewGraph at the start of this evaluation.
-    //
-    // A previous version of this method collapsed the outer wrapper
-    // entirely and returned `base` with its identity unchanged. That
-    // left the graph holding a node at `context.identity` whose
-    // `committed` resolved snapshot had `base.identity`, and
-    // `finishEvaluation` re-parented `base`'s subtree under the
-    // ToolbarHost's graph node — overwriting the parent pointer that
-    // Panel's own graph node had just set. State-change invalidations
-    // that walk up via `invalidateAncestorCachedSnapshots` skipped
-    // the Panel node, so subsequently-cached ancestor snapshots went
-    // stale. The visible symptom was pointer scrolling updating the
-    // scroll state internally but the rendered surface only catching
-    // up on the next non-scroll event (a click, a keypress, etc.).
-    var scopeWithStrip = base
-    scopeWithStrip.children = [
-      toolbarContentNode(
-        from: base,
-        in: context
-      ),
-      stripNode,
-    ]
-    scopeWithStrip.layoutBehavior = .safeAreaInset(
+    // Keep the scope boundary on `base` so toolbar-focus inherits the
+    // ActionScope's identity. Install the safe-area reclaiming step on
+    // the scope root, and move the actual toolbar composition into a
+    // real child view so retained snapshot rebuilds recurse through a
+    // committed toolbar subtree instead of a stale injected copy.
+    let toolbarNode = ToolbarScopeNode(
+      contentChildren: base.children,
+      contentLayoutBehavior: base.layoutBehavior,
+      stripNode: stripNode,
       edge: toolbarEdge,
-      alignment: toolbarAlignment,
-      spacing: 0,
-      safeArea: .zero
+      alignment: toolbarAlignment
+    ).resolve(
+      in: context.child(component: .named("toolbar-scope"))
+    )
+
+    var scopeWithStrip = base
+    scopeWithStrip.children = [toolbarNode]
+    scopeWithStrip.layoutBehavior = .safeAreaIgnoring(
+      context.environmentValues.safeAreaInsets.masked(to: toolbarEdgeSet)
     )
     // Clear the preference at this scope boundary so absorbed items
     // do not re-bubble to ancestor toolbar hosts.
     scopeWithStrip.preferenceValues[ToolbarItemsPreferenceKey.self] = []
 
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("ToolbarHost"),
-        children: [scopeWithStrip],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction,
-        layoutBehavior: .safeAreaIgnoring(
-          context.environmentValues.safeAreaInsets.masked(to: toolbarEdgeSet)
-        )
-      )
-    ]
+    return [scopeWithStrip]
   }
 
   private var toolbarEdge: Edge {
@@ -164,18 +142,56 @@ public struct ToolbarHost<Content: View & Sendable, S: ToolbarStyle>: View, Reso
     }
   }
 
-  private func toolbarContentNode(
-    from base: ResolvedNode,
-    in context: ResolveContext
-  ) -> ResolvedNode {
-    ResolvedNode(
-      identity: base.identity.child(.named("toolbar-content")),
-      kind: .view("ToolbarContent"),
-      children: base.children,
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      layoutBehavior: base.layoutBehavior
+}
+
+private struct ToolbarScopeNode: View, ResolvableView {
+  let contentChildren: [ResolvedNode]
+  let contentLayoutBehavior: LayoutBehavior
+  let stripNode: ResolvedNode
+  let edge: Edge
+  let alignment: Alignment
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let contentNode = ToolbarContentNode(
+      children: contentChildren,
+      layoutBehavior: contentLayoutBehavior
+    ).resolve(
+      in: context.child(component: .named("content"))
     )
+
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("ToolbarScope"),
+        children: [contentNode, stripNode],
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        layoutBehavior: .safeAreaInset(
+          edge: edge,
+          alignment: alignment,
+          spacing: 0,
+          safeArea: .zero
+        )
+      )
+    ]
+  }
+}
+
+private struct ToolbarContentNode: View, ResolvableView {
+  let children: [ResolvedNode]
+  let layoutBehavior: LayoutBehavior
+
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("ToolbarContent"),
+        children: children,
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        layoutBehavior: layoutBehavior
+      )
+    ]
   }
 }
 

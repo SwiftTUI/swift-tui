@@ -204,6 +204,65 @@ struct FullScreenTabGestureTests {
     #expect(uniqueSurfaces.count >= 3)
     #expect(uniqueSurfaces.first != uniqueSurfaces.last)
   }
+
+  @Test("fullscreen tab wrapped in a bottom toolbar renders the palette item")
+  func fullscreenToolbarRendersPaletteItem() {
+    let terminalSize = Size(width: 40, height: 12)
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+
+    let artifacts = DefaultRenderer().render(
+      FullScreenTab()
+        .toolbarItem(.init(title: "⌃K Palette", action: {}))
+        .panel(id: "gallery")
+        .toolbar(style: DefaultBottomToolbarStyle()),
+      context: .init(
+        identity: Identity(components: [.named("FullScreenToolbarVisibility")]),
+        environmentValues: env
+      ),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+
+    let paletteRows = artifacts.rasterSurface.lines.enumerated().compactMap { index, line in
+      line.contains("⌃K Palette") ? index : nil
+    }
+    #expect(!paletteRows.isEmpty, "expected toolbar row to contain the palette item")
+  }
+
+  @Test("fullscreen toolbar stays present in the rendered surface while animation ticks")
+  func fullscreenToolbarStaysPresentAcrossAnimationFrames() async throws {
+    let terminalSize = Size(width: 40, height: 12)
+    let rootIdentity = Identity(components: [.named("FullScreenToolbarAnimationVisibility")])
+    let host = GestureRecordingHost(size: terminalSize)
+
+    let result = try await runHarness(
+      host: host,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      viewBuilder: {
+        FullScreenTab()
+          .toolbarItem(.init(title: "⌃K Palette", action: {}))
+          .panel(id: "gallery")
+          .toolbar(style: DefaultBottomToolbarStyle())
+      },
+      eventSchedule: [
+        .init(
+          delayNanoseconds: 700_000_000,
+          event: .key(.character("q"))
+        )
+      ]
+    )
+
+    #expect(result.exitReason == .quitKey)
+    #expect(!host.surfaces.isEmpty)
+    let missingPalette = host.surfaces.enumerated().filter { _, surface in
+      !surface.lines.contains { $0.contains("⌃K Palette") }
+    }
+    #expect(
+      missingPalette.isEmpty,
+      "expected every rendered surface to retain the palette toolbar item; missing on frames: \(missingPalette.map { $0.0 })"
+    )
+  }
 }
 
 private struct ScheduledInputEvent {
