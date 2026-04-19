@@ -71,13 +71,39 @@ package final class LocalGestureRegistry: Equatable {
     recognizers = preserved
   }
 
-  package func removeSubtrees(
+  package func activeIdentities(
     rootedAt roots: [Identity]
+  ) -> Set<Identity> {
+    guard !roots.isEmpty else { return [] }
+    return Set(
+      recognizers.compactMap { identity, recognizer in
+        guard recognizer.isActive,
+          identityMatchesAnySubtreeRoot(identity, roots: roots)
+        else {
+          return nil
+        }
+        return identity
+      }
+    )
+  }
+
+  package func removeSubtrees(
+    rootedAt roots: [Identity],
+    preserving preservedIdentities: Set<Identity> = []
   ) {
     guard !roots.isEmpty else { return }
     for identity in recognizers.keys.filter({
       identityMatchesAnySubtreeRoot($0, roots: roots)
+        && !preservedIdentities.contains($0)
     }) {
+      recognizers.removeValue(forKey: identity)?.tearDown()
+    }
+  }
+
+  package func prune(
+    keeping liveIdentities: Set<Identity>
+  ) {
+    for identity in recognizers.keys.filter({ !liveIdentities.contains($0) }) {
       recognizers.removeValue(forKey: identity)?.tearDown()
     }
   }

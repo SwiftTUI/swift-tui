@@ -92,12 +92,24 @@ package final class LocalGestureStateRegistry: Equatable {
   }
 
   package func removeSubtrees(
-    rootedAt roots: [Identity]
+    rootedAt roots: [Identity],
+    preserving preservedIdentities: Set<Identity> = []
   ) {
     guard !roots.isEmpty else { return }
     for identity in bindingsByIdentity.keys.filter({
       identityMatchesAnySubtreeRoot($0, roots: roots)
+        && !preservedIdentities.contains($0)
     }) {
+      if let bindings = bindingsByIdentity.removeValue(forKey: identity) {
+        for binding in bindings { binding.resetToSeed() }
+      }
+    }
+  }
+
+  package func prune(
+    keeping liveIdentities: Set<Identity>
+  ) {
+    for identity in bindingsByIdentity.keys.filter({ !liveIdentities.contains($0) }) {
       if let bindings = bindingsByIdentity.removeValue(forKey: identity) {
         for binding in bindings { binding.resetToSeed() }
       }

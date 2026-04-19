@@ -1,5 +1,6 @@
 [tools]
 bun = "latest"
+codex = "latest"
 prek = "latest"
 swift = "latest"
 

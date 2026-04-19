@@ -10,5 +10,8 @@
     "GUI/XtermWebTUIGUI",
     "Examples/WebExample",
     "Examples/XtermWebExample"
-  ]
+  ],
+  "dependencies": {
+    "@openai/codex": "^0.121.0"
+  }
 }
