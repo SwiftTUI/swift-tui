@@ -141,6 +141,41 @@ struct ToolbarTests {
     }
   }
 
+  @Test("Top toolbar reclaims the container's top safe area")
+  func topToolbarUsesTopSafeArea() {
+    let panel =
+      Panel(id: "outer") {
+        Text("body")
+          .toolbarItem(
+            .init(
+              title: "Save",
+              icon: nil,
+              position: .top,
+              isEnabled: true,
+              action: {}
+            )
+          )
+      }
+      .toolbar(style: DefaultTopToolbarStyle())
+      .frame(width: 20, height: 5)
+
+    let artifacts = render(
+      panel,
+      terminalSize: .init(width: 20, height: 6),
+      safeAreaInsets: .init(top: 1, leading: 0, bottom: 0, trailing: 0)
+    )
+    let lines = artifacts.rasterSurface.lines
+    let saveRow = lines.firstIndex { $0.contains("Save") }
+    let bodyRow = lines.firstIndex { $0.contains("body") }
+
+    #expect(saveRow != nil)
+    #expect(bodyRow != nil)
+    if let saveRow, let bodyRow {
+      #expect(saveRow == 0)
+      #expect(saveRow < bodyRow)
+    }
+  }
+
   @Test(
     "Toolbar-strip buttons inherit the Panel's scope path so commands registered at the Panel are visible from toolbar focus"
   )
@@ -216,6 +251,41 @@ struct ToolbarTests {
       #expect(bodyRow < closeRow)
     }
   }
+
+  @Test("Bottom toolbar reclaims the container's bottom safe area")
+  func bottomToolbarUsesBottomSafeArea() {
+    let panel =
+      Panel(id: "outer") {
+        Text("body")
+          .toolbarItem(
+            .init(
+              title: "Close",
+              icon: nil,
+              position: .bottom,
+              isEnabled: true,
+              action: {}
+            )
+          )
+      }
+      .toolbar(style: DefaultBottomToolbarStyle())
+      .frame(width: 20, height: 5)
+
+    let artifacts = render(
+      panel,
+      terminalSize: .init(width: 20, height: 6),
+      safeAreaInsets: .init(top: 0, leading: 0, bottom: 1, trailing: 0)
+    )
+    let lines = artifacts.rasterSurface.lines
+    let bodyRow = lines.firstIndex { $0.contains("body") }
+    let closeRow = lines.firstIndex { $0.contains("Close") }
+
+    #expect(closeRow != nil)
+    #expect(bodyRow != nil)
+    if let bodyRow, let closeRow {
+      #expect(closeRow == lines.index(before: lines.endIndex))
+      #expect(bodyRow < closeRow)
+    }
+  }
 }
 
 @MainActor
@@ -235,4 +305,26 @@ private func findNode(
 private func isKind(_ kind: NodeKind, named name: String) -> Bool {
   if case .view(let n) = kind, n == name { return true }
   return false
+}
+
+@MainActor
+private func render<V: View>(
+  _ view: V,
+  terminalSize: Size,
+  safeAreaInsets: EdgeInsets
+) -> FrameArtifacts {
+  var environmentValues = EnvironmentValues()
+  environmentValues.terminalSize = terminalSize
+  environmentValues.safeAreaInsets = safeAreaInsets
+  return DefaultRenderer().render(
+    view,
+    context: .init(
+      identity: testIdentity("toolbar-safe-area-root"),
+      environmentValues: environmentValues
+    ),
+    proposal: .init(
+      width: terminalSize.width,
+      height: terminalSize.height
+    )
+  )
 }

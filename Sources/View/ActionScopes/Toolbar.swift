@@ -111,19 +111,19 @@ public struct ToolbarHost<Content: View & Sendable, S: ToolbarStyle>: View, Reso
     // stale. The visible symptom was pointer scrolling updating the
     // scroll state internally but the rendered surface only catching
     // up on the next non-scroll event (a click, a keypress, etc.).
-    let updatedChildren: [ResolvedNode] =
-      switch style.placement {
-      case .top: [stripNode] + base.children
-      case .bottom: base.children + [stripNode]
-      }
-
     var scopeWithStrip = base
-    scopeWithStrip.children = updatedChildren
-    scopeWithStrip.layoutBehavior = .stack(
-      axis: .vertical,
+    scopeWithStrip.children = [
+      toolbarContentNode(
+        from: base,
+        in: context
+      ),
+      stripNode,
+    ]
+    scopeWithStrip.layoutBehavior = .safeAreaInset(
+      edge: toolbarEdge,
+      alignment: toolbarAlignment,
       spacing: 0,
-      horizontalAlignment: .center,
-      verticalAlignment: .center
+      safeArea: .zero
     )
     // Clear the preference at this scope boundary so absorbed items
     // do not re-bubble to ancestor toolbar hosts.
@@ -135,9 +135,47 @@ public struct ToolbarHost<Content: View & Sendable, S: ToolbarStyle>: View, Reso
         kind: .view("ToolbarHost"),
         children: [scopeWithStrip],
         environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
+        transactionSnapshot: context.transaction,
+        layoutBehavior: .safeAreaIgnoring(
+          context.environmentValues.safeAreaInsets.masked(to: toolbarEdgeSet)
+        )
       )
     ]
+  }
+
+  private var toolbarEdge: Edge {
+    switch style.placement {
+    case .top: .top
+    case .bottom: .bottom
+    }
+  }
+
+  private var toolbarAlignment: Alignment {
+    switch style.placement {
+    case .top: .top
+    case .bottom: .bottom
+    }
+  }
+
+  private var toolbarEdgeSet: Edge.Set {
+    switch style.placement {
+    case .top: .top
+    case .bottom: .bottom
+    }
+  }
+
+  private func toolbarContentNode(
+    from base: ResolvedNode,
+    in context: ResolveContext
+  ) -> ResolvedNode {
+    ResolvedNode(
+      identity: base.identity.child(.named("toolbar-content")),
+      kind: .view("ToolbarContent"),
+      children: base.children,
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction,
+      layoutBehavior: base.layoutBehavior
+    )
   }
 }
 
