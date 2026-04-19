@@ -49,6 +49,7 @@ extension RunLoop {
 
     guard let hitTarget else {
       armedPointerRouteID = nil
+      armedPointerRouteUsesPointerHandler = false
       capturedPointerRouteID = nil
       setPressedIdentity(nil, transient: false)
       return
@@ -73,11 +74,17 @@ extension RunLoop {
       {
         _ = focusTracker.setFocus(to: focusIdentity)
       }
-      armedPointerRouteID = nil
       if shouldCapturePointer(routeID: hitTarget.region.routeID) {
         capturedPointerRouteID = hitTarget.region.routeID
+        armedPointerRouteID = nil
+        armedPointerRouteUsesPointerHandler = false
       } else {
         capturedPointerRouteID = nil
+        // Non-capturing gestures like TapGesture still need the rest of the
+        // pressed interaction stream so they can observe drag cancellation and
+        // the eventual release.
+        armedPointerRouteID = hitTarget.region.routeID
+        armedPointerRouteUsesPointerHandler = true
       }
       setPressedIdentity(hitTarget.focusIdentity, transient: false)
       return
@@ -89,10 +96,12 @@ extension RunLoop {
     {
       _ = focusTracker.setFocus(to: focusIdentity)
       armedPointerRouteID = hitTarget.region.routeID
+      armedPointerRouteUsesPointerHandler = false
       setPressedIdentity(focusIdentity, transient: false)
       return
     }
     armedPointerRouteID = nil
+    armedPointerRouteUsesPointerHandler = false
     setPressedIdentity(nil, transient: false)
   }
 
@@ -107,6 +116,7 @@ extension RunLoop {
     defer {
       capturedPointerRouteID = nil
       armedPointerRouteID = nil
+      armedPointerRouteUsesPointerHandler = false
       setPressedIdentity(nil, transient: false)
     }
 
@@ -131,13 +141,34 @@ extension RunLoop {
     }
 
     let hitTarget = hitTarget(at: location)
+    guard let region = interactionRegion(routeID: armedPointerRouteID) else {
+      return
+    }
+
+    let pointerHandled = dispatchPointerEvent(
+      preferredRouteID: armedPointerRouteID,
+      identity: region.identity,
+      event: .init(
+        kind: .up(.primary),
+        location: location,
+        targetRect: region.rect,
+        scrollContext: scrollContext(for: region.identity)
+      )
+    )
+    if pointerHandled {
+      return
+    }
+    if armedPointerRouteUsesPointerHandler {
+      return
+    }
+
     guard hitTarget?.region.routeID == armedPointerRouteID else {
       return
     }
 
     let focusedIdentity =
       hitTarget?.focusIdentity
-      ?? interactionRegion(routeID: armedPointerRouteID).flatMap { focusIdentity(for: $0.identity) }
+      ?? focusIdentity(for: region.identity)
 
     if let focusedIdentity {
       let handled = localActionRegistry.dispatch(identity: focusedIdentity)
@@ -155,6 +186,25 @@ extension RunLoop {
     guard armedPointerRouteID != nil else {
       return
     }
+    if armedPointerRouteUsesPointerHandler,
+      let armedPointerRouteID,
+      let region = interactionRegion(routeID: armedPointerRouteID)
+    {
+      let handled = dispatchPointerEvent(
+        preferredRouteID: armedPointerRouteID,
+        identity: region.identity,
+        event: .init(
+          kind: .dragged(.primary),
+          location: location,
+          targetRect: region.rect,
+          scrollContext: scrollContext(for: region.identity)
+        )
+      )
+      if handled {
+        return
+      }
+    }
+
     updateArmedPointerState(at: location)
   }
 

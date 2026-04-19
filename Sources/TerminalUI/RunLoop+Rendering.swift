@@ -87,6 +87,7 @@ extension RunLoop {
         {
           capturedPointerRouteID = nil
           armedPointerRouteID = nil
+          armedPointerRouteUsesPointerHandler = false
         }
 
         let focusChanged = focusTracker.updateRegions(
