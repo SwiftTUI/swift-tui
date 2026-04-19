@@ -117,6 +117,34 @@ struct GestureViewModifierTests {
     #expect(region.captureOnPress == true)
   }
 
+  @Test(".gesture attached after offset translates the interaction region")
+  func gestureAfterOffsetMovesInteractionRegion() throws {
+    let root = Identity(components: [IdentityComponent(rawValue: "offset-root")])
+    var env = EnvironmentValues()
+    env.terminalSize = Size(width: 20, height: 6)
+
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let gestureRegistry = LocalGestureRegistry()
+    let gestureStateRegistry = LocalGestureStateRegistry()
+
+    var ctx = ResolveContext(identity: root, environmentValues: env)
+    ctx.localPointerHandlerRegistry = pointerRegistry
+    ctx.localGestureRegistry = gestureRegistry
+    ctx.localGestureStateRegistry = gestureStateRegistry
+
+    let artifacts = DefaultRenderer().render(
+      Text("Tap")
+        .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
+        .offset(x: 4, y: 2)
+        .gesture(TapGesture().onEnded {}),
+      context: ctx,
+      proposal: .init(width: 20, height: 6)
+    )
+
+    let region = try #require(artifacts.semanticSnapshot.interactionRegions.first)
+    #expect(region.rect == .init(origin: .init(x: 4, y: 2), size: .init(width: 5, height: 1)))
+  }
+
   @Test(".gesture(_:including: .subviews) does not register at this view")
   func gestureMaskExcludesGesture() throws {
     @MainActor final class Box { var count = 0 }
