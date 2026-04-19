@@ -87,7 +87,10 @@ final class ExclusiveGestureRecognizer<V>: GestureRecognizer {
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
     let a = first.handleDeadline(at: instant)
-    let b = second.handleDeadline(at: instant)
+    // Only forward to second if first has failed/cancelled — second is the
+    // fallback that only runs when first gives up.
+    let firstGaveUp = first.phase == .failed || first.phase == .cancelled
+    let b = firstGaveUp ? second.handleDeadline(at: instant) : false
     return a || b
   }
 

@@ -64,4 +64,53 @@ struct ExclusiveGestureTests {
     #expect(firstCount == 0)
     #expect(secondCount == 1)
   }
+
+  @Test("ExclusiveGesture gates second deadline on first phase")
+  func gateSecondDeadlineOnFirstPhase() {
+    let t0 = MonotonicInstant.now()
+    let firstDeadline = t0.advanced(by: .milliseconds(100))
+    let secondDeadline = t0.advanced(by: .milliseconds(500))
+
+    // Create recognizers manually to control deadline scheduling.
+    let firstRec = AnyGestureRecognizer(
+      LongPressGestureRecognizer(
+        minimumDuration: .milliseconds(100),
+        maximumDistance: 0,
+        requestDeadline: { _ in }
+      )
+    )
+    let secondRec = AnyGestureRecognizer(
+      LongPressGestureRecognizer(
+        minimumDuration: .milliseconds(500),
+        maximumDistance: 0,
+        requestDeadline: { _ in }
+      )
+    )
+    let exclusive = ExclusiveGestureRecognizer<Bool>(
+      first: firstRec,
+      second: secondRec
+    )
+
+    // Simulate both recognizers receiving down events with timestamp t0.
+    let downEvent = LocalPointerEvent(
+      kind: .down(.primary),
+      location: .zero,
+      targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1)),
+      timestamp: t0
+    )
+    _ = firstRec.handle(event: downEvent)
+    _ = secondRec.handle(event: downEvent)
+
+    // At t0 + 100ms, first's deadline fires.
+    let firstFired = exclusive.handleDeadline(at: firstDeadline)
+    #expect(firstFired == true)
+    #expect(firstRec.phase == .ended)
+
+    // At t0 + 500ms, second's deadline would fire, but first already ended.
+    // With the fix, second should NOT process this deadline.
+    let secondFired = exclusive.handleDeadline(at: secondDeadline)
+    #expect(secondFired == false)
+    // Second's recognizer should still be in .possible (it never transitioned).
+    #expect(secondRec.phase == .possible)
+  }
 }
