@@ -3,6 +3,8 @@ package struct NodeHandlers {
   package var keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler]
   package var keyPressHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.KeyPressHandler]
   package var pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler]
+  package var gestureRegistrations: [Identity: AnyGestureRecognizer]
+  package var gestureStateRegistrations: [Identity: [AnyGestureStateBinding]]
   package var focusBindingRegistrations: [FocusBindingRegistrationSnapshot]
   package var focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot]
   package var lifecycleRegistrations: LifecycleHandlerSnapshot
@@ -14,6 +16,8 @@ package struct NodeHandlers {
     keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler] = [:],
     keyPressHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.KeyPressHandler] = [:],
     pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
+    gestureRegistrations: [Identity: AnyGestureRecognizer] = [:],
+    gestureStateRegistrations: [Identity: [AnyGestureStateBinding]] = [:],
     focusBindingRegistrations: [FocusBindingRegistrationSnapshot] = [],
     focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot] = [],
     lifecycleRegistrations: LifecycleHandlerSnapshot = .init(),
@@ -24,6 +28,8 @@ package struct NodeHandlers {
     self.keyHandlerRegistrations = keyHandlerRegistrations
     self.keyPressHandlerRegistrations = keyPressHandlerRegistrations
     self.pointerHandlerRegistrations = pointerHandlerRegistrations
+    self.gestureRegistrations = gestureRegistrations
+    self.gestureStateRegistrations = gestureStateRegistrations
     self.focusBindingRegistrations = focusBindingRegistrations
     self.focusedValuesRegistrations = focusedValuesRegistrations
     self.lifecycleRegistrations = lifecycleRegistrations
@@ -65,6 +71,20 @@ package struct NodeHandlers {
     handler: @escaping LocalPointerHandlerRegistry.Handler
   ) {
     pointerHandlerRegistrations[routeID] = handler
+  }
+
+  package mutating func recordGesture(
+    identity: Identity,
+    recognizer: AnyGestureRecognizer
+  ) {
+    gestureRegistrations[identity] = recognizer
+  }
+
+  package mutating func recordGestureStateBinding(
+    identity: Identity,
+    binding: AnyGestureStateBinding
+  ) {
+    gestureStateRegistrations[identity, default: []].append(binding)
   }
 
   package mutating func recordFocusBinding(

@@ -396,6 +396,26 @@ package final class ViewNode {
     )
   }
 
+  package func recordGestureRegistration(
+    identity: Identity,
+    recognizer: AnyGestureRecognizer
+  ) {
+    registeredHandlers.recordGesture(
+      identity: identity,
+      recognizer: recognizer
+    )
+  }
+
+  package func recordGestureStateBinding(
+    identity: Identity,
+    binding: AnyGestureStateBinding
+  ) {
+    registeredHandlers.recordGestureStateBinding(
+      identity: identity,
+      binding: binding
+    )
+  }
+
   package func recordFocusBindingRegistration(
     _ registration: FocusBindingRegistrationSnapshot
   ) {

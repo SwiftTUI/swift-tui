@@ -50,6 +50,10 @@ package final class LocalGestureStateRegistry: Equatable {
     binding: AnyGestureStateBinding
   ) {
     bindingsByIdentity[identity, default: []].append(binding)
+    ViewNodeContext.current?.recordGestureStateBinding(
+      identity: identity,
+      binding: binding
+    )
   }
 
   package func bindings(for identity: Identity) -> [AnyGestureStateBinding] {
@@ -79,6 +83,16 @@ package final class LocalGestureStateRegistry: Equatable {
       if let bindings = bindingsByIdentity.removeValue(forKey: identity) {
         for binding in bindings { binding.resetToSeed() }
       }
+    }
+  }
+
+  /// Re-populates the registry from a snapshot captured by `NodeHandlers`.
+  /// Used during cache-hit frames where resolve doesn't run but
+  /// registrations must still be live.
+  package func restore(_ snapshot: [Identity: [AnyGestureStateBinding]]) {
+    guard !snapshot.isEmpty else { return }
+    for (identity, bindings) in snapshot {
+      bindingsByIdentity[identity] = bindings
     }
   }
 }
