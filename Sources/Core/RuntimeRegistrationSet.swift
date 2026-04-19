@@ -59,17 +59,33 @@ package struct RuntimeRegistrationSet {
       return
     }
 
+    let preservedGestureIdentities =
+      gestureRegistry?.activeIdentities(rootedAt: roots) ?? []
+
     actionRegistry?.removeSubtrees(rootedAt: roots)
     keyHandlerRegistry?.removeSubtrees(rootedAt: roots)
     pointerHandlerRegistry?.removeSubtrees(rootedAt: roots)
-    gestureRegistry?.removeSubtrees(rootedAt: roots)
-    gestureStateRegistry?.removeSubtrees(rootedAt: roots)
+    gestureRegistry?.removeSubtrees(
+      rootedAt: roots,
+      preserving: preservedGestureIdentities
+    )
+    gestureStateRegistry?.removeSubtrees(
+      rootedAt: roots,
+      preserving: preservedGestureIdentities
+    )
     focusBindingRegistry?.removeSubtrees(rootedAt: roots)
     focusedValuesRegistry?.removeSubtrees(rootedAt: roots)
     lifecycleRegistry?.removeSubtrees(rootedAt: roots)
     taskRegistry?.removeSubtrees(rootedAt: roots)
     preferenceObservationRegistry?.removeSubtrees(rootedAt: roots)
     commandRegistry?.removeSubtrees(rootedAt: roots)
+  }
+
+  package func pruneOrphanedGestures(
+    keeping liveIdentities: Set<Identity>
+  ) {
+    gestureRegistry?.prune(keeping: liveIdentities)
+    gestureStateRegistry?.prune(keeping: liveIdentities)
   }
 
   package func restore(

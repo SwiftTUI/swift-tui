@@ -75,6 +75,9 @@ extension RunLoop {
         artifacts = renderedArtifacts
 
         latestSemanticSnapshot = renderedArtifacts.semanticSnapshot
+        runtimeRegistrations.pruneOrphanedGestures(
+          keeping: renderer.liveIdentitySnapshot()
+        )
 
         // Release pointer capture if the captured region disappeared from
         // the rendered tree (e.g. a view with an active gesture was removed

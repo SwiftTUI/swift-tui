@@ -60,6 +60,56 @@ struct GestureTeardownTests {
     #expect(gestureReg.recognizer(for: parent) == nil)
     #expect(box.currentValue() == 0)  // reset fired
   }
+
+  @Test("RuntimeRegistrationSet.removeSubtrees preserves active gestures during reevaluation")
+  func runtimeRemovalPreservesActiveGestures() {
+    let gestureReg = LocalGestureRegistry()
+    let stateReg = LocalGestureStateRegistry()
+    let identity = Identity(components: [IdentityComponent(rawValue: "drag")])
+
+    let tracker = ActiveTracker()
+    gestureReg.register(identity: identity, recognizer: AnyGestureRecognizer(tracker))
+
+    let box = GestureStateBox<Int>(seed: 0, slotOrdinal: 0)
+    box.setValue(77)
+    stateReg.register(identity: identity, binding: box.eraseToAnyBinding())
+
+    let registrations = RuntimeRegistrationSet(
+      gestureRegistry: gestureReg,
+      gestureStateRegistry: stateReg
+    )
+    registrations.removeSubtrees(rootedAt: [identity])
+
+    #expect(tracker.tornDown == false)
+    #expect(gestureReg.recognizer(for: identity) != nil)
+    #expect(box.currentValue() == 77)
+    #expect(stateReg.bindings(for: identity).count == 1)
+  }
+
+  @Test("RuntimeRegistrationSet.pruneOrphanedGestures cancels removed active gestures")
+  func runtimePrunesOrphanedGestures() {
+    let gestureReg = LocalGestureRegistry()
+    let stateReg = LocalGestureStateRegistry()
+    let identity = Identity(components: [IdentityComponent(rawValue: "drag")])
+
+    let tracker = ActiveTracker()
+    gestureReg.register(identity: identity, recognizer: AnyGestureRecognizer(tracker))
+
+    let box = GestureStateBox<Int>(seed: 0, slotOrdinal: 0)
+    box.setValue(21)
+    stateReg.register(identity: identity, binding: box.eraseToAnyBinding())
+
+    let registrations = RuntimeRegistrationSet(
+      gestureRegistry: gestureReg,
+      gestureStateRegistry: stateReg
+    )
+    registrations.pruneOrphanedGestures(keeping: [])
+
+    #expect(tracker.tornDown == true)
+    #expect(gestureReg.recognizer(for: identity) == nil)
+    #expect(box.currentValue() == 0)
+    #expect(stateReg.bindings(for: identity).isEmpty)
+  }
 }
 
 @MainActor
@@ -67,6 +117,18 @@ private final class TearDownTracker: GestureRecognizer {
   typealias Value = Int
   var phase: GestureRecognizerPhase = .possible
   var tornDown = false
+  func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition { .ignored }
+  func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
+  func currentValue() -> Int? { nil }
+  func tearDown() { tornDown = true }
+}
+
+@MainActor
+private final class ActiveTracker: GestureRecognizer {
+  typealias Value = Int
+  var phase: GestureRecognizerPhase = .possible
+  var tornDown = false
+  var isActive: Bool { true }
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition { .ignored }
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
   func currentValue() -> Int? { nil }
