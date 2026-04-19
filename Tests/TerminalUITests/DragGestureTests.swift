@@ -73,6 +73,8 @@ struct DragGestureTests {
     _ = rec.handle(event: event(.dragged(.primary), at: Point(x: 10, y: 0), at: t2))
     let value: DragGesture.Value? = rec.currentValue()
     let v = try #require(value)
-    #expect(v.velocity.width > 0)  // moving rightward
+    #expect(v.velocity == Size(width: 100, height: 0))
+    #expect(v.predictedEndTranslation == Size(width: 35, height: 0))
+    #expect(v.predictedEndLocation == Point(x: 35, y: 0))
   }
 }

@@ -33,7 +33,7 @@ public struct SemanticExtractor {
           focusRegions.append(
             FocusRegion(
               identity: node.identity,
-              rect: node.bounds,
+              rect: semanticBounds(for: node),
               focusInteractions: node.semanticMetadata.focusInteractions,
               scopePath: scopePath,
               sectionIdentity: sectionIdentity
@@ -48,7 +48,7 @@ public struct SemanticExtractor {
         {
           let computedRect = interactionRect(for: node, clippedTo: clipRect)
           let finalRect =
-            node.semanticMetadata.explicitInteractionRect ?? computedRect
+            transformedExplicitInteractionRect(for: node) ?? computedRect
           if let finalRect {
             interactionRegions.append(
               InteractionRegion(
@@ -254,10 +254,43 @@ extension SemanticExtractor {
     for node: PlacedNode,
     clippedTo clipRect: Rect?
   ) -> Rect? {
+    let semanticBounds = semanticBounds(for: node)
     guard let clipRect else {
-      return node.bounds.isEmpty ? nil : node.bounds
+      return semanticBounds.isEmpty ? nil : semanticBounds
     }
-    return node.bounds.intersection(clipRect)
+    return semanticBounds.intersection(clipRect)
+  }
+
+  private func semanticBounds(
+    for node: PlacedNode
+  ) -> Rect {
+    switch node.layoutBehavior {
+    case .offset(let x, let y):
+      return translated(
+        node.bounds,
+        by: .init(x: x, y: y)
+      )
+    default:
+      return node.bounds
+    }
+  }
+
+  private func transformedExplicitInteractionRect(
+    for node: PlacedNode
+  ) -> Rect? {
+    guard let rect = node.semanticMetadata.explicitInteractionRect else {
+      return nil
+    }
+
+    switch node.layoutBehavior {
+    case .offset(let x, let y):
+      return translated(
+        rect,
+        by: .init(x: x, y: y)
+      )
+    default:
+      return rect
+    }
   }
 
   private func appendPayloadSemantics(
@@ -581,6 +614,19 @@ extension SemanticExtractor {
     return Rect(
       origin: .init(x: minX, y: minY),
       size: .init(width: maxX - minX, height: maxY - minY)
+    )
+  }
+
+  private func translated(
+    _ rect: Rect,
+    by delta: Point
+  ) -> Rect {
+    Rect(
+      origin: .init(
+        x: rect.origin.x + delta.x,
+        y: rect.origin.y + delta.y
+      ),
+      size: rect.size
     )
   }
 }
