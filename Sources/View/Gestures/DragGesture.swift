@@ -19,12 +19,23 @@ public struct DragGesture: Gesture {
   public typealias Body = Never
 
   public struct Value: Equatable, Sendable {
+    /// The absolute monotonic time this sample was produced.
     public var time: MonotonicInstant
+    /// The current location in the resolved `coordinateSpace`.
     public var location: Point
+    /// The location when the drag began.
     public var startLocation: Point
+    /// `location - startLocation`.
     public var translation: Size
+    /// Instantaneous velocity in cells/second, computed from a
+    /// trailing ~100ms sample window. Integer arithmetic — velocities
+    /// below 1 cell/sec truncate to zero.
     public var velocity: Size
+    /// `startLocation + predictedEndTranslation`. Integer truncation
+    /// means velocities below 4 cells/sec produce zero contribution.
     public var predictedEndLocation: Point
+    /// `translation + velocity/4` — projects ~250ms of current velocity
+    /// forward. Integer truncation as above.
     public var predictedEndTranslation: Size
 
     public init(

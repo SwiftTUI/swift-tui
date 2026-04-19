@@ -4,6 +4,15 @@ public import Core
 ///
 /// `Value == Void` — TapGesture exposes no data beyond "it fired."
 /// Use `SpatialTapGesture` if you need the tap location.
+///
+/// ## Terminal-faithful semantics
+///
+/// Unlike SwiftUI on iOS/macOS, there is no inter-tap timeout:
+/// two `.up` events on-target count as a double-tap regardless of
+/// elapsed time between them. Terminals have no OS-level tap
+/// coalescing, so this is the faithful translation of the recognizer
+/// to a discrete-event environment. If your use case requires a
+/// bounded interval, compose with your own timer externally.
 public struct TapGesture: Gesture {
   public typealias Value = Void
   public typealias Body = Never

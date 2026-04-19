@@ -225,6 +225,13 @@ final class MapDecorator<From, To>: GestureRecognizer {
 
 // MARK: - .updating($gestureState)
 
+/// A gesture that threads a value into `@GestureState` with automatic reset
+/// on gesture termination.
+///
+/// > Warning: The `inout Transaction` parameter passed to the updater
+/// > closure is currently a no-op stand-in; mutations to the transaction
+/// > are silently discarded. See `Gesture.updating(_:body:)` documentation
+/// > for details and tracking information.
 public struct GestureStateGesture<Child: Gesture, State>: Gesture {
   public typealias Value = Child.Value
   public typealias Body = Never
@@ -270,6 +277,19 @@ public struct GestureStateGesture<Child: Gesture, State>: Gesture {
 }
 
 extension Gesture {
+  /// Threads the gesture's value into a `@GestureState`-backed cell
+  /// during the gesture, with automatic reset on gesture end.
+  ///
+  /// > Warning: The `inout Transaction` parameter is currently a
+  /// > no-op stand-in. SwiftUI threads the frame's active transaction
+  /// > (from `withAnimation` or the frame scheduler) here so authors
+  /// > can inspect or mutate animation semantics. TerminalUI does
+  /// > not yet plumb this through; mutations to the transaction
+  /// > inside the closure are silently discarded.
+  ///
+  /// Full transaction threading is tracked in
+  /// `docs/proposals/GESTURES_IMPLEMENTATION.md` as a deferred
+  /// enhancement.
   public func updating<State>(
     _ state: GestureStateBinding<State>,
     body: @escaping @MainActor (Value, inout State, inout Transaction) -> Void
