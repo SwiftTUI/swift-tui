@@ -66,6 +66,18 @@ package protocol GestureRecognizer: AnyObject {
 
   var phase: GestureRecognizerPhase { get }
 
+  /// Indicates the recognizer has begun processing a pointer interaction
+  /// and has not yet reached a terminal phase. The runtime uses this to
+  /// preserve recognizer state across view re-resolves that would
+  /// otherwise rebuild and discard the recognizer mid-gesture.
+  ///
+  /// Default: `phase != .possible && !phase.isTerminal` (began/changed).
+  /// Primitives that capture interaction state while still in `.possible`
+  /// — e.g. `DragGesture` records `startLocation` on `.down` but stays
+  /// in `.possible` until `minimumDistance` is crossed — should override
+  /// to include their "has started tracking" condition.
+  var isActive: Bool { get }
+
   /// Delivers an event. Returns whether the event was consumed.
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition
 
@@ -84,11 +96,18 @@ package protocol GestureRecognizer: AnyObject {
   func tearDown()
 }
 
+extension GestureRecognizer {
+  package var isActive: Bool {
+    phase != .possible && !phase.isTerminal
+  }
+}
+
 /// Type-erasing wrapper so the `Gesture` protocol can be used without
 /// exposing Value at the registry level.
 @MainActor
 public final class AnyGestureRecognizer {
   private let _phase: () -> GestureRecognizerPhase
+  private let _isActive: () -> Bool
   private let _handleEvent: (LocalPointerEvent) -> GestureRecognizerEventDisposition
   private let _handleDeadline: (MonotonicInstant) -> Bool
   private let _tearDown: () -> Void
@@ -99,6 +118,7 @@ public final class AnyGestureRecognizer {
 
   package init<R: GestureRecognizer>(_ recognizer: R) {
     self._phase = { recognizer.phase }
+    self._isActive = { recognizer.isActive }
     self._handleEvent = { recognizer.handle(event: $0) }
     self._handleDeadline = { recognizer.handleDeadline(at: $0) }
     self._tearDown = { recognizer.tearDown() }
@@ -107,6 +127,11 @@ public final class AnyGestureRecognizer {
   }
 
   public var phase: GestureRecognizerPhase { _phase() }
+
+  /// Whether the recognizer is mid-interaction. `LocalGestureRegistry`
+  /// uses this to preserve state when `.gesture(_:)` re-resolves during
+  /// an active gesture.
+  public var isActive: Bool { _isActive() }
 
   package func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     _handleEvent(event)

@@ -50,13 +50,34 @@ struct _AttachGestureModifier<Content: View, G: Gesture>: View, ResolvableView {
       gestureStateRegistry: context.localGestureStateRegistry,
       requestDeadline: requestDeadline
     )
+
+    // Drop stale `@GestureState` bindings from prior body evaluations
+    // before the fresh recognizer registers its own. `.register`
+    // appends (one `.updating` node = one binding), and
+    // `.gesture(_:)` rebuilds the tree on every resolve — without
+    // this clear, the per-identity bindings array grows unboundedly
+    // across frames, retaining discarded `GestureStateBox` instances.
+    context.localGestureStateRegistry?.clearBindings(for: node.identity)
+
     let recognizer = gesture._makeRecognizer(context: buildContext)
     gestureRegistry.register(identity: node.identity, recognizer: recognizer)
 
-    // Forward pointer events through the recognizer.
+    // Forward pointer events through the recognizer. The handler
+    // closure looks up the *current* recognizer from
+    // `LocalGestureRegistry` at dispatch time rather than capturing
+    // the one built above by value: `.gesture(_:)` rebuilds the tree
+    // on every body evaluation, but `register(identity:recognizer:)`
+    // preserves an `isActive` recognizer across rebuilds — so the
+    // recognizer resolved here on one resolve may end up being kept
+    // across the next, and we must route events to whichever wins.
     let routeID = primaryRouteID(for: node.identity)
+    let gestureRegistryRef = gestureRegistry
+    let handlerIdentity = node.identity
     pointerRegistry.register(routeID: routeID) { event in
-      let disposition = recognizer.handle(event: event)
+      guard let current = gestureRegistryRef.recognizer(for: handlerIdentity) else {
+        return false
+      }
+      let disposition = current.handle(event: event)
       return disposition == .handled
     }
 

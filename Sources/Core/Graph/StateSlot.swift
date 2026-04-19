@@ -10,25 +10,60 @@ package struct AnyStateSlot {
     storage = .uninitialized
   }
 
+  /// Creates an initialized slot. If `T` conforms to `Equatable` at
+  /// runtime, the slot stores a type-safe equality comparator so later
+  /// `set(_:)` calls can report `didChange` correctly. Otherwise the
+  /// comparator conservatively reports every write as a change.
+  ///
+  /// Historically this type had both an `init<T>` and an
+  /// `init<T: Equatable>` overload, but the Equatable overload was
+  /// unreachable from most callers (including `initializeIfNeeded` and
+  /// `set`) because Swift resolves overloads based on statically-known
+  /// constraints. Every slot silently ended up with the always-false
+  /// comparator, which in turn caused `setStateSlot` to treat every
+  /// write as a change — a latent source of spurious invalidations
+  /// (notably: `@GestureState` reset-on-teardown writing the same seed
+  /// value to a slot whose previous value was already seed would still
+  /// dirty the view and schedule another frame, producing an infinite
+  /// resolve loop). The fix: detect Equatable via `any Equatable`
+  /// existential opening at init time and build the right comparator
+  /// regardless of static constraint context.
   package init<T>(_ value: T) {
-    storage = .value(
-      value,
-      T.self,
-      { _, _ in false }
-    )
+    storage = Self.makeStorage(value: value, valueType: T.self)
   }
 
-  package init<T: Equatable>(_ value: T) {
-    storage = .value(
-      value,
-      T.self,
-      { lhs, rhs in
-        guard let lhs = lhs as? T, let rhs = rhs as? T else {
-          return false
-        }
-        return lhs == rhs
+  private static func makeStorage<T>(
+    value: T,
+    valueType: Any.Type
+  ) -> Storage {
+    if let equatable = value as? any Equatable {
+      return .value(value, valueType, makeEquatableComparator(equatable))
+    }
+    return .value(value, valueType, { _, _ in false })
+  }
+
+  /// Accepts an `any Equatable` existential and returns a comparator
+  /// closure bound to the existential's concrete static type via
+  /// Swift's implicit existential opening.
+  private static func makeEquatableComparator(
+    _ sample: any Equatable
+  ) -> (Any, Any) -> Bool {
+    return makeEquatableComparatorImpl(sample)
+  }
+
+  /// The implicit-existential-opening trampoline: when called with an
+  /// `any Equatable` argument, Swift 5.7+ binds `T` to the concrete
+  /// underlying type, so the returned closure captures a proper
+  /// type-safe `==`.
+  private static func makeEquatableComparatorImpl<T: Equatable>(
+    _ sample: T
+  ) -> (Any, Any) -> Bool {
+    return { lhs, rhs in
+      guard let l = lhs as? T, let r = rhs as? T else {
+        return false
       }
-    )
+      return l == r
+    }
   }
 
   package func stores<T>(_ type: T.Type) -> Bool {
@@ -71,7 +106,10 @@ package struct AnyStateSlot {
     }
 
     let didChange = !equals(existingValue, value)
-    self = AnyStateSlot(value)
+    // Preserve the existing `equals` closure — equality semantics are
+    // fixed at initial-store time and must not be reset to the
+    // non-Equatable always-false comparator when the value updates.
+    storage = .value(value, valueType, equals)
     return didChange
   }
 

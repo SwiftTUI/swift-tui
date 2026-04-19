@@ -107,6 +107,15 @@ final class DragGestureRecognizer: GestureRecognizer {
     self.coordinateSpace = coordinateSpace
   }
 
+  /// `startLocation` is set on `.down` but `phase` stays `.possible`
+  /// until `minimumDistance` is crossed — override `isActive` so the
+  /// registry sees the recognizer as in-flight from `.down` onward,
+  /// protecting its state from being torn down by a re-resolve that
+  /// lands between `.down` and the first `.dragged`.
+  var isActive: Bool {
+    startLocation != nil && !phase.isTerminal
+  }
+
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     guard !phase.isTerminal else { return .ignored }
     switch event.kind {

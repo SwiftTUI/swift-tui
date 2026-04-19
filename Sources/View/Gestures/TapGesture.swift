@@ -48,6 +48,13 @@ final class TapGestureRecognizer: GestureRecognizer {
     self.requiredCount = count
   }
 
+  /// A `.down` event sets `pressStart` but `phase` stays `.possible`
+  /// until `requiredCount` taps complete — override so the registry
+  /// preserves the recognizer across re-resolves during the press.
+  var isActive: Bool {
+    pressStart != nil && !phase.isTerminal
+  }
+
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     guard !phase.isTerminal else { return .ignored }
 

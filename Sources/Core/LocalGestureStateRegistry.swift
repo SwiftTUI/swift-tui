@@ -60,6 +60,21 @@ package final class LocalGestureStateRegistry: Equatable {
     bindingsByIdentity[identity] ?? []
   }
 
+  /// Drops all bindings for `identity` without firing their reset
+  /// closures. `.gesture(_:)` calls this before registering a fresh
+  /// recognizer tree so the per-resolve `register` calls don't
+  /// accumulate stale bindings pointing to discarded
+  /// `GestureStateBox` instances from prior body evaluations.
+  ///
+  /// Does NOT call `resetToSeed` on the dropped bindings — those
+  /// bindings point to boxes from previous body runs that are already
+  /// detached from the view's live state slot; resetting them would
+  /// either no-op or (worse) trample the current gesture's in-flight
+  /// state.
+  package func clearBindings(for identity: Identity) {
+    bindingsByIdentity.removeValue(forKey: identity)
+  }
+
   package func resetAll(for identity: Identity) {
     for binding in bindings(for: identity) {
       binding.resetToSeed()
@@ -67,9 +82,12 @@ package final class LocalGestureStateRegistry: Equatable {
   }
 
   package func reset() {
-    for bindings in bindingsByIdentity.values {
-      for binding in bindings { binding.resetToSeed() }
-    }
+    // Full-frame rebuilds call this; do NOT fire `resetToSeed` on
+    // registered bindings — a gesture in progress would have its
+    // `@GestureState` value silently wiped between frames. Subtree
+    // teardown (`removeSubtrees`) is the correct place to reset
+    // values because that genuinely corresponds to the view
+    // disappearing.
     bindingsByIdentity.removeAll(keepingCapacity: true)
   }
 

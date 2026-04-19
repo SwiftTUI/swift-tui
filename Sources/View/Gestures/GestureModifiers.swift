@@ -52,6 +52,7 @@ final class OnEndedDecorator<V>: GestureRecognizer {
   }
 
   var phase: GestureRecognizerPhase { inner.phase }
+  var isActive: Bool { inner.isActive }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     let disposition = inner.handle(event: event)
@@ -130,6 +131,7 @@ final class OnChangedDecorator<V: Equatable>: GestureRecognizer {
   }
 
   var phase: GestureRecognizerPhase { inner.phase }
+  var isActive: Bool { inner.isActive }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     let disposition = inner.handle(event: event)
@@ -206,6 +208,7 @@ final class MapDecorator<From, To>: GestureRecognizer {
   }
 
   var phase: GestureRecognizerPhase { inner.phase }
+  var isActive: Bool { inner.isActive }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     inner.handle(event: event)
@@ -306,6 +309,17 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
   let box: GestureStateBox<S>
   let updater: @MainActor (V, inout S, inout Transaction) -> Void
 
+  /// Tracks whether this decorator's updater has actually written to
+  /// `box` during the gesture's lifetime. Guards `box.resetToSeed()`:
+  /// resetting an already-seed box is surprisingly consequential
+  /// because `.gesture(_:)` rebuilds its recognizer tree on every
+  /// resolve, and `LocalGestureRegistry.register` tears down the
+  /// previous recognizer on replace — if `tearDown` unconditionally
+  /// called `resetToSeed`, an attached gesture that never fired would
+  /// still write to the `@GestureState` slot every frame, dirtying the
+  /// owning view and scheduling another resolve pass ad infinitum.
+  private var didFire = false
+
   init(
     inner: AnyGestureRecognizer,
     box: GestureStateBox<S>,
@@ -317,6 +331,7 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
   }
 
   var phase: GestureRecognizerPhase { inner.phase }
+  var isActive: Bool { inner.isActive }
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     let disposition = inner.handle(event: event)
@@ -327,17 +342,20 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
       var transaction = Transaction()
       updater(value, &state, &transaction)
       box.setValue(state)
+      didFire = true
     }
-    if inner.phase.isTerminal {
+    if inner.phase.isTerminal, didFire {
       box.resetToSeed()
+      didFire = false
     }
     return disposition
   }
 
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
     let didTerminate = inner.handleDeadline(at: instant)
-    if didTerminate {
+    if didTerminate, didFire {
       box.resetToSeed()
+      didFire = false
     }
     return didTerminate
   }
@@ -346,6 +364,9 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
 
   func tearDown() {
     inner.tearDown()
-    box.resetToSeed()
+    if didFire {
+      box.resetToSeed()
+      didFire = false
+    }
   }
 }

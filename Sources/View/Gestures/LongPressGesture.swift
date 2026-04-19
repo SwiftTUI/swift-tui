@@ -66,6 +66,10 @@ final class LongPressGestureRecognizer: GestureRecognizer {
     self.requestDeadline = requestDeadline
   }
 
+  var isActive: Bool {
+    pressStart != nil && !phase.isTerminal
+  }
+
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     guard !phase.isTerminal else { return .ignored }
     switch event.kind {

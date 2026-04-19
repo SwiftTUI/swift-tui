@@ -8,13 +8,15 @@ import Testing
 @MainActor
 @Suite
 struct GestureResetAndReplayTests {
-  @Test("resetAll drains gesture recognizers and tears them down")
+  @Test("resetAll drains inactive recognizers and clears state bindings without firing resetToSeed")
   func resetAllDrainsGestures() {
     let gestureRegistry = LocalGestureRegistry()
     let stateRegistry = LocalGestureStateRegistry()
     let identity = Identity(components: [IdentityComponent(rawValue: "r")])
 
     let tracker = TearDownTracker()
+    // `tracker.phase` is `.possible` with no "has started tracking"
+    // signal — default `isActive == false` — so resetAll tears it down.
     gestureRegistry.register(identity: identity, recognizer: AnyGestureRecognizer(tracker))
 
     let box = GestureStateBox<Int>(seed: 0, slotOrdinal: 0)
@@ -27,9 +29,35 @@ struct GestureResetAndReplayTests {
     )
     set.resetAll()
 
+    // Inactive recognizer: torn down and removed.
     #expect(tracker.tornDown == true)
     #expect(gestureRegistry.recognizer(for: identity) == nil)
-    #expect(box.currentValue() == 0)
+    // State registry: bindings dict cleared …
+    #expect(stateRegistry.bindings(for: identity).isEmpty)
+    // … but the box is NOT reset. `resetAll` fires on every
+    // full-resolve frame; calling `resetToSeed` from here would wipe
+    // a mid-flight `@GestureState` value between frames. Subtree
+    // teardown (`removeSubtrees`) is the correct path for that reset
+    // (see `stateRegistryRemoveSubtrees`).
+    #expect(box.currentValue() == 99)
+  }
+
+  @Test("resetAll preserves an active recognizer mid-gesture")
+  func resetAllPreservesActive() {
+    let gestureRegistry = LocalGestureRegistry()
+    let identity = Identity(components: [IdentityComponent(rawValue: "r")])
+
+    let active = ActiveTracker()
+    gestureRegistry.register(identity: identity, recognizer: AnyGestureRecognizer(active))
+
+    let set = RuntimeRegistrationSet(gestureRegistry: gestureRegistry)
+    set.resetAll()
+
+    // Active recognizer survives resetAll — otherwise a `.down` event
+    // between full-resolve frames would have its captured state
+    // silently torn down before the first `.dragged` arrives.
+    #expect(active.tornDown == false)
+    #expect(gestureRegistry.recognizer(for: identity) != nil)
   }
 
   @Test("Gesture recognizer survives a cache-hit rebuild via ViewNode replay")
@@ -98,6 +126,20 @@ struct GestureResetAndReplayTests {
 private final class TearDownTracker: GestureRecognizer {
   typealias Value = Int
   var phase: GestureRecognizerPhase = .possible
+  var tornDown = false
+  func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition { .ignored }
+  func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
+  func currentValue() -> Int? { nil }
+  func tearDown() { tornDown = true }
+}
+
+/// Reports `isActive == true` to simulate a recognizer that has
+/// captured interaction state while still in `.possible`.
+@MainActor
+private final class ActiveTracker: GestureRecognizer {
+  typealias Value = Int
+  var phase: GestureRecognizerPhase = .possible
+  var isActive: Bool { true }
   var tornDown = false
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition { .ignored }
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
