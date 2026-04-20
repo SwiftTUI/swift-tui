@@ -19,4 +19,10 @@ struct DroppedPathTests {
     let path: DroppedPath = "/tmp/x"
     #expect(path.rawValue == "/tmp/x")
   }
+
+  @Test("DroppedPath debugDescription includes the type name and raw value")
+  func debugDescriptionFormat() {
+    let path = DroppedPath("/a/b")
+    #expect(path.debugDescription == "DroppedPath(/a/b)")
+  }
 }
