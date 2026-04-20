@@ -28,6 +28,10 @@ extension RunLoop {
         }
         handleMouseEvent(mouseEvent)
         return nil
+      case .paste:
+        // Paste dispatch arrives in a subsequent task; ignore for now
+        // to keep the build green without altering current behavior.
+        return nil
       }
     }
   }

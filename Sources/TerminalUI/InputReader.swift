@@ -84,10 +84,24 @@ public struct MouseEvent: Equatable, Sendable {
   }
 }
 
+/// A bracketed-paste burst emitted by the terminal between
+/// `ESC[200~` and `ESC[201~`. The `content` is the raw payload with
+/// no terminal framing — callers decide whether the bytes represent a
+/// file drop (routed to `.dropDestination` destinations) or ordinary
+/// pasted text (routed back as character `KeyPress` events).
+public struct PasteEvent: Equatable, Sendable {
+  public var content: String
+
+  public init(content: String) {
+    self.content = content
+  }
+}
+
 /// A normalized terminal input event.
 public enum InputEvent: Equatable, Sendable {
   case key(KeyPress)
   case mouse(MouseEvent)
+  case paste(PasteEvent)
 
   /// Convenience for creating a key event with optional modifiers.
   public static func key(
@@ -120,6 +134,9 @@ func coalescedInputEvents(
   for event in events {
     switch event {
     case .key:
+      flushPendingMouseEvent()
+      coalesced.append(event)
+    case .paste:
       flushPendingMouseEvent()
       coalesced.append(event)
     case .mouse(let mouseEvent):
