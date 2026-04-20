@@ -32,7 +32,7 @@ struct ImagesTab: View {
   }
 
   // 1. Intrinsic — the image is measured in terminal cells using
-  //    `ceil(pixelSize / terminalCellPixelSize)`. With the default
+  //    `ceil(pixelSize / cellPixelMetrics)`. With the default
   //    8×16 cell size, an 85×128 pixel PNG resolves to roughly
   //    11×8 cells and is placed unscaled.
   private var intrinsicSection: some View {
