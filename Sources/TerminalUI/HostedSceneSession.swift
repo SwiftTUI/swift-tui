@@ -21,6 +21,7 @@ package typealias HostedSceneRunner =
 @MainActor
 public final class HostedSceneSession {
   public let descriptor: TerminalUISceneDescriptor
+  public private(set) var currentFocusPresentation: FocusPresentation = .none
 
   private let sessionName: String
   private let host: StreamingTerminalHost
@@ -30,6 +31,7 @@ public final class HostedSceneSession {
   private let stateContainer: StateContainer<TerminalUISceneSessionState>
   private let focusTracker: FocusTracker
   private let runScene: HostedSceneRunner
+  private let onFocusPresentationChange: (@MainActor @Sendable (FocusPresentation) -> Void)?
   private var runTask: Task<RunLoopExitReason, any Error>?
 
   public convenience init<A: App>(
@@ -39,7 +41,9 @@ public final class HostedSceneSession {
     appearance: TerminalAppearance,
     theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
-    onOutput: @escaping @Sendable (String) -> Void
+    onOutput: @escaping @Sendable (String) -> Void,
+    onFocusPresentationChange:
+      (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) throws {
     let sessionName = "\(String(reflecting: A.self)).\(sceneID.rawValue)"
     var visitor = HostedSceneSelectionVisitor(
@@ -64,7 +68,8 @@ public final class HostedSceneSession {
       theme: theme,
       capabilityProfile: capabilityProfile,
       runScene: selection.runScene,
-      onOutput: onOutput
+      onOutput: onOutput,
+      onFocusPresentationChange: onFocusPresentationChange
     )
   }
 
@@ -77,7 +82,9 @@ public final class HostedSceneSession {
     theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile,
     runScene: @escaping HostedSceneRunner,
-    onOutput: @escaping @Sendable (String) -> Void
+    onOutput: @escaping @Sendable (String) -> Void,
+    onFocusPresentationChange:
+      (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) {
     self.descriptor = descriptor
     self.sessionName = sessionName
@@ -108,6 +115,7 @@ public final class HostedSceneSession {
     focusTracker = FocusTracker(
       invalidationIdentities: [rootIdentity]
     )
+    self.onFocusPresentationChange = onFocusPresentationChange
   }
 
   public func start() async throws -> RunLoopExitReason {
@@ -120,7 +128,10 @@ public final class HostedSceneSession {
       terminalInputReader: inputReader,
       signalReader: signalReader,
       scheduler: scheduler,
-      surfaceName: "hosted-\(descriptor.id.rawValue)"
+      surfaceName: "hosted-\(descriptor.id.rawValue)",
+      focusPresentationHandler: { [weak self] presentation in
+        self?.updateCurrentFocusPresentation(presentation)
+      }
     )
 
     let task = Task {
@@ -138,9 +149,11 @@ public final class HostedSceneSession {
     do {
       let exitReason = try await task.value
       runTask = nil
+      updateCurrentFocusPresentation(.none)
       return exitReason
     } catch {
       runTask = nil
+      updateCurrentFocusPresentation(.none)
       throw error
     }
   }
@@ -195,6 +208,20 @@ public final class HostedSceneSession {
   public func stop() {
     inputReader.finish()
     signalReader.finish()
+    updateCurrentFocusPresentation(.none)
+  }
+}
+
+extension HostedSceneSession {
+  private func updateCurrentFocusPresentation(
+    _ presentation: FocusPresentation
+  ) {
+    guard currentFocusPresentation != presentation else {
+      return
+    }
+
+    currentFocusPresentation = presentation
+    onFocusPresentationChange?(presentation)
   }
 }
 
