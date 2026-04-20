@@ -165,6 +165,17 @@ enum InputReaderTiming {
   static let mouseEventFlushDelayMilliseconds = 1
 }
 
+/// Returns `true` when `buffer` begins with the 6-byte bracketed-paste
+/// start marker `ESC [ 2 0 0 ~`.  Pure and side-effect free.
+private func matchesBracketedPasteStart(_ buffer: [UInt8]) -> Bool {
+  let marker: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E]
+  guard buffer.count >= marker.count else { return false }
+  for index in 0..<marker.count where buffer[index] != marker[index] {
+    return false
+  }
+  return true
+}
+
 /// Schedule-once-per-cluster state machine for the input reader's
 /// pending-mouse-event flush.  Extracted from the dispatch-source-
 /// based reader so the schedule invariant can be tested without
@@ -297,7 +308,10 @@ extension TerminalInputParser {
 
   private mutating func parseEscapeSequence() -> InputEvent? {
     guard bufferedBytes.count > 1 else {
-      return nil
+      // Lone ESC — emit a bare escape key press so consumers receive
+      // the keystroke instead of stalling until the next byte arrives.
+      bufferedBytes.removeFirst()
+      return .key(KeyPress(.escape))
     }
 
     guard bufferedBytes[1] == 0x5B else {
@@ -321,6 +335,11 @@ extension TerminalInputParser {
 
     guard bufferedBytes.count > 2 else {
       return nil
+    }
+
+    // Bracketed-paste start: ESC [ 2 0 0 ~ ... ESC [ 2 0 1 ~
+    if matchesBracketedPasteStart(bufferedBytes) {
+      return parseBracketedPaste()
     }
 
     if bufferedBytes[2] == 0x3C {
@@ -426,6 +445,40 @@ extension TerminalInputParser {
     case 0x46: return .end
     default: return nil
     }
+  }
+
+  /// Parses a bracketed-paste envelope: `ESC [ 2 0 0 ~ <payload> ESC [ 2 0 1 ~`.
+  ///
+  /// On entry the buffer is guaranteed to begin with the 6-byte start marker.
+  /// If the matching end marker is already buffered, the whole envelope is
+  /// consumed and a `.paste` event is returned.  Otherwise the buffer is left
+  /// untouched so the caller can wait for more bytes.
+  private mutating func parseBracketedPaste() -> InputEvent? {
+    // Buffer layout at entry: ESC [ 2 0 0 ~ <payload> ESC [ 2 0 1 ~
+    let startMarker: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x30, 0x7E]
+    let endMarker: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
+    guard bufferedBytes.count >= startMarker.count else { return nil }
+    // Look for the end marker anywhere after the start marker.
+    let payloadStart = startMarker.count
+    var searchIndex = payloadStart
+    let totalCount = bufferedBytes.count
+    while searchIndex + endMarker.count <= totalCount {
+      var matches = true
+      for offset in 0..<endMarker.count
+      where bufferedBytes[searchIndex + offset] != endMarker[offset] {
+        matches = false
+        break
+      }
+      if matches {
+        let payloadBytes = Array(bufferedBytes[payloadStart..<searchIndex])
+        bufferedBytes.removeFirst(searchIndex + endMarker.count)
+        let content = String(decoding: payloadBytes, as: UTF8.self)
+        return .paste(PasteEvent(content: content))
+      }
+      searchIndex += 1
+    }
+    // End marker not yet seen — keep buffering.
+    return nil
   }
 
   private mutating func parseSGRMouseSequence() -> InputEvent? {
