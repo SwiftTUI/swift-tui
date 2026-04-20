@@ -2,7 +2,6 @@ import Testing
 
 @testable import Core
 @_spi(Runners) @testable import TerminalUI
-@testable import View
 
 #if canImport(Darwin)
   import Darwin
