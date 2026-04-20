@@ -1055,8 +1055,18 @@ extension Rasterizer {
         canvas.fillEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
       }
     case .ellipse:
-      let rx = max(0, (subW - 1) / 2)
-      let ry = max(0, (subH - 1) / 2)
+      // Compute semi-axes in pixel space, then convert back to sub-pixel
+      // coordinates using the current sub-pixel dimensions. The `-1` preserves
+      // inclusive-bound semantics so the outline stays within (0...sub-1).
+      // At 8x16 metrics (the default), this reproduces the pre-correction
+      // output exactly because sub-pixels are square.
+      let metrics = environment.cellPixelMetrics
+      let subpixelPxWidth = max(1, metrics.width / 2)
+      let subpixelPxHeight = max(1, metrics.height / 4)
+      let halfWidthPx = (cellW * metrics.width) / 2
+      let halfHeightPx = (cellH * metrics.height) / 2
+      let rx = max(0, halfWidthPx / subpixelPxWidth - 1)
+      let ry = max(0, halfHeightPx / subpixelPxHeight - 1)
       if stroke {
         canvas.strokeEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
       } else {
