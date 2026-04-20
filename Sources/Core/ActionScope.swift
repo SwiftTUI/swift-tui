@@ -13,7 +13,6 @@
 /// See `docs/proposals/ACTION_SCOPES_AND_COMMANDS.md` for the full
 /// design.
 public protocol ActionScope: Identifiable {
-  associatedtype ID: Hashable & Sendable
 }
 
 /// A type-erased `Hashable & Sendable` identity.
@@ -48,12 +47,12 @@ public struct AnyID: Hashable, Sendable {
   }
 }
 
-internal protocol AnyIDBox: Sendable {
+private protocol AnyIDBox: Sendable {
   func hash(into hasher: inout Hasher)
   func isEqual(to other: any AnyIDBox) -> Bool
 }
 
-internal struct AnyIDConcreteBox<Value: Hashable & Sendable>: AnyIDBox {
+private struct AnyIDConcreteBox<Value: Hashable & Sendable>: AnyIDBox {
   let value: Value
 
   init(value: Value) {

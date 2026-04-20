@@ -402,15 +402,13 @@ extension TabView {
     let foreground: AnyShapeStyle =
       if isSelected {
         AnyShapeStyle(.terminalAccent(tone))
-      } else if isFocused {
-        .semantic(.foreground)
       } else {
-        .semantic(.muted)
+        .semantic(.foreground)
       }
     return Text("\(label) ")
       .lineLimit(1)
       .foregroundStyle(foreground)
-      .drawMetadata(.init(opacity: isSelected || isFocused ? 1.0 : 0.4))
+      .drawMetadata(.init(opacity: 1.0))
   }
 
   @ViewBuilder
@@ -495,10 +493,8 @@ extension TabView {
     let labelForeground: AnyShapeStyle =
       if isSelected {
         AnyShapeStyle(.terminalAccent(tone))
-      } else if isFocused {
-        .semantic(.foreground)
       } else {
-        .semantic(.separator)
+        .semantic(.foreground)
       }
     return HStack(alignment: .top, spacing: 0) {
       Text("│ ")
@@ -508,7 +504,7 @@ extension TabView {
       Text(label)
         .lineLimit(1)
         .foregroundStyle(labelForeground)
-        .drawMetadata(.init(opacity: isSelected || isFocused ? 1.0 : 0.8))
+        .drawMetadata(.init(opacity: 1.0))
       Text(" │")
         .lineLimit(1)
         .foregroundStyle(chromeForeground)
@@ -561,10 +557,8 @@ extension TabView {
     let foreground: AnyShapeStyle =
       if isSelected {
         selectedForegroundStyle
-      } else if isFocused {
-        .semantic(.foreground)
       } else {
-        .semantic(.muted)
+        .semantic(.foreground)
       }
     let separatorGlyph = trailingSeparatorStyle.glyph
     let separatorForeground: AnyShapeStyle =
@@ -580,7 +574,7 @@ extension TabView {
             Rectangle().fill(selectedBackgroundStyle)
           }
         }
-        .drawMetadata(.init(opacity: isSelected || isFocused ? 1.0 : 0.6))
+        .drawMetadata(.init(opacity: 1.0))
       if showsTrailingSeparator {
         Text(separatorGlyph)
           .lineLimit(1)

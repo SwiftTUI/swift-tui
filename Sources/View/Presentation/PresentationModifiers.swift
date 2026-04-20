@@ -76,21 +76,36 @@ package func confirmationDialogPromptPresentationSpec() -> PromptPresentationSpe
 }
 
 package func sheetPromptPresentationSpec(
-  backdropOpacity: Double = 0
+  backdropOpacity: Double = 0,
+  chrome: PresentationChrome = .surface
 ) -> PromptPresentationSpec {
-  PromptPresentationSpec(
+  // Dropdown-chromed sheets want to land flush against the window
+  // edge (top, full width) rather than floating centered; override
+  // the layout defaults so callers don't have to restate them.
+  let alignment: Alignment =
+    switch chrome {
+    case .surface: .center
+    case .dropdown: .topLeading
+    }
+  let minWidth: Int =
+    switch chrome {
+    case .surface: 20
+    case .dropdown: 0
+    }
+  return PromptPresentationSpec(
     token: "sheet",
     descriptor: .init(
-      alignment: .center,
+      alignment: alignment,
       presentationRole: .sheet,
       backdropOpacity: backdropOpacity,
       defaultDismissTitle: "Close",
       headerTone: .accent,
-      minWidth: 20,
+      minWidth: minWidth,
       scrollMinHeight: 4,
       scrollIdealHeight: 12,
       scrollMaxHeight: 20,
-      bodyMode: .contentOnly
+      bodyMode: .contentOnly,
+      chrome: chrome
     ),
     reconcile: { registry, sourceIdentity, item in
       registry.sheet.sync(
@@ -193,6 +208,28 @@ extension View {
       title: String(title),
       isPresented: isPresented,
       spec: sheetPromptPresentationSpec(),
+      sheetContent: sheetContent()
+    )
+  }
+
+  /// Presents `content` as a full-width, top-aligned dropdown banner
+  /// with a single soft bottom divider and no side or top border —
+  /// suited to command palettes and similar chrome that should read as
+  /// part of the window itself rather than a floating card.
+  ///
+  /// Semantically a sheet (routes through the sheet presentation
+  /// registry and obeys the same Escape-dismissal rules), distinguished
+  /// only by its visual chrome.
+  public func paletteSheet<S: StringProtocol, SheetContent: View>(
+    _ title: S,
+    isPresented: Binding<Bool>,
+    @ViewBuilder content sheetContent: () -> SheetContent
+  ) -> some View {
+    BuiltinSheetPresentationModifier(
+      content: self,
+      title: String(title),
+      isPresented: isPresented,
+      spec: sheetPromptPresentationSpec(chrome: .dropdown),
       sheetContent: sheetContent()
     )
   }
@@ -321,7 +358,15 @@ package struct HostedPromptPresentation: View {
   }
 
   package var body: some View {
-    ZStack(alignment: .topLeading) {
+    // Dropdown chrome lands flush against the window edges; surface
+    // chrome floats with a 1-cell inset so the stroked box never kisses
+    // the terminal edge.
+    let insetEdges: EdgeInsets =
+      switch item.descriptor.chrome {
+      case .surface: .init(top: 1, leading: 1, bottom: 1, trailing: 1)
+      case .dropdown: .init(top: 0, leading: 0, bottom: 0, trailing: 0)
+      }
+    return ZStack(alignment: .topLeading) {
       if item.descriptor.backdropOpacity > 0 {
         Rectangle()
           .fill(.background.opacity(item.descriptor.backdropOpacity))
@@ -329,14 +374,7 @@ package struct HostedPromptPresentation: View {
       }
 
       PromptPresentationSurface(item: item)
-        .padding(
-          .init(
-            top: 1,
-            leading: 1,
-            bottom: 1,
-            trailing: 1
-          )
-        )
+        .padding(insetEdges)
         .frame(
           maxWidth: .infinity,
           maxHeight: .infinity,
@@ -384,7 +422,7 @@ package struct PromptPresentationSurface: View, ActionScope {
   package var body: some View {
     let surfaceBackground = AnyShapeStyle(.terminalSurfaceBackground)
 
-    VStack(alignment: .leading, spacing: 0) {
+    let content = VStack(alignment: .leading, spacing: 0) {
       presentationHeader
       switch item.descriptor.bodyMode {
       case .contentOnly:
@@ -394,26 +432,58 @@ package struct PromptPresentationSurface: View, ActionScope {
       }
     }
     .padding(.init(horizontal: 1, vertical: 1))
-    .background {
-      RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(surfaceBackground)
-    }
-    .overlay {
-      RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-        .terminalBorder(.accent),
-        style: .presentationChrome
+
+    switch item.descriptor.chrome {
+    case .surface:
+      return AnyView(
+        content
+          .background {
+            RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(surfaceBackground)
+          }
+          .overlay {
+            RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+              .terminalBorder(.accent),
+              style: .presentationChrome
+            )
+          }
+          .frame(
+            minWidth: .finite(item.descriptor.minWidth),
+            maxWidth: maximumWidth,
+            alignment: .leading
+          )
+          .focusScope()
+          .semanticMetadata(
+            .init(
+              presentationRole: item.descriptor.presentationRole
+            )
+          )
+      )
+    case .dropdown:
+      // Full-width, top-aligned strip. No side or top border — a single
+      // soft bottom divider reads as a shadow under the content.
+      return AnyView(
+        content
+          .frame(
+            maxWidth: .infinity,
+            alignment: .topLeading
+          )
+          .background {
+            Rectangle().fill(surfaceBackground)
+          }
+          .overlay(alignment: .bottom) {
+            Divider()
+              .foregroundStyle(.separator)
+              .drawMetadata(.init(opacity: 0.6))
+              .frame(maxWidth: .infinity, alignment: .bottom)
+          }
+          .focusScope()
+          .semanticMetadata(
+            .init(
+              presentationRole: item.descriptor.presentationRole
+            )
+          )
       )
     }
-    .frame(
-      minWidth: .finite(item.descriptor.minWidth),
-      maxWidth: maximumWidth,
-      alignment: .leading
-    )
-    .focusScope()
-    .semanticMetadata(
-      .init(
-        presentationRole: item.descriptor.presentationRole
-      )
-    )
   }
 
   private var maximumWidth: ProposedDimension {

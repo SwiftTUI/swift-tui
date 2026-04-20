@@ -131,7 +131,7 @@ public struct GalleryView: View {
       action: { selection = .fullScreen }
     )
     .toolbar(style: DefaultBottomToolbarStyle())
-    .sheet("Command palette", isPresented: $isPaletteOpen) {
+    .paletteSheet("Command palette", isPresented: $isPaletteOpen) {
       // Read from the class holder at sheet-content construction
       // time. Because we mutated holder.commands earlier in this
       // same body pass (inside the EnvironmentReader closure), the

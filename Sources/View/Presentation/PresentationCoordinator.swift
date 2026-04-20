@@ -364,6 +364,24 @@ where Item.ID: Sendable {
 
 // MARK: - Built-In Item Models
 
+/// Visual chrome treatment applied to a prompt presentation's surface.
+///
+/// Sheets, alerts, and confirmation dialogs share one rendering path;
+/// this enum selects how the chrome around the content is drawn.
+public enum PresentationChrome: Equatable, Sendable {
+  /// Default: rounded inset surface with a foreground-tint stroke on
+  /// every side. Used by alerts, confirmation dialogs, and standard
+  /// sheets.
+  case surface
+
+  /// Flat, edge-to-edge strip with no side or top border and a single
+  /// soft divider along the bottom that reads like a shadow under the
+  /// content. Used for command-palette dropdowns and similar banners
+  /// that should read as part of the window chrome rather than a
+  /// floating card.
+  case dropdown
+}
+
 package struct PromptPresentationDescriptor: Equatable, Sendable {
   package enum BodyMode: Equatable, Sendable {
     case contentOnly
@@ -381,6 +399,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
   package var scrollIdealHeight: Int
   package var scrollMaxHeight: Int
   package var bodyMode: BodyMode
+  package var chrome: PresentationChrome
 
   package init(
     alignment: Alignment,
@@ -393,7 +412,8 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
     scrollMinHeight: Int,
     scrollIdealHeight: Int,
     scrollMaxHeight: Int,
-    bodyMode: BodyMode
+    bodyMode: BodyMode,
+    chrome: PresentationChrome = .surface
   ) {
     self.alignment = alignment
     self.presentationRole = presentationRole
@@ -406,6 +426,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
     self.scrollIdealHeight = scrollIdealHeight
     self.scrollMaxHeight = scrollMaxHeight
     self.bodyMode = bodyMode
+    self.chrome = chrome
   }
 }
 
