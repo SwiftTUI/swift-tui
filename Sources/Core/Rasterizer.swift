@@ -1073,7 +1073,7 @@ extension Rasterizer {
         canvas.fillEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
       }
     case .capsule:
-      drawCapsule(into: &canvas, stroke: stroke)
+      drawCapsule(into: &canvas, stroke: stroke, metrics: environment.cellPixelMetrics)
     case .rectangle, .roundedRectangle:
       // Not reachable: the caller dispatches these to the cell-aligned
       // paint path.  We still need the case for exhaustiveness.
@@ -1127,13 +1127,14 @@ extension Rasterizer {
     }
   }
 
-  /// Draws a capsule into the Braille canvas. A wide capsule (subW >=
-  /// subH) has a rectangular body flanked by two half-circles at the
-  /// left and right short-axis ends; a tall capsule has its semicircles
-  /// at the top and bottom.
+  /// Draws a capsule into the Braille canvas. A wide capsule (pxWidth >=
+  /// pxHeight in pixel space) has a rectangular body flanked by two
+  /// aspect-corrected half-ellipses at the left and right ends; a tall
+  /// capsule has its semi-ellipses at the top and bottom.
   private func drawCapsule(
     into canvas: inout BrailleCanvas,
-    stroke: Bool
+    stroke: Bool,
+    metrics: CellPixelMetrics
   ) {
     let subW = canvas.subpixelWidth
     let subH = canvas.subpixelHeight
@@ -1146,60 +1147,74 @@ extension Rasterizer {
       return
     }
 
-    if subW >= subH {
-      // Wide capsule: radius = short axis / 2.
-      let radius = max(0, (subH - 1) / 2)
+    // Derive cell frame dimensions from the Braille canvas (2 subpixels
+    // wide, 4 tall per cell). These are always exact on a well-formed
+    // canvas; ceiling-style derivation guards against degenerate inputs.
+    let cellW = max(1, (subW + 1) / 2)
+    let cellH = max(1, (subH + 3) / 4)
+    let subpixelPxWidth = max(1, metrics.width / 2)
+    let subpixelPxHeight = max(1, metrics.height / 4)
+    let pxWidth = cellW * metrics.width
+    let pxHeight = cellH * metrics.height
+    // Cap pixel radius = shortest pixel axis / 2 (same as Circle).
+    let capRadiusPx = min(pxWidth, pxHeight) / 2
+    // Subpixel radii for the cap, preserving the old (-1) inclusive-bound
+    // clamp so bit-identity at 8x16 metrics holds.
+    let rx = max(0, capRadiusPx / subpixelPxWidth - 1)
+    let ry = max(0, capRadiusPx / subpixelPxHeight - 1)
+
+    if pxWidth >= pxHeight {
+      // Wide capsule: caps on left/right, body connects horizontally.
       let cy = (subH - 1) / 2
-      let leftCx = radius
-      let rightCx = subW - 1 - radius
+      let leftCx = rx
+      let rightCx = subW - 1 - rx
       if stroke {
-        // Two half-circles plus the two horizontal body edges.
-        canvas.strokeCircle(centerX: leftCx, centerY: cy, radius: radius)
-        canvas.strokeCircle(centerX: rightCx, centerY: cy, radius: radius)
+        // Two half-ellipses plus the two horizontal body edges.
+        canvas.strokeEllipse(centerX: leftCx, centerY: cy, radiusX: rx, radiusY: ry)
+        canvas.strokeEllipse(centerX: rightCx, centerY: cy, radiusX: rx, radiusY: ry)
         // Top and bottom body edges between the two centers.
         if rightCx > leftCx {
           for x in leftCx...rightCx {
-            canvas.setPixel(x: x, y: cy - radius)
-            canvas.setPixel(x: x, y: cy + radius)
+            canvas.setPixel(x: x, y: cy - ry)
+            canvas.setPixel(x: x, y: cy + ry)
           }
         }
       } else {
-        canvas.fillCircle(centerX: leftCx, centerY: cy, radius: radius)
-        canvas.fillCircle(centerX: rightCx, centerY: cy, radius: radius)
+        canvas.fillEllipse(centerX: leftCx, centerY: cy, radiusX: rx, radiusY: ry)
+        canvas.fillEllipse(centerX: rightCx, centerY: cy, radiusX: rx, radiusY: ry)
         if rightCx > leftCx {
           let bodyWidth = rightCx - leftCx + 1
           canvas.fillRect(
             x: leftCx,
-            y: max(0, cy - radius),
+            y: max(0, cy - ry),
             width: bodyWidth,
-            height: min(subH, 2 * radius + 1)
+            height: min(subH, 2 * ry + 1)
           )
         }
       }
     } else {
-      // Tall capsule: radius = short axis (subW) / 2.
-      let radius = max(0, (subW - 1) / 2)
+      // Tall capsule: caps on top/bottom, body connects vertically.
       let cx = (subW - 1) / 2
-      let topCy = radius
-      let bottomCy = subH - 1 - radius
+      let topCy = ry
+      let bottomCy = subH - 1 - ry
       if stroke {
-        canvas.strokeCircle(centerX: cx, centerY: topCy, radius: radius)
-        canvas.strokeCircle(centerX: cx, centerY: bottomCy, radius: radius)
+        canvas.strokeEllipse(centerX: cx, centerY: topCy, radiusX: rx, radiusY: ry)
+        canvas.strokeEllipse(centerX: cx, centerY: bottomCy, radiusX: rx, radiusY: ry)
         if bottomCy > topCy {
           for y in topCy...bottomCy {
-            canvas.setPixel(x: cx - radius, y: y)
-            canvas.setPixel(x: cx + radius, y: y)
+            canvas.setPixel(x: cx - rx, y: y)
+            canvas.setPixel(x: cx + rx, y: y)
           }
         }
       } else {
-        canvas.fillCircle(centerX: cx, centerY: topCy, radius: radius)
-        canvas.fillCircle(centerX: cx, centerY: bottomCy, radius: radius)
+        canvas.fillEllipse(centerX: cx, centerY: topCy, radiusX: rx, radiusY: ry)
+        canvas.fillEllipse(centerX: cx, centerY: bottomCy, radiusX: rx, radiusY: ry)
         if bottomCy > topCy {
           let bodyHeight = bottomCy - topCy + 1
           canvas.fillRect(
-            x: max(0, cx - radius),
+            x: max(0, cx - rx),
             y: topCy,
-            width: min(subW, 2 * radius + 1),
+            width: min(subW, 2 * rx + 1),
             height: bodyHeight
           )
         }
