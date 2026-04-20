@@ -24,7 +24,7 @@ extension ActionScope where Self: View & Sendable {
 
 public struct DropDestinationModifier<Content: View & Sendable>: View, ResolvableView {
   nonisolated let content: Content
-  let action: @MainActor @Sendable ([DroppedPath]) -> Bool
+  nonisolated let action: @MainActor @Sendable ([DroppedPath]) -> Bool
 
   init(
     content: Content,
