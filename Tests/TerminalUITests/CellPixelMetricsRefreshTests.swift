@@ -2,6 +2,7 @@ import Testing
 
 @testable import Core
 @_spi(Runners) @testable import TerminalUI
+@testable import View
 
 #if canImport(Darwin)
   import Darwin
@@ -129,5 +130,41 @@ struct CellPixelMetricsRefreshTests {
     session.resize(to: Size(width: 80, height: 24), cellPixelSize: Size(width: 12, height: 24))
 
     #expect(session.hostGraphicsCapabilitiesForTesting.cellPixelSize == Size(width: 12, height: 24))
+  }
+
+  @Test("SIGWINCH-driven refresh surfaces new metrics in the next GeometryReader proxy")
+  @MainActor
+  func sigwinchRefreshSurfacesInProxy() {
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalSize = Size(width: 40, height: 10)
+    environmentValues.cellPixelMetrics = CellPixelMetrics(
+      width: 8, height: 16, source: .reported
+    )
+
+    let first = DefaultRenderer().render(
+      GeometryReader { proxy in
+        Text("w=\(proxy.cellPixelMetrics.width)")
+      },
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues
+      )
+    )
+    #expect(first.rasterSurface.lines.contains("w=8"))
+
+    environmentValues.cellPixelMetrics = CellPixelMetrics(
+      width: 12, height: 24, source: .reported
+    )
+
+    let second = DefaultRenderer().render(
+      GeometryReader { proxy in
+        Text("w=\(proxy.cellPixelMetrics.width)")
+      },
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues
+      )
+    )
+    #expect(second.rasterSurface.lines.contains("w=12"))
   }
 }
