@@ -11,6 +11,7 @@ package struct RuntimeRegistrationSet {
   package let taskRegistry: LocalTaskRegistry?
   package let preferenceObservationRegistry: LocalPreferenceObservationRegistry?
   package let commandRegistry: CommandRegistry?
+  package let dropDestinationRegistry: DropDestinationRegistry?
 
   package init(
     actionRegistry: LocalActionRegistry? = nil,
@@ -23,7 +24,8 @@ package struct RuntimeRegistrationSet {
     lifecycleRegistry: LocalLifecycleRegistry? = nil,
     taskRegistry: LocalTaskRegistry? = nil,
     preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil,
-    commandRegistry: CommandRegistry? = nil
+    commandRegistry: CommandRegistry? = nil,
+    dropDestinationRegistry: DropDestinationRegistry? = nil
   ) {
     self.actionRegistry = actionRegistry
     self.keyHandlerRegistry = keyHandlerRegistry
@@ -36,6 +38,7 @@ package struct RuntimeRegistrationSet {
     self.taskRegistry = taskRegistry
     self.preferenceObservationRegistry = preferenceObservationRegistry
     self.commandRegistry = commandRegistry
+    self.dropDestinationRegistry = dropDestinationRegistry
   }
 
   package func resetAll() {
@@ -50,6 +53,7 @@ package struct RuntimeRegistrationSet {
     taskRegistry?.reset()
     preferenceObservationRegistry?.reset()
     commandRegistry?.reset()
+    dropDestinationRegistry?.reset()
   }
 
   package func removeSubtrees(
@@ -79,6 +83,7 @@ package struct RuntimeRegistrationSet {
     taskRegistry?.removeSubtrees(rootedAt: roots)
     preferenceObservationRegistry?.removeSubtrees(rootedAt: roots)
     commandRegistry?.removeSubtrees(rootedAt: roots)
+    dropDestinationRegistry?.removeSubtrees(rootedAt: roots)
   }
 
   package func pruneOrphanedGestures(
