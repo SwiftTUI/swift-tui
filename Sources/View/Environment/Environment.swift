@@ -143,7 +143,8 @@ public struct EnvironmentValues: Equatable, Sendable {
         heavyFields: snapshot.style.heavyFields,
         foregroundStyle: foregroundStyle,
         tintStyle: tintStyle,
-        isEnabled: isEnabled
+        isEnabled: isEnabled,
+        cellPixelMetrics: cellPixelMetrics
       )
     } else {
       style = StyleEnvironmentSnapshot(
@@ -151,7 +152,8 @@ public struct EnvironmentValues: Equatable, Sendable {
         theme: theme,
         foregroundStyle: foregroundStyle,
         tintStyle: tintStyle,
-        isEnabled: isEnabled
+        isEnabled: isEnabled,
+        cellPixelMetrics: cellPixelMetrics
       )
     }
     return EnvironmentSnapshot(
