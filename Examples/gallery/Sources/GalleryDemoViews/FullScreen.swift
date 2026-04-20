@@ -17,11 +17,14 @@ struct FullScreenTab: View {
         in: playfieldBounds,
         metrics: metrics
       )
-      let block = FullScreenToyPhysics.blockSize(metrics: metrics)
+      let height = max(
+        1,
+        Int((Double(FullScreenToyPhysics.diameter) / metrics.aspectRatio).rounded())
+      )
 
       ZStack(alignment: .topLeading) {
-        Rectangle()
-          .frame(width: block.width, height: block.height)
+        Circle()
+          .frame(width: FullScreenToyPhysics.diameter, height: height)
           .offset(x: current.x, y: current.y)
           .foregroundStyle(.cyan)
           .gesture(dragGesture(in: playfieldBounds, metrics: metrics))
@@ -87,7 +90,12 @@ struct FullScreenTab: View {
 }
 
 struct FullScreenToyPhysics {
-  static let blockWidth = 6
+  /// Cell-width of the circular subject. The height of the cell frame is
+  /// derived at the view layer from `cellPixelMetrics.aspectRatio` so the
+  /// cell-space frame is visually square; the `Circle` rasterizer then
+  /// applies its own sub-pixel aspect correction to emit a pixel-true
+  /// circle on any terminal.
+  static let diameter = 6
   static let fixedScale = 16
   static let tickMilliseconds = 40
   static let tickNanoseconds: UInt64 = 40_000_000
@@ -103,13 +111,6 @@ struct FullScreenToyPhysics {
   static let playfieldWidthtInset = 2
   static let initialLaunchX = 0
   static let initialLaunchY = -10
-
-  /// Height of the rectangular subject in cells, scaled so its *visual*
-  /// aspect is square regardless of the terminal's cell aspect.
-  static func blockSize(metrics: CellPixelMetrics) -> Size {
-    let height = max(1, Int((Double(blockWidth) / metrics.aspectRatio).rounded()))
-    return Size(width: blockWidth, height: height)
-  }
 
   struct BoundsID: Hashable {
     let width: Int
@@ -294,10 +295,10 @@ struct FullScreenToyPhysics {
     in bounds: Size,
     metrics: CellPixelMetrics
   ) -> FixedPoint {
-    let block = blockSize(metrics: metrics)
+    let height = max(1, Int((Double(diameter) / metrics.aspectRatio).rounded()))
     return FixedPoint(
-      x: max(0, bounds.width - block.width) * fixedScale,
-      y: max(0, bounds.height - block.height) * fixedScale
+      x: max(0, bounds.width - diameter) * fixedScale,
+      y: max(0, bounds.height - height) * fixedScale
     )
   }
 
