@@ -308,8 +308,15 @@ extension RunLoop {
     effectiveEnvironmentValues.terminalAppearance = terminalHost.appearance
     effectiveEnvironmentValues.theme = terminalHost.theme
     effectiveEnvironmentValues.terminalSize = terminalHost.surfaceSize
-    effectiveEnvironmentValues.terminalCellPixelSize =
-      terminalHost.graphicsCapabilities.cellPixelSize ?? .init(width: 8, height: 16)
+    if let cellPixelSize = terminalHost.graphicsCapabilities.cellPixelSize {
+      effectiveEnvironmentValues.cellPixelMetrics = CellPixelMetrics(
+        width: cellPixelSize.width,
+        height: cellPixelSize.height,
+        source: .reported
+      )
+    } else {
+      effectiveEnvironmentValues.cellPixelMetrics = .estimated
+    }
     effectiveEnvironmentValues.focusedIdentity = focusTracker.currentFocusIdentity
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
