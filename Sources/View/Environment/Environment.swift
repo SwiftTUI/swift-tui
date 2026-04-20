@@ -218,6 +218,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var localLifecycleRegistry: LocalLifecycleRegistry?
   package var localTaskRegistry: LocalTaskRegistry?
   package var commandRegistry: CommandRegistry?
+  package var dropDestinationRegistry: DropDestinationRegistry?
   package var invalidationProxy: ResolveInvalidationProxy?
   package var observationBridge: ObservationBridge?
   package var viewGraph: ViewGraph?
@@ -240,7 +241,8 @@ public struct ResolveContext: Equatable, Sendable {
       lifecycleRegistry: localLifecycleRegistry,
       taskRegistry: localTaskRegistry,
       preferenceObservationRegistry: localPreferenceObservationRegistry,
-      commandRegistry: commandRegistry
+      commandRegistry: commandRegistry,
+      dropDestinationRegistry: dropDestinationRegistry
     )
   }
 
