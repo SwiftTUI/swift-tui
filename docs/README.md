@@ -63,3 +63,4 @@ Implementation records retained for context (landed work that still informs revi
 - [LIPGLOSS_SWIFTUI_EQUIVALENTS.md](LIPGLOSS_SWIFTUI_EQUIVALENTS.md) — Lip Gloss / TUI ↔ SwiftUI concept mapping
 - [TERMINAL_NATIVE_UI_RESEARCH.md](TERMINAL_NATIVE_UI_RESEARCH.md) — UI-side research that informed the design
 - [TERMINAL_NATIVE_UX_RESEARCH.md](TERMINAL_NATIVE_UX_RESEARCH.md) — UX/workflow research
+- [CELL_PIXEL_GEOMETRY_RESEARCH.md](CELL_PIXEL_GEOMETRY_RESEARCH.md) — motivations and trade-offs for exposing pixel-level geometry on a cell-based API
