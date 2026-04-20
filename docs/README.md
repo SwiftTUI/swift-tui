@@ -48,6 +48,7 @@ Active design proposals that are still shaping decisions:
 - [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md) — scope-based command, keybinding, and toolbar design (partially landed)
 - [proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md](proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md) — phase-by-phase implementation plan
 - [proposals/ASYNC_PRESENTATION.md](proposals/ASYNC_PRESENTATION.md) — moving terminal writes off the main actor
+- [proposals/CELL_PIXEL_METRICS.md](proposals/CELL_PIXEL_METRICS.md) — exposing cell pixel dimensions on `GeometryProxy` and `EnvironmentValues` for shape aspect, motion, and image sizing
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
 
 Implementation records retained for context (landed work that still informs reviews):
