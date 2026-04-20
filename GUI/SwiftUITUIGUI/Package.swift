@@ -16,7 +16,7 @@ let package = Package(
     )
   ],
   dependencies: [
-    .package(path: "../.."),
+    .package(name: "swift-terminal-ui", path: "../.."),
     .package(url: "https://github.com/GoodHatsLLC/libghostty-spm.git", exact: "1.0.1776121692"),
   ],
   targets: [

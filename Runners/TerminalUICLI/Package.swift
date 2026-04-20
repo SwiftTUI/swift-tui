@@ -24,7 +24,7 @@ let package = Package(
     .library(name: "TerminalUICLI", targets: ["TerminalUICLI"])
   ],
   dependencies: [
-    .package(path: "../.."),
+    .package(name: "swift-terminal-ui", path: "../.."),
     .package(path: "../../Vendor/UnixSignals"),
   ],
   targets: [

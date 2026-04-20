@@ -105,6 +105,32 @@ That does not change the package-development rule for this repository:
 - Xcode is also acceptable for native-only build and run work, but it is not
   the default documented path for repo-wide package development
 
+## Worktrees
+
+Internal packages in this repository depend on the repo root via local path
+dependencies and refer to that package as `swift-terminal-ui`.
+
+When adding new local path dependencies that point back at this repo, prefer
+the explicit form:
+
+```swift
+.package(name: "swift-terminal-ui", path: "../..")
+```
+
+That pins the package name used by downstream `.product(..., package:
+"swift-terminal-ui")` references and keeps nested packages working even when a
+worktree directory is renamed.
+
+For new git worktrees, still keep the final path component as
+`swift-terminal-ui` when practical, for example:
+
+```text
+.../worktrees/<task>/swift-terminal-ui
+```
+
+That keeps local package identity, DerivedData naming, and ad hoc shell
+tooling predictable across the repo.
+
 ## Android
 
 Android cross-compilation also uses Swift 6.3.0 from `swiftly`, plus the Swift

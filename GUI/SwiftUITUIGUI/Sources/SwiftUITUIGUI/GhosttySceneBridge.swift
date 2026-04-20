@@ -17,6 +17,11 @@ final class GhosttySceneBridge {
   private var terminalSession: InMemoryTerminalSession! = nil
   private var bufferedOutput: [String] = []
   private var surfaceReady = false
+  private var focusPresentation: FocusPresentation = .none
+  private var manualKeyboardPresentationRequested = false
+  #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+    private weak var platformView: TerminalView?
+  #endif
   private(set) var lastViewportSize: Size?
 
   init(
@@ -84,6 +89,15 @@ final class GhosttySceneBridge {
     syncSessionStyle()
   }
 
+  func updateKeyboardPresentation(
+    focusPresentation: FocusPresentation,
+    manualKeyboardPresentationRequested: Bool
+  ) {
+    self.focusPresentation = focusPresentation
+    self.manualKeyboardPresentationRequested = manualKeyboardPresentationRequested
+    syncKeyboardPresentation()
+  }
+
   func receiveOutput(_ output: String) {
     if surfaceReady {
       terminalSession.receive(output)
@@ -91,6 +105,13 @@ final class GhosttySceneBridge {
       bufferedOutput.append(output)
     }
   }
+
+  #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+    func attachPlatformView(_ view: TerminalView) {
+      platformView = view
+      syncKeyboardPresentation()
+    }
+  #endif
 
   func handleSurfaceResize(_ viewport: InMemoryTerminalViewport) {
     surfaceReady = true
@@ -121,6 +142,32 @@ final class GhosttySceneBridge {
     }
 
     session.updateStyle(style.renderStyle)
+  }
+
+  private var allowsExpandedKeyboardPresentation: Bool {
+    focusPresentation.prefersTextInput || manualKeyboardPresentationRequested
+  }
+
+  private func syncKeyboardPresentation() {
+    #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+      guard let platformView else {
+        return
+      }
+
+      if allowsExpandedKeyboardPresentation {
+        GhosttyKeyboardPresentationController.presentExpandedKeyboard(for: platformView)
+      } else {
+        GhosttyKeyboardPresentationController.suppressExpandedKeyboard(for: platformView)
+      }
+    #endif
+  }
+
+  var focusPresentationForTesting: FocusPresentation {
+    focusPresentation
+  }
+
+  var allowsExpandedKeyboardPresentationForTesting: Bool {
+    allowsExpandedKeyboardPresentation
   }
 }
 

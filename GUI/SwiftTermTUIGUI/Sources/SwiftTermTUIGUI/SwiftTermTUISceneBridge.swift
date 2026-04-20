@@ -19,6 +19,8 @@ final class SwiftTermSceneBridge {
 
   private var style: SwiftTermTUITerminalStyle
   private var session: (any HostedSceneSessionHandling)?
+  private var focusPresentation: FocusPresentation = .none
+  private var manualKeyboardPresentationRequested = false
   private(set) var lastViewportSize: Size?
 
   init(
@@ -53,6 +55,15 @@ final class SwiftTermSceneBridge {
     self.style = style
     apply(style: style, to: terminalView)
     syncSessionStyle()
+  }
+
+  func updateKeyboardPresentation(
+    focusPresentation: FocusPresentation,
+    manualKeyboardPresentationRequested: Bool
+  ) {
+    self.focusPresentation = focusPresentation
+    self.manualKeyboardPresentationRequested = manualKeyboardPresentationRequested
+    syncKeyboardPresentation()
   }
 
   func receiveOutput(_ output: String) {
@@ -114,6 +125,20 @@ final class SwiftTermSceneBridge {
     session.updateStyle(style.renderStyle)
   }
 
+  private var allowsExpandedKeyboardPresentation: Bool {
+    focusPresentation.prefersTextInput || manualKeyboardPresentationRequested
+  }
+
+  private func syncKeyboardPresentation() {
+    #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+      if allowsExpandedKeyboardPresentation {
+        SwiftTermKeyboardPresentationController.presentExpandedKeyboard(for: terminalView)
+      } else {
+        SwiftTermKeyboardPresentationController.suppressExpandedKeyboard(for: terminalView)
+      }
+    #endif
+  }
+
   private func apply(
     style: SwiftTermTUITerminalStyle,
     to view: TerminalView
@@ -140,6 +165,14 @@ final class SwiftTermSceneBridge {
       view.font = style.nativeFont
       return view
     #endif
+  }
+
+  var focusPresentationForTesting: FocusPresentation {
+    focusPresentation
+  }
+
+  var allowsExpandedKeyboardPresentationForTesting: Bool {
+    allowsExpandedKeyboardPresentation
   }
 }
 

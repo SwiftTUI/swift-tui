@@ -24,7 +24,7 @@ let package = Package(
     .library(name: "TerminalUIWASI", targets: ["TerminalUIWASI"])
   ],
   dependencies: [
-    .package(path: "../..")
+    .package(name: "swift-terminal-ui", path: "../..")
   ],
   targets: [
     .target(
