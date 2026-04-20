@@ -7,13 +7,16 @@ public import Core
 public struct GeometryProxy: Equatable, Sendable {
   public var size: Size
   public var safeAreaInsets: EdgeInsets
+  public var cellPixelMetrics: CellPixelMetrics
 
   public init(
     size: Size,
-    safeAreaInsets: EdgeInsets = .zero
+    safeAreaInsets: EdgeInsets = .zero,
+    cellPixelMetrics: CellPixelMetrics = .estimated
   ) {
     self.size = size
     self.safeAreaInsets = safeAreaInsets
+    self.cellPixelMetrics = cellPixelMetrics
   }
 }
 
@@ -33,7 +36,8 @@ public struct GeometryReader<Content: View>: View, ResolvableView {
     let proxy = context.trackingObservableAccess {
       GeometryProxy(
         size: context.environmentValues.terminalSize,
-        safeAreaInsets: context.environmentValues.safeAreaInsets
+        safeAreaInsets: context.environmentValues.safeAreaInsets,
+        cellPixelMetrics: context.environmentValues.cellPixelMetrics
       )
     }
     let view = context.trackingObservableAccess {
