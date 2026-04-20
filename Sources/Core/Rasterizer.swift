@@ -1039,13 +1039,20 @@ extension Rasterizer {
 
     switch geometry {
     case .circle:
-      // The largest circle fits inside the short axis.  Use (min-1)/2
-      // so the outline stays within the inclusive (0...sub-1) range.
-      let radius = max(0, (min(subW, subH) - 1) / 2)
+      let radii = Self.subpixelCircleRadii(
+        frameCells: Size(width: cellW, height: cellH),
+        metrics: environment.cellPixelMetrics
+      )
+      // Preserve the (min-1)/2 inclusive-bound semantics of the pre-correction
+      // code: at 8x16 metrics, radii.rx == radii.ry == old `(min(subW, subH) - 1) / 2 + 1`
+      // (integer off-by-one irrelevant here — we subtract 1 to keep the
+      // outline inside the (0...sub-1) coordinate range).
+      let rx = max(0, radii.rx - 1)
+      let ry = max(0, radii.ry - 1)
       if stroke {
-        canvas.strokeCircle(centerX: cx, centerY: cy, radius: radius)
+        canvas.strokeEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
       } else {
-        canvas.fillCircle(centerX: cx, centerY: cy, radius: radius)
+        canvas.fillEllipse(centerX: cx, centerY: cy, radiusX: rx, radiusY: ry)
       }
     case .ellipse:
       let rx = max(0, (subW - 1) / 2)
