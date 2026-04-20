@@ -57,24 +57,49 @@ private func decodeFileURLIfNeeded(_ token: String) -> String {
 private func percentDecode(_ input: String) -> String {
   var output = ""
   output.reserveCapacity(input.count)
+  var byteBuffer: [UInt8] = []
+
+  func flushBytes() {
+    guard !byteBuffer.isEmpty else { return }
+    if let decoded = String(validating: byteBuffer, as: UTF8.self) {
+      output.append(decoded)
+    } else {
+      // Lossy fallback: emit each byte as its Latin-1 scalar.
+      for byte in byteBuffer {
+        output.unicodeScalars.append(UnicodeScalar(byte))
+      }
+    }
+    byteBuffer.removeAll(keepingCapacity: true)
+  }
+
   var scalars = input.unicodeScalars.makeIterator()
   while let scalar = scalars.next() {
     guard scalar == "%" else {
+      flushBytes()
       output.unicodeScalars.append(scalar)
       continue
     }
-    guard
-      let hi = scalars.next(), let lo = scalars.next(),
-      let hiValue = hexValue(hi), let loValue = hexValue(lo)
-    else {
+    guard let hi = scalars.next() else {
+      flushBytes()
       output.append("%")
       continue
     }
-    let byte = UInt8(hiValue << 4 | loValue)
-    if let decoded = UnicodeScalar(UInt32(byte)) {
-      output.unicodeScalars.append(decoded)
+    guard let lo = scalars.next() else {
+      flushBytes()
+      output.append("%")
+      output.unicodeScalars.append(hi)
+      continue
     }
+    guard let hiValue = hexValue(hi), let loValue = hexValue(lo) else {
+      flushBytes()
+      output.append("%")
+      output.unicodeScalars.append(hi)
+      output.unicodeScalars.append(lo)
+      continue
+    }
+    byteBuffer.append(UInt8(hiValue << 4 | loValue))
   }
+  flushBytes()
   return output
 }
 

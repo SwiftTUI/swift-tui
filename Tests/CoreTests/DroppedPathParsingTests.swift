@@ -50,4 +50,30 @@ struct DroppedPathParsingTests {
     #expect(parseDroppedPaths("").isEmpty)
     #expect(parseDroppedPaths("   ").isEmpty)
   }
+
+  @Test("Multibyte UTF-8 percent-encoded paths decode correctly")
+  func multibyteUTF8() {
+    // U+5199 U+771F .jpg  →  %E5%86%99%E7%9C%9F.jpg
+    let paths = parseDroppedPaths("file:///Users/me/%E5%86%99%E7%9C%9F.jpg")
+    #expect(paths == [DroppedPath("/Users/me/写真.jpg")])
+  }
+
+  @Test("Truncated percent sequence at end of input preserves consumed characters")
+  func truncatedPercent() {
+    // Bare %
+    #expect(parseDroppedPaths("file:///path%") == [DroppedPath("/path%")])
+    // Single hex digit after %
+    #expect(parseDroppedPaths("file:///path%4") == [DroppedPath("/path%4")])
+  }
+
+  @Test("Non-hex character after percent preserves both characters literally")
+  func nonHexPercent() {
+    #expect(parseDroppedPaths("file:///path%2Z/foo") == [DroppedPath("/path%2Z/foo")])
+  }
+
+  @Test("Unterminated single quote accumulates remainder as one path")
+  func unterminatedSingleQuote() {
+    // Current behavior — lock it in so we don't regress silently.
+    #expect(parseDroppedPaths("'/not/closed") == [DroppedPath("/not/closed")])
+  }
 }
