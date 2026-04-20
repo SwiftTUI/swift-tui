@@ -89,12 +89,12 @@ struct FullScreenTabGestureTests {
       eventSchedule: [
         .init(
           delayNanoseconds: 700_000_000,
-          event: .key(.character("q"))
+          event: .key(KeyPress(.character("c"), modifiers: .ctrl))
         )
       ]
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.renderedFrames >= 2)
 
     let uniqueSurfaces = deduplicated(host.surfaces)
@@ -248,12 +248,12 @@ struct FullScreenTabGestureTests {
       eventSchedule: [
         .init(
           delayNanoseconds: 700_000_000,
-          event: .key(.character("q"))
+          event: .key(KeyPress(.character("c"), modifiers: .ctrl))
         )
       ]
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(!host.surfaces.isEmpty)
     let missingPalette = host.surfaces.enumerated().filter { _, surface in
       !surface.lines.contains { $0.contains("⌃K Palette") }

@@ -842,10 +842,14 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost()
     let result = try await makeRuntimeHarness(
       terminal: terminal,
-      events: [.tab, .tab, .tab, .tab, .tab, .tab, .arrowDown, .escape, .tab, .character("q")]
+      events: [
+        KeyPress(.tab), KeyPress(.tab), KeyPress(.tab), KeyPress(.tab), KeyPress(.tab),
+        KeyPress(.tab), KeyPress(.arrowDown), KeyPress(.escape), KeyPress(.tab),
+        KeyPress(.character("c"), modifiers: .ctrl),
+      ]
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState.selectionMode == .accent)
     #expect(
       terminal.frames.contains(where: {
@@ -863,10 +867,14 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost()
     let result = try await makeRuntimeHarness(
       terminal: terminal,
-      events: [.tab, .tab, .tab, .tab, .arrowDown, .arrowDown, .arrowUp, .return, .character("q")]
+      events: [
+        KeyPress(.tab), KeyPress(.tab), KeyPress(.tab), KeyPress(.tab),
+        KeyPress(.arrowDown), KeyPress(.arrowDown), KeyPress(.arrowUp), KeyPress(.return),
+        KeyPress(.character("c"), modifiers: .ctrl),
+      ]
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState == InteractiveDemoState(value: 2))
     let firstFrame = try #require(terminal.frames.first)
     #expect(firstFrame.contains("▤ Presets"))
@@ -888,12 +896,15 @@ struct InteractiveRuntimeTests {
     let result = try await makeRuntimeHarness(
       terminal: terminal,
       events: [
-        .tab, .tab, .tab, .tab, .tab, .backspace, .character("-"), .character("1"), .character("2"),
-        .return, .character("q"),
+        KeyPress(.tab), KeyPress(.tab), KeyPress(.tab), KeyPress(.tab), KeyPress(.tab),
+        KeyPress(.backspace),
+        KeyPress(.character("-")), KeyPress(.character("1")), KeyPress(.character("2")),
+        KeyPress(.return),
+        KeyPress(.character("c"), modifiers: .ctrl),
       ]
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState.value == -12)
     #expect(result.finalState.inputBuffer == "-12")
     let firstMetrics = try #require(terminal.presentationMetrics.first)
@@ -912,10 +923,13 @@ struct InteractiveRuntimeTests {
     let terminal = RecordingTerminalHost()
     let result = try await makeRuntimeHarness(
       terminal: terminal,
-      events: [.tab, .tab, .return, .character("q")]
+      events: [
+        KeyPress(.tab), KeyPress(.tab), KeyPress(.return),
+        KeyPress(.character("c"), modifiers: .ctrl),
+      ]
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState.accentPreviewEnabled)
     #expect(terminal.frames.contains(where: { $0.contains("Accent Preview") }))
   }
@@ -935,7 +949,9 @@ struct InteractiveRuntimeTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.return, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader(),
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -957,7 +973,7 @@ struct InteractiveRuntimeTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState == 1)
 
     let initialRoot = try #require(
@@ -1002,7 +1018,7 @@ struct InteractiveRuntimeTests {
       terminal: terminal,
       events: [
         .key(.return),
-        .key(.character("q")),
+        .key(KeyPress(.character("c"), modifiers: .ctrl)),
       ],
       rootIdentity: testIdentity("StandaloneLinkRuntime"),
       terminalSize: .init(width: 20, height: 1),
@@ -1018,7 +1034,7 @@ struct InteractiveRuntimeTests {
       }
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(recorder.destinations == ["https://example.com"])
   }
 
@@ -1036,7 +1052,7 @@ struct InteractiveRuntimeTests {
         .key(.return),
         .key(.tab),
         .key(.return),
-        .key(.character("q")),
+        .key(KeyPress(.character("c"), modifiers: .ctrl)),
       ],
       rootIdentity: testIdentity("InlineLinkRuntime"),
       terminalSize: .init(width: 24, height: 1),
@@ -1053,7 +1069,7 @@ struct InteractiveRuntimeTests {
       }
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(
       recorder.destinations == [
         "https://one.example",
@@ -1088,7 +1104,7 @@ struct InteractiveRuntimeTests {
       events: [
         .mouse(.init(kind: .down(.primary), location: centerPoint(of: rect))),
         .mouse(.init(kind: .up(.primary), location: centerPoint(of: rect))),
-        .key(.character("q")),
+        .key(KeyPress(.character("c"), modifiers: .ctrl)),
       ],
       rootIdentity: rootIdentity,
       terminalSize: terminalSize,
@@ -1103,7 +1119,7 @@ struct InteractiveRuntimeTests {
       }
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(recorder.destinations == ["https://example.com"])
   }
 
@@ -1163,11 +1179,11 @@ struct InteractiveRuntimeTests {
       recorder: recorder,
       focusable: true,
       events: [
-        .init(delayNanoseconds: 50_000_000, value: .character("q"))
+        .init(delayNanoseconds: 50_000_000, value: KeyPress(.character("c"), modifiers: .ctrl))
       ]
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(terminal.frames.count == 1)
     #expect(recorder.appearCountsAtPresent == [0])
     #expect(recorder.events(matchingPrefix: "appear:").count == 1)
@@ -1184,12 +1200,12 @@ struct InteractiveRuntimeTests {
       terminal: terminal,
       recorder: recorder,
       events: [
-        .init(delayNanoseconds: 50_000_000, value: .character("t")),
-        .init(delayNanoseconds: 50_000_000, value: .character("q")),
+        .init(delayNanoseconds: 50_000_000, value: KeyPress(.character("t"))),
+        .init(delayNanoseconds: 50_000_000, value: KeyPress(.character("c"), modifiers: .ctrl)),
       ]
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState.showChild == false)
     #expect(await recorder.waitForEvent("taskStart:\(lifecycleProbeIdentity)"))
     #expect(await recorder.waitForEvent("disappear:\(lifecycleProbeIdentity)"))
@@ -1209,11 +1225,11 @@ struct InteractiveRuntimeTests {
       terminal: RecordingTerminalHost(),
       recorder: recorder,
       events: [
-        .init(delayNanoseconds: 50_000_000, value: .character("q"))
+        .init(delayNanoseconds: 50_000_000, value: KeyPress(.character("c"), modifiers: .ctrl))
       ]
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(await recorder.waitForEvent("taskCancel:\(lifecycleProbeIdentity)"))
   }
 
@@ -1230,7 +1246,7 @@ struct InteractiveRuntimeTests {
       ]
     )
 
-    #expect(result.exitReason == .ctrlC)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(await recorder.waitForEvent("taskCancel:\(lifecycleProbeIdentity)"))
   }
 
@@ -1298,7 +1314,8 @@ struct InteractiveRuntimeTests {
       },
       sessionName: "InteractiveRuntimeTests.ResizeWindow",
       terminalHost: terminal,
-      inputReader: GateInputReader(gate: quitGate, event: .character("q")),
+      inputReader: GateInputReader(
+        gate: quitGate, event: KeyPress(.character("c"), modifiers: .ctrl)),
       signalReader: TimedSignalReader(
         signals: [
           .init(delayNanoseconds: 50_000_000, value: "SIGWINCH")
@@ -1306,7 +1323,7 @@ struct InteractiveRuntimeTests {
       )
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.renderedFrames == 2)
     #expect(terminal.presentedSurfaceSizes == [initialSize, resizedSize])
   }
@@ -1325,7 +1342,8 @@ struct InteractiveRuntimeTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       terminalHost: terminal,
-      inputReader: GateInputReader(gate: quitGate, event: .character("q")),
+      inputReader: GateInputReader(
+        gate: quitGate, event: KeyPress(.character("c"), modifiers: .ctrl)),
       signalReader: EmptySignalReader(),
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -1353,7 +1371,7 @@ struct InteractiveRuntimeTests {
     let firstFrame = try #require(terminal.frames.first)
     let lastFrame = try #require(terminal.frames.last)
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(toastDismissed)
     #expect(result.renderedFrames >= 2)
     #expect(firstFrame.contains("Action performed"))
@@ -1373,7 +1391,8 @@ struct InteractiveRuntimeTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       terminalHost: terminal,
-      inputReader: GateInputReader(gate: AsyncEventGate(), event: .character("q")),
+      inputReader: GateInputReader(
+        gate: AsyncEventGate(), event: KeyPress(.character("c"), modifiers: .ctrl)),
       signalReader: TimedSignalReader(
         signals: [
           .init(delayNanoseconds: 1_000_000_000, value: "SIGTERM")

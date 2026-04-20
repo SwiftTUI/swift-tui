@@ -1,4 +1,4 @@
-import Core
+public import Core
 public import View
 
 /// Errors thrown while turning an ``App`` or ``Scene`` declaration into a
@@ -166,6 +166,7 @@ public struct AnyScene: Scene {
   @_spi(Runners) public var identifier: WindowIdentifier
   @_spi(Runners) public var title: String?
   @_spi(Runners) public var rootIdentity: Identity
+  @_spi(Runners) public var exitKeyBindings: ExitKeyBindings
 
   private let makeScopedRootViewClosure: @MainActor () -> ScopedBuilder<Content>
 
@@ -173,11 +174,13 @@ public struct AnyScene: Scene {
     identifier: WindowIdentifier,
     title: String?,
     rootIdentity: Identity,
+    exitKeyBindings: ExitKeyBindings = .default,
     makeRootView: @escaping @MainActor () -> ScopedBuilder<Content>
   ) {
     self.identifier = identifier
     self.title = title
     self.rootIdentity = rootIdentity
+    self.exitKeyBindings = exitKeyBindings
     makeScopedRootViewClosure = makeRootView
   }
 
@@ -346,6 +349,7 @@ public struct WindowGroup<Content: View>: Scene {
   public let id: WindowIdentifier
 
   private let contentBuilder: ScopedBuilder<Content>
+  private let exitKeyBindings: ExitKeyBindings
 
   /// Creates a window scene with an explicit identifier.
   public init(
@@ -354,6 +358,7 @@ public struct WindowGroup<Content: View>: Scene {
   ) {
     self.title = nil
     self.id = id
+    self.exitKeyBindings = .default
     contentBuilder = ScopedBuilder {
       content()
     }
@@ -369,9 +374,50 @@ public struct WindowGroup<Content: View>: Scene {
     let normalizedTitle = String(title)
     self.title = normalizedTitle
     self.id = id ?? WindowIdentifier(normalizedTitle)
+    self.exitKeyBindings = .default
     contentBuilder = ScopedBuilder {
       content()
     }
+  }
+
+  private init(
+    title: String?,
+    id: WindowIdentifier,
+    contentBuilder: ScopedBuilder<Content>,
+    exitKeyBindings: ExitKeyBindings
+  ) {
+    self.title = title
+    self.id = id
+    self.contentBuilder = contentBuilder
+    self.exitKeyBindings = exitKeyBindings
+  }
+
+  /// Returns a copy of this `WindowGroup` whose exit bindings are set
+  /// to `bindings`. The call replaces any previously configured set in
+  /// full — there is no accumulation — so chained calls behave as
+  /// last-write-wins.
+  ///
+  /// Pass ``ExitKeyBindings/none`` (or `[]`) to disable framework-level
+  /// exits entirely; the window will then only exit in response to OS
+  /// signals, `stdin` EOF, or an explicit exit returned by a consumer
+  /// `keyHandler` or `keyCommand`.
+  public func exitOnKeys(_ keys: [KeyPress]) -> WindowGroup<Content> {
+    WindowGroup(
+      title: title,
+      id: id,
+      contentBuilder: contentBuilder,
+      exitKeyBindings: ExitKeyBindings(keys)
+    )
+  }
+
+  /// Convenience for a single-binding exit configuration. Equivalent
+  /// to `exitOnKeys([KeyPress(key, modifiers: modifiers)])` and shares
+  /// its replacement semantics.
+  public func exitOnKey(
+    _ key: KeyEvent,
+    modifiers: EventModifiers = []
+  ) -> WindowGroup<Content> {
+    exitOnKeys([KeyPress(key, modifiers: modifiers)])
   }
 
   public var body: Never {
@@ -383,6 +429,7 @@ public struct WindowGroup<Content: View>: Scene {
       identifier: id,
       title: title,
       rootIdentity: rootIdentity,
+      exitKeyBindings: exitKeyBindings,
       makeRootView: { contentBuilder }
     )
   }

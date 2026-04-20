@@ -35,14 +35,13 @@ extension RunLoop {
   package func handleKeyPress(
     _ keyPress: KeyPress
   ) -> RunLoopExitReason? {
-    let keyEvent = keyPress.key
-
     // Scope-based keyCommand dispatch for modifier-bearing keys.
     // Walks the current focus chain shallowest-first; a matching
     // keyCommand consumes the event (or blocks dispatch if disabled)
-    // before the framework's default quit behavior runs — so a
-    // consumer-registered Ctrl+C command takes precedence over the
-    // default exit.
+    // before the configured exit bindings run — so a consumer that
+    // registers a `keyCommand` for an exit key (e.g. Ctrl+C) takes
+    // precedence over the framework-level exit for the duration that
+    // scope is on the focus chain.
     if !keyPress.modifiers.isEmpty {
       let binding = KeyBinding(key: keyPress.key, modifiers: keyPress.modifiers)
       if commandRegistry.dispatch(key: binding, along: currentFocusScopePath()) {
@@ -50,14 +49,12 @@ extension RunLoop {
       }
     }
 
-    // Default quit behavior.
-    switch keyEvent {
-    case .character("q") where keyPress.modifiers.isEmpty:
-      return .quitKey
-    case .character("c") where keyPress.modifiers == .ctrl:
-      return .ctrlC
-    default:
-      break
+    // Configured exit bindings are the single source of truth for
+    // framework-level exits. The runtime never hardcodes an exit key
+    // outside this check; consumers that pass ``ExitKeyBindings.none``
+    // opt out of framework-provided exits entirely.
+    if exitKeyBindings.contains(keyPress) {
+      return .userExit(keyPress)
     }
 
     let focusedIdentity = focusTracker.currentFocusIdentity
@@ -107,8 +104,6 @@ extension RunLoop {
       case KeyPress(.tab, modifiers: []):
         focusTracker.focusNext()
         return nil
-      case KeyPress(.character("c"), modifiers: .ctrl):
-        return .ctrlC
       case let keyPress where keyPress.modifiers.isEmpty:
         switch keyPress.key {
         case .arrowLeft, .arrowRight, .arrowUp, .arrowDown, .return, .space,
@@ -152,8 +147,6 @@ extension RunLoop {
         }
       }
       return nil
-    case KeyPress(.character("c"), modifiers: .ctrl):
-      return .ctrlC
     default:
       return nil
     }

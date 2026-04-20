@@ -638,7 +638,7 @@ struct AnimationRepeatForeverGrowthTests {
 
     let result = try await runLoop.run()
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(
       result.renderedFrames >= 3,
       """
@@ -788,7 +788,7 @@ private final class DelayedQuitTerminalInputReader: TerminalInputReading {
         if delayNanoseconds > 0 {
           try? await Task.sleep(nanoseconds: delayNanoseconds)
         }
-        continuation.yield(.key(.character("q")))
+        continuation.yield(.key(KeyPress(.character("c"), modifiers: .ctrl)))
         continuation.finish()
       }
 

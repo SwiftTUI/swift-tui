@@ -66,6 +66,7 @@ import View
       focusTracker: focusTracker,
       environment: environmentSnapshot,
       environmentValues: environmentValues,
+      exitKeyBindings: configuration.exitKeyBindings,
       viewBuilder: { (_: TerminalUISceneSessionState, _: Identity?) in
         WindowHostView(content: configuration.makeScopedRootView())
       }

@@ -871,7 +871,7 @@ struct Phase4ObservationAndEnvironmentTests {
       signalReader: Phase4EmptySignalReader()
     )
 
-    #expect(result.exitReason == .ctrlC)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(model.name == "Hi")
     let lastFrame = try #require(terminal.frames.last)
     #expect(lastFrame.contains("Name: Hi"))
@@ -901,14 +901,14 @@ struct Phase4ObservationAndEnvironmentTests {
       events: [
         .mouse(.init(kind: .down(.primary), location: centerPoint(of: primaryRect))),
         .mouse(.init(kind: .up(.primary), location: centerPoint(of: primaryRect))),
-        .key(.character("q")),
+        .key(KeyPress(.character("c"), modifiers: .ctrl)),
       ],
       viewBuilder: {
         GalleryLikeObservableSceneView(model: model)
       }
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(model.primaryCount == 1)
     #expect(terminal.frames.contains(where: { $0.contains("Pressed 1 times") }))
     let lastFrame = try #require(terminal.frames.last)
@@ -939,14 +939,14 @@ struct Phase4ObservationAndEnvironmentTests {
       terminalHost: terminal,
       inputReader: Phase4ScriptedInputReader(
         events: [
-          .return,
-          .character("q"),
+          KeyPress(.return),
+          KeyPress(.character("c"), modifiers: .ctrl),
         ]
       ),
       signalReader: Phase4EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     let firstFrame = try #require(terminal.frames.first)
     let lastFrame = try #require(terminal.frames.last)
     #expect(firstFrame.contains("Background #1E222A"))
@@ -964,11 +964,11 @@ struct Phase4ObservationAndEnvironmentTests {
       },
       sessionName: "Phase4ObservationAndEnvironmentTests.TerminalSizeRuntime",
       terminalHost: terminal,
-      inputReader: Phase4ScriptedInputReader(events: [.character("q")]),
+      inputReader: Phase4ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: Phase4EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     let firstFrame = try #require(terminal.frames.first)
     #expect(firstFrame.contains("Terminal 60x18"))
   }
