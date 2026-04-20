@@ -46,10 +46,10 @@ struct HostedSceneSessionTests {
       await recorder.frameCount >= 2
     }
 
-    session.sendInput(Array("q".utf8))
+    session.sendInput([0x03])  // Ctrl+C
     let exitReason = try await task.value
 
-    #expect(exitReason == .quitKey)
+    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
   }
 
   @Test("hosted scene session schedules a new frame on appearance update")
@@ -88,10 +88,10 @@ struct HostedSceneSessionTests {
       await recorder.frameCount >= 2
     }
 
-    session.sendInput(Array("q".utf8))
+    session.sendInput([0x03])  // Ctrl+C
     let exitReason = try await task.value
 
-    #expect(exitReason == .quitKey)
+    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
   }
 
   @Test("hosted scene session schedules a new frame on style update")
@@ -148,10 +148,10 @@ struct HostedSceneSessionTests {
       await recorder.frameCount >= 2
     }
 
-    session.sendInput(Array("q".utf8))
+    session.sendInput([0x03])  // Ctrl+C
     let exitReason = try await task.value
 
-    #expect(exitReason == .quitKey)
+    #expect(exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
   }
 
   @Test("hosted scene session throws when the requested scene does not exist")

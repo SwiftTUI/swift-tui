@@ -43,11 +43,13 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.ActionWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.return, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(actionRecorder.count == 1)
 
     let firstFrame = try #require(terminal.frames.first)
@@ -57,7 +59,7 @@ struct AppRuntimeTests {
     #expect(firstFrame.contains("Launcher"))
     #expect(firstFrame.contains("Increment"))
     #expect(lastFrame.contains("Count 1"))
-    #expect(lastFrame.contains("q quits"))
+    #expect(lastFrame.contains("ctrl-c exits"))
     #expect(firstMetrics.usedFullRepaint)
     #expect(firstMetrics.cellsChanged == firstSurfaceSize.width * firstSurfaceSize.height)
   }
@@ -73,11 +75,11 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.CanvasWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.character("q")]),
+      inputReader: ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(terminal.presentedSurfaceSizes == [terminal.surfaceSize])
 
     let firstFrame = try #require(terminal.frames.first)
@@ -99,11 +101,11 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.ClippedWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.character("q")]),
+      inputReader: ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(terminal.presentedSurfaceSizes == [terminal.surfaceSize])
   }
 
@@ -129,7 +131,7 @@ struct AppRuntimeTests {
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .ctrlC)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
 
     let lastFrame = try #require(terminal.frames.last)
     #expect(lastFrame.contains("Hi_"))
@@ -160,7 +162,7 @@ struct AppRuntimeTests {
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .ctrlC)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
 
     let lastFrame = try #require(terminal.frames.last)
     #expect(lastFrame.contains("Hi"))
@@ -180,11 +182,13 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.AlertWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.return, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.renderedFrames >= 2)
 
     let firstFrame = try #require(terminal.frames.first)
@@ -206,11 +210,13 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.SheetPresentationWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.return, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.renderedFrames >= 2)
 
     let firstFrame = try #require(terminal.frames.first)
@@ -226,7 +232,7 @@ struct AppRuntimeTests {
     let terminal = RecordingTerminalHost(surfaceSize: .init(width: 40, height: 12))
 
     // Script: Enter presses the "Present" button (sheet opens), then
-    // Escape dismisses, then `q` quits. The last rendered frame must not
+    // Escape dismisses, then Ctrl+C exits. The last rendered frame must not
     // contain the sheet body — the framework's Escape path has taken it
     // down, even though focus was inside the sheet's TextField (edit
     // interactions) at the time the key fired.
@@ -236,11 +242,13 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.SheetPresentationWindow.Escape",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.return, .escape, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.return), KeyPress(.escape), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
 
     let openedFrame = try #require(
       terminal.frames.first { $0.contains("Sheet body") },
@@ -276,11 +284,13 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.SheetFocusRestorationWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.return, .escape, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.return), KeyPress(.escape), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.renderedFrames >= 3)
 
     let firstFrame = try #require(terminal.frames.first)
@@ -305,11 +315,13 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.FocusWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.tab, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.tab), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.renderedFrames == 2)
 
     let firstFrame = try #require(terminal.frames.first)
@@ -331,11 +343,13 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.DisappearingFocusWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.tab, .return, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.tab), KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.renderedFrames >= 3)
 
     let lastFrame = try #require(terminal.frames.last)
@@ -354,11 +368,13 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.GeometryFocusWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.arrowRight, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.arrowRight), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.renderedFrames == 2)
 
     let lastFrame = try #require(terminal.frames.last)
@@ -376,11 +392,11 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.BoolFocusStateWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.character("q")]),
+      inputReader: ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
 
     let lastFrame = try #require(terminal.frames.last)
     #expect(lastFrame.contains("First focused: true"))
@@ -398,11 +414,11 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.RequestedBoolFocusWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.character("q")]),
+      inputReader: ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
 
     let firstFrame = try #require(terminal.frames.first)
     #expect(firstFrame.contains("Focus: BoolFocusWindow/Second"))
@@ -420,11 +436,13 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.OptionalFocusStateWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.tab, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.tab), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
 
     let firstFrame = try #require(terminal.frames.first)
     let lastFrame = try #require(terminal.frames.last)
@@ -457,11 +475,13 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.FocusedValueWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.tab, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.tab), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
 
     let firstFrame = try #require(terminal.frames.first)
     let lastFrame = try #require(terminal.frames.last)
@@ -480,11 +500,13 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.FocusedAncestorValueWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.tab, .character("q")]),
+      inputReader: ScriptedInputReader(events: [
+        KeyPress(.tab), KeyPress(.character("c"), modifiers: .ctrl),
+      ]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
 
     let firstFrame = try #require(terminal.frames.first)
     let lastFrame = try #require(terminal.frames.last)
@@ -503,11 +525,11 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.DefaultFocusWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [.character("q")]),
+      inputReader: ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: EmptySignalReader()
     )
 
-    #expect(result.exitReason == .quitKey)
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
 
     let firstFrame = try #require(terminal.frames.first)
     #expect(firstFrame.contains("Field: second"))
@@ -647,7 +669,7 @@ private struct ActionWindow: View {
         )
         .buttonStyle(.borderedProminent)
       }
-      Text("Count \(count) | q quits")
+      Text("Count \(count) | ctrl-c exits")
         .foregroundStyle(.muted)
     }
   }

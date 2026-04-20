@@ -23,9 +23,14 @@ public enum KeyHandlingResult: Equatable, Sendable {
 }
 
 /// Why an interactive run loop stopped.
+///
+/// - ``userExit(_:)``: a key press configured in ``ExitKeyBindings``
+///   was received. The associated ``KeyPress`` identifies which key.
+/// - ``signal(_:)``: the run loop terminated in response to an OS
+///   signal (for example `SIGTERM`).
+/// - ``inputEnded``: the input stream reached end-of-file.
 public enum RunLoopExitReason: Equatable, Sendable {
-  case quitKey
-  case ctrlC
+  case userExit(KeyPress)
   case signal(String)
   case inputEnded
 }
@@ -101,6 +106,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let environment: EnvironmentSnapshot
   package let environmentValues: EnvironmentValues
   package let proposalOverride: ProposedSize?
+  package let exitKeyBindings: ExitKeyBindings
   package let localActionRegistry = LocalActionRegistry()
   package let localPointerHandlerRegistry = LocalPointerHandlerRegistry()
   package let localGestureRegistry = LocalGestureRegistry()
@@ -160,6 +166,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     proposal: ProposedSize? = nil,
+    exitKeyBindings: ExitKeyBindings = .default,
     viewBuilder: DeferredStateBodyBuilder<State, Content>
   ) {
     self.rootIdentity = rootIdentity
@@ -174,6 +181,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     self.environment = environment
     self.environmentValues = environmentValues
     self.proposalOverride = proposal
+    self.exitKeyBindings = exitKeyBindings
     self.viewBuilder = viewBuilder
   }
 
@@ -190,6 +198,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     proposal: ProposedSize? = nil,
+    exitKeyBindings: ExitKeyBindings = .default,
     viewBuilder: DeferredStateBodyBuilder<State, Content>
   ) {
     self.init(
@@ -205,6 +214,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       environment: environment,
       environmentValues: environmentValues,
       proposal: proposal,
+      exitKeyBindings: exitKeyBindings,
       viewBuilder: viewBuilder
     )
   }
@@ -223,6 +233,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     proposal: ProposedSize? = nil,
+    exitKeyBindings: ExitKeyBindings = .default,
     viewBuilder: @escaping (_ state: State, _ focusedIdentity: Identity?) -> Content
   ) {
     self.init(
@@ -238,6 +249,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       environment: environment,
       environmentValues: environmentValues,
       proposal: proposal,
+      exitKeyBindings: exitKeyBindings,
       viewBuilder: ScopedMapper { input in
         viewBuilder(input.state, input.focusedIdentity)
       }
@@ -259,6 +271,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
     proposal: ProposedSize? = nil,
+    exitKeyBindings: ExitKeyBindings = .default,
     viewBuilder: @escaping (_ state: State, _ focusedIdentity: Identity?) -> Content
   ) {
     self.init(
@@ -274,6 +287,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       environment: environment,
       environmentValues: environmentValues,
       proposal: proposal,
+      exitKeyBindings: exitKeyBindings,
       viewBuilder: viewBuilder
     )
   }
