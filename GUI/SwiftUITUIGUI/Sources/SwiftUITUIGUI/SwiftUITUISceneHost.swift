@@ -10,6 +10,8 @@ public final class SwiftUITUISceneHost {
 
   public private(set) var isRunning = false
   public private(set) var lastError: String?
+  public private(set) var focusPresentation: FocusPresentation = .none
+  public private(set) var manualKeyboardPresentationRequested = false
 
   @ObservationIgnored
   private let bridge: GhosttySceneBridge
@@ -39,6 +41,9 @@ public final class SwiftUITUISceneHost {
         Task { @MainActor [weak bridge] in
           bridge?.receiveOutput(output)
         }
+      },
+      onFocusPresentationChange: { [weak self] presentation in
+        self?.updateFocusPresentation(presentation)
       }
     )
     bridge.attach(session: session)
@@ -75,6 +80,12 @@ public final class SwiftUITUISceneHost {
     startTask?.cancel()
     startTask = nil
     bridge.stopSession()
+    focusPresentation = .none
+    manualKeyboardPresentationRequested = false
+    bridge.updateKeyboardPresentation(
+      focusPresentation: focusPresentation,
+      manualKeyboardPresentationRequested: manualKeyboardPresentationRequested
+    )
     isRunning = false
   }
 
@@ -82,7 +93,32 @@ public final class SwiftUITUISceneHost {
     bridge.apply(style: style)
   }
 
+  public func toggleManualKeyboardPresentation() {
+    guard focusPresentation.prefersTextInput == false else {
+      return
+    }
+
+    manualKeyboardPresentationRequested.toggle()
+    bridge.updateKeyboardPresentation(
+      focusPresentation: focusPresentation,
+      manualKeyboardPresentationRequested: manualKeyboardPresentationRequested
+    )
+  }
+
   var bridgeForTesting: GhosttySceneBridge {
     bridge
+  }
+
+  private func updateFocusPresentation(
+    _ presentation: FocusPresentation
+  ) {
+    focusPresentation = presentation
+    if presentation.prefersTextInput || presentation.semantics == .none {
+      manualKeyboardPresentationRequested = false
+    }
+    bridge.updateKeyboardPresentation(
+      focusPresentation: presentation,
+      manualKeyboardPresentationRequested: manualKeyboardPresentationRequested
+    )
   }
 }

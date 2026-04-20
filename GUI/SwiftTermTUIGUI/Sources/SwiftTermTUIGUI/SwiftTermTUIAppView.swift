@@ -119,6 +119,17 @@ private struct SceneTerminalSurface: SwiftUI.View {
           // Keep one persistent SwiftTerm-backed platform view per scene host
           // so the underlying terminal buffer survives scene switches.
           .id(host.descriptor.id)
+          #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+            .overlay(alignment: .topTrailing) {
+              if host.focusPresentation.prefersTextInput == false {
+                KeyboardToggleButton(
+                  isPresented: host.manualKeyboardPresentationRequested,
+                  action: host.toggleManualKeyboardPresentation
+                )
+                .padding(12)
+              }
+            }
+          #endif
           .task {
             host.start()
           }
@@ -135,3 +146,23 @@ private struct SceneTerminalSurface: SwiftUI.View {
     }
   }
 }
+
+#if canImport(UIKit) && !targetEnvironment(macCatalyst)
+  @available(iOS 17.0, *)
+  private struct KeyboardToggleButton: SwiftUI.View {
+    let isPresented: Bool
+    let action: () -> Void
+
+    var body: some SwiftUI.View {
+      Button(action: action) {
+        Image(systemName: isPresented ? "keyboard.chevron.compact.down" : "keyboard")
+          .font(.system(size: 15, weight: .semibold))
+          .foregroundStyle(.primary)
+          .frame(width: 36, height: 36)
+          .background(.regularMaterial, in: Circle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(isPresented ? "Hide keyboard" : "Show keyboard")
+    }
+  }
+#endif
