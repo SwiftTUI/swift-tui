@@ -456,13 +456,16 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
   public var foregroundStyle: AnyShapeStyle?
   public var tintStyle: AnyShapeStyle?
   public var isEnabled: Bool
+  /// Display metrics for the current terminal surface.
+  public var cellPixelMetrics: CellPixelMetrics
 
   public init(
     appearance: TerminalAppearance = .fallback,
     theme: Theme? = nil,
     foregroundStyle: AnyShapeStyle? = nil,
     tintStyle: AnyShapeStyle? = nil,
-    isEnabled: Bool = true
+    isEnabled: Bool = true,
+    cellPixelMetrics: CellPixelMetrics = .estimated
   ) {
     self.heavyFields = StyleHeavyFieldsStorage(
       appearance: appearance,
@@ -471,6 +474,7 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
     self.foregroundStyle = foregroundStyle
     self.tintStyle = tintStyle
     self.isEnabled = isEnabled
+    self.cellPixelMetrics = cellPixelMetrics
   }
 
   /// Creates a snapshot reusing existing heavy-field storage (no copy).
@@ -478,12 +482,14 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
     heavyFields: StyleHeavyFieldsStorage,
     foregroundStyle: AnyShapeStyle?,
     tintStyle: AnyShapeStyle?,
-    isEnabled: Bool
+    isEnabled: Bool,
+    cellPixelMetrics: CellPixelMetrics = .estimated
   ) {
     self.heavyFields = heavyFields
     self.foregroundStyle = foregroundStyle
     self.tintStyle = tintStyle
     self.isEnabled = isEnabled
+    self.cellPixelMetrics = cellPixelMetrics
   }
 
   public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -492,7 +498,8 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
         && lhs.theme == rhs.theme
         && lhs.foregroundStyle == rhs.foregroundStyle
         && lhs.tintStyle == rhs.tintStyle
-        && lhs.isEnabled == rhs.isEnabled)
+        && lhs.isEnabled == rhs.isEnabled
+        && lhs.cellPixelMetrics == rhs.cellPixelMetrics)
   }
 }
 
