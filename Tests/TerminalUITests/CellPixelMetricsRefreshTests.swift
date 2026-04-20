@@ -68,4 +68,36 @@ struct CellPixelMetricsRefreshTests {
 
     #expect(host.graphicsCapabilities.cellPixelSize == Size(width: 8, height: 16))
   }
+
+  @Test("StreamingTerminalHost surface reflects updated cellPixelSize")
+  func streamingHostUpdateCellPixelSize() {
+    let host = StreamingTerminalHost(
+      surfaceSize: Size(width: 80, height: 24),
+      graphicsCapabilities: TerminalGraphicsCapabilities(
+        cellPixelSize: Size(width: 8, height: 16)
+      ),
+      outputHandler: { _ in }
+    )
+
+    #expect(host.graphicsCapabilities.cellPixelSize == Size(width: 8, height: 16))
+
+    host.updateCellPixelSize(Size(width: 12, height: 24))
+
+    #expect(host.graphicsCapabilities.cellPixelSize == Size(width: 12, height: 24))
+  }
+
+  @Test("StreamingTerminalHost clears cell pixel size on nil update")
+  func streamingHostClearsCellPixelSize() {
+    let host = StreamingTerminalHost(
+      surfaceSize: Size(width: 80, height: 24),
+      graphicsCapabilities: TerminalGraphicsCapabilities(
+        cellPixelSize: Size(width: 10, height: 20)
+      ),
+      outputHandler: { _ in }
+    )
+
+    host.updateCellPixelSize(nil)
+
+    #expect(host.graphicsCapabilities.cellPixelSize == nil)
+  }
 }

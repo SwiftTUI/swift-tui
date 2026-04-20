@@ -4,6 +4,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   private struct State: Sendable {
     var surfaceSize: Size
     var renderStyle: TerminalRenderStyle
+    var graphicsCapabilities: TerminalGraphicsCapabilities
     var lastSubmittedSurface: RasterSurface?
   }
 
@@ -12,7 +13,10 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   private let outputHandler: @Sendable (String) -> Void
 
   package let capabilityProfile: TerminalCapabilityProfile
-  package let graphicsCapabilities: TerminalGraphicsCapabilities
+
+  package var graphicsCapabilities: TerminalGraphicsCapabilities {
+    state.withLock(\.graphicsCapabilities)
+  }
 
   package init(
     surfaceSize: Size,
@@ -25,7 +29,6 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   ) {
     self.outputHandler = outputHandler
     self.capabilityProfile = capabilityProfile
-    self.graphicsCapabilities = graphicsCapabilities
 
     let resolvedAppearance =
       appearance
@@ -41,6 +44,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
           appearance: resolvedAppearance,
           theme: theme
         ),
+        graphicsCapabilities: graphicsCapabilities,
         lastSubmittedSurface: nil
       )
     )
@@ -90,6 +94,13 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   ) {
     state.withLock { state in
       state.renderStyle = style
+      state.lastSubmittedSurface = nil
+    }
+  }
+
+  package func updateCellPixelSize(_ cellPixelSize: Size?) {
+    state.withLock { state in
+      state.graphicsCapabilities.cellPixelSize = cellPixelSize
       state.lastSubmittedSurface = nil
     }
   }
