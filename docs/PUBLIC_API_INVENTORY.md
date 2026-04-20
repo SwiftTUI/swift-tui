@@ -131,6 +131,7 @@ These are supported peer packages, but they are not root library products in
 The core data model and pipeline types are canonical:
 
 - geometry, layout, semantic, draw, raster, scheduler, diagnostics, and commit data types
+  - **`CellPixelMetrics`**: read-only display metrics describing how cells map to device pixels. Exposes `width`, `height`, `source` (`.reported` / `.estimated`), derived `aspectRatio`, and the `.estimated` fallback constant. Consumed via `GeometryProxy.cellPixelMetrics` and `EnvironmentValues.cellPixelMetrics`.
 - image payload, resolved-asset, and raster-image-attachment data types used by the rendering pipeline
 - the layout engine, rasterizer, scheduler, semantic extractor, draw extractor, snapshot renderer, and commit planner
 - the incremental presentation and retained-frame machinery that the runtime depends on

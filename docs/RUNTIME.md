@@ -157,6 +157,18 @@ The runtime is materially incremental in common steady-state paths, but it is no
   op lowering that was actually applied
 - `SIGWINCH` schedules a fresh frame and re-reads terminal size without exiting the run loop
 
+### Cell pixel size refresh
+
+`POSIXTerminalHost` (`TerminalHost` class in `Sources/TerminalUI/TerminalHost.swift`)
+re-reads `cellPixelSize` on every access to `baselineGraphicsCapabilities()` via
+`ioctl(TIOCGWINSZ)` — a single cheap syscall. Escape-sequence probes
+(`CSI 16 t`, `CSI 14 t`, Kitty support, sixel capability) remain one-shot at
+startup; only cell pixel dimensions are live.
+
+Hosted sessions can simulate a cell-pixel-size change in tests via
+`HostedSceneSession.resize(to:cellPixelSize:)`, which threads the new value
+through `StreamingTerminalHost.updateCellPixelSize(_:)` and fires a SIGWINCH.
+
 ### Deterministic Scenario Checks
 
 The standing runtime checks are deterministic scenario tests rather than wall-clock benchmarks.
