@@ -42,14 +42,11 @@ public struct DefaultBottomToolbarStyle: ToolbarStyle {
   public init() {}
 }
 
-extension ActionScope where Self: View & Sendable {
+extension ActionScope where Self: View {
   /// Declares that this scope has a toolbar. Toolbar items contributed
   /// by descendant views via `.toolbarItem(_:)` are absorbed at this
   /// scope and rendered as a horizontal strip above or below the
   /// scope's content per `style.placement`.
-  ///
-  /// Items not absorbed here (because no descendant contributed any)
-  /// do not change the rendered output.
   @MainActor
   public func toolbar<S: ToolbarStyle>(style: S) -> ToolbarHost<Self, S> {
     ToolbarHost(content: self, style: style)
@@ -199,6 +196,11 @@ private struct ToolbarContentNode: View, ResolvableView {
 /// layout. Each item is rendered as a Button whose label is the item
 /// title; when an icon is present, the title is prefixed by the icon
 /// with a single-cell gap.
+///
+/// The strip claims the full horizontal width of its host and paints a
+/// chrome-surface background behind it so the toolbar reads as a
+/// distinct bar rather than a floating row of buttons flush against
+/// the content.
 private struct ToolbarItemsStrip<S: ToolbarStyle>: View, ResolvableView {
   let items: [ToolbarItemConfig]
   let style: S
@@ -210,7 +212,16 @@ private struct ToolbarItemsStrip<S: ToolbarStyle>: View, ResolvableView {
         ToolbarItemButton(config: items[index])
       }
     }
-    return [content.resolve(in: context)]
+    // Frame-then-background so the fill covers the full row width, not
+    // just the items' natural extent. Items stay flush-leading; the
+    // Rectangle fills the trailing slack.
+    let strip =
+      content
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background {
+        Rectangle().fill(AnyShapeStyle(.terminalSurfaceBackground))
+      }
+    return [strip.resolve(in: context)]
   }
 }
 

@@ -142,7 +142,8 @@ extension Picker {
     isEnabled: Bool,
     styleEnvironment: StyleEnvironmentSnapshot
   ) -> some View {
-    VStack(alignment: .leading, spacing: 0) {
+    let rowLineWidth = inlineRowIntrinsicLineWidth(for: options)
+    return VStack(alignment: .leading, spacing: 0) {
       ForEach(0..<options.count) { index in
         pickerRow(
           label: options[index].label,
@@ -150,7 +151,7 @@ extension Picker {
           isActiveNavigation: showsFocusEffect,
           isEnabled: isEnabled,
           styleEnvironment: styleEnvironment,
-          lineWidth: nil,
+          lineWidth: rowLineWidth,
           routeIdentity: pickerOptionIdentity(
             for: controlIdentity,
             index: index
@@ -178,6 +179,10 @@ extension Picker {
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
     )
+    // Focus is communicated by the thick border overlay; avoid a tinted
+    // container fill, which otherwise reads as every row being highlighted.
+    let containerFillStyle = AnyShapeStyle(.background)
+    let resolvedLineWidth = lineWidth ?? inlineRowIntrinsicLineWidth(for: options)
     let rows = inlineRows(
       controlIdentity: controlIdentity,
       options: options,
@@ -186,7 +191,7 @@ extension Picker {
       isEnabled: isEnabled,
       styleEnvironment: styleEnvironment,
       viewportLineCount: viewportLineCount,
-      lineWidth: lineWidth
+      lineWidth: resolvedLineWidth
     )
 
     VStack(alignment: .leading, spacing: 0) {
@@ -200,13 +205,13 @@ extension Picker {
             isActiveNavigation: isActiveNavigation && showsFocusEffect,
             isEnabled: isEnabled,
             styleEnvironment: styleEnvironment,
-            lineWidth: lineWidth
+            lineWidth: resolvedLineWidth
           )
         }
       }
       .padding(.init(horizontal: 1, vertical: 1))
       .background {
-        RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(containerChrome.backgroundStyle)
+        RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(containerFillStyle)
       }
       .overlay {
         RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
@@ -223,6 +228,19 @@ extension Picker {
         minimumHeight: 1 + rows.count + 2
       )
     )
+  }
+
+  /// Intrinsic row width used so every inline/menu option row occupies the
+  /// same cell width — the selected-row highlight then covers the full row
+  /// instead of wrapping to the label and leaving a jagged right edge.
+  private func inlineRowIntrinsicLineWidth(for options: [Option]) -> Int {
+    let maxLabelWidth =
+      options
+      .map { layoutText(for: $0.label, width: nil).size.width }
+      .max() ?? 0
+    // `controlFocusRail` reserves a single cell for the rail glyph and
+    // `controlFocusRow` inserts one cell of spacing between rail and content.
+    return maxLabelWidth + 2
   }
 
   private func inlineRows(
@@ -348,20 +366,29 @@ extension Picker {
       } else {
         AnyShapeStyle(.foreground)
       }
-    let row = controlFocusRow(
-      showsRail: isSelected,
-      railStyle: markerStyle,
-      isHighlighted: isSelected && isActiveNavigation,
-      backgroundStyle: rowChrome.backgroundStyle,
-      reservesRailSpaceWhenHidden: true,
-      spacing: 1
-    ) {
-      Text(label)
-        .lineLimit(1)
-        .foregroundStyle(labelStyle)
-    }
-    .drawMetadata(.init(opacity: rowChrome.opacity))
-    .frame(width: lineWidth, alignment: .leading)
+    // Size the row first, then apply the highlight — otherwise
+    // `.background` would hug the HStack's natural (text-only) width and
+    // leave a jagged right edge. `.frame(alignment: .leading)` pins the
+    // rail+label flush left; the background spans the full row width
+    // because it's applied to the frame, not to the HStack's natural size.
+    let row =
+      HStack(alignment: .center, spacing: 1) {
+        controlFocusRail(
+          isVisible: isSelected,
+          style: markerStyle,
+          reservesSpaceWhenHidden: true
+        )
+        Text(label)
+          .lineLimit(1)
+          .foregroundStyle(labelStyle)
+      }
+      .frame(width: lineWidth, alignment: .leading)
+      .background {
+        if isSelected && isActiveNavigation {
+          Rectangle().fill(rowChrome.backgroundStyle)
+        }
+      }
+      .drawMetadata(.init(opacity: rowChrome.opacity))
 
     if let routeIdentity {
       PointerRouteView(
