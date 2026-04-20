@@ -21,9 +21,9 @@ struct FullScreenTabGestureTests {
   func spawnStateStartsAtBottomCenter() {
     let terminalSize = Size(width: 40, height: 12)
     let playfield = FullScreenToyPhysics.playfieldBounds(from: terminalSize)
-    let floor = FullScreenToyPhysics.maximumOrigin(in: playfield)
+    let floor = FullScreenToyPhysics.maximumOrigin(in: playfield, metrics: .estimated)
 
-    let state = FullScreenToyPhysics.spawnState(in: playfield)
+    let state = FullScreenToyPhysics.spawnState(in: playfield, metrics: .estimated)
 
     #expect(state.position.x == floor.x / 2)
     #expect(state.position.y == floor.y)
@@ -34,13 +34,13 @@ struct FullScreenTabGestureTests {
   @Test("fullscreen toy physics applies gravity and bounces off the floor")
   func physicsBouncesOffFloor() {
     let terminalSize = Size(width: 40, height: 12)
-    let floor = FullScreenToyPhysics.maximumOrigin(in: terminalSize)
+    let floor = FullScreenToyPhysics.maximumOrigin(in: terminalSize, metrics: .estimated)
     var state = FullScreenToyPhysics.State(
       position: .init(x: 10 * FullScreenToyPhysics.fixedScale, y: floor.y - 1),
       velocity: .init(x: 0, y: 10)
     )
 
-    FullScreenToyPhysics.step(&state, in: terminalSize)
+    FullScreenToyPhysics.step(&state, in: terminalSize, metrics: .estimated)
 
     #expect(state.position.y == floor.y)
     #expect(state.velocity.y < 0)
@@ -49,13 +49,13 @@ struct FullScreenTabGestureTests {
   @Test("fullscreen toy physics reflects from the right wall")
   func physicsReflectsOffRightWall() {
     let terminalSize = Size(width: 40, height: 12)
-    let wall = FullScreenToyPhysics.maximumOrigin(in: terminalSize)
+    let wall = FullScreenToyPhysics.maximumOrigin(in: terminalSize, metrics: .estimated)
     var state = FullScreenToyPhysics.State(
       position: .init(x: wall.x - 2, y: 4 * FullScreenToyPhysics.fixedScale),
       velocity: .init(x: 6, y: 0)
     )
 
-    FullScreenToyPhysics.step(&state, in: terminalSize)
+    FullScreenToyPhysics.step(&state, in: terminalSize, metrics: .estimated)
 
     #expect(state.position.x == wall.x)
     #expect(state.velocity.x < 0)
@@ -70,10 +70,11 @@ struct FullScreenTabGestureTests {
       to: &state,
       translation: .zero,
       velocity: Size(width: 100, height: -50),
-      in: terminalSize
+      in: terminalSize,
+      metrics: .estimated
     )
 
-    #expect(state.velocity == .init(x: 64, y: -32))
+    #expect(state.velocity == .init(x: 64, y: -16))
   }
 
   @Test("fullscreen demo keeps presenting frames while gravity runs")
