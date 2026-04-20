@@ -1,7 +1,7 @@
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@_spi(Runners) @testable import TerminalUI
 
 #if canImport(Darwin)
   import Darwin
@@ -99,5 +99,35 @@ struct CellPixelMetricsRefreshTests {
     host.updateCellPixelSize(nil)
 
     #expect(host.graphicsCapabilities.cellPixelSize == nil)
+  }
+
+  @Test("HostedSceneSession.resize carries cellPixelSize into the host")
+  @MainActor
+  func hostedResizeUpdatesCellPixelSize() {
+    let session = HostedSceneSession(
+      descriptor: TerminalUISceneDescriptor(
+        id: WindowIdentifier("test"),
+        title: nil,
+        isDefault: true
+      ),
+      rootIdentity: Identity(components: ["test"]),
+      sessionName: "test",
+      initialSize: Size(width: 80, height: 24),
+      appearance: .fallback,
+      theme: nil,
+      capabilityProfile: .trueColor,
+      runScene: { _, _, _ in
+        RunLoopResult(
+          finalState: TerminalUISceneSessionState(),
+          renderedFrames: 0,
+          exitReason: .inputEnded
+        )
+      },
+      onOutput: { _ in }
+    )
+
+    session.resize(to: Size(width: 80, height: 24), cellPixelSize: Size(width: 12, height: 24))
+
+    #expect(session.hostGraphicsCapabilitiesForTesting.cellPixelSize == Size(width: 12, height: 24))
   }
 }

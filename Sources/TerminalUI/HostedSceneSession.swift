@@ -158,6 +158,19 @@ public final class HostedSceneSession {
     signalReader.send("SIGWINCH")
   }
 
+  public func resize(
+    to size: Size,
+    cellPixelSize: Size?
+  ) {
+    host.updateSurfaceSize(size)
+    host.updateCellPixelSize(cellPixelSize)
+    signalReader.send("SIGWINCH")
+  }
+
+  package var hostGraphicsCapabilitiesForTesting: TerminalGraphicsCapabilities {
+    host.graphicsCapabilities
+  }
+
   public func updateAppearance(
     _ appearance: TerminalAppearance
   ) {
