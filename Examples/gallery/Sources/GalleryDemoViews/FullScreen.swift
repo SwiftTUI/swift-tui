@@ -32,7 +32,7 @@ struct FullScreenTab: View {
         await runToyLoop(in: playfieldBounds, metrics: metrics)
       }
     }
-    .padding(2)
+    .border(.tint)
     .background(.tint)
   }
 
@@ -100,6 +100,7 @@ struct FullScreenToyPhysics {
   static let floorBounceDenominator = 4
   static let settleVelocity = 2
   static let playfieldHeightInset = 6
+  static let playfieldWidthtInset = 2
   static let initialLaunchX = 0
   static let initialLaunchY = -10
 
@@ -190,7 +191,7 @@ struct FullScreenToyPhysics {
     from bounds: Size
   ) -> Size {
     Size(
-      width: bounds.width,
+      width: max(0, bounds.width - playfieldWidthtInset),
       height: max(0, bounds.height - playfieldHeightInset)
     )
   }
