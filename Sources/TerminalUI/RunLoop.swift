@@ -101,6 +101,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let scheduler: any FrameScheduling
   package let stateContainer: StateContainer<State>
   package let focusTracker: FocusTracker
+  package let focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)?
   package let keyHandler: StateKeyHandler<State>?
   package let viewBuilder: DeferredStateBodyBuilder<State, Content>
   package let environment: EnvironmentSnapshot
@@ -138,6 +139,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   }
 
   package var latestSemanticSnapshot = SemanticSnapshot()
+  package var currentFocusPresentation: FocusPresentation = .none
   package var latestActivePaletteCommands: [ActivePaletteCommand] = []
   package var currentFocusedValues = FocusedValues()
   package var previousPreferenceObservations: [PreferenceObservationRegistrationSnapshot] = []
@@ -162,6 +164,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     scheduler: any FrameScheduling = FrameScheduler(),
     stateContainer: StateContainer<State>,
     focusTracker: FocusTracker,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil,
     keyHandler: StateKeyHandler<State>? = nil,
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
@@ -177,6 +180,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     self.scheduler = scheduler
     self.stateContainer = stateContainer
     self.focusTracker = focusTracker
+    self.focusPresentationHandler = focusPresentationHandler
     self.keyHandler = keyHandler
     self.environment = environment
     self.environmentValues = environmentValues
@@ -194,6 +198,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     scheduler: any FrameScheduling = FrameScheduler(),
     stateContainer: StateContainer<State>,
     focusTracker: FocusTracker,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil,
     keyHandler: StateKeyHandler<State>? = nil,
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
@@ -210,6 +215,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       scheduler: scheduler,
       stateContainer: stateContainer,
       focusTracker: focusTracker,
+      focusPresentationHandler: focusPresentationHandler,
       keyHandler: keyHandler,
       environment: environment,
       environmentValues: environmentValues,
@@ -229,6 +235,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     scheduler: any FrameScheduling = FrameScheduler(),
     stateContainer: StateContainer<State>,
     focusTracker: FocusTracker,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil,
     keyHandler: StateKeyHandler<State>? = nil,
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
@@ -245,6 +252,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       scheduler: scheduler,
       stateContainer: stateContainer,
       focusTracker: focusTracker,
+      focusPresentationHandler: focusPresentationHandler,
       keyHandler: keyHandler,
       environment: environment,
       environmentValues: environmentValues,
@@ -267,6 +275,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     scheduler: any FrameScheduling = FrameScheduler(),
     stateContainer: StateContainer<State>,
     focusTracker: FocusTracker,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil,
     keyHandler: StateKeyHandler<State>? = nil,
     environment: EnvironmentSnapshot = .init(),
     environmentValues: EnvironmentValues = .init(),
@@ -283,6 +292,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       scheduler: scheduler,
       stateContainer: stateContainer,
       focusTracker: focusTracker,
+      focusPresentationHandler: focusPresentationHandler,
       keyHandler: keyHandler,
       environment: environment,
       environmentValues: environmentValues,
@@ -416,6 +426,19 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     if sleepDuration > .zero {
       eventPump.scheduleDeadlineWake(sleepDuration)
     }
+  }
+}
+
+extension RunLoop {
+  package func updateFocusPresentation(
+    _ presentation: FocusPresentation
+  ) {
+    guard currentFocusPresentation != presentation else {
+      return
+    }
+
+    currentFocusPresentation = presentation
+    focusPresentationHandler?(presentation)
   }
 }
 

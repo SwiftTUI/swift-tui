@@ -17,6 +17,19 @@ struct HostedSceneSessionTests {
     }
   }
 
+  private struct FocusPresentationApp: App {
+    var body: some Scene {
+      WindowGroup("Primary", id: WindowIdentifier("primary")) {
+        VStack {
+          Text("Activate")
+            .focusable(true, interactions: .activate)
+          Text("Edit")
+            .focusable(true, interactions: .edit)
+        }
+      }
+    }
+  }
+
   @Test("hosted scene session rerenders on resize without exiting")
   func hostedSceneSessionRerendersOnResize() async throws {
     let recorder = OutputRecorder()
@@ -171,6 +184,44 @@ struct HostedSceneSessionTests {
       Issue.record("Unexpected error: \(error)")
     }
   }
+
+  @Test("hosted scene session publishes committed focus presentation changes")
+  func hostedSceneSessionPublishesFocusPresentationChanges() async throws {
+    let recorder = FocusPresentationRecorder()
+    let session = try HostedSceneSession(
+      for: FocusPresentationApp(),
+      sceneID: WindowIdentifier("primary"),
+      initialSize: .init(width: 24, height: 6),
+      appearance: .fallback,
+      onOutput: { _ in },
+      onFocusPresentationChange: { presentation in
+        recorder.record(presentation)
+      }
+    )
+
+    let task = Task {
+      try await session.start()
+    }
+
+    try await waitUntil("activate focus presentation") {
+      session.currentFocusPresentation.semantics == .activate
+    }
+    #expect(session.currentFocusPresentation.prefersTextInput == false)
+
+    session.sendInput([0x09])
+
+    try await waitUntil("edit focus presentation") {
+      session.currentFocusPresentation.semantics == .edit
+    }
+    #expect(session.currentFocusPresentation.prefersTextInput)
+
+    session.stop()
+    let exitReason = try await task.value
+
+    #expect(exitReason == .inputEnded)
+    #expect(session.currentFocusPresentation == .none)
+    #expect(recorder.presentations.map(\.semantics) == [.activate, .edit, .none])
+  }
 }
 
 private actor OutputRecorder {
@@ -186,11 +237,22 @@ private actor OutputRecorder {
 }
 
 @MainActor
+private final class FocusPresentationRecorder {
+  private(set) var presentations: [FocusPresentation] = []
+
+  func record(
+    _ presentation: FocusPresentation
+  ) {
+    presentations.append(presentation)
+  }
+}
+
+@MainActor
 private func waitUntil(
   _ label: String,
   timeoutNanoseconds: UInt64 = 5_000_000_000,
   pollNanoseconds: UInt64 = 20_000_000,
-  condition: @escaping @Sendable () async -> Bool
+  condition: @escaping () async -> Bool
 ) async throws {
   let clock = ContinuousClock()
   let start = clock.now

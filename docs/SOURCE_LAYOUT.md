@@ -116,7 +116,7 @@ library product. Downstream package consumers reach those types through
 - `Scheduler.swift`: invalidation and wake scheduling
 - `StateContainer.swift`: runtime-owned state storage
 - `TextFigureSupport.swift`: embedded-FIGlet font lookup, layout metrics, caching, and rendering support used by proposal-aware figure text
-- `FocusTracker.swift`, `FocusPolicy.swift`, `FocusInteractionTypes.swift`, and `FocusedValues.swift`: focus state and focus-value transport
+- `FocusTracker.swift`, `FocusPolicy.swift`, `FocusInteractionTypes.swift`, `FocusPresentation.swift`, and `FocusedValues.swift`: focus state and focus-value transport
 - `PreferenceValues.swift`: preference storage
 - `SemanticRoleTypes.swift` and `BuiltinPointerRoutes.swift`: closed semantic roles and structured pointer routes
 - `Appearance.swift`, `Styling.swift`, `TerminalChromeStyle.swift`, and `ViewStyleTypes.swift`: styling and appearance support

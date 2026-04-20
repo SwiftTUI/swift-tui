@@ -140,6 +140,9 @@ extension RunLoop {
         )
       }
 
+      let focusPresentation = artifacts.semanticSnapshot.focusPresentation(
+        for: focusTracker.currentFocusIdentity
+      )
       let presentationDamage: PresentationDamage? =
         if rerenderedForFocusSync {
           nil
@@ -176,6 +179,7 @@ extension RunLoop {
         currentLifecycleRegistry: localLifecycleRegistry,
         currentTaskRegistry: localTaskRegistry
       )
+      updateFocusPresentation(focusPresentation)
       _ = localPreferenceObservationRegistry.applyChanges(
         since: previousPreferenceObservations
       )

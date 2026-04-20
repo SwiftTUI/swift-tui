@@ -12,6 +12,8 @@ import View
   @_spi(Runners) public let surfaceName: String
   @_spi(Runners) public let environmentValues: [String: String]
   @_spi(Runners) public let diagnosticsLogger: FrameDiagnosticsLogger?
+  @_spi(Runners) public let focusPresentationHandler:
+    (@MainActor @Sendable (FocusPresentation) -> Void)?
 
   @_spi(Runners) public init(
     terminalHost: any TerminalHosting,
@@ -20,7 +22,8 @@ import View
     scheduler: any FrameScheduling = FrameScheduler(),
     surfaceName: String = "terminal",
     environmentValues: [String: String] = [:],
-    diagnosticsLogger: FrameDiagnosticsLogger? = nil
+    diagnosticsLogger: FrameDiagnosticsLogger? = nil,
+    focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) {
     self.terminalHost = terminalHost
     self.terminalInputReader = terminalInputReader
@@ -29,6 +32,7 @@ import View
     self.surfaceName = surfaceName
     self.environmentValues = environmentValues
     self.diagnosticsLogger = diagnosticsLogger
+    self.focusPresentationHandler = focusPresentationHandler
   }
 }
 
@@ -64,6 +68,7 @@ import View
       scheduler: resources.scheduler,
       stateContainer: stateContainer,
       focusTracker: focusTracker,
+      focusPresentationHandler: resources.focusPresentationHandler,
       environment: environmentSnapshot,
       environmentValues: environmentValues,
       exitKeyBindings: configuration.exitKeyBindings,
