@@ -1168,8 +1168,13 @@ extension TerminalHosting {
 
     private func baselineGraphicsCapabilities() -> TerminalGraphicsCapabilities {
       var capabilities = capabilityProbe.cachedGraphicsCapabilities ?? .none
-      if capabilities.cellPixelSize == nil {
-        capabilities.cellPixelSize = try? controller.cellPixelSize(of: outputFileDescriptor)
+      // Always attempt a fresh ioctl read. The syscall is cheap and its
+      // result is authoritative when the kernel reports pixel dimensions.
+      // We only fall back to the cached value if the fresh read returns
+      // nil, which preserves previously-probed escape-sequence values
+      // (CSI 16 t / CSI 14 t) across frames.
+      if let fresh = try? controller.cellPixelSize(of: outputFileDescriptor) {
+        capabilities.cellPixelSize = fresh
       }
       capabilityProbe.cachedGraphicsCapabilities = capabilities
       return capabilities
