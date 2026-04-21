@@ -34,10 +34,11 @@ public struct SwiftUITUIAppView<A: TerminalUI.App>: SwiftUI.View {
 
 @available(macOS 14.0, iOS 17.0, macCatalyst 17.0, *)
 private struct TerminalSurfaceHost: SwiftUI.View {
+  let host: SwiftUITUISceneHost
   let context: TerminalViewState
 
   var body: some SwiftUI.View {
-    TerminalSurfaceRepresentable(context: context)
+    TerminalSurfaceRepresentable(host: host, context: context)
       .background(.clear)
   }
 }
@@ -45,6 +46,7 @@ private struct TerminalSurfaceHost: SwiftUI.View {
 #if canImport(AppKit) && !targetEnvironment(macCatalyst)
   @available(macOS 14.0, *)
   private struct TerminalSurfaceRepresentable: NSViewRepresentable {
+    let host: SwiftUITUISceneHost
     let context: TerminalViewState
 
     func makeNSView(context _: Context) -> TerminalView {
@@ -66,6 +68,7 @@ private struct TerminalSurfaceHost: SwiftUI.View {
 #elseif canImport(UIKit)
   @available(iOS 17.0, macCatalyst 17.0, *)
   private struct TerminalSurfaceRepresentable: UIViewRepresentable {
+    let host: SwiftUITUISceneHost
     let context: TerminalViewState
 
     func makeUIView(context _: Context) -> TerminalView {
@@ -82,6 +85,7 @@ private struct TerminalSurfaceHost: SwiftUI.View {
       view.delegate = context
       view.controller = context.controller
       view.configuration = context.configuration
+      host.bridgeForTesting.attachPlatformView(view)
     }
   }
 #endif
@@ -131,11 +135,22 @@ private struct SceneTerminalSurface: SwiftUI.View {
   var body: some SwiftUI.View {
     Group {
       if let host {
-        TerminalSurfaceHost(context: host.viewState)
+        TerminalSurfaceHost(host: host, context: host.viewState)
           // Force a fresh Ghostty-backed platform view per scene. Reusing the
           // same TerminalView across scene swaps can leave the previous
           // in-memory session holding a freed surface pointer.
           .id(host.descriptor.id)
+          #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+            .overlay(alignment: .topTrailing) {
+              if host.focusPresentation.prefersTextInput == false {
+                KeyboardToggleButton(
+                  isPresented: host.manualKeyboardPresentationRequested,
+                  action: host.toggleManualKeyboardPresentation
+                )
+                .padding(12)
+              }
+            }
+          #endif
           .task {
             host.start()
           }
@@ -152,3 +167,23 @@ private struct SceneTerminalSurface: SwiftUI.View {
     }
   }
 }
+
+#if canImport(UIKit) && !targetEnvironment(macCatalyst)
+  @available(iOS 17.0, *)
+  private struct KeyboardToggleButton: SwiftUI.View {
+    let isPresented: Bool
+    let action: () -> Void
+
+    var body: some SwiftUI.View {
+      Button(action: action) {
+        Image(systemName: isPresented ? "keyboard.chevron.compact.down" : "keyboard")
+          .font(.system(size: 15, weight: .semibold))
+          .foregroundStyle(.primary)
+          .frame(width: 36, height: 36)
+          .background(.regularMaterial, in: Circle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(isPresented ? "Hide keyboard" : "Show keyboard")
+    }
+  }
+#endif
