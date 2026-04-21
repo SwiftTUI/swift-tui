@@ -38,6 +38,8 @@
       }
       defer { sceneClose(slaveFD) }
 
+      sceneConfigureNoSigPipe(STDOUT_FILENO)
+
       // Set the slave's window size to match the current terminal
       syncWindowSize(from: STDOUT_FILENO, to: slaveFD)
 

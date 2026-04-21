@@ -20,6 +20,16 @@
   #endif
 
   @inline(__always)
+  func sceneConfigureNoSigPipe(
+    _ fileDescriptor: Int32
+  ) {
+    #if canImport(Darwin)
+      guard fileDescriptor >= 0 else { return }
+      _ = fcntl(fileDescriptor, F_SETNOSIGPIPE, 1)
+    #endif
+  }
+
+  @inline(__always)
   func sceneOpenDirectory(
     _ path: String
   ) -> SceneDirectoryHandle? {
@@ -53,7 +63,9 @@
 
   @inline(__always)
   func sceneSocket() -> Int32 {
-    socket(AF_UNIX, sceneSocketStreamType, 0)
+    let fileDescriptor = socket(AF_UNIX, sceneSocketStreamType, 0)
+    sceneConfigureNoSigPipe(fileDescriptor)
+    return fileDescriptor
   }
 
   @inline(__always)
@@ -61,9 +73,11 @@
     _ path: String,
     _ flags: Int32
   ) -> Int32 {
-    unsafe path.withCString { cPath in
+    let fileDescriptor = unsafe path.withCString { cPath in
       unsafe open(cPath, flags)
     }
+    sceneConfigureNoSigPipe(fileDescriptor)
+    return fileDescriptor
   }
 
   @inline(__always)
@@ -88,7 +102,13 @@
     _ buffer: UnsafeRawPointer?,
     _ count: Int
   ) -> Int {
-    unsafe write(fileDescriptor, buffer, count)
+    #if canImport(Darwin) || canImport(Glibc) || canImport(Android)
+      let sent = unsafe send(fileDescriptor, buffer, count, Int32(MSG_NOSIGNAL))
+      if sent >= 0 || errno != ENOTSOCK {
+        return sent
+      }
+    #endif
+    return unsafe write(fileDescriptor, buffer, count)
   }
 
   @inline(__always)
@@ -162,11 +182,13 @@
   func sceneAccept(
     _ fileDescriptor: Int32
   ) -> Int32 {
-    unsafe accept(
+    let clientFileDescriptor = unsafe accept(
       fileDescriptor,
       nil as UnsafeMutablePointer<sockaddr>?,
       nil as UnsafeMutablePointer<socklen_t>?
     )
+    sceneConfigureNoSigPipe(clientFileDescriptor)
+    return clientFileDescriptor
   }
 
   @inline(__always)
