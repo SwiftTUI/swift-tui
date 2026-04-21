@@ -119,6 +119,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let localLifecycleRegistry = LocalLifecycleRegistry()
   package let localTaskRegistry = LocalTaskRegistry()
   package let commandRegistry = CommandRegistry()
+  package let dropDestinationRegistry = DropDestinationRegistry()
   package let lifecycleCoordinator = LifecycleCoordinator()
   package let observationBridge = ObservationBridge()
 
@@ -134,7 +135,8 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       lifecycleRegistry: localLifecycleRegistry,
       taskRegistry: localTaskRegistry,
       preferenceObservationRegistry: localPreferenceObservationRegistry,
-      commandRegistry: commandRegistry
+      commandRegistry: commandRegistry,
+      dropDestinationRegistry: dropDestinationRegistry
     )
   }
 
