@@ -15,7 +15,7 @@ let package = Package(
     )
   ],
   dependencies: [
-    .package(path: "../.."),
+    .package(name: "swift-terminal-ui", path: "../.."),
     .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.13.0"),
   ],
   targets: [

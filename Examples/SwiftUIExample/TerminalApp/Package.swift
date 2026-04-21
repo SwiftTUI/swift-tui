@@ -15,7 +15,7 @@ let package = Package(
     )
   ],
   dependencies: [
-    .package(path: "../../.."),
+    .package(name: "swift-terminal-ui", path: "../../.."),
     .package(path: "../../gallery"),
   ],
   targets: [
