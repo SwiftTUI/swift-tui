@@ -830,6 +830,7 @@ extension TerminalHosting {
       if capabilityProfile.supportsMouseReporting {
         try write(enableMouseReportingSequence())
       }
+      try write("\u{001B}[?2004h")  // enable bracketed paste
       shouldRestoreOnFailure = false
     }
 
@@ -869,6 +870,7 @@ extension TerminalHosting {
       if capabilityProfile.supportsMouseReporting {
         try writeSynchronously(disableMouseReportingSequence())
       }
+      try writeSynchronously("\u{001B}[?2004l")  // disable bracketed paste
       try writeSynchronously(resetStyleSequence())
       try writeSynchronously(showCursorSequence())
       try writeSynchronously(exitAlternateScreenSequence())
@@ -1495,6 +1497,7 @@ extension TerminalHosting {
       if capabilityProfile.supportsMouseReporting {
         setup += enableMouseReportingSequence()
       }
+      setup += "\u{001B}[?2004h"  // enable bracketed paste
       try write(setup)
     }
 
@@ -1503,6 +1506,7 @@ extension TerminalHosting {
       if capabilityProfile.supportsMouseReporting {
         teardown += disableMouseReportingSequence()
       }
+      teardown += "\u{001B}[?2004l"  // disable bracketed paste
       teardown += showCursorSequence()
       teardown += resetStyleSequence()
       teardown += exitAlternateScreenSequence()

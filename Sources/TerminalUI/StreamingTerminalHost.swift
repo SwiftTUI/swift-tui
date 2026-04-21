@@ -111,6 +111,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     if capabilityProfile.supportsMouseReporting {
       setup += "\u{001B}[?1002h\u{001B}[?1006h"
     }
+    setup += "\u{001B}[?2004h"  // enable bracketed paste
     try write(setup)
   }
 
@@ -119,6 +120,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     if capabilityProfile.supportsMouseReporting {
       teardown += "\u{001B}[?1002l\u{001B}[?1006l"
     }
+    teardown += "\u{001B}[?2004l"  // disable bracketed paste
     teardown += "\u{001B}[?25h"
     teardown += "\u{001B}[0m"
     teardown += "\u{001B}[?1049l"
