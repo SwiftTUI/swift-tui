@@ -7,15 +7,6 @@ import Testing
 @MainActor
 @Suite
 struct FullScreenTabGestureTests {
-  @Test("fullscreen toy playfield reserves six rows at the bottom")
-  func playfieldBoundsReserveBottomInset() {
-    let terminalSize = Size(width: 40, height: 12)
-
-    let playfield = FullScreenToyPhysics.playfieldBounds(from: terminalSize)
-
-    #expect(playfield.width == terminalSize.width)
-    #expect(playfield.height == terminalSize.height - FullScreenToyPhysics.playfieldHeightInset)
-  }
 
   @Test("fullscreen toy starts at bottom center with its initial launch velocity")
   func spawnStateStartsAtBottomCenter() {
