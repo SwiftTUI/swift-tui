@@ -1367,6 +1367,7 @@ extension TerminalHosting {
       if capabilityProfile.supportsMouseReporting {
         reset += disableMouseReportingSequence()
       }
+      reset += "\u{001B}[?2004l"  // disable bracketed paste
       reset += showCursorSequence()
       reset += resetStyleSequence()
       reset += exitAlternateScreenSequence()
