@@ -1,10 +1,11 @@
+import Synchronization
 import Testing
 import View
 
 @testable import TerminalUI
 
 @MainActor
-@Suite
+@Suite(.serialized)
 struct HostedSceneSessionTests {
   private struct HostedApp: App {
     var body: some Scene {
@@ -39,9 +40,7 @@ struct HostedSceneSessionTests {
       initialSize: .init(width: 24, height: 6),
       appearance: .fallback,
       onOutput: { output in
-        Task {
-          await recorder.record(output)
-        }
+        recorder.record(output)
       }
     )
 
@@ -50,13 +49,13 @@ struct HostedSceneSessionTests {
     }
 
     try await waitUntil("first frame") {
-      await recorder.frameCount >= 1
+      recorder.frameCount >= 1
     }
 
     session.resize(to: .init(width: 32, height: 8))
 
     try await waitUntil("second frame") {
-      await recorder.frameCount >= 2
+      recorder.frameCount >= 2
     }
 
     session.sendInput([0x03])  // Ctrl+C
@@ -74,9 +73,7 @@ struct HostedSceneSessionTests {
       initialSize: .init(width: 24, height: 6),
       appearance: .fallback,
       onOutput: { output in
-        Task {
-          await recorder.record(output)
-        }
+        recorder.record(output)
       }
     )
 
@@ -85,7 +82,7 @@ struct HostedSceneSessionTests {
     }
 
     try await waitUntil("first frame") {
-      await recorder.frameCount >= 1
+      recorder.frameCount >= 1
     }
 
     session.updateAppearance(
@@ -98,7 +95,7 @@ struct HostedSceneSessionTests {
     )
 
     try await waitUntil("second frame") {
-      await recorder.frameCount >= 2
+      recorder.frameCount >= 2
     }
 
     session.sendInput([0x03])  // Ctrl+C
@@ -116,9 +113,7 @@ struct HostedSceneSessionTests {
       initialSize: .init(width: 24, height: 6),
       appearance: .fallback,
       onOutput: { output in
-        Task {
-          await recorder.record(output)
-        }
+        recorder.record(output)
       }
     )
 
@@ -127,7 +122,7 @@ struct HostedSceneSessionTests {
     }
 
     try await waitUntil("first frame") {
-      await recorder.frameCount >= 1
+      recorder.frameCount >= 1
     }
 
     session.updateStyle(
@@ -158,7 +153,7 @@ struct HostedSceneSessionTests {
     )
 
     try await waitUntil("second frame") {
-      await recorder.frameCount >= 2
+      recorder.frameCount >= 2
     }
 
     session.sendInput([0x03])  // Ctrl+C
@@ -224,14 +219,18 @@ struct HostedSceneSessionTests {
   }
 }
 
-private actor OutputRecorder {
-  private(set) var frameCount = 0
+private final class OutputRecorder: Sendable {
+  private let frameCountStorage = Mutex(0)
+
+  var frameCount: Int {
+    frameCountStorage.withLock { $0 }
+  }
 
   func record(
     _ output: String
   ) {
     if output.contains("\u{001B}[2J") {
-      frameCount += 1
+      frameCountStorage.withLock { $0 += 1 }
     }
   }
 }

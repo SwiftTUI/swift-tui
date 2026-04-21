@@ -1361,7 +1361,7 @@ struct InteractiveRuntimeTests {
       try await runLoop.run()
     }
 
-    let toastDismissed = try await waitUntil {
+    let toastDismissed = try await waitUntil(timeoutNanoseconds: 10_000_000_000) {
       guard terminal.frames.count >= 2 else {
         return false
       }

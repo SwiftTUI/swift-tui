@@ -3,6 +3,7 @@ import Testing
 @testable import Core
 @testable import View
 
+@MainActor
 @Suite
 struct CellPixelMetricsEnvironmentTests {
   @Test("default environment value is .estimated")
