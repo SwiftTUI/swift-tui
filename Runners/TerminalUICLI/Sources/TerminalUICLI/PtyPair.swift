@@ -53,6 +53,9 @@
         throw .allocationFailed(errno: errno)
       }
 
+      sceneConfigureNoSigPipe(masterFD)
+      sceneConfigureNoSigPipe(slaveFD)
+
       // We only need the slave path, not the slave fd — clients open it themselves.
       // Read the path before closing the slave fd.
       guard let slavePath = sceneTTYName(slaveFD) else {

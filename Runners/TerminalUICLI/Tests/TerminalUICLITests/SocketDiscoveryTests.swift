@@ -141,6 +141,34 @@ struct SocketDiscoveryTests {
     try await waitUntilSocketRemoved(server.socketPath)
     #expect(!FileManager.default.fileExists(atPath: server.socketPath))
   }
+
+  @Test("Socket writes return EPIPE instead of raising SIGPIPE")
+  func socketWritesReturnEPipeInsteadOfSigPipe() throws {
+    var descriptors = [Int32](repeating: -1, count: 2)
+    let status = unsafe descriptors.withUnsafeMutableBufferPointer { buffer in
+      unsafe socketpair(AF_UNIX, streamSocketType(), 0, buffer.baseAddress)
+    }
+    #expect(status == 0)
+    defer {
+      if descriptors[0] >= 0 {
+        sceneClose(descriptors[0])
+      }
+      if descriptors[1] >= 0 {
+        sceneClose(descriptors[1])
+      }
+    }
+
+    sceneClose(descriptors[1])
+    descriptors[1] = -1
+
+    errno = 0
+    let bytesWritten = unsafe "LIST\n".withCString { pointer in
+      unsafe sceneWrite(descriptors[0], pointer, unsafe strlen(pointer))
+    }
+
+    #expect(bytesWritten == -1)
+    #expect(errno == EPIPE || errno == ECONNRESET)
+  }
 }
 
 private func makeServer(appName: String, identifier: String) -> SceneDiscoveryServer {
@@ -165,6 +193,14 @@ private func makeServer(appName: String, identifier: String) -> SceneDiscoverySe
 
 private func uniqueAppName() -> String {
   "terminaluiscenes-tests-\(UUID().uuidString)"
+}
+
+private func streamSocketType() -> Int32 {
+  #if canImport(Darwin)
+    SOCK_STREAM
+  #elseif canImport(Glibc)
+    Int32(SOCK_STREAM.rawValue)
+  #endif
 }
 
 private func waitForServer(at socketPath: String) async throws {

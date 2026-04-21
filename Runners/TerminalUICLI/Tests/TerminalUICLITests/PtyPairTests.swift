@@ -48,4 +48,16 @@ struct PtyPairTests {
     #expect(!pty.hasAttachedClient())
     pty.close()
   }
+
+  @Test("Master fd suppresses SIGPIPE on Darwin")
+  func masterSuppressesSigPipeOnDarwin() throws {
+    #if canImport(Darwin)
+      let pty = try PtyPair()
+      defer { pty.close() }
+
+      #expect(fcntl(pty.masterFD, F_GETNOSIGPIPE) == 1)
+    #else
+      throw Skip("Darwin-only SIGPIPE file-descriptor flags")
+    #endif
+  }
 }
