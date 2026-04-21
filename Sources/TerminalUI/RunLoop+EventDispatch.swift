@@ -28,9 +28,9 @@ extension RunLoop {
         }
         handleMouseEvent(mouseEvent)
         return nil
-      case .paste:
-        // Paste dispatch arrives in a subsequent task; ignore for now
-        // to keep the build green without altering current behavior.
+      case .paste(let pasteEvent):
+        scheduler.requestInput()
+        handlePaste(pasteEvent)
         return nil
       }
     }
@@ -153,6 +153,48 @@ extension RunLoop {
       return nil
     default:
       return nil
+    }
+  }
+
+  /// Routes a bracketed-paste burst either to a registered drop
+  /// destination (when the payload parses into one or more
+  /// path-shaped tokens and some scope on the focus chain claims it)
+  /// or falls through to the character-key pipeline so text inputs
+  /// like `TextEditor`/`SecureField` keep receiving pasted text.
+  ///
+  /// Leafmost-first bubbling is handled inside
+  /// ``DropDestinationRegistry.dispatch(paths:along:)``; this method
+  /// hands the registry the shallowest-first focus scope path and
+  /// only honors consumption when the registry reports `true`.
+  package func handlePaste(_ pasteEvent: PasteEvent) {
+    let paths = parseDroppedPaths(pasteEvent.content)
+    if !paths.isEmpty {
+      let consumed = dropDestinationRegistry.dispatch(
+        paths: paths,
+        along: currentFocusScopePath()
+      )
+      if consumed { return }
+    }
+    // Fall through: re-emit the paste content as a sequence of
+    // character key events so text-input views (TextEditor,
+    // SecureField, REPL-style consumers) continue to see pasted
+    // text. This preserves pre-bracketed-paste behavior for the
+    // non-drop case.
+    for scalar in pasteEvent.content.unicodeScalars {
+      // Skip control characters except common whitespace.
+      guard scalar.value >= 0x20 || scalar == "\n" || scalar == "\t" else {
+        continue
+      }
+      let key: KeyEvent
+      switch scalar {
+      case "\n", "\r": key = .return
+      case "\t": key = .tab
+      case " ": key = .space
+      default:
+        let character = Character(String(scalar))
+        key = .character(character)
+      }
+      _ = handleKeyPress(KeyPress(key, modifiers: []))
     }
   }
 

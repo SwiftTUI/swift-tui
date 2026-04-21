@@ -289,6 +289,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     childContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     childContext.commandRegistry = commandRegistry
+    childContext.dropDestinationRegistry = dropDestinationRegistry
     childContext.invalidationProxy = invalidationProxy
     childContext.observationBridge = observationBridge
     childContext.viewGraph = viewGraph
@@ -329,6 +330,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.localFocusedValuesRegistry = localFocusedValuesRegistry
     replacedContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     replacedContext.commandRegistry = commandRegistry
+    replacedContext.dropDestinationRegistry = dropDestinationRegistry
     replacedContext.invalidationProxy = invalidationProxy
     replacedContext.observationBridge = observationBridge
     replacedContext.viewGraph = viewGraph

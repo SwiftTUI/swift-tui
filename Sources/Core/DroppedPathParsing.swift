@@ -5,17 +5,31 @@
 ///
 /// Returns an empty list for input that contains no path-shaped
 /// tokens; callers treat empty as "not a drop, fall through to text
-/// paste".
+/// paste". A token is considered path-shaped when it starts with `/`
+/// or `~`, or when it is a `file://`-prefixed URL (the URL decodes to
+/// an absolute POSIX path). Pasted text that happens to be
+/// whitespace-separated words (e.g. "plain typed text") yields an
+/// empty result so bracketed paste of ordinary prose still falls
+/// through to the character-input pipeline.
 public func parseDroppedPaths(_ pasted: String) -> [DroppedPath] {
   var results: [DroppedPath] = []
   var current = ""
+  var currentIsQuoted = false
   var index = pasted.startIndex
   let end = pasted.endIndex
 
   func flushCurrent() {
+    defer {
+      current.removeAll(keepingCapacity: true)
+      currentIsQuoted = false
+    }
     guard !current.isEmpty else { return }
-    results.append(DroppedPath(decodeFileURLIfNeeded(current)))
-    current.removeAll(keepingCapacity: true)
+    let decoded = decodeFileURLIfNeeded(current)
+    // A token is path-shaped only if it starts with `/` or `~`.
+    // Single-quoted segments also count — terminals quote paths that
+    // contain spaces, and quoted prose is extremely unusual here.
+    guard looksLikePath(decoded) || currentIsQuoted else { return }
+    results.append(DroppedPath(decoded))
   }
 
   while index < end {
@@ -33,6 +47,7 @@ public func parseDroppedPaths(_ pasted: String) -> [DroppedPath] {
         index = pasted.index(after: index)
       }
     case "'":
+      currentIsQuoted = true
       var inside = pasted.index(after: index)
       while inside < end, pasted[inside] != "'" {
         current.append(pasted[inside])
@@ -46,6 +61,11 @@ public func parseDroppedPaths(_ pasted: String) -> [DroppedPath] {
   }
   flushCurrent()
   return results
+}
+
+private func looksLikePath(_ token: String) -> Bool {
+  guard let first = token.first else { return false }
+  return first == "/" || first == "~"
 }
 
 private func decodeFileURLIfNeeded(_ token: String) -> String {
