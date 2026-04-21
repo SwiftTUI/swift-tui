@@ -81,6 +81,10 @@ public struct GalleryView: View {
         .tabItem("Animations")
         .tag(Tab.animations)
 
+      FileDropTab()
+        .tabItem("File Drop")
+        .tag(Tab.fileDrop)
+
       FullScreenTab()
         .tabItem("Full Screen")
         .tag(Tab.fullScreen)
@@ -127,6 +131,10 @@ public struct GalleryView: View {
       action: { selection = .animations }
     )
     .paletteCommand(
+      name: "Switch to File Drop",
+      action: { selection = .fileDrop }
+    )
+    .paletteCommand(
       name: "Switch to Full Screen",
       action: { selection = .fullScreen }
     )
@@ -170,6 +178,7 @@ extension GalleryView {
     case bordersAndShapes
     case images
     case animations
+    case fileDrop
     case fullScreen
   }
 }
