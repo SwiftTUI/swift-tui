@@ -361,6 +361,7 @@ extension RunLoop {
     context.localFocusedValuesRegistry = localFocusedValuesRegistry
     context.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     context.commandRegistry = commandRegistry
+    context.dropDestinationRegistry = dropDestinationRegistry
     context.invalidationProxy = .init(invalidator: scheduler)
     context.observationBridge = observationBridge
     context.requestDeadline = { [weak scheduler] instant in
