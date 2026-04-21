@@ -482,6 +482,7 @@ extension ResolveContext {
     self.localLifecycleRegistry = localLifecycleRegistry
     self.localTaskRegistry = localTaskRegistry
     commandRegistry = nil
+    dropDestinationRegistry = nil
     invalidationProxy = nil
     observationBridge = nil
     viewGraph = nil
@@ -515,6 +516,7 @@ extension ResolveContext {
       && lhs.localLifecycleRegistry == rhs.localLifecycleRegistry
       && lhs.localTaskRegistry == rhs.localTaskRegistry
       && lhs.commandRegistry == rhs.commandRegistry
+      && lhs.dropDestinationRegistry == rhs.dropDestinationRegistry
       && lhs.observationBridge == rhs.observationBridge
   }
 }
