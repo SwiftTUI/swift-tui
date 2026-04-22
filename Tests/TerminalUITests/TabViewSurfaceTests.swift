@@ -35,17 +35,17 @@ struct TabViewSurfaceTests {
 
     return DefaultRenderer().render(
       TabView(selection: .constant(selection)) {
-        Text("Home content")
-          .tabItem(TabItemLabel("Home", detail: "3"))
-          .tag("home")
+        Tab("Home", detail: "3", value: "home") {
+          Text("Home content")
+        }
 
-        Text("Settings content")
-          .tabItem(TabItemLabel("Settings"))
-          .tag("settings")
+        Tab("Settings", value: "settings") {
+          Text("Settings content")
+        }
 
-        Text("Logs content")
-          .tabItem(TabItemLabel("Logs"))
-          .tag("logs")
+        Tab("Logs", value: "logs") {
+          Text("Logs content")
+        }
       }
       .tabViewStyle(style)
       .id(testIdentity("Tabs")),
@@ -82,13 +82,13 @@ struct TabViewSurfaceTests {
   func tabViewResolvesTypedLabels() throws {
     let artifacts = DefaultRenderer().render(
       TabView(selection: .constant("home")) {
-        Text("Home content")
-          .tabItem(TabItemLabel("Home", detail: "3"))
-          .tag("home")
+        Tab("Home", detail: "3", value: "home") {
+          Text("Home content")
+        }
 
-        Text("Settings content")
-          .tabItem(TabItemLabel("Settings"))
-          .tag("settings")
+        Tab("Settings", value: "settings") {
+          Text("Settings content")
+        }
       }
       .id(testIdentity("Tabs")),
       context: .init(identity: testIdentity("Root")),
@@ -103,6 +103,30 @@ struct TabViewSurfaceTests {
     #expect(homeNode.semanticMetadata.tabItemLabel == TabItemLabel("Home", detail: "3"))
     #expect(homeNode.semanticMetadata.presentationRole == nil)
     #expect(artifacts.resolvedTree.semanticMetadata.presentationRole == .tabView)
+  }
+
+  @Test("TabView badge initializer preserves badge text in chrome and semantics")
+  func tabViewBadgeInitializerPreservesBadgeText() throws {
+    let artifacts = DefaultRenderer().render(
+      TabView(selection: .constant("inbox")) {
+        Tab("Inbox", badge: "7", value: "inbox") {
+          Text("Inbox content")
+        }
+
+        Tab("Archive", value: "archive") {
+          Text("Archive content")
+        }
+      }
+      .id(testIdentity("Tabs")),
+      context: .init(identity: testIdentity("Root")),
+      proposal: .init(width: 32, height: 4)
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    let inboxNode = try #require(artifacts.resolvedTree.descendant(withText: "Inbox content"))
+
+    #expect(surface.contains("Inbox · [7]"))
+    #expect(inboxNode.semanticMetadata.tabItemLabel == TabItemLabel("Inbox", badge: "7"))
   }
 
   @Test("TabView arrow navigation preserves selection until activation")
@@ -125,13 +149,13 @@ struct TabViewSurfaceTests {
 
     _ = DefaultRenderer().render(
       TabView(selection: selection) {
-        Text("Home content")
-          .tabItem("Home")
-          .tag("home")
+        Tab("Home", value: "home") {
+          Text("Home content")
+        }
 
-        Text("Settings content")
-          .tabItem("Settings")
-          .tag("settings")
+        Tab("Settings", value: "settings") {
+          Text("Settings content")
+        }
       }
       .id(testIdentity("Tabs")),
       context: .init(
@@ -184,13 +208,13 @@ struct TabViewSurfaceTests {
 
     _ = renderer.render(
       TabView(selection: selection) {
-        Text("Home content")
-          .tabItem("Home")
-          .tag("home")
+        Tab("Home", value: "home") {
+          Text("Home content")
+        }
 
-        Text("Settings content")
-          .tabItem("Settings")
-          .tag("settings")
+        Tab("Settings", value: "settings") {
+          Text("Settings content")
+        }
       }
       .id(testIdentity("Tabs")),
       context: context,
@@ -208,13 +232,13 @@ struct TabViewSurfaceTests {
     updatedContext.invalidatedIdentities = invalidatedIdentities
     _ = renderer.render(
       TabView(selection: selection) {
-        Text("Home content")
-          .tabItem("Home")
-          .tag("home")
+        Tab("Home", value: "home") {
+          Text("Home content")
+        }
 
-        Text("Settings content")
-          .tabItem("Settings")
-          .tag("settings")
+        Tab("Settings", value: "settings") {
+          Text("Settings content")
+        }
       }
       .id(testIdentity("Tabs")),
       context: updatedContext,
@@ -305,17 +329,17 @@ struct TabViewSurfaceTests {
 
     func makeView() -> some View {
       TabView(selection: selection) {
-        Text("Home content")
-          .tabItem("Home")
-          .tag("home")
+        Tab("Home", value: "home") {
+          Text("Home content")
+        }
 
-        Text("Settings content")
-          .tabItem("Settings")
-          .tag("settings")
+        Tab("Settings", value: "settings") {
+          Text("Settings content")
+        }
 
-        Text("Logs content")
-          .tabItem("Logs")
-          .tag("logs")
+        Tab("Logs", value: "logs") {
+          Text("Logs content")
+        }
       }
       .tabViewStyle(.underline)
       .id(testIdentity("Tabs"))
@@ -359,25 +383,25 @@ struct TabViewSurfaceTests {
   func underlineTabsAlignRulesWithLabels() {
     let lines = DefaultRenderer().render(
       TabView(selection: .constant("layout")) {
-        Text("Controls content")
-          .tabItem("Controls")
-          .tag("controls")
+        Tab("Controls", value: "controls") {
+          Text("Controls content")
+        }
 
-        Text("Collections content")
-          .tabItem("Collections")
-          .tag("collections")
+        Tab("Collections", value: "collections") {
+          Text("Collections content")
+        }
 
-        Text("Layout content")
-          .tabItem("Layout")
-          .tag("layout")
+        Tab("Layout", value: "layout") {
+          Text("Layout content")
+        }
 
-        Text("Appearance content")
-          .tabItem("Appearance")
-          .tag("appearance")
+        Tab("Appearance", value: "appearance") {
+          Text("Appearance content")
+        }
 
-        Text("Charts content")
-          .tabItem("Charts")
-          .tag("charts")
+        Tab("Charts", value: "charts") {
+          Text("Charts content")
+        }
       }
       .id(testIdentity("GalleryTabs")),
       context: .init(identity: testIdentity("Root")),

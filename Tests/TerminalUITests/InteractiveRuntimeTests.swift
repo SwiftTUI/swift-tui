@@ -4488,7 +4488,7 @@ private struct GalleryShapedAnimatingScrollFixture: View {
 }
 
 private struct TabHostedTallExternalBindingScrollFixture: View {
-  enum Tab: Hashable {
+  enum TallExternalBindingTab: Hashable {
     case controls
     case logs
   }
@@ -4497,23 +4497,23 @@ private struct TabHostedTallExternalBindingScrollFixture: View {
   let positionBox: LockedBox<ScrollPosition>
 
   var body: some View {
-    TabView(selection: .constant(Tab.logs)) {
-      Text("Controls")
-        .tabItem("Controls")
-        .tag(Tab.controls)
+    TabView(selection: .constant(TallExternalBindingTab.logs)) {
+      Tab("Controls", value: TallExternalBindingTab.controls) {
+        Text("Controls")
+      }
 
-      TallExternalBindingScrollFixture(
-        scrollIdentity: scrollIdentity,
-        positionBox: positionBox
-      )
-      .tabItem("Logs")
-      .tag(Tab.logs)
+      Tab("Logs", value: TallExternalBindingTab.logs) {
+        TallExternalBindingScrollFixture(
+          scrollIdentity: scrollIdentity,
+          positionBox: positionBox
+        )
+      }
     }
   }
 }
 
 private struct TabHostedGalleryShapedAnimatingScrollFixture: View {
-  enum Tab: Hashable {
+  enum GalleryAnimatingTab: Hashable {
     case controls
     case animations
   }
@@ -4522,17 +4522,17 @@ private struct TabHostedGalleryShapedAnimatingScrollFixture: View {
   let positionBox: LockedBox<ScrollPosition>
 
   var body: some View {
-    TabView(selection: .constant(Tab.animations)) {
-      Text("Controls")
-        .tabItem("Controls")
-        .tag(Tab.controls)
+    TabView(selection: .constant(GalleryAnimatingTab.animations)) {
+      Tab("Controls", value: GalleryAnimatingTab.controls) {
+        Text("Controls")
+      }
 
-      GalleryShapedAnimatingScrollFixture(
-        scrollIdentity: scrollIdentity,
-        positionBox: positionBox
-      )
-      .tabItem("Animations")
-      .tag(Tab.animations)
+      Tab("Animations", value: GalleryAnimatingTab.animations) {
+        GalleryShapedAnimatingScrollFixture(
+          scrollIdentity: scrollIdentity,
+          positionBox: positionBox
+        )
+      }
     }
   }
 }
@@ -4588,7 +4588,7 @@ private struct InternalStateGalleryShapedFixture: View {
 }
 
 private struct TabHostedInternalStateGalleryFixture: View {
-  enum Tab: Hashable {
+  enum InternalStateGalleryTab: Hashable {
     case controls
     case animations
   }
@@ -4599,17 +4599,17 @@ private struct TabHostedInternalStateGalleryFixture: View {
   // `.constant(...)` — the selection binding writes go through the
   // parent view's state container, which re-resolves the entire TabView
   // subtree on each write.
-  @State private var selection: Tab = .animations
+  @State private var selection: InternalStateGalleryTab = .animations
 
   var body: some View {
     TabView(selection: $selection) {
-      Text("Controls")
-        .tabItem("Controls")
-        .tag(Tab.controls)
+      Tab("Controls", value: InternalStateGalleryTab.controls) {
+        Text("Controls")
+      }
 
-      InternalStateGalleryShapedFixture()
-        .tabItem("Animations")
-        .tag(Tab.animations)
+      Tab("Animations", value: InternalStateGalleryTab.animations) {
+        InternalStateGalleryShapedFixture()
+      }
     }
   }
 }

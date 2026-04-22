@@ -15,18 +15,18 @@ struct FocusTransitionTests {
 
   private static func tabViewWithPicker() -> some View {
     TabView(selection: .constant("demo")) {
-      Picker("Options", selection: .constant("one")) {
-        Text("One").tag("one")
-        Text("Two").tag("two")
-        Text("Three").tag("three")
+      Tab("Demo", value: "demo") {
+        Picker("Options", selection: .constant("one")) {
+          Text("One").tag("one")
+          Text("Two").tag("two")
+          Text("Three").tag("three")
+        }
+        .pickerStyle(.segmented)
       }
-      .pickerStyle(.segmented)
-      .tabItem("Demo")
-      .tag("demo")
 
-      Text("Other tab")
-        .tabItem("Other")
-        .tag("other")
+      Tab("Other", value: "other") {
+        Text("Other tab")
+      }
     }
     .id(testIdentity("Tabs"))
   }
@@ -576,13 +576,13 @@ private struct StatefulTabSelectionView: View {
 
   var body: some View {
     TabView(selection: $selection) {
-      Text("Demo body")
-        .tabItem("Demo")
-        .tag("demo")
+      Tab("Demo", value: "demo") {
+        Text("Demo body")
+      }
 
-      Text("Other body")
-        .tabItem("Other")
-        .tag("other")
+      Tab("Other", value: "other") {
+        Text("Other body")
+      }
     }
     .id(testIdentity("Tabs"))
   }
