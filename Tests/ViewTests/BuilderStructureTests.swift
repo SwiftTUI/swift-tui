@@ -19,20 +19,6 @@ struct BuilderStructureTests {
     #expect(resolved.children.map(resolvedNodeLabelText(from:)) == ["A", "B", "C", "D"])
   }
 
-  @Test("erased declared builder children preserve nested builder output order")
-  func erasedDeclaredBuilderChildrenPreserveNestedBuilderOutputOrder() {
-    let resolved = Resolver().resolve(
-      combinedView(
-        from: erasedDeclaredBuilderChildren(from: nestedBuilderProbe()),
-        kindName: "ErasedProbe"
-      ),
-      in: .init(identity: testIdentity("BuilderStructure", "ErasedTraversal"))
-    )
-
-    #expect(resolved.kind == .view("ErasedProbe"))
-    #expect(resolvedNodeLabelText(from: resolved) == "A B C D")
-  }
-
   @Test("deferred declared builder children preserve nested builder output order")
   func deferredDeclaredBuilderChildrenPreserveNestedBuilderOutputOrder() {
     let resolved = Resolver().resolve(
@@ -45,23 +31,6 @@ struct BuilderStructureTests {
 
     #expect(resolved.kind == .view("DeferredProbe"))
     #expect(resolvedNodeLabelText(from: resolved) == "A B C D")
-  }
-
-  @Test("limited-availability builder branches still resolve through the compatibility seam")
-  func limitedAvailabilityBuilderBranchesStillResolve() {
-    let children = erasedDeclaredBuilderChildren(
-      from: limitedAvailabilityBuilderProbe()
-    )
-    let resolved = Resolver().resolve(
-      combinedView(
-        from: children,
-        kindName: "AvailabilityProbe"
-      ),
-      in: .init(identity: testIdentity("BuilderStructure", "Availability"))
-    )
-
-    #expect(children.count == 1)
-    #expect(resolvedNodeLabelText(from: resolved) == "Current")
   }
 
   @Test("deferred builder children preserve limited-availability output")

@@ -104,7 +104,7 @@ func assertRenderedTextFixtures<Content: View>(
     )
     return
   }
-  let rootView = composedFixtureRoot(from: erasedDeclaredBuilderChildren(from: view()))
+  let rootView = view()
 
   let fixtureRootDirectory =
     fixtureDirectory
@@ -409,16 +409,6 @@ private func sanitizePathComponent(
     .inverted
   let parts = value.components(separatedBy: invalidCharacters).filter { !$0.isEmpty }
   return parts.isEmpty ? "unnamed" : parts.joined(separator: "-")
-}
-
-@MainActor
-private func composedFixtureRoot(
-  from children: [AnyView]
-) -> AnyView {
-  combinedView(
-    from: children,
-    kindName: "Group"
-  )
 }
 
 private enum RenderedTextFixtureIssue: Error, CustomStringConvertible {
