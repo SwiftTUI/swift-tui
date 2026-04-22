@@ -9,6 +9,8 @@ The `View` module is the authoring surface of TerminalUI.
 It provides:
 
 - body-only ``View/View`` definitions
+- first-class public modifier algebra through ``ViewModifier``,
+  ``View/modifier(_:)``, and ``ModifiedContent``
 - typed builders through ``ViewBuilder``
 - state and data flow through ``State``, ``Binding``, and ``Bindable``
 - environment and focused-value access through ``EnvironmentValues``, ``EnvironmentReader``, ``GeometryReader``, ``FocusedValue``, and ``FocusedBinding``
@@ -39,7 +41,8 @@ struct DeployPanel: View {
 }
 ```
 
-The public surface ends at authored views, layouts, and environment-driven modifiers. Lowering helpers and wrapper types remain package-only implementation details.
+The public surface ends at authored views, layouts, and first-class modifiers.
+Lowering helpers remain package-only implementation details.
 
 ## Topics
 

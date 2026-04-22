@@ -6,9 +6,10 @@ extension View {
     key: Key.Type = Key.self,
     value: Key.Value
   ) -> some View {
-    PreferenceWritingModifier<Key, Self>(
-      content: self,
-      value: value
+    modifier(
+      PreferenceWritingModifier<Key>(
+        value: value
+      )
     )
   }
 
@@ -17,9 +18,10 @@ extension View {
     _ key: Key.Type = Key.self,
     _ transform: @escaping (inout Key.Value) -> Void
   ) -> some View {
-    PreferenceTransformModifier<Key, Self>(
-      content: self,
-      transform: transform
+    modifier(
+      PreferenceTransformModifier<Key>(
+        transform: transform
+      )
     )
   }
 
@@ -28,9 +30,10 @@ extension View {
     _ key: Key.Type = Key.self,
     perform action: @escaping @MainActor (Key.Value) -> Void
   ) -> some View where Key.Value: Equatable {
-    PreferenceChangeModifier<Key, Self>(
-      content: self,
-      action: action
+    modifier(
+      PreferenceChangeModifier<Key>(
+        action: action
+      )
     )
   }
 
@@ -40,10 +43,11 @@ extension View {
     alignment: Alignment = .center,
     @ViewBuilder _ transform: @escaping (Key.Value) -> Content
   ) -> some View {
-    PreferenceBackgroundValueModifier<Self, Key, Content>(
-      base: self,
-      alignment: alignment,
-      transform: transform
+    modifier(
+      PreferenceBackgroundValueModifier<Key, Content>(
+        alignment: alignment,
+        transform: transform
+      )
     )
   }
 
@@ -53,31 +57,35 @@ extension View {
     alignment: Alignment = .center,
     @ViewBuilder _ transform: @escaping (Key.Value) -> Content
   ) -> some View {
-    PreferenceOverlayValueModifier<Self, Key, Content>(
-      base: self,
-      alignment: alignment,
-      transform: transform
+    modifier(
+      PreferenceOverlayValueModifier<Key, Content>(
+        alignment: alignment,
+        transform: transform
+      )
     )
   }
 }
 
-private struct PreferenceWritingModifier<Key: PreferenceKey, Content: View>: View, ResolvableView {
-  var content: Content
+public struct PreferenceWritingModifier<Key: PreferenceKey>: PrimitiveViewModifier {
   var value: Key.Value
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     node.preferenceValues.merge(Key.self, value: value)
     return [node]
   }
 }
 
-private struct PreferenceTransformModifier<Key: PreferenceKey, Content: View>: View, ResolvableView
-{
-  var content: Content
+public struct PreferenceTransformModifier<Key: PreferenceKey>: PrimitiveViewModifier {
   var transform: (inout Key.Value) -> Void
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     node.preferenceValues.transform(
       Key.self,
@@ -87,12 +95,16 @@ private struct PreferenceTransformModifier<Key: PreferenceKey, Content: View>: V
   }
 }
 
-private struct PreferenceChangeModifier<Key: PreferenceKey, Content: View>: View, ResolvableView
-where Key.Value: Equatable {
-  var content: Content
+public struct PreferenceChangeModifier<Key: PreferenceKey>: PrimitiveViewModifier
+where
+  Key.Value: Equatable
+{
   let action: @MainActor (Key.Value) -> Void
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
     let dynamicPropertyScope = currentAuthoringContext()
     context.localPreferenceObservationRegistry?.register(
@@ -108,27 +120,27 @@ where Key.Value: Equatable {
   }
 }
 
-private struct PreferenceOverlayValueModifier<Base: View, Key: PreferenceKey, Overlay: View>: View,
-  ResolvableView
+public struct PreferenceOverlayValueModifier<Key: PreferenceKey, Overlay: View>:
+  PrimitiveViewModifier
 {
-  var base: Base
   var alignment: Alignment
   private let transform: (Key.Value) -> Overlay
   private let authoringScope: AuthoringContext?
 
   init(
-    base: Base,
     alignment: Alignment,
     @ViewBuilder transform: @escaping (Key.Value) -> Overlay
   ) {
-    self.base = base
     self.alignment = alignment
     self.transform = transform
     authoringScope = currentAuthoringContext()
   }
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let baseNode = base.resolve(in: context.child(component: .named("base")))
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let baseNode = content.resolve(in: context.child(component: .named("base")))
     let overlayView = withAuthoringContext(authoringScope) {
       context.trackingObservableAccess {
         transform(baseNode.preferenceValues[Key.self])
@@ -148,28 +160,27 @@ private struct PreferenceOverlayValueModifier<Base: View, Key: PreferenceKey, Ov
   }
 }
 
-private struct PreferenceBackgroundValueModifier<
-  Base: View, Key: PreferenceKey,
-  Background: View
->: View, ResolvableView {
-  var base: Base
+public struct PreferenceBackgroundValueModifier<Key: PreferenceKey, Background: View>:
+  PrimitiveViewModifier
+{
   var alignment: Alignment
   private let transform: (Key.Value) -> Background
   private let authoringScope: AuthoringContext?
 
   init(
-    base: Base,
     alignment: Alignment,
     @ViewBuilder transform: @escaping (Key.Value) -> Background
   ) {
-    self.base = base
     self.alignment = alignment
     self.transform = transform
     authoringScope = currentAuthoringContext()
   }
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let baseNode = base.resolve(in: context.child(component: .named("base")))
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let baseNode = content.resolve(in: context.child(component: .named("base")))
     let backgroundView = withAuthoringContext(authoringScope) {
       context.trackingObservableAccess {
         transform(baseNode.preferenceValues[Key.self])

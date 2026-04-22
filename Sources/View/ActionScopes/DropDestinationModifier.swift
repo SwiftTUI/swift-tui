@@ -17,37 +17,30 @@ extension ActionScope where Self: View & Sendable {
   @MainActor
   public func dropDestination(
     action: @escaping @MainActor @Sendable ([DroppedPath]) -> Bool
-  ) -> DropDestinationModifier<Self> {
-    DropDestinationModifier(content: self, action: action)
+  ) -> some View & ActionScope & Sendable {
+    modifier(
+      DropDestinationRegistrationModifier(
+        action: action
+      )
+    )
   }
 }
 
-public struct DropDestinationModifier<Content: View & Sendable>: View, ResolvableView {
-  nonisolated let content: Content
-  nonisolated let action: @MainActor @Sendable ([DroppedPath]) -> Bool
+public struct DropDestinationRegistrationModifier: PrimitiveViewModifier, Sendable {
+  package let action: @MainActor @Sendable ([DroppedPath]) -> Bool
 
-  init(
-    content: Content,
+  package init(
     action: @escaping @MainActor @Sendable ([DroppedPath]) -> Bool
   ) {
-    self.content = content
     self.action = action
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Content: View>(
+    content: ModifierContentInputs<Content>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
     context.dropDestinationRegistry?.register(at: node.identity, handler: action)
     return [node]
   }
 }
-
-// Forward the inner scope's identity so chained `.dropDestination`,
-// `.keyCommand`, and `.paletteCommand` keep compiling: after the
-// modifier, the wrapped view is still an ActionScope whose id equals
-// the content's.
-extension DropDestinationModifier: Identifiable where Content: ActionScope {
-  public typealias ID = Content.ID
-  nonisolated public var id: Content.ID { content.id }
-}
-
-extension DropDestinationModifier: ActionScope where Content: ActionScope {}

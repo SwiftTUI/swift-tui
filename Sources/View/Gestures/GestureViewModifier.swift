@@ -7,21 +7,26 @@ extension View {
     _ gesture: G,
     including mask: GestureMask = .all
   ) -> some View {
-    _AttachGestureModifier(content: self, gesture: gesture, mask: mask)
+    modifier(
+      GestureAttachmentModifier(
+        gesture: gesture,
+        mask: mask
+      )
+    )
   }
 }
 
-// MARK: - _AttachGestureModifier
+// MARK: - GestureAttachmentModifier
 
 @MainActor
-struct _AttachGestureModifier<Content: View, G: Gesture>: View, ResolvableView {
-  let content: Content
+public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
   let gesture: G
   let mask: GestureMask
 
-  var body: Never { neverBody() }
-
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Content: View>(
+    content: ModifierContentInputs<Content>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     // Resolve the content first so its identity and region exist.
     var node = content.resolve(in: context)
 
@@ -101,18 +106,22 @@ extension View {
   /// Overrides the hit-test region for gesture recognition.
   /// Pass `nil` to use the view's natural bounds.
   public func contentShape(_ rect: Rect?) -> some View {
-    _ContentShapeModifier(content: self, explicitRect: rect)
+    modifier(
+      ContentShapeModifier(
+        explicitRect: rect
+      )
+    )
   }
 }
 
 @MainActor
-struct _ContentShapeModifier<Content: View>: View, ResolvableView {
-  let content: Content
+public struct ContentShapeModifier: PrimitiveViewModifier {
   let explicitRect: Rect?
 
-  var body: Never { neverBody() }
-
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Content: View>(
+    content: ModifierContentInputs<Content>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     guard let explicitRect else { return [node] }
     node.semanticMetadata = node.semanticMetadata.merging(

@@ -128,7 +128,7 @@ library product. Downstream package consumers reach those types through
 
 ## `View`
 
-- `Foundation/AnyView.swift`, `Foundation/StylePrimitives.swift`, `Foundation/ViewBaseTypes.swift`, `Foundation/ViewCompositionHelpers.swift`, and `Foundation/ViewFoundation.swift`: `View`, `Resolver`, `AnyView`, style primitives, and internal composition helpers
+- `Foundation/AnyView.swift`, `Foundation/StylePrimitives.swift`, `Foundation/ViewBaseTypes.swift`, `Foundation/ViewCompositionHelpers.swift`, `Foundation/ViewFoundation.swift`, and `Foundation/ViewModifier.swift`: `View`, `ViewModifier`, `ModifiedContent`, `Resolver`, `AnyView`, style primitives, and internal composition helpers
 - `ViewBuilder/ViewBuilder.swift`, `ViewBuilder/TupleView.swift`, `ViewBuilder/ConditionalContentView.swift`, `ViewBuilder/VariadicView.swift`, and `ViewBuilder/EmptyView.swift`: typed builder artifacts and builder machinery
 - `State/State.swift`, `State/FocusState.swift`, and `State/FocusedValue.swift`: `@State`, focus bindings, and focused-value projections
 - `Environment/Environment.swift`, `Environment/ImageEnvironment.swift`, `Environment/Observation.swift`, and `Environment/StyleEnvironment.swift`: environment storage, repo-owned `@Bindable`, image resource roots, and style environment plumbing
@@ -138,7 +138,7 @@ library product. Downstream package consumers reach those types through
 - `Primitives/*.swift` and `Shapes/*.swift`: text/image primitives including `TextFigure`, labeled containers, tile backgrounds, and basic shapes
 - `Controls/*.swift`: control surfaces, rendering helpers, and shared control support
 - `Presentation/PresentationCoordinator.swift` and `Presentation/PresentationModifiers.swift`: shared presentation host, single-pass overlay composition, family coordinators, package-only declaration reconciliation, and built-in alert/confirmation-dialog/sheet/toast surfaces
-- `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifiers and the package-only wrapper views that back them
+- `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifiers plus the package-only modifier-value lowering hooks that back them
 - `View.docc/`: module landing page and authoring guides
 
 ## `TerminalUICharts`

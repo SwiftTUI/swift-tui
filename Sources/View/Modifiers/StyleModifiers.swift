@@ -69,18 +69,20 @@ extension View {
   }
 
   public func foregroundStyle<S: ShapeStyle>(_ style: S) -> some View {
-    EnvironmentWritingModifier(
-      content: self,
-      keyPath: \.foregroundStyle,
-      value: AnyShapeStyle(style)
+    modifier(
+      EnvironmentWritingModifier(
+        keyPath: \.foregroundStyle,
+        value: AnyShapeStyle(style)
+      )
     )
   }
 
   public func tint<S: ShapeStyle>(_ style: S) -> some View {
-    EnvironmentWritingModifier(
-      content: self,
-      keyPath: \.tintStyle,
-      value: AnyShapeStyle(style)
+    modifier(
+      EnvironmentWritingModifier(
+        keyPath: \.tintStyle,
+        value: AnyShapeStyle(style)
+      )
     )
   }
 
@@ -98,10 +100,11 @@ extension View {
     _ tag: V,
     includeOptional: Bool = true
   ) -> some View {
-    TagValueView(
-      content: self,
-      tag: tag,
-      includeOptional: includeOptional
+    modifier(
+      TagValueModifier(
+        tag: tag,
+        includeOptional: includeOptional
+      )
     )
   }
 
@@ -183,14 +186,15 @@ extension View {
     blendPhase: Double,
     sides: Edge.Set
   ) -> some View {
-    BorderView(
-      content: erasedToAnyView,
-      set: set,
-      foreground: foreground,
-      background: background,
-      blend: blend,
-      blendPhase: blendPhase,
-      sides: sides
+    modifier(
+      BorderModifier(
+        set: set,
+        foreground: foreground,
+        background: background,
+        blend: blend,
+        blendPhase: blendPhase,
+        sides: sides
+      )
     )
   }
 
@@ -281,26 +285,15 @@ extension View {
   }
 }
 
-public struct TagValueView<Content: View, Value: Hashable & Sendable>: View, ResolvableView {
-  var content: Content
-  var tag: Value
-  var includeOptional: Bool
+public struct TagValueModifier<Value: Hashable & Sendable>: PrimitiveViewModifier {
+  package var tag: Value
+  package var includeOptional: Bool
 
-  public init(
-    content: Content,
-    tag: Value,
-    includeOptional: Bool = true
-  ) {
-    self.content = content
-    self.tag = tag
-    self.includeOptional = includeOptional
-  }
-
-  package func resolveElements(
+  package func resolve<Content: View>(
+    content: ModifierContentInputs<Content>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let tagged = SemanticMetadataModifier(
-      content: content,
       metadata: .init(
         selectionTag: .init(
           value: tag,
@@ -308,12 +301,12 @@ public struct TagValueView<Content: View, Value: Hashable & Sendable>: View, Res
         )
       )
     )
-    return tagged.resolveElements(in: context)
+    return tagged.resolve(content: content, in: context)
   }
 }
 
-extension TagValueView: TabChildMetadataContributing {
-  package var tabChildMetadataContribution: PeekedTabChildMetadata {
+extension TagValueModifier: TabItemMetadataProvidingModifier {
+  package var tabItemMetadataContribution: PeekedTabChildMetadata {
     PeekedTabChildMetadata(
       label: nil,
       tag: SelectionTag(
@@ -321,10 +314,6 @@ extension TagValueView: TabChildMetadataContributing {
         includeOptional: includeOptional
       )
     )
-  }
-
-  package func withTabChildInnerContent<R>(_ body: (Any) -> R) -> R {
-    body(content)
   }
 }
 

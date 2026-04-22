@@ -332,6 +332,14 @@ struct CustomTransitionBodyWalkingTests {
     #expect(insertion.opacity == 0.0)
     #expect(insertion.offsetX == 3)
   }
+
+  @Test("custom Transition body walking falls back through authored wrapper views")
+  func customTransitionWalksThroughArbitraryWrapperViews() throws {
+    let transition = AnyTransition(WrappedFadeAndSlideTransition())
+    let insertion = transition.insertionModifiers()
+    #expect(insertion.opacity == 0.0)
+    #expect(insertion.offsetX == 5)
+  }
 }
 
 /// Fades to opacity 0.25 during will/did phases, 1.0 at identity.
@@ -367,12 +375,36 @@ struct CombinedFadeAndSlideTransition: Transition {
   }
 }
 
+/// Wraps the modifier chain in an authored `View` type so the
+/// transition walker still needs its non-modifier structural fallback.
+@MainActor
+struct WrappedFadeAndSlideTransition: Transition {
+  func body(content: TransitionContent<Self>, phase: TransitionPhase) -> some View {
+    TransitionEnvelope {
+      TransitionShim()
+        .offset(x: phase == .identity ? 0 : 5, y: 0)
+        .opacity(phase == .identity ? 1.0 : 0.0)
+    }
+  }
+}
+
 /// An innocuous leaf view used as the authored-body content for the
 /// custom-transition walking tests.  Its resolve elements are never
 /// actually rendered — only the wrapping modifiers are probed.
 struct TransitionShim: View {
   @MainActor
   var body: some View { EmptyView() }
+}
+
+struct TransitionEnvelope<Content: View>: View {
+  let content: Content
+
+  init(@ViewBuilder content: () -> Content) {
+    self.content = content()
+  }
+
+  @MainActor
+  var body: some View { content }
 }
 
 /// Minimal CustomAnimation conformance used by the Transaction

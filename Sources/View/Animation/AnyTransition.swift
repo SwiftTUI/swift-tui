@@ -146,21 +146,15 @@ public struct AnyTransition: Sendable {
     self.removalModifiers = { removalModifiers }
   }
 
-  /// Walks a custom ``Transition/body`` output tree using a combination
-  /// of protocol conformance (for well-known modifier wrappers that
-  /// expose a ``TransitionEffectContributing`` shim) and Swift
-  /// `Mirror` reflection (for other wrappers with a `content` field).
-  /// Opacity and offset effects are aggregated into a single
-  /// ``TransitionModifiers`` value.
+  /// Walks a custom ``Transition/body`` output tree and aggregates
+  /// opacity/offset effects into a single ``TransitionModifiers``
+  /// value.
   ///
-  /// The walk understands:
-  /// - ``OffsetView`` (offset effects from `.offset(x:y:)`)
-  /// - ``DrawMetadataModifier`` with an `explicitOpacity`
-  ///   (`.opacity(_:)` wraps its content in one of these)
-  /// - Generic wrappers that expose a `content` field — the walk
-  ///   recurses into them so opacity and offset can appear in any
-  ///   composition, even when wrapped by unrelated intermediate
-  ///   modifiers.
+  /// Preferred traversal order:
+  /// - future generic modifier-chain traversal via
+  ///   ``TransitionEffectProbeTraversable``
+  /// - `Mirror` reflection for arbitrary authored wrapper views that
+  ///   cannot yet expose a structured traversal hook
   ///
   /// Effects from modifiers the runtime does not yet understand are
   /// silently ignored; the ``TransitionModifiers`` type documents the
@@ -173,17 +167,12 @@ public struct AnyTransition: Sendable {
   }
 
   @MainActor
-  private static func walk(view: Any, into result: inout TransitionModifiers) {
-    // Protocol-based probe first: the well-known modifier wrappers
-    // conform to TransitionEffectContributing and can report their
-    // effect contribution directly.
-    if let contributor = view as? any TransitionEffectContributing {
-      contributor.contributeTransitionEffects(into: &result)
-      if let child = contributor.transitionChildForProbe {
-        walk(view: child, into: &result)
-      }
+  fileprivate static func walk(view: Any, into result: inout TransitionModifiers) {
+    if let traversable = view as? any TransitionEffectProbeTraversable {
+      traversable.collectTransitionEffects(into: &result)
       return
     }
+
     // Otherwise use Mirror reflection to descend into any wrapper
     // that exposes a conventional child field.  View builders,
     // generic wrappers, and user-authored compositions all fall
@@ -204,20 +193,29 @@ public struct AnyTransition: Sendable {
   }
 }
 
-/// Package protocol adopted by well-known modifier wrappers so the
-/// transition body-walking code can extract opacity/offset effects
-/// from authored custom transitions.  Conformances must contribute
-/// their own effect *and* report the next view to probe (typically
-/// the wrapped content) so the walk can reach nested modifiers.
+/// Modifier-side transition semantic hook.
 ///
-/// Marked `@MainActor` because all View conformances in this codebase
-/// are main-actor-isolated — crossing the isolation boundary with a
-/// nonisolated requirement would be a Swift 6 strict-concurrency
-/// error on every wrapper type.
+/// Built-in modifiers should report transition effects here instead of
+/// attaching semantics to concrete wrapper views.
 @MainActor
-package protocol TransitionEffectContributing {
+package protocol TransitionEffectProvidingModifier: ViewModifier {
   func contributeTransitionEffects(into modifiers: inout TransitionModifiers)
-  var transitionChildForProbe: Any? { get }
+}
+
+/// Structured traversal hook for authored transition bodies.
+@MainActor
+package protocol TransitionEffectProbeTraversable {
+  func collectTransitionEffects(into modifiers: inout TransitionModifiers)
+}
+
+extension ModifiedContent: TransitionEffectProbeTraversable
+where Content: View, Modifier: ViewModifier {
+  package func collectTransitionEffects(into modifiers: inout TransitionModifiers) {
+    if let provider = modifier as? any TransitionEffectProvidingModifier {
+      provider.contributeTransitionEffects(into: &modifiers)
+    }
+    AnyTransition.walk(view: content, into: &modifiers)
+  }
 }
 
 // MARK: - Helpers

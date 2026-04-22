@@ -23,28 +23,29 @@ extension View {
   }
 
   public func id(_ identity: Identity) -> some View {
-    IDView(identity: identity, content: self)
+    modifier(IDModifier(identity: identity))
   }
 
   public func layoutMetadata(_ metadata: LayoutMetadata) -> some View {
-    LayoutMetadataModifier(content: self, metadata: metadata)
+    modifier(LayoutMetadataModifier(metadata: metadata))
   }
 
   public func layoutValue<Key: LayoutValueKey>(
     key: Key.Type,
     value: Key.Value
   ) -> some View {
-    LayoutValueModifier<Key, Self>(content: self, value: value)
+    modifier(LayoutValueModifier<Key>(value: value))
   }
 
   public func alignmentGuide(
     _ alignment: HorizontalAlignment,
     computeValue: @escaping @Sendable (ViewDimensions) -> Int
   ) -> some View {
-    HorizontalAlignmentGuideModifier(
-      content: self,
-      alignment: alignment,
-      computeValue: computeValue
+    modifier(
+      HorizontalAlignmentGuideModifier(
+        alignment: alignment,
+        computeValue: computeValue
+      )
     )
   }
 
@@ -52,15 +53,16 @@ extension View {
     _ alignment: VerticalAlignment,
     computeValue: @escaping @Sendable (ViewDimensions) -> Int
   ) -> some View {
-    VerticalAlignmentGuideModifier(
-      content: self,
-      alignment: alignment,
-      computeValue: computeValue
+    modifier(
+      VerticalAlignmentGuideModifier(
+        alignment: alignment,
+        computeValue: computeValue
+      )
     )
   }
 
   package func drawMetadata(_ metadata: DrawMetadata) -> some View {
-    DrawMetadataModifier(content: self, metadata: metadata)
+    modifier(DrawMetadataModifier(metadata: metadata))
   }
 
   public func opacity(_ opacity: Double) -> some View {
@@ -68,19 +70,19 @@ extension View {
   }
 
   public func semanticMetadata(_ metadata: SemanticMetadata) -> some View {
-    SemanticMetadataModifier(content: self, metadata: metadata)
+    modifier(SemanticMetadataModifier(metadata: metadata))
   }
 
   public func onAppear(
     perform action: @escaping @MainActor @Sendable () -> Void
   ) -> some View {
-    AppearLifecycleModifier(content: self, action: action)
+    modifier(AppearLifecycleModifier(action: action))
   }
 
   public func onDisappear(
     perform action: @escaping @MainActor @Sendable () -> Void
   ) -> some View {
-    DisappearLifecycleModifier(content: self, action: action)
+    modifier(DisappearLifecycleModifier(action: action))
   }
 
   public func onChange<Value: Equatable & Sendable>(
@@ -88,11 +90,12 @@ extension View {
     initial: Bool = false,
     _ action: @escaping @MainActor @Sendable () -> Void
   ) -> some View {
-    ChangeLifecycleModifier(
-      content: self,
-      value: value,
-      initial: initial,
-      action: { _, _ in action() }
+    modifier(
+      ChangeLifecycleModifier(
+        value: value,
+        initial: initial,
+        action: { _, _ in action() }
+      )
     )
   }
 
@@ -101,11 +104,12 @@ extension View {
     initial: Bool = false,
     _ action: @escaping @MainActor @Sendable (Value, Value) -> Void
   ) -> some View {
-    ChangeLifecycleModifier(
-      content: self,
-      value: value,
-      initial: initial,
-      action: action
+    modifier(
+      ChangeLifecycleModifier(
+        value: value,
+        initial: initial,
+        action: action
+      )
     )
   }
 
@@ -114,11 +118,12 @@ extension View {
     @_inheritActorContext
     _ action: @escaping @isolated(any) @Sendable () async -> Void
   ) -> some View {
-    TaskLifecycleModifier(
-      content: self,
-      priority: priority,
-      descriptorID: nil,
-      action: action
+    modifier(
+      TaskLifecycleModifier(
+        priority: priority,
+        descriptorID: nil,
+        action: action
+      )
     )
   }
 
@@ -128,11 +133,12 @@ extension View {
     @_inheritActorContext
     _ action: @escaping @isolated(any) @Sendable () async -> Void
   ) -> some View {
-    TaskLifecycleModifier(
-      content: self,
-      priority: priority,
-      descriptorID: String(reflecting: value),
-      action: action
+    modifier(
+      TaskLifecycleModifier(
+        priority: priority,
+        descriptorID: String(reflecting: value),
+        action: action
+      )
     )
   }
 
@@ -173,10 +179,11 @@ extension View {
   }
 
   public func offset(_ offset: Size) -> some View {
-    OffsetView(
-      content: erasedToAnyView,
-      x: offset.width,
-      y: offset.height
+    modifier(
+      OffsetModifier(
+        x: offset.width,
+        y: offset.height
+      )
     )
   }
 
@@ -184,10 +191,11 @@ extension View {
     x: Int = 0,
     y: Int = 0
   ) -> some View {
-    OffsetView(
-      content: erasedToAnyView,
-      x: x,
-      y: y
+    modifier(
+      OffsetModifier(
+        x: x,
+        y: y
+      )
     )
   }
 
@@ -203,10 +211,11 @@ extension View {
     x: Int = 0,
     y: Int = 0
   ) -> some View {
-    PositionView(
-      content: erasedToAnyView,
-      x: x,
-      y: y
+    modifier(
+      PositionModifier(
+        x: x,
+        y: y
+      )
     )
   }
 
@@ -235,11 +244,12 @@ extension View {
     in namespace: MatchedGeometryNamespace = .default,
     isSource: Bool = true
   ) -> some View {
-    MatchedGeometryView(
-      content: self,
-      config: MatchedGeometryConfig(
-        key: MatchedGeometryKey(namespace: namespace, id: id),
-        isSource: isSource
+    modifier(
+      MatchedGeometryModifier(
+        config: MatchedGeometryConfig(
+          key: MatchedGeometryKey(namespace: namespace, id: id),
+          isSource: isSource
+        )
       )
     )
   }
@@ -280,21 +290,22 @@ extension View {
   }
 
   public func padding(_ amount: Int = 1) -> some View {
-    PaddingView(content: erasedToAnyView, insets: .init(all: amount))
+    modifier(PaddingModifier(insets: .init(all: amount)))
   }
 
   public func padding(_ insets: EdgeInsets) -> some View {
-    PaddingView(content: erasedToAnyView, insets: insets)
+    modifier(PaddingModifier(insets: insets))
   }
 
   public func padding(_ edges: Edge.Set, _ amount: Int = 1) -> some View {
-    PaddingView(
-      content: erasedToAnyView,
-      insets: EdgeInsets(
-        top: edges.contains(.top) ? amount : 0,
-        leading: edges.contains(.leading) ? amount : 0,
-        bottom: edges.contains(.bottom) ? amount : 0,
-        trailing: edges.contains(.trailing) ? amount : 0
+    modifier(
+      PaddingModifier(
+        insets: EdgeInsets(
+          top: edges.contains(.top) ? amount : 0,
+          leading: edges.contains(.leading) ? amount : 0,
+          bottom: edges.contains(.bottom) ? amount : 0,
+          trailing: edges.contains(.trailing) ? amount : 0
+        )
       )
     )
   }
@@ -302,10 +313,11 @@ extension View {
   public func safeAreaPadding(
     _ edges: Edge.Set = .all
   ) -> some View {
-    SafeAreaPaddingView(
-      content: erasedToAnyView,
-      edges: edges,
-      additional: 0
+    modifier(
+      SafeAreaPaddingModifier(
+        edges: edges,
+        additional: 0
+      )
     )
   }
 
@@ -319,20 +331,18 @@ extension View {
     _ edges: Edge.Set,
     _ amount: Int
   ) -> some View {
-    SafeAreaPaddingView(
-      content: erasedToAnyView,
-      edges: edges,
-      additional: amount
+    modifier(
+      SafeAreaPaddingModifier(
+        edges: edges,
+        additional: amount
+      )
     )
   }
 
   public func ignoresSafeArea(
     _ edges: Edge.Set = .all
   ) -> some View {
-    IgnoreSafeAreaView(
-      content: erasedToAnyView,
-      edges: edges
-    )
+    modifier(IgnoreSafeAreaModifier(edges: edges))
   }
 
   public func safeAreaInset<Inset: View>(
@@ -341,12 +351,14 @@ extension View {
     spacing: Int = 0,
     @ViewBuilder content: () -> Inset
   ) -> some View {
-    SafeAreaInsetView(
-      base: self,
-      inset: content(),
-      edge: edge,
-      alignment: alignment,
-      spacing: spacing
+    modifier(
+      SafeAreaInsetModifier(
+        inset: content(),
+        edge: edge,
+        alignment: alignment,
+        spacing: spacing,
+        insetAuthoringContext: makeDeferredAuthoringContext()
+      )
     )
   }
 
@@ -355,11 +367,12 @@ extension View {
     height: Int? = nil,
     alignment: Alignment = .center
   ) -> some View {
-    FrameView(
-      content: erasedToAnyView,
-      width: width,
-      height: height,
-      alignment: alignment
+    modifier(
+      FrameModifier(
+        width: width,
+        height: height,
+        alignment: alignment
+      )
     )
   }
 
@@ -372,15 +385,16 @@ extension View {
     maxHeight: ProposedDimension? = nil,
     alignment: Alignment = .center
   ) -> some View {
-    FlexibleFrameView(
-      content: erasedToAnyView,
-      minWidth: minWidth,
-      idealWidth: idealWidth,
-      maxWidth: maxWidth,
-      minHeight: minHeight,
-      idealHeight: idealHeight,
-      maxHeight: maxHeight,
-      alignment: alignment
+    modifier(
+      FlexibleFrameModifier(
+        minWidth: minWidth,
+        idealWidth: idealWidth,
+        maxWidth: maxWidth,
+        minHeight: minHeight,
+        idealHeight: idealHeight,
+        maxHeight: maxHeight,
+        alignment: alignment
+      )
     )
   }
 
@@ -388,10 +402,12 @@ extension View {
     alignment: Alignment = .center,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    OverlayView(
-      base: self,
-      overlay: content(),
-      alignment: alignment
+    modifier(
+      OverlayModifier(
+        overlay: content(),
+        alignment: alignment,
+        overlayAuthoringContext: makeDeferredAuthoringContext()
+      )
     )
   }
 
@@ -399,10 +415,12 @@ extension View {
     alignment: Alignment = .center,
     @ViewBuilder content: () -> Content
   ) -> some View {
-    BackgroundView(
-      base: self,
-      background: content(),
-      alignment: alignment
+    modifier(
+      BackgroundModifier(
+        background: content(),
+        alignment: alignment,
+        backgroundAuthoringContext: makeDeferredAuthoringContext()
+      )
     )
   }
 
@@ -410,10 +428,11 @@ extension View {
     _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
     _ value: Value
   ) -> some View {
-    EnvironmentWritingModifier(
-      content: self,
-      keyPath: keyPath,
-      value: value
+    modifier(
+      EnvironmentWritingModifier(
+        keyPath: keyPath,
+        value: value
+      )
     )
   }
 
@@ -421,10 +440,11 @@ extension View {
     _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
     transform: @escaping (inout Value) -> Void
   ) -> some View {
-    EnvironmentTransformModifier(
-      content: self,
-      keyPath: keyPath,
-      transform: transform
+    modifier(
+      EnvironmentTransformModifier(
+        keyPath: keyPath,
+        transform: transform
+      )
     )
   }
 }
@@ -466,87 +486,70 @@ package func focusStructureMetadata(
   )
 }
 
-package struct IDView<Content: View>: View, ResolvableView {
+public struct IDModifier: PrimitiveViewModifier {
   package var identity: Identity
-  package var content: Content
 
-  package init(identity: Identity, content: Content) {
-    self.identity = identity
-    self.content = content
-  }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     [content.resolve(in: context.replacingIdentity(with: identity))]
   }
 }
 
-package struct LayoutMetadataModifier<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct LayoutMetadataModifier: PrimitiveViewModifier {
   package var metadata: LayoutMetadata
 
-  package init(content: Content, metadata: LayoutMetadata) {
-    self.content = content
-    self.metadata = metadata
-  }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     node.layoutMetadata = node.layoutMetadata.merging(metadata)
     return [node]
   }
 }
 
-package struct DrawMetadataModifier<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct DrawMetadataModifier: PrimitiveViewModifier {
   package var metadata: DrawMetadata
 
-  package init(content: Content, metadata: DrawMetadata) {
-    self.content = content
-    self.metadata = metadata
-  }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     node.drawMetadata = node.drawMetadata.merging(metadata)
     return [node]
   }
 }
 
-extension DrawMetadataModifier: TransitionEffectContributing {
+extension DrawMetadataModifier: TransitionEffectProvidingModifier {
   package func contributeTransitionEffects(into modifiers: inout TransitionModifiers) {
     if let opacity = metadata.baseStyle.explicitOpacity {
       modifiers.opacity = opacity
     }
   }
-  package var transitionChildForProbe: Any? { content }
 }
 
-package struct SemanticMetadataModifier<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct SemanticMetadataModifier: PrimitiveViewModifier {
   package var metadata: SemanticMetadata
 
-  package init(content: Content, metadata: SemanticMetadata) {
-    self.content = content
-    self.metadata = metadata
-  }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     node.semanticMetadata = node.semanticMetadata.merging(metadata)
     return [node]
   }
 }
 
-extension SemanticMetadataModifier: TabChildMetadataContributing {
-  package var tabChildMetadataContribution: PeekedTabChildMetadata {
+extension SemanticMetadataModifier: TabItemMetadataProvidingModifier {
+  package var tabItemMetadataContribution: PeekedTabChildMetadata {
     PeekedTabChildMetadata(
       label: metadata.tabItemLabel,
       tag: metadata.selectionTag
     )
-  }
-
-  package func withTabChildInnerContent<R>(_ body: (Any) -> R) -> R {
-    body(content)
   }
 }
 
@@ -558,11 +561,13 @@ private func lifecycleHandlerID(
   "\(identity)#\(phase)[\(ordinal)]"
 }
 
-private struct AppearLifecycleModifier<Content: View>: View, ResolvableView {
-  var content: Content
+public struct AppearLifecycleModifier: PrimitiveViewModifier {
   let action: @MainActor @Sendable () -> Void
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     let dynamicPropertyScope = currentAuthoringContext()
     let lifecycleAction = action
@@ -586,11 +591,13 @@ private struct AppearLifecycleModifier<Content: View>: View, ResolvableView {
   }
 }
 
-private struct DisappearLifecycleModifier<Content: View>: View, ResolvableView {
-  var content: Content
+public struct DisappearLifecycleModifier: PrimitiveViewModifier {
   let action: @MainActor @Sendable () -> Void
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     let dynamicPropertyScope = currentAuthoringContext()
     let lifecycleAction = action
@@ -614,15 +621,15 @@ private struct DisappearLifecycleModifier<Content: View>: View, ResolvableView {
   }
 }
 
-private struct ChangeLifecycleModifier<Content: View, Value: Equatable & Sendable>:
-  View, ResolvableView
-{
-  var content: Content
+public struct ChangeLifecycleModifier<Value: Equatable & Sendable>: PrimitiveViewModifier {
   var value: Value
   var initial: Bool
   let action: @MainActor @Sendable (Value, Value) -> Void
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     let dynamicPropertyScope = currentAuthoringContext()
     let node = content.resolve(in: context)
     let ownerNode = context.viewGraph?.nodeForIdentity(node.identity)
@@ -674,13 +681,15 @@ private struct ChangeLifecycleModifier<Content: View, Value: Equatable & Sendabl
   }
 }
 
-private struct TaskLifecycleModifier<Content: View>: View, ResolvableView {
-  var content: Content
+public struct TaskLifecycleModifier: PrimitiveViewModifier {
   var priority: TaskPriority
   var descriptorID: String?
   let action: @Sendable () async -> Void
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     let dynamicPropertyScope = currentAuthoringContext()
     let taskAction = action
@@ -709,42 +718,26 @@ private struct TaskLifecycleModifier<Content: View>: View, ResolvableView {
   }
 }
 
-package struct EnvironmentWritingModifier<Content: View, Value>: View, ResolvableView {
-  package var content: Content
+public struct EnvironmentWritingModifier<Value>: PrimitiveViewModifier {
   package var keyPath: WritableKeyPath<EnvironmentValues, Value>
   package var value: Value
 
-  package init(
-    content: Content,
-    keyPath: WritableKeyPath<EnvironmentValues, Value>,
-    value: Value
-  ) {
-    self.content = content
-    self.keyPath = keyPath
-    self.value = value
-  }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     return content.resolveElements(in: context.settingEnvironment(keyPath, to: value))
   }
 }
 
-package struct EnvironmentTransformModifier<Content: View, Value>: View, ResolvableView {
-  package var content: Content
+public struct EnvironmentTransformModifier<Value>: PrimitiveViewModifier {
   package var keyPath: WritableKeyPath<EnvironmentValues, Value>
   package var transform: (inout Value) -> Void
 
-  package init(
-    content: Content,
-    keyPath: WritableKeyPath<EnvironmentValues, Value>,
-    transform: @escaping (inout Value) -> Void
-  ) {
-    self.content = content
-    self.keyPath = keyPath
-    self.transform = transform
-  }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     content.resolveElements(
       in: context.transformingEnvironment(
         keyPath,
@@ -754,18 +747,15 @@ package struct EnvironmentTransformModifier<Content: View, Value>: View, Resolva
   }
 }
 
-package struct PaddingView<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct PaddingModifier: PrimitiveViewModifier {
   package var insets: EdgeInsets
 
-  package init(content: Content, insets: EdgeInsets) {
-    self.content = content
-    self.insets = insets
-  }
-
   @inline(never)
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let contentNode = resolveWrapperContent(
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let contentNode = resolveModifierContent(
       content,
       in: context.child(component: .named("content"))
     )
@@ -782,13 +772,15 @@ package struct PaddingView<Content: View>: View, ResolvableView {
   }
 }
 
-package struct SafeAreaPaddingView<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct SafeAreaPaddingModifier: PrimitiveViewModifier {
   package var edges: Edge.Set
   package var additional: Int
 
   @inline(never)
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     let safeAreaInsets = context.environmentValues.safeAreaInsets.masked(to: edges)
     let appliedInsets = safeAreaInsets.adding(
       max(0, additional),
@@ -800,7 +792,7 @@ package struct SafeAreaPaddingView<Content: View>: View, ResolvableView {
       .transformingEnvironment(\.safeAreaInsets) { safeAreaInsets in
         safeAreaInsets = safeAreaInsets.adding(appliedInsets)
       }
-    let contentNode = resolveWrapperContent(content, in: contentContext)
+    let contentNode = resolveModifierContent(content, in: contentContext)
     return [
       ResolvedNode(
         identity: context.identity,
@@ -814,12 +806,14 @@ package struct SafeAreaPaddingView<Content: View>: View, ResolvableView {
   }
 }
 
-package struct IgnoreSafeAreaView<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct IgnoreSafeAreaModifier: PrimitiveViewModifier {
   package var edges: Edge.Set
 
   @inline(never)
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     let reclaimedInsets = context.environmentValues.safeAreaInsets.masked(to: edges)
     let contentContext =
       context
@@ -827,7 +821,7 @@ package struct IgnoreSafeAreaView<Content: View>: View, ResolvableView {
       .transformingEnvironment(\.safeAreaInsets) { safeAreaInsets in
         safeAreaInsets = safeAreaInsets.zeroing(edges)
       }
-    let contentNode = resolveWrapperContent(content, in: contentContext)
+    let contentNode = resolveModifierContent(content, in: contentContext)
     return [
       ResolvedNode(
         identity: context.identity,
@@ -841,21 +835,39 @@ package struct IgnoreSafeAreaView<Content: View>: View, ResolvableView {
   }
 }
 
-package struct SafeAreaInsetView<Base: View, Inset: View>: View, ResolvableView {
-  package var base: Base
+public struct SafeAreaInsetModifier<Inset: View>: PrimitiveViewModifier {
   package var inset: Inset
   package var edge: Edge
   package var alignment: Alignment
   package var spacing: Int
+  package var insetAuthoringContext: AuthoringContext?
+
+  package init(
+    inset: Inset,
+    edge: Edge,
+    alignment: Alignment,
+    spacing: Int,
+    insetAuthoringContext: AuthoringContext?
+  ) {
+    self.inset = inset
+    self.edge = edge
+    self.alignment = alignment
+    self.spacing = spacing
+    self.insetAuthoringContext = insetAuthoringContext
+  }
 
   @inline(never)
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let baseNode = resolveWrapperContent(
-      base,
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let baseNode = resolveModifierContent(
+      content,
       in: context.child(component: .named("base"))
     )
-    let insetNode = resolveWrapperContent(
+    let insetNode = resolveStoredModifierView(
       inset,
+      authoringContext: insetAuthoringContext,
       in: context.child(component: .named("inset"))
     )
     return [
@@ -879,8 +891,7 @@ package struct SafeAreaInsetView<Base: View, Inset: View>: View, ResolvableView 
 /// Wrapper that installs a ``LayoutBehavior/border`` on its child so the
 /// layout engine reserves frame space for the border glyphs and the
 /// rasterizer paints them into the reserved cells.
-package struct BorderView<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct BorderModifier: PrimitiveViewModifier {
   package var set: BorderSet
   package var foreground: BorderEdgeStyle?
   package var background: BorderBackgroundStyle?
@@ -888,27 +899,12 @@ package struct BorderView<Content: View>: View, ResolvableView {
   package var blendPhase: Double
   package var sides: Edge.Set
 
-  package init(
-    content: Content,
-    set: BorderSet,
-    foreground: BorderEdgeStyle?,
-    background: BorderBackgroundStyle?,
-    blend: BorderBlend? = nil,
-    blendPhase: Double = 0,
-    sides: Edge.Set
-  ) {
-    self.content = content
-    self.set = set
-    self.foreground = foreground
-    self.background = background
-    self.blend = blend
-    self.blendPhase = blendPhase
-    self.sides = sides
-  }
-
   @inline(never)
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let contentNode = resolveWrapperContent(
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let contentNode = resolveModifierContent(
       content,
       in: context.child(component: .named("content"))
     )
@@ -932,27 +928,17 @@ package struct BorderView<Content: View>: View, ResolvableView {
   }
 }
 
-package struct FrameView<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct FrameModifier: PrimitiveViewModifier {
   package var width: Int?
   package var height: Int?
   package var alignment: Alignment
 
-  package init(
-    content: Content,
-    width: Int?,
-    height: Int?,
-    alignment: Alignment
-  ) {
-    self.content = content
-    self.width = width
-    self.height = height
-    self.alignment = alignment
-  }
-
   @inline(never)
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let contentNode = resolveWrapperContent(
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let contentNode = resolveModifierContent(
       content,
       in: context.child(component: .named("content"))
     )
@@ -969,24 +955,16 @@ package struct FrameView<Content: View>: View, ResolvableView {
   }
 }
 
-package struct OffsetView<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct OffsetModifier: PrimitiveViewModifier {
   package var x: Int
   package var y: Int
 
-  package init(
-    content: Content,
-    x: Int,
-    y: Int
-  ) {
-    self.content = content
-    self.x = x
-    self.y = y
-  }
-
   @inline(never)
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let contentNode = resolveWrapperContent(
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let contentNode = resolveModifierContent(
       content,
       in: context.child(component: .named("content"))
     )
@@ -1003,32 +981,23 @@ package struct OffsetView<Content: View>: View, ResolvableView {
   }
 }
 
-extension OffsetView: TransitionEffectContributing {
+extension OffsetModifier: TransitionEffectProvidingModifier {
   package func contributeTransitionEffects(into modifiers: inout TransitionModifiers) {
     modifiers.offsetX = x
     modifiers.offsetY = y
   }
-  package var transitionChildForProbe: Any? { content }
 }
 
-package struct PositionView<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct PositionModifier: PrimitiveViewModifier {
   package var x: Int
   package var y: Int
 
-  package init(
-    content: Content,
-    x: Int,
-    y: Int
-  ) {
-    self.content = content
-    self.x = x
-    self.y = y
-  }
-
   @inline(never)
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let contentNode = resolveWrapperContent(
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let contentNode = resolveModifierContent(
       content,
       in: context.child(component: .named("content"))
     )
@@ -1045,16 +1014,13 @@ package struct PositionView<Content: View>: View, ResolvableView {
   }
 }
 
-package struct MatchedGeometryView<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct MatchedGeometryModifier: PrimitiveViewModifier {
   package var config: MatchedGeometryConfig
 
-  package init(content: Content, config: MatchedGeometryConfig) {
-    self.content = content
-    self.config = config
-  }
-
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     let nodes = content.resolveElements(in: context)
     return nodes.map { node in
       var tagged = node
@@ -1064,8 +1030,7 @@ package struct MatchedGeometryView<Content: View>: View, ResolvableView {
   }
 }
 
-package struct FlexibleFrameView<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct FlexibleFrameModifier: PrimitiveViewModifier {
   package var minWidth: ProposedDimension?
   package var idealWidth: ProposedDimension?
   package var maxWidth: ProposedDimension?
@@ -1074,29 +1039,12 @@ package struct FlexibleFrameView<Content: View>: View, ResolvableView {
   package var maxHeight: ProposedDimension?
   package var alignment: Alignment
 
-  package init(
-    content: Content,
-    minWidth: ProposedDimension?,
-    idealWidth: ProposedDimension?,
-    maxWidth: ProposedDimension?,
-    minHeight: ProposedDimension?,
-    idealHeight: ProposedDimension?,
-    maxHeight: ProposedDimension?,
-    alignment: Alignment
-  ) {
-    self.content = content
-    self.minWidth = minWidth
-    self.idealWidth = idealWidth
-    self.maxWidth = maxWidth
-    self.minHeight = minHeight
-    self.idealHeight = idealHeight
-    self.maxHeight = maxHeight
-    self.alignment = alignment
-  }
-
   @inline(never)
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let contentNode = resolveWrapperContent(
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let contentNode = resolveModifierContent(
       content,
       in: context.child(component: .named("content"))
     )
@@ -1117,24 +1065,32 @@ package struct FlexibleFrameView<Content: View>: View, ResolvableView {
   }
 }
 
-package struct OverlayView<Base: View, OverlayContent: View>: View, ResolvableView {
-  package var base: Base
+public struct OverlayModifier<OverlayContent: View>: PrimitiveViewModifier {
   package var overlay: OverlayContent
   package var alignment: Alignment
+  package var overlayAuthoringContext: AuthoringContext?
 
-  package init(base: Base, overlay: OverlayContent, alignment: Alignment) {
-    self.base = base
+  package init(
+    overlay: OverlayContent,
+    alignment: Alignment,
+    overlayAuthoringContext: AuthoringContext?
+  ) {
     self.overlay = overlay
     self.alignment = alignment
+    self.overlayAuthoringContext = overlayAuthoringContext
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let baseNode = resolveWrapperContent(
-      base,
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let baseNode = resolveModifierContent(
+      content,
       in: context.child(component: .named("base"))
     )
-    let overlayNode = resolveWrapperContent(
+    let overlayNode = resolveStoredModifierView(
       overlay,
+      authoringContext: overlayAuthoringContext,
       in: context.child(component: .named("overlay"))
     )
     return [
@@ -1152,31 +1108,51 @@ package struct OverlayView<Base: View, OverlayContent: View>: View, ResolvableVi
 
 @inline(never)
 @MainActor
-private func resolveWrapperContent<Content: View>(
-  _ content: Content,
+private func resolveModifierContent<Base: View>(
+  _ content: ModifierContentInputs<Base>,
   in context: ResolveContext
 ) -> ResolvedNode {
-  resolveView(content, in: context)
+  content.resolve(in: context)
 }
 
-package struct BackgroundView<Base: View, BackgroundContent: View>: View, ResolvableView {
-  package var base: Base
+@inline(never)
+@MainActor
+private func resolveStoredModifierView<Content: View>(
+  _ content: Content,
+  authoringContext: AuthoringContext?,
+  in context: ResolveContext
+) -> ResolvedNode {
+  withAuthoringContext(authoringContext) {
+    resolveView(content, in: context)
+  }
+}
+
+public struct BackgroundModifier<BackgroundContent: View>: PrimitiveViewModifier {
   package var background: BackgroundContent
   package var alignment: Alignment
+  package var backgroundAuthoringContext: AuthoringContext?
 
-  package init(base: Base, background: BackgroundContent, alignment: Alignment) {
-    self.base = base
+  package init(
+    background: BackgroundContent,
+    alignment: Alignment,
+    backgroundAuthoringContext: AuthoringContext?
+  ) {
     self.background = background
     self.alignment = alignment
+    self.backgroundAuthoringContext = backgroundAuthoringContext
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let backgroundNode = resolveWrapperContent(
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    let backgroundNode = resolveStoredModifierView(
       background,
+      authoringContext: backgroundAuthoringContext,
       in: context.child(component: .named("background"))
     )
-    let baseNode = resolveWrapperContent(
-      base,
+    let baseNode = resolveModifierContent(
+      content,
       in: context.child(component: .named("base"))
     )
     return [
