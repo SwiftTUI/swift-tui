@@ -59,29 +59,48 @@ public protocol SignalReading: AnyObject {
 
 /// Emits runtime signals from an in-process source.
 public final class InProcessSignalReader: SignalReading, Sendable {
-  private let continuation = Mutex<AsyncStream<String>.Continuation?>(nil)
+  private struct State: Sendable {
+    var continuation: AsyncStream<String>.Continuation?
+    var continuationGeneration: UInt64 = 0
+  }
+
+  private let state = Mutex(State())
 
   public init() {}
 
   public func events() -> AsyncStream<String> {
-    AsyncStream { continuation in
-      self.continuation.withLock { stored in
-        stored = continuation
+    makeManagedAsyncStream { continuation in
+      let generation = self.state.withLock { state in
+        state.continuationGeneration &+= 1
+        state.continuation = continuation
+        return state.continuationGeneration
+      }
+
+      return { _ in
+        self.state.withLock { state in
+          guard state.continuationGeneration == generation else {
+            return
+          }
+          state.continuation = nil
+        }
       }
     }
   }
 
   public func send(_ signalName: String) {
-    _ = continuation.withLock { continuation in
+    state.withLock { state in
+      let continuation = state.continuation
       continuation?.yield(signalName)
     }
   }
 
   public func finish() {
-    continuation.withLock { continuation in
-      continuation?.finish()
-      continuation = nil
+    let continuation = state.withLock { state in
+      let continuation = state.continuation
+      state.continuation = nil
+      return continuation
     }
+    continuation?.finish()
   }
 }
 

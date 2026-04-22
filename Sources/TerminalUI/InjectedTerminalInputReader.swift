@@ -5,6 +5,7 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     var parser = TerminalInputParser()
     var controlParser = ControlMessageParser()
     var continuation: AsyncStream<InputEvent>.Continuation?
+    var continuationGeneration: UInt64 = 0
     var pendingEvents: [InputEvent] = []
     var pendingMouseEvents: [InputEvent] = []
     var activeMouseFlushToken: UInt64?
@@ -86,11 +87,16 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
 
   package func inputEvents() -> AsyncStream<InputEvent> {
     makeManagedAsyncStream { continuation in
-      let (shouldFinish, pendingEvents) = self.state.withLock { state in
+      let (generation, shouldFinish, pendingEvents) = self.state.withLock { state in
+        state.continuationGeneration &+= 1
         state.continuation = continuation
         let pendingEvents = state.pendingEvents
         state.pendingEvents.removeAll(keepingCapacity: true)
-        return (state.finished, pendingEvents)
+        return (
+          state.continuationGeneration,
+          state.finished,
+          pendingEvents
+        )
       }
 
       for event in pendingEvents {
@@ -104,6 +110,9 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
 
       return { _ in
         self.state.withLock { state in
+          guard state.continuationGeneration == generation else {
+            return
+          }
           state.continuation = nil
           state.activeMouseFlushToken = nil
         }
