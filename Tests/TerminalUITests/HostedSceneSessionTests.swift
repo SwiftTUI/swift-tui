@@ -210,12 +210,60 @@ struct HostedSceneSessionTests {
     }
     #expect(session.currentFocusPresentation.prefersTextInput)
 
-    session.stop()
-    let exitReason = try await task.value
+    let stopExitReason = try await session.stopAndWait()
+    let taskExitReason = try await task.value
 
-    #expect(exitReason == .inputEnded)
+    #expect(stopExitReason == .inputEnded)
+    #expect(taskExitReason == .inputEnded)
     #expect(session.currentFocusPresentation == .none)
     #expect(recorder.presentations.map(\.semantics) == [.activate, .edit, .none])
+  }
+
+  @Test("hosted scene session stopAndWait returns nil when the session was never started")
+  func hostedSceneSessionStopAndWaitReturnsNilWhenNeverStarted() async throws {
+    let session = try HostedSceneSession(
+      for: HostedApp(),
+      sceneID: WindowIdentifier("primary"),
+      initialSize: .init(width: 24, height: 6),
+      appearance: .fallback,
+      onOutput: { _ in }
+    )
+
+    let exitReason = try await session.stopAndWait()
+
+    #expect(exitReason == nil)
+    #expect(session.currentFocusPresentation == .none)
+  }
+
+  @Test(
+    "hosted scene session stopAndWait owns shutdown after the original start waiter is cancelled")
+  func hostedSceneSessionStopAndWaitOwnsShutdownAfterCancelledStartWaiter() async throws {
+    let recorder = OutputRecorder()
+    let session = try HostedSceneSession(
+      for: HostedApp(),
+      sceneID: WindowIdentifier("primary"),
+      initialSize: .init(width: 24, height: 6),
+      appearance: .fallback,
+      onOutput: { output in
+        recorder.record(output)
+      }
+    )
+
+    let task = Task {
+      try await session.start()
+    }
+
+    try await waitUntil("first frame") {
+      recorder.frameCount >= 1
+    }
+
+    task.cancel()
+
+    let stopExitReason = try await session.stopAndWait()
+    let taskExitReason = try await task.value
+
+    #expect(stopExitReason == .inputEnded)
+    #expect(taskExitReason == .inputEnded)
   }
 }
 
