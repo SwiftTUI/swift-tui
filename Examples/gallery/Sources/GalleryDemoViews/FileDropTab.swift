@@ -15,6 +15,10 @@ struct FileDropTab: View {
         Divider()
         VStack(alignment: .leading, spacing: 0) {
           ForEach(Array(droppedPaths.enumerated()), id: \.offset) { _, path in
+            let ext = path.components(separatedBy: ".").last
+            if let ext, ext.lowercased() == "png" {
+              Image(fileURL: ext)
+            }
             Text(path)
           }
         }
