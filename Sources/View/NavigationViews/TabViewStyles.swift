@@ -759,6 +759,7 @@ package struct LiteralTabsStripView: View {
           chrome: .literalTabs,
           styleEnvironment: configuration.styleEnvironment
         )
+        .fixedSize(horizontal: true, vertical: true)
       }
 
       if let overflow = presentation.overflowMenu {
@@ -775,6 +776,7 @@ package struct LiteralTabsStripView: View {
           chrome: .literalTabs,
           styleEnvironment: configuration.styleEnvironment
         )
+        .fixedSize(horizontal: true, vertical: true)
       }
 
       Spacer(minLength: 0)

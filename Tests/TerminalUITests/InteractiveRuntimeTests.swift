@@ -1331,6 +1331,57 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("literal tab overflow updates on SIGWINCH without requiring additional input")
+  func literalTabOverflowUpdatesOnSIGWINCHWithoutAdditionalInput() async throws {
+    let initialSize = Size(width: 40, height: 8)
+    let resizedSize = Size(width: 24, height: 8)
+    var currentSize = initialSize
+    var appliedResize = false
+    var presentationCount = 0
+    let quitGate = AsyncEventGate()
+
+    let terminal = RecordingTerminalHost(
+      surfaceSizeProvider: { currentSize },
+      presentObserver: {
+        presentationCount += 1
+        if !appliedResize {
+          appliedResize = true
+          currentSize = resizedSize
+        } else if presentationCount >= 2 {
+          Task {
+            await quitGate.open()
+          }
+        }
+      }
+    )
+
+    let result = try await runTestSceneSession(
+      scene: WindowGroup("Literal Tab Resize") {
+        SigwinchLiteralTabOverflowFixture()
+      },
+      sessionName: "InteractiveRuntimeTests.LiteralTabResize",
+      terminalHost: terminal,
+      inputReader: GateInputReader(
+        gate: quitGate, event: KeyPress(.character("c"), modifiers: .ctrl)),
+      signalReader: TimedSignalReader(
+        signals: [
+          .init(delayNanoseconds: 50_000_000, value: "SIGWINCH")
+        ]
+      )
+    )
+
+    let firstFrame = try #require(terminal.frames.first)
+    let secondFrame = try #require(terminal.frames.last)
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.renderedFrames == 2)
+    #expect(terminal.presentedSurfaceSizes == [initialSize, resizedSize])
+    #expect(firstFrame.contains("▾") == false)
+    #expect(secondFrame.contains("▾"))
+    #expect(secondFrame.contains("…") == false)
+  }
+
+  @MainActor
   @Test("toast auto-dismiss rerenders without additional input")
   func toastAutoDismissRerendersWithoutAdditionalInput() async throws {
     let terminalSize = Size(width: 32, height: 8)
@@ -4534,6 +4585,30 @@ private struct TabHostedGalleryShapedAnimatingScrollFixture: View {
         )
       }
     }
+  }
+}
+
+private struct SigwinchLiteralTabOverflowFixture: View {
+  var body: some View {
+    TabView(selection: .constant("one")) {
+      Tab("One", value: "one") {
+        Text("One content")
+      }
+
+      Tab("Two", value: "two") {
+        Text("Two content")
+      }
+
+      Tab("Three", value: "three") {
+        Text("Three content")
+      }
+
+      Tab("Four", value: "four") {
+        Text("Four content")
+      }
+    }
+    .tabViewStyle(.literalTabs)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 

@@ -12,6 +12,7 @@ package final class FrameResolveState {
   package var environment: EnvironmentSnapshot
   package var focusedValues: FocusedValues
   package var transaction: TransactionSnapshot
+  package var proposal: ProposedSize
   package var selectiveEvaluationEnabled: Bool
 
   /// When true, the next call to ``update(from:)`` will force root evaluation
@@ -22,9 +23,11 @@ package final class FrameResolveState {
 
   private var previousFocusedIdentity: Identity?
   private var previousPressedIdentity: Identity?
+  private var previousProposal: ProposedSize?
 
   /// Whether the per-frame environment values changed in a way that
-  /// requires root re-evaluation (e.g., focus or pressed identity changed).
+  /// requires root re-evaluation (e.g., focus, pressed identity, or
+  /// proposal changed).
   package private(set) var environmentRequiresRootEvaluation: Bool = false
 
   package init() {
@@ -34,18 +37,21 @@ package final class FrameResolveState {
     environment = .init()
     focusedValues = .init()
     transaction = .init()
+    proposal = .unspecified
     selectiveEvaluationEnabled = false
   }
 
-  package func update(from context: ResolveContext) {
+  package func update(from context: ResolveContext, proposal: ProposedSize) {
     let newFocused = context.environmentValues.focusedIdentity
     let newPressed = context.environmentValues.pressedIdentity
     environmentRequiresRootEvaluation =
       forceRootEvaluation
       || newFocused != previousFocusedIdentity
       || newPressed != previousPressedIdentity
+      || proposal != previousProposal
     previousFocusedIdentity = newFocused
     previousPressedIdentity = newPressed
+    previousProposal = proposal
     forceRootEvaluation = false
 
     invalidatedIdentities = context.invalidatedIdentities
@@ -54,5 +60,6 @@ package final class FrameResolveState {
     environment = context.environment
     focusedValues = context.focusedValues
     transaction = context.transaction
+    self.proposal = proposal
   }
 }
