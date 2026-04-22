@@ -420,7 +420,6 @@ package struct PromptPresentationSurface: View, ActionScope {
   }
 
   package var body: some View {
-    let surfaceBackground = AnyShapeStyle(.terminalSurfaceBackground)
 
     let content = VStack(alignment: .leading, spacing: 0) {
       presentationHeader
@@ -435,54 +434,50 @@ package struct PromptPresentationSurface: View, ActionScope {
 
     switch item.descriptor.chrome {
     case .surface:
-      return AnyView(
-        content
-          .background {
-            RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(surfaceBackground)
-          }
-          .overlay {
-            RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-              .terminalBorder(.accent),
-              style: .presentationChrome
-            )
-          }
-          .frame(
-            minWidth: .finite(item.descriptor.minWidth),
-            maxWidth: maximumWidth,
-            alignment: .leading
+      content
+        .background {
+          RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.terminalSurfaceBackground)
+        }
+        .overlay {
+          RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+            .terminalBorder(.accent),
+            style: .presentationChrome
           )
-          .focusScope()
-          .semanticMetadata(
-            .init(
-              presentationRole: item.descriptor.presentationRole
-            )
+        }
+        .frame(
+          minWidth: .finite(item.descriptor.minWidth),
+          maxWidth: maximumWidth,
+          alignment: .leading
+        )
+        .focusScope()
+        .semanticMetadata(
+          .init(
+            presentationRole: item.descriptor.presentationRole
           )
-      )
+        )
     case .dropdown:
       // Full-width, top-aligned strip. No side or top border — a single
       // soft bottom divider reads as a shadow under the content.
-      return AnyView(
-        content
-          .frame(
-            maxWidth: .infinity,
-            alignment: .topLeading
+      content
+        .frame(
+          maxWidth: .infinity,
+          alignment: .topLeading
+        )
+        .background {
+          Rectangle().fill(.terminalSurfaceBackground)
+        }
+        .overlay(alignment: .bottom) {
+          Divider()
+            .foregroundStyle(.separator)
+            .drawMetadata(.init(opacity: 0.6))
+            .frame(maxWidth: .infinity, alignment: .bottom)
+        }
+        .focusScope()
+        .semanticMetadata(
+          .init(
+            presentationRole: item.descriptor.presentationRole
           )
-          .background {
-            Rectangle().fill(surfaceBackground)
-          }
-          .overlay(alignment: .bottom) {
-            Divider()
-              .foregroundStyle(.separator)
-              .drawMetadata(.init(opacity: 0.6))
-              .frame(maxWidth: .infinity, alignment: .bottom)
-          }
-          .focusScope()
-          .semanticMetadata(
-            .init(
-              presentationRole: item.descriptor.presentationRole
-            )
-          )
-      )
+        )
     }
   }
 
