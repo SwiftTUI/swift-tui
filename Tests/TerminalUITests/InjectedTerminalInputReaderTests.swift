@@ -86,4 +86,56 @@ struct InjectedTerminalInputReaderTests {
     #expect(receivedMessages.withLock { $0 } == [.style(style)])
     #expect(events == [.key(.character("q"))])
   }
+
+  @Test("injected input reader flushes pointer bursts before later key input")
+  func injectedReaderFlushesPointerBurstsBeforeLaterKeyInput() async {
+    let inputReader = InjectedTerminalInputReader()
+
+    let eventsTask = Task {
+      var events: [InputEvent] = []
+      for await event in inputReader.inputEvents() {
+        events.append(event)
+      }
+      return events
+    }
+
+    let scrollSequence: [UInt8] = [
+      0x1B, 0x5B, 0x3C, 0x36, 0x35, 0x3B, 0x35, 0x3B, 0x37, 0x4D,
+    ]
+
+    for _ in 0..<20 {
+      inputReader.send(scrollSequence)
+    }
+    inputReader.send(Array("q".utf8))
+    inputReader.finish()
+
+    let events = await eventsTask.value
+
+    let mouseEvents = Array(events.dropLast())
+
+    #expect(!mouseEvents.isEmpty)
+    #expect(events.last == .key(.character("q")))
+    #expect(
+      mouseEvents.allSatisfy { event in
+        guard case .mouse(let mouseEvent) = event,
+          case .scrolled(let deltaX, let deltaY) = mouseEvent.kind
+        else {
+          return false
+        }
+        return deltaX == 0
+          && deltaY > 0
+          && mouseEvent.location == .init(x: 4, y: 6)
+      }
+    )
+    #expect(
+      mouseEvents.reduce(0) { partial, event in
+        guard case .mouse(let mouseEvent) = event,
+          case .scrolled(_, let deltaY) = mouseEvent.kind
+        else {
+          return partial
+        }
+        return partial + deltaY
+      } == 20
+    )
+  }
 }
