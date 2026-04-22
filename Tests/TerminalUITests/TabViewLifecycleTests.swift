@@ -7,18 +7,17 @@ import Testing
 /// Regression tests for the "TabView speculatively resolves every tab
 /// body on every frame" bug.
 ///
-/// Before the fix, TabView.resolvedOptions called resolveDeclaredChildren
-/// on the WHOLE child list to read each child's tabItem label and
-/// selection tag off its resolved node. The side effect was that
-/// inactive tabs' .onAppear and .task handlers fired on frame 1 while
-/// the user was still looking at a different tab. Because lifecycle
-/// events are scheduled from the resolved tree, inactive tabs landed
-/// in the commit plan for tabs the user had never visited.
+/// Before the fix, TabView resolved the whole child list up front while
+/// determining labels and selection tags. The side effect was that inactive
+/// tabs' .onAppear and .task handlers fired on frame 1 while the user was
+/// still looking at a different tab. Because lifecycle events are scheduled
+/// from the resolved tree, inactive tabs landed in the commit plan for tabs
+/// the user had never visited.
 ///
-/// The fix: peek (label, tag) statically off the declared child via
-/// TabChildMetadataContributing, and only invoke resolveView on the
-/// tab whose tag matches the current selection. Inactive tabs never
-/// enter beginEvaluation, so no lifecycle events fire.
+/// The fix: enumerate declared `Tab(...)` entries, read their eager metadata
+/// without resolving their bodies, and only invoke resolveView on the tab
+/// whose tag matches the current selection. Inactive tabs never enter
+/// beginEvaluation, so no lifecycle events fire.
 @MainActor
 @Suite
 struct TabViewLifecycleTests {
@@ -30,20 +29,20 @@ struct TabViewLifecycleTests {
     let taskRegistry = LocalTaskRegistry()
     let artifacts = DefaultRenderer().render(
       TabView(selection: .constant("home")) {
-        Text("Home content")
-          .onAppear { probe.homeAppearCount += 1 }
-          .tabItem("Home")
-          .tag("home")
+        Tab("Home", value: "home") {
+          Text("Home content")
+            .onAppear { probe.homeAppearCount += 1 }
+        }
 
-        Text("Settings content")
-          .onAppear { probe.settingsAppearCount += 1 }
-          .tabItem("Settings")
-          .tag("settings")
+        Tab("Settings", value: "settings") {
+          Text("Settings content")
+            .onAppear { probe.settingsAppearCount += 1 }
+        }
 
-        Text("Logs content")
-          .onAppear { probe.logsAppearCount += 1 }
-          .tabItem("Logs")
-          .tag("logs")
+        Tab("Logs", value: "logs") {
+          Text("Logs content")
+            .onAppear { probe.logsAppearCount += 1 }
+        }
       },
       context: .init(
         identity: testIdentity("Root"),
@@ -86,15 +85,15 @@ struct TabViewLifecycleTests {
       let taskRegistry = LocalTaskRegistry()
       let artifacts = DefaultRenderer().render(
         TabView(selection: .constant(tag)) {
-          Text("Home content")
-            .onAppear { probe.homeAppearCount += 1 }
-            .tabItem("Home")
-            .tag("home")
+          Tab("Home", value: "home") {
+            Text("Home content")
+              .onAppear { probe.homeAppearCount += 1 }
+          }
 
-          Text("Settings content")
-            .onAppear { probe.settingsAppearCount += 1 }
-            .tabItem("Settings")
-            .tag("settings")
+          Tab("Settings", value: "settings") {
+            Text("Settings content")
+              .onAppear { probe.settingsAppearCount += 1 }
+          }
         },
         context: .init(
           identity: testIdentity("Root"),
@@ -134,16 +133,16 @@ struct TabViewLifecycleTests {
     let taskRegistry = LocalTaskRegistry()
     let artifacts = DefaultRenderer().render(
       TabView(selection: .constant("home")) {
-        Text("Home content")
-          .tabItem("Home")
-          .tag("home")
+        Tab("Home", value: "home") {
+          Text("Home content")
+        }
 
-        Text("Settings content")
-          .task(priority: .userInitiated) {
-            // Must never be reached — this tab is not active.
-          }
-          .tabItem("Settings")
-          .tag("settings")
+        Tab("Settings", value: "settings") {
+          Text("Settings content")
+            .task(priority: .userInitiated) {
+              // Must never be reached — this tab is not active.
+            }
+        }
       },
       context: .init(
         identity: testIdentity("Root"),

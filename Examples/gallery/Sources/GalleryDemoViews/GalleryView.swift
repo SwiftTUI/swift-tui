@@ -19,7 +19,7 @@ private final class PaletteCommandHolder {
 public struct GalleryView: View {
   public init() {}
 
-  @State private var selection: Tab = .counter
+  @State private var selection: GalleryTab = .counter
   @State private var isPaletteOpen: Bool = false
   @State private var paletteHolder = PaletteCommandHolder()
   // The palette's TextField state and focus binding live HERE, not
@@ -33,7 +33,7 @@ public struct GalleryView: View {
   // can collide with this view's own `@State` slots by source-line
   // ordinal — the exact crash pattern observed before this refactor
   // (`ViewNode.stateSlot` type-mismatch on a slot previously
-  // initialized by `@State selection: Tab`).
+  // initialized by `@State selection: GalleryTab`).
   @State private var paletteQuery: String = ""
   @FocusState private var isPaletteQueryFocused: Bool
 
@@ -57,37 +57,37 @@ public struct GalleryView: View {
 
   private func galleryBody() -> some View {
     TabView(selection: $selection) {
-      CounterTab()
-        .tabItem("Counter")
-        .tag(Tab.counter)
+      Tab("Counter", value: GalleryTab.counter) {
+        CounterTab()
+      }
 
-      TodoTab()
-        .tabItem("Todo")
-        .tag(Tab.todo)
+      Tab("Todo", value: GalleryTab.todo) {
+        TodoTab()
+      }
 
-      CalculatorTab()
-        .tabItem("Calculator")
-        .tag(Tab.calculator)
+      Tab("Calculator", value: GalleryTab.calculator) {
+        CalculatorTab()
+      }
 
-      BordersAndShapesTab()
-        .tabItem("Borders & Shapes")
-        .tag(Tab.bordersAndShapes)
+      Tab("Borders & Shapes", value: GalleryTab.bordersAndShapes) {
+        BordersAndShapesTab()
+      }
 
-      ImagesTab()
-        .tabItem("Images")
-        .tag(Tab.images)
+      Tab("Images", value: GalleryTab.images) {
+        ImagesTab()
+      }
 
-      AnimationsTab()
-        .tabItem("Animations")
-        .tag(Tab.animations)
+      Tab("Animations", value: GalleryTab.animations) {
+        AnimationsTab()
+      }
 
-      FileDropTab()
-        .tabItem("File Drop")
-        .tag(Tab.fileDrop)
+      Tab("File Drop", value: GalleryTab.fileDrop) {
+        FileDropTab()
+      }
 
-      FullScreenTab()
-        .tabItem("Full Screen")
-        .tag(Tab.fullScreen)
+      Tab("Full Screen", value: GalleryTab.fullScreen) {
+        FullScreenTab()
+      }
     }
     .tabViewStyle(.literalTabs)
     .toolbarItem(
@@ -171,7 +171,7 @@ public struct GalleryView: View {
 }
 
 extension GalleryView {
-  enum Tab: Hashable {
+  enum GalleryTab: Hashable {
     case counter
     case todo
     case calculator

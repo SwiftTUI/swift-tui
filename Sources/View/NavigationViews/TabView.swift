@@ -1,7 +1,7 @@
-public import Core
+package import Core
 
-/// Selects one child view from a tagged set and renders a terminal-native tab
-/// strip above the active content.
+/// Selects one declared tab and renders a terminal-native tab strip above the
+/// active content.
 public struct TabView<SelectionValue: Hashable, Content: View>: View, ResolvableView {
   public var selection: Binding<SelectionValue>
   private var content: Content
@@ -172,30 +172,32 @@ extension TabView {
   private func resolvedOptions(
     in context: ResolveContext
   ) -> [TabOption] {
-    // Phase 1: walk declared children and peek metadata (tabItem + tag)
+    // Phase 1: walk declared children and peek metadata (tab label + tag)
     // off each without resolving. We capture a lazy `resolveOne` closure
     // per child so that only the active tab actually enters the resolve
     // pipeline — inactive tabs never call `beginEvaluation`, so their
     // `.onAppear` / `.task` handlers do not fire until the user first
-    // selects them (which is the moment a new ViewNode is created for
-    // that child and `finishEvaluation` emits the structural appear).
+    // selects them.
     var peekedEntries: [PeekedTabChildMetadata] = []
     var resolveClosures: [() -> ResolvedNode] = []
     var nextIndex = 0
-    // Match the old resolveDeclaredChildren(...) double-scoping so
-    // per-tab ViewNode identities are preserved across this refactor.
     let childContext = context.child(component: .named("TabOptions"))
     enumerateDeclaredChildViews(
       content,
       in: childContext,
       kindName: "Tab",
       nextIndex: &nextIndex
-    ) { child, _, resolveOne in
+    ) { child, childContext, resolveOne in
       peekedEntries.append(peekTabChildMetadata(from: child))
-      resolveClosures.append(resolveOne)
+      if let declaration = child as? any TabChildDirectResolving {
+        resolveClosures.append {
+          declaration.resolveTabChild(in: childContext)
+        }
+      } else {
+        resolveClosures.append(resolveOne)
+      }
     }
 
-    // Phase 2: determine the active tab by matching tags.
     let selectedIndex =
       peekedEntries.firstIndex { entry in
         guard let tag = entry.tag else { return false }
@@ -203,10 +205,6 @@ extension TabView {
       }
       ?? peekedEntries.indices.first { peekedEntries[$0].tag != nil }
 
-    // Phase 3: resolve ONLY the active tab. Inactive tabs return a
-    // TabOption with `node: nil` — they contribute only a label +
-    // selection tag to the tab strip, and nothing to the committed
-    // ViewNode tree.
     return peekedEntries.enumerated().compactMap { index, entry in
       guard let tag = entry.tag else {
         return nil
@@ -214,9 +212,6 @@ extension TabView {
       let isActive = (index == selectedIndex)
       let resolvedNodeIfActive = isActive ? resolveClosures[index]() : nil
 
-      // Prefer the statically peeked label; fall back to introspecting
-      // the active resolved tree (for composed content that exposes its
-      // label lazily); otherwise default to "Tab N".
       let label: TabItemLabel
       if let peekedLabel = entry.label {
         label = peekedLabel
@@ -732,41 +727,11 @@ private func setStoredFocusedTabIndex(
   )
 }
 
-extension View {
-  public func tabItem(
-    _ label: TabItemLabel
-  ) -> some View {
-    semanticMetadata(
-      .init(tabItemLabel: label)
-    )
-  }
-
-  public func tabItem<S: StringProtocol>(
-    _ title: S
-  ) -> some View {
-    tabItem(TabItemLabel(title))
-  }
-}
-
 private func tabItemIdentity(
   for controlIdentity: Identity,
   index: Int
 ) -> Identity {
   controlIdentity.child(.indexed("TabItem", index: index))
-}
-
-private func tabSelectionTag(
-  in node: ResolvedNode
-) -> SelectionTag? {
-  if let tag = node.semanticMetadata.selectionTag {
-    return tag
-  }
-  for child in node.children {
-    if let match = tabSelectionTag(in: child) {
-      return match
-    }
-  }
-  return nil
 }
 
 private func tabItemLabel(
@@ -785,10 +750,6 @@ private func tabItemLabel(
 
 // MARK: - Metadata peeking
 
-/// Metadata peeled statically off a declared TabView child without
-/// triggering a resolve pass. Tab children typically wrap their body in
-/// `.tabItem(...)` and `.tag(...)` modifiers — both of which are
-/// metadata-only wrappers that can be inspected structurally.
 package struct PeekedTabChildMetadata {
   package var label: TabItemLabel?
   package var tag: SelectionTag?
@@ -799,24 +760,17 @@ package struct PeekedTabChildMetadata {
   }
 }
 
-/// A view wrapper whose body does not need to be resolved in order to
-/// extract its tab metadata contribution. Conforming types carry their
-/// metadata on the wrapper struct itself and expose their inner content
-/// so the walker can continue peeling modifier layers.
 @MainActor
 package protocol TabChildMetadataContributing {
-  /// The metadata contributed by this single wrapper layer.
   var tabChildMetadataContribution: PeekedTabChildMetadata { get }
-  /// Forwards the inner content to `body` so the walker can continue
-  /// peeling subsequent metadata wrappers without resolving them.
   func withTabChildInnerContent<R>(_ body: (Any) -> R) -> R
 }
 
-/// Recursively peels metadata-only modifier layers off `view`, returning
-/// the accumulated `TabItemLabel` + `SelectionTag`. Stops at the first
-/// view that does not conform to `TabChildMetadataContributing`, which
-/// means any non-metadata wrapper (state, gestures, layout) on an
-/// inactive tab is NEVER touched — its body is never read.
+@MainActor
+package protocol TabChildDirectResolving: TabChildMetadataContributing {
+  func resolveTabChild(in context: ResolveContext) -> ResolvedNode
+}
+
 @MainActor
 package func peekTabChildMetadata(from view: Any) -> PeekedTabChildMetadata {
   var result = PeekedTabChildMetadata()

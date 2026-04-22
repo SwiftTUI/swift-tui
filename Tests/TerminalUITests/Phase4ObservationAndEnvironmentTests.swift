@@ -1377,20 +1377,20 @@ private struct GalleryLikeObservableSceneView: View {
         .padding(.init(horizontal: 1, vertical: 0))
       Divider()
       TabView(selection: $model.activeTab) {
-        workbenchSurface(
-          selection: $model.selectedControlDemo,
-          entries: [
-            ("Buttons", "buttons"),
-            ("Inputs", "inputs"),
-            ("Value Controls", "values"),
-          ],
-          title: "Buttons",
-          subtitle: "Filled primary actions with plain secondary actions."
-        ) {
-          controlsPreview
+        Tab("Controls", value: "controls") {
+          workbenchSurface(
+            selection: $model.selectedControlDemo,
+            entries: [
+              ("Buttons", "buttons"),
+              ("Inputs", "inputs"),
+              ("Value Controls", "values"),
+            ],
+            title: "Buttons",
+            subtitle: "Filled primary actions with plain secondary actions."
+          ) {
+            controlsPreview
+          }
         }
-        .tabItem("Controls")
-        .tag("controls")
       }
       .frame(
         maxWidth: .infinity,

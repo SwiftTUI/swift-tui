@@ -688,21 +688,21 @@ private struct TabHostedRepeatForeverProbe: View {
 
   var body: some View {
     TabView(selection: $selection) {
-      ScrollView {
-        VStack(alignment: .leading, spacing: 1) {
-          OnAppearRepeatForeverProbe()
-          Canvas(ProbeCanvasDrawing(value: 7))
-            .frame(width: 30, height: 4)
+      Tab("Animated", value: 0) {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 1) {
+            OnAppearRepeatForeverProbe()
+            Canvas(ProbeCanvasDrawing(value: 7))
+              .frame(width: 30, height: 4)
+          }
+          .padding(1)
         }
-        .padding(1)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .tabItem("Animated")
-      .tag(0)
 
-      Text("Other")
-        .tabItem("Other")
-        .tag(1)
+      Tab("Other", value: 1) {
+        Text("Other")
+      }
     }
   }
 }
