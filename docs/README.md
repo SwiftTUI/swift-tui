@@ -50,6 +50,7 @@ Active design proposals that are still shaping decisions:
 - [proposals/ASYNC_PRESENTATION.md](proposals/ASYNC_PRESENTATION.md) — moving terminal writes off the main actor
 - [proposals/CELL_PIXEL_METRICS.md](proposals/CELL_PIXEL_METRICS.md) — exposing cell pixel dimensions on `GeometryProxy` and `EnvironmentValues` for shape aspect, motion, and image sizing
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
+- [proposals/VIEW_MODIFIER_LAYER.md](proposals/VIEW_MODIFIER_LAYER.md) — clean-break public `ViewModifier` / `ModifiedContent` design and migration plan
 
 Implementation records retained for context (landed work that still informs reviews):
 
