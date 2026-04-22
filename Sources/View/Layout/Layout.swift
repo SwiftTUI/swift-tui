@@ -547,11 +547,13 @@ private struct LayoutContainer<Content: View>: View, ResolvableView {
   }
 }
 
-package struct LayoutValueModifier<Key: LayoutValueKey, Content: View>: View, ResolvableView {
-  var content: Content
+public struct LayoutValueModifier<Key: LayoutValueKey>: PrimitiveViewModifier {
   var value: Key.Value
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     node.layoutMetadata = node.layoutMetadata.settingLayoutValue(
       value,
@@ -563,12 +565,14 @@ package struct LayoutValueModifier<Key: LayoutValueKey, Content: View>: View, Re
   }
 }
 
-package struct HorizontalAlignmentGuideModifier<Content: View>: View, ResolvableView {
-  var content: Content
+public struct HorizontalAlignmentGuideModifier: PrimitiveViewModifier {
   var alignment: HorizontalAlignment
   var computeValue: @Sendable (ViewDimensions) -> Int
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     node.layoutMetadata = node.layoutMetadata.settingHorizontalAlignmentGuide(
       alignment,
@@ -579,12 +583,14 @@ package struct HorizontalAlignmentGuideModifier<Content: View>: View, Resolvable
   }
 }
 
-package struct VerticalAlignmentGuideModifier<Content: View>: View, ResolvableView {
-  var content: Content
+public struct VerticalAlignmentGuideModifier: PrimitiveViewModifier {
   var alignment: VerticalAlignment
   var computeValue: @Sendable (ViewDimensions) -> Int
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     node.layoutMetadata = node.layoutMetadata.settingVerticalAlignmentGuide(
       alignment,

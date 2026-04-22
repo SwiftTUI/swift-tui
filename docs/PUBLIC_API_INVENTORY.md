@@ -15,6 +15,7 @@ This page is the post-migration reference for the public surface of the package.
 The canonical authoring surface is the SwiftUI-shaped one:
 
 - `View`, `ViewBuilder`, `AnyView`, `TupleView`, `ConditionalContent`, `VariadicView`, `EmptyView`, `Text`, `TextFigure`, `Link`, `Image`, `Spacer`, `Divider`, `Group`
+- modifier algebra through `ViewModifier`, `View.modifier(_:)`, and `ModifiedContent`
 - text layout enums and interpolation support exposed through `Text`, including `Text.TruncationMode`, `Text.WrappingStrategy`, and rich interpolation of embedded `Text` and `Link` segments
 - banner-style text rendering through `TextFigure`, including enum-backed embedded-font selection through `TextFigure.Font` and discovery through `TextFigure.availableFonts`
 - `VStack`, `HStack`, `LazyVStack`, `LazyHStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `GeometryReader` (`LazyVStack` and `LazyHStack` support viewport-lazy placement and single-`ForEach` full-lazy rows)
@@ -154,7 +155,8 @@ These migration-era APIs are no longer public:
 - `StateViewBuilder`
 - the `AnyViewNode`-based `RunLoop` initializer
 - `DefaultRenderer.render<V: ViewNode>`
-- concrete wrapper-view implementation types such as `IDView`, `LayoutMetadataModifier`, `DrawMetadataModifier`, `SemanticMetadataModifier`, `EnvironmentWritingModifier`, `EnvironmentTransformModifier`, `PaddingView`, `FrameView`, `OverlayView`, and `BackgroundView`
+- concrete wrapper-view implementation types such as `IDView`, `PaddingView`,
+  `FrameView`, `OverlayView`, `BackgroundView`, and `TagValueView`
 - runtime registry and replay types such as `LocalActionRegistry`, `LocalKeyHandlerRegistry`, `LocalLifecycleRegistry`, `LocalTaskRegistry`, `TaskRegistration`, `LifecycleHandlerSnapshot`, and `LocalKeyEvent`
 - keyboard-help compatibility APIs such as `KeyboardShortcut`, `KeyboardShortcutGroup`, `KeyboardShortcutHelpView`, `.keyboardShortcut(...)`, and `.keyboardShortcutHelp(...)`
 - the global hotkey registration seam: `.onKeyPress(...)` view modifier, `HotkeyRegistry`, `HotkeyBinding`, and `HotkeyRegistrationSnapshot`. Consumers now bind keys through the ActionScope-based commands surface (see [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)); the replacements — `.keyCommand`, `.paletteCommand`, `.toolbar`, and `.toolbarItem` — ship on the public `View` surface.
@@ -176,7 +178,7 @@ These symbols still exist for internal reuse, diagnostics, or narrow package-loc
 - `ResolvableView`
 - `ViewNode`
 - the local runtime registries and lifecycle replay helpers used by `RunLoop`
-- concrete modifier wrapper views that back `.id`, metadata modifiers, `.environment`, `.padding`, `.frame`, `.overlay`, and `.background`
+- primitive modifier-lowering hooks such as `PrimitiveViewModifier` and `ModifierContentInputs`
 
 ## Test-Support And Internal Seams
 

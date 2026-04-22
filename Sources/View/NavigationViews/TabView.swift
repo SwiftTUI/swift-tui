@@ -189,9 +189,9 @@ extension TabView {
       nextIndex: &nextIndex
     ) { child, childContext, resolveOne in
       peekedEntries.append(peekTabChildMetadata(from: child))
-      if let declaration = child as? any TabChildDirectResolving {
+      if let declaration = child as? any TabDeclarationView {
         resolveClosures.append {
-          declaration.resolveTabChild(in: childContext)
+          declaration.resolveTabDeclarationContent(in: childContext)
         }
       } else {
         resolveClosures.append(resolveOne)
@@ -758,34 +758,80 @@ package struct PeekedTabChildMetadata {
     self.label = label
     self.tag = tag
   }
+
+  package mutating func merge(_ other: PeekedTabChildMetadata) {
+    if let label = other.label, label != self.label {
+      self.label = self.label ?? label
+    }
+    if let tag = other.tag, tag != self.tag {
+      self.tag = self.tag ?? tag
+    }
+  }
 }
 
+/// Modifier-side tab metadata semantic hook.
+///
+/// Built-in modifiers should report label/tag semantics here instead
+/// of attaching them to concrete wrapper views.
 @MainActor
-package protocol TabChildMetadataContributing {
-  var tabChildMetadataContribution: PeekedTabChildMetadata { get }
-  func withTabChildInnerContent<R>(_ body: (Any) -> R) -> R
+package protocol TabItemMetadataProvidingModifier: ViewModifier {
+  var tabItemMetadataContribution: PeekedTabChildMetadata { get }
 }
 
+/// Structured metadata-peeking hook for authored tab child trees.
 @MainActor
-package protocol TabChildDirectResolving: TabChildMetadataContributing {
-  func resolveTabChild(in context: ResolveContext) -> ResolvedNode
+package protocol TabMetadataPeekingView {
+  var peekedTabChildMetadata: PeekedTabChildMetadata { get }
+}
+
+/// Declaration-level hook for `Tab`-style child declarations.
+///
+/// Future `ModifiedContent` chains that wrap a `Tab` declaration may
+/// also conform so the selected child can still resolve directly
+/// without a declaration wrapper node.
+@MainActor
+package protocol TabDeclarationView {
+  var tabDeclarationMetadata: PeekedTabChildMetadata { get }
+  func resolveTabDeclarationContent(in context: ResolveContext) -> ResolvedNode
+}
+
+extension ModifiedContent: TabMetadataPeekingView
+where Content: View, Modifier: ViewModifier {
+  package var peekedTabChildMetadata: PeekedTabChildMetadata {
+    if let provider = modifier as? any TabItemMetadataProvidingModifier {
+      var result = provider.tabItemMetadataContribution
+      result.merge(peekTabChildMetadata(from: content))
+      return result
+    }
+    return peekTabChildMetadata(from: content)
+  }
+}
+
+extension ModifiedContent: TabDeclarationView
+where Content: TabDeclarationView & View, Modifier: ViewModifier {
+  package var tabDeclarationMetadata: PeekedTabChildMetadata {
+    if let provider = modifier as? any TabItemMetadataProvidingModifier {
+      var result = provider.tabItemMetadataContribution
+      result.merge(content.tabDeclarationMetadata)
+      return result
+    }
+    return content.tabDeclarationMetadata
+  }
+
+  package func resolveTabDeclarationContent(in context: ResolveContext) -> ResolvedNode {
+    resolveView(self, in: context)
+  }
 }
 
 @MainActor
 package func peekTabChildMetadata(from view: Any) -> PeekedTabChildMetadata {
-  var result = PeekedTabChildMetadata()
-  var current: Any = view
-  while let provider = current as? any TabChildMetadataContributing {
-    let contribution = provider.tabChildMetadataContribution
-    if let label = contribution.label, result.label == nil {
-      result.label = label
-    }
-    if let tag = contribution.tag, result.tag == nil {
-      result.tag = tag
-    }
-    current = provider.withTabChildInnerContent { $0 }
+  if let declaration = view as? any TabDeclarationView {
+    return declaration.tabDeclarationMetadata
   }
-  return result
+  if let peekable = view as? any TabMetadataPeekingView {
+    return peekable.peekedTabChildMetadata
+  }
+  return PeekedTabChildMetadata()
 }
 
 /// Hosts a pre-resolved tab content subtree inside the `tabBody` view

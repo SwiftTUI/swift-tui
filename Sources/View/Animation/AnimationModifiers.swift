@@ -15,10 +15,11 @@ extension View {
     _ animation: Animation?,
     value: V
   ) -> some View {
-    ValueAnimationModifier(
-      content: self,
-      animation: animation,
-      value: value
+    modifier(
+      ValueAnimationModifier(
+        animation: animation,
+        value: value
+      )
     )
   }
 
@@ -30,7 +31,7 @@ extension View {
   public func transaction(
     _ transform: @escaping @Sendable (inout Transaction) -> Void
   ) -> some View {
-    TransactionModifier(content: self, transform: transform)
+    modifier(TransactionModifier(transform: transform))
   }
 }
 
@@ -97,24 +98,22 @@ public struct Transaction: Sendable {
 
 // MARK: - ValueAnimationModifier
 
-package struct ValueAnimationModifier<Content: View, Value: Equatable & Sendable>:
-  View, ResolvableView
-{
-  package var content: Content
+public struct ValueAnimationModifier<Value: Equatable & Sendable>: PrimitiveViewModifier {
   package var animation: Animation?
   package var value: Value
 
   package init(
-    content: Content,
     animation: Animation?,
     value: Value
   ) {
-    self.content = content
     self.animation = animation
     self.value = value
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     // Read the previous value from a non-invalidating state slot.
     let (previousValue, ordinal) = previousValueAndOrdinal(in: context)
     let valueChanged = previousValue.map { $0 != value } ?? true
@@ -165,19 +164,19 @@ enum ValueAnimationModifierSlot {
 
 // MARK: - TransactionModifier
 
-package struct TransactionModifier<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct TransactionModifier: PrimitiveViewModifier {
   package var transform: @Sendable (inout Transaction) -> Void
 
   package init(
-    content: Content,
     transform: @escaping @Sendable (inout Transaction) -> Void
   ) {
-    self.content = content
     self.transform = transform
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var transaction = Transaction(request: context.transaction.animationRequest)
     transform(&transaction)
 

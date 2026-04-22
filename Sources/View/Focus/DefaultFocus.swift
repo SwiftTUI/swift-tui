@@ -1,14 +1,15 @@
-import Core
+package import Core
 
 extension View {
   public func defaultFocus(
     _ binding: FocusState<Bool>.Binding,
     _ value: Bool = true
   ) -> some View {
-    BoolDefaultFocusModifier(
-      content: self,
-      binding: binding,
-      value: value
+    modifier(
+      BoolDefaultFocusModifier(
+        binding: binding,
+        value: value
+      )
     )
   }
 
@@ -16,20 +17,23 @@ extension View {
     _ binding: FocusState<Value?>.Binding,
     _ value: Value
   ) -> some View {
-    OptionalDefaultFocusModifier(
-      content: self,
-      binding: binding,
-      value: value
+    modifier(
+      OptionalDefaultFocusModifier(
+        binding: binding,
+        value: value
+      )
     )
   }
 }
 
-private struct BoolDefaultFocusModifier<Content: View>: View, ResolvableView {
-  var content: Content
+public struct BoolDefaultFocusModifier: PrimitiveViewModifier {
   var binding: FocusState<Bool>.Binding
   var value: Bool
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     applyDefaultFocus(in: context)
     return content.resolveElements(in: context)
   }
@@ -73,14 +77,14 @@ private struct BoolDefaultFocusModifier<Content: View>: View, ResolvableView {
   }
 }
 
-private struct OptionalDefaultFocusModifier<Content: View, Value: Hashable>: View,
-  ResolvableView
-{
-  var content: Content
+public struct OptionalDefaultFocusModifier<Value: Hashable>: PrimitiveViewModifier {
   var binding: FocusState<Value?>.Binding
   var value: Value
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     applyDefaultFocus(in: context)
     return content.resolveElements(in: context)
   }

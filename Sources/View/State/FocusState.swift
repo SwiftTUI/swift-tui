@@ -1,4 +1,4 @@
-import Core
+package import Core
 
 private struct FocusStateSnapshot<Value: Equatable> {
   var value: Value
@@ -260,27 +260,30 @@ extension View {
   public func focused(
     _ binding: FocusState<Bool>.Binding
   ) -> some View {
-    BoolFocusBindingModifier(content: self, binding: binding)
+    modifier(BoolFocusBindingModifier(binding: binding))
   }
 
   public func focused<Value: Hashable>(
     _ binding: FocusState<Value?>.Binding,
     equals value: Value
   ) -> some View {
-    OptionalFocusBindingModifier(
-      content: self,
-      binding: binding,
-      value: value
+    modifier(
+      OptionalFocusBindingModifier(
+        binding: binding,
+        value: value
+      )
     )
   }
 }
 
 @MainActor
-private struct BoolFocusBindingModifier<Content: View>: View, ResolvableView {
-  var content: Content
+public struct BoolFocusBindingModifier: PrimitiveViewModifier {
   var binding: FocusState<Bool>.Binding
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
     context.localFocusBindingRegistry?.register(
       identity: node.identity,
@@ -296,14 +299,14 @@ private struct BoolFocusBindingModifier<Content: View>: View, ResolvableView {
 }
 
 @MainActor
-private struct OptionalFocusBindingModifier<Content: View, Value: Hashable>: View,
-  ResolvableView
-{
-  var content: Content
+public struct OptionalFocusBindingModifier<Value: Hashable>: PrimitiveViewModifier {
   var binding: FocusState<Value?>.Binding
   var value: Value
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
     context.localFocusBindingRegistry?.register(
       identity: node.identity,

@@ -1,7 +1,8 @@
 # View Modifier Layer
 
 **Date:** 2026-04-21  
-**Status:** Draft  
+**Status:** Shipped. Retained as the April 21, 2026 implementation note for the
+modifier-layer migration.  
 **Scope:** `View` public surface, modifier lowering, transition probing, tab metadata peeking
 
 ## Summary

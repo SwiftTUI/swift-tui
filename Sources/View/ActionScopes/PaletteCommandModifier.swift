@@ -58,39 +58,40 @@ extension ActionScope where Self: View & Sendable {
     description: String? = nil,
     isEnabled: Bool = true,
     action: @escaping @MainActor @Sendable () -> Void
-  ) -> PaletteCommandModifier<Self> {
-    PaletteCommandModifier(
-      content: self,
-      name: name,
-      description: description,
-      isEnabled: isEnabled,
-      action: action
+  ) -> some View & ActionScope & Sendable {
+    modifier(
+      PaletteCommandRegistrationModifier(
+        name: name,
+        description: description,
+        isEnabled: isEnabled,
+        action: action
+      )
     )
   }
 }
 
-public struct PaletteCommandModifier<Content: View & Sendable>: View, ResolvableView {
-  nonisolated let content: Content
-  let name: String
-  let description: String?
-  let isEnabled: Bool
-  let action: @MainActor @Sendable () -> Void
+public struct PaletteCommandRegistrationModifier: PrimitiveViewModifier, Sendable {
+  package let name: String
+  package let description: String?
+  package let isEnabled: Bool
+  package let action: @MainActor @Sendable () -> Void
 
-  init(
-    content: Content,
+  package init(
     name: String,
     description: String?,
     isEnabled: Bool,
     action: @escaping @MainActor @Sendable () -> Void
   ) {
-    self.content = content
     self.name = name
     self.description = description
     self.isEnabled = isEnabled
     self.action = action
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Content: View>(
+    content: ModifierContentInputs<Content>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
     context.commandRegistry?.registerPaletteCommand(
       at: node.identity,
@@ -104,13 +105,3 @@ public struct PaletteCommandModifier<Content: View & Sendable>: View, Resolvable
     return [node]
   }
 }
-
-// Forward the inner scope's identity so chained `.paletteCommand`
-// and `.keyCommand` calls keep compiling: after the modifier, the
-// wrapped view is still an ActionScope whose id equals the content's.
-extension PaletteCommandModifier: Identifiable where Content: ActionScope {
-  public typealias ID = Content.ID
-  nonisolated public var id: Content.ID { content.id }
-}
-
-extension PaletteCommandModifier: ActionScope where Content: ActionScope {}

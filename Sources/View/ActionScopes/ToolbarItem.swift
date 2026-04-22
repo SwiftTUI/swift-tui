@@ -1,4 +1,4 @@
-internal import Core
+package import Core
 
 /// A declarative description of a single toolbar item contributed by a
 /// descendant view via `.toolbarItem(_:)`.
@@ -55,15 +55,21 @@ extension View {
   /// Contributions accumulate in declaration order and are delivered
   /// as a single aggregated list to the absorbing scope.
   public func toolbarItem(_ config: ToolbarItemConfig) -> some View {
-    ToolbarItemContribution(content: self, config: config)
+    modifier(
+      ToolbarItemContributionModifier(
+        config: config
+      )
+    )
   }
 }
 
-private struct ToolbarItemContribution<Content: View>: View, ResolvableView {
-  let content: Content
-  let config: ToolbarItemConfig
+public struct ToolbarItemContributionModifier: PrimitiveViewModifier, Sendable {
+  package let config: ToolbarItemConfig
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Content: View>(
+    content: ModifierContentInputs<Content>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     node.preferenceValues.merge(
       ToolbarItemsPreferenceKey.self,

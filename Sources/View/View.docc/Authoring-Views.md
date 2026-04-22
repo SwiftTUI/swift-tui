@@ -42,7 +42,9 @@ Most familiar modifier categories are available:
 - environment modifiers such as `.environment(...)` and `.transformEnvironment(...)`
 - lifecycle modifiers such as `.onAppear`, `.onDisappear`, `.onChange(of:initial:_:)`, and `.task(...)`
 
-Concrete wrapper views behind those modifiers are package-only. Call sites should stay on the modifier surface.
+Modifiers are first-class public API through `ViewModifier`,
+`View.modifier(_:)`, and `ModifiedContent`. Direct lowering hooks remain
+package-only; ordinary call sites should stay on the modifier surface.
 
 ## Preview And Inspection
 

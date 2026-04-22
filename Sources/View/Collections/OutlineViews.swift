@@ -67,15 +67,21 @@ extension List {
   )
   where
     Data: RandomAccessCollection,
-    Content == OutlineGroup<Data, SelectionValue, TagValueView<RowContent, SelectionValue>>
+    Content == OutlineGroup<
+      Data,
+      SelectionValue,
+      ModifiedContent<RowContent, TagValueModifier<SelectionValue>>
+    >
   {
     self.init(
       selection: selection
     ) {
       OutlineGroup(data, id: id, children: children) { element in
-        TagValueView(
-          content: rowContent(element),
-          tag: element[keyPath: id]
+        rowContent(element).modifier(
+          TagValueModifier(
+            tag: element[keyPath: id],
+            includeOptional: true
+          )
         )
       }
     }
@@ -90,15 +96,21 @@ extension List {
   )
   where
     Data: RandomAccessCollection,
-    Content == OutlineGroup<Data, SelectionValue, TagValueView<RowContent, SelectionValue>>
+    Content == OutlineGroup<
+      Data,
+      SelectionValue,
+      ModifiedContent<RowContent, TagValueModifier<SelectionValue>>
+    >
   {
     self.init(
       selection: selection
     ) {
       OutlineGroup(data, id: id, children: children) { element in
-        TagValueView(
-          content: rowContent(element),
-          tag: element[keyPath: id]
+        rowContent(element).modifier(
+          TagValueModifier(
+            tag: element[keyPath: id],
+            includeOptional: true
+          )
         )
       }
     }
@@ -113,15 +125,21 @@ extension List {
   )
   where
     Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID?,
-    Content == OutlineGroup<Data, ID, TagValueView<RowContent, ID>>
+    Content == OutlineGroup<
+      Data,
+      ID,
+      ModifiedContent<RowContent, TagValueModifier<ID>>
+    >
   {
     self.init(
       selection: selection
     ) {
       OutlineGroup(data, id: id, children: children) { element in
-        TagValueView(
-          content: rowContent(element),
-          tag: element[keyPath: id]
+        rowContent(element).modifier(
+          TagValueModifier(
+            tag: element[keyPath: id],
+            includeOptional: true
+          )
         )
       }
     }
@@ -136,15 +154,21 @@ extension List {
   )
   where
     Data: RandomAccessCollection, ID: Hashable, SelectionValue == ID?,
-    Content == OutlineGroup<Data, ID, TagValueView<RowContent, ID>>
+    Content == OutlineGroup<
+      Data,
+      ID,
+      ModifiedContent<RowContent, TagValueModifier<ID>>
+    >
   {
     self.init(
       selection: selection
     ) {
       OutlineGroup(data, id: id, children: children) { element in
-        TagValueView(
-          content: rowContent(element),
-          tag: element[keyPath: id]
+        rowContent(element).modifier(
+          TagValueModifier(
+            tag: element[keyPath: id],
+            includeOptional: true
+          )
         )
       }
     }
@@ -161,7 +185,11 @@ extension List where SelectionValue: Hashable {
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
     SelectionValue == Data.Element.ID,
-    Content == OutlineGroup<Data, Data.Element.ID, TagValueView<RowContent, Data.Element.ID>>
+    Content == OutlineGroup<
+      Data,
+      Data.Element.ID,
+      ModifiedContent<RowContent, TagValueModifier<Data.Element.ID>>
+    >
   {
     self.init(
       data,
@@ -181,7 +209,11 @@ extension List where SelectionValue: Hashable {
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
     SelectionValue == Data.Element.ID,
-    Content == OutlineGroup<Data, Data.Element.ID, TagValueView<RowContent, Data.Element.ID>>
+    Content == OutlineGroup<
+      Data,
+      Data.Element.ID,
+      ModifiedContent<RowContent, TagValueModifier<Data.Element.ID>>
+    >
   {
     self.init(
       data,
@@ -201,7 +233,11 @@ extension List where SelectionValue: Hashable {
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
     SelectionValue == Data.Element.ID?,
-    Content == OutlineGroup<Data, Data.Element.ID, TagValueView<RowContent, Data.Element.ID>>
+    Content == OutlineGroup<
+      Data,
+      Data.Element.ID,
+      ModifiedContent<RowContent, TagValueModifier<Data.Element.ID>>
+    >
   {
     self.init(
       data,
@@ -221,7 +257,11 @@ extension List where SelectionValue: Hashable {
   where
     Data: RandomAccessCollection, Data.Element: Identifiable,
     SelectionValue == Data.Element.ID?,
-    Content == OutlineGroup<Data, Data.Element.ID, TagValueView<RowContent, Data.Element.ID>>
+    Content == OutlineGroup<
+      Data,
+      Data.Element.ID,
+      ModifiedContent<RowContent, TagValueModifier<Data.Element.ID>>
+    >
   {
     self.init(
       data,

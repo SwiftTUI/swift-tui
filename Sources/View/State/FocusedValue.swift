@@ -66,10 +66,11 @@ extension View {
     _ keyPath: WritableKeyPath<FocusedValues, Value?>,
     _ value: Value
   ) -> some View {
-    FocusedValueWritingModifier(
-      content: self,
-      keyPath: keyPath,
-      value: value
+    modifier(
+      FocusedValueWritingModifier(
+        keyPath: keyPath,
+        value: value
+      )
     )
   }
 
@@ -77,10 +78,11 @@ extension View {
     _ keyPath: WritableKeyPath<FocusedValues, Value?>,
     _ value: Value?
   ) -> some View {
-    FocusedValueWritingModifier(
-      content: self,
-      keyPath: keyPath,
-      value: value
+    modifier(
+      FocusedValueWritingModifier(
+        keyPath: keyPath,
+        value: value
+      )
     )
   }
 
@@ -99,14 +101,14 @@ extension View {
   }
 }
 
-private struct FocusedValueWritingModifier<Content: View, Value: Sendable>: View,
-  ResolvableView
-{
-  var content: Content
+public struct FocusedValueWritingModifier<Value: Sendable>: PrimitiveViewModifier {
   var keyPath: WritableKeyPath<FocusedValues, Value?>
   var value: Value?
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
 
     if let value {

@@ -223,15 +223,24 @@ public struct LifecycleHandlerSnapshot
 public final class LocalLifecycleRegistry
 public final class LocalTaskRegistry
 public struct IDView
-public struct LayoutMetadataModifier
-public struct DrawMetadataModifier
-public struct SemanticMetadataModifier
-public struct EnvironmentWritingModifier
-public struct EnvironmentTransformModifier
 public struct PaddingView
 public struct FrameView
 public struct OverlayView
 public struct BackgroundView
+public struct TagValueView
+EOF
+
+while IFS= read -r symbol; do
+  [ -z "$symbol" ] && continue
+  if rg -n --glob '*.swift' --fixed-strings --quiet -- "$symbol" Sources; then
+    fail "Retired modifier-wrapper seam reappeared in source: $symbol."
+  fi
+done <<'EOF'
+resolveWrapperContent
+withTabChildInnerContent
+TabChildMetadataContributing
+TransitionEffectContributing
+transitionChildForProbe
 EOF
 
 while IFS= read -r symbol; do

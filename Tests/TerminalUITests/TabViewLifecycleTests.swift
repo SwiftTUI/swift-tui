@@ -161,6 +161,48 @@ struct TabViewLifecycleTests {
     }
     #expect(taskStarts.isEmpty)
   }
+
+  @Test(
+    "TabView peeks label and tag metadata from plain modifier chains without resolving inactive children"
+  )
+  func plainTaggedChildrenStayInactiveDuringMetadataPeeking() {
+    let probe = LifecycleProbe()
+    let lifecycleRegistry = LocalLifecycleRegistry()
+    let taskRegistry = LocalTaskRegistry()
+
+    let artifacts = DefaultRenderer().render(
+      TabView(selection: .constant("settings")) {
+        Text("Home content")
+          .onAppear { probe.homeAppearCount += 1 }
+          .semanticMetadata(.init(tabItemLabel: TabItemLabel("Home")))
+          .tag("home")
+
+        Text("Settings content")
+          .onAppear { probe.settingsAppearCount += 1 }
+          .semanticMetadata(.init(tabItemLabel: TabItemLabel("Settings")))
+          .tag("settings")
+      },
+      context: .init(
+        identity: testIdentity("Root"),
+        localLifecycleRegistry: lifecycleRegistry,
+        localTaskRegistry: taskRegistry,
+        applyEnvironmentValues: true
+      ),
+      proposal: .init(width: 32, height: 4)
+    )
+
+    LifecycleCoordinator().applyCommittedFrame(
+      plan: artifacts.commitPlan,
+      currentLifecycleRegistry: lifecycleRegistry,
+      currentTaskRegistry: taskRegistry
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(surface.contains("Home"))
+    #expect(surface.contains("Settings"))
+    #expect(probe.homeAppearCount == 0)
+    #expect(probe.settingsAppearCount == 1)
+  }
 }
 
 @MainActor

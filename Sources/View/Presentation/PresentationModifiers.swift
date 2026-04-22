@@ -122,16 +122,19 @@ extension View {
     isPresented: Binding<Bool>
   ) -> some View {
     let spec = alertPromptPresentationSpec()
-    return BuiltinPromptPresentationModifier(
-      content: self,
-      title: String(title),
-      isPresented: isPresented,
-      spec: spec,
-      actions: defaultPresentationActions(
-        defaultDismissTitle: spec.descriptor.defaultDismissTitle,
-        isPresented: isPresented
-      ),
-      message: EmptyView()
+    return modifier(
+      BuiltinPromptPresentationModifier(
+        title: String(title),
+        isPresented: isPresented,
+        spec: spec,
+        actions: defaultPresentationActions(
+          defaultDismissTitle: spec.descriptor.defaultDismissTitle,
+          isPresented: isPresented
+        ),
+        message: EmptyView(),
+        actionsAuthoringContext: makeDeferredAuthoringContext(),
+        messageAuthoringContext: makeDeferredAuthoringContext()
+      )
     )
   }
 
@@ -141,13 +144,16 @@ extension View {
     @ViewBuilder actions: () -> Actions,
     @ViewBuilder message: () -> Message
   ) -> some View {
-    BuiltinPromptPresentationModifier(
-      content: self,
-      title: String(title),
-      isPresented: isPresented,
-      spec: alertPromptPresentationSpec(),
-      actions: actions(),
-      message: message()
+    modifier(
+      BuiltinPromptPresentationModifier(
+        title: String(title),
+        isPresented: isPresented,
+        spec: alertPromptPresentationSpec(),
+        actions: actions(),
+        message: message(),
+        actionsAuthoringContext: makeDeferredAuthoringContext(),
+        messageAuthoringContext: makeDeferredAuthoringContext()
+      )
     )
   }
 
@@ -156,16 +162,19 @@ extension View {
     isPresented: Binding<Bool>
   ) -> some View {
     let spec = confirmationDialogPromptPresentationSpec()
-    return BuiltinPromptPresentationModifier(
-      content: self,
-      title: String(title),
-      isPresented: isPresented,
-      spec: spec,
-      actions: defaultPresentationActions(
-        defaultDismissTitle: spec.descriptor.defaultDismissTitle,
-        isPresented: isPresented
-      ),
-      message: EmptyView()
+    return modifier(
+      BuiltinPromptPresentationModifier(
+        title: String(title),
+        isPresented: isPresented,
+        spec: spec,
+        actions: defaultPresentationActions(
+          defaultDismissTitle: spec.descriptor.defaultDismissTitle,
+          isPresented: isPresented
+        ),
+        message: EmptyView(),
+        actionsAuthoringContext: makeDeferredAuthoringContext(),
+        messageAuthoringContext: makeDeferredAuthoringContext()
+      )
     )
   }
 
@@ -175,13 +184,16 @@ extension View {
     @ViewBuilder actions: () -> Actions,
     @ViewBuilder message: () -> Message
   ) -> some View {
-    BuiltinPromptPresentationModifier(
-      content: self,
-      title: String(title),
-      isPresented: isPresented,
-      spec: confirmationDialogPromptPresentationSpec(),
-      actions: actions(),
-      message: message()
+    modifier(
+      BuiltinPromptPresentationModifier(
+        title: String(title),
+        isPresented: isPresented,
+        spec: confirmationDialogPromptPresentationSpec(),
+        actions: actions(),
+        message: message(),
+        actionsAuthoringContext: makeDeferredAuthoringContext(),
+        messageAuthoringContext: makeDeferredAuthoringContext()
+      )
     )
   }
 
@@ -189,12 +201,14 @@ extension View {
     isPresented: Binding<Bool>,
     @ViewBuilder content sheetContent: () -> SheetContent
   ) -> some View {
-    BuiltinSheetPresentationModifier(
-      content: self,
-      title: "",
-      isPresented: isPresented,
-      spec: sheetPromptPresentationSpec(),
-      sheetContent: sheetContent()
+    modifier(
+      BuiltinSheetPresentationModifier(
+        title: "",
+        isPresented: isPresented,
+        spec: sheetPromptPresentationSpec(),
+        sheetContent: sheetContent(),
+        sheetContentAuthoringContext: makeDeferredAuthoringContext()
+      )
     )
   }
 
@@ -203,12 +217,14 @@ extension View {
     isPresented: Binding<Bool>,
     @ViewBuilder content sheetContent: () -> SheetContent
   ) -> some View {
-    BuiltinSheetPresentationModifier(
-      content: self,
-      title: String(title),
-      isPresented: isPresented,
-      spec: sheetPromptPresentationSpec(),
-      sheetContent: sheetContent()
+    modifier(
+      BuiltinSheetPresentationModifier(
+        title: String(title),
+        isPresented: isPresented,
+        spec: sheetPromptPresentationSpec(),
+        sheetContent: sheetContent(),
+        sheetContentAuthoringContext: makeDeferredAuthoringContext()
+      )
     )
   }
 
@@ -225,12 +241,14 @@ extension View {
     isPresented: Binding<Bool>,
     @ViewBuilder content sheetContent: () -> SheetContent
   ) -> some View {
-    BuiltinSheetPresentationModifier(
-      content: self,
-      title: String(title),
-      isPresented: isPresented,
-      spec: sheetPromptPresentationSpec(chrome: .dropdown),
-      sheetContent: sheetContent()
+    modifier(
+      BuiltinSheetPresentationModifier(
+        title: String(title),
+        isPresented: isPresented,
+        spec: sheetPromptPresentationSpec(chrome: .dropdown),
+        sheetContent: sheetContent(),
+        sheetContentAuthoringContext: makeDeferredAuthoringContext()
+      )
     )
   }
 }
@@ -248,18 +266,21 @@ private func defaultPresentationActions(
   )
 }
 
-private struct BuiltinPromptPresentationModifier<
-  Content: View, Actions: View,
-  Message: View
->: View, ResolvableView {
-  var content: Content
+public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
+  PrimitiveViewModifier
+{
   var title: String
   var isPresented: Binding<Bool>
   var spec: PromptPresentationSpec
   var actions: Actions
   var message: Message
+  var actionsAuthoringContext: AuthoringContext?
+  var messageAuthoringContext: AuthoringContext?
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     guard isPresented.wrappedValue else {
       return [node]
@@ -273,8 +294,12 @@ private struct BuiltinPromptPresentationModifier<
       ),
       title: title,
       descriptor: spec.descriptor,
-      actionPayloads: deferredDeclaredBuilderChildren(from: actions),
-      messagePayloads: deferredDeclaredBuilderChildren(from: message),
+      actionPayloads: withAuthoringContext(actionsAuthoringContext) {
+        deferredDeclaredBuilderChildren(from: actions)
+      },
+      messagePayloads: withAuthoringContext(messageAuthoringContext) {
+        deferredDeclaredBuilderChildren(from: message)
+      },
       contentPayloads: [],
       dismiss: { [isPresented] in
         isPresented.wrappedValue = false
@@ -299,16 +324,17 @@ private struct BuiltinPromptPresentationModifier<
   }
 }
 
-private struct BuiltinSheetPresentationModifier<Content: View, SheetContent: View>: View,
-  ResolvableView
-{
-  var content: Content
+public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveViewModifier {
   var title: String
   var isPresented: Binding<Bool>
   var spec: PromptPresentationSpec
   var sheetContent: SheetContent
+  var sheetContentAuthoringContext: AuthoringContext?
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     guard isPresented.wrappedValue else {
       return [node]
@@ -324,7 +350,9 @@ private struct BuiltinSheetPresentationModifier<Content: View, SheetContent: Vie
       descriptor: spec.descriptor,
       actionPayloads: [],
       messagePayloads: [],
-      contentPayloads: deferredDeclaredBuilderChildren(from: sheetContent),
+      contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
+        deferredDeclaredBuilderChildren(from: sheetContent)
+      },
       dismiss: { [isPresented] in
         isPresented.wrappedValue = false
       }
@@ -597,12 +625,13 @@ extension View {
     style: ToastStyle = .info,
     duration: Double? = 3.0
   ) -> some View {
-    ToastModifier(
-      content: self,
-      isPresented: isPresented,
-      style: style,
-      duration: duration,
-      toastContent: Text(String(message))
+    modifier(
+      ToastModifier(
+        isPresented: isPresented,
+        style: style,
+        duration: duration,
+        toastContent: Text(String(message))
+      )
     )
   }
 
@@ -613,26 +642,27 @@ extension View {
     duration: Double? = 3.0,
     @ViewBuilder content toastContent: () -> ToastContent
   ) -> some View {
-    ToastModifier(
-      content: self,
-      isPresented: isPresented,
-      style: style,
-      duration: duration,
-      toastContent: toastContent()
+    modifier(
+      ToastModifier(
+        isPresented: isPresented,
+        style: style,
+        duration: duration,
+        toastContent: toastContent()
+      )
     )
   }
 }
 
-private struct ToastModifier<Content: View, ToastContent: View>: View,
-  ResolvableView
-{
-  var content: Content
+public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
   var isPresented: Binding<Bool>
   var style: ToastStyle
   var duration: Double?
   var toastContent: ToastContent
 
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
     guard isPresented.wrappedValue else {
       return [node]

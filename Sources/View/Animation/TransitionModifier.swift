@@ -10,20 +10,21 @@ extension View {
   /// the view is rendered as a non-semantic overlay — it does not
   /// participate in layout, focus, semantics, or interaction.
   public func transition(_ transition: AnyTransition) -> some View {
-    TransitionViewModifier(content: self, transition: transition)
+    modifier(TransitionRegistrationModifier(transition: transition))
   }
 }
 
-package struct TransitionViewModifier<Content: View>: View, ResolvableView {
-  package var content: Content
+public struct TransitionRegistrationModifier: PrimitiveViewModifier, Sendable {
   package var transition: AnyTransition
 
-  package init(content: Content, transition: AnyTransition) {
-    self.content = content
+  package init(transition: AnyTransition) {
     self.transition = transition
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     let nodes = content.resolveElements(in: context)
     // Register the transition for every emitted identity so the
     // animation controller can look it up during insertion/removal

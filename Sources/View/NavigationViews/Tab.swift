@@ -31,21 +31,15 @@ public struct Tab<SelectionValue: Hashable & Sendable, Content: View>: View {
   }
 }
 
-extension Tab: TabChildMetadataContributing {
-  package var tabChildMetadataContribution: PeekedTabChildMetadata {
+extension Tab: TabDeclarationView {
+  package var tabDeclarationMetadata: PeekedTabChildMetadata {
     PeekedTabChildMetadata(
       label: label,
       tag: SelectionTag(value: selectionValue)
     )
   }
 
-  package func withTabChildInnerContent<R>(_ body: (Any) -> R) -> R {
-    body(content)
-  }
-}
-
-extension Tab: TabChildDirectResolving {
-  package func resolveTabChild(
+  package func resolveTabDeclarationContent(
     in context: ResolveContext
   ) -> ResolvedNode {
     let lowered =

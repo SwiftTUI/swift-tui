@@ -42,32 +42,39 @@ public struct DefaultBottomToolbarStyle: ToolbarStyle {
   public init() {}
 }
 
-extension ActionScope where Self: View {
+extension ActionScope where Self: View & Sendable {
   /// Declares that this scope has a toolbar. Toolbar items contributed
   /// by descendant views via `.toolbarItem(_:)` are absorbed at this
   /// scope and rendered as a horizontal strip above or below the
   /// scope's content per `style.placement`.
   @MainActor
-  public func toolbar<S: ToolbarStyle>(style: S) -> ToolbarHost<Self, S> {
-    ToolbarHost(content: self, style: style)
+  public func toolbar<S: ToolbarStyle>(
+    style: S
+  ) -> some View & ActionScope & Sendable {
+    modifier(
+      ToolbarModifier(
+        style: style
+      )
+    )
   }
 }
 
-/// The view returned by `.toolbar(style:)`. Reads accumulated
+/// Primitive lowering for `.toolbar(style:)`. Reads accumulated
 /// `ToolbarItemsPreferenceKey` contributions off the resolved content
 /// node, composes a toolbar strip next to the content using
 /// `style.itemLayout` + `style.placement`, and clears the preference
 /// so items do not bubble past this scope.
-public struct ToolbarHost<Content: View & Sendable, S: ToolbarStyle>: View, ResolvableView {
-  nonisolated let content: Content
-  let style: S
+public struct ToolbarModifier<S: ToolbarStyle>: PrimitiveViewModifier, Sendable {
+  package let style: S
 
-  init(content: Content, style: S) {
-    self.content = content
+  package init(style: S) {
     self.style = style
   }
 
-  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+  package func resolve<Content: View>(
+    content: ModifierContentInputs<Content>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
     // Resolve the wrapped ActionScope at the ToolbarHost's own
     // identity. The scope root must remain the real graph node so
     // retained snapshot rebuilds recurse through the current
@@ -242,13 +249,3 @@ private struct ToolbarItemButton: View {
     .disabled(!config.isEnabled)
   }
 }
-
-// Forward the inner scope's identity so chained modifiers keep
-// compiling: after the toolbar modifier, the wrapped view is still an
-// ActionScope whose id equals the content's.
-extension ToolbarHost: Identifiable where Content: ActionScope {
-  public typealias ID = Content.ID
-  nonisolated public var id: Content.ID { content.id }
-}
-
-extension ToolbarHost: ActionScope where Content: ActionScope {}
