@@ -162,15 +162,27 @@ public struct PhaseAnimator<Phase: Equatable & Sendable, Content: View>: View {
 
   @MainActor
   private func advance(to phase: Phase, with animation: Animation?) async {
-    await withCheckedContinuation {
-      (continuation: CheckedContinuation<Void, Never>) in
-      withAnimation(animation) {
-        currentPhase = phase
-      } completion: {
-        MainActor.assumeIsolated {
-          continuation.resume()
+    guard !Task.isCancelled else {
+      return
+    }
+
+    let completionGate = OneShotContinuationGate()
+    await withTaskCancellationHandler {
+      await withCheckedContinuation {
+        (continuation: CheckedContinuation<Void, Never>) in
+        completionGate.install(continuation)
+        guard !Task.isCancelled else {
+          completionGate.resume()
+          return
+        }
+        withAnimation(animation) {
+          currentPhase = phase
+        } completion: {
+          completionGate.resume()
         }
       }
+    } onCancel: {
+      completionGate.resume()
     }
   }
 }

@@ -33,6 +33,7 @@ public final class HostedSceneSession {
   private let runScene: HostedSceneRunner
   private let onFocusPresentationChange: (@MainActor @Sendable (FocusPresentation) -> Void)?
   private var runTask: Task<RunLoopExitReason, any Error>?
+  private var shutdownWaiter: Task<Void, Never>?
 
   public convenience init<A: App>(
     for app: A,
@@ -149,10 +150,12 @@ public final class HostedSceneSession {
     do {
       let exitReason = try await task.value
       runTask = nil
+      shutdownWaiter = nil
       updateCurrentFocusPresentation(.none)
       return exitReason
     } catch {
       runTask = nil
+      shutdownWaiter = nil
       updateCurrentFocusPresentation(.none)
       throw error
     }
@@ -206,9 +209,31 @@ public final class HostedSceneSession {
   }
 
   public func stop() {
+    _ = beginStop()
+  }
+
+  public func stopAndWait() async throws -> RunLoopExitReason? {
+    guard let runTask = beginStop() else {
+      return nil
+    }
+    let exitReason = try await runTask.value
+    await shutdownWaiter?.value
+    return exitReason
+  }
+}
+
+extension HostedSceneSession {
+  private func beginStop() -> Task<RunLoopExitReason, any Error>? {
     inputReader.finish()
     signalReader.finish()
     updateCurrentFocusPresentation(.none)
+    guard let runTask else {
+      return nil
+    }
+    if shutdownWaiter == nil {
+      shutdownWaiter = Task { _ = await runTask.result }
+    }
+    return runTask
   }
 }
 
