@@ -272,6 +272,51 @@ struct PhaseAnimatorTests {
     _ = strings
     _ = bools
   }
+
+  @Test("PhaseAnimator one-shot gate resumes an installed continuation")
+  func oneShotGateResumesInstalledContinuation() async {
+    let gate = OneShotContinuationGate()
+    let task = Task {
+      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        gate.install(continuation)
+      }
+    }
+
+    await Task.yield()
+    gate.resume()
+    await task.value
+  }
+
+  @Test("PhaseAnimator one-shot gate replays a resume that arrives before installation")
+  func oneShotGateReplaysEarlyResume() async {
+    let gate = OneShotContinuationGate()
+    gate.resume()
+
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      gate.install(continuation)
+    }
+  }
+
+  @Test("PhaseAnimator one-shot gate releases cancellation-driven waits exactly once")
+  func oneShotGateSupportsCancellationHandlerPattern() async {
+    let gate = OneShotContinuationGate()
+    let task = Task {
+      await withTaskCancellationHandler {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+          gate.install(continuation)
+        }
+      } onCancel: {
+        gate.resume()
+      }
+    }
+
+    await Task.yield()
+    task.cancel()
+    await task.value
+
+    // Repeated resumes after cancellation must be harmless.
+    gate.resume()
+  }
 }
 
 @Suite("Transaction.animation round-trip")
