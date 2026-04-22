@@ -127,7 +127,7 @@ struct RasterizerTests {
             .image(
               bounds: imageBounds,
               identity: imageIdentity,
-              payload: .init(source: .named("demo.png"))
+              payload: .init(source: .path("demo.png"))
             )
           ]
         )

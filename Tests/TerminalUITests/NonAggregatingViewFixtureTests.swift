@@ -57,7 +57,7 @@ struct NonAggregatingViewFixtureTests {
         name: name,
         size: .init(width: 16, height: 1),
         view: AnyView(
-          Label("Endpoint", systemImage: "◎")
+          Label("Endpoint", icon: { Text("◎") })
         )
       )
 

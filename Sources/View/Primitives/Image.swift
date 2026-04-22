@@ -8,9 +8,9 @@ public struct Image: View, ResolvableView {
   public var scalingMode: ImageScalingMode
 
   public init(
-    _ name: String
+    path: String
   ) {
-    source = .named(name)
+    source = .path(path)
     isResizable = false
     scalingMode = .stretch
   }

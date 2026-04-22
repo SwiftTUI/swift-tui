@@ -1,6 +1,6 @@
 /// A high-level image source used by the public view surface.
 public enum ImageSource: Equatable, Hashable, Sendable {
-  case named(String)
+  case path(String)
   case fileURL(String)
   case pngData([UInt8])
 }

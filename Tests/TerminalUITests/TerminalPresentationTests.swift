@@ -426,7 +426,7 @@ struct TerminalPresentationTests {
         .init(
           identity: testIdentity("Root", "Image"),
           bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
-          source: .named("asset-a.png"),
+          source: .path("asset-a.png"),
           resolvedReference: .filePath("/tmp/asset-a.png"),
           pixelSize: .init(width: 8, height: 8),
           isResizable: false,
@@ -488,7 +488,7 @@ struct TerminalPresentationTests {
         .init(
           identity: testIdentity("Root", "Image"),
           bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
-          source: .named("asset-a.png"),
+          source: .path("asset-a.png"),
           resolvedReference: .filePath("/tmp/asset-a.png"),
           pixelSize: .init(width: 8, height: 8),
           isResizable: false,
@@ -503,7 +503,7 @@ struct TerminalPresentationTests {
         .init(
           identity: testIdentity("Root", "Image"),
           bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 1, height: 1)),
-          source: .named("asset-a.png"),
+          source: .path("asset-a.png"),
           resolvedReference: .filePath("/tmp/asset-a.png"),
           pixelSize: .init(width: 8, height: 8),
           isResizable: false,
@@ -546,7 +546,7 @@ struct TerminalPresentationTests {
         .init(
           identity: testIdentity("Root", "Image"),
           bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
-          source: .named("asset-a.png"),
+          source: .path("asset-a.png"),
           resolvedReference: .filePath("/tmp/asset-a.png"),
           pixelSize: .init(width: 8, height: 8),
           isResizable: false,
@@ -561,7 +561,7 @@ struct TerminalPresentationTests {
         .init(
           identity: testIdentity("Root", "Image"),
           bounds: .init(origin: .init(x: 0, y: 1), size: .init(width: 1, height: 1)),
-          source: .named("asset-a.png"),
+          source: .path("asset-a.png"),
           resolvedReference: .filePath("/tmp/asset-a.png"),
           pixelSize: .init(width: 8, height: 8),
           isResizable: false,
