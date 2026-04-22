@@ -273,6 +273,61 @@ actionRole:
 focusable(role:
 EOF
 
+if ! rg -n --fixed-strings --quiet -- 'extensible style protocols rather than closed public enums' docs/PUBLIC_SURFACE_POLICY.md; then
+  fail "docs/PUBLIC_SURFACE_POLICY.md should keep the extensible style-protocol policy."
+fi
+
+if ! rg -n --fixed-strings --quiet -- 'transitional migration debt' docs/PUBLIC_SURFACE_POLICY.md; then
+  fail "docs/PUBLIC_SURFACE_POLICY.md should mark enum-backed authoring styles as transitional migration debt."
+fi
+
+if ! rg -n --fixed-strings --quiet -- '### Authoring style families' docs/PUBLIC_API_INVENTORY.md; then
+  fail "docs/PUBLIC_API_INVENTORY.md should inventory the authoring style families explicitly."
+fi
+
+if ! rg -n --fixed-strings --quiet -- 'Protocol-backed style families today' docs/PUBLIC_API_INVENTORY.md; then
+  fail "docs/PUBLIC_API_INVENTORY.md should separate protocol-backed style families from transitional ones."
+fi
+
+if ! rg -n --fixed-strings --quiet -- 'Transitional enum-backed authoring style families' docs/PUBLIC_API_INVENTORY.md; then
+  fail "docs/PUBLIC_API_INVENTORY.md should keep the transitional enum-backed style family inventory."
+fi
+
+if ! rg -n --fixed-strings --quiet -- 'public protocol ToolbarStyle' Sources/View/ActionScopes/Toolbar.swift; then
+  fail "ToolbarStyle should stay a public extensible style protocol."
+fi
+
+if ! rg -n --fixed-strings --quiet -- 'package protocol TabViewStyle' Sources/View/NavigationViews/TabViewStyles.swift; then
+  fail "TabViewStyle should stay extracted as a dedicated protocol-backed style seam."
+fi
+
+if rg -n -P --quiet -- '(public|package)\s+enum\s+TabViewStyle\b' Sources/View/NavigationViews/TabViewStyles.swift; then
+  fail "TabViewStyle must not regress to an enum-owned style surface."
+fi
+
+if rg -n -P --quiet -- 'AnyTabViewStyle|AutomaticTabViewStyle|UnderlineTabViewStyle|LiteralTabsTabViewStyle|PowerlineTabViewStyle' Sources/View/NavigationViews/TabView.swift; then
+  fail "TabView.swift should not branch directly on built-in tab style types; keep style ownership in TabViewStyles.swift."
+fi
+
+if rg -n -P --quiet -- 'switch\s+.*tabStyle|switch\s+.*tabViewStyle' Sources/View/NavigationViews/TabView.swift; then
+  fail "TabView.swift should not switch directly on tab styles."
+fi
+
+public_style_enums=$(
+  rg -n -P --glob '*.swift' -- 'public enum ([A-Za-z_][A-Za-z0-9_]*Style)\b' Sources \
+    | sed -E 's/.*public enum ([A-Za-z_][A-Za-z0-9_]*Style).*/\1/' \
+    | LC_ALL=C sort -u
+)
+
+for style_enum in $public_style_enums; do
+  case "$style_enum" in
+    AnyShapeStyle|ButtonStyle|ListStyle|OutlineStyle|PickerStyle|TextFieldStyle|ToastStyle) ;;
+    *)
+      fail "New public enum-backed *Style surface appeared: $style_enum. Authoring-facing style APIs should prefer public extensible style protocols."
+      ;;
+  esac
+done
+
 if ! rg -n --fixed-strings --quiet -- 'Removed From The Public Surface' docs/PUBLIC_API_INVENTORY.md; then
   fail "docs/PUBLIC_API_INVENTORY.md should keep the 'Removed From The Public Surface' section."
 fi

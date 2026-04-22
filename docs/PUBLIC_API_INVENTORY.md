@@ -53,6 +53,25 @@ The canonical shape / border / gradient surface as of the Milestone 7 shape-and-
 - **Gradient / pattern paints**: `LinearGradient`, `RadialGradient`, `PatternFill` (`░ ▒ ▓` shading with optional background). All conform to `ShapeStyle` and are sampled per-cell at rasterization time. As of the April 13, 2026 Animatable-protocol migration `LinearGradient.startPoint` / `endPoint` and `RadialGradient.center` are typed as `UnitPoint` instead of `Alignment` (see below).
 - **`Canvas<Drawing>`** and `CanvasDrawing` / `CanvasContext` (`Core` + `View`): arbitrary 2×4-Braille-subpixel drawing escape hatch for content the `Shape` algebra can't express (sparklines, plots, hand-drawn glyphs). The drawing primitives live in `Core` so the rasterizer can consume them directly; the authoring shell is a `View` in the `View` layer.
 
+### Authoring style families
+
+The repo is mid-migration from enum-owned control and container styling to
+public, extensible style protocols.
+
+- **Protocol-backed style families today**: `ShapeStyle`, `ToolbarStyle`, and
+  `AnyTabViewStyle` with the package-only `TabViewStyle` implementation
+  protocol that currently backs the built-in tab styles.
+- **Transitional enum-backed authoring style families**: `ButtonStyle`,
+  `TextFieldStyle`, `PickerStyle`, `ListStyle`, `OutlineStyle`, and
+  `ToastStyle`.
+
+Migration note:
+
+- The transitional enum-backed families are legacy exceptions, not a pattern to
+  copy. New authoring-facing `*Style` APIs should prefer public style
+  protocols plus type-erased environment storage, and existing families should
+  migrate in place rather than multiplying enum-backed surfaces.
+
 ### Animation primitives and `Animatable` conformance
 
 The animation pipeline now follows the SwiftUI-shaped `Animatable`-protocol model (see `docs/proposals/ANIMATABLE_PROTOCOL_MIGRATION.md`). The new public surface is:

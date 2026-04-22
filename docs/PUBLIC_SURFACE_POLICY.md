@@ -63,6 +63,26 @@ The old public string-style helpers and public `Theme` shims have already been r
 
 Any remaining styling compatibility should stay confined to lower-level core types and should not re-enter the main `View` authoring surface. New docs should show typed semantic style APIs instead.
 
+Authoring-facing control and container style APIs should converge on public,
+extensible style protocols rather than closed public enums.
+
+- Prefer `public protocol ...Style` plus type-erased environment storage such
+  as `Any...Style` for new authoring-facing style families.
+- Built-in styles should be concrete style values that conform to those
+  protocols; shorthand ergonomics belong on the eraser or dedicated default
+  types, not on a closed enum that owns the whole authoring surface.
+- Once a style family is migrated, the owning control or container should
+  delegate through configuration and presentation seams instead of switching
+  directly on every built-in style case.
+- `ShapeStyle` and `ToolbarStyle` are the current public models for extensible
+  style protocols. `TabViewStyle` is the in-progress migration model and should
+  keep moving toward that shape rather than regressing to renderer-owned
+  branching.
+- The remaining public enum-backed authoring style families —
+  `ButtonStyle`, `TextFieldStyle`, `PickerStyle`, `ListStyle`,
+  `OutlineStyle`, and `ToastStyle` — are transitional migration debt, not
+  precedent for new API design.
+
 ## Transitional Runtime Policy
 
 Runtime bridges and staging adapters are acceptable while the package is still reconciling old host shapes with the current commit model.

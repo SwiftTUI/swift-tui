@@ -9,6 +9,16 @@ skip_bun_install=0
 host_os=$(uname -s)
 is_linux=0
 failures=""
+step_index=0
+
+tmp_root=${TMPDIR:-/tmp}
+log_root=$(mktemp -d "$tmp_root/swift-terminal-ui-test-all.XXXXXX")
+
+cleanup() {
+  rm -rf "$log_root"
+}
+
+trap cleanup EXIT
 
 if [ "$host_os" = "Linux" ]; then
   is_linux=1
@@ -47,12 +57,45 @@ EOF
 
 add_failure() {
   title=$1
+  exit_code=$2
+  log_file=$3
+  failure_record=$title'|'$exit_code'|'$log_file
+
   if [ -z "$failures" ]; then
-    failures=$title
+    failures=$failure_record
   else
     failures=$failures'
-'$title
+'$failure_record
   fi
+}
+
+read_step_exit_code() {
+  status_file=$1
+
+  if [ -f "$status_file" ]; then
+    cat "$status_file"
+  else
+    echo 1
+  fi
+}
+
+run_logged_command() {
+  log_file=$1
+  status_file=$2
+  shift 2
+
+  rm -f "$status_file"
+
+  (
+    set +e
+    "$@"
+    command_status=$?
+    printf '%s\n' "$command_status" >"$status_file"
+    exit 0
+  ) 2>&1 | tee "$log_file"
+
+  command_status=$(read_step_exit_code "$status_file")
+  [ "$command_status" -eq 0 ]
 }
 
 for argument in "$@"; do
@@ -110,33 +153,45 @@ run_step() {
   title=$1
   workdir=$2
   shift 2
+  step_index=$((step_index + 1))
+  log_file=$log_root/step-$step_index.log
+  status_file=$log_root/step-$step_index.status
 
   echo ""
   echo "==> $title"
 
   if (
     cd "$workdir" &&
-    "$@"
+    run_logged_command "$log_file" "$status_file" "$@"
   ); then
+    rm -f "$status_file"
     echo "PASS: $title"
   else
+    exit_code=$(read_step_exit_code "$status_file")
+    rm -f "$status_file"
     >&2 echo "FAIL: $title"
-    add_failure "$title"
+    add_failure "$title" "$exit_code" "$log_file"
   fi
 }
 
 run_function_step() {
   title=$1
   shift
+  step_index=$((step_index + 1))
+  log_file=$log_root/step-$step_index.log
+  status_file=$log_root/step-$step_index.status
 
   echo ""
   echo "==> $title"
 
-  if "$@"; then
+  if run_logged_command "$log_file" "$status_file" "$@"; then
+    rm -f "$status_file"
     echo "PASS: $title"
   else
+    exit_code=$(read_step_exit_code "$status_file")
+    rm -f "$status_file"
     >&2 echo "FAIL: $title"
-    add_failure "$title"
+    add_failure "$title" "$exit_code" "$log_file"
   fi
 }
 
@@ -264,8 +319,28 @@ fi
 OLD_IFS=$IFS
 IFS='
 '
-for failure in $failures; do
-  >&2 echo "  - $failure"
+for failure_record in $failures; do
+  title=${failure_record%%|*}
+  remainder=${failure_record#*|}
+  exit_code=${remainder%%|*}
+  log_file=${remainder#*|}
+
+  >&2 echo "  - $title (exit $exit_code)"
+done
+
+for failure_record in $failures; do
+  title=${failure_record%%|*}
+  remainder=${failure_record#*|}
+  exit_code=${remainder%%|*}
+  log_file=${remainder#*|}
+
+  >&2 echo ""
+  >&2 echo "===== $title (exit $exit_code) ====="
+  if [ -f "$log_file" ]; then
+    cat "$log_file" >&2
+  else
+    >&2 echo "Missing captured log: $log_file"
+  fi
 done
 IFS=$OLD_IFS
 
