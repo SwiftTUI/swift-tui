@@ -481,8 +481,8 @@ extension SnapshotRenderer {
 
   private func describe(_ source: ImageSource) -> String {
     switch source {
-    case .named(let name):
-      return "named(\(name))"
+    case .path(let name):
+      return "path(\(name))"
     case .fileURL(let value):
       return "fileURL(\(value))"
     case .pngData(let bytes):

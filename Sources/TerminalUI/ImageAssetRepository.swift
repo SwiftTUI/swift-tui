@@ -181,7 +181,7 @@ final class ImageAssetRepository: Sendable {
     resourceRoots: [String]
   ) -> ImageAssetReference? {
     switch source {
-    case .named(let name):
+    case .path(let name):
       if name.hasPrefix("/") {
         return .filePath(name)
       }

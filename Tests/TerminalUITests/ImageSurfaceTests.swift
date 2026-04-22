@@ -55,7 +55,7 @@ struct ImageSurfaceTests {
     }
 
     let artifacts = DefaultRenderer().render(
-      Image("icons/logo.png")
+      Image(path: "icons/logo.png")
         .environment(\.imageResourceRoots, [root.path])
     )
     let attachment = try #require(artifacts.rasterSurface.imageAttachments.first)
@@ -87,7 +87,7 @@ struct ImageSurfaceTests {
     }
 
     let artifacts = DefaultRenderer().render(
-      Label("Brand", image: "icons/label.png")
+      Label("Brand", image: Image(path: "icons/label.png"))
         .environment(\.imageResourceRoots, [root.path]),
       context: .init(identity: testIdentity("Label", "Image"))
     )
