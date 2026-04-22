@@ -22,28 +22,12 @@ public struct GalleryView: View {
   @State private var selection: GalleryTab = .counter
   @State private var isPaletteOpen: Bool = false
   @State private var paletteHolder = PaletteCommandHolder()
-  // The palette's TextField state and focus binding live HERE, not
-  // inside `CommandPaletteList`, because sheet-content views inherit
-  // their parent's authoring context (see `View.resolveBody` in
-  // `State.swift:383` — it reuses the current authoring context when
-  // one is set, and `ScopedBuilder` captures this view's context at
-  // sheet-construction time). Declaring `@State` / `@FocusState`
-  // inside the sheet's content view would route those property
-  // wrappers' state slots through THIS view's viewNode, where they
-  // can collide with this view's own `@State` slots by source-line
-  // ordinal — the exact crash pattern observed before this refactor
-  // (`ViewNode.stateSlot` type-mismatch on a slot previously
-  // initialized by `@State selection: GalleryTab`).
-  @State private var paletteQuery: String = ""
-  @FocusState private var isPaletteQueryFocused: Bool
 
   public var body: some View {
     GalleryRuntimeBridge(
       selection: $selection,
       isPaletteOpen: $isPaletteOpen,
-      paletteHolder: paletteHolder,
-      paletteQuery: $paletteQuery,
-      isPaletteQueryFocused: $isPaletteQueryFocused
+      paletteHolder: paletteHolder
     )
   }
 }
@@ -52,8 +36,6 @@ private struct GalleryRuntimeBridge: View {
   @Binding var selection: GalleryView.GalleryTab
   @Binding var isPaletteOpen: Bool
   let paletteHolder: PaletteCommandHolder
-  @Binding var paletteQuery: String
-  let isPaletteQueryFocused: FocusState<Bool>.Binding
 
   var body: some View {
     // `EnvironmentReader` sits on the gallery panel's resolve chain so
@@ -161,15 +143,8 @@ private struct GalleryRuntimeBridge: View {
       // same body pass (inside the EnvironmentReader closure), the
       // read here sees the freshest value — not whatever was there
       // before.
-      //
-      // Query text and focus state are hoisted to this view's
-      // storage (see property declarations above for the reason);
-      // we pass them through as bindings so the sheet's content can
-      // both read and drive them without declaring its own wrappers.
       CommandPaletteList(
         commands: paletteHolder.commands,
-        query: $paletteQuery,
-        isQueryFocused: isPaletteQueryFocused,
         dismiss: { isPaletteOpen = false }
       )
     }
@@ -178,10 +153,8 @@ private struct GalleryRuntimeBridge: View {
   private func openPalette() {
     // Nothing to snapshot at this point — the class-backed
     // `paletteHolder.commands` is kept up-to-date continuously by
-    // the EnvironmentReader above. Reset the query, ask focus to
-    // land on the text field, and flip the sheet open.
-    paletteQuery = ""
-    isPaletteQueryFocused.wrappedValue = true
+    // the EnvironmentReader above. Opening the sheet is enough;
+    // the palette owns its own query/focus state now.
     isPaletteOpen = true
   }
 }

@@ -1,43 +1,49 @@
 import TerminalUI
 
 /// A fuzzy-filterable command-palette list used inside the Gallery's
-/// palette sheet. Renders a text field at the top that drives a
-/// subsequence-based fuzzy filter over the supplied commands; each
-/// match is a button that fires the captured action and dismisses the
-/// palette.
+/// palette sheet. The outer wrapper intentionally returns a
+/// single-child `Group` so the stateful body becomes a DECLARED child
+/// instead of the deferred payload's root view. In the graph-backed
+/// runtime path, declared children are resolved through `resolveView`,
+/// which gives the child its own `viewNode` and therefore safe local
+/// `@State` / `@FocusState` storage.
 ///
-/// The commands are passed in explicitly (rather than read from the
-/// environment) because opening the palette as a sheet moves focus
-/// into the overlay tree, where the scope chain no longer includes
-/// the Gallery's Panel. The caller snapshots `activePaletteCommands`
-/// at the moment the palette opens and passes that snapshot through
-/// — so the list reflects "what was visible when the user invoked
-/// the palette", which is the right UX for a command palette.
-/// Important: this view must NOT declare its own `@State` or
-/// `@FocusState` wrappers. Sheet content is resolved inside the
-/// parent view's authoring context (see `View.resolveBody` in
-/// `State.swift:383` and `ScopedBuilder` — deferred payloads inherit
-/// the sheet-creating view's context). Local property wrappers here
-/// would route state-slot lookups through the PARENT's viewNode,
-/// colliding with its real `@State` slots by source-line ordinal and
-/// triggering `ViewNode.stateSlot` type-mismatch fatalError. All
-/// mutable palette state (query text, focus binding) lives on
-/// `GalleryView` and is threaded here as `Binding`s.
+/// The commands are still passed in explicitly (rather than read from
+/// the environment) because opening the palette as a sheet moves focus
+/// into the overlay tree, where the scope chain no longer includes the
+/// Gallery's Panel. The caller snapshots `activePaletteCommands` at
+/// the moment the palette opens and passes that snapshot through, so
+/// the list reflects what was visible when the user invoked the
+/// palette.
 struct CommandPaletteList: View {
   let commands: [ActivePaletteCommand]
-  let query: Binding<String>
-  let isQueryFocused: FocusState<Bool>.Binding
   let dismiss: @MainActor @Sendable () -> Void
 
+  var body: some View {
+    Group {
+      CommandPaletteListBody(
+        commands: commands,
+        dismiss: dismiss
+      )
+    }
+  }
+}
+
+private struct CommandPaletteListBody: View {
+  let commands: [ActivePaletteCommand]
+  let dismiss: @MainActor @Sendable () -> Void
+
+  @State private var query = ""
+  @FocusState private var isQueryFocused: Bool
+
   private var matches: [(command: ActivePaletteCommand, score: Int)] {
-    let queryText = query.wrappedValue
-    if queryText.isEmpty {
+    if query.isEmpty {
       return commands.enumerated().map { ($0.element, $0.offset) }
     }
     return
       commands
       .compactMap { command in
-        fuzzyMatchScore(query: queryText, against: command.name)
+        fuzzyMatchScore(query: query, against: command.name)
           .map { (command: command, score: $0) }
       }
       .sorted { $0.score < $1.score }
@@ -48,15 +54,8 @@ struct CommandPaletteList: View {
       header
       Divider()
       diagnosticRow
-      TextField("Filter commands…", text: query)
-        .focused(isQueryFocused)
-        .onAppear {
-          // Belt-and-braces: parent already sets
-          // `isPaletteQueryFocused = true` in `openPalette()`, but
-          // if the user re-presents the same sheet without going
-          // through that path, this onAppear still grabs focus.
-          isQueryFocused.wrappedValue = true
-        }
+      TextField("Filter commands…", text: $query)
+        .focused($isQueryFocused)
       Divider()
       matchList
       Divider()
@@ -64,6 +63,10 @@ struct CommandPaletteList: View {
     }
     .padding(1)
     .frame(minWidth: 44, alignment: .leading)
+    .onAppear {
+      query = ""
+      isQueryFocused = true
+    }
   }
 
   private var header: some View {
@@ -84,7 +87,7 @@ struct CommandPaletteList: View {
       Text("debug:")
       Text("cmds=\(commands.count)")
       Text("match=\(matches.count)")
-      Text("focus=\(isQueryFocused.wrappedValue ? "yes" : "no")")
+      Text("focus=\(isQueryFocused ? "yes" : "no")")
       Spacer()
     }
     .foregroundStyle(.separator)
