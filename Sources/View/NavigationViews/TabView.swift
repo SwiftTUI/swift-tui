@@ -59,13 +59,7 @@ extension TabView {
       }
     let tabStyle = context.environmentValues.tabViewStyle
     let styleConfiguration = TabViewStyleConfiguration(
-      controlIdentity: context.identity,
-      options: options.map {
-        .init(
-          label: $0.label,
-          contentPayload: $0.contentPayload
-        )
-      },
+      options: options.map { .init(label: $0.label) },
       selectedIndex: selectedIndex,
       focusedIndex: focusedIndex,
       isFocused: isFocused,
@@ -75,6 +69,10 @@ extension TabView {
       isOverflowMenuExpanded: storedTabOverflowMenuExpanded(in: ownerNode)
     )
     let stylePresentation = tabStyle.presentation(for: styleConfiguration)
+    let activeContentPayload =
+      selectedIndex.flatMap { index in
+        options.indices.contains(index) ? options[index].contentPayload : nil
+      }
 
     if isEnabled {
       let binding = selection
@@ -211,6 +209,9 @@ extension TabView {
     let child = tabStyle.resolveBody(
       configuration: styleConfiguration,
       presentation: stylePresentation,
+      controlIdentity: context.identity,
+      activeContentIndex: selectedIndex,
+      activeContent: activeContentPayload,
       in: context.child(component: .named("TabBody"))
     )
 

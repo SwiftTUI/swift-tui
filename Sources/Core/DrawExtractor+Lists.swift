@@ -1,8 +1,3 @@
-private enum ResolvedListStyle: Equatable {
-  case plain
-  case insetGrouped
-}
-
 package struct ListDisplayLine {
   enum Kind {
     case text(String, TextStyle)
@@ -35,14 +30,12 @@ extension DrawExtractor {
       for: payload,
       in: bounds
     )
-    let listStyle: ResolvedListStyle =
-      payload.style == .plain ? .plain : .insetGrouped
     let contentBounds = layout.contentBounds
     guard contentBounds.size.width > 0, contentBounds.size.height > 0 else {
-      return listChromeCommands(for: payload, in: bounds, style: listStyle)
+      return listChromeCommands(for: payload, in: bounds)
     }
 
-    var commands = listChromeCommands(for: payload, in: bounds, style: listStyle)
+    var commands = listChromeCommands(for: payload, in: bounds)
     let lines = layout.lines
 
     for (index, line) in lines.enumerated() {
@@ -127,28 +120,27 @@ extension DrawExtractor {
 
   private func listChromeCommands(
     for payload: ListPayload,
-    in bounds: Rect,
-    style: ResolvedListStyle
+    in bounds: Rect
   ) -> [DrawCommand] {
-    guard style == .insetGrouped else {
+    guard let container = payload.style.listContainer else {
       return []
     }
 
     return [
       .fill(
         bounds: bounds,
-        geometry: .roundedRectangle(cornerRadius: 1),
-        insetAmount: 0,
+        geometry: container.geometry,
+        insetAmount: container.insetAmount,
         style: payload.backgroundStyle ?? .semantic(.fill),
-        mode: .interior(strokeWidth: 1)
+        mode: container.fillMode
       ),
       .stroke(
         bounds: bounds,
-        geometry: .roundedRectangle(cornerRadius: 1),
-        insetAmount: 0,
+        geometry: container.geometry,
+        insetAmount: container.insetAmount,
         style: payload.borderStyle ?? .semantic(.separator),
-        strokeStyle: .init(borderSet: .rounded),
-        strokeBorder: true,
+        strokeStyle: container.strokeStyle,
+        strokeBorder: container.strokeBorder,
         backgroundStyle: nil
       ),
     ]
@@ -156,17 +148,17 @@ extension DrawExtractor {
 
   private func listContentBounds(
     in bounds: Rect,
-    style: ResolvedListStyle
+    style: CollectionStylePresentation
   ) -> Rect {
-    guard style == .insetGrouped else {
-      return bounds
-    }
-
+    let insets = style.listContentInsets
     return Rect(
-      origin: .init(x: bounds.origin.x + 1, y: bounds.origin.y + 1),
+      origin: .init(
+        x: bounds.origin.x + insets.leading,
+        y: bounds.origin.y + insets.top
+      ),
       size: .init(
-        width: max(0, bounds.size.width - 2),
-        height: max(0, bounds.size.height - 2)
+        width: max(0, bounds.size.width - insets.leading - insets.trailing),
+        height: max(0, bounds.size.height - insets.top - insets.bottom)
       )
     )
   }
@@ -175,12 +167,9 @@ extension DrawExtractor {
     for payload: ListPayload,
     in bounds: Rect
   ) -> ListVisibleLayout {
-    let listStyle: ResolvedListStyle =
-      payload.style == .plain ? .plain : .insetGrouped
-    let contentBounds = listContentBounds(in: bounds, style: listStyle)
+    let contentBounds = listContentBounds(in: bounds, style: payload.style)
     let lines = visibleListLines(
       for: payload,
-      style: listStyle,
       viewportLineCount: contentBounds.size.height,
       showsIndicators: payload.showsIndicators
     )
@@ -193,11 +182,10 @@ extension DrawExtractor {
 
   private func visibleListLines(
     for payload: ListPayload,
-    style: ResolvedListStyle,
     viewportLineCount: Int,
     showsIndicators: Bool
   ) -> [ListDisplayLine] {
-    let displayLines = materializedListLines(for: payload, style: style)
+    let displayLines = materializedListLines(for: payload)
     guard viewportLineCount > 0 else {
       return []
     }
@@ -260,8 +248,7 @@ extension DrawExtractor {
   }
 
   private func materializedListLines(
-    for payload: ListPayload,
-    style: ResolvedListStyle
+    for payload: ListPayload
   ) -> [ListDisplayLine] {
     var lines: [ListDisplayLine] = []
     var rowIndex = 0
@@ -333,7 +320,7 @@ extension DrawExtractor {
           )
         )
 
-        if style == .plain,
+        if payload.style.showsListRowSeparators,
           shouldRenderRowSeparator(
             current: item,
             next: payload.items.dropFirst(index + 1).first
@@ -349,7 +336,9 @@ extension DrawExtractor {
         }
         rowIndex += 1
       case .sectionBreak:
-        guard style == .plain, listSectionSeparatorIsVisible(item) else {
+        guard payload.style.showsListSectionSeparators,
+          listSectionSeparatorIsVisible(item)
+        else {
           continue
         }
         lines.append(

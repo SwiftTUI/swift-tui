@@ -2461,7 +2461,7 @@ struct SwiftUISurfaceTests {
   func pickerStylesRenderEditingChromeDirectlyFromFocus() {
     func renderPicker(
       id: Identity,
-      style: PickerStyle
+      style: AnyPickerStyle
     ) -> (unfocused: RasterSurface, focused: RasterSurface) {
       let picker =
         Picker("Mode", selection: .constant(1)) {

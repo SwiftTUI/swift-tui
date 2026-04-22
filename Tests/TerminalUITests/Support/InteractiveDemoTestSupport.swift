@@ -606,7 +606,7 @@ private func buttonControl(
   label: String,
   action: @escaping @MainActor @Sendable () -> Void,
   buttonRole: ButtonRole? = nil,
-  buttonStyle: ButtonStyle = .automatic,
+  buttonStyle: AnyButtonStyle = .automatic,
   disabled: Bool = false
 ) -> AnyView {
   AnyView(

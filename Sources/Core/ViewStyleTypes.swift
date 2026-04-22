@@ -1,34 +1,3 @@
-/// A style that controls how text fields are rendered.
-public enum TextFieldStyle: Hashable, Sendable {
-  case automatic
-  case plain
-  case roundedBorder
-}
-
-/// A style that controls how pickers present their options.
-public enum PickerStyle: Hashable, Sendable {
-  case automatic
-  case inline
-  case segmented
-  case radioGroup
-  case menu
-}
-
-/// A style that controls the chrome and separators used by lists and tables.
-public enum ListStyle: Hashable, Sendable {
-  case automatic
-  case plain
-  case insetGrouped
-}
-
-/// A style that controls the disclosure treatment of outline views.
-public enum OutlineStyle: Hashable, Sendable {
-  case automatic
-  case rounded
-  case plain
-  case ascii
-}
-
 /// Horizontal alignment for cells and headers in a table column.
 public enum TableColumnAlignment: Hashable, Sendable {
   case leading

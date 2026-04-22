@@ -277,8 +277,8 @@ if ! rg -n --fixed-strings --quiet -- 'extensible style protocols rather than cl
   fail "docs/PUBLIC_SURFACE_POLICY.md should keep the extensible style-protocol policy."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'transitional migration debt' docs/PUBLIC_SURFACE_POLICY.md; then
-  fail "docs/PUBLIC_SURFACE_POLICY.md should mark enum-backed authoring styles as transitional migration debt."
+if ! rg -n --fixed-strings --quiet -- 'New public enum-backed authoring `*Style` surfaces should not be added' docs/PUBLIC_SURFACE_POLICY.md; then
+  fail "docs/PUBLIC_SURFACE_POLICY.md should forbid new enum-backed authoring style surfaces."
 fi
 
 if ! rg -n --fixed-strings --quiet -- '### Authoring style families' docs/PUBLIC_API_INVENTORY.md; then
@@ -286,19 +286,29 @@ if ! rg -n --fixed-strings --quiet -- '### Authoring style families' docs/PUBLIC
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'Protocol-backed style families today' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should separate protocol-backed style families from transitional ones."
+  fail "docs/PUBLIC_API_INVENTORY.md should inventory the protocol-backed authoring style families."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'Transitional enum-backed authoring style families' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should keep the transitional enum-backed style family inventory."
+if ! rg -n --fixed-strings --quiet -- 'Type-erased style storage' docs/PUBLIC_API_INVENTORY.md; then
+  fail "docs/PUBLIC_API_INVENTORY.md should inventory the type-erased style storage values."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'public protocol ToolbarStyle' Sources/View/ActionScopes/Toolbar.swift; then
   fail "ToolbarStyle should stay a public extensible style protocol."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'package protocol TabViewStyle' Sources/View/NavigationViews/TabViewStyles.swift; then
-  fail "TabViewStyle should stay extracted as a dedicated protocol-backed style seam."
+if ! rg -n --fixed-strings --quiet -- 'public protocol ShapeStyle' Sources/Core/Styling.swift; then
+  fail "ShapeStyle should stay a public extensible style protocol."
+fi
+
+for style_protocol in ButtonStyle TextFieldStyle PickerStyle ListStyle OutlineStyle ToastStyle TabViewStyle; do
+  if ! rg -n -P --quiet -- "public protocol ${style_protocol}\\b" Sources/View; then
+    fail "${style_protocol} should be a public extensible style protocol in View."
+  fi
+done
+
+if ! rg -n --fixed-strings --quiet -- 'public protocol TabViewStyle' Sources/View/NavigationViews/TabViewStyles.swift; then
+  fail "TabViewStyle should be a public extensible style protocol."
 fi
 
 if rg -n -P --quiet -- '(public|package)\s+enum\s+TabViewStyle\b' Sources/View/NavigationViews/TabViewStyles.swift; then
@@ -321,7 +331,7 @@ public_style_enums=$(
 
 for style_enum in $public_style_enums; do
   case "$style_enum" in
-    AnyShapeStyle|ButtonStyle|ListStyle|OutlineStyle|PickerStyle|TextFieldStyle|ToastStyle) ;;
+    AnyShapeStyle) ;;
     *)
       fail "New public enum-backed *Style surface appeared: $style_enum. Authoring-facing style APIs should prefer public extensible style protocols."
       ;;

@@ -48,10 +48,7 @@ extension Picker {
     in context: ResolveContext
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
-    let pickerStyle =
-      context.environmentValues.pickerStyle == .automatic
-      ? PickerStyle.inline
-      : context.environmentValues.pickerStyle
+    let pickerStyle = context.environmentValues.pickerStyle
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
@@ -67,28 +64,7 @@ extension Picker {
       let binding = selection
       let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
-        let delta: Int?
-        switch pickerStyle {
-        case .segmented:
-          switch event {
-          case .arrowLeft:
-            delta = -1
-          case .arrowRight:
-            delta = 1
-          default:
-            delta = nil
-          }
-        case .inline, .automatic, .radioGroup, .menu:
-          switch event {
-          case .arrowUp:
-            delta = -1
-          case .arrowDown:
-            delta = 1
-          default:
-            delta = nil
-          }
-        }
-
+        let delta = pickerStyle.selectionDelta(for: event)
         guard let delta, !options.isEmpty else {
           return false
         }
@@ -137,7 +113,7 @@ extension Picker {
         }
       }
 
-      if pickerStyle == .menu {
+      if pickerStyle.wantsTriggerPointerRoute {
         let triggerRouteID = primaryRouteID(
           for: pickerTriggerIdentity(for: context.identity)
         )
@@ -147,11 +123,11 @@ extension Picker {
       }
     }
 
-    let body = pickerBody(
+    let configuration = PickerStyleConfiguration(
       controlIdentity: context.identity,
-      options: options,
+      label: .init(authoringContext: authoringScope) { label },
+      options: options.map { .init(label: $0.label) },
       selectedIndex: selectedIndex,
-      pickerStyle: pickerStyle,
       isFocused: isFocused,
       isActiveNavigation: isFocused,
       showsFocusEffect: showsFocusEffect,
@@ -160,7 +136,8 @@ extension Picker {
       viewportLineCount: context.environmentValues.pickerViewportLineCount,
       lineWidth: context.environmentValues.pickerLineWidth
     )
-    let child = body.resolve(
+    let child = pickerStyle.resolveBody(
+      configuration: configuration,
       in: context.child(component: .named("PickerBody"))
     )
 

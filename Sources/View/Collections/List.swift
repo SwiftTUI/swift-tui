@@ -152,10 +152,7 @@ extension List {
     in context: ResolveContext
   ) -> ResolvedNode {
     let styleEnvironment = context.environmentValues.styleEnvironmentSnapshot
-    let listStyle =
-      context.environmentValues.listStyle == .automatic
-      ? ListStyle.insetGrouped
-      : context.environmentValues.listStyle
+    let listStyle = context.environmentValues.listStyle.presentation
     let isFocused = context.environmentValues.focusedIdentity == context.identity
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled

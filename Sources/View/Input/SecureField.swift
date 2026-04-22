@@ -6,6 +6,7 @@ public struct SecureField<Label: View>: View, ResolvableView {
   public var prompt: Text?
   private var label: Label
   private var showsLabel: Bool
+  private let authoringScope: AuthoringContext?
 
   public init<S: StringProtocol>(
     _ title: S,
@@ -15,6 +16,7 @@ public struct SecureField<Label: View>: View, ResolvableView {
     prompt = Text(String(title))
     label = EmptyView()
     showsLabel = false
+    authoringScope = currentAuthoringContext()
   }
 
   public init(
@@ -26,6 +28,7 @@ public struct SecureField<Label: View>: View, ResolvableView {
     self.prompt = prompt
     self.label = label()
     showsLabel = true
+    authoringScope = currentAuthoringContext()
   }
 
   package func resolveElements(
@@ -44,10 +47,7 @@ extension SecureField {
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
     let fieldText = text.wrappedValue
-    let effectiveStyle =
-      context.environmentValues.textFieldStyle == .automatic
-      ? TextFieldStyle.roundedBorder
-      : context.environmentValues.textFieldStyle
+    let textFieldStyle = context.environmentValues.textFieldStyle
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
@@ -60,16 +60,18 @@ extension SecureField {
       isActiveNavigation: isFocused,
       masked: true
     )
-    let child = textEntryFieldBody(
+    let configuration = TextFieldStyleConfiguration(
       displayText: entryText.displayText,
       isShowingPrompt: entryText.isShowingPrompt,
-      label: label,
+      label: .init(authoringContext: authoringScope) { label },
       showsLabel: showsLabel,
-      style: effectiveStyle,
       chrome: chrome,
       placeholderStyle: styleEnvironment.themeStyle(for: .placeholder),
-      focusActive: isFocused && showsFocusEffect
-    ).resolve(
+      focusActive: isFocused && showsFocusEffect,
+      styleEnvironment: styleEnvironment
+    )
+    let child = textFieldStyle.resolveBody(
+      configuration: configuration,
       in: context.child(component: .named("SecureFieldBody"))
     )
 

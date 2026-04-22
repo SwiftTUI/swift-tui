@@ -33,19 +33,19 @@ private enum ButtonBorderShapeKey: EnvironmentKey {
 }
 
 private enum ButtonStyleKey: EnvironmentKey {
-  static let defaultValue = ButtonStyle.automatic
+  static let defaultValue = AnyButtonStyle.automatic
 }
 
 private enum TextFieldStyleKey: EnvironmentKey {
-  static let defaultValue = TextFieldStyle.automatic
+  static let defaultValue = AnyTextFieldStyle.automatic
 }
 
 private enum PickerStyleKey: EnvironmentKey {
-  static let defaultValue = PickerStyle.automatic
+  static let defaultValue = AnyPickerStyle.automatic
 }
 
 private enum ListStyleKey: EnvironmentKey {
-  static let defaultValue = ListStyle.automatic
+  static let defaultValue = AnyListStyle.automatic
 }
 
 private enum TabViewStyleKey: EnvironmentKey {
@@ -118,22 +118,22 @@ extension EnvironmentValues {
     set { self[ButtonBorderShapeKey.self] = newValue }
   }
 
-  public var buttonStyle: ButtonStyle {
+  public var buttonStyle: AnyButtonStyle {
     get { self[ButtonStyleKey.self] }
     set { self[ButtonStyleKey.self] = newValue }
   }
 
-  public var textFieldStyle: TextFieldStyle {
+  public var textFieldStyle: AnyTextFieldStyle {
     get { self[TextFieldStyleKey.self] }
     set { self[TextFieldStyleKey.self] = newValue }
   }
 
-  public var pickerStyle: PickerStyle {
+  public var pickerStyle: AnyPickerStyle {
     get { self[PickerStyleKey.self] }
     set { self[PickerStyleKey.self] = newValue }
   }
 
-  public var listStyle: ListStyle {
+  public var listStyle: AnyListStyle {
     get { self[ListStyleKey.self] }
     set { self[ListStyleKey.self] = newValue }
   }

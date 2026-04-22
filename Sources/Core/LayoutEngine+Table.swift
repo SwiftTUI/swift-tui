@@ -19,7 +19,10 @@ extension LayoutEngine {
       rows: payload.rows
     )
     var lineMetrics = (
-      width: borderedTableLineWidth(widths: widths),
+      width: borderedTableLineWidth(
+        widths: widths,
+        glyphs: payload.style.tableBorderGlyphs
+      ),
       height: 2
     )
 

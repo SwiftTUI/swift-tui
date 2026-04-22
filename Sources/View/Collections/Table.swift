@@ -77,10 +77,7 @@ extension Table {
     let isEnabled = context.environmentValues.isEnabled
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isSelectable = selection != nil
-    let tableStyle =
-      context.environmentValues.listStyle == .plain
-      ? ListStyle.plain
-      : ListStyle.insetGrouped
+    let tableStyle = context.environmentValues.listStyle.presentation
     let showsIndicators =
       context.environmentValues.scrollIndicatorVisibility != .hidden
     let showsHeaders =

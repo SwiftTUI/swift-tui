@@ -159,86 +159,12 @@ package func textEntryDisplayText(
   )
 }
 
-@MainActor
-package func textEntryFieldBody<Label: View>(
-  displayText: String,
-  isShowingPrompt: Bool,
-  label: Label,
-  showsLabel: Bool,
-  style: TextFieldStyle,
-  chrome: ControlChrome,
-  placeholderStyle: AnyShapeStyle,
-  focusActive: Bool = false
-) -> some View {
-  let textStyle =
-    isShowingPrompt ? placeholderStyle : chrome.foregroundStyle
-  let baseField =
-    Text(displayText)
-    .fixedSize(horizontal: true, vertical: false)
-    .foregroundStyle(textStyle)
-    .drawMetadata(.init(opacity: chrome.opacity))
-  let stretchedField =
-    HStack(alignment: .center, spacing: 0) {
-      baseField
-      Spacer(minLength: 0)
-    }
-
-  @ViewBuilder
-  func fieldContent() -> some View {
-    switch style {
-    case .plain:
-      baseField
-    case .roundedBorder, .automatic:
-      stretchedField
-        .padding(.init(horizontal: 1, vertical: 1))
-        .background {
-          RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(chrome.backgroundStyle)
-        }
-        .overlay {
-          RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
-            chrome.borderStyle,
-            style: focusActive ? .thick : .init(),
-            backgroundStyle: chrome.borderBackgroundStyle
-          )
-        }
-    }
-  }
-
-  @ViewBuilder
-  func labeledField() -> some View {
-    if showsLabel {
-      VStack(alignment: .leading, spacing: 0) {
-        label
-          .foregroundStyle(.terminalBorder(.accent))
-        fieldContent()
-      }
-    } else {
-      fieldContent()
-    }
-  }
-
-  @ViewBuilder
-  func bodyView() -> some View {
-    switch style {
-    case .roundedBorder, .automatic:
-      labeledField().layoutMetadata(
-        .init(
-          minimumHeight: (showsLabel ? 1 : 0) + 3
-        )
-      )
-    default:
-      labeledField()
-    }
-  }
-
-  return bodyView()
-}
-
 public struct TextField<Label: View>: View, ResolvableView {
   public var text: Binding<String>
   public var prompt: Text?
   private var label: Label
   private var showsLabel: Bool
+  private let authoringScope: AuthoringContext?
 
   public init<S: StringProtocol>(
     _ title: S,
@@ -248,6 +174,7 @@ public struct TextField<Label: View>: View, ResolvableView {
     prompt = Text(String(title))
     label = EmptyView()
     showsLabel = false
+    authoringScope = currentAuthoringContext()
   }
 
   public init(
@@ -259,6 +186,7 @@ public struct TextField<Label: View>: View, ResolvableView {
     self.prompt = prompt
     self.label = label()
     showsLabel = true
+    authoringScope = currentAuthoringContext()
   }
 
   package func resolveElements(
@@ -277,10 +205,7 @@ extension TextField {
     let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
     let isEnabled = context.environmentValues.isEnabled
     let fieldText = text.wrappedValue
-    let effectiveStyle =
-      context.environmentValues.textFieldStyle == .automatic
-      ? TextFieldStyle.roundedBorder
-      : context.environmentValues.textFieldStyle
+    let textFieldStyle = context.environmentValues.textFieldStyle
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
       isFocused: isFocused && showsFocusEffect
@@ -293,16 +218,18 @@ extension TextField {
       isActiveNavigation: isFocused,
       masked: false
     )
-    let child = textEntryFieldBody(
+    let configuration = TextFieldStyleConfiguration(
       displayText: entryText.displayText,
       isShowingPrompt: entryText.isShowingPrompt,
-      label: label,
+      label: .init(authoringContext: authoringScope) { label },
       showsLabel: showsLabel,
-      style: effectiveStyle,
       chrome: chrome,
       placeholderStyle: styleEnvironment.themeStyle(for: .placeholder),
-      focusActive: isFocused && showsFocusEffect
-    ).resolve(
+      focusActive: isFocused && showsFocusEffect,
+      styleEnvironment: styleEnvironment
+    )
+    let child = textFieldStyle.resolveBody(
+      configuration: configuration,
       in: context.child(component: .named("TextFieldBody"))
     )
 
