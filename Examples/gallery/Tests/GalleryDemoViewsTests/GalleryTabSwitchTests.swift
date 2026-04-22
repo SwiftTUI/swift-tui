@@ -457,8 +457,6 @@ private struct GallerySelectionSeedHarness: View {
   @State private var selection: GalleryView.GalleryTab
   @State private var isPaletteOpen = false
   @State private var paletteHolder = TestPaletteCommandHolder()
-  @State private var paletteQuery = ""
-  @FocusState private var isPaletteQueryFocused: Bool
 
   init(initialSelection: GalleryView.GalleryTab) {
     _selection = State(initialValue: initialSelection)
@@ -468,9 +466,7 @@ private struct GallerySelectionSeedHarness: View {
     GallerySelectionRuntimeBridge(
       selection: $selection,
       isPaletteOpen: $isPaletteOpen,
-      paletteHolder: paletteHolder,
-      paletteQuery: $paletteQuery,
-      isPaletteQueryFocused: $isPaletteQueryFocused
+      paletteHolder: paletteHolder
     )
   }
 }
@@ -479,8 +475,6 @@ private struct GallerySelectionRuntimeBridge: View {
   @Binding var selection: GalleryView.GalleryTab
   @Binding var isPaletteOpen: Bool
   let paletteHolder: TestPaletteCommandHolder
-  @Binding var paletteQuery: String
-  let isPaletteQueryFocused: FocusState<Bool>.Binding
 
   var body: some View {
     EnvironmentReader(\.activePaletteCommands) { commands in
@@ -575,16 +569,12 @@ private struct GallerySelectionRuntimeBridge: View {
     .paletteSheet("Command palette", isPresented: $isPaletteOpen) {
       CommandPaletteList(
         commands: paletteHolder.commands,
-        query: $paletteQuery,
-        isQueryFocused: isPaletteQueryFocused,
         dismiss: { isPaletteOpen = false }
       )
     }
   }
 
   private func openPalette() {
-    paletteQuery = ""
-    isPaletteQueryFocused.wrappedValue = true
     isPaletteOpen = true
   }
 }
