@@ -97,7 +97,9 @@ struct PresentationEscapeDismissTests {
       ToastPresentationItem(
         id: "toast#1",
         contentPayloads: [],
-        style: .info,
+        presentation: InfoToastStyle().resolvePresentation(
+          for: ToastStyleConfiguration()
+        ),
         duration: nil,
         dismiss: { toastDismissed += 1 }
       )

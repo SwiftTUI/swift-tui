@@ -84,15 +84,12 @@ extension DrawExtractor {
     for payload: TablePayload,
     in bounds: Rect
   ) -> (lines: [TableDisplayLine], widths: [Int]) {
-    let tableStyle: ResolvedTableStyle =
-      payload.style == .plain ? .plain : .insetGrouped
     let widths = measureTableColumnWidths(
       columns: payload.columns,
       rows: payload.rows
     )
     let lines = visibleTableLines(
       for: payload,
-      style: tableStyle,
       viewportLineCount: bounds.size.height,
       showsIndicators: payload.showsIndicators,
       widths: widths
@@ -102,14 +99,12 @@ extension DrawExtractor {
 
   private func visibleTableLines(
     for payload: TablePayload,
-    style: ResolvedTableStyle,
     viewportLineCount: Int,
     showsIndicators: Bool,
     widths: [Int]
   ) -> [TableDisplayLine] {
     let displayLines = materializedTableLines(
       for: payload,
-      style: style,
       widths: widths
     )
 
@@ -175,7 +170,6 @@ extension DrawExtractor {
         overflowIndicatorLine(
           widths: widths,
           payload: payload,
-          style: style,
           symbol: "↑"
         )
       )
@@ -186,7 +180,6 @@ extension DrawExtractor {
         overflowIndicatorLine(
           widths: widths,
           payload: payload,
-          style: style,
           symbol: "↓"
         )
       )
@@ -199,14 +192,13 @@ extension DrawExtractor {
 
   private func materializedTableLines(
     for payload: TablePayload,
-    style: ResolvedTableStyle,
     widths: [Int]
   ) -> [TableDisplayLine] {
     let borderStyle = TextStyle(
       foregroundStyle: payload.borderStyle ?? .semantic(.separator),
       opacity: payload.opacity
     )
-    let glyphs = tableBorderGlyphs(for: style)
+    let glyphs = payload.style.tableBorderGlyphs
     var lines: [TableDisplayLine] = [
       .init(
         segments: borderSegments(
@@ -224,9 +216,7 @@ extension DrawExtractor {
 
     if payload.showsHeaders {
       var headerStyle = TextStyle(
-        foregroundStyle: style == .insetGrouped
-          ? AnyShapeStyle(.terminalBorder(.accent))
-          : .semantic(.muted)
+        foregroundStyle: payload.style.tableHeaderForegroundStyle ?? .semantic(.muted)
       )
       headerStyle.opacity *= payload.opacity
       lines.append(
@@ -245,9 +235,7 @@ extension DrawExtractor {
             borderStyle: borderStyle,
             glyphs: glyphs
           ),
-          backgroundStyle: style == .insetGrouped
-            ? AnyShapeStyle(.terminalRow(.neutral, isOdd: true))
-            : nil,
+          backgroundStyle: payload.style.tableHeaderBackgroundStyle,
           role: .header,
           isSelectedRow: false,
           rowIndex: nil

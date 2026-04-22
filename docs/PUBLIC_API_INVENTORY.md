@@ -58,19 +58,19 @@ The canonical shape / border / gradient surface as of the Milestone 7 shape-and-
 The repo is mid-migration from enum-owned control and container styling to
 public, extensible style protocols.
 
-- **Protocol-backed style families today**: `ShapeStyle`, `ToolbarStyle`, and
-  `AnyTabViewStyle` with the package-only `TabViewStyle` implementation
-  protocol that currently backs the built-in tab styles.
-- **Transitional enum-backed authoring style families**: `ButtonStyle`,
-  `TextFieldStyle`, `PickerStyle`, `ListStyle`, `OutlineStyle`, and
-  `ToastStyle`.
+- **Protocol-backed style families today**: `ShapeStyle`, `ToolbarStyle`,
+  `ButtonStyle`, `TextFieldStyle`, `PickerStyle`, `ListStyle`,
+  `OutlineStyle`, `ToastStyle`, and `TabViewStyle`.
+- **Type-erased style storage**: `AnyShapeStyle`, `AnyButtonStyle`,
+  `AnyTextFieldStyle`, `AnyPickerStyle`, `AnyListStyle`, `AnyOutlineStyle`,
+  `AnyToastStyle`, and `AnyTabViewStyle` are the concrete values used where
+  environment or modifier plumbing needs a non-generic stored style.
 
 Migration note:
 
-- The transitional enum-backed families are legacy exceptions, not a pattern to
-  copy. New authoring-facing `*Style` APIs should prefer public style
-  protocols plus type-erased environment storage, and existing families should
-  migrate in place rather than multiplying enum-backed surfaces.
+- New authoring-facing `*Style` APIs should prefer public style protocols plus
+  type-erased environment storage. Enum-backed authoring style families are not
+  part of the intended public design.
 
 ### Animation primitives and `Animatable` conformance
 

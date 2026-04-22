@@ -14,9 +14,10 @@ extension LayoutEngine {
   package func measuredListIdealSize(
     for payload: ListPayload
   ) -> Size {
-    let isPlainStyle = payload.style == .plain
-    let horizontalInset = isPlainStyle ? 0 : 2
-    let verticalInset = isPlainStyle ? 0 : 2
+    let horizontalInset =
+      payload.style.listContentInsets.leading + payload.style.listContentInsets.trailing
+    let verticalInset =
+      payload.style.listContentInsets.top + payload.style.listContentInsets.bottom
     let lineMetrics = payload.items.enumerated().reduce(
       into: (width: 0, height: 0, rowIndex: 0)
     ) { partial, element in
@@ -38,7 +39,7 @@ extension LayoutEngine {
           layoutText(for: prefix + item.text, width: nil).size.width
         )
         partial.height += 1
-        if isPlainStyle,
+        if payload.style.showsListRowSeparators,
           listRowSeparatorIsVisible(
             current: item,
             next: payload.items.dropFirst(index + 1).first
@@ -49,7 +50,7 @@ extension LayoutEngine {
         }
         partial.rowIndex += 1
       case .sectionBreak:
-        if isPlainStyle, listSectionSeparatorIsVisible(item) {
+        if payload.style.showsListSectionSeparators, listSectionSeparatorIsVisible(item) {
           partial.height += 1
           partial.width = max(partial.width, 1)
         }

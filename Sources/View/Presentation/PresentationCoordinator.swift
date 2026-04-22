@@ -461,20 +461,20 @@ package struct PromptPresentationItem: Identifiable, Sendable {
 package struct ToastPresentationItem: Identifiable, Sendable {
   package var id: String
   package var contentPayloads: [DeferredViewPayload]
-  package var style: ToastStyle
+  package var presentation: ToastStylePresentation
   package var duration: Double?
   package var dismiss: @MainActor @Sendable () -> Void
 
   package init(
     id: String,
     contentPayloads: [DeferredViewPayload],
-    style: ToastStyle,
+    presentation: ToastStylePresentation,
     duration: Double?,
     dismiss: @escaping @MainActor @Sendable () -> Void
   ) {
     self.id = id
     self.contentPayloads = contentPayloads
-    self.style = style
+    self.presentation = presentation
     self.duration = duration
     self.dismiss = dismiss
   }

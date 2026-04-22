@@ -74,14 +74,14 @@ extensible style protocols rather than closed public enums.
 - Once a style family is migrated, the owning control or container should
   delegate through configuration and presentation seams instead of switching
   directly on every built-in style case.
-- `ShapeStyle` and `ToolbarStyle` are the current public models for extensible
-  style protocols. `TabViewStyle` is the in-progress migration model and should
-  keep moving toward that shape rather than regressing to renderer-owned
-  branching.
-- The remaining public enum-backed authoring style families —
+- The current public authoring models are `ShapeStyle`, `ToolbarStyle`,
   `ButtonStyle`, `TextFieldStyle`, `PickerStyle`, `ListStyle`,
-  `OutlineStyle`, and `ToastStyle` — are transitional migration debt, not
-  precedent for new API design.
+  `OutlineStyle`, `ToastStyle`, and `TabViewStyle`, with type-erased storage
+  such as `Any...Style` where environment or modifier plumbing requires a
+  concrete value.
+- New public enum-backed authoring `*Style` surfaces should not be added, and
+  previously removed enum-backed style families should not be reintroduced as
+  compatibility shims.
 
 ## Transitional Runtime Policy
 

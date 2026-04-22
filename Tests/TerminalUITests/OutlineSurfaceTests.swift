@@ -25,13 +25,13 @@ struct OutlineSurfaceTests {
   @Test(
     "OutlineGroup renders connector variants through the public outlineStyle environment",
     arguments: [
-      (OutlineStyle.rounded, "╰─"),
-      (OutlineStyle.plain, "└─"),
-      (OutlineStyle.ascii, "`-"),
+      (AnyOutlineStyle.rounded, "╰─"),
+      (AnyOutlineStyle.plain, "└─"),
+      (AnyOutlineStyle.ascii, "`-"),
     ]
   )
   func outlineGroupRendersConnectorVariants(
-    style: OutlineStyle,
+    style: AnyOutlineStyle,
     connector: String
   ) {
     let artifacts = DefaultRenderer().render(

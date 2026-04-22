@@ -70,7 +70,7 @@ public struct TablePayload: Equatable, Sendable {
   public var columns: [TableColumnPayload]
   public var rows: [TableRowPayload]
   public var selectedRowIndex: Int?
-  public var style: ListStyle
+  public var style: CollectionStylePresentation
   public var foregroundStyle: AnyShapeStyle?
   public var backgroundStyle: AnyShapeStyle?
   public var borderStyle: AnyShapeStyle?
@@ -86,7 +86,7 @@ public struct TablePayload: Equatable, Sendable {
     columns: [TableColumnPayload],
     rows: [TableRowPayload],
     selectedRowIndex: Int?,
-    style: ListStyle,
+    style: CollectionStylePresentation,
     foregroundStyle: AnyShapeStyle? = nil,
     backgroundStyle: AnyShapeStyle? = nil,
     borderStyle: AnyShapeStyle? = nil,
@@ -145,13 +145,39 @@ package func formattedTableLineWidth(
 }
 
 package func borderedTableLineWidth(
-  widths: [Int]
+  widths: [Int],
+  glyphs: TableBorderGlyphs
 ) -> Int {
   guard !widths.isEmpty else {
     return 0
   }
 
-  return widths.reduce(0, +) + (widths.count * 3) + 1
+  return max(
+    borderedTableLineWidth(
+      widths: widths,
+      left: glyphs.left,
+      join: glyphs.columnJoin,
+      right: glyphs.right
+    ),
+    borderedTableLineWidth(
+      widths: widths,
+      left: glyphs.topLeft,
+      join: glyphs.topJoin,
+      right: glyphs.topRight
+    ),
+    borderedTableLineWidth(
+      widths: widths,
+      left: glyphs.middleLeft,
+      join: glyphs.middleJoin,
+      right: glyphs.middleRight
+    ),
+    borderedTableLineWidth(
+      widths: widths,
+      left: glyphs.bottomLeft,
+      join: glyphs.bottomJoin,
+      right: glyphs.bottomRight
+    )
+  )
 }
 
 package func renderTableLine(
@@ -201,6 +227,19 @@ package func renderTableCell(
   case .leading:
     return line + String(repeating: " ", count: remaining)
   }
+}
+
+private func borderedTableLineWidth(
+  widths: [Int],
+  left: String,
+  join: String,
+  right: String
+) -> Int {
+  let cellsWidth = widths.reduce(0, +) + (widths.count * 2)
+  let leftWidth = layoutText(for: left, width: nil).size.width
+  let rightWidth = layoutText(for: right, width: nil).size.width
+  let joinWidth = layoutText(for: join, width: nil).size.width * max(0, widths.count - 1)
+  return cellsWidth + leftWidth + joinWidth + rightWidth
 }
 
 package func showsTableRowSeparator(

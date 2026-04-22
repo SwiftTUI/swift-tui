@@ -246,10 +246,11 @@ private func linkTextStyle(
   let isFocused = context.environmentValues.focusedIdentity == identity
   let showsFocusEffect = context.environmentValues.isFocusEffectEnabled
   let isPressed = context.environmentValues.pressedIdentity == identity
-  let chrome = styleEnvironment.buttonChrome(
-    buttonStyle: .link,
+  let chrome = resolvedLinkButtonChrome(
+    styleEnvironment: styleEnvironment,
     isEnabled: context.environmentValues.isEnabled,
-    isFocused: isFocused && showsFocusEffect,
+    isFocused: isFocused,
+    showsFocusEffect: showsFocusEffect,
     isPressed: isPressed
   )
 

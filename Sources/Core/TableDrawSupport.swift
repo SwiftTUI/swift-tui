@@ -1,26 +1,3 @@
-enum ResolvedTableStyle: Equatable {
-  case plain
-  case insetGrouped
-}
-
-struct TableBorderGlyphs {
-  var topLeft: Character
-  var top: Character
-  var topJoin: Character
-  var topRight: Character
-  var left: Character
-  var columnJoin: Character
-  var right: Character
-  var middleLeft: Character
-  var middle: Character
-  var middleJoin: Character
-  var middleRight: Character
-  var bottomLeft: Character
-  var bottom: Character
-  var bottomJoin: Character
-  var bottomRight: Character
-}
-
 struct TableDisplaySegment {
   var content: String
   var style: TextStyle
@@ -53,10 +30,9 @@ extension DrawExtractor {
   func overflowIndicatorLine(
     widths: [Int],
     payload: TablePayload,
-    style: ResolvedTableStyle,
     symbol: String
   ) -> TableDisplayLine {
-    let glyphs = tableBorderGlyphs(for: style)
+    let glyphs = payload.style.tableBorderGlyphs
     let borderStyle = TextStyle(
       foregroundStyle: payload.borderStyle ?? .semantic(.separator),
       opacity: payload.opacity
@@ -126,7 +102,7 @@ extension DrawExtractor {
     glyphs: TableBorderGlyphs
   ) -> [TableDisplaySegment] {
     var segments: [TableDisplaySegment] = [
-      .init(content: String(glyphs.left), style: borderStyle)
+      .init(content: glyphs.left, style: borderStyle)
     ]
     for (index, cell) in cells.enumerated() {
       segments.append(
@@ -137,13 +113,13 @@ extension DrawExtractor {
       )
       if index < cells.count - 1 {
         segments.append(
-          .init(content: String(glyphs.columnJoin), style: borderStyle)
+          .init(content: glyphs.columnJoin, style: borderStyle)
         )
       }
     }
 
     segments.append(
-      .init(content: String(glyphs.right), style: borderStyle)
+      .init(content: glyphs.right, style: borderStyle)
     )
     return segments
   }
@@ -158,10 +134,10 @@ extension DrawExtractor {
       return []
     }
 
-    let left: Character
-    let fill: Character
-    let join: Character
-    let right: Character
+    let left: String
+    let fill: String
+    let join: String
+    let right: String
 
     switch position {
     case .top:
@@ -182,69 +158,26 @@ extension DrawExtractor {
     }
 
     var segments: [TableDisplaySegment] = [
-      .init(content: String(left), style: style)
+      .init(content: left, style: style)
     ]
 
     for (index, width) in widths.enumerated() {
       segments.append(
         .init(
-          content: String(repeating: String(fill), count: width + 2),
+          content: String(repeating: fill, count: width + 2),
           style: style
         )
       )
       if index < widths.count - 1 {
         segments.append(
-          .init(content: String(join), style: style)
+          .init(content: join, style: style)
         )
       }
     }
 
     segments.append(
-      .init(content: String(right), style: style)
+      .init(content: right, style: style)
     )
     return segments
-  }
-
-  func tableBorderGlyphs(
-    for style: ResolvedTableStyle
-  ) -> TableBorderGlyphs {
-    switch style {
-    case .plain:
-      .init(
-        topLeft: "┌",
-        top: "─",
-        topJoin: "┬",
-        topRight: "┐",
-        left: "│",
-        columnJoin: "│",
-        right: "│",
-        middleLeft: "├",
-        middle: "─",
-        middleJoin: "┼",
-        middleRight: "┤",
-        bottomLeft: "└",
-        bottom: "─",
-        bottomJoin: "┴",
-        bottomRight: "┘"
-      )
-    case .insetGrouped:
-      .init(
-        topLeft: "╭",
-        top: "─",
-        topJoin: "┬",
-        topRight: "╮",
-        left: "│",
-        columnJoin: "│",
-        right: "│",
-        middleLeft: "├",
-        middle: "─",
-        middleJoin: "┼",
-        middleRight: "┤",
-        bottomLeft: "╰",
-        bottom: "─",
-        bottomJoin: "┴",
-        bottomRight: "╯"
-      )
-    }
   }
 }

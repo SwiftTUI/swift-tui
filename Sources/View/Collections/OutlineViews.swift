@@ -1,11 +1,11 @@
-public import Core
+import Core
 
 private enum OutlineStyleKey: EnvironmentKey {
-  static let defaultValue = OutlineStyle.automatic
+  static let defaultValue = AnyOutlineStyle.automatic
 }
 
 extension EnvironmentValues {
-  public var outlineStyle: OutlineStyle {
+  public var outlineStyle: AnyOutlineStyle {
     get { self[OutlineStyleKey.self] }
     set { self[OutlineStyleKey.self] = newValue }
   }
@@ -407,13 +407,13 @@ private struct ScopedOutlineRowContent<Content: View>: View, ResolvableView {
 private func outlinePrefix(
   ancestry: [Bool],
   isLast: Bool,
-  style: OutlineStyle
+  style: AnyOutlineStyle
 ) -> String {
   guard !ancestry.isEmpty else {
     return ""
   }
 
-  let resolvedStyle = resolvedOutlineStyle(style)
+  let resolvedStyle = style.presentation
   let ancestorPrefix = ancestry.map { showsContinuation in
     outlineIndenter(
       showsContinuation: showsContinuation,
@@ -424,34 +424,16 @@ private func outlinePrefix(
   return ancestorPrefix + outlineConnector(isLast: isLast, style: resolvedStyle)
 }
 
-private func resolvedOutlineStyle(
-  _ style: OutlineStyle
-) -> OutlineStyle {
-  style == .automatic ? .rounded : style
-}
-
 private func outlineConnector(
   isLast: Bool,
-  style: OutlineStyle
+  style: OutlineStylePresentation
 ) -> String {
-  switch style {
-  case .plain:
-    return isLast ? "└─ " : "├─ "
-  case .ascii:
-    return isLast ? "`- " : "|- "
-  default:
-    return isLast ? "╰─ " : "├─ "
-  }
+  isLast ? style.leafConnector : style.branchConnector
 }
 
 private func outlineIndenter(
   showsContinuation: Bool,
-  style: OutlineStyle
+  style: OutlineStylePresentation
 ) -> String {
-  switch style {
-  case .ascii:
-    return showsContinuation ? "| " : "  "
-  default:
-    return showsContinuation ? "│ " : "  "
-  }
+  showsContinuation ? style.continuingIndenter : style.emptyIndenter
 }

@@ -608,7 +608,7 @@ public struct ListItemPayload: Equatable, Sendable {
 public struct ListPayload: Equatable, Sendable {
   public var items: [ListItemPayload]
   public var selectedRowIndex: Int?
-  public var style: ListStyle
+  public var style: CollectionStylePresentation
   public var foregroundStyle: AnyShapeStyle?
   public var backgroundStyle: AnyShapeStyle?
   public var borderStyle: AnyShapeStyle?
@@ -622,7 +622,7 @@ public struct ListPayload: Equatable, Sendable {
   public init(
     items: [ListItemPayload],
     selectedRowIndex: Int?,
-    style: ListStyle,
+    style: CollectionStylePresentation,
     foregroundStyle: AnyShapeStyle? = nil,
     backgroundStyle: AnyShapeStyle? = nil,
     borderStyle: AnyShapeStyle? = nil,

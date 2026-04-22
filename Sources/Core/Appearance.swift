@@ -26,15 +26,6 @@ public enum ButtonRole: Hashable, Sendable {
   case confirm
 }
 
-/// A high-level visual treatment for buttons.
-public enum ButtonStyle: Hashable, Sendable {
-  case automatic
-  case plain
-  case bordered
-  case borderedProminent
-  case link
-}
-
 /// The resolved chrome used to render a focused or interactive control.
 public struct ControlChrome: Equatable, Sendable {
   public var foregroundStyle: AnyShapeStyle
@@ -637,45 +628,6 @@ extension StyleEnvironmentSnapshot {
     )
   }
 
-  package func buttonChrome(
-    buttonStyle: ButtonStyle,
-    isEnabled: Bool,
-    isFocused: Bool,
-    isPressed: Bool = false,
-    prominence: ControlProminence = .standard,
-    role: ButtonRole? = nil
-  ) -> ControlChrome {
-    switch buttonStyle {
-    case .plain:
-      return standardPlainButtonChrome(isEnabled: isEnabled, role: role)
-    case .link:
-      return standardLinkButtonChrome(
-        isEnabled: isEnabled,
-        isFocused: isFocused,
-        isPressed: isPressed,
-        role: role
-      )
-    case .bordered:
-      return controlChrome(
-        isEnabled: isEnabled,
-        isFocused: isFocused,
-        isPressed: isPressed,
-        isSelected: false,
-        prominence: .standard,
-        role: role
-      )
-    case .automatic, .borderedProminent:
-      return controlChrome(
-        isEnabled: isEnabled,
-        isFocused: isFocused,
-        isPressed: isPressed,
-        isSelected: false,
-        prominence: .increased,
-        role: role
-      )
-    }
-  }
-
   package func groupBoxChrome(
     prominence: ControlProminence = .standard
   ) -> ContainerChrome {
@@ -684,86 +636,6 @@ extension StyleEnvironmentSnapshot {
       foregroundStyle: resolvedStyle(for: .foreground),
       borderStyle: AnyShapeStyle(.terminalBorder(tone))
     )
-  }
-
-  private func standardPlainButtonChrome(
-    isEnabled: Bool,
-    role: ButtonRole?
-  ) -> ControlChrome {
-    guard isEnabled else {
-      return .init(
-        foregroundStyle: themeStyle(for: .placeholder),
-        contentBackgroundStyle: themeStyle(for: .background),
-        borderForegroundStyle: themeStyle(for: .background),
-        opacity: 0.6
-      )
-    }
-
-    return .init(
-      foregroundStyle: plainForegroundStyle(for: role),
-      contentBackgroundStyle: themeStyle(for: .background),
-      borderForegroundStyle: themeStyle(for: .background)
-    )
-  }
-
-  private func standardLinkButtonChrome(
-    isEnabled: Bool,
-    isFocused: Bool,
-    isPressed: Bool,
-    role: ButtonRole?
-  ) -> ControlChrome {
-    guard isEnabled else {
-      return .init(
-        foregroundStyle: themeStyle(for: .placeholder),
-        contentBackgroundStyle: themeStyle(for: .background),
-        borderForegroundStyle: themeStyle(for: .background),
-        opacity: 0.6
-      )
-    }
-
-    let tone = chromeTone(for: role)
-    let background =
-      if isFocused || isPressed {
-        AnyShapeStyle(.terminalRow(tone, isSelected: true))
-      } else {
-        themeStyle(for: .background)
-      }
-
-    return .init(
-      foregroundStyle: linkForegroundStyle(for: role),
-      contentBackgroundStyle: background,
-      borderForegroundStyle: themeStyle(for: .background)
-    )
-  }
-
-  private func plainForegroundStyle(
-    for role: ButtonRole?
-  ) -> AnyShapeStyle {
-    switch role {
-    case .destructive:
-      themeStyle(for: .danger)
-    case .cancel, .close:
-      themeStyle(for: .muted)
-    case .confirm:
-      resolvedStyle(for: .tint)
-    case nil:
-      resolvedStyle(for: .foreground)
-    }
-  }
-
-  private func linkForegroundStyle(
-    for role: ButtonRole?
-  ) -> AnyShapeStyle {
-    switch role {
-    case .destructive:
-      themeStyle(for: .danger)
-    case .cancel, .close:
-      themeStyle(for: .muted)
-    case .confirm:
-      resolvedStyle(for: .tint)
-    case nil:
-      themeStyle(for: .link)
-    }
   }
 
   private func contrastingForegroundStyle(

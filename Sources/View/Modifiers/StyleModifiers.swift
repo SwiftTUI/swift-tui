@@ -14,27 +14,51 @@ extension View {
   }
 
   public func buttonStyle(
-    _ style: ButtonStyle
+    _ style: AnyButtonStyle
   ) -> some View {
     environment(\.buttonStyle, style)
   }
 
+  public func buttonStyle<S: ButtonStyle>(
+    _ style: S
+  ) -> some View {
+    buttonStyle(AnyButtonStyle(style))
+  }
+
   public func textFieldStyle(
-    _ style: TextFieldStyle
+    _ style: AnyTextFieldStyle
   ) -> some View {
     environment(\.textFieldStyle, style)
   }
 
+  public func textFieldStyle<S: TextFieldStyle>(
+    _ style: S
+  ) -> some View {
+    textFieldStyle(AnyTextFieldStyle(style))
+  }
+
   public func pickerStyle(
-    _ style: PickerStyle
+    _ style: AnyPickerStyle
   ) -> some View {
     environment(\.pickerStyle, style)
   }
 
+  public func pickerStyle<S: PickerStyle>(
+    _ style: S
+  ) -> some View {
+    pickerStyle(AnyPickerStyle(style))
+  }
+
   public func listStyle(
-    _ style: ListStyle
+    _ style: AnyListStyle
   ) -> some View {
     environment(\.listStyle, style)
+  }
+
+  public func listStyle<S: ListStyle>(
+    _ style: S
+  ) -> some View {
+    listStyle(AnyListStyle(style))
   }
 
   /// Control how tab views render their tab bar.
@@ -44,34 +68,22 @@ extension View {
     environment(\.tabViewStyle, style)
   }
 
-  public func tabViewStyle(
-    _ style: AutomaticTabViewStyle
-  ) -> some View {
-    tabViewStyle(AnyTabViewStyle(style))
-  }
-
-  public func tabViewStyle(
-    _ style: UnderlineTabViewStyle
-  ) -> some View {
-    tabViewStyle(AnyTabViewStyle(style))
-  }
-
-  public func tabViewStyle(
-    _ style: LiteralTabsTabViewStyle
-  ) -> some View {
-    tabViewStyle(AnyTabViewStyle(style))
-  }
-
-  public func tabViewStyle(
-    _ style: PowerlineTabViewStyle
+  public func tabViewStyle<S: TabViewStyle>(
+    _ style: S
   ) -> some View {
     tabViewStyle(AnyTabViewStyle(style))
   }
 
   public func outlineStyle(
-    _ style: OutlineStyle
+    _ style: AnyOutlineStyle
   ) -> some View {
     environment(\.outlineStyle, style)
+  }
+
+  public func outlineStyle<S: OutlineStyle>(
+    _ style: S
+  ) -> some View {
+    outlineStyle(AnyOutlineStyle(style))
   }
 
   public func scrollIndicators(
