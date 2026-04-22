@@ -597,6 +597,12 @@ extension TerminalHosting {
       }
     }
 
+    func hasPendingFrame() -> Bool {
+      state.withLock { state in
+        state.pending != nil
+      }
+    }
+
     func consumePendingError() throws {
       let pendingError = state.withLock { state in
         let pendingError = state.pendingError
@@ -1085,6 +1091,9 @@ extension TerminalHosting {
       }
 
       if presentationWriter.consumeDropFlag() {
+        presentationSession.markDroppedFrame()
+      }
+      if presentationWriter.hasPendingFrame() {
         presentationSession.markDroppedFrame()
       }
       try presentationWriter.consumePendingError()
