@@ -6,6 +6,9 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     var controlParser = ControlMessageParser()
     var continuation: AsyncStream<InputEvent>.Continuation?
     var pendingEvents: [InputEvent] = []
+    var pendingMouseEvents: [InputEvent] = []
+    var activeMouseFlushToken: UInt64?
+    var nextMouseFlushToken: UInt64 = 0
     var finished = false
   }
 
@@ -21,7 +24,7 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
   package func send(
     _ bytes: [UInt8]
   ) {
-    let (messages, events, continuation):
+    let (messages, bufferedEvents, continuation):
       (
         [TerminalControlMessage],
         [InputEvent],
@@ -47,23 +50,37 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
       controlHandler(message)
     }
 
-    for event in events {
-      continuation?.yield(event)
+    guard continuation != nil else {
+      return
+    }
+
+    for event in bufferedEvents {
+      yieldInjectedEvent(event)
     }
   }
 
   package func finish() {
-    let continuation: AsyncStream<InputEvent>.Continuation? = state.withLock { state in
-      guard !state.finished else {
-        return nil
+    let (continuation, pendingMouseEvents):
+      (
+        AsyncStream<InputEvent>.Continuation?,
+        [InputEvent]
+      ) = state.withLock { state in
+        guard !state.finished else {
+          return (nil, [])
+        }
+
+        state.finished = true
+        let continuation = state.continuation
+        state.continuation = nil
+        let pendingMouseEvents = coalescedInputEvents(state.pendingMouseEvents)
+        state.pendingMouseEvents.removeAll(keepingCapacity: true)
+        state.activeMouseFlushToken = nil
+        return (continuation, pendingMouseEvents)
       }
 
-      state.finished = true
-      let continuation = state.continuation
-      state.continuation = nil
-      return continuation
+    for event in pendingMouseEvents {
+      continuation?.yield(event)
     }
-
     continuation?.finish()
   }
 
@@ -88,8 +105,77 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
       continuation.onTermination = { _ in
         self.state.withLock { state in
           state.continuation = nil
+          state.activeMouseFlushToken = nil
         }
       }
+    }
+  }
+
+  private func yieldInjectedEvent(
+    _ event: InputEvent
+  ) {
+    switch event {
+    case .mouse(let mouseEvent) where mouseEvent.isCoalescible:
+      scheduleCoalescedMouseFlush(for: .mouse(mouseEvent))
+    default:
+      let (continuation, flushedMouseEvents) = flushPendingMouseEvents()
+      for flushedEvent in flushedMouseEvents {
+        continuation?.yield(flushedEvent)
+      }
+      let currentContinuation = state.withLock { $0.continuation }
+      currentContinuation?.yield(event)
+    }
+  }
+
+  private func scheduleCoalescedMouseFlush(
+    for event: InputEvent
+  ) {
+    let token: UInt64? = state.withLock { state in
+      state.pendingMouseEvents.append(event)
+      guard state.activeMouseFlushToken == nil else {
+        return nil
+      }
+
+      state.nextMouseFlushToken += 1
+      let token = state.nextMouseFlushToken
+      state.activeMouseFlushToken = token
+      return token
+    }
+
+    guard let token else {
+      return
+    }
+
+    Task { [weak self] in
+      try? await Task.sleep(
+        nanoseconds: UInt64(InputReaderTiming.mouseEventFlushDelayMilliseconds) * 1_000_000
+      )
+      let (continuation, flushedMouseEvents) =
+        self?.flushPendingMouseEvents(
+          matching: token
+        ) ?? (nil, [])
+      for flushedEvent in flushedMouseEvents {
+        continuation?.yield(flushedEvent)
+      }
+    }
+  }
+
+  private func flushPendingMouseEvents(
+    matching token: UInt64? = nil
+  ) -> (
+    AsyncStream<InputEvent>.Continuation?,
+    [InputEvent]
+  ) {
+    state.withLock { state in
+      if let token, state.activeMouseFlushToken != token {
+        return (state.continuation, [])
+      }
+
+      let continuation = state.continuation
+      let flushedMouseEvents = coalescedInputEvents(state.pendingMouseEvents)
+      state.pendingMouseEvents.removeAll(keepingCapacity: true)
+      state.activeMouseFlushToken = nil
+      return (continuation, flushedMouseEvents)
     }
   }
 }
