@@ -65,16 +65,92 @@ struct GalleryTabSwitchTests {
     )
   }
 
-  private static func boundsOfText(_ target: String, in node: PlacedNode) -> Rect? {
+  @Test("deleting the top todo row does not switch the gallery back to Counter")
+  func deletingTopTodoRowKeepsTodoSelected() async throws {
+    let terminalSize = Size(width: 80, height: 24)
+    let rootIdentity = Identity(components: [.named("GalleryTodoDeleteSelectionRegression")])
+    let view = GallerySelectionSeedHarness(initialSelection: .counter)
+
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+    let initial = DefaultRenderer().render(
+      view,
+      context: .init(identity: rootIdentity, environmentValues: env),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+
+    let todoBounds = try #require(Self.boundsOfText("Todo", in: initial.placedTree))
+    let todoClickCenter = Point(
+      x: todoBounds.origin.x + todoBounds.size.width / 2,
+      y: todoBounds.origin.y + todoBounds.size.height / 2
+    )
+
+    let todoSelected = DefaultRenderer().render(
+      GallerySelectionSeedHarness(initialSelection: .todo),
+      context: .init(identity: rootIdentity, environmentValues: env),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+    let deleteBounds = try #require(
+      Self.boundsOfText("×", in: todoSelected.placedTree, chooseTopMost: true)
+    )
+    let deleteClickCenter = Point(
+      x: deleteBounds.origin.x + deleteBounds.size.width / 2,
+      y: deleteBounds.origin.y + deleteBounds.size.height / 2
+    )
+
+    let host = GalleryTabSwitchRecordingHost(size: terminalSize)
+    _ = try await Self.runHarness(
+      host: host,
+      terminalSize: terminalSize,
+      events: [
+        .mouse(.init(kind: .down(.primary), location: todoClickCenter)),
+        .mouse(.init(kind: .up(.primary), location: todoClickCenter)),
+        .mouse(.init(kind: .down(.primary), location: deleteClickCenter)),
+        .mouse(.init(kind: .up(.primary), location: deleteClickCenter)),
+      ],
+      rootIdentity: rootIdentity,
+      viewBuilder: { view }
+    )
+
+    let surface = try #require(host.lastPresentedSurface).lines.joined(separator: "\n")
+    #expect(
+      surface.contains("remaining"),
+      "expected the Todo tab to stay selected after deleting the top row; surface was:\n\(surface)"
+    )
+  }
+
+  private static func boundsOfText(
+    _ target: String,
+    in node: PlacedNode,
+    chooseTopMost: Bool = false
+  ) -> Rect? {
+    var matches: [Rect] = []
+    collectBoundsOfText(target, in: node, into: &matches)
+    guard !matches.isEmpty else {
+      return nil
+    }
+    if chooseTopMost {
+      return matches.min(by: {
+        if $0.origin.y == $1.origin.y {
+          return $0.origin.x < $1.origin.x
+        }
+        return $0.origin.y < $1.origin.y
+      })
+    }
+    return matches.first
+  }
+
+  private static func collectBoundsOfText(
+    _ target: String,
+    in node: PlacedNode,
+    into matches: inout [Rect]
+  ) {
     if case .text(let content) = node.drawPayload, content == target {
-      return node.bounds
+      matches.append(node.bounds)
     }
     for child in node.children {
-      if let match = boundsOfText(target, in: child) {
-        return match
-      }
+      collectBoundsOfText(target, in: child, into: &matches)
     }
-    return nil
   }
 
   @MainActor
@@ -105,6 +181,147 @@ struct GalleryTabSwitchTests {
       viewBuilder: { _, _ in viewBuilder() }
     )
     return try await runLoop.run()
+  }
+}
+
+@MainActor
+private final class TestPaletteCommandHolder {
+  var commands: [ActivePaletteCommand] = []
+}
+
+private struct GallerySelectionSeedHarness: View {
+  @State private var selection: GalleryView.GalleryTab
+  @State private var isPaletteOpen = false
+  @State private var paletteHolder = TestPaletteCommandHolder()
+  @State private var paletteQuery = ""
+  @FocusState private var isPaletteQueryFocused: Bool
+
+  init(initialSelection: GalleryView.GalleryTab) {
+    _selection = State(initialValue: initialSelection)
+  }
+
+  var body: some View {
+    GallerySelectionRuntimeBridge(
+      selection: $selection,
+      isPaletteOpen: $isPaletteOpen,
+      paletteHolder: paletteHolder,
+      paletteQuery: $paletteQuery,
+      isPaletteQueryFocused: $isPaletteQueryFocused
+    )
+  }
+}
+
+private struct GallerySelectionRuntimeBridge: View {
+  @Binding var selection: GalleryView.GalleryTab
+  @Binding var isPaletteOpen: Bool
+  let paletteHolder: TestPaletteCommandHolder
+  @Binding var paletteQuery: String
+  let isPaletteQueryFocused: FocusState<Bool>.Binding
+
+  var body: some View {
+    EnvironmentReader(\.activePaletteCommands) { commands in
+      if !commands.isEmpty {
+        paletteHolder.commands = commands
+      }
+      return galleryBody()
+    }
+  }
+
+  private func galleryBody() -> some View {
+    TabView(selection: $selection) {
+      Tab("Counter", value: GalleryView.GalleryTab.counter) {
+        CounterTab()
+      }
+
+      Tab("Todo", value: GalleryView.GalleryTab.todo) {
+        TodoTab()
+      }
+
+      Tab("Calculator", value: GalleryView.GalleryTab.calculator) {
+        CalculatorTab()
+      }
+
+      Tab("Borders & Shapes", value: GalleryView.GalleryTab.bordersAndShapes) {
+        BordersAndShapesTab()
+      }
+
+      Tab("Images", value: GalleryView.GalleryTab.images) {
+        ImagesTab()
+      }
+
+      Tab("Animations", value: GalleryView.GalleryTab.animations) {
+        AnimationsTab()
+      }
+
+      Tab("File Drop", value: GalleryView.GalleryTab.fileDrop) {
+        FileDropTab()
+      }
+
+      Tab("Full Screen", value: GalleryView.GalleryTab.fullScreen) {
+        FullScreenTab()
+      }
+    }
+    .tabViewStyle(.literalTabs)
+    .toolbarItem(
+      .init(
+        title: "⌃K Palette",
+        action: { openPalette() }
+      )
+    )
+    .panel(id: "gallery")
+    .keyCommand(
+      "Command palette",
+      key: .character("k"),
+      modifiers: .ctrl,
+      action: { openPalette() }
+    )
+    .paletteCommand(
+      name: "Switch to Counter",
+      action: { selection = .counter }
+    )
+    .paletteCommand(
+      name: "Switch to Todo",
+      action: { selection = .todo }
+    )
+    .paletteCommand(
+      name: "Switch to Calculator",
+      action: { selection = .calculator }
+    )
+    .paletteCommand(
+      name: "Switch to Borders & Shapes",
+      action: { selection = .bordersAndShapes }
+    )
+    .paletteCommand(
+      name: "Switch to Images",
+      action: { selection = .images }
+    )
+    .paletteCommand(
+      name: "Switch to Animations",
+      action: { selection = .animations }
+    )
+    .paletteCommand(
+      name: "Switch to File Drop",
+      action: { selection = .fileDrop }
+    )
+    .paletteCommand(
+      name: "Switch to Full Screen",
+      action: { selection = .fullScreen }
+    )
+    .toolbar(style: DefaultBottomToolbarStyle())
+    .paletteSheet("Command palette", isPresented: $isPaletteOpen) {
+      CommandPaletteList(
+        commands: paletteHolder.commands,
+        query: $paletteQuery,
+        isQueryFocused: isPaletteQueryFocused,
+        dismiss: { isPaletteOpen = false }
+      )
+    }
+  }
+
+  private func openPalette() {
+    paletteQuery = ""
+    isPaletteQueryFocused.wrappedValue = true
+    isPaletteOpen = true
   }
 }
 

@@ -306,7 +306,7 @@ public struct State<Value> {
   }
 
   public var projectedValue: Binding<Value> {
-    activeLocation()?.binding
+    return activeLocation()?.binding
       ?? Binding(
         mainActorGet: { wrappedValue },
         set: { wrappedValue = $0 }
