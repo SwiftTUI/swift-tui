@@ -147,7 +147,7 @@ public struct DefaultRenderer {
     let runtimeRegistrations = resolveContext.runtimeRegistrations
     resolveContext.imageAssetResolver = imageRepository.resolver()
     resolveContext.frameState = frameState
-    frameState.update(from: resolveContext)
+    frameState.update(from: resolveContext, proposal: proposal)
     viewGraph.beginFrame()
     let canUseSelectiveEvaluation =
       frameState.selectiveEvaluationEnabled

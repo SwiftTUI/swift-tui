@@ -71,11 +71,7 @@ extension TabView {
       isFocused: isFocused,
       showsFocusEffect: showsFocusEffect,
       styleEnvironment: styleEnvironment,
-      availableWidth: max(
-        0,
-        context.environmentValues.terminalSize.width
-          - context.environmentValues.safeAreaInsets.horizontal
-      ),
+      availableWidth: tabViewAvailableWidth(in: context),
       isOverflowMenuExpanded: storedTabOverflowMenuExpanded(in: ownerNode)
     )
     let stylePresentation = tabStyle.presentation(for: styleConfiguration)
@@ -454,6 +450,27 @@ package struct PeekedTabChildMetadata {
       self.tag = self.tag ?? tag
     }
   }
+}
+
+@MainActor
+private func tabViewAvailableWidth(
+  in context: ResolveContext
+) -> Int {
+  let environmentWidth = max(
+    0,
+    context.environmentValues.terminalSize.width
+      - context.environmentValues.safeAreaInsets.horizontal
+  )
+  let proposalWidth: Int? =
+    if let frameState = context.frameState,
+      case .finite(let width) = frameState.proposal.width
+    {
+      max(0, width)
+    } else {
+      nil
+    }
+
+  return proposalWidth.map { min($0, environmentWidth) } ?? environmentWidth
 }
 
 /// Modifier-side tab metadata semantic hook.

@@ -92,10 +92,12 @@ struct TabViewSurfaceTests {
 
   private func renderOverflowTabArtifacts(
     selection: Binding<String>,
-    focused: Bool = false
+    focused: Bool = false,
+    terminalWidth: Int = 24,
+    proposalWidth: Int = 24
   ) -> FrameArtifacts {
     var environmentValues = EnvironmentValues()
-    environmentValues.terminalSize = Size(width: 24, height: 8)
+    environmentValues.terminalSize = Size(width: terminalWidth, height: 8)
     if focused {
       environmentValues.focusedIdentity = testIdentity("Tabs")
     }
@@ -106,7 +108,7 @@ struct TabViewSurfaceTests {
         identity: testIdentity("Root"),
         environmentValues: environmentValues
       ),
-      proposal: .init(width: 24, height: 8)
+      proposal: .init(width: proposalWidth, height: 8)
     )
   }
 
@@ -511,6 +513,67 @@ struct TabViewSurfaceTests {
           "One content",
         ]
     )
+  }
+
+  @Test(
+    "literal tabs collapse against the current frame proposal instead of a stale terminal width")
+  func literalTabsCollapseAgainstCurrentFrameProposal() {
+    let surface = renderOverflowTabArtifacts(
+      selection: .constant("one"),
+      terminalWidth: 80,
+      proposalWidth: 24
+    )
+    .rasterSurface.lines
+    .prefix(4)
+    .map(trimTrailingSpaces)
+
+    #expect(
+      Array(surface)
+        == [
+          "╭─────╮╭─────╮╭───╮",
+          "│ One ││ Two ││ ▾ │",
+          "┘     └┴─────┴┴───┴─────",
+          "One content",
+        ]
+    )
+    #expect(surface.joined(separator: "\n").contains("…") == false)
+  }
+
+  @Test("literal tabs recompute overflow when the proposal changes under selective evaluation")
+  func literalTabsRecomputeOverflowWhenProposalChangesUnderSelectiveEvaluation() {
+    let renderer = DefaultRenderer()
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalSize = Size(width: 80, height: 8)
+    let context = ResolveContext(
+      identity: testIdentity("Root"),
+      environmentValues: environmentValues
+    )
+
+    let wideSurface = renderer.render(
+      overflowTabView(selection: .constant("one")),
+      context: context,
+      proposal: .init(width: 40, height: 8)
+    )
+    .rasterSurface.lines
+    .prefix(3)
+    .map(trimTrailingSpaces)
+    .joined(separator: "\n")
+
+    renderer.enableSelectiveEvaluation()
+
+    let narrowSurface = renderer.render(
+      overflowTabView(selection: .constant("one")),
+      context: context,
+      proposal: .init(width: 24, height: 8)
+    )
+    .rasterSurface.lines
+    .prefix(3)
+    .map(trimTrailingSpaces)
+    .joined(separator: "\n")
+
+    #expect(wideSurface.contains("▾") == false)
+    #expect(narrowSurface.contains("▾"))
+    #expect(narrowSurface.contains("…") == false)
   }
 
   @Test("literal tab overflow trigger expands and adopts the selected-hidden state")

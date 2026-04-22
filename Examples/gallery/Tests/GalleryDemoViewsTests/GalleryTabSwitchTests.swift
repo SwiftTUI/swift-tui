@@ -6,6 +6,25 @@ import Testing
 @MainActor
 @Suite
 struct GalleryTabSwitchTests {
+  @Test("gallery tabs collapse into the overflow trigger instead of ellipsizing")
+  func galleryTabsCollapseIntoOverflowTrigger() {
+    var env = EnvironmentValues()
+    env.terminalSize = .init(width: 80, height: 24)
+
+    let artifacts = DefaultRenderer().render(
+      GalleryView(),
+      context: .init(
+        identity: Identity(components: [.named("GalleryTabOverflowSurfaceTest")]),
+        environmentValues: env
+      ),
+      proposal: .init(width: 40, height: 24)
+    )
+
+    let surface = artifacts.rasterSurface.lines.prefix(3).joined(separator: "\n")
+    #expect(surface.contains("▾"))
+    #expect(surface.contains("…") == false)
+  }
+
   @Test("clicking a gallery tab switches tabs without crashing")
   func clickingGalleryTabSwitchesSelection() async throws {
     let terminalSize = Size(width: 80, height: 24)
