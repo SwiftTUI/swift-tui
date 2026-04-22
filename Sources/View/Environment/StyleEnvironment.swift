@@ -49,7 +49,7 @@ private enum ListStyleKey: EnvironmentKey {
 }
 
 private enum TabViewStyleKey: EnvironmentKey {
-  static let defaultValue = TabViewStyle.automatic
+  static let defaultValue = AnyTabViewStyle.automatic
 }
 
 private enum ScrollIndicatorVisibilityKey: EnvironmentKey {
@@ -138,7 +138,7 @@ extension EnvironmentValues {
     set { self[ListStyleKey.self] = newValue }
   }
 
-  public var tabViewStyle: TabViewStyle {
+  public var tabViewStyle: AnyTabViewStyle {
     get { self[TabViewStyleKey.self] }
     set { self[TabViewStyleKey.self] = newValue }
   }

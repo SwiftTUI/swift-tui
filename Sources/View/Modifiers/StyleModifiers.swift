@@ -39,9 +39,33 @@ extension View {
 
   /// Control how tab views render their tab bar.
   public func tabViewStyle(
-    _ style: TabViewStyle
+    _ style: AnyTabViewStyle
   ) -> some View {
     environment(\.tabViewStyle, style)
+  }
+
+  public func tabViewStyle(
+    _ style: AutomaticTabViewStyle
+  ) -> some View {
+    tabViewStyle(AnyTabViewStyle(style))
+  }
+
+  public func tabViewStyle(
+    _ style: UnderlineTabViewStyle
+  ) -> some View {
+    tabViewStyle(AnyTabViewStyle(style))
+  }
+
+  public func tabViewStyle(
+    _ style: LiteralTabsTabViewStyle
+  ) -> some View {
+    tabViewStyle(AnyTabViewStyle(style))
+  }
+
+  public func tabViewStyle(
+    _ style: PowerlineTabViewStyle
+  ) -> some View {
+    tabViewStyle(AnyTabViewStyle(style))
   }
 
   public func outlineStyle(
