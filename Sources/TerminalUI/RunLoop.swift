@@ -452,18 +452,12 @@ private final class KeyboardInputAdapter: TerminalInputReading {
   }
 
   func inputEvents() -> AsyncStream<InputEvent> {
-    AsyncStream { continuation in
-      let keyEvents = self.inputReader.events()
-      let task = Task {
-        for await keyPress in keyEvents {
-          continuation.yield(.key(keyPress))
-        }
-        continuation.finish()
+    let keyEvents = inputReader.events()
+    return makeTaskBackedAsyncStream { continuation in
+      for await keyPress in keyEvents {
+        continuation.yield(InputEvent.key(keyPress))
       }
-
-      continuation.onTermination = { _ in
-        task.cancel()
-      }
+      continuation.finish()
     }
   }
 }

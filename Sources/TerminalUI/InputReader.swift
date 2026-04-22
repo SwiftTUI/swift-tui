@@ -675,70 +675,67 @@ public final class InputReader: InputReading, TerminalInputReading {
 extension InputReader {
   #if canImport(WASILibc)
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
-      AsyncStream { continuation in
+      makeTaskBackedAsyncStream(
+        launch: { operation in
+          Task.detached {
+            await operation()
+          }
+        }
+      ) { continuation in
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
-        let task = Task.detached {
-          var parser = TerminalInputParser()
-          var controlParser = ControlMessageParser()
-          var pendingMouseEvents: [InputEvent] = []
+        var parser = TerminalInputParser()
+        var controlParser = ControlMessageParser()
+        var pendingMouseEvents: [InputEvent] = []
 
-          func flushPendingMouseEvents() {
-            guard !pendingMouseEvents.isEmpty else {
-              return
-            }
-
-            let flushedEvents = coalescedInputEvents(pendingMouseEvents)
-            pendingMouseEvents.removeAll(keepingCapacity: true)
-            for event in flushedEvents {
-              continuation.yield(event)
-            }
+        func flushPendingMouseEvents() {
+          guard !pendingMouseEvents.isEmpty else {
+            return
           }
 
-          while !Task.isCancelled {
-            var buffer = Array(repeating: UInt8(0), count: 512)
-            let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
+          let flushedEvents = coalescedInputEvents(pendingMouseEvents)
+          pendingMouseEvents.removeAll(keepingCapacity: true)
+          for event in flushedEvents {
+            continuation.yield(event)
+          }
+        }
 
-            if bytesRead > 0 {
-              let chunk = Array(buffer.prefix(Int(bytesRead)))
-              let filtered = controlParser.feed(chunk)
+        while !Task.isCancelled {
+          var buffer = Array(repeating: UInt8(0), count: 512)
+          let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
 
-              for message in filtered.messages {
-                flushPendingMouseEvents()
-                controlHandler(message)
-              }
+          if bytesRead > 0 {
+            let chunk = Array(buffer.prefix(Int(bytesRead)))
+            let filtered = controlParser.feed(chunk)
 
-              for event in parser.feed(filtered.payload) {
-                switch event {
-                case .mouse(let mouseEvent) where mouseEvent.isCoalescible:
-                  pendingMouseEvents.append(.mouse(mouseEvent))
-                default:
-                  flushPendingMouseEvents()
-                  continuation.yield(event)
-                }
-              }
-              continue
+            for message in filtered.messages {
+              flushPendingMouseEvents()
+              controlHandler(message)
             }
 
-            if bytesRead < 0, errno == EAGAIN || errno == EWOULDBLOCK {
-              if !pendingMouseEvents.isEmpty {
+            for event in parser.feed(filtered.payload) {
+              switch event {
+              case .mouse(let mouseEvent) where mouseEvent.isCoalescible:
+                pendingMouseEvents.append(.mouse(mouseEvent))
+              default:
                 flushPendingMouseEvents()
+                continuation.yield(event)
               }
-              try? await Task.sleep(nanoseconds: 1_000_000)
-              continue
             }
+            continue
+          }
 
-            flushPendingMouseEvents()
-            continuation.finish()
-            return
+          if bytesRead < 0, errno == EAGAIN || errno == EWOULDBLOCK {
+            if !pendingMouseEvents.isEmpty {
+              flushPendingMouseEvents()
+            }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+            continue
           }
 
           flushPendingMouseEvents()
           continuation.finish()
-        }
-
-        continuation.onTermination = { _ in
-          task.cancel()
+          return
         }
       }
     }
@@ -746,50 +743,50 @@ extension InputReader {
     private func makeEventStream<Event: Sendable>(
       transform: @escaping @Sendable (inout TerminalInputParser, [UInt8]) -> [Event]
     ) -> AsyncStream<Event> {
-      AsyncStream { continuation in
-        let fileDescriptor = self.fileDescriptor
-        let controlHandler = self.controlHandler
-        let task = Task.detached {
-          var parser = TerminalInputParser()
-          var controlParser = ControlMessageParser()
-
-          while !Task.isCancelled {
-            var buffer = Array(repeating: UInt8(0), count: 512)
-            let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
-
-            if bytesRead > 0 {
-              let chunk = Array(buffer.prefix(Int(bytesRead)))
-              let filtered = controlParser.feed(chunk)
-
-              for message in filtered.messages {
-                controlHandler(message)
-              }
-
-              for event in transform(&parser, filtered.payload) {
-                continuation.yield(event)
-              }
-              await Task.yield()
-              continue
-            }
-
-            if bytesRead < 0, errno == EAGAIN || errno == EWOULDBLOCK {
-              try? await Task.sleep(nanoseconds: 1_000_000)
-              continue
-            }
-
-            continuation.finish()
-            return
+      makeTaskBackedAsyncStream(
+        launch: { operation in
+          Task.detached {
+            await operation()
           }
         }
+      ) { continuation in
+        let fileDescriptor = self.fileDescriptor
+        let controlHandler = self.controlHandler
+        var parser = TerminalInputParser()
+        var controlParser = ControlMessageParser()
 
-        continuation.onTermination = { _ in
-          task.cancel()
+        while !Task.isCancelled {
+          var buffer = Array(repeating: UInt8(0), count: 512)
+          let bytesRead = unsafe platformRead(fileDescriptor, &buffer, buffer.count)
+
+          if bytesRead > 0 {
+            let chunk = Array(buffer.prefix(Int(bytesRead)))
+            let filtered = controlParser.feed(chunk)
+
+            for message in filtered.messages {
+              controlHandler(message)
+            }
+
+            for event in transform(&parser, filtered.payload) {
+              continuation.yield(event)
+            }
+            await Task.yield()
+            continue
+          }
+
+          if bytesRead < 0, errno == EAGAIN || errno == EWOULDBLOCK {
+            try? await Task.sleep(nanoseconds: 1_000_000)
+            continue
+          }
+
+          continuation.finish()
+          return
         }
       }
     }
   #else
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
-      AsyncStream { continuation in
+      makeManagedAsyncStream { continuation in
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
@@ -895,7 +892,7 @@ extension InputReader {
 
         source.resume()
 
-        continuation.onTermination = { _ in
+        return { _ in
           source.cancel()
         }
       }
@@ -904,7 +901,7 @@ extension InputReader {
     private func makeEventStream<Event: Sendable>(
       transform: @escaping @Sendable (inout TerminalInputParser, [UInt8]) -> [Event]
     ) -> AsyncStream<Event> {
-      AsyncStream { continuation in
+      makeManagedAsyncStream { continuation in
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
@@ -962,7 +959,7 @@ extension InputReader {
 
         source.resume()
 
-        continuation.onTermination = { _ in
+        return { _ in
           source.cancel()
         }
       }

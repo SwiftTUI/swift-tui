@@ -85,8 +85,8 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
   }
 
   package func inputEvents() -> AsyncStream<InputEvent> {
-    AsyncStream { continuation in
-      let (shouldFinish, pendingEvents) = state.withLock { state in
+    makeManagedAsyncStream { continuation in
+      let (shouldFinish, pendingEvents) = self.state.withLock { state in
         state.continuation = continuation
         let pendingEvents = state.pendingEvents
         state.pendingEvents.removeAll(keepingCapacity: true)
@@ -99,10 +99,10 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
 
       if shouldFinish {
         continuation.finish()
-        return
+        return { _ in }
       }
 
-      continuation.onTermination = { _ in
+      return { _ in
         self.state.withLock { state in
           state.continuation = nil
           state.activeMouseFlushToken = nil
