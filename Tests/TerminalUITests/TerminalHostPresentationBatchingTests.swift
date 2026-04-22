@@ -265,7 +265,7 @@ struct TerminalHostPresentationBatchingTests {
     #expect(
       controller.writes == [
         "\u{001B}[2J\u{001B}[1;1HAAAA",
-        "\u{001B}[1;1HAB",
+        "\u{001B}[2J\u{001B}[1;1HABAA",
       ]
     )
 
@@ -280,6 +280,65 @@ struct TerminalHostPresentationBatchingTests {
     #expect(metrics.strategy == .fullRepaint)
     #expect(
       controller.writes.last == "\u{001B}[2J\u{001B}[1;1HWXYZ"
+    )
+  }
+
+  @Test(
+    "terminal host forces a full repaint immediately when the current submit replaces a queued frame"
+  )
+  func replacingQueuedFrameUsesImmediateFullRepaint() throws {
+    let controller = BlockingPresentationWriteController(
+      isTTY: true,
+      blocksFirstWrite: false
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .previewUnicode
+    )
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["AAAA"]
+      )
+    )
+    try host.drainPendingPresentation()
+
+    controller.armBlockNextWrite()
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["BBBB"]
+      )
+    )
+    #expect(controller.waitForBlockedWriteToStart())
+
+    _ = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["CCCC"]
+      )
+    )
+    let metrics = try host.present(
+      RasterSurface(
+        size: .init(width: 4, height: 1),
+        lines: ["CCCD"]
+      )
+    )
+
+    controller.unblockWrite()
+    try host.drainPendingPresentation()
+
+    #expect(metrics.strategy == .fullRepaint)
+    #expect(
+      controller.writes == [
+        "\u{001B}[2J\u{001B}[1;1HAAAA",
+        "\u{001B}[1;1HBBBB",
+        "\u{001B}[2J\u{001B}[1;1HCCCD",
+      ]
     )
   }
 
@@ -392,7 +451,7 @@ private final class BlockingPresentationWriteController: TerminalControlling {
   private let isTTYValue: Bool
   private let blockedWriteStarted = DispatchSemaphore(value: 0)
   private let releaseBlockedWrite = DispatchSemaphore(value: 0)
-  private let shouldBlockFirstWriteStorage = LockedBox(true)
+  private let shouldBlockNextWriteStorage: LockedBox<Bool>
   private let writesStorage = LockedBox<[String]>([])
 
   private(set) var writes: [String] {
@@ -400,8 +459,12 @@ private final class BlockingPresentationWriteController: TerminalControlling {
     set { writesStorage.value = newValue }
   }
 
-  init(isTTY: Bool) {
+  init(
+    isTTY: Bool,
+    blocksFirstWrite: Bool = true
+  ) {
     isTTYValue = isTTY
+    shouldBlockNextWriteStorage = LockedBox(blocksFirstWrite)
   }
 
   func isATTY(_: Int32) -> Bool {
@@ -429,7 +492,7 @@ private final class BlockingPresentationWriteController: TerminalControlling {
   func setFileStatusFlags(_: Int32, on _: Int32) throws {}
 
   func write(_ output: String, to _: Int32) throws {
-    let shouldBlockFirstWrite = shouldBlockFirstWriteStorage.withLock { state in
+    let shouldBlockFirstWrite = shouldBlockNextWriteStorage.withLock { state in
       let shouldBlock = state
       if state {
         state = false
@@ -457,6 +520,12 @@ private final class BlockingPresentationWriteController: TerminalControlling {
 
   func waitForBlockedWriteToStart() -> Bool {
     blockedWriteStarted.wait(timeout: .now() + 1) == .success
+  }
+
+  func armBlockNextWrite() {
+    shouldBlockNextWriteStorage.withLock { state in
+      state = true
+    }
   }
 
   func unblockWrite() {
