@@ -38,15 +38,31 @@ public struct GalleryView: View {
   @FocusState private var isPaletteQueryFocused: Bool
 
   public var body: some View {
+    GalleryRuntimeBridge(
+      selection: $selection,
+      isPaletteOpen: $isPaletteOpen,
+      paletteHolder: paletteHolder,
+      paletteQuery: $paletteQuery,
+      isPaletteQueryFocused: $isPaletteQueryFocused
+    )
+  }
+}
+
+private struct GalleryRuntimeBridge: View {
+  @Binding var selection: GalleryView.GalleryTab
+  @Binding var isPaletteOpen: Bool
+  let paletteHolder: PaletteCommandHolder
+  @Binding var paletteQuery: String
+  let isPaletteQueryFocused: FocusState<Bool>.Binding
+
+  var body: some View {
     // `EnvironmentReader` sits on the gallery panel's resolve chain so
     // the runtime-injected `activePaletteCommands` arrives with the
     // scope-chain snapshot taken at the end of the previous frame.
     //
-    // We update `paletteHolder.commands` INSIDE the reader's content
-    // closure so the sheet's content (built further down in the same
-    // synchronous body pass) reads the freshest value. Using a class
-    // holder lets us side-effect without triggering @State
-    // invalidation loops.
+    // Keep the Gallery's stateful surface outside this bridge so
+    // environment-driven re-resolves do not recreate the tab-selection
+    // owner.
     EnvironmentReader(\.activePaletteCommands) { commands in
       if !commands.isEmpty {
         paletteHolder.commands = commands
@@ -57,35 +73,35 @@ public struct GalleryView: View {
 
   private func galleryBody() -> some View {
     TabView(selection: $selection) {
-      Tab("Counter", value: GalleryTab.counter) {
+      Tab("Counter", value: GalleryView.GalleryTab.counter) {
         CounterTab()
       }
 
-      Tab("Todo", value: GalleryTab.todo) {
+      Tab("Todo", value: GalleryView.GalleryTab.todo) {
         TodoTab()
       }
 
-      Tab("Calculator", value: GalleryTab.calculator) {
+      Tab("Calculator", value: GalleryView.GalleryTab.calculator) {
         CalculatorTab()
       }
 
-      Tab("Borders & Shapes", value: GalleryTab.bordersAndShapes) {
+      Tab("Borders & Shapes", value: GalleryView.GalleryTab.bordersAndShapes) {
         BordersAndShapesTab()
       }
 
-      Tab("Images", value: GalleryTab.images) {
+      Tab("Images", value: GalleryView.GalleryTab.images) {
         ImagesTab()
       }
 
-      Tab("Animations", value: GalleryTab.animations) {
+      Tab("Animations", value: GalleryView.GalleryTab.animations) {
         AnimationsTab()
       }
 
-      Tab("File Drop", value: GalleryTab.fileDrop) {
+      Tab("File Drop", value: GalleryView.GalleryTab.fileDrop) {
         FileDropTab()
       }
 
-      Tab("Full Screen", value: GalleryTab.fullScreen) {
+      Tab("Full Screen", value: GalleryView.GalleryTab.fullScreen) {
         FullScreenTab()
       }
     }
@@ -153,7 +169,7 @@ public struct GalleryView: View {
       CommandPaletteList(
         commands: paletteHolder.commands,
         query: $paletteQuery,
-        isQueryFocused: $isPaletteQueryFocused,
+        isQueryFocused: isPaletteQueryFocused,
         dismiss: { isPaletteOpen = false }
       )
     }
@@ -165,7 +181,7 @@ public struct GalleryView: View {
     // the EnvironmentReader above. Reset the query, ask focus to
     // land on the text field, and flip the sheet open.
     paletteQuery = ""
-    isPaletteQueryFocused = true
+    isPaletteQueryFocused.wrappedValue = true
     isPaletteOpen = true
   }
 }
