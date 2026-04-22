@@ -42,11 +42,29 @@ struct BordersAndShapesTabTests {
   func chasingLightSchedulesVisibleRuntimeFrames() async throws {
     let terminalSize = Size(width: 80, height: 28)
     let rootIdentity = Identity(components: [.named("BordersAndShapesRunLoop")])
-    let host = GalleryCountingTerminalHost(surfaceSize: terminalSize)
+    let quitGate = GalleryAsyncEventGate()
+    let host = GalleryCountingTerminalHost(
+      surfaceSize: terminalSize,
+      presentObserver: { presentCount in
+        guard presentCount >= 3 else {
+          return
+        }
+        Task {
+          await quitGate.open()
+        }
+      }
+    )
+    let timeoutTask = Task {
+      try? await Task.sleep(nanoseconds: 1_000_000_000)
+      await quitGate.open()
+    }
+    defer {
+      timeoutTask.cancel()
+    }
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       terminalHost: host,
-      terminalInputReader: GalleryDelayedQuitInputReader(delayNanoseconds: 250_000_000),
+      terminalInputReader: GalleryGateInputReader(gate: quitGate),
       signalReader: nil,
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -86,10 +104,15 @@ private final class GalleryCountingTerminalHost: TerminalHosting {
   let surfaceSize: Size
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
+  private let presentObserver: @Sendable (Int) -> Void
   private(set) var presentCount = 0
 
-  init(surfaceSize: Size) {
+  init(
+    surfaceSize: Size,
+    presentObserver: @escaping @Sendable (Int) -> Void = { _ in }
+  ) {
     self.surfaceSize = surfaceSize
+    self.presentObserver = presentObserver
   }
 
   func enableRawMode() throws {}
@@ -100,6 +123,7 @@ private final class GalleryCountingTerminalHost: TerminalHosting {
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
     presentCount += 1
+    presentObserver(presentCount)
     return .init(
       bytesWritten: 0,
       linesTouched: surface.size.height,
@@ -111,20 +135,50 @@ private final class GalleryCountingTerminalHost: TerminalHosting {
   func write(_: String) throws {}
 }
 
-private final class GalleryDelayedQuitInputReader: TerminalInputReading {
-  let delayNanoseconds: UInt64
+private actor GalleryAsyncEventGate {
+  private var isOpen = false
+  private var waiters: [CheckedContinuation<Void, Never>] = []
 
-  init(delayNanoseconds: UInt64) {
-    self.delayNanoseconds = delayNanoseconds
+  func wait() async {
+    if isOpen {
+      return
+    }
+
+    await withCheckedContinuation { continuation in
+      if isOpen {
+        continuation.resume()
+        return
+      }
+      waiters.append(continuation)
+    }
+  }
+
+  func open() {
+    guard !isOpen else {
+      return
+    }
+    isOpen = true
+    let continuations = waiters
+    waiters.removeAll(keepingCapacity: false)
+
+    for continuation in continuations {
+      continuation.resume()
+    }
+  }
+}
+
+private final class GalleryGateInputReader: TerminalInputReading {
+  let gate: GalleryAsyncEventGate
+
+  init(gate: GalleryAsyncEventGate) {
+    self.gate = gate
   }
 
   func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
-      let delayNanoseconds = self.delayNanoseconds
+      let gate = gate
       let task = Task {
-        if delayNanoseconds > 0 {
-          try? await Task.sleep(nanoseconds: delayNanoseconds)
-        }
+        await gate.wait()
         continuation.yield(.key(KeyPress(.character("c"), modifiers: .ctrl)))
         continuation.finish()
       }
