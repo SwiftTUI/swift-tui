@@ -30,7 +30,7 @@ extension TabView {
   private struct TabOption: Sendable {
     var tag: SelectionTag
     var label: TabItemLabel
-    var node: ResolvedNode?
+    var contentPayload: DeferredViewPayload?
   }
 
   private func resolvedNode(
@@ -57,6 +57,28 @@ extension TabView {
       } else {
         nil
       }
+    let tabStyle = context.environmentValues.tabViewStyle
+    let styleConfiguration = TabViewStyleConfiguration(
+      controlIdentity: context.identity,
+      options: options.map {
+        .init(
+          label: $0.label,
+          contentPayload: $0.contentPayload
+        )
+      },
+      selectedIndex: selectedIndex,
+      focusedIndex: focusedIndex,
+      isFocused: isFocused,
+      showsFocusEffect: showsFocusEffect,
+      styleEnvironment: styleEnvironment,
+      availableWidth: max(
+        0,
+        context.environmentValues.terminalSize.width
+          - context.environmentValues.safeAreaInsets.horizontal
+      ),
+      isOverflowMenuExpanded: storedTabOverflowMenuExpanded(in: ownerNode)
+    )
+    let stylePresentation = tabStyle.presentation(for: styleConfiguration)
 
     if isEnabled {
       let binding = selection
@@ -73,6 +95,7 @@ extension TabView {
           return withAuthoringContext(dynamicPropertyScope) {
             switch keyPress {
             case KeyPress(.arrowLeft, modifiers: []):
+              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
               moveStoredTabFocus(
                 ownerNode: ownerNode,
                 selectedIndex: selectedIndex,
@@ -81,6 +104,7 @@ extension TabView {
               )
               return true
             case KeyPress(.arrowRight, modifiers: []):
+              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
               moveStoredTabFocus(
                 ownerNode: ownerNode,
                 selectedIndex: selectedIndex,
@@ -89,14 +113,21 @@ extension TabView {
               )
               return true
             case KeyPress(.home, modifiers: []):
+              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
               setStoredFocusedTabIndex(0, in: ownerNode)
               return true
             case KeyPress(.end, modifiers: []):
+              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
               setStoredFocusedTabIndex(max(0, options.count - 1), in: ownerNode)
+              return true
+            case KeyPress(.escape, modifiers: [])
+            where storedTabOverflowMenuExpanded(in: ownerNode):
+              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
               return true
             case KeyPress(.arrowUp, modifiers: []), KeyPress(.arrowDown, modifiers: []):
               return true
             case KeyPress(.tab, modifiers: []), KeyPress(.tab, modifiers: .shift):
+              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
               setStoredFocusedTabIndex(nil, in: ownerNode)
               return false
             default:
@@ -108,7 +139,8 @@ extension TabView {
         identity: context.identity,
         handler: {
           withAuthoringContext(dynamicPropertyScope) {
-            activateBoundTabSelection(
+            setStoredTabOverflowMenuExpanded(false, in: ownerNode)
+            return activateBoundTabSelection(
               binding,
               focusedIndexOwnerNode: ownerNode,
               orderedTags: orderedTags,
@@ -119,7 +151,7 @@ extension TabView {
         followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
       )
 
-      for index in options.indices {
+      for index in stylePresentation.visibleOptionIndices {
         let routeID = primaryRouteID(
           for: tabItemIdentity(
             for: context.identity,
@@ -132,28 +164,59 @@ extension TabView {
           }
 
           return withAuthoringContext(dynamicPropertyScope) {
+            setStoredTabOverflowMenuExpanded(false, in: ownerNode)
             setStoredFocusedTabIndex(index, in: ownerNode)
             return setBoundSelection(binding, to: options[index].tag)
           }
         }
       }
+
+      if let overflowPresentation = stylePresentation.overflowMenu {
+        let triggerRouteID = primaryRouteID(
+          for: tabOverflowTriggerIdentity(for: context.identity)
+        )
+        context.localPointerHandlerRegistry?.register(routeID: triggerRouteID) { event in
+          guard case .down(.primary) = event.kind else {
+            return false
+          }
+
+          return withAuthoringContext(dynamicPropertyScope) {
+            let nextExpanded = !storedTabOverflowMenuExpanded(in: ownerNode)
+            setStoredTabOverflowMenuExpanded(nextExpanded, in: ownerNode)
+            if nextExpanded, let focusIndex = overflowPresentation.preferredOverflowFocusIndex {
+              setStoredFocusedTabIndex(focusIndex, in: ownerNode)
+            }
+            return true
+          }
+        }
+
+        for index in overflowPresentation.overflowIndices {
+          let routeID = primaryRouteID(
+            for: tabOverflowItemIdentity(
+              for: context.identity,
+              index: index
+            )
+          )
+          context.localPointerHandlerRegistry?.register(routeID: routeID) { event in
+            guard case .down(.primary) = event.kind else {
+              return false
+            }
+
+            return withAuthoringContext(dynamicPropertyScope) {
+              setStoredFocusedTabIndex(index, in: ownerNode)
+              setStoredTabOverflowMenuExpanded(false, in: ownerNode)
+              return setBoundSelection(binding, to: options[index].tag)
+            }
+          }
+        }
+      }
     }
 
-    let tabStyle = context.environmentValues.tabViewStyle
-
-    let child =
-      tabBody(
-        controlIdentity: context.identity,
-        options: options,
-        selectedIndex: selectedIndex,
-        focusedIndex: focusedIndex,
-        isFocused: isFocused,
-        showsFocusEffect: showsFocusEffect,
-        styleEnvironment: styleEnvironment,
-        tabStyle: tabStyle
-      ).resolve(
-        in: context.child(component: .named("TabBody"))
-      )
+    let child = tabStyle.resolveBody(
+      configuration: styleConfiguration,
+      presentation: stylePresentation,
+      in: context.child(component: .named("TabBody"))
+    )
 
     return ResolvedNode(
       identity: context.identity,
@@ -180,6 +243,8 @@ extension TabView {
     // selects them.
     var peekedEntries: [PeekedTabChildMetadata] = []
     var resolveClosures: [() -> ResolvedNode] = []
+    let declaredContentPayloads = deferredDeclaredBuilderChildren(from: content)
+    var contentPayloads: [DeferredViewPayload?] = []
     var nextIndex = 0
     let childContext = context.child(component: .named("TabOptions"))
     enumerateDeclaredChildViews(
@@ -189,6 +254,12 @@ extension TabView {
       nextIndex: &nextIndex
     ) { child, childContext, resolveOne in
       peekedEntries.append(peekTabChildMetadata(from: child))
+      let payloadIndex = contentPayloads.count
+      let contentPayload =
+        declaredContentPayloads.indices.contains(payloadIndex)
+        ? declaredContentPayloads[payloadIndex]
+        : nil
+      contentPayloads.append(contentPayload)
       if let declaration = child as? any TabDeclarationView {
         resolveClosures.append {
           declaration.resolveTabDeclarationContent(in: childContext)
@@ -210,20 +281,20 @@ extension TabView {
         return nil
       }
       let isActive = (index == selectedIndex)
-      let resolvedNodeIfActive = isActive ? resolveClosures[index]() : nil
 
       let label: TabItemLabel
       if let peekedLabel = entry.label {
         label = peekedLabel
-      } else if let resolved = resolvedNodeIfActive,
-        let derived = tabItemLabel(in: resolved)
-      {
-        label = derived
-      } else if let resolved = resolvedNodeIfActive {
-        let fallbackTitle = resolvedNodeLabelText(from: resolved)
-        label = TabItemLabel(
-          fallbackTitle.isEmpty ? "Tab \(index + 1)" : fallbackTitle
-        )
+      } else if isActive {
+        let resolved = resolveClosures[index]()
+        if let derived = tabItemLabel(in: resolved) {
+          label = derived
+        } else {
+          let fallbackTitle = resolvedNodeLabelText(from: resolved)
+          label = TabItemLabel(
+            fallbackTitle.isEmpty ? "Tab \(index + 1)" : fallbackTitle
+          )
+        }
       } else {
         label = TabItemLabel("Tab \(index + 1)")
       }
@@ -231,413 +302,11 @@ extension TabView {
       return TabOption(
         tag: tag,
         label: label,
-        node: resolvedNodeIfActive
+        contentPayload: contentPayloads[index]
       )
     }
   }
 
-  @ViewBuilder
-  private func tabBody(
-    controlIdentity: Identity,
-    options: [TabOption],
-    selectedIndex: Int?,
-    focusedIndex: Int?,
-    isFocused: Bool,
-    showsFocusEffect: Bool,
-    styleEnvironment: StyleEnvironmentSnapshot,
-    tabStyle: TabViewStyle
-  ) -> some View {
-    let activeIndex = selectedIndex ?? 0
-    let activeTone: TerminalTone = .accent
-    let focusActive = isFocused && showsFocusEffect
-
-    let hasRule = tabStyle != .powerline
-    let hasLiteralTabEdgeRow = tabStyle == .literalTabs
-    let stripHeight =
-      if hasLiteralTabEdgeRow {
-        3
-      } else if hasRule {
-        2
-      } else {
-        1
-      }
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(alignment: .top, spacing: 0) {
-        ForEach(options.indices, id: \.self) { index in
-          let option = options[index]
-          let isSelected = index == activeIndex
-          let isTabFocused = focusActive && index == focusedIndex
-
-          PointerRouteView(
-            identity: tabItemIdentity(
-              for: controlIdentity,
-              index: index
-            ),
-            content: VStack(alignment: .leading, spacing: 0) {
-              let trailingSeparatorStyle: PowerlineSeparatorStyle =
-                if index == activeIndex {
-                  .selectedTrailing
-                } else if index + 1 == activeIndex {
-                  .selectedLeading
-                } else {
-                  .plain
-                }
-              tabItemView(
-                label: option.label.displayText,
-                isSelected: isSelected,
-                isFocused: isTabFocused,
-                showsTrailingSeparator: index < options.count - 1,
-                trailingSeparatorStyle: trailingSeparatorStyle,
-                tone: activeTone,
-                style: tabStyle,
-                styleEnvironment: styleEnvironment
-              )
-              if hasRule {
-                tabItemRuleSegment(
-                  label: option.label.displayText,
-                  isSelected: isSelected,
-                  isFocused: isTabFocused,
-                  tone: activeTone,
-                  style: tabStyle,
-                  styleEnvironment: styleEnvironment
-                )
-              }
-              if hasLiteralTabEdgeRow {
-                literalTabBottomSegment(
-                  index: index,
-                  label: option.label.displayText,
-                  isSelected: isSelected,
-                  tone: activeTone
-                )
-              }
-            }
-            .background {
-              if isTabFocused {
-                Rectangle()
-                  .fill(AnyShapeStyle(.terminalSurface(activeTone)))
-              }
-            }
-          )
-        }
-        Spacer(minLength: 0)
-      }
-      .frame(height: stripHeight, alignment: .leading)
-      .background {
-        if hasLiteralTabEdgeRow {
-          VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 0)
-              .frame(height: stripHeight - 1)
-            Divider(
-              drawMetadata: .init(
-                foregroundStyle: .semantic(.foreground)
-              )
-            )
-            .frame(maxWidth: .infinity, minHeight: 1, maxHeight: 1, alignment: .leading)
-          }
-        }
-      }
-      if options.indices.contains(activeIndex), let activeNode = options[activeIndex].node {
-        ResolvedContentView(node: activeNode)
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      } else {
-        EmptyView()
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      }
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-  }
-
-  @ViewBuilder
-  private func tabItemView(
-    label: String,
-    isSelected: Bool,
-    isFocused: Bool,
-    showsTrailingSeparator: Bool,
-    trailingSeparatorStyle: PowerlineSeparatorStyle,
-    tone: TerminalTone,
-    style: TabViewStyle,
-    styleEnvironment: StyleEnvironmentSnapshot
-  ) -> some View {
-    switch style == .automatic ? .underline : style {
-    case .automatic, .underline:
-      underlineTabItem(
-        label: label,
-        isSelected: isSelected,
-        isFocused: isFocused,
-        tone: tone
-      )
-    case .literalTabs:
-      literalTabItem(
-        label: label,
-        isSelected: isSelected,
-        isFocused: isFocused,
-        tone: tone
-      )
-    case .powerline:
-      powerlineTabItem(
-        label: label,
-        isSelected: isSelected,
-        isFocused: isFocused,
-        showsTrailingSeparator: showsTrailingSeparator,
-        trailingSeparatorStyle: trailingSeparatorStyle,
-        tone: tone,
-        styleEnvironment: styleEnvironment
-      )
-    }
-  }
-
-  // MARK: - Underline style (default)
-
-  private func underlineTabItem(
-    label: String,
-    isSelected: Bool,
-    isFocused: Bool,
-    tone: TerminalTone
-  ) -> some View {
-    let foreground: AnyShapeStyle =
-      if isSelected {
-        AnyShapeStyle(.terminalAccent(tone))
-      } else {
-        .semantic(.foreground)
-      }
-    return Text("\(label) ")
-      .lineLimit(1)
-      .foregroundStyle(foreground)
-      .drawMetadata(.init(opacity: 1.0))
-  }
-
-  @ViewBuilder
-  private func tabItemRuleSegment(
-    label: String,
-    isSelected: Bool,
-    isFocused: Bool,
-    tone: TerminalTone,
-    style: TabViewStyle,
-    styleEnvironment: StyleEnvironmentSnapshot
-  ) -> some View {
-    let resolvedStyle = style == .automatic ? TabViewStyle.underline : style
-    switch resolvedStyle {
-    case .automatic, .underline:
-      underlineRuleSegment(
-        label: label,
-        isSelected: isSelected,
-        isFocused: isFocused,
-        tone: tone
-      )
-    case .literalTabs:
-      roundedRuleSegment(
-        label: label,
-        isSelected: isSelected,
-        isFocused: isFocused,
-        tone: tone
-      )
-    case .powerline:
-      EmptyView()
-    }
-  }
-
-  private func underlineRuleSegment(
-    label: String,
-    isSelected: Bool,
-    isFocused: Bool,
-    tone: TerminalTone
-  ) -> some View {
-    let width = tabLabelCellWidth(label)
-    let glyph: Character =
-      if isSelected && isFocused { "▄" } else if isSelected || isFocused { "▂" } else { "▁" }
-    let foreground: AnyShapeStyle =
-      if isSelected {
-        AnyShapeStyle(.terminalAccent(tone))
-      } else if isFocused {
-        .semantic(.foreground)
-      } else {
-        .semantic(.separator)
-      }
-    let text =
-      "\(String(repeating: glyph, count: width)) "
-    return Text(text)
-      .lineLimit(1)
-      .foregroundStyle(foreground)
-      .frame(height: 1, alignment: .leading)
-  }
-
-  // MARK: - Rounded style (unicode tab shapes)
-
-  private func literalTabItem(
-    label: String,
-    isSelected: Bool,
-    isFocused: Bool,
-    tone: TerminalTone
-  ) -> some View {
-    let interiorWidth = tabLabelCellWidth(label) + 2
-    let topText = "╭" + String(repeating: "─", count: interiorWidth) + "╮"
-    let chromeForeground = AnyShapeStyle(.foreground)
-    return Text(topText)
-      .lineLimit(1)
-      .foregroundStyle(chromeForeground)
-      .drawMetadata(.init(opacity: 1.0))
-  }
-
-  private func roundedRuleSegment(
-    label: String,
-    isSelected: Bool,
-    isFocused: Bool,
-    tone: TerminalTone
-  ) -> some View {
-    let chromeForeground = AnyShapeStyle(.foreground)
-    let labelForeground: AnyShapeStyle =
-      if isSelected {
-        AnyShapeStyle(.terminalAccent(tone))
-      } else {
-        .semantic(.foreground)
-      }
-    return HStack(alignment: .top, spacing: 0) {
-      Text("│ ")
-        .lineLimit(1)
-        .foregroundStyle(chromeForeground)
-        .drawMetadata(.init(opacity: 1.0))
-      Text(label)
-        .lineLimit(1)
-        .foregroundStyle(labelForeground)
-        .drawMetadata(.init(opacity: 1.0))
-      Text(" │")
-        .lineLimit(1)
-        .foregroundStyle(chromeForeground)
-        .drawMetadata(.init(opacity: 1.0))
-    }
-    .frame(height: 1, alignment: .leading)
-  }
-
-  private func literalTabBottomSegment(
-    index: Int,
-    label: String,
-    isSelected: Bool,
-    tone: TerminalTone
-  ) -> some View {
-    let interiorWidth = tabLabelCellWidth(label) + 2
-    let inactiveLeadingGlyph = "┴"
-    let chromeForeground = AnyShapeStyle(.foreground)
-    let text =
-      if isSelected {
-        "┘" + String(repeating: " ", count: interiorWidth) + "└"
-      } else {
-        inactiveLeadingGlyph + String(repeating: "─", count: interiorWidth) + "┴"
-      }
-    return Text(text)
-      .lineLimit(1)
-      .foregroundStyle(chromeForeground)
-      .drawMetadata(.init(opacity: 1.0))
-      .frame(height: 1, alignment: .leading)
-  }
-
-  // MARK: - Powerline style (p10k-inspired)
-
-  private func powerlineTabItem(
-    label: String,
-    isSelected: Bool,
-    isFocused: Bool,
-    showsTrailingSeparator: Bool,
-    trailingSeparatorStyle: PowerlineSeparatorStyle,
-    tone: TerminalTone,
-    styleEnvironment: StyleEnvironmentSnapshot
-  ) -> some View {
-    let selectedBackgroundColor = powerlineSelectedBackgroundColor(
-      tone: tone,
-      styleEnvironment: styleEnvironment
-    )
-    let selectedBackgroundStyle = AnyShapeStyle(selectedBackgroundColor)
-    let selectedForegroundStyle = AnyShapeStyle(
-      contrastingForegroundColor(on: selectedBackgroundColor)
-    )
-    let foreground: AnyShapeStyle =
-      if isSelected {
-        selectedForegroundStyle
-      } else {
-        .semantic(.foreground)
-      }
-    let separatorGlyph = trailingSeparatorStyle.glyph
-    let separatorForeground: AnyShapeStyle =
-      trailingSeparatorStyle == .plain
-      ? .semantic(.separator)
-      : selectedBackgroundStyle
-    return HStack(alignment: .top, spacing: 0) {
-      Text("\(label) ")
-        .lineLimit(1)
-        .foregroundStyle(foreground)
-        .background {
-          if isSelected {
-            Rectangle().fill(selectedBackgroundStyle)
-          }
-        }
-        .drawMetadata(.init(opacity: 1.0))
-      if showsTrailingSeparator {
-        Text(separatorGlyph)
-          .lineLimit(1)
-          .foregroundStyle(separatorForeground)
-          .drawMetadata(.init(opacity: trailingSeparatorStyle.opacity))
-      }
-    }
-  }
-}
-
-private enum PowerlineSeparatorStyle {
-  case plain
-  case selectedLeading
-  case selectedTrailing
-
-  var glyph: String {
-    switch self {
-    case .plain:
-      "╱"
-    case .selectedLeading:
-      "◢"
-    case .selectedTrailing:
-      "◤"
-    }
-  }
-
-  var opacity: Double {
-    switch self {
-    case .plain:
-      0.6
-    case .selectedLeading, .selectedTrailing:
-      1.0
-    }
-  }
-}
-
-private func powerlineSelectedBackgroundColor(
-  tone: TerminalTone,
-  styleEnvironment: StyleEnvironmentSnapshot
-) -> Color {
-  switch tone {
-  case .accent:
-    styleEnvironment.appearance.tintColor
-  case .info:
-    styleEnvironment.theme.color(for: .info)
-  case .success:
-    styleEnvironment.theme.color(for: .success)
-  case .warning:
-    styleEnvironment.theme.color(for: .warning)
-  case .danger:
-    styleEnvironment.theme.color(for: .danger)
-  case .neutral:
-    styleEnvironment.theme.color(for: .selection)
-  }
-}
-
-private func contrastingForegroundColor(
-  on backgroundColor: Color
-) -> Color {
-  let whiteContrast = Color.white.contrastRatio(to: backgroundColor)
-  let blackContrast = Color.black.contrastRatio(to: backgroundColor)
-  return whiteContrast >= blackContrast ? .white : .black
-}
-
-private func tabLabelCellWidth(
-  _ label: String
-) -> Int {
-  layoutText(for: label, width: nil).size.width
 }
 
 @MainActor
@@ -705,6 +374,7 @@ private func activateBoundTabSelection<SelectionValue: Hashable>(
 }
 
 private let tabFocusedIndexStateSlot = -4_000_001
+private let tabOverflowMenuExpandedStateSlot = -4_000_002
 
 @MainActor
 private func storedFocusedTabIndex(
@@ -727,11 +397,28 @@ private func setStoredFocusedTabIndex(
   )
 }
 
-private func tabItemIdentity(
-  for controlIdentity: Identity,
-  index: Int
-) -> Identity {
-  controlIdentity.child(.indexed("TabItem", index: index))
+@MainActor
+private func storedTabOverflowMenuExpanded(
+  in ownerNode: Core.ViewNode?
+) -> Bool {
+  guard let ownerNode else {
+    return false
+  }
+  return ownerNode.stateSlot(
+    ordinal: tabOverflowMenuExpandedStateSlot,
+    seed: false
+  )
+}
+
+@MainActor
+private func setStoredTabOverflowMenuExpanded(
+  _ isExpanded: Bool,
+  in ownerNode: Core.ViewNode?
+) {
+  ownerNode?.setStateSlot(
+    ordinal: tabOverflowMenuExpandedStateSlot,
+    value: isExpanded
+  )
 }
 
 private func tabItemLabel(
@@ -832,47 +519,4 @@ package func peekTabChildMetadata(from view: Any) -> PeekedTabChildMetadata {
     return peekable.peekedTabChildMetadata
   }
   return PeekedTabChildMetadata()
-}
-
-/// Hosts a pre-resolved tab content subtree inside the `tabBody` view
-/// hierarchy without collapsing its own identity into the captured
-/// node.
-///
-/// If this view returned `[node]` directly, `normalizeResolvedElements`
-/// would unwrap the single-element array and hand the captured
-/// `ResolvedNode` straight back to the outer resolver.  That causes
-/// `finishEvaluation` to set this view's ViewNode's `committed` to the
-/// captured subtree's root (e.g. the ScrollView's resolved tree),
-/// *including its stale per-node fields and identity*.  The
-/// ScrollView's own ViewNode then becomes orphaned from the snapshot
-/// walk: when a scroll event re-evaluates just the ScrollView via the
-/// selective dirty plan, its updated `committed` never reaches the
-/// root snapshot — `ResolvedContentView`'s stale `committed` copy is
-/// used instead.  The visible symptom is a ScrollView whose scroll
-/// offset stays frozen until some unrelated interaction forces a full
-/// re-resolve of the tab body.
-///
-/// Wrapping the captured node as a **child** of an outer
-/// `ResolvedContentView`-identity node keeps this view's identity and
-/// committed snapshot distinct from the captured subtree's, so
-/// `finishEvaluation` installs the captured subtree's root as a
-/// child ViewNode under us.  The normal `snapshot()` walk then
-/// recurses into that child ViewNode and picks up its current
-/// committed state — including any per-frame re-evaluation.
-private struct ResolvedContentView: View, ResolvableView {
-  let node: ResolvedNode
-
-  package func resolveElements(
-    in context: ResolveContext
-  ) -> [ResolvedNode] {
-    [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view("ResolvedContent"),
-        children: [node],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
-      )
-    ]
-  }
 }

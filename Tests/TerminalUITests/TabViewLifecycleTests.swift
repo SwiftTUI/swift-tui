@@ -203,6 +203,50 @@ struct TabViewLifecycleTests {
     #expect(probe.homeAppearCount == 0)
     #expect(probe.settingsAppearCount == 1)
   }
+
+  @Test("switching selected tabs keeps distinct local-state storage per tab content root")
+  func switchingTabsKeepsDistinctContentStateIdentities() {
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("TabSwitchStateIsolation")
+    let proposal = ProposedSize(width: .finite(32), height: .finite(6))
+
+    _ = renderer.render(
+      TabView(selection: .constant("count")) {
+        Tab("Count", value: "count") {
+          CountStateTabRoot()
+        }
+
+        Tab("Label", value: "label") {
+          LabelStateTabRoot()
+        }
+      },
+      context: .init(
+        identity: rootIdentity,
+        applyEnvironmentValues: true
+      ),
+      proposal: proposal
+    )
+
+    let second = renderer.render(
+      TabView(selection: .constant("label")) {
+        Tab("Count", value: "count") {
+          CountStateTabRoot()
+        }
+
+        Tab("Label", value: "label") {
+          LabelStateTabRoot()
+        }
+      },
+      context: .init(
+        identity: rootIdentity,
+        applyEnvironmentValues: true
+      ),
+      proposal: proposal
+    )
+
+    let surface = second.rasterSurface.lines.joined(separator: "\n")
+    #expect(surface.contains("label seeded"))
+  }
 }
 
 @MainActor
@@ -210,4 +254,20 @@ private final class LifecycleProbe {
   var homeAppearCount = 0
   var settingsAppearCount = 0
   var logsAppearCount = 0
+}
+
+private struct CountStateTabRoot: View {
+  @State private var count = 0
+
+  var body: some View {
+    Text("count \(count)")
+  }
+}
+
+private struct LabelStateTabRoot: View {
+  @State private var label = "seeded"
+
+  var body: some View {
+    Text("label \(label)")
+  }
 }

@@ -24,7 +24,7 @@ extension ResolvedNode {
 @Suite
 struct TabViewSurfaceTests {
   private func renderTabArtifacts(
-    style: TabViewStyle = .automatic,
+    style: AnyTabViewStyle = .automatic,
     focused: Bool = false,
     selection: String = "home"
   ) -> FrameArtifacts {
@@ -58,7 +58,7 @@ struct TabViewSurfaceTests {
   }
 
   private func renderTabView(
-    style: TabViewStyle = .automatic,
+    style: AnyTabViewStyle = .automatic,
     focused: Bool = false,
     selection: String = "home"
   ) -> String {
@@ -66,14 +66,68 @@ struct TabViewSurfaceTests {
       .rasterSurface.lines.joined(separator: "\n")
   }
 
+  private func overflowTabView(
+    selection: Binding<String>
+  ) -> some View {
+    TabView(selection: selection) {
+      Tab("One", value: "one") {
+        Text("One content")
+      }
+
+      Tab("Two", value: "two") {
+        Text("Two content")
+      }
+
+      Tab("Three", value: "three") {
+        Text("Three content")
+      }
+
+      Tab("Four", value: "four") {
+        Text("Four content")
+      }
+    }
+    .tabViewStyle(.literalTabs)
+    .id(testIdentity("Tabs"))
+  }
+
+  private func renderOverflowTabArtifacts(
+    selection: Binding<String>,
+    focused: Bool = false
+  ) -> FrameArtifacts {
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalSize = Size(width: 24, height: 8)
+    if focused {
+      environmentValues.focusedIdentity = testIdentity("Tabs")
+    }
+
+    return DefaultRenderer().render(
+      overflowTabView(selection: selection),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues
+      ),
+      proposal: .init(width: 24, height: 8)
+    )
+  }
+
   private func stripBounds(
-    for style: TabViewStyle
+    for style: AnyTabViewStyle
   ) -> Rect {
-    Rect(
+    let height: Int =
+      switch style.debugDescription {
+      case "AnyTabViewStyle.powerline":
+        1
+      case "AnyTabViewStyle.literalTabs":
+        3
+      default:
+        2
+      }
+
+    return Rect(
       origin: .zero,
       size: .init(
         width: 40,
-        height: style == .powerline ? 1 : style == .literalTabs ? 3 : 2
+        height: height
       )
     )
   }
@@ -435,6 +489,106 @@ struct TabViewSurfaceTests {
           "│ Home · 3 ││ Settings ││ Logs │",
           "┴──────────┴┘          └┴──────┴────────",
           "Settings content",
+        ]
+    )
+  }
+
+  @Test("literal tabs replace overflowing trailing tabs with a dropdown trigger")
+  func literalTabsCollapseOverflowIntoDropdownTrigger() {
+    let lines = renderOverflowTabArtifacts(
+      selection: .constant("one")
+    )
+    .rasterSurface.lines
+    .prefix(4)
+    .map(trimTrailingSpaces)
+
+    #expect(
+      Array(lines)
+        == [
+          "╭─────╮╭─────╮╭───╮",
+          "│ One ││ Two ││ ▾ │",
+          "┘     └┴─────┴┴───┴─────",
+          "One content",
+        ]
+    )
+  }
+
+  @Test("literal tab overflow trigger expands and adopts the selected-hidden state")
+  func literalTabOverflowTriggerSelectsHiddenTabs() {
+    final class SelectionBox {
+      var value = "one"
+    }
+
+    let selectionBox = SelectionBox()
+    let selection = Binding(
+      get: { selectionBox.value },
+      set: { selectionBox.value = $0 }
+    )
+    let renderer = DefaultRenderer()
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalSize = Size(width: 24, height: 8)
+
+    var context = ResolveContext(
+      identity: testIdentity("Root"),
+      environmentValues: environmentValues
+    )
+    context.localPointerHandlerRegistry = pointerRegistry
+
+    _ = renderer.render(
+      overflowTabView(selection: selection),
+      context: context,
+      proposal: .init(width: 24, height: 8)
+    )
+
+    let triggerRouteID = primaryRouteID(
+      for: testIdentity("Tabs").child(.named("TabOverflowTrigger"))
+    )
+    #expect(pointerRegistry.hasHandler(routeID: triggerRouteID))
+    #expect(
+      pointerRegistry.dispatch(
+        routeID: triggerRouteID,
+        event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
+      )
+    )
+
+    let expandedSurface = renderer.render(
+      overflowTabView(selection: selection),
+      context: context,
+      proposal: .init(width: 24, height: 8)
+    ).rasterSurface.lines.joined(separator: "\n")
+
+    #expect(expandedSurface.contains("Three"))
+    #expect(expandedSurface.contains("Four"))
+
+    let hiddenRouteID = primaryRouteID(
+      for: testIdentity("Tabs").child(.indexed("TabOverflowItem", index: 3))
+    )
+    #expect(pointerRegistry.hasHandler(routeID: hiddenRouteID))
+    #expect(
+      pointerRegistry.dispatch(
+        routeID: hiddenRouteID,
+        event: .init(kind: .down(.primary), location: .zero, targetRect: .zero)
+      )
+    )
+    #expect(selectionBox.value == "four")
+
+    let lines = renderer.render(
+      overflowTabView(selection: selection),
+      context: context,
+      proposal: .init(width: 24, height: 8)
+    )
+    .rasterSurface.lines
+    .prefix(4)
+    .map(trimTrailingSpaces)
+
+    #expect(
+      Array(lines)
+        == [
+          "╭─────╮╭─────╮╭───╮",
+          "│ One ││ Two ││ ▼ │",
+          "┴─────┴┴─────┴┘   └─────",
+          "Four content",
         ]
     )
   }
