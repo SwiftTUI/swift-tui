@@ -129,11 +129,13 @@ extension View {
         spec: spec,
         actions: defaultPresentationActions(
           defaultDismissTitle: spec.descriptor.defaultDismissTitle,
-          isPresented: isPresented
+          isPresented: isPresented,
+          dismissAuthoringContext: makeDeferredAuthoringContext()
         ),
         message: EmptyView(),
         actionsAuthoringContext: makeDeferredAuthoringContext(),
-        messageAuthoringContext: makeDeferredAuthoringContext()
+        messageAuthoringContext: makeDeferredAuthoringContext(),
+        dismissAuthoringContext: makeDeferredAuthoringContext()
       )
     )
   }
@@ -152,7 +154,8 @@ extension View {
         actions: actions(),
         message: message(),
         actionsAuthoringContext: makeDeferredAuthoringContext(),
-        messageAuthoringContext: makeDeferredAuthoringContext()
+        messageAuthoringContext: makeDeferredAuthoringContext(),
+        dismissAuthoringContext: makeDeferredAuthoringContext()
       )
     )
   }
@@ -169,11 +172,13 @@ extension View {
         spec: spec,
         actions: defaultPresentationActions(
           defaultDismissTitle: spec.descriptor.defaultDismissTitle,
-          isPresented: isPresented
+          isPresented: isPresented,
+          dismissAuthoringContext: makeDeferredAuthoringContext()
         ),
         message: EmptyView(),
         actionsAuthoringContext: makeDeferredAuthoringContext(),
-        messageAuthoringContext: makeDeferredAuthoringContext()
+        messageAuthoringContext: makeDeferredAuthoringContext(),
+        dismissAuthoringContext: makeDeferredAuthoringContext()
       )
     )
   }
@@ -192,7 +197,8 @@ extension View {
         actions: actions(),
         message: message(),
         actionsAuthoringContext: makeDeferredAuthoringContext(),
-        messageAuthoringContext: makeDeferredAuthoringContext()
+        messageAuthoringContext: makeDeferredAuthoringContext(),
+        dismissAuthoringContext: makeDeferredAuthoringContext()
       )
     )
   }
@@ -207,7 +213,8 @@ extension View {
         isPresented: isPresented,
         spec: sheetPromptPresentationSpec(),
         sheetContent: sheetContent(),
-        sheetContentAuthoringContext: makeDeferredAuthoringContext()
+        sheetContentAuthoringContext: makeDeferredAuthoringContext(),
+        dismissAuthoringContext: makeDeferredAuthoringContext()
       )
     )
   }
@@ -223,7 +230,8 @@ extension View {
         isPresented: isPresented,
         spec: sheetPromptPresentationSpec(),
         sheetContent: sheetContent(),
-        sheetContentAuthoringContext: makeDeferredAuthoringContext()
+        sheetContentAuthoringContext: makeDeferredAuthoringContext(),
+        dismissAuthoringContext: makeDeferredAuthoringContext()
       )
     )
   }
@@ -247,7 +255,8 @@ extension View {
         isPresented: isPresented,
         spec: sheetPromptPresentationSpec(chrome: .dropdown),
         sheetContent: sheetContent(),
-        sheetContentAuthoringContext: makeDeferredAuthoringContext()
+        sheetContentAuthoringContext: makeDeferredAuthoringContext(),
+        dismissAuthoringContext: makeDeferredAuthoringContext()
       )
     )
   }
@@ -256,12 +265,15 @@ extension View {
 @MainActor
 private func defaultPresentationActions(
   defaultDismissTitle: String,
-  isPresented: Binding<Bool>
+  isPresented: Binding<Bool>,
+  dismissAuthoringContext: AuthoringContext?
 ) -> Button<Text> {
   Button(
     defaultDismissTitle,
     action: {
-      isPresented.wrappedValue = false
+      withAuthoringContext(dismissAuthoringContext) {
+        isPresented.wrappedValue = false
+      }
     }
   )
 }
@@ -276,6 +288,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
   var message: Message
   var actionsAuthoringContext: AuthoringContext?
   var messageAuthoringContext: AuthoringContext?
+  var dismissAuthoringContext: AuthoringContext?
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
@@ -287,6 +300,7 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
     }
 
     let sourceIdentity = node.identity
+    let dismissInvalidator = context.invalidationProxy?.invalidator
     let item = PromptPresentationItem(
       id: presentationAttachmentID(
         for: sourceIdentity,
@@ -301,8 +315,11 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
         deferredDeclaredBuilderChildren(from: message)
       },
       contentPayloads: [],
-      dismiss: { [isPresented] in
-        isPresented.wrappedValue = false
+      dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+        withAuthoringContext(dismissAuthoringContext) {
+          isPresented.wrappedValue = false
+        }
+        dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
       }
     )
 
@@ -330,6 +347,7 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
   var spec: PromptPresentationSpec
   var sheetContent: SheetContent
   var sheetContentAuthoringContext: AuthoringContext?
+  var dismissAuthoringContext: AuthoringContext?
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
@@ -341,6 +359,7 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
     }
 
     let sourceIdentity = node.identity
+    let dismissInvalidator = context.invalidationProxy?.invalidator
     let item = PromptPresentationItem(
       id: presentationAttachmentID(
         for: sourceIdentity,
@@ -353,8 +372,11 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
       contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
         deferredDeclaredBuilderChildren(from: sheetContent)
       },
-      dismiss: { [isPresented] in
-        isPresented.wrappedValue = false
+      dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+        withAuthoringContext(dismissAuthoringContext) {
+          isPresented.wrappedValue = false
+        }
+        dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
       }
     )
 
@@ -837,6 +859,7 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
   var style: AnyToastStyle
   var duration: Double?
   var toastContent: ToastContent
+  var dismissAuthoringContext: AuthoringContext? = makeDeferredAuthoringContext()
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
@@ -848,6 +871,7 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
     }
 
     let sourceIdentity = node.identity
+    let dismissInvalidator = context.invalidationProxy?.invalidator
     let item = ToastPresentationItem(
       id: presentationAttachmentID(
         for: sourceIdentity,
@@ -856,8 +880,11 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
       contentPayloads: deferredDeclaredBuilderChildren(from: toastContent),
       presentation: style.presentation(for: ToastStyleConfiguration()),
       duration: duration,
-      dismiss: { [isPresented] in
-        isPresented.wrappedValue = false
+      dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
+        withAuthoringContext(dismissAuthoringContext) {
+          isPresented.wrappedValue = false
+        }
+        dismissInvalidator?.requestInvalidation(of: [sourceIdentity])
       }
     )
 

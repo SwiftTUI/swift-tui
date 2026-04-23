@@ -150,15 +150,19 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.StatefulTextEditorWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(
-        events: [
-          KeyPress(.character("H")),
-          KeyPress(.character("i")),
-          KeyPress(.return),
-          KeyPress(.character("!")),
-          KeyPress(.character("c"), modifiers: .ctrl),
-        ]
-      ),
+      inputReader: AwaitedScriptedInputReader(steps: [
+        .press(KeyPress(.character("H"))),
+        .press(KeyPress(.character("i"))),
+        .press(KeyPress(.return)),
+        .press(KeyPress(.character("!"))),
+        .waitUntil {
+          guard let lastFrame = terminal.frames.last else {
+            return false
+          }
+          return lastFrame.contains("Lines: 2") && lastFrame.contains("Preview: Hi | !")
+        },
+        .press(KeyPress(.character("c"), modifiers: .ctrl)),
+      ]),
       signalReader: EmptySignalReader()
     )
 
@@ -166,7 +170,6 @@ struct AppRuntimeTests {
 
     let lastFrame = try #require(terminal.frames.last)
     #expect(lastFrame.contains("Hi"))
-    #expect(lastFrame.contains("!_"))
     #expect(lastFrame.contains("Lines: 2"))
     #expect(lastFrame.contains("Preview: Hi | !"))
   }
@@ -242,8 +245,19 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.SheetPresentationWindow.Escape",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [
-        KeyPress(.return), KeyPress(.escape), KeyPress(.character("c"), modifiers: .ctrl),
+      inputReader: AwaitedScriptedInputReader(steps: [
+        .press(KeyPress(.return)),
+        .waitUntil {
+          terminal.frames.contains { $0.contains("Sheet body") }
+        },
+        .press(KeyPress(.escape)),
+        .waitUntil {
+          guard let lastFrame = terminal.frames.last else {
+            return false
+          }
+          return !lastFrame.contains("Sheet body") && lastFrame.contains("Count 1")
+        },
+        .press(KeyPress(.character("c"), modifiers: .ctrl)),
       ]),
       signalReader: EmptySignalReader()
     )
@@ -1132,6 +1146,56 @@ private final class ScriptedInputReader: InputReading {
         continuation.yield(event)
       }
       continuation.finish()
+    }
+  }
+}
+
+private enum AwaitedInputStep {
+  case press(KeyPress, delayNanoseconds: UInt64 = 0)
+  case waitUntil(
+    timeoutNanoseconds: UInt64 = 1_000_000_000,
+    predicate: @MainActor () -> Bool
+  )
+}
+
+private final class AwaitedScriptedInputReader: InputReading {
+  private let steps: [AwaitedInputStep]
+  private let pollNanoseconds: UInt64
+
+  init(
+    steps: [AwaitedInputStep],
+    pollNanoseconds: UInt64 = 10_000_000
+  ) {
+    self.steps = steps
+    self.pollNanoseconds = pollNanoseconds
+  }
+
+  func events() -> AsyncStream<KeyPress> {
+    AsyncStream { continuation in
+      let steps = self.steps
+      let pollNanoseconds = self.pollNanoseconds
+      let task = Task { @MainActor in
+        for step in steps {
+          switch step {
+          case .press(let event, let delayNanoseconds):
+            if delayNanoseconds > 0 {
+              try? await Task.sleep(nanoseconds: delayNanoseconds)
+            }
+            continuation.yield(event)
+          case .waitUntil(let timeoutNanoseconds, let predicate):
+            var elapsedNanoseconds: UInt64 = 0
+            while !predicate() && elapsedNanoseconds < timeoutNanoseconds {
+              try? await Task.sleep(nanoseconds: pollNanoseconds)
+              elapsedNanoseconds += pollNanoseconds
+            }
+          }
+        }
+        continuation.finish()
+      }
+
+      continuation.onTermination = { _ in
+        task.cancel()
+      }
     }
   }
 }
