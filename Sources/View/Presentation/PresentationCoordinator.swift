@@ -1044,11 +1044,22 @@ package struct PresentationHostingRoot<Content: View>: View, ResolvableView {
       resolveViewElements(content, in: contentContext),
       in: contentContext
     )
-    let declarations = baseNode.preferenceValues[
-      PresentationCoordinatorDeclarationPreferenceKey.self]
-    hostState.reconcile(declarations.declarations)
+    reconcilePresentationDeclarations(
+      from: baseNode,
+      into: hostState
+    )
     return [baseNode]
   }
+}
+
+@MainActor
+private func reconcilePresentationDeclarations(
+  from baseNode: ResolvedNode,
+  into hostState: PresentationHostState
+) {
+  let declarations = baseNode.preferenceValues[
+    PresentationCoordinatorDeclarationPreferenceKey.self]
+  hostState.reconcile(declarations.declarations)
 }
 
 @MainActor
@@ -1057,6 +1068,14 @@ package func composePresentationHostTree(
   hostState: PresentationHostState,
   in context: ResolveContext
 ) -> ResolvedNode {
+  // Selective dirty evaluation can re-resolve only the presentation-
+  // declaring subtree. Reconcile from the current resolved snapshot so
+  // wrapper-hosted overlays still present on the same input frame even
+  // when the outer hosting root does not re-evaluate.
+  reconcilePresentationDeclarations(
+    from: baseNode,
+    into: hostState
+  )
   let hostContext = context.child(component: .named("PresentationHost"))
   let overlayEntries = hostState.overlayEntries()
   let overlayContext = hostContext.child(component: .named("overlay"))

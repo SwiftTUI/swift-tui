@@ -186,6 +186,59 @@ struct GalleryStyleDispatchTests {
     )
   }
 
+  @Test("Gallery-exact flow: ⌃K presents the palette on the next runtime input frame")
+  func galleryExactFlowPresentsPaletteImmediatelyAfterRuntimeInput() throws {
+    GallerySimulator.reset()
+
+    let runLoop = makeRunLoopLocal(
+      terminalSize: .init(width: 60, height: 16)
+    ) {
+      GallerySimulator()
+    }
+    try renderInitial(runLoop)
+    try settleGalleryPaletteEnvironment(runLoop)
+
+    let reason = runLoop.handle(
+      .input(.key(.character("k"), modifiers: .ctrl))
+    )
+    #expect(reason == nil)
+
+    var rendered = 0
+    try runLoop.renderPendingFrames(renderedFrames: &rendered)
+
+    let surfaceText = latestSurfaceText(for: runLoop)
+    #expect(surfaceText.contains("Command palette"))
+    #expect(surfaceText.contains("palette sheet"))
+  }
+
+  @Test("Wrapper-hosted gallery palette still presents immediately after ⌃K")
+  func wrapperHostedGalleryPresentsPaletteImmediatelyAfterRuntimeInput() throws {
+    GallerySimulator.reset()
+
+    let runLoop = makeRunLoopLocal(
+      terminalSize: .init(width: 60, height: 16)
+    ) {
+      WrappedGallerySimulator()
+    }
+    try renderInitial(runLoop)
+    try settleGalleryPaletteEnvironment(runLoop)
+
+    let reason = runLoop.handle(
+      .input(.key(.character("k"), modifiers: .ctrl))
+    )
+    #expect(reason == nil)
+
+    var rendered = 0
+    try runLoop.renderPendingFrames(renderedFrames: &rendered)
+
+    let snapshot = GallerySimulator.snapshotAtKeyPress.value
+    #expect(snapshot.count == 3)
+
+    let surfaceText = latestSurfaceText(for: runLoop)
+    #expect(surfaceText.contains("Command palette"))
+    #expect(surfaceText.contains("palette sheet"))
+  }
+
   @Test(
     "activePaletteCommands captured via env reader reflects Panel commands when a .toolbar wraps the Panel"
   )
@@ -325,6 +378,15 @@ private struct GallerySimulator: View {
 }
 
 @MainActor
+private struct WrappedGallerySimulator: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      GallerySimulator()
+    }
+  }
+}
+
+@MainActor
 private struct PaletteDupProbeRoot: View {
   static let tickSource = LockedBoxLocal<Int>(initial: 0)
 
@@ -375,9 +437,9 @@ private struct GalleryStyleOuter: View {
 
 @MainActor
 private func makeRunLoopLocal<V: View>(
+  terminalSize: Size = .init(width: 40, height: 10),
   @ViewBuilder content: @escaping () -> V
 ) -> RunLoop<Int, V> {
-  let terminalSize = Size(width: 40, height: 10)
   let terminal = GalleryStyleTerminalHost(surfaceSizeProvider: { terminalSize })
   let rootIdentity = testIdentity("GalleryStyleRoot")
   var environmentValues = EnvironmentValues()
@@ -406,6 +468,29 @@ private func renderInitial<State, V: View>(_ runLoop: RunLoop<State, V>) throws 
   var renderedFrames = 0
   try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
   runLoop.renderer.enableSelectiveEvaluation()
+}
+
+@MainActor
+private func settleGalleryPaletteEnvironment<State, V: View>(
+  _ runLoop: RunLoop<State, V>
+) throws {
+  for _ in 0..<3 {
+    runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
+    var rendered = 0
+    try runLoop.renderPendingFrames(renderedFrames: &rendered)
+  }
+}
+
+@MainActor
+private func latestSurfaceText<State, V: View>(
+  for runLoop: RunLoop<State, V>
+) -> String {
+  guard let terminal = runLoop.terminalHost as? GalleryStyleTerminalHost,
+    let surface = terminal.latestSurface
+  else {
+    return ""
+  }
+  return surface.lines.joined(separator: "\n")
 }
 
 private final class GalleryStyleTerminalHost: TerminalHosting {
