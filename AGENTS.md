@@ -52,6 +52,15 @@ Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
   [docs/SOURCE_LAYOUT.md](docs/SOURCE_LAYOUT.md) aligned with file moves.
 - Treat fixture changes as evidence, not housekeeping. See
   [docs/TESTING_AND_FIXTURE_POLICY.md](docs/TESTING_AND_FIXTURE_POLICY.md).
+- For runtime state bugs, distinguish transient flicker from true state loss.
+  If state must survive lazy tab, deferred-content, or presentation churn,
+  hoist ownership above that seam. Do not over-hoist: tab-local state may be
+  intentionally ephemeral across tab switches, but palette open/close should
+  be transparent unless the palette itself changes selection. See
+  [docs/RUNTIME.md](docs/RUNTIME.md) and
+  [docs/STATE_KEYING.md](docs/STATE_KEYING.md).
+- For wrapper-hosted or scene-hosted regressions, reproduce and test the
+  composed runtime path, not just the inner view in isolation.
 
 ## Code Style
 
@@ -105,6 +114,10 @@ Test suites are split by layer:
 
 Prefer Swift Testing (`import Testing`, `@Test`, `#expect`) for new tests.
 Existing XCTest suites may remain.
+
+For runtime and animation tests, prefer real `RunLoop` input-path coverage and
+bounded condition-based waits over fixed sleeps. See
+[docs/TESTING_AND_FIXTURE_POLICY.md](docs/TESTING_AND_FIXTURE_POLICY.md).
 
 ## Documentation
 

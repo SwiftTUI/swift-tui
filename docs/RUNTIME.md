@@ -21,8 +21,18 @@ are authored inside the base view tree but displayed at the root.
 
 - Base resolution collects presentation declarations during the ordinary resolve pass
 - Visible presentation payloads resolve as overlay roots after the base tree has already been resolved
+- Presentation hosts derive visible overlay state from the current resolved
+  base declarations before overlay composition; wrapper-hosted and selectively
+  re-evaluated subtrees must not wait for an outer host rerender before an
+  already-declared presentation appears
 - The renderer composes the base root and any overlay roots for downstream measure, place, semantics, draw, raster, and commit work
-- Opening or dismissing a presentation does not re-resolve the displayed base subtree under a synthetic identity path
+- Opening or dismissing a presentation does not re-resolve the displayed base
+  subtree under a synthetic identity path. Presentation churn should be
+  transparent to the currently selected tab or child owner unless the
+  presentation action itself mutates the state that selects different content
+- Dismissing a presentation prunes only the overlay-owned subtree identities
+  for that presentation; dismissal must not run broad stale-subtree cleanup
+  that reaches unrelated retained content
 - Modal overlays can still suppress base interaction through the composed frame's semantic state
 
 ## Input, Focus, And Interaction
@@ -98,9 +108,20 @@ The shipped ownership model is split into three categories:
 
 - `@State` persistence is keyed by view identity path plus source location
 - Rebinding the same view instance into a different identity path creates a different state slot
+- Keying only preserves state while the owning identity survives. State that
+  must outlive active-tab bodies, deferred content, or presentation churn
+  should be owned above those lazy seams and threaded down through bindings or
+  explicit model state
+- Active-tab local state may still be intentionally ephemeral across tab
+  selection changes because `TabView` resolves only the selected body. Hoist
+  only the state that must survive that tab churn; presentation open and close
+  alone should not force the same reset
 - `StateContainer` invalidates only when an `Equatable` state change actually changes value
 - Projected bindings and local actions route through the same invalidation path
 - Direct local actions restore the dynamic-property scope they were registered under so mutations remain bound to the right runtime scope
+- Button actions, key-command handlers, dismiss closures, projected bindings,
+  and other imperative paths must preserve that same authoring and
+  dynamic-property scope so each path invalidates the same owner
 
 ### Environment Model
 
