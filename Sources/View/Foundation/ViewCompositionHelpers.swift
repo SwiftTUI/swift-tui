@@ -55,7 +55,12 @@ package struct DeferredPayloadGroupView: View, ResolvableView {
     case 0:
       return []
     case 1:
-      return payloads[0].resolveElements(in: context)
+      return [
+        resolveView(
+          DeferredPayloadView(payload: payloads[0]),
+          in: context
+        )
+      ]
     default:
       return [
         resolveDeferredGroupElements(
@@ -80,7 +85,8 @@ private func resolveDeferredGroupElements(
 ) -> ResolvedNode {
   context.recordResolvedComputation()
   let resolvedChildren = payloads.enumerated().map { index, payload in
-    payload.resolve(
+    resolveView(
+      DeferredPayloadView(payload: payload),
       in: context.indexedChild(
         kind: .init(rawValue: kindName),
         index: index

@@ -79,20 +79,7 @@ struct PresentationContinuityTests {
     #expect(shownArtifacts.resolvedTree.descendant(withText: "Sheet body") != nil)
   }
 
-  // Disabled during Phase 0 of the ActionScopes rewrite. Removing the
-  // `.onKeyPress(.escape)` wrapper from `HostedPromptPresentation` exposed a
-  // lifecycle-tracking quirk in the view graph: without that outer
-  // pass-through ResolvableView, the overlay subtree's descendants are not
-  // registered deeply enough for `removeSubtree` to fire structural
-  // `disappear`/`taskCancel` events on dismissal. The scenario under test
-  // (Escape-owned presentation dismissal) is scheduled for a proper
-  // framework-owned implementation in Phase 3; this test should be
-  // re-enabled then, likely with an explicit-dismiss-button assertion
-  // instead of the current lifecycle snapshot assertion.
-  @Test(
-    "sheet overlay lifecycle starts on presentation and stops on dismissal",
-    .disabled("Phase 0 regression — see comment above.")
-  )
+  @Test("sheet overlay lifecycle starts on presentation and stops on dismissal")
   func sheetOverlayLifecycleStartsAndStopsWithTheOverlay() throws {
     let renderer = DefaultRenderer()
     let rootIdentity = testIdentity("Root")

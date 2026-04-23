@@ -1130,7 +1130,8 @@ private struct PresentationCoordinatorBodyHost: View, ResolvableView {
   var payload: DeferredViewPayload
 
   func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let childNode = payload.resolve(
+    let childNode = resolveView(
+      DeferredPayloadView(payload: payload),
       in: context.child(component: .named("body"))
     )
 
