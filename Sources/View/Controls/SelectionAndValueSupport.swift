@@ -701,6 +701,7 @@ package func textEditorBody(
     }
     .padding(.init(horizontal: 1, vertical: 1))
   }
+  .focusable(false)
   .background {
     RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(chrome.backgroundStyle)
   }

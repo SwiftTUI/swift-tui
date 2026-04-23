@@ -96,6 +96,7 @@ extension RunLoop {
     if keyPress == KeyPress(.escape, modifiers: []) {
       if let dismiss = renderer.topmostEscapeDismissAction() {
         dismiss()
+        scheduler.requestInvalidation(of: [rootIdentity])
         return nil
       }
     }

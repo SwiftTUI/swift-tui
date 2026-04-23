@@ -78,12 +78,12 @@ struct FullScreenTabGestureTests {
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       viewBuilder: { FullScreenTab() },
-      eventSchedule: [
-        .init(
-          delayNanoseconds: 700_000_000,
-          event: .key(KeyPress(.character("c"), modifiers: .ctrl))
-        )
-      ]
+      terminalInputReader: AwaitedTerminalInputReader(steps: [
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          deduplicated(host.surfaces).count >= 2
+        },
+        .event(.key(KeyPress(.character("c"), modifiers: .ctrl))),
+      ])
     )
 
     #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
@@ -237,12 +237,12 @@ struct FullScreenTabGestureTests {
           .panel(id: "gallery")
           .toolbar(style: DefaultBottomToolbarStyle())
       },
-      eventSchedule: [
-        .init(
-          delayNanoseconds: 700_000_000,
-          event: .key(KeyPress(.character("c"), modifiers: .ctrl))
-        )
-      ]
+      terminalInputReader: AwaitedTerminalInputReader(steps: [
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          deduplicated(host.surfaces).count >= 2
+        },
+        .event(.key(KeyPress(.character("c"), modifiers: .ctrl))),
+      ])
     )
 
     #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
@@ -262,6 +262,14 @@ private struct ScheduledInputEvent {
   let event: InputEvent
 }
 
+private enum AwaitedTerminalInputStep {
+  case event(InputEvent, delayNanoseconds: UInt64 = 0)
+  case waitUntil(
+    timeoutNanoseconds: UInt64 = 1_000_000_000,
+    predicate: @MainActor () -> Bool
+  )
+}
+
 private final class ScheduledTerminalInputReader: TerminalInputReading {
   let schedule: [ScheduledInputEvent]
 
@@ -278,6 +286,48 @@ private final class ScheduledTerminalInputReader: TerminalInputReading {
             try? await Task.sleep(nanoseconds: item.delayNanoseconds)
           }
           continuation.yield(item.event)
+        }
+        continuation.finish()
+      }
+
+      continuation.onTermination = { _ in
+        task.cancel()
+      }
+    }
+  }
+}
+
+private final class AwaitedTerminalInputReader: TerminalInputReading {
+  private let steps: [AwaitedTerminalInputStep]
+  private let pollNanoseconds: UInt64
+
+  init(
+    steps: [AwaitedTerminalInputStep],
+    pollNanoseconds: UInt64 = 10_000_000
+  ) {
+    self.steps = steps
+    self.pollNanoseconds = pollNanoseconds
+  }
+
+  func inputEvents() -> AsyncStream<InputEvent> {
+    AsyncStream { continuation in
+      let steps = self.steps
+      let pollNanoseconds = self.pollNanoseconds
+      let task = Task { @MainActor in
+        for step in steps {
+          switch step {
+          case .event(let event, let delayNanoseconds):
+            if delayNanoseconds > 0 {
+              try? await Task.sleep(nanoseconds: delayNanoseconds)
+            }
+            continuation.yield(event)
+          case .waitUntil(let timeoutNanoseconds, let predicate):
+            var elapsedNanoseconds: UInt64 = 0
+            while !predicate() && elapsedNanoseconds < timeoutNanoseconds {
+              try? await Task.sleep(nanoseconds: pollNanoseconds)
+              elapsedNanoseconds += pollNanoseconds
+            }
+          }
         }
         continuation.finish()
       }
@@ -320,12 +370,29 @@ private func runHarness<V: View>(
   viewBuilder: @escaping () -> V,
   eventSchedule: [ScheduledInputEvent]
 ) async throws -> RunLoopResult<Int> {
+  try await runHarness(
+    host: host,
+    terminalSize: terminalSize,
+    rootIdentity: rootIdentity,
+    viewBuilder: viewBuilder,
+    terminalInputReader: ScheduledTerminalInputReader(schedule: eventSchedule)
+  )
+}
+
+@MainActor
+private func runHarness<V: View>(
+  host: GestureRecordingHost,
+  terminalSize: Size,
+  rootIdentity: Identity,
+  viewBuilder: @escaping () -> V,
+  terminalInputReader: any TerminalInputReading
+) async throws -> RunLoopResult<Int> {
   var env = EnvironmentValues()
   env.terminalSize = terminalSize
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
     terminalHost: host,
-    terminalInputReader: ScheduledTerminalInputReader(schedule: eventSchedule),
+    terminalInputReader: terminalInputReader,
     signalReader: nil,
     scheduler: FrameScheduler(),
     stateContainer: StateContainer(
