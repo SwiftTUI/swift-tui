@@ -385,6 +385,31 @@ package final class ViewGraph {
     removeSubtree(rootedAt: previousResolvedRoot)
   }
 
+  package func pruneDetachedIdentitySubtree(
+    rootedAt identity: Identity
+  ) {
+    let staleNodes = nodesByIdentity.values
+      .filter { node in
+        node.prepareForFrame(currentFrameID)
+        return (node.identity == identity || node.identity.isDescendant(of: identity))
+          && node.wasPresentAtFrameStart
+          && !node.visitedThisFrame(currentFrameID)
+      }
+      .sorted { lhs, rhs in
+        if lhs.identity.components.count == rhs.identity.components.count {
+          return lhs.identity < rhs.identity
+        }
+        return lhs.identity.components.count > rhs.identity.components.count
+      }
+
+    for node in staleNodes {
+      guard nodesByIdentity[node.identity] != nil else {
+        continue
+      }
+      removeSubtree(rootedAt: node)
+    }
+  }
+
   package func recordReusedSubtree(
     _ subtree: ResolvedNode,
     invalidator: (any Invalidating)?
@@ -555,7 +580,6 @@ package final class ViewGraph {
     resolved: ResolvedNode,
     placed: PlacedNode?
   ) -> [LifecycleEvent] {
-    removeUnvisitedStructuralSubtrees(excluding: rootIdentity)
     root = nodesByIdentity[rootIdentity]
 
     for identity in frameOrder {
@@ -617,33 +641,6 @@ package final class ViewGraph {
     invalidatedIdentities.removeAll(keepingCapacity: true)
     graphLocalDirtyIdentities.removeAll(keepingCapacity: true)
     return latestLifecycleEvents
-  }
-
-  private func removeUnvisitedStructuralSubtrees(
-    excluding rootIdentity: Identity
-  ) {
-    let staleRoots = nodesByIdentity.values
-      .filter { node in
-        node.prepareForFrame(currentFrameID)
-        return node.identity != rootIdentity
-          && node.wasPresentAtFrameStart
-          && node.participatesInStructuralLifecycle
-          && !node.visitedThisFrame(currentFrameID)
-          && (node.parent == nil || node.parent?.visitedThisFrame(currentFrameID) == true)
-      }
-      .sorted { lhs, rhs in
-        if lhs.identity.components.count == rhs.identity.components.count {
-          return lhs.identity < rhs.identity
-        }
-        return lhs.identity.components.count < rhs.identity.components.count
-      }
-
-    for node in staleRoots {
-      guard nodesByIdentity[node.identity] != nil else {
-        continue
-      }
-      removeSubtree(rootedAt: node)
-    }
   }
 
   package func snapshot() -> ResolvedNode {
