@@ -9,11 +9,10 @@ package struct ScopedBuilder<Output: View>: View, ResolvableView {
     _ authoringContext: AuthoringContext?,
     _ apply: @escaping @MainActor (ResolveContext) -> [ResolvedNode]
   ) -> @MainActor (ResolveContext) -> [ResolvedNode] {
-    guard let authoringContext else {
-      return apply
-    }
-
     return { context in
+      // A deferred builder with no captured scope should resolve as a fresh
+      // authored subtree at its destination, not inherit whatever task-local
+      // authoring context happened to be active in the parent wrapper.
       withAuthoringContext(authoringContext) {
         apply(context)
       }
