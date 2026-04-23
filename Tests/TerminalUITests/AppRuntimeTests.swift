@@ -276,19 +276,8 @@ struct AppRuntimeTests {
     #expect(lastFrame.contains("Count 1"))
   }
 
-  // Disabled during Phase 0 of the ActionScopes rewrite. This test pressed
-  // `.escape` to dismiss the sheet, which relied on the now-removed
-  // `.onKeyPress(.escape)` handler inside `HostedPromptPresentation`. Escape-
-  // owned presentation dismissal returns in Phase 3 as a proper framework-
-  // owned behavior; re-enable this test then. Attempts to drive dismissal via
-  // the sheet's explicit Close button as a workaround currently leave
-  // `presentFocused` unrestored — the test should stay bound to the
-  // framework-owned Escape path.
   @MainActor
-  @Test(
-    "dismissing a sheet restores focus to the previously focused base control",
-    .disabled("Phase 0 regression — see comment above.")
-  )
+  @Test("dismissing a sheet restores focus to the previously focused base control")
   func dismissingSheetRestoresFocusToThePreviouslyFocusedBaseControl() async throws {
     let terminal = RecordingTerminalHost(surfaceSize: .init(width: 72, height: 14))
 
@@ -298,8 +287,20 @@ struct AppRuntimeTests {
       },
       sessionName: "AppRuntimeTests.SheetFocusRestorationWindow",
       terminalHost: terminal,
-      inputReader: ScriptedInputReader(events: [
-        KeyPress(.return), KeyPress(.escape), KeyPress(.character("c"), modifiers: .ctrl),
+      inputReader: AwaitedScriptedInputReader(steps: [
+        .press(KeyPress(.return)),
+        .waitUntil {
+          terminal.frames.contains { $0.contains("Sheet focus active: true") }
+        },
+        .press(KeyPress(.escape)),
+        .waitUntil {
+          guard let lastFrame = terminal.frames.last else {
+            return false
+          }
+          return !lastFrame.contains("Sheet focus active: true")
+            && lastFrame.contains("Base focused: true")
+        },
+        .press(KeyPress(.character("c"), modifiers: .ctrl)),
       ]),
       signalReader: EmptySignalReader()
     )
