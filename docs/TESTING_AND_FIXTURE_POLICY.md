@@ -43,6 +43,17 @@ not as the default place for every new assertion.
 - Keep one or two end-to-end smoke suites for whole-pipeline confidence.
 - Treat fixture changes as evidence, not as housekeeping.
 - Keep performance checks deterministic and scenario-based.
+- When behavior depends on input dispatch, selective invalidation, or
+  presentation timing, reproduce and assert through the real runtime path
+  instead of only invoking direct handlers.
+- Add composed-path regressions for wrapper-hosted, scene-hosted, or
+  otherwise nested runtime bugs; plain inner-content canaries often miss
+  host-reconciliation failures.
+- Use bounded condition-based waits for async and animation coverage instead
+  of fixed sleeps or guessed frame counts.
+- Focused suites are for triage and localization. `bun run test` remains the
+  completion gate for changes that touch shared runtime behavior, repo-wide
+  test infrastructure, or tooling.
 
 ## Fixture Updates
 
@@ -86,3 +97,8 @@ When updating fixtures:
 - Did the relevant fixture or benchmark update because behavior changed, not because the implementation drifted?
 - Do the docs still describe the current file map and the current fallback cases?
 - Is there still at least one local test that can fail without needing the whole integration suite?
+- If the bug depended on runtime composition, did the regression exercise the
+  real hosted path that failed in practice?
+- If the test waits for runtime progress, does it wait on an observable
+  condition with a timeout instead of sleeping for a guessed duration?
+- If the change touched shared runtime behavior or repo tooling, did the final tree pass `bun run test`?

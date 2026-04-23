@@ -59,7 +59,13 @@ That ordering is visible in `DefaultRenderer`, `FrameArtifacts`, `Pipeline`, and
 - Public `View` values are lowered into `ResolvedNode` trees through package-only lowering helpers
 - Structural views such as `Group`, `ForEach`, and conditionals affect the resolved child set
 - Environment and metadata are merged here
-- Root-hoisted presentations are declared during normal base resolution, then composed around the resolved base tree afterward so the displayed base subtree keeps its authored identity space
+- Root-hoisted presentations are declared during normal base resolution, then
+  composed around the resolved base tree afterward so the displayed base
+  subtree keeps its authored identity space
+- Presentation hosts reconcile any host-owned mirrored presentation state
+  from the current resolved base tree before choosing overlay entries;
+  selective dirty evaluation can re-resolve only the declaring subtree,
+  especially under wrapper and scene hosts
 - Reuse is conservative and keyed by identity, invalidation scope, and compatible context
 
 ### Measure
@@ -92,6 +98,9 @@ That ordering is visible in `DefaultRenderer`, `FrameArtifacts`, `Pipeline`, and
 
 - `CommitPlanner` packages semantic, lifecycle, and handler-installation work into `CommitPlan`
 - `ViewGraph` owns lifecycle state and emits explicit appear, disappear, task-start, and task-cancel operations during frame finalization
+- Presentation dismissal cleanup must stay scoped to the dismissed overlay
+  subtree identities instead of broad stale-subtree sweeps that can tear down
+  unrelated retained content
 - Public `.onAppear`, `.onDisappear`, and `.task` hooks lower into this phase rather than firing during resolve
 
 ## Runtime Model
