@@ -1067,14 +1067,16 @@ package func composePresentationHostTree(
     return baseNode
   }
 
+  guard !overlayEntries.isEmpty else {
+    context.runtimeRegistrations.removeSubtrees(rootedAt: [overlayContext.identity])
+    context.viewGraph?.pruneDetachedIdentitySubtree(rootedAt: overlayContext.identity)
+    return baseNode
+  }
+
   let overlayNode = resolveView(
     PresentationOverlayHost(entries: overlayEntries),
     in: overlayContext
   )
-
-  guard !overlayEntries.isEmpty else {
-    return baseNode
-  }
 
   var hostedBaseNode = baseNode
   if hostState.disablesBaseInteraction {
