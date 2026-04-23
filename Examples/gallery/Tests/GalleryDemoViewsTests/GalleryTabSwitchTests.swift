@@ -1,5 +1,5 @@
 import Dispatch
-import TerminalUI
+@_spi(Runners) import TerminalUI
 import Testing
 
 @testable import GalleryDemoViews
@@ -224,6 +224,14 @@ struct GalleryTabSwitchTests {
       rendered.contains("remaining") && !rendered.contains("Write docs")
     }
 
+    let stableAfterDeleteScreen = try await Self.waitForScreen(
+      on: pty.master,
+      screen: &screen,
+      timeoutNanoseconds: 400_000_000
+    ) { rendered in
+      rendered.contains("A SwiftUI-shaped terminal UI")
+    }
+
     _ = close(pty.master)
 
     _ = try await runTask.value
@@ -235,6 +243,142 @@ struct GalleryTabSwitchTests {
     #expect(
       !afterDeleteScreen.contains("A SwiftUI-shaped terminal UI"),
       "expected not to snap back to the Counter tab; screen was:\n\(afterDeleteScreen)"
+    )
+    #expect(
+      !stableAfterDeleteScreen.contains("A SwiftUI-shaped terminal UI"),
+      "expected follow-up frames to stay on Todo after deleting the top row; screen was:\n\(stableAfterDeleteScreen)"
+    )
+    #expect(
+      stableAfterDeleteScreen.contains("2 remaining"),
+      "expected the deletion to persist across follow-up frames; screen was:\n\(stableAfterDeleteScreen)"
+    )
+  }
+
+  @Test("scene-hosted gallery stays on Todo after deleting the top todo row")
+  func sceneHostedGalleryDeletingTopTodoRowKeepsTodoVisible() async throws {
+    let terminalSize = Size(width: 80, height: 24)
+    let rootIdentity = Identity(components: [.named("GalleryTodoDeleteSceneHostedBounds")])
+
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+    let initial = DefaultRenderer().render(
+      GalleryView(),
+      context: .init(identity: rootIdentity, environmentValues: env),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+
+    let todoBounds = try #require(Self.boundsOfText("Todo", in: initial.placedTree))
+    let todoClickCenter = Point(
+      x: todoBounds.origin.x + todoBounds.size.width / 2,
+      y: todoBounds.origin.y + todoBounds.size.height / 2
+    )
+
+    let todoSelected = DefaultRenderer().render(
+      GallerySelectionSeedHarness(initialSelection: .todo),
+      context: .init(identity: rootIdentity, environmentValues: env),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+    let deleteBounds = try #require(
+      Self.boundsOfText("×", in: todoSelected.placedTree, chooseTopMost: true)
+    )
+    let deleteClickCenter = Point(
+      x: deleteBounds.origin.x + deleteBounds.size.width / 2,
+      y: deleteBounds.origin.y + deleteBounds.size.height / 2
+    )
+
+    let pty = try #require(Self.makePseudoTerminal(size: terminalSize))
+    defer {
+      _ = close(pty.master)
+      _ = close(pty.slave)
+    }
+
+    let host = TerminalHost(
+      inputFileDescriptor: pty.slave,
+      outputFileDescriptor: pty.slave,
+      fallbackSize: terminalSize,
+      capabilityProfile: .previewUnicode
+    )
+    let inputReader = InputReader(fileDescriptor: pty.slave)
+
+    let runTask = Task {
+      try await Self.runSceneHarness(
+        scene: WindowGroup("Gallery Window") {
+          GalleryView()
+        },
+        terminalHost: host,
+        terminalInputReader: inputReader,
+        sessionName: "GalleryTabSwitchTests.SceneHostedGalleryDelete"
+      )
+    }
+
+    var screen = PTYVisibleScreen(size: terminalSize)
+
+    let initialScreen = try await Self.waitForScreen(
+      on: pty.master,
+      screen: &screen
+    ) { rendered in
+      rendered.contains("Counter") && rendered.contains("Todo")
+    }
+    #expect(
+      initialScreen.contains("Counter"),
+      "expected the initial gallery frame to render; screen was:\n\(initialScreen)"
+    )
+
+    try Self.writeAllBytes(
+      Self.sgrPrimaryClick(at: todoClickCenter),
+      to: pty.master
+    )
+
+    let todoScreen = try await Self.waitForScreen(
+      on: pty.master,
+      screen: &screen
+    ) { rendered in
+      rendered.contains("remaining") && rendered.contains("Write docs")
+    }
+    #expect(
+      todoScreen.contains("remaining"),
+      "expected the Todo tab after clicking Todo; screen was:\n\(todoScreen)"
+    )
+
+    try Self.writeAllBytes(
+      Self.sgrPrimaryClick(at: deleteClickCenter),
+      to: pty.master
+    )
+
+    let afterDeleteScreen = try await Self.waitForScreen(
+      on: pty.master,
+      screen: &screen
+    ) { rendered in
+      rendered.contains("remaining") && !rendered.contains("Write docs")
+    }
+
+    let stableAfterDeleteScreen = try await Self.waitForScreen(
+      on: pty.master,
+      screen: &screen,
+      timeoutNanoseconds: 400_000_000
+    ) { rendered in
+      rendered.contains("A SwiftUI-shaped terminal UI")
+    }
+
+    _ = close(pty.master)
+
+    _ = try await runTask.value
+
+    #expect(
+      afterDeleteScreen.contains("remaining"),
+      "expected the Todo tab to remain visible after deleting the top row; screen was:\n\(afterDeleteScreen)"
+    )
+    #expect(
+      !afterDeleteScreen.contains("A SwiftUI-shaped terminal UI"),
+      "expected not to snap back to the Counter tab; screen was:\n\(afterDeleteScreen)"
+    )
+    #expect(
+      !stableAfterDeleteScreen.contains("A SwiftUI-shaped terminal UI"),
+      "expected follow-up frames to stay on Todo after deleting the top row; screen was:\n\(stableAfterDeleteScreen)"
+    )
+    #expect(
+      stableAfterDeleteScreen.contains("2 remaining"),
+      "expected the deletion to persist across follow-up frames; screen was:\n\(stableAfterDeleteScreen)"
     )
   }
 
@@ -317,6 +461,39 @@ struct GalleryTabSwitchTests {
       viewBuilder: { _, _ in viewBuilder() }
     )
     return try await runLoop.run()
+  }
+
+  @MainActor
+  private static func runSceneHarness<S: Scene>(
+    scene: S,
+    terminalHost: any TerminalHosting,
+    terminalInputReader: any TerminalInputReading,
+    sessionName: String
+  ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
+    let selections = collectWindowSceneSelections(from: scene)
+    guard let selection = selections.first else {
+      throw AppLaunchError.noScenes
+    }
+    guard selections.count == 1 else {
+      fatalError("expected a single scene for the gallery test harness")
+    }
+
+    return try await selection.run(
+      sessionName: sessionName,
+      resources: .init(
+        terminalHost: terminalHost,
+        terminalInputReader: terminalInputReader,
+        signalReader: GalleryTabSwitchEmptySignals(),
+        scheduler: FrameScheduler()
+      ),
+      stateContainer: StateContainer(
+        initialState: TerminalUISceneSessionState(),
+        invalidationIdentities: [selection.rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [selection.rootIdentity]
+      )
+    )
   }
 
   private static func makePseudoTerminal(
