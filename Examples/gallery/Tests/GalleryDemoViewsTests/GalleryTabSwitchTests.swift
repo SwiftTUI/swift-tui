@@ -254,6 +254,71 @@ struct GalleryTabSwitchTests {
     )
   }
 
+  @Test(
+    "opening and dismissing the palette keeps fullscreen progress while Full Screen stays selected")
+  func paletteOpenAndDismissKeepsFullscreenProgress() async throws {
+    let terminalSize = Size(width: 80, height: 24)
+    let rootIdentity = Identity(components: [.named("GalleryFullScreenPaletteContinuity")])
+    let view = GallerySelectionSeedHarness(initialSelection: .fullScreen)
+    let host = GalleryTabSwitchRecordingHost(size: terminalSize)
+    let capture = GallerySurfaceCapture()
+
+    let result = try await Self.runHarness(
+      terminalHost: host,
+      terminalInputReader: GalleryTabSwitchAwaitedInputReader(steps: [
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          let surfaces = deduplicated(host.surfaces)
+          guard surfaces.count >= 2 else {
+            return false
+          }
+          capture.initialFullscreenSurface = capture.initialFullscreenSurface ?? surfaces.first
+          capture.prePaletteSurface = surfaces.last
+          return capture.prePaletteSurface != capture.initialFullscreenSurface
+        },
+        .event(.key(KeyPress(.character("k"), modifiers: .ctrl))),
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          let text = host.lastPresentedSurface?.lines.joined(separator: "\n") ?? ""
+          return text.contains("Command palette")
+        },
+        .event(.key(KeyPress(.escape, modifiers: []))),
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          guard let surface = host.lastPresentedSurface else {
+            return false
+          }
+          let text = surface.lines.joined(separator: "\n")
+          guard !text.contains("Command palette"), !text.contains("palette sheet") else {
+            return false
+          }
+          capture.postDismissSurface = surface
+          return true
+        },
+        .event(.key(KeyPress(.character("c"), modifiers: .ctrl))),
+      ]),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      viewBuilder: { view }
+    )
+
+    let initialFullscreenSurface = try #require(capture.initialFullscreenSurface)
+    let prePaletteSurface = try #require(capture.prePaletteSurface)
+    let postDismissSurface = try #require(capture.postDismissSurface)
+    let postDismissText = postDismissSurface.lines.joined(separator: "\n")
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(
+      prePaletteSurface != initialFullscreenSurface,
+      "expected fullscreen animation to advance before opening the palette"
+    )
+    #expect(
+      postDismissSurface != initialFullscreenSurface,
+      "dismissing the palette should not recreate the fullscreen tab at its initial spawn frame"
+    )
+    #expect(
+      !postDismissText.contains("A SwiftUI-shaped terminal UI"),
+      "dismissing the palette should keep the Full Screen tab selected; surface was:\n\(postDismissText)"
+    )
+  }
+
   @Test("scene-hosted gallery stays on Todo after deleting the top todo row")
   func sceneHostedGalleryDeletingTopTodoRowKeepsTodoVisible() async throws {
     let terminalSize = Size(width: 80, height: 24)
@@ -773,6 +838,56 @@ private final class GalleryTabSwitchScriptedInput: TerminalInputReading {
   }
 }
 
+private enum GalleryTabSwitchAwaitedInputStep {
+  case event(InputEvent, delayNanoseconds: UInt64 = 0)
+  case waitUntil(
+    timeoutNanoseconds: UInt64 = 1_000_000_000,
+    predicate: @MainActor () -> Bool
+  )
+}
+
+private final class GalleryTabSwitchAwaitedInputReader: TerminalInputReading {
+  private let steps: [GalleryTabSwitchAwaitedInputStep]
+  private let pollNanoseconds: UInt64
+
+  init(
+    steps: [GalleryTabSwitchAwaitedInputStep],
+    pollNanoseconds: UInt64 = 10_000_000
+  ) {
+    self.steps = steps
+    self.pollNanoseconds = pollNanoseconds
+  }
+
+  func inputEvents() -> AsyncStream<InputEvent> {
+    AsyncStream { continuation in
+      let steps = self.steps
+      let pollNanoseconds = self.pollNanoseconds
+      let task = Task { @MainActor in
+        for step in steps {
+          switch step {
+          case .event(let event, let delayNanoseconds):
+            if delayNanoseconds > 0 {
+              try? await Task.sleep(nanoseconds: delayNanoseconds)
+            }
+            continuation.yield(event)
+          case .waitUntil(let timeoutNanoseconds, let predicate):
+            var elapsedNanoseconds: UInt64 = 0
+            while !predicate() && elapsedNanoseconds < timeoutNanoseconds {
+              try? await Task.sleep(nanoseconds: pollNanoseconds)
+              elapsedNanoseconds += pollNanoseconds
+            }
+          }
+        }
+        continuation.finish()
+      }
+
+      continuation.onTermination = { _ in
+        task.cancel()
+      }
+    }
+  }
+}
+
 private final class GalleryTabSwitchEmptySignals: SignalReading {
   func events() -> AsyncStream<String> {
     AsyncStream { continuation in
@@ -785,6 +900,7 @@ private final class GalleryTabSwitchRecordingHost: TerminalHosting {
   let surfaceSize: Size
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
+  private(set) var surfaces: [RasterSurface] = []
   private(set) var lastPresentedSurface: RasterSurface?
 
   init(size: Size) {
@@ -799,9 +915,28 @@ private final class GalleryTabSwitchRecordingHost: TerminalHosting {
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+    surfaces.append(surface)
     lastPresentedSurface = surface
     return .init(bytesWritten: 0, linesTouched: 0, cellsChanged: 0, strategy: .fullRepaint)
   }
+}
+
+@MainActor
+private final class GallerySurfaceCapture {
+  var initialFullscreenSurface: RasterSurface?
+  var prePaletteSurface: RasterSurface?
+  var postDismissSurface: RasterSurface?
+}
+
+private func deduplicated(
+  _ surfaces: [RasterSurface]
+) -> [RasterSurface] {
+  var result: [RasterSurface] = []
+  result.reserveCapacity(surfaces.count)
+  for surface in surfaces where result.last != surface {
+    result.append(surface)
+  }
+  return result
 }
 
 private struct PTYVisibleScreen {

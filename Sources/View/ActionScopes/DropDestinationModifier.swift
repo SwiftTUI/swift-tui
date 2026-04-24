@@ -20,6 +20,7 @@ extension ActionScope where Self: View & Sendable {
   ) -> some View & ActionScope & Sendable {
     modifier(
       DropDestinationRegistrationModifier(
+        authoringContext: currentImperativeAuthoringContextSnapshot(),
         action: action
       )
     )
@@ -27,11 +28,14 @@ extension ActionScope where Self: View & Sendable {
 }
 
 public struct DropDestinationRegistrationModifier: PrimitiveViewModifier, Sendable {
+  package let authoringContext: ImperativeAuthoringContextSnapshot?
   package let action: @MainActor @Sendable ([DroppedPath]) -> Bool
 
   package init(
+    authoringContext: ImperativeAuthoringContextSnapshot?,
     action: @escaping @MainActor @Sendable ([DroppedPath]) -> Bool
   ) {
+    self.authoringContext = authoringContext
     self.action = action
   }
 
@@ -40,7 +44,15 @@ public struct DropDestinationRegistrationModifier: PrimitiveViewModifier, Sendab
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
-    context.dropDestinationRegistry?.register(at: node.identity, handler: action)
+    let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
+    context.dropDestinationRegistry?.register(
+      at: node.identity,
+      handler: { paths in
+        withImperativeAuthoringContext(dynamicPropertyScope) {
+          action(paths)
+        }
+      }
+    )
     return [node]
   }
 }
