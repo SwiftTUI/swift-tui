@@ -4,7 +4,7 @@ import Testing
 @testable import SwiftUITUIGUI
 
 @Test
-func terminal_style_maps_to_ghostty_configuration_and_single_host_style() {
+func terminal_style_maps_to_native_render_style() {
   let palette = SwiftUITUITerminalPalette(
     foreground: .hex("#112233"),
     background: .hex("#445566"),
@@ -59,19 +59,13 @@ func terminal_style_maps_to_ghostty_configuration_and_single_host_style() {
     theme: theme
   )
 
-  let configuration = style.terminalConfiguration
-  let renderedConfiguration = configuration.rendered
-  #expect(renderedConfiguration.contains("font-family = Iosevka"))
-  #expect(renderedConfiguration.contains("font-size = 13"))
-  #expect(renderedConfiguration.contains("cursor-style = underline"))
-  #expect(renderedConfiguration.contains("cursor-style-blink = false"))
-  #expect(renderedConfiguration.contains("background-opacity = 0.5"))
-
-  let terminalTheme = style.terminalTheme
-  #expect(terminalTheme.light.rendered.contains("background = #445566"))
-  #expect(terminalTheme.light.rendered.contains("foreground = #112233"))
-  #expect(terminalTheme.light.rendered.contains("palette = 15=#FFFFFF"))
-  #expect(terminalTheme.dark.rendered.contains("background = #445566"))
+  #expect(style.fontFamily == "Iosevka")
+  #expect(style.fontSize == 13)
+  #expect(style.cursorStyle == .underline)
+  #expect(style.cursorBlink == false)
+  #expect(style.backgroundOpacity == 0.5)
+  #expect(style.palette.selectionBackground == .hex("#AABBCC"))
+  #expect(style.palette.selectionForeground == .hex("#DDEEFF"))
 
   let renderStyle = style.renderStyle
   #expect(renderStyle.theme == theme)

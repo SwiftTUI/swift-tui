@@ -129,7 +129,7 @@ another app or runtime lifecycle.
   - `Runners/TerminalUICLI`: terminal-native executable runner, scene discovery, ptys, and attach flows
   - `Runners/TerminalUIWASI`: WASI executable runner plus manifest mode
 - embedded host packages:
-  - `GUI/SwiftUITUIGUI`: Ghostty-backed SwiftUI host package for macOS and iOS
+  - `GUI/SwiftUITUIGUI`: native SwiftUI host package for macOS and iOS
   - `GUI/SwiftTermTUIGUI`: SwiftTerm-backed SwiftUI host package for macOS and iOS
   - `GUI/WebTUIGUI`: Bun-based browser host that consumes a `TerminalUIWASI` build and `ghostty-web`
   - `GUI/XtermWebTUIGUI`: Bun-based browser host that consumes a `TerminalUIWASI` build and xterm.js

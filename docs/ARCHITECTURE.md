@@ -105,14 +105,15 @@ That ordering is visible in `DefaultRenderer`, `FrameArtifacts`, `Pipeline`, and
 
 ## Runtime Model
 
-`RunLoop` wraps the pure frame pipeline in an interactive terminal session.
+`RunLoop` wraps the pure frame pipeline in an interactive session.
 
 It coordinates:
 
 - `TerminalHost` for raw mode, alternate-screen ownership, surface sizing, and writes
 - `StreamingTerminalHost` for embedded hosts that need the same presentation contract without owning a file descriptor
+- `HostedSceneSession` native surface hosting for embedded SwiftUI hosts that consume `RasterSurface` directly
 - input readers and signal readers for event streams
-- `InjectedTerminalInputReader` for wrapper-managed byte delivery that still shares the terminal control-message contract
+- `InjectedTerminalInputReader` for wrapper-managed byte or event delivery that still shares the terminal control-message contract
 - `FrameScheduler` for invalidations, deadlines, signals, and wakeups
 - `StateContainer` plus dynamic state storage for local state changes
 - focus, action, key, lifecycle, task, pointer, and focused-value registries

@@ -5,7 +5,7 @@
 Make TerminalUI apps shippable outside a local terminal in four peer embedded
 host packages:
 
-- `GUI/SwiftUITUIGUI`: a Ghostty-backed SPM package that lets a macOS or iOS app host a TerminalUI scene inside SwiftUI
+- `GUI/SwiftUITUIGUI`: a native SwiftUI SPM package that lets a macOS or iOS app host a TerminalUI scene without a terminal emulator
 - `GUI/SwiftTermTUIGUI`: a SwiftTerm-backed SPM package that lets a macOS or iOS app host a TerminalUI scene inside SwiftUI
 - `GUI/WebTUIGUI`: a Bun-based package that lets a TerminalUI app ship in the browser on top of `ghostty-web`
 - `GUI/XtermWebTUIGUI`: a Bun-based package that lets a TerminalUI app ship in the browser on top of xterm.js
@@ -34,28 +34,29 @@ The host-facing root work is landed:
   plus WASI scene launch
 - shared control-message parsing lives in
   `Sources/TerminalUI/TerminalControlMessages.swift`
-- embedded hosts use `InjectedTerminalInputReader` and
-  `StreamingTerminalHost`
+- embedded hosts use `InjectedTerminalInputReader`; terminal-emulator-backed
+  hosts use streaming presentation output, while the native SwiftUI host
+  receives `RasterSurface` values directly
 - hosted sessions now accept paired render-style updates so terminal appearance
   and semantic theme move together at runtime
 - `TerminalUI` is now library-only; executable launch is entirely runner-owned
 
 ### `GUI/SwiftUITUIGUI`
 
-The Ghostty-backed SwiftUI host package is landed as a standalone SPM package:
+The native SwiftUI host package is landed as a standalone SPM package:
 
 - package root: `GUI/SwiftUITUIGUI`
 - dependencies:
   - local path dependency on the root package
-  - published `libghostty-spm`
 - key runtime files:
   - `SwiftUITUIAppState.swift`
   - `SwiftUITUIAppView.swift`
   - `SwiftUITUISceneHost.swift`
-  - `GhosttySceneBridge.swift`
+  - `NativeSceneBridge.swift`
+  - `NativeTerminalSurfaceView.swift`
   - `SwiftUITUITerminalStyle.swift`
 - SwiftUI styles now expose explicit light and dark theme variants, each pairing
-  Ghostty palette state with TerminalUI semantic theme tokens
+  native renderer palette state with TerminalUI semantic theme tokens
 - verification:
   - `SceneRetentionTests.swift`
   - `ResizeBridgeTests.swift`
@@ -137,7 +138,7 @@ The current boundary is:
   - control-message contract for resize and render-style updates
 - host packages:
   - window or browser shell integration
-  - terminal widget embedding
+  - native surface, terminal widget, or browser terminal embedding
   - scene tabs, pickers, or other host-local chrome
   - host-specific style mapping and host-owned theme swapping
 
@@ -162,7 +163,7 @@ new products in the root package.
 3. Each scene gets its own retained runtime session. Switching scenes changes which hosted session is visible; it does not rebuild the app body from scratch.
 4. Scene switching is host-managed. It is not a new terminal escape-sequence protocol.
 5. Terminal style is host-owned. The Swift package and the Bun package expose mirrored style concepts, not a shared cross-language source file, and host packages choose the active theme variant.
-6. The Apple host packages intentionally remain backend-specific peer packages rather than one backend-abstracted package. `GUI/SwiftUITUIGUI` owns Ghostty integration and `GUI/SwiftTermTUIGUI` owns SwiftTerm integration.
+6. The Apple host packages intentionally remain backend-specific peer packages rather than one backend-abstracted package. `GUI/SwiftUITUIGUI` owns the native SwiftUI surface and `GUI/SwiftTermTUIGUI` owns SwiftTerm integration.
 7. The web packages keep one wasm module instance per scene and one browser terminal per scene so scene state survives switches without a more complex protocol.
 8. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior and is now extended with paired render-style updates.
 
@@ -185,5 +186,5 @@ repository.
 - generating an Xcode project
 - building custom desktop or mobile chrome beyond a terminal surface and scene/style control APIs
 - replacing the browser terminal stack with a custom implementation
-- collapsing the Ghostty-backed and SwiftTerm-backed Apple hosts into a single backend-abstracted package
+- collapsing the native SwiftUI and SwiftTerm-backed Apple hosts into a single backend-abstracted package
 - adding tabs, split panes, or session persistence beyond in-memory retained scene sessions

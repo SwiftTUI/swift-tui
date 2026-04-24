@@ -1,4 +1,3 @@
-import Ghostty
 import TerminalUI
 
 public enum SwiftUITUICursorStyle: String, Sendable, Hashable {
@@ -40,23 +39,6 @@ public struct SwiftUITUITerminalPalette: Equatable, Sendable {
     ansi: .default
   )
 
-  fileprivate var ghosttyConfiguration: TerminalConfiguration {
-    var configuration = TerminalConfiguration()
-    configuration =
-      configuration
-      .background(background.hexString())
-      .foreground(foreground.hexString())
-      .cursorColor(cursor.hexString())
-      .selectionBackground(selectionBackground.hexString())
-      .selectionForeground(selectionForeground.hexString())
-
-    for (index, color) in ansi.indexedColors.sorted(by: { $0.key < $1.key }) {
-      configuration = configuration.palette(index, color: color.hexString())
-    }
-
-    return configuration
-  }
-
   fileprivate var terminalAppearance: TerminalAppearance {
     TerminalAppearance(
       foregroundColor: foreground,
@@ -97,33 +79,6 @@ public struct SwiftUITUITerminalStyle: Equatable, Sendable {
 
   public static let `default` = Self()
 
-  public var terminalConfiguration: TerminalConfiguration {
-    var configuration = TerminalConfiguration()
-
-    if let fontFamily {
-      configuration = configuration.fontFamily(fontFamily)
-    }
-    if let fontSize {
-      configuration = configuration.fontSize(fontSize)
-    }
-
-    configuration =
-      configuration
-      .cursorStyle(cursorStyle.terminalCursorStyle)
-      .cursorStyleBlink(cursorBlink)
-      .backgroundOpacity(Double(backgroundOpacity))
-
-    return configuration
-  }
-
-  public var terminalTheme: TerminalTheme {
-    let configuration = palette.ghosttyConfiguration
-    return TerminalTheme(
-      light: configuration,
-      dark: configuration
-    )
-  }
-
   public var renderStyle: TerminalRenderStyle {
     .init(
       appearance: palette.terminalAppearance,
@@ -133,18 +88,5 @@ public struct SwiftUITUITerminalStyle: Equatable, Sendable {
 
   public var terminalAppearance: TerminalAppearance {
     renderStyle.appearance
-  }
-}
-
-extension SwiftUITUICursorStyle {
-  fileprivate var terminalCursorStyle: TerminalCursorStyle {
-    switch self {
-    case .block:
-      .block
-    case .bar:
-      .bar
-    case .underline:
-      .underline
-    }
   }
 }

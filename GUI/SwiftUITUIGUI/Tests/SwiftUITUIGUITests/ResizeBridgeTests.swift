@@ -7,20 +7,21 @@ import Testing
 private final class FakeSceneSession: HostedSceneSessionHandling {
   var startCount = 0
   var stopCount = 0
-  var receivedResizes: [Size] = []
+  var receivedResizes: [(size: Size, cellPixelSize: Size?)] = []
   var receivedStyles: [TerminalRenderStyle] = []
+  var receivedEvents: [InputEvent] = []
 
   func start() async throws -> RunLoopExitReason {
     startCount += 1
     return .inputEnded
   }
 
-  func sendInput(_ bytes: [UInt8]) {
-    _ = bytes
+  func send(_ event: InputEvent) {
+    receivedEvents.append(event)
   }
 
-  func resize(to size: Size) {
-    receivedResizes.append(size)
+  func resize(to size: Size, cellPixelSize: Size?) {
+    receivedResizes.append((size, cellPixelSize))
   }
 
   func updateStyle(_ style: TerminalRenderStyle) {
@@ -36,7 +37,7 @@ private final class FakeSceneSession: HostedSceneSessionHandling {
 @Test
 func bridge_forwards_resize_and_style_updates() async throws {
   let style = SwiftUITUITerminalStyle.default
-  let bridge = GhosttySceneBridge(
+  let bridge = NativeSceneBridge(
     descriptor: .init(id: "dashboard", title: "Dashboard", isDefault: true),
     style: style
   )
@@ -47,17 +48,15 @@ func bridge_forwards_resize_and_style_updates() async throws {
   _ = try await bridge.startSession()
   #expect(session.startCount == 1)
 
-  bridge.handleSurfaceResize(
-    .init(
-      columns: 120,
-      rows: 40,
-      widthPixels: 960,
-      heightPixels: 640,
-      cellWidthPixels: 8,
-      cellHeightPixels: 16
-    )
+  bridge.resize(
+    to: .init(width: 120, height: 40),
+    cellPixelSize: .init(width: 8, height: 16)
   )
-  #expect(session.receivedResizes == [.init(width: 120, height: 40)])
+  #expect(session.receivedResizes.map(\.size) == [.init(width: 120, height: 40)])
+  #expect(session.receivedResizes.map(\.cellPixelSize) == [.init(width: 8, height: 16)])
+
+  bridge.send(.key(.init(.character("x"))))
+  #expect(session.receivedEvents == [.key(.init(.character("x")))])
 
   #expect(session.receivedStyles.last == style.renderStyle)
 
@@ -90,7 +89,7 @@ func bridge_forwards_resize_and_style_updates() async throws {
 @Test
 func bridge_tracks_keyboard_policy_from_focus_presentation() {
   let style = SwiftUITUITerminalStyle.default
-  let bridge = GhosttySceneBridge(
+  let bridge = NativeSceneBridge(
     descriptor: .init(id: "dashboard", title: "Dashboard", isDefault: true),
     style: style
   )

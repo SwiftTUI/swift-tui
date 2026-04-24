@@ -60,6 +60,41 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     }
   }
 
+  package func send(
+    _ event: InputEvent
+  ) {
+    let continuation = state.withLock { state in
+      guard !state.finished else {
+        return nil as AsyncStream<InputEvent>.Continuation?
+      }
+
+      guard let continuation = state.continuation else {
+        state.pendingEvents.append(event)
+        return nil
+      }
+
+      return continuation
+    }
+
+    guard continuation != nil else {
+      return
+    }
+
+    yieldInjectedEvent(event)
+  }
+
+  package func send(
+    _ events: [InputEvent]
+  ) {
+    guard !events.isEmpty else {
+      return
+    }
+
+    for event in events {
+      send(event)
+    }
+  }
+
   package func finish() {
     let (continuation, pendingMouseEvents):
       (
