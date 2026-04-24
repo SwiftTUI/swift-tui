@@ -450,6 +450,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ListInShortFrame()) }
     ),
+    LayoutEntry(
+      id: "collections.for-each-identity-reorder",
+      category: .collections,
+      title: "For each identity reorder",
+      blurb: "reorder preserves identity",
+      marker: "For each identity reorder",
+      tier: .behaviour,
+      makeView: { AnyView(ForEachIdentityReorder()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
