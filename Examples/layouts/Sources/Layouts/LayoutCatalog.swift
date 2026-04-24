@@ -387,6 +387,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ViewThatFitsVerticalOnly()) }
     ),
+    LayoutEntry(
+      id: "view-that-fits.boundary-inclusive",
+      category: .viewThatFits,
+      title: "View that fits boundary inclusive",
+      blurb: "pin inclusive-vs-exclusive at exact threshold",
+      marker: "View that fits boundary inclusive",
+      tier: .behaviour,
+      makeView: { AnyView(ViewThatFitsBoundaryInclusive()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
