@@ -181,3 +181,46 @@ the renderer clips the child's intrinsic painting to that empty
 region. No follow-up remediation needed.
 
 **Status:** Closed — observed behaviour matches SwiftUI semantics.
+
+### 6. `GeometryReader` in an unconstrained HStack does not hog — HStack shrinks to content
+
+**Surfaced by:** `Examples/layouts/Tests/LayoutsTests/Geometry/GeometryReaderInHStackHogsBehaviourTests.swift`
+(layout `geometry.in-hstack-hogs`, plan task #38).
+
+**Plan prediction:** The classic SwiftUI "GeometryReader hogs" gotcha
+— an unconstrained `GeometryReader` inside an `HStack` claims all the
+horizontal space the parent offers, pushing its `Text` sibling
+off-screen or truncating it at the right edge.
+
+**Observed (80×28 viewport, HStack has only `.frame(height: 5)`):**
+
+```
+[2] | ▛▀▀▀▀▀▀▀▀▀▀▀▀▀▜|
+[5] | ▌[G] [SIBLING]▐|
+[8] | ▙▄▄▄▄▄▄▄▄▄▄▄▄▄▟|
+```
+
+Two library-specific behaviours both depart from SwiftUI:
+
+  1. The `HStack` shrinks to its intrinsic content width (~13 cells)
+     rather than expanding to the 80-cell horizontal proposal. In
+     SwiftUI an `HStack` takes the proposed width.
+  2. The `GeometryReader` contributes its child's intrinsic width
+     (3 cells for `[G]`) to the HStack measurement rather than
+     claiming the full horizontal proposal.
+
+Even adding `.frame(width: 40)` to the `HStack` (see the exploratory
+fixed-width variant) leaves the content centered within the frame at
+~13 cells wide, with `[SIBLING]` fully visible. The classic
+"eats everything" gotcha does NOT reproduce.
+
+**Resolution:** Pinned the observed behaviour (both `[G]` and
+`[SIBLING]` on the same row; HStack border < 40 cells on an 80-cell
+viewport). Likely related to finding #4: the reader's proxy reports
+`terminalSize` directly rather than flowing through the proposal
+pipeline, and the surrounding `HStack` measurement does not see the
+reader's "infinite" flex either. Revisit alongside finding #4.
+
+**Status:** Open — likely related to finding #4; test pins observed
+behaviour. Candidate remediation is shared with the GeometryReader
+proposal-tightening work.

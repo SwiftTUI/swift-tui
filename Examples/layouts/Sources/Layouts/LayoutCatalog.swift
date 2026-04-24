@@ -351,6 +351,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(GeometryReaderTakesProposal()) }
     ),
+    LayoutEntry(
+      id: "geometry.in-hstack-hogs",
+      category: .geometry,
+      title: "Geometry reader in HStack hogs",
+      blurb: "Classic 'eats everything' gotcha",
+      marker: "Geometry reader in HStack hogs",
+      tier: .behaviour,
+      makeView: { AnyView(GeometryReaderInHStackHogs()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
