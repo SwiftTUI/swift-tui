@@ -144,6 +144,15 @@ public enum LayoutCatalog {
       tier: .smoke,
       makeView: { AnyView(AsymmetricPaddingInsets()) }
     ),
+    LayoutEntry(
+      id: "padding.border-ordering",
+      category: .padding,
+      title: "Padding border ordering",
+      blurb: ".padding.border vs .border.padding give different widths",
+      marker: "Padding border ordering",
+      tier: .behaviour,
+      makeView: { AnyView(PaddingBorderOrdering()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
