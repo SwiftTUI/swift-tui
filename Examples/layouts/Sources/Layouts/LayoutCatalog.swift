@@ -162,6 +162,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(SafeAreaInsetBottomBar()) }
     ),
+    LayoutEntry(
+      id: "padding.ignores-safe-area-bleed",
+      category: .padding,
+      title: "Ignores safe area bleed",
+      blurb: "content paints through the safe area bar zone",
+      marker: "Ignores safe area bleed",
+      tier: .behaviour,
+      makeView: { AnyView(IgnoresSafeAreaBleed()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
