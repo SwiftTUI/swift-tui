@@ -270,6 +270,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ZStackPaintOrderOverlap()) }
     ),
+    LayoutEntry(
+      id: "zstack.sized-by-largest",
+      category: .zStack,
+      title: "ZStack sized by largest",
+      blurb: "stack size equals the largest child's size",
+      marker: "ZStack sized by largest",
+      tier: .behaviour,
+      makeView: { AnyView(ZStackSizedByLargest()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
