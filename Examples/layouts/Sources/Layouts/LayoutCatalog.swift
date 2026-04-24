@@ -81,6 +81,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(FlexibleFrameAlignmentGrid()) }
     ),
+    LayoutEntry(
+      id: "frames.fixed-size-text",
+      category: .frames,
+      title: "FixedSize text",
+      blurb: "narrow parent + .fixedSize() → content escapes",
+      marker: "FixedSize text",
+      tier: .behaviour,
+      makeView: { AnyView(FixedSizeText()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
