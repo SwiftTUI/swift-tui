@@ -81,3 +81,37 @@ Tracking as an open design question; no library change required for
 the Layouts example to ship.
 
 **Status:** Open — design question. Current workaround is adequate.
+
+### 3. `.frame(maxWidth:)` is not enforced — child exceeds max under a large proposal
+
+**Surfaced by:** `Examples/layouts/Tests/LayoutsTests/Frames/MinIdealMaxFrameClampBehaviourTests.swift`
+(layout `frames.min-ideal-max-frame-clamp`, plan task #10).
+
+**Plan prediction:** A view with
+`.frame(minWidth: 20, idealWidth: 40, maxWidth: 60)` rendered inside
+an outer `.frame(width: 80)` should clamp DOWN to `maxWidth` (60 inner
+cells → 62 cells including a 1-cell border ring).
+
+**Observed (80×20 viewport):**
+
+```
+[15]|          ▛▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▜|
+```
+
+The above-max copy renders at ~70 cells border-width (68 inner
+cells), exceeding `maxWidth: 60`.
+
+The `minWidth` clamp (below-min copy clamps UP to minWidth=20 inner +
+2 border = 22 total) and `idealWidth` (ideal copy sits at 40 when
+proposed 40) are both honoured. Only the `maxWidth` ceiling is
+silently exceeded.
+
+**Resolution:** Pinned observed behaviour in the test (`aboveMax >
+60`) rather than the SwiftUI-faithful ceiling. SwiftUI's own
+`FlexibleFrameModifier` clamps to maxWidth when the proposed width
+exceeds it; the library's implementation appears to accept the
+parent's proposal directly when it is above minWidth, ignoring
+maxWidth. Likely a genuine divergence — candidate remediation work
+item for the frame modifier implementation.
+
+**Status:** Open — library divergence; test pins observed behaviour.
