@@ -16,6 +16,7 @@ Usage: Scripts/check_demo_builds.sh [--skip-clean] [--skip-bun-install]
 Builds the repository's demo packages and host shells, then runs stack-safety
 input harnesses against the terminal examples:
   - Examples/gallery
+  - Examples/layouts
   - Examples/SwiftUIExample/TerminalApp
   - Examples/WebExample/TerminalApp
   - GUI/SwiftUITUIGUI
@@ -111,6 +112,7 @@ fi
 if [ "$skip_clean" -eq 0 ]; then
   for package_path in \
     "Examples/gallery" \
+    "Examples/layouts" \
     "Examples/SwiftUIExample/TerminalApp" \
     "Examples/WebExample/TerminalApp" \
     "GUI/SwiftUITUIGUI" \
@@ -145,6 +147,16 @@ run_step \
   python3 Scripts/stack_safety_harness.py \
     --binary Examples/gallery/.build/release/gallery-demo \
     --count 20
+
+run_step \
+  "Build Examples/layouts" \
+  "$repo_root" \
+  swift build --package-path Examples/layouts
+
+run_step \
+  "Build Examples/layouts (release)" \
+  "$repo_root" \
+  swift build -c release --package-path Examples/layouts
 
 run_step \
   "Build Examples/SwiftUIExample/TerminalApp" \
