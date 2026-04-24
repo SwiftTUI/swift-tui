@@ -369,6 +369,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(GeometryReaderAnchorCorner()) }
     ),
+    LayoutEntry(
+      id: "view-that-fits.axis-choice",
+      category: .viewThatFits,
+      title: "View that fits axis choice",
+      blurb: "3 variants at 3 widths; pick widest that fits",
+      marker: "View that fits axis choice",
+      tier: .behaviour,
+      makeView: { AnyView(ViewThatFitsAxisChoice()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
