@@ -189,6 +189,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(NestedBorderOrdering()) }
     ),
+    LayoutEntry(
+      id: "borders.per-side-border-colors",
+      category: .bordersOverlays,
+      title: "Per-side border colors",
+      blurb: "BorderEdgeStyle 4-color",
+      marker: "Per-side border colors",
+      tier: .behaviour,
+      makeView: { AnyView(PerSideBorderColors()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
