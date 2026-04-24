@@ -49,3 +49,24 @@ extension RasterSurface {
     (0..<lines.count).contains(y) ? lines[y] : nil
   }
 }
+
+/// Returns the 0-based column offset of the first occurrence of
+/// `needle` in `line`, or `nil` if absent. Avoids Foundation's
+/// `String.range(of:)` to keep the test target free of Foundation
+/// imports.
+func column(of needle: String, in line: String?) -> Int? {
+  guard let line else { return nil }
+  let needleChars = Array(needle)
+  let lineChars = Array(line)
+  guard !needleChars.isEmpty, lineChars.count >= needleChars.count else { return nil }
+  let last = lineChars.count - needleChars.count
+  for start in 0...last {
+    var match = true
+    for offset in 0..<needleChars.count where lineChars[start + offset] != needleChars[offset] {
+      match = false
+      break
+    }
+    if match { return start }
+  }
+  return nil
+}
