@@ -17,42 +17,63 @@ struct VStackLeadingGuideShiftBehaviourTests {
   /// Observed raster (40×10 viewport, layout has `.padding(1)`):
   /// ```
   /// [1] |     VStack leading guide shift|   (col 5)
-  /// [2] |     normal|                        (col 5)
-  /// [3] | shifted|                           (col 1)
-  /// [4] |     normal again|                  (col 5)
+  /// [2] |     plain above|                  (col 5)
+  /// [3] | shifted|                          (col 1)
+  /// [4] |     plain below|                  (col 5)
   /// ```
   ///
   /// This matches faithful SwiftUI semantics: increasing an
   /// alignment-guide value shifts the view in the OPPOSITE
-  /// direction along the axis. The plan originally predicted a
-  /// rightward shift; see
-  /// `docs/proposals/FRAMEWORK_RESERVED_KEY_CONSUMER_ESCAPE_HATCH.md`
-  /// finding #1 — this test pins the observed (SwiftUI-faithful)
-  /// behaviour.
+  /// direction along the alignment axis. The plan originally
+  /// predicted a rightward shift; see
+  /// `docs/proposals/layout/BEHAVIOUR_FINDINGS.md` finding #1 — this
+  /// test pins the observed (SwiftUI-faithful) behaviour.
+  ///
+  /// Markers (`"plain above"`, `"shifted"`, `"plain below"`) are
+  /// unique words so substring matching is unambiguous — renaming a
+  /// single row no longer silently shifts which row this test
+  /// measures.
   @Test("shifted row sits 4 cells LEFT of unshifted siblings")
   func shiftedRowOffsetMatchesAlignmentGuide() {
     let raster = render(VStackLeadingGuideShift(), width: 40, height: 10).rasterSurface
 
-    guard let normalRow = raster.firstRow(containing: "normal"),
-      let shiftedRow = raster.firstRow(containing: "shifted")
+    guard
+      let plainAbove = raster.firstRow(containing: "plain above"),
+      let shifted = raster.firstRow(containing: "shifted"),
+      let plainBelow = raster.firstRow(containing: "plain below")
     else {
+      let dump = raster.lines.joined(separator: "\n")
       Issue.record(
-        "expected 'normal' and 'shifted' rows in raster:\n\(raster.lines.joined(separator: "\n"))"
+        "expected 'plain above', 'shifted', and 'plain below' rows in raster:\n\(dump)"
       )
       return
     }
 
-    let normalCol = firstNonSpaceCol(in: raster.row(at: normalRow) ?? "")
-    let shiftedCol = firstNonSpaceCol(in: raster.row(at: shiftedRow) ?? "")
+    guard
+      let aboveLine = raster.row(at: plainAbove),
+      let shiftedLine = raster.row(at: shifted),
+      let belowLine = raster.row(at: plainBelow)
+    else {
+      Issue.record("raster rows missing")
+      return
+    }
 
-    #expect(normalCol != nil, "row \(normalRow) had no non-space chars")
-    #expect(shiftedCol != nil, "row \(shiftedRow) had no non-space chars")
+    guard
+      let aboveCol = firstNonSpaceCol(in: aboveLine),
+      let shiftedCol = firstNonSpaceCol(in: shiftedLine),
+      let belowCol = firstNonSpaceCol(in: belowLine)
+    else {
+      Issue.record("one of the marker rows was entirely whitespace")
+      return
+    }
 
-    guard let normalCol, let shiftedCol else { return }
-
+    #expect(aboveCol == belowCol, "plain rows share the same leading col")
+    // Positive alignment-guide value shifts the view in the opposite
+    // direction (SwiftUI-faithful). See
+    // docs/proposals/layout/BEHAVIOUR_FINDINGS.md Finding #1.
     #expect(
-      shiftedCol == normalCol - 4,
-      "shifted first-non-space col (\(shiftedCol)) should equal normal (\(normalCol)) - 4"
+      shiftedCol == aboveCol - 4,
+      "shifted col (\(shiftedCol)) should be 4 less than plain col (\(aboveCol))"
     )
   }
 
