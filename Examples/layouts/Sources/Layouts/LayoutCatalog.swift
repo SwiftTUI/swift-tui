@@ -45,6 +45,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ZStackAlignmentGrid()) }
     ),
+    LayoutEntry(
+      id: "stacks.hstack-priority-tug",
+      category: .stacks,
+      title: "HStack priority tug",
+      blurb: "priorities 0/1/0 under squeeze",
+      marker: "HStack priority tug",
+      tier: .behaviour,
+      makeView: { AnyView(HStackPriorityTug()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
