@@ -172,8 +172,7 @@ export function encodeMouseInputMessage(
   input: WebTUIMouseInput
 ): Uint8Array {
   return textEncoder.encode(
-    [
-      recordPrefix,
+    recordPrefix + [
       "mouse",
       input.kind,
       Math.max(0, Math.floor(input.x)),
