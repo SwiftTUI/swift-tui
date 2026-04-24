@@ -252,6 +252,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ClippedOverflowCrop()) }
     ),
+    LayoutEntry(
+      id: "offset.negative-escape",
+      category: .offsetPosition,
+      title: "Negative offset escape",
+      blurb: ".offset(x: -2) paints outside parent frame",
+      marker: "Negative offset escape",
+      tier: .behaviour,
+      makeView: { AnyView(NegativeOffsetEscape()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
