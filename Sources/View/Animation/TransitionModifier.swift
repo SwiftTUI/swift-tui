@@ -29,7 +29,7 @@ public struct TransitionRegistrationModifier: PrimitiveViewModifier, Sendable {
     // Register the transition for every emitted identity so the
     // animation controller can look it up during insertion/removal
     // diffing.
-    if let sink = TransitionRegistrationStorage.currentSink {
+    if let sink = TransitionRegistrationStorage.effectiveSink {
       for node in nodes {
         sink.registerTransition(for: node.identity, transition: transition)
       }
