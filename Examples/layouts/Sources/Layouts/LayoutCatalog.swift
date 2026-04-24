@@ -108,6 +108,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(MinIdealMaxFrameClamp()) }
     ),
+    LayoutEntry(
+      id: "frames.layout-priority-cascade",
+      category: .frames,
+      title: "Layout priority cascade",
+      blurb: "priorities 0/1/0/2 drop order",
+      marker: "Layout priority cascade",
+      tier: .behaviour,
+      makeView: { AnyView(LayoutPriorityCascade()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
