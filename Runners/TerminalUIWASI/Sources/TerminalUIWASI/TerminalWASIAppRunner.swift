@@ -20,6 +20,22 @@ public enum TerminalWASIAppRunnerError: Error, Equatable, Sendable, CustomString
   }
 }
 
+package enum WASITransportMode: Equatable, Sendable {
+  case surface
+  case ansi
+}
+
+package func resolveWASITransportMode(
+  environmentValue: (String) -> String?
+) -> WASITransportMode {
+  switch environmentValue("TUIGUI_TRANSPORT")?.lowercased() {
+  case "ansi", "terminal", "xterm", "ghostty-web":
+    return .ansi
+  default:
+    return .surface
+  }
+}
+
 /// Orchestrates scene manifest output and WASI-hosted scene launch.
 public enum TerminalWASIAppRunner {
   @MainActor
@@ -158,17 +174,9 @@ public enum TerminalWASIAppRunner {
       )
     }
 
-    private enum WASITransportMode {
-      case surface
-      case ansi
-    }
-
     private static func wasiTransportMode() -> WASITransportMode {
-      switch environmentValue(named: "TUIGUI_TRANSPORT")?.lowercased() {
-      case "ansi", "terminal", "xterm", "ghostty-web":
-        return .ansi
-      default:
-        return .surface
+      resolveWASITransportMode { name in
+        environmentValue(named: name)
       }
     }
 

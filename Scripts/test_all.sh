@@ -40,6 +40,7 @@ Runs the full checked-in repo verification surface:
   - GUI/XtermWebTUIGUI Bun tests
   - Examples/gallery tests
   - Examples/WebExample Bun tests
+  - Examples/WebExample browser integration test
   - Examples/XtermWebExample Bun tests
 
 The script also checks required environment dependencies up front:
@@ -302,6 +303,11 @@ run_step \
   "Run Examples/WebExample Bun tests" \
   "$repo_root/Examples/WebExample" \
   bun test
+
+run_step \
+  "Run Examples/WebExample browser integration test" \
+  "$repo_root/Examples/WebExample" \
+  bun run test:browser
 
 run_step \
   "Run Examples/XtermWebExample Bun tests" \

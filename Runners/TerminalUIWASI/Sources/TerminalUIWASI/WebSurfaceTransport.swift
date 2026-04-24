@@ -236,18 +236,20 @@ final class WebSurfaceInputReader: TerminalInputReading, Sendable {
   }
 }
 
-enum WebSurfaceInputControlMessage: Equatable, Sendable {
+package enum WebSurfaceInputControlMessage: Equatable, Sendable {
   case resize(Size, cellPixelSize: Size?)
   case style(TerminalRenderStyle)
 }
 
-private struct WebSurfaceInputParser {
+package struct WebSurfaceInputParser {
   private static let introducer: UInt8 = 0x1E
 
   private var bufferedCommand: [UInt8]?
   private var terminalInputParser = TerminalInputParser()
 
-  mutating func feed(
+  package init() {}
+
+  package mutating func feed(
     _ bytes: [UInt8]
   ) -> (events: [InputEvent], controlMessages: [WebSurfaceInputControlMessage]) {
     var payload: [UInt8] = []
@@ -535,8 +537,8 @@ private struct WebSurfaceInputParser {
   }
 }
 
-private enum WebSurfaceFrameEncoder {
-  static func encode(
+package enum WebSurfaceFrameEncoder {
+  package static func encode(
     _ surface: RasterSurface
   ) -> String {
     var styles: [ResolvedTextStyle?] = [nil]
