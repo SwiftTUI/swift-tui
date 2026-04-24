@@ -261,6 +261,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(NegativeOffsetEscape()) }
     ),
+    LayoutEntry(
+      id: "zstack.paint-order-overlap",
+      category: .zStack,
+      title: "ZStack paint order overlap",
+      blurb: "later paints over earlier at shared cells",
+      marker: "ZStack paint order overlap",
+      tier: .behaviour,
+      makeView: { AnyView(ZStackPaintOrderOverlap()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
