@@ -432,6 +432,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ColonAlignedForm()) }
     ),
+    LayoutEntry(
+      id: "alignment.dimension-dependent-guide",
+      category: .alignmentGuides,
+      title: "Alignment guide dimension dependent",
+      blurb: "bottoms align via { d in d.height }",
+      marker: "Alignment guide dimension dependent",
+      tier: .behaviour,
+      makeView: { AnyView(AlignmentGuideDimensionDependent()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
