@@ -117,6 +117,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(LayoutPriorityCascade()) }
     ),
+    LayoutEntry(
+      id: "frames.proposal-tightening",
+      category: .frames,
+      title: "Proposal tightening",
+      blurb: ".frame(width:30) caps inner GeometryReader proxy",
+      marker: "Proposal tightening",
+      tier: .behaviour,
+      makeView: { AnyView(ProposalTightening()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {

@@ -115,3 +115,39 @@ maxWidth. Likely a genuine divergence — candidate remediation work
 item for the frame modifier implementation.
 
 **Status:** Open — library divergence; test pins observed behaviour.
+
+### 4. `GeometryReader` reports terminal size, not the locally-proposed size
+
+**Surfaced by:** `Examples/layouts/Tests/LayoutsTests/Frames/ProposalTighteningBehaviourTests.swift`
+(layout `frames.proposal-tightening`, plan task #12).
+
+**Plan prediction:** A `GeometryReader` wrapped in
+`.frame(width: 30, height: 3)` inside an 80-wide terminal should
+report `proxy.size.width == 30`. The fixed frame is supposed to
+TIGHTEN the proposal that reaches its child.
+
+**Observed (80×10 viewport):**
+
+```
+| w=80                          |
+```
+
+The GeometryReader reports the full terminal width (80) regardless
+of the surrounding `.frame(width: 30)`.
+
+**Cause:** `GeometryReader.resolveElements(in:)` reads
+`context.environmentValues.terminalSize` directly to populate the
+proxy's `size`, ignoring the locally-proposed size that a
+SwiftUI-faithful implementation would carry through resolve. The
+view-tree is correctly TIGHTENED for layout purposes (the visible
+border around the GeometryReader is 30 cells wide), but the proxy
+itself never sees the tightening.
+
+**Resolution:** Pinned observed behaviour in the test (`w=80`) with
+guidance to flip the assertion when the library is fixed to honour
+proposal tightening for GeometryReader proxies. Genuine library
+divergence; candidate remediation work item for the GeometryReader
+implementation (likely needs to thread the proposed size through
+`ResolveContext`).
+
+**Status:** Open — library divergence; test pins observed behaviour.
