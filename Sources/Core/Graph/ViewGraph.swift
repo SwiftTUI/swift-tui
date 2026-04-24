@@ -399,7 +399,7 @@ package final class ViewGraph {
         if lhs.identity.components.count == rhs.identity.components.count {
           return lhs.identity < rhs.identity
         }
-        return lhs.identity.components.count > rhs.identity.components.count
+        return lhs.identity.components.count < rhs.identity.components.count
       }
 
     for node in staleNodes {
@@ -856,6 +856,12 @@ package final class ViewGraph {
   private func removeSubtree(
     rootedAt node: ViewNode
   ) {
+    guard let current = nodesByIdentity[node.identity],
+      current === node
+    else {
+      return
+    }
+
     node.prepareForFrame(currentFrameID)
 
     for child in node.children {
