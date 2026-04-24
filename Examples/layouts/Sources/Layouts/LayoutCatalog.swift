@@ -441,6 +441,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(AlignmentGuideDimensionDependent()) }
     ),
+    LayoutEntry(
+      id: "collections.list-in-short-frame",
+      category: .collections,
+      title: "List in short frame",
+      blurb: "20-row List in 5-row frame",
+      marker: "List in short frame",
+      tier: .behaviour,
+      makeView: { AnyView(ListInShortFrame()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
