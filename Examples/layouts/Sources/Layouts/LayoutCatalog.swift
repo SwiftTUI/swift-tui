@@ -26,7 +26,16 @@ public enum LayoutCatalog {
       marker: "HStack alignment triad",
       tier: .behaviour,
       makeView: { AnyView(HStackAlignmentTriad()) }
-    )
+    ),
+    LayoutEntry(
+      id: "stacks.vstack-spacing-vs-padding",
+      category: .stacks,
+      title: "VStack spacing vs padding",
+      blurb: "spacing lives between siblings; padding wraps each",
+      marker: "VStack spacing vs padding",
+      tier: .smoke,
+      makeView: { AnyView(VStackSpacingVsPadding()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
