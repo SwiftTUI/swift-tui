@@ -13,9 +13,13 @@ struct LayoutsApp: App {
 
 /// Two-state router: nil → picker, non-nil → detail host.
 ///
-/// `@State var selectedID` is hoisted above both sub-views so
-/// returning from detail to picker does not destroy the picker's
-/// internal focus/selection state on the way back.
+/// `selectedID` lives on the router because only the router owns
+/// the routing bit — `LayoutDetailHost.onBack` must flip it on the
+/// parent, and `LayoutPicker.onSelect` must write it from below.
+/// The `ConditionalContent` branch swap tears down each subview on
+/// transition; the picker self-clears its local `selection` after
+/// firing `onSelect`, so a fresh picker on back-trip is the correct
+/// state.
 struct LayoutsRoot: View {
   @State private var selectedID: LayoutEntry.ID?
 
@@ -23,6 +27,11 @@ struct LayoutsRoot: View {
     if let id = selectedID, let entry = LayoutCatalog.entry(id: id) {
       LayoutDetailHost(entry: entry, onBack: { @MainActor @Sendable in selectedID = nil })
     } else {
+      // Fallback includes the case `selectedID != nil && entry == nil`
+      // (stale ID pointing at a removed catalog entry). The catalog is
+      // static and compiled-in today, so the case is unreachable in
+      // practice; if the catalog ever becomes dynamic, reset
+      // `selectedID = nil` here to self-heal.
       LayoutPicker(onSelect: { selectedID = $0 })
     }
   }
