@@ -30,6 +30,9 @@ implementation.
 That keeps the JavaScript bundle version-locked and avoids the extra Ghostty
 browser asset path used by `GUI/WebTUIGUI`.
 
+Because `TerminalUIWASI` defaults to the structured `web-surface` transport,
+this package sets `TUIGUI_TRANSPORT=ansi` when launching browser-hosted apps.
+
 ## API
 
 ```ts

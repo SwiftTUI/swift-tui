@@ -675,15 +675,16 @@ public final class InputReader: InputReading, TerminalInputReading {
 extension InputReader {
   #if canImport(WASILibc)
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
-      makeTaskBackedAsyncStream(
+      let fileDescriptor = self.fileDescriptor
+      let controlHandler = self.controlHandler
+
+      return makeTaskBackedAsyncStream(
         launch: { operation in
           Task.detached {
             await operation()
           }
         }
       ) { continuation in
-        let fileDescriptor = self.fileDescriptor
-        let controlHandler = self.controlHandler
         var parser = TerminalInputParser()
         var controlParser = ControlMessageParser()
         var pendingMouseEvents: [InputEvent] = []
@@ -743,15 +744,16 @@ extension InputReader {
     private func makeEventStream<Event: Sendable>(
       transform: @escaping @Sendable (inout TerminalInputParser, [UInt8]) -> [Event]
     ) -> AsyncStream<Event> {
-      makeTaskBackedAsyncStream(
+      let fileDescriptor = self.fileDescriptor
+      let controlHandler = self.controlHandler
+
+      return makeTaskBackedAsyncStream(
         launch: { operation in
           Task.detached {
             await operation()
           }
         }
       ) { continuation in
-        let fileDescriptor = self.fileDescriptor
-        let controlHandler = self.controlHandler
         var parser = TerminalInputParser()
         var controlParser = ControlMessageParser()
 

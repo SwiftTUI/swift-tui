@@ -44,6 +44,7 @@ test("bridge seeds initial render style and emits runtime style updates", async 
   expect(
     bridge.environment.TUIGUI_RENDER_STYLE
   ).toBe(encodeWebTUITerminalRenderStyleBase64(style));
+  expect(bridge.environment.TUIGUI_TRANSPORT).toBe("surface");
 
   bridge.updateRenderStyle(style);
   const input = await bridge.stdin.read();
@@ -75,4 +76,29 @@ test("bridge resize updates environment, emits control input, and notifies liste
   unsubscribe();
   bridge.resize(90, 30);
   expect(seen).toEqual([[132, 41]]);
+});
+
+test("bridge decodes structured surface output", () => {
+  const bridge = new BrowserWASIBridge({
+    sceneId: "main",
+    columns: 80,
+    rows: 24,
+  });
+  const frames: unknown[] = [];
+  const text: string[] = [];
+
+  bridge.bindOutput({
+    presentSurface: (frame) => frames.push(frame),
+    writeOutput: (output) => text.push(output),
+  });
+
+  bridge.stdout.write(
+    new TextEncoder().encode(
+      '\u001Esurface:{"version":1,"width":2,"height":1,"styles":[null],"rows":[[[0,"O",1,0],[1,"K",1,0]]],"images":[]}\n'
+    )
+  );
+  bridge.stdout.write(new TextEncoder().encode("legacy text\n"));
+
+  expect(frames).toHaveLength(1);
+  expect(text).toEqual(["legacy text\n"]);
 });

@@ -93,6 +93,43 @@ public enum TerminalWASIAppRunner {
 
     @MainActor
     private static func wasiSceneResources() -> SceneSessionResources {
+      switch wasiTransportMode() {
+      case .surface:
+        return webSurfaceSceneResources()
+      case .ansi:
+        return ansiSceneResources()
+      }
+    }
+
+    @MainActor
+    private static func webSurfaceSceneResources() -> SceneSessionResources {
+      let signalReader = InProcessSignalReader()
+      let host = WebSurfaceTransportHost(
+        surfaceSize: wasiSurfaceSize(),
+        renderStyle: wasiRenderStyle()
+          ?? .init(appearance: .fallback)
+      )
+      let inputReader = WebSurfaceInputReader { message in
+        switch message {
+        case .resize(let size, let cellPixelSize):
+          host.updateSurfaceSize(size, cellPixelSize: cellPixelSize)
+          signalReader.send("SIGWINCH")
+        case .style(let style):
+          host.updateStyle(style)
+          signalReader.send("SIGWINCH")
+        }
+      }
+
+      return .init(
+        terminalHost: host,
+        terminalInputReader: inputReader,
+        signalReader: signalReader,
+        surfaceName: "web-surface"
+      )
+    }
+
+    @MainActor
+    private static func ansiSceneResources() -> SceneSessionResources {
       let signalReader = InProcessSignalReader()
       let initialStyle = wasiRenderStyle()
       let host = WebTerminalHost(
@@ -119,6 +156,20 @@ public enum TerminalWASIAppRunner {
         signalReader: signalReader,
         surfaceName: "ghostty-web"
       )
+    }
+
+    private enum WASITransportMode {
+      case surface
+      case ansi
+    }
+
+    private static func wasiTransportMode() -> WASITransportMode {
+      switch environmentValue(named: "TUIGUI_TRANSPORT")?.lowercased() {
+      case "ansi", "terminal", "xterm", "ghostty-web":
+        return .ansi
+      default:
+        return .surface
+      }
     }
 
     private static func wasiRenderStyle() -> TerminalRenderStyle? {

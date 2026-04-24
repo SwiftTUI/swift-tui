@@ -20,14 +20,16 @@ This package now lives in the repo's Bun workspace. Run `bun install` from the
 repo root or from any workspace package directory, and Bun will maintain one
 root `bun.lock` plus stable relative workspace links.
 
-## Ghostty Dependency
+## Surface Transport
 
-This package now consumes the published [`ghostty-web`](https://www.npmjs.com/package/ghostty-web)
-npm package through Bun instead of importing from the repository's `reference/`
-directory or from a GitHub source snapshot.
+This package uses TerminalUI's `web-surface` WASI transport. The Swift runner
+emits structured raster-surface records on stdout, and the browser host draws
+rectangles and text into a canvas. It does not load a terminal emulator and does
+not depend on `ghostty-web` or `ghostty-vt.wasm`.
 
-That keeps the JavaScript bundle and `ghostty-vt.wasm` asset version-locked and
-avoids the extra Ghostty submodule and Zig bootstrap step during app builds.
+`web-surface` is the default `TerminalUIWASI` browser transport. WebTUIGUI still
+sets `TUIGUI_TRANSPORT=surface` explicitly so generated app environments are
+self-describing.
 
 ## API
 
@@ -73,7 +75,7 @@ The build flow is intentionally small:
 2. `build:wasm` copies the app's wasm artifact into `dist/assets/app.wasm`,
    validates it with the browser `WebAssembly` API, then keeps the stripped
    artifact only if stripping still produces browser-parseable wasm.
-3. `build:web` bundles `index.html` and the browser entrypoint with Bun, then copies `ghostty-web`'s packaged `ghostty-vt.wasm` into `dist/`.
+3. `build:web` bundles `index.html` and the browser entrypoint with Bun.
 
 ## Notes
 
@@ -82,4 +84,5 @@ The build flow is intentionally small:
   one active palette/theme pair plus the runtime payload sent into TerminalUI.
 - Hosts that want multiple themes swap entire `WebTUITerminalStyle` objects;
   the library does not provide a built-in mode switcher.
-- `BrowserWASIBridge` and `StdIOPipe` are the internal glue for future WASI-backed integration.
+- `BrowserWASIBridge` sets `TUIGUI_TRANSPORT=surface` and decodes surface
+  frames before handing them to the canvas runtime.

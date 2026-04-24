@@ -44,6 +44,7 @@ test("bridge seeds initial render style and emits runtime style updates", async 
   expect(
     bridge.environment.TUIGUI_RENDER_STYLE
   ).toBe(encodeWebTUITerminalRenderStyleBase64(style));
+  expect(bridge.environment.TUIGUI_TRANSPORT).toBe("ansi");
 
   bridge.updateRenderStyle(style);
   const input = await bridge.stdin.read();
