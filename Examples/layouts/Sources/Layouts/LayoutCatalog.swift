@@ -468,6 +468,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(TableColumnPrioritization()) }
     ),
+    LayoutEntry(
+      id: "shapes.circle-in-non-square-frame",
+      category: .shapesCanvas,
+      title: "Circle in non square frame",
+      blurb: "circle in 12×5 leaves empty corners",
+      marker: "Circle in non square frame",
+      tier: .behaviour,
+      makeView: { AnyView(CircleInNonSquareFrame()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
