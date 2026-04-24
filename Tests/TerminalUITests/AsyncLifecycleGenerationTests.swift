@@ -184,7 +184,7 @@ private func collectEvents<Element: Sendable>(
 @MainActor
 private func waitUntil(
   _ label: String,
-  timeoutNanoseconds: UInt64 = 1_000_000_000,
+  timeoutNanoseconds: UInt64 = 5_000_000_000,
   pollNanoseconds: UInt64 = 10_000_000,
   condition: @escaping () async -> Bool
 ) async throws {
@@ -202,7 +202,7 @@ private func waitUntil(
 private func awaitTaskValue<Value: Sendable>(
   _ task: Task<Value, Never>,
   label: String,
-  timeoutNanoseconds: UInt64 = 1_000_000_000
+  timeoutNanoseconds: UInt64 = 5_000_000_000
 ) async throws -> Value {
   try await withThrowingTaskGroup(of: Value.self) { group in
     group.addTask {

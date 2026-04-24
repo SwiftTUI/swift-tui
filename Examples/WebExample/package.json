@@ -8,13 +8,15 @@
     "dev": "bun run build:terminal && bun --watch src/index.ts",
     "build": "bun run build:terminal && bun build ./src/index.html --outdir=dist --sourcemap --target=browser --minify && bun build ./src/wasm-scene-worker.ts --outfile=dist/wasm-scene-worker.js --target=browser --format=esm --minify && bun run src/build-pages.ts",
     "start": "bun src/start.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "test:browser": "playwright install chromium && bun run build && bun test ./src/browser-integration.browser.ts --timeout 120000"
   },
   "dependencies": {
     "@bjorn3/browser_wasi_shim": "^0.4.2",
     "webtuigui": "workspace:*"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "playwright": "^1.59.1"
   }
 }

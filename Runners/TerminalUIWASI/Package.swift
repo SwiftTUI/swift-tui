@@ -37,7 +37,8 @@ let package = Package(
     .testTarget(
       name: "TerminalUIWASITests",
       dependencies: [
-        "TerminalUIWASI"
+        "TerminalUIWASI",
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
       ],
       swiftSettings: swiftSettings()
     ),
