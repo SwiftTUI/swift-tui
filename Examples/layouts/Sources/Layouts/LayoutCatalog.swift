@@ -342,6 +342,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ScrollViewWithSafeAreaInset()) }
     ),
+    LayoutEntry(
+      id: "geometry.takes-proposal",
+      category: .geometry,
+      title: "Geometry reader takes proposal",
+      blurb: "proxy.size reflects frame proposal",
+      marker: "Geometry reader takes proposal",
+      tier: .behaviour,
+      makeView: { AnyView(GeometryReaderTakesProposal()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
