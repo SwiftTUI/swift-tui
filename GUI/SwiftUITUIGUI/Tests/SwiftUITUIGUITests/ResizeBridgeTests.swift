@@ -87,6 +87,31 @@ func bridge_forwards_resize_and_style_updates() async throws {
 
 @MainActor
 @Test
+func bridge_forwards_pointer_events_in_order() {
+  let bridge = NativeSceneBridge(
+    descriptor: .init(id: "dashboard", title: "Dashboard", isDefault: true),
+    style: .default
+  )
+  let session = FakeSceneSession()
+  let location = Point(x: 4, y: 2)
+
+  bridge.attach(session: session)
+  bridge.send(.mouse(.init(kind: .down(.primary), location: location)))
+  bridge.send(.mouse(.init(kind: .dragged(.primary), location: .init(x: 5, y: 2))))
+  bridge.send(.mouse(.init(kind: .up(.primary), location: .init(x: 5, y: 2))))
+  bridge.send(.mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 3), location: location)))
+
+  #expect(
+    session.receivedEvents == [
+      .mouse(.init(kind: .down(.primary), location: location)),
+      .mouse(.init(kind: .dragged(.primary), location: .init(x: 5, y: 2))),
+      .mouse(.init(kind: .up(.primary), location: .init(x: 5, y: 2))),
+      .mouse(.init(kind: .scrolled(deltaX: 0, deltaY: 3), location: location)),
+    ])
+}
+
+@MainActor
+@Test
 func bridge_tracks_keyboard_policy_from_focus_presentation() {
   let style = SwiftUITUITerminalStyle.default
   let bridge = NativeSceneBridge(

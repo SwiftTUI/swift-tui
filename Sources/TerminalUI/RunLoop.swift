@@ -327,6 +327,20 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// Runs the interactive session until input ends, a quit condition occurs, or
   /// the session is cancelled.
   public func run() async throws -> RunLoopResult<State> {
+    // Install the renderer's animation controller as task-local
+    // registration storage so concurrent hosted scenes cannot steal
+    // each other's animation, transition, or completion registrations.
+    let animationController = renderer.internalAnimationController
+    return try await AnimationRegistrationStorage.withSink(animationController) {
+      try await TransitionRegistrationStorage.withSink(animationController) {
+        try await AnimationCompletionStorage.withSink(animationController) {
+          try await runWithInstalledAnimationSinks()
+        }
+      }
+    }
+  }
+
+  private func runWithInstalledAnimationSinks() async throws -> RunLoopResult<State> {
     stateContainer.invalidator = scheduler
     focusTracker.invalidator = scheduler
     observationBridge.attachInvalidator(scheduler)
@@ -335,20 +349,6 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     defer {
       lifecycleCoordinator.shutdown()
       try? terminalHost.disableRawMode()
-    }
-
-    // Install the renderer's animation controller as the active
-    // registration sink so `withAnimation` can hand concrete Animation
-    // values off to it, `.transition()` can register per-identity
-    // transitions with it, and the completion-accepting withAnimation
-    // overload can register batch completion closures.
-    AnimationRegistrationStorage.currentSink = renderer.internalAnimationController
-    TransitionRegistrationStorage.currentSink = renderer.internalAnimationController
-    AnimationCompletionStorage.currentSink = renderer.internalAnimationController
-    defer {
-      AnimationRegistrationStorage.currentSink = nil
-      TransitionRegistrationStorage.currentSink = nil
-      AnimationCompletionStorage.currentSink = nil
     }
 
     scheduler.requestInvalidation(of: [rootIdentity])
