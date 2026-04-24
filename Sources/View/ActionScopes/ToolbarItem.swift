@@ -19,6 +19,7 @@ public struct ToolbarItemConfig: Sendable {
   public var isEnabled: Bool
   public var action: @MainActor @Sendable () -> Void
 
+  @MainActor
   public init(
     title: String,
     icon: Image? = nil,
@@ -26,11 +27,16 @@ public struct ToolbarItemConfig: Sendable {
     isEnabled: Bool = true,
     action: @escaping @MainActor @Sendable () -> Void
   ) {
+    let authoringContext = currentImperativeAuthoringContextSnapshot()
     self.title = title
     self.icon = icon
     self.position = position
     self.isEnabled = isEnabled
-    self.action = action
+    self.action = {
+      withImperativeAuthoringContext(authoringContext) {
+        action()
+      }
+    }
   }
 }
 
@@ -54,10 +60,12 @@ extension View {
   ///
   /// Contributions accumulate in declaration order and are delivered
   /// as a single aggregated list to the absorbing scope.
+  @MainActor
   public func toolbarItem(_ config: ToolbarItemConfig) -> some View {
     modifier(
       ToolbarItemContributionModifier(
-        config: config
+        config: config,
+        authoringContext: currentImperativeAuthoringContextSnapshot()
       )
     )
   }
@@ -65,15 +73,23 @@ extension View {
 
 public struct ToolbarItemContributionModifier: PrimitiveViewModifier, Sendable {
   package let config: ToolbarItemConfig
+  package let authoringContext: ImperativeAuthoringContextSnapshot?
 
   package func resolve<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
+    let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
+    var wrappedConfig = config
+    wrappedConfig.action = { [action = config.action] in
+      withImperativeAuthoringContext(dynamicPropertyScope) {
+        action()
+      }
+    }
     node.preferenceValues.merge(
       ToolbarItemsPreferenceKey.self,
-      value: [config]
+      value: [wrappedConfig]
     )
     return [node]
   }

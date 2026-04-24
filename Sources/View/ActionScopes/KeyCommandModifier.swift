@@ -24,6 +24,7 @@ extension ActionScope where Self: View & Sendable {
         binding: KeyBinding(key: key, modifiers: modifiers),
         description: description,
         isEnabled: isEnabled,
+        authoringContext: currentImperativeAuthoringContextSnapshot(),
         action: action
       )
     )
@@ -34,17 +35,20 @@ public struct KeyCommandRegistrationModifier: PrimitiveViewModifier, Sendable {
   package let binding: KeyBinding
   package let description: String
   package let isEnabled: Bool
+  package let authoringContext: ImperativeAuthoringContextSnapshot?
   package let action: @MainActor @Sendable () -> Void
 
   package init(
     binding: KeyBinding,
     description: String,
     isEnabled: Bool,
+    authoringContext: ImperativeAuthoringContextSnapshot?,
     action: @escaping @MainActor @Sendable () -> Void
   ) {
     self.binding = binding
     self.description = description
     self.isEnabled = isEnabled
+    self.authoringContext = authoringContext
     self.action = action
   }
 
@@ -59,12 +63,17 @@ public struct KeyCommandRegistrationModifier: PrimitiveViewModifier, Sendable {
       // registration; the command will never fire.
       return [node]
     }
+    let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
     context.commandRegistry?.registerKeyCommand(
       at: node.identity,
       binding: binding,
       description: description,
       isEnabled: isEnabled,
-      action: action
+      action: {
+        withImperativeAuthoringContext(dynamicPropertyScope) {
+          action()
+        }
+      }
     )
     return [node]
   }

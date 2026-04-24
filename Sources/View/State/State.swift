@@ -119,6 +119,55 @@ package func withAuthoringContext<Result>(
   }
 }
 
+/// A sendable snapshot of the authoring identity an imperative callback should
+/// mutate through when it fires outside a resolve pass.
+package struct ImperativeAuthoringContextSnapshot: Sendable {
+  package let viewIdentity: Identity
+  package let focusedValues: FocusedValues
+
+  @MainActor
+  package init?(_ context: AuthoringContext? = currentAuthoringContext()) {
+    guard let context else {
+      return nil
+    }
+    viewIdentity = context.viewIdentity
+    focusedValues = context.focusedValues
+  }
+
+  @MainActor
+  fileprivate var authoringContext: AuthoringContext {
+    AuthoringContext(
+      viewIdentity: viewIdentity,
+      focusedValues: focusedValues
+    )
+  }
+}
+
+@MainActor
+package func currentImperativeAuthoringContextSnapshot() -> ImperativeAuthoringContextSnapshot? {
+  ImperativeAuthoringContextSnapshot()
+}
+
+@MainActor
+package func withImperativeAuthoringContext<Result>(
+  _ snapshot: ImperativeAuthoringContextSnapshot?,
+  _ apply: () -> Result
+) -> Result {
+  withAuthoringContext(snapshot?.authoringContext) {
+    apply()
+  }
+}
+
+@MainActor
+package func withImperativeAuthoringContext<Result>(
+  _ snapshot: ImperativeAuthoringContextSnapshot?,
+  _ apply: () async -> Result
+) async -> Result {
+  await withAuthoringContext(snapshot?.authoringContext) {
+    await apply()
+  }
+}
+
 @MainActor
 package final class AuthoringOrdinalTracker {
   private(set) var nextOrdinal = 0

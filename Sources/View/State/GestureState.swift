@@ -36,7 +36,7 @@ public final class GestureStateBox<Value> {
   /// the slot (dependency-tracked). Otherwise falls back to the local
   /// seed-initialized value.
   public func currentValue() -> Value {
-    if let location = currentLocation() {
+    if let location = scopedLocation() {
       return location.getValue()
     }
     return localValue
@@ -45,7 +45,7 @@ public final class GestureStateBox<Value> {
   /// Writes a new value. When bound to a ViewNode, writes through
   /// setStateSlot (queues invalidation + respects AnimationContext).
   public func setValue(_ newValue: Value) {
-    if let location = currentLocation() {
+    if let location = scopedLocation() {
       location.setValue(newValue)
     } else {
       localValue = newValue
@@ -75,6 +75,15 @@ public final class GestureStateBox<Value> {
   fileprivate func currentLocation() -> GestureStateLocation<Value>? {
     guard let lastBoundIdentity else { return nil }
     return boundLocationsByIdentity[lastBoundIdentity]
+  }
+
+  private func scopedLocation() -> GestureStateLocation<Value>? {
+    if let context = AuthoringContextStorage.current,
+      let existing = rememberedLocation(for: context.viewIdentity)
+    {
+      return existing
+    }
+    return currentLocation()
   }
 
   /// Produces a type-erased binding for registration with the runtime.

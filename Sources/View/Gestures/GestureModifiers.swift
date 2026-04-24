@@ -25,8 +25,13 @@ public struct _EndedGesture<Child: Gesture>: Gesture {
     context: GestureRecognizerBuildContext
   ) -> AnyGestureRecognizer {
     let inner = child._makeRecognizer(context: context)
+    let authoringContext = currentImperativeAuthoringContextSnapshot()
     return AnyGestureRecognizer(
-      OnEndedDecorator<Child.Value>(inner: inner, action: action)
+      OnEndedDecorator<Child.Value>(
+        inner: inner,
+        authoringContext: authoringContext,
+        action: action
+      )
     )
   }
 }
@@ -43,11 +48,17 @@ extension Gesture {
 final class OnEndedDecorator<V>: GestureRecognizer {
   typealias Value = V
   let inner: AnyGestureRecognizer
+  let authoringContext: ImperativeAuthoringContextSnapshot?
   let action: @MainActor (V) -> Void
   private var didFire = false
 
-  init(inner: AnyGestureRecognizer, action: @escaping @MainActor (V) -> Void) {
+  init(
+    inner: AnyGestureRecognizer,
+    authoringContext: ImperativeAuthoringContextSnapshot?,
+    action: @escaping @MainActor (V) -> Void
+  ) {
     self.inner = inner
+    self.authoringContext = authoringContext
     self.action = action
   }
 
@@ -73,7 +84,9 @@ final class OnEndedDecorator<V>: GestureRecognizer {
   private func fireIfNeeded() {
     guard !didFire, inner.phase == .ended else { return }
     if let value: V = inner.currentValue(as: V.self) {
-      action(value)
+      withImperativeAuthoringContext(authoringContext) {
+        action(value)
+      }
       didFire = true
     }
   }
@@ -104,8 +117,13 @@ public struct _ChangedGesture<Child: Gesture>: Gesture where Child.Value: Equata
     context: GestureRecognizerBuildContext
   ) -> AnyGestureRecognizer {
     let inner = child._makeRecognizer(context: context)
+    let authoringContext = currentImperativeAuthoringContextSnapshot()
     return AnyGestureRecognizer(
-      OnChangedDecorator<Child.Value>(inner: inner, action: action)
+      OnChangedDecorator<Child.Value>(
+        inner: inner,
+        authoringContext: authoringContext,
+        action: action
+      )
     )
   }
 }
@@ -122,11 +140,17 @@ extension Gesture where Value: Equatable {
 final class OnChangedDecorator<V: Equatable>: GestureRecognizer {
   typealias Value = V
   let inner: AnyGestureRecognizer
+  let authoringContext: ImperativeAuthoringContextSnapshot?
   let action: @MainActor (V) -> Void
   private var lastValue: V?
 
-  init(inner: AnyGestureRecognizer, action: @escaping @MainActor (V) -> Void) {
+  init(
+    inner: AnyGestureRecognizer,
+    authoringContext: ImperativeAuthoringContextSnapshot?,
+    action: @escaping @MainActor (V) -> Void
+  ) {
     self.inner = inner
+    self.authoringContext = authoringContext
     self.action = action
   }
 
@@ -151,7 +175,9 @@ final class OnChangedDecorator<V: Equatable>: GestureRecognizer {
 
   private func fireIfNeeded() {
     if let value: V = inner.currentValue(as: V.self), value != lastValue {
-      action(value)
+      withImperativeAuthoringContext(authoringContext) {
+        action(value)
+      }
       lastValue = value
     }
   }
@@ -182,8 +208,13 @@ public struct _MapGesture<Child: Gesture, NewValue>: Gesture {
     context: GestureRecognizerBuildContext
   ) -> AnyGestureRecognizer {
     let inner = child._makeRecognizer(context: context)
+    let authoringContext = currentImperativeAuthoringContextSnapshot()
     return AnyGestureRecognizer(
-      MapDecorator<Child.Value, NewValue>(inner: inner, transform: transform)
+      MapDecorator<Child.Value, NewValue>(
+        inner: inner,
+        authoringContext: authoringContext,
+        transform: transform
+      )
     )
   }
 }
@@ -200,10 +231,16 @@ extension Gesture {
 final class MapDecorator<From, To>: GestureRecognizer {
   typealias Value = To
   let inner: AnyGestureRecognizer
+  let authoringContext: ImperativeAuthoringContextSnapshot?
   let transform: @MainActor (From) -> To
 
-  init(inner: AnyGestureRecognizer, transform: @escaping @MainActor (From) -> To) {
+  init(
+    inner: AnyGestureRecognizer,
+    authoringContext: ImperativeAuthoringContextSnapshot?,
+    transform: @escaping @MainActor (From) -> To
+  ) {
     self.inner = inner
+    self.authoringContext = authoringContext
     self.transform = transform
   }
 
@@ -220,7 +257,9 @@ final class MapDecorator<From, To>: GestureRecognizer {
 
   func currentValue() -> To? {
     guard let from: From = inner.currentValue(as: From.self) else { return nil }
-    return transform(from)
+    return withImperativeAuthoringContext(authoringContext) {
+      transform(from)
+    }
   }
 
   func tearDown() { inner.tearDown() }
@@ -261,6 +300,7 @@ public struct GestureStateGesture<Child: Gesture, State>: Gesture {
     context: GestureRecognizerBuildContext
   ) -> AnyGestureRecognizer {
     let inner = child._makeRecognizer(context: context)
+    let authoringContext = currentImperativeAuthoringContextSnapshot()
 
     // Register this @GestureState with the runtime so the registry can
     // reset on subtree teardown.
@@ -273,6 +313,7 @@ public struct GestureStateGesture<Child: Gesture, State>: Gesture {
       UpdatingDecorator<Child.Value, State>(
         inner: inner,
         box: state.box,
+        authoringContext: authoringContext,
         updater: updater
       )
     )
@@ -307,6 +348,7 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
 
   let inner: AnyGestureRecognizer
   let box: GestureStateBox<S>
+  let authoringContext: ImperativeAuthoringContextSnapshot?
   let updater: @MainActor (V, inout S, inout Transaction) -> Void
 
   /// Tracks whether this decorator's updater has actually written to
@@ -323,10 +365,12 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
   init(
     inner: AnyGestureRecognizer,
     box: GestureStateBox<S>,
+    authoringContext: ImperativeAuthoringContextSnapshot?,
     updater: @escaping @MainActor (V, inout S, inout Transaction) -> Void
   ) {
     self.inner = inner
     self.box = box
+    self.authoringContext = authoringContext
     self.updater = updater
   }
 
@@ -338,14 +382,21 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
     if disposition == .handled,
       let value: V = inner.currentValue(as: V.self)
     {
-      var state = box.currentValue()
-      var transaction = Transaction()
-      updater(value, &state, &transaction)
-      box.setValue(state)
+      let nextState = withImperativeAuthoringContext(authoringContext) { () -> S in
+        var state = box.currentValue()
+        var transaction = Transaction()
+        updater(value, &state, &transaction)
+        return state
+      }
+      withImperativeAuthoringContext(authoringContext) {
+        box.setValue(nextState)
+      }
       didFire = true
     }
     if inner.phase.isTerminal, didFire {
-      box.resetToSeed()
+      withImperativeAuthoringContext(authoringContext) {
+        box.resetToSeed()
+      }
       didFire = false
     }
     return disposition
@@ -354,7 +405,9 @@ final class UpdatingDecorator<V, S>: GestureRecognizer {
   func handleDeadline(at instant: MonotonicInstant) -> Bool {
     let didTerminate = inner.handleDeadline(at: instant)
     if didTerminate, didFire {
-      box.resetToSeed()
+      withImperativeAuthoringContext(authoringContext) {
+        box.resetToSeed()
+      }
       didFire = false
     }
     return didTerminate

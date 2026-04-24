@@ -79,14 +79,22 @@ struct AsyncLifecycleGenerationTests {
     let inputReader = InjectedTerminalInputReader()
     let firstReady = AwaitingNextProbe()
     let secondReady = AwaitingNextProbe()
+    let deliveredEvents = EventProbe<InputEvent>()
     let firstConsumer = awaitNextValue(
       from: inputReader.inputEvents(),
       readyProbe: firstReady
     )
-    let secondConsumer = collectEvents(
-      from: inputReader.inputEvents(),
-      readyProbe: secondReady
-    )
+    let secondConsumer = Task {
+      var iterator = inputReader.inputEvents().makeAsyncIterator()
+      await secondReady.markReady()
+
+      var events: [InputEvent] = []
+      while let event = await iterator.next() {
+        events.append(event)
+        await deliveredEvents.replace(events)
+      }
+      return events
+    }
     let scrollSequence: [UInt8] = [
       0x1B, 0x5B, 0x3C, 0x36, 0x35, 0x3B, 0x35, 0x3B, 0x37, 0x4D,
     ]
@@ -103,7 +111,9 @@ struct AsyncLifecycleGenerationTests {
     _ = await firstConsumer.result
     inputReader.send(scrollSequence)
 
-    try await Task.sleep(nanoseconds: 20_000_000)
+    try await waitUntil("replacement mouse flush delivery") {
+      await deliveredEvents.count == 1
+    }
     inputReader.finish()
 
     let events = try await awaitTaskValue(
@@ -129,6 +139,18 @@ private actor AwaitingNextProbe {
 
   func markReady() {
     isReady = true
+  }
+}
+
+private actor EventProbe<Element: Sendable> {
+  private var events: [Element] = []
+
+  var count: Int {
+    events.count
+  }
+
+  func replace(_ events: [Element]) {
+    self.events = events
   }
 }
 

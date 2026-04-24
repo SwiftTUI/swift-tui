@@ -64,6 +64,7 @@ extension ActionScope where Self: View & Sendable {
         name: name,
         description: description,
         isEnabled: isEnabled,
+        authoringContext: currentImperativeAuthoringContextSnapshot(),
         action: action
       )
     )
@@ -74,17 +75,20 @@ public struct PaletteCommandRegistrationModifier: PrimitiveViewModifier, Sendabl
   package let name: String
   package let description: String?
   package let isEnabled: Bool
+  package let authoringContext: ImperativeAuthoringContextSnapshot?
   package let action: @MainActor @Sendable () -> Void
 
   package init(
     name: String,
     description: String?,
     isEnabled: Bool,
+    authoringContext: ImperativeAuthoringContextSnapshot?,
     action: @escaping @MainActor @Sendable () -> Void
   ) {
     self.name = name
     self.description = description
     self.isEnabled = isEnabled
+    self.authoringContext = authoringContext
     self.action = action
   }
 
@@ -93,13 +97,18 @@ public struct PaletteCommandRegistrationModifier: PrimitiveViewModifier, Sendabl
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let node = content.resolve(in: context)
+    let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
     context.commandRegistry?.registerPaletteCommand(
       at: node.identity,
       command: RegisteredPaletteCommand(
         name: name,
         description: description,
         isEnabled: isEnabled,
-        action: action
+        action: {
+          withImperativeAuthoringContext(dynamicPropertyScope) {
+            action()
+          }
+        }
       )
     )
     return [node]

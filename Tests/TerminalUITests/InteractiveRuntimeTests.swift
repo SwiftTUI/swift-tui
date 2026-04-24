@@ -2487,7 +2487,6 @@ struct InteractiveRuntimeTests {
     let scrollBytes = sgrScrollDown(at: centerPoint(of: scrollRect))
     for _ in 0..<12 {
       try writeAllBytes(scrollBytes, to: writeDescriptor)
-      usleep(50)
     }
 
     let scrollBurstBecameVisible = try await waitUntil {
@@ -2499,8 +2498,11 @@ struct InteractiveRuntimeTests {
     let positionAfterScrollBurst = positionBox.value
 
     let clickBytes = sgrPrimaryClick(at: .init(x: 1, y: 1))
+    let frameCountBeforeClick = terminal.visibleFrames.count
     try writeAllBytes(clickBytes, to: writeDescriptor)
-    try await Task.sleep(nanoseconds: 50_000_000)
+    _ = try await waitUntil(timeoutNanoseconds: 500_000_000) {
+      terminal.visibleFrames.count > frameCountBeforeClick
+    }
 
     let frameAfterClick = terminal.visibleFrames.last ?? ""
 
@@ -2579,7 +2581,6 @@ struct InteractiveRuntimeTests {
     let scrollBytes = sgrScrollDown(at: centerPoint(of: scrollRect))
     for _ in 0..<12 {
       inputReader.send(scrollBytes)
-      usleep(50)
     }
 
     let scrollBurstBecameVisible = try await waitUntil {
@@ -2590,8 +2591,11 @@ struct InteractiveRuntimeTests {
     let frameAfterScrollBurst = terminal.visibleFrames.last ?? ""
     let positionAfterScrollBurst = positionBox.value
 
+    let frameCountBeforeClick = terminal.visibleFrames.count
     inputReader.send(sgrPrimaryClick(at: .init(x: 1, y: 1)))
-    try await Task.sleep(nanoseconds: 50_000_000)
+    _ = try await waitUntil(timeoutNanoseconds: 500_000_000) {
+      terminal.visibleFrames.count > frameCountBeforeClick
+    }
 
     let frameAfterClick = terminal.visibleFrames.last ?? ""
 
