@@ -504,6 +504,15 @@ public enum LayoutCatalog {
       tier: .smoke,
       makeView: { AnyView(SheetOverScrollLayout()) }
     ),
+    LayoutEntry(
+      id: "presentation.alert-anchor-stable",
+      category: .presentationLayout,
+      title: "Alert anchor stable",
+      blurb: "underlying top-left stable across alert show/hide",
+      marker: "Alert anchor stable",
+      tier: .behaviour,
+      makeView: { AnyView(AlertAnchorStable()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
