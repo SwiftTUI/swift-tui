@@ -90,6 +90,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(FixedSizeText()) }
     ),
+    LayoutEntry(
+      id: "frames.fixed-size-one-axis",
+      category: .frames,
+      title: "FixedSize one axis",
+      blurb: "wrap horizontally, don't stretch vertically",
+      marker: "FixedSize one axis",
+      tier: .behaviour,
+      makeView: { AnyView(FixedSizeOneAxis()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
