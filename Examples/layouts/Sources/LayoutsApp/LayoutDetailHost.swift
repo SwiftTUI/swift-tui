@@ -2,24 +2,21 @@ import Layouts
 import TerminalUI
 
 /// Full-screen detail host for one ``LayoutEntry``. Renders
-/// `entry.makeView()` occupying the body, with a 1-row footer and an
-/// Esc key command that calls `onBack`.
+/// `entry.makeView()` filling the available space, with a 1-row
+/// footer and a ⌃B key command that calls `onBack` to return to the
+/// picker.
 ///
 /// The host deliberately owns no sheet / alert / other presentation
-/// seam; individual layouts that demo presentations own their own Esc
-/// handling. See `project_presentation_escape_dismiss.md`.
+/// seam; individual layouts that demo presentations own their own
+/// dismiss handling. See `project_presentation_escape_dismiss.md`.
 ///
-/// Esc-binding limitation: `.keyCommand(...)` requires a non-empty
-/// `modifiers:` set; modifier-less registrations (including
-/// `modifiers: []`) are silently dropped at resolve time —
-/// single-key bindings for Esc/Tab/Enter/arrows/typing are reserved
-/// for framework-internal dispatch. See
-/// `Sources/View/ActionScopes/KeyCommandModifier.swift` for the
-/// enforcement site. We register the binding anyway so that the
-/// declaration reads as intended and so behaviour upgrades for free
-/// if the framework later routes bare Esc through consumer key
-/// commands; today `onBack` from this site will not fire and the
-/// detail host has no dismissal keystroke of its own.
+/// Why ⌃B instead of Esc: the framework reserves Esc (and other
+/// unmodified navigation keys) for presentation dismissal in
+/// `KeyCommandModifier`; consumer-bound single-key commands are
+/// silently dropped. ⌃B is the nearest idiomatic "back" chord in
+/// terminal UIs. See the open design question at
+/// `docs/proposals/FRAMEWORK_RESERVED_KEY_CONSUMER_ESCAPE_HATCH.md`
+/// (file to be created).
 struct LayoutDetailHost: View {
   let entry: LayoutEntry
   let onBack: @MainActor @Sendable () -> Void
@@ -29,15 +26,15 @@ struct LayoutDetailHost: View {
       entry.makeView()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       Divider()
-      Text("esc back  ·  ⌃C quit  ·  \(entry.category.rawValue) / \(entry.title)")
+      Text("⌃B back  ·  ⌃C quit  ·  \(entry.category.rawValue) / \(entry.title)")
         .foregroundStyle(.muted)
         .padding(.horizontal, 1)
     }
     .panel(id: "layouts.detail.\(entry.id)")
     .keyCommand(
       "Back",
-      key: .escape,
-      modifiers: [],
+      key: .character("b"),
+      modifiers: .ctrl,
       action: onBack
     )
   }
