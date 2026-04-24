@@ -315,6 +315,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(DividerOrientationFlip()) }
     ),
+    LayoutEntry(
+      id: "scrolling.vertical-measures-content",
+      category: .scrolling,
+      title: "Vertical scroll measures content",
+      blurb: "raster height = proposal; content taller than viewport",
+      marker: "Vertical scroll measures content",
+      tier: .behaviour,
+      makeView: { AnyView(VerticalScrollMeasuresContent()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
