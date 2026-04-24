@@ -198,6 +198,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(PerSideBorderColors()) }
     ),
+    LayoutEntry(
+      id: "borders.border-blend-static-phase",
+      category: .bordersOverlays,
+      title: "Border blend static phase",
+      blurb: "phase 0 vs 0.5; no RunLoop",
+      marker: "Border blend static phase",
+      tier: .behaviour,
+      makeView: { AnyView(BorderBlendStaticPhase()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
