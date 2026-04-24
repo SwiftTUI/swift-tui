@@ -360,6 +360,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(GeometryReaderInHStackHogs()) }
     ),
+    LayoutEntry(
+      id: "geometry.anchor-corner",
+      category: .geometry,
+      title: "Geometry reader anchor corner",
+      blurb: ".position using proxy.size locates corner",
+      marker: "Geometry reader anchor corner",
+      tier: .behaviour,
+      makeView: { AnyView(GeometryReaderAnchorCorner()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
