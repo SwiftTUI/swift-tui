@@ -513,6 +513,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(AlertAnchorStable()) }
     ),
+    LayoutEntry(
+      id: "matched.badge-move",
+      category: .matched,
+      title: "Matched geometry badge move",
+      blurb: "matchedGeometryEffect: badge moves between containers",
+      marker: "Matched geometry badge move",
+      tier: .behaviour,
+      makeView: { AnyView(MatchedGeometryBadgeMove()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
