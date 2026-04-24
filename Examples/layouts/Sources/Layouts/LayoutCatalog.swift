@@ -297,6 +297,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ThreeSpacerSharing()) }
     ),
+    LayoutEntry(
+      id: "spacers.min-length-respected",
+      category: .spacers,
+      title: "Spacer min length respected",
+      blurb: "Spacer(minLength: 10) honored under tight proposal",
+      marker: "Spacer min length respected",
+      tier: .behaviour,
+      makeView: { AnyView(SpacerMinLengthRespected()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
