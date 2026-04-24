@@ -171,6 +171,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(IgnoresSafeAreaBleed()) }
     ),
+    LayoutEntry(
+      id: "borders.background-vs-overlay-paint-order",
+      category: .bordersOverlays,
+      title: "Background vs overlay paint order",
+      blurb: "overlay wins at cell collisions; background loses",
+      marker: "Background vs overlay paint order",
+      tier: .behaviour,
+      makeView: { AnyView(BackgroundVsOverlayPaintOrder()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
