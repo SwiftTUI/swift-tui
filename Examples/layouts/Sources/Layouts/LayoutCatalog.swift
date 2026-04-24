@@ -63,6 +63,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(VStackLeadingGuideShift()) }
     ),
+    LayoutEntry(
+      id: "frames.frame-fixed-inside-unbounded",
+      category: .frames,
+      title: "Frame fixed inside unbounded",
+      blurb: "fixed frame in infinite vs tight parent",
+      marker: "Frame fixed inside unbounded",
+      tier: .smoke,
+      makeView: { AnyView(FrameFixedInsideUnbounded()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
