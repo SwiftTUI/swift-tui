@@ -486,6 +486,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(CapsuleAxisFlip()) }
     ),
+    LayoutEntry(
+      id: "shapes.canvas-honors-clipped",
+      category: .shapesCanvas,
+      title: "Canvas honors clipped",
+      blurb: "Canvas drawing past frame is dropped by .clipped()",
+      marker: "Canvas honors clipped",
+      tier: .behaviour,
+      makeView: { AnyView(CanvasHonorsClipped()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {

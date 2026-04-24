@@ -224,3 +224,49 @@ reader's "infinite" flex either. Revisit alongside finding #4.
 **Status:** Open — likely related to finding #4; test pins observed
 behaviour. Candidate remediation is shared with the GeometryReader
 proposal-tightening work.
+
+### 7. `Canvas` already self-clips at the subpixel level — `.clipped()` is a no-op overlay
+
+**Surfaced by:** `Examples/layouts/Tests/LayoutsTests/ShapesCanvas/CanvasHonorsClippedBehaviourTests.swift`
+(layout `shapes.canvas-honors-clipped`, plan task #53).
+
+**Plan prediction:** A `Canvas` whose drawing paints subpixels past
+the canvas's frame would, without `.clipped()`, leak painted cells
+into adjacent layout regions of the raster. Adding `.clipped()` to
+the Canvas would crop the overflow.
+
+**Observed (rendered at 60×12, identical layout with and without `.clipped()`):**
+
+```
+[2] | ▛▀▀▀▀▀▀▀▀▀▀▜|             <- top border, 10-cell frame
+[5] | ▌⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉▐|             <- canvas line: cyan at cols 2..11 ONLY
+[7] | ▙▄▄▄▄▄▄▄▄▄▄▟|             <- bottom border
+```
+
+Both variants — with `.clipped()` and without — produce the **same**
+raster. The drawing requests a horizontal line spanning
+`context.width * 3` subpixels (3× the frame's own width), but the
+`CanvasContext` exposed to the drawing is sized to the frame's
+subpixel extent and silently discards out-of-range pixels (per
+`CanvasDrawing` doc: "Out-of-range pixels are silently clipped").
+The library guarantees subpixel-bounds clipping at the source, so
+`.clipped()` has nothing to crop downstream.
+
+**Resolution:** Pinned the observed behaviour (cyan strictly within
+the 10-cell frame interior, cols 2..11). Because removing `.clipped()`
+does not change the raster, the planned "remove `.clipped()` →
+overflow leaks" vacuity check is not informative; the test instead
+A/Bs against a wider canvas frame (10 → 30 cells), which DOES extend
+the cyan-painted region as the right edge moves. That A/B proves the
+assertion is observing the actual frame edge rather than vacuously
+true.
+
+The library is correct (Canvas cannot leak past its own frame at the
+subpixel level — that's what `BrailleCanvas`'s "silently clipped"
+contract guarantees). The plan's predicted vacuity was wrong because
+it assumed `.clipped()` was a load-bearing modifier on `Canvas`; on
+this library it is a redundant overlay.
+
+**Status:** Closed — spec was wrong about the vacuity. Library is
+faithful: Canvas self-clips at subpixel bounds, `.clipped()` is
+defensive but functionally a no-op for `Canvas` overflow.
