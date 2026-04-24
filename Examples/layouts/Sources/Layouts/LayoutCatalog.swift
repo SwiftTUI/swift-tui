@@ -1,3 +1,5 @@
+import TerminalUI
+
 /// Source-of-truth list of every layout in the Layouts example app.
 ///
 /// The app picker iterates this to render the list; the parameterised
@@ -12,7 +14,20 @@ public enum LayoutCatalog {
   /// phase of the plan. `LayoutCatalog` is complete once 56 entries
   /// are listed and `CatalogIntegrityTests.entries_coverAllCategories`
   /// passes.
-  public static let all: [LayoutEntry] = []
+  public static let all: [LayoutEntry] = [
+    // AnyView policy: `makeView` is the single documented AnyView seam
+    // for the heterogeneous catalog. Every concrete layout below is a
+    // strongly-typed `View`; erasure happens only in the closure.
+    LayoutEntry(
+      id: "stacks.hstack-alignment-triad",
+      category: .stacks,
+      title: "HStack alignment triad",
+      blurb: ".top vs .center vs .bottom with mixed-height children",
+      marker: "HStack alignment triad",
+      tier: .behaviour,
+      makeView: { AnyView(HStackAlignmentTriad()) }
+    )
+  ]
 
   public static func entry(id: String) -> LayoutEntry? {
     all.first { $0.id == id }
