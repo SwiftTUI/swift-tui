@@ -234,6 +234,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(OffsetPreservesMeasuredSize()) }
     ),
+    LayoutEntry(
+      id: "offset.position-ignores-layout",
+      category: .offsetPosition,
+      title: "Position ignores layout",
+      blurb: ".position(x:y:) anchors child at an absolute point",
+      marker: "Position ignores layout",
+      tier: .behaviour,
+      makeView: { AnyView(PositionIgnoresLayout()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
