@@ -390,7 +390,7 @@ package struct RemovalEntry: Sendable {
 }
 
 @MainActor
-package final class AnimationController {
+package final class AnimationController: Sendable {
   private var previousSnapshots: [Identity: AnimatableSnapshot] = [:]
   /// Full tree from the previous frame, retained so removals can capture
   /// their subtrees.

@@ -53,7 +53,7 @@ public func withAnimation<Result>(
     // Deliver the concrete animation to the renderer-owned sink so the
     // controller can re-hydrate it when it reads the box back out of
     // the transaction.
-    AnimationRegistrationStorage.currentSink?.registerAnimationBox(
+    AnimationRegistrationStorage.effectiveSink?.registerAnimationBox(
       box,
       payload: animation
     )
@@ -91,7 +91,7 @@ public func withAnimation<Result>(
 ) rethrows -> Result {
   _ = completionCriteria  // reserved for when logically/removed diverge
   let batchID = AnimationBatchIDAllocator.next()
-  AnimationCompletionStorage.currentSink?.registerCompletion(
+  AnimationCompletionStorage.effectiveSink?.registerCompletion(
     batchID: batchID,
     closure: completion
   )
