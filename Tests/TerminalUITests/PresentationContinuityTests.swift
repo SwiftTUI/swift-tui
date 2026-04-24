@@ -103,8 +103,8 @@ struct PresentationContinuityTests {
       in: shownArtifacts
     )
 
-    #expect(shownOperations.contains(where: isAppear))
-    #expect(shownOperations.contains(where: isTaskStart))
+    #expect(shownOperations.filter(isAppear).count == 1)
+    #expect(shownOperations.filter(isTaskStart).count == 1)
 
     let dismissedArtifacts = renderer.render(
       sheetLifecycleRoot(isPresented: false),
@@ -116,8 +116,8 @@ struct PresentationContinuityTests {
       in: dismissedArtifacts
     )
 
-    #expect(dismissedOperations.contains(where: isTaskCancel))
-    #expect(dismissedOperations.contains(where: isDisappear))
+    #expect(dismissedOperations.filter(isTaskCancel).count == 1)
+    #expect(dismissedOperations.filter(isDisappear).count == 1)
   }
 
   @Test("toast activation keeps the focused base control identity stable")

@@ -224,7 +224,7 @@ struct GalleryTabSwitchTests {
       rendered.contains("remaining") && !rendered.contains("Write docs")
     }
 
-    let stableAfterDeleteScreen = try await Self.waitForScreen(
+    let stableAfterDeleteScreen = try await Self.observeScreenWhileAbsent(
       on: pty.master,
       screen: &screen,
       timeoutNanoseconds: 400_000_000
@@ -417,7 +417,7 @@ struct GalleryTabSwitchTests {
       rendered.contains("remaining") && !rendered.contains("Write docs")
     }
 
-    let stableAfterDeleteScreen = try await Self.waitForScreen(
+    let stableAfterDeleteScreen = try await Self.observeScreenWhileAbsent(
       on: pty.master,
       screen: &screen,
       timeoutNanoseconds: 400_000_000
@@ -632,6 +632,20 @@ struct GalleryTabSwitchTests {
     )
   }
 
+  private enum ScreenWaitError: Error, CustomStringConvertible {
+    case timedOut(rendered: String)
+    case forbiddenStateObserved(rendered: String)
+
+    var description: String {
+      switch self {
+      case .timedOut(let rendered):
+        "Timed out waiting for screen condition; last screen was:\n\(rendered)"
+      case .forbiddenStateObserved(let rendered):
+        "Observed forbidden screen state:\n\(rendered)"
+      }
+    }
+  }
+
   private static func waitForScreen(
     on fileDescriptor: Int32,
     screen: inout PTYVisibleScreen,
@@ -658,7 +672,47 @@ struct GalleryTabSwitchTests {
     if !finalBytes.isEmpty {
       screen.feed(finalBytes)
     }
-    return screen.renderedText
+    rendered = screen.renderedText
+    if condition(rendered) {
+      return rendered
+    }
+    throw ScreenWaitError.timedOut(rendered: rendered)
+  }
+
+  private static func observeScreenWhileAbsent(
+    on fileDescriptor: Int32,
+    screen: inout PTYVisibleScreen,
+    timeoutNanoseconds: UInt64,
+    pollNanoseconds: UInt64 = 5_000_000,
+    forbidden: (String) -> Bool
+  ) async throws -> String {
+    let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+    var rendered = screen.renderedText
+    if forbidden(rendered) {
+      throw ScreenWaitError.forbiddenStateObserved(rendered: rendered)
+    }
+
+    while DispatchTime.now().uptimeNanoseconds < deadline {
+      let bytes = try readAvailableBytes(from: fileDescriptor)
+      if !bytes.isEmpty {
+        screen.feed(bytes)
+        rendered = screen.renderedText
+      }
+      if forbidden(rendered) {
+        throw ScreenWaitError.forbiddenStateObserved(rendered: rendered)
+      }
+      try await Task.sleep(nanoseconds: pollNanoseconds)
+    }
+
+    let finalBytes = try readAvailableBytes(from: fileDescriptor)
+    if !finalBytes.isEmpty {
+      screen.feed(finalBytes)
+    }
+    rendered = screen.renderedText
+    if forbidden(rendered) {
+      throw ScreenWaitError.forbiddenStateObserved(rendered: rendered)
+    }
+    return rendered
   }
 
   private static func readAvailableBytes(
