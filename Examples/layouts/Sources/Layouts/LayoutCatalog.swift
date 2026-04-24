@@ -397,6 +397,15 @@ public enum LayoutCatalog {
       makeView: { AnyView(ViewThatFitsBoundaryInclusive()) }
     ),
     LayoutEntry(
+      id: "custom-layout.flow-wrap",
+      category: .customLayout,
+      title: "Flow layout wrap",
+      blurb: "custom Layout: wrap children into rows when they don't fit",
+      marker: "Flow layout wrap",
+      tier: .behaviour,
+      makeView: { AnyView(FlowLayoutWrap()) }
+    ),
+    LayoutEntry(
       id: "custom-layout.any-layout-hv-swap",
       category: .customLayout,
       title: "Any layout HV swap",
