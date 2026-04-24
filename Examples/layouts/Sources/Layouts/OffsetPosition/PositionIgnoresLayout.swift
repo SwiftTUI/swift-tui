@@ -6,8 +6,9 @@ import TerminalUI
 ///
 /// A ZStack provides a visible background (a muted-filled `Rectangle`)
 /// so the absolute position contrast is obvious; the `[PIN]` label is
-/// centered at `(x: 40, y: 14)` on an 80×28 surface (middle of the
-/// viewport).
+/// anchored at `(x: 60, y: 5)` — an OFF-CENTER point chosen so that
+/// removing `.position` produces a visibly different raster (the
+/// natural ZStack layout would center `[PIN]` near column 40, row 14).
 ///
 /// The header `"Position ignores layout"` is the catalog marker; it
 /// lives above the positioned area so the raster row containing `[PIN]`
@@ -20,7 +21,7 @@ public struct PositionIgnoresLayout: View {
       Text("Position ignores layout").foregroundStyle(.muted)
       ZStack {
         Rectangle().fill(Color.blue)
-        Text("[PIN]").position(x: 40, y: 14)
+        Text("[PIN]").position(x: 60, y: 5)
       }
     }
   }
