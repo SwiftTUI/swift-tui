@@ -39,6 +39,7 @@ Runs the full checked-in repo verification surface:
   - GUI/WebTUIGUI Bun tests
   - GUI/XtermWebTUIGUI Bun tests
   - Examples/gallery tests
+  - Examples/layouts tests
   - Examples/WebExample Bun tests
   - Examples/WebExample browser integration test
   - Examples/XtermWebExample Bun tests
@@ -298,6 +299,10 @@ run_step \
 run_function_step \
   "Run Examples/gallery tests" \
   run_swift test --package-path Examples/gallery
+
+run_function_step \
+  "Run Examples/layouts tests" \
+  run_swift test --package-path Examples/layouts
 
 run_step \
   "Run Examples/WebExample Bun tests" \
