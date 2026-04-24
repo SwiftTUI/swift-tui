@@ -36,6 +36,15 @@ public enum LayoutCatalog {
       tier: .smoke,
       makeView: { AnyView(VStackSpacingVsPadding()) }
     ),
+    LayoutEntry(
+      id: "stacks.zstack-alignment-grid",
+      category: .stacks,
+      title: "ZStack alignment grid",
+      blurb: "9 cells: every alignment with a marker child",
+      marker: "ZStack alignment grid",
+      tier: .behaviour,
+      makeView: { AnyView(ZStackAlignmentGrid()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
