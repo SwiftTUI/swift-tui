@@ -288,6 +288,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ZStackSpacerNoop()) }
     ),
+    LayoutEntry(
+      id: "spacers.three-sharing",
+      category: .spacers,
+      title: "Three spacer sharing",
+      blurb: "HStack with 3 Spacers splits residual equally",
+      marker: "Three spacer sharing",
+      tier: .behaviour,
+      makeView: { AnyView(ThreeSpacerSharing()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
