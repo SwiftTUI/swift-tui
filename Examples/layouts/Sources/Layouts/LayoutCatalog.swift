@@ -324,6 +324,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(VerticalScrollMeasuresContent()) }
     ),
+    LayoutEntry(
+      id: "scrolling.horizontal-infinite-child",
+      category: .scrolling,
+      title: "Horizontal scroll with infinite child",
+      blurb: ".frame(maxWidth:.infinity) inside horizontal ScrollView",
+      marker: "Horizontal scroll with infinite child",
+      tier: .behaviour,
+      makeView: { AnyView(HorizontalScrollWithInfiniteChild()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
