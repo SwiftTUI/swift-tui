@@ -180,6 +180,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(BackgroundVsOverlayPaintOrder()) }
     ),
+    LayoutEntry(
+      id: "borders.nested-border-ordering",
+      category: .bordersOverlays,
+      title: "Nested border ordering",
+      blurb: "two concentric rings; inner hugs content, outer hugs padding",
+      marker: "Nested border ordering",
+      tier: .behaviour,
+      makeView: { AnyView(NestedBorderOrdering()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
