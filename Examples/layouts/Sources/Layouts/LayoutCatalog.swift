@@ -423,6 +423,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(RadialLayout()) }
     ),
+    LayoutEntry(
+      id: "alignment.colon-aligned-form",
+      category: .alignmentGuides,
+      title: "Colon aligned form",
+      blurb: "custom HorizontalAlignment at colon",
+      marker: "Colon aligned form",
+      tier: .behaviour,
+      makeView: { AnyView(ColonAlignedForm()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
