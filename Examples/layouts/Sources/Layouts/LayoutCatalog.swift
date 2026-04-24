@@ -279,6 +279,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ZStackSizedByLargest()) }
     ),
+    LayoutEntry(
+      id: "zstack.spacer-noop",
+      category: .zStack,
+      title: "ZStack spacer noop",
+      blurb: "Spacer is a no-op for sizing in ZStack",
+      marker: "ZStack spacer noop",
+      tier: .behaviour,
+      makeView: { AnyView(ZStackSpacerNoop()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
