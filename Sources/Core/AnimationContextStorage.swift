@@ -18,7 +18,7 @@ package enum AnimationContextStorage {
 /// closure once every animation and every removal overlay tagged with
 /// the batch ID has drained.
 @MainActor
-package protocol AnimationCompletionSink: AnyObject {
+package protocol AnimationCompletionSink: AnyObject, Sendable {
   func registerCompletion(
     batchID: AnimationBatchID,
     closure: @escaping @Sendable () -> Void
@@ -27,33 +27,75 @@ package protocol AnimationCompletionSink: AnyObject {
 
 @MainActor
 package enum AnimationCompletionStorage {
+  @TaskLocal package static var currentTaskSink: (any AnimationCompletionSink)?
   package static weak var currentSink: (any AnimationCompletionSink)?
+
+  package static var effectiveSink: (any AnimationCompletionSink)? {
+    currentTaskSink ?? currentSink
+  }
+
+  package static func withSink<Result>(
+    _ sink: any AnimationCompletionSink,
+    operation: () async throws -> Result
+  ) async rethrows -> Result {
+    try await $currentTaskSink.withValue(sink) {
+      try await operation()
+    }
+  }
 }
 
 /// Sink used by the View-layer `withAnimation` to deliver concrete
 /// `Animation` values to the renderer's animation controller without
 /// introducing a direct module dependency.
 ///
-/// TerminalUI installs a concrete sink on the ``RunLoop`` at startup
-/// via ``installAnimationRegistrationSink(_:)``.
+/// TerminalUI installs a concrete sink on the ``RunLoop`` using task-local
+/// storage so concurrent scenes keep their animation registrations isolated.
 @MainActor
-package protocol AnimationRegistrationSink: AnyObject {
+package protocol AnimationRegistrationSink: AnyObject, Sendable {
   func registerAnimationBox(_ box: AnimationBox, payload: any Sendable)
 }
 
 @MainActor
 package enum AnimationRegistrationStorage {
+  @TaskLocal package static var currentTaskSink: (any AnimationRegistrationSink)?
   package static weak var currentSink: (any AnimationRegistrationSink)?
+
+  package static var effectiveSink: (any AnimationRegistrationSink)? {
+    currentTaskSink ?? currentSink
+  }
+
+  package static func withSink<Result>(
+    _ sink: any AnimationRegistrationSink,
+    operation: () async throws -> Result
+  ) async rethrows -> Result {
+    try await $currentTaskSink.withValue(sink) {
+      try await operation()
+    }
+  }
 }
 
 /// Sink used by the View-layer `.transition()` modifier to register
 /// per-identity transitions with the renderer's animation controller.
 @MainActor
-package protocol TransitionRegistrationSink: AnyObject {
+package protocol TransitionRegistrationSink: AnyObject, Sendable {
   func registerTransition(for identity: Identity, transition: any Sendable)
 }
 
 @MainActor
 package enum TransitionRegistrationStorage {
+  @TaskLocal package static var currentTaskSink: (any TransitionRegistrationSink)?
   package static weak var currentSink: (any TransitionRegistrationSink)?
+
+  package static var effectiveSink: (any TransitionRegistrationSink)? {
+    currentTaskSink ?? currentSink
+  }
+
+  package static func withSink<Result>(
+    _ sink: any TransitionRegistrationSink,
+    operation: () async throws -> Result
+  ) async rethrows -> Result {
+    try await $currentTaskSink.withValue(sink) {
+      try await operation()
+    }
+  }
 }
