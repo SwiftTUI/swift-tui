@@ -477,6 +477,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(CircleInNonSquareFrame()) }
     ),
+    LayoutEntry(
+      id: "shapes.capsule-axis-flip",
+      category: .shapesCanvas,
+      title: "Capsule axis flip",
+      blurb: "wide vs tall capsule rounds different ends",
+      marker: "Capsule axis flip",
+      tier: .behaviour,
+      makeView: { AnyView(CapsuleAxisFlip()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
