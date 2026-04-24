@@ -6,81 +6,88 @@ import Testing
 @MainActor
 @Suite
 struct IgnoresSafeAreaBleedBehaviourTests {
-  /// `.ignoresSafeArea(.bottom)` lets the `ScrollView`'s drawing area
-  /// extend INTO the bottom row. When the `[STATUS BAR]` is overlaid
-  /// at the ZStack's bottom alignment, the bar text covers the
-  /// scroll-content cells in its column range but the scroll
-  /// indicator on the trailing edge peeks through on the same row,
-  /// providing observable evidence that the ScrollView paints through
-  /// the bar zone.
+  /// A/B proof that `.ignoresSafeArea(.bottom)` reclaims the bottom
+  /// safe-area zone established by an outer `.safeAreaPadding(.bottom, 3)`.
   ///
-  /// Observed raster at 40×10 viewport:
+  /// `IgnoresSafeAreaBleed` is the WITH variant. `WithoutIgnoreVariant`
+  /// below is identical except it omits `.ignoresSafeArea(.bottom)`.
+  ///
+  /// Observed rasters at 40×14:
   ///
   /// ```
-  /// [0]|Ignores safe area bleed                █|
-  /// [1]|content 0                              █|
-  /// [2]|content 1                              █|
-  /// [3]|content 2                              █|
-  /// [4]|content 3                              ┃|
-  /// [5]|content 4                              ┃|
-  /// [6]|content 5                              ┃|
-  /// [7]|content 6                              ┃|
-  /// [8]|content 7                              ┃|
-  /// [9]|[STATUS BAR]                           ▼|
+  /// WITH                                        WITHOUT
+  /// [0] |Ignores safe area bleed              █| [0] |Ignores safe area bleed              █|
+  /// [1] |content 0                            █| [1] |content 0                            █|
+  /// ...                                          ...
+  /// [12]|content 11                           ┃| [10]|content 9                            ▼|
+  /// [13]|content 12                           ▼| [11]| … empty …                           |
+  ///                                              [12]| … empty …                           |
+  ///                                              [13]| … empty …                           |
   /// ```
   ///
-  /// Compare with `SafeAreaInsetBottomBar` (layout #16) where the
-  /// scroll indicator's last glyph sits one row HIGHER (row 8) and
-  /// the bar row contains only the bar text — the `.safeAreaInset`
-  /// modifier reduces the ScrollView proposal there. In this layout
-  /// the ZStack overlay does not reduce the proposal and the
-  /// `.ignoresSafeArea(.bottom)` modifier is consistent with the
-  /// observed behaviour: the ScrollView occupies the full ZStack
-  /// height including the bar's row.
-  ///
-  /// Pinned behaviour:
-  ///   - `[STATUS BAR]` row is the last row (height-1).
-  ///   - The same row contains a non-bar glyph at the trailing column
-  ///     (the scroll indicator `▼`), proving the ScrollView paints
-  ///     through the bar zone.
-  @Test("scroll indicator extends into the status-bar row (bleed)")
-  func scrollIndicatorReachesBarRow() {
+  /// Pinned: the WITH variant paints content into the reserved 3-row
+  /// bottom zone; the WITHOUT variant stops 3 rows higher.
+  @Test("With .ignoresSafeArea, content bleeds into the safe area zone")
+  func ignoresSafeAreaPaintsIntoReservedZone() {
     let width = 40
-    let height = 10
-    let raster = render(IgnoresSafeAreaBleed(), width: width, height: height).rasterSurface
+    let height = 14
+    let withIgnore = render(
+      IgnoresSafeAreaBleed(),
+      width: width,
+      height: height,
+      id: "with-ignore"
+    ).rasterSurface
+    let withoutIgnore = render(
+      WithoutIgnoreVariant(),
+      width: width,
+      height: height,
+      id: "without-ignore"
+    ).rasterSurface
 
-    guard let barRow = raster.firstRow(containing: "[STATUS BAR]") else {
-      Issue.record(
-        "expected '[STATUS BAR]' in raster:\n\(raster.lines.joined(separator: "\n"))"
-      )
-      return
-    }
-    #expect(
-      barRow == height - 1,
-      "expected status bar at last row (\(height - 1)); got \(barRow)"
-    )
-
-    guard let barLine = raster.row(at: barRow) else { return }
-    let barCols = Array(barLine)
-
-    // The `[STATUS BAR]` text covers the leading columns. The
-    // trailing columns on the same row should contain the
-    // ScrollView's vertical indicator glyph, evidencing the bleed.
-    // Scan for any non-space, non-bar-text glyph after the closing
-    // `]` of the bar.
-    let closingBracketIndex = barCols.firstIndex(of: "]")
-    guard let closingBracketIndex else {
-      Issue.record(
-        "expected ']' in bar row '\(barLine)'"
-      )
-      return
-    }
-    let trailing = barCols[barCols.index(after: closingBracketIndex)...]
-    let hasNonSpaceTrailing = trailing.contains { !$0.isWhitespace }
+    let withRows = withIgnore.rows(containing: "content ")
+    let withoutRows = withoutIgnore.rows(containing: "content ")
+    let withDump = withIgnore.lines.joined(separator: "\n")
+    let withoutDump = withoutIgnore.lines.joined(separator: "\n")
 
     #expect(
-      hasNonSpaceTrailing,
-      "expected ScrollView indicator glyph after ']' on bar row \(barRow); row='\(barLine)'\n\(raster.lines.joined(separator: "\n"))"
+      !withRows.isEmpty,
+      "baseline: with-ignore should show content; raster:\n\(withDump)"
     )
+    #expect(
+      !withoutRows.isEmpty,
+      "baseline: without-ignore should show content; raster:\n\(withoutDump)"
+    )
+
+    // The reclaimed zone is 3 rows deep: with-ignore should paint 3
+    // more content rows AND reach further down the raster than
+    // without-ignore.
+    #expect(
+      withRows.count > withoutRows.count,
+      "with-ignore rows \(withRows.count) should exceed without-ignore \(withoutRows.count); WITH:\n\(withDump)\nWITHOUT:\n\(withoutDump)"
+    )
+    #expect(
+      (withRows.last ?? -1) > (withoutRows.last ?? -1),
+      "with-ignore last content row \(withRows.last ?? -1) should be below without-ignore last content row \(withoutRows.last ?? -1)"
+    )
+    #expect(
+      withRows.last == height - 1,
+      "with-ignore should extend content to the last viewport row (\(height - 1)); got \(withRows.last ?? -1)"
+    )
+  }
+}
+
+/// Identical to `IgnoresSafeAreaBleed` except it omits the
+/// `.ignoresSafeArea(.bottom)` modifier. Used by the A/B comparison.
+private struct WithoutIgnoreVariant: View {
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Ignores safe area bleed").foregroundStyle(.muted)
+        ForEach(0..<30, id: \.self) { i in
+          Text("content \(i)")
+        }
+      }
+    }
+    .safeAreaPadding(.bottom, 3)
   }
 }
