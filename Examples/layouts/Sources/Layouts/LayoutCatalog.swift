@@ -153,6 +153,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(PaddingBorderOrdering()) }
     ),
+    LayoutEntry(
+      id: "padding.safe-area-inset-bottom-bar",
+      category: .padding,
+      title: "Safe area inset bottom bar",
+      blurb: "bar pinned bottom; inner proposal reduced",
+      marker: "Safe area inset bottom bar",
+      tier: .behaviour,
+      makeView: { AnyView(SafeAreaInsetBottomBar()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
