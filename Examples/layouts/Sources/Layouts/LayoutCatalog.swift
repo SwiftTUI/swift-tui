@@ -211,7 +211,7 @@ public enum LayoutCatalog {
       id: "borders.background-shapestyle-vs-content-overloads",
       category: .bordersOverlays,
       title: "Background ShapeStyle vs Content overloads",
-      blurb: ".background(.tint) vs .background { Rectangle }",
+      blurb: ".background(Color.red) vs .background { Rectangle().fill(Color.red) }",
       marker: "Background ShapeStyle vs Content overloads",
       tier: .smoke,
       makeView: { AnyView(BackgroundShapeStyleVsContentOverloads()) }

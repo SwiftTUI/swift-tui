@@ -820,9 +820,12 @@ extension LayoutEntry {
 - [ ] **Step 2: Verify it compiles**
 
 Run: `cd Examples/layouts && swift build`
-Expected: fails with "no targets" on `Layouts` (still no members of
-the catalog) — but `LayoutEntry.swift` itself compiles. If you see a
-Swift syntax error on `LayoutEntry.swift`, fix it now.
+Expected: build will report `target 'LayoutsApp' is empty` until
+Task 7 adds the `@main` entry — that is OK and unrelated to
+`LayoutEntry.swift`. The new file itself compiles successfully;
+confirm via `swiftc -parse Examples/layouts/Sources/Layouts/LayoutEntry.swift`
+or by reading the build log for any syntax error specific to
+`LayoutEntry.swift`. Fix any such error now.
 
 - [ ] **Step 3: Commit**
 
@@ -866,7 +869,13 @@ public enum LayoutCatalog {
 - [ ] **Step 2: Verify it compiles**
 
 Run: `cd Examples/layouts && swift build --target Layouts`
-Expected: success.
+Expected: the `Layouts` library target itself builds successfully.
+The package-level `swift build` will still report
+`target 'LayoutsApp' is empty` until Task 7 adds the `@main` entry;
+that is OK. If you want to confirm without the LayoutsApp noise,
+the per-target build above is the cleanest signal. As a last
+resort, `swiftc -parse Sources/Layouts/LayoutCatalog.swift` proves
+the catalog source itself parses.
 
 - [ ] **Step 3: Commit**
 
