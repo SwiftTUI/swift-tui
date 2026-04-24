@@ -135,6 +135,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(IntrinsicTextUnderZeroProposal()) }
     ),
+    LayoutEntry(
+      id: "padding.asymmetric-padding-insets",
+      category: .padding,
+      title: "Asymmetric padding insets",
+      blurb: "EdgeInsets with asymmetric top/leading/bottom/trailing",
+      marker: "Asymmetric padding insets",
+      tier: .smoke,
+      makeView: { AnyView(AsymmetricPaddingInsets()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
