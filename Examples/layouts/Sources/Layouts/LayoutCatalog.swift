@@ -459,6 +459,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ForEachIdentityReorder()) }
     ),
+    LayoutEntry(
+      id: "collections.table-column-prioritization",
+      category: .collections,
+      title: "Table column prioritization",
+      blurb: "Table column compression order",
+      marker: "Table column prioritization",
+      tier: .behaviour,
+      makeView: { AnyView(TableColumnPrioritization()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
