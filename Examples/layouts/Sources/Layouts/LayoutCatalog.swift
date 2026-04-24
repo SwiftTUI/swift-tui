@@ -72,6 +72,15 @@ public enum LayoutCatalog {
       tier: .smoke,
       makeView: { AnyView(FrameFixedInsideUnbounded()) }
     ),
+    LayoutEntry(
+      id: "frames.flexible-frame-alignment-grid",
+      category: .frames,
+      title: "Flexible frame alignment grid",
+      blurb: "9 cells exercising every alignment",
+      marker: "Flexible frame alignment grid",
+      tier: .behaviour,
+      makeView: { AnyView(FlexibleFrameAlignmentGrid()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
