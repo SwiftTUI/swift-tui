@@ -1,14 +1,6 @@
-import { expect, mock, test } from "bun:test";
+import { expect, test } from "bun:test";
 
-mock.module("ghostty-web", () => ({
-  init: async () => {},
-  Terminal: class {},
-  FitAddon: class {},
-}));
-
-const { createWebTUIApp } = await import("./WebTUIApp.ts");
-
-import type { WebTUIAppOptions } from "./WebTUIApp.ts";
+import { createWebTUIApp, type WebTUIAppOptions } from "./WebTUIApp.ts";
 import type {
   ResolvedWebTUITerminalStyle,
   WebTUITerminalStyle,

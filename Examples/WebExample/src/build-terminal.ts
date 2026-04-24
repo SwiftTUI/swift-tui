@@ -2,7 +2,6 @@ import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   buildAppWasm,
-  copyGhosttyWasmAsset,
   generateSceneManifest,
 } from "webtuigui";
 
@@ -26,9 +25,6 @@ await buildAppWasm({
   product: appExecutable,
 });
 await mkdir(distDirectory, { recursive: true });
-await copyGhosttyWasmAsset({
-  outputPath: join(distDirectory, "ghostty-vt.wasm"),
-});
 await Bun.write(
   join(distDirectory, "coi-serviceworker.js"),
   await Bun.file(coiServiceWorkerPath).arrayBuffer()

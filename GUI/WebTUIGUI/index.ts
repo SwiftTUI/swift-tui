@@ -1,17 +1,16 @@
 export * from "./src/WebTUIApp.ts";
 export * from "./src/WebTUISceneManifest.ts";
 export * from "./src/WebTUITerminalStyle.ts";
+export * from "./src/WebTUISurfaceTransport.ts";
 export * from "./src/WebTUISceneRuntime.ts";
 export * from "./src/wasi/BrowserWASIBridge.ts";
 export * from "./src/wasi/StdIOPipe.ts";
 export * from "./src/build/buildAppWasm.ts";
-export * from "./src/build/copyGhosttyWasmAsset.ts";
 export * from "./src/build/generateSceneManifest.ts";
 export * from "./src/build/resolveSwiftArtifacts.ts";
 
 import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { copyGhosttyWasmAsset } from "./src/build/copyGhosttyWasmAsset.ts";
 import { generateSceneManifest } from "./src/build/generateSceneManifest.ts";
 import { buildAppWasm } from "./src/build/buildAppWasm.ts";
 
@@ -104,19 +103,12 @@ async function bunBuildWeb(options: {
     throw new Error([stdout, stderr].filter(Boolean).join("\n").trim() || "web build failed");
   }
 
-  await copyGhosttyWasmAsset({
-    outputPath: join(options.outputDirectory, "ghostty-vt.wasm"),
-  });
 }
 
 async function bunServe(
   packagePath: string,
   distPath: string
 ): Promise<void> {
-  await copyGhosttyWasmAsset({
-    outputPath: join(distPath, "ghostty-vt.wasm"),
-  });
-
   const server = Bun.serve({
     port: Number(process.env.PORT ?? "3000"),
     development: {
@@ -130,9 +122,6 @@ async function bunServe(
       }
       if (url.pathname === "/scene-manifest.json") {
         return new Response(Bun.file(join(distPath, "scene-manifest.json")));
-      }
-      if (url.pathname === "/ghostty-vt.wasm") {
-        return new Response(Bun.file(join(distPath, "ghostty-vt.wasm")));
       }
       if (url.pathname.startsWith("/assets/")) {
         return new Response(Bun.file(join(distPath, url.pathname.slice(1))));

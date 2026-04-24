@@ -43,6 +43,8 @@ export interface WasmSceneResizeEvent {
   sceneId: string;
   columns: number;
   rows: number;
+  cellWidth?: number;
+  cellHeight?: number;
 }
 
 export interface WasmSceneRuntimeHandle {
@@ -117,13 +119,15 @@ class WasmSceneRuntime extends WebTUISceneRuntime {
     }
 
     this.didMount = true;
-    this.detachResizeListener = this.bridge?.subscribeResize((columns, rows) => {
+    this.detachResizeListener = this.bridge?.subscribeResize((columns, rows, cellWidth, cellHeight) => {
       this.onSceneResize?.({
         sceneId: this.descriptor.id,
         columns,
         rows,
+        cellWidth,
+        cellHeight,
       });
-      this.inputWriter?.write(encodeResizeControlMessage(columns, rows));
+      this.inputWriter?.write(encodeResizeControlMessage(columns, rows, cellWidth, cellHeight));
     });
 
     const initialColumns = Number(this.bridge?.environment.TUIGUI_COLUMNS ?? "0") || 0;

@@ -31,6 +31,7 @@ export class BrowserWASIBridge {
   constructor(options: BrowserWASIBridgeOptions) {
     this.environment = {
       TUIGUI_MODE: "browser",
+      TUIGUI_TRANSPORT: "ansi",
       TUIGUI_SCENE: options.sceneId,
       TUIGUI_COLUMNS: String(Math.max(1, options.columns)),
       TUIGUI_ROWS: String(Math.max(1, options.rows)),

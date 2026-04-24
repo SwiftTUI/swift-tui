@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import {
   decodeWebTUITerminalRenderStyleBase64,
   encodeWebTUITerminalRenderStyleBase64,
-  ghosttyThemeForStyle,
   normalizeWebTUITerminalStyle,
   resolveWebTUITerminalRenderStyle,
   webTUITerminalBackgroundColor,
@@ -62,7 +61,7 @@ test("terminal style resolves host-owned theme payloads", () => {
   ).toBe("#fafafa");
 });
 
-test("terminal style maps to ghostty theme and translucent background", () => {
+test("terminal style maps to surface palette and translucent background", () => {
   const style = {
     backgroundOpacity: 0.5,
     palette: {
@@ -90,8 +89,8 @@ test("terminal style maps to ghostty theme and translucent background", () => {
     },
   };
 
-  expect(ghosttyThemeForStyle(style).foreground).toBe("#ededed");
-  expect(ghosttyThemeForStyle(style).background).toBe("#202020");
+  expect(normalizeWebTUITerminalStyle(style).palette.foreground).toBe("#ededed");
+  expect(normalizeWebTUITerminalStyle(style).palette.background).toBe("#202020");
   expect(webTUITerminalBackgroundColor(style)).toBe("rgba(32, 32, 32, 0.5)");
   expect(resolveWebTUITerminalRenderStyle(style).appearance.palette["0"]).toBe("#20242c");
 });

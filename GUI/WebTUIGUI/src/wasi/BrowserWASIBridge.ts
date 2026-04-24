@@ -3,6 +3,12 @@ import {
   encodeWebTUITerminalRenderStyleBase64,
   type WebTUITerminalStyle,
 } from "../WebTUITerminalStyle.ts";
+import {
+  WebTUIOutputDecoder,
+  encodeRenderStyleControlMessage,
+  encodeResizeControlMessage,
+  type WebTUISurfaceFrame,
+} from "../WebTUISurfaceTransport.ts";
 
 export interface BrowserWASIBridgeOptions {
   sceneId: string;
@@ -13,9 +19,9 @@ export interface BrowserWASIBridgeOptions {
 }
 
 export interface BrowserWASIOutputSink {
-  writeOutput(text: string): void;
+  presentSurface(frame: WebTUISurfaceFrame): void;
+  writeOutput?(text: string): void;
   writeError?(text: string): void;
-  resize(columns: number, rows: number): void;
 }
 
 export class BrowserWASIBridge {
@@ -26,11 +32,17 @@ export class BrowserWASIBridge {
 
   private detachStdout?: () => void;
   private detachStderr?: () => void;
-  private readonly resizeListeners = new Set<(columns: number, rows: number) => void>();
+  private readonly resizeListeners = new Set<(
+    columns: number,
+    rows: number,
+    cellWidth?: number,
+    cellHeight?: number
+  ) => void>();
 
   constructor(options: BrowserWASIBridgeOptions) {
     this.environment = {
       TUIGUI_MODE: "browser",
+      TUIGUI_TRANSPORT: "surface",
       TUIGUI_SCENE: options.sceneId,
       TUIGUI_COLUMNS: String(Math.max(1, options.columns)),
       TUIGUI_ROWS: String(Math.max(1, options.rows)),
@@ -50,8 +62,18 @@ export class BrowserWASIBridge {
   ): void {
     this.detachStdout?.();
     this.detachStderr?.();
+    const decoder = new WebTUIOutputDecoder();
     this.detachStdout = this.stdout.subscribe((chunk) => {
-      sink.writeOutput(new TextDecoder().decode(chunk));
+      for (const record of decoder.feed(chunk)) {
+        switch (record.type) {
+        case "surface":
+          sink.presentSurface(record.frame);
+          break;
+        case "text":
+          sink.writeOutput?.(record.text);
+          break;
+        }
+      }
     });
     this.detachStderr = this.stderr.subscribe((chunk) => {
       sink.writeError?.(new TextDecoder().decode(chunk));
@@ -60,15 +82,17 @@ export class BrowserWASIBridge {
 
   resize(
     columns: number,
-    rows: number
+    rows: number,
+    cellWidth?: number,
+    cellHeight?: number
   ): void {
     const normalizedColumns = Math.max(1, columns);
     const normalizedRows = Math.max(1, rows);
     this.environment.TUIGUI_COLUMNS = String(normalizedColumns);
     this.environment.TUIGUI_ROWS = String(normalizedRows);
-    this.stdin.write(encodeResizeControlMessage(columns, rows));
+    this.stdin.write(encodeResizeControlMessage(columns, rows, cellWidth, cellHeight));
     for (const listener of this.resizeListeners) {
-      listener(normalizedColumns, normalizedRows);
+      listener(normalizedColumns, normalizedRows, cellWidth, cellHeight);
     }
   }
 
@@ -86,7 +110,12 @@ export class BrowserWASIBridge {
   }
 
   subscribeResize(
-    listener: (columns: number, rows: number) => void
+    listener: (
+      columns: number,
+      rows: number,
+      cellWidth?: number,
+      cellHeight?: number
+    ) => void
   ): () => void {
     this.resizeListeners.add(listener);
     return () => {
@@ -104,16 +133,7 @@ export class BrowserWASIBridge {
   }
 }
 
-export function encodeResizeControlMessage(
-  columns: number,
-  rows: number
-): Uint8Array {
-  return new TextEncoder().encode(`\u001Eresize:${Math.max(1, columns)}:${Math.max(1, rows)}\n`);
-}
-
-export function encodeRenderStyleControlMessage(
-  style: WebTUITerminalStyle
-): Uint8Array {
-  const encoded = encodeWebTUITerminalRenderStyleBase64(style);
-  return new TextEncoder().encode(`\u001Estyle:${encoded}\n`);
-}
+export {
+  encodeRenderStyleControlMessage,
+  encodeResizeControlMessage,
+};

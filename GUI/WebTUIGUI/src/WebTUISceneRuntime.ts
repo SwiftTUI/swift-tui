@@ -1,18 +1,20 @@
 import {
-  FitAddon,
-  Terminal,
-  init,
-  type ITerminalOptions,
-} from "./vendor/ghostty-web.ts";
-import {
   applyWebTUITerminalStyle,
-  ghosttyThemeForStyle,
   normalizeWebTUITerminalStyle,
   type ResolvedWebTUITerminalStyle,
   type WebTUITerminalStyle,
+  webTUITerminalBackgroundColor,
 } from "./WebTUITerminalStyle.ts";
-import { BrowserWASIBridge, encodeResizeControlMessage } from "./wasi/BrowserWASIBridge.ts";
+import {
+  encodeKeyInputMessage,
+  encodeMouseInputMessage,
+  encodePasteInputMessage,
+  type WebTUIKeyInput,
+  type WebTUISurfaceFrame,
+  type WebTUISurfaceStyle,
+} from "./WebTUISurfaceTransport.ts";
 import type { WebTUISceneDescriptor } from "./WebTUISceneManifest.ts";
+import { BrowserWASIBridge } from "./wasi/BrowserWASIBridge.ts";
 
 export interface WebTUISceneRuntimeOptions {
   mount: HTMLElement;
@@ -27,17 +29,25 @@ export class WebTUISceneRuntime {
   readonly element: HTMLElement;
   readonly terminalMount: HTMLElement;
 
-  private terminal?: Terminal;
-  private fitAddon?: FitAddon;
   private readonly bridge?: BrowserWASIBridge;
   private readonly onInput: (chunk: Uint8Array) => void;
   private currentStyle: ResolvedWebTUITerminalStyle;
-  private readonly inputEncoder = new TextEncoder();
-  private detachPointerTrackingFallback?: () => void;
-  private mouseButtonsPressed = 0;
-  private activePointerId?: number;
-  private activePointerButton?: number;
-  private activePointerLocation?: { col: number; row: number };
+  private canvas?: HTMLCanvasElement;
+  private diagnosticText?: HTMLElement;
+  private resizeObserver?: ResizeObserver;
+  private detachInputHandlers?: () => void;
+  private currentFrame?: WebTUISurfaceFrame;
+  private columns = 80;
+  private rows = 24;
+  private cellWidth = 8;
+  private cellHeight = 18;
+  private activePointerButton: "primary" | "middle" | "secondary" = "primary";
+  private lastSentResize?: {
+    columns: number;
+    rows: number;
+    cellWidth: number;
+    cellHeight: number;
+  };
   private isVisible = false;
 
   constructor(options: WebTUISceneRuntimeOptions) {
@@ -56,6 +66,7 @@ export class WebTUISceneRuntime {
 
     this.terminalMount = document.createElement("div");
     this.terminalMount.className = "webtuigui-scene__terminal";
+    this.terminalMount.tabIndex = 0;
 
     this.element.append(header, this.terminalMount);
     options.mount.appendChild(this.element);
@@ -63,41 +74,27 @@ export class WebTUISceneRuntime {
   }
 
   async mount(): Promise<void> {
-    if (this.terminal) {
+    if (this.canvas) {
       return;
     }
 
-    await init();
-    const options = this.terminalOptionsForStyle(this.currentStyle);
-    this.terminal = new Terminal(options);
-    this.fitAddon = new FitAddon();
-    this.terminal.loadAddon(this.fitAddon);
-
-    this.terminal.onData((data) => {
-      this.onInput(this.inputEncoder.encode(data));
-    });
-
-    this.terminal.onResize((size) => {
-      if (this.bridge) {
-        this.bridge.resize(size.cols, size.rows);
-      } else {
-        this.onInput(encodeResizeControlMessage(size.cols, size.rows));
-      }
-    });
+    const canvas = document.createElement("canvas");
+    canvas.className = "webtuigui-scene__surface";
+    this.canvas = canvas;
+    this.terminalMount.replaceChildren(canvas);
+    this.installInputHandlers();
+    this.installResizeObserver();
 
     this.bridge?.bindOutput({
-      writeOutput: (text) => this.terminal?.write(text),
-      writeError: (text) => this.terminal?.write(text),
-      resize: (columns, rows) => {
-        this.terminal?.resize(columns, rows);
-      },
+      presentSurface: (frame) => this.presentSurface(frame),
+      writeOutput: (text) => this.writeOutput(text),
+      writeError: (text) => this.writeOutput(text),
     });
 
-    this.terminal.open(this.terminalMount);
     this.applyStyle(this.currentStyle);
-    this.fitAddon.fit();
-    this.fitAddon.observeResize();
-    this.installPointerTrackingFallback();
+    this.measureCells();
+    this.resizeToMount();
+    this.draw();
   }
 
   setVisible(
@@ -106,8 +103,8 @@ export class WebTUISceneRuntime {
     this.isVisible = visible;
     this.applyVisibility();
     if (visible) {
-      this.fitAddon?.fit();
-      this.terminal?.focus();
+      this.resizeToMount();
+      this.terminalMount.focus?.();
     }
   }
 
@@ -115,30 +112,33 @@ export class WebTUISceneRuntime {
     style: WebTUITerminalStyle
   ): void {
     this.currentStyle = normalizeWebTUITerminalStyle(style);
-    const terminalOptions = this.terminal?.options;
-    if (terminalOptions) {
-      terminalOptions.fontSize = this.currentStyle.fontSize;
-      terminalOptions.fontFamily = this.currentStyle.fontFamily;
-      terminalOptions.cursorBlink = this.currentStyle.cursorBlink;
-      terminalOptions.cursorStyle = this.currentStyle.cursorStyle;
-      terminalOptions.theme = ghosttyThemeForStyle(this.currentStyle);
-    }
     this.applyStyle(this.currentStyle);
     this.bridge?.updateRenderStyle(this.currentStyle);
-    this.fitAddon?.fit();
+    this.measureCells();
+    this.resizeToMount();
+    this.draw();
   }
 
   resize(
     columns: number,
     rows: number
   ): void {
-    this.terminal?.resize(columns, rows);
+    this.columns = Math.max(1, Math.round(columns));
+    this.rows = Math.max(1, Math.round(rows));
+    this.resizeCanvas();
+    this.draw();
   }
 
   writeOutput(
     text: string
   ): void {
-    this.terminal?.write(text);
+    if (!this.diagnosticText) {
+      const diagnosticText = document.createElement("pre");
+      diagnosticText.className = "webtuigui-scene__diagnostic";
+      this.diagnosticText = diagnosticText;
+      this.terminalMount.appendChild(diagnosticText);
+    }
+    this.diagnosticText.textContent = `${this.diagnosticText.textContent ?? ""}${text}`;
   }
 
   sendInput(
@@ -148,24 +148,19 @@ export class WebTUISceneRuntime {
   }
 
   dispose(): void {
-    this.detachPointerTrackingFallback?.();
-    this.fitAddon?.dispose();
-    this.terminal?.dispose();
+    this.detachInputHandlers?.();
+    this.resizeObserver?.disconnect();
     this.element.remove();
   }
 
-  private terminalOptionsForStyle(
-    style: WebTUITerminalStyle
-  ): ITerminalOptions {
-    const normalized = normalizeWebTUITerminalStyle(style);
-    return {
-      cursorBlink: normalized.cursorBlink,
-      cursorStyle: normalized.cursorStyle,
-      fontFamily: normalized.fontFamily,
-      fontSize: normalized.fontSize,
-      theme: ghosttyThemeForStyle(normalized),
-      allowTransparency: normalized.backgroundOpacity < 1,
-    };
+  private presentSurface(
+    frame: WebTUISurfaceFrame
+  ): void {
+    this.currentFrame = frame;
+    this.columns = Math.max(1, Math.round(frame.width));
+    this.rows = Math.max(1, Math.round(frame.height));
+    this.resizeCanvas();
+    this.draw();
   }
 
   private applyStyle(
@@ -178,6 +173,18 @@ export class WebTUISceneRuntime {
     this.element.style.overflow = "hidden";
     this.element.style.gap = "0.5rem";
     this.element.style.gridTemplateRows = "auto 1fr";
+
+    this.terminalMount.style.position = "relative";
+    this.terminalMount.style.overflow = "hidden";
+    this.terminalMount.style.outline = "none";
+    this.terminalMount.style.background = webTUITerminalBackgroundColor(this.currentStyle);
+    this.terminalMount.style.minHeight = `${this.cellHeight * 8}px`;
+
+    if (this.canvas) {
+      this.canvas.style.display = "block";
+      this.canvas.style.width = "100%";
+      this.canvas.style.height = "100%";
+    }
   }
 
   private applyVisibility(): void {
@@ -189,325 +196,412 @@ export class WebTUISceneRuntime {
     );
   }
 
-  private installPointerTrackingFallback(): void {
-    this.detachPointerTrackingFallback?.();
+  private installResizeObserver(): void {
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
 
-    const captureOptions = { capture: true } as const;
-    const wheelOptions = { capture: true, passive: false } as const;
+    this.resizeObserver = new ResizeObserver(() => {
+      this.resizeToMount();
+    });
+    this.resizeObserver.observe(this.terminalMount);
+  }
 
-    const handlePointerDown = (event: PointerEvent) => {
-      const button = this.pointerButton(event);
-      const tracking = this.mouseTrackingState();
-      const cell = tracking && this.mouseCellLocation(event, tracking);
-      if (!tracking || !cell || button === undefined) {
+  private installInputHandlers(): void {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.isComposing) {
+        return;
+      }
+      const key = keyInputFromKeyboardEvent(event);
+      if (!key) {
         return;
       }
 
-      this.mouseButtonsPressed |= 1 << button;
-      this.activePointerId = event.pointerId;
-      this.activePointerButton = button;
-      this.activePointerLocation = cell;
-      this.setPointerCapture(event);
-      this.terminal?.focus();
-      this.forwardMouseEvent(button, cell, false, event, tracking.useSGR);
+      this.onInput(encodeKeyInputMessage({
+        ...key,
+        modifiers: modifierMask(event),
+      }));
       event.preventDefault();
-      event.stopImmediatePropagation();
+    };
+
+    const handlePaste = (event: ClipboardEvent) => {
+      const text = event.clipboardData?.getData("text/plain") ?? "";
+      if (!text) {
+        return;
+      }
+      this.onInput(encodePasteInputMessage(text));
+      event.preventDefault();
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const location = this.cellLocation(event);
+      if (!location) {
+        return;
+      }
+
+      const button = pointerButton(event.button);
+      this.activePointerButton = button;
+      this.terminalMount.focus?.();
+      this.terminalMount.setPointerCapture?.(event.pointerId);
+      this.onInput(encodeMouseInputMessage({
+        kind: "down",
+        x: location.x,
+        y: location.y,
+        button,
+        modifiers: modifierMask(event),
+      }));
+      event.preventDefault();
     };
 
     const handlePointerUp = (event: PointerEvent) => {
-      const tracking = this.mouseTrackingState();
-      const button =
-        this.activePointerId === event.pointerId
-          ? this.activePointerButton
-          : this.pointerButton(event);
-      const cell = tracking && (this.mouseCellLocation(event, tracking) ?? this.activePointerLocation);
-      if (button !== undefined) {
-        this.mouseButtonsPressed &= ~(1 << button);
-      }
-      this.releasePointerCapture(event);
-      this.clearActivePointer(event.pointerId);
-      if (!tracking || !cell || button === undefined) {
+      const location = this.cellLocation(event);
+      this.terminalMount.releasePointerCapture?.(event.pointerId);
+      if (!location) {
         return;
       }
 
-      this.forwardMouseEvent(button, cell, true, event, tracking.useSGR);
+      this.onInput(encodeMouseInputMessage({
+        kind: "up",
+        x: location.x,
+        y: location.y,
+        button: pointerButton(event.button) ?? this.activePointerButton,
+        modifiers: modifierMask(event),
+      }));
       event.preventDefault();
-      event.stopImmediatePropagation();
     };
 
     const handlePointerMove = (event: PointerEvent) => {
-      const tracking = this.mouseTrackingState();
-      if (!tracking) {
+      const location = this.cellLocation(event);
+      if (!location) {
         return;
       }
 
-      this.mouseButtonsPressed = this.pointerButtons(event);
-
-      if (!tracking.buttonMotion && !tracking.anyMotion) {
-        return;
-      }
-
-      if (tracking.buttonMotion && !tracking.anyMotion && this.mouseButtonsPressed === 0) {
-        return;
-      }
-
-      const cell = this.mouseCellLocation(event, tracking);
-      if (!cell) {
-        return;
-      }
-      if (this.activePointerId === event.pointerId) {
-        this.activePointerLocation = cell;
-      }
-
-      let button = 32;
-      if (this.mouseButtonsPressed & 1) {
-        button += 0;
-      } else if (this.mouseButtonsPressed & 2) {
-        button += 1;
-      } else if (this.mouseButtonsPressed & 4) {
-        button += 2;
-      }
-
-      this.forwardMouseEvent(button, cell, false, event, tracking.useSGR);
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-
-    const handlePointerCancel = (event: PointerEvent) => {
-      const tracking = this.mouseTrackingState();
-      const button = this.activePointerId === event.pointerId ? this.activePointerButton : undefined;
-      const cell = tracking && (this.mouseCellLocation(event, tracking) ?? this.activePointerLocation);
-      if (button !== undefined && tracking && cell) {
-        this.forwardMouseEvent(button, cell, true, event, tracking.useSGR);
-      }
-      this.mouseButtonsPressed = 0;
-      this.releasePointerCapture(event);
-      this.clearActivePointer(event.pointerId);
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      this.onInput(encodeMouseInputMessage({
+        kind: event.buttons ? "dragged" : "moved",
+        x: location.x,
+        y: location.y,
+        button: this.activePointerButton,
+        modifiers: modifierMask(event),
+      }));
     };
 
     const handleWheel = (event: WheelEvent) => {
-      const tracking = this.mouseTrackingState();
-      const cell = tracking && this.mouseCellLocation(event, tracking);
-      if (!tracking || !cell) {
+      const location = this.cellLocation(event);
+      if (!location) {
         return;
       }
 
-      const button = event.deltaY < 0 ? 64 : 65;
-      this.forwardMouseEvent(button, cell, false, event, tracking.useSGR);
+      this.onInput(encodeMouseInputMessage({
+        kind: "scrolled",
+        x: location.x,
+        y: location.y,
+        deltaX: normalizedWheelDelta(event.deltaX),
+        deltaY: normalizedWheelDelta(event.deltaY),
+        modifiers: modifierMask(event),
+      }));
       event.preventDefault();
-      event.stopImmediatePropagation();
     };
 
-    this.terminalMount.addEventListener("pointerdown", handlePointerDown, captureOptions);
-    this.terminalMount.addEventListener("pointerup", handlePointerUp, captureOptions);
-    this.terminalMount.addEventListener("pointermove", handlePointerMove, captureOptions);
-    this.terminalMount.addEventListener("pointercancel", handlePointerCancel, captureOptions);
-    this.terminalMount.addEventListener("wheel", handleWheel, wheelOptions);
+    this.terminalMount.addEventListener("keydown", handleKeyDown);
+    this.terminalMount.addEventListener("paste", handlePaste);
+    this.terminalMount.addEventListener("pointerdown", handlePointerDown);
+    this.terminalMount.addEventListener("pointerup", handlePointerUp);
+    this.terminalMount.addEventListener("pointermove", handlePointerMove);
+    this.terminalMount.addEventListener("wheel", handleWheel, { passive: false });
 
-    this.detachPointerTrackingFallback = () => {
-      this.terminalMount.removeEventListener("pointerdown", handlePointerDown, captureOptions);
-      this.terminalMount.removeEventListener("pointerup", handlePointerUp, captureOptions);
-      this.terminalMount.removeEventListener("pointermove", handlePointerMove, captureOptions);
-      this.terminalMount.removeEventListener("pointercancel", handlePointerCancel, captureOptions);
-      this.terminalMount.removeEventListener("wheel", handleWheel, wheelOptions);
+    this.detachInputHandlers = () => {
+      this.terminalMount.removeEventListener("keydown", handleKeyDown);
+      this.terminalMount.removeEventListener("paste", handlePaste);
+      this.terminalMount.removeEventListener("pointerdown", handlePointerDown);
+      this.terminalMount.removeEventListener("pointerup", handlePointerUp);
+      this.terminalMount.removeEventListener("pointermove", handlePointerMove);
+      this.terminalMount.removeEventListener("wheel", handleWheel);
     };
   }
 
-  private pointerButton(
-    event: PointerEvent
-  ): number | undefined {
-    switch (event.button) {
-    case 0:
-      return 0
-    case 1:
-      return 1
-    case 2:
-      return 2
-    default:
-      return undefined
-    }
+  private resizeToMount(): void {
+    this.measureCells();
+    const rect = this.terminalMount.getBoundingClientRect?.();
+    const width = rect?.width && rect.width > 0 ? rect.width : this.columns * this.cellWidth;
+    const height = rect?.height && rect.height > 0 ? rect.height : this.rows * this.cellHeight;
+    const nextColumns = Math.max(1, Math.floor(width / this.cellWidth));
+    const nextRows = Math.max(1, Math.floor(height / this.cellHeight));
+
+    this.columns = nextColumns;
+    this.rows = nextRows;
+    this.sendResizeIfNeeded();
+    this.resizeCanvas();
   }
 
-  private pointerButtons(
-    event: PointerEvent
-  ): number {
-    let buttons = 0;
-    if ((event.buttons & 1) !== 0) {
-      buttons |= 1;
-    }
-    if ((event.buttons & 4) !== 0) {
-      buttons |= 2;
-    }
-    if ((event.buttons & 2) !== 0) {
-      buttons |= 4;
-    }
-    return buttons;
-  }
-
-  private setPointerCapture(
-    event: PointerEvent
-  ): void {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
+  private sendResizeIfNeeded(): void {
+    const current = {
+      columns: this.columns,
+      rows: this.rows,
+      cellWidth: this.cellWidth,
+      cellHeight: this.cellHeight,
+    };
+    if (this.lastSentResize
+      && this.lastSentResize.columns === current.columns
+      && this.lastSentResize.rows === current.rows
+      && this.lastSentResize.cellWidth === current.cellWidth
+      && this.lastSentResize.cellHeight === current.cellHeight
+    ) {
       return;
     }
-    try {
-      target.setPointerCapture(event.pointerId);
-    } catch {
-      // Ignore pointer-capture failures and continue with best-effort forwarding.
-    }
+
+    this.lastSentResize = current;
+    this.bridge?.resize(current.columns, current.rows, current.cellWidth, current.cellHeight);
   }
 
-  private releasePointerCapture(
-    event: PointerEvent
-  ): void {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
+  private resizeCanvas(): void {
+    if (!this.canvas) {
       return;
     }
-    if (!target.hasPointerCapture(event.pointerId)) {
-      return;
-    }
-    try {
-      target.releasePointerCapture(event.pointerId);
-    } catch {
-      // Ignore pointer-capture failures and continue cleaning up local state.
-    }
+
+    const cssWidth = Math.max(1, this.columns * this.cellWidth);
+    const cssHeight = Math.max(1, this.rows * this.cellHeight);
+    const scale = globalThis.window?.devicePixelRatio || 1;
+    this.canvas.width = Math.ceil(cssWidth * scale);
+    this.canvas.height = Math.ceil(cssHeight * scale);
+    this.canvas.style.width = `${cssWidth}px`;
+    this.canvas.style.height = `${cssHeight}px`;
   }
 
-  private clearActivePointer(
-    pointerId: number
-  ): void {
-    if (this.activePointerId !== pointerId) {
+  private measureCells(): void {
+    const canvas = this.canvas ?? document.createElement("canvas");
+    const context = canvas.getContext?.("2d");
+    if (!context) {
+      this.cellWidth = Math.max(1, Math.round(this.currentStyle.fontSize * 0.62));
+      this.cellHeight = Math.max(1, Math.round(this.currentStyle.fontSize * 1.35));
       return;
     }
-    this.activePointerId = undefined;
-    this.activePointerButton = undefined;
-    this.activePointerLocation = undefined;
+
+    context.font = this.fontForStyle();
+    this.cellWidth = Math.max(1, Math.ceil(context.measureText("W").width));
+    this.cellHeight = Math.max(1, Math.ceil(this.currentStyle.fontSize * 1.35));
   }
 
-  private mouseTrackingState():
-    | {
-        useSGR: boolean;
-        buttonMotion: boolean;
-        anyMotion: boolean;
-        canvasRect: DOMRect;
-        charWidth: number;
-        charHeight: number;
+  private draw(): void {
+    const canvas = this.canvas;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) {
+      return;
+    }
+
+    const scale = globalThis.window?.devicePixelRatio || 1;
+    context.setTransform(scale, 0, 0, scale, 0, 0);
+    context.textBaseline = "alphabetic";
+    context.clearRect(0, 0, canvas.width / scale, canvas.height / scale);
+    context.fillStyle = webTUITerminalBackgroundColor(this.currentStyle);
+    context.fillRect(0, 0, this.columns * this.cellWidth, this.rows * this.cellHeight);
+
+    const frame = this.currentFrame;
+    if (!frame) {
+      return;
+    }
+
+    for (let y = 0; y < frame.rows.length; y += 1) {
+      const row = frame.rows[y] ?? [];
+      for (const cell of row) {
+        const [x, text, span, styleIndex] = cell;
+        const style = frame.styles[styleIndex] ?? undefined;
+        this.drawCell(context, x, y, text, span, style);
       }
-    | undefined {
-    const terminal = this.terminal as
-      | {
-          getMode?(mode: number, ansiMode?: boolean): boolean;
-          renderer?: {
-            charWidth?: number;
-            charHeight?: number;
-          };
-        }
-      | undefined;
-    const canvas = this.terminalMount.querySelector("canvas");
-
-    if (!(canvas instanceof HTMLCanvasElement)) {
-      return undefined;
     }
-
-    const normalTracking = terminal?.getMode?.(1000, false) ?? false;
-    const buttonMotion = terminal?.getMode?.(1002, false) ?? false;
-    const anyMotion = terminal?.getMode?.(1003, false) ?? false;
-    const useSGR = terminal?.getMode?.(1006, false) ?? true;
-    const charWidth = terminal?.renderer?.charWidth ?? 0;
-    const charHeight = terminal?.renderer?.charHeight ?? 0;
-
-    if (!(normalTracking || buttonMotion || anyMotion)) {
-      return undefined;
-    }
-
-    if (!(charWidth > 0) || !(charHeight > 0)) {
-      return undefined;
-    }
-
-    return {
-      useSGR,
-      buttonMotion,
-      anyMotion,
-      canvasRect: canvas.getBoundingClientRect(),
-      charWidth,
-      charHeight,
-    };
   }
 
-  private mouseCellLocation(
-    event: MouseEvent,
-    tracking: {
-      canvasRect: DOMRect;
-      charWidth: number;
-      charHeight: number;
-    }
-  ): {
-    col: number;
-    row: number;
-  } | undefined {
-    const x = event.clientX - tracking.canvasRect.left;
-    const y = event.clientY - tracking.canvasRect.top;
-
-    if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      return undefined;
-    }
-
-    return {
-      col: Math.max(1, Math.floor(x / tracking.charWidth) + 1),
-      row: Math.max(1, Math.floor(y / tracking.charHeight) + 1),
-    };
-  }
-
-  private forwardMouseEvent(
-    button: number,
-    location: {
-      col: number;
-      row: number;
-    },
-    isRelease: boolean,
-    event: MouseEvent,
-    useSGR: boolean
+  private drawCell(
+    context: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    text: string,
+    span: number,
+    style?: WebTUISurfaceStyle | null
   ): void {
-    const modifiers = this.mouseModifierBits(event);
-    const sequence = useSGR
-      ? `\u001B[<${button + modifiers};${location.col};${location.row}${isRelease ? "m" : "M"}`
-      : this.encodeX10MouseSequence(button, location, isRelease, modifiers);
+    const rectX = x * this.cellWidth;
+    const rectY = y * this.cellHeight;
+    const width = Math.max(1, span) * this.cellWidth;
+    const background = resolvedBackground(style, this.currentStyle);
+    const foreground = resolvedForeground(style, this.currentStyle);
+    const opacity = style?.opacity ?? 1;
 
-    this.onInput(this.inputEncoder.encode(sequence));
+    if (background) {
+      context.globalAlpha = opacity;
+      context.fillStyle = background;
+      context.fillRect(rectX, rectY, width, this.cellHeight);
+    }
+
+    if (text !== " ") {
+      context.globalAlpha = opacity;
+      context.font = this.fontForStyle(style);
+      context.fillStyle = foreground;
+      context.fillText(
+        text,
+        rectX,
+        rectY + Math.floor((this.cellHeight + this.currentStyle.fontSize) / 2) - 2
+      );
+    }
+
+    this.drawTextLine(context, rectX, rectY, width, style?.underline, "underline", foreground);
+    this.drawTextLine(context, rectX, rectY, width, style?.strikethrough, "strike", foreground);
+    context.globalAlpha = 1;
   }
 
-  private encodeX10MouseSequence(
-    button: number,
-    location: {
-      col: number;
-      row: number;
-    },
-    isRelease: boolean,
-    modifiers: number
+  private drawTextLine(
+    context: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    line: WebTUISurfaceStyle["underline"],
+    placement: "underline" | "strike",
+    fallbackColor: string
+  ): void {
+    if (!line) {
+      return;
+    }
+    context.strokeStyle = line.color ?? fallbackColor;
+    context.lineWidth = line.pattern === "double" ? 2 : 1;
+    if (line.pattern === "dot") {
+      context.setLineDash([1, 3]);
+    } else if (line.pattern === "dash") {
+      context.setLineDash([4, 3]);
+    } else {
+      context.setLineDash([]);
+    }
+
+    const lineY = placement === "underline"
+      ? y + this.cellHeight - 2
+      : y + Math.floor(this.cellHeight / 2);
+    context.beginPath();
+    context.moveTo(x, lineY);
+    context.lineTo(x + width, lineY);
+    context.stroke();
+    context.setLineDash([]);
+  }
+
+  private fontForStyle(
+    style?: WebTUISurfaceStyle | null
   ): string {
-    const encodedButton = (isRelease ? 3 : button) + modifiers + 32;
-    const column = String.fromCharCode(Math.min(location.col + 32, 255));
-    const row = String.fromCharCode(Math.min(location.row + 32, 255));
-    return `\u001B[M${String.fromCharCode(encodedButton)}${column}${row}`;
+    const emphasis = style?.em ?? 0;
+    const italic = (emphasis & 2) !== 0 ? "italic " : "";
+    const weight = (emphasis & 1) !== 0 ? "700 " : "";
+    return `${italic}${weight}${this.currentStyle.fontSize}px ${this.currentStyle.fontFamily}`;
   }
 
-  private mouseModifierBits(
+  private cellLocation(
     event: MouseEvent
-  ): number {
-    let modifiers = 0;
-    if (event.shiftKey) {
-      modifiers |= 4;
+  ): { x: number; y: number } | undefined {
+    const rect = this.canvas?.getBoundingClientRect?.() ?? this.terminalMount.getBoundingClientRect?.();
+    if (!rect) {
+      return undefined;
     }
-    if (event.metaKey) {
-      modifiers |= 8;
+
+    const x = Math.floor((event.clientX - rect.left) / this.cellWidth);
+    const y = Math.floor((event.clientY - rect.top) / this.cellHeight);
+    if (x < 0 || y < 0 || x >= this.columns || y >= this.rows) {
+      return undefined;
     }
-    if (event.ctrlKey) {
-      modifiers |= 16;
-    }
-    return modifiers;
+    return { x, y };
   }
+}
+
+function keyInputFromKeyboardEvent(
+  event: KeyboardEvent
+): Pick<WebTUIKeyInput, "key" | "character"> | undefined {
+  switch (event.key) {
+  case "Enter":
+    return { key: "return" };
+  case " ":
+    return { key: "space" };
+  case "Tab":
+    return { key: "tab" };
+  case "ArrowLeft":
+    return { key: "arrowLeft" };
+  case "ArrowRight":
+    return { key: "arrowRight" };
+  case "ArrowUp":
+    return { key: "arrowUp" };
+  case "ArrowDown":
+    return { key: "arrowDown" };
+  case "Backspace":
+    return { key: "backspace" };
+  case "Escape":
+    return { key: "escape" };
+  case "Home":
+    return { key: "home" };
+  case "End":
+    return { key: "end" };
+  default:
+    {
+      const characters = Array.from(event.key);
+      if (characters.length !== 1) {
+        return undefined;
+      }
+      return {
+        key: "character",
+        character: characters[0],
+      };
+    }
+  }
+}
+
+function pointerButton(
+  button: number
+): "primary" | "middle" | "secondary" {
+  switch (button) {
+  case 1:
+    return "middle";
+  case 2:
+    return "secondary";
+  default:
+    return "primary";
+  }
+}
+
+function modifierMask(
+  event: MouseEvent | KeyboardEvent
+): number {
+  let mask = 0;
+  if (event.shiftKey) {
+    mask |= 1;
+  }
+  if (event.altKey) {
+    mask |= 2;
+  }
+  if (event.ctrlKey) {
+    mask |= 4;
+  }
+  return mask;
+}
+
+function normalizedWheelDelta(
+  delta: number
+): number {
+  if (delta > 0) {
+    return 1;
+  }
+  if (delta < 0) {
+    return -1;
+  }
+  return 0;
+}
+
+function resolvedForeground(
+  style: WebTUISurfaceStyle | null | undefined,
+  terminalStyle: ResolvedWebTUITerminalStyle
+): string {
+  if ((style?.em ?? 0) & 16) {
+    return style?.bg ?? terminalStyle.theme.background;
+  }
+  return style?.fg ?? terminalStyle.theme.foreground;
+}
+
+function resolvedBackground(
+  style: WebTUISurfaceStyle | null | undefined,
+  terminalStyle: ResolvedWebTUITerminalStyle
+): string | undefined {
+  if ((style?.em ?? 0) & 16) {
+    return style?.fg ?? terminalStyle.theme.foreground;
+  }
+  return style?.bg;
 }

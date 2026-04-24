@@ -1,5 +1,3 @@
-import type { ITheme } from "./vendor/ghostty-web.ts";
-
 export type WebTUITerminalCursorStyle = "block" | "bar" | "underline";
 
 export interface WebTUIANSIColors {
@@ -205,35 +203,6 @@ export function decodeWebTUITerminalRenderStyleBase64(
   } catch {
     return undefined;
   }
-}
-
-export function ghosttyThemeForStyle(
-  style: WebTUITerminalStyle
-): ITheme {
-  const normalized = normalizeWebTUITerminalStyle(style);
-  return {
-    foreground: normalized.palette.foreground,
-    background: normalized.palette.background,
-    cursor: normalized.palette.cursor,
-    selectionBackground: normalized.palette.selectionBackground,
-    selectionForeground: normalized.palette.selectionForeground,
-    black: normalized.palette.ansi.black,
-    red: normalized.palette.ansi.red,
-    green: normalized.palette.ansi.green,
-    yellow: normalized.palette.ansi.yellow,
-    blue: normalized.palette.ansi.blue,
-    magenta: normalized.palette.ansi.magenta,
-    cyan: normalized.palette.ansi.cyan,
-    white: normalized.palette.ansi.white,
-    brightBlack: normalized.palette.ansi.brightBlack,
-    brightRed: normalized.palette.ansi.brightRed,
-    brightGreen: normalized.palette.ansi.brightGreen,
-    brightYellow: normalized.palette.ansi.brightYellow,
-    brightBlue: normalized.palette.ansi.brightBlue,
-    brightMagenta: normalized.palette.ansi.brightMagenta,
-    brightCyan: normalized.palette.ansi.brightCyan,
-    brightWhite: normalized.palette.ansi.brightWhite,
-  };
 }
 
 export function webTUITerminalBackgroundColor(

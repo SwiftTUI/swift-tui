@@ -1,12 +1,6 @@
-import { expect, mock, test } from "bun:test";
+import { expect, test } from "bun:test";
 
-mock.module("ghostty-web", () => ({
-  init: async () => {},
-  Terminal: class {},
-  FitAddon: class {},
-}));
-
-const { WebTUISceneRuntime } = await import("./WebTUISceneRuntime.ts");
+import { WebTUISceneRuntime } from "./WebTUISceneRuntime.ts";
 
 test("hidden scenes stay out of layout even after style updates", () => {
   const mount = makeElement("div");
@@ -58,6 +52,7 @@ function makeElement(tagName: string): Record<string, unknown> {
     },
     append: () => {},
     appendChild: () => {},
+    replaceChildren: () => {},
     remove: () => {},
   };
 }
