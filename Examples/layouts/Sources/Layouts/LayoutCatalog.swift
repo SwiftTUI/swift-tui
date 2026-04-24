@@ -225,6 +225,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(OverlayAlignmentBadge()) }
     ),
+    LayoutEntry(
+      id: "offset.preserves-measured-size",
+      category: .offsetPosition,
+      title: "Offset preserves measured size",
+      blurb: "offset shifts paint only, not layout",
+      marker: "Offset preserves measured size",
+      tier: .behaviour,
+      makeView: { AnyView(OffsetPreservesMeasuredSize()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
