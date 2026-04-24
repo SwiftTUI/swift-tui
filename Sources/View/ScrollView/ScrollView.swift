@@ -6,7 +6,8 @@ public struct ScrollView<Content: View>: View, ResolvableView {
   public var showsIndicators: Bool
   @State private var internalPosition = ScrollPosition.zero
   private var explicitPosition: Binding<ScrollPosition>?
-  private let authoringScope: AuthoringContext?
+  private let contentAuthoringScope: AuthoringContext?
+  private let interactionAuthoringScope: AuthoringContext?
   private var content: Content
   public var position: Binding<ScrollPosition> {
     explicitPosition ?? $internalPosition
@@ -19,7 +20,8 @@ public struct ScrollView<Content: View>: View, ResolvableView {
     self.axes = axes
     self.showsIndicators = showsIndicators
     explicitPosition = nil
-    authoringScope = makeDeferredAuthoringContext()
+    interactionAuthoringScope = currentAuthoringContext()
+    contentAuthoringScope = makeDeferredAuthoringContext()
     self.content = content()
   }
   public init(
@@ -31,7 +33,8 @@ public struct ScrollView<Content: View>: View, ResolvableView {
     self.axes = axes
     self.showsIndicators = showsIndicators
     explicitPosition = position
-    authoringScope = makeDeferredAuthoringContext()
+    interactionAuthoringScope = currentAuthoringContext()
+    contentAuthoringScope = makeDeferredAuthoringContext()
     self.content = content()
   }
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
@@ -67,10 +70,12 @@ public struct ScrollView<Content: View>: View, ResolvableView {
       )
       if context.environmentValues.isEnabled {
         let binding = position
-        let dynamicPropertyScope = currentAuthoringContext()
+        let authoringContext =
+          currentImperativeAuthoringContextSnapshot()
+          ?? ImperativeAuthoringContextSnapshot(interactionAuthoringScope)
         let registerKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = { identity, targetAxis in
           context.localKeyHandlerRegistry?.register(identity: identity) { event in
-            withAuthoringContext(dynamicPropertyScope) {
+            withImperativeAuthoringContext(authoringContext) {
               var next = binding.wrappedValue
               guard applyScrollKey(event, to: &next, targetAxis: targetAxis) else {
                 return false
@@ -92,7 +97,7 @@ public struct ScrollView<Content: View>: View, ResolvableView {
           guard case .scrolled(let deltaX, let deltaY) = event.kind else {
             return false
           }
-          return withAuthoringContext(dynamicPropertyScope) {
+          return withImperativeAuthoringContext(authoringContext) {
             let current = binding.wrappedValue
             var next = current
             var changed = false
@@ -142,7 +147,7 @@ public struct ScrollView<Content: View>: View, ResolvableView {
               else {
                 return false
               }
-              return withAuthoringContext(dynamicPropertyScope) {
+              return withImperativeAuthoringContext(authoringContext) {
                 let current = binding.wrappedValue
                 var next = current
                 switch axis {
@@ -187,7 +192,7 @@ public struct ScrollView<Content: View>: View, ResolvableView {
           horizontalScrollIndicatorIdentity(for: context.identity)
         )
       }
-      let child = withAuthoringContext(authoringScope) {
+      let child = withAuthoringContext(contentAuthoringScope) {
         content.resolve(in: context.child(component: .named("ScrollContent")))
       }
       let indicatorFocusStyle =

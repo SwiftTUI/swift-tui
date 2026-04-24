@@ -1139,10 +1139,11 @@ struct TerminalPresentationTests {
     )
 
     let drainStarted = DispatchSemaphore(value: 0)
+    let allowDrain = DispatchSemaphore(value: 0)
     let drainFinished = DispatchSemaphore(value: 0)
     DispatchQueue.global().async {
       drainStarted.signal()
-      usleep(20_000)
+      _ = allowDrain.wait(timeout: .now() + 1)
       var buffer = Array(repeating: UInt8(0), count: 8192)
       _ = unsafe read(readDescriptor, &buffer, buffer.count)
       drainFinished.signal()
@@ -1151,9 +1152,26 @@ struct TerminalPresentationTests {
     #expect(drainStarted.wait(timeout: .now() + 1) == .success)
 
     let controller = POSIXTerminalController()
-    try controller.write("ok", to: writeDescriptor)
+    let writeFinished = DispatchSemaphore(value: 0)
+    let writeResult = LockedBox<Result<Void, any Error>?>(nil)
+    DispatchQueue.global().async {
+      writeResult.withLock { result in
+        result = Result {
+          try controller.write("ok", to: writeDescriptor)
+        }
+      }
+      writeFinished.signal()
+    }
+
+    #expect(writeFinished.wait(timeout: .now() + .milliseconds(50)) == .timedOut)
+    allowDrain.signal()
 
     #expect(drainFinished.wait(timeout: .now() + 1) == .success)
+    #expect(writeFinished.wait(timeout: .now() + 1) == .success)
+    let completedWrite = try #require(writeResult.value)
+    #expect(throws: Never.self) {
+      try completedWrite.get()
+    }
 
     _ = close(writeDescriptor)
     didCloseWriteDescriptor = true

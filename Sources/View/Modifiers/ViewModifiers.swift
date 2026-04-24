@@ -569,7 +569,7 @@ public struct AppearLifecycleModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let dynamicPropertyScope = currentAuthoringContext()
+    let authoringContext = currentImperativeAuthoringContextSnapshot()
     let lifecycleAction = action
     let handlerID = lifecycleHandlerID(
       for: node.identity,
@@ -579,7 +579,7 @@ public struct AppearLifecycleModifier: PrimitiveViewModifier {
     context.localLifecycleRegistry?.registerAppear(
       handlerID: handlerID,
       handler: {
-        withAuthoringContext(dynamicPropertyScope) {
+        withImperativeAuthoringContext(authoringContext) {
           lifecycleAction()
         }
       }
@@ -599,7 +599,7 @@ public struct DisappearLifecycleModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let dynamicPropertyScope = currentAuthoringContext()
+    let authoringContext = currentImperativeAuthoringContextSnapshot()
     let lifecycleAction = action
     let handlerID = lifecycleHandlerID(
       for: node.identity,
@@ -609,7 +609,7 @@ public struct DisappearLifecycleModifier: PrimitiveViewModifier {
     context.localLifecycleRegistry?.registerDisappear(
       handlerID: handlerID,
       handler: {
-        withAuthoringContext(dynamicPropertyScope) {
+        withImperativeAuthoringContext(authoringContext) {
           lifecycleAction()
         }
       }
@@ -630,7 +630,7 @@ public struct ChangeLifecycleModifier<Value: Equatable & Sendable>: PrimitiveVie
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let dynamicPropertyScope = currentAuthoringContext()
+    let authoringContext = currentImperativeAuthoringContextSnapshot()
     let node = content.resolve(in: context)
     let ownerNode = context.viewGraph?.nodeForIdentity(node.identity)
     let modifierOrdinal = ownerNode?.claimChangeModifierOrdinal() ?? 0
@@ -671,7 +671,7 @@ public struct ChangeLifecycleModifier<Value: Equatable & Sendable>: PrimitiveVie
     context.localLifecycleRegistry?.registerChange(
       handlerID: handlerID,
       handler: {
-        withAuthoringContext(dynamicPropertyScope) {
+        withImperativeAuthoringContext(authoringContext) {
           lifecycleAction(oldValue, value)
         }
       }
@@ -691,7 +691,7 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    let dynamicPropertyScope = currentAuthoringContext()
+    let authoringContext = currentImperativeAuthoringContextSnapshot()
     let taskAction = action
     let lifecycleIdentity = ViewNodeContext.current?.identity ?? node.identity
     let descriptor = TaskDescriptor(
@@ -704,7 +704,7 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
         registration: .init(
           descriptor: descriptor,
           operation: {
-            await withAuthoringContext(dynamicPropertyScope) {
+            await withImperativeAuthoringContext(authoringContext) {
               await taskAction()
             }
           }

@@ -53,16 +53,15 @@ extension Menu {
 
     if isEnabled {
       let binding = expansionBinding
-      let dynamicPropertyScope = currentAuthoringContext()
       context.localActionRegistry?.register(
         identity: context.identity,
-        handler: {
-          withAuthoringContext(dynamicPropertyScope) {
+        handler: { [authoringContext = currentImperativeAuthoringContextSnapshot()] in
+          withImperativeAuthoringContext(authoringContext) {
             binding.wrappedValue.toggle()
             return true
           }
         },
-        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+        followUpInvalidationIdentity: currentImperativeAuthoringContextSnapshot()?.viewIdentity
       )
     }
 

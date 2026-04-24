@@ -62,14 +62,16 @@ extension Picker {
 
     if isEnabled {
       let binding = selection
-      let dynamicPropertyScope = currentAuthoringContext() ?? authoringScope
+      let authoringContext =
+        currentImperativeAuthoringContextSnapshot()
+        ?? ImperativeAuthoringContextSnapshot(authoringScope)
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
         let delta = pickerStyle.selectionDelta(for: event)
         guard let delta, !options.isEmpty else {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
+        return withImperativeAuthoringContext(authoringContext) {
           stepBoundSelection(
             binding,
             orderedTags: options.map(\.tag),
@@ -86,7 +88,7 @@ extension Picker {
           return false
         }
 
-        return withAuthoringContext(dynamicPropertyScope) {
+        return withImperativeAuthoringContext(authoringContext) {
           stepBoundSelection(
             binding,
             orderedTags: options.map(\.tag),
@@ -107,7 +109,7 @@ extension Picker {
             return false
           }
 
-          return withAuthoringContext(dynamicPropertyScope) {
+          return withImperativeAuthoringContext(authoringContext) {
             setBoundSelection(binding, to: option.tag)
           }
         }

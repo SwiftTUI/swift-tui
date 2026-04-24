@@ -53,7 +53,12 @@ extension SecureField {
       isFocused: isFocused && showsFocusEffect
     )
 
-    registerTextEntryBinding(text, in: context)
+    registerTextEntryBinding(
+      text,
+      authoringContext: currentImperativeAuthoringContextSnapshot()
+        ?? ImperativeAuthoringContextSnapshot(authoringScope),
+      in: context
+    )
     let entryText = textEntryDisplayText(
       text: fieldText,
       promptText: prompt?.content,

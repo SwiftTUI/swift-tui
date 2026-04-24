@@ -4,9 +4,11 @@ package import Core
 public struct TextEditor: View, ResolvableView {
   public var text: Binding<String>
   @State private var scrollPosition = ScrollPosition.zero
+  private let authoringScope: AuthoringContext?
 
   public init(text: Binding<String>) {
     self.text = text
+    authoringScope = currentAuthoringContext()
   }
 
   package func resolveElements(
@@ -36,6 +38,8 @@ extension TextEditor {
     registerMultilineTextEntryBinding(
       text,
       scrollPosition: $scrollPosition,
+      authoringContext: currentImperativeAuthoringContextSnapshot()
+        ?? ImperativeAuthoringContextSnapshot(authoringScope),
       in: context
     )
 
