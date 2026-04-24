@@ -54,6 +54,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(HStackPriorityTug()) }
     ),
+    LayoutEntry(
+      id: "stacks.vstack-leading-guide-shift",
+      category: .stacks,
+      title: "VStack leading guide shift",
+      blurb: "one row shifted via .alignmentGuide(.leading) { _ in 4 }",
+      marker: "VStack leading guide shift",
+      tier: .behaviour,
+      makeView: { AnyView(VStackLeadingGuideShift()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
