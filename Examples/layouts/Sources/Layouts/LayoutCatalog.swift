@@ -207,6 +207,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(BorderBlendStaticPhase()) }
     ),
+    LayoutEntry(
+      id: "borders.background-shapestyle-vs-content-overloads",
+      category: .bordersOverlays,
+      title: "Background ShapeStyle vs Content overloads",
+      blurb: ".background(.tint) vs .background { Rectangle }",
+      marker: "Background ShapeStyle vs Content overloads",
+      tier: .smoke,
+      makeView: { AnyView(BackgroundShapeStyleVsContentOverloads()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
