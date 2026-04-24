@@ -495,6 +495,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(CanvasHonorsClipped()) }
     ),
+    LayoutEntry(
+      id: "presentation.sheet-over-scroll",
+      category: .presentationLayout,
+      title: "Sheet over scroll layout",
+      blurb: "sheet present doesn't break underlying resolve",
+      marker: "Sheet over scroll layout",
+      tier: .smoke,
+      makeView: { AnyView(SheetOverScrollLayout()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
