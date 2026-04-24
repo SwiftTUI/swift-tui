@@ -216,6 +216,15 @@ public enum LayoutCatalog {
       tier: .smoke,
       makeView: { AnyView(BackgroundShapeStyleVsContentOverloads()) }
     ),
+    LayoutEntry(
+      id: "borders.overlay-alignment-badge",
+      category: .bordersOverlays,
+      title: "Overlay alignment badge",
+      blurb: "overlay(alignment: .bottomTrailing) anchors at corner",
+      marker: "Overlay alignment badge",
+      tier: .behaviour,
+      makeView: { AnyView(OverlayAlignmentBadge()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
