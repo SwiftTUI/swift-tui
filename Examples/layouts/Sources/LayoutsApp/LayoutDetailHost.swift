@@ -15,8 +15,7 @@ import TerminalUI
 /// `KeyCommandModifier`; consumer-bound single-key commands are
 /// silently dropped. ⌃B is the nearest idiomatic "back" chord in
 /// terminal UIs. See the open design question at
-/// `docs/proposals/FRAMEWORK_RESERVED_KEY_CONSUMER_ESCAPE_HATCH.md`
-/// (file to be created).
+/// `docs/proposals/layout/BEHAVIOUR_FINDINGS.md` finding #2.
 struct LayoutDetailHost: View {
   let entry: LayoutEntry
   let onBack: @MainActor @Sendable () -> Void
