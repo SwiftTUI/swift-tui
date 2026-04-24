@@ -151,3 +151,33 @@ implementation (likely needs to thread the proposed size through
 `ResolveContext`).
 
 **Status:** Open — library divergence; test pins observed behaviour.
+
+### 5. `.frame(width: 0, height: 0)` clips intrinsic content out of the raster
+
+**Surfaced by:** `Examples/layouts/Tests/LayoutsTests/Frames/IntrinsicTextUnderZeroProposalBehaviourTests.swift`
+(layout `frames.intrinsic-text-under-zero-proposal`, plan task #13).
+
+**Plan prediction:** Open question — does
+`Text("intrinsic content").frame(width: 0, height: 0)` render at the
+text's intrinsic size (overflowing the 0×0 frame) or vanish?
+
+**Observed (60×10 viewport):**
+
+```
+[3] | plain copy:|
+[5] | intrinsic content|       ← one and only "intrinsic content" row
+[7] | zero-frame copy:|
+```
+
+The plain copy renders normally; the `.frame(width: 0, height: 0)`
+copy is clipped out — its layout slot is empty between the
+`zero-frame copy:` label and the bottom of the surface.
+
+**Resolution:** Pinned observed behaviour in the test (exactly one
+visible "intrinsic content" row). This matches the SwiftUI faithful
+model: `.frame(width: 0, height: 0)` reports the explicit 0×0
+container size to its parent, so the parent reserves zero space and
+the renderer clips the child's intrinsic painting to that empty
+region. No follow-up remediation needed.
+
+**Status:** Closed — observed behaviour matches SwiftUI semantics.

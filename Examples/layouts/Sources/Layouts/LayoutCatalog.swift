@@ -126,6 +126,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ProposalTightening()) }
     ),
+    LayoutEntry(
+      id: "frames.intrinsic-text-under-zero-proposal",
+      category: .frames,
+      title: "Intrinsic text under zero proposal",
+      blurb: "Text at 0×0 proposal",
+      marker: "Intrinsic text under zero proposal",
+      tier: .behaviour,
+      makeView: { AnyView(IntrinsicTextUnderZeroProposal()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
