@@ -306,6 +306,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(SpacerMinLengthRespected()) }
     ),
+    LayoutEntry(
+      id: "spacers.divider-orientation-flip",
+      category: .spacers,
+      title: "Divider orientation flip",
+      blurb: "Divider is a horizontal rule in VStack, vertical rule in HStack",
+      marker: "Divider orientation flip",
+      tier: .behaviour,
+      makeView: { AnyView(DividerOrientationFlip()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
