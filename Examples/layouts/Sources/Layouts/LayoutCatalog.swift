@@ -333,6 +333,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(HorizontalScrollWithInfiniteChild()) }
     ),
+    LayoutEntry(
+      id: "scrolling.safe-area-inset",
+      category: .scrolling,
+      title: "Scroll view with safe area inset",
+      blurb: "first content row below top inset",
+      marker: "Scroll view with safe area inset",
+      tier: .behaviour,
+      makeView: { AnyView(ScrollViewWithSafeAreaInset()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
