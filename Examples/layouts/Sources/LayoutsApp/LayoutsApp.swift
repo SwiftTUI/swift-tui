@@ -32,7 +32,7 @@ struct LayoutsRoot: View {
       // static and compiled-in today, so the case is unreachable in
       // practice; if the catalog ever becomes dynamic, reset
       // `selectedID = nil` here to self-heal.
-      LayoutPicker(onSelect: { selectedID = $0 })
+      LayoutPicker(onSelect: { @MainActor @Sendable id in selectedID = id })
     }
   }
 }

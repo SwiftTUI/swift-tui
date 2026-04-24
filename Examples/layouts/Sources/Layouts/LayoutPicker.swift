@@ -1,16 +1,25 @@
-import Layouts
 import TerminalUI
 
 /// Full-screen picker: a sectioned list of every ``LayoutEntry`` in
 /// ``LayoutCatalog/all``, grouped by ``LayoutEntry/Category``.
 /// Selecting an entry calls `onSelect` with its ID; the parent
-/// ``LayoutsRoot`` flips into the detail host.
-struct LayoutPicker: View {
-  let onSelect: (LayoutEntry.ID) -> Void
+/// `LayoutsRoot` flips into the detail host.
+///
+/// Lives in the `Layouts` library (not `LayoutsApp`) so the
+/// `LayoutsTests` target can `@testable import Layouts` and rasterise
+/// the picker in `PickerShellTests`. Executable targets cannot be
+/// reliably `@testable`-imported from a sibling test target; library
+/// targets can.
+public struct LayoutPicker: View {
+  let onSelect: @MainActor @Sendable (LayoutEntry.ID) -> Void
 
   @State private var selection: LayoutEntry.ID?
 
-  var body: some View {
+  public init(onSelect: @escaping @MainActor @Sendable (LayoutEntry.ID) -> Void) {
+    self.onSelect = onSelect
+  }
+
+  public var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       header
       Divider()
