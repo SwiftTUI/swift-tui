@@ -99,6 +99,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(FixedSizeOneAxis()) }
     ),
+    LayoutEntry(
+      id: "frames.min-ideal-max-frame-clamp",
+      category: .frames,
+      title: "Min ideal max frame clamp",
+      blurb: "clamp points under 3 proposals",
+      marker: "Min ideal max frame clamp",
+      tier: .behaviour,
+      makeView: { AnyView(MinIdealMaxFrameClamp()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
