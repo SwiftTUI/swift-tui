@@ -378,6 +378,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ViewThatFitsAxisChoice()) }
     ),
+    LayoutEntry(
+      id: "view-that-fits.vertical-only",
+      category: .viewThatFits,
+      title: "View that fits vertical only",
+      blurb: "axis: .vertical; height-driven swap",
+      marker: "View that fits vertical only",
+      tier: .behaviour,
+      makeView: { AnyView(ViewThatFitsVerticalOnly()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
