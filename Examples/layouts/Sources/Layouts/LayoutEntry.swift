@@ -18,6 +18,7 @@ public struct LayoutEntry: Identifiable, Hashable, Sendable {
   public let category: Category
   public let title: String
   public let blurb: String
+  /// Substring guaranteed to appear in the rendered raster; `LayoutSmokeTests` uses this to prove the layout produced output.
   public let marker: String
   public let tier: TestTier
   public let makeView: @MainActor @Sendable () -> AnyView
