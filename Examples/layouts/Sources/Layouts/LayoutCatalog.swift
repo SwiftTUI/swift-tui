@@ -243,6 +243,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(PositionIgnoresLayout()) }
     ),
+    LayoutEntry(
+      id: "offset.clipped-overflow-crop",
+      category: .offsetPosition,
+      title: "Clipped overflow crop",
+      blurb: ".clipped() drops content past its frame",
+      marker: "Clipped overflow crop",
+      tier: .behaviour,
+      makeView: { AnyView(ClippedOverflowCrop()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
