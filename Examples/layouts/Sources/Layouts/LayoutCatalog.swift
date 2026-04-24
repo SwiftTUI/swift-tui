@@ -414,6 +414,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(AnyLayoutHVSwap()) }
     ),
+    LayoutEntry(
+      id: "custom-layout.radial",
+      category: .customLayout,
+      title: "Radial layout",
+      blurb: "custom Layout placing children in a ring",
+      marker: "Radial layout",
+      tier: .behaviour,
+      makeView: { AnyView(RadialLayout()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
