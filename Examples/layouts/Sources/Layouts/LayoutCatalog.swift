@@ -396,6 +396,15 @@ public enum LayoutCatalog {
       tier: .behaviour,
       makeView: { AnyView(ViewThatFitsBoundaryInclusive()) }
     ),
+    LayoutEntry(
+      id: "custom-layout.any-layout-hv-swap",
+      category: .customLayout,
+      title: "Any layout HV swap",
+      blurb: "AnyLayout(VStackLayout vs HStackLayout) at runtime",
+      marker: "Any layout HV swap",
+      tier: .behaviour,
+      makeView: { AnyView(AnyLayoutHVSwap()) }
+    ),
   ]
 
   public static func entry(id: String) -> LayoutEntry? {
