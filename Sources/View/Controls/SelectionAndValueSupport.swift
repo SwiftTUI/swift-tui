@@ -620,15 +620,15 @@ package func controlFocusRow<Content: View>(
 func registerMultilineTextEntryBinding(
   _ binding: Binding<String>,
   scrollPosition: Binding<ScrollPosition>,
+  authoringContext: ImperativeAuthoringContextSnapshot?,
   in context: ResolveContext
 ) {
   guard context.environmentValues.isEnabled else {
     return
   }
 
-  let dynamicPropertyScope = currentAuthoringContext()
   context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
-    withAuthoringContext(dynamicPropertyScope) {
+    withImperativeAuthoringContext(authoringContext) {
       mutateTextEntryBinding(
         binding,
         event: event,

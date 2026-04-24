@@ -4,6 +4,7 @@ package import Core
 public struct Toggle<Label: View>: View, ResolvableView {
   public var isOn: Binding<Bool>
   private var label: Label
+  private let authoringScope: AuthoringContext?
 
   public init(
     isOn: Binding<Bool>,
@@ -11,6 +12,7 @@ public struct Toggle<Label: View>: View, ResolvableView {
   ) {
     self.isOn = isOn
     self.label = label()
+    authoringScope = currentAuthoringContext()
   }
 
   public init<S: StringProtocol>(
@@ -19,6 +21,7 @@ public struct Toggle<Label: View>: View, ResolvableView {
   ) where Label == Text {
     self.isOn = isOn
     label = Text(String(title))
+    authoringScope = currentAuthoringContext()
   }
 
   package func resolveElements(
@@ -47,16 +50,21 @@ extension Toggle {
 
     if isEnabled {
       let binding = isOn
-      let dynamicPropertyScope = currentAuthoringContext()
       context.localActionRegistry?.register(
         identity: context.identity,
         handler: {
-          withAuthoringContext(dynamicPropertyScope) {
+          [
+            authoringContext =
+              currentImperativeAuthoringContextSnapshot()
+              ?? ImperativeAuthoringContextSnapshot(authoringScope)
+          ] in
+          withImperativeAuthoringContext(authoringContext) {
             binding.wrappedValue.toggle()
             return true
           }
         },
-        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+        followUpInvalidationIdentity: (currentImperativeAuthoringContextSnapshot()
+          ?? ImperativeAuthoringContextSnapshot(authoringScope))?.viewIdentity
       )
     }
 
@@ -114,15 +122,19 @@ extension Toggle {
 @MainActor
 package func registerTextEntryBinding(
   _ binding: Binding<String>,
+  authoringContext: ImperativeAuthoringContextSnapshot?,
   in context: ResolveContext
 ) {
   guard context.environmentValues.isEnabled else {
     return
   }
 
-  let dynamicPropertyScope = currentAuthoringContext()
-  context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
-    withAuthoringContext(dynamicPropertyScope) {
+  guard let keyHandlerRegistry = context.localKeyHandlerRegistry else {
+    return
+  }
+
+  keyHandlerRegistry.register(identity: context.identity) { event in
+    withImperativeAuthoringContext(authoringContext) {
       mutateTextEntryBinding(
         binding,
         event: event,
@@ -211,7 +223,12 @@ extension TextField {
       isFocused: isFocused && showsFocusEffect
     )
 
-    registerTextEntryBinding(text, in: context)
+    registerTextEntryBinding(
+      text,
+      authoringContext: currentImperativeAuthoringContextSnapshot()
+        ?? ImperativeAuthoringContextSnapshot(authoringScope),
+      in: context
+    )
     let entryText = textEntryDisplayText(
       text: fieldText,
       promptText: prompt?.content,
@@ -252,6 +269,7 @@ public struct DisclosureGroup<Label: View, Content: View>: View, ResolvableView 
   public var isExpanded: Binding<Bool>
   private var label: Label
   private var content: Content
+  private let authoringScope: AuthoringContext?
 
   public init(
     isExpanded: Binding<Bool>,
@@ -261,6 +279,7 @@ public struct DisclosureGroup<Label: View, Content: View>: View, ResolvableView 
     self.isExpanded = isExpanded
     self.label = label()
     self.content = content()
+    authoringScope = currentAuthoringContext()
   }
 
   public init<S: StringProtocol>(
@@ -271,6 +290,7 @@ public struct DisclosureGroup<Label: View, Content: View>: View, ResolvableView 
     self.isExpanded = isExpanded
     label = Text(String(title))
     self.content = content()
+    authoringScope = currentAuthoringContext()
   }
 
   package func resolveElements(
@@ -298,16 +318,21 @@ extension DisclosureGroup {
 
     if isEnabled {
       let binding = isExpanded
-      let dynamicPropertyScope = currentAuthoringContext()
       context.localActionRegistry?.register(
         identity: context.identity,
         handler: {
-          withAuthoringContext(dynamicPropertyScope) {
+          [
+            authoringContext =
+              currentImperativeAuthoringContextSnapshot()
+              ?? ImperativeAuthoringContextSnapshot(authoringScope)
+          ] in
+          withImperativeAuthoringContext(authoringContext) {
             binding.wrappedValue.toggle()
             return true
           }
         },
-        followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+        followUpInvalidationIdentity: (currentImperativeAuthoringContextSnapshot()
+          ?? ImperativeAuthoringContextSnapshot(authoringScope))?.viewIdentity
       )
     }
 

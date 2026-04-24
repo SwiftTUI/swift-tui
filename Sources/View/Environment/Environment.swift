@@ -35,14 +35,22 @@ private struct TypedEnvironmentValueBox<Value: Sendable>: EnvironmentValueBox {
 public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String
   package let isPlaceholder: Bool
+  package let authoringContext: ImperativeAuthoringContextSnapshot?
   private let handler: @MainActor @Sendable (LinkDestination) -> Bool
 
+  @MainActor
   public init(
     _ handler: @escaping @MainActor @Sendable (LinkDestination) -> Bool
   ) {
+    let authoringContext = currentImperativeAuthoringContextSnapshot()
     snapshotLabel = "OpenLinkAction.custom"
     isPlaceholder = false
-    self.handler = handler
+    self.authoringContext = authoringContext
+    self.handler = { destination in
+      withImperativeAuthoringContext(authoringContext) {
+        handler(destination)
+      }
+    }
   }
 
   @discardableResult
@@ -64,10 +72,12 @@ public struct OpenLinkAction: Sendable, CustomStringConvertible, CustomDebugStri
   package init(
     snapshotLabel: String,
     isPlaceholder: Bool,
+    authoringContext: ImperativeAuthoringContextSnapshot? = nil,
     handler: @escaping @MainActor @Sendable (LinkDestination) -> Bool
   ) {
     self.snapshotLabel = snapshotLabel
     self.isPlaceholder = isPlaceholder
+    self.authoringContext = authoringContext
     self.handler = handler
   }
 

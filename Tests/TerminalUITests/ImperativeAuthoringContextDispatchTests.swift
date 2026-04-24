@@ -126,6 +126,342 @@ struct ImperativeAuthoringContextDispatchTests {
     #expect(surfaceText(secondary.host).contains("idle"))
     #expect(surfaceText(secondary.host).contains("commits:0"))
   }
+
+  @Test(
+    "onAppear mutates the graph that revealed the child when the same view instance is hosted twice"
+  )
+  func appearLifecycleTargetsDispatchingGraph() async throws {
+    let sharedView = AppearLifecycleScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedAppearPrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedAppearSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    _ = primary.runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl))
+
+    try await waitUntil("appear lifecycle mutation") {
+      do {
+        try renderPending(primary.runLoop)
+        try renderPending(secondary.runLoop)
+      } catch {
+        return false
+      }
+      return surfaceText(primary.host).contains("appeared")
+        || surfaceText(secondary.host).contains("appeared")
+    }
+
+    #expect(surfaceText(primary.host).contains("appeared"))
+    #expect(surfaceText(secondary.host).contains("idle"))
+  }
+
+  @Test(
+    "onDisappear mutates the graph that hid the child when the same view instance is hosted twice"
+  )
+  func disappearLifecycleTargetsDispatchingGraph() async throws {
+    let sharedView = DisappearLifecycleScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedDisappearPrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedDisappearSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    _ = primary.runLoop.handleKeyPress(KeyPress(.character("d"), modifiers: .ctrl))
+
+    try await waitUntil("disappear lifecycle mutation") {
+      do {
+        try renderPending(primary.runLoop)
+        try renderPending(secondary.runLoop)
+      } catch {
+        return false
+      }
+      return surfaceText(primary.host).contains("disappeared")
+        || surfaceText(secondary.host).contains("disappeared")
+    }
+
+    #expect(surfaceText(primary.host).contains("disappeared"))
+    #expect(surfaceText(secondary.host).contains("idle"))
+  }
+
+  @Test(
+    "onChange mutates the graph whose value changed when the same view instance is hosted twice"
+  )
+  func changeLifecycleTargetsDispatchingGraph() async throws {
+    let sharedView = ChangeLifecycleScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedChangePrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedChangeSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    _ = primary.runLoop.handleKeyPress(KeyPress(.character("c"), modifiers: .ctrl))
+
+    try await waitUntil("change lifecycle mutation") {
+      do {
+        try renderPending(primary.runLoop)
+        try renderPending(secondary.runLoop)
+      } catch {
+        return false
+      }
+      return surfaceText(primary.host).contains("changed")
+        || surfaceText(secondary.host).contains("changed")
+    }
+
+    #expect(surfaceText(primary.host).contains("changed"))
+    #expect(surfaceText(primary.host).contains("count:1"))
+    #expect(surfaceText(secondary.host).contains("idle"))
+    #expect(surfaceText(secondary.host).contains("count:0"))
+  }
+
+  @Test(
+    "task mutates the graph that started it when the same view instance is hosted twice"
+  )
+  func taskLifecycleTargetsDispatchingGraph() async throws {
+    let sharedView = TaskLifecycleScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedTaskPrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedTaskSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    _ = primary.runLoop.handleKeyPress(KeyPress(.character("t"), modifiers: .ctrl))
+
+    try await waitUntil("task lifecycle mutation", timeoutNanoseconds: 1_000_000_000) {
+      do {
+        try renderPending(primary.runLoop)
+        try renderPending(secondary.runLoop)
+      } catch {
+        return false
+      }
+      return surfaceText(primary.host).contains("tasked")
+        || surfaceText(secondary.host).contains("tasked")
+    }
+
+    #expect(surfaceText(primary.host).contains("tasked"))
+    #expect(surfaceText(secondary.host).contains("idle"))
+  }
+
+  @Test(
+    "menu action mutates the graph that activated it when the same view instance is hosted twice")
+  func menuActionTargetsDispatchingGraph() throws {
+    let sharedView = MenuScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedMenuPrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedMenuSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    #expect(primary.runLoop.localActionRegistry.dispatch(identity: testIdentity("ScopedMenu")))
+    try renderPending(primary.runLoop)
+    try renderPending(secondary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("Action 1"))
+    #expect(!surfaceText(secondary.host).contains("Action 1"))
+  }
+
+  @Test(
+    "toggle action mutates the graph that activated it when the same view instance is hosted twice")
+  func toggleActionTargetsDispatchingGraph() throws {
+    let sharedView = ToggleScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedTogglePrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedToggleSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    #expect(primary.runLoop.localActionRegistry.dispatch(identity: testIdentity("ScopedToggle")))
+    try renderPending(primary.runLoop)
+    try renderPending(secondary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("on:true"))
+    #expect(surfaceText(secondary.host).contains("on:false"))
+  }
+
+  @Test(
+    "disclosure action mutates the graph that activated it when the same view instance is hosted twice"
+  )
+  func disclosureActionTargetsDispatchingGraph() throws {
+    let sharedView = DisclosureScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedDisclosurePrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedDisclosureSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    #expect(
+      primary.runLoop.localActionRegistry.dispatch(identity: testIdentity("ScopedDisclosure")))
+    try renderPending(primary.runLoop)
+    try renderPending(secondary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("expanded:true"))
+    #expect(surfaceText(secondary.host).contains("expanded:false"))
+  }
+
+  @Test(
+    "text field key handling mutates the graph that received it when the same view instance is hosted twice"
+  )
+  func textFieldKeyHandlerTargetsDispatchingGraph() throws {
+    let sharedView = TextFieldScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedTextFieldPrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedTextFieldSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    #expect(
+      primary.runLoop.localKeyHandlerRegistry.dispatch(
+        identity: testIdentity("ScopedTextField"),
+        event: .character("x")
+      )
+    )
+    try renderPending(primary.runLoop)
+    try renderPending(secondary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("value:x"))
+    #expect(surfaceText(secondary.host).contains("value:-"))
+  }
+
+  @Test(
+    "text editor key handling mutates the graph that received it when the same view instance is hosted twice"
+  )
+  func textEditorKeyHandlerTargetsDispatchingGraph() throws {
+    let sharedView = TextEditorScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedTextEditorPrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedTextEditorSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    #expect(
+      primary.runLoop.localKeyHandlerRegistry.dispatch(
+        identity: testIdentity("ScopedTextEditor"),
+        event: .character("z")
+      )
+    )
+    try renderPending(primary.runLoop)
+    try renderPending(secondary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("count:1"))
+    #expect(surfaceText(secondary.host).contains("count:0"))
+  }
+
+  @Test(
+    "stepper key handling mutates the graph that received it when the same view instance is hosted twice"
+  )
+  func stepperKeyHandlerTargetsDispatchingGraph() throws {
+    let sharedView = StepperScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedStepperPrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedStepperSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    #expect(
+      primary.runLoop.localKeyHandlerRegistry.dispatch(
+        identity: testIdentity("ScopedStepper"),
+        event: .arrowRight
+      )
+    )
+    try renderPending(primary.runLoop)
+    try renderPending(secondary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("value:1"))
+    #expect(surfaceText(secondary.host).contains("value:0"))
+  }
+
+  @Test(
+    "slider key handling mutates the graph that received it when the same view instance is hosted twice"
+  )
+  func sliderKeyHandlerTargetsDispatchingGraph() throws {
+    let sharedView = SliderScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedSliderPrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedSliderSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    #expect(
+      primary.runLoop.localKeyHandlerRegistry.dispatch(
+        identity: testIdentity("ScopedSlider"),
+        event: .arrowRight
+      )
+    )
+    try renderPending(primary.runLoop)
+    try renderPending(secondary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("value:1"))
+    #expect(surfaceText(secondary.host).contains("value:0"))
+  }
+
+  @Test(
+    "picker key handling mutates the graph that received it when the same view instance is hosted twice"
+  )
+  func pickerKeyHandlerTargetsDispatchingGraph() throws {
+    let sharedView = PickerScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedPickerPrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedPickerSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    #expect(
+      primary.runLoop.localKeyHandlerRegistry.dispatch(
+        identity: testIdentity("ScopedPicker"),
+        event: .arrowDown
+      )
+    )
+    try renderPending(primary.runLoop)
+    try renderPending(secondary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("selection:two"))
+    #expect(surfaceText(secondary.host).contains("selection:one"))
+  }
+
+  @Test(
+    "scroll view pointer handling mutates the graph that received it when the same view instance is hosted twice"
+  )
+  func scrollViewPointerHandlerTargetsDispatchingGraph() throws {
+    let sharedView = ScrollViewScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedScrollPrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedScrollSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    #expect(
+      primary.runLoop.localPointerHandlerRegistry.dispatch(
+        routeID: primaryRouteID(for: testIdentity("ScopedScrollView")),
+        event: .init(
+          kind: .scrolled(deltaX: 0, deltaY: 1),
+          location: .zero,
+          targetRect: .init(origin: .zero, size: .init(width: 10, height: 4))
+        )
+      )
+    )
+    try renderPending(primary.runLoop)
+    try renderPending(secondary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("offset:1"))
+    #expect(surfaceText(secondary.host).contains("offset:0"))
+  }
+
+  @Test(
+    "link action mutates the graph that activated it when the same view instance is hosted twice")
+  func linkActionTargetsDispatchingGraph() throws {
+    let sharedView = LinkScopeFixture()
+    let primary = makeRunLoop(rootName: "SharedLinkPrimary") { sharedView }
+    let secondary = makeRunLoop(rootName: "SharedLinkSecondary") { sharedView }
+
+    try renderInitial(primary.runLoop)
+    try renderInitial(secondary.runLoop)
+
+    #expect(primary.runLoop.localActionRegistry.dispatch(identity: testIdentity("ScopedLink")))
+    try renderPending(primary.runLoop)
+    try renderPending(secondary.runLoop)
+
+    #expect(surfaceText(primary.host).contains("opens:1"))
+    #expect(surfaceText(secondary.host).contains("opens:0"))
+  }
 }
 
 @MainActor
@@ -215,6 +551,237 @@ private struct GestureCallbackScopeFixture: View {
 }
 
 @MainActor
+private struct AppearLifecycleScopeFixture: View {
+  @State private var showsChild = false
+  @State private var status = "idle"
+
+  var body: some View {
+    Panel(id: "scope") {
+      VStack(alignment: .leading, spacing: 1) {
+        Text(status).focusable(true)
+        if showsChild {
+          Text("child").onAppear {
+            status = "appeared"
+          }
+        }
+      }
+    }
+    .keyCommand("Toggle child", key: .character("a"), modifiers: .ctrl) {
+      showsChild.toggle()
+    }
+  }
+}
+
+@MainActor
+private struct DisappearLifecycleScopeFixture: View {
+  @State private var showsChild = true
+  @State private var status = "idle"
+
+  var body: some View {
+    Panel(id: "scope") {
+      VStack(alignment: .leading, spacing: 1) {
+        Text(status).focusable(true)
+        if showsChild {
+          Text("child").onDisappear {
+            status = "disappeared"
+          }
+        }
+      }
+    }
+    .keyCommand("Toggle child", key: .character("d"), modifiers: .ctrl) {
+      showsChild.toggle()
+    }
+  }
+}
+
+@MainActor
+private struct ChangeLifecycleScopeFixture: View {
+  @State private var count = 0
+  @State private var status = "idle"
+
+  var body: some View {
+    Panel(id: "scope") {
+      Text("status:\(status)|count:\(count)").focusable(true)
+    }
+    .keyCommand("Increment", key: .character("c"), modifiers: .ctrl) {
+      count += 1
+    }
+    .onChange(of: count) {
+      status = "changed"
+    }
+  }
+}
+
+@MainActor
+private struct TaskLifecycleScopeFixture: View {
+  @State private var showsChild = false
+  @State private var status = "idle"
+
+  var body: some View {
+    Panel(id: "scope") {
+      VStack(alignment: .leading, spacing: 1) {
+        Text(status).focusable(true)
+        if showsChild {
+          Text("child")
+            .task(id: "load") {
+              status = "tasked"
+            }
+        }
+      }
+    }
+    .keyCommand("Toggle child", key: .character("t"), modifiers: .ctrl) {
+      showsChild.toggle()
+    }
+  }
+}
+
+@MainActor
+private struct MenuScopeFixture: View {
+  var body: some View {
+    Menu("Actions") {
+      Text("Action 1")
+    }
+    .id(testIdentity("ScopedMenu"))
+  }
+}
+
+@MainActor
+private struct ToggleScopeFixture: View {
+  @State private var isOn = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("on:\(isOn)")
+      Toggle("Enabled", isOn: $isOn)
+        .id(testIdentity("ScopedToggle"))
+    }
+  }
+}
+
+@MainActor
+private struct DisclosureScopeFixture: View {
+  @State private var isExpanded = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("expanded:\(isExpanded)")
+      DisclosureGroup("More", isExpanded: $isExpanded) {
+        Text("Details")
+      }
+      .id(testIdentity("ScopedDisclosure"))
+    }
+  }
+}
+
+@MainActor
+private struct TextFieldScopeFixture: View {
+  @State private var value = ""
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("value:\(value.isEmpty ? "-" : value)")
+      TextField("Name", text: $value)
+        .id(testIdentity("ScopedTextField"))
+    }
+  }
+}
+
+@MainActor
+private struct TextEditorScopeFixture: View {
+  @State private var value = ""
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("count:\(value.count)")
+      TextEditor(text: $value)
+        .id(testIdentity("ScopedTextEditor"))
+        .frame(width: 16, height: 3, alignment: .topLeading)
+    }
+  }
+}
+
+@MainActor
+private struct StepperScopeFixture: View {
+  @State private var value = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("value:\(value)")
+      Stepper("Count", value: $value, in: 0...3)
+        .id(testIdentity("ScopedStepper"))
+    }
+  }
+}
+
+@MainActor
+private struct SliderScopeFixture: View {
+  @State private var value = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("value:\(value)")
+      Slider("Value", value: $value, in: 0...4)
+        .id(testIdentity("ScopedSlider"))
+    }
+  }
+}
+
+@MainActor
+private struct PickerScopeFixture: View {
+  @State private var selection = "one"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("selection:\(selection)")
+      Picker("Mode", selection: $selection) {
+        Text("One").tag("one")
+        Text("Two").tag("two")
+      }
+      .id(testIdentity("ScopedPicker"))
+    }
+  }
+}
+
+@MainActor
+private struct ScrollViewScopeFixture: View {
+  @State private var position = ScrollPosition.zero
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("offset:\(position.y)")
+      ScrollView(.vertical, position: $position) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<12) { index in
+            Text("Row \(index)")
+          }
+        }
+      }
+      .id(testIdentity("ScopedScrollView"))
+      .frame(width: 12, height: 4, alignment: .topLeading)
+    }
+  }
+}
+
+@MainActor
+private struct LinkScopeFixture: View {
+  @State private var opens = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("opens:\(opens)")
+      Link("Docs", destination: "https://example.com")
+        .id(testIdentity("ScopedLink"))
+    }
+    .openLinkAction(
+      OpenLinkAction { _ in
+        opens += 1
+        return true
+      }
+    )
+  }
+}
+
+@MainActor
 private func makeRunLoop<V: View>(
   rootName: String,
   @ViewBuilder content: @escaping () -> V
@@ -279,6 +846,34 @@ private func centerPoint(of rect: Rect) -> Point {
     x: rect.origin.x + rect.size.width / 2,
     y: rect.origin.y + rect.size.height / 2
   )
+}
+
+private struct ImperativeDispatchTimeout: Error, CustomStringConvertible {
+  let label: String
+
+  var description: String {
+    "Timed out waiting for \(label)"
+  }
+}
+
+@MainActor
+private func waitUntil(
+  _ label: String,
+  timeoutNanoseconds: UInt64 = 500_000_000,
+  pollNanoseconds: UInt64 = 10_000_000,
+  condition: @escaping @MainActor () -> Bool
+) async throws {
+  let clock = ContinuousClock()
+  let deadline = clock.now.advanced(by: .nanoseconds(Int64(timeoutNanoseconds)))
+  while true {
+    if condition() {
+      return
+    }
+    if clock.now >= deadline {
+      throw ImperativeDispatchTimeout(label: label)
+    }
+    try await Task.sleep(nanoseconds: pollNanoseconds)
+  }
 }
 
 @MainActor

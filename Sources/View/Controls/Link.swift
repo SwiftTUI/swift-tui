@@ -281,14 +281,11 @@ private func registerOpenLinkAction(
   }
 
   let openLinkAction = context.environmentValues.openLinkAction
-  let dynamicPropertyScope = currentAuthoringContext()
   localActionRegistry.register(
     identity: identity,
     handler: {
-      withAuthoringContext(dynamicPropertyScope) {
-        openLinkAction(destination)
-      }
+      openLinkAction(destination)
     },
-    followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+    followUpInvalidationIdentity: openLinkAction.authoringContext?.viewIdentity
   )
 }
