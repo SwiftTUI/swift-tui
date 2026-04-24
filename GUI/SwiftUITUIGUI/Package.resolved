@@ -1,15 +1,6 @@
 {
-  "originHash" : "7c6a5dd8f61cc1668b261581f4821200dcec4f2cf664de082a06ab8937fefede",
+  "originHash" : "bba5d465bbd083158e2b7fe4860115c4182404efb489b614c71f391877291a11",
   "pins" : [
-    {
-      "identity" : "libghostty-spm",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/GoodHatsLLC/libghostty-spm.git",
-      "state" : {
-        "revision" : "0fe86b8c3f44465806785fbd84d5fac23826fbea",
-        "version" : "1.0.1776121692"
-      }
-    },
     {
       "identity" : "swift-async-algorithms",
       "kind" : "remoteSourceControl",

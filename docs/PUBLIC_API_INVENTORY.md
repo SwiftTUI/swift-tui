@@ -138,7 +138,7 @@ package surface:
   - `Runners/TerminalUICLI` exposes `TerminalCLIAppRunner` plus the default terminal-native `App.main()` story
   - `Runners/TerminalUIWASI` exposes `TerminalWASIAppRunner` plus the default WASI `App.main()` story
 - embedded host packages:
-  - `GUI/SwiftUITUIGUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on top of Ghostty
+  - `GUI/SwiftUITUIGUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on a native raster surface
   - `GUI/SwiftTermTUIGUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on top of SwiftTerm
   - `GUI/WebTUIGUI` hosts a `TerminalUIWASI` build in the browser using the same manifest and hosted-session story
   - `GUI/XtermWebTUIGUI` hosts a `TerminalUIWASI` build in the browser using the same manifest and hosted-session story on top of xterm.js

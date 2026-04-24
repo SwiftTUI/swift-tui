@@ -2,15 +2,6 @@
   "originHash" : "cb70837bfb09c05f16e23627de5e792cff09778283d8201fd787a0a66f5eb905",
   "pins" : [
     {
-      "identity" : "libghostty-spm",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/GoodHatsLLC/libghostty-spm.git",
-      "state" : {
-        "revision" : "0fe86b8c3f44465806785fbd84d5fac23826fbea",
-        "version" : "1.0.1776121692"
-      }
-    },
-    {
       "identity" : "swift-async-algorithms",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-async-algorithms.git",

@@ -95,7 +95,7 @@ library product. Downstream package consumers reach those types through
 
 ## Embedded Host Packages
 
-- `GUI/SwiftUITUIGUI`: Ghostty-backed SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
+- `GUI/SwiftUITUIGUI`: native SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
 - `GUI/SwiftTermTUIGUI`: SwiftTerm-backed SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
 - `GUI/WebTUIGUI`: Bun-based web host that consumes a `TerminalUIWASI` build and manifest
 - `GUI/XtermWebTUIGUI`: Bun-based web host that consumes a `TerminalUIWASI` build and manifest through xterm.js

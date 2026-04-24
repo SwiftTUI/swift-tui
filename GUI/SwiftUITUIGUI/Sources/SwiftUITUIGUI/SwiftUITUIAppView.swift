@@ -1,4 +1,3 @@
-import Ghostty
 import SwiftUI
 import TerminalUI
 
@@ -35,10 +34,9 @@ public struct SwiftUITUIAppView<A: TerminalUI.App>: SwiftUI.View {
 @available(macOS 14.0, iOS 17.0, macCatalyst 17.0, *)
 private struct TerminalSurfaceHost: SwiftUI.View {
   let host: SwiftUITUISceneHost
-  let context: TerminalViewState
 
   var body: some SwiftUI.View {
-    TerminalSurfaceRepresentable(host: host, context: context)
+    TerminalSurfaceRepresentable(host: host)
       .background(.clear)
   }
 }
@@ -47,45 +45,58 @@ private struct TerminalSurfaceHost: SwiftUI.View {
   @available(macOS 14.0, *)
   private struct TerminalSurfaceRepresentable: NSViewRepresentable {
     let host: SwiftUITUISceneHost
-    let context: TerminalViewState
 
-    func makeNSView(context _: Context) -> TerminalView {
-      let view = TerminalView(frame: .zero)
+    func makeNSView(context _: Context) -> NativeTerminalSurfaceView {
+      let view = NativeTerminalSurfaceView(frame: .zero)
       configure(view)
       return view
     }
 
-    func updateNSView(_ view: TerminalView, context _: Context) {
+    func updateNSView(_ view: NativeTerminalSurfaceView, context _: Context) {
       configure(view)
     }
 
-    private func configure(_ view: TerminalView) {
-      view.delegate = context
-      view.controller = context.controller
-      view.configuration = context.configuration
+    private func configure(_ view: NativeTerminalSurfaceView) {
+      view.surface = host.latestSurface
+      view.style = host.style
+      view.focusPresentation = host.focusPresentation
+      view.allowsTextInput =
+        host.focusPresentation.prefersTextInput || host.manualKeyboardPresentationRequested
+      view.onResize = { [weak host] size, cellPixelSize in
+        host?.resize(to: size, cellPixelSize: cellPixelSize)
+      }
+      view.onInputEvent = { [weak host] event in
+        host?.send(event)
+      }
     }
   }
 #elseif canImport(UIKit)
   @available(iOS 17.0, macCatalyst 17.0, *)
   private struct TerminalSurfaceRepresentable: UIViewRepresentable {
     let host: SwiftUITUISceneHost
-    let context: TerminalViewState
 
-    func makeUIView(context _: Context) -> TerminalView {
-      let view = TerminalView(frame: .zero)
+    func makeUIView(context _: Context) -> NativeTerminalSurfaceView {
+      let view = NativeTerminalSurfaceView(frame: .zero)
       configure(view)
       return view
     }
 
-    func updateUIView(_ view: TerminalView, context _: Context) {
+    func updateUIView(_ view: NativeTerminalSurfaceView, context _: Context) {
       configure(view)
     }
 
-    private func configure(_ view: TerminalView) {
-      view.delegate = context
-      view.controller = context.controller
-      view.configuration = context.configuration
-      host.bridgeForTesting.attachPlatformView(view)
+    private func configure(_ view: NativeTerminalSurfaceView) {
+      view.surface = host.latestSurface
+      view.style = host.style
+      view.focusPresentation = host.focusPresentation
+      view.allowsTextInput =
+        host.focusPresentation.prefersTextInput || host.manualKeyboardPresentationRequested
+      view.onResize = { [weak host] size, cellPixelSize in
+        host?.resize(to: size, cellPixelSize: cellPixelSize)
+      }
+      view.onInputEvent = { [weak host] event in
+        host?.send(event)
+      }
     }
   }
 #endif
@@ -135,10 +146,7 @@ private struct SceneTerminalSurface: SwiftUI.View {
   var body: some SwiftUI.View {
     Group {
       if let host {
-        TerminalSurfaceHost(host: host, context: host.viewState)
-          // Force a fresh Ghostty-backed platform view per scene. Reusing the
-          // same TerminalView across scene swaps can leave the previous
-          // in-memory session holding a freed surface pointer.
+        TerminalSurfaceHost(host: host)
           .id(host.descriptor.id)
           #if canImport(UIKit) && !targetEnvironment(macCatalyst)
             .overlay(alignment: .topTrailing) {

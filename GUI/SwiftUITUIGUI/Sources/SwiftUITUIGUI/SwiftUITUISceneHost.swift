@@ -1,4 +1,3 @@
-import Ghostty
 import Observation
 import SwiftUI
 import TerminalUI
@@ -12,9 +11,11 @@ public final class SwiftUITUISceneHost {
   public private(set) var lastError: String?
   public private(set) var focusPresentation: FocusPresentation = .none
   public private(set) var manualKeyboardPresentationRequested = false
+  public private(set) var latestSurface: RasterSurface?
+  public private(set) var style: SwiftUITUITerminalStyle
 
   @ObservationIgnored
-  private let bridge: GhosttySceneBridge
+  private let bridge: NativeSceneBridge
 
   @ObservationIgnored
   private var startTask: Task<Void, Never>?
@@ -25,8 +26,9 @@ public final class SwiftUITUISceneHost {
     style: SwiftUITUITerminalStyle
   ) throws {
     self.descriptor = descriptor
+    self.style = style
     let initialRenderStyle = style.renderStyle
-    bridge = GhosttySceneBridge(
+    bridge = NativeSceneBridge(
       descriptor: descriptor,
       style: style
     )
@@ -37,20 +39,14 @@ public final class SwiftUITUISceneHost {
       initialSize: .init(width: 80, height: 24),
       appearance: initialRenderStyle.appearance,
       theme: initialRenderStyle.theme,
-      onOutput: { [weak bridge] output in
-        Task { @MainActor [weak bridge] in
-          bridge?.receiveOutput(output)
-        }
+      onSurface: { [weak self] surface in
+        self?.receiveSurface(surface)
       },
       onFocusPresentationChange: { [weak self] presentation in
         self?.updateFocusPresentation(presentation)
       }
     )
     bridge.attach(session: session)
-  }
-
-  public var viewState: TerminalViewState {
-    bridge.viewState
   }
 
   public func start() {
@@ -90,7 +86,21 @@ public final class SwiftUITUISceneHost {
   }
 
   public func apply(style: SwiftUITUITerminalStyle) {
+    self.style = style
     bridge.apply(style: style)
+  }
+
+  public func resize(
+    to size: Size,
+    cellPixelSize: Size?
+  ) {
+    bridge.resize(to: size, cellPixelSize: cellPixelSize)
+  }
+
+  public func send(
+    _ event: InputEvent
+  ) {
+    bridge.send(event)
   }
 
   public func toggleManualKeyboardPresentation() {
@@ -105,8 +115,14 @@ public final class SwiftUITUISceneHost {
     )
   }
 
-  var bridgeForTesting: GhosttySceneBridge {
+  var bridgeForTesting: NativeSceneBridge {
     bridge
+  }
+
+  private func receiveSurface(
+    _ surface: RasterSurface
+  ) {
+    latestSurface = surface
   }
 
   private func updateFocusPresentation(

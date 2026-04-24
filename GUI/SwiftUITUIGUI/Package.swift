@@ -16,15 +16,13 @@ let package = Package(
     )
   ],
   dependencies: [
-    .package(name: "swift-terminal-ui", path: "../.."),
-    .package(url: "https://github.com/GoodHatsLLC/libghostty-spm.git", exact: "1.0.1776121692"),
+    .package(name: "swift-terminal-ui", path: "../..")
   ],
   targets: [
     .target(
       name: "SwiftUITUIGUI",
       dependencies: [
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "Ghostty", package: "libghostty-spm"),
+        .product(name: "TerminalUI", package: "swift-terminal-ui")
       ]
     ),
     .testTarget(
@@ -32,7 +30,6 @@ let package = Package(
       dependencies: [
         "SwiftUITUIGUI",
         .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "Ghostty", package: "libghostty-spm"),
       ]
     ),
   ],
