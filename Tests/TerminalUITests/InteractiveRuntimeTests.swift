@@ -1742,6 +1742,82 @@ struct InteractiveRuntimeTests {
   }
 
   @MainActor
+  @Test("focusing an offscreen ScrollView descendant scrolls to the minimum visible offset")
+  func focusingOffscreenScrollViewDescendantScrollsToMinimumVisibleOffset() throws {
+    final class ScrollBox {
+      var position = ScrollPosition.zero
+    }
+
+    let terminalSize = Size(width: 20, height: 8)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("FocusDrivenScrollFixture")
+    let scrollIdentity = testIdentity("FocusDrivenScrollFixture", "Scroll")
+    let scheduler = FrameScheduler()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let box = ScrollBox()
+
+    func rowIdentity(_ index: Int) -> Identity {
+      testIdentity("FocusDrivenScrollFixture", "Scroll", "Row\(index)")
+    }
+
+    let view =
+      ScrollView(
+        .vertical,
+        showsIndicators: false,
+        position: Binding(
+          get: { box.position },
+          set: { box.position = $0 }
+        )
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<8) { index in
+            Button("Row \(index)") {}
+              .id(rowIdentity(index))
+          }
+        }
+      }
+      .id(scrollIdentity)
+      .frame(width: 10, height: 3, alignment: .topLeading)
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalAppearance = terminal.appearance
+    environmentValues.terminalSize = terminalSize
+
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: ScriptedTerminalInputReader(events: []),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      environmentValues: environmentValues,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        view
+      }
+    )
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    #expect(box.position == .zero)
+    #expect((terminal.frames.last ?? "").contains("Row 0"))
+    #expect(!(terminal.frames.last ?? "").contains("Row 5"))
+
+    #expect(focusTracker.setFocus(to: rowIdentity(5)))
+    scheduler.requestInvalidation(of: [rootIdentity])
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    #expect(box.position == .init(x: 0, y: 3))
+    #expect(!(terminal.frames.last ?? "").contains("Row 0"))
+    #expect((terminal.frames.last ?? "").contains("Row 5"))
+  }
+
+  @MainActor
   @Test("ScrollView without an explicit position binding manages keyboard scrolling internally")
   func scrollViewWithoutExplicitPositionHandlesKeyboardScrolling() async throws {
     let terminalSize = Size(width: 20, height: 8)
@@ -4715,7 +4791,7 @@ private struct TabHostedInternalStateGalleryFixture: View {
 
 private struct GalleryLikeScrollFixture: View {
   @State private var fontNumber = 2
-  @State private var font: EmbeddedFigletFont = .acrobatic
+  @State private var font: EmbeddedFigletFont = .small
   @State private var taskRuns = 0
 
   private var fontCount: Int {
@@ -4784,7 +4860,7 @@ private struct GalleryLikeScrollFixture: View {
 
 private struct RootAliasGalleryLikeScrollFixture: View {
   @State private var fontNumber = 2
-  @State private var font: EmbeddedFigletFont = .acrobatic
+  @State private var font: EmbeddedFigletFont = .small
 
   private var fontCount: Int {
     EmbeddedFigletFont.allCases.count
@@ -4856,7 +4932,7 @@ private struct LayoutHostedGalleryLikeScrollFixture: View {
 
 private struct LayoutHostedGalleryLikeScrollContent: View {
   @State private var fontNumber = 2
-  @State private var font: EmbeddedFigletFont = .acrobatic
+  @State private var font: EmbeddedFigletFont = .small
 
   private var fontCount: Int {
     EmbeddedFigletFont.allCases.count

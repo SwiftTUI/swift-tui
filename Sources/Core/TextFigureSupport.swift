@@ -4,16 +4,54 @@ import Synchronization
 
 public typealias TextFigureFont = EmbeddedFigletFont
 
+public struct TextFigureColorMode: Equatable, Sendable {
+  enum Storage: Equatable, Sendable {
+    case authored
+    case fillUnstyled(AnyShapeStyle?)
+    case monochrome
+    case override(AnyShapeStyle?)
+    case tinted(AnyShapeStyle?)
+  }
+
+  var storage: Storage
+
+  public static let authored = Self(storage: .authored)
+  public static let fillUnstyled = Self(storage: .fillUnstyled(nil))
+  public static let monochrome = Self(storage: .monochrome)
+  public static let `override` = Self(storage: .override(nil))
+  public static let tinted = Self(storage: .tinted(nil))
+
+  public static func fillUnstyled<S: ShapeStyle>(_ style: S) -> Self {
+    Self(storage: .fillUnstyled(AnyShapeStyle(style)))
+  }
+
+  public static func `override`<S: ShapeStyle>(_ style: S) -> Self {
+    Self(storage: .override(AnyShapeStyle(style)))
+  }
+
+  public static func tinted<S: ShapeStyle>(_ style: S) -> Self {
+    Self(storage: .tinted(AnyShapeStyle(style)))
+  }
+}
+
 public struct TextFigurePayload: Equatable, Hashable, Sendable {
   public var content: String
   public var font: TextFigureFont
+  public var colorMode: TextFigureColorMode
 
   public init(
     content: String,
-    font: TextFigureFont
+    font: TextFigureFont,
+    colorMode: TextFigureColorMode = .authored
   ) {
     self.content = content
     self.font = font
+    self.colorMode = colorMode
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(content)
+    hasher.combine(font)
   }
 }
 
@@ -24,6 +62,7 @@ package struct TextFigureLayoutMetrics: Equatable, Sendable {
 
 package struct TextFigureRenderResult: Equatable, Sendable {
   var lines: [String]
+  var styledLines: [PreformattedTextLine]
   var size: Size
 }
 
@@ -100,16 +139,19 @@ package enum TextFigureSupport {
 
   package static func render(
     _ payload: TextFigurePayload,
-    boundsWidth: Int
+    boundsWidth: Int,
+    environment: StyleEnvironmentSnapshot
   ) -> TextFigureRenderResult {
     guard !payload.content.isEmpty else {
-      return .init(lines: [], size: .zero)
+      return .init(lines: [], styledLines: [], size: .zero)
     }
 
     let metrics = layoutMetrics(for: payload)
     let renderWidth = max(1, max(boundsWidth, metrics.minimumWidth))
 
-    guard let text = try? resolvedFiglet(for: payload, width: renderWidth).render(payload.content)
+    guard
+      let surface = try? resolvedFiglet(for: payload, width: renderWidth)
+        .renderSurface(payload.content)
     else {
       reportTextFigureConfigurationError(
         "TextFigure could not render embedded font '\(payload.font.rawValue)'"
@@ -117,9 +159,15 @@ package enum TextFigureSupport {
       return fallbackRenderResult(for: payload.content)
     }
 
-    let lines = renderedLines(from: text).map(trimmedTrailingSpaces)
+    let styledLines = renderedLines(
+      from: surface,
+      colorMode: payload.colorMode,
+      environment: environment
+    )
+    let lines = styledLines.map(\.content)
     return .init(
       lines: lines,
+      styledLines: styledLines,
       size: .init(
         width: lines.map { layoutText(for: $0, width: nil).size.width }.max() ?? 0,
         height: lines.count
@@ -155,14 +203,114 @@ package enum TextFigureSupport {
   }
 
   private static func renderedLines(
-    from text: FigletText
-  ) -> [String] {
-    var lines = text.rawValue.split(separator: "\n", omittingEmptySubsequences: false).map(
-      String.init)
-    if lines.last == "" {
-      lines.removeLast()
+    from surface: FigletSurface,
+    colorMode: TextFigureColorMode,
+    environment: StyleEnvironmentSnapshot
+  ) -> [PreformattedTextLine] {
+    surface.rows.map { row in
+      let trimmedRow = trimmingTrailingSpaces(row)
+      var runs: [PreformattedTextRun] = []
+      runs.reserveCapacity(trimmedRow.count)
+
+      for cell in trimmedRow {
+        let style = textStyle(
+          for: cell,
+          colorMode: colorMode,
+          environment: environment
+        )
+        let content = String(cell.character)
+        if var previous = runs.last, previous.style == style {
+          previous.content += content
+          runs[runs.count - 1] = previous
+        } else {
+          runs.append(.init(content: content, style: style))
+        }
+      }
+
+      return PreformattedTextLine(runs: runs)
     }
-    return lines
+  }
+
+  private static func textStyle(
+    for cell: FigletCell,
+    colorMode: TextFigureColorMode,
+    environment: StyleEnvironmentSnapshot
+  ) -> TextStyle {
+    switch colorMode.storage {
+    case .authored:
+      return authoredTextStyle(from: cell.style, environment: environment)
+    case .fillUnstyled(let fillStyle):
+      if cell.style == .plain {
+        return fillStyle.map { TextStyle(foregroundStyle: $0) } ?? TextStyle()
+      }
+      return authoredTextStyle(from: cell.style, environment: environment)
+    case .monochrome:
+      return TextStyle()
+    case .override(let overrideStyle):
+      return overrideStyle.map { TextStyle(foregroundStyle: $0) } ?? TextStyle()
+    case .tinted(let tintStyle):
+      let authoredStyle = authoredTextStyle(from: cell.style, environment: environment)
+      guard !authoredStyle.isDefault,
+        let tintColor = tintColor(for: tintStyle, environment: environment)
+      else {
+        return authoredStyle
+      }
+      let tinted = ResolvedTextStyle(authoredStyle, theme: environment.theme)
+        .tinted(with: tintColor)
+      return TextStyle(
+        foregroundStyle: tinted.foregroundColor.map(AnyShapeStyle.init),
+        backgroundStyle: tinted.backgroundColor.map(AnyShapeStyle.init),
+        emphasis: tinted.emphasis,
+        underlineStyle: tinted.underlineStyle,
+        strikethroughStyle: tinted.strikethroughStyle,
+        opacity: tinted.opacity
+      )
+    }
+  }
+
+  private static func authoredTextStyle(
+    from style: FigletStyle,
+    environment: StyleEnvironmentSnapshot
+  ) -> TextStyle {
+    TextStyle(
+      foregroundStyle: style.foreground
+        .flatMap { color in terminalColor(for: color, environment: environment) }
+        .map(AnyShapeStyle.init),
+      backgroundStyle: style.background
+        .flatMap { color in terminalBackgroundColor(for: color, environment: environment) }
+        .map(AnyShapeStyle.init)
+    )
+  }
+
+  private static func terminalColor(
+    for color: FigletTerminalColor,
+    environment: StyleEnvironmentSnapshot
+  ) -> Color? {
+    let paletteIndex = [
+      0, 4, 2, 6, 1, 5, 3, 7,
+      8, 12, 10, 14, 9, 13, 11, 15,
+    ][color.rawValue]
+    return environment.appearance.palette[paletteIndex]
+  }
+
+  private static func terminalBackgroundColor(
+    for color: FigletTerminalColor,
+    environment: StyleEnvironmentSnapshot
+  ) -> Color? {
+    let paletteIndex = [0, 4, 2, 6, 1, 5, 3, 7][min(color.rawValue, 7)]
+    return environment.appearance.palette[paletteIndex]
+  }
+
+  private static func tintColor(
+    for style: AnyShapeStyle?,
+    environment: StyleEnvironmentSnapshot
+  ) -> Color? {
+    let effectiveStyle = style ?? environment.tintStyle ?? .semantic(.tint)
+    return resolveStyleColor(
+      style: effectiveStyle,
+      theme: environment.theme,
+      appearance: environment.appearance
+    )
   }
 
   private static func fallbackLayoutMetrics(
@@ -181,8 +329,12 @@ package enum TextFigureSupport {
   ) -> TextFigureRenderResult {
     let lines = plainTextLines(from: content)
     let widths = lines.map { layoutText(for: $0, width: nil).size.width }
+    let styledLines = lines.map { line in
+      PreformattedTextLine(runs: [.init(content: line)])
+    }
     return .init(
       lines: lines,
+      styledLines: styledLines,
       size: .init(width: widths.max() ?? 0, height: lines.count)
     )
   }
@@ -196,14 +348,14 @@ package enum TextFigureSupport {
     return content.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
   }
 
-  private static func trimmedTrailingSpaces(
-    _ line: String
-  ) -> String {
-    var characters = Array(line)
-    while characters.last == " " {
-      characters.removeLast()
+  private static func trimmingTrailingSpaces(
+    _ row: [FigletCell]
+  ) -> [FigletCell] {
+    var cells = row
+    while cells.last?.character == " " {
+      cells.removeLast()
     }
-    return String(characters)
+    return cells
   }
 }
 

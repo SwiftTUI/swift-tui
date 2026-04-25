@@ -404,6 +404,20 @@ extension SnapshotRenderer {
       }
       details += "]"
       return details
+    case .styledPreformattedText(
+      let bounds,
+      let lines,
+      let style
+    ):
+      var details = "styledPreformattedText[\(describe(bounds)) lines=\(lines.count)"
+      if let firstLine = lines.first {
+        details += " firstLine=\"\(firstLine.content)\""
+      }
+      if !style.isDefault {
+        details += " style=\(describe(style))"
+      }
+      details += "]"
+      return details
     case .richText(
       let bounds,
       let payload,
