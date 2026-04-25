@@ -363,8 +363,12 @@ private struct NativeTerminalMetrics {
     boldItalicFont = NativePlatformFont.terminalFont(style: style, emphasis: [.bold, .italic])
 
     let characterSize = NativePlatformFont.measureTerminalCharacter(baseFont)
+    // Natural line height: leaves room for descenders. Box-drawing glyphs
+    // are rendered procedurally and tile regardless of the cell's height,
+    // so we don't have to fight font metrics here.
+    let lineHeight = ceil(baseFont.ascender - baseFont.descender + baseFont.leading)
     let cellWidth = max(1, ceil(characterSize.width))
-    let cellHeight = max(1, ceil(baseFont.ascender - baseFont.descender))
+    let cellHeight = max(1, ceil(max(characterSize.height, lineHeight)))
     cellSize = CGSize(width: cellWidth, height: cellHeight)
     textOffset = CGPoint(
       x: 0,
@@ -496,19 +500,31 @@ private enum NativeRasterSurfaceRenderer {
       foreground,
       alphaMultiplier: style.opacity
     )
-    let font = metrics.font(for: style.emphasis)
-    let textPoint = CGPoint(
-      x: rect.minX,
-      y: rect.minY + metrics.textOffset.y
-    )
-    let text = String(cell.character) as NSString
-    text.draw(
-      at: textPoint,
-      withAttributes: [
-        .font: font,
-        .foregroundColor: color,
-      ]
-    )
+
+    let drewBoxDrawing =
+      BoxDrawingRenderer.canRender(cell.character)
+      && BoxDrawingRenderer.draw(
+        character: cell.character,
+        in: rect,
+        color: color.cgColor,
+        context: context
+      )
+
+    if !drewBoxDrawing {
+      let font = metrics.font(for: style.emphasis)
+      let textPoint = CGPoint(
+        x: rect.minX,
+        y: rect.minY + metrics.textOffset.y
+      )
+      let text = String(cell.character) as NSString
+      text.draw(
+        at: textPoint,
+        withAttributes: [
+          .font: font,
+          .foregroundColor: color,
+        ]
+      )
+    }
 
     drawLineDecorations(
       style: style,

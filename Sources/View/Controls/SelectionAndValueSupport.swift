@@ -540,7 +540,7 @@ func stepBoundSelection<SelectionValue: Hashable>(
     }
     ?? (direction > 0 ? -1 : orderedTags.count)
   let nextIndex = min(
-    max(currentIndex + direction, 0),
+    max(currentIndex + delta, 0),
     orderedTags.count - 1
   )
   guard nextIndex != currentIndex else {
