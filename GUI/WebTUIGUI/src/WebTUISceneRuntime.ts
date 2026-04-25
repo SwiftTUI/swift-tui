@@ -6,6 +6,10 @@ import {
   webTUITerminalBackgroundColor,
 } from "./WebTUITerminalStyle.ts";
 import {
+  canRenderBoxDrawing,
+  drawBoxDrawing,
+} from "./BoxDrawingRenderer.ts";
+import {
   encodeKeyInputMessage,
   encodeMouseInputMessage,
   encodePasteInputMessage,
@@ -433,13 +437,20 @@ export class WebTUISceneRuntime {
 
     if (text !== " ") {
       context.globalAlpha = opacity;
-      context.font = this.fontForStyle(style);
       context.fillStyle = foreground;
-      context.fillText(
-        text,
-        rectX,
-        rectY + Math.floor((this.cellHeight + this.currentStyle.fontSize) / 2) - 2
-      );
+      if (!canRenderBoxDrawing(text) || !drawBoxDrawing(context, text, {
+        x: rectX,
+        y: rectY,
+        width,
+        height: this.cellHeight,
+      })) {
+        context.font = this.fontForStyle(style);
+        context.fillText(
+          text,
+          rectX,
+          rectY + Math.floor((this.cellHeight + this.currentStyle.fontSize) / 2) - 2
+        );
+      }
     }
 
     this.drawTextLine(context, rectX, rectY, width, style?.underline, "underline", foreground);
