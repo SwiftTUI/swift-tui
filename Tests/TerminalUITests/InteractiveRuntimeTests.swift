@@ -2487,7 +2487,7 @@ struct InteractiveRuntimeTests {
       events: [
         .mouse(
           .init(
-            kind: .scrolled(deltaX: 0, deltaY: 3),
+            kind: .scrolled(deltaX: 0, deltaY: 6),
             location: centerPoint(of: scrollRect)
           ))
       ],
@@ -2792,7 +2792,7 @@ struct InteractiveRuntimeTests {
       scheduler.consumeReadyFrame(at: .now())
     )
     #expect(scheduledFrame.causes.contains(.invalidation))
-    #expect(scheduledFrame.invalidatedIdentities == [scrollIdentity])
+    #expect(scheduledFrame.invalidatedIdentities == [rootIdentity, scrollIdentity])
   }
 
   @MainActor
@@ -2927,6 +2927,39 @@ struct InteractiveRuntimeTests {
     let rendered = terminal.frames.last ?? ""
     #expect(rendered.contains("List row 1"))
     #expect(!rendered.contains("List row 0"))
+  }
+
+  @MainActor
+  @Test("handled pointer scrolling repaints LayoutPicker-shaped structural ScrollView")
+  func handledPointerScrollingRepaintsLayoutPickerShapedStructuralScrollView() async throws {
+    let terminalSize = Size(width: 56, height: 14)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("LayoutPickerShapedScrollInvalidation")
+    let view = LayoutsRootShapedScrollFixture()
+    let scrollRect = try #require(
+      renderedFirstScrollViewportRect(
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    _ = try await runTerminalInputHarness(
+      terminal: terminal,
+      events: Array(
+        repeating: .mouse(
+          .init(kind: .scrolled(deltaX: 0, deltaY: 1), location: centerPoint(of: scrollRect))
+        ),
+        count: 8
+      ),
+      rootIdentity: rootIdentity,
+      terminalSize: terminalSize,
+      viewBuilder: { view }
+    )
+
+    let rendered = terminal.frames.last ?? ""
+    #expect(rendered.contains("Category 1"))
+    #expect(!rendered.contains("Demo row 0-0"))
   }
 
   @MainActor
@@ -4683,6 +4716,53 @@ private struct ScrollWrappedListFixture: View {
       .id(scrollIdentity)
       .listStyle(.insetGrouped)
       Text("Footer")
+    }
+  }
+}
+
+private struct LayoutPickerShapedScrollFixture: View {
+  @State private var selection: String?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("TerminalUI - Layouts")
+        Text("64 layouts across 8 categories")
+      }
+      .padding(.horizontal, 1)
+      Divider()
+      ScrollView {
+        List(selection: $selection, onActivate: { _ in }) {
+          ForEach(0..<6) { section in
+            Section("Category \(section)") {
+              ForEach(0..<6) { row in
+                VStack(alignment: .leading, spacing: 0) {
+                  Text("Demo row \(section)-\(row)")
+                  Text("Detail \(section)-\(row)")
+                }
+                .tag("\(section)-\(row)")
+              }
+            }
+          }
+        }
+      }
+      .listStyle(.insetGrouped)
+      Divider()
+      Text("up/down move - return open - ctrl-c quit")
+        .padding(.horizontal, 1)
+    }
+    .panel(id: "layout-picker-shaped")
+  }
+}
+
+private struct LayoutsRootShapedScrollFixture: View {
+  @State private var selectedID: String?
+
+  var body: some View {
+    if let selectedID {
+      Text("Selected \(selectedID)")
+    } else {
+      LayoutPickerShapedScrollFixture()
     }
   }
 }

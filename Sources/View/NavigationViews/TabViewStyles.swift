@@ -766,13 +766,20 @@ private struct TabViewStyleBodyHost<Strip: View, Overflow: View>: View, Resolvab
     let overflowNode = overflow.resolve(
       in: context.child(component: .named("overflow-view"))
     )
-    let contentChildren =
-      activeContent?.resolveElements(
-        in: context.indexedChild(
-          kind: .init(rawValue: "TabContentPayload"),
-          index: activeContentIndex ?? 0
+    let contentChildren: [ResolvedNode]
+    if let activeContent {
+      contentChildren = [
+        resolveView(
+          DeferredPayloadView(payload: activeContent),
+          in: context.indexedChild(
+            kind: .init(rawValue: "TabContentPayload"),
+            index: activeContentIndex ?? 0
+          )
         )
-      ) ?? []
+      ]
+    } else {
+      contentChildren = []
+    }
 
     let stripSlot = TabViewLayoutSlotNode(
       kindName: "TabStripSlot",
