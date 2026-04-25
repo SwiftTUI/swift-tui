@@ -721,7 +721,22 @@ struct InteractiveRuntimeTests {
       InteractiveDemoIdentity.resetButton,
       InteractiveDemoIdentity.accentToggle,
       InteractiveDemoIdentity.presetMenu,
-      InteractiveDemoIdentity.presetList,
+      listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 5),
+      listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 6),
+      listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 7),
+      InteractiveDemoIdentity.inputField,
+      InteractiveDemoIdentity.selectionModePicker,
+      InteractiveDemoIdentity.textLabDisclosure,
+      InteractiveDemoIdentity.textLabScrollPreview,
+      verticalScrollIndicatorIdentity(for: InteractiveDemoIdentity.textLabScrollPreview),
+    ]
+    let traversalOrder: [Identity] = [
+      InteractiveDemoIdentity.incrementButton,
+      InteractiveDemoIdentity.decrementButton,
+      InteractiveDemoIdentity.resetButton,
+      InteractiveDemoIdentity.accentToggle,
+      InteractiveDemoIdentity.presetMenu,
+      listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 5),
       InteractiveDemoIdentity.inputField,
       InteractiveDemoIdentity.selectionModePicker,
       InteractiveDemoIdentity.textLabDisclosure,
@@ -735,15 +750,15 @@ struct InteractiveRuntimeTests {
       invalidationIdentities: [InteractiveDemoIdentity.root]
     )
     _ = tracker.updateRegions(artifacts.semanticSnapshot.focusRegions)
-    #expect(tracker.currentFocusIdentity == expectedOrder[0])
+    #expect(tracker.currentFocusIdentity == traversalOrder[0])
 
-    for identity in expectedOrder.dropFirst() {
+    for identity in traversalOrder.dropFirst() {
       tracker.focusNext()
       #expect(tracker.currentFocusIdentity == identity)
     }
 
     tracker.focusNext()
-    #expect(tracker.currentFocusIdentity == expectedOrder[0])
+    #expect(tracker.currentFocusIdentity == traversalOrder[0])
   }
 
   @Test("interactive demo disables reset at zero and re-enables it off zero")
@@ -780,7 +795,11 @@ struct InteractiveRuntimeTests {
         InteractiveDemoIdentity.decrementButton,
         InteractiveDemoIdentity.accentToggle,
         InteractiveDemoIdentity.presetMenu,
-        InteractiveDemoIdentity.presetList,
+        listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 1),
+        listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 2),
+        listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 3),
+        listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 4),
+        listRowIdentity(for: InteractiveDemoIdentity.presetList, rowIndex: 5),
         InteractiveDemoIdentity.inputField,
         InteractiveDemoIdentity.selectionModePicker,
         InteractiveDemoIdentity.textLabDisclosure,
@@ -871,7 +890,7 @@ struct InteractiveRuntimeTests {
       terminal: terminal,
       events: [
         KeyPress(.tab), KeyPress(.tab), KeyPress(.tab), KeyPress(.tab),
-        KeyPress(.arrowDown), KeyPress(.arrowDown), KeyPress(.arrowUp), KeyPress(.return),
+        KeyPress(.arrowDown), KeyPress(.arrowDown), KeyPress(.arrowDown), KeyPress(.return),
         KeyPress(.character("c"), modifiers: .ctrl),
       ]
     )

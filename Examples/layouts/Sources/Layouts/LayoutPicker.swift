@@ -24,7 +24,7 @@ public struct LayoutPicker: View {
       header
       Divider()
       ScrollView {
-        List(selection: $selection) {
+        List(selection: $selection, onActivate: activate) {
           ForEach(LayoutEntry.Category.allCases, id: \.rawValue) { category in
             let entries = LayoutCatalog.all.filter { $0.category == category }
             if !entries.isEmpty {
@@ -41,15 +41,13 @@ public struct LayoutPicker: View {
       Divider()
       footer
     }
-    .onChange(of: selection) { _, newValue in
-      if let id = newValue {
-        onSelect(id)
-        // Clear selection so returning to the picker doesn't re-open
-        // the same entry on the next render.
-        selection = nil
-      }
-    }
     .panel(id: "layouts.picker")
+  }
+
+  private func activate(_ id: LayoutEntry.ID?) {
+    if let id {
+      onSelect(id)
+    }
   }
 
   private func row(_ entry: LayoutEntry) -> some View {
@@ -72,7 +70,7 @@ public struct LayoutPicker: View {
   }
 
   private var footer: some View {
-    Text("↑↓ move  ·  ⏎ open  ·  ⌃C quit").foregroundStyle(.muted)
+    Text("↑↓ move  ·  ⏎ open  ·  click open  ·  ⌃C quit").foregroundStyle(.muted)
       .padding(.horizontal, 1)
   }
 }

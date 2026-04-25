@@ -49,6 +49,7 @@ extension RunLoop {
     if !keyPress.modifiers.isEmpty {
       let binding = KeyBinding(key: keyPress.key, modifiers: keyPress.modifiers)
       if commandRegistry.dispatch(key: binding, along: currentFocusScopePath()) {
+        scheduler.requestInvalidation(of: [rootIdentity])
         return nil
       }
     }

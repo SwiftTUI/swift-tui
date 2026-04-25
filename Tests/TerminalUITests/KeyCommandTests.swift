@@ -216,6 +216,156 @@ struct KeyCommandDispatchTests {
     _ = runLoop.handleKeyPress(KeyPress(.character("s"), modifiers: .ctrl))
     #expect(descendantFired.count == 0)
   }
+
+  @Test("keyCommand root invalidation redraws imperative route changes")
+  func keyCommandRootInvalidationRedrawsImperativeRouteChanges() throws {
+    let model = KeyCommandRouterModel()
+    let runLoop = makeRunLoop {
+      KeyCommandRouterFixture(model: model)
+    }
+    try renderInitial(runLoop)
+
+    #expect(latestSurfaceText(for: runLoop).contains("detail"))
+
+    _ = runLoop.handle(.input(.key(.character("b"), modifiers: .ctrl)))
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let surfaceText = latestSurfaceText(for: runLoop)
+    #expect(renderedFrames > 0)
+    #expect(surfaceText.contains("picker"))
+    #expect(!surfaceText.contains("detail"))
+  }
+
+  @Test("keyCommand fires after list activation routes into a new Panel")
+  func keyCommandDispatchesAfterListActivationRouteChange() throws {
+    let runLoop = makeRunLoop {
+      KeyCommandListRouteFixture()
+    }
+    try renderInitial(runLoop)
+
+    let rowIdentity = try #require(
+      runLoop.latestSemanticSnapshot.focusRegions.map(\.identity).first {
+        $0.description.contains("ListRow[0]")
+      })
+    #expect(runLoop.focusTracker.setFocus(to: rowIdentity))
+
+    _ = runLoop.handle(.input(.key(.return)))
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    #expect(latestSurfaceText(for: runLoop).contains("detail"))
+
+    _ = runLoop.handle(.input(.key(.character("b"), modifiers: .ctrl)))
+    renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let surfaceText = latestSurfaceText(for: runLoop)
+    #expect(surfaceText.contains("Open"))
+    #expect(!surfaceText.contains("detail"))
+  }
+
+  @Test("keyCommand fires after route change to a Panel with no focusable child")
+  func keyCommandDispatchesAfterRouteChangeToBarePanel() throws {
+    let runLoop = makeRunLoop {
+      KeyCommandListRouteFixture(detailHasFocusableChild: false)
+    }
+    try renderInitial(runLoop)
+
+    let rowIdentity = try #require(
+      runLoop.latestSemanticSnapshot.focusRegions.map(\.identity).first {
+        $0.description.contains("ListRow[0]")
+      })
+    #expect(runLoop.focusTracker.setFocus(to: rowIdentity))
+
+    _ = runLoop.handle(.input(.key(.return)))
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    #expect(latestSurfaceText(for: runLoop).contains("detail"))
+    #expect(!runLoop.currentFocusScopePath().isEmpty)
+
+    _ = runLoop.handle(.input(.key(.character("b"), modifiers: .ctrl)))
+    renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let surfaceText = latestSurfaceText(for: runLoop)
+    #expect(surfaceText.contains("Open"))
+    #expect(!surfaceText.contains("detail"))
+  }
+
+  @Test("keyCommand fires after mouse list activation routes into a new Panel")
+  func keyCommandDispatchesAfterMouseListActivationRouteChange() throws {
+    let runLoop = makeRunLoop {
+      KeyCommandListRouteFixture()
+    }
+    try renderInitial(runLoop)
+
+    let rowIdentity = try #require(
+      runLoop.latestSemanticSnapshot.focusRegions.map(\.identity).first {
+        $0.description.contains("ListRow[0]")
+      })
+    let rowRegion = try #require(
+      runLoop.latestSemanticSnapshot.interactionRegions.first { $0.identity == rowIdentity })
+    let rowCenter = Point(
+      x: rowRegion.rect.origin.x + rowRegion.rect.size.width / 2,
+      y: rowRegion.rect.origin.y + rowRegion.rect.size.height / 2
+    )
+
+    _ = runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: rowCenter))))
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: rowCenter))))
+    renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    #expect(latestSurfaceText(for: runLoop).contains("detail"))
+
+    _ = runLoop.handle(.input(.key(.character("b"), modifiers: .ctrl)))
+    renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let surfaceText = latestSurfaceText(for: runLoop)
+    #expect(surfaceText.contains("Open"))
+    #expect(!surfaceText.contains("detail"))
+  }
+
+  @Test("keyCommand fires after batched mouse click routes into a new Panel")
+  func keyCommandDispatchesAfterBatchedMouseListActivationRouteChange() throws {
+    let runLoop = makeRunLoop {
+      KeyCommandListRouteFixture()
+    }
+    try renderInitial(runLoop)
+
+    let rowIdentity = try #require(
+      runLoop.latestSemanticSnapshot.focusRegions.map(\.identity).first {
+        $0.description.contains("ListRow[0]")
+      })
+    let rowRegion = try #require(
+      runLoop.latestSemanticSnapshot.interactionRegions.first { $0.identity == rowIdentity })
+    let rowCenter = Point(
+      x: rowRegion.rect.origin.x + rowRegion.rect.size.width / 2,
+      y: rowRegion.rect.origin.y + rowRegion.rect.size.height / 2
+    )
+
+    _ = runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: rowCenter))))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: rowCenter))))
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    #expect(latestSurfaceText(for: runLoop).contains("detail"))
+    #expect(!runLoop.currentFocusScopePath().isEmpty)
+    let backBinding = KeyBinding(key: .character("b"), modifiers: .ctrl)
+    #expect(
+      runLoop.currentFocusScopePath().contains {
+        runLoop.commandRegistry.keyCommand(at: $0, matching: backBinding) != nil
+      }
+    )
+
+    _ = runLoop.handle(.input(.key(.character("b"), modifiers: .ctrl)))
+    renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let surfaceText = latestSurfaceText(for: runLoop)
+    #expect(surfaceText.contains("Open"))
+    #expect(!surfaceText.contains("detail"))
+  }
 }
 
 @MainActor
@@ -246,6 +396,18 @@ private func makeRunLoop<V: View>(
 }
 
 @MainActor
+private func latestSurfaceText<State, V: View>(
+  for runLoop: RunLoop<State, V>
+) -> String {
+  guard let terminal = runLoop.terminalHost as? KeyCommandTerminalHost,
+    let surface = terminal.latestSurface
+  else {
+    return ""
+  }
+  return surface.lines.joined(separator: "\n")
+}
+
+@MainActor
 private func renderInitial<State, V: View>(_ runLoop: RunLoop<State, V>) throws {
   runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
   var renderedFrames = 0
@@ -257,6 +419,62 @@ private func renderInitial<State, V: View>(_ runLoop: RunLoop<State, V>) throws 
 final class Counter {
   private(set) var count = 0
   func increment() { count += 1 }
+}
+
+@MainActor
+private final class KeyCommandRouterModel {
+  var showingDetail = true
+}
+
+private struct KeyCommandRouterFixture: View {
+  let model: KeyCommandRouterModel
+
+  var body: some View {
+    if model.showingDetail {
+      Panel(id: "detail") {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("detail").focusable(true)
+          Text("detail stale row")
+          Text("detail stale footer")
+        }
+      }
+      .keyCommand("Back", key: .character("b"), modifiers: .ctrl) {
+        model.showingDetail = false
+      }
+    } else {
+      Panel(id: "picker") {
+        Text("picker").focusable(true)
+      }
+    }
+  }
+}
+
+private struct KeyCommandListRouteFixture: View {
+  @State private var showingDetail = false
+  @State private var selection: Int?
+
+  var detailHasFocusableChild = true
+
+  var body: some View {
+    if showingDetail {
+      Panel(id: "detail") {
+        if detailHasFocusableChild {
+          Text("detail").focusable(true)
+        } else {
+          Text("detail")
+        }
+      }
+      .keyCommand("Back", key: .character("b"), modifiers: .ctrl) {
+        showingDetail = false
+      }
+    } else {
+      Panel(id: "picker") {
+        List(selection: $selection, onActivate: { _ in showingDetail = true }) {
+          Text("Open").tag(0)
+        }
+      }
+    }
+  }
 }
 
 private final class KeyCommandTerminalHost: TerminalHosting {

@@ -357,6 +357,17 @@ extension SemanticExtractor {
           )
         )
         nextHitTestOrder += 1
+        if !sealingParentOnChain {
+          focusRegions.append(
+            FocusRegion(
+              identity: identity,
+              rect: clippedRect,
+              focusInteractions: .activate,
+              scopePath: scopePath,
+              sectionIdentity: sectionIdentity ?? node.identity
+            )
+          )
+        }
       }
     case .table(let payload):
       let layout = DrawExtractor().visibleTableLayout(
