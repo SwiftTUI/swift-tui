@@ -141,6 +141,108 @@ test("runtime draws decoded surface frames into the canvas", async () => {
   }
 });
 
+test("runtime draws box and block elements procedurally instead of as font glyphs", async () => {
+  const dom = installFakeDOM();
+  try {
+    const bridge = new BrowserWASIBridge({
+      sceneId: "main",
+      columns: 4,
+      rows: 2,
+    });
+    const mount = new FakeElement("div");
+    const runtime = new WebTUISceneRuntime({
+      mount: mount as unknown as HTMLElement,
+      descriptor: { id: "main", title: "Main", isDefault: true },
+      style: {
+        fontSize: 20,
+        fontFamily: "Test Mono",
+      },
+      bridge,
+      onInput: () => {},
+    });
+
+    await runtime.mount();
+
+    const canvas = dom.canvases[0]!;
+    const context = canvas.context;
+    context.operations = [];
+    bridge.stdout.write(encoder.encode(surfaceRecord({
+      version: 1,
+      width: 4,
+      height: 2,
+      styles: [
+        null,
+        {
+          fg: "#EBB33CFF",
+        },
+      ],
+      rows: [
+        [
+          [0, "┌", 1, 1],
+          [1, "─", 1, 1],
+          [2, "▄", 1, 1],
+          [3, "A", 1, 1],
+        ],
+      ],
+      images: [],
+    })));
+
+    expect(fillTextOperations(context, "┌")).toEqual([]);
+    expect(fillTextOperations(context, "─")).toEqual([]);
+    expect(fillTextOperations(context, "▄")).toEqual([]);
+    expect(fillTextOperations(context, "A")).toHaveLength(1);
+
+    const boxFills = fillRectOperations(context, "#EBB33CFF");
+    expect(boxFills).toContainEqual({
+      type: "fillRect",
+      x: 4.5,
+      y: 13,
+      width: 5.5,
+      height: 1,
+      fillStyle: "#EBB33CFF",
+      globalAlpha: 1,
+    });
+    expect(boxFills).toContainEqual({
+      type: "fillRect",
+      x: 4.5,
+      y: 13,
+      width: 1,
+      height: 14,
+      fillStyle: "#EBB33CFF",
+      globalAlpha: 1,
+    });
+    expect(boxFills).toContainEqual({
+      type: "fillRect",
+      x: 10,
+      y: 13,
+      width: 5.5,
+      height: 1,
+      fillStyle: "#EBB33CFF",
+      globalAlpha: 1,
+    });
+    expect(boxFills).toContainEqual({
+      type: "fillRect",
+      x: 14.5,
+      y: 13,
+      width: 5.5,
+      height: 1,
+      fillStyle: "#EBB33CFF",
+      globalAlpha: 1,
+    });
+    expect(boxFills).toContainEqual({
+      type: "fillRect",
+      x: 20,
+      y: 13.5,
+      width: 10,
+      height: 13.5,
+      fillStyle: "#EBB33CFF",
+      globalAlpha: 1,
+    });
+  } finally {
+    dom.restore();
+  }
+});
+
 test("runtime keeps diagnostic stdout visible when output is not a surface frame", async () => {
   const dom = installFakeDOM();
   try {
@@ -271,6 +373,12 @@ function fillRectOperations(
   return context.operations.filter(
     (operation) => operation.type === "fillRect" && operation.fillStyle === fillStyle
   );
+}
+
+function surfaceRecord(
+  frame: Record<string, unknown>
+): string {
+  return `\u001Esurface:${JSON.stringify(frame)}\n`;
 }
 
 interface FakeDOMOptions {
@@ -461,9 +569,10 @@ class RecordingCanvasContext {
   textBaseline = "";
   globalAlpha = 1;
   lineWidth = 1;
+  lineCap = "butt";
 
   private lineDash: number[] = [];
-  private path: Array<[string, number, number]> = [];
+  private path: Array<[string, ...number[]]> = [];
 
   measureText(
     text: string
@@ -540,6 +649,17 @@ class RecordingCanvasContext {
     y: number
   ): void {
     this.path.push(["lineTo", x, y]);
+  }
+
+  bezierCurveTo(
+    control1X: number,
+    control1Y: number,
+    control2X: number,
+    control2Y: number,
+    x: number,
+    y: number
+  ): void {
+    this.path.push(["bezierCurveTo", control1X, control1Y, control2X, control2Y, x, y]);
   }
 
   stroke(): void {
