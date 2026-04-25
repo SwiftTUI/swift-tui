@@ -20,7 +20,7 @@ struct CounterTab: View {
       Spacer(minLength: 1)
       HStack(alignment: .bottom) {
         mathButton(" - ", step, -)
-        TextFigure("\(count)", font: .miniwi)
+        TextFigure("\(count)", font: .future)
           .frame(minWidth: 14, alignment: .center)
         mathButton(" + ", step, +)
       }

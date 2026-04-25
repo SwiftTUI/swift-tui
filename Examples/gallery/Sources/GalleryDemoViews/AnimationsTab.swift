@@ -138,11 +138,11 @@ struct AnimationsTab: View {
           }
           // Opacity transition — a large TextFigure fades in/out via the
           // pre-composited cell-background blend.
-          TextFigure("FADE", font: .smMono9)
+          TextFigure("FADE", font: .smBlock)
             .opacity(0)
             .overlay {
               if showOpacityFigure {
-                TextFigure("FADE", font: .smMono9)
+                TextFigure("FADE", font: .smBlock)
                   .foregroundStyle(Color.cyan)
                   .transition(.opacity)
               }
@@ -160,11 +160,11 @@ struct AnimationsTab: View {
           // Slide transition — uses .transition(.slide), which is an
           // asymmetric move(edge: .leading) → move(edge: .trailing) that
           // exercises the placed-level overlay injection path.
-          TextFigure("SLIDE", font: .smMono9)
+          TextFigure("SLIDE", font: .smBlock)
             .opacity(0)
             .overlay {
               if showSlideFigure {
-                TextFigure("SLIDE", font: .smMono9)
+                TextFigure("SLIDE", font: .smBlock)
                   .foregroundStyle(Color.yellow)
                   .transition(.slide)
               }

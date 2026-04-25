@@ -13,6 +13,7 @@ let bundledFontNames = [
   "slant",
   "small",
   "doom",
+  "future",
   "ansi-shadow",
   "calvin-sm",
   "208",
