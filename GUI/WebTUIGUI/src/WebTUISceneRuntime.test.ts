@@ -243,6 +243,68 @@ test("runtime draws box and block elements procedurally instead of as font glyph
   }
 });
 
+test("runtime draws rounded box corners with the cell foreground stroke", async () => {
+  const dom = installFakeDOM();
+  try {
+    const bridge = new BrowserWASIBridge({
+      sceneId: "main",
+      columns: 4,
+      rows: 1,
+    });
+    const mount = new FakeElement("div");
+    const runtime = new WebTUISceneRuntime({
+      mount: mount as unknown as HTMLElement,
+      descriptor: { id: "main", title: "Main", isDefault: true },
+      style: {
+        fontSize: 20,
+        fontFamily: "Test Mono",
+      },
+      bridge,
+      onInput: () => {},
+    });
+
+    await runtime.mount();
+
+    const canvas = dom.canvases[0]!;
+    const context = canvas.context;
+    context.strokeStyle = "#000000";
+    context.operations = [];
+    bridge.stdout.write(encoder.encode(surfaceRecord({
+      version: 1,
+      width: 4,
+      height: 1,
+      styles: [
+        null,
+        {
+          fg: "#EBB33CFF",
+        },
+      ],
+      rows: [
+        [
+          [0, "╭", 1, 1],
+          [1, "╮", 1, 1],
+        ],
+      ],
+      images: [],
+    })));
+
+    expect(fillTextOperations(context, "╭")).toEqual([]);
+    expect(fillTextOperations(context, "╮")).toEqual([]);
+    const strokes = context.operations.filter((operation) => operation.type === "stroke");
+    expect(strokes).toHaveLength(2);
+    expect(strokes.every((operation) => operation.strokeStyle === "#EBB33CFF")).toBe(true);
+    expect(strokes.every((operation) => operation.lineWidth === 1)).toBe(true);
+    expect(strokes.every((operation) => operation.lineDash instanceof Array)).toBe(true);
+    expect(strokes.every((operation) => (operation.lineDash as unknown[]).length === 0)).toBe(true);
+    expect(strokes.every((operation) => {
+      const path = operation.path as Array<[string, ...number[]]>;
+      return path.some(([command]) => command === "bezierCurveTo");
+    })).toBe(true);
+  } finally {
+    dom.restore();
+  }
+});
+
 test("runtime keeps diagnostic stdout visible when output is not a surface frame", async () => {
   const dom = installFakeDOM();
   try {
