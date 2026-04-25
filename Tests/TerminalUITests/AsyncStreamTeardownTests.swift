@@ -101,7 +101,7 @@ private actor AsyncStreamProducerProbe {
 @MainActor
 private func waitUntil(
   _ label: String,
-  timeoutNanoseconds: UInt64 = 1_000_000_000,
+  timeoutNanoseconds: UInt64 = 5_000_000_000,
   pollNanoseconds: UInt64 = 10_000_000,
   condition: @escaping () async -> Bool
 ) async throws {

@@ -122,6 +122,45 @@ struct TextFigureSurfaceTests {
     #expect(styleRuns.contains { $0.style.strikethroughStyle != nil })
   }
 
+  @Test("TextFigure preserves authored TDF colors by default")
+  func textFigurePreservesAuthoredTDFColorsByDefault() {
+    let artifacts = render(TextFigure("x", font: embeddedFont(named: "208")))
+    let palette = TerminalAppearance.fallback.palette
+    let foregrounds = foregroundColors(in: artifacts)
+
+    #expect(!foregrounds.isEmpty)
+    #expect(
+      foregrounds.contains { color in
+        color == palette.red || color == palette.brightRed
+      })
+  }
+
+  @Test("TextFigure monochrome color mode strips authored colors")
+  func textFigureMonochromeColorModeStripsAuthoredColors() {
+    let artifacts = render(
+      TextFigure("x", font: embeddedFont(named: "208"))
+        .textFigureColorMode(.monochrome)
+        .foregroundStyle(Color.green)
+    )
+    let foregrounds = foregroundColors(in: artifacts)
+
+    #expect(!foregrounds.isEmpty)
+    #expect(foregrounds.allSatisfy { $0 == Color.green })
+  }
+
+  @Test("TextFigure override color mode replaces authored colors")
+  func textFigureOverrideColorModeReplacesAuthoredColors() {
+    let artifacts = render(
+      TextFigure("x", font: embeddedFont(named: "208"))
+        .textFigureColorMode(.override(Color.cyan))
+        .foregroundStyle(Color.red)
+    )
+    let foregrounds = foregroundColors(in: artifacts)
+
+    #expect(!foregrounds.isEmpty)
+    #expect(foregrounds.allSatisfy { $0 == Color.cyan })
+  }
+
   @Test("fractional opacity produces distinct blended foreground colors")
   func fractionalOpacityProducesDistinctForegroundColors() {
     // Guards against a regression to binary "faint" opacity rendering:
@@ -164,5 +203,11 @@ struct TextFigureSurfaceTests {
       fatalError("Missing embedded TextFigure font \(name)")
     }
     return font
+  }
+
+  private func foregroundColors(
+    in artifacts: FrameArtifacts
+  ) -> [Color] {
+    artifacts.rasterSurface.styleRuns.compactMap(\.style.foregroundColor)
   }
 }

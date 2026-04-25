@@ -611,7 +611,7 @@ public struct ResolvedNode: Equatable, Sendable {
       && kind == other.kind
       && Self.typeDiscriminatorsCompatible(typeDiscriminator, other.typeDiscriminator)
       && environmentSnapshot == other.environmentSnapshot
-      && layoutBehavior.isEquivalentForMeasurement(to: other.layoutBehavior)
+      && layoutBehavior.isEquivalentForPlacement(to: other.layoutBehavior)
       && layoutMetadata == other.layoutMetadata
       && drawPayload == other.drawPayload
       && intrinsicSize == other.intrinsicSize
@@ -908,6 +908,46 @@ public struct SemanticSnapshot: Equatable, Sendable {
   }
 }
 
+public struct PreformattedTextRun: Equatable, Sendable {
+  public var content: String
+  public var style: TextStyle
+
+  public init(
+    content: String,
+    style: TextStyle = .init()
+  ) {
+    self.content = content
+    self.style = style
+  }
+}
+
+public struct PreformattedTextLine: Equatable, Sendable {
+  public var runs: [PreformattedTextRun]
+
+  public init(runs: [PreformattedTextRun]) {
+    self.runs = Self.normalizedRuns(from: runs)
+  }
+
+  public var content: String {
+    runs.map(\.content).joined()
+  }
+
+  private static func normalizedRuns(from runs: [PreformattedTextRun]) -> [PreformattedTextRun] {
+    var normalized: [PreformattedTextRun] = []
+
+    for run in runs where !run.content.isEmpty {
+      if var previous = normalized.last, previous.style == run.style {
+        previous.content += run.content
+        normalized[normalized.count - 1] = previous
+      } else {
+        normalized.append(run)
+      }
+    }
+
+    return normalized
+  }
+}
+
 public indirect enum DrawCommand: Equatable, Sendable {
   case group(bounds: Rect, children: [DrawCommand])
   case text(
@@ -921,6 +961,11 @@ public indirect enum DrawCommand: Equatable, Sendable {
   case preformattedText(
     bounds: Rect,
     lines: [String],
+    style: TextStyle
+  )
+  case styledPreformattedText(
+    bounds: Rect,
+    lines: [PreformattedTextLine],
     style: TextStyle
   )
   case richText(

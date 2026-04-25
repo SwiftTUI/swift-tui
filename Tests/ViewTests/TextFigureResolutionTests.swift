@@ -32,6 +32,6 @@ struct TextFigureResolutionTests {
 
     #expect(fontNames.contains("standard"))
     #expect(fontNames.contains("slant"))
-    #expect(fontNames.contains("banner"))
+    #expect(fontNames.contains("ansi-shadow"))
   }
 }

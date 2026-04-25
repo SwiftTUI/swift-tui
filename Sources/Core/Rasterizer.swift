@@ -598,6 +598,58 @@ extension Rasterizer {
             x += cluster.cellWidth
           }
         }
+      case .styledPreformattedText(
+        let bounds,
+        let lines,
+        let style
+      ):
+        guard bounds.size.height > 0, bounds.size.width > 0 else {
+          continue
+        }
+
+        for (lineIndex, line) in lines.prefix(bounds.size.height).enumerated() {
+          var x = bounds.origin.x
+
+          for run in line.runs {
+            let runStyle = style.merging(run.style)
+            let clusters = clusterize(run.content)
+
+            for cluster in clusters {
+              guard x + cluster.cellWidth <= bounds.origin.x + bounds.size.width else {
+                break
+              }
+
+              let resolvedStyle = resolveTextStyle(
+                runStyle,
+                environment: environment,
+                bounds: bounds,
+                sampleX: x,
+                sampleY: bounds.origin.y + lineIndex,
+                width: cluster.cellWidth,
+                currentCellBackground: currentCellBackground(
+                  cells: cells,
+                  x: x,
+                  y: bounds.origin.y + lineIndex
+                )
+              )
+
+              write(
+                cluster.character,
+                width: cluster.cellWidth,
+                style: resolvedStyle.isDefault ? nil : resolvedStyle,
+                atX: x,
+                y: bounds.origin.y + lineIndex,
+                cells: &cells,
+                clip: frame.clip
+              )
+              x += cluster.cellWidth
+            }
+
+            if x >= bounds.origin.x + bounds.size.width {
+              break
+            }
+          }
+        }
       case .richText(
         let bounds,
         let payload,

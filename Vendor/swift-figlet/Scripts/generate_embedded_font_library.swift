@@ -7,7 +7,21 @@ struct FontEntry {
   let fileURL: URL
 }
 
-let supportedExtensions = ["flf", "tlf"]
+let supportedExtensions = ["flf", "tlf", "tdf"]
+let bundledFontNames = [
+  "standard",
+  "slant",
+  "small",
+  "doom",
+  "ansi-shadow",
+  "calvin-sm",
+  "208",
+  "pagga",
+  "bloodyx",
+  "cnerip",
+  "3d",
+  "sm-block",
+]
 let swiftKeywords = [
   "actor",
   "as",
@@ -140,8 +154,28 @@ func swiftCaseName(for fontName: String) -> String {
   return swiftKeywords.contains(baseName) ? "\(baseName)Font" : baseName
 }
 
-func makeFontEntries(from uniqueFontFilesByName: [String: URL]) -> [FontEntry] {
-  let fontNames = uniqueFontFilesByName.keys.sorted()
+func fontName(for fileURL: URL, baseNameCounts: [String: Int]) -> String {
+  let baseName = fileURL.deletingPathExtension().lastPathComponent
+  guard baseNameCounts[baseName, default: 0] > 1 else {
+    return baseName
+  }
+
+  if fileURL.pathExtension == "tdf" {
+    return fileURL.lastPathComponent
+  }
+
+  return baseName
+}
+
+func makeFontEntries(from fontFiles: [URL]) -> [FontEntry] {
+  let baseNameCounts = fontFiles.reduce(into: [String: Int]()) { result, fileURL in
+    result[fileURL.deletingPathExtension().lastPathComponent, default: 0] += 1
+  }
+  let fontFilesByName = fontFiles.reduce(into: [String: URL]()) { result, fileURL in
+    let name = fontName(for: fileURL, baseNameCounts: baseNameCounts)
+    result[name] = fileURL
+  }
+  let fontNames = fontFilesByName.keys.sorted()
   var usedCaseNames: [String] = []
   var entries: [FontEntry] = []
   entries.reserveCapacity(fontNames.count)
@@ -161,12 +195,37 @@ func makeFontEntries(from uniqueFontFilesByName: [String: URL]) -> [FontEntry] {
       FontEntry(
         fontName: fontName,
         caseName: caseName,
-        fileURL: uniqueFontFilesByName[fontName]!
+        fileURL: fontFilesByName[fontName]!
       )
     )
   }
 
   return entries
+}
+
+func bundledFontFiles(from fontFiles: [URL], requestedFontNames: [String]) throws -> [URL] {
+  var remainingFontFiles = fontFiles
+  var bundledFontFiles: [URL] = []
+  bundledFontFiles.reserveCapacity(requestedFontNames.count)
+
+  for requestedFontName in requestedFontNames {
+    guard
+      let index = remainingFontFiles.firstIndex(where: { fileURL in
+        fileURL.lastPathComponent == requestedFontName
+          || fileURL.deletingPathExtension().lastPathComponent == requestedFontName
+      })
+    else {
+      throw NSError(
+        domain: "generate_embedded_font_library",
+        code: 2,
+        userInfo: [NSLocalizedDescriptionKey: "Missing bundled font '\(requestedFontName)'"]
+      )
+    }
+
+    bundledFontFiles.append(remainingFontFiles.remove(at: index))
+  }
+
+  return bundledFontFiles
 }
 
 func chunked(_ value: String, maxLength: Int) -> [String] {
@@ -243,39 +302,81 @@ guard !discoveredFontFiles.isEmpty else {
   )
 }
 
-var uniqueFontFilesByName: [String: URL] = [:]
-for fontFile in discoveredFontFiles {
-  uniqueFontFilesByName[fontFile.deletingPathExtension().lastPathComponent] = fontFile
-}
-
-let fontEntries = makeFontEntries(from: uniqueFontFilesByName)
+let fontEntries = makeFontEntries(
+  from: try bundledFontFiles(from: discoveredFontFiles, requestedFontNames: bundledFontNames))
 let outputDirectory = outputFile.deletingLastPathComponent()
 try fileManager.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
-var renderedAssignments: [String] = []
-renderedAssignments.reserveCapacity(fontEntries.count)
 var renderedCases: [String] = []
 renderedCases.reserveCapacity(fontEntries.count)
 
-for fontEntry in fontEntries {
+func renderedAssignment(for fontEntry: FontEntry) throws -> String {
   let fontBytes = try Data(contentsOf: fontEntry.fileURL)
-  let fontData = String(decoding: fontBytes, as: UTF8.self)
-  let chunks = chunked(fontData, maxLength: 4_096)
+  let encodedFontData = fontBytes.base64EncodedString()
+  let chunks = chunked(encodedFontData, maxLength: 4_096).map(swiftStringLiteral)
   var renderedLines = [
-    "        fontData = String()",
-    "        fontData.reserveCapacity(\(fontBytes.count))",
+    "        encodedFontData = String()",
+    "        encodedFontData.reserveCapacity(\(encodedFontData.count))",
   ]
 
   renderedLines.append(
     contentsOf: chunks.map { chunk in
-      "        fontData += \"\(swiftStringLiteral(chunk))\""
+      "        encodedFontData += \"\(chunk)\""
     })
   renderedLines.append(
-    "        fonts[EmbeddedFigletFont.\(fontEntry.caseName).rawValue] = fontData")
+    "        fonts[EmbeddedFigletFont.\(fontEntry.caseName).rawValue] = EmbeddedFontStorage.decode(encodedFontData, fontName: \"\(swiftStringLiteral(fontEntry.fontName))\")"
+  )
 
-  renderedAssignments.append(renderedLines.joined(separator: "\n"))
+  return renderedLines.joined(separator: "\n")
+}
+
+func renderedPartFile(partIndex: Int, fontEntries: ArraySlice<FontEntry>) throws -> String {
+  var renderedAssignments: [String] = []
+  renderedAssignments.reserveCapacity(fontEntries.count)
+
+  for fontEntry in fontEntries {
+    renderedAssignments.append(try renderedAssignment(for: fontEntry))
+  }
+
+  return """
+    // Generated by Scripts/generate_embedded_font_library.swift.
+    // Do not edit by hand.
+
+    extension EmbeddedFigletFont {
+        static func embeddedFontDataPart\(partIndex)() -> [String: [UInt8]] {
+            var fonts: [String: [UInt8]] = [:]
+            fonts.reserveCapacity(\(fontEntries.count))
+            var encodedFontData = String()
+    \(renderedAssignments.joined(separator: "\n\n"))
+            return fonts
+        }
+    }
+    """
+}
+
+for fontEntry in fontEntries {
   renderedCases.append(
-    "        case \(fontEntry.caseName) = \"\(swiftStringLiteral(fontEntry.fontName))\"")
+    "  case \(fontEntry.caseName) = \"\(swiftStringLiteral(fontEntry.fontName))\"")
+}
+
+let outputBaseName = outputFile.deletingPathExtension().lastPathComponent
+let stalePartFiles = try fileManager.contentsOfDirectory(
+  at: outputDirectory,
+  includingPropertiesForKeys: nil
+)
+.filter {
+  $0.lastPathComponent.hasPrefix("\(outputBaseName)+Part") && $0.pathExtension == "swift"
+}
+for stalePartFile in stalePartFiles {
+  try fileManager.removeItem(at: stalePartFile)
+}
+
+let partSize = 100
+let partRanges = stride(from: 0, to: fontEntries.count, by: partSize).map { start in
+  start..<min(start + partSize, fontEntries.count)
+}
+let renderedPartMerges = partRanges.indices.map { partIndex in
+  "    fonts.merge(embeddedFontDataPart\(partIndex)()) { current, _ in current }"
 }
 
 let output = """
@@ -287,17 +388,25 @@ let output = """
   public enum EmbeddedFigletFont: String, CaseIterable, Sendable {
   \(renderedCases.joined(separator: "\n"))
 
-      public static let library: FigletFontLibrary = {
-          var fonts: [String: String] = [:]
-          fonts.reserveCapacity(\(fontEntries.count))
-          var fontData = String()
-  \(renderedAssignments.joined(separator: "\n\n"))
-          return FigletFontLibrary(
-              name: "swift-figlet embedded fonts",
-              fontData: fonts
-          )
-      }()
+    public static let library: FigletFontLibrary = {
+      var fonts: [String: [UInt8]] = [:]
+      fonts.reserveCapacity(\(fontEntries.count))
+  \(renderedPartMerges.joined(separator: "\n"))
+      return FigletFontLibrary(
+        name: "swift-figlet embedded fonts",
+        fonts: fonts
+      )
+    }()
   }
   """
 
 try output.write(to: outputFile, atomically: true, encoding: .utf8)
+
+for (partIndex, range) in partRanges.enumerated() {
+  let partFile = outputDirectory.appending(path: "\(outputBaseName)+Part\(partIndex).swift")
+  let partOutput = try renderedPartFile(
+    partIndex: partIndex,
+    fontEntries: fontEntries[range]
+  )
+  try partOutput.write(to: partFile, atomically: true, encoding: .utf8)
+}

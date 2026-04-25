@@ -180,10 +180,15 @@ extension DrawExtractor {
         )
       )
     case .textFigure(let payload):
+      let renderedFigure = TextFigureSupport.render(
+        payload,
+        boundsWidth: bounds.size.width,
+        environment: environmentSnapshot.style
+      )
       commands.append(
-        .preformattedText(
+        .styledPreformattedText(
           bounds: bounds,
-          lines: TextFigureSupport.render(payload, boundsWidth: bounds.size.width).lines,
+          lines: renderedFigure.styledLines,
           style: textStyle(from: drawMetadata)
         )
       )

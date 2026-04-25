@@ -1,6 +1,12 @@
 import Foundation
 public import SwiftFiglet
 
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#endif
+
 public enum FigletCLI {
   public static func main(
     arguments: [String] = Array(CommandLine.arguments.dropFirst()),
@@ -23,7 +29,8 @@ public enum FigletCLI {
 
   public static func run(
     arguments: [String],
-    fontLibraries: [FigletFontLibrary] = []
+    fontLibraries: [FigletFontLibrary] = [],
+    terminalWidth: (() -> Int?)? = nil
   ) throws -> Int32 {
     let options = try CLIOptions.parse(arguments)
 
@@ -55,23 +62,36 @@ public enum FigletCLI {
     let figlet = Figlet(
       font: font,
       configuration: FigletConfiguration(
-        width: options.width,
+        width: options.width ?? terminalWidth?() ?? detectedTerminalWidth() ?? defaultWidth,
         direction: options.direction,
         justification: options.justification
       )
     )
 
-    var output = try figlet.render(options.text.joined(separator: " ")).description
+    var renderedOutput = try figlet.render(options.text.joined(separator: " "))
     if options.reverse {
-      output = FigletText(output).reversed().description
+      renderedOutput = renderedOutput.reversed()
     }
     if options.flip {
-      output = FigletText(output).flipped().description
+      renderedOutput = renderedOutput.flipped()
     }
+    let output: String
     if options.stripSurroundingNewlines {
-      output = FigletText(output).strippingSurroundingNewlines()
+      renderedOutput = renderedOutput.strippedSurroundingNewlines()
+      output =
+        renderedOutput.containsANSIStyles
+        ? renderedOutput.ansiDescription.trimmingTrailingNewline()
+        : renderedOutput.description.trimmingTrailingNewline()
     } else if options.normalizeSurroundingNewlines {
-      output = FigletText(output).normalizingSurroundingNewlines()
+      renderedOutput = renderedOutput.normalizedSurroundingNewlines()
+      output =
+        renderedOutput.containsANSIStyles
+        ? renderedOutput.ansiDescription
+        : renderedOutput.description
+    } else if renderedOutput.containsANSIStyles {
+      output = renderedOutput.ansiDescription
+    } else {
+      output = renderedOutput.description
     }
 
     FileHandle.standardOutput.write(Data(output.utf8))
@@ -82,7 +102,7 @@ public enum FigletCLI {
 
 private struct CLIOptions {
   var font = FigletFont.defaultFontName
-  var width = 80
+  var width: Int?
   var direction: FigletDirection = .automatic
   var justification: FigletJustification = .automatic
   var reverse = false
@@ -194,6 +214,21 @@ private struct CLIError: Error {
   }
 }
 
+private let defaultWidth = 80
+
+private func detectedTerminalWidth() -> Int? {
+  #if canImport(Darwin) || canImport(Glibc)
+    var size = winsize()
+    let result = unsafe ioctl(STDOUT_FILENO, TIOCGWINSZ, &size)
+    guard result == 0, size.ws_col > 0 else {
+      return nil
+    }
+    return Int(size.ws_col)
+  #else
+    return nil
+  #endif
+}
+
 private let helpText = """
   usage: figlet [options] [text...]
 
@@ -201,7 +236,7 @@ private let helpText = """
     -f, --font FONT                         Font name or path (default: standard)
     -D, --direction DIR                     auto | left-to-right | right-to-left
     -j, --justify JUSTIFY                   auto | left | center | right
-    -w, --width COLS                        Wrap width (default: 80)
+    -w, --width COLS                        Wrap width (default: terminal width, fallback 80)
     -r, --reverse                           Reverse rendered output
     -F, --flip                              Flip rendered output
     -n, --normalize-surrounding-newlines    Add one blank line before and after
@@ -209,6 +244,25 @@ private let helpText = """
     -l, --list-fonts                        List bundled fonts
     -i, --info-font                         Print font comment metadata
     -h, --help                              Show this help
+
+  Fonts:
+    Supported formats (extension is optional when referencing by name):
+      .flf    FIGfont — the canonical figlet format
+      .tlf    TOIlet Lite Font — FIGfont with Unicode and ANSI color
+      .tdf    TheDraw Font — legacy DOS color block font
+
+    Lookup order for -f NAME:
+      1. NAME treated as a file path (with or without extension)
+      2. Fonts bundled into this binary (see --list-fonts)
+      3. Search directories, first match wins:
+           $SWIFT_FIGLET_FONT_DIRS   colon-separated list of directories
+           $SWIFT_FIGLET_FONT_DIR    single directory
+           ~/.figfonts/              per-user font directory
+           ./figfonts/               relative to current working directory
+
+    To install a custom font, drop a .flf, .tlf, or .tdf file into
+    ~/.figfonts/ (creating it if needed) and reference it by basename,
+    e.g. `figlet -f doom hello` for ~/.figfonts/doom.flf.
   """
 
 extension String {
@@ -217,5 +271,13 @@ extension String {
       return nil
     }
     return String(dropFirst(prefix.count))
+  }
+
+  fileprivate func trimmingTrailingNewline() -> String {
+    var value = self
+    while value.hasSuffix("\n") || value.hasSuffix("\r") {
+      value.removeLast()
+    }
+    return value
   }
 }
