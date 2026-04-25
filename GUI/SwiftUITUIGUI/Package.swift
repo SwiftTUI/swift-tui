@@ -23,6 +23,9 @@ let package = Package(
       name: "SwiftUITUIGUI",
       dependencies: [
         .product(name: "TerminalUI", package: "swift-terminal-ui")
+      ],
+      resources: [
+        .process("Resources")
       ]
     ),
     .testTarget(

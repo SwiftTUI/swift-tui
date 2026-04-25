@@ -11,6 +11,7 @@ public enum EmbeddedFigletFont: String, CaseIterable, Sendable {
   case calvinSm = "calvin-sm"
   case cnerip = "cnerip"
   case doom = "doom"
+  case future = "future"
   case pagga = "pagga"
   case slant = "slant"
   case smBlock = "sm-block"
@@ -19,7 +20,7 @@ public enum EmbeddedFigletFont: String, CaseIterable, Sendable {
 
   public static let library: FigletFontLibrary = {
     var fonts: [String: [UInt8]] = [:]
-    fonts.reserveCapacity(12)
+    fonts.reserveCapacity(13)
     fonts.merge(embeddedFontDataPart0()) { current, _ in current }
     return FigletFontLibrary(
       name: "swift-figlet embedded fonts",

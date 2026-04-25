@@ -356,16 +356,15 @@ private struct NativeTerminalMetrics {
   let textOffset: CGPoint
 
   init(style: SwiftUITUITerminalStyle) {
-    let baseFont = NativePlatformFont.terminalFont(style: style)
+    let baseFont = NativePlatformFont.terminalFont(style: style, emphasis: [])
     font = baseFont
-    boldFont = baseFont.withTerminalTraits([.bold])
-    italicFont = baseFont.withTerminalTraits([.italic])
-    boldItalicFont = baseFont.withTerminalTraits([.bold, .italic])
+    boldFont = NativePlatformFont.terminalFont(style: style, emphasis: [.bold])
+    italicFont = NativePlatformFont.terminalFont(style: style, emphasis: [.italic])
+    boldItalicFont = NativePlatformFont.terminalFont(style: style, emphasis: [.bold, .italic])
 
     let characterSize = NativePlatformFont.measureTerminalCharacter(baseFont)
-    let lineHeight = ceil(baseFont.ascender - baseFont.descender + baseFont.leading)
     let cellWidth = max(1, ceil(characterSize.width))
-    let cellHeight = max(1, ceil(max(characterSize.height, lineHeight)))
+    let cellHeight = max(1, ceil(baseFont.ascender - baseFont.descender))
     cellSize = CGSize(width: cellWidth, height: cellHeight)
     textOffset = CGPoint(
       x: 0,
@@ -600,15 +599,28 @@ private enum NativeRasterSurfaceRenderer {
 
   extension NativePlatformFont {
     fileprivate static func terminalFont(
-      style: SwiftUITUITerminalStyle
+      style: SwiftUITUITerminalStyle,
+      emphasis: TerminalUI.TextStyle.TextEmphasis
     ) -> NativePlatformFont {
+      BundledFonts.registerIfNeeded()
       let size = CGFloat(style.fontSize ?? 14)
+
       if let fontFamily = style.fontFamily,
         let font = NSFont(name: fontFamily, size: size)
       {
-        return font
+        return font.withTerminalTraits(emphasis)
       }
-      return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+
+      let postScriptName = BundledFonts.postScriptName(
+        forBold: emphasis.contains(.bold),
+        italic: emphasis.contains(.italic)
+      )
+      if let bundled = NSFont(name: postScriptName, size: size) {
+        return bundled
+      }
+
+      let fallback = NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+      return fallback.withTerminalTraits(emphasis)
     }
 
     fileprivate static func measureTerminalCharacter(
@@ -670,7 +682,9 @@ private enum NativeRasterSurfaceRenderer {
         in: rect,
         from: .zero,
         operation: .sourceOver,
-        fraction: 1
+        fraction: 1,
+        respectFlipped: true,
+        hints: nil
       )
     }
   }
@@ -740,15 +754,28 @@ private enum NativeRasterSurfaceRenderer {
 
   extension NativePlatformFont {
     fileprivate static func terminalFont(
-      style: SwiftUITUITerminalStyle
+      style: SwiftUITUITerminalStyle,
+      emphasis: TerminalUI.TextStyle.TextEmphasis
     ) -> NativePlatformFont {
+      BundledFonts.registerIfNeeded()
       let size = CGFloat(style.fontSize ?? 14)
+
       if let fontFamily = style.fontFamily,
         let font = UIFont(name: fontFamily, size: size)
       {
-        return font
+        return font.withTerminalTraits(emphasis)
       }
-      return UIFont.monospacedSystemFont(ofSize: size, weight: .regular)
+
+      let postScriptName = BundledFonts.postScriptName(
+        forBold: emphasis.contains(.bold),
+        italic: emphasis.contains(.italic)
+      )
+      if let bundled = UIFont(name: postScriptName, size: size) {
+        return bundled
+      }
+
+      let fallback = UIFont.monospacedSystemFont(ofSize: size, weight: .regular)
+      return fallback.withTerminalTraits(emphasis)
     }
 
     fileprivate static func measureTerminalCharacter(
