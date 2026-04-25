@@ -14,11 +14,25 @@ package struct ListDisplayLine {
   var kind: Kind
   var isHeader: Bool
   var rowIndex: Int?
+  var sectionIndex: Int?
+
+  init(
+    kind: Kind,
+    isHeader: Bool,
+    rowIndex: Int?,
+    sectionIndex: Int? = nil
+  ) {
+    self.kind = kind
+    self.isHeader = isHeader
+    self.rowIndex = rowIndex
+    self.sectionIndex = sectionIndex
+  }
 }
 
 package struct ListVisibleLayout {
   package var contentBounds: Rect
   package var lines: [ListDisplayLine]
+  package var sectionChromeBounds: [Rect]
 }
 
 extension DrawExtractor {
@@ -26,16 +40,16 @@ extension DrawExtractor {
     for payload: ListPayload,
     in bounds: Rect
   ) -> [DrawCommand] {
-    let layout = visibleListLayout(
+    let layout = payload.style.visibleListLayout(
       for: payload,
       in: bounds
     )
     let contentBounds = layout.contentBounds
     guard contentBounds.size.width > 0, contentBounds.size.height > 0 else {
-      return listChromeCommands(for: payload, in: bounds)
+      return listChromeCommands(for: payload, in: bounds, layout: layout)
     }
 
-    var commands = listChromeCommands(for: payload, in: bounds)
+    var commands = listChromeCommands(for: payload, in: bounds, layout: layout)
     let lines = layout.lines
 
     for (index, line) in lines.enumerated() {
@@ -120,260 +134,34 @@ extension DrawExtractor {
 
   private func listChromeCommands(
     for payload: ListPayload,
-    in bounds: Rect
+    in bounds: Rect,
+    layout: ListVisibleLayout
   ) -> [DrawCommand] {
     guard let container = payload.style.listContainer else {
       return []
     }
 
-    return [
-      .fill(
-        bounds: bounds,
-        geometry: container.geometry,
-        insetAmount: container.insetAmount,
-        style: payload.backgroundStyle ?? .semantic(.fill),
-        mode: container.fillMode
-      ),
-      .stroke(
-        bounds: bounds,
-        geometry: container.geometry,
-        insetAmount: container.insetAmount,
-        style: payload.borderStyle ?? .semantic(.separator),
-        strokeStyle: container.strokeStyle,
-        strokeBorder: container.strokeBorder,
-        backgroundStyle: nil
-      ),
-    ]
-  }
-
-  private func listContentBounds(
-    in bounds: Rect,
-    style: CollectionStylePresentation
-  ) -> Rect {
-    let insets = style.listContentInsets
-    return Rect(
-      origin: .init(
-        x: bounds.origin.x + insets.leading,
-        y: bounds.origin.y + insets.top
-      ),
-      size: .init(
-        width: max(0, bounds.size.width - insets.leading - insets.trailing),
-        height: max(0, bounds.size.height - insets.top - insets.bottom)
-      )
-    )
-  }
-
-  package func visibleListLayout(
-    for payload: ListPayload,
-    in bounds: Rect
-  ) -> ListVisibleLayout {
-    let contentBounds = listContentBounds(in: bounds, style: payload.style)
-    let lines = visibleListLines(
-      for: payload,
-      viewportLineCount: contentBounds.size.height,
-      showsIndicators: payload.showsIndicators
-    )
-
-    return ListVisibleLayout(
-      contentBounds: contentBounds,
-      lines: lines
-    )
-  }
-
-  private func visibleListLines(
-    for payload: ListPayload,
-    viewportLineCount: Int,
-    showsIndicators: Bool
-  ) -> [ListDisplayLine] {
-    let displayLines = materializedListLines(for: payload)
-    guard viewportLineCount > 0 else {
-      return []
+    let chromeBounds = payload.style.listChromeBounds(for: layout, in: bounds)
+    return chromeBounds.flatMap { sectionBounds in
+      [
+        .fill(
+          bounds: sectionBounds,
+          geometry: container.geometry,
+          insetAmount: container.insetAmount,
+          style: payload.backgroundStyle ?? .semantic(.fill),
+          mode: container.fillMode
+        ),
+        .stroke(
+          bounds: sectionBounds,
+          geometry: container.geometry,
+          insetAmount: container.insetAmount,
+          style: payload.borderStyle ?? .semantic(.separator),
+          strokeStyle: container.strokeStyle,
+          strokeBorder: container.strokeBorder,
+          backgroundStyle: nil
+        ),
+      ]
     }
-
-    if displayLines.count > viewportLineCount {
-      let visibleLineCount =
-        showsIndicators && viewportLineCount >= 3
-        ? max(1, viewportLineCount - 2)
-        : viewportLineCount
-      let selectedLineIndex = selectedListLineIndex(in: displayLines)
-      let lineIndex = min(
-        max(selectedLineIndex ?? 0, 0),
-        max(0, displayLines.count - 1)
-      )
-      let offset = min(
-        max(0, lineIndex - (visibleLineCount / 2)),
-        max(0, displayLines.count - visibleLineCount)
-      )
-      let end = min(displayLines.count, offset + visibleLineCount)
-      guard showsIndicators, viewportLineCount >= 3 else {
-        return Array(displayLines[offset..<end])
-      }
-      var visible: [ListDisplayLine] = []
-      visible.reserveCapacity(visibleLineCount + 2)
-      visible.append(
-        .init(
-          kind: .text(
-            "↑", .init(foregroundStyle: .semantic(.separator), opacity: payload.opacity)),
-          isHeader: true,
-          rowIndex: nil
-        )
-      )
-      if offset == 0 {
-        visible[0] = .init(
-          kind: .text("", .init(foregroundStyle: .semantic(.muted), opacity: payload.opacity)),
-          isHeader: true,
-          rowIndex: nil
-        )
-      }
-      visible.append(contentsOf: displayLines[offset..<end])
-      visible.append(
-        .init(
-          kind: .text(
-            "↓", .init(foregroundStyle: .semantic(.separator), opacity: payload.opacity)),
-          isHeader: true,
-          rowIndex: nil
-        )
-      )
-      if end >= displayLines.count {
-        visible[visible.count - 1] = .init(
-          kind: .text("", .init(foregroundStyle: .semantic(.muted), opacity: payload.opacity)),
-          isHeader: true,
-          rowIndex: nil
-        )
-      }
-      return visible
-    }
-
-    return Array(displayLines.prefix(viewportLineCount))
-  }
-
-  private func materializedListLines(
-    for payload: ListPayload
-  ) -> [ListDisplayLine] {
-    var lines: [ListDisplayLine] = []
-    var rowIndex = 0
-
-    for (index, item) in payload.items.enumerated() {
-      switch item.kind {
-      case .header:
-        var styleOverride = item.style
-        if styleOverride.foregroundStyle == nil {
-          styleOverride.foregroundStyle = AnyShapeStyle(.terminalBorder(.accent))
-        }
-        styleOverride.opacity *= payload.opacity
-        lines.append(
-          .init(
-            kind: .text(item.text, styleOverride),
-            isHeader: true,
-            rowIndex: nil
-          )
-        )
-      case .footer:
-        var styleOverride = item.style
-        if styleOverride.foregroundStyle == nil {
-          styleOverride.foregroundStyle = .semantic(.muted)
-        }
-        styleOverride.opacity *= payload.opacity
-        lines.append(
-          .init(
-            kind: .text(item.text, styleOverride),
-            isHeader: true,
-            rowIndex: nil
-          )
-        )
-      case .row:
-        var styleOverride = item.style
-        if let rowForegroundStyle = item.rowForegroundStyle {
-          styleOverride.foregroundStyle = rowForegroundStyle
-        } else if styleOverride.foregroundStyle == nil {
-          styleOverride.foregroundStyle = payload.foregroundStyle ?? .semantic(.foreground)
-        }
-        styleOverride.opacity *= payload.opacity
-        let isSelected = rowIndex == payload.selectedRowIndex
-        let marker =
-          payload.showsSelectionMarker
-          ? (isSelected ? "▌ " : "  ")
-          : ""
-        let markerStyle = TextStyle(
-          foregroundStyle: isSelected
-            ? (payload.selectedRowMarkerStyle ?? payload.selectedRowForegroundStyle ?? payload
-              .foregroundStyle ?? .semantic(.foreground))
-            : payload.borderStyle ?? .semantic(.separator),
-          opacity: payload.opacity
-        )
-        if isSelected, let selectedForegroundStyle = payload.selectedRowForegroundStyle {
-          styleOverride.foregroundStyle = selectedForegroundStyle
-        }
-        lines.append(
-          .init(
-            kind: .row(
-              marker: marker,
-              markerStyle: markerStyle,
-              text: item.text,
-              textStyle: styleOverride,
-              backgroundStyle: isSelected
-                ? (payload.selectedRowBackgroundStyle ?? item.rowBackgroundStyle)
-                : item.rowBackgroundStyle
-            ),
-            isHeader: false,
-            rowIndex: rowIndex
-          )
-        )
-
-        if payload.style.showsListRowSeparators,
-          shouldRenderRowSeparator(
-            current: item,
-            next: payload.items.dropFirst(index + 1).first
-          )
-        {
-          lines.append(
-            .init(
-              kind: .separator(payload.borderStyle ?? .semantic(.separator)),
-              isHeader: false,
-              rowIndex: nil
-            )
-          )
-        }
-        rowIndex += 1
-      case .sectionBreak:
-        guard payload.style.showsListSectionSeparators,
-          listSectionSeparatorIsVisible(item)
-        else {
-          continue
-        }
-        lines.append(
-          .init(
-            kind: .separator(payload.borderStyle ?? .semantic(.separator)),
-            isHeader: true,
-            rowIndex: nil
-          )
-        )
-      }
-    }
-
-    return lines
-  }
-
-  private func shouldRenderRowSeparator(
-    current: ListItemPayload,
-    next: ListItemPayload?
-  ) -> Bool {
-    guard let next, next.kind == .row else {
-      return false
-    }
-    if current.rowSeparators.bottom == .hidden || next.rowSeparators.top == .hidden {
-      return false
-    }
-    return true
-  }
-
-  private func listSectionSeparatorIsVisible(
-    _ item: ListItemPayload
-  ) -> Bool {
-    if item.sectionSeparators.bottom == .hidden || item.sectionSeparators.top == .hidden {
-      return false
-    }
-    return true
   }
 
   func scrollIndicatorCommands(
@@ -600,18 +388,4 @@ extension DrawExtractor {
     return "█"
   }
 
-  private func selectedListLineIndex(
-    in lines: [ListDisplayLine]
-  ) -> Int? {
-    lines.firstIndex { line in
-      switch line.kind {
-      case .text(let content, _):
-        return content.hasPrefix("> ")
-      case .row(let marker, _, _, _, _):
-        return marker != "  "
-      case .separator:
-        return false
-      }
-    }
-  }
 }

@@ -6,8 +6,6 @@ import TerminalUI
 ///
 /// SwiftUI semantics call for the `.frame` to TIGHTEN the proposal
 /// reaching the GeometryReader so `proxy.size` reports `(40, 10)`.
-/// The library currently reports the full terminal size — see
-/// `BEHAVIOUR_FINDINGS.md` finding #4.
 ///
 /// The header `"Geometry reader takes proposal"` is the catalog marker.
 public struct GeometryReaderTakesProposal: View {

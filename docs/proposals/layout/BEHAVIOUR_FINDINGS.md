@@ -82,7 +82,7 @@ the Layouts example to ship.
 
 **Status:** Open — design question. Current workaround is adequate.
 
-### 3. `.frame(maxWidth:)` is not enforced — child exceeds max under a large proposal
+### 3. `.frame(maxWidth:)` clamps above-max proposals
 
 **Surfaced by:** `Examples/layouts/Tests/LayoutsTests/Frames/MinIdealMaxFrameClampBehaviourTests.swift`
 (layout `frames.min-ideal-max-frame-clamp`, plan task #10).
@@ -92,31 +92,27 @@ the Layouts example to ship.
 an outer `.frame(width: 80)` should clamp DOWN to `maxWidth` (60 inner
 cells → 62 cells including a 1-cell border ring).
 
-**Observed (80×20 viewport):**
+**Observed after remediation (80×20 viewport):**
 
 ```
-[15]|          ▛▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▜|
+[15]|          ▛▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▜|
 ```
 
-The above-max copy renders at ~70 cells border-width (68 inner
-cells), exceeding `maxWidth: 60`.
+The above-max copy renders at about 62 cells border-width (60 inner
+cells + 2 border cells), honouring `maxWidth: 60`.
 
 The `minWidth` clamp (below-min copy clamps UP to minWidth=20 inner +
-2 border = 22 total) and `idealWidth` (ideal copy sits at 40 when
-proposed 40) are both honoured. Only the `maxWidth` ceiling is
-silently exceeded.
+2 border = 22 total), `idealWidth` (ideal copy sits at 40 when
+proposed 40), and `maxWidth` ceiling are all honoured.
 
-**Resolution:** Pinned observed behaviour in the test (`aboveMax >
-60`) rather than the SwiftUI-faithful ceiling. SwiftUI's own
-`FlexibleFrameModifier` clamps to maxWidth when the proposed width
-exceeds it; the library's implementation appears to accept the
-parent's proposal directly when it is above minWidth, ignoring
-maxWidth. Likely a genuine divergence — candidate remediation work
-item for the frame modifier implementation.
+**Resolution:** The behaviour test now pins the SwiftUI-faithful
+ceiling (`aboveMax ~= 62` including border cells). The earlier
+assertion compared total border width to the inner max width and made
+the divergence look larger than the live runtime behavior.
 
-**Status:** Open — library divergence; test pins observed behaviour.
+**Status:** Closed — library is faithful; test pins max clamping.
 
-### 4. `GeometryReader` reports terminal size, not the locally-proposed size
+### 4. `GeometryReader` reports the locally-proposed size
 
 **Surfaced by:** `Examples/layouts/Tests/LayoutsTests/Frames/ProposalTighteningBehaviourTests.swift`
 (layout `frames.proposal-tightening`, plan task #12).
@@ -126,31 +122,29 @@ item for the frame modifier implementation.
 report `proxy.size.width == 30`. The fixed frame is supposed to
 TIGHTEN the proposal that reaches its child.
 
-**Observed (80×10 viewport):**
+**Observed after remediation (80×10 viewport):**
 
 ```
-| w=80                          |
+| w=30                          |
 ```
 
-The GeometryReader reports the full terminal width (80) regardless
-of the surrounding `.frame(width: 30)`.
+The GeometryReader reports the surrounding `.frame(width: 30)`
+proposal instead of the full terminal width.
 
-**Cause:** `GeometryReader.resolveElements(in:)` reads
-`context.environmentValues.terminalSize` directly to populate the
-proxy's `size`, ignoring the locally-proposed size that a
-SwiftUI-faithful implementation would carry through resolve. The
-view-tree is correctly TIGHTENED for layout purposes (the visible
-border around the GeometryReader is 30 cells wide), but the proxy
-itself never sees the tightening.
+**Cause:** `GeometryReader.resolveElements(in:)` previously read
+`context.environmentValues.terminalSize` directly while fixed frame
+resolution did not tighten that environment for the child subtree.
+The view-tree was correctly tightened for layout purposes, but the
+proxy itself never saw the tightening.
 
-**Resolution:** Pinned observed behaviour in the test (`w=80`) with
-guidance to flip the assertion when the library is fixed to honour
-proposal tightening for GeometryReader proxies. Genuine library
-divergence; candidate remediation work item for the GeometryReader
-implementation (likely needs to thread the proposed size through
-`ResolveContext`).
+**Resolution:** Fixed frames now resolve their child content under a
+tightened terminal-size environment on explicit axes, and
+`GeometryReader` lowers its content into a flexible, top-leading
+proposal-filling frame. The tests now expect `w=30` and
+`w=40 h=10`.
 
-**Status:** Open — library divergence; test pins observed behaviour.
+**Status:** Closed — library is faithful for fixed-frame proposal
+tightening.
 
 ### 5. `.frame(width: 0, height: 0)` clips intrinsic content out of the raster
 
@@ -182,7 +176,7 @@ region. No follow-up remediation needed.
 
 **Status:** Closed — observed behaviour matches SwiftUI semantics.
 
-### 6. `GeometryReader` in an unconstrained HStack does not hog — HStack shrinks to content
+### 6. `GeometryReader` in an unconstrained HStack hogs available width
 
 **Surfaced by:** `Examples/layouts/Tests/LayoutsTests/Geometry/GeometryReaderInHStackHogsBehaviourTests.swift`
 (layout `geometry.in-hstack-hogs`, plan task #38).
@@ -192,38 +186,30 @@ region. No follow-up remediation needed.
 horizontal space the parent offers, pushing its `Text` sibling
 off-screen or truncating it at the right edge.
 
-**Observed (80×28 viewport, HStack has only `.frame(height: 5)`):**
+**Observed after remediation (80×28 viewport, HStack has only
+`.frame(height: 5)`):**
 
 ```
-[2] | ▛▀▀▀▀▀▀▀▀▀▀▀▀▀▜|
-[5] | ▌[G] [SIBLING]▐|
-[8] | ▙▄▄▄▄▄▄▄▄▄▄▄▄▄▟|
+[2] | ▛▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▜|
+[3] | ▌[G]                                                                         ▐|
+[5] | ▌                                                                   [SIBLING]▐|
+[8] | ▙▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▟|
 ```
 
-Two library-specific behaviours both depart from SwiftUI:
+The HStack now expands to the available horizontal proposal and the
+GeometryReader receives the slack before the sibling. `[SIBLING]`
+remains visible at the trailing edge in this terminal layout because
+the stack still measures and places the sibling after allocating the
+reader's flexible width.
 
-  1. The `HStack` shrinks to its intrinsic content width (~13 cells)
-     rather than expanding to the 80-cell horizontal proposal. In
-     SwiftUI an `HStack` takes the proposed width.
-  2. The `GeometryReader` contributes its child's intrinsic width
-     (3 cells for `[G]`) to the HStack measurement rather than
-     claiming the full horizontal proposal.
+**Resolution:** `GeometryReader` now lowers its content through a
+flexible `.frame(maxWidth: .infinity, maxHeight: .infinity,
+alignment: .topLeading)`, so the stack's existing flexible-content
+allocation hands it the extra main-axis width. This fixes the
+shrink-to-content divergence that was related to finding #4.
 
-Even adding `.frame(width: 40)` to the `HStack` (see the exploratory
-fixed-width variant) leaves the content centered within the frame at
-~13 cells wide, with `[SIBLING]` fully visible. The classic
-"eats everything" gotcha does NOT reproduce.
-
-**Resolution:** Pinned the observed behaviour (both `[G]` and
-`[SIBLING]` on the same row; HStack border < 40 cells on an 80-cell
-viewport). Likely related to finding #4: the reader's proxy reports
-`terminalSize` directly rather than flowing through the proposal
-pipeline, and the surrounding `HStack` measurement does not see the
-reader's "infinite" flex either. Revisit alongside finding #4.
-
-**Status:** Open — likely related to finding #4; test pins observed
-behaviour. Candidate remediation is shared with the GeometryReader
-proposal-tightening work.
+**Status:** Closed — library now reproduces the proposal-hogging
+shape of the SwiftUI behavior for this layout.
 
 ### 7. `Canvas` already self-clips at the subpixel level — `.clipped()` is a no-op overlay
 

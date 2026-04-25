@@ -7,10 +7,8 @@ import TerminalUI
 /// the reader, `proxy.size.width` would equal 40 and `[X]` would land
 /// near column 40 − 2 = 38 (centered there by `.position`).
 ///
-/// Per `BEHAVIOUR_FINDINGS.md` finding #4 the proxy currently reports
-/// the full terminal width, so `[X]` anchors at `(terminalWidth − 2,
-/// 0)` — well outside the 40-wide frame.  The behaviour test pins
-/// whatever lands in the raster.
+/// The reader's fixed frame tightens `proxy.size`, so `[X]` anchors
+/// near the frame's top-right corner.
 ///
 /// The header `"Geometry reader anchor corner"` is the catalog marker.
 public struct GeometryReaderAnchorCorner: View {

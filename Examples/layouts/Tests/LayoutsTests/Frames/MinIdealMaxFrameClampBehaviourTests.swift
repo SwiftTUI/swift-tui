@@ -36,11 +36,9 @@ struct MinIdealMaxFrameClampBehaviourTests {
   ///     minWidth (20 inner + 2 border = 22 total). Correct.
   ///   - ideal copy (outer width 40): inner frame matches the outer
   ///     proposal (40 total). Correct.
-  ///   - above-max copy (outer width 80): inner frame does NOT clamp
-  ///     down to maxWidth — it instead renders near the outer 80
-  ///     proposal (observed 70 including border). See
-  ///     `BEHAVIOUR_FINDINGS.md` finding #3.
-  @Test("border widths demonstrate min→ideal clamping (max not enforced)")
+  ///   - above-max copy (outer width 80): inner frame clamps down to
+  ///     maxWidth (60 inner + 2 border cells).
+  @Test("border widths demonstrate min→ideal→max clamping")
   func borderWidthsMatchClamp() {
     let raster = render(MinIdealMaxFrameClamp(), width: 80, height: 20).rasterSurface
 
@@ -82,14 +80,9 @@ struct MinIdealMaxFrameClampBehaviourTests {
       (38...42).contains(ideal),
       "ideal copy measured \(ideal); expected ~40 (±2)"
     )
-    // Observed: maxWidth is NOT enforced by the library. The
-    // above-max copy renders at the full outer proposal instead of
-    // clamping down to maxWidth (60). See finding #3. Pinning
-    // observed behaviour: the above-max copy measures ABOVE
-    // maxWidth+border, not at-or-below.
     #expect(
-      aboveMax > 60,
-      "above-max copy measured \(aboveMax); observed behaviour (finding #3) is that maxWidth is not enforced and the copy exceeds 60 cells"
+      (60...64).contains(aboveMax),
+      "above-max copy measured \(aboveMax); expected ~62 (max 60 + 2 border)"
     )
   }
 

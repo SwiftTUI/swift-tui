@@ -35,7 +35,7 @@ public struct LayoutPicker: View {
           }
         }
       }
-      .listStyle(.plain)
+      .listStyle(.insetGrouped)
       Divider()
       footer
     }

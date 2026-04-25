@@ -6,34 +6,19 @@ import Testing
 @MainActor
 @Suite
 struct GeometryReaderAnchorCornerBehaviourTests {
-  /// Observed raster at 80×28 (reader wrapped in
-  /// `.frame(width: 40, height: 5).border(.separator)`):
+  /// Reader wrapped in `.frame(width: 40, height: 5).border(.separator)`:
   ///
   /// ```
   /// [1]  Geometry reader anchor corner|
   /// [2]  ▛▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▜|                                (border ends near col 41)
-  /// [3]  ▌                                        ▐                                    [X]|
+  /// [3]  ▌                                     [X]▐|
   /// [4]  ▌                                        ▐|
   /// [8]  ▙▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▟|
   /// ```
   ///
-  /// Per `BEHAVIOUR_FINDINGS.md` finding #4, `proxy.size.width`
-  /// equals the full terminal width (80), not the tightened frame
-  /// width (40).  The `.position(x: proxy.size.width − 2)` call
-  /// therefore places `[X]` at absolute column ~78 in the reader's
-  /// coordinate space, which is OUTSIDE the 40-wide bordered frame.
-  ///
-  /// A SwiftUI-faithful outcome would place `[X]` near the
-  /// top-right corner of the bordered frame (around column 38 in
-  /// padded coordinates).  The library's actual raster has `[X]`
-  /// near column 77 — well past the border's right edge (~ col 41).
-  /// The frame does not clip `[X]`: the positioned child escapes
-  /// the bordered region instead.
-  ///
-  /// This test pins the observed behaviour.  When finding #4 is
-  /// fixed, the primary assertion should flip to check that `[X]`
-  /// sits within the bordered frame (~col 38).
-  @Test("[X] escapes the 40-wide frame because proxy.size reports 80 (finding #4)")
+  /// The tightened proxy width places `[X]` inside the bordered frame
+  /// near the top-right corner.
+  @Test("[X] anchors inside the tightened 40-wide frame")
   func anchorLandsOutsideFrame() {
     let raster = render(GeometryReaderAnchorCorner(), width: 80, height: 28).rasterSurface
     let joined = raster.lines.joined(separator: "\n")
@@ -46,40 +31,32 @@ struct GeometryReaderAnchorCornerBehaviourTests {
         """
         expected `[X]` in raster — if the library has started clipping \
         positioned content outside the reader's frame, this test needs \
-        to flip to assert `[X]` is absent.  See BEHAVIOUR_FINDINGS.md finding #4.
+        to flip to assert `[X]` is absent.
         \(joined)
         """
       )
       return
     }
 
-    // Finding #4: proxy.size.width == 80, so
-    // `.position(x: 78)` → `[X]` centered at column 78.
-    // `[X]` is 3 cells wide → leading column ~77 (= 78 − 3/2).
     #expect(
-      xCol >= 60,
+      (35...42).contains(xCol),
       """
-      expected `[X]` to land past column 60 (observed behaviour under \
-      finding #4: proxy.size reports terminal width 80). \
-      Got col=\(xCol).  When finding #4 is fixed, flip this to expect \
-      `[X]` inside the 40-wide frame (leading col ~37).
+      expected `[X]` inside the 40-wide frame near the trailing edge; \
+      got col=\(xCol).
       \(joined)
       """
     )
 
-    // Prove the positioned child has ESCAPED the bordered frame.
-    // The border's top-right corner glyph `▜` sits near column 41.
+    // Prove the positioned child remains inside the bordered frame.
     if let borderRow = raster.firstRow(containing: "▜"),
       let borderLine = raster.row(at: borderRow),
       let rightEdge = column(of: "▜", in: borderLine)
     {
       #expect(
-        xCol > rightEdge,
+        xCol < rightEdge,
         """
-        expected `[X]` (col \(xCol)) to sit past the frame's right \
-        border edge (col \(rightEdge)). \
-        If `[X]` lands INSIDE the frame, finding #4 may be fixed — flip \
-        this assertion and close the finding.
+        expected `[X]` (col \(xCol)) inside the frame's right border \
+        edge (col \(rightEdge)).
         \(joined)
         """
       )

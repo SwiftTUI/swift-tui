@@ -319,7 +319,7 @@ extension SemanticExtractor {
         nextHitTestOrder: &nextHitTestOrder
       )
     case .list(let payload):
-      let layout = DrawExtractor().visibleListLayout(
+      let layout = payload.style.visibleListLayout(
         for: payload,
         in: node.bounds
       )
