@@ -118,8 +118,15 @@ extension RunLoop {
         if focusedValuesChanged {
           currentFocusedValues = resolvedFocusedValues
         }
+        let scrollPositionChanged = localScrollPositionRegistry.sync(
+          focusedIdentity: focusTracker.currentFocusIdentity,
+          focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
+          scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes
+        )
 
-        if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged {
+        if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged
+          || scrollPositionChanged
+        {
           rerenderedForFocusSync = true
           if !focusSyncBudget.recordRerender() {
             focusSyncBudgetExceeded = true
@@ -359,6 +366,7 @@ extension RunLoop {
     context.localGestureStateRegistry = localGestureStateRegistry
     context.localFocusBindingRegistry = localFocusBindingRegistry
     context.localFocusedValuesRegistry = localFocusedValuesRegistry
+    context.localScrollPositionRegistry = localScrollPositionRegistry
     context.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     context.commandRegistry = commandRegistry
     context.dropDestinationRegistry = dropDestinationRegistry

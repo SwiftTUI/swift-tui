@@ -384,6 +384,54 @@ struct DiagnosticsAndCacheTests {
     #expect(second.diagnostics.placedNodesReused > 0)
   }
 
+  @Test("retained placement respects ScrollView position changes")
+  func retainedPlacementRespectsScrollViewPositionChanges() {
+    let renderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    let box = LockedBox(ScrollPosition.zero)
+
+    func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        )
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Row 0")
+          Text("Row 1")
+          Text("Row 2")
+          Text("Row 3")
+          Text("Row 4")
+        }
+      }
+      .id(testIdentity("Scrollable"))
+      .frame(width: 12, height: 3, alignment: .topLeading)
+    }
+
+    _ = renderer.render(
+      makeView(),
+      context: .init(identity: testIdentity("Root"))
+    )
+
+    box.withLock {
+      $0.scrollBy(y: 1)
+    }
+
+    let second = renderer.render(
+      makeView(),
+      context: .init(identity: testIdentity("Root"))
+    )
+    let rendered = second.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(rendered.contains("Row 1"))
+    #expect(rendered.contains("Row 2"))
+    #expect(rendered.contains("Row 3"))
+    #expect(!rendered.contains("Row 0"))
+  }
+
   @Test("lazy stacks reduce placement work across scroll position changes")
   func lazyStacksReducePlacementWorkAcrossScrollPositionChanges() {
     let eagerRenderer = DefaultRenderer(

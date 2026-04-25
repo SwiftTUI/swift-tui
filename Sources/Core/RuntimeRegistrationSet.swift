@@ -7,6 +7,7 @@ package struct RuntimeRegistrationSet {
   package let gestureStateRegistry: LocalGestureStateRegistry?
   package let focusBindingRegistry: LocalFocusBindingRegistry?
   package let focusedValuesRegistry: LocalFocusedValuesRegistry?
+  package let scrollPositionRegistry: LocalScrollPositionRegistry?
   package let lifecycleRegistry: LocalLifecycleRegistry?
   package let taskRegistry: LocalTaskRegistry?
   package let preferenceObservationRegistry: LocalPreferenceObservationRegistry?
@@ -21,6 +22,7 @@ package struct RuntimeRegistrationSet {
     gestureStateRegistry: LocalGestureStateRegistry? = nil,
     focusBindingRegistry: LocalFocusBindingRegistry? = nil,
     focusedValuesRegistry: LocalFocusedValuesRegistry? = nil,
+    scrollPositionRegistry: LocalScrollPositionRegistry? = nil,
     lifecycleRegistry: LocalLifecycleRegistry? = nil,
     taskRegistry: LocalTaskRegistry? = nil,
     preferenceObservationRegistry: LocalPreferenceObservationRegistry? = nil,
@@ -34,6 +36,7 @@ package struct RuntimeRegistrationSet {
     self.gestureStateRegistry = gestureStateRegistry
     self.focusBindingRegistry = focusBindingRegistry
     self.focusedValuesRegistry = focusedValuesRegistry
+    self.scrollPositionRegistry = scrollPositionRegistry
     self.lifecycleRegistry = lifecycleRegistry
     self.taskRegistry = taskRegistry
     self.preferenceObservationRegistry = preferenceObservationRegistry
@@ -49,6 +52,7 @@ package struct RuntimeRegistrationSet {
     gestureStateRegistry?.reset()
     focusBindingRegistry?.reset()
     focusedValuesRegistry?.reset()
+    scrollPositionRegistry?.reset()
     lifecycleRegistry?.reset()
     taskRegistry?.reset()
     preferenceObservationRegistry?.reset()
@@ -79,6 +83,7 @@ package struct RuntimeRegistrationSet {
     )
     focusBindingRegistry?.removeSubtrees(rootedAt: roots)
     focusedValuesRegistry?.removeSubtrees(rootedAt: roots)
+    scrollPositionRegistry?.removeSubtrees(rootedAt: roots)
     lifecycleRegistry?.removeSubtrees(rootedAt: roots)
     taskRegistry?.removeSubtrees(rootedAt: roots)
     preferenceObservationRegistry?.removeSubtrees(rootedAt: roots)
@@ -106,6 +111,7 @@ package struct RuntimeRegistrationSet {
     gestureStateRegistry?.restore(handlers.gestureStateRegistrations)
     focusBindingRegistry?.restore(handlers.focusBindingRegistrations)
     focusedValuesRegistry?.restore(handlers.focusedValuesRegistrations)
+    scrollPositionRegistry?.restore(handlers.scrollPositionRegistrations)
     lifecycleRegistry?.restore(handlers.lifecycleRegistrations)
     taskRegistry?.restore(handlers.taskRegistrations)
     preferenceObservationRegistry?.restore(

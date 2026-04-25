@@ -223,6 +223,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var localPointerHandlerRegistry: LocalPointerHandlerRegistry?
   package var localFocusBindingRegistry: LocalFocusBindingRegistry?
   package var localFocusedValuesRegistry: LocalFocusedValuesRegistry?
+  package var localScrollPositionRegistry: LocalScrollPositionRegistry?
   package var localPreferenceObservationRegistry: LocalPreferenceObservationRegistry?
   package var localKeyHandlerRegistry: LocalKeyHandlerRegistry?
   package var localLifecycleRegistry: LocalLifecycleRegistry?
@@ -248,6 +249,7 @@ public struct ResolveContext: Equatable, Sendable {
       gestureStateRegistry: localGestureStateRegistry,
       focusBindingRegistry: localFocusBindingRegistry,
       focusedValuesRegistry: localFocusedValuesRegistry,
+      scrollPositionRegistry: localScrollPositionRegistry,
       lifecycleRegistry: localLifecycleRegistry,
       taskRegistry: localTaskRegistry,
       preferenceObservationRegistry: localPreferenceObservationRegistry,
@@ -297,6 +299,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.localPointerHandlerRegistry = localPointerHandlerRegistry
     childContext.localFocusBindingRegistry = localFocusBindingRegistry
     childContext.localFocusedValuesRegistry = localFocusedValuesRegistry
+    childContext.localScrollPositionRegistry = localScrollPositionRegistry
     childContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     childContext.commandRegistry = commandRegistry
     childContext.dropDestinationRegistry = dropDestinationRegistry
@@ -338,6 +341,7 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.localPointerHandlerRegistry = localPointerHandlerRegistry
     replacedContext.localFocusBindingRegistry = localFocusBindingRegistry
     replacedContext.localFocusedValuesRegistry = localFocusedValuesRegistry
+    replacedContext.localScrollPositionRegistry = localScrollPositionRegistry
     replacedContext.localPreferenceObservationRegistry = localPreferenceObservationRegistry
     replacedContext.commandRegistry = commandRegistry
     replacedContext.dropDestinationRegistry = dropDestinationRegistry
@@ -487,6 +491,7 @@ extension ResolveContext {
     self.localPointerHandlerRegistry = nil
     self.localFocusBindingRegistry = nil
     self.localFocusedValuesRegistry = localFocusedValuesRegistry
+    localScrollPositionRegistry = nil
     localPreferenceObservationRegistry = nil
     self.localKeyHandlerRegistry = localKeyHandlerRegistry
     self.localLifecycleRegistry = localLifecycleRegistry
@@ -521,6 +526,7 @@ extension ResolveContext {
       && lhs.localActionRegistry == rhs.localActionRegistry
       && lhs.localFocusBindingRegistry == rhs.localFocusBindingRegistry
       && lhs.localFocusedValuesRegistry == rhs.localFocusedValuesRegistry
+      && lhs.localScrollPositionRegistry == rhs.localScrollPositionRegistry
       && lhs.localPreferenceObservationRegistry == rhs.localPreferenceObservationRegistry
       && lhs.localKeyHandlerRegistry == rhs.localKeyHandlerRegistry
       && lhs.localLifecycleRegistry == rhs.localLifecycleRegistry

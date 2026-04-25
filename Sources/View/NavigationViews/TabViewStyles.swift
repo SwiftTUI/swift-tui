@@ -645,8 +645,14 @@ private enum TabViewLayoutSubviewRoleKey: LayoutValueKey {
 @MainActor
 private let tabViewContainerAnyLayout = AnyLayout(TabViewContainerLayout())
 
-private struct TabViewContainerLayout: Layout, MeasurementLayoutReuseProviding {
+private struct TabViewContainerLayout: Layout, MeasurementLayoutReuseProviding,
+  PlacementLayoutReuseProviding
+{
   var measurementLayoutReuseSignature: String {
+    "TabViewContainerLayout"
+  }
+
+  var placementLayoutReuseSignature: String {
     "TabViewContainerLayout"
   }
 

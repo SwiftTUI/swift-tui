@@ -7,6 +7,7 @@ package struct NodeHandlers {
   package var gestureStateRegistrations: [Identity: [AnyGestureStateBinding]]
   package var focusBindingRegistrations: [FocusBindingRegistrationSnapshot]
   package var focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot]
+  package var scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot]
   package var lifecycleRegistrations: LifecycleHandlerSnapshot
   package var taskRegistrations: [Identity: TaskRegistration]
   package var preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot]
@@ -20,6 +21,7 @@ package struct NodeHandlers {
     gestureStateRegistrations: [Identity: [AnyGestureStateBinding]] = [:],
     focusBindingRegistrations: [FocusBindingRegistrationSnapshot] = [],
     focusedValuesRegistrations: [FocusedValuesRegistrationSnapshot] = [],
+    scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot] = [],
     lifecycleRegistrations: LifecycleHandlerSnapshot = .init(),
     taskRegistrations: [Identity: TaskRegistration] = [:],
     preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot] = []
@@ -32,6 +34,7 @@ package struct NodeHandlers {
     self.gestureStateRegistrations = gestureStateRegistrations
     self.focusBindingRegistrations = focusBindingRegistrations
     self.focusedValuesRegistrations = focusedValuesRegistrations
+    self.scrollPositionRegistrations = scrollPositionRegistrations
     self.lifecycleRegistrations = lifecycleRegistrations
     self.taskRegistrations = taskRegistrations
     self.preferenceObservationRegistrations = preferenceObservationRegistrations
@@ -105,6 +108,18 @@ package struct NodeHandlers {
       focusedValuesRegistrations[existingIndex].values.merge(registration.values)
     } else {
       focusedValuesRegistrations.append(registration)
+    }
+  }
+
+  package mutating func recordScrollPosition(
+    _ registration: ScrollPositionRegistrationSnapshot
+  ) {
+    if let existingIndex = scrollPositionRegistrations.firstIndex(where: {
+      $0.identity == registration.identity
+    }) {
+      scrollPositionRegistrations[existingIndex] = registration
+    } else {
+      scrollPositionRegistrations.append(registration)
     }
   }
 

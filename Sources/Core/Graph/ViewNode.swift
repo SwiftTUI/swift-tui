@@ -428,6 +428,12 @@ package final class ViewNode {
     registeredHandlers.recordFocusedValues(registration)
   }
 
+  package func recordScrollPositionRegistration(
+    _ registration: ScrollPositionRegistrationSnapshot
+  ) {
+    registeredHandlers.recordScrollPosition(registration)
+  }
+
   package func recordLifecycleAppearRegistration(
     handlerID: String,
     handler: @escaping LocalLifecycleRegistry.Handler
