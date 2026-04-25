@@ -899,7 +899,10 @@ struct InteractiveRuntimeTests {
     #expect(result.finalState == InteractiveDemoState(value: 2))
     let firstFrame = try #require(terminal.frames.first)
     #expect(firstFrame.contains("▤ Presets"))
-    #expect(firstFrame.contains("│╭-5"))
+    // The list reserves a 2-cell selection gutter unconditionally so that
+    // toggling focus does not shift row content sideways; row text therefore
+    // sits two columns inside the corner glyph rather than butting against it.
+    #expect(firstFrame.contains("│╭  -5"))
     #expect(firstFrame.contains("│ ↑"))
     #expect(firstFrame.contains("│ ↓"))
     #expect(

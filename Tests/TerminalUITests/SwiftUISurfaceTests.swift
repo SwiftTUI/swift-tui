@@ -3214,8 +3214,12 @@ struct SwiftUISurfaceTests {
     let unfocusedList = renderList(focused: false)
     let focusedList = renderList(focused: true)
     #expect(unfocusedList != focusedList)
-    #expect(!unfocusedList.lines.joined(separator: "\n").contains("▌ One"))
+    // The selection-marker gutter is structural: the glyph reserves its
+    // column on the selected row in both states, so the rendered character
+    // grid is identical and only the cell styling differs on focus.
+    #expect(unfocusedList.lines.joined(separator: "\n").contains("▌ One"))
     #expect(focusedList.lines.joined(separator: "\n").contains("▌ One"))
+    #expect(unfocusedList.lines == focusedList.lines)
 
     let unfocusedTable = renderTable(focused: false)
     let focusedTable = renderTable(focused: true)

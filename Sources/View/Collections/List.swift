@@ -304,7 +304,11 @@ extension List {
       selectedRowBackgroundStyle: isListOrRowFocused && showsFocusEffect
         ? rowChrome.backgroundStyle : nil,
       selectedRowMarkerStyle: isListOrRowFocused && showsFocusEffect ? rowChrome.borderStyle : nil,
-      showsSelectionMarker: isListOrRowFocused && showsFocusEffect && !rows.isEmpty,
+      // The gutter is structural: reserve it for any non-empty list whose
+      // focus effects are enabled, regardless of whether focus is currently
+      // inside the list. Toggling the gutter on focus arrival would shift
+      // every row's content sideways at the moment of highlighting.
+      showsSelectionMarker: showsFocusEffect && !rows.isEmpty,
       showsIndicators: showsIndicators,
       opacity: chrome.opacity
     )
