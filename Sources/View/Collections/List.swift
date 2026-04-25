@@ -126,13 +126,16 @@ extension Section {
 /// Presents selectable rows in a vertically scrollable list.
 public struct List<SelectionValue: Hashable, Content: View>: View, ResolvableView {
   public var selection: Binding<SelectionValue>
+  private var onActivate: (@MainActor (SelectionValue) -> Void)?
   private var content: Content
 
   public init(
     selection: Binding<SelectionValue>,
+    onActivate: (@MainActor (SelectionValue) -> Void)? = nil,
     @ViewBuilder content: () -> Content
   ) {
     self.selection = selection
+    self.onActivate = onActivate
     self.content = content()
   }
 
@@ -166,19 +169,38 @@ extension List {
         selection: selection.wrappedValue
       )
     }
+    let focusedRowIndex = rows.indices.first { rowIndex in
+      context.environmentValues.focusedIdentity
+        == listRowIdentity(
+          for: context.identity,
+          rowIndex: rowIndex
+        )
+    }
+    let isListOrRowFocused = isFocused || focusedRowIndex != nil
+    let activeRowIndex = focusedRowIndex ?? selectedIndex
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
-      isFocused: isFocused && showsFocusEffect
+      isFocused: isListOrRowFocused && showsFocusEffect
     )
     let rowChrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
-      isFocused: isFocused && showsFocusEffect,
+      isFocused: isListOrRowFocused && showsFocusEffect,
       isSelected: true
     )
 
     if isEnabled {
       let binding = selection
       let dynamicPropertyScope = currentAuthoringContext()
+      let activate: @MainActor (SelectionTag) -> Bool = { tag in
+        guard let value = pickerSelectionValue(from: tag, as: SelectionValue.self) else {
+          return false
+        }
+        if binding.wrappedValue != value {
+          binding.wrappedValue = value
+        }
+        onActivate?(value)
+        return true
+      }
       context.localKeyHandlerRegistry?.register(identity: context.identity) { event in
         let delta: Int?
         switch event {
@@ -186,6 +208,13 @@ extension List {
           delta = -1
         case .arrowDown:
           delta = 1
+        case .return, .space:
+          guard let selectedIndex, rows.indices.contains(selectedIndex) else {
+            return false
+          }
+          return withAuthoringContext(dynamicPropertyScope) {
+            activate(rows[selectedIndex].tag)
+          }
         default:
           delta = nil
         }
@@ -221,35 +250,59 @@ extension List {
       }
 
       for (rowIndex, row) in rows.enumerated() {
-        let routeID = primaryRouteID(
-          for: listRowIdentity(
-            for: context.identity,
-            rowIndex: rowIndex
-          )
+        let rowIdentity = listRowIdentity(
+          for: context.identity,
+          rowIndex: rowIndex
         )
-        context.localPointerHandlerRegistry?.register(routeID: routeID) { event in
-          guard case .down(.primary) = event.kind else {
+        context.localActionRegistry?.register(
+          identity: rowIdentity,
+          handler: {
+            withAuthoringContext(dynamicPropertyScope) {
+              activate(row.tag)
+            }
+          },
+          followUpInvalidationIdentity: dynamicPropertyScope?.viewIdentity
+        )
+        context.localKeyHandlerRegistry?.register(identity: rowIdentity) { event in
+          let delta: Int?
+          switch event {
+          case .arrowUp:
+            delta = -1
+          case .arrowDown:
+            delta = 1
+          default:
+            delta = nil
+          }
+
+          guard let delta, !rows.isEmpty else {
             return false
           }
 
-          return withAuthoringContext(dynamicPropertyScope) {
-            setBoundSelection(binding, to: row.tag)
+          let targetIndex = min(
+            max(rowIndex + delta, rows.startIndex),
+            rows.index(before: rows.endIndex)
+          )
+          _ = withAuthoringContext(dynamicPropertyScope) {
+            setBoundSelection(binding, to: rows[targetIndex].tag)
           }
+          return false
         }
       }
     }
 
     let payload = ListPayload(
       items: resolvedContent.items,
-      selectedRowIndex: selectedIndex,
+      selectedRowIndex: activeRowIndex,
       style: listStyle,
       foregroundStyle: chrome.foregroundStyle,
       backgroundStyle: chrome.backgroundStyle,
       borderStyle: chrome.borderStyle,
-      selectedRowForegroundStyle: isFocused && showsFocusEffect ? rowChrome.foregroundStyle : nil,
-      selectedRowBackgroundStyle: isFocused && showsFocusEffect ? rowChrome.backgroundStyle : nil,
-      selectedRowMarkerStyle: isFocused && showsFocusEffect ? rowChrome.borderStyle : nil,
-      showsSelectionMarker: isFocused && showsFocusEffect && !rows.isEmpty,
+      selectedRowForegroundStyle: isListOrRowFocused && showsFocusEffect
+        ? rowChrome.foregroundStyle : nil,
+      selectedRowBackgroundStyle: isListOrRowFocused && showsFocusEffect
+        ? rowChrome.backgroundStyle : nil,
+      selectedRowMarkerStyle: isListOrRowFocused && showsFocusEffect ? rowChrome.borderStyle : nil,
+      showsSelectionMarker: isListOrRowFocused && showsFocusEffect && !rows.isEmpty,
       showsIndicators: showsIndicators,
       opacity: chrome.opacity
     )
@@ -260,6 +313,7 @@ extension List {
       environmentSnapshot: context.environment,
       transactionSnapshot: context.transaction,
       semanticMetadata: focusableControlMetadata(
+        isFocusable: rows.isEmpty ? nil : false,
         focusInteractions: .edit,
         scrollRole: .list,
         presentationRole: .list

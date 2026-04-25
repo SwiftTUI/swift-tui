@@ -653,7 +653,15 @@ private func presetListView(
   bindings: InteractiveDemoBindings
 ) -> AnyView {
   AnyView(
-    List(selection: bindings.selectedPresetIndex) {
+    List(
+      selection: bindings.selectedPresetIndex,
+      onActivate: { index in
+        guard state.presets.indices.contains(index) else {
+          return
+        }
+        bindings.value.wrappedValue = state.presets[index]
+      }
+    ) {
       Section {
         ForEach(state.presets.indices, id: \.self) { index in
           Text(

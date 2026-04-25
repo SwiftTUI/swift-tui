@@ -2527,6 +2527,7 @@ struct SwiftUISurfaceTests {
 
     let box = SelectionBox()
     let registry = LocalKeyHandlerRegistry()
+    let actionRegistry = LocalActionRegistry()
     var environmentValues = EnvironmentValues()
     environmentValues.focusedIdentity = testIdentity("PresetList")
 
@@ -2546,15 +2547,56 @@ struct SwiftUISurfaceTests {
       context: .init(
         identity: testIdentity("Root"),
         environmentValues: environmentValues,
+        localActionRegistry: actionRegistry,
         localKeyHandlerRegistry: registry,
         applyEnvironmentValues: true
       )
     )
 
-    #expect(artifacts.semanticSnapshot.focusRegions.map(\.identity) == [testIdentity("PresetList")])
+    #expect(
+      artifacts.semanticSnapshot.focusRegions.map(\.identity) == [
+        listRowIdentity(for: testIdentity("PresetList"), rowIndex: 0),
+        listRowIdentity(for: testIdentity("PresetList"), rowIndex: 1),
+        listRowIdentity(for: testIdentity("PresetList"), rowIndex: 2),
+      ])
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("▌ Zero"))
     #expect(registry.dispatch(identity: testIdentity("PresetList"), event: .arrowDown))
     #expect(box.value == 2)
+    #expect(
+      actionRegistry.dispatch(
+        identity: listRowIdentity(for: testIdentity("PresetList"), rowIndex: 2)
+      )
+    )
+    #expect(box.value == 4)
+  }
+
+  @Test("List row focus renders the focused row without requiring selection")
+  func listRowFocusRendersFocusedRow() {
+    var environmentValues = EnvironmentValues()
+    environmentValues.focusedIdentity = listRowIdentity(
+      for: testIdentity("PresetList"),
+      rowIndex: 1
+    )
+
+    let artifacts = DefaultRenderer().render(
+      List(selection: .constant(nil as Int?)) {
+        Text("Zero").tag(0)
+        Text("One").tag(1)
+        Text("Two").tag(2)
+      }
+      .id(testIdentity("PresetList"))
+      .listStyle(.plain),
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: environmentValues,
+        applyEnvironmentValues: true
+      )
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(surface.contains("▌ One"))
+    #expect(!surface.contains("▌ Zero"))
+    #expect(!surface.contains("▌ Two"))
   }
 
   @Test("plain List leaves Section headers and footers unobscured inline with tagged row content")
