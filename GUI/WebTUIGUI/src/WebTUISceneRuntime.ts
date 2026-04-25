@@ -438,6 +438,7 @@ export class WebTUISceneRuntime {
     if (text !== " ") {
       context.globalAlpha = opacity;
       context.fillStyle = foreground;
+      context.strokeStyle = foreground;
       if (!canRenderBoxDrawing(text) || !drawBoxDrawing(context, text, {
         x: rectX,
         y: rectY,
