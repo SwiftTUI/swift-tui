@@ -2,8 +2,8 @@ public import Core
 
 /// A terminal-native geometry proxy.
 ///
-/// For now, the proxy reports the current terminal surface size from the
-/// environment rather than a per-container local coordinate space.
+/// The proxy reports the size proposed by the nearest resolved container when
+/// that container can tighten the geometry environment.
 public struct GeometryProxy: Equatable, Sendable {
   public var size: Size
   public var safeAreaInsets: EdgeInsets
@@ -20,7 +20,7 @@ public struct GeometryProxy: Equatable, Sendable {
   }
 }
 
-/// Reads the current terminal geometry and maps it into authored content.
+/// Reads the current proposed geometry and maps it into authored content.
 public struct GeometryReader<Content: View>: View, ResolvableView {
   private let content: (GeometryProxy) -> Content
 
@@ -43,6 +43,9 @@ public struct GeometryReader<Content: View>: View, ResolvableView {
     let view = context.trackingObservableAccess {
       content(proxy)
     }
-    return view.resolveElements(in: context)
+    return
+      view
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+      .resolveElements(in: context)
   }
 }

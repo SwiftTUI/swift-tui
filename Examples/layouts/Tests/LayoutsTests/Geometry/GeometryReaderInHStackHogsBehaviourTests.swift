@@ -14,32 +14,20 @@ struct GeometryReaderInHStackHogsBehaviourTests {
   /// GeometryReader fills the terminal width and `[SIBLING]` gets
   /// pushed off-screen (or truncated at the far right).
   ///
-  /// Observed raster at 80×28:
+  /// Observed raster at 80×28 after GeometryReader adopts flexible
+  /// proposal-filling behaviour:
   ///
   /// ```
   /// [1]  Geometry reader in HStack hogs|
-  /// [2]  ▛▀▀▀▀▀▀▀▀▀▀▀▀▀▜|
-  /// [5]  ▌[G] [SIBLING]▐|
+  /// [2]  ▛▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▜|
+  /// [3]  ▌[G]                                                                         ▐|
+  /// [5]  ▌                                                                   [SIBLING]▐|
   /// [8]  ▙▄▄▄▄▄▄▄▄▄▄▄▄▄▟|
   /// ```
   ///
-  /// Two library-specific observations:
-  ///   1. The HStack shrinks to its intrinsic content width (~13 cells
-  ///      for `"[G] [SIBLING]"`), rather than taking the full 80-cell
-  ///      proposal.  The `.frame(height: 5)` is honoured in the
-  ///      vertical axis, but horizontally the stack fits the content.
-  ///   2. The GeometryReader contributes its child's intrinsic width
-  ///      (`[G]`, 3 cells) to the HStack rather than hogging the
-  ///      parent's horizontal proposal.
-  ///
-  /// Net effect: BOTH `[G]` and `[SIBLING]` are fully visible inside
-  /// a narrow border (no hogging, no starvation).  The classic
-  /// "eats everything" gotcha does NOT reproduce here.
-  ///
-  /// Pinning the observed behaviour: both labels are visible on the
-  /// same row with `[G]` leading.  See `BEHAVIOUR_FINDINGS.md`
-  /// finding #6.
-  @Test("GeometryReader does not hog — HStack shrinks to content and both children render")
+  /// The HStack now expands to the available horizontal proposal and
+  /// the GeometryReader receives the slack before the sibling.
+  @Test("GeometryReader hogs available HStack width")
   func bothChildrenVisibleHStackShrinksToContent() {
     let raster = render(GeometryReaderInHStackHogs(), width: 80, height: 28).rasterSurface
     let joined = raster.lines.joined(separator: "\n")
@@ -51,23 +39,16 @@ struct GeometryReaderInHStackHogsBehaviourTests {
     guard let sibRow = raster.firstRow(containing: "[SIBLING]") else {
       Issue.record(
         """
-        expected `[SIBLING]` in raster — if the library has adopted \
-        the SwiftUI "GeometryReader hogs" behaviour, this test should \
-        be flipped to expect `[SIBLING]` to be absent/pushed off-screen.
-        See BEHAVIOUR_FINDINGS.md finding #6.
+        expected `[SIBLING]` in raster at the trailing edge after \
+        the GeometryReader takes the available slack.
         \(joined)
         """
       )
       return
     }
 
-    // Both on the same row.
-    #expect(
-      gRow == sibRow,
-      "expected `[G]` and `[SIBLING]` on the same raster row; got G=\(gRow), SIB=\(sibRow)\n\(joined)"
-    )
-
-    // `[G]` precedes `[SIBLING]`.
+    // `[G]` starts near the leading edge and `[SIBLING]` is pushed
+    // toward the trailing edge by the reader's flexible allocation.
     let gLine = raster.row(at: gRow) ?? ""
     let sibLine = raster.row(at: sibRow) ?? ""
     guard let gCol = column(of: "[G]", in: gLine),
@@ -77,31 +58,24 @@ struct GeometryReaderInHStackHogsBehaviourTests {
       return
     }
     #expect(
-      gCol < sibCol,
-      "expected `[G]` to lead `[SIBLING]` in the HStack; got G=\(gCol), SIB=\(sibCol)\n\(joined)"
+      gCol < 5,
+      "expected `[G]` near the leading edge; got col=\(gCol)\n\(joined)"
+    )
+    #expect(
+      sibCol > 60,
+      "expected `[SIBLING]` near the trailing edge; got col=\(sibCol)\n\(joined)"
     )
 
-    // The HStack is shrink-to-fit: the bordered width is ≤ 20 cells,
-    // well under the 80-cell proposal.  This pins the observation
-    // that the HStack does NOT expand to the proposal.
-    // Find the top border row and compute its width.
+    // The HStack now takes the available horizontal proposal.
     if let borderRow = raster.firstRow(containing: "▛") {
       let borderLine = raster.row(at: borderRow) ?? ""
-      // The top-left corner glyph is `▛`; find its column and the
-      // matching top-right corner `▜`.
       if let leftCol = column(of: "▛", in: borderLine),
         let rightCol = column(of: "▜", in: borderLine)
       {
         let borderWidth = rightCol - leftCol + 1
         #expect(
-          borderWidth < 40,
-          """
-          expected HStack border to shrink around content (< 40 cells \
-          wide on an 80-cell viewport); got borderWidth=\(borderWidth). \
-          A wide border (~80) would indicate the library now gives the \
-          HStack the full horizontal proposal — revisit BEHAVIOUR_FINDINGS.md finding #6.
-          \(joined)
-          """
+          borderWidth >= 70,
+          "expected HStack border to expand toward the 80-cell proposal; got \(borderWidth)\n\(joined)"
         )
       }
     }

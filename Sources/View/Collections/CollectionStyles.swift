@@ -140,7 +140,7 @@ public struct PlainListStyle:
   }
 }
 
-/// A grouped collection style with rounded outer chrome.
+/// A grouped collection style with rounded section chrome.
 public struct InsetGroupedListStyle:
   ListStyle,
   Sendable,

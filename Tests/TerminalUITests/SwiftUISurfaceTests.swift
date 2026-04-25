@@ -2611,7 +2611,8 @@ struct SwiftUISurfaceTests {
     )
 
     let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
-    #expect(surface.contains("╭"))
+    let lines = artifacts.rasterSurface.lines
+    #expect(lines.filter { $0.contains("╭") }.count == 2)
     #expect(surface.contains("Primary"))
     #expect(surface.contains("Secondary"))
     #expect(surface.contains("▌ Two"))

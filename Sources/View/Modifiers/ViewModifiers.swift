@@ -938,9 +938,20 @@ public struct FrameModifier: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
+    var contentContext = context.child(component: .named("content"))
+    if width != nil || height != nil {
+      var terminalSize = contentContext.environmentValues.terminalSize
+      if let width {
+        terminalSize.width = width
+      }
+      if let height {
+        terminalSize.height = height
+      }
+      contentContext = contentContext.settingEnvironment(\.terminalSize, to: terminalSize)
+    }
     let contentNode = resolveModifierContent(
       content,
-      in: context.child(component: .named("content"))
+      in: contentContext
     )
     return [
       ResolvedNode(
