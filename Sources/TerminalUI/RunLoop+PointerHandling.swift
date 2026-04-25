@@ -258,7 +258,9 @@ extension RunLoop {
         )
       )
       if handled {
-        scheduler.requestInvalidation(of: [scrollRoute.identity])
+        scheduler.requestInvalidation(
+          of: scrollPointerInvalidationIdentities(for: scrollRoute.identity)
+        )
       }
     } else if let hitTarget = hitTarget(at: location) {
       let handled = dispatchPointerEvent(
@@ -272,9 +274,29 @@ extension RunLoop {
         )
       )
       if handled {
-        scheduler.requestInvalidation(of: [hitTarget.region.identity])
+        scheduler.requestInvalidation(
+          of: scrollPointerInvalidationIdentities(for: hitTarget.region.identity)
+        )
       }
     }
+  }
+
+  private func scrollPointerInvalidationIdentities(
+    for identity: Identity
+  ) -> Set<Identity> {
+    var identities: Set<Identity> = [identity]
+    var parent = identity.parent
+    while let current = parent {
+      guard !current.components.isEmpty else {
+        break
+      }
+      if current == rootIdentity, identities.count > 1 {
+        break
+      }
+      identities.insert(current)
+      parent = current.parent
+    }
+    return identities
   }
 
   /// Returns whether a click at `location` should move focus to `focusIdentity`.
