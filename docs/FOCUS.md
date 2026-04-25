@@ -604,7 +604,61 @@ This aligns with the existing project vision:
 - focused values and focus state are part of SwiftUI-faithful runtime semantics, not convenience extras
 - **the focus chain is load-bearing for the scope hypothesis.** Commands belong to scopes, and a scope's activation predicate is that its anchor node is on the current focus chain. Tree presence is a prerequisite but not sufficient — a resolved-but-unreachable node is philosophically silent. This elevates focus from "keyboard routing" to "the primary reachability primitive" — every command availability decision the framework makes bottoms out in focus-chain membership. See [STATUS.md](STATUS.md) for the full scope hypothesis.
 
-## 10. Sources
+## 10. A Nuanced Case: Focus Appearance In `List`
+
+The relationship between focus, selection, and visual highlighting in `List` is one of the places where SwiftUI is easier to caricature than to describe. It is worth working through carefully because the project diverges from one plausible reading of SwiftUI's behavior, and the divergence is intentional.
+
+### 10.1 What You Actually See In SwiftUI
+
+When you keyboard-navigate a SwiftUI `List(selection: $sel)` — for example, a sidebar in a `NavigationSplitView` with `NavigationLink` rows — you do see a tint move row by row as you press the arrow keys. It is tempting to call that a "focus tint," but it is not. It is the *selection* tint, and the reason it tracks the arrow keys is that on selection-driven lists the keyboard navigation drives the selection binding directly. Focus and selection move together because that is how the platform wires keyboard navigation through a selection-bound list, not because the list paints a separate focus highlight on top of selection.
+
+A few consequences fall out of that:
+
+- A selection-bound `List` can show its selected-row tint even when keyboard focus has left the list entirely. The tint is bound to selection, not to focus ownership.
+- The list *container* itself does not paint a single uniform background tint behind every row simply because focus is inside it. The visible affordance is row-shaped, not list-shaped.
+- macOS sidebars do communicate "this list is the active one" through a subtle border or inset treatment, but that lives at the chrome edge, not as a content-region fill.
+
+So the short version of SwiftUI's behavior is:
+
+- The row tint is selection.
+- Selection follows keyboard navigation.
+- The container does not get a separate focus fill.
+
+### 10.2 Why The Analogy To This Project Is Imperfect
+
+This runtime does not implement `NavigationLink`. Its `List` accepts a `selection:` binding, but selection is not tied to a navigation routing system. There is no sidebar-versus-detail relationship to anchor the "selection persists when focus leaves" pattern, and there is no separate route-driven selection that competes with keyboard movement.
+
+That changes the design question. In SwiftUI a selection-bound list has two distinct things to communicate (the route-active row, and where the keyboard cursor currently is) and uses one channel (selection-follows-focus) for both. Without `NavigationLink`, this project effectively only has the second of those things to communicate. The selected row *is* the focused row in almost every case the runtime cares about.
+
+That makes any one-to-one parity argument suspect. The faithful answer is not "do whatever SwiftUI does," because SwiftUI's behavior is shaped by a navigation model the project does not yet have. The faithful answer is to ask which of SwiftUI's signals are still meaningful here, and which were doing work that is no longer needed.
+
+### 10.3 The Decision The Project Has Made
+
+The runtime models focus appearance for `List` at the row layer, not the container layer:
+
+- The container chrome (`List`'s own background and border fills) stays neutral regardless of whether focus is inside the list. See `Sources/View/Collections/List.swift` where `controlChrome` is invoked with `isFocused: false`.
+- The active row (the focused-or-selected row) gets `rowChrome(...)` resolved with `isFocused: true, isSelected: true`, which paints `terminalRow(tone, isSelected: true)` as a row-shaped background.
+- A small caret glyph (`▌`) at the leading edge of the active row reinforces the row-shaped signal in low-color terminals.
+
+The reason this matters: when an earlier version of the runtime tinted both the list container *and* the active row using the same shape style, the two highlights resolved to identical colors and visually merged. The user could see that "something is selected" but not "which row is selected." Two redundant signals at different layers, painted with the same color, cancel each other out.
+
+Removing the container tint leaves a single, row-shaped focus signal, which is the SwiftUI-faithful affordance for the sub-problem the project actually solves (a selection-bound list without navigation routing).
+
+### 10.4 What This Decision Does Not Cover
+
+There is one case the current behavior does not communicate well: a `List` that has focus but no active row — for example, an empty list, or a list that has just received focus and has no selection yet. Today such a list shows no focus affordance at all, because the only signal lives at the row layer and there is no row to paint.
+
+If the project later needs to express "this list is the currently active container" independently of any row, the right move is probably to give the list back a focused *border* tone (the chrome already supports this via `controlChrome.borderForegroundStyle`) without re-introducing the focused content-background fill. That preserves the row-shaped affordance as the dominant signal while still letting the chrome edge announce list-level activation, which is closer to the macOS sidebar pattern than the previous all-rows-tinted behavior was.
+
+This is filed as a known open consideration rather than a bug. Until a use case forces it, the simpler rule (focus is signalled at the row layer, full stop) is preferable to a layered set of rules whose interaction has to be reasoned about every time the styling changes.
+
+### 10.5 The General Principle
+
+The case generalizes beyond `List`. When a SwiftUI-faithful runtime considers focus appearance, the useful question is not "does SwiftUI paint a highlight here?" — it is "what is SwiftUI's highlight actually communicating, and does that signal still have a referent in the simplified model?" Selection-follows-focus tinting in a navigation sidebar is a real SwiftUI behavior, but it is doing work that depends on machinery (selection plus routing) that may or may not exist downstream. Borrowing the *appearance* without the *machinery* produces a highlight that means nothing, which reads as visual noise rather than as an affordance.
+
+The project's working rule is therefore to model focus appearance against the runtime's own semantics, with SwiftUI as a reference for the questions worth asking, not as a literal style sheet.
+
+## 11. Sources
 
 Primary Apple sources used for this document:
 
