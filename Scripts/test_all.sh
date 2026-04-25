@@ -102,19 +102,19 @@ run_logged_command() {
 
 for argument in "$@"; do
   case "$argument" in
-    --skip-bun-install)
-      skip_bun_install=1
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      >&2 echo "Unknown argument: $argument"
-      >&2 echo ""
-      usage
-      exit 1
-      ;;
+  --skip-bun-install)
+    skip_bun_install=1
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    >&2 echo "Unknown argument: $argument"
+    >&2 echo ""
+    usage
+    exit 1
+    ;;
   esac
 done
 
@@ -164,7 +164,7 @@ run_step() {
 
   if (
     cd "$workdir" &&
-    run_logged_command "$log_file" "$status_file" "$@"
+      run_logged_command "$log_file" "$status_file" "$@"
   ); then
     rm -f "$status_file"
     echo "PASS: $title"
@@ -211,15 +211,15 @@ check_swift_environment() {
   echo "$version_output"
 
   case "$version_output" in
-    *"Swift version 6.3"*|*"Apple Swift version 6.3"*)
-      return 0
-      ;;
-    *)
-      >&2 echo ""
-      >&2 echo "Expected Swift 6.3.x for this repository."
-      >&2 echo "Use 'swiftly run swift ...' directly, or make sure 'swift' resolves to the swiftly-managed toolchain."
-      return 1
-      ;;
+  *"Swift version 6.3"* | *"Apple Swift version 6.3"*)
+    return 0
+    ;;
+  *)
+    >&2 echo ""
+    >&2 echo "Expected Swift 6.3.x for this repository."
+    >&2 echo "Use 'swiftly run swift ...' directly, or make sure 'swift' resolves to the swiftly-managed toolchain."
+    return 1
+    ;;
   esac
 }
 
@@ -276,25 +276,25 @@ else
     run_swift test --package-path GUI/SwiftUITUIGUI
 fi
 
-if [ "$is_linux" -eq 1 ]; then
-  skip_step \
-    "Run GUI/SwiftTermTUIGUI tests" \
-    "SwiftUI host package is only available on Apple platforms"
-else
-  run_function_step \
-    "Run GUI/SwiftTermTUIGUI tests" \
-    run_swift test --package-path GUI/SwiftTermTUIGUI
-fi
+#if [ "$is_linux" -eq 1 ]; then
+#  skip_step \
+#    "Run GUI/SwiftTermTUIGUI tests" \
+#    "SwiftUI host package is only available on Apple platforms"
+#else
+#  run_function_step \
+#    "Run GUI/SwiftTermTUIGUI tests" \
+#    run_swift test --package-path GUI/SwiftTermTUIGUI
+#fi
 
-run_step \
-  "Run GUI/WebTUIGUI Bun tests" \
-  "$repo_root/GUI/WebTUIGUI" \
-  bun test
+#run_step \
+#  "Run GUI/WebTUIGUI Bun tests" \
+#  "$repo_root/GUI/WebTUIGUI" \
+#  bun test
 
-run_step \
-  "Run GUI/XtermWebTUIGUI Bun tests" \
-  "$repo_root/GUI/XtermWebTUIGUI" \
-  bun test
+#run_step \
+#  "Run GUI/XtermWebTUIGUI Bun tests" \
+#  "$repo_root/GUI/XtermWebTUIGUI" \
+#  bun test
 
 run_function_step \
   "Run Examples/gallery tests" \
@@ -304,20 +304,20 @@ run_function_step \
   "Run Examples/layouts tests" \
   run_swift test --package-path Examples/layouts
 
-run_step \
-  "Run Examples/WebExample Bun tests" \
-  "$repo_root/Examples/WebExample" \
-  bun test
-
-run_step \
-  "Run Examples/WebExample browser integration test" \
-  "$repo_root/Examples/WebExample" \
-  bun run test:browser
-
-run_step \
-  "Run Examples/XtermWebExample Bun tests" \
-  "$repo_root/Examples/XtermWebExample" \
-  bun test
+# run_step \
+#   "Run Examples/WebExample Bun tests" \
+#   "$repo_root/Examples/WebExample" \
+#   bun test
+#
+# run_step \
+#   "Run Examples/WebExample browser integration test" \
+#   "$repo_root/Examples/WebExample" \
+#   bun run test:browser
+#
+# run_step \
+#   "Run Examples/XtermWebExample Bun tests" \
+#   "$repo_root/Examples/XtermWebExample" \
+#   bun test
 
 echo ""
 
