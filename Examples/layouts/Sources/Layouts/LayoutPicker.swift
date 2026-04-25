@@ -23,13 +23,15 @@ public struct LayoutPicker: View {
     VStack(alignment: .leading, spacing: 0) {
       header
       Divider()
-      List(selection: $selection) {
-        ForEach(LayoutEntry.Category.allCases, id: \.rawValue) { category in
-          let entries = LayoutCatalog.all.filter { $0.category == category }
-          if !entries.isEmpty {
-            Section(category.rawValue) {
-              ForEach(entries, id: \.id) { entry in
-                row(entry)
+      ScrollView {
+        List(selection: $selection) {
+          ForEach(LayoutEntry.Category.allCases, id: \.rawValue) { category in
+            let entries = LayoutCatalog.all.filter { $0.category == category }
+            if !entries.isEmpty {
+              Section(category.rawValue) {
+                ForEach(entries, id: \.id) { entry in
+                  row(entry)
+                }
               }
             }
           }
