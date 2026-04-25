@@ -20,12 +20,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Swift toolchain via swiftly
+      - name: Install swiftly and Swift toolchain
         shell: bash
         run: |
           set -euo pipefail
+          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
+          hash -r
           swiftly install --use --assume-yes
           swiftly list
+          # Persist swiftly on PATH and SWIFTLY_HOME_DIR for subsequent steps
+          # (each `run:` step gets a fresh shell, so env.sh sourcing alone won't carry over).
+          echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
