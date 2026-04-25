@@ -193,7 +193,7 @@ struct DeployDashboardView: View {
         .bold()
 
       HStack(alignment: .top, spacing: 2) {
-        TextFigure("\(rolloutPercent)%", font: .miniwi)
+        TextFigure("\(rolloutPercent)%", font: .future)
           .foregroundStyle(healthTone)
 
         VStack(alignment: .leading, spacing: 0) {
