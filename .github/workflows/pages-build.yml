@@ -17,12 +17,15 @@ jobs:
 
     steps:
 
-      - uses: swift-actions/setup-swift@v3
-        with:
-          swift-version: "6.3"
-
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install Swift toolchain via swiftly
+        shell: bash
+        run: |
+          set -euo pipefail
+          swiftly install --use --assume-yes
+          swiftly list
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
