@@ -172,6 +172,7 @@ private protocol AnyLayoutBox {
   var debugName: String { get }
   var builtinLayoutBehavior: LayoutBehavior? { get }
   var measurementReuseSignature: String? { get }
+  var placementReuseSignature: String? { get }
 
   func makeCache(subviews: LayoutSubviews) -> Any
 
@@ -198,6 +199,10 @@ package protocol MeasurementLayoutReuseProviding {
   var measurementLayoutReuseSignature: String { get }
 }
 
+package protocol PlacementLayoutReuseProviding {
+  var placementLayoutReuseSignature: String { get }
+}
+
 private struct ConcreteAnyLayoutBox<L: Layout>: AnyLayoutBox {
   var layout: L
 
@@ -211,6 +216,10 @@ private struct ConcreteAnyLayoutBox<L: Layout>: AnyLayoutBox {
 
   var measurementReuseSignature: String? {
     (layout as? any MeasurementLayoutReuseProviding)?.measurementLayoutReuseSignature
+  }
+
+  var placementReuseSignature: String? {
+    (layout as? any PlacementLayoutReuseProviding)?.placementLayoutReuseSignature
   }
 
   func makeCache(subviews: LayoutSubviews) -> Any {
@@ -284,6 +293,7 @@ public struct AnyLayout: Layout {
       customLayoutHandle = CustomLayoutHandle(
         proxyBox,
         measurementReuseSignature: box.measurementReuseSignature,
+        placementReuseSignature: box.placementReuseSignature,
         placementHandler: { engine, node, measured, bounds, passContext in
           proxyBox.placeSubviews(
             engine: engine,

@@ -473,6 +473,7 @@ extension CustomLayoutProxy {
 public final class CustomLayoutHandle: Sendable {
   public let proxy: any CustomLayoutProxy
   package let measurementReuseSignature: String?
+  package let placementReuseSignature: String?
   package let placementHandler:
     (
       @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) -> [PlacedNode]
@@ -480,16 +481,19 @@ public final class CustomLayoutHandle: Sendable {
 
   public init(
     _ proxy: some CustomLayoutProxy,
-    measurementReuseSignature: String? = nil
+    measurementReuseSignature: String? = nil,
+    placementReuseSignature: String? = nil
   ) {
     self.proxy = proxy
     self.measurementReuseSignature = measurementReuseSignature
+    self.placementReuseSignature = placementReuseSignature
     placementHandler = nil
   }
 
   package init(
     _ proxy: some CustomLayoutProxy,
     measurementReuseSignature: String? = nil,
+    placementReuseSignature: String? = nil,
     placementHandler:
       (
         @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) ->
@@ -498,6 +502,7 @@ public final class CustomLayoutHandle: Sendable {
   ) {
     self.proxy = proxy
     self.measurementReuseSignature = measurementReuseSignature
+    self.placementReuseSignature = placementReuseSignature
     self.placementHandler = placementHandler
   }
 
@@ -565,6 +570,30 @@ extension LayoutBehavior {
       case .custom(let rhsHandle) = other,
       let lhsSignature = lhsHandle.measurementReuseSignature,
       let rhsSignature = rhsHandle.measurementReuseSignature
+    else {
+      return false
+    }
+
+    return lhsSignature == rhsSignature
+  }
+
+  package func isEquivalentForPlacement(
+    to other: Self
+  ) -> Bool {
+    if self == other {
+      return true
+    }
+
+    if case .border(let lhsSet, _, _, _, _, let lhsSides) = self,
+      case .border(let rhsSet, _, _, _, _, let rhsSides) = other
+    {
+      return lhsSet == rhsSet && lhsSides == rhsSides
+    }
+
+    guard case .custom(let lhsHandle) = self,
+      case .custom(let rhsHandle) = other,
+      let lhsSignature = lhsHandle.placementReuseSignature,
+      let rhsSignature = rhsHandle.placementReuseSignature
     else {
       return false
     }

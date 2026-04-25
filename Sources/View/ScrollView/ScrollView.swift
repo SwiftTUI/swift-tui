@@ -73,6 +73,18 @@ public struct ScrollView<Content: View>: View, ResolvableView {
         let authoringContext =
           currentImperativeAuthoringContextSnapshot()
           ?? ImperativeAuthoringContextSnapshot(interactionAuthoringScope)
+        context.localScrollPositionRegistry?.register(
+          identity: context.identity,
+          currentOffset: {
+            let current = binding.wrappedValue
+            return ScrollOffset(x: current.x, y: current.y)
+          },
+          applyOffset: { offset in
+            withImperativeAuthoringContext(authoringContext) {
+              binding.wrappedValue = ScrollPosition(x: offset.x, y: offset.y)
+            }
+          }
+        )
         let registerKeyHandler: (Identity, ScrollIndicatorAxis?) -> Void = { identity, targetAxis in
           context.localKeyHandlerRegistry?.register(identity: identity) { event in
             withImperativeAuthoringContext(authoringContext) {
@@ -464,8 +476,12 @@ private struct ScrollViewLayout: Layout {
   }
 }
 
-extension ScrollViewLayout: MeasurementLayoutReuseProviding {
+extension ScrollViewLayout: MeasurementLayoutReuseProviding, PlacementLayoutReuseProviding {
   var measurementLayoutReuseSignature: String {
     "ScrollViewLayout:\(axes.rawValue):\(showsIndicators)"
+  }
+
+  var placementLayoutReuseSignature: String {
+    "ScrollViewLayout:\(axes.rawValue):\(showsIndicators):\(position.x):\(position.y)"
   }
 }

@@ -68,11 +68,15 @@ extension RunLoop {
         latestSemanticSnapshot.focusRegions.first(where: { $0.identity == identity })
       }?.focusInteractions ?? .automatic
 
-    if let focusedIdentity {
-      if localKeyHandlerRegistry.dispatch(
+    if let focusedIdentity,
+      localKeyHandlerRegistry.hasHandler(identity: focusedIdentity)
+    {
+      let handled = localKeyHandlerRegistry.dispatch(
         identity: focusedIdentity,
         keyPress: keyPress
-      ) {
+      )
+      scheduler.requestInvalidation(of: [rootIdentity])
+      if handled {
         return nil
       }
     }
