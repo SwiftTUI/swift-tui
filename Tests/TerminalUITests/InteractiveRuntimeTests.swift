@@ -700,7 +700,7 @@ struct InteractiveRuntimeTests {
     #expect(
       artifacts.semanticSnapshot.focusRegions.map(\.identity).contains(
         InteractiveDemoIdentity.selectionModePicker))
-    #expect(surface.contains("↓"))
+    #expect(surface.contains("▼"))
     #expect(surface.contains("12_"))
   }
 
@@ -880,11 +880,12 @@ struct InteractiveRuntimeTests {
     #expect(result.finalState == InteractiveDemoState(value: 2))
     let firstFrame = try #require(terminal.frames.first)
     #expect(firstFrame.contains("▤ Presets"))
-    #expect(firstFrame.contains("││-9"))
-    #expect(firstFrame.contains("││↓"))
+    #expect(firstFrame.contains("│╭-5"))
+    #expect(firstFrame.contains("│ ↑"))
+    #expect(firstFrame.contains("│ ↓"))
     #expect(
       terminal.frames.contains(where: {
-        $0.contains("││↑")
+        $0.contains("│ ↑")
           && $0.contains("││▌ 2")
       }))
     let lastFrame = try #require(terminal.frames.last)
