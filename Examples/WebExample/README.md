@@ -9,11 +9,8 @@ The example has two parts:
   library target plus a thin `WebExampleApp` executable launcher
 - `src/`: the Bun host that builds the manifest and wasm assets, serves them, and mounts `WebTUIGUI`
 
-The browser-hosted `WebExampleApp` is intentionally a curated, lightweight
-scene set rather than the full gallery package. The native examples still host
-the broader component gallery, but the slimmer web scene keeps the wasm build
-within the browser WebAssembly API's type-shape limits on current Swift 6.3
-toolchains.
+The browser-hosted `WebExampleApp` runs the same component gallery used by the
+SwiftUI demo, backed by the shared `GalleryDemoViews` target.
 
 ## Toolchains
 

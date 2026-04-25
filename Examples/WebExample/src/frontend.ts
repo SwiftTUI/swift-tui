@@ -121,19 +121,13 @@ const swiftKeywords: ReadonlySet<string> = new Set([
 
 const syntaxSample = `import TerminalUI
 import TerminalUICLI
+import GalleryDemoViews
 
 @main
-struct DeployApp: App {
-  @State private var releases = 18
-
+struct GalleryApp: App {
   var body: some Scene {
-    WindowGroup("Deploy Dashboard") {
-      VStack(alignment: .leading, spacing: 1) {
-        Text("Deploy Queue").bold()
-        ProgressView("Release", value: Double(releases), total: 24)
-        Button("Ship it") { releases += 1 }
-      }
-      .padding(1)
+    WindowGroup("Component Gallery") {
+      GalleryView()
     }
   }
 }`;
@@ -303,7 +297,7 @@ async function bootstrap(): Promise<void> {
                 </p>
                 <h2>The real app, running in the browser.</h2>
                 <p class="hero-stage-note">
-                  This is the actual WASI binary. Resize it and drive a curated release console built for the browser host.
+                  This is the same component gallery used by the SwiftUI demo, running from the actual WASI binary.
                 </p>
               </div>
             </div>
