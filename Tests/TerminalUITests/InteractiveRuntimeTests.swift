@@ -2778,6 +2778,7 @@ struct InteractiveRuntimeTests {
     scheduler.requestInvalidation(of: [rootIdentity])
     var renderedFrames = 0
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
 
     #expect(
       runLoop.handle(
@@ -2792,6 +2793,140 @@ struct InteractiveRuntimeTests {
     )
     #expect(scheduledFrame.causes.contains(.invalidation))
     #expect(scheduledFrame.invalidatedIdentities == [scrollIdentity])
+  }
+
+  @MainActor
+  @Test("handled pointer scrolling updates ScrollView internal state before follow-up input")
+  func handledPointerScrollingUpdatesInternalScrollStateBeforeFollowUpInput() throws {
+    let terminalSize = Size(width: 20, height: 8)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("InternalPointerScrollInvalidation")
+    let scrollIdentity = testIdentity("InternalPointerScrollInvalidation", "Scroll")
+    let scheduler = FrameScheduler()
+    let view =
+      ScrollView(.vertical) {
+        VStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<10) { index in
+            Text("Mouse \(index)")
+          }
+        }
+      }
+      .id(scrollIdentity)
+      .frame(width: 10, height: 5, alignment: .topLeading)
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalAppearance = terminal.appearance
+    environmentValues.terminalSize = terminalSize
+
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: ScriptedTerminalInputReader(events: []),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: environmentValues,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        view
+      }
+    )
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+
+    #expect(
+      runLoop.handle(
+        .input(
+          .mouse(
+            .init(kind: .scrolled(deltaX: 0, deltaY: 1), location: centerPoint(of: scrollRect))
+          ))) == nil)
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let rendered = terminal.frames.last ?? ""
+    #expect(rendered.contains("Mouse 1"))
+    #expect(!rendered.contains("Mouse 0"))
+  }
+
+  @MainActor
+  @Test("handled pointer scrolling repaints ScrollView wrapping a List before follow-up input")
+  func handledPointerScrollingRepaintsScrollViewWrappingListBeforeFollowUpInput() throws {
+    let terminalSize = Size(width: 40, height: 10)
+    let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
+    let rootIdentity = testIdentity("InternalListScrollInvalidation")
+    let scrollIdentity = testIdentity("InternalListScrollInvalidation", "Scroll")
+    let scheduler = FrameScheduler()
+    let view = ScrollWrappedListFixture(scrollIdentity: scrollIdentity)
+
+    let scrollRect = try #require(
+      renderedScrollViewportRect(
+        for: scrollIdentity,
+        in: view,
+        rootIdentity: rootIdentity,
+        terminalSize: terminalSize
+      )
+    )
+
+    var environmentValues = EnvironmentValues()
+    environmentValues.terminalAppearance = terminal.appearance
+    environmentValues.terminalSize = terminalSize
+
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: ScriptedTerminalInputReader(events: []),
+      signalReader: EmptySignalReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(
+        invalidationIdentities: [rootIdentity]
+      ),
+      environmentValues: environmentValues,
+      proposal: .init(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in
+        view
+      }
+    )
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+
+    let before = terminal.frames.last ?? ""
+    #expect(before.contains("List row 0"))
+
+    #expect(
+      runLoop.handle(
+        .input(
+          .mouse(
+            .init(kind: .scrolled(deltaX: 0, deltaY: 8), location: centerPoint(of: scrollRect))
+          ))) == nil)
+    try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+
+    let rendered = terminal.frames.last ?? ""
+    #expect(rendered.contains("List row 1"))
+    #expect(!rendered.contains("List row 0"))
   }
 
   @MainActor
@@ -4528,6 +4663,28 @@ private final class MouseControlBox {
   var tableSelection = 1
   var scrollPosition = ScrollPosition.zero
   var text = ""
+}
+
+private struct ScrollWrappedListFixture: View {
+  let scrollIdentity: Identity
+  @State private var selection: Int?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("Header")
+      ScrollView {
+        List(selection: $selection) {
+          ForEach(0..<12) { index in
+            Text("List row \(index)")
+              .tag(index)
+          }
+        }
+      }
+      .id(scrollIdentity)
+      .listStyle(.insetGrouped)
+      Text("Footer")
+    }
+  }
 }
 
 private struct StatefulImplicitPointerScrollFixture: View {

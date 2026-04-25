@@ -315,7 +315,7 @@ extension RunLoop {
     deltaX: Int = 0,
     deltaY: Int = 0
   ) -> ScrollRoute? {
-    latestSemanticSnapshot.scrollRoutes
+    let routes = latestSemanticSnapshot.scrollRoutes
       .filter { route in
         guard route.viewportRect.contains(point) else {
           return false
@@ -326,7 +326,14 @@ extension RunLoop {
         if deltaY != 0, !scrollsVertically { return false }
         return scrollsHorizontally || scrollsVertically
       }
-      .last
+
+    let scrollViewIdentities = Set(
+      latestSemanticSnapshot.selectionRoutes.lazy
+        .filter { $0.role == .scrollView }
+        .map(\.identity)
+    )
+    return routes.last { scrollViewIdentities.contains($0.identity) }
+      ?? routes.last
   }
 
   package func hitTarget(
