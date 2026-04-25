@@ -178,9 +178,11 @@ extension List {
     }
     let isListOrRowFocused = isFocused || focusedRowIndex != nil
     let activeRowIndex = focusedRowIndex ?? selectedIndex
+    // Focus is signalled at the row layer (caret + selected-row chrome);
+    // the list container itself stays neutral so the row signal stays visible.
     let chrome = styleEnvironment.controlChrome(
       isEnabled: isEnabled,
-      isFocused: isListOrRowFocused && showsFocusEffect
+      isFocused: false
     )
     let rowChrome = styleEnvironment.rowChrome(
       isEnabled: isEnabled,
