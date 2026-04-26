@@ -529,6 +529,94 @@ struct AsyncFrameTailRenderingTests {
     #expect(layoutState.placeRanOnMainThread == false)
   }
 
+  @Test("framework-owned WindowHostLayout runs on the frame-tail worker")
+  func frameworkOwnedWindowHostLayoutRunsOnFrameTailWorker() async throws {
+    try await assertFrameworkOwnedLayoutWorker(
+      WindowHostLayout {
+        Text("window content")
+      },
+      identity: testIdentity("AsyncFrameworkWindowHostLayoutRoot"),
+      proposal: .init(width: 24, height: 4),
+      marker: "window content"
+    )
+  }
+
+  private func assertFrameworkOwnedLayoutWorker<V: View>(
+    _ view: V,
+    identity: Identity,
+    proposal: ProposedSize,
+    marker: String
+  ) async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      view,
+      context: .init(identity: identity),
+      proposal: proposal
+    )
+    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(
+      artifacts.diagnostics.customLayoutFallbackCount == 0,
+      """
+      expected \(identity.path) to avoid custom-layout fallback; \
+      first fallback was \(artifacts.diagnostics.firstCustomLayoutFallbackIdentity?.path ?? "nil")
+      \(raster)
+      """
+    )
+    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    #expect(workerTimings.layoutCompute != .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(raster.contains(marker))
+  }
+
+  @Test("ScrollView layout remains on custom-layout fallback")
+  func scrollViewLayoutRemainsOnCustomLayoutFallback() async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      ScrollView([.vertical], showsIndicators: true) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("scroll row 0")
+          Text("scroll row 1")
+          Text("scroll row 2")
+        }
+      },
+      context: .init(identity: testIdentity("AsyncFrameworkScrollViewLayoutRoot")),
+      proposal: .init(width: 24, height: 4)
+    )
+    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(artifacts.diagnostics.customLayoutFallbackCount >= 1)
+    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity != nil)
+    #expect(workerTimings.layoutCompute == .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(raster.contains("scroll row 0"))
+  }
+
+  @Test("TabView container layout remains on custom-layout fallback")
+  func tabViewContainerLayoutRemainsOnCustomLayoutFallback() async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      TabView(selection: .constant("home")) {
+        Tab("Home", value: "home") {
+          Text("Home content")
+        }
+
+        Tab("Logs", value: "logs") {
+          Text("Logs content")
+        }
+      },
+      context: .init(identity: testIdentity("AsyncFrameworkTabViewLayoutRoot")),
+      proposal: .init(width: 40, height: 4)
+    )
+    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(artifacts.diagnostics.customLayoutFallbackCount >= 1)
+    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity != nil)
+    #expect(workerTimings.layoutCompute == .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(raster.contains("Home content"))
+  }
+
   @Test("worker backlog commits blocked frame before later input batch")
   func workerBacklogCommitsBlockedFrameBeforeLaterInputBatch() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailBacklogRoot")
