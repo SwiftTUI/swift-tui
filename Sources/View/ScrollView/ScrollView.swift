@@ -246,7 +246,7 @@ public struct ScrollView<Content: View>: View, ResolvableView {
   }
 }
 
-private struct ScrollViewLayout: Layout {
+private struct ScrollViewLayout: SendableLayout {
   private struct IndicatorInsets: Equatable {
     var trailing: Int = 0
     var bottom: Int = 0
@@ -476,12 +476,12 @@ private struct ScrollViewLayout: Layout {
   }
 }
 
-extension ScrollViewLayout: MeasurementLayoutReuseProviding, PlacementLayoutReuseProviding {
-  var measurementLayoutReuseSignature: String {
+extension ScrollViewLayout {
+  var measurementReuseSignature: String {
     "ScrollViewLayout:\(axes.rawValue):\(showsIndicators)"
   }
 
-  var placementLayoutReuseSignature: String {
+  var placementReuseSignature: String {
     "ScrollViewLayout:\(axes.rawValue):\(showsIndicators):\(position.x):\(position.y)"
   }
 }

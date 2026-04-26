@@ -569,9 +569,9 @@ struct AsyncFrameTailRenderingTests {
     #expect(raster.contains(marker))
   }
 
-  @Test("ScrollView layout remains on custom-layout fallback")
-  func scrollViewLayoutRemainsOnCustomLayoutFallback() async throws {
-    let artifacts = await DefaultRenderer().renderAsync(
+  @Test("framework-owned ScrollView layout runs on the frame-tail worker")
+  func frameworkOwnedScrollViewLayoutRunsOnFrameTailWorker() async throws {
+    try await assertFrameworkOwnedLayoutWorker(
       ScrollView([.vertical], showsIndicators: true) {
         VStack(alignment: .leading, spacing: 0) {
           Text("scroll row 0")
@@ -579,17 +579,31 @@ struct AsyncFrameTailRenderingTests {
           Text("scroll row 2")
         }
       },
-      context: .init(identity: testIdentity("AsyncFrameworkScrollViewLayoutRoot")),
+      identity: testIdentity("AsyncFrameworkScrollViewLayoutRoot"),
+      proposal: .init(width: 24, height: 4),
+      marker: "scroll row 0"
+    )
+  }
+
+  @Test("lazy indexed ScrollView content keeps layout on the main actor")
+  func lazyIndexedScrollViewContentKeepsLayoutOnMainActor() async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      ScrollView([.vertical], showsIndicators: true) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<12) { index in
+            Text("lazy row \(index)")
+          }
+        }
+      },
+      context: .init(identity: testIdentity("AsyncLazyIndexedScrollViewLayoutRoot")),
       proposal: .init(width: 24, height: 4)
     )
     let workerTimings = try #require(artifacts.diagnostics.workerTimings)
     let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
 
-    #expect(artifacts.diagnostics.customLayoutFallbackCount >= 1)
-    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity != nil)
     #expect(workerTimings.layoutCompute == .zero)
     #expect(workerTimings.rasterCompute != .zero)
-    #expect(raster.contains("scroll row 0"))
+    #expect(raster.contains("lazy row 0"))
   }
 
   @Test("TabView container layout remains on custom-layout fallback")
