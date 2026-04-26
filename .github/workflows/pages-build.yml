@@ -29,13 +29,15 @@ jobs:
           ~/.swiftly/bin/swiftly init --quiet-shell-followup
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
-          # Pin to the exact version in .swift-version. `swiftly install` with no
-          # arg ignores .swift-version and picks latest-in-series, which yielded
-          # 6.3.1 and broke import of the swift-6.3-RELEASE_wasm SDK (modules are
-          # keyed on full version, so 6.3.0 ≠ 6.3.1).
+          # `.swift-version` must match a swift.org release tag (e.g. `6.3` for
+          # swift-6.3-RELEASE, `6.3.1` for the 6.3.1 patch). swiftly has no
+          # exact entry for `6.3.0`, so it falls forward to `6.3.1`, which then
+          # can't import the swift-6.3-RELEASE_wasm SDK (Swift module compat is
+          # keyed on full compiler version).
           SWIFT_VERSION="$(tr -d '[:space:]' < .swift-version)"
           swiftly install --use --assume-yes "$SWIFT_VERSION"
           swiftly list
+          swiftly run swift --version
           # Persist swiftly on PATH and SWIFTLY_HOME_DIR for subsequent steps
           # (each `run:` step gets a fresh shell, so env.sh sourcing alone won't carry over).
           echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
