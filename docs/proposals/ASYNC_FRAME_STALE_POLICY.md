@@ -5,6 +5,10 @@
 Stages 1 and 2 implemented. Ordered commit remains the policy for future
 frame-tail cancellation or generation-dropping work.
 
+See [`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md)
+for the concrete design needed before Stage 3 can safely cancel unstarted tail
+work.
+
 The current async frame-tail renderer intentionally preserves ordered commit:
 when a worker frame finishes, the main actor commits it before newer input state
 is rendered and presented. This is conservative, but correct. It avoids
@@ -247,6 +251,11 @@ git commit -m "refactor(runtime): tag async render generations"
 ```
 
 ### Stage 3: Add cancellation before worker start
+
+Design prerequisite:
+
+- [ ] Land the render-generation scheduler design in
+  [`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md).
 
 - Teach the serial worker to skip jobs that have not started and are superseded.
 - Restrict cancellation to jobs with no worker-owned mutation.

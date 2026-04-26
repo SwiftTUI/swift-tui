@@ -47,6 +47,7 @@ Active design proposals that are still shaping decisions:
 
 - [proposals/ASYNC_PRESENTATION.md](proposals/ASYNC_PRESENTATION.md) — moving terminal writes off the main actor
 - [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — policy for future async pipeline frame cancellation and dropping
+- [proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md](proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md) — design for render-generation coalescing and safe pre-start cancellation
 - [proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md](proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md) — isolating custom layouts for future worker-side layout
 - [proposals/OFF_MAIN_PIPELINE_RENDERING.md](proposals/OFF_MAIN_PIPELINE_RENDERING.md) — evaluating off-main frame-tail rendering
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
