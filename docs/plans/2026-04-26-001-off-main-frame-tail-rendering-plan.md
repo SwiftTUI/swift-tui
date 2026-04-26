@@ -123,12 +123,12 @@ value snapshot.
 **Goal:** Prove whether tail offload is likely to help before changing runtime
 shape.
 
-- [ ] Add or document a repeatable diagnostics invocation for the gallery demo.
-- [ ] Add or document a repeatable diagnostics invocation for the layouts
+- [x] Add or document a repeatable diagnostics invocation for the gallery demo.
+- [x] Add or document a repeatable diagnostics invocation for the layouts
   example.
-- [ ] Add a synthetic large-tree benchmark or test helper if existing examples
+- [x] Add a synthetic large-tree benchmark or test helper if existing examples
   do not produce measurable tail time.
-- [ ] Capture baseline frame diagnostics for:
+- [x] Capture baseline frame diagnostics for:
   - resolve duration,
   - measure duration,
   - place duration,
@@ -137,7 +137,32 @@ shape.
   - raster duration,
   - commit duration,
   - presentation duration.
-- [ ] Decide whether tail time is large enough to justify Stage 1.
+- [x] Decide whether tail time is large enough to justify Stage 1.
+
+Characterization surfaces:
+
+- CLI demos can write tab-separated frame diagnostics with
+  `TERMUI_DIAGNOSTICS=/tmp/termui-diagnostics.tsv`:
+
+  ```bash
+  cd Examples/gallery
+  TERMUI_DIAGNOSTICS=/tmp/gallery-termui-diagnostics.tsv swiftly run swift run gallery-demo
+
+  cd ../layouts
+  TERMUI_DIAGNOSTICS=/tmp/layouts-termui-diagnostics.tsv swiftly run swift run layouts-demo
+  ```
+
+- `Phase1BenchmarkScenariosTests.largeStaticTreePhaseTimingScenario` is the
+  deterministic synthetic large-tree benchmark for this migration. It asserts
+  that phase timings exist and that a 160-row static tree drives substantial
+  measured, placed, and draw-node work.
+
+Stage 0 result:
+
+- The focused benchmark suite passes with the synthetic large-tree scenario.
+- The scenario is sufficient to justify Stage 1 seam extraction because it gives
+  a repeatable, non-interactive workload where the frame tail is represented in
+  diagnostics without depending on wall-clock thresholds.
 
 Stop condition:
 

@@ -290,6 +290,31 @@ struct Phase1BenchmarkScenariosTests {
     #expect(second.presentation.editOperationLowering == .eraseToEndOfLine)
     #expect(second.presentation.editOperationCount == 1)
   }
+
+  @Test("large static tree exposes tail phase timings for off-main characterization")
+  @MainActor
+  func largeStaticTreePhaseTimingScenario() throws {
+    let harness = BenchmarkHarness()
+
+    let frame = try harness.render(
+      LargeStaticTreeBenchmarkView(rowCount: 160),
+      context: .init(identity: Phase1BenchmarkIdentity.root)
+    )
+    let timings = try #require(frame.diagnostics.phaseTimings)
+
+    #expect(frame.presentation.strategy == .fullRepaint)
+    #expect(frame.diagnostics.resolvedNodeCount > 160)
+    #expect(frame.diagnostics.measuredNodeCount > 160)
+    #expect(frame.diagnostics.placedNodeCount > 160)
+    #expect(frame.diagnostics.drawNodeCount > 160)
+    #expect(timings.total >= timings.resolve)
+    #expect(timings.total >= timings.measure)
+    #expect(timings.total >= timings.place)
+    #expect(timings.total >= timings.semantics)
+    #expect(timings.total >= timings.draw)
+    #expect(timings.total >= timings.raster)
+    #expect(timings.total >= timings.commit)
+  }
 }
 
 private struct BenchmarkFrame {
@@ -534,6 +559,25 @@ private struct LazyForEachScrollBenchmarkView: View {
     }
     .id(Phase1BenchmarkIdentity.scrollRegion)
     .frame(width: 12, height: 3, alignment: .topLeading)
+  }
+}
+
+private struct LargeStaticTreeBenchmarkView: View {
+  let rowCount: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(0..<rowCount) { index in
+        HStack(spacing: 1) {
+          Text("Row \(index)")
+            .frame(width: 10, alignment: .leading)
+          Text("value \(index * 17)")
+            .foregroundStyle(.muted)
+          Text(index.isMultiple(of: 3) ? "alpha" : "beta")
+            .foregroundStyle(.muted)
+        }
+      }
+    }
   }
 }
 
