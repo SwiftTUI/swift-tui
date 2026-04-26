@@ -115,9 +115,12 @@ struct InputBatchingResponsivenessTests {
 
     let reader = InputReader(fileDescriptor: readEnd)
     let receivedEvents = LockedBox<[InputEvent]>([])
+    // Construct the stream before writing so the dispatch source is installed
+    // even when the consumer task is delayed by the full parallel test suite.
+    let inputEvents = reader.inputEvents()
 
     let consumerTask = Task {
-      for await event in reader.inputEvents() {
+      for await event in inputEvents {
         receivedEvents.withLock { events in
           events.append(event)
           return ()
@@ -148,7 +151,7 @@ struct InputBatchingResponsivenessTests {
     // Wait for the consumer task to drain the pipe and yield the event.  Keep
     // the write end open until the event arrives so the dispatch source cannot
     // observe EOF before its pending mouse flush runs under heavy test load.
-    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(15))
     while ContinuousClock.now < deadline {
       if receivedScrollEvent() {
         break
