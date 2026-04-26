@@ -178,6 +178,86 @@ struct AsyncFrameTailRenderingTests {
       })
   }
 
+  @Test("worker backlog commits blocked frame before later input batch")
+  func workerBacklogCommitsBlockedFrameBeforeLaterInputBatch() async throws {
+    let rootIdentity = testIdentity("AsyncFrameTailBacklogRoot")
+    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let renderer = DefaultRenderer()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    let inputReader = InjectedTerminalInputReader()
+    let terminal = AsyncFrameTailTerminalHost()
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      keyHandler: { keyPress, _, stateContainer in
+        if keyPress == KeyPress(.character("i")) {
+          stateContainer.mutate { value in
+            value += 1
+          }
+          return .handled
+        }
+        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+          return .exit(.userExit(keyPress))
+        }
+        return .ignored
+      },
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameTailCounterView(value: value)
+      }
+    )
+
+    let runTask = Task {
+      try await runLoop.run()
+    }
+
+    try await waitUntil {
+      terminal.frames.contains { $0.contains("value 0") }
+    }
+
+    inputReader.send(.key(.character("i")))
+    await gate.waitUntilBlocked()
+    #expect(terminal.frames.contains { $0.contains("value 1") } == false)
+
+    inputReader.send(.key(.character("i")))
+    inputReader.send(.key(.character("i")))
+    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.finish()
+    gate.release()
+
+    let result = try await valueWithTimeout {
+      try await runTask.value
+    }
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.finalState == 3)
+    let value1Index = terminal.frames.firstIndex { $0.contains("value 1") }
+    let value3Index = terminal.frames.firstIndex { $0.contains("value 3") }
+    #expect(value1Index != nil)
+    #expect(value3Index != nil)
+    if let value1Index, let value3Index {
+      #expect(value1Index < value3Index)
+    }
+  }
+
   @Test("async renderer records worker timing diagnostics")
   func asyncRendererRecordsWorkerTimingDiagnostics() async {
     let artifacts = await DefaultRenderer().renderAsync(
@@ -191,6 +271,15 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.diagnostics.phaseTimings != nil)
     #expect(artifacts.diagnostics.workerTimings != nil)
     #expect(artifacts.diagnostics.mainActorTimings != nil)
+  }
+}
+
+private struct AsyncFrameTailCounterView: View {
+  var value: Int
+
+  var body: some View {
+    Text("value \(value)")
+      .id(testIdentity("AsyncFrameTailCounterValue", "\(value)"))
   }
 }
 
