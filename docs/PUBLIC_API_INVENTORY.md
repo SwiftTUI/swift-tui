@@ -23,7 +23,7 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
 - `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`
 - `ToastStyle`
-- `Layout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `FocusInteractions`, `LinkDestination`, and `OpenLinkAction`
+- `Layout`, `SendableLayout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `FocusInteractions`, `LinkDestination`, and `OpenLinkAction`
 - image-source environment configuration such as `EnvironmentValues.imageResourceRoots`
 - `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and repo-owned `@Bindable`
 - canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.offset(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.clipped()`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.onChange(of:initial:_:)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.toast(...)`
@@ -37,6 +37,10 @@ Important public-surface rules after the lowering migration:
 - Callback-bearing authoring APIs follow the same model: `Binding.init(get:set:)` and `.task(...)` use actor-inheriting closure signatures, while button actions, `OpenLinkAction` over typed `LinkDestination`s, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`. In ordinary authored view code those all still resolve to main-actor authoring because `View.body` is `@MainActor`.
 - `ViewBuilder` no longer exposes `[AnyView]` in public closure signatures.
 - `AnyView` remains public as `View` erasure, but `AnyView.init(erasing:)` is no longer public.
+- Public custom layouts run through the main-actor custom-layout bridge unless
+  they explicitly conform to `SendableLayout`, which requires the layout value
+  and its cache to be `Sendable` before the renderer may evaluate that layout on
+  the frame-tail worker.
 
 ### Shapes, borders, and styling
 

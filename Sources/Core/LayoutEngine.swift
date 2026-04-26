@@ -441,7 +441,15 @@ public struct LayoutEngine: Sendable {
     of resolved: ResolvedNode,
     proposal: ProposedSize = .unspecified
   ) -> ViewDimensions {
-    let measured = measure(resolved, proposal: proposal)
+    dimensions(of: resolved, proposal: proposal, passContext: nil)
+  }
+
+  package func dimensions(
+    of resolved: ResolvedNode,
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> ViewDimensions {
+    let measured = measure(resolved, proposal: proposal, passContext: passContext)
     return viewDimensions(for: resolved, measured: measured)
   }
 
