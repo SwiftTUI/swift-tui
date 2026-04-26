@@ -29,11 +29,10 @@ jobs:
           ~/.swiftly/bin/swiftly init --quiet-shell-followup
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
-          # `.swift-version` must match a swift.org release tag (e.g. `6.3` for
-          # swift-6.3-RELEASE, `6.3.1` for the 6.3.1 patch). swiftly has no
-          # exact entry for `6.3.0`, so it falls forward to `6.3.1`, which then
-          # can't import the swift-6.3-RELEASE_wasm SDK (Swift module compat is
-          # keyed on full compiler version).
+          # `.swift-version` must match a real swift.org release tag, AND the
+          # compiler version must match the wasm SDK below exactly (Swift module
+          # compat is keyed on full compiler version, so e.g. 6.3 modules can't
+          # be imported by a 6.3.1 compiler).
           SWIFT_VERSION="$(tr -d '[:space:]' < .swift-version)"
           swiftly install --use --assume-yes "$SWIFT_VERSION"
           swiftly list
@@ -76,10 +75,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          if ! swiftly run swift sdk list | grep -q "swift-6.3-RELEASE_wasm"; then
+          if ! swiftly run swift sdk list | grep -q "swift-6.3.1-RELEASE_wasm"; then
             swiftly run swift sdk install \
-            https://download.swift.org/swift-6.3-release/wasm-sdk/swift-6.3-RELEASE/swift-6.3-RELEASE_wasm.artifactbundle.tar.gz \
-            --checksum 9fa4016ee632c7e9e906608ec3b55cf13dfc4dff44e47574c5af58064dc33fd9
+            https://download.swift.org/swift-6.3.1-release/wasm-sdk/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE_wasm.artifactbundle.tar.gz \
+            --checksum bd47baa20771f366d8beed7970afaa30742b2210097afd15f85427226d8f4cf2
           fi
 
       - name: Install Binaryen
@@ -110,7 +109,7 @@ jobs:
           swiftly list
           swiftly run swift --version
           swiftly run swift sdk list
-          plutil -p "$HOME/Library/Developer/Toolchains/swift-6.3-RELEASE.xctoolchain/Info.plist" || true
+          plutil -p "$HOME/Library/Developer/Toolchains/swift-6.3.1-RELEASE.xctoolchain/Info.plist" || true
 
       - name: Install Bun workspace deps
         shell: bash

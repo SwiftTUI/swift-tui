@@ -137,9 +137,9 @@ another app or runtime lifecycle.
 ## Requirements
 
 - macOS 15+ for local package development on Apple platforms
-- Swift 6.3.0 managed through `swiftly`
+- Swift 6.3.1 managed through `swiftly`
 
-The repo pins Swift `6.3.0` in [`.swift-version`](.swift-version) and uses
+The repo pins Swift `6.3.1` in [`.swift-version`](.swift-version) and uses
 `swiftly` as the default SwiftPM driver. See
 [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) for the full native, wasm, Bun, Xcode,
 and Android toolchain story.

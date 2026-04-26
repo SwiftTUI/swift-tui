@@ -15,12 +15,12 @@ SwiftUI demo, backed by the shared `GalleryDemoViews` target.
 ## Toolchains
 
 - Swift
-  - Use `swiftly` to run Swift 6.3
-  - configure the Swift SDK `swift-6.3-RELEASE_wasm` for the Swift build
+  - Use `swiftly` to run Swift 6.3.1
+  - configure the Swift SDK `swift-6.3.1-RELEASE_wasm` for the Swift build
   - Use `-Xswiftc -Osize` plus `-Xswiftc -Xfrontend -Xswiftc -disable-llvm-merge-functions-pass` for the wasm release build. Plain `-O`, and on some Darwin runners even plain `-Osize`, can emit merged outlined copy helpers whose signatures exceed the browser WebAssembly API's 1000-parameter limit and cause `WebAssembly.Module doesn't parse` startup failures.
   - The Swift Wasm build for a non-trivial TerminalUI program must configure the stack-size avoid runtime crashes. Stack and heap size may similarly require configuration.
   - An overkill example which does a required stack size bump, but also configures maximal upfront memory is:
-    - `swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm -c release -Xswiftc -Osize -Xswiftc -Xfrontend -Xswiftc -disable-llvm-merge-functions-pass -Xlinker --initial-memory=536870912 -Xlinker --max-memory=4294967296 -Xlinker -z -Xlinker "stack-size=1048576"`
+    - `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm -c release -Xswiftc -Osize -Xswiftc -Xfrontend -Xswiftc -disable-llvm-merge-functions-pass -Xlinker --initial-memory=536870912 -Xlinker --max-memory=4294967296 -Xlinker -z -Xlinker "stack-size=1048576"`
   - See build.sh and run.sh in TerminalUI
 - Use Bun for the web app.
 - (Bun is currently configured to build the Swift Wasm targets with overkill memory settings.)
