@@ -46,7 +46,6 @@ The repository [README.md](../README.md) is the public landing page.
 Active design proposals that are still shaping decisions:
 
 - [proposals/ASYNC_PRESENTATION.md](proposals/ASYNC_PRESENTATION.md) — moving terminal writes off the main actor
-- [proposals/CELL_PIXEL_METRICS.md](proposals/CELL_PIXEL_METRICS.md) — exposing cell pixel dimensions on `GeometryProxy` and `EnvironmentValues` for shape aspect, motion, and image sizing
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
 - [proposals/layout/BEHAVIOUR_FINDINGS.md](proposals/layout/BEHAVIOUR_FINDINGS.md) — behaviour-test findings from the layouts example
 
@@ -59,6 +58,7 @@ Implementation records retained for context (landed work that still informs revi
 - [proposals/ANIMATION_PLAN.md](proposals/ANIMATION_PLAN.md) — original animation rollout
 - [proposals/ANIMATABLE_PROTOCOL_MIGRATION.md](proposals/ANIMATABLE_PROTOCOL_MIGRATION.md) — follow-up migration to SwiftUI-shaped `Animatable`
 - [proposals/ARCHITECTURE_NOTES.md](proposals/ARCHITECTURE_NOTES.md) — view-graph and diffing improvements
+- [proposals/CELL_PIXEL_METRICS.md](proposals/CELL_PIXEL_METRICS.md) — public `CellPixelMetrics` on `GeometryProxy`/`EnvironmentValues` plus Braille-shape aspect correction
 - [proposals/GESTURES_IMPLEMENTATION.md](proposals/GESTURES_IMPLEMENTATION.md) — SwiftUI-shaped gesture API
 - [proposals/SHAPE_AND_BORDER_APIS.md](proposals/SHAPE_AND_BORDER_APIS.md) — shape and border API redesign
 - [proposals/VIEW_MODIFIER_LAYER.md](proposals/VIEW_MODIFIER_LAYER.md) — public `ViewModifier` / `ModifiedContent` migration

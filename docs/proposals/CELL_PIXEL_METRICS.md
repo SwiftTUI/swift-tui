@@ -1,6 +1,6 @@
 # Cell Pixel Metrics
 
-Status: Stage 1 shipped (`CellPixelMetrics` is public on `GeometryProxy` and `EnvironmentValues`, with SIGWINCH refresh). Active plan tracking remaining work: [../plans/2026-04-20-001-cell-pixel-metrics-plan.md](../plans/2026-04-20-001-cell-pixel-metrics-plan.md).
+Status: Shipped. Both stages are landed — `CellPixelMetrics` is public on `GeometryProxy` and `EnvironmentValues`, the runtime refreshes cell pixel size on `SIGWINCH`, the gallery physics toy uses a `Circle` subject, and the Braille rasterizer applies aspect correction to `Circle`/`Ellipse`/`Capsule` via `Rasterizer.subpixelCircleRadii`. DocC coverage lives in `Sources/Core/Core.docc/CellPixelMetrics.md` and `Sources/View/View.docc/AspectCorrectShapes.md`. Retained as the implementation record.
 Related research: [CELL_PIXEL_GEOMETRY_RESEARCH.md](../CELL_PIXEL_GEOMETRY_RESEARCH.md)
 
 ## Problem
