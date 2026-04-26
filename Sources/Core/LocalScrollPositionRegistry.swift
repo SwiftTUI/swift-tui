@@ -109,6 +109,10 @@ package final class LocalScrollPositionRegistry: Equatable {
     }
   }
 
+  package func snapshot() -> [ScrollPositionRegistrationSnapshot] {
+    Array(registrations.values)
+  }
+
   package func restore(_ snapshot: [ScrollPositionRegistrationSnapshot]) {
     guard !snapshot.isEmpty else {
       return

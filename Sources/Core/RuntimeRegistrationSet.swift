@@ -117,5 +117,8 @@ package struct RuntimeRegistrationSet {
     preferenceObservationRegistry?.restore(
       handlers.preferenceObservationRegistrations
     )
+    commandRegistry?.restoreKeyCommands(handlers.keyCommandRegistrations)
+    commandRegistry?.restorePaletteCommands(handlers.paletteCommandRegistrations)
+    dropDestinationRegistry?.restore(handlers.dropDestinationRegistrations)
   }
 }

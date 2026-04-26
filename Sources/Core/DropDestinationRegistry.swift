@@ -35,6 +35,10 @@ package final class DropDestinationRegistry: Equatable {
     handler: @escaping DropDestinationHandler
   ) {
     handlersByScope[scope] = handler
+    ViewNodeContext.current?.recordDropDestinationRegistration(
+      scope: scope,
+      handler: handler
+    )
   }
 
   /// Returns the registered handler at `scope`, if any.
@@ -68,6 +72,22 @@ package final class DropDestinationRegistry: Equatable {
   /// Clears every registration.
   package func reset() {
     handlersByScope.removeAll(keepingCapacity: true)
+  }
+
+  package func snapshot() -> [Identity: DropDestinationHandler] {
+    handlersByScope
+  }
+
+  package func restore(
+    _ snapshot: [Identity: DropDestinationHandler]
+  ) {
+    guard !snapshot.isEmpty else {
+      return
+    }
+
+    for (identity, handler) in snapshot {
+      handlersByScope[identity] = handler
+    }
   }
 
   /// Removes every registration whose identity sits under any of
