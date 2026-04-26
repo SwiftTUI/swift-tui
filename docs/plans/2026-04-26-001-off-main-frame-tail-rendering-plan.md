@@ -221,13 +221,24 @@ swiftly run swift test --filter TerminalUITests.InteractiveRuntimeTests
 
 **Goal:** Make the future worker own the caches it mutates.
 
-- [ ] Split `RetainedFrameStore` into main-actor commit state and tail state.
-- [ ] Move previous-raster-surface lookup into the tail state.
-- [ ] Move retained-layout session input into the tail state or a sendable
+- [x] Replace `RetainedFrameStore` with tail-owned retained state while keeping
+  commit state stateless on the main actor.
+- [x] Move previous-raster-surface lookup into the tail state.
+- [x] Move retained-layout session input into the tail state or a sendable
   retained-layout snapshot.
-- [ ] Keep `ViewGraph` lifecycle/finalization state on the main actor.
-- [ ] Confirm retained layout reuse still works for animation tick frames.
-- [ ] Confirm raster damage refinement still receives previous-surface data.
+- [x] Keep `ViewGraph` lifecycle/finalization state on the main actor.
+- [x] Confirm retained layout reuse still works for animation tick frames.
+- [x] Confirm raster damage refinement still receives previous-surface data.
+
+Stage 2 result:
+
+- `FrameTailRetainedState` now owns the retained layout index and previous
+  raster surface.
+- `FrameTailInput` receives a retained-state snapshot, so `renderView(...)`
+  no longer reaches into retained layout or raster fields directly.
+- `ViewGraph.finalizeFrame(...)`, commit planning, artifact assembly, and
+  lifecycle state remain on the main actor. The previous store only contained
+  tail reuse data, so no empty main-actor retained store was added.
 
 Commit boundary:
 
@@ -238,7 +249,7 @@ git commit -m "refactor(renderer): isolate frame-tail retained state"
 Validation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AnimationPipelineTests
+swiftly run swift test --filter TerminalUITests.AnimationPipelineIntegrationTests
 swiftly run swift test --filter TerminalUITests.TerminalHostPresentationBatchingTests
 swiftly run swift test --filter TerminalUITests.TerminalGraphicsProtocolTests
 ```
