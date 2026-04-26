@@ -2,15 +2,14 @@
 
 ## Status
 
-Stages 3A and 3B implemented. Draft design for the remaining stages after
+Stages 3A, 3B, and 3C implemented. Draft design for Stage 3D after
 [`ASYNC_FRAME_STALE_POLICY.md`](ASYNC_FRAME_STALE_POLICY.md) Stage 2.
 
 The short version: do not implement worker-job cancellation directly inside
-`FrameTailRenderer` yet. The current run loop awaits one `renderAsync` call at a
-time, and `DefaultRenderer` mutates main-actor renderer state before submitting
-tail work. A cancellable worker queue would have almost nothing safe to cancel
-until the run loop can represent queued render intent and the renderer can abort
-an uncommitted frame head.
+`FrameTailRenderer` until the worker has an explicit pre-start submission state.
+The run loop can now represent queued render intent, and `DefaultRenderer` can
+abort a prepared frame head, but completed and started tail work still stays on
+the ordered-commit path.
 
 ## Problem
 
@@ -298,10 +297,25 @@ Execution plan:
 
 - [`../plans/2026-04-26-002-frame-head-abort-plan.md`](../plans/2026-04-26-002-frame-head-abort-plan.md)
 
-- Add an abort path for prepared frame heads, or route resolve side effects into
-  draft-only state.
-- Prove abort leaves `ViewGraph`, runtime registrations, focus sync, animation
-  state, and diagnostics ready for a fresh render.
+- [x] Add an abort path for prepared frame heads, or route resolve side effects
+  into draft-only state.
+- [x] Prove abort leaves `ViewGraph`, runtime registrations, focus sync,
+  animation state, and diagnostics ready for a fresh render.
+
+Stage 3C result:
+
+- Async frame-head preparation now starts a single-use draft transaction. A draft
+  can finish or abort exactly once.
+- `ViewGraph` and `FrameResolveState` are checkpointed before frame-head
+  mutation and restored on abort.
+- Runtime registrations resolve into draft registries and are installed into
+  live registries only when the frame finishes.
+- `AnimationController` defers frame-head completion closures until finish and
+  restores animation state on abort.
+- Retained frame-tail state remains commit-only and is included in the abort
+  checkpoint seam.
+- `AsyncFrameTailRenderingTests` covers graph/registration rollback and
+  animation-completion discard for a prepared frame head.
 
 Commit boundary:
 
@@ -341,10 +355,6 @@ git commit -m "feat(runtime): cancel superseded unstarted frame-tail jobs"
 
 ## Recommendation
 
-Implement Stage 3A first. It is safe against the current renderer because it
-only cancels work that has not reached `DefaultRenderer` at all.
-
-Do not implement worker pre-start cancellation until Stage 3B and Stage 3C make
-an uncommitted frame head abortable. Without that seam, cancellation would avoid
-tail CPU but risk leaving main-actor renderer state advanced to a frame that was
-never committed.
+Implement Stage 3D next. Keep the cancellation point at dequeue time only: a
+queued tail job may be cancelled before it starts, while started or completed
+tail work must still finish through the ordered-commit path.

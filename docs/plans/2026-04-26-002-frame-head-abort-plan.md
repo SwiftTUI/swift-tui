@@ -1,7 +1,7 @@
 ---
 title: "refactor: make prepared frame heads abortable"
 type: refactor
-status: active
+status: completed
 date: 2026-04-26
 proposal: "../proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md"
 ---
@@ -32,6 +32,25 @@ let next = await renderer.renderAsync(...)
 
 After aborting `draft`, the renderer must behave as though that frame head was
 never prepared.
+
+## Implementation Result
+
+Stage 3C is implemented.
+
+- `DefaultRenderer` now creates a single-use async `FrameHeadDraft` transaction.
+  `finishFrame` consumes the draft and commits deferred side effects;
+  `abortFrameHead` consumes the draft and restores the checkpoint.
+- `ViewGraph`, `ViewNode`, `DependencyTracker`, and `FrameResolveState` expose
+  package checkpoint/restore seams used by the abort path.
+- Runtime registrations are staged in draft registries during frame-head
+  preparation and restored into live registries only when the frame finishes.
+- `AnimationController` frame-head transactions checkpoint animation state and
+  defer completion closures until finish; abort discards deferred completions.
+- Retained frame-tail state remains commit-only and is covered by an abort
+  checkpoint seam for future tail cancellation.
+- `AsyncFrameTailRenderingTests` covers normal committed scaffold effects,
+  draft registration staging, graph/registration rollback after abort, and
+  animation completion discard on abort.
 
 ## Problem Frame
 
