@@ -85,6 +85,7 @@ private struct FrameTailLayoutOutput {
   var measureDuration: Duration
   var placeDuration: Duration
   var layoutWork: LayoutWorkMetrics
+  var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
   var workerEnqueueToStart: Duration
   var workerCompute: Duration
   var ranOffMain: Bool
@@ -430,6 +431,7 @@ private final class FrameTailRenderer: Sendable {
       measureDuration: measureDuration,
       placeDuration: placeDuration,
       layoutWork: input.layoutPassContext.workMetrics,
+      workerCustomLayoutCacheUpdates: input.layoutPassContext.workerCustomLayoutCacheUpdates,
       workerEnqueueToStart: .zero,
       workerCompute: .zero,
       ranOffMain: false
@@ -994,6 +996,7 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
+    applyWorkerCustomLayoutCacheUpdates(tailLayout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
     )
@@ -1214,6 +1217,7 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
+    applyWorkerCustomLayoutCacheUpdates(tailLayout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
     )
@@ -1273,6 +1277,15 @@ public struct DefaultRenderer {
       baselinePlacedTree: tail.baselinePlaced
     )
     return artifacts
+  }
+
+  @MainActor
+  private func applyWorkerCustomLayoutCacheUpdates(
+    _ updates: [WorkerCustomLayoutCacheUpdate]
+  ) {
+    for update in updates {
+      update.apply()
+    }
   }
 
   private func measurePhase<Value>(

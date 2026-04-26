@@ -483,20 +483,23 @@ package protocol WorkerCustomLayoutProxy: Sendable {
   func measureContainer(
     engine: LayoutEngine,
     node: ResolvedNode,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
   ) -> Size
 
   func measureChildren(
     engine: LayoutEngine,
     node: ResolvedNode,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
   ) -> [MeasuredNode]
 
   func placeSubviews(
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect
+    in bounds: Rect,
+    passContext: LayoutPassContext?
   ) -> [PlacedNode]
 }
 
@@ -504,10 +507,11 @@ extension WorkerCustomLayoutProxy {
   package func measureChildren(
     engine: LayoutEngine,
     node: ResolvedNode,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
   ) -> [MeasuredNode] {
     node.children.map { child in
-      engine.measure(child, proposal: proposal)
+      engine.measure(child, proposal: proposal, passContext: passContext)
     }
   }
 }
@@ -516,11 +520,12 @@ extension WorkerCustomLayoutProxy {
 /// frame-tail worker.
 package struct WorkerCustomLayoutSnapshot: WorkerCustomLayoutProxy {
   package typealias MeasureContainerHandler =
-    @Sendable (LayoutEngine, ResolvedNode, ProposedSize) -> Size
+    @Sendable (LayoutEngine, ResolvedNode, ProposedSize, LayoutPassContext?) -> Size
   package typealias MeasureChildrenHandler =
-    @Sendable (LayoutEngine, ResolvedNode, ProposedSize) -> [MeasuredNode]
+    @Sendable (LayoutEngine, ResolvedNode, ProposedSize, LayoutPassContext?) -> [MeasuredNode]
   package typealias PlaceSubviewsHandler =
-    @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect) -> [PlacedNode]
+    @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) ->
+    [PlacedNode]
 
   package var debugName: String
   private let measureContainerHandler: MeasureContainerHandler
@@ -542,21 +547,23 @@ package struct WorkerCustomLayoutSnapshot: WorkerCustomLayoutProxy {
   package func measureContainer(
     engine: LayoutEngine,
     node: ResolvedNode,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
   ) -> Size {
-    measureContainerHandler(engine, node, proposal)
+    measureContainerHandler(engine, node, proposal, passContext)
   }
 
   package func measureChildren(
     engine: LayoutEngine,
     node: ResolvedNode,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
   ) -> [MeasuredNode] {
     if let measureChildrenHandler {
-      return measureChildrenHandler(engine, node, proposal)
+      return measureChildrenHandler(engine, node, proposal, passContext)
     }
     return node.children.map { child in
-      engine.measure(child, proposal: proposal)
+      engine.measure(child, proposal: proposal, passContext: passContext)
     }
   }
 
@@ -564,9 +571,10 @@ package struct WorkerCustomLayoutSnapshot: WorkerCustomLayoutProxy {
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect
+    in bounds: Rect,
+    passContext: LayoutPassContext?
   ) -> [PlacedNode] {
-    placeSubviewsHandler(engine, node, measured, bounds)
+    placeSubviewsHandler(engine, node, measured, bounds, passContext)
   }
 }
 
@@ -629,13 +637,15 @@ public final class CustomLayoutHandle: Sendable {
   package func measureContainer(
     engine: LayoutEngine,
     node: ResolvedNode,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
   ) -> Size {
     if let workerProxy {
       return workerProxy.measureContainer(
         engine: engine,
         node: node,
-        proposal: proposal
+        proposal: proposal,
+        passContext: passContext
       )
     }
     return proxy.measureContainer(
@@ -648,13 +658,15 @@ public final class CustomLayoutHandle: Sendable {
   package func measureChildren(
     engine: LayoutEngine,
     node: ResolvedNode,
-    proposal: ProposedSize
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
   ) -> [MeasuredNode] {
     if let workerProxy {
       return workerProxy.measureChildren(
         engine: engine,
         node: node,
-        proposal: proposal
+        proposal: proposal,
+        passContext: passContext
       )
     }
     return proxy.measureChildren(
@@ -676,7 +688,8 @@ public final class CustomLayoutHandle: Sendable {
         engine: engine,
         node: node,
         measured: measured,
-        in: bounds
+        in: bounds,
+        passContext: passContext
       )
     }
     if let placementHandler {

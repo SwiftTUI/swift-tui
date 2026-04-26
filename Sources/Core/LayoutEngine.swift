@@ -589,7 +589,8 @@ public struct LayoutEngine: Sendable {
       return handle.measureChildren(
         engine: self,
         node: resolved,
-        proposal: parentProposal
+        proposal: parentProposal,
+        passContext: passContext
       )
     }
   }
@@ -869,7 +870,8 @@ public struct LayoutEngine: Sendable {
       return handle.measureContainer(
         engine: self,
         node: resolved,
-        proposal: proposal
+        proposal: proposal,
+        passContext: passContext
       )
     }
   }

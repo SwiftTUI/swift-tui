@@ -872,7 +872,8 @@ private struct NoOpWorkerCustomLayoutProxy: WorkerCustomLayoutProxy {
   func measureContainer(
     engine _: LayoutEngine,
     node _: ResolvedNode,
-    proposal _: ProposedSize
+    proposal _: ProposedSize,
+    passContext _: LayoutPassContext?
   ) -> Size {
     .zero
   }
@@ -881,7 +882,8 @@ private struct NoOpWorkerCustomLayoutProxy: WorkerCustomLayoutProxy {
     engine _: LayoutEngine,
     node _: ResolvedNode,
     measured _: MeasuredNode,
-    in _: Rect
+    in _: Rect,
+    passContext _: LayoutPassContext?
   ) -> [PlacedNode] {
     []
   }
