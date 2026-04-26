@@ -77,8 +77,8 @@ execution modes:
 
 - terminal-native execution via the executable runner package `Runners/TerminalUICLI`
 - WASI execution via the executable runner package `Runners/TerminalUIWASI`
-- host-managed embedding via the embedded host packages `GUI/SwiftUITUIGUI`,
-  `GUI/WebTUIGUI`, and `GUI/XtermWebTUIGUI`
+- host-managed embedding via the embedded host packages `GUI/SwiftUITUIGUI`
+  and `GUI/WebTUIGUI`
 
 `TerminalUI` on its own is library-only. It provides the shared runtime,
 `TerminalUISceneManifest`, and `HostedSceneSession`, but it does not provide an
@@ -88,10 +88,11 @@ executable product or default `App.main()`.
 
 - Layout and containers: `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `ViewThatFits`, and custom `Layout`
 - State and focus: `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, focused values, focus effect controls, and default-focus modifiers
-- Controls and content: `Text`, `TextFigure`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `GroupBox`, `ControlGroup`, `TabView`, and terminal-native alert or confirmation presentation backed by embedded FIGlet fonts rather than external font files
+- Controls and content: `Text`, `TextFigure` (banner text backed by embedded FIGlet fonts), `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `GroupBox`, `ControlGroup`, `TabView`, and `Image` (PNG)
 - Presentation and workflow surfaces: `alert`, `confirmationDialog`, `sheet`, `toast`
+- Action scopes and commands: `Panel`, `.keyCommand`, `.paletteCommand`, `.toolbar`, `.toolbarItem`, with shallowest-wins focus-chain dispatch
 - Runtime integration: `Resolver`, `DefaultRenderer`, `RunLoop`, terminal input parsing, signal handling, alternate-screen ownership, capability-aware presentation, and lifecycle or task staging
-- Platform integration packages: executable runners `Runners/TerminalUICLI` and `Runners/TerminalUIWASI`, plus embedded hosts `GUI/SwiftUITUIGUI`, `GUI/WebTUIGUI`, and `GUI/XtermWebTUIGUI`
+- Platform integration packages: executable runners `Runners/TerminalUICLI` and `Runners/TerminalUIWASI`, plus embedded hosts `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`
 - Compact metrics and charts: `ProgressView`, `BarChart`, `ColumnChart`, `ComparisonChart`, `Sparkline`, `Timeline`, `ThresholdGauge`, and related support types in `TerminalUICharts`
 
 ## Package Products
@@ -130,8 +131,7 @@ another app or runtime lifecycle.
   - `Runners/TerminalUIWASI`: WASI executable runner plus manifest mode
 - embedded host packages:
   - `GUI/SwiftUITUIGUI`: native SwiftUI host package for macOS and iOS
-  - `GUI/WebTUIGUI`: Bun-based browser host that consumes a `TerminalUIWASI` build and `ghostty-web`
-  - `GUI/XtermWebTUIGUI`: Bun-based browser host that consumes a `TerminalUIWASI` build and xterm.js
+  - `GUI/WebTUIGUI`: Bun-based browser host that consumes a `TerminalUIWASI` build and a canvas surface transport (no terminal emulator dependency)
 
 ## Requirements
 
@@ -171,15 +171,14 @@ swiftly run swift package generate-documentation --target TerminalUI
 
 ## Current Constraints
 
-- The core `TerminalUI` runtime is still intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
-- Platform integration now lives outside the root package. Use executable runner packages for terminal-native or WASI execution, and embedded host packages for SwiftUI or browser embedding.
-- Presentation surfaces (`alert`, `confirmationDialog`, `sheet`, `toast`) are part of the supported `View` surface. The scope-and-commands authoring surface (`ActionScope`, `Panel`, `FocusContainment`, `keyCommand`, `paletteCommand` with `EnvironmentValues.activePaletteCommands`) has landed with shallowest-wins focus-chain dispatch; toolbar surfaces are still landing against the plan in [docs/proposals/ACTION_SCOPES_AND_COMMANDS.md](docs/proposals/ACTION_SCOPES_AND_COMMANDS.md).
+- The core `TerminalUI` runtime is intentionally narrow: one active terminal host, one active scene, and one full-canvas `WindowGroup` per session.
+- Platform integration lives outside the root package. Use executable runner packages for terminal-native or WASI execution, and embedded host packages for SwiftUI or browser embedding.
 
-## Upcoming Work
+## Deferred By Design
 
-- Remaining phases of the ActionScope/commands rollout: `toolbar` and `toolbarItem`
 - `NavigationStack` and richer popover-style presentation beyond the current sheet support
 - Richer focus ergonomics and scroll control
+- Broader media formats and animation beyond the current PNG image surface
 
 ## Documentation
 

@@ -1,6 +1,6 @@
 # Cell Pixel Metrics
 
-Status: Draft, awaiting review
+Status: Stage 1 shipped (`CellPixelMetrics` is public on `GeometryProxy` and `EnvironmentValues`, with SIGWINCH refresh). Active plan tracking remaining work: [../plans/2026-04-20-001-cell-pixel-metrics-plan.md](../plans/2026-04-20-001-cell-pixel-metrics-plan.md).
 Related research: [CELL_PIXEL_GEOMETRY_RESEARCH.md](../CELL_PIXEL_GEOMETRY_RESEARCH.md)
 
 ## Problem

@@ -139,8 +139,7 @@ package surface:
   - `Runners/TerminalUIWASI` exposes `TerminalWASIAppRunner` plus the default WASI `App.main()` story
 - embedded host packages:
   - `GUI/SwiftUITUIGUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on a native raster surface
-  - `GUI/WebTUIGUI` hosts a `TerminalUIWASI` build in the browser using the same manifest and hosted-session story
-  - `GUI/XtermWebTUIGUI` hosts a `TerminalUIWASI` build in the browser using the same manifest and hosted-session story on top of xterm.js
+  - `GUI/WebTUIGUI` hosts a `TerminalUIWASI` build in the browser using the same manifest and hosted-session story, drawing raster output onto a canvas via the `web-surface` transport
 
 These are supported peer packages, but they are not root library products in
 `Package.swift`.

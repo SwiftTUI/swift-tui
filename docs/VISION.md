@@ -76,25 +76,17 @@ Deferred items:
 - `NavigationStack`
 - popover-style presentation beyond the current sheet support
 
-Partially landed items (scaffolding shipped, consumer-facing surface in progress):
-
-- **Commands, keybindings, and scopes.** Commands belong to **scopes** — a
-  superset abstraction over navigation, sub-hierarchies, and modal modes. A
-  scope is a tree-authored command set with an activation predicate; the
-  predicate is focus-chain membership. The `ActionScope` protocol, the `Panel`
-  primitive, `FocusContainment`, the scope conformances on `Scene` and the
-  `.alert` / `.confirmationDialog` / `.sheet` presentation modifiers,
-  `.keyCommand(...)` with shallowest-wins focus-chain dispatch, and
-  `.paletteCommand(...)` with `EnvironmentValues.activePaletteCommands` have
-  shipped. The remaining surface (`toolbar`, `toolbarItem`) is still in
-  progress; see
-  [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)
-  for the full design and
-  [STATUS.md](STATUS.md#commands-keybindings-and-scopes) for phase tracking.
-
 These should not be implemented just because terminal frameworks often have
 analogous surfaces. They should land only once the terminal-specific interaction
 model is clear and the API still reads like the same product.
+
+Commands, keybindings, and scopes — `ActionScope`, `Panel`,
+`FocusContainment`, `.keyCommand`, `.paletteCommand`, `.toolbar`, and
+`.toolbarItem` — already follow this pattern: commands belong to **scopes**, a
+superset abstraction over navigation, sub-hierarchies, and modal modes, with
+focus-chain membership as the activation predicate. See
+[proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)
+for the full design.
 
 Navigation-oriented surfaces that are especially central to terminal UX, such as
 `TabView` and split-pane workspace layouts composed from stacks, may land

@@ -1,7 +1,7 @@
 # WebExample
 
 Minimal Bun web app that embeds a Swift `TerminalUI` executable through
-[`GUI/WebTUIGUI`](/Users/adamz/Developer/repos/swift-terminal-ui/GUI/WebTUIGUI).
+[`GUI/WebTUIGUI`](../../GUI/WebTUIGUI).
 
 The example has two parts:
 
@@ -31,7 +31,7 @@ SwiftUI demo, backed by the shared `GalleryDemoViews` target.
 bun install
 ```
 
-`WebExample` and `GUI/WebTUIGUI` now share the repo's Bun workspace, so running
+`WebExample` and `GUI/WebTUIGUI` share the repo's Bun workspace, so running
 `bun install` from the repo root is preferred. Running it from
 `Examples/WebExample` also works and updates the root workspace lockfile.
 

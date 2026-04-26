@@ -1,5 +1,7 @@
 # Gestures Implementation Plan
 
+**Status:** Shipped. Retained as the implementation record for the SwiftUI-faithful gesture API.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship a SwiftUI-faithful subset of the gesture API — `Gesture` protocol, `@GestureState`, `TapGesture`, `SpatialTapGesture`, `LongPressGesture`, `DragGesture`, `ExclusiveGesture`, `.gesture(_:including:)`, `.contentShape(_:)`, `.onTapGesture`, `.onLongPressGesture` — without passing through an "API match + implementation hack" stage.

@@ -8,18 +8,14 @@ The core terminal UI stack is implemented and regression-tested across the full 
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-The package is already usable for real terminal interfaces. The main gaps are
-not around the fundamental pipeline anymore; they are around breadth of surface
-area, app-shell ergonomics, and a few still-conservative runtime paths.
+The package is usable for real terminal interfaces. The main gaps are not in
+the fundamental pipeline; they are in breadth of surface area, app-shell
+ergonomics, and a few still-conservative runtime paths.
 
-The 2026 terminal-native reset is substantially landed: automatic chrome has
-been reset, shell navigation primitives are canonical, multiline editing and
-indeterminate loading are public, and `alert`/`confirmationDialog`/`sheet`/
-`toast` presentation surfaces live in the main `View` module. The
-ActionScope/commands rollout (see
-[proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md))
-is fully landed: the scope scaffolding, `.keyCommand`, `.paletteCommand`, and
-`.toolbar` + `.toolbarItem` are all part of the public `View` surface.
+`alert`, `confirmationDialog`, `sheet`, and `toast` are part of the public
+`View` surface. The full ActionScope/commands rollout — `Panel`,
+`.keyCommand`, `.paletteCommand`, `.toolbar`, and `.toolbarItem` — has shipped
+(see [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)).
 
 ## Shipped Surface
 
@@ -60,21 +56,21 @@ is fully landed: the scope scaffolding, `.keyCommand`, `.paletteCommand`, and
 
 ## Current Constraints
 
-- The core `TerminalUI` runtime still renders one active scene into one active host per session, but it no longer decides that an authored app must declare exactly one scene.
-- `TerminalUI` is now library-only. Platform integration splits between executable runner packages in `Runners/` and embedded host packages in `GUI/`.
-- Embedded GUI host packages now use `TerminalUI` scene manifests plus `HostedSceneSession`, and the repository includes peer host packages at `GUI/SwiftUITUIGUI`, `GUI/WebTUIGUI`, and `GUI/XtermWebTUIGUI`. Those packages still own their own platform shell integration, scene switching chrome, and style surfaces.
+- The core `TerminalUI` runtime renders one active scene into one active host per session. Multi-scene apps are supported, but only one scene is on screen at a time per host.
+- `TerminalUI` is library-only. Platform integration splits between executable runner packages in `Runners/` and embedded host packages in `GUI/`.
+- Embedded GUI host packages use `TerminalUI` scene manifests plus `HostedSceneSession`. Peer host packages live at `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`; they own their own platform shell integration, scene switching chrome, and style surfaces.
 - Embedded GUI host packages own one active host style object at a time and
-  can swap it at runtime; the root TUI app continues to render semantic tokens
-  without knowing which host theme is active.
+  can swap it at runtime; the root TUI app renders semantic tokens without
+  knowing which host theme is active.
 - The runtime is keyboard-first, but mouse input is supported where the terminal advertises reporting. Pointer interaction should be treated as additive rather than as the primary design center.
 - Image decoding and terminal presentation are PNG-only in the current runtime. Broader media formats and animation remain deferred.
-- WASI support now works with the `swiftly`-managed Swift 6.3.1 toolchain and `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through the `Runners/TerminalUIWASI` / example-app build path. The shorter `swift ...` form is fine from a shell where `swift` already resolves through `swiftly`. `xcrun swift` may still resolve to an incompatible Xcode toolchain.
-- Some focus surfaces are still missing:
+- WASI builds use the `swiftly`-managed Swift 6.3.1 toolchain via `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through `Runners/TerminalUIWASI` / example-app build paths. The shorter `swift ...` form works from a shell where `swift` already resolves through `swiftly`; `xcrun swift` may resolve to an incompatible Xcode toolchain.
+- Some focus surfaces remain missing:
   - namespace-scoped default-focus APIs such as `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus`
   - object-focused wrappers such as `@FocusedObject`
-- Some geometry-bound preference surfaces are still deferred:
+- Some geometry-bound preference surfaces are deferred:
   - anchor-based preference APIs such as `anchorPreference(...)` and `transformAnchorPreference(...)` until local coordinate spaces and anchor resolution ship
-- Some higher-level workflow surfaces are still unsettled:
+- Some higher-level workflow surfaces are unsettled:
   - richer multiline editing behaviors beyond the current `TextEditor`
 - Some internal lowering seams remain package-only for runtime plumbing and tests:
   - `ViewNode`
@@ -88,76 +84,46 @@ See [VISION.md](VISION.md) for the rationale and the intended ordering.
 - popover-style presentation beyond the current sheet support
 - richer accessibility and assistive-technology modeling beyond the current semantic tree
 
-The project now treats terminal-native reinterpretation as a first-class design
-rule. The remaining gaps are therefore prioritized around terminal workspaces,
-deeper scroll control, and navigation surfaces that still need a stronger
-hypothesis before they graduate.
+The project treats terminal-native reinterpretation as a first-class design
+rule. The remaining gaps are prioritized around terminal workspaces, deeper
+scroll control, and navigation surfaces that still need a stronger hypothesis
+before they graduate.
 
 ### Commands, Keybindings, and Scopes
 
-An earlier toolbar/command-palette/help-sheet implementation was reverted
-because it preceded a clear design model. The replacement is the ActionScope
-model described in
+The ActionScope model described in
 [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)
-and tracked by
-[proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md](proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md).
-The core model operates at a deeper level than toolbars or commands specifically.
+has fully landed:
 
-**Commands belong to scopes. A scope is a tree-authored command set with an
-activation predicate. The activation predicate is focus-chain membership.**
-
-See
-[proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md)
-for the full model: the scope-kind taxonomy (`Scene`, `Presentation`, `Panel`),
-shallowest-wins dispatch precedence, the scope-root-only command surface, the
-hoisted toolbar-item preference contract, and the discoverability invariant.
-
-#### Landed vs pending
-
-The rollout follows the phased plan in
-[proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md](proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md).
-
-Landed:
-
-- `.onKeyPress(...)` and the global `HotkeyRegistry` have been removed. The
-  consumer-facing keybinding surface is now the ActionScope-based commands
-  plan rather than a view modifier that writes into a global registry.
 - `ActionScope` protocol, `AnyID`, and a scope-identity-keyed `CommandRegistry`
-  are in place and wired into the runtime.
-- `Panel` primitive plus `.panel(id:)` / `.panel()` / `.focusContainment(_:)`
-  are part of the public `View` surface.
+  wired into the runtime.
+- `Panel` primitive plus `.panel(id:)` / `.panel()` / `.focusContainment(_:)`.
 - `Scene`-conforming types and the `.alert` / `.confirmationDialog` / `.sheet`
-  presentation modifiers conform to `ActionScope`, and presentation overlays
+  presentation modifiers conform to `ActionScope`; presentation overlays
   scope-inherit scene identity.
-- `.keyCommand(...)` with shallowest-wins focus-chain dispatch. Consumer-
-  registered `(key, modifiers)` bindings on any `ActionScope & View` fire
-  when the scope is on the current focus chain; modifier-less registrations
-  are silently dropped (single-key dispatch is framework-reserved for typing,
-  arrow navigation, Tab, Enter, and Escape); a disabled match consumes the
-  event without firing and blocks deeper matches.
-- `.paletteCommand(...)` plus `EnvironmentValues.activePaletteCommands`.
-  Palette commands register at their scope's identity; after each frame the
-  runtime captures the commands visible along the current focus chain and
-  exposes them (ordered shallowest-first) through the environment so
-  consumer-authored palette surfaces can query them.
-- `.toolbar(style:)` on any `ActionScope & View`, plus the `.toolbarItem(...)`
-  hoisting preference that lets any descendant view contribute an item to the
-  nearest enclosing toolbar. `ToolbarStyle` plus `DefaultTopToolbarStyle` and
-  `DefaultBottomToolbarStyle` control the strip's layout and placement;
-  contributions bubble past intermediate scopes until absorbed, and render as
-  a horizontal strip above or below the scope's content.
+- `.keyCommand(...)` with shallowest-wins focus-chain dispatch. Modifier-less
+  registrations are silently dropped (single-key dispatch is framework-reserved
+  for typing, arrow navigation, Tab, Enter, and Escape); a disabled match
+  consumes the event without firing and blocks deeper matches.
+- `.paletteCommand(...)` plus `EnvironmentValues.activePaletteCommands` for
+  consumer-authored palette surfaces. The captured list is refreshed after each
+  frame from the current focus chain.
+- `.toolbar(style:)` plus the `.toolbarItem(...)` hoisting preference;
+  contributions bubble past intermediate scopes until absorbed by the nearest
+  enclosing toolbar. `ToolbarStyle`, `DefaultTopToolbarStyle`, and
+  `DefaultBottomToolbarStyle` control layout and placement.
 
 Framework-owned single-key dispatch continues through `LocalKeyHandlerRegistry`
-for built-in controls.
+for built-in controls. The earlier global `HotkeyRegistry` and `.onKeyPress(...)`
+modifier have been removed.
 
-#### Open design questions
+Open design questions still tracked in the proposal:
 
-The following are tracked alongside the remaining implementation phases:
-
-- **Precedence on collisions.** If two scopes on the same chain both bind the same `(key, modifiers)` pair, shallowest wins per the landed plan. Cross-scope-kind priority beyond pure chain depth is still open.
-- **State-predicated scopes still tree-author.** Selection-like state lives on some node; the anchor is that node. What differs is the activation predicate, not the authoring site.
-- **Escape-hatch risk.** A generic condition-scope would become a dumping ground. Resist a new scope kind until a real case proves the curated set insufficient.
-- **Modes aren't always navigation.** Vim-style modes (insert/normal/visual) are state-predicated scopes that don't correspond to tree transitions. The model handles this, but the DSL needs state-predicate scopes as first-class, not just structural ones.
+- **Cross-scope-kind precedence on collisions.** Shallowest-wins is the landed
+  rule; cross-kind priority beyond chain depth remains open.
+- **State-predicate scopes as first-class DSL surface.** The model handles
+  selection- and mode-predicated scopes; the authoring DSL still treats
+  state-predicate scopes implicitly through their anchor node.
 
 ## See Also
 
