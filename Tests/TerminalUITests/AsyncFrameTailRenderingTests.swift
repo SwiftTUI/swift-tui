@@ -268,11 +268,14 @@ struct AsyncFrameTailRenderingTests {
           && row["custom_layout_fallbacks"] == "0"
           && row["first_custom_layout_fallback"] == "-"
           && row["stale_frame_policy"] == "commit_ordered"
+          && row["desired_generation"] != nil
           && row["render_generation"] != nil
           && row["layout_input_generation"] == row["render_generation"]
           && row["layout_output_generation"] == row["render_generation"]
           && row["raster_input_generation"] == row["render_generation"]
           && row["raster_output_generation"] == row["render_generation"]
+          && row["coalesced_event_batches"] != nil
+          && row["coalesced_wake_causes"] != nil
       })
   }
 
@@ -678,6 +681,11 @@ struct AsyncFrameTailRenderingTests {
 
     let inputReader = InjectedTerminalInputReader()
     let terminal = AsyncFrameTailTerminalHost()
+    let diagnosticsURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-async-tail-coalescing-\(UUID().uuidString).tsv")
+    defer {
+      try? FileManager.default.removeItem(at: diagnosticsURL)
+    }
     let stateContainer = StateContainer(
       initialState: 0,
       invalidationIdentities: [rootIdentity]
@@ -707,6 +715,8 @@ struct AsyncFrameTailRenderingTests {
         AsyncFrameTailCounterView(value: value)
       }
     )
+    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
+    #expect(runLoop.diagnosticsLogger != nil)
 
     let runTask = Task {
       try await runLoop.run()
@@ -732,13 +742,25 @@ struct AsyncFrameTailRenderingTests {
 
     #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(result.finalState == 3)
+    #expect(result.renderedFrames == 3)
     let value1Index = terminal.frames.firstIndex { $0.contains("value 1") }
+    let value2Index = terminal.frames.firstIndex { $0.contains("value 2") }
     let value3Index = terminal.frames.firstIndex { $0.contains("value 3") }
     #expect(value1Index != nil)
+    #expect(value2Index == nil)
     #expect(value3Index != nil)
     if let value1Index, let value3Index {
       #expect(value1Index < value3Index)
     }
+
+    let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
+    let rows = diagnosticRows(diagnostics)
+    #expect(
+      rows.contains { row in
+        (Int(row["coalesced_event_batches"] ?? "") ?? 0) >= 2
+          && (row["coalesced_wake_causes"] ?? "").contains("input")
+          && row["stale_frame_policy"] == "commit_ordered"
+      })
   }
 
   @Test("async renderer records worker timing diagnostics")

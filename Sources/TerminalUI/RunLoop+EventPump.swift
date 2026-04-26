@@ -47,6 +47,11 @@ extension RunLoop {
     var scheduleDeadlineWake: @Sendable (Duration) -> Void
   }
 
+  package struct RenderEventDrain {
+    var events: [RuntimeEvent]
+    var coalescedEventBatches: Int
+  }
+
   package final class EventPumpCompletion: Sendable {
     private let remainingStreams: Mutex<Int>
 
@@ -223,6 +228,28 @@ extension RunLoop {
     }
 
     return drainedEvents
+  }
+
+  package func drainPendingRenderEvents(
+    from eventPump: EventPump,
+    initialEvents: [RuntimeEvent]
+  ) -> RenderEventDrain {
+    var events = initialEvents
+    var coalescedEventBatches = 0
+
+    while true {
+      let additionalEvents = eventPump.drainEvents()
+      guard !additionalEvents.isEmpty else {
+        break
+      }
+      coalescedEventBatches += 1
+      events.append(contentsOf: additionalEvents)
+    }
+
+    return RenderEventDrain(
+      events: events,
+      coalescedEventBatches: coalescedEventBatches
+    )
   }
 
   package func isCoalesciblePointerRuntimeEvent(

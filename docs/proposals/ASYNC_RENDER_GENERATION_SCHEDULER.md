@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft design for the next stage after
+Stage 3A implemented. Draft design for the remaining stages after
 [`ASYNC_FRAME_STALE_POLICY.md`](ASYNC_FRAME_STALE_POLICY.md) Stage 2.
 
 The short version: do not implement worker-job cancellation directly inside
@@ -249,11 +249,20 @@ The important distinction is:
 
 ### Stage 3A: Coalesce not-yet-started render intent
 
-- Drain all currently queued event batches before starting the next render.
-- Keep completed and active renders on the ordered-commit path.
-- Add diagnostics for desired generation and coalesced event batches.
-- Add tests proving an input burst queued during a blocked render produces one
+- [x] Drain all currently queued event batches before starting the next render.
+- [x] Keep completed and active renders on the ordered-commit path.
+- [x] Add diagnostics for desired generation and coalesced event batches.
+- [x] Add tests proving an input burst queued during a blocked render produces one
   next render for the final state.
+
+Stage 3A result:
+
+- The run loop drains all currently buffered event batches before starting the
+  next render.
+- Runtime TSV diagnostics include `desired_generation`,
+  `coalesced_event_batches`, and `coalesced_wake_causes`.
+- The ordered-commit regression now proves a queued input burst still commits
+  the already-blocked frame, then renders only the final coalesced state.
 
 Commit boundary:
 

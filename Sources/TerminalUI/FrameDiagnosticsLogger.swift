@@ -24,6 +24,9 @@ public struct FrameDiagnosticRecord: Sendable {
   public var focusRegionCount: Int
   public var phaseTimings: FramePhaseTimings?
   public var renderGenerations: FrameRenderGenerations
+  public var desiredGeneration: UInt64
+  public var coalescedEventBatches: Int
+  public var coalescedWakeCauses: String
   public var workerTimings: FrameWorkerTimings?
   public var mainActorTimings: FrameMainActorTimings?
   public var customLayoutFallbackCount: Int
@@ -150,11 +153,14 @@ public final class FrameDiagnosticsLogger {
       rasterMs,
       commitMs,
       pipelineMs,
+      String(record.desiredGeneration),
       String(renderGenerations.render.rawValue),
       formatGeneration(renderGenerations.layoutInput),
       formatGeneration(renderGenerations.layoutOutput),
       formatGeneration(renderGenerations.rasterInput),
       formatGeneration(renderGenerations.rasterOutput),
+      String(record.coalescedEventBatches),
+      record.coalescedWakeCauses,
       layoutEnqueueMs,
       layoutComputeMs,
       rasterEnqueueMs,
@@ -213,11 +219,14 @@ public final class FrameDiagnosticsLogger {
       "raster_ms",
       "commit_ms",
       "pipeline_ms",
+      "desired_generation",
       "render_generation",
       "layout_input_generation",
       "layout_output_generation",
       "raster_input_generation",
       "raster_output_generation",
+      "coalesced_event_batches",
+      "coalesced_wake_causes",
       "worker_layout_enqueue_ms",
       "worker_layout_compute_ms",
       "worker_raster_enqueue_ms",

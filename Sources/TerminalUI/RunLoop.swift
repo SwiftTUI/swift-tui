@@ -211,6 +211,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var capturedPointerRouteID: RouteID?
   package var postActionInvalidationIdentities: Set<Identity> = []
   package var previousRenderedState: State?
+  package var nextRenderIntentGeneration: UInt64 = 1
+  package var pendingCoalescedEventBatches = 0
+  package var pendingCoalescedWakeCauses: Set<WakeCause> = []
 
   /// Optional file-based diagnostics logger. When set, every rendered frame
   /// emits a tab-separated record to the configured output file.
@@ -441,9 +444,14 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
         }
         continue
       }
+      let renderEventDrain = drainPendingRenderEvents(
+        from: eventPump,
+        initialEvents: pendingEvents
+      )
+      pendingCoalescedEventBatches += renderEventDrain.coalescedEventBatches
 
       var handledNonExitEvent = false
-      for event in pendingEvents {
+      for event in renderEventDrain.events {
         let hadReadyFrameBeforeEvent = scheduler.hasPendingFrame(at: .now())
         if let exitReason = handle(event) {
           let shouldFlushBeforeExit =
