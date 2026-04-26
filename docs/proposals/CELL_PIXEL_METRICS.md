@@ -321,7 +321,7 @@ Migration — the physics type stops living in a pure cell space and starts taki
 
 The physics struct signature changes from `step(_ state: inout State, in bounds: Size)` to `step(_ state: inout State, in bounds: Size, metrics: CellPixelMetrics)` (and similarly for `spawnState`, `displayPosition`, `applyRelease`, `blockSize`). The view layer reads `proxy.cellPixelMetrics` and threads it through alongside `bounds`.
 
-`Examples/gallery/Tests/GalleryDemoViewsTests/FullScreenTabGestureTests.swift` adopts `.estimated` as the default test metric, so its numeric assertions remain unchanged.
+`Examples/gallery/Tests/GalleryDemoViewsTests/PhysicsTabGestureTests.swift` adopts `.estimated` as the default test metric, so its numeric assertions remain unchanged.
 
 ---
 

@@ -36,12 +36,10 @@ Runs the full checked-in repo verification surface:
   - Runners/TerminalUIWASI tests
   - GUI/SwiftUITUIGUI tests
   - GUI/WebTUIGUI Bun tests
-  - GUI/XtermWebTUIGUI Bun tests
   - Examples/gallery tests
   - Examples/layouts tests
   - Examples/WebExample Bun tests
   - Examples/WebExample browser integration test
-  - Examples/XtermWebExample Bun tests
 
 The script also checks required environment dependencies up front:
   - Swift 6.3.x via `swiftly` when available, otherwise `swift`
@@ -280,11 +278,6 @@ fi
 #  "$repo_root/GUI/WebTUIGUI" \
 #  bun test
 
-#run_step \
-#  "Run GUI/XtermWebTUIGUI Bun tests" \
-#  "$repo_root/GUI/XtermWebTUIGUI" \
-#  bun test
-
 run_function_step \
   "Run Examples/gallery tests" \
   run_swift test --package-path Examples/gallery
@@ -302,11 +295,6 @@ run_function_step \
 #   "Run Examples/WebExample browser integration test" \
 #   "$repo_root/Examples/WebExample" \
 #   bun run test:browser
-#
-# run_step \
-#   "Run Examples/XtermWebExample Bun tests" \
-#   "$repo_root/Examples/XtermWebExample" \
-#   bun test
 
 echo ""
 

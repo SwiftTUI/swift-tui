@@ -83,8 +83,8 @@ private struct GalleryRuntimeBridge: View {
         FileDropTab()
       }
 
-      Tab("Full Screen", value: GalleryView.GalleryTab.fullScreen) {
-        FullScreenTab()
+      Tab("Physics", value: GalleryView.GalleryTab.physics) {
+        PhysicsTab()
       }
     }
     .tabViewStyle(.literalTabs)
@@ -133,8 +133,8 @@ private struct GalleryRuntimeBridge: View {
       action: { selection = .fileDrop }
     )
     .paletteCommand(
-      name: "Switch to Full Screen",
-      action: { selection = .fullScreen }
+      name: "Switch to Physics",
+      action: { selection = .physics }
     )
     .toolbar(style: DefaultBottomToolbarStyle())
     .paletteSheet("Command palette", isPresented: $isPaletteOpen) {
@@ -168,6 +168,6 @@ extension GalleryView {
     case images
     case animations
     case fileDrop
-    case fullScreen
+    case physics
   }
 }

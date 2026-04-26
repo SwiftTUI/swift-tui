@@ -255,11 +255,11 @@ struct GalleryTabSwitchTests {
   }
 
   @Test(
-    "opening and dismissing the palette keeps fullscreen progress while Full Screen stays selected")
-  func paletteOpenAndDismissKeepsFullscreenProgress() async throws {
+    "opening and dismissing the palette keeps Physics progress while Physics stays selected")
+  func paletteOpenAndDismissKeepsPhysicsProgress() async throws {
     let terminalSize = Size(width: 80, height: 24)
-    let rootIdentity = Identity(components: [.named("GalleryFullScreenPaletteContinuity")])
-    let view = GallerySelectionSeedHarness(initialSelection: .fullScreen)
+    let rootIdentity = Identity(components: [.named("GalleryPhysicsPaletteContinuity")])
+    let view = GallerySelectionSeedHarness(initialSelection: .physics)
     let host = GalleryTabSwitchRecordingHost(size: terminalSize)
     let capture = GallerySurfaceCapture()
 
@@ -271,9 +271,9 @@ struct GalleryTabSwitchTests {
           guard surfaces.count >= 2 else {
             return false
           }
-          capture.initialFullscreenSurface = capture.initialFullscreenSurface ?? surfaces.first
+          capture.initialPhysicsSurface = capture.initialPhysicsSurface ?? surfaces.first
           capture.prePaletteSurface = surfaces.last
-          return capture.prePaletteSurface != capture.initialFullscreenSurface
+          return capture.prePaletteSurface != capture.initialPhysicsSurface
         },
         .event(.key(KeyPress(.character("k"), modifiers: .ctrl))),
         .waitUntil(timeoutNanoseconds: 2_000_000_000) {
@@ -299,19 +299,19 @@ struct GalleryTabSwitchTests {
       viewBuilder: { view }
     )
 
-    let initialFullscreenSurface = try #require(capture.initialFullscreenSurface)
+    let initialPhysicsSurface = try #require(capture.initialPhysicsSurface)
     let prePaletteSurface = try #require(capture.prePaletteSurface)
     let postDismissSurface = try #require(capture.postDismissSurface)
     let postDismissText = postDismissSurface.lines.joined(separator: "\n")
 
     #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
     #expect(
-      prePaletteSurface != initialFullscreenSurface,
+      prePaletteSurface != initialPhysicsSurface,
       "expected fullscreen animation to advance before opening the palette"
     )
     #expect(
-      postDismissSurface != initialFullscreenSurface,
-      "dismissing the palette should not recreate the fullscreen tab at its initial spawn frame"
+      postDismissSurface != initialPhysicsSurface,
+      "dismissing the palette should not recreate the physics tab at its initial spawn frame"
     )
     #expect(
       !postDismissText.contains("A SwiftUI-shaped terminal UI"),
@@ -811,8 +811,8 @@ private struct GallerySelectionRuntimeBridge: View {
         FileDropTab()
       }
 
-      Tab("Full Screen", value: GalleryView.GalleryTab.fullScreen) {
-        FullScreenTab()
+      Tab("Full Screen", value: GalleryView.GalleryTab.physics) {
+        PhysicsTab()
       }
     }
     .tabViewStyle(.literalTabs)
@@ -859,7 +859,7 @@ private struct GallerySelectionRuntimeBridge: View {
     )
     .paletteCommand(
       name: "Switch to Full Screen",
-      action: { selection = .fullScreen }
+      action: { selection = .physics }
     )
     .toolbar(style: DefaultBottomToolbarStyle())
     .paletteSheet("Command palette", isPresented: $isPaletteOpen) {
@@ -977,7 +977,7 @@ private final class GalleryTabSwitchRecordingHost: TerminalHosting {
 
 @MainActor
 private final class GallerySurfaceCapture {
-  var initialFullscreenSurface: RasterSurface?
+  var initialPhysicsSurface: RasterSurface?
   var prePaletteSurface: RasterSurface?
   var postDismissSurface: RasterSurface?
 }

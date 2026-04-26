@@ -6,7 +6,7 @@ import Testing
 
 @MainActor
 @Suite
-struct FullScreenTabGestureTests {
+struct PhysicsTabGestureTests {
 
   @Test("fullscreen toy starts at bottom center with its initial launch velocity")
   func spawnStateStartsAtBottomCenter() {
@@ -71,13 +71,13 @@ struct FullScreenTabGestureTests {
   @Test("fullscreen demo keeps presenting frames while gravity runs")
   func gravityLoopSchedulesRuntimeFrames() async throws {
     let terminalSize = Size(width: 40, height: 12)
-    let rootIdentity = Identity(components: [.named("FullScreenTabGravityLoop")])
+    let rootIdentity = Identity(components: [.named("PhysicsTabGravityLoop")])
     let host = GestureRecordingHost(size: terminalSize)
     let result = try await runHarness(
       host: host,
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
-      viewBuilder: { FullScreenTab() },
+      viewBuilder: { PhysicsTab() },
       terminalInputReader: AwaitedTerminalInputReader(steps: [
         .waitUntil(timeoutNanoseconds: 2_000_000_000) {
           deduplicated(host.surfaces).count >= 2
@@ -97,8 +97,8 @@ struct FullScreenTabGestureTests {
   @Test("dragging the fullscreen demo rectangle updates the rendered surface and commits position")
   func draggingRectangleUpdatesAndCommits() async throws {
     let terminalSize = Size(width: 40, height: 12)
-    let rootIdentity = Identity(components: [.named("FullScreenTabGestureTest")])
-    let view = FullScreenTab()
+    let rootIdentity = Identity(components: [.named("PhysicsTabGestureTest")])
+    let view = PhysicsTab()
 
     var env = EnvironmentValues()
     env.terminalSize = terminalSize
@@ -143,8 +143,8 @@ struct FullScreenTabGestureTests {
   @Test("fullscreen demo rectangle remains draggable after its offset changes")
   func draggingRectangleTwiceTracksItsMovedPosition() async throws {
     let terminalSize = Size(width: 40, height: 12)
-    let rootIdentity = Identity(components: [.named("FullScreenTabGestureTwiceTest")])
-    let view = FullScreenTab()
+    let rootIdentity = Identity(components: [.named("PhysicsTabGestureTwiceTest")])
+    let view = PhysicsTab()
 
     var env = EnvironmentValues()
     env.terminalSize = terminalSize
@@ -204,7 +204,7 @@ struct FullScreenTabGestureTests {
     env.terminalSize = terminalSize
 
     let artifacts = DefaultRenderer().render(
-      FullScreenTab()
+      PhysicsTab()
         .toolbarItem(.init(title: "⌃K Palette", action: {}))
         .panel(id: "gallery")
         .toolbar(style: DefaultBottomToolbarStyle()),
@@ -232,7 +232,7 @@ struct FullScreenTabGestureTests {
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       viewBuilder: {
-        FullScreenTab()
+        PhysicsTab()
           .toolbarItem(.init(title: "⌃K Palette", action: {}))
           .panel(id: "gallery")
           .toolbar(style: DefaultBottomToolbarStyle())

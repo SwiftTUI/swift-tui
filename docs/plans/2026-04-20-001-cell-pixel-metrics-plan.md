@@ -66,7 +66,7 @@ Match the spec's Non-goals section exactly:
 | `Sources/TerminalUI/StreamingTerminalHost.swift` | Move `graphicsCapabilities` into the locked state; add `updateCellPixelSize(_:)`. |
 | `Sources/TerminalUI/HostedSceneSession.swift` | Add `resize(to:cellPixelSize:)` overload. |
 | `Examples/gallery/Sources/GalleryDemoViews/FullScreen.swift` | Stage 1: physics struct takes `metrics:` param; adaptive `blockSize(metrics:)`. Stage 2: swap `Rectangle` → `Circle`; delete `blockSize`. |
-| `Examples/gallery/Tests/GalleryDemoViewsTests/FullScreenTabGestureTests.swift` | Update call sites to pass `.estimated`. |
+| `Examples/gallery/Tests/GalleryDemoViewsTests/PhysicsTabGestureTests.swift` | Update call sites to pass `.estimated`. |
 | `Tests/TerminalUITests/GeometryReaderSurfaceTests.swift` | Add an assertion that the proxy exposes the environment's metrics. |
 | `Sources/Core/Styling.swift` | Stage 2: add `cellPixelMetrics` field to `StyleEnvironmentSnapshot`. |
 | `Sources/View/Environment/Environment.swift` | Stage 2: populate `cellPixelMetrics` on `StyleEnvironmentSnapshot` construction. |
@@ -994,7 +994,7 @@ git commit -m "test(runtime): assert cellPixelMetrics refresh reaches GeometryRe
 
 **Files:**
 - Modify: `Examples/gallery/Sources/GalleryDemoViews/FullScreen.swift`
-- Modify: `Examples/gallery/Tests/GalleryDemoViewsTests/FullScreenTabGestureTests.swift`
+- Modify: `Examples/gallery/Tests/GalleryDemoViewsTests/PhysicsTabGestureTests.swift`
 
 - [ ] **Step 1: Update `FullScreenToyPhysics` signatures to accept metrics**
 
@@ -1141,7 +1141,7 @@ struct FullScreenToyPhysics {
 
 All existing per-axis bounce code inside `step` stays unchanged — the `maximumOrigin` computed with `metrics:` is the only new input.
 
-- [ ] **Step 2: Update `FullScreenTab` body**
+- [ ] **Step 2: Update `PhysicsTab` body**
 
 The view reads `proxy.cellPixelMetrics` and threads it through every call:
 
@@ -1228,7 +1228,7 @@ private func runToyLoop(
 
 - [ ] **Step 3: Update the existing gesture test to pass `.estimated`**
 
-In `Examples/gallery/Tests/GalleryDemoViewsTests/FullScreenTabGestureTests.swift`, add `metrics: .estimated` to every `FullScreenToyPhysics` call site. Locate with:
+In `Examples/gallery/Tests/GalleryDemoViewsTests/PhysicsTabGestureTests.swift`, add `metrics: .estimated` to every `FullScreenToyPhysics` call site. Locate with:
 
 ```bash
 ```
@@ -1249,7 +1249,7 @@ Expected: build succeeds; existing gesture assertions remain numerically identic
 
 ```bash
 git add Examples/gallery/Sources/GalleryDemoViews/FullScreen.swift \
-        Examples/gallery/Tests/GalleryDemoViewsTests/FullScreenTabGestureTests.swift
+        Examples/gallery/Tests/GalleryDemoViewsTests/PhysicsTabGestureTests.swift
 git commit -m "feat(gallery): physics toy consumes CellPixelMetrics for isotropic motion"
 ```
 
@@ -1911,7 +1911,7 @@ git commit -m "test(raster): pin Circle output at non-default cell aspects"
 
 **Files:**
 - Modify: `Examples/gallery/Sources/GalleryDemoViews/FullScreen.swift`
-- Modify: `Examples/gallery/Tests/GalleryDemoViewsTests/FullScreenTabGestureTests.swift`
+- Modify: `Examples/gallery/Tests/GalleryDemoViewsTests/PhysicsTabGestureTests.swift`
 
 - [ ] **Step 1: Delete `blockSize(metrics:)`; introduce `diameter`**
 
@@ -1951,7 +1951,7 @@ static func maximumOrigin(
 
 - [ ] **Step 2: Swap the subject view**
 
-In `FullScreenTab.body`:
+In `PhysicsTab.body`:
 
 ```swift
 let metrics = proxy.cellPixelMetrics
@@ -1968,7 +1968,7 @@ ZStack(alignment: .topLeading) {
 
 - [ ] **Step 3: Update gallery tests**
 
-Any place in `FullScreenTabGestureTests.swift` referring to `blockSize(metrics:)` becomes:
+Any place in `PhysicsTabGestureTests.swift` referring to `blockSize(metrics:)` becomes:
 
 ```swift
 let height = max(1, Int((Double(FullScreenToyPhysics.diameter) / CellPixelMetrics.estimated.aspectRatio).rounded()))
@@ -1990,7 +1990,7 @@ Expected: clean build, gesture tests pass with equivalent numerics (`blockWidth=
 
 ```bash
 git add Examples/gallery/Sources/GalleryDemoViews/FullScreen.swift \
-        Examples/gallery/Tests/GalleryDemoViewsTests/FullScreenTabGestureTests.swift
+        Examples/gallery/Tests/GalleryDemoViewsTests/PhysicsTabGestureTests.swift
 git commit -m "feat(gallery): physics toy subject becomes an aspect-correct Circle"
 ```
 

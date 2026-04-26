@@ -1,6 +1,6 @@
 import TerminalUI
 
-struct FullScreenTab: View {
+struct PhysicsTab: View {
   @State private var toyState = FullScreenToyPhysics.State()
   @State private var didSeedInitialPosition = false
   @GestureState private var dragOffset = Size.zero
