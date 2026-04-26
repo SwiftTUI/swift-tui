@@ -89,6 +89,23 @@ private struct FrameTailLayoutOutput {
   var workerCompute: Duration
 }
 
+private struct FrameTailSemanticsOutput {
+  var semantics: SemanticSnapshot
+  var duration: Duration
+}
+
+private struct FrameTailDrawOutput {
+  var draw: DrawNode
+  var duration: Duration
+}
+
+private struct FrameTailRasterOutput {
+  var surface: RasterSurface
+  var drawnIdentities: Set<Identity>
+  var presentationDamage: PresentationDamage?
+  var duration: Duration
+}
+
 private struct FrameTailOutput {
   var measured: MeasuredNode
   var placed: PlacedNode
@@ -397,30 +414,26 @@ private final class FrameTailRenderer: Sendable {
       placed: placed,
       retainedLayout: input.retained.retainedLayout
     )
-    let (semantics, semanticsDuration) = measurePhase(clock: clock) {
-      semanticExtractor.extract(from: placed)
-    }
-    let (draw, drawDuration) = measurePhase(clock: clock) {
-      drawExtractor.extract(from: placed)
-    }
-    let beforeRaster = renderHooks.withLock { hooks in
-      hooks?.beforeRaster
-    }
-    beforeRaster?()
-    let (rasterized, rasterDuration) = measurePhase(clock: clock) {
-      rasterizer.rasterizeCollectingVisibleIdentities(
-        draw,
-        minimumSize: minimumRasterSurfaceSize(for: input.proposal),
-        previousSurface: input.retained.previousRasterSurface,
-        damage: presentationDamage
-      )
-    }
+    let semantics = renderSemantics(
+      placed: placed,
+      clock: clock
+    )
+    let draw = renderDraw(
+      placed: placed,
+      clock: clock
+    )
+    let raster = renderRasterSurface(
+      input,
+      draw: draw.draw,
+      presentationDamage: presentationDamage,
+      clock: clock
+    )
     let diagnostics = FrameTailDiagnostics(
       measureDuration: layout.measureDuration,
       placeDuration: layout.placeDuration,
-      semanticsDuration: semanticsDuration,
-      drawDuration: drawDuration,
-      rasterDuration: rasterDuration,
+      semanticsDuration: semantics.duration,
+      drawDuration: draw.duration,
+      rasterDuration: raster.duration,
       layoutWork: layout.layoutWork,
       workerTimings: nil,
       measurementCache: layoutEngine.cache?.metrics
@@ -429,13 +442,65 @@ private final class FrameTailRenderer: Sendable {
       measured: layout.measured,
       placed: placed,
       baselinePlaced: layout.baselinePlaced,
-      semantics: semantics,
-      draw: draw,
-      raster: rasterized.surface,
-      drawnIdentities: rasterized.visibleIdentities,
-      presentationDamage: rasterized.presentationDamage,
+      semantics: semantics.semantics,
+      draw: draw.draw,
+      raster: raster.surface,
+      drawnIdentities: raster.drawnIdentities,
+      presentationDamage: raster.presentationDamage,
       diagnostics: diagnostics,
       workerCompletedAt: nil
+    )
+  }
+
+  private func renderSemantics(
+    placed: PlacedNode,
+    clock: ContinuousClock?
+  ) -> FrameTailSemanticsOutput {
+    let (semantics, duration) = measurePhase(clock: clock) {
+      semanticExtractor.extract(from: placed)
+    }
+    return .init(
+      semantics: semantics,
+      duration: duration
+    )
+  }
+
+  private func renderDraw(
+    placed: PlacedNode,
+    clock: ContinuousClock?
+  ) -> FrameTailDrawOutput {
+    let (draw, duration) = measurePhase(clock: clock) {
+      drawExtractor.extract(from: placed)
+    }
+    return .init(
+      draw: draw,
+      duration: duration
+    )
+  }
+
+  private func renderRasterSurface(
+    _ input: FrameTailInput,
+    draw: DrawNode,
+    presentationDamage: PresentationDamage?,
+    clock: ContinuousClock?
+  ) -> FrameTailRasterOutput {
+    let beforeRaster = renderHooks.withLock { hooks in
+      hooks?.beforeRaster
+    }
+    beforeRaster?()
+    let (rasterized, duration) = measurePhase(clock: clock) {
+      rasterizer.rasterizeCollectingVisibleIdentities(
+        draw,
+        minimumSize: minimumRasterSurfaceSize(for: input.proposal),
+        previousSurface: input.retained.previousRasterSurface,
+        damage: presentationDamage
+      )
+    }
+    return .init(
+      surface: rasterized.surface,
+      drawnIdentities: rasterized.visibleIdentities,
+      presentationDamage: rasterized.presentationDamage,
+      duration: duration
     )
   }
 
