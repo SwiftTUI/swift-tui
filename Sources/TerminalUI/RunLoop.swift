@@ -356,7 +356,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     scheduler.requestInvalidation(of: [rootIdentity])
 
     var renderedFrames = 0
-    try renderPendingFrames(renderedFrames: &renderedFrames)
+    try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
 
     // After the initial render establishes the view tree and evaluator
     // closures, enable selective dirty evaluation for subsequent frames.
@@ -372,7 +372,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     scheduleNextWakeIfNeeded(using: eventPump)
 
     if scheduler.hasPendingFrame(at: .now()) {
-      try renderPendingFrames(renderedFrames: &renderedFrames)
+      try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
       scheduleNextWakeIfNeeded(using: eventPump)
     }
 
@@ -380,7 +380,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       let pendingEvents = await drainPendingEvents(from: eventPump)
       guard !pendingEvents.isEmpty else {
         if scheduler.hasPendingFrame(at: .now()) {
-          try renderPendingFrames(renderedFrames: &renderedFrames)
+          try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
         }
         if let nextWake = scheduler.nextWakeInstant(after: .now()),
           nextWake > .now()
@@ -407,7 +407,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
                 return false
               }())
           if shouldFlushBeforeExit {
-            try renderPendingFrames(renderedFrames: &renderedFrames)
+            try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
           }
           return RunLoopResult(
             finalState: stateContainer.state,
@@ -417,7 +417,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
         }
         handledNonExitEvent = true
       }
-      try renderPendingFrames(renderedFrames: &renderedFrames)
+      try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
       if let nextWake = scheduler.nextWakeInstant(after: .now()),
         nextWake > .now()
       {

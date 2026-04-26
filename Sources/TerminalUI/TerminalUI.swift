@@ -1,25 +1,32 @@
 @_exported import Core
 @_exported import EmbeddedFonts
+import Synchronization
 @_exported import View
 
 #if canImport(Dispatch)
   @unsafe @preconcurrency import Dispatch
 #endif
 
-private final class FrameTailRetainedState {
-  private var previousFrameIndex: RetainedFrameIndex?
-  private var previousRasterSurface: RasterSurface?
+private final class FrameTailRetainedState: Sendable {
+  private struct State: Sendable {
+    var previousFrameIndex: RetainedFrameIndex?
+    var previousRasterSurface: RasterSurface?
+  }
+
+  private let state = Mutex(State())
 
   func input(
     invalidatedIdentities: Set<Identity>
   ) -> FrameTailRetainedInput {
-    .init(
-      retainedLayout: RetainedLayoutSession(
-        previousFrameIndex: previousFrameIndex,
-        invalidatedIdentities: invalidatedIdentities
-      ),
-      previousRasterSurface: previousRasterSurface
-    )
+    state.withLock { state in
+      .init(
+        retainedLayout: RetainedLayoutSession(
+          previousFrameIndex: state.previousFrameIndex,
+          invalidatedIdentities: invalidatedIdentities
+        ),
+        previousRasterSurface: state.previousRasterSurface
+      )
+    }
   }
 
   /// Stores the frame's artifacts so the next frame's pipeline can
@@ -41,8 +48,10 @@ private final class FrameTailRetainedState {
   ) {
     var indexable = artifacts
     indexable.placedTree = baselinePlacedTree
-    previousFrameIndex = .init(frame: indexable)
-    previousRasterSurface = artifacts.rasterSurface
+    state.withLock { state in
+      state.previousFrameIndex = .init(frame: indexable)
+      state.previousRasterSurface = artifacts.rasterSurface
+    }
   }
 }
 
@@ -100,7 +109,7 @@ private struct FrameTailWorkerResult<Value> {
   var completedAt: ContinuousClock.Instant?
 }
 
-private final class FrameTailRenderer {
+private final class FrameTailRenderer: Sendable {
   private let layoutEngine: LayoutEngine
   private let semanticExtractor: SemanticExtractor
   private let drawExtractor: DrawExtractor
@@ -137,16 +146,20 @@ private final class FrameTailRenderer {
     _ input: FrameTailInput,
     clock: ContinuousClock?
   ) -> FrameTailLayoutOutput {
-    let result = timedSync(clock: clock) {
-      renderLayoutInline(
-        input,
-        clock: clock
-      )
-    }
-    var layout = result.value
-    layout.workerEnqueueToStart = result.enqueueToStart
-    layout.workerCompute = result.compute
-    return layout
+    renderLayoutInline(
+      input,
+      clock: clock
+    )
+  }
+
+  func renderLayoutAsync(
+    _ input: FrameTailInput,
+    clock: ContinuousClock?
+  ) async -> FrameTailLayoutOutput {
+    renderLayoutInline(
+      input,
+      clock: clock
+    )
   }
 
   func renderRaster(
@@ -157,6 +170,31 @@ private final class FrameTailRenderer {
   ) -> FrameTailOutput {
     let result = timedSync(clock: clock) {
       renderRasterInline(
+        input,
+        layout: layout,
+        placed: placed,
+        clock: clock
+      )
+    }
+    var output = result.value
+    output.diagnostics.workerTimings = .init(
+      layoutEnqueueToStart: layout.workerEnqueueToStart,
+      layoutCompute: layout.workerCompute,
+      rasterEnqueueToStart: result.enqueueToStart,
+      rasterCompute: result.compute
+    )
+    output.workerCompletedAt = result.completedAt
+    return output
+  }
+
+  func renderRasterAsync(
+    _ input: FrameTailInput,
+    layout: FrameTailLayoutOutput,
+    placed: PlacedNode,
+    clock: ContinuousClock?
+  ) async -> FrameTailOutput {
+    let result = await timedAsync(clock: clock) {
+      self.renderRasterInline(
         input,
         layout: layout,
         placed: placed,
@@ -221,6 +259,47 @@ private final class FrameTailRenderer {
 
     let enqueuedAt = clock.now
     return sync {
+      let startedAt = clock.now
+      let value = operation()
+      let completedAt = clock.now
+      return .init(
+        value: value,
+        enqueueToStart: enqueuedAt.duration(to: startedAt),
+        compute: startedAt.duration(to: completedAt),
+        completedAt: completedAt
+      )
+    }
+  }
+
+  private func async<Value>(
+    _ operation: @escaping @Sendable () -> Value
+  ) async -> Value {
+    #if canImport(Dispatch)
+      await withCheckedContinuation { continuation in
+        queue.async {
+          continuation.resume(returning: operation())
+        }
+      }
+    #else
+      operation()
+    #endif
+  }
+
+  private func timedAsync<Value>(
+    clock: ContinuousClock?,
+    _ operation: @escaping @Sendable () -> Value
+  ) async -> FrameTailWorkerResult<Value> {
+    guard let clock else {
+      return .init(
+        value: await async(operation),
+        enqueueToStart: .zero,
+        compute: .zero,
+        completedAt: nil
+      )
+    }
+
+    let enqueuedAt = clock.now
+    return await async {
       let startedAt = clock.now
       let value = operation()
       let completedAt = clock.now
@@ -573,6 +652,23 @@ public struct DefaultRenderer {
     )
   }
 
+  /// Renders `root` into complete frame artifacts, suspending while the
+  /// frame-tail worker computes the Sendable semantics, draw, and raster phases.
+  @MainActor
+  public func renderAsync<V: View>(
+    _ root: V,
+    context: ResolveContext = .init(),
+    proposal: ProposedSize = .unspecified,
+    collectsDiagnostics: Bool = true
+  ) async -> FrameArtifacts {
+    await renderViewAsync(
+      root,
+      context: context,
+      proposal: proposal,
+      collectsDiagnostics: collectsDiagnostics
+    )
+  }
+
   @MainActor
   private func renderView<V: View>(
     _ root: V,
@@ -708,6 +804,195 @@ public struct DefaultRenderer {
       at: animationTimestamp
     )
     let tail = frameTailRenderer.renderRaster(
+      frameTailInput,
+      layout: tailLayout,
+      placed: placed,
+      clock: clock
+    )
+    var workerTimings = tail.diagnostics.workerTimings
+    if var timings = workerTimings,
+      let clock,
+      let workerCompletedAt = tail.workerCompletedAt
+    {
+      timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
+      workerTimings = timings
+    }
+    let (commit, commitDuration) = measurePhase(clock: clock) {
+      let lifecycleEvents = viewGraph.finalizeFrame(
+        rootIdentity: resolveContext.identity,
+        resolved: resolved,
+        placed: tail.placed
+      )
+      return commitPlanner.plan(
+        resolved: resolved,
+        placed: tail.placed,
+        semantics: tail.semantics,
+        transaction: frameContext.transaction,
+        lifecycleEvents: lifecycleEvents
+      )
+    }
+    frameTailRenderer.pruneMeasurementCache(
+      keeping: viewGraph.liveIdentitySnapshot()
+    )
+    let diagnostics: FrameDiagnostics
+    if collectsDiagnostics {
+      let phaseTimings = FramePhaseTimings(
+        resolve: resolveDuration,
+        measure: tail.diagnostics.measureDuration,
+        place: tail.diagnostics.placeDuration,
+        semantics: tail.diagnostics.semanticsDuration,
+        draw: tail.diagnostics.drawDuration,
+        raster: tail.diagnostics.rasterDuration,
+        commit: commitDuration
+      )
+      diagnostics = FrameDiagnostics.summarize(
+        resolved: resolved,
+        measured: tail.measured,
+        placed: tail.placed,
+        semantics: tail.semantics,
+        draw: tail.draw,
+        invalidatedIdentities: frameContext.invalidatedIdentities,
+        resolveWork: resolveContext.resolveWorkTracker?.snapshot,
+        layoutWork: tail.diagnostics.layoutWork,
+        presentationDamage: tail.presentationDamage,
+        presentationSurfaceWidth: tail.raster.size.width,
+        phaseTimings: phaseTimings,
+        workerTimings: workerTimings,
+        measurementCache: tail.diagnostics.measurementCache
+      )
+    } else {
+      diagnostics = .init()
+    }
+    let artifacts = FrameArtifacts(
+      resolvedTree: resolved,
+      measuredTree: tail.measured,
+      placedTree: tail.placed,
+      semanticSnapshot: tail.semantics,
+      drawTree: tail.draw,
+      rasterSurface: tail.raster,
+      presentationDamage: tail.presentationDamage,
+      drawnIdentities: tail.drawnIdentities,
+      commitPlan: commit,
+      diagnostics: diagnostics
+    )
+
+    frameTailRenderer.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: tail.baselinePlaced
+    )
+    return artifacts
+  }
+
+  @MainActor
+  private func renderViewAsync<V: View>(
+    _ root: V,
+    context: ResolveContext,
+    proposal: ProposedSize,
+    collectsDiagnostics: Bool = true
+  ) async -> FrameArtifacts {
+    let clock: ContinuousClock? = collectsDiagnostics ? ContinuousClock() : nil
+
+    var resolveContext = context
+    let runtimeRegistrations = resolveContext.runtimeRegistrations
+    resolveContext.imageAssetResolver = imageRepository.resolver()
+    resolveContext.frameState = frameState
+    frameState.update(from: resolveContext, proposal: proposal)
+    viewGraph.beginFrame()
+    let canUseSelectiveEvaluation =
+      frameState.selectiveEvaluationEnabled
+      && !frameState.environmentRequiresRootEvaluation
+      && !context.invalidatedIdentities.contains(resolveContext.identity)
+    if canUseSelectiveEvaluation {
+      viewGraph.invalidateAndQueueDirty(context.invalidatedIdentities)
+    } else {
+      viewGraph.invalidate(context.invalidatedIdentities)
+    }
+    resolveContext.viewGraph = viewGraph
+    resolveContext.observationBridge?.attachViewGraph(viewGraph)
+    resolveContext.observationBridge?.beginTrackingPass()
+    let wrappedRoot = PresentationHostingRoot(
+      content: root,
+      hostState: presentationHostState
+    )
+    viewGraph.setRootEvaluator(rootIdentity: resolveContext.identity) {
+      _ = resolver.resolve(wrappedRoot, in: resolveContext)
+    }
+    viewGraph.setEvaluator(for: resolveContext.identity) {
+      _ = resolver.resolve(wrappedRoot, in: resolveContext)
+    }
+    let (_, resolveDuration): (Void, Duration)
+    animationController.beginTransitionCollection()
+    if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
+      resolveDuration = .zero
+    } else {
+      let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
+      if let dirtyEvaluationPlan {
+        runtimeRegistrations.removeSubtrees(
+          rootedAt: dirtyEvaluationPlan.frontierIdentities
+        )
+      } else {
+        runtimeRegistrations.resetAll()
+      }
+
+      (_, resolveDuration) = measurePhase(clock: clock) {
+        viewGraph.evaluateDirtyNodes(
+          using: dirtyEvaluationPlan
+        )
+      }
+    }
+    animationController.finishTransitionCollection()
+    var resolved = viewGraph.snapshot()
+    resolved = composePresentationHostTree(
+      baseNode: resolved,
+      hostState: presentationHostState,
+      in: resolveContext
+    )
+    resolved = wrapInContainerSafeArea(
+      resolved,
+      context: resolveContext
+    )
+
+    let animationTimestamp = MonotonicInstant.now()
+    animationController.processResolvedTree(
+      resolved,
+      transaction: context.transaction,
+      timestamp: animationTimestamp
+    )
+    _ = animationController.applyInterpolations(
+      to: &resolved,
+      at: animationTimestamp
+    )
+
+    let frameTailRetainedInput = frameTailRenderer.retainedInput(
+      invalidatedIdentities: context.invalidatedIdentities
+    )
+    let layoutPassContext = LayoutPassContext(
+      retainedLayout: frameTailRetainedInput.retainedLayout,
+      invalidatedIdentities: context.invalidatedIdentities
+    )
+    let frameContext = FrameContext(
+      environment: context.environment,
+      transaction: context.transaction,
+      invalidatedIdentities: context.invalidatedIdentities
+    )
+    let frameTailInput = FrameTailInput(
+      resolved: resolved,
+      proposal: proposal,
+      rootIdentity: resolveContext.identity,
+      retained: frameTailRetainedInput,
+      layoutPassContext: layoutPassContext
+    )
+    let tailLayout = await frameTailRenderer.renderLayoutAsync(
+      frameTailInput,
+      clock: clock
+    )
+    var placed = tailLayout.baselinePlaced
+    animationController.capturePlacedTree(tailLayout.baselinePlaced)
+    animationController.applyPlacedOverlays(
+      to: &placed,
+      at: animationTimestamp
+    )
+    let tail = await frameTailRenderer.renderRasterAsync(
       frameTailInput,
       layout: tailLayout,
       placed: placed,

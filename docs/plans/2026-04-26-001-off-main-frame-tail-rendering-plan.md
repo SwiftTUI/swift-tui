@@ -348,17 +348,33 @@ swiftly run swift test --package-path GUI/SwiftUITUIGUI --filter hosted_surface
 
 **Goal:** Let the main actor suspend while tail computation runs.
 
-- [ ] Add async render entry point on `DefaultRenderer`.
-- [ ] Convert `RunLoop.renderPendingFrames(renderedFrames:)` to async or route
+- [x] Add async render entry point on `DefaultRenderer`.
+- [x] Convert `RunLoop.renderPendingFrames(renderedFrames:)` to async or route
   through an async helper.
-- [ ] Preserve ordered frame commit.
-- [ ] Do not drop computed frames.
-- [ ] Confirm input and signal readers can enqueue work while the main actor is
+- [x] Preserve ordered frame commit.
+- [x] Do not drop computed frames.
+- [x] Confirm input and signal readers can enqueue work while the main actor is
   suspended awaiting the worker.
-- [ ] Keep focus-sync rerender loop intact.
-- [ ] Keep animation deadline scheduling after commit.
-- [ ] Keep presentation after commit decision and before lifecycle application
+- [x] Keep focus-sync rerender loop intact.
+- [x] Keep animation deadline scheduling after commit.
+- [x] Keep presentation after commit decision and before lifecycle application
   exactly where current semantics require it.
+
+Stage 5 result:
+
+- `DefaultRenderer.renderAsync` now exposes an async runtime render path.
+- `RunLoop.runWithInstalledAnimationSinks()` routes through
+  `renderPendingFramesAsync(renderedFrames:)`, while the existing synchronous
+  `renderPendingFrames(renderedFrames:)` remains available for deterministic
+  package tests.
+- The runtime awaits the frame-tail raster worker and preserves the existing
+  presentation, lifecycle, focus-sync, animation-deadline, diagnostics, and
+  transient-press ordering.
+- Validation found that `LayoutProxyBox` custom-layout callbacks still use
+  `MainActor.assumeIsolated`; moving layout to the Dispatch worker traps for
+  authored `Layout` content. Stage 5 therefore keeps layout on the main actor
+  and runs the Sendable semantics/draw/raster tail on the worker. Fully
+  off-main layout requires a later custom-layout isolation design.
 
 Commit boundary:
 

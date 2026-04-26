@@ -1,6 +1,6 @@
 /// Extracts focus, interaction, action, selection, and scroll routing from a
 /// placed tree.
-public struct SemanticExtractor {
+public struct SemanticExtractor: Sendable {
   public init() {}
 
   /// Extracts semantic routing data from `placed`.
