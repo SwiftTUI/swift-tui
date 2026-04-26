@@ -599,6 +599,29 @@ private func injectPlacedOverlays(
 
 @MainActor
 package final class AnimationController: Sendable {
+  package struct Checkpoint {
+    fileprivate var previousSnapshots: [Identity: AnimatableSnapshot]
+    fileprivate var previousTreeRoot: ResolvedNode?
+    fileprivate var previousPlacedRoot: PlacedNode?
+    fileprivate var previousMatchedGeometryBounds: [MatchedGeometryKey: Rect]
+    fileprivate var previousMatchedKeyIdentities: [MatchedGeometryKey: Identity]
+    fileprivate var previousParentByIdentity: [Identity: Identity]
+    fileprivate var previousChildIndexByIdentity: [Identity: Int]
+    fileprivate var activeAnimations: [AnimationKey: ActiveAnimation]
+    fileprivate var registeredAnimations: [AnimationBox: Animation]
+    fileprivate var completionClosures: [AnimationBatchID: @Sendable () -> Void]
+    fileprivate var batchRefCounts: [AnimationBatchID: Int]
+    fileprivate var pendingEmptyBatchCompletions: [AnimationBatchID: MonotonicInstant]
+    fileprivate var transitionsByIdentity: [Identity: AnyTransition]
+    fileprivate var previousTransitionsByIdentity: [Identity: AnyTransition]
+    fileprivate var pendingTransitionsByIdentity: [Identity: AnyTransition]
+    fileprivate var removingIdentities: [Identity: RemovalEntry]
+    fileprivate var previousIdentities: Set<Identity>
+    fileprivate var lastTickResult: AnimationTickResult
+    fileprivate var isFrameHeadTransactionActive: Bool
+    fileprivate var deferredFrameHeadCompletions: [@Sendable () -> Void]
+  }
+
   private var previousSnapshots: [Identity: AnimatableSnapshot] = [:]
   /// Full tree from the previous frame, retained so removals can capture
   /// their subtrees.
@@ -658,6 +681,8 @@ package final class AnimationController: Sendable {
   private var removingIdentities: [Identity: RemovalEntry] = [:]
   private var previousIdentities: Set<Identity> = []
   package private(set) var lastTickResult: AnimationTickResult = .init()
+  private var isFrameHeadTransactionActive = false
+  private var deferredFrameHeadCompletions: [@Sendable () -> Void] = []
 
   /// Target frame interval during active animation (30 FPS).
   private let frameInterval: Duration = .milliseconds(33)
@@ -666,6 +691,86 @@ package final class AnimationController: Sendable {
   private let defaultTransitionDuration: Duration = .milliseconds(250)
 
   package init() {}
+
+  package func beginFrameHeadTransaction() -> Checkpoint {
+    precondition(
+      !isFrameHeadTransactionActive,
+      "AnimationController frame-head transactions cannot be nested."
+    )
+    let checkpoint = makeCheckpoint()
+    isFrameHeadTransactionActive = true
+    deferredFrameHeadCompletions.removeAll(keepingCapacity: true)
+    return checkpoint
+  }
+
+  package func commitFrameHeadTransaction(_ checkpoint: Checkpoint) {
+    precondition(
+      isFrameHeadTransactionActive,
+      "No AnimationController frame-head transaction is active."
+    )
+    let completions = deferredFrameHeadCompletions
+    isFrameHeadTransactionActive = checkpoint.isFrameHeadTransactionActive
+    deferredFrameHeadCompletions = checkpoint.deferredFrameHeadCompletions
+    for completion in completions {
+      completion()
+    }
+  }
+
+  package func abortFrameHeadTransaction(_ checkpoint: Checkpoint) {
+    precondition(
+      isFrameHeadTransactionActive,
+      "No AnimationController frame-head transaction is active."
+    )
+    restore(checkpoint)
+  }
+
+  private func makeCheckpoint() -> Checkpoint {
+    Checkpoint(
+      previousSnapshots: previousSnapshots,
+      previousTreeRoot: previousTreeRoot,
+      previousPlacedRoot: previousPlacedRoot,
+      previousMatchedGeometryBounds: previousMatchedGeometryBounds,
+      previousMatchedKeyIdentities: previousMatchedKeyIdentities,
+      previousParentByIdentity: previousParentByIdentity,
+      previousChildIndexByIdentity: previousChildIndexByIdentity,
+      activeAnimations: activeAnimations,
+      registeredAnimations: registeredAnimations,
+      completionClosures: completionClosures,
+      batchRefCounts: batchRefCounts,
+      pendingEmptyBatchCompletions: pendingEmptyBatchCompletions,
+      transitionsByIdentity: transitionsByIdentity,
+      previousTransitionsByIdentity: previousTransitionsByIdentity,
+      pendingTransitionsByIdentity: pendingTransitionsByIdentity,
+      removingIdentities: removingIdentities,
+      previousIdentities: previousIdentities,
+      lastTickResult: lastTickResult,
+      isFrameHeadTransactionActive: isFrameHeadTransactionActive,
+      deferredFrameHeadCompletions: deferredFrameHeadCompletions
+    )
+  }
+
+  private func restore(_ checkpoint: Checkpoint) {
+    previousSnapshots = checkpoint.previousSnapshots
+    previousTreeRoot = checkpoint.previousTreeRoot
+    previousPlacedRoot = checkpoint.previousPlacedRoot
+    previousMatchedGeometryBounds = checkpoint.previousMatchedGeometryBounds
+    previousMatchedKeyIdentities = checkpoint.previousMatchedKeyIdentities
+    previousParentByIdentity = checkpoint.previousParentByIdentity
+    previousChildIndexByIdentity = checkpoint.previousChildIndexByIdentity
+    activeAnimations = checkpoint.activeAnimations
+    registeredAnimations = checkpoint.registeredAnimations
+    completionClosures = checkpoint.completionClosures
+    batchRefCounts = checkpoint.batchRefCounts
+    pendingEmptyBatchCompletions = checkpoint.pendingEmptyBatchCompletions
+    transitionsByIdentity = checkpoint.transitionsByIdentity
+    previousTransitionsByIdentity = checkpoint.previousTransitionsByIdentity
+    pendingTransitionsByIdentity = checkpoint.pendingTransitionsByIdentity
+    removingIdentities = checkpoint.removingIdentities
+    previousIdentities = checkpoint.previousIdentities
+    lastTickResult = checkpoint.lastTickResult
+    isFrameHeadTransactionActive = checkpoint.isFrameHeadTransactionActive
+    deferredFrameHeadCompletions = checkpoint.deferredFrameHeadCompletions
+  }
 
   /// Stores a snapshot of the placed tree at the end of the frame so
   /// the next frame's removal detection can find the disappearing
@@ -1649,11 +1754,19 @@ package final class AnimationController: Sendable {
     if newCount <= 0 {
       batchRefCounts.removeValue(forKey: batchID)
       if let closure = completionClosures.removeValue(forKey: batchID) {
-        closure()
+        fireOrDeferCompletion(closure)
       }
     } else {
       batchRefCounts[batchID] = newCount
     }
+  }
+
+  private func fireOrDeferCompletion(_ completion: @escaping @Sendable () -> Void) {
+    guard isFrameHeadTransactionActive else {
+      completion()
+      return
+    }
+    deferredFrameHeadCompletions.append(completion)
   }
 
   /// Applies interpolated values to the resolved tree for the given
@@ -1858,7 +1971,7 @@ package final class AnimationController: Sendable {
       for batchID in drainedBatchIDs {
         pendingEmptyBatchCompletions.removeValue(forKey: batchID)
         if let closure = completionClosures.removeValue(forKey: batchID) {
-          closure()
+          fireOrDeferCompletion(closure)
         }
       }
     }
@@ -2323,6 +2436,8 @@ package final class AnimationController: Sendable {
     removingIdentities.removeAll(keepingCapacity: true)
     previousIdentities.removeAll(keepingCapacity: true)
     lastTickResult = .init()
+    isFrameHeadTransactionActive = false
+    deferredFrameHeadCompletions.removeAll(keepingCapacity: true)
   }
 }
 

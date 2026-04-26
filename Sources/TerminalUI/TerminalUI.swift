@@ -139,6 +139,7 @@ private struct FrameHeadDraft {
   var resolveDuration: Duration
   var runtimeRegistrationDraft: RuntimeRegistrationDraft
   var runtimeRegistrationMutation: RuntimeRegistrationMutation
+  var animationCheckpoint: AnimationController.Checkpoint
 }
 
 @MainActor
@@ -1506,6 +1507,7 @@ public struct DefaultRenderer {
     }
     let (_, resolveDuration): (Void, Duration)
     var runtimeRegistrationMutation = RuntimeRegistrationMutation.none
+    let animationCheckpoint = animationController.beginFrameHeadTransaction()
     animationController.beginTransitionCollection()
     if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
       resolveDuration = .zero
@@ -1590,7 +1592,8 @@ public struct DefaultRenderer {
       animationTimestamp: animationTimestamp,
       resolveDuration: resolveDuration,
       runtimeRegistrationDraft: runtimeRegistrationDraft,
-      runtimeRegistrationMutation: runtimeRegistrationMutation
+      runtimeRegistrationMutation: runtimeRegistrationMutation,
+      animationCheckpoint: animationCheckpoint
     )
   }
 
@@ -1678,6 +1681,7 @@ public struct DefaultRenderer {
       )
     }
     commitRuntimeRegistrations(for: draft)
+    animationController.commitFrameHeadTransaction(draft.animationCheckpoint)
     applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()

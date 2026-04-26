@@ -1909,6 +1909,101 @@ struct AnimationControllerPropertyTests {
     #expect(fireCount.count == 1)
   }
 
+  @Test("frame-head transaction defers batch completion until commit")
+  func frameHeadTransactionDefersBatchCompletionUntilCommit() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(100))
+    controller.register(animation)
+
+    let batchID = AnimationBatchID(8_001)
+    let fireCount = FireCounter()
+    controller.registerCompletion(batchID: batchID) {
+      fireCount.increment()
+    }
+
+    let leafIdentity = Identity(components: [.named("transaction-leaf")])
+    var frame1Metadata = DrawMetadata()
+    frame1Metadata.baseStyle.explicitOpacity = 1.0
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame1Metadata
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    let checkpoint = controller.beginFrameHeadTransaction()
+
+    var frame2Metadata = DrawMetadata()
+    frame2Metadata.baseStyle.explicitOpacity = 0.0
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame2Metadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    transaction.animationBatchID = batchID
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+
+    let past = t0.advanced(by: .milliseconds(200))
+    _ = controller.applyInterpolations(to: &frame2, at: past)
+    #expect(fireCount.count == 0)
+
+    controller.commitFrameHeadTransaction(checkpoint)
+    #expect(fireCount.count == 1)
+  }
+
+  @Test("frame-head transaction abort restores batch completion state")
+  func frameHeadTransactionAbortRestoresBatchCompletionState() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(100))
+    controller.register(animation)
+
+    let batchID = AnimationBatchID(8_002)
+    let fireCount = FireCounter()
+    controller.registerCompletion(batchID: batchID) {
+      fireCount.increment()
+    }
+
+    let leafIdentity = Identity(components: [.named("aborted-transaction-leaf")])
+    var frame1Metadata = DrawMetadata()
+    frame1Metadata.baseStyle.explicitOpacity = 1.0
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame1Metadata
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2Metadata = DrawMetadata()
+    frame2Metadata.baseStyle.explicitOpacity = 0.0
+    var frame2 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf"),
+      drawMetadata: frame2Metadata
+    )
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    transaction.animationBatchID = batchID
+
+    let checkpoint = controller.beginFrameHeadTransaction()
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+    let past = t0.advanced(by: .milliseconds(200))
+    _ = controller.applyInterpolations(to: &frame2, at: past)
+    #expect(fireCount.count == 0)
+
+    controller.abortFrameHeadTransaction(checkpoint)
+    #expect(fireCount.count == 0)
+    #expect(controller.activeAnimationCount == 0)
+
+    var committedFrame = frame2
+    controller.processResolvedTree(committedFrame, transaction: transaction, timestamp: t0)
+    _ = controller.applyInterpolations(to: &committedFrame, at: past)
+    #expect(fireCount.count == 1)
+  }
+
   @Test(
     "withAnimation completion fires after duration even when no tracked property changes"
   )
@@ -1968,6 +2063,43 @@ struct AnimationControllerPropertyTests {
     // ``completionClosures`` in a single pass.
     var frame4 = frame3
     _ = controller.applyInterpolations(to: &frame4, at: past.advanced(by: .milliseconds(50)))
+    #expect(fireCount.count == 1)
+  }
+
+  @Test("frame-head transaction defers stranded completion until commit")
+  func frameHeadTransactionDefersStrandedCompletionUntilCommit() throws {
+    let controller = AnimationController()
+    let animation = Animation.linear(duration: .milliseconds(100))
+    controller.register(animation)
+
+    let batchID = AnimationBatchID(8_003)
+    let fireCount = FireCounter()
+    controller.registerCompletion(batchID: batchID) {
+      fireCount.increment()
+    }
+
+    let leafIdentity = Identity(components: [.named("stranded-transaction-leaf")])
+    let frame1 = ResolvedNode(
+      identity: leafIdentity,
+      kind: .view("Leaf")
+    )
+    let t0 = MonotonicInstant.now()
+    controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
+
+    var frame2 = frame1
+    var transaction = TransactionSnapshot()
+    transaction.animationRequest = .animate(animation.animationBox)
+    transaction.animationBatchID = batchID
+
+    let checkpoint = controller.beginFrameHeadTransaction()
+    controller.processResolvedTree(frame2, transaction: transaction, timestamp: t0)
+    _ = controller.applyInterpolations(
+      to: &frame2,
+      at: t0.advanced(by: .milliseconds(200))
+    )
+    #expect(fireCount.count == 0)
+
+    controller.commitFrameHeadTransaction(checkpoint)
     #expect(fireCount.count == 1)
   }
 
