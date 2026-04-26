@@ -1,9 +1,12 @@
 ---
-title: refactor: tighten terminal paint pipeline
+title: "refactor: tighten terminal paint pipeline"
 type: refactor
-status: active
+status: shipped
 date: 2026-04-18
 ---
+
+> **Note:** Shipped. All 16 task checkboxes below are checked; `PresentationDamage` / `presentationDamage` diagnostics, terminal edit-op lowering, and the related paint-pipeline narrowing live in `Sources/Core/CommitAndFrameTypes.swift` and `Sources/TerminalUI/`.
+
 
 # refactor: tighten terminal paint pipeline
 
