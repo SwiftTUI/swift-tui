@@ -384,7 +384,7 @@ Stage 9 result:
 - `AsyncFrameTailRenderingTests` now renders `WindowHostLayout` through
   `DefaultRenderer.renderAsync` and requires worker timings with zero
   custom-layout fallback diagnostics.
-- `ScrollViewLayout` remains on the main-actor custom-layout fallback.
+- `ScrollViewLayout` initially remained on the main-actor custom-layout fallback.
   Attempting to move it into `SendableLayout` made the interactive demo's
   headless run-loop selection-mode test crash with a signal-10 test helper
   exit. Its existing retained-layout reuse signatures remain in place for the
@@ -396,6 +396,41 @@ Stage 9 result:
   composed runtime path is debugged.
 - Test-only custom layouts and the SwiftUI mirror examples remain ordinary
   `Layout` conformers unless they are explicitly serving worker-path coverage.
+
+### Stage 10: Move ScrollView after fixing worker stack depth
+
+- [x] Diagnose the `ScrollViewLayout` worker-path crash on the composed runtime
+  path.
+- [x] Move frame-tail layout work onto a dedicated large-stack layout worker on
+  Darwin instead of the default dispatch worker stack.
+- [x] Migrate `ScrollViewLayout` to `SendableLayout`.
+- [x] Update async renderer coverage so framework-owned `ScrollView` requires
+  worker layout timings and zero custom-layout fallback diagnostics.
+- [x] Keep lazy indexed child sources on the main actor until their child-source
+  callbacks have a worker-safe snapshot.
+
+Stage 10 result:
+
+- The signal-10 failure reproduced as an `EXC_BAD_ACCESS` on
+  `swift-terminal-ui.frame-tail-renderer` while recursively placing the resolved
+  tree, before any test assertion failed. The backtrace showed layout placement
+  stack exhaustion rather than a bad ScrollView measurement or placement value.
+- Async layout now uses a lazy `FrameTailLayoutWorker` with an 8 MiB pthread
+  stack on Darwin. Raster work and synchronous renderer coordination remain on
+  the existing serial dispatch queue.
+- `ScrollViewLayout` now conforms to `SendableLayout`; its measurement
+  signature depends on axes and indicator visibility, and its placement
+  signature also includes scroll offset.
+- ScrollViews with lazy indexed content still keep layout on the main actor.
+  `ForEachIndexedChildSource` currently uses `MainActor.assumeIsolated` for its
+  identity and child-resolution callbacks, so the frame-tail offload gate rejects
+  trees with indexed child sources until that source is snapshotted for worker
+  use.
+- The existing `InteractiveRuntimeTests/headlessRunLoopChangesSelectionMode`
+  runtime path covers the previous crash shape once `ScrollViewLayout` can run
+  off-main.
+- `TabViewContainerLayout` remains on the main-actor fallback pending a separate
+  diagnosis of the gallery tab-click runtime crash.
 
 ## Required Tests
 

@@ -3,6 +3,10 @@
 import Synchronization
 @_exported import View
 
+#if canImport(Darwin)
+  import Darwin
+#endif
+
 #if canImport(Dispatch)
   @unsafe @preconcurrency import Dispatch
 #endif
@@ -128,6 +132,208 @@ private struct FrameTailWorkerResult<Value> {
   var completedAt: ContinuousClock.Instant?
 }
 
+private final class FrameTailLayoutWorkerBox: Sendable {
+  private let storage = Mutex<FrameTailLayoutWorker?>(nil)
+
+  func async<Value>(
+    _ operation: @escaping @Sendable () -> Value
+  ) async -> Value {
+    let worker = storage.withLock { storage in
+      if let storage {
+        return storage
+      }
+      let worker = FrameTailLayoutWorker()
+      storage = worker
+      return worker
+    }
+    return await worker.async(operation)
+  }
+}
+
+#if canImport(Darwin) && canImport(Dispatch)
+  @safe private final class FrameTailLayoutWorkerState: Sendable {
+    struct Job: Sendable {
+      var operation: @Sendable () -> Void
+    }
+
+    private enum NextJob {
+      case job(Job)
+      case idle
+      case stop
+    }
+
+    private struct State: Sendable {
+      var jobs: [Job] = []
+      var isStopping = false
+    }
+
+    private let state = Mutex(State())
+    private let semaphore = DispatchSemaphore(value: 0)
+
+    func enqueue(_ job: Job) {
+      state.withLock { state in
+        state.jobs.append(job)
+      }
+      semaphore.signal()
+    }
+
+    func stop() {
+      state.withLock { state in
+        state.isStopping = true
+      }
+      semaphore.signal()
+    }
+
+    func runLoop() {
+      unsafe pthread_setname_np("swift-terminal-ui.frame-tail-layout")
+
+      while true {
+        semaphore.wait()
+
+        drainJobs: while true {
+          switch nextJob() {
+          case .job(let job):
+            job.operation()
+          case .idle:
+            break drainJobs
+          case .stop:
+            return
+          }
+        }
+      }
+    }
+
+    private func nextJob() -> NextJob {
+      state.withLock { state in
+        if !state.jobs.isEmpty {
+          return .job(state.jobs.removeFirst())
+        }
+        if state.isStopping {
+          return .stop
+        }
+        return .idle
+      }
+    }
+  }
+
+  @safe private final class FrameTailLayoutWorker: Sendable {
+    private static let stackSize = 8 * 1024 * 1024
+
+    private let state: FrameTailLayoutWorkerState
+    private let thread: UInt?
+    private let fallbackQueue = DispatchQueue(label: "swift-terminal-ui.frame-tail-layout-fallback")
+
+    init() {
+      let state = FrameTailLayoutWorkerState()
+      self.state = state
+      thread = Self.startThread(state: state)
+    }
+
+    deinit {
+      stopThread()
+    }
+
+    func async<Value>(
+      _ operation: @escaping @Sendable () -> Value
+    ) async -> Value {
+      await withCheckedContinuation { continuation in
+        enqueue(
+          FrameTailLayoutWorkerState.Job {
+            continuation.resume(returning: operation())
+          }
+        )
+      }
+    }
+
+    private static func startThread(
+      state: FrameTailLayoutWorkerState
+    ) -> UInt? {
+      var attributes = pthread_attr_t()
+      guard unsafe pthread_attr_init(&attributes) == 0 else {
+        return nil
+      }
+      defer {
+        unsafe pthread_attr_destroy(&attributes)
+      }
+
+      _ = unsafe pthread_attr_setstacksize(&attributes, Self.stackSize)
+
+      var createdThread: pthread_t?
+      let retainedState = unsafe Unmanaged.passRetained(state)
+      let result = unsafe pthread_create(
+        &createdThread,
+        &attributes,
+        { pointer in
+          let state = unsafe Unmanaged<FrameTailLayoutWorkerState>
+            .fromOpaque(pointer)
+            .takeRetainedValue()
+          state.runLoop()
+          return nil
+        },
+        unsafe retainedState.toOpaque()
+      )
+
+      guard result == 0 else {
+        unsafe retainedState.release()
+        return nil
+      }
+      guard unsafe createdThread != nil else {
+        unsafe retainedState.release()
+        return nil
+      }
+      return UInt(bitPattern: unsafe createdThread!)
+    }
+
+    private func stopThread() {
+      guard
+        let thread,
+        let currentThread = unsafe pthread_t(bitPattern: thread)
+      else {
+        return
+      }
+      guard unsafe pthread_equal(pthread_self(), currentThread) == 0 else {
+        return
+      }
+
+      state.stop()
+      unsafe pthread_join(currentThread, nil)
+    }
+
+    private func enqueue(_ job: FrameTailLayoutWorkerState.Job) {
+      guard thread != nil else {
+        fallbackQueue.async {
+          job.operation()
+        }
+        return
+      }
+
+      state.enqueue(job)
+    }
+  }
+#elseif canImport(Dispatch)
+  private final class FrameTailLayoutWorker: Sendable {
+    private let queue = DispatchQueue(label: "swift-terminal-ui.frame-tail-layout")
+
+    func async<Value>(
+      _ operation: @escaping @Sendable () -> Value
+    ) async -> Value {
+      await withCheckedContinuation { continuation in
+        queue.async {
+          continuation.resume(returning: operation())
+        }
+      }
+    }
+  }
+#else
+  private final class FrameTailLayoutWorker: Sendable {
+    func async<Value>(
+      _ operation: @escaping @Sendable () -> Value
+    ) async -> Value {
+      operation()
+    }
+  }
+#endif
+
 package struct FrameTailRenderHooks: Sendable {
   package var beforeLayout: (@Sendable () -> Void)?
   package var beforeRaster: (@Sendable () -> Void)?
@@ -162,6 +368,7 @@ private final class FrameTailRenderer: Sendable {
   private let retainedState = FrameTailRetainedState()
   private let renderHooks = Mutex<FrameTailRenderHooks?>(nil)
   private let suspensionHooks = Mutex<FrameRenderSuspensionHooks?>(nil)
+  private let layoutWorker = FrameTailLayoutWorkerBox()
 
   #if canImport(Dispatch)
     private let queue = DispatchQueue(label: "swift-terminal-ui.frame-tail-renderer")
@@ -210,7 +417,7 @@ private final class FrameTailRenderer: Sendable {
       )
     }
 
-    let result = await timedAsync(clock: clock) {
+    let result = await timedLayoutAsync(clock: clock) {
       self.renderLayoutInline(
         input,
         clock: clock
@@ -227,6 +434,7 @@ private final class FrameTailRenderer: Sendable {
     _ input: FrameTailInput
   ) -> Bool {
     !containsMainActorOnlyCustomLayout(input.resolved)
+      && !containsMainActorIndexedChildSource(input.resolved)
   }
 
   func renderRaster(
@@ -403,6 +611,33 @@ private final class FrameTailRenderer: Sendable {
     }
   }
 
+  private func timedLayoutAsync<Value>(
+    clock: ContinuousClock?,
+    _ operation: @escaping @Sendable () -> Value
+  ) async -> FrameTailWorkerResult<Value> {
+    guard let clock else {
+      return .init(
+        value: await layoutWorker.async(operation),
+        enqueueToStart: .zero,
+        compute: .zero,
+        completedAt: nil
+      )
+    }
+
+    let enqueuedAt = clock.now
+    return await layoutWorker.async {
+      let startedAt = clock.now
+      let value = operation()
+      let completedAt = clock.now
+      return .init(
+        value: value,
+        enqueueToStart: enqueuedAt.duration(to: startedAt),
+        compute: startedAt.duration(to: completedAt),
+        completedAt: completedAt
+      )
+    }
+  }
+
   private func renderLayoutInline(
     _ input: FrameTailInput,
     clock: ContinuousClock?
@@ -447,6 +682,15 @@ private final class FrameTailRenderer: Sendable {
       return true
     }
     return node.children.contains { containsMainActorOnlyCustomLayout($0) }
+  }
+
+  private func containsMainActorIndexedChildSource(
+    _ node: ResolvedNode
+  ) -> Bool {
+    if node.usesIndexedChildSource {
+      return true
+    }
+    return node.children.contains { containsMainActorIndexedChildSource($0) }
   }
 
   private func renderRasterInline(
