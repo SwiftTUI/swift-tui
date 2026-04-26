@@ -27,6 +27,7 @@ public struct FrameDiagnosticRecord: Sendable {
   public var mainActorTimings: FrameMainActorTimings?
   public var customLayoutFallbackCount: Int
   public var firstCustomLayoutFallbackIdentity: String?
+  public var staleFramePolicy: String
   public var inputEventsQueuedDuringRenderSuspension: Int
   public var presentationStrategy: String
   public var presentationBytesWritten: Int
@@ -156,6 +157,7 @@ public final class FrameDiagnosticsLogger {
       mainActorSuspendedMs,
       String(record.customLayoutFallbackCount),
       record.firstCustomLayoutFallbackIdentity ?? "-",
+      record.staleFramePolicy,
       String(record.inputEventsQueuedDuringRenderSuspension),
       // presentation
       record.presentationStrategy,
@@ -213,6 +215,7 @@ public final class FrameDiagnosticsLogger {
       "main_actor_suspended_ms",
       "custom_layout_fallbacks",
       "first_custom_layout_fallback",
+      "stale_frame_policy",
       "input_events_during_render_suspension",
       "present_strategy",
       "present_ms",
