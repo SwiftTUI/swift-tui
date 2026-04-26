@@ -133,21 +133,8 @@ struct InputBatchingResponsivenessTests {
       unsafe write(writeEnd, buffer.baseAddress, buffer.count)
     }
     #expect(bytesWritten == scrollEventBytes.count)
-    close(writeEnd)
-    didCloseWriteEnd = true
 
-    // Wait for the consumer task to drain the pipe and yield the
-    // event(s).  Closing the writeEnd makes the dispatch source
-    // see EOF, so the reader's stream finishes deterministically.
-    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
-    while ContinuousClock.now < deadline {
-      if !receivedEvents.value.isEmpty {
-        break
-      }
-      try await Task.sleep(nanoseconds: 5_000_000)
-    }
-
-    #expect(
+    func receivedScrollEvent() -> Bool {
       receivedEvents.value.contains { event in
         if case .mouse(let mouse) = event,
           case .scrolled = mouse.kind
@@ -155,10 +142,27 @@ struct InputBatchingResponsivenessTests {
           return true
         }
         return false
-      },
+      }
+    }
+
+    // Wait for the consumer task to drain the pipe and yield the event.  Keep
+    // the write end open until the event arrives so the dispatch source cannot
+    // observe EOF before its pending mouse flush runs under heavy test load.
+    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    while ContinuousClock.now < deadline {
+      if receivedScrollEvent() {
+        break
+      }
+      try await Task.sleep(nanoseconds: 5_000_000)
+    }
+
+    #expect(
+      receivedScrollEvent(),
       "the consumer must see at least one scroll event from the pipe"
     )
 
+    close(writeEnd)
+    didCloseWriteEnd = true
     _ = close(readEnd)
     didCloseReadEnd = true
   }
