@@ -371,6 +371,32 @@ Stage 8 result:
   custom layouts, requiring worker timings and zero custom-layout fallback
   diagnostics.
 
+### Stage 9: Adopt the opt-in for framework-owned custom layouts
+
+- [x] Audit framework-owned custom `Layout` conformers in `Sources/`.
+- [x] Migrate pure value-shaped framework layouts to `SendableLayout`.
+- [x] Add async renderer coverage for real framework surfaces that previously
+  depended on main-actor custom-layout fallback.
+
+Stage 9 result:
+
+- `WindowHostLayout` now conforms to `SendableLayout`.
+- `AsyncFrameTailRenderingTests` now renders `WindowHostLayout` through
+  `DefaultRenderer.renderAsync` and requires worker timings with zero
+  custom-layout fallback diagnostics.
+- `ScrollViewLayout` remains on the main-actor custom-layout fallback.
+  Attempting to move it into `SendableLayout` made the interactive demo's
+  headless run-loop selection-mode test crash with a signal-10 test helper
+  exit. Its existing retained-layout reuse signatures remain in place for the
+  main-actor fallback path.
+- `TabViewContainerLayout` remains on the main-actor custom-layout fallback.
+  Attempting to move it into `SendableLayout` made the gallery tab-click runtime
+  input path crash with a signal-10 test helper exit, while the simpler async
+  renderer surface passed. The fallback is now explicitly covered until that
+  composed runtime path is debugged.
+- Test-only custom layouts and the SwiftUI mirror examples remain ordinary
+  `Layout` conformers unless they are explicitly serving worker-path coverage.
+
 ## Required Tests
 
 - Built-in-only trees still run layout on the worker.

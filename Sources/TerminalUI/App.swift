@@ -194,7 +194,15 @@ public struct AnyScene: Scene {
   }
 }
 
-package struct WindowHostLayout: Layout {
+package struct WindowHostLayout: SendableLayout {
+  package var measurementReuseSignature: String {
+    "WindowHostLayout"
+  }
+
+  package var placementReuseSignature: String {
+    "WindowHostLayout"
+  }
+
   package func sizeThatFits(
     proposal: ProposedViewSize,
     subviews: LayoutSubviews,
