@@ -3,16 +3,19 @@
 @_exported import View
 
 @MainActor
-private final class RetainedFrameStore {
+private final class FrameTailRetainedState {
   private var previousFrameIndex: RetainedFrameIndex?
-  private(set) var previousRasterSurface: RasterSurface?
+  private var previousRasterSurface: RasterSurface?
 
-  func layoutSession(
+  func input(
     invalidatedIdentities: Set<Identity>
-  ) -> RetainedLayoutSession {
-    RetainedLayoutSession(
-      previousFrameIndex: previousFrameIndex,
-      invalidatedIdentities: invalidatedIdentities
+  ) -> FrameTailRetainedInput {
+    .init(
+      retainedLayout: RetainedLayoutSession(
+        previousFrameIndex: previousFrameIndex,
+        invalidatedIdentities: invalidatedIdentities
+      ),
+      previousRasterSurface: previousRasterSurface
     )
   }
 
@@ -29,7 +32,10 @@ private final class RetainedFrameStore {
   ///
   /// When no overlays were injected this frame, pass the same
   /// `placedTree` as baseline — the two are identical.
-  func store(_ artifacts: FrameArtifacts, baselinePlacedTree: PlacedNode) {
+  func storeCommittedFrame(
+    _ artifacts: FrameArtifacts,
+    baselinePlacedTree: PlacedNode
+  ) {
     var indexable = artifacts
     indexable.placedTree = baselinePlacedTree
     previousFrameIndex = .init(frame: indexable)
@@ -37,12 +43,17 @@ private final class RetainedFrameStore {
   }
 }
 
+private struct FrameTailRetainedInput {
+  var retainedLayout: RetainedLayoutSession
+  var previousRasterSurface: RasterSurface?
+}
+
 private struct FrameTailInput {
   var resolved: ResolvedNode
   var proposal: ProposedSize
   var rootIdentity: Identity
+  var retained: FrameTailRetainedInput
   var layoutPassContext: LayoutPassContext
-  var previousRasterSurface: RasterSurface?
 }
 
 private struct FrameTailDiagnostics {
@@ -85,7 +96,7 @@ public struct DefaultRenderer {
   private let presentationHostState: PresentationHostState
   private let animationController: AnimationController
 
-  private let retainedFrames: RetainedFrameStore
+  private let frameTailRetainedState: FrameTailRetainedState
 
   /// Creates a renderer with the supplied pipeline components.
   @MainActor
@@ -108,7 +119,7 @@ public struct DefaultRenderer {
     frameState = .init()
     presentationHostState = .init()
     animationController = .init()
-    retainedFrames = .init()
+    frameTailRetainedState = .init()
   }
 
   /// Package-only accessor so the run loop can register animations
@@ -240,10 +251,11 @@ public struct DefaultRenderer {
       at: animationTimestamp
     )
 
+    let frameTailRetainedInput = frameTailRetainedState.input(
+      invalidatedIdentities: context.invalidatedIdentities
+    )
     let layoutPassContext = LayoutPassContext(
-      retainedLayout: retainedFrames.layoutSession(
-        invalidatedIdentities: context.invalidatedIdentities
-      ),
+      retainedLayout: frameTailRetainedInput.retainedLayout,
       invalidatedIdentities: context.invalidatedIdentities
     )
     let frameContext = FrameContext(
@@ -256,8 +268,8 @@ public struct DefaultRenderer {
         resolved: resolved,
         proposal: proposal,
         rootIdentity: resolveContext.identity,
-        layoutPassContext: layoutPassContext,
-        previousRasterSurface: retainedFrames.previousRasterSurface
+        retained: frameTailRetainedInput,
+        layoutPassContext: layoutPassContext
       ),
       animationTimestamp: animationTimestamp,
       clock: clock
@@ -318,7 +330,10 @@ public struct DefaultRenderer {
       diagnostics: diagnostics
     )
 
-    retainedFrames.store(artifacts, baselinePlacedTree: tail.baselinePlaced)
+    frameTailRetainedState.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: tail.baselinePlaced
+    )
     return artifacts
   }
 
@@ -369,7 +384,7 @@ public struct DefaultRenderer {
     let presentationDamage = presentationDamage(
       rootIdentity: input.rootIdentity,
       placed: placed,
-      retainedLayout: input.layoutPassContext.retainedLayout
+      retainedLayout: input.retained.retainedLayout
     )
     let (semantics, semanticsDuration) = measurePhase(clock: clock) {
       semanticExtractor.extract(from: placed)
@@ -381,7 +396,7 @@ public struct DefaultRenderer {
       rasterizer.rasterizeCollectingVisibleIdentities(
         draw,
         minimumSize: minimumRasterSurfaceSize(for: input.proposal),
-        previousSurface: input.previousRasterSurface,
+        previousSurface: input.retained.previousRasterSurface,
         damage: presentationDamage
       )
     }

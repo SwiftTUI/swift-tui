@@ -786,7 +786,7 @@ struct AnimationPipelineIntegrationTests {
   func removalOverlaysDoNotAccumulateAcrossTickFrames() throws {
     // Regression for the "slide-out leaves render artefacts"
     // gallery bug: `applyPlacedOverlays` used to mutate the placed
-    // tree in place, and `retainedFrames.store` committed the
+    // tree in place, and the retained frame-tail state committed the
     // mutated tree to the retained cache.  Subsequent tick frames
     // then reused that cached tree via `retainedPlacement` and
     // `applyPlacedOverlays` injected ANOTHER overlay on top,
