@@ -1,8 +1,20 @@
 @MainActor
 package final class DependencyTracker {
+  package struct Checkpoint {
+    fileprivate var currentDependencies: DependencySet
+  }
+
   package private(set) var currentDependencies = DependencySet()
 
   package init() {}
+
+  package func makeCheckpoint() -> Checkpoint {
+    Checkpoint(currentDependencies: currentDependencies)
+  }
+
+  package func restore(_ checkpoint: Checkpoint) {
+    currentDependencies = checkpoint.currentDependencies
+  }
 
   package func recordStateRead(_ key: StateSlotKey) {
     currentDependencies.stateSlotReads.insert(key)
