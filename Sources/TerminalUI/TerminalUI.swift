@@ -87,6 +87,7 @@ private struct FrameTailLayoutOutput {
   var layoutWork: LayoutWorkMetrics
   var workerEnqueueToStart: Duration
   var workerCompute: Duration
+  var ranOffMain: Bool
 }
 
 private struct FrameTailSemanticsOutput {
@@ -127,11 +128,14 @@ private struct FrameTailWorkerResult<Value> {
 }
 
 package struct FrameTailRenderHooks: Sendable {
+  package var beforeLayout: (@Sendable () -> Void)?
   package var beforeRaster: (@Sendable () -> Void)?
 
   package init(
+    beforeLayout: (@Sendable () -> Void)? = nil,
     beforeRaster: (@Sendable () -> Void)? = nil
   ) {
+    self.beforeLayout = beforeLayout
     self.beforeRaster = beforeRaster
   }
 }
@@ -198,10 +202,30 @@ private final class FrameTailRenderer: Sendable {
     _ input: FrameTailInput,
     clock: ContinuousClock?
   ) async -> FrameTailLayoutOutput {
-    renderLayoutInline(
-      input,
-      clock: clock
-    )
+    guard canOffloadLayout(input) else {
+      return renderLayoutInline(
+        input,
+        clock: clock
+      )
+    }
+
+    let result = await timedAsync(clock: clock) {
+      self.renderLayoutInline(
+        input,
+        clock: clock
+      )
+    }
+    var output = result.value
+    output.workerEnqueueToStart = result.enqueueToStart
+    output.workerCompute = result.compute
+    output.ranOffMain = true
+    return output
+  }
+
+  func canOffloadLayout(
+    _ input: FrameTailInput
+  ) -> Bool {
+    !containsCustomLayout(input.resolved)
   }
 
   func renderRaster(
@@ -382,6 +406,10 @@ private final class FrameTailRenderer: Sendable {
     _ input: FrameTailInput,
     clock: ContinuousClock?
   ) -> FrameTailLayoutOutput {
+    let beforeLayout = renderHooks.withLock { hooks in
+      hooks?.beforeLayout
+    }
+    beforeLayout?()
     let (measured, measureDuration) = measurePhase(clock: clock) {
       layoutEngine.measure(
         input.resolved,
@@ -403,8 +431,18 @@ private final class FrameTailRenderer: Sendable {
       placeDuration: placeDuration,
       layoutWork: input.layoutPassContext.workMetrics,
       workerEnqueueToStart: .zero,
-      workerCompute: .zero
+      workerCompute: .zero,
+      ranOffMain: false
     )
+  }
+
+  private func containsCustomLayout(
+    _ node: ResolvedNode
+  ) -> Bool {
+    if case .custom = node.layoutBehavior {
+      return true
+    }
+    return node.children.contains { containsCustomLayout($0) }
   }
 
   private func renderRasterInline(
@@ -1110,17 +1148,31 @@ public struct DefaultRenderer {
       retained: frameTailRetainedInput,
       layoutPassContext: layoutPassContext
     )
+    let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
+    let layoutSuspends = frameTailRenderer.canOffloadLayout(frameTailInput)
+    let layoutSuspensionStart = layoutSuspends ? clock?.now : nil
+    if layoutSuspends {
+      suspensionHooks?.onBegin?()
+    }
     let tailLayout = await frameTailRenderer.renderLayoutAsync(
       frameTailInput,
       clock: clock
     )
+    if layoutSuspends {
+      suspensionHooks?.onEnd?()
+    }
+    let layoutSuspensionDuration =
+      if let layoutSuspensionStart, let clock {
+        layoutSuspensionStart.duration(to: clock.now)
+      } else {
+        Duration.zero
+      }
     let placed = tailLayout.baselinePlaced
     animationController.capturePlacedTree(tailLayout.baselinePlaced)
     let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
       for: placed,
       at: animationTimestamp
     )
-    let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
     let rasterSuspensionStart = clock?.now
     suspensionHooks?.onBegin?()
     let tail = await frameTailRenderer.renderRasterAsync(
@@ -1137,6 +1189,7 @@ public struct DefaultRenderer {
       } else {
         Duration.zero
       }
+    let renderSuspensionDuration = layoutSuspensionDuration + rasterSuspensionDuration
     var workerTimings = tail.diagnostics.workerTimings
     if var timings = workerTimings,
       let clock,
@@ -1175,10 +1228,11 @@ public struct DefaultRenderer {
       )
       let mainActorTimings = FrameMainActorTimings(
         blocked: resolveDuration
-          + tail.diagnostics.measureDuration
-          + tail.diagnostics.placeDuration
+          + (tailLayout.ranOffMain
+            ? .zero
+            : tail.diagnostics.measureDuration + tail.diagnostics.placeDuration)
           + commitDuration,
-        suspended: rasterSuspensionDuration
+        suspended: renderSuspensionDuration
       )
       diagnostics = FrameDiagnostics.summarize(
         resolved: resolved,

@@ -13,21 +13,25 @@ tail:
 measure -> place -> semantics -> draw -> raster
 ```
 
-Implementation proved that this target has to be narrower for the current
+Implementation proved that this target has to be conditional for the current
 runtime. Authored custom-layout callbacks still use main-actor-isolated
-`LayoutProxyBox` entry points, so `measure -> place` cannot move to a worker
-without a separate custom-layout isolation design. The implemented and retained
-first cut is:
+`LayoutProxyBox` entry points, so custom `measure -> place` cannot move to a
+worker without a separate custom-layout isolation design. The retained first cut
+is:
 
 ```
-main actor: resolve -> measure -> place -> animation overlays
-worker: semantics -> draw -> raster
+main actor: resolve -> animation interpolation
+worker when built-in-only: measure -> place
+main actor when custom layout is present: measure -> place
+main actor: placed-animation overlay snapshot
+worker: overlay application -> semantics -> draw -> raster
 main actor: commit -> present -> lifecycle
 ```
 
-The worker is a private per-renderer serial queue. `resolve`, layout,
+The worker is a private per-renderer serial queue. `resolve`, custom layout,
 focus synchronization, lifecycle commit, runtime registration mutation, and
-terminal presentation remain owned by the main actor.
+terminal presentation remain owned by the main actor. Built-in layout can run on
+the worker because it is value-shaped after resolve.
 
 ## Implementation result
 
@@ -35,9 +39,9 @@ The staged migration landed behind the existing public runtime surface:
 
 - `DefaultRenderer` now has an async render entry point used by the interactive
   run loop.
-- A private `FrameTailRenderer` owns the worker-side semantic extraction, draw
-  extraction, rasterization, previous-surface reuse, and worker timing
-  diagnostics.
+- A private `FrameTailRenderer` owns built-in layout offload, worker-side
+  placed-overlay application, semantic extraction, draw extraction,
+  rasterization, previous-surface reuse, and worker timing diagnostics.
 - The runtime awaits the worker and preserves ordered frame commit. It does not
   drop computed frames or present newer frames ahead of older side effects.
 - Blocking-tail tests verify that input can be queued while async tail rendering
@@ -45,11 +49,11 @@ The staged migration landed behind the existing public runtime surface:
 - Full repository validation passed with `bun run test` after the async runtime
   path and stress coverage were added.
 
-Decision: keep the async runtime path, but treat it as a post-layout frame-tail
-offload. It is a correct suspension boundary for semantics/draw/raster-heavy
-frames and a useful architectural seam. It is not evidence that the whole frame
-tail, especially custom layout measurement and placement, is ready to leave the
-main actor.
+Decision: keep the async runtime path, but treat it as a guarded frame-tail
+offload. It is a correct suspension boundary for built-in layout and
+semantics/draw/raster-heavy frames, and it gives custom layout an explicit
+fallback boundary. It is not evidence that custom layout measurement and
+placement are ready to leave the main actor.
 
 ## Problem
 
@@ -235,19 +239,20 @@ Skipping this loop would regress focus and scroll behavior.
 
 ## Viable migration shape
 
-### Phase 1: Post-layout frame tail offload
+### Phase 1: Guarded frame tail offload
 
-Introduce a package-internal worker responsible for the Sendable post-layout
-tail:
-
-```
-semantics -> draw -> raster
-```
-
-The main actor still performs:
+Introduce a package-internal worker responsible for the Sendable built-in
+layout and post-layout tail:
 
 ```
-resolve -> measure -> place -> animation capture/interpolation -> worker tail -> commit -> present
+built-in measure -> built-in place -> overlay application -> semantics -> draw -> raster
+```
+
+The main actor still performs resolve, animation interpolation, animation
+snapshotting, custom-layout fallback, commit, and presentation:
+
+```
+resolve -> animation interpolation -> guarded worker tail -> commit -> present
 ```
 
 The worker should be a single serial actor or queue-owned object. A serial
@@ -291,8 +296,9 @@ package final class FrameTailRenderer: Sendable {
 ```
 
 `RetainedTailState` should be split by actor ownership. Previous-surface raster
-reuse can be worker-owned. Retained layout state remains main-actor-owned until
-custom layout measurement and placement have a non-main isolation model.
+reuse and built-in retained-layout cache access can be worker-owned. Custom
+layout measurement and placement remain main-actor-owned until custom layouts
+have a non-main isolation model.
 
 The first implementation can keep `LayoutEngine`, `SemanticExtractor`,
 `DrawExtractor`, and `Rasterizer` as they are if they are `Sendable` enough for a
@@ -300,9 +306,10 @@ worker-owned instance. If strict concurrency rejects that, make the worker a
 class isolated behind a serial `DispatchQueue` and keep the mutable components
 private to that queue.
 
-Implementation note: the landed version used the pragmatic serial
-`DispatchQueue` shape and kept `LayoutEngine` on the main actor because authored
-custom-layout callbacks are still main-actor-isolated.
+Implementation note: the landed version uses the pragmatic serial
+`DispatchQueue` shape. Built-in layout jobs run on that queue; resolved trees
+containing `.custom` layout fall back to inline main-actor layout because
+authored custom-layout callbacks are still main-actor-isolated.
 
 ### Phase 1A: Main-actor orchestration
 
@@ -583,8 +590,8 @@ should not be carried as runtime complexity without evidence.
 
 - What custom-layout API or snapshot design would let measurement and placement
   run away from the main actor without `MainActor.assumeIsolated` traps?
-- Should animation placed-overlay application move into the worker once removal
-  overlay state can be passed as an explicit value snapshot?
+- Can the placed-animation overlay snapshot be narrowed further so it is easier
+  to inspect, diff, and fuzz independently of `AnimationController`?
 - How much of `CommitPlanner.plan(...)` can become pure once
   `ViewGraph.finalizeFrame(...)` is split from commit planning?
 
@@ -592,16 +599,16 @@ should not be carried as runtime complexity without evidence.
 
 Do not attempt whole-pipeline off-main rendering first.
 
-Keep the landed post-layout frame-tail seam and continue measuring it on
-semantics/draw/raster-heavy workloads. It targets the only region of the
+Keep the landed guarded frame-tail seam and continue measuring it on built-in
+layout and semantics/draw/raster-heavy workloads. It targets the regions of the
 current runtime that proved pure enough for a worker without changing the
 authoring model:
 
 ```
-semantics -> draw -> raster
+built-in measure -> built-in place -> overlay application -> semantics -> draw -> raster
 ```
 
-Treat off-main layout as a separate future project requiring an explicit
+Treat off-main custom layout as a separate future project requiring an explicit
 custom-layout isolation design. Treat off-main `resolve` as a still larger
 future project requiring explicit authoring context, side-effect snapshots, and
 a main-actor registry apply phase.

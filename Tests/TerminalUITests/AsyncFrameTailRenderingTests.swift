@@ -87,6 +87,84 @@ struct AsyncFrameTailRenderingTests {
     #expect(lifecycleRecorder.events == ["appear 0", "appear 1"])
   }
 
+  @Test("blocked built-in layout queues input without committing ahead")
+  func blockedBuiltInLayoutQueuesInputWithoutCommittingAhead() async throws {
+    let rootIdentity = testIdentity("AsyncFrameTailLayoutRoot")
+    let gate = AsyncFrameTailBlockingGate()
+    let renderer = DefaultRenderer()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeLayout: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    let inputReader = InjectedTerminalInputReader()
+    let terminal = AsyncFrameTailTerminalHost()
+    let lifecycleRecorder = AsyncFrameTailLifecycleRecorder()
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      keyHandler: { keyPress, _, stateContainer in
+        if keyPress == KeyPress(.character("i")) {
+          stateContainer.mutate { value in
+            value += 1
+          }
+          return .handled
+        }
+        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+          return .exit(.userExit(keyPress))
+        }
+        return .ignored
+      },
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameTailStressView(
+          value: value,
+          lifecycleRecorder: lifecycleRecorder
+        )
+      }
+    )
+
+    let runTask = Task {
+      try await runLoop.run()
+    }
+
+    await gate.waitUntilBlocked()
+    #expect(terminal.frames.isEmpty)
+
+    inputReader.send(.key(.character("i")))
+    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.finish()
+
+    #expect(terminal.frames.isEmpty)
+    gate.release()
+
+    let result = try await valueWithTimeout {
+      try await runTask.value
+    }
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.finalState == 1)
+    #expect(gate.rasterEntryCount >= 1)
+    #expect(terminal.frames.count >= 2)
+    #expect(terminal.frames.first?.contains("value 0") == true)
+    #expect(terminal.frames.last?.contains("value 1") == true)
+    #expect(lifecycleRecorder.events == ["appear 0", "appear 1"])
+  }
+
   @Test("diagnostics count input queued during async render suspension")
   func diagnosticsCountInputQueuedDuringAsyncRenderSuspension() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailDiagnosticsRoot")
