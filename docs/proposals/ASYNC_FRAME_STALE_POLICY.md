@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed policy for any future frame-tail cancellation or generation-dropping
-work.
+Stage 1 implemented. This remains the policy for future frame-tail cancellation
+or generation-dropping work.
 
 The current async frame-tail renderer intentionally preserves ordered commit:
 when a worker frame finishes, the main actor commits it before newer input state
@@ -204,11 +204,18 @@ the second measures staleness pressure.
 
 ### Stage 1: Document and assert ordered commit
 
-- Keep the current no-drop behavior.
-- Add a dedicated test name that states computed async frames commit in order
+- [x] Keep the current no-drop behavior.
+- [x] Add a dedicated test name that states computed async frames commit in order
   even when newer input is queued.
-- Add diagnostics text explaining that stale worker results are currently
+- [x] Add diagnostics text explaining that stale worker results are currently
   committed, not dropped.
+
+Stage 1 result:
+
+- `AsyncFrameTailRenderingTests` names the ordered-commit contract directly:
+  computed async frames commit in order even when newer input is queued.
+- `FrameDiagnosticsLogger` writes `stale_frame_policy=commit_ordered` for every
+  runtime diagnostics row.
 
 Commit boundary:
 

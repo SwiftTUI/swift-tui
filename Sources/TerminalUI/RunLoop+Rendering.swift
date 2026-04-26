@@ -266,6 +266,7 @@ extension RunLoop {
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
             firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
+            staleFramePolicy: "commit_ordered",
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
@@ -538,6 +539,7 @@ extension RunLoop {
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
             firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
+            staleFramePolicy: "commit_ordered",
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint

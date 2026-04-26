@@ -267,6 +267,7 @@ struct AsyncFrameTailRenderingTests {
           && row["main_actor_suspended_ms"] != nil
           && row["custom_layout_fallbacks"] == "0"
           && row["first_custom_layout_fallback"] == "-"
+          && row["stale_frame_policy"] == "commit_ordered"
       })
   }
 
@@ -655,8 +656,8 @@ struct AsyncFrameTailRenderingTests {
     )
   }
 
-  @Test("worker backlog commits blocked frame before later input batch")
-  func workerBacklogCommitsBlockedFrameBeforeLaterInputBatch() async throws {
+  @Test("computed async frames commit in order even when newer input is queued")
+  func computedAsyncFramesCommitInOrderEvenWhenNewerInputIsQueued() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailBacklogRoot")
     let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
     let renderer = DefaultRenderer()
