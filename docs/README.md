@@ -53,7 +53,9 @@ Active design proposals that are still shaping decisions:
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
 - [proposals/layout/BEHAVIOUR_FINDINGS.md](proposals/layout/BEHAVIOUR_FINDINGS.md) — behaviour-test findings from the layouts example
 
-Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`active`, `design-approved`, or `shipped`). Currently all are `shipped` and retained as historical task-by-task records; new in-flight plans land here.
+Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`active`, `design-approved`, or `shipped`). Current active plans:
+
+- [plans/2026-04-26-002-frame-head-abort-plan.md](plans/2026-04-26-002-frame-head-abort-plan.md) — Stage 3C plan for making prepared frame heads abortable before cancellable frame-tail jobs
 
 Implementation records retained for context (landed work that still informs reviews):
 
