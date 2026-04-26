@@ -291,6 +291,13 @@ struct AsyncFrameTailRenderingTests {
 
     #expect(artifacts.diagnostics.customLayoutFallbackCount == 1)
     #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == rootIdentity)
+    guard case .custom(let customLayoutHandle) = artifacts.resolvedTree.layoutBehavior else {
+      Issue.record("expected custom layout root")
+      return
+    }
+    #expect(customLayoutHandle.executionCapability == .mainActorOnly)
+    #expect(!customLayoutHandle.canRunOnWorker)
+    #expect(customLayoutHandle.workerProxy == nil)
     #expect(workerTimings.layoutEnqueueToStart == .zero)
     #expect(workerTimings.layoutCompute == .zero)
     #expect(workerTimings.rasterCompute != .zero)

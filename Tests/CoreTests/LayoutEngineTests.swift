@@ -677,6 +677,28 @@ struct LayoutEngineTests {
     #expect(!parent.supportsRetainedReuse)
   }
 
+  @Test("custom layout handles default to main actor execution")
+  func customLayoutHandlesDefaultToMainActorExecution() {
+    let handle = CustomLayoutHandle(NoOpCustomLayoutProxy())
+
+    #expect(handle.executionCapability == .mainActorOnly)
+    #expect(!handle.canRunOnWorker)
+    #expect(handle.workerProxy == nil)
+  }
+
+  @Test("custom layout handles report worker execution capability")
+  func customLayoutHandlesReportWorkerExecutionCapability() throws {
+    let workerProxy = NoOpWorkerCustomLayoutProxy()
+    let handle = CustomLayoutHandle(
+      NoOpCustomLayoutProxy(),
+      workerProxy: workerProxy
+    )
+
+    #expect(handle.executionCapability == .worker)
+    #expect(handle.canRunOnWorker)
+    #expect(try #require(handle.workerProxy).debugName == "NoOpWorkerCustomLayoutProxy")
+  }
+
   @Test("retained placement translates eager scroll subtrees when only viewport origin changes")
   func retainedPlacementTranslatesEagerViewportShift() {
     let engine = LayoutEngine()
@@ -822,6 +844,29 @@ private func stack(
 private final class NoOpCustomLayoutProxy: CustomLayoutProxy {
   var debugName: String {
     "NoOpCustomLayoutProxy"
+  }
+
+  func measureContainer(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    proposal _: ProposedSize
+  ) -> Size {
+    .zero
+  }
+
+  func placeSubviews(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    measured _: MeasuredNode,
+    in _: Rect
+  ) -> [PlacedNode] {
+    []
+  }
+}
+
+private struct NoOpWorkerCustomLayoutProxy: WorkerCustomLayoutProxy {
+  var debugName: String {
+    "NoOpWorkerCustomLayoutProxy"
   }
 
   func measureContainer(
