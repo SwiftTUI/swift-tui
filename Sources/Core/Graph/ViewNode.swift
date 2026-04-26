@@ -1,5 +1,34 @@
 @MainActor
 package final class ViewNode {
+  package struct Checkpoint {
+    fileprivate var invalidator: (any Invalidating)?
+    fileprivate var ownerGraph: ViewGraph?
+    fileprivate var parent: ViewNode?
+    fileprivate var committed: ResolvedNode
+    fileprivate var isCommittedSnapshotFresh: Bool
+    fileprivate var children: [ViewNode]
+    fileprivate var stateSlots: [Int: AnyStateSlot]
+    fileprivate var dependencies: DependencySet
+    fileprivate var lifecycleState: NodeLifecycleState
+    fileprivate var registeredHandlers: NodeHandlers
+    fileprivate var isDirty: Bool
+    fileprivate var wasPresentAtFrameStart: Bool
+    fileprivate var wasVisitedThisFrame: Bool
+    fileprivate var previousChildrenIdentities: [Identity]
+    fileprivate var previousLifecycleMetadata: LifecycleMetadata
+    fileprivate var bodyStateSlotCount: Int?
+    fileprivate var currentBodyStateSlotCount: Int
+    fileprivate var pendingChangeHandlerIDs: [String]
+    fileprivate var dependencyTracker: DependencyTracker.Checkpoint
+    fileprivate var registrationCaptureDepth: Int
+    fileprivate var evaluationDepth: Int
+    fileprivate var hasCommittedPresence: Bool
+    fileprivate var nextChangeModifierOrdinal: Int
+    fileprivate var preparedFrameID: UInt64
+    fileprivate var visitedFrameID: UInt64
+    fileprivate var evaluator: (@MainActor () -> Void)?
+  }
+
   package let identity: Identity
   package weak var invalidator: (any Invalidating)?
   package weak var ownerGraph: ViewGraph?
@@ -93,6 +122,74 @@ package final class ViewNode {
     nextChangeModifierOrdinal = 0
     preparedFrameID = 0
     visitedFrameID = 0
+    evaluator = nil
+  }
+
+  package func makeCheckpoint() -> Checkpoint {
+    Checkpoint(
+      invalidator: invalidator,
+      ownerGraph: ownerGraph,
+      parent: parent,
+      committed: committed,
+      isCommittedSnapshotFresh: isCommittedSnapshotFresh,
+      children: children,
+      stateSlots: stateSlots,
+      dependencies: dependencies,
+      lifecycleState: lifecycleState,
+      registeredHandlers: registeredHandlers,
+      isDirty: isDirty,
+      wasPresentAtFrameStart: wasPresentAtFrameStart,
+      wasVisitedThisFrame: wasVisitedThisFrame,
+      previousChildrenIdentities: previousChildrenIdentities,
+      previousLifecycleMetadata: previousLifecycleMetadata,
+      bodyStateSlotCount: bodyStateSlotCount,
+      currentBodyStateSlotCount: currentBodyStateSlotCount,
+      pendingChangeHandlerIDs: pendingChangeHandlerIDs,
+      dependencyTracker: dependencyTracker.makeCheckpoint(),
+      registrationCaptureDepth: registrationCaptureDepth,
+      evaluationDepth: evaluationDepth,
+      hasCommittedPresence: hasCommittedPresence,
+      nextChangeModifierOrdinal: nextChangeModifierOrdinal,
+      preparedFrameID: preparedFrameID,
+      visitedFrameID: visitedFrameID,
+      evaluator: evaluator
+    )
+  }
+
+  package func restore(_ checkpoint: Checkpoint) {
+    invalidator = checkpoint.invalidator
+    ownerGraph = checkpoint.ownerGraph
+    parent = checkpoint.parent
+    committed = checkpoint.committed
+    isCommittedSnapshotFresh = checkpoint.isCommittedSnapshotFresh
+    children = checkpoint.children
+    stateSlots = checkpoint.stateSlots
+    dependencies = checkpoint.dependencies
+    lifecycleState = checkpoint.lifecycleState
+    registeredHandlers = checkpoint.registeredHandlers
+    isDirty = checkpoint.isDirty
+    wasPresentAtFrameStart = checkpoint.wasPresentAtFrameStart
+    wasVisitedThisFrame = checkpoint.wasVisitedThisFrame
+    previousChildrenIdentities = checkpoint.previousChildrenIdentities
+    previousLifecycleMetadata = checkpoint.previousLifecycleMetadata
+    bodyStateSlotCount = checkpoint.bodyStateSlotCount
+    currentBodyStateSlotCount = checkpoint.currentBodyStateSlotCount
+    pendingChangeHandlerIDs = checkpoint.pendingChangeHandlerIDs
+    dependencyTracker.restore(checkpoint.dependencyTracker)
+    registrationCaptureDepth = checkpoint.registrationCaptureDepth
+    evaluationDepth = checkpoint.evaluationDepth
+    hasCommittedPresence = checkpoint.hasCommittedPresence
+    nextChangeModifierOrdinal = checkpoint.nextChangeModifierOrdinal
+    preparedFrameID = checkpoint.preparedFrameID
+    visitedFrameID = checkpoint.visitedFrameID
+    evaluator = checkpoint.evaluator
+  }
+
+  package func detachAfterCheckpointRestore() {
+    invalidator = nil
+    ownerGraph = nil
+    parent = nil
+    children = []
     evaluator = nil
   }
 
