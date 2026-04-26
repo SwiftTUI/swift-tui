@@ -180,20 +180,28 @@ bun run test
 
 **Goal:** Split the seam while everything still runs on the main actor.
 
-- [ ] Introduce package-internal `FrameTailInput`.
-- [ ] Introduce package-internal `FrameTailOutput`.
-- [ ] Introduce package-internal `FrameTailDiagnostics`.
-- [ ] Extract a synchronous helper from `DefaultRenderer.renderView(...)`:
+- [x] Introduce package-internal `FrameTailInput`.
+- [x] Introduce package-internal `FrameTailOutput`.
+- [x] Introduce package-internal `FrameTailDiagnostics`.
+- [x] Extract a synchronous helper from `DefaultRenderer.renderView(...)`:
 
   ```swift
   private func renderFrameTail(_ input: FrameTailInput) -> FrameTailOutput
   ```
 
-- [ ] Keep all current state ownership unchanged.
-- [ ] Keep `DefaultRenderer.render(...)` public behavior unchanged.
-- [ ] Preserve current `FrameDiagnostics` output shape.
-- [ ] Add a narrow regression test that compares current one-shot render output
-  to the extracted-tail path if such a test hook is practical.
+- [x] Keep all current state ownership unchanged.
+- [x] Keep `DefaultRenderer.render(...)` public behavior unchanged.
+- [x] Preserve current `FrameDiagnostics` output shape.
+- [x] Cover extracted-tail behavior through the existing public renderer path.
+
+Stage 1 result:
+
+- `DefaultRenderer.renderView(...)` now delegates
+  `measure -> place -> semantics -> draw -> raster` to a synchronous
+  `@MainActor` frame-tail helper.
+- No separate regression hook was needed because the extracted helper remains
+  private and single-path; the existing presentation, benchmark, and
+  interactive runtime suites exercise the same public renderer path.
 
 Commit boundary:
 

@@ -37,6 +37,36 @@ private final class RetainedFrameStore {
   }
 }
 
+private struct FrameTailInput {
+  var resolved: ResolvedNode
+  var proposal: ProposedSize
+  var rootIdentity: Identity
+  var layoutPassContext: LayoutPassContext
+  var previousRasterSurface: RasterSurface?
+}
+
+private struct FrameTailDiagnostics {
+  var measureDuration: Duration
+  var placeDuration: Duration
+  var semanticsDuration: Duration
+  var drawDuration: Duration
+  var rasterDuration: Duration
+  var layoutWork: LayoutWorkMetrics
+  var measurementCache: MeasurementCacheMetrics?
+}
+
+private struct FrameTailOutput {
+  var measured: MeasuredNode
+  var placed: PlacedNode
+  var baselinePlaced: PlacedNode
+  var semantics: SemanticSnapshot
+  var draw: DrawNode
+  var raster: RasterSurface
+  var drawnIdentities: Set<Identity>
+  var presentationDamage: PresentationDamage?
+  var diagnostics: FrameTailDiagnostics
+}
+
 /// Renders authored terminal views through the full frame pipeline.
 ///
 /// `DefaultRenderer` is the public one-shot entry point for turning a `View`
@@ -132,17 +162,6 @@ public struct DefaultRenderer {
   ) -> FrameArtifacts {
     let clock: ContinuousClock? = collectsDiagnostics ? ContinuousClock() : nil
 
-    func measurePhase<Value>(
-      _ operation: () -> Value
-    ) -> (Value, Duration) {
-      guard let clock else {
-        return (operation(), .zero)
-      }
-      let start = clock.now
-      let value = operation()
-      return (value, start.duration(to: clock.now))
-    }
-
     var resolveContext = context
     let runtimeRegistrations = resolveContext.runtimeRegistrations
     resolveContext.imageAssetResolver = imageRepository.resolver()
@@ -188,7 +207,7 @@ public struct DefaultRenderer {
         runtimeRegistrations.resetAll()
       }
 
-      (_, resolveDuration) = measurePhase {
+      (_, resolveDuration) = measurePhase(clock: clock) {
         viewGraph.evaluateDirtyNodes(
           using: dirtyEvaluationPlan
         )
@@ -232,18 +251,95 @@ public struct DefaultRenderer {
       transaction: context.transaction,
       invalidatedIdentities: context.invalidatedIdentities
     )
-    let (measured, measureDuration) = measurePhase {
-      layoutEngine.measure(
-        resolved,
+    let tail = renderFrameTail(
+      FrameTailInput(
+        resolved: resolved,
         proposal: proposal,
-        passContext: layoutPassContext
+        rootIdentity: resolveContext.identity,
+        layoutPassContext: layoutPassContext,
+        previousRasterSurface: retainedFrames.previousRasterSurface
+      ),
+      animationTimestamp: animationTimestamp,
+      clock: clock
+    )
+    let (commit, commitDuration) = measurePhase(clock: clock) {
+      let lifecycleEvents = viewGraph.finalizeFrame(
+        rootIdentity: resolveContext.identity,
+        resolved: resolved,
+        placed: tail.placed
+      )
+      return commitPlanner.plan(
+        resolved: resolved,
+        placed: tail.placed,
+        semantics: tail.semantics,
+        transaction: frameContext.transaction,
+        lifecycleEvents: lifecycleEvents
       )
     }
-    var (placed, placeDuration) = measurePhase {
+    layoutEngine.cache?.prune(keeping: viewGraph.liveIdentitySnapshot())
+    let diagnostics: FrameDiagnostics
+    if collectsDiagnostics {
+      let phaseTimings = FramePhaseTimings(
+        resolve: resolveDuration,
+        measure: tail.diagnostics.measureDuration,
+        place: tail.diagnostics.placeDuration,
+        semantics: tail.diagnostics.semanticsDuration,
+        draw: tail.diagnostics.drawDuration,
+        raster: tail.diagnostics.rasterDuration,
+        commit: commitDuration
+      )
+      diagnostics = FrameDiagnostics.summarize(
+        resolved: resolved,
+        measured: tail.measured,
+        placed: tail.placed,
+        semantics: tail.semantics,
+        draw: tail.draw,
+        invalidatedIdentities: frameContext.invalidatedIdentities,
+        resolveWork: resolveContext.resolveWorkTracker?.snapshot,
+        layoutWork: tail.diagnostics.layoutWork,
+        presentationDamage: tail.presentationDamage,
+        presentationSurfaceWidth: tail.raster.size.width,
+        phaseTimings: phaseTimings,
+        measurementCache: tail.diagnostics.measurementCache
+      )
+    } else {
+      diagnostics = .init()
+    }
+    let artifacts = FrameArtifacts(
+      resolvedTree: resolved,
+      measuredTree: tail.measured,
+      placedTree: tail.placed,
+      semanticSnapshot: tail.semantics,
+      drawTree: tail.draw,
+      rasterSurface: tail.raster,
+      presentationDamage: tail.presentationDamage,
+      drawnIdentities: tail.drawnIdentities,
+      commitPlan: commit,
+      diagnostics: diagnostics
+    )
+
+    retainedFrames.store(artifacts, baselinePlacedTree: tail.baselinePlaced)
+    return artifacts
+  }
+
+  @MainActor
+  private func renderFrameTail(
+    _ input: FrameTailInput,
+    animationTimestamp: MonotonicInstant,
+    clock: ContinuousClock?
+  ) -> FrameTailOutput {
+    let (measured, measureDuration) = measurePhase(clock: clock) {
+      layoutEngine.measure(
+        input.resolved,
+        proposal: input.proposal,
+        passContext: input.layoutPassContext
+      )
+    }
+    var (placed, placeDuration) = measurePhase(clock: clock) {
       layoutEngine.place(
-        resolved,
+        input.resolved,
         measured: measured,
-        passContext: layoutPassContext
+        passContext: input.layoutPassContext
       )
     }
     // Cache the BASELINE placed tree (pre-overlay) for two things:
@@ -271,85 +367,56 @@ public struct DefaultRenderer {
       at: animationTimestamp
     )
     let presentationDamage = presentationDamage(
-      rootIdentity: resolveContext.identity,
+      rootIdentity: input.rootIdentity,
       placed: placed,
-      retainedLayout: layoutPassContext.retainedLayout
+      retainedLayout: input.layoutPassContext.retainedLayout
     )
-    let (semantics, semanticsDuration) = measurePhase {
+    let (semantics, semanticsDuration) = measurePhase(clock: clock) {
       semanticExtractor.extract(from: placed)
     }
-    let (draw, drawDuration) = measurePhase {
+    let (draw, drawDuration) = measurePhase(clock: clock) {
       drawExtractor.extract(from: placed)
     }
-    let (rasterized, rasterDuration) = measurePhase {
+    let (rasterized, rasterDuration) = measurePhase(clock: clock) {
       rasterizer.rasterizeCollectingVisibleIdentities(
         draw,
-        minimumSize: minimumRasterSurfaceSize(for: proposal),
-        previousSurface: retainedFrames.previousRasterSurface,
+        minimumSize: minimumRasterSurfaceSize(for: input.proposal),
+        previousSurface: input.previousRasterSurface,
         damage: presentationDamage
       )
     }
-    let raster = rasterized.surface
-    let drawnIdentities = rasterized.visibleIdentities
-    let refinedPresentationDamage = rasterized.presentationDamage
-    let (commit, commitDuration) = measurePhase {
-      let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: resolveContext.identity,
-        resolved: resolved,
-        placed: placed
-      )
-      return commitPlanner.plan(
-        resolved: resolved,
-        placed: placed,
-        semantics: semantics,
-        transaction: frameContext.transaction,
-        lifecycleEvents: lifecycleEvents
-      )
-    }
-    layoutEngine.cache?.prune(keeping: viewGraph.liveIdentitySnapshot())
-    let diagnostics: FrameDiagnostics
-    if collectsDiagnostics {
-      let phaseTimings = FramePhaseTimings(
-        resolve: resolveDuration,
-        measure: measureDuration,
-        place: placeDuration,
-        semantics: semanticsDuration,
-        draw: drawDuration,
-        raster: rasterDuration,
-        commit: commitDuration
-      )
-      diagnostics = FrameDiagnostics.summarize(
-        resolved: resolved,
-        measured: measured,
-        placed: placed,
-        semantics: semantics,
-        draw: draw,
-        invalidatedIdentities: frameContext.invalidatedIdentities,
-        resolveWork: resolveContext.resolveWorkTracker?.snapshot,
-        layoutWork: layoutPassContext.workMetrics,
-        presentationDamage: refinedPresentationDamage,
-        presentationSurfaceWidth: raster.size.width,
-        phaseTimings: phaseTimings,
-        measurementCache: layoutEngine.cache?.metrics
-      )
-    } else {
-      diagnostics = .init()
-    }
-    let artifacts = FrameArtifacts(
-      resolvedTree: resolved,
-      measuredTree: measured,
-      placedTree: placed,
-      semanticSnapshot: semantics,
-      drawTree: draw,
-      rasterSurface: raster,
-      presentationDamage: refinedPresentationDamage,
-      drawnIdentities: drawnIdentities,
-      commitPlan: commit,
+    let diagnostics = FrameTailDiagnostics(
+      measureDuration: measureDuration,
+      placeDuration: placeDuration,
+      semanticsDuration: semanticsDuration,
+      drawDuration: drawDuration,
+      rasterDuration: rasterDuration,
+      layoutWork: input.layoutPassContext.workMetrics,
+      measurementCache: layoutEngine.cache?.metrics
+    )
+    return FrameTailOutput(
+      measured: measured,
+      placed: placed,
+      baselinePlaced: baselinePlaced,
+      semantics: semantics,
+      draw: draw,
+      raster: rasterized.surface,
+      drawnIdentities: rasterized.visibleIdentities,
+      presentationDamage: rasterized.presentationDamage,
       diagnostics: diagnostics
     )
+  }
 
-    retainedFrames.store(artifacts, baselinePlacedTree: baselinePlaced)
-    return artifacts
+  private func measurePhase<Value>(
+    clock: ContinuousClock?,
+    _ operation: () -> Value
+  ) -> (Value, Duration) {
+    guard let clock else {
+      return (operation(), .zero)
+    }
+    let start = clock.now
+    let value = operation()
+    return (value, start.duration(to: clock.now))
   }
 
   private func wrapInContainerSafeArea(
