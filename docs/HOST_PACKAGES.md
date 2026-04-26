@@ -2,11 +2,10 @@
 
 ## Goal
 
-Make TerminalUI apps shippable outside a local terminal in four peer embedded
+Make TerminalUI apps shippable outside a local terminal in three peer embedded
 host packages:
 
 - `GUI/SwiftUITUIGUI`: a native SwiftUI SPM package that lets a macOS or iOS app host a TerminalUI scene without a terminal emulator
-- `GUI/SwiftTermTUIGUI`: a SwiftTerm-backed SPM package that lets a macOS or iOS app host a TerminalUI scene inside SwiftUI
 - `GUI/WebTUIGUI`: a Bun-based package that lets a TerminalUI app ship in the browser on top of `ghostty-web`
 - `GUI/XtermWebTUIGUI`: a Bun-based package that lets a TerminalUI app ship in the browser on top of xterm.js
 
@@ -57,31 +56,6 @@ The native SwiftUI host package is landed as a standalone SPM package:
   - `SwiftUITUITerminalStyle.swift`
 - SwiftUI styles now expose explicit light and dark theme variants, each pairing
   native renderer palette state with TerminalUI semantic theme tokens
-- verification:
-  - `SceneRetentionTests.swift`
-  - `ResizeBridgeTests.swift`
-  - `StyleMappingTests.swift`
-
-### `GUI/SwiftTermTUIGUI`
-
-The SwiftTerm-backed SwiftUI host package is also landed as a standalone SPM
-package:
-
-- package root: `GUI/SwiftTermTUIGUI`
-- dependencies:
-  - local path dependency on the root package
-  - published `SwiftTerm`
-- key runtime files:
-  - `SwiftTermTUIAppState.swift`
-  - `SwiftTermTUIAppView.swift`
-  - `SwiftTermTUISceneHost.swift`
-  - `SwiftTermTUISceneBridge.swift`
-  - `SwiftTermTUITerminalStyle.swift`
-- the package keeps one persistent `SwiftTerm.TerminalView` per hosted scene so
-  the underlying terminal buffer and emulation state survive scene switches
-- SwiftUI styles continue to expose explicit light and dark theme variants,
-  each pairing SwiftTerm-native palette state with TerminalUI semantic theme
-  tokens
 - verification:
   - `SceneRetentionTests.swift`
   - `ResizeBridgeTests.swift`
@@ -163,7 +137,7 @@ new products in the root package.
 3. Each scene gets its own retained runtime session. Switching scenes changes which hosted session is visible; it does not rebuild the app body from scratch.
 4. Scene switching is host-managed. It is not a new terminal escape-sequence protocol.
 5. Terminal style is host-owned. The Swift package and the Bun package expose mirrored style concepts, not a shared cross-language source file, and host packages choose the active theme variant.
-6. The Apple host packages intentionally remain backend-specific peer packages rather than one backend-abstracted package. `GUI/SwiftUITUIGUI` owns the native SwiftUI surface and `GUI/SwiftTermTUIGUI` owns SwiftTerm integration.
+6. The Apple host package owns the native SwiftUI surface without a terminal-emulator dependency.
 7. The web packages keep one wasm module instance per scene and one browser terminal per scene so scene state survives switches without a more complex protocol.
 8. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior and is now extended with paired render-style updates.
 
@@ -186,5 +160,5 @@ repository.
 - generating an Xcode project
 - building custom desktop or mobile chrome beyond a terminal surface and scene/style control APIs
 - replacing the browser terminal stack with a custom implementation
-- collapsing the native SwiftUI and SwiftTerm-backed Apple hosts into a single backend-abstracted package
+- adding another Apple terminal-emulator-backed host package
 - adding tabs, split panes, or session persistence beyond in-memory retained scene sessions

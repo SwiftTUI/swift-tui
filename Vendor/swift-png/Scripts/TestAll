@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+swift --version
+swift build
+swift build -c release
+#  Debug-only tests
+swift test -c debug --filter LZ77Tests
+swift test -c debug --filter PNGTests
+#  All tests
+swift test -c release --no-parallel

@@ -11,6 +11,7 @@ hooks = [
     entry = "swift format format -i --configuration .swift-format.json",
     language = "system",
     files = '.*\.swift$',
+    exclude = '^Vendor/(swift-hash|swift-png)/',
     pass_filenames = true
   },
   {

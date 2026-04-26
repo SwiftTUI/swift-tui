@@ -51,6 +51,12 @@ toolchain, but with the wasm SDK selected through `--swift-sdk`.
 Wasm builds of TerminalUI apps will often require a stack size larger than the default.
 Their starting and max memory can also be bumped - although no yet-known failures have been attributed to this.
 
+Install the matching Swift 6.3.1 release wasm SDK with:
+
+```bash
+swift sdk install https://download.swift.org/swift-6.3.1-release/wasm-sdk/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE_wasm.artifactbundle.tar.gz --checksum bd47baa20771f366d8beed7970afaa30742b2210097afd15f85427226d8f4cf2
+```
+
 Examples:
 
 ```bash
@@ -59,7 +65,7 @@ swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --package-path Runn
 swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm -c release -Xswiftc -Osize -Xswiftc -Xfrontend -Xswiftc -disable-llvm-merge-functions-pass -Xlinker --initial-memory=536870912 -Xlinker --max-memory=4294967296 -Xlinker -z -Xlinker "stack-size=1048576"
 ```
 
-`GUI/WebTUIGUI` build scripts use `swiftly` directly, so require a 
+`GUI/WebTUIGUI` build scripts use `swiftly` directly, so require a
 swiftly-managed Swift 6.3.1 toolchain.
 Install Swiftly before invoking `bun` if required.
 
@@ -95,8 +101,7 @@ bun run build
 Xcode remains a valid native build path.
 
 In particular, the outer macOS or iOS app build still works fine in Xcode when
-a consumer embeds `GUI/SwiftUITUIGUI` or `GUI/SwiftTermTUIGUI` in an
-application target.
+a consumer embeds `GUI/SwiftUITUIGUI` in an application target.
 
 That does not change the package-development rule for this repository:
 
