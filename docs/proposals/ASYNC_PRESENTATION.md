@@ -1,62 +1,80 @@
 # Async Terminal Presentation
 
+## Status
+
+Implemented for the POSIX terminal host.
+
+`TerminalHost.present(_:)` still runs the render-to-presentation planning step
+on the caller's actor, but it no longer performs the potentially blocking
+terminal write inline. The host now batches the planned output into one string
+and submits it to a private `PresentationWriter`, which writes on a dedicated
+serial `DispatchQueue`.
+
+The remaining known limitation is error wakeup behavior: write failures are
+observed by the next `present()`, `write()`, `drainPendingPresentation()`, or
+`disableRawMode()` call. A failure that happens while the runtime is otherwise
+idle is stored, but it does not currently wake the event loop immediately.
+
 ## Problem
 
-The RunLoop's render path is synchronous on the main actor:
+The RunLoop's render path used to be synchronous through the terminal write:
 
 ```
-event → state mutation → pipeline → present(surface) → write(2) → next event
+event -> state mutation -> pipeline -> present(surface) -> write(2) -> next event
 ```
 
-`present()` calls `TerminalPresentationPlanner.plan()` (cheap), then
-`POSIXTerminalController.write()` (potentially expensive). The write path
-issues direct `write(2)` syscalls to stdout, handling `EAGAIN` by blocking
-with `poll()`. Over a slow pipe — SSH being the common case — this blocks the
-main actor from handling input events until the write completes.
+`present()` calls `TerminalPresentationPlanner.plan()` (cheap), then writes the
+planned output to stdout. The write path issues direct `write(2)` syscalls and
+handles `EAGAIN` by blocking with `poll()`. Over a slow pipe, SSH being the
+common case, this can take milliseconds to tens of milliseconds and would block
+the main actor from handling input events until the write completed.
 
-The other platforms don't have this problem. On macOS/iOS, Core Animation
-composites on a separate process. On web, the WASI worker posts frames to the
-browser's main thread. The terminal host is the only platform where the
-framework is responsible for the last mile to the display.
+Other hosts do not have the same last-mile constraint. On macOS and iOS, Core
+Animation composites separately. On web, the WASI worker posts frames to the
+browser. The POSIX terminal host is responsible for final display writes.
 
-## Goal
+## Goals
 
-Move the terminal write path off the main actor so that the main actor can
-return to handling input events immediately after producing a frame. Drop
-intermediate frames when the write path can't keep up.
+- Keep the seven-phase rendering pipeline unchanged.
+- Keep `TerminalHosting`'s public surface unchanged.
+- Keep planning in `TerminalHost.present(_:)`.
+- Move blocking `write(2)` work off the main actor.
+- Drop intermediate frames when the terminal writer cannot keep up.
+- Recover from dropped frames with a full repaint.
 
 ## Non-goals
 
-- Changing the rendering pipeline. The 7-phase pipeline stays as-is.
-- Changing the `TerminalHosting` protocol's public surface.
-- Changing the `TerminalPresentationPlanner`. It already produces the right
-  artifacts.
-- Parallelizing the pipeline itself. Layout, draw, and raster still run
-  synchronously on the main actor.
-- Process-level separation (tmux-style session persistence). That's a
-  different project.
+- Parallelizing layout, draw, or rasterization.
+- Changing `TerminalPresentationPlanner`.
+- Process-level separation or tmux-style session persistence.
+- Changing web, GUI, or streaming hosts.
 
 ---
 
-## Current architecture (relevant pieces)
+## Current architecture
 
 ### Write path
 
 ```
-RunLoop.renderPendingFrames()                          @MainActor
-  renderer.render(...)        → FrameArtifacts
-  terminalHost.present(surface)                        @MainActor
-    TerminalPresentationPlanner.plan(prev, current)    pure, fast
-      → TerminalPresentationPlan (strategy + spans)
-    bufferedOutput = render plan to String              fast
-    POSIXTerminalController.write(bufferedOutput)      BLOCKS on write(2)
-      → write(2) loop, poll() on EAGAIN
-    lastPresentedSurface = current                     bookkeeping
+RunLoop.renderPendingFrames()                             @MainActor
+  renderer.render(...)           -> FrameArtifacts
+  terminalHost.present(surface)                           @MainActor
+    synchronizePresentationState()
+    resolvedGraphicsCapabilities(...)
+    imageRenderer.preparedSurface(...)
+    TerminalPresentationPlanner.plan(prev, current)
+      -> TerminalPresentationPlan
+    bufferedOutput = render plan to String
+    presentationWriter.submit(bufferedOutput)             returns immediately
+    lastSubmittedSurface = preparedSurface
+
+PresentationWriter                                        serial DispatchQueue
+  controller.write(bufferedOutput, to: fd)
+    -> write(2) loop, poll() on EAGAIN
 ```
 
-The blocking call is `write(bufferedOutput)` inside `present()`. Everything
-before it is fast (microseconds). The write can take milliseconds to tens of
-milliseconds depending on the pipe.
+Everything up to `submit(...)` is still synchronous. The blocking syscall loop is
+the only part moved off the caller.
 
 ### Input path
 
@@ -65,387 +83,271 @@ Input already runs off the main actor:
 ```
 InputReader (DispatchQueue / Task.detached)
   DispatchSource.makeReadSource(fd: 0)
-  → reads bytes, parses events
-  → yields to AsyncStream
+  -> reads bytes, parses events
+  -> yields to AsyncStream
 RunLoop (MainActor)
-  → consumes stream via EventPump
+  -> consumes stream via EventPump
 ```
+
+Async presentation complements this path by keeping terminal output writes from
+blocking input consumption.
 
 ### Capability queries
 
-`TerminalHost` issues synchronous OSC/CSI queries during `enableRawMode()`
-and (for graphics) on-demand during `present()`. These are request-response
-pairs on the terminal: write a query sequence to stdout, read the response
-from stdin with a 40ms poll timeout.
+`TerminalHost` still performs terminal request-response queries synchronously:
 
-These must remain synchronous — they happen before the run loop starts (at
-initialization) or at first present (graphics probing). They cannot be
-interleaved with async writes.
+1. Appearance queries run during `enableRawMode()`.
+2. Graphics probing is lazy and runs on first presentation that needs image
+   attachments.
+
+Graphics probing cannot interleave with async presentation writes because the
+probe sends query bytes to stdout and reads the response from stdin. Before the
+first graphics probe, `present(_:)` drains any pending writer output. It then
+runs the probe synchronously and submits the resulting presentation payload
+after probing finishes.
 
 ---
 
-## Proposed design
+## Implemented design
 
-### New type: `PresentationWriter`
+### `PresentationWriter`
 
-A non-main-actor type that owns the terminal output file descriptor and
-writes presentation plans to it. The `TerminalHost` creates it and feeds it
-frames. The RunLoop doesn't know it exists.
+`PresentationWriter` is a private, `Sendable` class in `TerminalHost.swift`.
+It owns:
 
-```
-┌─────────────────────────────┐    ┌──────────────────────────────┐
-│         MainActor           │    │     PresentationWriter       │
-│                             │    │     (off main actor)         │
-│  event handling             │    │                              │
-│  state mutation             │    │                              │
-│  pipeline                   │    │                              │
-│  plan = planner.plan(...)   │    │                              │
-│  submit(plan, surface) ─────┼───>│  receive plan                │
-│  (returns immediately)      │    │  write(2) bytes to fd        │
-│  handle next event          │    │  update lastPresentedSurface │
-│                             │    │                              │
-└─────────────────────────────┘    └──────────────────────────────┘
-```
+- the terminal controller,
+- the output file descriptor,
+- a serial `DispatchQueue`,
+- a `Mutex`-protected state record containing the pending frame, write status,
+  drop flag, and pending error.
 
-### Responsibilities split
-
-**Stays on main actor (`TerminalHost.present()`):**
-- Call `TerminalPresentationPlanner.plan(previousSurface, currentSurface)`
-- Render the plan to a `String` (or `[UInt8]`)
-- Submit the rendered output + surface to the writer
-- Return immediately
-
-**Moves to `PresentationWriter`:**
-- Own the output file descriptor (or a write-only wrapper)
-- `write(2)` loop with `EAGAIN`/`poll()` handling
-- Update `lastPresentedSurface` (needs to be communicated back or shared)
-- Frame dropping when a newer frame arrives during a write
-
-### Channel design
-
-The channel between the main actor and the writer is a single-slot latest-
-value buffer:
+It deliberately uses a serial queue instead of a Swift actor. The write loop can
+block in `poll()`, and a queue-backed worker avoids occupying a cooperative
+Swift executor thread while still keeping the main actor free.
 
 ```swift
-actor PresentationWriter {
-    private let fd: Int32
-    private var pending: PresentationFrame?
-    private var isWriting: Bool = false
+private final class PresentationWriter: Sendable {
+  private struct State: Sendable {
+    var pending: PresentationFrame?
+    var isWriting = false
+    var didDropFrame = false
+    var pendingError: TerminalHostError?
+  }
 
-    func submit(_ frame: PresentationFrame) {
-        pending = frame  // overwrites any unwritten frame
-        if !isWriting {
-            isWriting = true
-            writePending()
-        }
+  private let queue = DispatchQueue(label: "swift-terminal-ui.presentation-writer")
+  private let state = Mutex(State())
+
+  func submit(_ frame: PresentationFrame) {
+    let shouldStart = state.withLock { state in
+      guard state.pendingError == nil else {
+        return false
+      }
+      if state.pending != nil {
+        state.didDropFrame = true
+      }
+      state.pending = frame
+      guard !state.isWriting else {
+        return false
+      }
+      state.isWriting = true
+      return true
     }
 
-    private func writePending() {
-        while let frame = pending {
-            pending = nil
-            writeBytes(frame.output, to: fd)  // blocking write(2) — but on this actor, not main
-        }
-        isWriting = false
+    guard shouldStart else {
+      return
     }
+
+    queue.async { [self] in
+      writePendingFrames()
+    }
+  }
 }
 ```
 
-When the main actor submits a frame:
-- If the writer is idle, it begins writing immediately.
-- If the writer is mid-write, the new frame replaces the pending slot. When
-  the current write finishes, the writer picks up the latest frame and skips
-  any intermediate ones.
+The queue drains frames in order, but the buffer holds only one pending frame.
+If a new frame arrives while one frame is being written and another frame is
+already pending, the pending frame is replaced and `didDropFrame` is set.
 
-This is natural frame dropping. If three frames arrive while one is being
-written, only the most recent one is written next. The intermediate frames
-are never presented — which is correct, because they represent stale state.
+### Main actor state
 
-### The `lastPresentedSurface` problem
+`TerminalHost` tracks submitted presentation state in `PresentationSession`:
 
-`TerminalPresentationPlanner.plan()` needs the previously presented surface
-to compute incremental diffs. Today, `lastPresentedSurface` is updated
-synchronously after `write()` completes. With async writes, the main actor
-doesn't know which surface was last *actually written* to the terminal.
+- `lastSubmittedSurface`
+- `transmittedKittyImages`
+- `forceFullRepaint`
+- `writer`
 
-Two options:
+The planner diffs against `lastSubmittedSurface`, not against a
+writer-confirmed surface. This is optimistic tracking: once a frame is
+submitted, the main actor treats that surface as the next baseline.
 
-**Option A: Optimistic tracking (recommended)**
+When the writer reports a dropped frame, or when the main actor sees that the
+writer still has a queued pending frame before planning the next frame,
+`PresentationSession.markDroppedFrame()` sets `forceFullRepaint = true` and
+clears retained Kitty image state.
 
-The main actor maintains `lastPresentedSurface` as before — it updates it
-immediately when submitting a frame, not when the write completes. The planner
-diffs against the most recently *submitted* surface, not the most recently
-*written* one.
+### Drop recovery
 
-This is correct because: if a frame is dropped (replaced by a newer one
-before the writer got to it), the *next* frame's plan will be computed
-against the dropped frame. The writer will then write that plan. But the
-terminal still shows the *pre-drop* frame. The incremental diff is wrong —
-it assumes the terminal shows the dropped frame, but the terminal shows the
-frame before it.
+Frame dropping creates a possible baseline mismatch:
 
-This means: **after a frame drop, the next write must be a full repaint.**
+1. Frame 1 is being written.
+2. Frame 2 is submitted and becomes pending.
+3. Frame 3 is submitted before frame 2 is written, replacing frame 2.
+4. A later incremental plan might otherwise diff against a surface the terminal
+   never displayed.
 
-The fix: the writer signals back when it drops a frame. The main actor marks
-the next plan as needing a full repaint. This is cheap — full repaints are
-already the fallback for surface size changes and first frames.
+The implementation recovers by forcing a full repaint as soon as the mismatch is
+known. `synchronizePresentationState()` consumes the writer's drop flag and also
+marks a drop if the writer still has a pending frame at the beginning of a new
+presentation. That means the next planned payload is full repaint rather than a
+known-invalid incremental diff.
 
-```swift
-actor PresentationWriter {
-    private(set) var didDropFrame: Bool = false
+Full repaint recovery also clears retained Kitty image bookkeeping, because a
+terminal clear invalidates assumptions about which image placements are still
+visible.
 
-    func submit(_ frame: PresentationFrame) {
-        if pending != nil {
-            didDropFrame = true  // we're replacing an unwritten frame
-        }
-        pending = frame
-        // ...
-    }
+### Metrics
 
-    func consumeDropFlag() -> Bool {
-        let dropped = didDropFrame
-        didDropFrame = false
-        return dropped
-    }
-}
-```
+`present(_:)` still returns `TerminalPresentationMetrics` synchronously. The
+metrics describe the planned payload, not confirmed write completion.
 
-On the main actor, before planning:
+`bytesWritten` is the number of UTF-8 bytes in the payload submitted to the
+writer. It does not mean the writer has already completed those bytes when
+`present(_:)` returns. Write duration and confirmed byte counts are not part of
+`TerminalPresentationMetrics`.
 
-```swift
-let forceFullRepaint = await writer.consumeDropFlag()
-let previousSurface = forceFullRepaint ? nil : lastSubmittedSurface
-let plan = planner.plan(previousSurface: previousSurface, currentSurface: newSurface)
-```
+### Errors
 
-Passing `nil` for `previousSurface` forces a full repaint, which is always
-correct regardless of what the terminal currently shows.
+The writer stores the first write error in `pendingError` and stops accepting new
+frames until that error is consumed. `TerminalHost` consumes pending errors in:
 
-**Option B: Writer-owned tracking**
+- `present(_:)`, via `synchronizePresentationState()`,
+- `drainPendingPresentation()`,
+- `write(_:)`, because it drains before writing synchronously,
+- `disableRawMode()`, after draining the writer.
 
-The writer owns `lastPresentedSurface` and the planner runs on the writer
-actor. This moves the planning step off the main actor too.
+This preserves the synchronous `throws` contract without changing
+`TerminalHosting`, but error reporting may be delayed until the next host call.
+The known remaining gap is idle failure wakeup: if the writer fails and no later
+host call occurs, the stored error does not currently interrupt the event loop.
 
-Upside: no "drop flag" coordination. The writer always knows what the
-terminal actually shows and always computes correct diffs.
+### Synchronous writes
 
-Downside: the `RasterSurface` must be sent to the writer actor for planning,
-and the writer must own the planner. This moves more work off the main actor
-than necessary. Planning is fast — it's the write that's slow.
+Direct host writes still exist for raw-mode setup, raw-mode teardown, capability
+queries, `clearScreen()`, `moveCursor(to:)`, and public `write(_:)`.
 
-**Recommendation: Option A.** It keeps the planning on the main actor where
-it's simple, and handles frame drops with a one-bit signal. Frame drops are
-uncommon (they require the terminal to be slower than the frame rate), and a
-full repaint after a drop is cheap.
-
-### Capability queries
-
-Capability queries are synchronous request-response pairs that happen:
-1. During `enableRawMode()` — before the run loop and before the writer
-   exists. No conflict.
-2. On-demand during `present()` for graphics probing — currently on first
-   present.
-
-For case 2: graphics probing must complete before the first frame is
-submitted to the writer. The simplest approach is to probe eagerly during
-`enableRawMode()` rather than lazily during `present()`. This is already
-nearly the case — appearance queries run at enable time, and graphics queries
-could be moved there.
-
-If lazy probing is kept: the first call to `present()` runs the probes
-synchronously (no frame has been submitted yet, so the writer has nothing to
-do), then creates and starts the writer. Subsequent calls submit to the
-writer.
-
-### `TerminalHosting` protocol
-
-The public protocol doesn't change. `present(_ surface:)` still returns
-`TerminalPresentationMetrics` synchronously. The async write is an internal
-implementation detail of `TerminalHost`.
-
-For metrics: `present()` returns the metrics from the *planning* step (span
-count, strategy, cells changed), not from the write step. These are available
-immediately since planning runs on the main actor. Write-level metrics (bytes
-written, write duration) would need to be reported separately if needed —
-but they're not currently part of `TerminalPresentationMetrics`.
-
-If `present()` needs to remain `throws` (it currently is, because `write(2)`
-can fail): the main actor would check for write errors from the *previous*
-frame's submission. If the writer encountered a write error, `present()`
-throws it on the next call. This is a one-frame delay in error reporting,
-which is fine — write errors are fatal (broken pipe) and the RunLoop will
-exit.
+Before a direct public write, `TerminalHost.write(_:)` drains pending
+presentation output and invalidates retained presentation state. That keeps
+manual writes from being interleaved with queued frame output and prevents the
+next incremental presentation from diffing against stale terminal contents.
 
 ---
 
-## Changes by file
+## Frame lifecycle
 
-### `TerminalHost.swift`
-
-- Add `PresentationWriter` as a private nested type or a package-internal
-  type in the same file.
-- `TerminalHost` gains a `private var writer: PresentationWriter?` created
-  after capability probing completes.
-- `present()` changes from: plan → render → write → update surface
-  to: plan → render → submit to writer → update surface.
-- Add `forceFullRepaint` flag, checked and cleared each frame.
-- Move graphics capability probing to `enableRawMode()` (or keep lazy but
-  ensure it completes before the writer is created).
-- `disableRawMode()` drains the writer (waits for any in-flight write to
-  finish before restoring terminal state).
-
-### `POSIXTerminalController`
-
-No changes. The write loop moves into `PresentationWriter`, but
-`PresentationWriter` can call the controller's `write()` method or directly
-use the same `platformWrite()` + `waitUntilWritable()` logic.
-
-Alternatively: extract the write loop into a standalone function that both
-the controller and the writer can call. This avoids duplicating the
-`EAGAIN`/`EINTR`/`poll()` logic.
-
-### `RunLoop+Rendering.swift`
-
-No changes. `renderPendingFrames()` calls `terminalHost.present()` as before.
-The async behavior is encapsulated inside `TerminalHost`.
-
-### `DefaultRenderer`, `TerminalPresentationPlanner`, pipeline
-
-No changes.
-
-### `WebTerminalHost`
-
-No changes needed. The web host already hands off to the browser's rendering
-pipeline via message passing.
-
----
-
-## Frame lifecycle under the new design
-
-### Normal case (writer is idle)
+### Normal case
 
 ```
-1. Event arrives
-2. Main actor: handle event → state mutation → pipeline → plan
-3. Main actor: submit(plan, surface) to writer
-4. Writer: immediately starts write(2)
-5. Main actor: returns to event loop
-6. Writer: write completes
-7. (idle until next frame)
+1. Event arrives.
+2. Main actor handles event, mutates state, and renders frame artifacts.
+3. TerminalHost plans presentation output.
+4. TerminalHost submits output to PresentationWriter and returns.
+5. Main actor continues handling input/events.
+6. PresentationWriter writes the payload to the terminal.
 ```
 
-No observable difference from today, except the main actor is free during
-step 6 instead of blocking.
-
-### Slow terminal (writer is still writing)
+### Slow terminal
 
 ```
-1. Event arrives
-2. Main actor: pipeline → plan → submit frame 2 to writer
-   Writer: still writing frame 1
-3. Event arrives
-4. Main actor: pipeline → plan → submit frame 3 to writer
-   Writer: still writing frame 1, frame 2 replaced by frame 3, drop flag set
-5. Writer: finishes frame 1, picks up frame 3 (frame 2 was dropped)
-6. Main actor: next present() sees drop flag → forces full repaint for frame 4
+1. Writer is still writing frame 1.
+2. Main actor submits frame 2; it becomes pending.
+3. Main actor submits frame 3 before frame 2 is written.
+4. Writer replaces pending frame 2 with frame 3 and sets didDropFrame.
+5. Main actor observes the drop or pending-frame state before a later plan.
+6. The later plan is forced to full repaint.
 ```
 
-Frame 2 is never written to the terminal. Frame 3's plan may have been
-computed as an incremental diff against frame 2, but the writer writes it
-anyway — and then frame 4 gets a full repaint to correct any drift.
+Intermediate frames are intentionally discarded. They represent stale UI state,
+and keeping them would produce an unbounded backlog.
 
 ### Shutdown
 
 ```
-1. RunLoop exit requested
-2. Main actor: submits final frame (if any)
-3. Main actor: calls disableRawMode()
-4. disableRawMode(): awaits writer drain (writer finishes current write)
-5. disableRawMode(): restores terminal state (show cursor, leave alt screen)
+1. RunLoop exit requested.
+2. Main actor submits final frame if needed.
+3. disableRawMode() captures the writer.
+4. disableRawMode() drains the writer.
+5. disableRawMode() consumes pending write errors.
+6. Terminal reset bytes are written synchronously.
+7. Input flags and termios attributes are restored.
 ```
 
-The drain ensures the last frame is fully written before the terminal is
-restored. Without this, the terminal could show a partial frame momentarily
-before the alt screen exits.
+Draining before terminal reset prevents queued frame output from racing with
+cursor restore, bracketed-paste disable, or alternate-screen exit.
 
 ---
 
 ## Risks and mitigations
 
-### Risk: write error reporting delay
+### Write error reporting delay
 
-Write errors (broken pipe, EIO) are detected one frame late — when the next
-`present()` checks for errors from the previous submission.
+Write errors are detected on the writer queue, then observed by the main actor
+on a later host call. This is acceptable for the current synchronous
+`TerminalHosting` contract, where write errors are fatal and teardown also
+checks the pending error.
 
-**Mitigation:** Write errors are fatal. The RunLoop will exit on the next
-`present()` call. One frame of delay before exit is acceptable. If immediate
-detection is needed: the writer can signal an error via a shared atomic flag
-that the RunLoop checks in its event loop, but this adds complexity for
-minimal benefit.
+If immediate failure handling becomes required, add a writer-to-run-loop wakeup
+path so a stored error schedules the event loop to exit even when no further
+presentation is pending.
 
-### Risk: frame drop causes visible flash
+### Full repaint tearing
 
-After a frame drop, the next frame is a full repaint. If the repaint is
-large, the terminal may briefly show a partially-written frame (tearing).
+After a dropped frame, recovery uses a full repaint. Large full repaint payloads
+can visibly tear on terminals that do not support synchronized output.
 
-**Mitigation:** This already happens today for surface resizes. The
-`TerminalHost` now wraps full repaint payloads in capability-gated
-synchronized-output envelopes (`CSI ? 2026 h` / `CSI ? 2026 l`) when the
-terminal supports them, which prevents tearing on supporting terminals
-without changing incremental write semantics.
+When the capability profile supports synchronized output, full repaint payloads
+are wrapped with `CSI ? 2026 h` / `CSI ? 2026 l`. This includes drop-recovery
+full repaints.
 
-### Risk: actor hop latency
+### Repeated drops on very slow terminals
 
-Submitting a frame to the writer actor requires a context switch. For frames
-where the write would have been fast (small incremental update to a local
-terminal), the actor hop adds overhead for no benefit.
+If the terminal is consistently slower than frame production, the host may
+alternate between dropped frames and full repaint recovery. This is still
+bounded: the queue never grows beyond one pending frame.
 
-**Mitigation:** The overhead is single-digit microseconds. The write is
-at minimum a syscall (also microseconds). The difference is unmeasurable in
-practice. If profiling shows it matters: the writer could be a simple
-DispatchQueue + lock instead of a Swift actor, avoiding structured
-concurrency overhead.
+If this becomes common in practice, the next step is frame pacing based on
+writer duration. That is an optimization; correctness does not depend on it.
 
-### Risk: `lastPresentedSurface` drift
+### Capability probe latency
 
-The optimistic tracking model (Option A) assumes frame drops are uncommon and
-recovers via full repaint. If the terminal is consistently slower than the
-frame rate, every other frame triggers a full repaint.
-
-**Mitigation:** This is self-correcting. Full repaints are more expensive to
-write, which means the writer spends more time writing, which means more
-frames are dropped, which means fewer writes total. The steady state is: one
-full repaint, then one incremental, then one full repaint — alternating. This
-is fine for a slow terminal. The alternative (sending every incremental diff
-and falling behind) would be worse — it creates an unbounded backlog of stale
-frames.
-
-If this pattern is common enough to measure: the writer could report its
-write duration, and the main actor could throttle frame production to match.
-But this is optimization, not correctness.
+Graphics probing can still block the caller on first image presentation. That is
+intentional: query/response bytes cannot be safely interleaved with queued frame
+output. The host drains before the probe and caches the resulting capability
+state.
 
 ---
 
-## Implementation order
+## Validation
 
-1. **Extract the write loop** from `POSIXTerminalController` into a
-   standalone function (or keep it and let the writer call the controller).
-   Verify nothing breaks — this is a pure refactor.
+The focused regression surface is
+`TerminalHostPresentationBatchingTests`.
 
-2. **Add `PresentationWriter`** as a package-internal actor. Give it
-   `submit()`, `drain()`, and `consumeDropFlag()`. Write a test that submits
-   frames faster than they can be written and verifies frame dropping.
+Current coverage includes:
 
-3. **Move graphics probing** to `enableRawMode()` so it completes before the
-   writer exists. Verify nothing breaks.
+- full repaint output is batched into one write,
+- incremental spans are batched into one write,
+- damage-aware presentation still narrows incremental output,
+- stale pending frames are dropped,
+- drop recovery forces full repaint,
+- replacement of a queued frame can force immediate full repaint,
+- synchronized-output envelopes wrap drop-recovery full repaints when supported.
 
-4. **Wire `TerminalHost.present()` to the writer.** Create the writer after
-   probing completes. Submit frames instead of writing directly. Check the
-   drop flag before planning. Drain on `disableRawMode()`.
+Useful commands:
 
-5. **Test over SSH.** Introduce artificial write latency (e.g., pipe through
-   `pv --rate-limit`) to verify frame dropping behavior, full-repaint
-   recovery, and shutdown drain.
+```bash
+swiftly run swift test --filter TerminalUITests.TerminalHostPresentationBatchingTests
+bun run test
+```
 
-6. **Measure.** Compare input-to-display latency with and without the async
-   writer on a local terminal. Verify the actor hop doesn't add measurable
-   latency for the common (fast) case.
+Run `bun run test` before considering changes to shared presentation behavior
+complete.
