@@ -1,5 +1,5 @@
 {
-  "name": "swift-terminal-ui-web-workspace",
+  "name": "swift-terminal-ui-workspace",
   "private": true,
   "scripts": {
     "test": "sh ./Scripts/test_all.sh",
@@ -7,9 +7,7 @@
   },
   "workspaces": [
     "GUI/WebTUIGUI",
-    "GUI/XtermWebTUIGUI",
-    "Examples/WebExample",
-    "Examples/XtermWebExample"
+    "Examples/WebExample"
   ],
   "dependencies": {
     "@openai/codex": "^0.121.0"
