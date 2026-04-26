@@ -5,10 +5,11 @@
 Proposed follow-up to
 [`OFF_MAIN_PIPELINE_RENDERING.md`](OFF_MAIN_PIPELINE_RENDERING.md).
 
-The runtime now offloads built-in layout and post-layout frame-tail work when a
-resolved tree contains only value-shaped layout behaviors. If any subtree uses
-`.custom(CustomLayoutHandle)`, layout falls back to the main actor for the whole
-tree. That fallback is intentional: the current authored `Layout` bridge is
+The runtime now offloads built-in layout, post-layout frame-tail work,
+explicitly opted-in `SendableLayout` custom layout, framework-owned
+`SendableLayout` containers, and snapshotted lazy indexed child sources.
+Ordinary public `Layout` conformers still fall back to the main actor for
+layout. That fallback is intentional: the default authored `Layout` bridge is
 main-actor-owned.
 
 This document describes what would have to change before custom layout
@@ -452,6 +453,29 @@ Stage 11 result:
   passes with `TabViewContainerLayout` opted in, indicating the earlier
   signal-10 failure was covered by the Stage 10 worker-stack fix and indexed
   source offload gate.
+
+### Stage 12: Snapshot lazy indexed child sources for the worker
+
+- [x] Keep authored `ForEach` content resolution on the main actor.
+- [x] Materialize lazy indexed child sources into Sendable resolved-child
+  snapshots before suspending for async layout.
+- [x] Teach the offload gate to inspect snapshot children so a main-actor-only
+  custom layout inside lazy content still blocks worker layout.
+- [x] Update async renderer coverage for lazy `ScrollView` content.
+
+Stage 12 result:
+
+- `IndexedChildSourceSnapshot` now carries already-resolved lazy children as a
+  Sendable source that can answer `child(at:)` on the frame-tail layout worker.
+- `DefaultRenderer.renderAsync` snapshots indexed child sources only when they
+  are the visible blocker and no already-visible main-actor-only custom layout
+  prevents layout offload.
+- `FrameTailRenderer.canOffloadLayout` now distinguishes main-actor-only indexed
+  sources from worker-safe snapshots, and scans snapshot children for nested
+  main-actor-only custom layouts before allowing worker layout.
+- Lazy `ScrollView` + `LazyVStack` + `ForEach` content now records layout worker
+  timings instead of forcing layout inline. A separate regression keeps a lazy
+  child containing ordinary public `Layout` on the main actor.
 
 ## Required Tests
 

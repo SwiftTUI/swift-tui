@@ -434,7 +434,14 @@ private final class FrameTailRenderer: Sendable {
     _ input: FrameTailInput
   ) -> Bool {
     !containsMainActorOnlyCustomLayout(input.resolved)
-      && !containsMainActorIndexedChildSource(input.resolved)
+      && !containsMainActorOnlyIndexedChildSource(input.resolved)
+  }
+
+  func needsIndexedChildSourceWorkerSnapshot(
+    _ input: FrameTailInput
+  ) -> Bool {
+    !containsMainActorOnlyCustomLayout(input.resolved)
+      && containsMainActorOnlyIndexedChildSource(input.resolved)
   }
 
   func renderRaster(
@@ -681,16 +688,28 @@ private final class FrameTailRenderer: Sendable {
     {
       return true
     }
+    if let workerChildren = node.indexedChildSource?.workerResolvedChildren,
+      workerChildren.contains(where: containsMainActorOnlyCustomLayout)
+    {
+      return true
+    }
     return node.children.contains { containsMainActorOnlyCustomLayout($0) }
   }
 
-  private func containsMainActorIndexedChildSource(
+  private func containsMainActorOnlyIndexedChildSource(
     _ node: ResolvedNode
   ) -> Bool {
-    if node.usesIndexedChildSource {
-      return true
+    if let source = node.indexedChildSource {
+      if !source.canRunOnWorker {
+        return true
+      }
+      if let workerChildren = source.workerResolvedChildren,
+        workerChildren.contains(where: containsMainActorOnlyIndexedChildSource)
+      {
+        return true
+      }
     }
-    return node.children.contains { containsMainActorIndexedChildSource($0) }
+    return node.children.contains { containsMainActorOnlyIndexedChildSource($0) }
   }
 
   private func renderRasterInline(
@@ -1390,13 +1409,23 @@ public struct DefaultRenderer {
       transaction: context.transaction,
       invalidatedIdentities: context.invalidatedIdentities
     )
-    let frameTailInput = FrameTailInput(
+    var frameTailInput = FrameTailInput(
       resolved: resolved,
       proposal: proposal,
       rootIdentity: resolveContext.identity,
       retained: frameTailRetainedInput,
       layoutPassContext: layoutPassContext
     )
+    if frameTailRenderer.needsIndexedChildSourceWorkerSnapshot(frameTailInput) {
+      resolved = indexedChildSourceWorkerSnapshot(of: resolved)
+      frameTailInput = FrameTailInput(
+        resolved: resolved,
+        proposal: proposal,
+        rootIdentity: resolveContext.identity,
+        retained: frameTailRetainedInput,
+        layoutPassContext: layoutPassContext
+      )
+    }
     let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
     let layoutSuspends = frameTailRenderer.canOffloadLayout(frameTailInput)
     let layoutSuspensionStart = layoutSuspends ? clock?.now : nil
@@ -1530,6 +1559,30 @@ public struct DefaultRenderer {
     for update in updates {
       update.apply()
     }
+  }
+
+  @MainActor
+  private func indexedChildSourceWorkerSnapshot(
+    of node: ResolvedNode
+  ) -> ResolvedNode {
+    var node = node
+    node.children = node.children.map(indexedChildSourceWorkerSnapshot(of:))
+
+    guard let source = node.indexedChildSource,
+      !source.canRunOnWorker
+    else {
+      return node
+    }
+
+    let children = (0..<source.count).map { index in
+      indexedChildSourceWorkerSnapshot(of: source.child(at: index))
+    }
+    node.indexedChildSource = IndexedChildSourceSnapshot(
+      identityRoot: source.identityRoot,
+      measurementSignature: source.measurementSignature,
+      children: children
+    )
+    return node
   }
 
   private func measurePhase<Value>(
