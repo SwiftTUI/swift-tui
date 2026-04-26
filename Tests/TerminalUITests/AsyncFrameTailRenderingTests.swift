@@ -954,6 +954,72 @@ struct AsyncFrameTailRenderingTests {
     #expect(recorder.events.contains("drop:1:1"))
   }
 
+  @Test("blocked async frame head defers animation completion until commit")
+  func blockedAsyncFrameHeadDefersAnimationCompletionUntilCommit() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadAnimationCompletionRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: AsyncFrameHeadAbortScaffoldState(),
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: terminal.proposal,
+      viewBuilder: { state, _ in
+        AsyncFrameHeadAbortScaffoldView(
+          state: state,
+          recorder: recorder
+        )
+      }
+    )
+    focusTracker.invalidator = runLoop.scheduler
+
+    try await withAsyncFrameHeadAbortAnimationSinks(runLoop.renderer) {
+      runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+      var initialFrames = 0
+      try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+      focusLeafmostAsyncFrameHeadAbortScaffoldRegion(in: runLoop)
+
+      let gate = AsyncFrameTailBlockingGate()
+      renderer.setFrameTailRenderHooks(
+        .init(beforeRaster: {
+          gate.beforeRaster()
+        })
+      )
+      defer {
+        renderer.setFrameTailRenderHooks(nil)
+        gate.release()
+      }
+
+      recorder.reset()
+      _ = runLoop.handleKeyPress(KeyPress(.space, modifiers: []))
+      let renderTask = Task { @MainActor in
+        var renderedFrames = 0
+        try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+        return renderedFrames
+      }
+
+      await gate.waitUntilBlocked()
+      #expect(recorder.events.contains("action"))
+      #expect(!recorder.events.contains("animation-completion"))
+
+      gate.release()
+      _ = try await valueWithTimeout {
+        try await renderTask.value
+      }
+
+      #expect(recorder.events.contains("animation-completion"))
+    }
+  }
+
   @Test("async renderer tags monotonically increasing render generations")
   func asyncRendererTagsMonotonicallyIncreasingRenderGenerations() async {
     let renderer = DefaultRenderer()
