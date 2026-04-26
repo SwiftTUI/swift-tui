@@ -141,6 +141,130 @@ test("runtime draws decoded surface frames into the canvas", async () => {
   }
 });
 
+test("runtime decodes surface images once and reuses the cached image", async () => {
+  const decodedBlobs: Blob[] = [];
+  const dom = installFakeDOM({
+    createImageBitmap: async (blob) => {
+      decodedBlobs.push(blob);
+      return { imageId: `decoded-${decodedBlobs.length}` };
+    },
+  });
+  try {
+    const bridge = new BrowserWASIBridge({
+      sceneId: "main",
+      columns: 4,
+      rows: 2,
+    });
+    const mount = new FakeElement("div");
+    const runtime = new WebTUISceneRuntime({
+      mount: mount as unknown as HTMLElement,
+      descriptor: { id: "main", title: "Main", isDefault: true },
+      style: {
+        fontSize: 20,
+        fontFamily: "Test Mono",
+      },
+      bridge,
+      onInput: () => {},
+    });
+
+    await runtime.mount();
+
+    const canvas = dom.canvases[0]!;
+    const context = canvas.context;
+    context.operations = [];
+    bridge.stdout.write(encoder.encode(surfaceRecord({
+      version: 1,
+      width: 4,
+      height: 2,
+      styles: [null],
+      rows: [[], []],
+      images: [
+        {
+          id: "png:test",
+          format: "png",
+          bounds: [1, 0, 2, 2],
+          visibleBounds: [1, 0, 1, 2],
+          scalingMode: "stretch",
+          pixelSize: [2, 2],
+          pngBase64: "iVBORw==",
+        },
+        {
+          id: "png:test",
+          format: "png",
+          bounds: [3, 0, 1, 1],
+          visibleBounds: [3, 0, 1, 1],
+          scalingMode: "stretch",
+          pixelSize: [2, 2],
+        },
+      ],
+    })));
+    await flushPromises();
+
+    expect(decodedBlobs).toHaveLength(1);
+    expect(drawImageOperations(context)).toEqual([
+      {
+        type: "drawImage",
+        imageId: "decoded-1",
+        x: 10,
+        y: 0,
+        width: 20,
+        height: 54,
+      },
+      {
+        type: "drawImage",
+        imageId: "decoded-1",
+        x: 30,
+        y: 0,
+        width: 10,
+        height: 27,
+      },
+    ]);
+    expect(context.operations).toContainEqual({
+      type: "rect",
+      x: 10,
+      y: 0,
+      width: 10,
+      height: 54,
+    });
+    expect(context.operations).toContainEqual({
+      type: "clip",
+      path: [["rect", 10, 0, 10, 54]],
+    });
+
+    context.operations = [];
+    bridge.stdout.write(encoder.encode(surfaceRecord({
+      version: 1,
+      width: 4,
+      height: 2,
+      styles: [null],
+      rows: [[], []],
+      images: [
+        {
+          id: "png:test",
+          format: "png",
+          bounds: [0, 1, 1, 1],
+          visibleBounds: [0, 1, 1, 1],
+          scalingMode: "stretch",
+        },
+      ],
+    })));
+
+    expect(decodedBlobs).toHaveLength(1);
+    expect(drawImageOperations(context)).toEqual([
+      {
+        type: "drawImage",
+        imageId: "decoded-1",
+        x: 0,
+        y: 27,
+        width: 10,
+        height: 27,
+      },
+    ]);
+  } finally {
+    dom.restore();
+  }
+});
+
 test("runtime draws box and block elements procedurally instead of as font glyphs", async () => {
   const dom = installFakeDOM();
   try {
@@ -437,6 +561,17 @@ function fillRectOperations(
   );
 }
 
+function drawImageOperations(
+  context: RecordingCanvasContext
+): RecordingCanvasOperation[] {
+  return context.operations.filter((operation) => operation.type === "drawImage");
+}
+
+async function flushPromises(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 function surfaceRecord(
   frame: Record<string, unknown>
 ): string {
@@ -445,6 +580,7 @@ function surfaceRecord(
 
 interface FakeDOMOptions {
   devicePixelRatio?: number;
+  createImageBitmap?: (blob: Blob) => Promise<unknown>;
 }
 
 function installFakeDOM(
@@ -456,6 +592,7 @@ function installFakeDOM(
   const previousDocument = globalThis.document;
   const previousWindow = globalThis.window;
   const previousResizeObserver = globalThis.ResizeObserver;
+  const previousCreateImageBitmap = globalThis.createImageBitmap;
   const canvases: FakeCanvasElement[] = [];
 
   globalThis.document = {
@@ -472,6 +609,9 @@ function installFakeDOM(
     devicePixelRatio: options.devicePixelRatio ?? 1,
   } as unknown as Window & typeof globalThis;
   globalThis.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
+  if (options.createImageBitmap) {
+    globalThis.createImageBitmap = options.createImageBitmap as typeof createImageBitmap;
+  }
 
   return {
     canvases,
@@ -479,6 +619,7 @@ function installFakeDOM(
       globalThis.document = previousDocument;
       globalThis.window = previousWindow;
       globalThis.ResizeObserver = previousResizeObserver;
+      globalThis.createImageBitmap = previousCreateImageBitmap;
     },
   };
 }
@@ -697,6 +838,50 @@ class RecordingCanvasContext {
 
   beginPath(): void {
     this.path = [];
+  }
+
+  save(): void {
+    this.operations.push({ type: "save" });
+  }
+
+  restore(): void {
+    this.operations.push({ type: "restore" });
+  }
+
+  rect(
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): void {
+    this.path.push(["rect", x, y, width, height]);
+    this.operations.push({ type: "rect", x, y, width, height });
+  }
+
+  clip(): void {
+    this.operations.push({
+      type: "clip",
+      path: [...this.path],
+    });
+  }
+
+  drawImage(
+    image: unknown,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): void {
+    this.operations.push({
+      type: "drawImage",
+      imageId: image && typeof image === "object" && "imageId" in image
+        ? (image as { imageId: unknown }).imageId
+        : undefined,
+      x,
+      y,
+      width,
+      height,
+    });
   }
 
   moveTo(

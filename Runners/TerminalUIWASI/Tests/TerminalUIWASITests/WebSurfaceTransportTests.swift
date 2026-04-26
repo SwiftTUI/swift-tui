@@ -40,6 +40,36 @@ struct WebSurfaceTransportTests {
     #expect(metrics.strategy == .fullRepaint)
   }
 
+  @Test("encoder emits image data once and then reuses the cached image id")
+  func encoderEmitsImageDataOnceAndThenReusesCachedImageID() throws {
+    var knownImageIDs: Set<String> = []
+    let firstFrame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.imageSurface(),
+        knownImageIDs: &knownImageIDs
+      )
+    )
+    let secondFrame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        Self.imageSurface(),
+        knownImageIDs: &knownImageIDs
+      )
+    )
+
+    let firstImage = try #require((firstFrame["images"] as? [[String: Any]])?.first)
+    let secondImage = try #require((secondFrame["images"] as? [[String: Any]])?.first)
+
+    #expect(firstImage["format"] as? String == "png")
+    #expect(firstImage["bounds"] as? [Int] == [1, 0, 3, 2])
+    #expect(firstImage["visibleBounds"] as? [Int] == [2, 0, 2, 2])
+    #expect(firstImage["pixelSize"] as? [Int] == [3, 2])
+    #expect(firstImage["scalingMode"] as? String == "stretch")
+    #expect(firstImage["pngBase64"] as? String == "iVBORw==")
+
+    #expect(secondImage["id"] as? String == firstImage["id"] as? String)
+    #expect(secondImage["pngBase64"] == nil)
+  }
+
   @Test("parser handles resize and style commands split across chunks")
   func parserHandlesChunkedControlCommands() throws {
     var parser = WebSurfaceInputParser()
@@ -170,6 +200,39 @@ struct WebSurfaceTransportTests {
         ],
       ]
     )
+  }
+
+  private static func imageSurface() -> RasterSurface {
+    let bytes: [UInt8] = [0x89, 0x50, 0x4E, 0x47]
+    return RasterSurface(
+      size: .init(width: 4, height: 2),
+      lines: [
+        "    ",
+        "    ",
+      ],
+      imageAttachments: [
+        RasterImageAttachment(
+          identity: .init(components: [.named("image")]),
+          bounds: .init(origin: .init(x: 1, y: 0), size: .init(width: 3, height: 2)),
+          visibleBounds: .init(origin: .init(x: 2, y: 0), size: .init(width: 2, height: 2)),
+          source: .pngData(bytes),
+          resolvedReference: .embeddedPNG(bytes),
+          pixelSize: .init(width: 3, height: 2),
+          isResizable: true
+        )
+      ]
+    )
+  }
+
+  private static func decodedSurfaceFrame(
+    _ output: String
+  ) throws -> [String: Any] {
+    let prefix = "\u{001E}surface:"
+    let line = output.trimmingCharacters(in: .newlines)
+    #expect(line.hasPrefix(prefix))
+    let json = String(line.dropFirst(prefix.count))
+    let decoded = try JSONSerialization.jsonObject(with: Data(json.utf8))
+    return try #require(decoded as? [String: Any])
   }
 
   private static func fixture(

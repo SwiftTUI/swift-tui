@@ -24,13 +24,35 @@ export type WebTUISurfaceCell = [
   styleIndex: number,
 ];
 
+export type WebTUISurfaceRect = [
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+];
+
+export type WebTUISurfaceSize = [
+  width: number,
+  height: number,
+];
+
+export interface WebTUISurfaceImage {
+  id: string;
+  format: "png";
+  bounds: WebTUISurfaceRect;
+  visibleBounds: WebTUISurfaceRect;
+  scalingMode: "stretch" | "fit" | "fill";
+  pixelSize?: WebTUISurfaceSize;
+  pngBase64?: string;
+}
+
 export interface WebTUISurfaceFrame {
   version: 1;
   width: number;
   height: number;
   styles: Array<WebTUISurfaceStyle | null>;
   rows: WebTUISurfaceCell[][];
-  images?: unknown[];
+  images?: WebTUISurfaceImage[];
 }
 
 export type WebTUIOutputRecord =
@@ -196,5 +218,50 @@ function isWebTUISurfaceFrame(
     && typeof frame.width === "number"
     && typeof frame.height === "number"
     && Array.isArray(frame.styles)
-    && Array.isArray(frame.rows);
+    && Array.isArray(frame.rows)
+    && (frame.images === undefined || isWebTUISurfaceImages(frame.images));
+}
+
+function isWebTUISurfaceImages(
+  value: unknown
+): value is WebTUISurfaceImage[] {
+  return Array.isArray(value) && value.every(isWebTUISurfaceImage);
+}
+
+function isWebTUISurfaceImage(
+  value: unknown
+): value is WebTUISurfaceImage {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const image = value as Partial<WebTUISurfaceImage>;
+  return typeof image.id === "string"
+    && image.format === "png"
+    && isWebTUISurfaceRect(image.bounds)
+    && isWebTUISurfaceRect(image.visibleBounds)
+    && isWebTUISurfaceScalingMode(image.scalingMode)
+    && (image.pixelSize === undefined || isWebTUISurfaceSize(image.pixelSize))
+    && (image.pngBase64 === undefined || typeof image.pngBase64 === "string");
+}
+
+function isWebTUISurfaceRect(
+  value: unknown
+): value is WebTUISurfaceRect {
+  return Array.isArray(value)
+    && value.length === 4
+    && value.every((entry) => typeof entry === "number");
+}
+
+function isWebTUISurfaceSize(
+  value: unknown
+): value is WebTUISurfaceSize {
+  return Array.isArray(value)
+    && value.length === 2
+    && value.every((entry) => typeof entry === "number");
+}
+
+function isWebTUISurfaceScalingMode(
+  value: unknown
+): value is WebTUISurfaceImage["scalingMode"] {
+  return value === "stretch" || value === "fit" || value === "fill";
 }

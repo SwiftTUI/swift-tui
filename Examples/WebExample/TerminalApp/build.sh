@@ -3,7 +3,7 @@
 set -euo pipefail
 
 swift_args=(
-  --swift-sdk swift-6.3-RELEASE_wasm
+  --swift-sdk swift-6.3.1-RELEASE_wasm
   -c release
   -Xswiftc -Osize
   -Xswiftc -Xfrontend
