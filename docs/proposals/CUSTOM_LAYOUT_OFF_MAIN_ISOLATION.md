@@ -132,6 +132,12 @@ execution needs one of these cache models:
 Recommendation: start with model 1 for correctness. Move to model 2 only if the
 main-actor cache apply step is too expensive or too complex to reason about.
 
+Implementation note: Stage 4 landed the model-1 handoff channel for
+package-internal worker snapshots. Stage 5 uses model 2 for explicitly opted-in
+public `SendableLayout` values because the protocol requires `Cache: Sendable`
+and lets the worker proxy own the cache without crossing `LayoutProxyBox`.
+Ordinary `Layout` conformers still use the main-actor-owned cache.
+
 ### Public API Surface
 
 Do not make all `Layout` conformers implicitly worker-capable.
@@ -275,10 +281,32 @@ git commit -m "refactor(layout): hand off custom layout cache updates"
 
 ### Stage 5: Decide public opt-in
 
-- Decide whether public opt-in is a protocol, modifier, or both.
-- Add compile-time Sendable constraints where possible.
-- Document that non-opted-in custom layouts remain correct but run layout on
+- [x] Decide whether public opt-in is a protocol, modifier, or both.
+- [x] Add compile-time Sendable constraints where possible.
+- [x] Document that non-opted-in custom layouts remain correct but run layout on
   the main actor.
+
+Stage 5 result:
+
+- The public opt-in is protocol-based: `SendableLayout` refines `Layout` and
+  `Sendable`, and requires `Cache: Sendable`.
+- A more-constrained `SendableLayout.callAsFunction` routes direct
+  `MyLayout { ... }` authoring through the worker-capable erasure path.
+- `AnyLayout` has a constrained `SendableLayout` initializer that installs a
+  worker-safe proxy for non-built-in custom layouts while preserving the
+  existing `LayoutProxyBox` fallback path.
+- Ordinary public `Layout` conformers remain main-actor-only and continue to
+  report custom-layout fallback diagnostics.
+- The async renderer regression suite verifies that an opted-in public
+  `SendableLayout` measures and places off the main thread and reuses its cache
+  between measurement and placement.
+
+Current limitation: `SendableLayout` is an author contract backed by Swift's
+`Sendable` constraints; it cannot prove that a layout avoids mutable globals or
+other external side effects. The worker proxy uses a worker-owned cache scoped
+like the existing main-actor bridge, but broader semantic parity still needs
+targeted coverage for custom alignment guides, `ViewDimensions`, focus sync,
+and animation tick reuse.
 
 Commit boundary:
 
@@ -315,7 +343,8 @@ git commit -m "docs(layout): define off-main custom layout opt-in"
 Keep the fallback for public authored custom layouts and do not attempt to move
 them off-main by force.
 
-The next useful implementation step is Stage 5: decide whether the public opt-in
-should be protocol-based, modifier-based, or both. Keep public authored
-`Layout` on the main-actor fallback path until that opt-in surface can express
-the Sendable value and cache constraints clearly.
+The next useful implementation step is semantic-parity coverage for opted-in
+public `SendableLayout` values: alignment guides, `ViewDimensions`,
+focus-driven rerender convergence, and animation tick cache reuse should be
+pinned before broadening the opt-in recommendation beyond carefully audited
+layouts.

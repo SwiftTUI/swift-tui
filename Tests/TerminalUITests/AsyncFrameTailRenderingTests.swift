@@ -345,6 +345,45 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("layout"))
   }
 
+  @Test("public SendableLayout opt-in runs layout on the frame-tail worker")
+  func publicSendableLayoutOptInRunsLayoutOnFrameTailWorker() async throws {
+    let rootIdentity = testIdentity("AsyncSendableLayoutRoot")
+    let recorder = AsyncFrameTailSendableLayoutRecorder()
+
+    let artifacts = await DefaultRenderer().renderAsync(
+      AsyncFrameTailSendableLayout(recorder: recorder) {
+        Text("sendable")
+        Text("layout")
+      },
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 32, height: 6)
+    )
+
+    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let mainActorTimings = try #require(artifacts.diagnostics.mainActorTimings)
+    let layoutState = recorder.state
+
+    #expect(artifacts.diagnostics.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    guard case .custom(let customLayoutHandle) = artifacts.resolvedTree.layoutBehavior else {
+      Issue.record("expected custom layout root")
+      return
+    }
+    #expect(customLayoutHandle.executionCapability == .worker)
+    #expect(customLayoutHandle.canRunOnWorker)
+    #expect(customLayoutHandle.workerProxy != nil)
+    #expect(layoutState.makeCacheCount == 1)
+    #expect(layoutState.measuredCache == 1)
+    #expect(layoutState.placedCache == 1)
+    #expect(layoutState.measureRanOnMainThread == false)
+    #expect(layoutState.placeRanOnMainThread == false)
+    #expect(workerTimings.layoutCompute != .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(mainActorTimings.suspended != .zero)
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("sendable"))
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("layout"))
+  }
+
   @Test("worker backlog commits blocked frame before later input batch")
   func workerBacklogCommitsBlockedFrameBeforeLaterInputBatch() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailBacklogRoot")
@@ -519,6 +558,51 @@ private struct AsyncFrameTailCustomLayout: Layout {
   }
 }
 
+private struct AsyncFrameTailSendableLayout: SendableLayout {
+  let recorder: AsyncFrameTailSendableLayoutRecorder
+
+  func makeCache(subviews _: LayoutSubviews) -> Int {
+    recorder.nextCache()
+  }
+
+  func updateCache(
+    _ cache: inout Int,
+    subviews _: LayoutSubviews
+  ) {}
+
+  func sizeThatFits(
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Int
+  ) -> LayoutSize {
+    recorder.recordMeasure(cache: cache)
+    let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    return .init(
+      width: sizes.map(\.width).max() ?? 0,
+      height: sizes.reduce(0) { $0 + $1.height }
+    )
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Int
+  ) {
+    recorder.recordPlace(cache: cache)
+    var y = bounds.origin.y
+    for subview in subviews {
+      let size = subview.sizeThatFits(.unspecified)
+      subview.place(
+        at: .init(x: bounds.origin.x, y: y),
+        anchor: .topLeading,
+        proposal: .init(width: size.width, height: size.height)
+      )
+      y += size.height
+    }
+  }
+}
+
 private struct AsyncFrameTailWorkerCustomLayout<Content: View>: View, ResolvableView {
   var recorder: AsyncFrameTailWorkerCustomLayoutRecorder
   var content: Content
@@ -674,6 +758,43 @@ private final class AsyncFrameTailWorkerCustomLayoutRecorder: Sendable {
       state.cacheApplyCount += 1
       state.cacheApplyRanOnMainThread = Thread.isMainThread
       state.cacheApplyIdentity = identity
+    }
+  }
+}
+
+private final class AsyncFrameTailSendableLayoutRecorder: Sendable {
+  struct State: Sendable {
+    var makeCacheCount = 0
+    var measuredCache: Int?
+    var placedCache: Int?
+    var measureRanOnMainThread: Bool?
+    var placeRanOnMainThread: Bool?
+  }
+
+  private let stateStorage = Mutex(State())
+
+  var state: State {
+    stateStorage.withLock { $0 }
+  }
+
+  func nextCache() -> Int {
+    stateStorage.withLock { state in
+      state.makeCacheCount += 1
+      return state.makeCacheCount
+    }
+  }
+
+  func recordMeasure(cache: Int) {
+    stateStorage.withLock { state in
+      state.measuredCache = cache
+      state.measureRanOnMainThread = Thread.isMainThread
+    }
+  }
+
+  func recordPlace(cache: Int) {
+    stateStorage.withLock { state in
+      state.placedCache = cache
+      state.placeRanOnMainThread = Thread.isMainThread
     }
   }
 }

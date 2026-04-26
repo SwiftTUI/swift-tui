@@ -1,4 +1,5 @@
 public import Core
+import Synchronization
 
 /// Declares a typed value exchanged between a parent layout and its subviews.
 public protocol LayoutValueKey {
@@ -30,15 +31,18 @@ public struct LayoutSubview {
   fileprivate let child: ResolvedNode
   fileprivate let engine: LayoutEngine
   fileprivate let placementRecorder: LayoutSubviewPlacementRecorder?
+  fileprivate let passContext: LayoutPassContext?
 
   fileprivate init(
     child: ResolvedNode,
     engine: LayoutEngine,
-    placementRecorder: LayoutSubviewPlacementRecorder? = nil
+    placementRecorder: LayoutSubviewPlacementRecorder? = nil,
+    passContext: LayoutPassContext? = nil
   ) {
     self.child = child
     self.engine = engine
     self.placementRecorder = placementRecorder
+    self.passContext = passContext
   }
 
   /// The child's declared layout priority.
@@ -73,12 +77,20 @@ public struct LayoutSubview {
 
   /// Measures the child under `proposal`.
   public func sizeThatFits(_ proposal: ProposedViewSize) -> LayoutSize {
-    engine.measure(child, proposal: proposal).measuredSize
+    engine.measure(
+      child,
+      proposal: proposal,
+      passContext: passContext
+    ).measuredSize
   }
 
   /// Returns layout dimensions for the child under `proposal`.
   public func dimensions(in proposal: ProposedViewSize) -> ViewDimensions {
-    engine.dimensions(of: child, proposal: proposal)
+    engine.dimensions(
+      of: child,
+      proposal: proposal,
+      passContext: passContext
+    )
   }
 
   /// Places the child at `position` using `anchor` and `proposal`.
@@ -140,6 +152,16 @@ public protocol Layout {
   )
 }
 
+/// A custom layout whose value and cache can be evaluated on the frame-tail
+/// worker.
+///
+/// Conforming to this protocol is an opt-in contract: the layout value, its
+/// cache, and any state captured by its callbacks must be safe to use away from
+/// the main actor. Layouts that conform to `Layout` but not `SendableLayout`
+/// remain correct and continue to run through the main-actor custom-layout
+/// bridge.
+public protocol SendableLayout: Layout, Sendable where Cache: Sendable {}
+
 extension Layout {
   public func updateCache(
     _ cache: inout Cache,
@@ -148,6 +170,19 @@ extension Layout {
     cache = makeCache(subviews: subviews)
   }
 
+  @MainActor
+  public func callAsFunction<Content: View>(
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    return LayoutContainer(
+      layout: AnyLayout(self),
+      authoringScope: currentAuthoringContext(),
+      content: content()
+    )
+  }
+}
+
+extension SendableLayout {
   @MainActor
   public func callAsFunction<Content: View>(
     @ViewBuilder content: () -> Content
@@ -267,6 +302,153 @@ private struct ConcreteAnyLayoutBox<L: Layout>: AnyLayoutBox {
   }
 }
 
+private final class SendableLayoutWorkerProxy<L: SendableLayout>: WorkerCustomLayoutProxy {
+  private struct CacheKey: Hashable, Sendable {
+    var identity: Identity
+    var proposal: ProposedSize
+  }
+
+  private struct State: Sendable {
+    var cachedStates: [CacheKey: L.Cache] = [:]
+  }
+
+  let debugName: String
+  private let layout: L
+  private let state = Mutex(State())
+
+  init(layout: L) {
+    self.layout = layout
+    debugName = String(describing: L.self)
+  }
+
+  func measureContainer(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize,
+    passContext: LayoutPassContext?
+  ) -> Size {
+    let subviews = layoutSubviews(
+      for: node,
+      engine: engine,
+      passContext: passContext
+    )
+    var cache = preparedCache(
+      for: node,
+      proposal: proposal,
+      subviews: subviews
+    )
+    let size = layout.sizeThatFits(
+      proposal: proposal,
+      subviews: subviews,
+      cache: &cache
+    )
+    storeCache(cache, for: node, proposal: proposal)
+    return size
+  }
+
+  func placeSubviews(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: Rect,
+    passContext: LayoutPassContext?
+  ) -> [PlacedNode] {
+    let placementRecorder = LayoutSubviewPlacementRecorder()
+    let subviews = layoutSubviews(
+      for: node,
+      engine: engine,
+      placementRecorder: placementRecorder,
+      passContext: passContext
+    )
+    var cache = preparedCache(
+      for: node,
+      proposal: measured.proposal,
+      subviews: subviews
+    )
+    layout.placeSubviews(
+      in: bounds,
+      proposal: measured.proposal,
+      subviews: subviews,
+      cache: &cache
+    )
+    storeCache(cache, for: node, proposal: measured.proposal)
+    discardCachedStates(for: node.identity)
+
+    return node.children.map { child in
+      let placement =
+        placementRecorder.placement(for: child.identity)
+        ?? defaultPlacement(in: bounds, proposal: measured.proposal)
+      let childMeasurement = engine.measure(
+        child,
+        proposal: placement.proposal,
+        passContext: passContext
+      )
+      return engine.place(
+        child,
+        measured: childMeasurement,
+        in: LayoutRect(
+          origin: placedOrigin(
+            for: childMeasurement.measuredSize,
+            at: placement.position,
+            anchor: placement.anchor
+          ),
+          size: childMeasurement.measuredSize
+        ),
+        viewportContext: placement.viewportContext,
+        passContext: passContext
+      )
+    }
+  }
+
+  private func layoutSubviews(
+    for node: ResolvedNode,
+    engine: LayoutEngine,
+    placementRecorder: LayoutSubviewPlacementRecorder? = nil,
+    passContext: LayoutPassContext?
+  ) -> LayoutSubviews {
+    node.children.map { child in
+      LayoutSubview(
+        child: child,
+        engine: engine,
+        placementRecorder: placementRecorder,
+        passContext: passContext
+      )
+    }
+  }
+
+  private func preparedCache(
+    for node: ResolvedNode,
+    proposal: ProposedSize,
+    subviews: LayoutSubviews
+  ) -> L.Cache {
+    let key = CacheKey(identity: node.identity, proposal: proposal)
+    var cache = state.withLock { state in
+      state.cachedStates[key] ?? layout.makeCache(subviews: subviews)
+    }
+    layout.updateCache(&cache, subviews: subviews)
+    return cache
+  }
+
+  private func storeCache(
+    _ cache: L.Cache,
+    for node: ResolvedNode,
+    proposal: ProposedSize
+  ) {
+    let key = CacheKey(identity: node.identity, proposal: proposal)
+    state.withLock { state in
+      state.cachedStates[key] = cache
+    }
+  }
+
+  private func discardCachedStates(
+    for identity: Identity
+  ) {
+    state.withLock { state in
+      state.cachedStates = state.cachedStates.filter { $0.key.identity != identity }
+    }
+  }
+}
+
 /// A type-erased custom layout.
 public struct AnyLayout: Layout {
   /// The type-erased cache storage used by `AnyLayout`.
@@ -294,6 +476,33 @@ public struct AnyLayout: Layout {
         proxyBox,
         measurementReuseSignature: box.measurementReuseSignature,
         placementReuseSignature: box.placementReuseSignature,
+        placementHandler: { engine, node, measured, bounds, passContext in
+          proxyBox.placeSubviews(
+            engine: engine,
+            node: node,
+            measured: measured,
+            in: bounds,
+            passContext: passContext
+          )
+        }
+      )
+    } else {
+      customLayoutHandle = nil
+    }
+  }
+
+  /// Erases a worker-safe layout value.
+  @MainActor
+  public init<L: SendableLayout>(_ layout: L) {
+    let box = ConcreteAnyLayoutBox(layout: layout)
+    self.box = box
+    if box.builtinLayoutBehavior == nil {
+      let proxyBox = LayoutProxyBox(box: box)
+      customLayoutHandle = CustomLayoutHandle(
+        proxyBox,
+        measurementReuseSignature: box.measurementReuseSignature,
+        placementReuseSignature: box.placementReuseSignature,
+        workerProxy: SendableLayoutWorkerProxy(layout: layout),
         placementHandler: { engine, node, measured, bounds, passContext in
           proxyBox.placeSubviews(
             engine: engine,
@@ -708,7 +917,8 @@ private final class LayoutProxyBox: CustomLayoutProxy {
         LayoutSubview(
           child: child,
           engine: engine,
-          placementRecorder: placementRecorder
+          placementRecorder: placementRecorder,
+          passContext: passContext
         )
       }
       let cacheKey = CacheKey(identity: node.identity, proposal: measured.proposal)
