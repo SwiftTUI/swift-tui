@@ -17,5 +17,6 @@ struct TimingDiagnosticsTests {
     )
 
     #expect(artifacts.diagnostics.phaseTimings != nil)
+    #expect(artifacts.diagnostics.workerTimings != nil)
   }
 }

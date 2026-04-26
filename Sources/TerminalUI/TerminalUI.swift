@@ -2,7 +2,10 @@
 @_exported import EmbeddedFonts
 @_exported import View
 
-@MainActor
+#if canImport(Dispatch)
+  @unsafe @preconcurrency import Dispatch
+#endif
+
 private final class FrameTailRetainedState {
   private var previousFrameIndex: RetainedFrameIndex?
   private var previousRasterSurface: RasterSurface?
@@ -63,6 +66,7 @@ private struct FrameTailDiagnostics {
   var drawDuration: Duration
   var rasterDuration: Duration
   var layoutWork: LayoutWorkMetrics
+  var workerTimings: FrameWorkerTimings?
   var measurementCache: MeasurementCacheMetrics?
 }
 
@@ -72,6 +76,8 @@ private struct FrameTailLayoutOutput {
   var measureDuration: Duration
   var placeDuration: Duration
   var layoutWork: LayoutWorkMetrics
+  var workerEnqueueToStart: Duration
+  var workerCompute: Duration
 }
 
 private struct FrameTailOutput {
@@ -84,299 +90,150 @@ private struct FrameTailOutput {
   var drawnIdentities: Set<Identity>
   var presentationDamage: PresentationDamage?
   var diagnostics: FrameTailDiagnostics
+  var workerCompletedAt: ContinuousClock.Instant?
 }
 
-/// Renders authored terminal views through the full frame pipeline.
-///
-/// `DefaultRenderer` is the public one-shot entry point for turning a `View`
-/// into `FrameArtifacts` for previews, snapshot tests, diagnostics, or custom
-/// presentation.
-public struct DefaultRenderer {
-  public let resolver: Resolver
-  public let layoutEngine: LayoutEngine
-  public let semanticExtractor: SemanticExtractor
-  public let drawExtractor: DrawExtractor
-  public let rasterizer: Rasterizer
-  public let commitPlanner: CommitPlanner
-  private let imageRepository: ImageAssetRepository
-  private let viewGraph: ViewGraph
-  private let frameState: FrameResolveState
-  private let presentationHostState: PresentationHostState
-  private let animationController: AnimationController
+private struct FrameTailWorkerResult<Value> {
+  var value: Value
+  var enqueueToStart: Duration
+  var compute: Duration
+  var completedAt: ContinuousClock.Instant?
+}
 
-  private let frameTailRetainedState: FrameTailRetainedState
+private final class FrameTailRenderer {
+  private let layoutEngine: LayoutEngine
+  private let semanticExtractor: SemanticExtractor
+  private let drawExtractor: DrawExtractor
+  private let rasterizer: Rasterizer
+  private let retainedState = FrameTailRetainedState()
 
-  /// Creates a renderer with the supplied pipeline components.
-  @MainActor
-  public init(
-    resolver: Resolver = .init(),
-    layoutEngine: LayoutEngine = .init(cache: MeasurementCache()),
-    semanticExtractor: SemanticExtractor = .init(),
-    drawExtractor: DrawExtractor = .init(),
-    rasterizer: Rasterizer = .init(),
-    commitPlanner: CommitPlanner = .init()
+  #if canImport(Dispatch)
+    private let queue = DispatchQueue(label: "swift-terminal-ui.frame-tail-renderer")
+  #endif
+
+  init(
+    layoutEngine: LayoutEngine,
+    semanticExtractor: SemanticExtractor,
+    drawExtractor: DrawExtractor,
+    rasterizer: Rasterizer
   ) {
-    self.resolver = resolver
     self.layoutEngine = layoutEngine
     self.semanticExtractor = semanticExtractor
     self.drawExtractor = drawExtractor
     self.rasterizer = rasterizer
-    self.commitPlanner = commitPlanner
-    imageRepository = sharedImageAssetRepository
-    viewGraph = .init()
-    frameState = .init()
-    presentationHostState = .init()
-    animationController = .init()
-    frameTailRetainedState = .init()
   }
 
-  /// Package-only accessor so the run loop can register animations
-  /// against the renderer's controller before a `withAnimation` body
-  /// executes.
-  @MainActor
-  package var internalAnimationController: AnimationController {
-    animationController
+  func retainedInput(
+    invalidatedIdentities: Set<Identity>
+  ) -> FrameTailRetainedInput {
+    sync {
+      retainedState.input(
+        invalidatedIdentities: invalidatedIdentities
+      )
+    }
   }
 
-  /// Package-only accessor so the run loop can route framework-reserved
-  /// single-key events (currently Escape) to the active presentation
-  /// coordinator stack. Returns the dismiss closure of the topmost
-  /// Escape-dismissible presentation, or nil when none is active.
-  @MainActor
-  package func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
-    presentationHostState.topmostEscapeDismissAction()
+  func renderLayout(
+    _ input: FrameTailInput,
+    clock: ContinuousClock?
+  ) -> FrameTailLayoutOutput {
+    let result = timedSync(clock: clock) {
+      renderLayoutInline(
+        input,
+        clock: clock
+      )
+    }
+    var layout = result.value
+    layout.workerEnqueueToStart = result.enqueueToStart
+    layout.workerCompute = result.compute
+    return layout
   }
 
-  /// Package-only accessor exposing the renderer's internal
-  /// `ViewGraph.registrationAliasDiagnostics`.  Added for Item 7 of
-  /// `docs/proposals/ARCHITECTURE_NOTES.md` to let tests measure the alias layer's
-  /// actual workload against the architecture doc's hypothesis.
-  @MainActor
-  package var debugRegistrationAliasDiagnostics: RegistrationAliasDiagnostics {
-    viewGraph.registrationAliasDiagnostics
-  }
-
-  /// Renders `root` into complete frame artifacts.
-  @MainActor
-  public func render<V: View>(
-    _ root: V,
-    context: ResolveContext = .init(),
-    proposal: ProposedSize = .unspecified,
-    collectsDiagnostics: Bool = true
-  ) -> FrameArtifacts {
-    renderView(
-      root,
-      context: context,
-      proposal: proposal,
-      collectsDiagnostics: collectsDiagnostics
+  func renderRaster(
+    _ input: FrameTailInput,
+    layout: FrameTailLayoutOutput,
+    placed: PlacedNode,
+    clock: ContinuousClock?
+  ) -> FrameTailOutput {
+    let result = timedSync(clock: clock) {
+      renderRasterInline(
+        input,
+        layout: layout,
+        placed: placed,
+        clock: clock
+      )
+    }
+    var output = result.value
+    output.diagnostics.workerTimings = .init(
+      layoutEnqueueToStart: layout.workerEnqueueToStart,
+      layoutCompute: layout.workerCompute,
+      rasterEnqueueToStart: result.enqueueToStart,
+      rasterCompute: result.compute
     )
+    output.workerCompletedAt = result.completedAt
+    return output
   }
 
-  @MainActor
-  private func renderView<V: View>(
-    _ root: V,
-    context: ResolveContext,
-    proposal: ProposedSize,
-    collectsDiagnostics: Bool = true
-  ) -> FrameArtifacts {
-    let clock: ContinuousClock? = collectsDiagnostics ? ContinuousClock() : nil
+  func pruneMeasurementCache(
+    keeping identities: Set<Identity>
+  ) {
+    sync {
+      layoutEngine.cache?.prune(keeping: identities)
+    }
+  }
 
-    var resolveContext = context
-    let runtimeRegistrations = resolveContext.runtimeRegistrations
-    resolveContext.imageAssetResolver = imageRepository.resolver()
-    resolveContext.frameState = frameState
-    frameState.update(from: resolveContext, proposal: proposal)
-    viewGraph.beginFrame()
-    let canUseSelectiveEvaluation =
-      frameState.selectiveEvaluationEnabled
-      && !frameState.environmentRequiresRootEvaluation
-      && !context.invalidatedIdentities.contains(resolveContext.identity)
-    if canUseSelectiveEvaluation {
-      viewGraph.invalidateAndQueueDirty(context.invalidatedIdentities)
-    } else {
-      viewGraph.invalidate(context.invalidatedIdentities)
+  func storeCommittedFrame(
+    _ artifacts: FrameArtifacts,
+    baselinePlacedTree: PlacedNode
+  ) {
+    sync {
+      retainedState.storeCommittedFrame(
+        artifacts,
+        baselinePlacedTree: baselinePlacedTree
+      )
     }
-    resolveContext.viewGraph = viewGraph
-    resolveContext.observationBridge?.attachViewGraph(viewGraph)
-    resolveContext.observationBridge?.beginTrackingPass()
-    let wrappedRoot = PresentationHostingRoot(
-      content: root,
-      hostState: presentationHostState
-    )
-    viewGraph.setRootEvaluator(rootIdentity: resolveContext.identity) {
-      _ = resolver.resolve(wrappedRoot, in: resolveContext)
-    }
-    viewGraph.setEvaluator(for: resolveContext.identity) {
-      _ = resolver.resolve(wrappedRoot, in: resolveContext)
-    }
-    let (_, resolveDuration): (Void, Duration)
-    animationController.beginTransitionCollection()
-    if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
-      // Nothing is dirty — skip evaluation entirely and reuse the
-      // existing tree snapshot.  The root evaluator and registrations
-      // are untouched.
-      resolveDuration = .zero
-    } else {
-      let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
-      if let dirtyEvaluationPlan {
-        runtimeRegistrations.removeSubtrees(
-          rootedAt: dirtyEvaluationPlan.frontierIdentities
-        )
-      } else {
-        runtimeRegistrations.resetAll()
+  }
+
+  private func sync<Value>(
+    _ operation: () -> Value
+  ) -> Value {
+    #if canImport(Dispatch)
+      queue.sync {
+        operation()
       }
-
-      (_, resolveDuration) = measurePhase(clock: clock) {
-        viewGraph.evaluateDirtyNodes(
-          using: dirtyEvaluationPlan
-        )
-      }
-    }
-    animationController.finishTransitionCollection()
-    var resolved = viewGraph.snapshot()
-    resolved = composePresentationHostTree(
-      baseNode: resolved,
-      hostState: presentationHostState,
-      in: resolveContext
-    )
-    resolved = wrapInContainerSafeArea(
-      resolved,
-      context: resolveContext
-    )
-
-    // Animation: capture from/to for changed animatable properties, then
-    // apply interpolated values to the resolved tree before measure.
-    // This is the only pipeline insertion for animation — the rest of
-    // measure/place/draw/raster runs unchanged on the mutated tree.
-    let animationTimestamp = MonotonicInstant.now()
-    animationController.processResolvedTree(
-      resolved,
-      transaction: context.transaction,
-      timestamp: animationTimestamp
-    )
-    _ = animationController.applyInterpolations(
-      to: &resolved,
-      at: animationTimestamp
-    )
-
-    let frameTailRetainedInput = frameTailRetainedState.input(
-      invalidatedIdentities: context.invalidatedIdentities
-    )
-    let layoutPassContext = LayoutPassContext(
-      retainedLayout: frameTailRetainedInput.retainedLayout,
-      invalidatedIdentities: context.invalidatedIdentities
-    )
-    let frameContext = FrameContext(
-      environment: context.environment,
-      transaction: context.transaction,
-      invalidatedIdentities: context.invalidatedIdentities
-    )
-    let frameTailInput = FrameTailInput(
-      resolved: resolved,
-      proposal: proposal,
-      rootIdentity: resolveContext.identity,
-      retained: frameTailRetainedInput,
-      layoutPassContext: layoutPassContext
-    )
-    let tailLayout = renderFrameTailLayout(
-      frameTailInput,
-      clock: clock
-    )
-    var placed = tailLayout.baselinePlaced
-    // Capture the BASELINE placed tree (pre-overlay) for two things:
-    // 1. The animation controller's removal-snapshot lookup on the
-    //    next frame (capturePlacedTree).
-    // 2. The retained-layout store below, so future tick frames
-    //    reuse the canonical layout and not an animation-decorated
-    //    tree.
-    //
-    // If we stored the post-overlay placed tree, subsequent ticks
-    // would hit retainedPlacement and return the cached tree
-    // including the stale transient overlay — then applyPlacedOverlays
-    // would inject another overlay on top, growing the tree each
-    // tick and leaving ghosted artefacts visible after the animation
-    // completes.
-    animationController.capturePlacedTree(tailLayout.baselinePlaced)
-    // Inject any pending removal overlays at placed level (draw-only,
-    // no layout-shift on sibling containers).  Only applies to
-    // entries whose placedSnapshot was captured in a previous frame
-    // — the resolved-level fallback handles first-frame removals
-    // where no placed tree is cached yet.
-    animationController.applyPlacedOverlays(
-      to: &placed,
-      at: animationTimestamp
-    )
-    let tail = renderFrameTailRaster(
-      frameTailInput,
-      layout: tailLayout,
-      placed: placed,
-      clock: clock
-    )
-    let (commit, commitDuration) = measurePhase(clock: clock) {
-      let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: resolveContext.identity,
-        resolved: resolved,
-        placed: tail.placed
-      )
-      return commitPlanner.plan(
-        resolved: resolved,
-        placed: tail.placed,
-        semantics: tail.semantics,
-        transaction: frameContext.transaction,
-        lifecycleEvents: lifecycleEvents
-      )
-    }
-    layoutEngine.cache?.prune(keeping: viewGraph.liveIdentitySnapshot())
-    let diagnostics: FrameDiagnostics
-    if collectsDiagnostics {
-      let phaseTimings = FramePhaseTimings(
-        resolve: resolveDuration,
-        measure: tail.diagnostics.measureDuration,
-        place: tail.diagnostics.placeDuration,
-        semantics: tail.diagnostics.semanticsDuration,
-        draw: tail.diagnostics.drawDuration,
-        raster: tail.diagnostics.rasterDuration,
-        commit: commitDuration
-      )
-      diagnostics = FrameDiagnostics.summarize(
-        resolved: resolved,
-        measured: tail.measured,
-        placed: tail.placed,
-        semantics: tail.semantics,
-        draw: tail.draw,
-        invalidatedIdentities: frameContext.invalidatedIdentities,
-        resolveWork: resolveContext.resolveWorkTracker?.snapshot,
-        layoutWork: tail.diagnostics.layoutWork,
-        presentationDamage: tail.presentationDamage,
-        presentationSurfaceWidth: tail.raster.size.width,
-        phaseTimings: phaseTimings,
-        measurementCache: tail.diagnostics.measurementCache
-      )
-    } else {
-      diagnostics = .init()
-    }
-    let artifacts = FrameArtifacts(
-      resolvedTree: resolved,
-      measuredTree: tail.measured,
-      placedTree: tail.placed,
-      semanticSnapshot: tail.semantics,
-      drawTree: tail.draw,
-      rasterSurface: tail.raster,
-      presentationDamage: tail.presentationDamage,
-      drawnIdentities: tail.drawnIdentities,
-      commitPlan: commit,
-      diagnostics: diagnostics
-    )
-
-    frameTailRetainedState.storeCommittedFrame(
-      artifacts,
-      baselinePlacedTree: tail.baselinePlaced
-    )
-    return artifacts
+    #else
+      operation()
+    #endif
   }
 
-  @MainActor
-  private func renderFrameTailLayout(
+  private func timedSync<Value>(
+    clock: ContinuousClock?,
+    _ operation: () -> Value
+  ) -> FrameTailWorkerResult<Value> {
+    guard let clock else {
+      return .init(
+        value: sync(operation),
+        enqueueToStart: .zero,
+        compute: .zero,
+        completedAt: nil
+      )
+    }
+
+    let enqueuedAt = clock.now
+    return sync {
+      let startedAt = clock.now
+      let value = operation()
+      let completedAt = clock.now
+      return .init(
+        value: value,
+        enqueueToStart: enqueuedAt.duration(to: startedAt),
+        compute: startedAt.duration(to: completedAt),
+        completedAt: completedAt
+      )
+    }
+  }
+
+  private func renderLayoutInline(
     _ input: FrameTailInput,
     clock: ContinuousClock?
   ) -> FrameTailLayoutOutput {
@@ -399,12 +256,13 @@ public struct DefaultRenderer {
       baselinePlaced: placed,
       measureDuration: measureDuration,
       placeDuration: placeDuration,
-      layoutWork: input.layoutPassContext.workMetrics
+      layoutWork: input.layoutPassContext.workMetrics,
+      workerEnqueueToStart: .zero,
+      workerCompute: .zero
     )
   }
 
-  @MainActor
-  private func renderFrameTailRaster(
+  private func renderRasterInline(
     _ input: FrameTailInput,
     layout: FrameTailLayoutOutput,
     placed: PlacedNode,
@@ -436,6 +294,7 @@ public struct DefaultRenderer {
       drawDuration: drawDuration,
       rasterDuration: rasterDuration,
       layoutWork: layout.layoutWork,
+      workerTimings: nil,
       measurementCache: layoutEngine.cache?.metrics
     )
     return FrameTailOutput(
@@ -447,7 +306,8 @@ public struct DefaultRenderer {
       raster: rasterized.surface,
       drawnIdentities: rasterized.visibleIdentities,
       presentationDamage: rasterized.presentationDamage,
-      diagnostics: diagnostics
+      diagnostics: diagnostics,
+      workerCompletedAt: nil
     )
   }
 
@@ -461,25 +321,6 @@ public struct DefaultRenderer {
     let start = clock.now
     let value = operation()
     return (value, start.duration(to: clock.now))
-  }
-
-  private func wrapInContainerSafeArea(
-    _ resolved: ResolvedNode,
-    context: ResolveContext
-  ) -> ResolvedNode {
-    let safeAreaInsets = context.environmentValues.safeAreaInsets
-    guard !safeAreaInsets.isZero else {
-      return resolved
-    }
-
-    return ResolvedNode(
-      identity: resolved.identity.child(.named("ContainerSafeArea")),
-      kind: .view("ContainerSafeArea"),
-      children: [resolved],
-      environmentSnapshot: context.environment,
-      transactionSnapshot: context.transaction,
-      layoutBehavior: .padding(safeAreaInsets)
-    )
   }
 
   private func minimumRasterSurfaceSize(
@@ -638,6 +479,343 @@ public struct DefaultRenderer {
     for row in lowerBound..<upperBound {
       textRowRanges[row, default: []].append(leadingColumn..<trailingColumn)
     }
+  }
+}
+
+/// Renders authored terminal views through the full frame pipeline.
+///
+/// `DefaultRenderer` is the public one-shot entry point for turning a `View`
+/// into `FrameArtifacts` for previews, snapshot tests, diagnostics, or custom
+/// presentation.
+public struct DefaultRenderer {
+  public let resolver: Resolver
+  public let layoutEngine: LayoutEngine
+  public let semanticExtractor: SemanticExtractor
+  public let drawExtractor: DrawExtractor
+  public let rasterizer: Rasterizer
+  public let commitPlanner: CommitPlanner
+  private let imageRepository: ImageAssetRepository
+  private let viewGraph: ViewGraph
+  private let frameState: FrameResolveState
+  private let presentationHostState: PresentationHostState
+  private let animationController: AnimationController
+
+  private let frameTailRenderer: FrameTailRenderer
+
+  /// Creates a renderer with the supplied pipeline components.
+  @MainActor
+  public init(
+    resolver: Resolver = .init(),
+    layoutEngine: LayoutEngine = .init(cache: MeasurementCache()),
+    semanticExtractor: SemanticExtractor = .init(),
+    drawExtractor: DrawExtractor = .init(),
+    rasterizer: Rasterizer = .init(),
+    commitPlanner: CommitPlanner = .init()
+  ) {
+    self.resolver = resolver
+    self.layoutEngine = layoutEngine
+    self.semanticExtractor = semanticExtractor
+    self.drawExtractor = drawExtractor
+    self.rasterizer = rasterizer
+    self.commitPlanner = commitPlanner
+    imageRepository = sharedImageAssetRepository
+    viewGraph = .init()
+    frameState = .init()
+    presentationHostState = .init()
+    animationController = .init()
+    frameTailRenderer = .init(
+      layoutEngine: layoutEngine,
+      semanticExtractor: semanticExtractor,
+      drawExtractor: drawExtractor,
+      rasterizer: rasterizer
+    )
+  }
+
+  /// Package-only accessor so the run loop can register animations
+  /// against the renderer's controller before a `withAnimation` body
+  /// executes.
+  @MainActor
+  package var internalAnimationController: AnimationController {
+    animationController
+  }
+
+  /// Package-only accessor so the run loop can route framework-reserved
+  /// single-key events (currently Escape) to the active presentation
+  /// coordinator stack. Returns the dismiss closure of the topmost
+  /// Escape-dismissible presentation, or nil when none is active.
+  @MainActor
+  package func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
+    presentationHostState.topmostEscapeDismissAction()
+  }
+
+  /// Package-only accessor exposing the renderer's internal
+  /// `ViewGraph.registrationAliasDiagnostics`.  Added for Item 7 of
+  /// `docs/proposals/ARCHITECTURE_NOTES.md` to let tests measure the alias layer's
+  /// actual workload against the architecture doc's hypothesis.
+  @MainActor
+  package var debugRegistrationAliasDiagnostics: RegistrationAliasDiagnostics {
+    viewGraph.registrationAliasDiagnostics
+  }
+
+  /// Renders `root` into complete frame artifacts.
+  @MainActor
+  public func render<V: View>(
+    _ root: V,
+    context: ResolveContext = .init(),
+    proposal: ProposedSize = .unspecified,
+    collectsDiagnostics: Bool = true
+  ) -> FrameArtifacts {
+    renderView(
+      root,
+      context: context,
+      proposal: proposal,
+      collectsDiagnostics: collectsDiagnostics
+    )
+  }
+
+  @MainActor
+  private func renderView<V: View>(
+    _ root: V,
+    context: ResolveContext,
+    proposal: ProposedSize,
+    collectsDiagnostics: Bool = true
+  ) -> FrameArtifacts {
+    let clock: ContinuousClock? = collectsDiagnostics ? ContinuousClock() : nil
+
+    var resolveContext = context
+    let runtimeRegistrations = resolveContext.runtimeRegistrations
+    resolveContext.imageAssetResolver = imageRepository.resolver()
+    resolveContext.frameState = frameState
+    frameState.update(from: resolveContext, proposal: proposal)
+    viewGraph.beginFrame()
+    let canUseSelectiveEvaluation =
+      frameState.selectiveEvaluationEnabled
+      && !frameState.environmentRequiresRootEvaluation
+      && !context.invalidatedIdentities.contains(resolveContext.identity)
+    if canUseSelectiveEvaluation {
+      viewGraph.invalidateAndQueueDirty(context.invalidatedIdentities)
+    } else {
+      viewGraph.invalidate(context.invalidatedIdentities)
+    }
+    resolveContext.viewGraph = viewGraph
+    resolveContext.observationBridge?.attachViewGraph(viewGraph)
+    resolveContext.observationBridge?.beginTrackingPass()
+    let wrappedRoot = PresentationHostingRoot(
+      content: root,
+      hostState: presentationHostState
+    )
+    viewGraph.setRootEvaluator(rootIdentity: resolveContext.identity) {
+      _ = resolver.resolve(wrappedRoot, in: resolveContext)
+    }
+    viewGraph.setEvaluator(for: resolveContext.identity) {
+      _ = resolver.resolve(wrappedRoot, in: resolveContext)
+    }
+    let (_, resolveDuration): (Void, Duration)
+    animationController.beginTransitionCollection()
+    if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
+      // Nothing is dirty — skip evaluation entirely and reuse the
+      // existing tree snapshot.  The root evaluator and registrations
+      // are untouched.
+      resolveDuration = .zero
+    } else {
+      let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
+      if let dirtyEvaluationPlan {
+        runtimeRegistrations.removeSubtrees(
+          rootedAt: dirtyEvaluationPlan.frontierIdentities
+        )
+      } else {
+        runtimeRegistrations.resetAll()
+      }
+
+      (_, resolveDuration) = measurePhase(clock: clock) {
+        viewGraph.evaluateDirtyNodes(
+          using: dirtyEvaluationPlan
+        )
+      }
+    }
+    animationController.finishTransitionCollection()
+    var resolved = viewGraph.snapshot()
+    resolved = composePresentationHostTree(
+      baseNode: resolved,
+      hostState: presentationHostState,
+      in: resolveContext
+    )
+    resolved = wrapInContainerSafeArea(
+      resolved,
+      context: resolveContext
+    )
+
+    // Animation: capture from/to for changed animatable properties, then
+    // apply interpolated values to the resolved tree before measure.
+    // This is the only pipeline insertion for animation — the rest of
+    // measure/place/draw/raster runs unchanged on the mutated tree.
+    let animationTimestamp = MonotonicInstant.now()
+    animationController.processResolvedTree(
+      resolved,
+      transaction: context.transaction,
+      timestamp: animationTimestamp
+    )
+    _ = animationController.applyInterpolations(
+      to: &resolved,
+      at: animationTimestamp
+    )
+
+    let frameTailRetainedInput = frameTailRenderer.retainedInput(
+      invalidatedIdentities: context.invalidatedIdentities
+    )
+    let layoutPassContext = LayoutPassContext(
+      retainedLayout: frameTailRetainedInput.retainedLayout,
+      invalidatedIdentities: context.invalidatedIdentities
+    )
+    let frameContext = FrameContext(
+      environment: context.environment,
+      transaction: context.transaction,
+      invalidatedIdentities: context.invalidatedIdentities
+    )
+    let frameTailInput = FrameTailInput(
+      resolved: resolved,
+      proposal: proposal,
+      rootIdentity: resolveContext.identity,
+      retained: frameTailRetainedInput,
+      layoutPassContext: layoutPassContext
+    )
+    let tailLayout = frameTailRenderer.renderLayout(
+      frameTailInput,
+      clock: clock
+    )
+    var placed = tailLayout.baselinePlaced
+    // Capture the BASELINE placed tree (pre-overlay) for two things:
+    // 1. The animation controller's removal-snapshot lookup on the
+    //    next frame (capturePlacedTree).
+    // 2. The retained-layout store below, so future tick frames
+    //    reuse the canonical layout and not an animation-decorated
+    //    tree.
+    //
+    // If we stored the post-overlay placed tree, subsequent ticks
+    // would hit retainedPlacement and return the cached tree
+    // including the stale transient overlay — then applyPlacedOverlays
+    // would inject another overlay on top, growing the tree each
+    // tick and leaving ghosted artefacts visible after the animation
+    // completes.
+    animationController.capturePlacedTree(tailLayout.baselinePlaced)
+    // Inject any pending removal overlays at placed level (draw-only,
+    // no layout-shift on sibling containers).  Only applies to
+    // entries whose placedSnapshot was captured in a previous frame
+    // — the resolved-level fallback handles first-frame removals
+    // where no placed tree is cached yet.
+    animationController.applyPlacedOverlays(
+      to: &placed,
+      at: animationTimestamp
+    )
+    let tail = frameTailRenderer.renderRaster(
+      frameTailInput,
+      layout: tailLayout,
+      placed: placed,
+      clock: clock
+    )
+    var workerTimings = tail.diagnostics.workerTimings
+    if var timings = workerTimings,
+      let clock,
+      let workerCompletedAt = tail.workerCompletedAt
+    {
+      timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
+      workerTimings = timings
+    }
+    let (commit, commitDuration) = measurePhase(clock: clock) {
+      let lifecycleEvents = viewGraph.finalizeFrame(
+        rootIdentity: resolveContext.identity,
+        resolved: resolved,
+        placed: tail.placed
+      )
+      return commitPlanner.plan(
+        resolved: resolved,
+        placed: tail.placed,
+        semantics: tail.semantics,
+        transaction: frameContext.transaction,
+        lifecycleEvents: lifecycleEvents
+      )
+    }
+    frameTailRenderer.pruneMeasurementCache(
+      keeping: viewGraph.liveIdentitySnapshot()
+    )
+    let diagnostics: FrameDiagnostics
+    if collectsDiagnostics {
+      let phaseTimings = FramePhaseTimings(
+        resolve: resolveDuration,
+        measure: tail.diagnostics.measureDuration,
+        place: tail.diagnostics.placeDuration,
+        semantics: tail.diagnostics.semanticsDuration,
+        draw: tail.diagnostics.drawDuration,
+        raster: tail.diagnostics.rasterDuration,
+        commit: commitDuration
+      )
+      diagnostics = FrameDiagnostics.summarize(
+        resolved: resolved,
+        measured: tail.measured,
+        placed: tail.placed,
+        semantics: tail.semantics,
+        draw: tail.draw,
+        invalidatedIdentities: frameContext.invalidatedIdentities,
+        resolveWork: resolveContext.resolveWorkTracker?.snapshot,
+        layoutWork: tail.diagnostics.layoutWork,
+        presentationDamage: tail.presentationDamage,
+        presentationSurfaceWidth: tail.raster.size.width,
+        phaseTimings: phaseTimings,
+        workerTimings: workerTimings,
+        measurementCache: tail.diagnostics.measurementCache
+      )
+    } else {
+      diagnostics = .init()
+    }
+    let artifacts = FrameArtifacts(
+      resolvedTree: resolved,
+      measuredTree: tail.measured,
+      placedTree: tail.placed,
+      semanticSnapshot: tail.semantics,
+      drawTree: tail.draw,
+      rasterSurface: tail.raster,
+      presentationDamage: tail.presentationDamage,
+      drawnIdentities: tail.drawnIdentities,
+      commitPlan: commit,
+      diagnostics: diagnostics
+    )
+
+    frameTailRenderer.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: tail.baselinePlaced
+    )
+    return artifacts
+  }
+
+  private func measurePhase<Value>(
+    clock: ContinuousClock?,
+    _ operation: () -> Value
+  ) -> (Value, Duration) {
+    guard let clock else {
+      return (operation(), .zero)
+    }
+    let start = clock.now
+    let value = operation()
+    return (value, start.duration(to: clock.now))
+  }
+
+  private func wrapInContainerSafeArea(
+    _ resolved: ResolvedNode,
+    context: ResolveContext
+  ) -> ResolvedNode {
+    let safeAreaInsets = context.environmentValues.safeAreaInsets
+    guard !safeAreaInsets.isZero else {
+      return resolved
+    }
+
+    return ResolvedNode(
+      identity: resolved.identity.child(.named("ContainerSafeArea")),
+      kind: .view("ContainerSafeArea"),
+      children: [resolved],
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction,
+      layoutBehavior: .padding(safeAreaInsets)
+    )
   }
 
   /// Enables selective dirty-frontier evaluation for subsequent frames.

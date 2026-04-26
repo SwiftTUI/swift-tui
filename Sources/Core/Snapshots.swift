@@ -33,6 +33,14 @@ public struct SnapshotRenderer {
       lines.append("phaseTimings=nil")
     }
 
+    if let workerTimings = diagnostics.workerTimings {
+      lines.append(
+        "workerTimings=layoutEnqueue:\(describe(workerTimings.layoutEnqueueToStart)) layoutCompute:\(describe(workerTimings.layoutCompute)) rasterEnqueue:\(describe(workerTimings.rasterEnqueueToStart)) rasterCompute:\(describe(workerTimings.rasterCompute)) completionToCommit:\(describe(workerTimings.completionToMainCommit))"
+      )
+    } else {
+      lines.append("workerTimings=nil")
+    }
+
     if let cache = diagnostics.measurementCache {
       lines.append(
         "measurementCache=generation:\(cache.generation) entries:\(cache.entries) lookups:\(cache.lookups) hits:\(cache.hits) misses:\(cache.misses) invalidations:\(cache.invalidations) stores:\(cache.stores)"

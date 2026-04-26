@@ -524,6 +524,29 @@ public struct FramePhaseTimings: Equatable, Sendable {
   }
 }
 
+/// Timing summaries for work submitted to the frame-tail renderer.
+public struct FrameWorkerTimings: Equatable, Sendable {
+  public var layoutEnqueueToStart: Duration
+  public var layoutCompute: Duration
+  public var rasterEnqueueToStart: Duration
+  public var rasterCompute: Duration
+  public var completionToMainCommit: Duration
+
+  public init(
+    layoutEnqueueToStart: Duration = .zero,
+    layoutCompute: Duration = .zero,
+    rasterEnqueueToStart: Duration = .zero,
+    rasterCompute: Duration = .zero,
+    completionToMainCommit: Duration = .zero
+  ) {
+    self.layoutEnqueueToStart = layoutEnqueueToStart
+    self.layoutCompute = layoutCompute
+    self.rasterEnqueueToStart = rasterEnqueueToStart
+    self.rasterCompute = rasterCompute
+    self.completionToMainCommit = completionToMainCommit
+  }
+}
+
 /// Diagnostic counters and summaries for one rendered frame.
 public struct PresentationDamageDiagnostics: Equatable, Sendable {
   public var textRowCount: Int
@@ -608,6 +631,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var selectionRouteCount: Int
   public var presentationDamage: PresentationDamageDiagnostics?
   public var phaseTimings: FramePhaseTimings?
+  public var workerTimings: FrameWorkerTimings?
   public var measurementCache: MeasurementCacheMetrics?
 
   public init(
@@ -629,6 +653,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     selectionRouteCount: Int = 0,
     presentationDamage: PresentationDamageDiagnostics? = nil,
     phaseTimings: FramePhaseTimings? = nil,
+    workerTimings: FrameWorkerTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil
   ) {
     self.proposal = proposal
@@ -649,6 +674,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     self.selectionRouteCount = selectionRouteCount
     self.presentationDamage = presentationDamage
     self.phaseTimings = phaseTimings
+    self.workerTimings = workerTimings
     self.measurementCache = measurementCache
   }
 }
@@ -927,6 +953,7 @@ extension FrameDiagnostics {
     presentationDamage: PresentationDamage? = nil,
     presentationSurfaceWidth: Int = 0,
     phaseTimings: FramePhaseTimings? = nil,
+    workerTimings: FrameWorkerTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil
   ) -> Self {
     Self(
@@ -953,6 +980,7 @@ extension FrameDiagnostics {
         )
       },
       phaseTimings: phaseTimings,
+      workerTimings: workerTimings,
       measurementCache: measurementCache
     )
   }
