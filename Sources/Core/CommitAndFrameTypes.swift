@@ -1031,7 +1031,9 @@ extension FrameDiagnostics {
     count: inout Int,
     firstIdentity: inout Identity?
   ) {
-    if case .custom = node.layoutBehavior {
+    if case .custom(let handle) = node.layoutBehavior,
+      !handle.canRunOnWorker
+    {
       count += 1
       if firstIdentity == nil {
         firstIdentity = node.identity

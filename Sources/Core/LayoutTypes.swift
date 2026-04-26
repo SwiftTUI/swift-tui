@@ -512,6 +512,64 @@ extension WorkerCustomLayoutProxy {
   }
 }
 
+/// Sendable closure-backed snapshot for custom layouts that can execute on the
+/// frame-tail worker.
+package struct WorkerCustomLayoutSnapshot: WorkerCustomLayoutProxy {
+  package typealias MeasureContainerHandler =
+    @Sendable (LayoutEngine, ResolvedNode, ProposedSize) -> Size
+  package typealias MeasureChildrenHandler =
+    @Sendable (LayoutEngine, ResolvedNode, ProposedSize) -> [MeasuredNode]
+  package typealias PlaceSubviewsHandler =
+    @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect) -> [PlacedNode]
+
+  package var debugName: String
+  private let measureContainerHandler: MeasureContainerHandler
+  private let measureChildrenHandler: MeasureChildrenHandler?
+  private let placeSubviewsHandler: PlaceSubviewsHandler
+
+  package init(
+    debugName: String,
+    measureChildren: MeasureChildrenHandler? = nil,
+    measureContainer: @escaping MeasureContainerHandler,
+    placeSubviews: @escaping PlaceSubviewsHandler
+  ) {
+    self.debugName = debugName
+    measureChildrenHandler = measureChildren
+    measureContainerHandler = measureContainer
+    placeSubviewsHandler = placeSubviews
+  }
+
+  package func measureContainer(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize
+  ) -> Size {
+    measureContainerHandler(engine, node, proposal)
+  }
+
+  package func measureChildren(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize
+  ) -> [MeasuredNode] {
+    if let measureChildrenHandler {
+      return measureChildrenHandler(engine, node, proposal)
+    }
+    return node.children.map { child in
+      engine.measure(child, proposal: proposal)
+    }
+  }
+
+  package func placeSubviews(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: Rect
+  ) -> [PlacedNode] {
+    placeSubviewsHandler(engine, node, measured, bounds)
+  }
+}
+
 /// Reference wrapper used to carry a custom layout through the pipeline.
 public final class CustomLayoutHandle: Sendable {
   public let proxy: any CustomLayoutProxy
@@ -554,7 +612,10 @@ public final class CustomLayoutHandle: Sendable {
   }
 
   public var debugName: String {
-    proxy.debugName
+    if let workerProxy {
+      return workerProxy.debugName
+    }
+    return proxy.debugName
   }
 
   package var executionCapability: CustomLayoutExecutionCapability {
@@ -565,6 +626,44 @@ public final class CustomLayoutHandle: Sendable {
     workerProxy != nil
   }
 
+  package func measureContainer(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize
+  ) -> Size {
+    if let workerProxy {
+      return workerProxy.measureContainer(
+        engine: engine,
+        node: node,
+        proposal: proposal
+      )
+    }
+    return proxy.measureContainer(
+      engine: engine,
+      node: node,
+      proposal: proposal
+    )
+  }
+
+  package func measureChildren(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize
+  ) -> [MeasuredNode] {
+    if let workerProxy {
+      return workerProxy.measureChildren(
+        engine: engine,
+        node: node,
+        proposal: proposal
+      )
+    }
+    return proxy.measureChildren(
+      engine: engine,
+      node: node,
+      proposal: proposal
+    )
+  }
+
   package func placeSubviews(
     engine: LayoutEngine,
     node: ResolvedNode,
@@ -572,6 +671,14 @@ public final class CustomLayoutHandle: Sendable {
     in bounds: Rect,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
+    if let workerProxy {
+      return workerProxy.placeSubviews(
+        engine: engine,
+        node: node,
+        measured: measured,
+        in: bounds
+      )
+    }
     if let placementHandler {
       return placementHandler(engine, node, measured, bounds, passContext)
     }

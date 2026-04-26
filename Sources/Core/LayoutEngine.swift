@@ -586,7 +586,7 @@ public struct LayoutEngine: Sendable {
         measure(child, proposal: parentProposal, passContext: passContext)
       }
     case .custom(let handle):
-      return handle.proxy.measureChildren(
+      return handle.measureChildren(
         engine: self,
         node: resolved,
         proposal: parentProposal
@@ -866,7 +866,7 @@ public struct LayoutEngine: Sendable {
       }
       return childMeasurements[selectedIndex].measuredSize
     case .custom(let handle):
-      return handle.proxy.measureContainer(
+      return handle.measureContainer(
         engine: self,
         node: resolved,
         proposal: proposal

@@ -225,7 +225,7 @@ private final class FrameTailRenderer: Sendable {
   func canOffloadLayout(
     _ input: FrameTailInput
   ) -> Bool {
-    !containsCustomLayout(input.resolved)
+    !containsMainActorOnlyCustomLayout(input.resolved)
   }
 
   func renderRaster(
@@ -436,13 +436,15 @@ private final class FrameTailRenderer: Sendable {
     )
   }
 
-  private func containsCustomLayout(
+  private func containsMainActorOnlyCustomLayout(
     _ node: ResolvedNode
   ) -> Bool {
-    if case .custom = node.layoutBehavior {
+    if case .custom(let handle) = node.layoutBehavior,
+      !handle.canRunOnWorker
+    {
       return true
     }
-    return node.children.contains { containsCustomLayout($0) }
+    return node.children.contains { containsMainActorOnlyCustomLayout($0) }
   }
 
   private func renderRasterInline(

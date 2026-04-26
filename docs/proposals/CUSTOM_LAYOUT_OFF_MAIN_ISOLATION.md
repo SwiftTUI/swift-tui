@@ -208,11 +208,30 @@ git commit -m "refactor(layout): split custom layout execution capability"
 
 ### Stage 3: Snapshot an internal worker-safe layout
 
-- Build one package-internal custom layout fixture whose value and cache are
+- [x] Build one package-internal custom layout fixture whose value and cache are
   Sendable.
-- Resolve it into a worker-capable snapshot.
-- Run measurement and placement on the frame-tail worker.
-- Keep authored public `Layout` on the fallback path.
+- [x] Resolve it into a worker-capable snapshot.
+- [x] Run measurement and placement on the frame-tail worker.
+- [x] Keep authored public `Layout` on the fallback path.
+
+Stage 3 result:
+
+- `WorkerCustomLayoutSnapshot` is a package-internal, Sendable closure-backed
+  snapshot for worker-capable custom layout measurement and placement.
+- `CustomLayoutHandle` dispatches measurement, child measurement, and placement
+  through `workerProxy` when present; otherwise it preserves the existing
+  main-actor-compatible `CustomLayoutProxy` path.
+- `FrameTailRenderer` only blocks layout offload for custom layout handles that
+  are still `mainActorOnly`.
+- Fallback diagnostics now count main-actor-only custom layouts, not
+  worker-capable custom snapshots.
+- `AsyncFrameTailRenderingTests` resolves a worker-backed internal custom layout
+  and verifies measurement and placement run off the main thread while public
+  authored `Layout` remains on the fallback path.
+
+Stage 3 intentionally does not move cache ownership off-main. The test snapshot
+uses only Sendable captured state and performs fresh measurement/placement work;
+cache input/output handoff remains Stage 4.
 
 Commit boundary:
 
@@ -273,11 +292,10 @@ git commit -m "docs(layout): define off-main custom layout opt-in"
 
 ## Recommendation
 
-Keep the current fallback and do not attempt to move existing authored custom
-layouts off-main by force.
+Keep the fallback for public authored custom layouts and do not attempt to move
+them off-main by force.
 
-The next useful implementation step is Stage 1: make the fallback observable in
-diagnostics and lock it with tests. After that, prototype a package-internal
-worker-safe custom layout before designing public API. That sequence keeps the
-landed built-in layout offload correct while giving custom layout a narrow,
-testable path toward worker execution.
+The next useful implementation step is Stage 4: add an explicit cache handoff
+for worker-capable custom layouts. That keeps the landed built-in layout offload
+correct while turning the package-internal worker snapshot from a no-cache
+prototype into a candidate execution model with SwiftUI-shaped cache semantics.
