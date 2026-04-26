@@ -260,6 +260,7 @@ extension RunLoop {
             interactionRegionCount: diag.interactionRegionCount,
             focusRegionCount: diag.focusRegionCount,
             phaseTimings: diag.phaseTimings,
+            workerTimings: diag.workerTimings,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
               ? "full" : "incremental",
             presentationBytesWritten: presentationMetrics.bytesWritten,

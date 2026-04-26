@@ -23,6 +23,7 @@ public struct FrameDiagnosticRecord: Sendable {
   public var interactionRegionCount: Int
   public var focusRegionCount: Int
   public var phaseTimings: FramePhaseTimings?
+  public var workerTimings: FrameWorkerTimings?
   public var presentationStrategy: String
   public var presentationBytesWritten: Int
   public var presentationLinesTouched: Int
@@ -97,6 +98,12 @@ public final class FrameDiagnosticsLogger {
     let rasterMs = formatMs(timings?.raster)
     let commitMs = formatMs(timings?.commit)
     let pipelineMs = formatMs(timings?.total)
+    let workerTimings = record.workerTimings
+    let layoutEnqueueMs = formatMs(workerTimings?.layoutEnqueueToStart)
+    let layoutComputeMs = formatMs(workerTimings?.layoutCompute)
+    let rasterEnqueueMs = formatMs(workerTimings?.rasterEnqueueToStart)
+    let rasterComputeMs = formatMs(workerTimings?.rasterCompute)
+    let workerCompletionToCommitMs = formatMs(workerTimings?.completionToMainCommit)
     let presentMs = formatMs(record.presentationDuration)
     let totalMs = formatMs(record.totalFrameDuration)
     let cacheHit =
@@ -133,6 +140,11 @@ public final class FrameDiagnosticsLogger {
       rasterMs,
       commitMs,
       pipelineMs,
+      layoutEnqueueMs,
+      layoutComputeMs,
+      rasterEnqueueMs,
+      rasterComputeMs,
+      workerCompletionToCommitMs,
       // presentation
       record.presentationStrategy,
       presentMs,
@@ -180,6 +192,11 @@ public final class FrameDiagnosticsLogger {
       "raster_ms",
       "commit_ms",
       "pipeline_ms",
+      "worker_layout_enqueue_ms",
+      "worker_layout_compute_ms",
+      "worker_raster_enqueue_ms",
+      "worker_raster_compute_ms",
+      "worker_completion_to_commit_ms",
       "present_strategy",
       "present_ms",
       "present_bytes",

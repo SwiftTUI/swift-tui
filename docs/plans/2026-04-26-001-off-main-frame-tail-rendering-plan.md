@@ -305,18 +305,30 @@ bun run test
 
 **Goal:** Move extracted tail computation behind a per-renderer serial worker.
 
-- [ ] Add `FrameTailRenderer`.
-- [ ] Prefer a Swift actor if strict sendability is clean.
-- [ ] Use a serial `DispatchQueue`-backed class if existing mutable pipeline
+- [x] Add `FrameTailRenderer`.
+- [x] Evaluate a Swift actor against strict sendability.
+- [x] Use a serial `DispatchQueue`-backed class because existing mutable pipeline
   components make actor sendability noisy without adding safety.
-- [ ] Give each `DefaultRenderer` its own worker.
-- [ ] Keep worker-owned `LayoutEngine`, `SemanticExtractor`, `DrawExtractor`,
+- [x] Give each `DefaultRenderer` its own worker.
+- [x] Keep worker-owned `LayoutEngine`, `SemanticExtractor`, `DrawExtractor`,
   `Rasterizer`, and tail retained state private to the worker.
-- [ ] Keep a synchronous test path if needed for deterministic unit coverage.
-- [ ] Add worker timing diagnostics:
+- [x] Keep a synchronous test path if needed for deterministic unit coverage.
+- [x] Add worker timing diagnostics:
   - enqueue-to-start latency,
   - tail compute duration,
   - completion-to-main-commit latency.
+
+Stage 4 result:
+
+- `DefaultRenderer` now delegates retained-state access, layout tail, raster
+  tail, measurement-cache pruning, and committed-frame storage to a private
+  per-renderer `FrameTailRenderer`.
+- The worker uses a serial `DispatchQueue` where available and falls back to
+  inline execution when Dispatch is unavailable.
+- `FrameDiagnostics.workerTimings` and `FrameDiagnosticsLogger` now expose
+  layout/raster enqueue and compute timings plus completion-to-commit delay.
+- The public synchronous render path still waits for the worker. Main-actor
+  suspension is deferred to Stage 5.
 
 Commit boundary:
 
@@ -329,7 +341,7 @@ Validation:
 ```bash
 swiftly run swift test --filter TerminalUITests.Phase1BenchmarkScenariosTests
 swiftly run swift test --filter TerminalUITests.InteractiveRuntimeTests
-swiftly run swift test --filter TerminalUITests.HostedSurfaceRegressionTests
+swiftly run swift test --package-path GUI/SwiftUITUIGUI --filter hosted_surface
 ```
 
 ## Stage 5: Convert Runtime Rendering Boundary To Async
