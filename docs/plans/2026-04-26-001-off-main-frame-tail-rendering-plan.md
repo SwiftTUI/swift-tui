@@ -260,10 +260,10 @@ swiftly run swift test --filter TerminalUITests.TerminalGraphicsProtocolTests
 
 Option A, safer first cut:
 
-- [ ] Worker computes baseline `measured` and `placed`.
-- [ ] Main actor runs `animationController.capturePlacedTree(...)`.
-- [ ] Main actor runs `animationController.applyPlacedOverlays(...)`.
-- [ ] Worker computes `semantics`, `draw`, and `raster` from the overlay-applied
+- [x] Worker computes baseline `measured` and `placed`.
+- [x] Main actor runs `animationController.capturePlacedTree(...)`.
+- [x] Main actor runs `animationController.applyPlacedOverlays(...)`.
+- [x] Worker computes `semantics`, `draw`, and `raster` from the overlay-applied
   placed tree.
 
 Option B, target shape:
@@ -279,6 +279,14 @@ Recommendation:
   uncertainty.
 - Move to Option B only after parity tests are green.
 
+Stage 3 result:
+
+- The current synchronous path now has the same two-hop shape that the first
+  worker implementation should use: layout tail, main-actor placed overlays,
+  raster tail.
+- The animation controller remains main-actor-owned. Option B is deferred until
+  removal-overlay state can be passed as an explicit value snapshot.
+
 Commit boundary:
 
 ```bash
@@ -289,7 +297,7 @@ Validation:
 
 ```bash
 swiftly run swift test --filter TerminalUITests.AnimationRepeatForeverGrowthTests
-swiftly run swift test --filter TerminalUITests.AnimationPipelineTests
+swiftly run swift test --filter TerminalUITests.AnimationPipelineIntegrationTests
 bun run test
 ```
 

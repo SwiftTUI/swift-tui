@@ -66,6 +66,14 @@ private struct FrameTailDiagnostics {
   var measurementCache: MeasurementCacheMetrics?
 }
 
+private struct FrameTailLayoutOutput {
+  var measured: MeasuredNode
+  var baselinePlaced: PlacedNode
+  var measureDuration: Duration
+  var placeDuration: Duration
+  var layoutWork: LayoutWorkMetrics
+}
+
 private struct FrameTailOutput {
   var measured: MeasuredNode
   var placed: PlacedNode
@@ -263,15 +271,45 @@ public struct DefaultRenderer {
       transaction: context.transaction,
       invalidatedIdentities: context.invalidatedIdentities
     )
-    let tail = renderFrameTail(
-      FrameTailInput(
-        resolved: resolved,
-        proposal: proposal,
-        rootIdentity: resolveContext.identity,
-        retained: frameTailRetainedInput,
-        layoutPassContext: layoutPassContext
-      ),
-      animationTimestamp: animationTimestamp,
+    let frameTailInput = FrameTailInput(
+      resolved: resolved,
+      proposal: proposal,
+      rootIdentity: resolveContext.identity,
+      retained: frameTailRetainedInput,
+      layoutPassContext: layoutPassContext
+    )
+    let tailLayout = renderFrameTailLayout(
+      frameTailInput,
+      clock: clock
+    )
+    var placed = tailLayout.baselinePlaced
+    // Capture the BASELINE placed tree (pre-overlay) for two things:
+    // 1. The animation controller's removal-snapshot lookup on the
+    //    next frame (capturePlacedTree).
+    // 2. The retained-layout store below, so future tick frames
+    //    reuse the canonical layout and not an animation-decorated
+    //    tree.
+    //
+    // If we stored the post-overlay placed tree, subsequent ticks
+    // would hit retainedPlacement and return the cached tree
+    // including the stale transient overlay — then applyPlacedOverlays
+    // would inject another overlay on top, growing the tree each
+    // tick and leaving ghosted artefacts visible after the animation
+    // completes.
+    animationController.capturePlacedTree(tailLayout.baselinePlaced)
+    // Inject any pending removal overlays at placed level (draw-only,
+    // no layout-shift on sibling containers).  Only applies to
+    // entries whose placedSnapshot was captured in a previous frame
+    // — the resolved-level fallback handles first-frame removals
+    // where no placed tree is cached yet.
+    animationController.applyPlacedOverlays(
+      to: &placed,
+      at: animationTimestamp
+    )
+    let tail = renderFrameTailRaster(
+      frameTailInput,
+      layout: tailLayout,
+      placed: placed,
       clock: clock
     )
     let (commit, commitDuration) = measurePhase(clock: clock) {
@@ -338,11 +376,10 @@ public struct DefaultRenderer {
   }
 
   @MainActor
-  private func renderFrameTail(
+  private func renderFrameTailLayout(
     _ input: FrameTailInput,
-    animationTimestamp: MonotonicInstant,
     clock: ContinuousClock?
-  ) -> FrameTailOutput {
+  ) -> FrameTailLayoutOutput {
     let (measured, measureDuration) = measurePhase(clock: clock) {
       layoutEngine.measure(
         input.resolved,
@@ -350,37 +387,29 @@ public struct DefaultRenderer {
         passContext: input.layoutPassContext
       )
     }
-    var (placed, placeDuration) = measurePhase(clock: clock) {
+    let (placed, placeDuration) = measurePhase(clock: clock) {
       layoutEngine.place(
         input.resolved,
         measured: measured,
         passContext: input.layoutPassContext
       )
     }
-    // Cache the BASELINE placed tree (pre-overlay) for two things:
-    // 1. The animation controller's removal-snapshot lookup on the
-    //    next frame (capturePlacedTree).
-    // 2. The retained-layout store below, so future tick frames
-    //    reuse the canonical layout and not an animation-decorated
-    //    tree.
-    //
-    // If we stored the post-overlay placed tree, subsequent ticks
-    // would hit retainedPlacement and return the cached tree
-    // including the stale transient overlay — then applyPlacedOverlays
-    // would inject another overlay on top, growing the tree each
-    // tick and leaving ghosted artefacts visible after the animation
-    // completes.
-    let baselinePlaced = placed
-    animationController.capturePlacedTree(baselinePlaced)
-    // Inject any pending removal overlays at placed level (draw-only,
-    // no layout-shift on sibling containers).  Only applies to
-    // entries whose placedSnapshot was captured in a previous frame
-    // — the resolved-level fallback handles first-frame removals
-    // where no placed tree is cached yet.
-    animationController.applyPlacedOverlays(
-      to: &placed,
-      at: animationTimestamp
+    return FrameTailLayoutOutput(
+      measured: measured,
+      baselinePlaced: placed,
+      measureDuration: measureDuration,
+      placeDuration: placeDuration,
+      layoutWork: input.layoutPassContext.workMetrics
     )
+  }
+
+  @MainActor
+  private func renderFrameTailRaster(
+    _ input: FrameTailInput,
+    layout: FrameTailLayoutOutput,
+    placed: PlacedNode,
+    clock: ContinuousClock?
+  ) -> FrameTailOutput {
     let presentationDamage = presentationDamage(
       rootIdentity: input.rootIdentity,
       placed: placed,
@@ -401,18 +430,18 @@ public struct DefaultRenderer {
       )
     }
     let diagnostics = FrameTailDiagnostics(
-      measureDuration: measureDuration,
-      placeDuration: placeDuration,
+      measureDuration: layout.measureDuration,
+      placeDuration: layout.placeDuration,
       semanticsDuration: semanticsDuration,
       drawDuration: drawDuration,
       rasterDuration: rasterDuration,
-      layoutWork: input.layoutPassContext.workMetrics,
+      layoutWork: layout.layoutWork,
       measurementCache: layoutEngine.cache?.metrics
     )
     return FrameTailOutput(
-      measured: measured,
+      measured: layout.measured,
       placed: placed,
-      baselinePlaced: baselinePlaced,
+      baselinePlaced: layout.baselinePlaced,
       semantics: semantics,
       draw: draw,
       raster: rasterized.surface,
