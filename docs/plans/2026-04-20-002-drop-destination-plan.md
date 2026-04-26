@@ -1,9 +1,12 @@
 ---
 title: "feat: drop destinations scoped to ActionScopes"
 type: feature
-status: active
+status: shipped
 date: 2026-04-20
 ---
+
+> **Note:** Shipped. The unchecked task boxes below are stale tracking. Implementation lives in `Sources/View/ActionScopes/DropDestinationModifier.swift` (public `.dropDestination(action:)`), `Sources/Core/DropDestinationRegistry.swift`, `Sources/Core/DroppedPathParsing.swift`, and `Sources/TerminalUI/RunLoop+EventDispatch.swift`. Tests cover dispatch in `Tests/CoreTests/DropDestinationRegistryTests.swift`, `Tests/CoreTests/DroppedPathParsingTests.swift`, `Tests/CoreTests/DroppedPathTests.swift`, `Tests/TerminalUITests/BracketedPasteParserTests.swift`, and `Tests/TerminalUITests/DropDestinationDispatchTests.swift`.
+
 
 # Drop Destination Implementation Plan
 

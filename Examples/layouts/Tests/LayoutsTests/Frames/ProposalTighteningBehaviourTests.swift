@@ -10,6 +10,13 @@ struct ProposalTighteningBehaviourTests {
   /// while the outer terminal is 80 cells wide. A SwiftUI-faithful
   /// implementation would tighten the proposal that reaches the
   /// reader so `proxy.size.width` reports `30`.
+  ///
+  /// See `docs/proposals/layout/BEHAVIOUR_FINDINGS.md` finding #4 —
+  /// `GeometryReader` previously read `terminalSize` from the
+  /// environment and missed fixed-frame tightening. The fix tightens
+  /// the terminal-size environment on explicit-axis frames and lowers
+  /// `GeometryReader`'s content into a flexible top-leading
+  /// proposal-filling frame.
   @Test("GeometryReader reports the tightened frame width")
   func proxyReportsTerminalWidth() {
     let raster = render(ProposalTightening(), width: 80, height: 10).rasterSurface

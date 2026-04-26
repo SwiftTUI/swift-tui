@@ -38,6 +38,11 @@ struct MinIdealMaxFrameClampBehaviourTests {
   ///     proposal (40 total). Correct.
   ///   - above-max copy (outer width 80): inner frame clamps down to
   ///     maxWidth (60 inner + 2 border cells).
+  ///
+  /// See `docs/proposals/layout/BEHAVIOUR_FINDINGS.md` finding #3 —
+  /// the original spec compared inner max width against
+  /// border-included width and made the clamp look like a divergence.
+  /// This test pins the SwiftUI-faithful ceiling.
   @Test("border widths demonstrate min→ideal→max clamping")
   func borderWidthsMatchClamp() {
     let raster = render(MinIdealMaxFrameClamp(), width: 80, height: 20).rasterSurface

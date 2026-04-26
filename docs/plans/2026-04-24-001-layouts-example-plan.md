@@ -1,9 +1,12 @@
 ---
 title: "feat: layouts example app & test suite"
 type: feature
-status: design-approved
+status: shipped
 date: 2026-04-24
 ---
+
+> **Note:** Shipped. The 56-entry catalog, picker shell, and smoke-plus-behaviour test suites live in `Examples/layouts/`. Behaviour findings continue to accumulate in [../proposals/layout/BEHAVIOUR_FINDINGS.md](../proposals/layout/BEHAVIOUR_FINDINGS.md).
+
 
 # Layouts Example App & Test Suite — Design
 

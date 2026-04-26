@@ -27,6 +27,12 @@ struct GeometryReaderInHStackHogsBehaviourTests {
   ///
   /// The HStack now expands to the available horizontal proposal and
   /// the GeometryReader receives the slack before the sibling.
+  ///
+  /// See `docs/proposals/layout/BEHAVIOUR_FINDINGS.md` finding #6 —
+  /// before the fix the GeometryReader shrank to content (related to
+  /// finding #4). It now lowers content through a flexible
+  /// `.frame(maxWidth: .infinity, maxHeight: .infinity, alignment:
+  /// .topLeading)` so the stack hands it the flexible-content slack.
   @Test("GeometryReader hogs available HStack width")
   func bothChildrenVisibleHStackShrinksToContent() {
     let raster = render(GeometryReaderInHStackHogs(), width: 80, height: 28).rasterSurface
