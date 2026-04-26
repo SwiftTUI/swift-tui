@@ -185,11 +185,20 @@ git commit -m "test(renderer): cover custom layout offload fallback"
 
 ### Stage 2: Split custom layout proxy capabilities
 
-- Add a package-internal worker-capability query to `CustomLayoutHandle`.
-- Keep existing `CustomLayoutProxy` as the main-actor-compatible path.
-- Add a separate worker proxy protocol whose requirements do not use
+- [x] Add a package-internal worker-capability query to `CustomLayoutHandle`.
+- [x] Keep existing `CustomLayoutProxy` as the main-actor-compatible path.
+- [x] Add a separate worker proxy protocol whose requirements do not use
   `MainActor.assumeIsolated`.
-- Ensure default authored `Layout` still reports main-actor-only.
+- [x] Ensure default authored `Layout` still reports main-actor-only.
+
+Stage 2 result:
+
+- `CustomLayoutHandle` reports `executionCapability`, `canRunOnWorker`, and an
+  optional package-internal `workerProxy`.
+- `WorkerCustomLayoutProxy` defines the worker-capable custom-layout execution
+  shape without replacing `CustomLayoutProxy`.
+- Public authored `Layout` still resolves through `LayoutProxyBox`, reports
+  `mainActorOnly`, and remains on the fallback path.
 
 Commit boundary:
 

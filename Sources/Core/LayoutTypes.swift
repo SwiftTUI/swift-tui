@@ -469,9 +469,53 @@ extension CustomLayoutProxy {
   }
 }
 
+/// Execution mode advertised by a custom layout handle.
+package enum CustomLayoutExecutionCapability: Equatable, Sendable {
+  case mainActorOnly
+  case worker
+}
+
+/// Interface implemented by custom layouts that can execute on the frame-tail
+/// worker without crossing a main-actor-isolated proxy.
+package protocol WorkerCustomLayoutProxy: Sendable {
+  var debugName: String { get }
+
+  func measureContainer(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize
+  ) -> Size
+
+  func measureChildren(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize
+  ) -> [MeasuredNode]
+
+  func placeSubviews(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    measured: MeasuredNode,
+    in bounds: Rect
+  ) -> [PlacedNode]
+}
+
+extension WorkerCustomLayoutProxy {
+  package func measureChildren(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    proposal: ProposedSize
+  ) -> [MeasuredNode] {
+    node.children.map { child in
+      engine.measure(child, proposal: proposal)
+    }
+  }
+}
+
 /// Reference wrapper used to carry a custom layout through the pipeline.
 public final class CustomLayoutHandle: Sendable {
   public let proxy: any CustomLayoutProxy
+  package let workerProxy: (any WorkerCustomLayoutProxy)?
   package let measurementReuseSignature: String?
   package let placementReuseSignature: String?
   package let placementHandler:
@@ -485,6 +529,7 @@ public final class CustomLayoutHandle: Sendable {
     placementReuseSignature: String? = nil
   ) {
     self.proxy = proxy
+    workerProxy = nil
     self.measurementReuseSignature = measurementReuseSignature
     self.placementReuseSignature = placementReuseSignature
     placementHandler = nil
@@ -494,6 +539,7 @@ public final class CustomLayoutHandle: Sendable {
     _ proxy: some CustomLayoutProxy,
     measurementReuseSignature: String? = nil,
     placementReuseSignature: String? = nil,
+    workerProxy: (any WorkerCustomLayoutProxy)? = nil,
     placementHandler:
       (
         @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) ->
@@ -503,11 +549,20 @@ public final class CustomLayoutHandle: Sendable {
     self.proxy = proxy
     self.measurementReuseSignature = measurementReuseSignature
     self.placementReuseSignature = placementReuseSignature
+    self.workerProxy = workerProxy
     self.placementHandler = placementHandler
   }
 
   public var debugName: String {
     proxy.debugName
+  }
+
+  package var executionCapability: CustomLayoutExecutionCapability {
+    workerProxy == nil ? .mainActorOnly : .worker
+  }
+
+  package var canRunOnWorker: Bool {
+    workerProxy != nil
   }
 
   package func placeSubviews(
