@@ -589,7 +589,8 @@ should not be carried as runtime complexity without evidence.
 ## Open questions
 
 - What custom-layout API or snapshot design would let measurement and placement
-  run away from the main actor without `MainActor.assumeIsolated` traps?
+  run away from the main actor without `MainActor.assumeIsolated` traps? See
+  [`CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md`](CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md).
 - Can the placed-animation overlay snapshot be narrowed further so it is easier
   to inspect, diff, and fuzz independently of `AnimationController`?
 - How much of `CommitPlanner.plan(...)` can become pure once
