@@ -299,8 +299,7 @@ Stage 5 result:
 Current limitation: `SendableLayout` is an author contract backed by Swift's
 `Sendable` constraints; it cannot prove that a layout avoids mutable globals or
 other external side effects. The worker proxy uses a worker-owned cache scoped
-like the existing main-actor bridge, but focus-driven rerender convergence still
-needs targeted coverage.
+like the existing main-actor bridge.
 
 Commit boundary:
 
@@ -328,9 +327,28 @@ Stage 6 result:
 - The async renderer regression suite now proves draw-only border phase changes
   reuse both measurement and placement work for an opted-in `SendableLayout`.
 
-Remaining limitation: focus-driven rerender convergence with a worker-capable
-custom layout still needs explicit runtime-path coverage before the opt-in
-should be recommended for focus-heavy containers.
+### Stage 7: Pin focus-sync convergence
+
+- [x] Cover default-focus synchronization through a public `SendableLayout` on
+  the composed runtime path.
+- [x] Cover Tab-driven focus movement through a public `SendableLayout` on the
+  composed runtime path.
+- [x] Assert the layout still measures and places on the frame-tail worker while
+  focus synchronization rerenders.
+
+Stage 7 result:
+
+- `AsyncFrameTailRenderingTests` now runs a `RunLoop` whose root view wraps
+  focused buttons in an opted-in public `SendableLayout`.
+- The test waits for default-focus synchronization to publish the first focused
+  identity, sends Tab, waits for the second focused identity and `FocusState`
+  value to render, then exits through the real input path.
+- The same test verifies the `SendableLayout` recorder's last measurement and
+  placement callbacks did not run on the main thread.
+
+Stage 7 also hardened `HostedSceneSessionTests` by increasing that suite's
+polling timeout from 5s to 15s. The previous 5s budget was repeatedly too tight
+under the full parallel root test run while passing in isolation.
 
 ## Required Tests
 
@@ -341,8 +359,8 @@ should be recommended for focus-heavy containers.
 - Alignment guides and `ViewDimensions` match the main-actor path. Covered for
   public `SendableLayout`; broaden if package-internal worker snapshots gain
   additional subview APIs.
-- Focus-sync rerender still converges when custom layout is involved. Still
-  open.
+- Focus-sync rerender still converges when custom layout is involved. Covered
+  for public `SendableLayout` on the runtime input path.
 - Animation tick frames still preserve retained-layout reuse. Covered for
   draw-only async frame-tail updates on public `SendableLayout`.
 - A custom layout with non-Sendable cache or main-actor-only proxy cannot enter
@@ -365,7 +383,10 @@ should be recommended for focus-heavy containers.
 Keep the fallback for public authored custom layouts and do not attempt to move
 them off-main by force.
 
-The next useful implementation step is focus-path coverage for opted-in public
-`SendableLayout` values: focus-driven rerender convergence should be pinned on
-the composed runtime path before broadening the opt-in recommendation beyond
-carefully audited layouts.
+The off-main custom-layout path now has coverage for the public opt-in's core
+semantic risks: worker execution, cache reuse, `LayoutSubview` dimensions,
+custom alignment guides, retained layout reuse across draw-only updates, and
+focus-sync rerender convergence. The next useful implementation step is broader
+adoption work: audit internal and example custom layouts for layouts that can
+honestly conform to `SendableLayout`, and leave the main-actor fallback in place
+for anything with non-Sendable or side-effectful cache semantics.

@@ -465,6 +465,70 @@ struct AsyncFrameTailRenderingTests {
     #expect(second.diagnostics.placedNodesComputed == 0)
   }
 
+  @Test("public SendableLayout focus sync rerender converges on the runtime path")
+  func publicSendableLayoutFocusSyncRerenderConvergesOnRuntimePath() async throws {
+    let rootIdentity = testIdentity("AsyncSendableLayoutFocusRoot")
+    let recorder = AsyncFrameTailSendableLayoutRecorder()
+    let inputReader = InjectedTerminalInputReader()
+    let terminal = AsyncFrameTailTerminalHost()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: DefaultRenderer(),
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      keyHandler: { keyPress, _, _ in
+        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+          return .exit(.userExit(keyPress))
+        }
+        return .ignored
+      },
+      proposal: terminal.proposal,
+      viewBuilder: { _, _ in
+        AsyncFrameTailSendableFocusView(recorder: recorder)
+      }
+    )
+
+    let runTask = Task {
+      try await runLoop.run()
+    }
+    defer {
+      inputReader.finish()
+      runTask.cancel()
+    }
+
+    try await waitUntil {
+      terminal.frames.contains {
+        $0.contains("Field: first")
+          && $0.contains("Focus: AsyncFrameTailSendableFocus/First")
+      }
+    }
+
+    inputReader.send(.key(.tab))
+
+    try await waitUntil {
+      terminal.frames.contains {
+        $0.contains("Field: second")
+          && $0.contains("Focus: AsyncFrameTailSendableFocus/Second")
+      }
+    }
+
+    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    let result = try await valueWithTimeout {
+      try await runTask.value
+    }
+    let layoutState = recorder.state
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(layoutState.measureRanOnMainThread == false)
+    #expect(layoutState.placeRanOnMainThread == false)
+  }
+
   @Test("worker backlog commits blocked frame before later input batch")
   func workerBacklogCommitsBlockedFrameBeforeLaterInputBatch() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailBacklogRoot")
@@ -602,6 +666,28 @@ private struct AsyncFrameTailStressView: View {
       }
     }
     .defaultFocus($focusedField, .button)
+  }
+}
+
+private struct AsyncFrameTailSendableFocusView: View {
+  @FocusState private var focusedField: AsyncFrameTailSendableFocusField?
+
+  let recorder: AsyncFrameTailSendableLayoutRecorder
+
+  var body: some View {
+    AsyncFrameTailSendableLayout(recorder: recorder) {
+      EnvironmentReader(\.focusedIdentity) { focusedIdentity in
+        Text("Focus: \(focusedIdentity.map(\.description) ?? "none")")
+      }
+      Text("Field: \(focusedField?.rawValue ?? "none")")
+      Button("First") {}
+        .id(testIdentity("AsyncFrameTailSendableFocus", "First"))
+        .focused($focusedField, equals: .first)
+      Button("Second") {}
+        .id(testIdentity("AsyncFrameTailSendableFocus", "Second"))
+        .focused($focusedField, equals: .second)
+    }
+    .defaultFocus($focusedField, .first)
   }
 }
 
@@ -956,6 +1042,11 @@ private final class AsyncFrameTailSendableLayoutRecorder: Sendable {
 
 private enum AsyncFrameTailFocusField: Hashable {
   case button
+}
+
+private enum AsyncFrameTailSendableFocusField: String, Hashable {
+  case first
+  case second
 }
 
 @MainActor
