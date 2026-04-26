@@ -1,9 +1,12 @@
 ---
 title: feat: cell pixel metrics and shape aspect correction
 type: feature
-status: active
+status: shipped
 date: 2026-04-20
 ---
+
+> **Note:** Both stages have shipped. Task checkboxes below were not back-ticked when the work landed; the proposal at [../proposals/CELL_PIXEL_METRICS.md](../proposals/CELL_PIXEL_METRICS.md) is the implementation record.
+
 
 # Cell Pixel Metrics Implementation Plan
 
