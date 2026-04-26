@@ -28,6 +28,25 @@ func render(
   )
 }
 
+@MainActor
+func renderAsync(
+  _ view: some View,
+  width: Int,
+  height: Int,
+  id: String = "\(#fileID).\(#function)"
+) async -> FrameArtifacts {
+  var env = EnvironmentValues()
+  env.terminalSize = Size(width: width, height: height)
+  return await DefaultRenderer().renderAsync(
+    view,
+    context: ResolveContext(
+      identity: Identity(components: ["layouts.behaviour.\(id)"]),
+      environmentValues: env
+    ),
+    proposal: ProposedSize(width: width, height: height)
+  )
+}
+
 extension RasterSurface {
   /// The 0-indexed row indices whose text contains `needle`, in ascending order.
   func rows(containing needle: String) -> [Int] {

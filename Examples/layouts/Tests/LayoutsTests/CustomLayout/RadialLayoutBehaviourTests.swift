@@ -194,4 +194,25 @@ struct RadialLayoutBehaviourTests {
       """
     )
   }
+
+  @Test("RingLayout is eligible for frame-tail worker layout")
+  func ringLayoutRunsOnFrameTailWorker() async throws {
+    let artifacts = await renderAsync(
+      RingLayout(radius: 4) {
+        Text("[E]")
+        Text("[S]")
+        Text("[W]")
+        Text("[N]")
+      },
+      width: 20,
+      height: 12
+    )
+    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+
+    #expect(artifacts.diagnostics.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    #expect(workerTimings.layoutCompute != .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("[E]"))
+  }
 }

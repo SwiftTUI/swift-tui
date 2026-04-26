@@ -181,4 +181,25 @@ struct FlowLayoutWrapBehaviourTests {
       """
     )
   }
+
+  @Test("FlowLayout is eligible for frame-tail worker layout")
+  func flowLayoutRunsOnFrameTailWorker() async throws {
+    let artifacts = await renderAsync(
+      FlowLayout(spacing: 1) {
+        Text("[item 0]")
+        Text("[item 1]")
+        Text("[item 2]")
+        Text("[item 3]")
+      },
+      width: 24,
+      height: 6
+    )
+    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+
+    #expect(artifacts.diagnostics.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    #expect(workerTimings.layoutCompute != .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("[item 0]"))
+  }
 }
