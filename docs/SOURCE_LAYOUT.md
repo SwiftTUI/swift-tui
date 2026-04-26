@@ -33,7 +33,6 @@ future file moves.
   - embedded host packages:
     - `GUI/SwiftUITUIGUI`
     - `GUI/WebTUIGUI`
-    - `GUI/XtermWebTUIGUI`
 
 - Vendored local packages:
   - `Vendor/UnixSignals`
@@ -98,8 +97,7 @@ library product. Downstream package consumers reach those types through
 ## Embedded Host Packages
 
 - `GUI/SwiftUITUIGUI`: native SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
-- `GUI/WebTUIGUI`: Bun-based web host that consumes a `TerminalUIWASI` build and manifest
-- `GUI/XtermWebTUIGUI`: Bun-based web host that consumes a `TerminalUIWASI` build and manifest through xterm.js
+- `GUI/WebTUIGUI`: Bun-based web host that consumes a `TerminalUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas
 
 ## `Core`
 

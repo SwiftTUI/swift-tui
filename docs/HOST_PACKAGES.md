@@ -2,12 +2,11 @@
 
 ## Goal
 
-Make TerminalUI apps shippable outside a local terminal in three peer embedded
+Make TerminalUI apps shippable outside a local terminal in two peer embedded
 host packages:
 
 - `GUI/SwiftUITUIGUI`: a native SwiftUI SPM package that lets a macOS or iOS app host a TerminalUI scene without a terminal emulator
-- `GUI/WebTUIGUI`: a Bun-based package that lets a TerminalUI app ship in the browser on top of `ghostty-web`
-- `GUI/XtermWebTUIGUI`: a Bun-based package that lets a TerminalUI app ship in the browser on top of xterm.js
+- `GUI/WebTUIGUI`: a Bun-based package that lets a TerminalUI app ship in the browser by drawing TerminalUI's `web-surface` raster output onto a canvas (no terminal emulator dependency)
 
 The authoring story stays the same:
 
@@ -33,9 +32,9 @@ The host-facing root work is landed:
   plus WASI scene launch
 - shared control-message parsing lives in
   `Sources/TerminalUI/TerminalControlMessages.swift`
-- embedded hosts use `InjectedTerminalInputReader`; terminal-emulator-backed
-  hosts use streaming presentation output, while the native SwiftUI host
-  receives `RasterSurface` values directly
+- embedded hosts use `InjectedTerminalInputReader`; the web host uses
+  streaming presentation output (`StreamingTerminalHost`), while the native
+  SwiftUI host receives `RasterSurface` values directly
 - hosted sessions now accept paired render-style updates so terminal appearance
   and semantic theme move together at runtime
 - `TerminalUI` is now library-only; executable launch is entirely runner-owned
@@ -63,42 +62,23 @@ The native SwiftUI host package is landed as a standalone SPM package:
 
 ### `GUI/WebTUIGUI`
 
-The web host package is also landed:
+The web host package is landed:
 
 - package root: `GUI/WebTUIGUI`
 - build stack: Bun plus the repo-managed Swift 6.3.1 toolchain
-- published dependency: npm `ghostty-web`
+- transport: TerminalUI's `web-surface` WASI transport. The Swift runner emits
+  structured raster-surface records on stdout, and the browser host draws
+  rectangles and text into a canvas. There is no terminal-emulator dependency.
 - key runtime and build files:
   - `src/WebTUIApp.ts`
   - `src/WebTUISceneRuntime.ts`
   - `src/WebTUISceneManifest.ts`
+  - `src/WebTUISurfaceTransport.ts`
   - `src/build/buildAppWasm.ts`
   - `src/build/generateSceneManifest.ts`
-- web styles now expose explicit light and dark theme variants and can bind
-  them to the host color scheme before pushing a full render-style payload into
+- web styles expose explicit light and dark theme variants and can bind them
+  to the host color scheme before pushing a full render-style payload into
   the WASI runtime
-- the Bun pipeline now builds manifest, wasm, and browser assets without
-  depending on repo-local Ghostty source snapshots
-
-### `GUI/XtermWebTUIGUI`
-
-The xterm.js-backed browser host package is also landed:
-
-- package root: `GUI/XtermWebTUIGUI`
-- build stack: Bun plus the repo-managed Swift 6.3.1 toolchain
-- published dependency: npm `@xterm/xterm` plus `@xterm/addon-fit`
-- key runtime and build files:
-  - `src/WebTUIApp.ts`
-  - `src/WebTUISceneRuntime.ts`
-  - `src/WebTUISceneManifest.ts`
-  - `src/build/buildAppWasm.ts`
-  - `src/build/generateSceneManifest.ts`
-- web styles now expose explicit light and dark theme variants and can bind
-  them to the host color scheme before pushing a full render-style payload into
-  the WASI runtime
-- the Bun pipeline now builds manifest, wasm, and browser assets without
-  depending on repo-local Ghostty source snapshots, and the xterm.js wrapper
-  keeps the browser terminal isolated from the GitHub-hosted Ghostty asset path
 
 ## Responsibilities Split
 
@@ -112,7 +92,7 @@ The current boundary is:
   - control-message contract for resize and render-style updates
 - host packages:
   - window or browser shell integration
-  - native surface, terminal widget, or browser terminal embedding
+  - native surface or canvas surface embedding
   - scene tabs, pickers, or other host-local chrome
   - host-specific style mapping and host-owned theme swapping
 
@@ -127,7 +107,7 @@ new products in the root package.
     ptys, and attach flows
   - `Runners/TerminalUIWASI` still executes one selected scene per wasm process
 - Host packages still own scene switching UI and style surfaces. The root package exposes scene manifests and hosted sessions, not a full cross-platform app shell.
-- `GUI/WebTUIGUI` and `GUI/XtermWebTUIGUI` build scripts drive the repo-default `swiftly` toolchain (falling back to plain `swift` when available). See [TOOLCHAINS.md](TOOLCHAINS.md) for the toolchain requirement. Both packages share the repo Bun workspace for builds and tests.
+- `GUI/WebTUIGUI` build scripts drive the repo-default `swiftly` toolchain (falling back to plain `swift` when available). See [TOOLCHAINS.md](TOOLCHAINS.md) for the toolchain requirement. The package shares the repo Bun workspace for builds and tests.
 - Executable runner packages and embedded host packages are intentionally outside the root package products. Consumers opt into them separately.
 
 ## Non-Negotiable Decisions
@@ -138,7 +118,7 @@ new products in the root package.
 4. Scene switching is host-managed. It is not a new terminal escape-sequence protocol.
 5. Terminal style is host-owned. The Swift package and the Bun package expose mirrored style concepts, not a shared cross-language source file, and host packages choose the active theme variant.
 6. The Apple host package owns the native SwiftUI surface without a terminal-emulator dependency.
-7. The web packages keep one wasm module instance per scene and one browser terminal per scene so scene state survives switches without a more complex protocol.
+7. The web package keeps one wasm module instance per scene and one canvas surface per scene so scene state survives switches without a more complex protocol.
 8. The existing resize control-message contract stays the foundation for all non-POSIX resize behavior and is now extended with paired render-style updates.
 
 ## Verification Paths
@@ -159,6 +139,5 @@ repository.
 
 - generating an Xcode project
 - building custom desktop or mobile chrome beyond a terminal surface and scene/style control APIs
-- replacing the browser terminal stack with a custom implementation
-- adding another Apple terminal-emulator-backed host package
+- adding a terminal-emulator-backed browser host package
 - adding tabs, split panes, or session persistence beyond in-memory retained scene sessions

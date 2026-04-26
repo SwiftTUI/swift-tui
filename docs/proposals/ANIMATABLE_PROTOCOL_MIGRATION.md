@@ -3,7 +3,7 @@
 > **For agentic workers:** Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Date:** 2026-04-13
-**Status:** Draft — awaiting execution
+**Status:** Shipped. Retained as the implementation record for the migration to the SwiftUI-shaped `Animatable` protocol pipeline.
 **Branch:** `main`
 **Supersedes (in part):** the enum-dispatch model established by `docs/proposals/ANIMATION_PLAN.md` (shipped 2026-04-10). That plan remains the historical record of the original animation system; this plan migrates its value-interpolation model to the SwiftUI-shaped `Animatable` protocol.
 

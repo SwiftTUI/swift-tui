@@ -1,14 +1,13 @@
 # Action Scopes and Commands
 
-**Status:** Partially landed. The scope scaffolding (`ActionScope`, `AnyID`,
+**Status:** Landed. The scope scaffolding (`ActionScope`, `AnyID`,
 `CommandRegistry`, `Panel` + `.panel(id:)` / `.panel()` / `.focusContainment(_:)`,
-`Scene` conformance, presentation-modifier conformances),
-`.keyCommand(...)` with shallowest-wins focus-chain dispatch, and
-`.paletteCommand(...)` with `EnvironmentValues.activePaletteCommands` have
-shipped on `main`. `.toolbar(style:)` and `.toolbarItem(...)` are pending —
-see
+`Scene` conformance, presentation-modifier conformances), `.keyCommand(...)`
+with shallowest-wins focus-chain dispatch, `.paletteCommand(...)` with
+`EnvironmentValues.activePaletteCommands`, and `.toolbar(style:)` plus
+`.toolbarItem(...)` are all part of the public `View` surface. See
 [ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md](ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md)
-for phase tracking.
+for the implementation record.
 **Supersedes:** the reverted toolbar/command-palette/help-sheet system (commit `112d98f`, reverted in `076d3e3`)
 
 ---
