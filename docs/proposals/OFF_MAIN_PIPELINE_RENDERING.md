@@ -478,6 +478,10 @@ If frame dropping is introduced later, it must either:
 
 Until that exists, ordered commit is the safer contract.
 
+See [`ASYNC_FRAME_STALE_POLICY.md`](ASYNC_FRAME_STALE_POLICY.md) for the
+dedicated policy and migration gates for future generation cancellation or
+stale-result dropping.
+
 ---
 
 ## Performance expectations
