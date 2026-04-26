@@ -4,7 +4,7 @@ Browser wrapper for TerminalUI apps using xterm.js.
 
 ## Toolchains
 
-Use Bun for this package, and use the repo-default `swiftly` Swift 6.3.0
+Use Bun for this package, and use the repo-default `swiftly` Swift 6.3.1
 toolchain for every Swift command that the build pipeline triggers.
 
 Quick check:

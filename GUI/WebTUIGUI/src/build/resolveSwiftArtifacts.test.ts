@@ -11,7 +11,7 @@ test("detects the required wasm Swift flag sequence", () => {
     hasRequiredWasmFlags([
       "build",
       "--swift-sdk",
-      "swift-6.3-RELEASE_wasm",
+      "swift-6.3.1-RELEASE_wasm",
       "-c",
       "release",
       ...requiredWasmSwiftFlags,
@@ -24,7 +24,7 @@ test("detects the required wasm Swift flag sequence", () => {
     hasRequiredWasmFlags([
       "build",
       "--swift-sdk",
-      "swift-6.3-RELEASE_wasm",
+      "swift-6.3.1-RELEASE_wasm",
       "-c",
       "release",
       "-Xswiftc",

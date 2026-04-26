@@ -51,9 +51,9 @@ The runtime and scene layer now follow the maximum path:
 ### Toolchain And Language Feasibility
 
 Local checks in this repository's environment show, using the repo-default
-`swiftly`-managed Swift 6.3.0 toolchain:
+`swiftly`-managed Swift 6.3.1 toolchain:
 
-- `swift --version` reports Apple Swift 6.3.
+- `swift --version` reports Apple Swift 6.3.1.
 - Variadic generic types compile in scratch experiments.
 - Pack iteration compiles in scratch experiments.
 - A result builder can produce a pack-backed structural container in scratch experiments.

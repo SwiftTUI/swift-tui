@@ -1,11 +1,11 @@
 # Toolchains
 
 This repository uses more than one build tool, but the default Swift workflow
-for package development and verification is `swiftly` with Swift `6.3.0`.
+for package development and verification is `swiftly` with Swift `6.3.1`.
 
 ## Swift
 
-The repo pins Swift `6.3.0` in [`.swift-version`](../.swift-version).
+The repo pins Swift `6.3.1` in [`.swift-version`](../.swift-version).
 
 Use `swiftly` by default for all repo-local SwiftPM work:
 
@@ -16,12 +16,12 @@ swiftly run swift package generate-documentation --target TerminalUI
 ```
 
 If you prefer the shorter `swift ...` form, only use it from a shell where
-`swift` already resolves to the `swiftly`-managed Swift 6.3.0 toolchain.
+`swift` already resolves to the `swiftly`-managed Swift 6.3.1 toolchain.
 
 That means:
 
-- `swift` resolves to the `swiftly`-managed Swift 6.3.0 toolchain
-- `swift --version` reports `Apple Swift version 6.3 (swift-6.3-RELEASE)`
+- `swift` resolves to the `swiftly`-managed Swift 6.3.1 toolchain
+- `swift --version` reports `Apple Swift version 6.3.1 (swift-6.3.1-RELEASE)`
 
 Verify that first:
 
@@ -42,11 +42,11 @@ swift package generate-documentation --target TerminalUI
 
 Do not use `xcrun swift` for the repo's package builds, tests, DocC generation,
 or wasm packaging. `xcrun` may resolve to an Xcode-selected toolchain that does
-not match the repo's pinned Swift 6.3.0 environment.
+not match the repo's pinned Swift 6.3.1 environment.
 
 ## WASM
 
-The wasm-facing package work also uses the same `swiftly`-managed Swift 6.3.0
+The wasm-facing package work also uses the same `swiftly`-managed Swift 6.3.1
 toolchain, but with the wasm SDK selected through `--swift-sdk`.
 Wasm builds of TerminalUI apps will often require a stack size larger than the default.
 Their starting and max memory can also be bumped - although no yet-known failures have been attributed to this.
@@ -54,20 +54,20 @@ Their starting and max memory can also be bumped - although no yet-known failure
 Examples:
 
 ```bash
-swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --target Core
-swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm --package-path Runners/TerminalUIWASI --target TerminalUIWASI
-swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm -c release -Xswiftc -Osize -Xswiftc -Xfrontend -Xswiftc -disable-llvm-merge-functions-pass -Xlinker --initial-memory=536870912 -Xlinker --max-memory=4294967296 -Xlinker -z -Xlinker "stack-size=1048576"
+swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --target Core
+swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --package-path Runners/TerminalUIWASI --target TerminalUIWASI
+swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm -c release -Xswiftc -Osize -Xswiftc -Xfrontend -Xswiftc -disable-llvm-merge-functions-pass -Xlinker --initial-memory=536870912 -Xlinker --max-memory=4294967296 -Xlinker -z -Xlinker "stack-size=1048576"
 ```
 
 `GUI/WebTUIGUI` build scripts use `swiftly` directly, so require a 
-swiftly-managed Swift 6.3.0 toolchain.
+swiftly-managed Swift 6.3.1 toolchain.
 Install Swiftly before invoking `bun` if required.
 
 ```
 curl -L https://download.swift.org/swiftly/darwin/swiftly.pkg > swiftly.pkg
 installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
 ~/.swiftly/bin/swiftly init
-swiftly install --use 6.3
+swiftly install --use 6.3.1
 ```
 
 ## Bun
@@ -100,7 +100,7 @@ application target.
 
 That does not change the package-development rule for this repository:
 
-- use the `swiftly`-managed Swift 6.3.0 toolchain for package builds, tests,
+- use the `swiftly`-managed Swift 6.3.1 toolchain for package builds, tests,
   DocC generation, and wrapper verification
 - Xcode is also acceptable for native-only build and run work, but it is not
   the default documented path for repo-wide package development
@@ -133,5 +133,5 @@ tooling predictable across the repo.
 
 ## Android
 
-Android cross-compilation also uses Swift 6.3.0 from `swiftly`, plus the Swift
+Android cross-compilation also uses Swift 6.3.1 from `swiftly`, plus the Swift
 Android SDK and Android NDK described in [ANDROID.md](ANDROID.md).

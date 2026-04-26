@@ -68,7 +68,7 @@ is fully landed: the scope scaffolding, `.keyCommand`, `.paletteCommand`, and
   without knowing which host theme is active.
 - The runtime is keyboard-first, but mouse input is supported where the terminal advertises reporting. Pointer interaction should be treated as additive rather than as the primary design center.
 - Image decoding and terminal presentation are PNG-only in the current runtime. Broader media formats and animation remain deferred.
-- WASI support now works with the `swiftly`-managed Swift 6.3.0 toolchain and `swiftly run swift build --swift-sdk swift-6.3-RELEASE_wasm ...` through the `Runners/TerminalUIWASI` / example-app build path. The shorter `swift ...` form is fine from a shell where `swift` already resolves through `swiftly`. `xcrun swift` may still resolve to an incompatible Xcode toolchain.
+- WASI support now works with the `swiftly`-managed Swift 6.3.1 toolchain and `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through the `Runners/TerminalUIWASI` / example-app build path. The shorter `swift ...` form is fine from a shell where `swift` already resolves through `swiftly`. `xcrun swift` may still resolve to an incompatible Xcode toolchain.
 - Some focus surfaces are still missing:
   - namespace-scoped default-focus APIs such as `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus`
   - object-focused wrappers such as `@FocusedObject`

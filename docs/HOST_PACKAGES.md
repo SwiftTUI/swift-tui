@@ -92,7 +92,7 @@ package:
 The web host package is also landed:
 
 - package root: `GUI/WebTUIGUI`
-- build stack: Bun plus the repo-managed Swift 6.3.0 toolchain
+- build stack: Bun plus the repo-managed Swift 6.3.1 toolchain
 - published dependency: npm `ghostty-web`
 - key runtime and build files:
   - `src/WebTUIApp.ts`
@@ -111,7 +111,7 @@ The web host package is also landed:
 The xterm.js-backed browser host package is also landed:
 
 - package root: `GUI/XtermWebTUIGUI`
-- build stack: Bun plus the repo-managed Swift 6.3.0 toolchain
+- build stack: Bun plus the repo-managed Swift 6.3.1 toolchain
 - published dependency: npm `@xterm/xterm` plus `@xterm/addon-fit`
 - key runtime and build files:
   - `src/WebTUIApp.ts`
