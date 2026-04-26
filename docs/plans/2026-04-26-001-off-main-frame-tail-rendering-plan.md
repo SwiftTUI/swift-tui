@@ -396,14 +396,26 @@ swiftly run swift test --filter TerminalUITests.HostedSceneSessionTests
 **Goal:** Prove off-main tail rendering does not reorder or lose runtime
 effects.
 
-- [ ] Add a blocking/fake tail worker test that suspends tail rendering.
-- [ ] While the tail is blocked, enqueue an input event.
-- [ ] Assert the input is accepted by the runtime but does not commit ahead of
+- [x] Add a blocking/fake tail worker test that suspends tail rendering.
+- [x] While the tail is blocked, enqueue an input event.
+- [x] Assert the input is accepted by the runtime but does not commit ahead of
   the blocked frame.
-- [ ] Assert lifecycle events fire once and in order.
-- [ ] Assert focus sync still rerenders as needed after tail completion.
-- [ ] Assert animation deadlines still reschedule.
-- [ ] Assert diagnostics report worker timing.
+- [x] Assert lifecycle events fire once and in order.
+- [x] Assert focus sync still rerenders as needed after tail completion.
+- [x] Assert animation deadlines still reschedule.
+- [x] Assert diagnostics report worker timing.
+
+Stage 6 result:
+
+- Added package-internal `FrameTailRenderHooks` so tests can pause the private
+  frame-tail renderer at the raster boundary without exposing public API.
+- Added `AsyncFrameTailRenderingTests`, covering blocked-tail input queuing,
+  no presentation while the blocked frame is unresolved, post-release
+  focus-sync rerendering, ordered lifecycle application, clean exit after queued
+  input, and async worker timing diagnostics.
+- Existing animation-deadline behavior remains covered by the Stage 5 runtime
+  validation and the focused `InteractiveRuntimeTests` pass for auto-dismiss,
+  pointer scroll during `PhaseAnimator`, and hosted animation frames.
 
 Commit boundary:
 
