@@ -109,12 +109,23 @@ private struct FrameTailWorkerResult<Value> {
   var completedAt: ContinuousClock.Instant?
 }
 
+package struct FrameTailRenderHooks: Sendable {
+  package var beforeRaster: (@Sendable () -> Void)?
+
+  package init(
+    beforeRaster: (@Sendable () -> Void)? = nil
+  ) {
+    self.beforeRaster = beforeRaster
+  }
+}
+
 private final class FrameTailRenderer: Sendable {
   private let layoutEngine: LayoutEngine
   private let semanticExtractor: SemanticExtractor
   private let drawExtractor: DrawExtractor
   private let rasterizer: Rasterizer
   private let retainedState = FrameTailRetainedState()
+  private let renderHooks = Mutex<FrameTailRenderHooks?>(nil)
 
   #if canImport(Dispatch)
     private let queue = DispatchQueue(label: "swift-terminal-ui.frame-tail-renderer")
@@ -229,6 +240,14 @@ private final class FrameTailRenderer: Sendable {
         artifacts,
         baselinePlacedTree: baselinePlacedTree
       )
+    }
+  }
+
+  func setRenderHooks(
+    _ hooks: FrameTailRenderHooks?
+  ) {
+    renderHooks.withLock { currentHooks in
+      currentHooks = hooks
     }
   }
 
@@ -358,6 +377,10 @@ private final class FrameTailRenderer: Sendable {
     let (draw, drawDuration) = measurePhase(clock: clock) {
       drawExtractor.extract(from: placed)
     }
+    let beforeRaster = renderHooks.withLock { hooks in
+      hooks?.beforeRaster
+    }
+    beforeRaster?()
     let (rasterized, rasterDuration) = measurePhase(clock: clock) {
       rasterizer.rasterizeCollectingVisibleIdentities(
         draw,
@@ -1121,5 +1144,12 @@ public struct DefaultRenderer {
   @MainActor
   package func liveIdentitySnapshot() -> Set<Identity> {
     viewGraph.liveIdentitySnapshot()
+  }
+
+  @MainActor
+  package func setFrameTailRenderHooks(
+    _ hooks: FrameTailRenderHooks?
+  ) {
+    frameTailRenderer.setRenderHooks(hooks)
   }
 }
