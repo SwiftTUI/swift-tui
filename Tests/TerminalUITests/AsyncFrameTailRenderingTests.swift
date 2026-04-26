@@ -268,6 +268,11 @@ struct AsyncFrameTailRenderingTests {
           && row["custom_layout_fallbacks"] == "0"
           && row["first_custom_layout_fallback"] == "-"
           && row["stale_frame_policy"] == "commit_ordered"
+          && row["render_generation"] != nil
+          && row["layout_input_generation"] == row["render_generation"]
+          && row["layout_output_generation"] == row["render_generation"]
+          && row["raster_input_generation"] == row["render_generation"]
+          && row["raster_output_generation"] == row["render_generation"]
       })
   }
 
@@ -749,6 +754,45 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.diagnostics.phaseTimings != nil)
     #expect(artifacts.diagnostics.workerTimings != nil)
     #expect(artifacts.diagnostics.mainActorTimings != nil)
+  }
+
+  @Test("async renderer tags monotonically increasing render generations")
+  func asyncRendererTagsMonotonicallyIncreasingRenderGenerations() async {
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("AsyncRenderGenerationRoot")
+
+    let first = await renderer.renderAsync(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("generation 1")
+      },
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 24, height: 3)
+    )
+    let second = await renderer.renderAsync(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("generation 2")
+      },
+      context: .init(
+        identity: rootIdentity,
+        invalidatedIdentities: [rootIdentity]
+      ),
+      proposal: .init(width: 24, height: 3)
+    )
+
+    let firstGenerations = first.diagnostics.renderGenerations
+    let secondGenerations = second.diagnostics.renderGenerations
+
+    #expect(firstGenerations.render.rawValue == 1)
+    #expect(secondGenerations.render.rawValue == 2)
+    #expect(secondGenerations.render > firstGenerations.render)
+    #expect(firstGenerations.layoutInput == firstGenerations.render)
+    #expect(firstGenerations.layoutOutput == firstGenerations.render)
+    #expect(firstGenerations.rasterInput == firstGenerations.render)
+    #expect(firstGenerations.rasterOutput == firstGenerations.render)
+    #expect(secondGenerations.layoutInput == secondGenerations.render)
+    #expect(secondGenerations.layoutOutput == secondGenerations.render)
+    #expect(secondGenerations.rasterInput == secondGenerations.render)
+    #expect(secondGenerations.rasterOutput == secondGenerations.render)
   }
 }
 

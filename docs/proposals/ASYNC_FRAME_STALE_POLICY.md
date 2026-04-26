@@ -2,8 +2,8 @@
 
 ## Status
 
-Stage 1 implemented. This remains the policy for future frame-tail cancellation
-or generation-dropping work.
+Stages 1 and 2 implemented. Ordered commit remains the policy for future
+frame-tail cancellation or generation-dropping work.
 
 The current async frame-tail renderer intentionally preserves ordered commit:
 when a worker frame finishes, the main actor commits it before newer input state
@@ -225,11 +225,20 @@ git commit -m "test(runtime): assert stale async frames commit in order"
 
 ### Stage 2: Add generation IDs without dropping
 
-- Thread a render generation through `DefaultRenderer.renderAsync` and
+- [x] Thread a render generation through `DefaultRenderer.renderAsync` and
   `FrameTailRenderer`.
-- Log generation IDs in `FrameDiagnostics`.
-- Assert results still commit in order.
-- Do not change scheduling or presentation behavior.
+- [x] Log generation IDs in `FrameDiagnostics`.
+- [x] Assert results still commit in order.
+- [x] Do not change scheduling or presentation behavior.
+
+Stage 2 result:
+
+- `RenderGeneration` is a monotonic ID assigned per `DefaultRenderer` render
+  pass.
+- `FrameRenderGenerations` records render, layout input/output, and raster
+  input/output generation IDs in `FrameDiagnostics`.
+- Runtime TSV diagnostics include generation columns without enabling
+  cancellation or stale-result dropping.
 
 Commit boundary:
 

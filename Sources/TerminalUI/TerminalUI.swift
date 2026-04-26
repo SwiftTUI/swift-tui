@@ -65,6 +65,7 @@ private struct FrameTailRetainedInput {
 }
 
 private struct FrameTailInput {
+  var generation: RenderGeneration
   var resolved: ResolvedNode
   var proposal: ProposedSize
   var rootIdentity: Identity
@@ -84,6 +85,7 @@ private struct FrameTailDiagnostics {
 }
 
 private struct FrameTailLayoutOutput {
+  var generation: RenderGeneration
   var measured: MeasuredNode
   var baselinePlaced: PlacedNode
   var measureDuration: Duration
@@ -113,6 +115,7 @@ private struct FrameTailRasterOutput {
 }
 
 private struct FrameTailOutput {
+  var generation: RenderGeneration
   var measured: MeasuredNode
   var placed: PlacedNode
   var baselinePlaced: PlacedNode
@@ -130,6 +133,18 @@ private struct FrameTailWorkerResult<Value> {
   var enqueueToStart: Duration
   var compute: Duration
   var completedAt: ContinuousClock.Instant?
+}
+
+private final class RenderGenerationSequencer: Sendable {
+  private let nextRawValue = Mutex<UInt64>(1)
+
+  func next() -> RenderGeneration {
+    nextRawValue.withLock { value in
+      let generation = RenderGeneration(value)
+      value &+= 1
+      return generation
+    }
+  }
 }
 
 private final class FrameTailLayoutWorkerBox: Sendable {
@@ -668,6 +683,7 @@ private final class FrameTailRenderer: Sendable {
       )
     }
     return FrameTailLayoutOutput(
+      generation: input.generation,
       measured: measured,
       baselinePlaced: placed,
       measureDuration: measureDuration,
@@ -754,6 +770,7 @@ private final class FrameTailRenderer: Sendable {
       measurementCache: layoutEngine.cache?.metrics
     )
     return FrameTailOutput(
+      generation: input.generation,
       measured: layout.measured,
       placed: placed,
       baselinePlaced: layout.baselinePlaced,
@@ -1007,6 +1024,7 @@ public struct DefaultRenderer {
   private let frameState: FrameResolveState
   private let presentationHostState: PresentationHostState
   private let animationController: AnimationController
+  private let renderGenerationSequencer: RenderGenerationSequencer
 
   private let frameTailRenderer: FrameTailRenderer
 
@@ -1031,6 +1049,7 @@ public struct DefaultRenderer {
     frameState = .init()
     presentationHostState = .init()
     animationController = .init()
+    renderGenerationSequencer = .init()
     frameTailRenderer = .init(
       layoutEngine: layoutEngine,
       semanticExtractor: semanticExtractor,
@@ -1106,6 +1125,7 @@ public struct DefaultRenderer {
     collectsDiagnostics: Bool = true
   ) -> FrameArtifacts {
     let clock: ContinuousClock? = collectsDiagnostics ? ContinuousClock() : nil
+    let renderGeneration = renderGenerationSequencer.next()
 
     var resolveContext = context
     let runtimeRegistrations = resolveContext.runtimeRegistrations
@@ -1198,6 +1218,7 @@ public struct DefaultRenderer {
       invalidatedIdentities: context.invalidatedIdentities
     )
     let frameTailInput = FrameTailInput(
+      generation: renderGeneration,
       resolved: resolved,
       proposal: proposal,
       rootIdentity: resolveContext.identity,
@@ -1290,6 +1311,13 @@ public struct DefaultRenderer {
         presentationDamage: tail.presentationDamage,
         presentationSurfaceWidth: tail.raster.size.width,
         phaseTimings: phaseTimings,
+        renderGenerations: .init(
+          render: renderGeneration,
+          layoutInput: frameTailInput.generation,
+          layoutOutput: tailLayout.generation,
+          rasterInput: frameTailInput.generation,
+          rasterOutput: tail.generation
+        ),
         workerTimings: workerTimings,
         mainActorTimings: mainActorTimings,
         measurementCache: tail.diagnostics.measurementCache
@@ -1325,6 +1353,7 @@ public struct DefaultRenderer {
     collectsDiagnostics: Bool = true
   ) async -> FrameArtifacts {
     let clock: ContinuousClock? = collectsDiagnostics ? ContinuousClock() : nil
+    let renderGeneration = renderGenerationSequencer.next()
 
     var resolveContext = context
     let runtimeRegistrations = resolveContext.runtimeRegistrations
@@ -1410,6 +1439,7 @@ public struct DefaultRenderer {
       invalidatedIdentities: context.invalidatedIdentities
     )
     var frameTailInput = FrameTailInput(
+      generation: renderGeneration,
       resolved: resolved,
       proposal: proposal,
       rootIdentity: resolveContext.identity,
@@ -1419,6 +1449,7 @@ public struct DefaultRenderer {
     if frameTailRenderer.needsIndexedChildSourceWorkerSnapshot(frameTailInput) {
       resolved = indexedChildSourceWorkerSnapshot(of: resolved)
       frameTailInput = FrameTailInput(
+        generation: renderGeneration,
         resolved: resolved,
         proposal: proposal,
         rootIdentity: resolveContext.identity,
@@ -1525,6 +1556,13 @@ public struct DefaultRenderer {
         presentationDamage: tail.presentationDamage,
         presentationSurfaceWidth: tail.raster.size.width,
         phaseTimings: phaseTimings,
+        renderGenerations: .init(
+          render: renderGeneration,
+          layoutInput: frameTailInput.generation,
+          layoutOutput: tailLayout.generation,
+          rasterInput: frameTailInput.generation,
+          rasterOutput: tail.generation
+        ),
         workerTimings: workerTimings,
         mainActorTimings: mainActorTimings,
         measurementCache: tail.diagnostics.measurementCache

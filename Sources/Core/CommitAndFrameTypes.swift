@@ -554,6 +554,48 @@ public struct FramePhaseTimings: Equatable, Sendable {
   }
 }
 
+/// Monotonic identity assigned to one renderer pass.
+public struct RenderGeneration: Comparable, Equatable, Hashable, Sendable {
+  public var rawValue: UInt64
+
+  public init(_ rawValue: UInt64 = 0) {
+    self.rawValue = rawValue
+  }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.rawValue < rhs.rawValue
+  }
+}
+
+extension RenderGeneration {
+  public static var zero: Self {
+    Self()
+  }
+}
+
+/// Generation IDs observed while rendering one frame.
+public struct FrameRenderGenerations: Equatable, Sendable {
+  public var render: RenderGeneration
+  public var layoutInput: RenderGeneration?
+  public var layoutOutput: RenderGeneration?
+  public var rasterInput: RenderGeneration?
+  public var rasterOutput: RenderGeneration?
+
+  public init(
+    render: RenderGeneration = .zero,
+    layoutInput: RenderGeneration? = nil,
+    layoutOutput: RenderGeneration? = nil,
+    rasterInput: RenderGeneration? = nil,
+    rasterOutput: RenderGeneration? = nil
+  ) {
+    self.render = render
+    self.layoutInput = layoutInput
+    self.layoutOutput = layoutOutput
+    self.rasterInput = rasterInput
+    self.rasterOutput = rasterOutput
+  }
+}
+
 /// Timing summaries for work submitted to the frame-tail renderer.
 public struct FrameWorkerTimings: Equatable, Sendable {
   public var layoutEnqueueToStart: Duration
@@ -675,6 +717,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var selectionRouteCount: Int
   public var presentationDamage: PresentationDamageDiagnostics?
   public var phaseTimings: FramePhaseTimings?
+  public var renderGenerations: FrameRenderGenerations
   public var workerTimings: FrameWorkerTimings?
   public var mainActorTimings: FrameMainActorTimings?
   public var measurementCache: MeasurementCacheMetrics?
@@ -700,6 +743,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     selectionRouteCount: Int = 0,
     presentationDamage: PresentationDamageDiagnostics? = nil,
     phaseTimings: FramePhaseTimings? = nil,
+    renderGenerations: FrameRenderGenerations = .init(),
     workerTimings: FrameWorkerTimings? = nil,
     mainActorTimings: FrameMainActorTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil,
@@ -724,6 +768,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     self.selectionRouteCount = selectionRouteCount
     self.presentationDamage = presentationDamage
     self.phaseTimings = phaseTimings
+    self.renderGenerations = renderGenerations
     self.workerTimings = workerTimings
     self.mainActorTimings = mainActorTimings
     self.measurementCache = measurementCache
@@ -1006,6 +1051,7 @@ extension FrameDiagnostics {
     presentationDamage: PresentationDamage? = nil,
     presentationSurfaceWidth: Int = 0,
     phaseTimings: FramePhaseTimings? = nil,
+    renderGenerations: FrameRenderGenerations = .init(),
     workerTimings: FrameWorkerTimings? = nil,
     mainActorTimings: FrameMainActorTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil
@@ -1035,6 +1081,7 @@ extension FrameDiagnostics {
         )
       },
       phaseTimings: phaseTimings,
+      renderGenerations: renderGenerations,
       workerTimings: workerTimings,
       mainActorTimings: mainActorTimings,
       measurementCache: measurementCache,
