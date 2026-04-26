@@ -52,8 +52,16 @@ public struct RadialLayout: View {
 /// trigonometry, no Foundation dependency.  The behaviour-tested
 /// invariant is the spatial relationship between the four cardinals
 /// and the center, not the precise pixel coordinates.
-struct RingLayout: Layout {
+struct RingLayout: SendableLayout {
   var radius: Int
+
+  var measurementReuseSignature: String {
+    "RingLayout(radius:\(radius)).measure"
+  }
+
+  var placementReuseSignature: String {
+    "RingLayout(radius:\(radius)).place"
+  }
 
   func sizeThatFits(
     proposal: ProposedViewSize,

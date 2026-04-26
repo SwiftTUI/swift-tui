@@ -3,7 +3,7 @@ import TerminalUI
 /// Two side-by-side `FlowLayout` containers wrapping the same eight
 /// `[item N]` children — the first container is `.frame(width: 30)`,
 /// the second is `.frame(width: 60)`.  ``FlowLayout`` is a custom
-/// `Layout` conformance that packs siblings left-to-right and wraps
+/// `SendableLayout` conformance that packs siblings left-to-right and wraps
 /// onto a new row whenever the next child would exceed the proposed
 /// width.
 ///
@@ -67,8 +67,16 @@ public struct FlowLayoutWrap: View {
 /// onto a new row whenever the next child would push the row past
 /// the proposal width.  Width-`unspecified` proposals lay every
 /// child out on a single row (no wrap budget known).
-struct FlowLayout: Layout {
+struct FlowLayout: SendableLayout {
   var spacing: Int
+
+  var measurementReuseSignature: String {
+    "FlowLayout(spacing:\(spacing)).measure"
+  }
+
+  var placementReuseSignature: String {
+    "FlowLayout(spacing:\(spacing)).place"
+  }
 
   func sizeThatFits(
     proposal: ProposedViewSize,

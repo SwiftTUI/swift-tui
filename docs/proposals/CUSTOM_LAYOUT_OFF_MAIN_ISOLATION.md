@@ -350,6 +350,27 @@ Stage 7 also hardened `HostedSceneSessionTests` by increasing that suite's
 polling timeout from 5s to 15s. The previous 5s budget was repeatedly too tight
 under the full parallel root test run while passing in isolation.
 
+### Stage 8: Adopt the opt-in in example layouts
+
+- [x] Audit the repository's real custom-layout conformers for honest
+  `SendableLayout` candidates.
+- [x] Migrate the TerminalUI layout showcase's pure `FlowLayout` and
+  `RingLayout` examples.
+- [x] Keep Apple SwiftUI mirror examples unchanged.
+- [x] Add example-package coverage proving the migrated layouts enter the
+  async frame-tail worker path without custom-layout fallback diagnostics.
+
+Stage 8 result:
+
+- `Examples/layouts` now marks `FlowLayout` and `RingLayout` as
+  `SendableLayout` values with reuse signatures derived from the fields that
+  affect measurement and placement.
+- `Examples/LayoutsSwiftUI` remains a SwiftUI comparison surface and does not
+  import or adopt TerminalUI's worker-layout opt-in.
+- The layout example behavior tests now include async renderer checks for both
+  custom layouts, requiring worker timings and zero custom-layout fallback
+  diagnostics.
+
 ## Required Tests
 
 - Built-in-only trees still run layout on the worker.
@@ -386,7 +407,7 @@ them off-main by force.
 The off-main custom-layout path now has coverage for the public opt-in's core
 semantic risks: worker execution, cache reuse, `LayoutSubview` dimensions,
 custom alignment guides, retained layout reuse across draw-only updates, and
-focus-sync rerender convergence. The next useful implementation step is broader
-adoption work: audit internal and example custom layouts for layouts that can
-honestly conform to `SendableLayout`, and leave the main-actor fallback in place
-for anything with non-Sendable or side-effectful cache semantics.
+focus-sync rerender convergence. Broader adoption should continue layout by
+layout: migrate only conformers that can honestly satisfy `SendableLayout`, and
+leave the main-actor fallback in place for anything with non-Sendable or
+side-effectful cache semantics.
