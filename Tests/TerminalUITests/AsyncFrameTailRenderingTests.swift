@@ -87,6 +87,97 @@ struct AsyncFrameTailRenderingTests {
     #expect(lifecycleRecorder.events == ["appear 0", "appear 1"])
   }
 
+  @Test("diagnostics count input queued during async render suspension")
+  func diagnosticsCountInputQueuedDuringAsyncRenderSuspension() async throws {
+    let rootIdentity = testIdentity("AsyncFrameTailDiagnosticsRoot")
+    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let renderer = DefaultRenderer()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    let diagnosticsURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-async-tail-\(UUID().uuidString).tsv")
+    defer {
+      try? FileManager.default.removeItem(at: diagnosticsURL)
+    }
+
+    let inputReader = InjectedTerminalInputReader()
+    let terminal = AsyncFrameTailTerminalHost()
+    let lifecycleRecorder = AsyncFrameTailLifecycleRecorder()
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      keyHandler: { keyPress, _, stateContainer in
+        if keyPress == KeyPress(.character("i")) {
+          stateContainer.mutate { value in
+            value += 1
+          }
+          return .handled
+        }
+        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+          return .exit(.userExit(keyPress))
+        }
+        return .ignored
+      },
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameTailStressView(
+          value: value,
+          lifecycleRecorder: lifecycleRecorder
+        )
+      }
+    )
+    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
+    #expect(runLoop.diagnosticsLogger != nil)
+
+    let runTask = Task {
+      try await runLoop.run()
+    }
+
+    try await waitUntil {
+      terminal.frames.contains { $0.contains("value 0") }
+    }
+
+    inputReader.send(.key(.character("i")))
+    await gate.waitUntilBlocked()
+    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.finish()
+    gate.release()
+
+    let result = try await valueWithTimeout {
+      try await runTask.value
+    }
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+
+    let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
+    let rows = diagnosticRows(diagnostics)
+    #expect(
+      rows.contains { row in
+        (Int(row["input_events_during_render_suspension"] ?? "") ?? 0) >= 1
+      })
+    #expect(
+      rows.allSatisfy { row in
+        row["main_actor_blocked_ms"] != nil
+          && row["main_actor_suspended_ms"] != nil
+      })
+  }
+
   @Test("async renderer records worker timing diagnostics")
   func asyncRendererRecordsWorkerTimingDiagnostics() async {
     let artifacts = await DefaultRenderer().renderAsync(
@@ -99,6 +190,7 @@ struct AsyncFrameTailRenderingTests {
 
     #expect(artifacts.diagnostics.phaseTimings != nil)
     #expect(artifacts.diagnostics.workerTimings != nil)
+    #expect(artifacts.diagnostics.mainActorTimings != nil)
   }
 }
 
@@ -155,9 +247,14 @@ private final class AsyncFrameTailBlockingGate: Sendable {
     var rasterEntryCount = 0
   }
 
+  private let blockingEntry: Int
   private let state = Mutex(State())
   private let entered = DispatchSemaphore(value: 0)
   private let releaseSemaphore = DispatchSemaphore(value: 0)
+
+  init(blockingEntry: Int = 1) {
+    self.blockingEntry = blockingEntry
+  }
 
   var rasterEntryCount: Int {
     state.withLock(\.rasterEntryCount)
@@ -166,7 +263,7 @@ private final class AsyncFrameTailBlockingGate: Sendable {
   func beforeRaster() {
     let shouldBlock = state.withLock { state in
       state.rasterEntryCount += 1
-      return state.rasterEntryCount == 1
+      return state.rasterEntryCount == blockingEntry
     }
     guard shouldBlock else {
       return
@@ -224,6 +321,36 @@ private final class AsyncFrameTailTerminalHost: TerminalHosting {
 }
 
 private struct AsyncFrameTailTimeout: Error {}
+
+@MainActor
+private func waitUntil(
+  timeoutNanoseconds: UInt64 = 5_000_000_000,
+  _ condition: () -> Bool
+) async throws {
+  let started = ContinuousClock().now
+  while !condition() {
+    if started.duration(to: ContinuousClock().now) > .nanoseconds(Int64(timeoutNanoseconds)) {
+      throw AsyncFrameTailTimeout()
+    }
+    try await Task.sleep(nanoseconds: 1_000_000)
+  }
+}
+
+private func diagnosticRows(_ text: String) -> [[String: String]] {
+  let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
+  guard let headerLine = lines.first else {
+    return []
+  }
+  let headers = headerLine.components(separatedBy: "\t")
+  return lines.dropFirst().map { line in
+    let fields = line.components(separatedBy: "\t")
+    var row: [String: String] = [:]
+    for (index, header) in headers.enumerated() where index < fields.count {
+      row[header] = fields[index]
+    }
+    return row
+  }
+}
 
 private func valueWithTimeout<Value: Sendable>(
   timeoutNanoseconds: UInt64 = 5_000_000_000,

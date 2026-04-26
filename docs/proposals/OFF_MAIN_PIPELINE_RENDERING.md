@@ -382,6 +382,10 @@ Add explicit worker queue latency once useful:
 
 Implementation status: `FrameDiagnostics.workerTimings` records enqueue,
 compute, and completion-to-main-commit timings for the worker portions.
+`FrameDiagnostics.mainActorTimings` records main-actor blocked render time and
+async worker-suspension time. `FrameDiagnosticsLogger` also records
+`input_events_during_render_suspension` so blocked-tail tests can prove input
+was accepted while commit remained ordered.
 
 ---
 
@@ -581,8 +585,6 @@ should not be carried as runtime complexity without evidence.
   run away from the main actor without `MainActor.assumeIsolated` traps?
 - Should animation placed-overlay application move into the worker once removal
   overlay state can be passed as an explicit value snapshot?
-- Should diagnostics expose main-actor blocked time separately from total frame
-  latency?
 - How much of `CommitPlanner.plan(...)` can become pure once
   `ViewGraph.finalizeFrame(...)` is split from commit planning?
 

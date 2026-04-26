@@ -18,5 +18,6 @@ struct TimingDiagnosticsTests {
 
     #expect(artifacts.diagnostics.phaseTimings != nil)
     #expect(artifacts.diagnostics.workerTimings != nil)
+    #expect(artifacts.diagnostics.mainActorTimings?.suspended == .zero)
   }
 }

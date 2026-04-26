@@ -41,6 +41,14 @@ public struct SnapshotRenderer {
       lines.append("workerTimings=nil")
     }
 
+    if let mainActorTimings = diagnostics.mainActorTimings {
+      lines.append(
+        "mainActorTimings=blocked:\(describe(mainActorTimings.blocked)) suspended:\(describe(mainActorTimings.suspended))"
+      )
+    } else {
+      lines.append("mainActorTimings=nil")
+    }
+
     if let cache = diagnostics.measurementCache {
       lines.append(
         "measurementCache=generation:\(cache.generation) entries:\(cache.entries) lookups:\(cache.lookups) hits:\(cache.hits) misses:\(cache.misses) invalidations:\(cache.invalidations) stores:\(cache.stores)"

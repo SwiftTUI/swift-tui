@@ -104,6 +104,43 @@ public final class InProcessSignalReader: SignalReading, Sendable {
   }
 }
 
+package final class RenderSuspensionDiagnostics: Sendable {
+  private struct State: Sendable {
+    var suspensionDepth = 0
+    var inputEventsQueuedDuringSuspension = 0
+  }
+
+  private let state = Mutex(State())
+
+  func beginSuspension() {
+    state.withLock { state in
+      state.suspensionDepth += 1
+    }
+  }
+
+  func endSuspension() {
+    state.withLock { state in
+      state.suspensionDepth = max(0, state.suspensionDepth - 1)
+    }
+  }
+
+  func recordInputEventQueuedIfSuspended() {
+    state.withLock { state in
+      if state.suspensionDepth > 0 {
+        state.inputEventsQueuedDuringSuspension += 1
+      }
+    }
+  }
+
+  func drainInputEventsQueuedDuringSuspension() -> Int {
+    state.withLock { state in
+      let value = state.inputEventsQueuedDuringSuspension
+      state.inputEventsQueuedDuringSuspension = 0
+      return value
+    }
+  }
+}
+
 @MainActor
 /// Drives an interactive terminal session for a state-backed view tree.
 public final class RunLoop<State: Equatable & Sendable, Content: View> {
@@ -142,6 +179,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let dropDestinationRegistry = DropDestinationRegistry()
   package let lifecycleCoordinator = LifecycleCoordinator()
   package let observationBridge = ObservationBridge()
+  package let renderSuspensionDiagnostics = RenderSuspensionDiagnostics()
 
   package var runtimeRegistrations: RuntimeRegistrationSet {
     RuntimeRegistrationSet(
@@ -210,6 +248,17 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     self.proposalOverride = proposal
     self.exitKeyBindings = exitKeyBindings
     self.viewBuilder = viewBuilder
+    let renderSuspensionDiagnostics = self.renderSuspensionDiagnostics
+    self.renderer.setFrameRenderSuspensionHooks(
+      .init(
+        onBegin: { [renderSuspensionDiagnostics] in
+          renderSuspensionDiagnostics.beginSuspension()
+        },
+        onEnd: { [renderSuspensionDiagnostics] in
+          renderSuspensionDiagnostics.endSuspension()
+        }
+      )
+    )
   }
 
   package convenience init(
