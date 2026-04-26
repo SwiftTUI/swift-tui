@@ -11,6 +11,9 @@ package struct NodeHandlers {
   package var lifecycleRegistrations: LifecycleHandlerSnapshot
   package var taskRegistrations: [Identity: TaskRegistration]
   package var preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot]
+  package var keyCommandRegistrations: [Identity: [KeyBinding: RegisteredKeyCommand]]
+  package var paletteCommandRegistrations: [Identity: [RegisteredPaletteCommand]]
+  package var dropDestinationRegistrations: [Identity: DropDestinationHandler]
 
   package init(
     actionRegistrations: [Identity: LocalActionRegistry.Registration] = [:],
@@ -24,7 +27,10 @@ package struct NodeHandlers {
     scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot] = [],
     lifecycleRegistrations: LifecycleHandlerSnapshot = .init(),
     taskRegistrations: [Identity: TaskRegistration] = [:],
-    preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot] = []
+    preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot] = [],
+    keyCommandRegistrations: [Identity: [KeyBinding: RegisteredKeyCommand]] = [:],
+    paletteCommandRegistrations: [Identity: [RegisteredPaletteCommand]] = [:],
+    dropDestinationRegistrations: [Identity: DropDestinationHandler] = [:]
   ) {
     self.actionRegistrations = actionRegistrations
     self.keyHandlerRegistrations = keyHandlerRegistrations
@@ -38,6 +44,9 @@ package struct NodeHandlers {
     self.lifecycleRegistrations = lifecycleRegistrations
     self.taskRegistrations = taskRegistrations
     self.preferenceObservationRegistrations = preferenceObservationRegistrations
+    self.keyCommandRegistrations = keyCommandRegistrations
+    self.paletteCommandRegistrations = paletteCommandRegistrations
+    self.dropDestinationRegistrations = dropDestinationRegistrations
   }
 
   package mutating func reset() {
@@ -155,5 +164,26 @@ package struct NodeHandlers {
     _ registration: PreferenceObservationRegistrationSnapshot
   ) {
     preferenceObservationRegistrations.append(registration)
+  }
+
+  package mutating func recordKeyCommand(
+    scope: Identity,
+    command: RegisteredKeyCommand
+  ) {
+    keyCommandRegistrations[scope, default: [:]][command.binding] = command
+  }
+
+  package mutating func recordPaletteCommand(
+    scope: Identity,
+    command: RegisteredPaletteCommand
+  ) {
+    paletteCommandRegistrations[scope, default: []].append(command)
+  }
+
+  package mutating func recordDropDestination(
+    scope: Identity,
+    handler: @escaping DropDestinationHandler
+  ) {
+    dropDestinationRegistrations[scope] = handler
   }
 }

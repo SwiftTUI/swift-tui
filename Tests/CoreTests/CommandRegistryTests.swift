@@ -204,6 +204,41 @@ struct CommandRegistryTests {
     let visible = registry.paletteCommands(along: [shallow, deep])
     #expect(visible.map(\.name) == ["Shallow", "Deep"])
   }
+
+  @Test("restore replays key and palette command snapshots")
+  func restoreReplaysCommandSnapshots() {
+    let source = CommandRegistry()
+    let restored = CommandRegistry()
+    let scope = Identity(components: ["scope"])
+    let fired = Counter()
+
+    source.registerKeyCommand(
+      at: scope,
+      binding: .init(key: .character("s"), modifiers: .ctrl),
+      description: "Save",
+      isEnabled: true,
+      action: { fired.increment() }
+    )
+    source.registerPaletteCommand(
+      at: scope,
+      command: RegisteredPaletteCommand(
+        name: "Open",
+        description: "Open file",
+        isEnabled: true,
+        action: {}
+      )
+    )
+
+    restored.restoreKeyCommands(source.snapshotKeyCommands())
+    restored.restorePaletteCommands(source.snapshotPaletteCommands())
+
+    _ = restored.dispatch(
+      key: .init(key: .character("s"), modifiers: .ctrl),
+      along: [scope]
+    )
+    #expect(fired.count == 1)
+    #expect(restored.paletteCommands(at: scope).map(\.name) == ["Open"])
+  }
 }
 
 @MainActor

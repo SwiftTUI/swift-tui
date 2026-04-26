@@ -92,6 +92,28 @@ struct DropDestinationRegistryTests {
     #expect(registry.handler(at: kept) != nil)
     #expect(registry.handler(at: removed) == nil)
   }
+
+  @Test("restore replays drop destination snapshots")
+  func restoreReplaysSnapshot() {
+    let source = DropDestinationRegistry()
+    let restored = DropDestinationRegistry()
+    let scope = Identity(components: ["panel"])
+    let fired = Counter()
+
+    source.register(at: scope) { _ in
+      fired.increment()
+      return true
+    }
+
+    restored.restore(source.snapshot())
+    let consumed = restored.dispatch(
+      paths: [DroppedPath("/a")],
+      along: [scope]
+    )
+
+    #expect(consumed == true)
+    #expect(fired.count == 1)
+  }
 }
 
 private final class Counter {

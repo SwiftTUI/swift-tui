@@ -85,14 +85,19 @@ package final class CommandRegistry: Equatable {
     isEnabled: Bool,
     action: @escaping @MainActor @Sendable () -> Void
   ) {
-    var table = keyCommandsByScope[scope] ?? [:]
-    table[binding] = RegisteredKeyCommand(
+    let command = RegisteredKeyCommand(
       binding: binding,
       description: description,
       isEnabled: isEnabled,
       action: action
     )
+    var table = keyCommandsByScope[scope] ?? [:]
+    table[binding] = command
     keyCommandsByScope[scope] = table
+    ViewNodeContext.current?.recordKeyCommandRegistration(
+      scope: scope,
+      command: command
+    )
   }
 
   /// Appends a palette command at the given scope identity.
@@ -103,6 +108,10 @@ package final class CommandRegistry: Equatable {
     var list = paletteCommandsByScope[scope] ?? []
     list.append(command)
     paletteCommandsByScope[scope] = list
+    ViewNodeContext.current?.recordPaletteCommandRegistration(
+      scope: scope,
+      command: command
+    )
   }
 
   /// Returns the registered key command at `scope` that matches
@@ -150,6 +159,42 @@ package final class CommandRegistry: Equatable {
   package func reset() {
     keyCommandsByScope.removeAll(keepingCapacity: true)
     paletteCommandsByScope.removeAll(keepingCapacity: true)
+  }
+
+  package func snapshotKeyCommands() -> [Identity: [KeyBinding: RegisteredKeyCommand]] {
+    keyCommandsByScope
+  }
+
+  package func snapshotPaletteCommands() -> [Identity: [RegisteredPaletteCommand]] {
+    paletteCommandsByScope
+  }
+
+  package func restoreKeyCommands(
+    _ snapshot: [Identity: [KeyBinding: RegisteredKeyCommand]]
+  ) {
+    guard !snapshot.isEmpty else {
+      return
+    }
+
+    for (identity, commands) in snapshot {
+      var table = keyCommandsByScope[identity] ?? [:]
+      for (binding, command) in commands {
+        table[binding] = command
+      }
+      keyCommandsByScope[identity] = table
+    }
+  }
+
+  package func restorePaletteCommands(
+    _ snapshot: [Identity: [RegisteredPaletteCommand]]
+  ) {
+    guard !snapshot.isEmpty else {
+      return
+    }
+
+    for (identity, commands) in snapshot {
+      paletteCommandsByScope[identity, default: []].append(contentsOf: commands)
+    }
   }
 
   /// Debug-only: snapshot of {scope identity → count of palette
