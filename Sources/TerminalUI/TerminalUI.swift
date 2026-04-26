@@ -208,6 +208,7 @@ private final class FrameTailRenderer: Sendable {
     _ input: FrameTailInput,
     layout: FrameTailLayoutOutput,
     placed: PlacedNode,
+    animationOverlaySnapshot: PlacedAnimationOverlaySnapshot,
     clock: ContinuousClock?
   ) -> FrameTailOutput {
     let result = timedSync(clock: clock) {
@@ -215,6 +216,7 @@ private final class FrameTailRenderer: Sendable {
         input,
         layout: layout,
         placed: placed,
+        animationOverlaySnapshot: animationOverlaySnapshot,
         clock: clock
       )
     }
@@ -233,6 +235,7 @@ private final class FrameTailRenderer: Sendable {
     _ input: FrameTailInput,
     layout: FrameTailLayoutOutput,
     placed: PlacedNode,
+    animationOverlaySnapshot: PlacedAnimationOverlaySnapshot,
     clock: ContinuousClock?
   ) async -> FrameTailOutput {
     let result = await timedAsync(clock: clock) {
@@ -240,6 +243,7 @@ private final class FrameTailRenderer: Sendable {
         input,
         layout: layout,
         placed: placed,
+        animationOverlaySnapshot: animationOverlaySnapshot,
         clock: clock
       )
     }
@@ -407,8 +411,14 @@ private final class FrameTailRenderer: Sendable {
     _ input: FrameTailInput,
     layout: FrameTailLayoutOutput,
     placed: PlacedNode,
+    animationOverlaySnapshot: PlacedAnimationOverlaySnapshot,
     clock: ContinuousClock?
   ) -> FrameTailOutput {
+    var placed = placed
+    applyPlacedAnimationOverlaySnapshot(
+      animationOverlaySnapshot,
+      to: &placed
+    )
     let presentationDamage = presentationDamage(
       rootIdentity: input.rootIdentity,
       placed: placed,
@@ -893,7 +903,7 @@ public struct DefaultRenderer {
       frameTailInput,
       clock: clock
     )
-    var placed = tailLayout.baselinePlaced
+    let placed = tailLayout.baselinePlaced
     // Capture the BASELINE placed tree (pre-overlay) for two things:
     // 1. The animation controller's removal-snapshot lookup on the
     //    next frame (capturePlacedTree).
@@ -903,24 +913,23 @@ public struct DefaultRenderer {
     //
     // If we stored the post-overlay placed tree, subsequent ticks
     // would hit retainedPlacement and return the cached tree
-    // including the stale transient overlay — then applyPlacedOverlays
-    // would inject another overlay on top, growing the tree each
-    // tick and leaving ghosted artefacts visible after the animation
+    // including the stale transient overlay — then overlay snapshot
+    // application would inject another overlay on top, growing the tree
+    // each tick and leaving ghosted artefacts visible after the animation
     // completes.
     animationController.capturePlacedTree(tailLayout.baselinePlaced)
-    // Inject any pending removal overlays at placed level (draw-only,
-    // no layout-shift on sibling containers).  Only applies to
-    // entries whose placedSnapshot was captured in a previous frame
-    // — the resolved-level fallback handles first-frame removals
-    // where no placed tree is cached yet.
-    animationController.applyPlacedOverlays(
-      to: &placed,
+    // Snapshot any pending placed-level animation overlays. The snapshot
+    // advances controller-owned animation state on the main actor, then the
+    // frame-tail worker applies the value data before semantics/draw/raster.
+    let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
+      for: placed,
       at: animationTimestamp
     )
     let tail = frameTailRenderer.renderRaster(
       frameTailInput,
       layout: tailLayout,
       placed: placed,
+      animationOverlaySnapshot: animationOverlaySnapshot,
       clock: clock
     )
     var workerTimings = tail.diagnostics.workerTimings
@@ -1105,10 +1114,10 @@ public struct DefaultRenderer {
       frameTailInput,
       clock: clock
     )
-    var placed = tailLayout.baselinePlaced
+    let placed = tailLayout.baselinePlaced
     animationController.capturePlacedTree(tailLayout.baselinePlaced)
-    animationController.applyPlacedOverlays(
-      to: &placed,
+    let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
+      for: placed,
       at: animationTimestamp
     )
     let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
@@ -1118,6 +1127,7 @@ public struct DefaultRenderer {
       frameTailInput,
       layout: tailLayout,
       placed: placed,
+      animationOverlaySnapshot: animationOverlaySnapshot,
       clock: clock
     )
     suspensionHooks?.onEnd?()
