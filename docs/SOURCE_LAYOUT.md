@@ -11,7 +11,8 @@ future file moves.
 - `Runners/`: peer SwiftPM executable runner packages for terminal-native CLI launch and WASI launch
 - `GUI/`: peer embedded host packages for SwiftUI hosting and Bun/browser hosting
 - `Examples/`: sibling example apps and example-specific package manifests
-- `Vendor/`: sibling vendored Swift packages such as `UnixSignals` and `swift-figlet`
+- `Vendor/`: sibling vendored Swift packages such as `UnixSignals`, `swift-figlet`,
+  `swift-hash`, and `swift-png`
 - `Fixtures/`: shared transport fixtures consumed by both Swift and web tests
 - `Scripts/`: repository policy scripts and hook helpers
 - `docs/`: reference docs, plans, and historical implementation records
@@ -31,13 +32,14 @@ future file moves.
     - `Runners/TerminalUIWASI`
   - embedded host packages:
     - `GUI/SwiftUITUIGUI`
-    - `GUI/SwiftTermTUIGUI`
     - `GUI/WebTUIGUI`
     - `GUI/XtermWebTUIGUI`
 
 - Vendored local packages:
   - `Vendor/UnixSignals`
   - `Vendor/swift-figlet`
+  - `Vendor/swift-hash`
+  - `Vendor/swift-png`
 
 `Core` remains the shared pipeline target, but it is not exposed as a separate
 library product. Downstream package consumers reach those types through
@@ -96,7 +98,6 @@ library product. Downstream package consumers reach those types through
 ## Embedded Host Packages
 
 - `GUI/SwiftUITUIGUI`: native SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
-- `GUI/SwiftTermTUIGUI`: SwiftTerm-backed SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
 - `GUI/WebTUIGUI`: Bun-based web host that consumes a `TerminalUIWASI` build and manifest
 - `GUI/XtermWebTUIGUI`: Bun-based web host that consumes a `TerminalUIWASI` build and manifest through xterm.js
 

@@ -37,8 +37,7 @@ let packageDependencies: [Package.Dependency] = [
     from: "1.1.3"
   ),
   .package(
-    url: "https://github.com/tayloraswift/swift-png.git",
-    exact: "4.4.9"
+    path: "Vendor/swift-png"
   ),
 ]
 
@@ -53,8 +52,7 @@ let terminalUIDependencies: [Target.Dependency] = [
   ),
   .product(
     name: "PNG",
-    package: "swift-png",
-    condition: .when(platforms: nativeRuntimePlatforms),
+    package: "swift-png"
   ),
 ]
 
@@ -65,8 +63,7 @@ let terminalUITestDependencies: [Target.Dependency] = [
   "TerminalUICharts",
   .product(
     name: "PNG",
-    package: "swift-png",
-    condition: .when(platforms: nativeRuntimePlatforms),
+    package: "swift-png"
   ),
 ]
 

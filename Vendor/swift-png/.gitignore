@@ -1,0 +1,12 @@
+.DS_Store
+.vscode
+/.build
+/.build.*
+/.ssgc
+/*.xcodeproj
+/Benchmarks/*.png.png
+/Benchmarks/compression/out/*.png
+/Benchmarks/compression/baseline/main
+/Benchmarks/decompression/out/*.png
+/Benchmarks/decompression/baseline/main
+/Tools/__pycache__/
