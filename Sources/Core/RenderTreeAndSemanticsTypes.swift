@@ -476,8 +476,12 @@ public struct ResolvedNode: Equatable, Sendable {
     }
 
     switch layoutBehavior {
-    case .viewThatFits, .custom:
+    case .viewThatFits:
       return false
+    case .custom(let handle):
+      return handle.measurementReuseSignature != nil
+        && handle.placementReuseSignature != nil
+        && children.allSatisfy(\.supportsRetainedReuse)
     default:
       return children.allSatisfy(\.supportsRetainedReuse)
     }

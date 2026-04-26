@@ -6,6 +6,17 @@ import Testing
 @testable import TerminalUI
 @testable import View
 
+private enum AsyncFrameTailRaisedCenterAlignmentID: AlignmentID {
+  static func defaultValue(in context: ViewDimensions) -> Int {
+    context[VerticalAlignment.center]
+  }
+}
+
+extension VerticalAlignment {
+  fileprivate static let asyncFrameTailRaisedCenter =
+    Self(AsyncFrameTailRaisedCenterAlignmentID.self)
+}
+
 @MainActor
 @Suite(.serialized)
 struct AsyncFrameTailRenderingTests {
@@ -384,6 +395,76 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("layout"))
   }
 
+  @Test("public SendableLayout reads dimensions and alignment guides on the worker")
+  func publicSendableLayoutReadsDimensionsAndAlignmentGuidesOnWorker() async throws {
+    let rootIdentity = testIdentity("AsyncSendableGuideLayoutRoot")
+    let recorder = AsyncFrameTailSendableLayoutRecorder()
+
+    let artifacts = await DefaultRenderer().renderAsync(
+      AsyncFrameTailSendableGuideLayout(recorder: recorder) {
+        Text("AB").alignmentGuide(.asyncFrameTailRaisedCenter) { dimensions in
+          dimensions[.trailing]
+        }
+        Text("C")
+      },
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 32, height: 6)
+    )
+
+    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let layoutState = recorder.state
+
+    #expect(artifacts.diagnostics.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    #expect(layoutState.measureRanOnMainThread == false)
+    #expect(layoutState.placeRanOnMainThread == false)
+    #expect(workerTimings.layoutCompute != .zero)
+    #expect(artifacts.rasterSurface.lines.filter { !$0.isEmpty } == ["ABC"])
+    #expect(
+      artifacts.placedTree.children.map(\.bounds.origin) == [
+        .init(x: 0, y: 0),
+        .init(x: 2, y: 0),
+      ])
+  }
+
+  @Test("public SendableLayout reuses retained layout across draw-only async frames")
+  func publicSendableLayoutReusesRetainedLayoutAcrossDrawOnlyAsyncFrames() async throws {
+    let rootIdentity = testIdentity("AsyncSendableLayoutReuseRoot")
+    let recorder = AsyncFrameTailSendableLayoutRecorder()
+    let renderer = DefaultRenderer()
+    let blend = BorderBlend([.red, .yellow, .green, .cyan, .blue, .magenta, .red])
+
+    @MainActor
+    func root(phase: Double) -> some View {
+      AsyncFrameTailSendableLayout(recorder: recorder) {
+        Text("tick")
+          .padding(1)
+          .border(
+            blend: blend,
+            set: .rounded,
+            phase: phase
+          )
+      }
+    }
+
+    let first = await renderer.renderAsync(
+      root(phase: 0),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 24, height: 6)
+    )
+    let second = await renderer.renderAsync(
+      root(phase: 0.5),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 24, height: 6)
+    )
+
+    #expect(first.diagnostics.measuredNodesComputed > 0)
+    #expect(first.diagnostics.placedNodesComputed > 0)
+    #expect(second.diagnostics.customLayoutFallbackCount == 0)
+    #expect(second.diagnostics.measuredNodesComputed == 0)
+    #expect(second.diagnostics.placedNodesComputed == 0)
+  }
+
   @Test("worker backlog commits blocked frame before later input batch")
   func workerBacklogCommitsBlockedFrameBeforeLaterInputBatch() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailBacklogRoot")
@@ -561,6 +642,14 @@ private struct AsyncFrameTailCustomLayout: Layout {
 private struct AsyncFrameTailSendableLayout: SendableLayout {
   let recorder: AsyncFrameTailSendableLayoutRecorder
 
+  var measurementReuseSignature: String {
+    "AsyncFrameTailSendableLayout.measure"
+  }
+
+  var placementReuseSignature: String {
+    "AsyncFrameTailSendableLayout.place"
+  }
+
   func makeCache(subviews _: LayoutSubviews) -> Int {
     recorder.nextCache()
   }
@@ -600,6 +689,72 @@ private struct AsyncFrameTailSendableLayout: SendableLayout {
       )
       y += size.height
     }
+  }
+}
+
+private struct AsyncFrameTailSendableGuideLayout: SendableLayout {
+  let recorder: AsyncFrameTailSendableLayoutRecorder
+
+  var measurementReuseSignature: String {
+    "AsyncFrameTailSendableGuideLayout.measure"
+  }
+
+  var placementReuseSignature: String {
+    "AsyncFrameTailSendableGuideLayout.place"
+  }
+
+  func makeCache(subviews _: LayoutSubviews) -> Int {
+    recorder.nextCache()
+  }
+
+  func updateCache(
+    _ cache: inout Int,
+    subviews _: LayoutSubviews
+  ) {}
+
+  func sizeThatFits(
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Int
+  ) -> LayoutSize {
+    recorder.recordMeasure(cache: cache)
+    guard subviews.count == 2 else {
+      return .zero
+    }
+
+    let first = subviews[0].dimensions(in: .unspecified)
+    let second = subviews[1].sizeThatFits(.unspecified)
+    return .init(
+      width: max(first.width, first[.asyncFrameTailRaisedCenter] + second.width),
+      height: max(first.height, second.height)
+    )
+  }
+
+  func placeSubviews(
+    in _: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache: inout Int
+  ) {
+    recorder.recordPlace(cache: cache)
+    guard subviews.count == 2 else {
+      return
+    }
+
+    let firstSize = subviews[0].sizeThatFits(.unspecified)
+    let firstDimensions = subviews[0].dimensions(in: .unspecified)
+    let secondSize = subviews[1].sizeThatFits(.unspecified)
+
+    subviews[0].place(
+      at: .init(x: 0, y: 0),
+      anchor: .topLeading,
+      proposal: .init(width: firstSize.width, height: firstSize.height)
+    )
+    subviews[1].place(
+      at: .init(x: firstDimensions[.asyncFrameTailRaisedCenter], y: 0),
+      anchor: .topLeading,
+      proposal: .init(width: secondSize.width, height: secondSize.height)
+    )
   }
 }
 
