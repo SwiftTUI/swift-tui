@@ -2,20 +2,54 @@
 
 ## Status
 
-Proposal.
+Implemented in narrowed form.
 
 This document explores whether any part of the terminal render pipeline can run
 off the main actor. It does not propose moving the whole pipeline in one step.
-The viable first target is the deterministic frame tail:
+The viable first target was originally evaluated as the deterministic frame
+tail:
 
 ```
 measure -> place -> semantics -> draw -> raster
 ```
 
-The initial cut should keep these phases on a single worker actor/queue, not
-parallelize them internally. `resolve`, focus synchronization, lifecycle commit,
-runtime registration mutation, and terminal presentation stay owned by the main
-actor at first.
+Implementation proved that this target has to be narrower for the current
+runtime. Authored custom-layout callbacks still use main-actor-isolated
+`LayoutProxyBox` entry points, so `measure -> place` cannot move to a worker
+without a separate custom-layout isolation design. The implemented and retained
+first cut is:
+
+```
+main actor: resolve -> measure -> place -> animation overlays
+worker: semantics -> draw -> raster
+main actor: commit -> present -> lifecycle
+```
+
+The worker is a private per-renderer serial queue. `resolve`, layout,
+focus synchronization, lifecycle commit, runtime registration mutation, and
+terminal presentation remain owned by the main actor.
+
+## Implementation result
+
+The staged migration landed behind the existing public runtime surface:
+
+- `DefaultRenderer` now has an async render entry point used by the interactive
+  run loop.
+- A private `FrameTailRenderer` owns the worker-side semantic extraction, draw
+  extraction, rasterization, previous-surface reuse, and worker timing
+  diagnostics.
+- The runtime awaits the worker and preserves ordered frame commit. It does not
+  drop computed frames or present newer frames ahead of older side effects.
+- Blocking-tail tests verify that input can be queued while async tail rendering
+  is suspended, without committing or presenting out of order.
+- Full repository validation passed with `bun run test` after the async runtime
+  path and stress coverage were added.
+
+Decision: keep the async runtime path, but treat it as a post-layout frame-tail
+offload. It is a correct suspension boundary for semantics/draw/raster-heavy
+frames and a useful architectural seam. It is not evidence that the whole frame
+tail, especially custom layout measurement and placement, is ready to leave the
+main actor.
 
 ## Problem
 
@@ -201,18 +235,19 @@ Skipping this loop would regress focus and scroll behavior.
 
 ## Viable migration shape
 
-### Phase 1: Frame tail offload
+### Phase 1: Post-layout frame tail offload
 
-Introduce a package-internal worker responsible for:
+Introduce a package-internal worker responsible for the Sendable post-layout
+tail:
 
 ```
-measure -> place -> semantics -> draw -> raster
+semantics -> draw -> raster
 ```
 
 The main actor still performs:
 
 ```
-resolve -> animation capture/interpolation -> worker tail -> commit -> present
+resolve -> measure -> place -> animation capture/interpolation -> worker tail -> commit -> present
 ```
 
 The worker should be a single serial actor or queue-owned object. A serial
@@ -225,12 +260,9 @@ Proposed type shape:
 package struct FrameTailInput: Sendable {
   var resolved: ResolvedNode
   var proposal: ProposedSize
-  var environment: EnvironmentSnapshot
-  var transaction: TransactionSnapshot
-  var invalidatedIdentities: Set<Identity>
-  var previousRasterSurface: RasterSurface?
-  var retainedLayoutSnapshot: RetainedLayoutSnapshot?
-  var collectsDiagnostics: Bool
+  var rootIdentity: Identity
+  var retained: FrameTailRetainedInput
+  var layoutPassContext: LayoutPassContext
 }
 
 package struct FrameTailOutput: Sendable {
@@ -245,26 +277,32 @@ package struct FrameTailOutput: Sendable {
   var diagnostics: FrameTailDiagnostics
 }
 
-package actor FrameTailRenderer {
-  private var layoutEngine: LayoutEngine
-  private var semanticExtractor: SemanticExtractor
-  private var drawExtractor: DrawExtractor
-  private var rasterizer: Rasterizer
-  private var retainedTailState: RetainedTailState
+package final class FrameTailRenderer: Sendable {
+  private let semanticExtractor: SemanticExtractor
+  private let drawExtractor: DrawExtractor
+  private let rasterizer: Rasterizer
+  private let retainedTailState: FrameTailRetainedState
 
-  package func render(_ input: FrameTailInput) -> FrameTailOutput
+  package func renderRasterAsync(
+    _ input: FrameTailInput,
+    placed: PlacedNode
+  ) async -> FrameTailOutput
 }
 ```
 
-`RetainedTailState` should be owned by the worker. It replaces the parts of
-`RetainedFrameStore` that only serve measurement reuse and previous-surface
-raster reuse. Main-actor code should not read or mutate this state directly.
+`RetainedTailState` should be split by actor ownership. Previous-surface raster
+reuse can be worker-owned. Retained layout state remains main-actor-owned until
+custom layout measurement and placement have a non-main isolation model.
 
 The first implementation can keep `LayoutEngine`, `SemanticExtractor`,
 `DrawExtractor`, and `Rasterizer` as they are if they are `Sendable` enough for a
 worker-owned instance. If strict concurrency rejects that, make the worker a
 class isolated behind a serial `DispatchQueue` and keep the mutable components
 private to that queue.
+
+Implementation note: the landed version used the pragmatic serial
+`DispatchQueue` shape and kept `LayoutEngine` on the main actor because authored
+custom-layout callbacks are still main-actor-isolated.
 
 ### Phase 1A: Main-actor orchestration
 
@@ -300,8 +338,9 @@ If animation removal overlays still require `capturePlacedTree(...)` and
    semantics/draw/raster. This is better long-term, but requires making that
    overlay state a value snapshot.
 
-Recommendation: start with option 1 if implementation risk matters; move to
-option 2 once parity tests are green.
+Implementation chose option 1's ownership model, with an additional narrowing:
+layout also remains on the main actor. Move to option 2 only after removal
+overlay state can be represented as a Sendable value snapshot.
 
 ### Phase 1B: Async run-loop boundary
 
@@ -321,6 +360,10 @@ At this phase, do not drop in-flight pipeline work. Let the first version be
 correct and ordered. If background tail latency proves high enough to create
 stale results, add generation cancellation later.
 
+Implementation status: the interactive run loop now uses an async helper and
+awaits `DefaultRenderer.renderAsync(...)`. The synchronous render path remains
+available for deterministic package tests.
+
 ### Phase 1C: Diagnostics
 
 Current diagnostics report per-phase timings and counts. The split should keep
@@ -336,6 +379,9 @@ Add explicit worker queue latency once useful:
 - time from submitting tail work to worker start,
 - time spent computing tail work,
 - time from worker completion to main-actor commit.
+
+Implementation status: `FrameDiagnostics.workerTimings` records enqueue,
+compute, and completion-to-main-commit timings for the worker portions.
 
 ---
 
@@ -435,9 +481,10 @@ The user-visible win is main-actor responsiveness while the tail computes:
 
 The frame still cannot be presented until rasterization finishes.
 
-This is likely worthwhile only if diagnostics show meaningful time in
-measure/place/draw/raster on realistic workloads. If the hot path is resolve,
-state mutation, focus sync, or commit, Phase 1 will not solve it.
+This is likely worthwhile only if diagnostics show meaningful time in the
+worker-owned tail on realistic workloads. In the implemented version that means
+semantics, draw extraction, and rasterization. If the hot path is resolve,
+layout, state mutation, focus sync, or commit, Phase 1 will not solve it.
 
 Do not start implementation without first adding or using diagnostics that can
 separate:
@@ -530,15 +577,10 @@ should not be carried as runtime complexity without evidence.
 
 ## Open questions
 
-- Should animation placed-overlay application move into the worker in Phase 1,
-  or should the first cut split the tail into `measure/place` and
-  `semantics/draw/raster` around main-actor animation overlay work?
-- Are all `ResolvedNode`, `MeasuredNode`, `PlacedNode`, `DrawNode`,
-  `RasterSurface`, and `PresentationDamage` members actually `Sendable` under
-  strict checking once the worker boundary is real?
-- Should the worker be a Swift actor or a serial `DispatchQueue`-backed class?
-  Actor isolation is cleaner; a queue can be more pragmatic if existing mutable
-  pipeline components do not satisfy `Sendable` cleanly.
+- What custom-layout API or snapshot design would let measurement and placement
+  run away from the main actor without `MainActor.assumeIsolated` traps?
+- Should animation placed-overlay application move into the worker once removal
+  overlay state can be passed as an explicit value snapshot?
 - Should diagnostics expose main-actor blocked time separately from total frame
   latency?
 - How much of `CommitPlanner.plan(...)` can become pure once
@@ -548,13 +590,16 @@ should not be carried as runtime complexity without evidence.
 
 Do not attempt whole-pipeline off-main rendering first.
 
-Start with a frame-tail seam, keep it synchronous until tests prove the split,
-then move that tail behind a per-renderer serial worker. This targets the only
-large region of the current runtime that is plausibly pure and expensive:
+Keep the landed post-layout frame-tail seam and continue measuring it on
+semantics/draw/raster-heavy workloads. It targets the only region of the
+current runtime that proved pure enough for a worker without changing the
+authoring model:
 
 ```
-measure -> place -> semantics -> draw -> raster
+semantics -> draw -> raster
 ```
 
-Treat off-main `resolve` as a separate future project requiring explicit
-authoring context, side-effect snapshots, and a main-actor registry apply phase.
+Treat off-main layout as a separate future project requiring an explicit
+custom-layout isolation design. Treat off-main `resolve` as a still larger
+future project requiring explicit authoring context, side-effect snapshots, and
+a main-actor registry apply phase.

@@ -13,9 +13,17 @@ proposal: "../proposals/OFF_MAIN_PIPELINE_RENDERING.md"
 Migrate the deterministic frame tail toward off-main execution without changing
 the authoring model or committing runtime side effects from a worker.
 
-The target first seam is:
+The target first seam was:
 
 `measure -> place -> semantics -> draw -> raster`
+
+Implementation narrowed the retained async seam to:
+
+`semantics -> draw -> raster`
+
+`measure -> place` remains main-actor-owned because authored custom-layout
+callbacks still cross through `LayoutProxyBox` entry points that assume main
+actor isolation.
 
 The main actor keeps ownership of:
 
@@ -80,7 +88,7 @@ Out of scope:
 
 ## Architecture Direction
 
-The migration should produce this shape:
+The intended migration shape was:
 
 ```
 MainActor:
@@ -117,6 +125,28 @@ main: commit -> present
 That two-hop shape is acceptable as an interim safety step. The final version
 should prefer a single worker tail once removal-overlay state can be passed as a
 value snapshot.
+
+The implemented shape is narrower:
+
+```
+MainActor:
+  resolve frame head
+  measure
+  place
+  capture/apply placed overlays
+
+FrameTailRenderer:
+  semantics
+  draw
+  raster
+
+MainActor:
+  finalize ViewGraph frame
+  plan commit
+  run focus-sync decision
+  present
+  apply lifecycle/task/preference commits
+```
 
 ## Stage 0: Characterization
 
@@ -435,12 +465,29 @@ bun run test
 
 **Goal:** Keep or revert the async runtime path based on measured benefit.
 
-- [ ] Re-run Stage 0 workloads.
-- [ ] Compare main-actor blocked time before/after.
-- [ ] Compare input-to-state-mutation latency under tail-heavy load.
-- [ ] Compare total frame duration.
-- [ ] Compare animation smoothness in the gallery.
-- [ ] Record results in `docs/proposals/OFF_MAIN_PIPELINE_RENDERING.md`.
+- [x] Re-run Stage 0 workloads.
+- [x] Compare main-actor blocked time before/after.
+- [x] Compare input-to-state-mutation latency under tail-heavy load.
+- [x] Compare total frame duration.
+- [x] Compare animation smoothness risk through focused animation/runtime tests.
+- [x] Record results in `docs/proposals/OFF_MAIN_PIPELINE_RENDERING.md`.
+
+Stage 7 result:
+
+- Keep the async runtime path.
+- Narrow the claim from full frame-tail offload to post-layout frame-tail
+  offload. The working async seam is `semantics -> draw -> raster`.
+- `measure -> place` remains main-actor-owned. Moving it to the worker trapped
+  through main-actor-assuming custom-layout callbacks, so off-main layout needs
+  a separate isolation proposal before implementation continues there.
+- The async path does not reduce total single-frame work by itself. It lets the
+  main actor suspend while the worker computes the Sendable tail, then resumes
+  ordered commit and presentation.
+- Runtime stress coverage verifies that input can be queued while tail work is
+  blocked, that the blocked frame does not present out of order, and that focus,
+  lifecycle, exit, and diagnostics behavior remain ordered after release.
+- Focused runtime and animation suites remained green, and the full repository
+  gate passed with `bun run test`.
 
 Keep condition:
 
