@@ -142,27 +142,21 @@ Ordinary `Layout` conformers still use the main-actor-owned cache.
 
 Do not make all `Layout` conformers implicitly worker-capable.
 
-Potential opt-in shapes:
+Chosen opt-in shape:
 
 ```
-public protocol SendableLayout: Layout, Sendable where Cache: Sendable {}
-```
-
-or:
-
-```
-extension View {
-  public func offMainLayoutEligible(_ enabled: Bool = true) -> some View
+public protocol SendableLayout: Layout, Sendable where Cache: Sendable {
+  var measurementReuseSignature: String { get }
+  var placementReuseSignature: String { get }
 }
 ```
 
 The protocol shape is more honest: a layout is worker-safe only if its value,
-cache, and captured closures are Sendable. A modifier flag can only express
-intent; it cannot prove the implementation is safe.
-
-The public spelling should wait until implementation pressure is clearer. The
-package-internal prototype can first add a worker-capable layout box for a small
-set of internal test layouts.
+cache, and captured closures are Sendable. The reuse signatures make retained
+measurement and placement eligibility explicit, so two independent layout
+values can participate in retained layout reuse only when the author declares
+the fields that affect measurement and placement stable. A modifier flag can
+only express intent; it cannot prove the implementation is safe.
 
 ## Migration Plan
 
@@ -289,7 +283,8 @@ git commit -m "refactor(layout): hand off custom layout cache updates"
 Stage 5 result:
 
 - The public opt-in is protocol-based: `SendableLayout` refines `Layout` and
-  `Sendable`, and requires `Cache: Sendable`.
+  `Sendable`, requires `Cache: Sendable`, and requires stable measurement and
+  placement reuse signatures.
 - A more-constrained `SendableLayout.callAsFunction` routes direct
   `MyLayout { ... }` authoring through the worker-capable erasure path.
 - `AnyLayout` has a constrained `SendableLayout` initializer that installs a
@@ -304,9 +299,8 @@ Stage 5 result:
 Current limitation: `SendableLayout` is an author contract backed by Swift's
 `Sendable` constraints; it cannot prove that a layout avoids mutable globals or
 other external side effects. The worker proxy uses a worker-owned cache scoped
-like the existing main-actor bridge, but broader semantic parity still needs
-targeted coverage for custom alignment guides, `ViewDimensions`, focus sync,
-and animation tick reuse.
+like the existing main-actor bridge, but focus-driven rerender convergence still
+needs targeted coverage.
 
 Commit boundary:
 
@@ -314,15 +308,43 @@ Commit boundary:
 git commit -m "docs(layout): define off-main custom layout opt-in"
 ```
 
+### Stage 6: Pin semantic parity and retained reuse
+
+- [x] Verify worker-side `LayoutSubview.dimensions(in:)` reads the same
+  alignment-guide values used by the main-actor custom-layout path.
+- [x] Verify opted-in public `SendableLayout` values retain measurement and
+  placement across draw-only frame-tail updates.
+- [x] Keep unsigned custom layouts excluded from retained placement reuse.
+
+Stage 6 result:
+
+- `SendableLayout` now requires `measurementReuseSignature` and
+  `placementReuseSignature`, matching the package-internal worker snapshot
+  contract.
+- `ResolvedNode.supportsRetainedReuse` admits `.custom` layout nodes only when
+  both signatures are present and all children can retain layout reuse.
+- `AsyncFrameTailRenderingTests` covers a public `SendableLayout` that reads
+  `ViewDimensions` and a custom vertical alignment guide on the worker.
+- The async renderer regression suite now proves draw-only border phase changes
+  reuse both measurement and placement work for an opted-in `SendableLayout`.
+
+Remaining limitation: focus-driven rerender convergence with a worker-capable
+custom layout still needs explicit runtime-path coverage before the opt-in
+should be recommended for focus-heavy containers.
+
 ## Required Tests
 
 - Built-in-only trees still run layout on the worker.
 - Custom-layout trees still fall back without trapping.
 - Worker-safe custom layout can measure and place on the worker.
 - Repeated custom-layout measurement preserves cache semantics.
-- Alignment guides and `ViewDimensions` match the main-actor path.
-- Focus-sync rerender still converges when custom layout is involved.
-- Animation tick frames still preserve retained-layout reuse.
+- Alignment guides and `ViewDimensions` match the main-actor path. Covered for
+  public `SendableLayout`; broaden if package-internal worker snapshots gain
+  additional subview APIs.
+- Focus-sync rerender still converges when custom layout is involved. Still
+  open.
+- Animation tick frames still preserve retained-layout reuse. Covered for
+  draw-only async frame-tail updates on public `SendableLayout`.
 - A custom layout with non-Sendable cache or main-actor-only proxy cannot enter
   the worker path.
 - Full `bun run test` passes after each implementation stage.
@@ -343,8 +365,7 @@ git commit -m "docs(layout): define off-main custom layout opt-in"
 Keep the fallback for public authored custom layouts and do not attempt to move
 them off-main by force.
 
-The next useful implementation step is semantic-parity coverage for opted-in
-public `SendableLayout` values: alignment guides, `ViewDimensions`,
-focus-driven rerender convergence, and animation tick cache reuse should be
-pinned before broadening the opt-in recommendation beyond carefully audited
-layouts.
+The next useful implementation step is focus-path coverage for opted-in public
+`SendableLayout` values: focus-driven rerender convergence should be pinned on
+the composed runtime path before broadening the opt-in recommendation beyond
+carefully audited layouts.

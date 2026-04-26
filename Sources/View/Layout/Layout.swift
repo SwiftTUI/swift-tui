@@ -160,7 +160,21 @@ public protocol Layout {
 /// the main actor. Layouts that conform to `Layout` but not `SendableLayout`
 /// remain correct and continue to run through the main-actor custom-layout
 /// bridge.
-public protocol SendableLayout: Layout, Sendable where Cache: Sendable {}
+public protocol SendableLayout: Layout, Sendable where Cache: Sendable {
+  /// A stable signature for measurement reuse across frames.
+  ///
+  /// Include every layout value field that can change measurement. Two layout
+  /// instances with the same measurement signature may reuse retained
+  /// measurement work.
+  var measurementReuseSignature: String { get }
+
+  /// A stable signature for placement reuse across frames.
+  ///
+  /// Include every layout value field that can change placement. Two layout
+  /// instances with the same placement signature may reuse retained placement
+  /// work.
+  var placementReuseSignature: String { get }
+}
 
 extension Layout {
   public func updateCache(
@@ -500,8 +514,8 @@ public struct AnyLayout: Layout {
       let proxyBox = LayoutProxyBox(box: box)
       customLayoutHandle = CustomLayoutHandle(
         proxyBox,
-        measurementReuseSignature: box.measurementReuseSignature,
-        placementReuseSignature: box.placementReuseSignature,
+        measurementReuseSignature: layout.measurementReuseSignature,
+        placementReuseSignature: layout.placementReuseSignature,
         workerProxy: SendableLayoutWorkerProxy(layout: layout),
         placementHandler: { engine, node, measured, bounds, passContext in
           proxyBox.placeSubviews(

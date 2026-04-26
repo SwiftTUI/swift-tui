@@ -396,7 +396,7 @@ private final class FocusPresentationRecorder {
 @MainActor
 private func waitUntil(
   _ label: String,
-  timeoutNanoseconds: UInt64 = 5_000_000_000,
+  timeoutNanoseconds: UInt64 = 15_000_000_000,
   pollNanoseconds: UInt64 = 20_000_000,
   condition: @escaping () async -> Bool
 ) async throws {

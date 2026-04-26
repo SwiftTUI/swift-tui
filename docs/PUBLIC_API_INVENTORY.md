@@ -39,8 +39,9 @@ Important public-surface rules after the lowering migration:
 - `AnyView` remains public as `View` erasure, but `AnyView.init(erasing:)` is no longer public.
 - Public custom layouts run through the main-actor custom-layout bridge unless
   they explicitly conform to `SendableLayout`, which requires the layout value
-  and its cache to be `Sendable` before the renderer may evaluate that layout on
-  the frame-tail worker.
+  and its cache to be `Sendable` and requires stable measurement and placement
+  reuse signatures before the renderer may evaluate that layout on the
+  frame-tail worker.
 
 ### Shapes, borders, and styling
 

@@ -675,6 +675,33 @@ struct LayoutEngineTests {
       )
     ]
     #expect(!parent.supportsRetainedReuse)
+
+    parent.children = [
+      ResolvedNode(
+        identity: testIdentity("custom"),
+        kind: .view("Custom"),
+        layoutBehavior: .custom(
+          CustomLayoutHandle(
+            NoOpCustomLayoutProxy(),
+            measurementReuseSignature: "custom.measure"
+          ))
+      )
+    ]
+    #expect(!parent.supportsRetainedReuse)
+
+    parent.children = [
+      ResolvedNode(
+        identity: testIdentity("custom"),
+        kind: .view("Custom"),
+        layoutBehavior: .custom(
+          CustomLayoutHandle(
+            NoOpCustomLayoutProxy(),
+            measurementReuseSignature: "custom.measure",
+            placementReuseSignature: "custom.place"
+          ))
+      )
+    ]
+    #expect(parent.supportsRetainedReuse)
   }
 
   @Test("custom layout handles default to main actor execution")
