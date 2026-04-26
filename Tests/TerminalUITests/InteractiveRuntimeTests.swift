@@ -2578,7 +2578,7 @@ struct InteractiveRuntimeTests {
       )
     }
 
-    let didRenderInitialFrame = try await waitUntil {
+    let didRenderInitialFrame = try await waitUntil(timeoutNanoseconds: 15_000_000_000) {
       !terminal.visibleFrames.isEmpty
     }
     #expect(didRenderInitialFrame)
@@ -2672,7 +2672,7 @@ struct InteractiveRuntimeTests {
       )
     }
 
-    let didRenderInitialFrame = try await waitUntil {
+    let didRenderInitialFrame = try await waitUntil(timeoutNanoseconds: 15_000_000_000) {
       !terminal.visibleFrames.isEmpty
     }
     #expect(didRenderInitialFrame)

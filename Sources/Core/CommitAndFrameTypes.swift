@@ -1070,6 +1070,16 @@ extension FrameDiagnostics {
       }
     }
 
+    if let workerChildren = node.indexedChildSource?.workerResolvedChildren {
+      for child in workerChildren {
+        collectCustomLayoutFallbacks(
+          in: child,
+          count: &count,
+          firstIdentity: &firstIdentity
+        )
+      }
+    }
+
     for child in node.children {
       collectCustomLayoutFallbacks(
         in: child,

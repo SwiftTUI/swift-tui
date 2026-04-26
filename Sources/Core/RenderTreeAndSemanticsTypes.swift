@@ -190,8 +190,49 @@ package protocol IndexedChildSource: Sendable {
   var count: Int { get }
   var identityRoot: Identity { get }
   var measurementSignature: String { get }
+  var canRunOnWorker: Bool { get }
+  var workerResolvedChildren: [ResolvedNode]? { get }
 
   func child(at index: Int) -> ResolvedNode
+}
+
+extension IndexedChildSource {
+  package var canRunOnWorker: Bool { false }
+  package var workerResolvedChildren: [ResolvedNode]? { nil }
+}
+
+/// Sendable resolved-child snapshot for lazy indexed containers that have
+/// already materialized their authored children on the main actor.
+package struct IndexedChildSourceSnapshot: IndexedChildSource {
+  package let identityRoot: Identity
+  package let measurementSignature: String
+  private let children: [ResolvedNode]
+
+  package init(
+    identityRoot: Identity,
+    measurementSignature: String,
+    children: [ResolvedNode]
+  ) {
+    self.identityRoot = identityRoot
+    self.measurementSignature = measurementSignature
+    self.children = children
+  }
+
+  package var count: Int {
+    children.count
+  }
+
+  package var canRunOnWorker: Bool {
+    true
+  }
+
+  package var workerResolvedChildren: [ResolvedNode]? {
+    children
+  }
+
+  package func child(at index: Int) -> ResolvedNode {
+    children[index]
+  }
 }
 
 /// An opaque namespace used to scope matched-geometry IDs so the

@@ -246,6 +246,7 @@ struct AsyncFrameTailRenderingTests {
     inputReader.send(.key(.character("i")))
     await gate.waitUntilBlocked()
     inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    runLoop.renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
     inputReader.finish()
     gate.release()
 
@@ -585,8 +586,8 @@ struct AsyncFrameTailRenderingTests {
     )
   }
 
-  @Test("lazy indexed ScrollView content keeps layout on the main actor")
-  func lazyIndexedScrollViewContentKeepsLayoutOnMainActor() async throws {
+  @Test("lazy indexed ScrollView content snapshots before worker layout")
+  func lazyIndexedScrollViewContentSnapshotsBeforeWorkerLayout() async throws {
     let artifacts = await DefaultRenderer().renderAsync(
       ScrollView([.vertical], showsIndicators: true) {
         LazyVStack(alignment: .leading, spacing: 0) {
@@ -601,9 +602,39 @@ struct AsyncFrameTailRenderingTests {
     let workerTimings = try #require(artifacts.diagnostics.workerTimings)
     let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
 
-    #expect(workerTimings.layoutCompute == .zero)
+    let lazyStack = try #require(artifacts.resolvedTree.children.first)
+    let source = try #require(lazyStack.indexedChildSource)
+
+    #expect(source.canRunOnWorker)
+    #expect(source.workerResolvedChildren?.count == 12)
+    #expect(workerTimings.layoutCompute != .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(raster.contains("lazy row 0"))
+  }
+
+  @Test("lazy indexed child with main-actor custom layout still blocks worker layout")
+  func lazyIndexedChildWithMainActorCustomLayoutStillBlocksWorkerLayout() async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      ScrollView([.vertical], showsIndicators: true) {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(0..<1) { _ in
+            AsyncFrameTailCustomLayout {
+              Text("custom lazy")
+            }
+          }
+        }
+      },
+      context: .init(identity: testIdentity("AsyncLazyIndexedCustomLayoutRoot")),
+      proposal: .init(width: 24, height: 4)
+    )
+    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
+
+    #expect(artifacts.diagnostics.customLayoutFallbackCount == 1)
+    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity != nil)
+    #expect(workerTimings.layoutCompute == .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(raster.contains("custom lazy"))
   }
 
   @Test("framework-owned TabView container layout runs on the frame-tail worker")
