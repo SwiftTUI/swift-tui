@@ -3,6 +3,7 @@ import Foundation
 import Synchronization
 import Testing
 
+@testable import Core
 @testable import TerminalUI
 @testable import View
 
@@ -810,6 +811,67 @@ struct AsyncFrameTailRenderingTests {
     #expect(syncArtifacts == asyncArtifacts)
   }
 
+  @Test("frame-head abort scaffold records normal committed effects")
+  func frameHeadAbortScaffoldRecordsNormalCommittedEffects() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadAbortScaffoldRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let inputReader = InjectedTerminalInputReader()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: DefaultRenderer(),
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: AsyncFrameHeadAbortScaffoldState(),
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: terminal.proposal,
+      viewBuilder: { state, _ in
+        AsyncFrameHeadAbortScaffoldView(
+          state: state,
+          recorder: recorder
+        )
+      }
+    )
+    focusTracker.invalidator = runLoop.scheduler
+
+    try await withAsyncFrameHeadAbortAnimationSinks(runLoop.renderer) {
+      try renderAsyncFrameHeadAbortScaffoldFrame(runLoop)
+      runLoop.renderer.enableSelectiveEvaluation()
+
+      #expect(recorder.events.contains("preference:pref-0"))
+      #expect(runLoop.focusTracker.currentFocusIdentity != nil)
+      #expect(!runLoop.latestSemanticSnapshot.scrollRoutes.isEmpty)
+
+      focusLeafmostAsyncFrameHeadAbortScaffoldRegion(in: runLoop)
+      _ = runLoop.handleKeyPress(KeyPress(.space, modifiers: []))
+      try renderAsyncFrameHeadAbortScaffoldFrame(runLoop)
+
+      #expect(recorder.events.contains("action"))
+      #expect(recorder.events.contains("change:true"))
+      #expect(recorder.events.contains("animation-completion"))
+      try await waitUntil {
+        recorder.events.contains("task:revealed")
+      }
+      #expect(recorder.events.contains("appear:revealed"))
+
+      _ = runLoop.handleKeyPress(KeyPress(.space, modifiers: []))
+      try renderAsyncFrameHeadAbortScaffoldFrame(runLoop)
+
+      #expect(recorder.events.contains("change:false"))
+
+      _ = runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl))
+      runLoop.handlePaste(PasteEvent(content: "/tmp/frame-head-abort.txt"))
+
+      #expect(recorder.events.contains("key-command"))
+      #expect(recorder.events.contains("drop:1"))
+    }
+  }
+
   @Test("async renderer tags monotonically increasing render generations")
   func asyncRendererTagsMonotonicallyIncreasingRenderGenerations() async {
     let renderer = DefaultRenderer()
@@ -913,6 +975,91 @@ private struct AsyncFrameTailSendableFocusView: View {
         .focused($focusedField, equals: .second)
     }
     .defaultFocus($focusedField, .first)
+  }
+}
+
+private struct AsyncFrameHeadAbortScaffoldState: Equatable, Sendable {
+  var value = 0
+}
+
+private enum AsyncFrameHeadAbortPreferenceKey: PreferenceKey {
+  static var defaultValue: [String] { [] }
+
+  static func reduce(value: inout [String], nextValue: () -> [String]) {
+    value.append(contentsOf: nextValue())
+  }
+}
+
+private enum AsyncFrameHeadAbortFocusField: Hashable {
+  case action
+}
+
+private struct AsyncFrameHeadAbortScaffoldView: View {
+  @FocusState private var focusedField: AsyncFrameHeadAbortFocusField?
+  @State private var animated = false
+
+  var state: AsyncFrameHeadAbortScaffoldState
+  var recorder: AsyncFrameHeadAbortEffectRecorder
+
+  var body: some View {
+    Panel(id: "abort-scaffold") {
+      ScrollView([.vertical], showsIndicators: true) {
+        VStack(alignment: .leading, spacing: 0) {
+          Button("Animated action") {
+            withAnimation(nil) {
+              animated.toggle()
+              recorder.record("action")
+            } completion: {
+              recorder.record("animation-completion")
+            }
+          }
+          .id(testIdentity("AsyncFrameHeadAbortAction"))
+          .focused($focusedField, equals: .action)
+
+          Text("value \(state.value)")
+            .id(testIdentity("AsyncFrameHeadAbortValue", "\(state.value)"))
+            .preference(
+              key: AsyncFrameHeadAbortPreferenceKey.self,
+              value: ["pref-\(state.value)"]
+            )
+            .onChange(of: animated) { _, value in
+              recorder.record("change:\(value)")
+            }
+
+          Text("filler")
+          Text("filler")
+          Text("filler")
+          Text("filler")
+          Text("filler")
+
+          if animated {
+            Text("revealed")
+              .id(testIdentity("AsyncFrameHeadAbortRevealed"))
+              .onAppear {
+                recorder.record("appear:revealed")
+              }
+              .onDisappear {
+                recorder.record("disappear:revealed")
+              }
+              .task {
+                recorder.record("task:revealed")
+              }
+          }
+        }
+      }
+      .frame(height: 3)
+      .onPreferenceChange(AsyncFrameHeadAbortPreferenceKey.self) { value in
+        recorder.record("preference:\(value.joined(separator: "+"))")
+      }
+    }
+    .keyCommand("Abort scaffold", key: .character("a"), modifiers: .ctrl) {
+      recorder.record("key-command")
+    }
+    .dropDestination { paths in
+      recorder.record("drop:\(paths.count)")
+      return true
+    }
+    .defaultFocus($focusedField, .action)
   }
 }
 
@@ -1280,6 +1427,64 @@ private final class AsyncFrameTailLifecycleRecorder {
 
   func record(_ event: String) {
     events.append(event)
+  }
+}
+
+private final class AsyncFrameHeadAbortEffectRecorder: Sendable {
+  private struct State: Sendable {
+    var events: [String] = []
+  }
+
+  private let state = Mutex(State())
+
+  var events: [String] {
+    state.withLock(\.events)
+  }
+
+  func record(_ event: String) {
+    state.withLock { state in
+      state.events.append(event)
+    }
+  }
+}
+
+@MainActor
+private func renderAsyncFrameHeadAbortScaffoldFrame<State, V: View>(
+  _ runLoop: TerminalUI.RunLoop<State, V>
+) throws {
+  runLoop.scheduler.requestInvalidation(of: [runLoop.rootIdentity])
+  var renderedFrames = 0
+  try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
+}
+
+@MainActor
+private func focusLeafmostAsyncFrameHeadAbortScaffoldRegion<State, V: View>(
+  in runLoop: TerminalUI.RunLoop<State, V>
+) {
+  guard
+    let leafmost = runLoop.latestSemanticSnapshot.focusRegions.filter({
+      runLoop.localActionRegistry.hasHandler(identity: $0.identity)
+    }).max(
+      by: { $0.scopePath.count < $1.scopePath.count }
+    )
+  else {
+    return
+  }
+  _ = runLoop.focusTracker.setFocus(to: leafmost.identity)
+}
+
+@MainActor
+private func withAsyncFrameHeadAbortAnimationSinks<Value>(
+  _ renderer: DefaultRenderer,
+  operation: () async throws -> Value
+) async throws -> Value {
+  let animationController = renderer.internalAnimationController
+  return try await AnimationRegistrationStorage.withSink(animationController) {
+    try await TransitionRegistrationStorage.withSink(animationController) {
+      try await AnimationCompletionStorage.withSink(animationController) {
+        try await operation()
+      }
+    }
   }
 }
 
