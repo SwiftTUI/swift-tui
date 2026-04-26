@@ -389,7 +389,7 @@ Stage 9 result:
   headless run-loop selection-mode test crash with a signal-10 test helper
   exit. Its existing retained-layout reuse signatures remain in place for the
   main-actor fallback path.
-- `TabViewContainerLayout` remains on the main-actor custom-layout fallback.
+- `TabViewContainerLayout` initially remained on the main-actor custom-layout fallback.
   Attempting to move it into `SendableLayout` made the gallery tab-click runtime
   input path crash with a signal-10 test helper exit, while the simpler async
   renderer surface passed. The fallback is now explicitly covered until that
@@ -429,8 +429,29 @@ Stage 10 result:
 - The existing `InteractiveRuntimeTests/headlessRunLoopChangesSelectionMode`
   runtime path covers the previous crash shape once `ScrollViewLayout` can run
   off-main.
-- `TabViewContainerLayout` remains on the main-actor fallback pending a separate
-  diagnosis of the gallery tab-click runtime crash.
+- `TabViewContainerLayout` remained on the main-actor fallback pending a separate
+  retry against the larger layout worker.
+
+### Stage 11: Move TabView after the worker-stack fix
+
+- [x] Retry `TabViewContainerLayout` on the worker after Stage 10's dedicated
+  layout worker.
+- [x] Migrate `TabViewContainerLayout` to `SendableLayout`.
+- [x] Update async renderer coverage so framework-owned `TabView` requires
+  worker layout timings and zero custom-layout fallback diagnostics.
+- [x] Re-run the gallery tab-click repro that previously crashed.
+
+Stage 11 result:
+
+- `TabViewContainerLayout` now conforms to `SendableLayout` with stable
+  measurement and placement signatures.
+- `AsyncFrameTailRenderingTests` now renders a real `TabView` through
+  `DefaultRenderer.renderAsync` and requires layout worker timings with zero
+  custom-layout fallback diagnostics.
+- `Examples/gallery` `GalleryTabSwitchTests/clickingGalleryTabSwitchesSelection`
+  passes with `TabViewContainerLayout` opted in, indicating the earlier
+  signal-10 failure was covered by the Stage 10 worker-stack fix and indexed
+  source offload gate.
 
 ## Required Tests
 

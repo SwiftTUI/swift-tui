@@ -606,9 +606,9 @@ struct AsyncFrameTailRenderingTests {
     #expect(raster.contains("lazy row 0"))
   }
 
-  @Test("TabView container layout remains on custom-layout fallback")
-  func tabViewContainerLayoutRemainsOnCustomLayoutFallback() async throws {
-    let artifacts = await DefaultRenderer().renderAsync(
+  @Test("framework-owned TabView container layout runs on the frame-tail worker")
+  func frameworkOwnedTabViewContainerLayoutRunsOnFrameTailWorker() async throws {
+    try await assertFrameworkOwnedLayoutWorker(
       TabView(selection: .constant("home")) {
         Tab("Home", value: "home") {
           Text("Home content")
@@ -618,17 +618,10 @@ struct AsyncFrameTailRenderingTests {
           Text("Logs content")
         }
       },
-      context: .init(identity: testIdentity("AsyncFrameworkTabViewLayoutRoot")),
-      proposal: .init(width: 40, height: 4)
+      identity: testIdentity("AsyncFrameworkTabViewLayoutRoot"),
+      proposal: .init(width: 40, height: 4),
+      marker: "Home content"
     )
-    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
-    let raster = artifacts.rasterSurface.lines.joined(separator: "\n")
-
-    #expect(artifacts.diagnostics.customLayoutFallbackCount >= 1)
-    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity != nil)
-    #expect(workerTimings.layoutCompute == .zero)
-    #expect(workerTimings.rasterCompute != .zero)
-    #expect(raster.contains("Home content"))
   }
 
   @Test("worker backlog commits blocked frame before later input batch")
