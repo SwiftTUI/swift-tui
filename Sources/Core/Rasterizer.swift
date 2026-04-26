@@ -1,5 +1,5 @@
 /// Converts draw commands into a terminal cell surface.
-public struct Rasterizer {
+public struct Rasterizer: Sendable {
   private static let emptyCompositingStyle = ResolvedTextStyle()
   private enum ResolvedShapeColorMode {
     case constant(Color?)

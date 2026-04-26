@@ -1,5 +1,5 @@
 /// Lowers placed nodes into draw commands.
-public struct DrawExtractor {
+public struct DrawExtractor: Sendable {
   public init() {}
 
   /// Extracts a draw tree from a placed tree.

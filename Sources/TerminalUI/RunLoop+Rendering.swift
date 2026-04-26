@@ -296,6 +296,271 @@ extension RunLoop {
     }
   }
 
+  package func renderPendingFramesAsync(renderedFrames: inout Int) async throws {
+    observationBridge.attachInvalidator(scheduler)
+
+    let hasDiagnosticsLogger = diagnosticsLogger != nil
+    while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+      // Drain gesture recognizer deadlines before rendering so that
+      // recognizers that transition on this wake see their new phase
+      // reflected in the upcoming render pass.
+      if scheduledFrame.causes.contains(.deadline) {
+        if let triggeredDeadline = scheduledFrame.triggeredDeadline {
+          drainGestureDeadlines(at: triggeredDeadline)
+        } else {
+          assertionFailure(
+            "FrameScheduler produced .deadline cause without a triggeredDeadline; "
+              + "gesture deadlines will not drain this frame."
+          )
+        }
+      }
+      var rerenderedForFocusSync = false
+      var focusSyncBudget = FocusSyncRerenderBudget()
+      var focusSyncBudgetExceeded = false
+      var artifacts: FrameArtifacts?
+      let currentState = stateContainer.state
+      if previousRenderedState != currentState {
+        renderer.forceRootEvaluation()
+        previousRenderedState = currentState
+      }
+      while true {
+        if rerenderedForFocusSync {
+          renderer.forceRootEvaluation()
+        }
+        let renderedArtifacts = await renderer.renderAsync(
+          viewBuilder(
+            (
+              state: currentState,
+              focusedIdentity: focusTracker.currentFocusIdentity
+            )),
+          context: resolveContext(for: scheduledFrame),
+          proposal: proposal(),
+          collectsDiagnostics: hasDiagnosticsLogger
+        )
+        artifacts = renderedArtifacts
+
+        latestSemanticSnapshot = renderedArtifacts.semanticSnapshot
+        runtimeRegistrations.pruneOrphanedGestures(
+          keeping: renderer.liveIdentitySnapshot()
+        )
+
+        // Release pointer capture if the captured region disappeared from
+        // the rendered tree (e.g. a view with an active gesture was removed
+        // mid-interaction).
+        if let capturedID = capturedPointerRouteID,
+          interactionRegion(routeID: capturedID) == nil
+        {
+          capturedPointerRouteID = nil
+          armedPointerRouteID = nil
+          armedPointerRouteUsesPointerHandler = false
+        }
+
+        let focusChanged = focusTracker.updateRegions(
+          renderedArtifacts.semanticSnapshot.focusRegions)
+        latestActivePaletteCommands =
+          commandRegistry
+          .paletteCommands(along: currentFocusScopePath())
+          .map { command in
+            ActivePaletteCommand(
+              name: command.name,
+              description: command.description,
+              isEnabled: command.isEnabled,
+              action: command.action
+            )
+          }
+        let desiredFocusRequest = localFocusBindingRegistry.desiredFocusRequest(
+          allowedIdentities: Set(renderedArtifacts.semanticSnapshot.focusRegions.map(\.identity))
+        )
+        let appliedFocusRequest = applyDesiredFocusRequest(desiredFocusRequest)
+        let focusStateChanged = localFocusBindingRegistry.sync(
+          actualFocusedIdentity: focusTracker.currentFocusIdentity
+        )
+        let resolvedFocusedValues = localFocusedValuesRegistry.focusedValues(
+          for: focusTracker.currentFocusIdentity,
+          in: renderedArtifacts.resolvedTree
+        )
+        let focusedValuesChanged = resolvedFocusedValues != currentFocusedValues
+        if focusedValuesChanged {
+          currentFocusedValues = resolvedFocusedValues
+        }
+        let scrollPositionChanged = localScrollPositionRegistry.sync(
+          focusedIdentity: focusTracker.currentFocusIdentity,
+          focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
+          scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes
+        )
+
+        if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged
+          || scrollPositionChanged
+        {
+          rerenderedForFocusSync = true
+          if !focusSyncBudget.recordRerender() {
+            focusSyncBudgetExceeded = true
+            break
+          }
+          continue
+        }
+        break
+      }
+
+      guard let artifacts else {
+        preconditionFailure("Focus synchronization produced no frame artifacts.")
+      }
+      if focusSyncBudgetExceeded {
+        let causes = scheduledFrame.causes.map(\.rawValue).sorted().joined(separator: "+")
+        assertionFailure(
+          "Focus synchronization did not converge after \(focusSyncBudget.rerenderCount) rerenders for frame causes \(causes). The runtime will present the latest available tree and continue."
+        )
+      }
+
+      let focusPresentation = artifacts.semanticSnapshot.focusPresentation(
+        for: focusTracker.currentFocusIdentity
+      )
+      let presentationDamage: PresentationDamage? =
+        if rerenderedForFocusSync {
+          nil
+        } else {
+          artifacts.presentationDamage
+        }
+      var presentationMetrics = TerminalPresentationMetrics()
+      let presentStart: ContinuousClock.Instant?
+      let presentClock: ContinuousClock?
+      if hasDiagnosticsLogger {
+        let clock = ContinuousClock()
+        presentClock = clock
+        presentStart = clock.now
+      } else {
+        presentClock = nil
+        presentStart = nil
+      }
+      if let damageAwareHost = terminalHost as? any DamageAwareTerminalHosting {
+        presentationMetrics = try damageAwareHost.present(
+          artifacts.rasterSurface,
+          damage: presentationDamage
+        )
+      } else {
+        presentationMetrics = try terminalHost.present(artifacts.rasterSurface)
+      }
+      let presentationDuration: Duration =
+        if let presentStart, let presentClock {
+          presentStart.duration(to: presentClock.now)
+        } else {
+          .zero
+        }
+      lifecycleCoordinator.applyCommittedFrame(
+        plan: artifacts.commitPlan,
+        currentLifecycleRegistry: localLifecycleRegistry,
+        currentTaskRegistry: localTaskRegistry
+      )
+      updateFocusPresentation(focusPresentation)
+      _ = localPreferenceObservationRegistry.applyChanges(
+        since: previousPreferenceObservations
+      )
+      previousPreferenceObservations = localPreferenceObservationRegistry.snapshot()
+      if !postActionInvalidationIdentities.isEmpty {
+        scheduler.requestInvalidation(of: postActionInvalidationIdentities)
+        postActionInvalidationIdentities.removeAll(keepingCapacity: true)
+      }
+      // After rendering, request the next animation frame deadline
+      // whenever the tick reported pending work.  Phase 4 split the
+      // tick result so ``hasPendingWork`` is the unambiguous "schedule
+      // another frame" signal — including for stranded-batch drains
+      // that aren't tied to any visible identity.
+      //
+      // The viewport gate that used to guard this path
+      // (``redrawIdentities.isDisjoint(with: drawnIdentities)``) is
+      // gone: its purpose was to quiesce ticks driving animations into
+      // clipped subtrees, but the gate had a one-way trap — once a
+      // tick produced an empty redraw set the only thing that could
+      // restart the loop was another tick.  ``redrawIdentities`` is
+      // still consulted by the incremental presentation diff for
+      // dirty-region calculation; only the wake-up decision is
+      // unconditional now.
+      let animationTick = renderer.internalAnimationController.lastTickResult
+      if animationTick.hasPendingWork,
+        let nextDeadline = animationTick.nextDeadline
+      {
+        let now = MonotonicInstant.now()
+        let scheduledDeadline =
+          if nextDeadline > now {
+            nextDeadline
+          } else {
+            now.advanced(by: AnimationWakeTiming.minimumLeadTime)
+          }
+        scheduler.requestDeadline(scheduledDeadline)
+      }
+      observationBridge.prune(
+        keeping: renderer.liveIdentitySnapshot()
+      )
+      renderedFrames += 1
+
+      if let diagnosticsLogger {
+        let diag = artifacts.diagnostics
+        let damageDiagnostics = diag.presentationDamage
+        let cacheMetrics = diag.measurementCache
+        let cacheHitRate: Double? =
+          if let cacheMetrics, cacheMetrics.lookups > 0 {
+            Double(cacheMetrics.hits) / Double(cacheMetrics.lookups)
+          } else {
+            nil
+          }
+        let pipelineTotal = diag.phaseTimings?.total ?? .zero
+        let causeSummary = scheduledFrame.causes
+          .map(\.rawValue)
+          .sorted()
+          .joined(separator: "+")
+        diagnosticsLogger.log(
+          FrameDiagnosticRecord(
+            frameNumber: renderedFrames,
+            causeSummary: causeSummary,
+            focusSyncRerenders: focusSyncBudget.rerenderCount,
+            invalidatedIdentityCount: diag.invalidatedIdentities.count,
+            resolvedNodeCount: diag.resolvedNodeCount,
+            resolvedNodesComputed: diag.resolvedNodesComputed,
+            resolvedNodesReused: diag.resolvedNodesReused,
+            measuredNodeCount: diag.measuredNodeCount,
+            measuredNodesComputed: diag.measuredNodesComputed,
+            measuredNodesReused: diag.measuredNodesReused,
+            placedNodeCount: diag.placedNodeCount,
+            drawNodeCount: diag.drawNodeCount,
+            interactionRegionCount: diag.interactionRegionCount,
+            focusRegionCount: diag.focusRegionCount,
+            phaseTimings: diag.phaseTimings,
+            workerTimings: diag.workerTimings,
+            presentationStrategy: presentationMetrics.strategy == .fullRepaint
+              ? "full" : "incremental",
+            presentationBytesWritten: presentationMetrics.bytesWritten,
+            presentationLinesTouched: presentationMetrics.linesTouched,
+            presentationCellsChanged: presentationMetrics.cellsChanged,
+            presentationDuration: presentationDuration,
+            damageRowCount: damageDiagnostics?.textRowCount,
+            damageRangeAwareRowCount: damageDiagnostics?.rangeAwareTextRowCount,
+            damageTextSpanCount: damageDiagnostics?.textSpanCount,
+            damageTextCellCount: damageDiagnostics?.textCellCount,
+            damageGraphicsInvalidationCount: damageDiagnostics?.graphicsInvalidationCount,
+            damageRequiresFullTextRepaint: damageDiagnostics?.requiresFullTextRepaint ?? false,
+            damageRequiresFullGraphicsReplay: damageDiagnostics?.requiresFullGraphicsReplay
+              ?? false,
+            presentationUsedSynchronizedOutput: presentationMetrics.usedSynchronizedOutput,
+            presentationGraphicsReplayScope: presentationMetrics.graphicsReplayScope.rawValue,
+            presentationGraphicsAttachmentsReplayed: presentationMetrics
+              .graphicsAttachmentsReplayed,
+            presentationEditOperationLowering: presentationMetrics.editOperationLowering.rawValue,
+            presentationEditOperationCount: presentationMetrics.editOperationCount,
+            measurementCacheHitRate: cacheHitRate,
+            totalFrameDuration: pipelineTotal + presentationDuration
+          )
+        )
+      }
+
+      if let transientPressedIdentity,
+        transientPressedIdentity == pressedIdentity
+      {
+        self.transientPressedIdentity = nil
+        setPressedIdentity(nil, transient: false)
+      }
+    }
+  }
+
   package func applyDesiredFocusRequest(
     _ request: FocusBindingRequest
   ) -> Bool {
