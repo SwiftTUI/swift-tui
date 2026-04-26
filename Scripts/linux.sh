@@ -38,6 +38,8 @@ Interactive:
 
 Repo-aware:
   test              Run \`swift test\`
+  cli-test          Run \`swift test\` for Runners/TerminalUICLI
+  cli-build-tests   Build Runners/TerminalUICLI tests without running them
   examples          Build the Linux example packages
   web               Build the browser examples after installing Bun and the Wasm SDK
   workflow          Mirror the Examples Linux workflow: examples + web
@@ -99,6 +101,13 @@ container_running() {
   [[ "$("$CONTAINER_TOOL" inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || printf false)" == "true" ]]
 }
 
+container_matches_config() {
+  ensure_container_tool
+  [[ "$("$CONTAINER_TOOL" inspect -f '{{.Config.WorkingDir}}' "$CONTAINER_NAME")" == "$CONTAINER_DIR" ]] &&
+    "$CONTAINER_TOOL" inspect -f '{{range .Mounts}}{{println .Destination}}{{end}}' "$CONTAINER_NAME" |
+      grep -Fxq "$CONTAINER_DIR"
+}
+
 ensure_volume() {
   ensure_container_tool
   local volume_name="$1"
@@ -122,6 +131,11 @@ ensure_container() {
   ensure_volume "$SWIFTPM_HOME_VOLUME"
   ensure_volume "$SWIFTPM_CACHE_VOLUME"
   ensure_volume "$BUN_VOLUME"
+
+  if container_exists && ! container_matches_config; then
+    log "Recreating $CONTAINER_NAME for workspace $CONTAINER_DIR"
+    "$CONTAINER_TOOL" rm -f "$CONTAINER_NAME" >/dev/null
+  fi
 
   if ! container_exists; then
     log "Creating $CONTAINER_NAME"
@@ -241,6 +255,22 @@ cmd_test() {
   "
 }
 
+cmd_cli_test() {
+  run_shell_script "
+    swift test \
+      --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/terminaluicli") \
+      --package-path Runners/TerminalUICLI
+  "
+}
+
+cmd_cli_build_tests() {
+  run_shell_script "
+    swift build --build-tests \
+      --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/terminaluicli") \
+      --package-path Runners/TerminalUICLI
+  "
+}
+
 cmd_web() {
   ensure_bun
   ensure_wasm_sdk
@@ -323,6 +353,12 @@ main() {
       ;;
     test)
       cmd_test
+      ;;
+    cli-test)
+      cmd_cli_test
+      ;;
+    cli-build-tests)
+      cmd_cli_build_tests
       ;;
     examples)
       cmd_examples
