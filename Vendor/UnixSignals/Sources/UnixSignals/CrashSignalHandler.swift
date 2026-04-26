@@ -208,11 +208,20 @@
 
         var action = sigaction()
         #if canImport(Darwin)
+          // __sigaction_u is a C union; assigning into one of its members has
+          // no static type-safety guarantee, so this read is genuinely unsafe.
           unsafe action.__sigaction_u.__sa_handler = crashSignalHandler
         #elseif canImport(Glibc) || canImport(Musl) || canImport(Android)
-          unsafe action.__sigaction_handler = .init(sa_handler: crashSignalHandler)
+          // The Glibc/Musl/Android shape is a typed struct, no `unsafe` needed.
+          action.__sigaction_handler = .init(sa_handler: crashSignalHandler)
         #endif
-        action.sa_flags = Int32(SA_RESETHAND | SA_ONSTACK)
+        // SA_RESETHAND/SA_ONSTACK Swift-import types differ across platforms
+        // (Glibc surfaces SA_RESETHAND as UInt32 because 0x80000000 overflows
+        // Int32). Normalize through UInt32 so the OR is well-typed everywhere.
+        let saFlags =
+          UInt32(truncatingIfNeeded: SA_RESETHAND)
+          | UInt32(truncatingIfNeeded: SA_ONSTACK)
+        action.sa_flags = Int32(truncatingIfNeeded: saFlags)
         unsafe sigemptyset(&action.sa_mask)
 
         var previousAction = sigaction()
