@@ -304,6 +304,44 @@ struct AsyncFrameTailRenderingTests {
     #expect(mainActorTimings.suspended != .zero)
   }
 
+  @Test("worker-safe custom layout snapshot runs layout on the frame-tail worker")
+  func workerSafeCustomLayoutSnapshotRunsLayoutOnFrameTailWorker() async throws {
+    let rootIdentity = testIdentity("AsyncWorkerCustomLayoutRoot")
+    let recorder = AsyncFrameTailWorkerCustomLayoutRecorder()
+
+    let artifacts = await DefaultRenderer().renderAsync(
+      AsyncFrameTailWorkerCustomLayout(recorder: recorder) {
+        Text("worker")
+        Text("layout")
+      },
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 32, height: 6)
+    )
+
+    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let mainActorTimings = try #require(artifacts.diagnostics.mainActorTimings)
+    let workerLayoutState = recorder.state
+
+    #expect(artifacts.diagnostics.customLayoutFallbackCount == 0)
+    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == nil)
+    guard case .custom(let customLayoutHandle) = artifacts.resolvedTree.layoutBehavior else {
+      Issue.record("expected custom layout root")
+      return
+    }
+    #expect(customLayoutHandle.executionCapability == .worker)
+    #expect(customLayoutHandle.canRunOnWorker)
+    #expect(customLayoutHandle.workerProxy != nil)
+    #expect(workerLayoutState.measureCount >= 1)
+    #expect(workerLayoutState.placeCount >= 1)
+    #expect(workerLayoutState.measureRanOnMainThread == false)
+    #expect(workerLayoutState.placeRanOnMainThread == false)
+    #expect(workerTimings.layoutCompute != .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(mainActorTimings.suspended != .zero)
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("worker"))
+    #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("layout"))
+  }
+
   @Test("worker backlog commits blocked frame before later input batch")
   func workerBacklogCommitsBlockedFrameBeforeLaterInputBatch() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailBacklogRoot")
@@ -474,6 +512,138 @@ private struct AsyncFrameTailCustomLayout: Layout {
         proposal: .init(width: size.width, height: size.height)
       )
       y += size.height
+    }
+  }
+}
+
+private struct AsyncFrameTailWorkerCustomLayout<Content: View>: View, ResolvableView {
+  var recorder: AsyncFrameTailWorkerCustomLayoutRecorder
+  var content: Content
+
+  init(
+    recorder: AsyncFrameTailWorkerCustomLayoutRecorder,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.recorder = recorder
+    self.content = content()
+  }
+
+  package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    let handle = CustomLayoutHandle(
+      AsyncFrameTailMainActorOnlyCustomLayoutProxy(),
+      measurementReuseSignature: "AsyncFrameTailWorkerCustomLayout.measure",
+      placementReuseSignature: "AsyncFrameTailWorkerCustomLayout.place",
+      workerProxy: asyncFrameTailWorkerCustomLayoutSnapshot(recorder: recorder)
+    )
+    return [
+      ResolvedNode(
+        identity: context.identity,
+        kind: .view("AsyncFrameTailWorkerCustomLayout"),
+        children: resolveDeclaredChildren(
+          content,
+          in: context,
+          kindName: "AsyncFrameTailWorkerCustomLayout"
+        ),
+        environmentSnapshot: context.environment,
+        transactionSnapshot: context.transaction,
+        layoutBehavior: .custom(handle)
+      )
+    ]
+  }
+}
+
+private func asyncFrameTailWorkerCustomLayoutSnapshot(
+  recorder: AsyncFrameTailWorkerCustomLayoutRecorder
+) -> WorkerCustomLayoutSnapshot {
+  WorkerCustomLayoutSnapshot(
+    debugName: "AsyncFrameTailWorkerCustomLayout",
+    measureContainer: { engine, node, _ in
+      recorder.recordMeasure()
+      let sizes = node.children.map { child in
+        engine.measure(child, proposal: .unspecified).measuredSize
+      }
+      return Size(
+        width: sizes.map(\.width).max() ?? 0,
+        height: sizes.reduce(0) { $0 + $1.height }
+      )
+    },
+    placeSubviews: { engine, node, _, bounds in
+      recorder.recordPlace()
+      var y = bounds.origin.y
+      return node.children.map { child in
+        let childMeasurement = engine.measure(child, proposal: .unspecified)
+        defer {
+          y += childMeasurement.measuredSize.height
+        }
+        return engine.place(
+          child,
+          measured: childMeasurement,
+          in: Rect(
+            origin: Point(x: bounds.origin.x, y: y),
+            size: childMeasurement.measuredSize
+          )
+        )
+      }
+    }
+  )
+}
+
+private final class AsyncFrameTailMainActorOnlyCustomLayoutProxy: CustomLayoutProxy {
+  var debugName: String {
+    "AsyncFrameTailWorkerCustomLayout"
+  }
+
+  func measureContainer(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    proposal _: ProposedSize
+  ) -> Size {
+    preconditionFailure("worker custom layout must use its worker proxy for measurement")
+  }
+
+  func measureChildren(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    proposal _: ProposedSize
+  ) -> [MeasuredNode] {
+    preconditionFailure("worker custom layout must use its worker proxy for child measurement")
+  }
+
+  func placeSubviews(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    measured _: MeasuredNode,
+    in _: Rect
+  ) -> [PlacedNode] {
+    preconditionFailure("worker custom layout must use its worker proxy for placement")
+  }
+}
+
+private final class AsyncFrameTailWorkerCustomLayoutRecorder: Sendable {
+  struct State: Sendable {
+    var measureCount = 0
+    var placeCount = 0
+    var measureRanOnMainThread: Bool?
+    var placeRanOnMainThread: Bool?
+  }
+
+  private let stateStorage = Mutex(State())
+
+  var state: State {
+    stateStorage.withLock { $0 }
+  }
+
+  func recordMeasure() {
+    stateStorage.withLock { state in
+      state.measureCount += 1
+      state.measureRanOnMainThread = Thread.isMainThread
+    }
+  }
+
+  func recordPlace() {
+    stateStorage.withLock { state in
+      state.placeCount += 1
+      state.placeRanOnMainThread = Thread.isMainThread
     }
   }
 }
