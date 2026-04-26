@@ -19,6 +19,12 @@ package struct FocusSyncRerenderBudget: Equatable, Sendable {
 }
 
 extension RunLoop {
+  package struct RenderIntentCoalescingDiagnostics: Equatable, Sendable {
+    package var desiredGeneration: UInt64
+    package var coalescedEventBatches: Int
+    package var coalescedWakeCauses: Set<WakeCause>
+  }
+
   private enum AnimationWakeTiming {
     // When a frame overruns its nominal 33 ms budget, the controller's
     // requested deadline can already be in the past by the time the
@@ -31,11 +37,35 @@ extension RunLoop {
     static var minimumLeadTime: Duration { .milliseconds(1) }
   }
 
+  package func nextRenderIntentDiagnostics(
+    for scheduledFrame: ScheduledFrame
+  ) -> RenderIntentCoalescingDiagnostics {
+    defer {
+      nextRenderIntentGeneration &+= 1
+      pendingCoalescedEventBatches = 0
+      pendingCoalescedWakeCauses.removeAll(keepingCapacity: true)
+    }
+
+    return RenderIntentCoalescingDiagnostics(
+      desiredGeneration: nextRenderIntentGeneration,
+      coalescedEventBatches: pendingCoalescedEventBatches,
+      coalescedWakeCauses: pendingCoalescedWakeCauses.union(scheduledFrame.causes)
+    )
+  }
+
+  package func formattedWakeCauses(
+    _ causes: Set<WakeCause>
+  ) -> String {
+    let values = causes.map(\.rawValue).sorted()
+    return values.isEmpty ? "-" : values.joined(separator: "+")
+  }
+
   package func renderPendingFrames(renderedFrames: inout Int) throws {
     observationBridge.attachInvalidator(scheduler)
 
     let hasDiagnosticsLogger = diagnosticsLogger != nil
     while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+      let renderIntentDiagnostics = nextRenderIntentDiagnostics(for: scheduledFrame)
       // Drain gesture recognizer deadlines before rendering so that
       // recognizers that transition on this wake see their new phase
       // reflected in the upcoming render pass.
@@ -263,6 +293,11 @@ extension RunLoop {
             focusRegionCount: diag.focusRegionCount,
             phaseTimings: diag.phaseTimings,
             renderGenerations: diag.renderGenerations,
+            desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+            coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches,
+            coalescedWakeCauses: formattedWakeCauses(
+              renderIntentDiagnostics.coalescedWakeCauses
+            ),
             workerTimings: diag.workerTimings,
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
@@ -310,6 +345,7 @@ extension RunLoop {
 
     let hasDiagnosticsLogger = diagnosticsLogger != nil
     while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+      let renderIntentDiagnostics = nextRenderIntentDiagnostics(for: scheduledFrame)
       // Drain gesture recognizer deadlines before rendering so that
       // recognizers that transition on this wake see their new phase
       // reflected in the upcoming render pass.
@@ -537,6 +573,11 @@ extension RunLoop {
             focusRegionCount: diag.focusRegionCount,
             phaseTimings: diag.phaseTimings,
             renderGenerations: diag.renderGenerations,
+            desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+            coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches,
+            coalescedWakeCauses: formattedWakeCauses(
+              renderIntentDiagnostics.coalescedWakeCauses
+            ),
             workerTimings: diag.workerTimings,
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
