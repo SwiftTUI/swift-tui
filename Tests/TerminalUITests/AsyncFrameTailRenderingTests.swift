@@ -335,6 +335,9 @@ struct AsyncFrameTailRenderingTests {
     #expect(workerLayoutState.placeCount >= 1)
     #expect(workerLayoutState.measureRanOnMainThread == false)
     #expect(workerLayoutState.placeRanOnMainThread == false)
+    #expect(workerLayoutState.cacheApplyCount == 1)
+    #expect(workerLayoutState.cacheApplyRanOnMainThread == true)
+    #expect(workerLayoutState.cacheApplyIdentity == rootIdentity)
     #expect(workerTimings.layoutCompute != .zero)
     #expect(workerTimings.rasterCompute != .zero)
     #expect(mainActorTimings.suspended != .zero)
@@ -557,21 +560,35 @@ private func asyncFrameTailWorkerCustomLayoutSnapshot(
 ) -> WorkerCustomLayoutSnapshot {
   WorkerCustomLayoutSnapshot(
     debugName: "AsyncFrameTailWorkerCustomLayout",
-    measureContainer: { engine, node, _ in
+    measureContainer: { engine, node, _, passContext in
       recorder.recordMeasure()
       let sizes = node.children.map { child in
-        engine.measure(child, proposal: .unspecified).measuredSize
+        engine.measure(
+          child,
+          proposal: .unspecified,
+          passContext: passContext
+        ).measuredSize
       }
       return Size(
         width: sizes.map(\.width).max() ?? 0,
         height: sizes.reduce(0) { $0 + $1.height }
       )
     },
-    placeSubviews: { engine, node, _, bounds in
+    placeSubviews: { engine, node, _, bounds, passContext in
       recorder.recordPlace()
+      let identity = node.identity
+      passContext?.recordWorkerCustomLayoutCacheUpdate(
+        .init(identity: identity) {
+          recorder.recordCacheApply(identity: identity)
+        }
+      )
       var y = bounds.origin.y
       return node.children.map { child in
-        let childMeasurement = engine.measure(child, proposal: .unspecified)
+        let childMeasurement = engine.measure(
+          child,
+          proposal: .unspecified,
+          passContext: passContext
+        )
         defer {
           y += childMeasurement.measuredSize.height
         }
@@ -581,7 +598,8 @@ private func asyncFrameTailWorkerCustomLayoutSnapshot(
           in: Rect(
             origin: Point(x: bounds.origin.x, y: y),
             size: childMeasurement.measuredSize
-          )
+          ),
+          passContext: passContext
         )
       }
     }
@@ -625,6 +643,9 @@ private final class AsyncFrameTailWorkerCustomLayoutRecorder: Sendable {
     var placeCount = 0
     var measureRanOnMainThread: Bool?
     var placeRanOnMainThread: Bool?
+    var cacheApplyCount = 0
+    var cacheApplyRanOnMainThread: Bool?
+    var cacheApplyIdentity: Identity?
   }
 
   private let stateStorage = Mutex(State())
@@ -644,6 +665,15 @@ private final class AsyncFrameTailWorkerCustomLayoutRecorder: Sendable {
     stateStorage.withLock { state in
       state.placeCount += 1
       state.placeRanOnMainThread = Thread.isMainThread
+    }
+  }
+
+  @MainActor
+  func recordCacheApply(identity: Identity) {
+    stateStorage.withLock { state in
+      state.cacheApplyCount += 1
+      state.cacheApplyRanOnMainThread = Thread.isMainThread
+      state.cacheApplyIdentity = identity
     }
   }
 }

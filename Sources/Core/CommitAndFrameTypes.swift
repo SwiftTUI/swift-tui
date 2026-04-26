@@ -449,6 +449,7 @@ package final class LayoutPassContext: Sendable {
   private struct MutableState: Sendable {
     var scrollViewportContext: ScrollViewportContext?
     var workMetrics: LayoutWorkMetrics
+    var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
   }
 
   package let retainedLayout: RetainedLayoutSession?
@@ -465,7 +466,8 @@ package final class LayoutPassContext: Sendable {
     state = .init(
       .init(
         scrollViewportContext: scrollViewportContext,
-        workMetrics: .init()
+        workMetrics: .init(),
+        workerCustomLayoutCacheUpdates: []
       )
     )
   }
@@ -478,10 +480,38 @@ package final class LayoutPassContext: Sendable {
     state.withLock { $0.workMetrics }
   }
 
+  package var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate] {
+    state.withLock { $0.workerCustomLayoutCacheUpdates }
+  }
+
   package func updateWorkMetrics(
     _ update: (inout LayoutWorkMetrics) -> Void
   ) {
     state.withLock { update(&$0.workMetrics) }
+  }
+
+  package func recordWorkerCustomLayoutCacheUpdate(
+    _ update: WorkerCustomLayoutCacheUpdate
+  ) {
+    state.withLock { $0.workerCustomLayoutCacheUpdates.append(update) }
+  }
+}
+
+package struct WorkerCustomLayoutCacheUpdate: Sendable {
+  package var identity: Identity
+  private let applyHandler: @MainActor @Sendable () -> Void
+
+  package init(
+    identity: Identity,
+    apply: @escaping @MainActor @Sendable () -> Void
+  ) {
+    self.identity = identity
+    applyHandler = apply
+  }
+
+  @MainActor
+  package func apply() {
+    applyHandler()
   }
 }
 

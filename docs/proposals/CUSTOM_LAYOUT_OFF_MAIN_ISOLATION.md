@@ -241,11 +241,31 @@ git commit -m "test(layout): prototype worker-safe custom layout snapshot"
 
 ### Stage 4: Add cache handoff
 
-- Snapshot cache input on the main actor before offload.
-- Return cache output with the worker result.
-- Apply cache updates on the main actor only after the frame is still the
+- [x] Snapshot cache input on the main actor before offload.
+- [x] Return cache output with the worker result.
+- [x] Apply cache updates on the main actor only after the frame is still the
   committed frame.
-- Drop cache output for abandoned stale-frame experiments.
+- [x] Keep cache output application centralized so abandoned stale-frame
+  experiments can drop output by not invoking the apply step.
+
+Stage 4 result:
+
+- `LayoutPassContext` now carries worker-produced
+  `WorkerCustomLayoutCacheUpdate` values alongside layout work metrics.
+- Worker-capable custom layout callbacks receive the active `LayoutPassContext`
+  so they can emit cache output without mutating main-actor-owned state on the
+  worker.
+- `FrameTailLayoutOutput` returns the collected cache updates to the main actor.
+- `DefaultRenderer` applies returned worker custom-layout cache updates on the
+  main actor after commit planning, and before storing the committed retained
+  frame.
+- The worker snapshot regression test verifies that cache apply runs once, runs
+  on the main thread, and applies to the committed custom-layout identity.
+
+Current limitation: there is still no public authored-layout cache snapshot.
+The handoff channel is now in place, but public `LayoutProxyBox` remains
+main-actor-only until Stage 5 decides the opt-in surface and the cache payload
+shape for real authored layouts.
 
 Commit boundary:
 
@@ -295,7 +315,7 @@ git commit -m "docs(layout): define off-main custom layout opt-in"
 Keep the fallback for public authored custom layouts and do not attempt to move
 them off-main by force.
 
-The next useful implementation step is Stage 4: add an explicit cache handoff
-for worker-capable custom layouts. That keeps the landed built-in layout offload
-correct while turning the package-internal worker snapshot from a no-cache
-prototype into a candidate execution model with SwiftUI-shaped cache semantics.
+The next useful implementation step is Stage 5: decide whether the public opt-in
+should be protocol-based, modifier-based, or both. Keep public authored
+`Layout` on the main-actor fallback path until that opt-in surface can express
+the Sendable value and cache constraints clearly.
