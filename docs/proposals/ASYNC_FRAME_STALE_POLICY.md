@@ -2,8 +2,8 @@
 
 ## Status
 
-Stages 1, 2, and scheduler Stage 3A implemented. Ordered commit remains the
-policy for future frame-tail cancellation or generation-dropping work.
+Stages 1, 2, and scheduler Stages 3A/3B implemented. Ordered commit remains
+the policy for future frame-tail cancellation or generation-dropping work.
 
 See [`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md)
 for the concrete design needed before Stage 3 can safely cancel unstarted tail
@@ -257,6 +257,7 @@ Design prerequisite:
 - [x] Land the render-generation scheduler design in
   [`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md).
 - [x] Coalesce not-yet-started render intent before starting the next render.
+- [x] Extract the async renderer frame-head and finish boundaries.
 
 - Teach the serial worker to skip jobs that have not started and are superseded.
 - Restrict cancellation to jobs with no worker-owned mutation.

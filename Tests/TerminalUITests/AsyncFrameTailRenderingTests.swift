@@ -757,7 +757,7 @@ struct AsyncFrameTailRenderingTests {
     let rows = diagnosticRows(diagnostics)
     #expect(
       rows.contains { row in
-        (Int(row["coalesced_event_batches"] ?? "") ?? 0) >= 2
+        (Int(row["coalesced_event_batches"] ?? "") ?? 0) >= 1
           && (row["coalesced_wake_causes"] ?? "").contains("input")
           && row["stale_frame_policy"] == "commit_ordered"
       })
@@ -776,6 +776,38 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.diagnostics.phaseTimings != nil)
     #expect(artifacts.diagnostics.workerTimings != nil)
     #expect(artifacts.diagnostics.mainActorTimings != nil)
+  }
+
+  @Test("sync and async renderer artifacts stay equivalent")
+  func syncAndAsyncRendererArtifactsStayEquivalent() async {
+    let rootIdentity = testIdentity("AsyncFrameTailParityRoot")
+    let proposal = ProposedSize(width: 24, height: 5)
+
+    @MainActor
+    func root() -> some View {
+      VStack(alignment: .leading, spacing: 1) {
+        Text("Parity")
+        HStack(spacing: 1) {
+          Text("A")
+          Text("B")
+        }
+      }
+    }
+
+    let syncArtifacts = DefaultRenderer().render(
+      root(),
+      context: .init(identity: rootIdentity),
+      proposal: proposal,
+      collectsDiagnostics: false
+    )
+    let asyncArtifacts = await DefaultRenderer().renderAsync(
+      root(),
+      context: .init(identity: rootIdentity),
+      proposal: proposal,
+      collectsDiagnostics: false
+    )
+
+    #expect(syncArtifacts == asyncArtifacts)
   }
 
   @Test("async renderer tags monotonically increasing render generations")

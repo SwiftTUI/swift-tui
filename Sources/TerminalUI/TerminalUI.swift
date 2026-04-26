@@ -128,6 +128,23 @@ private struct FrameTailOutput {
   var workerCompletedAt: ContinuousClock.Instant?
 }
 
+private struct FrameHeadDraft {
+  var clock: ContinuousClock?
+  var renderGeneration: RenderGeneration
+  var resolveContext: ResolveContext
+  var frameContext: FrameContext
+  var resolved: ResolvedNode
+  var frameTailInput: FrameTailInput
+  var animationTimestamp: MonotonicInstant
+  var resolveDuration: Duration
+}
+
+private struct AsyncFrameTailDraftOutput {
+  var layout: FrameTailLayoutOutput
+  var tail: FrameTailOutput
+  var renderSuspensionDuration: Duration
+}
+
 private struct FrameTailWorkerResult<Value> {
   var value: Value
   var enqueueToStart: Duration
@@ -1352,6 +1369,27 @@ public struct DefaultRenderer {
     proposal: ProposedSize,
     collectsDiagnostics: Bool = true
   ) async -> FrameArtifacts {
+    let draft = prepareFrameHead(
+      root,
+      context: context,
+      proposal: proposal,
+      collectsDiagnostics: collectsDiagnostics
+    )
+    let tailOutput = await renderFrameTailAsync(draft)
+    return finishFrame(
+      draft: draft,
+      tailOutput: tailOutput,
+      collectsDiagnostics: collectsDiagnostics
+    )
+  }
+
+  @MainActor
+  private func prepareFrameHead<V: View>(
+    _ root: V,
+    context: ResolveContext,
+    proposal: ProposedSize,
+    collectsDiagnostics: Bool
+  ) -> FrameHeadDraft {
     let clock: ContinuousClock? = collectsDiagnostics ? ContinuousClock() : nil
     let renderGeneration = renderGenerationSequencer.next()
 
@@ -1457,78 +1495,110 @@ public struct DefaultRenderer {
         layoutPassContext: layoutPassContext
       )
     }
+
+    return FrameHeadDraft(
+      clock: clock,
+      renderGeneration: renderGeneration,
+      resolveContext: resolveContext,
+      frameContext: frameContext,
+      resolved: resolved,
+      frameTailInput: frameTailInput,
+      animationTimestamp: animationTimestamp,
+      resolveDuration: resolveDuration
+    )
+  }
+
+  @MainActor
+  private func renderFrameTailAsync(
+    _ draft: FrameHeadDraft
+  ) async -> AsyncFrameTailDraftOutput {
     let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
-    let layoutSuspends = frameTailRenderer.canOffloadLayout(frameTailInput)
-    let layoutSuspensionStart = layoutSuspends ? clock?.now : nil
+    let layoutSuspends = frameTailRenderer.canOffloadLayout(draft.frameTailInput)
+    let layoutSuspensionStart = layoutSuspends ? draft.clock?.now : nil
     if layoutSuspends {
       suspensionHooks?.onBegin?()
     }
-    let tailLayout = await frameTailRenderer.renderLayoutAsync(
-      frameTailInput,
-      clock: clock
+    let layout = await frameTailRenderer.renderLayoutAsync(
+      draft.frameTailInput,
+      clock: draft.clock
     )
     if layoutSuspends {
       suspensionHooks?.onEnd?()
     }
     let layoutSuspensionDuration =
-      if let layoutSuspensionStart, let clock {
+      if let layoutSuspensionStart, let clock = draft.clock {
         layoutSuspensionStart.duration(to: clock.now)
       } else {
         Duration.zero
       }
-    let placed = tailLayout.baselinePlaced
-    animationController.capturePlacedTree(tailLayout.baselinePlaced)
+    let placed = layout.baselinePlaced
+    animationController.capturePlacedTree(layout.baselinePlaced)
     let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
       for: placed,
-      at: animationTimestamp
+      at: draft.animationTimestamp
     )
-    let rasterSuspensionStart = clock?.now
+    let rasterSuspensionStart = draft.clock?.now
     suspensionHooks?.onBegin?()
     let tail = await frameTailRenderer.renderRasterAsync(
-      frameTailInput,
-      layout: tailLayout,
+      draft.frameTailInput,
+      layout: layout,
       placed: placed,
       animationOverlaySnapshot: animationOverlaySnapshot,
-      clock: clock
+      clock: draft.clock
     )
     suspensionHooks?.onEnd?()
     let rasterSuspensionDuration =
-      if let rasterSuspensionStart, let clock {
+      if let rasterSuspensionStart, let clock = draft.clock {
         rasterSuspensionStart.duration(to: clock.now)
       } else {
         Duration.zero
       }
-    let renderSuspensionDuration = layoutSuspensionDuration + rasterSuspensionDuration
+
+    return AsyncFrameTailDraftOutput(
+      layout: layout,
+      tail: tail,
+      renderSuspensionDuration: layoutSuspensionDuration + rasterSuspensionDuration
+    )
+  }
+
+  @MainActor
+  private func finishFrame(
+    draft: FrameHeadDraft,
+    tailOutput: AsyncFrameTailDraftOutput,
+    collectsDiagnostics: Bool
+  ) -> FrameArtifacts {
+    let layout = tailOutput.layout
+    let tail = tailOutput.tail
     var workerTimings = tail.diagnostics.workerTimings
     if var timings = workerTimings,
-      let clock,
+      let clock = draft.clock,
       let workerCompletedAt = tail.workerCompletedAt
     {
       timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
       workerTimings = timings
     }
-    let (commit, commitDuration) = measurePhase(clock: clock) {
+    let (commit, commitDuration) = measurePhase(clock: draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: resolveContext.identity,
-        resolved: resolved,
+        rootIdentity: draft.resolveContext.identity,
+        resolved: draft.resolved,
         placed: tail.placed
       )
       return commitPlanner.plan(
-        resolved: resolved,
+        resolved: draft.resolved,
         placed: tail.placed,
         semantics: tail.semantics,
-        transaction: frameContext.transaction,
+        transaction: draft.frameContext.transaction,
         lifecycleEvents: lifecycleEvents
       )
     }
-    applyWorkerCustomLayoutCacheUpdates(tailLayout.workerCustomLayoutCacheUpdates)
+    applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
     )
     let diagnostics: FrameDiagnostics
     if collectsDiagnostics {
       let phaseTimings = FramePhaseTimings(
-        resolve: resolveDuration,
+        resolve: draft.resolveDuration,
         measure: tail.diagnostics.measureDuration,
         place: tail.diagnostics.placeDuration,
         semantics: tail.diagnostics.semanticsDuration,
@@ -1537,30 +1607,30 @@ public struct DefaultRenderer {
         commit: commitDuration
       )
       let mainActorTimings = FrameMainActorTimings(
-        blocked: resolveDuration
-          + (tailLayout.ranOffMain
+        blocked: draft.resolveDuration
+          + (layout.ranOffMain
             ? .zero
             : tail.diagnostics.measureDuration + tail.diagnostics.placeDuration)
           + commitDuration,
-        suspended: renderSuspensionDuration
+        suspended: tailOutput.renderSuspensionDuration
       )
       diagnostics = FrameDiagnostics.summarize(
-        resolved: resolved,
+        resolved: draft.resolved,
         measured: tail.measured,
         placed: tail.placed,
         semantics: tail.semantics,
         draw: tail.draw,
-        invalidatedIdentities: frameContext.invalidatedIdentities,
-        resolveWork: resolveContext.resolveWorkTracker?.snapshot,
+        invalidatedIdentities: draft.frameContext.invalidatedIdentities,
+        resolveWork: draft.resolveContext.resolveWorkTracker?.snapshot,
         layoutWork: tail.diagnostics.layoutWork,
         presentationDamage: tail.presentationDamage,
         presentationSurfaceWidth: tail.raster.size.width,
         phaseTimings: phaseTimings,
         renderGenerations: .init(
-          render: renderGeneration,
-          layoutInput: frameTailInput.generation,
-          layoutOutput: tailLayout.generation,
-          rasterInput: frameTailInput.generation,
+          render: draft.renderGeneration,
+          layoutInput: draft.frameTailInput.generation,
+          layoutOutput: layout.generation,
+          rasterInput: draft.frameTailInput.generation,
           rasterOutput: tail.generation
         ),
         workerTimings: workerTimings,
@@ -1571,7 +1641,7 @@ public struct DefaultRenderer {
       diagnostics = .init()
     }
     let artifacts = FrameArtifacts(
-      resolvedTree: resolved,
+      resolvedTree: draft.resolved,
       measuredTree: tail.measured,
       placedTree: tail.placed,
       semanticSnapshot: tail.semantics,
