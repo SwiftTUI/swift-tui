@@ -33,6 +33,11 @@ public struct SnapshotRenderer {
       lines.append("phaseTimings=nil")
     }
 
+    let generations = diagnostics.renderGenerations
+    lines.append(
+      "renderGenerations=render:\(describe(generations.render)) layoutInput:\(describe(generations.layoutInput)) layoutOutput:\(describe(generations.layoutOutput)) rasterInput:\(describe(generations.rasterInput)) rasterOutput:\(describe(generations.rasterOutput))"
+    )
+
     if let workerTimings = diagnostics.workerTimings {
       lines.append(
         "workerTimings=layoutEnqueue:\(describe(workerTimings.layoutEnqueueToStart)) layoutCompute:\(describe(workerTimings.layoutCompute)) rasterEnqueue:\(describe(workerTimings.rasterEnqueueToStart)) rasterCompute:\(describe(workerTimings.rasterCompute)) completionToCommit:\(describe(workerTimings.completionToMainCommit))"
@@ -169,6 +174,18 @@ extension SnapshotRenderer {
       + Double(components.attoseconds) / 1_000_000_000_000_000
     let rounded = (milliseconds * 100).rounded() / 100
     return "\(rounded)ms"
+  }
+
+  private func describe(
+    _ generation: RenderGeneration
+  ) -> String {
+    String(generation.rawValue)
+  }
+
+  private func describe(
+    _ generation: RenderGeneration?
+  ) -> String {
+    generation.map(describe) ?? "-"
   }
 
   private func renderResolved(

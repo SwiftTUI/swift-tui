@@ -23,6 +23,7 @@ public struct FrameDiagnosticRecord: Sendable {
   public var interactionRegionCount: Int
   public var focusRegionCount: Int
   public var phaseTimings: FramePhaseTimings?
+  public var renderGenerations: FrameRenderGenerations
   public var workerTimings: FrameWorkerTimings?
   public var mainActorTimings: FrameMainActorTimings?
   public var customLayoutFallbackCount: Int
@@ -104,6 +105,7 @@ public final class FrameDiagnosticsLogger {
     let commitMs = formatMs(timings?.commit)
     let pipelineMs = formatMs(timings?.total)
     let workerTimings = record.workerTimings
+    let renderGenerations = record.renderGenerations
     let layoutEnqueueMs = formatMs(workerTimings?.layoutEnqueueToStart)
     let layoutComputeMs = formatMs(workerTimings?.layoutCompute)
     let rasterEnqueueMs = formatMs(workerTimings?.rasterEnqueueToStart)
@@ -148,6 +150,11 @@ public final class FrameDiagnosticsLogger {
       rasterMs,
       commitMs,
       pipelineMs,
+      String(renderGenerations.render.rawValue),
+      formatGeneration(renderGenerations.layoutInput),
+      formatGeneration(renderGenerations.layoutOutput),
+      formatGeneration(renderGenerations.rasterInput),
+      formatGeneration(renderGenerations.rasterOutput),
       layoutEnqueueMs,
       layoutComputeMs,
       rasterEnqueueMs,
@@ -206,6 +213,11 @@ public final class FrameDiagnosticsLogger {
       "raster_ms",
       "commit_ms",
       "pipeline_ms",
+      "render_generation",
+      "layout_input_generation",
+      "layout_output_generation",
+      "raster_input_generation",
+      "raster_output_generation",
       "worker_layout_enqueue_ms",
       "worker_layout_compute_ms",
       "worker_raster_enqueue_ms",
@@ -259,5 +271,9 @@ public final class FrameDiagnosticsLogger {
     let ms = totalMicroseconds / 1000
     let frac = (totalMicroseconds % 1000) / 10
     return "\(ms).\(frac < 10 ? "0" : "")\(frac)"
+  }
+
+  private func formatGeneration(_ generation: RenderGeneration?) -> String {
+    generation.map { String($0.rawValue) } ?? "-"
   }
 }
