@@ -389,6 +389,214 @@ package struct RemovalEntry: Sendable {
   package var customState: AnimationState = .init()
 }
 
+package struct PlacedAnimationOverlaySnapshot: Sendable {
+  package var removalOverlays: [PlacedRemovalOverlaySnapshot]
+  package var insertionOffsets: [PlacedAnimationOverlayOffset]
+  package var matchedGeometryOffsets: [PlacedAnimationOverlayOffset]
+
+  package init(
+    removalOverlays: [PlacedRemovalOverlaySnapshot] = [],
+    insertionOffsets: [PlacedAnimationOverlayOffset] = [],
+    matchedGeometryOffsets: [PlacedAnimationOverlayOffset] = []
+  ) {
+    self.removalOverlays = removalOverlays
+    self.insertionOffsets = insertionOffsets
+    self.matchedGeometryOffsets = matchedGeometryOffsets
+  }
+}
+
+package struct PlacedRemovalOverlaySnapshot: Sendable {
+  package var parentIdentity: Identity
+  package var childIndex: Int
+  package var snapshot: PlacedNode
+  package var modifiers: TransitionModifiers
+
+  package init(
+    parentIdentity: Identity,
+    childIndex: Int,
+    snapshot: PlacedNode,
+    modifiers: TransitionModifiers
+  ) {
+    self.parentIdentity = parentIdentity
+    self.childIndex = childIndex
+    self.snapshot = snapshot
+    self.modifiers = modifiers
+  }
+}
+
+package struct PlacedAnimationOverlayOffset: Sendable {
+  package var identity: Identity
+  package var dx: Int
+  package var dy: Int
+
+  package init(
+    identity: Identity,
+    dx: Int,
+    dy: Int
+  ) {
+    self.identity = identity
+    self.dx = dx
+    self.dy = dy
+  }
+}
+
+package func applyPlacedAnimationOverlaySnapshot(
+  _ snapshot: PlacedAnimationOverlaySnapshot,
+  to tree: inout PlacedNode
+) {
+  if !snapshot.removalOverlays.isEmpty {
+    var injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]] = [:]
+    for removal in snapshot.removalOverlays {
+      var clone = removal.snapshot
+      applyPlacedOverlayModifiers(removal.modifiers, to: &clone)
+      injections[removal.parentIdentity, default: []].append(
+        (childIndex: removal.childIndex, snapshot: clone)
+      )
+    }
+    tree = injectPlacedOverlays(tree: tree, injections: injections)
+  }
+
+  let insertionOffsets = overlayOffsetMap(snapshot.insertionOffsets)
+  if !insertionOffsets.isEmpty {
+    tree = translatePlacedNodesByIdentity(
+      tree: tree,
+      offsets: insertionOffsets
+    )
+  }
+
+  let matchedGeometryOffsets = overlayOffsetMap(snapshot.matchedGeometryOffsets)
+  if !matchedGeometryOffsets.isEmpty {
+    tree = translatePlacedNodesByIdentity(
+      tree: tree,
+      offsets: matchedGeometryOffsets
+    )
+  }
+}
+
+private func overlayOffsetMap(
+  _ offsets: [PlacedAnimationOverlayOffset]
+) -> [Identity: (dx: Int, dy: Int)] {
+  var result: [Identity: (dx: Int, dy: Int)] = [:]
+  for offset in offsets {
+    result[offset.identity] = (dx: offset.dx, dy: offset.dy)
+  }
+  return result
+}
+
+private func translatePlacedNodesByIdentity(
+  tree: PlacedNode,
+  offsets: [Identity: (dx: Int, dy: Int)]
+) -> PlacedNode {
+  var node = tree
+  if let delta = offsets[node.identity] {
+    var translated = node
+    translateBounds(&translated, dx: delta.dx, dy: delta.dy)
+    return translated
+  }
+  let walked = node.children.map { child in
+    translatePlacedNodesByIdentity(tree: child, offsets: offsets)
+  }
+  node.children = walked
+  return node
+}
+
+private func applyPlacedOverlayModifiers(
+  _ modifiers: TransitionModifiers,
+  to node: inout PlacedNode
+) {
+  markTransient(&node)
+
+  if let opacity = modifiers.opacity {
+    applyOpacityCascadingPlaced(&node, opacity: opacity)
+  }
+
+  let dx = modifiers.offsetX ?? 0
+  let dy = modifiers.offsetY ?? 0
+  if dx != 0 || dy != 0 {
+    translateBounds(&node, dx: dx, dy: dy)
+  }
+}
+
+private func markTransient(_ node: inout PlacedNode) {
+  node.isTransient = true
+  var children = node.children
+  for i in children.indices {
+    markTransient(&children[i])
+  }
+  node.children = children
+}
+
+private func applyOpacityCascadingPlaced(
+  _ node: inout PlacedNode,
+  opacity: Double
+) {
+  var drawMetadata = node.drawMetadata
+  let base = drawMetadata.baseStyle.explicitOpacity ?? 1.0
+  drawMetadata.baseStyle.explicitOpacity = base * opacity
+  node.drawMetadata = drawMetadata
+
+  var children = node.children
+  for i in children.indices {
+    applyOpacityCascadingPlaced(&children[i], opacity: opacity)
+  }
+  node.children = children
+}
+
+private func translateBounds(
+  _ node: inout PlacedNode,
+  dx: Int,
+  dy: Int
+) {
+  let delta = Point(x: dx, y: dy)
+  node.bounds = Rect(
+    origin: Point(
+      x: node.bounds.origin.x + delta.x,
+      y: node.bounds.origin.y + delta.y
+    ),
+    size: node.bounds.size
+  )
+  node.contentBounds = Rect(
+    origin: Point(
+      x: node.contentBounds.origin.x + delta.x,
+      y: node.contentBounds.origin.y + delta.y
+    ),
+    size: node.contentBounds.size
+  )
+  if let clip = node.clipBounds {
+    node.clipBounds = Rect(
+      origin: Point(
+        x: clip.origin.x + delta.x,
+        y: clip.origin.y + delta.y
+      ),
+      size: clip.size
+    )
+  }
+  var children = node.children
+  for i in children.indices {
+    translateBounds(&children[i], dx: dx, dy: dy)
+  }
+  node.children = children
+}
+
+private func injectPlacedOverlays(
+  tree: PlacedNode,
+  injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]]
+) -> PlacedNode {
+  var node = tree
+  var children = node.children.map { child in
+    injectPlacedOverlays(tree: child, injections: injections)
+  }
+  if let injectionsForNode = injections[node.identity] {
+    let sorted = injectionsForNode.sorted { $0.childIndex < $1.childIndex }
+    for injection in sorted {
+      let insertIndex = min(injection.childIndex, children.count)
+      children.insert(injection.snapshot, at: insertIndex)
+    }
+  }
+  node.children = children
+  return node
+}
+
 @MainActor
 package final class AnimationController: Sendable {
   private var previousSnapshots: [Identity: AnimatableSnapshot] = [:]
@@ -536,10 +744,29 @@ package final class AnimationController: Sendable {
     to tree: inout PlacedNode,
     at timestamp: MonotonicInstant
   ) {
-    // 1. Inject removal overlays.
-    if !removingIdentities.isEmpty {
-      var injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]] = [:]
+    let snapshot = placedAnimationOverlaySnapshot(
+      for: tree,
+      at: timestamp
+    )
+    applyPlacedAnimationOverlaySnapshot(
+      snapshot,
+      to: &tree
+    )
+  }
 
+  /// Samples placed-level animation state into an explicit value
+  /// snapshot that can be applied away from the main actor.
+  ///
+  /// This method still owns animation bookkeeping: custom animation
+  /// state is advanced, completed keys are released, and batch
+  /// completions can fire. The returned snapshot is pure data.
+  package func placedAnimationOverlaySnapshot(
+    for tree: PlacedNode,
+    at timestamp: MonotonicInstant
+  ) -> PlacedAnimationOverlaySnapshot {
+    // 1. Inject removal overlays.
+    var removalOverlays: [PlacedRemovalOverlaySnapshot] = []
+    if !removingIdentities.isEmpty {
       for (identity, entry) in removingIdentities {
         guard let placedSnapshot = entry.placedSnapshot,
           let parentId = entry.parentIdentity
@@ -569,15 +796,14 @@ package final class AnimationController: Sendable {
           continue
         }
 
-        var clone = placedSnapshot
-        applyPlacedOverlayModifiers(modifiers, to: &clone)
-        injections[parentId, default: []].append(
-          (childIndex: entry.childIndex, snapshot: clone)
+        removalOverlays.append(
+          .init(
+            parentIdentity: parentId,
+            childIndex: entry.childIndex,
+            snapshot: placedSnapshot,
+            modifiers: modifiers
+          )
         )
-      }
-
-      if !injections.isEmpty {
-        tree = injectPlacedOverlays(tree: tree, injections: injections)
       }
     }
 
@@ -616,13 +842,6 @@ package final class AnimationController: Sendable {
       if let entry = activeAnimations.removeValue(forKey: key) {
         releaseBatch(entry.batchID)
       }
-    }
-
-    if !insertionOffsetsByIdentity.isEmpty {
-      tree = translatePlacedNodesByIdentity(
-        tree: tree,
-        offsets: insertionOffsetsByIdentity
-      )
     }
 
     // 3. Apply matched-geometry translations.  At progress 0 the
@@ -674,12 +893,23 @@ package final class AnimationController: Sendable {
       }
     }
 
-    if !matchedDeltasByIdentity.isEmpty {
-      tree = translatePlacedNodesByIdentity(
-        tree: tree,
-        offsets: matchedDeltasByIdentity
-      )
-    }
+    return .init(
+      removalOverlays: removalOverlays,
+      insertionOffsets: insertionOffsetsByIdentity.map { identity, offset in
+        .init(
+          identity: identity,
+          dx: offset.dx,
+          dy: offset.dy
+        )
+      },
+      matchedGeometryOffsets: matchedDeltasByIdentity.map { identity, offset in
+        .init(
+          identity: identity,
+          dx: offset.dx,
+          dy: offset.dy
+        )
+      }
+    )
   }
 
   private static func findBounds(
@@ -693,134 +923,6 @@ package final class AnimationController: Sendable {
       }
     }
     return nil
-  }
-
-  /// Walks the placed tree and translates the bounds of any node
-  /// whose identity is in `offsets`, along with the bounds of every
-  /// descendant (so children move with their parent).
-  private func translatePlacedNodesByIdentity(
-    tree: PlacedNode,
-    offsets: [Identity: (dx: Int, dy: Int)]
-  ) -> PlacedNode {
-    var node = tree
-    if let delta = offsets[node.identity] {
-      var translated = node
-      translateBounds(&translated, dx: delta.dx, dy: delta.dy)
-      return translated
-    }
-    let walked = node.children.map { child in
-      translatePlacedNodesByIdentity(tree: child, offsets: offsets)
-    }
-    node.children = walked
-    return node
-  }
-
-  /// Applies transition modifiers to a placed overlay subtree.
-  /// Opacity cascades to every descendant's drawMetadata; offsets
-  /// translate the root bounds (and, transitively, the descendant
-  /// bounds via the same delta).  The overlay subtree carries
-  /// isTransient = true on every node so the semantic extractor and
-  /// lifecycle coordinator skip it.
-  private func applyPlacedOverlayModifiers(
-    _ modifiers: TransitionModifiers,
-    to node: inout PlacedNode
-  ) {
-    // Mark the whole subtree transient.
-    markTransient(&node)
-
-    // Opacity cascades via drawMetadata.
-    if let opacity = modifiers.opacity {
-      applyOpacityCascadingPlaced(&node, opacity: opacity)
-    }
-
-    // Offset translates the bounds of every node in the subtree by
-    // the same delta.  Sub-cell fractional offsets are rounded to
-    // integer cells.
-    let dx = modifiers.offsetX ?? 0
-    let dy = modifiers.offsetY ?? 0
-    if dx != 0 || dy != 0 {
-      translateBounds(&node, dx: dx, dy: dy)
-    }
-  }
-
-  private func markTransient(_ node: inout PlacedNode) {
-    node.isTransient = true
-    var children = node.children
-    for i in children.indices {
-      markTransient(&children[i])
-    }
-    node.children = children
-  }
-
-  private func applyOpacityCascadingPlaced(
-    _ node: inout PlacedNode,
-    opacity: Double
-  ) {
-    var drawMetadata = node.drawMetadata
-    let base = drawMetadata.baseStyle.explicitOpacity ?? 1.0
-    drawMetadata.baseStyle.explicitOpacity = base * opacity
-    node.drawMetadata = drawMetadata
-
-    var children = node.children
-    for i in children.indices {
-      applyOpacityCascadingPlaced(&children[i], opacity: opacity)
-    }
-    node.children = children
-  }
-
-  private func translateBounds(
-    _ node: inout PlacedNode,
-    dx: Int,
-    dy: Int
-  ) {
-    let delta = Point(x: dx, y: dy)
-    node.bounds = Rect(
-      origin: Point(
-        x: node.bounds.origin.x + delta.x,
-        y: node.bounds.origin.y + delta.y
-      ),
-      size: node.bounds.size
-    )
-    node.contentBounds = Rect(
-      origin: Point(
-        x: node.contentBounds.origin.x + delta.x,
-        y: node.contentBounds.origin.y + delta.y
-      ),
-      size: node.contentBounds.size
-    )
-    if let clip = node.clipBounds {
-      node.clipBounds = Rect(
-        origin: Point(
-          x: clip.origin.x + delta.x,
-          y: clip.origin.y + delta.y
-        ),
-        size: clip.size
-      )
-    }
-    var children = node.children
-    for i in children.indices {
-      translateBounds(&children[i], dx: dx, dy: dy)
-    }
-    node.children = children
-  }
-
-  private func injectPlacedOverlays(
-    tree: PlacedNode,
-    injections: [Identity: [(childIndex: Int, snapshot: PlacedNode)]]
-  ) -> PlacedNode {
-    var node = tree
-    var children = node.children.map { child in
-      injectPlacedOverlays(tree: child, injections: injections)
-    }
-    if let injectionsForNode = injections[node.identity] {
-      let sorted = injectionsForNode.sorted { $0.childIndex < $1.childIndex }
-      for injection in sorted {
-        let insertIndex = min(injection.childIndex, children.count)
-        children.insert(injection.snapshot, at: insertIndex)
-      }
-    }
-    node.children = children
-    return node
   }
 
   /// Number of insertion-offset animations currently in flight.
