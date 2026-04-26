@@ -243,6 +243,8 @@ extension RunLoop {
           .map(\.rawValue)
           .sorted()
           .joined(separator: "+")
+        let inputEventsQueuedDuringRenderSuspension =
+          renderSuspensionDiagnostics.drainInputEventsQueuedDuringSuspension()
         diagnosticsLogger.log(
           FrameDiagnosticRecord(
             frameNumber: renderedFrames,
@@ -261,6 +263,9 @@ extension RunLoop {
             focusRegionCount: diag.focusRegionCount,
             phaseTimings: diag.phaseTimings,
             workerTimings: diag.workerTimings,
+            mainActorTimings: diag.mainActorTimings,
+            inputEventsQueuedDuringRenderSuspension:
+              inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
               ? "full" : "incremental",
             presentationBytesWritten: presentationMetrics.bytesWritten,
@@ -508,6 +513,8 @@ extension RunLoop {
           .map(\.rawValue)
           .sorted()
           .joined(separator: "+")
+        let inputEventsQueuedDuringRenderSuspension =
+          renderSuspensionDiagnostics.drainInputEventsQueuedDuringSuspension()
         diagnosticsLogger.log(
           FrameDiagnosticRecord(
             frameNumber: renderedFrames,
@@ -526,6 +533,9 @@ extension RunLoop {
             focusRegionCount: diag.focusRegionCount,
             phaseTimings: diag.phaseTimings,
             workerTimings: diag.workerTimings,
+            mainActorTimings: diag.mainActorTimings,
+            inputEventsQueuedDuringRenderSuspension:
+              inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
               ? "full" : "incremental",
             presentationBytesWritten: presentationMetrics.bytesWritten,

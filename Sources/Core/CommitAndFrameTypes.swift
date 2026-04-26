@@ -547,6 +547,20 @@ public struct FrameWorkerTimings: Equatable, Sendable {
   }
 }
 
+/// Main-actor timing summaries for one render pass.
+public struct FrameMainActorTimings: Equatable, Sendable {
+  public var blocked: Duration
+  public var suspended: Duration
+
+  public init(
+    blocked: Duration = .zero,
+    suspended: Duration = .zero
+  ) {
+    self.blocked = blocked
+    self.suspended = suspended
+  }
+}
+
 /// Diagnostic counters and summaries for one rendered frame.
 public struct PresentationDamageDiagnostics: Equatable, Sendable {
   public var textRowCount: Int
@@ -632,6 +646,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var presentationDamage: PresentationDamageDiagnostics?
   public var phaseTimings: FramePhaseTimings?
   public var workerTimings: FrameWorkerTimings?
+  public var mainActorTimings: FrameMainActorTimings?
   public var measurementCache: MeasurementCacheMetrics?
 
   public init(
@@ -654,6 +669,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     presentationDamage: PresentationDamageDiagnostics? = nil,
     phaseTimings: FramePhaseTimings? = nil,
     workerTimings: FrameWorkerTimings? = nil,
+    mainActorTimings: FrameMainActorTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil
   ) {
     self.proposal = proposal
@@ -675,6 +691,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     self.presentationDamage = presentationDamage
     self.phaseTimings = phaseTimings
     self.workerTimings = workerTimings
+    self.mainActorTimings = mainActorTimings
     self.measurementCache = measurementCache
   }
 }
@@ -954,6 +971,7 @@ extension FrameDiagnostics {
     presentationSurfaceWidth: Int = 0,
     phaseTimings: FramePhaseTimings? = nil,
     workerTimings: FrameWorkerTimings? = nil,
+    mainActorTimings: FrameMainActorTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil
   ) -> Self {
     Self(
@@ -981,6 +999,7 @@ extension FrameDiagnostics {
       },
       phaseTimings: phaseTimings,
       workerTimings: workerTimings,
+      mainActorTimings: mainActorTimings,
       measurementCache: measurementCache
     )
   }

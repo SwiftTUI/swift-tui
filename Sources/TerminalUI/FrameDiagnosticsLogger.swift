@@ -24,6 +24,8 @@ public struct FrameDiagnosticRecord: Sendable {
   public var focusRegionCount: Int
   public var phaseTimings: FramePhaseTimings?
   public var workerTimings: FrameWorkerTimings?
+  public var mainActorTimings: FrameMainActorTimings?
+  public var inputEventsQueuedDuringRenderSuspension: Int
   public var presentationStrategy: String
   public var presentationBytesWritten: Int
   public var presentationLinesTouched: Int
@@ -104,6 +106,9 @@ public final class FrameDiagnosticsLogger {
     let rasterEnqueueMs = formatMs(workerTimings?.rasterEnqueueToStart)
     let rasterComputeMs = formatMs(workerTimings?.rasterCompute)
     let workerCompletionToCommitMs = formatMs(workerTimings?.completionToMainCommit)
+    let mainActorTimings = record.mainActorTimings
+    let mainActorBlockedMs = formatMs(mainActorTimings?.blocked)
+    let mainActorSuspendedMs = formatMs(mainActorTimings?.suspended)
     let presentMs = formatMs(record.presentationDuration)
     let totalMs = formatMs(record.totalFrameDuration)
     let cacheHit =
@@ -145,6 +150,9 @@ public final class FrameDiagnosticsLogger {
       rasterEnqueueMs,
       rasterComputeMs,
       workerCompletionToCommitMs,
+      mainActorBlockedMs,
+      mainActorSuspendedMs,
+      String(record.inputEventsQueuedDuringRenderSuspension),
       // presentation
       record.presentationStrategy,
       presentMs,
@@ -197,6 +205,9 @@ public final class FrameDiagnosticsLogger {
       "worker_raster_enqueue_ms",
       "worker_raster_compute_ms",
       "worker_completion_to_commit_ms",
+      "main_actor_blocked_ms",
+      "main_actor_suspended_ms",
+      "input_events_during_render_suspension",
       "present_strategy",
       "present_ms",
       "present_bytes",

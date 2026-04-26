@@ -20,7 +20,8 @@ It gives you:
 
 - resolved, measured, placed, semantic, draw, and raster products
 - a `CommitPlan`
-- diagnostics about computed versus reused work
+- diagnostics about computed versus reused work, worker timing, and main-actor
+  blocked versus suspended render time
 
 That makes it useful for snapshot tests, previews, and deep debugging.
 
@@ -37,6 +38,11 @@ That makes it useful for snapshot tests, previews, and deep debugging.
 - task reconciliation
 
 Use it when your app wants explicit control over state containers, focus trackers, and rendered frames.
+
+When a ``FrameDiagnosticsLogger`` is installed, `RunLoop` writes one
+tab-separated row per presented frame. The timing columns include pipeline
+phase timings, worker queue/compute timings, `main_actor_blocked_ms`,
+`main_actor_suspended_ms`, and `input_events_during_render_suspension`.
 
 ## Scene-Based Apps
 

@@ -149,6 +149,7 @@ extension RunLoop {
 
     let completion = EventPumpCompletion(remainingStreams: 2)
     let buffer = EventPumpBuffer()
+    let renderSuspensionDiagnostics = renderSuspensionDiagnostics
     var inputTask: Task<Void, Never>?
     var signalTask: Task<Void, Never>?
     let deadlineState = DeadlineWakeState()
@@ -158,6 +159,7 @@ extension RunLoop {
 
       inputTask = Task {
         for await event in inputEvents {
+          renderSuspensionDiagnostics.recordInputEventQueuedIfSuspended()
           if buffer.enqueue(.input(event)) {
             continuation.yield()
           }

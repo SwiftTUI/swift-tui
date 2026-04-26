@@ -119,6 +119,19 @@ package struct FrameTailRenderHooks: Sendable {
   }
 }
 
+package struct FrameRenderSuspensionHooks: Sendable {
+  package var onBegin: (@Sendable () -> Void)?
+  package var onEnd: (@Sendable () -> Void)?
+
+  package init(
+    onBegin: (@Sendable () -> Void)? = nil,
+    onEnd: (@Sendable () -> Void)? = nil
+  ) {
+    self.onBegin = onBegin
+    self.onEnd = onEnd
+  }
+}
+
 private final class FrameTailRenderer: Sendable {
   private let layoutEngine: LayoutEngine
   private let semanticExtractor: SemanticExtractor
@@ -126,6 +139,7 @@ private final class FrameTailRenderer: Sendable {
   private let rasterizer: Rasterizer
   private let retainedState = FrameTailRetainedState()
   private let renderHooks = Mutex<FrameTailRenderHooks?>(nil)
+  private let suspensionHooks = Mutex<FrameRenderSuspensionHooks?>(nil)
 
   #if canImport(Dispatch)
     private let queue = DispatchQueue(label: "swift-terminal-ui.frame-tail-renderer")
@@ -249,6 +263,18 @@ private final class FrameTailRenderer: Sendable {
     renderHooks.withLock { currentHooks in
       currentHooks = hooks
     }
+  }
+
+  func setRenderSuspensionHooks(
+    _ hooks: FrameRenderSuspensionHooks?
+  ) {
+    suspensionHooks.withLock { currentHooks in
+      currentHooks = hooks
+    }
+  }
+
+  func renderSuspensionHooksSnapshot() -> FrameRenderSuspensionHooks? {
+    suspensionHooks.withLock { $0 }
   }
 
   private func sync<Value>(
@@ -868,6 +894,10 @@ public struct DefaultRenderer {
         raster: tail.diagnostics.rasterDuration,
         commit: commitDuration
       )
+      let mainActorTimings = FrameMainActorTimings(
+        blocked: phaseTimings.total,
+        suspended: .zero
+      )
       diagnostics = FrameDiagnostics.summarize(
         resolved: resolved,
         measured: tail.measured,
@@ -881,6 +911,7 @@ public struct DefaultRenderer {
         presentationSurfaceWidth: tail.raster.size.width,
         phaseTimings: phaseTimings,
         workerTimings: workerTimings,
+        mainActorTimings: mainActorTimings,
         measurementCache: tail.diagnostics.measurementCache
       )
     } else {
@@ -1015,12 +1046,22 @@ public struct DefaultRenderer {
       to: &placed,
       at: animationTimestamp
     )
+    let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
+    let rasterSuspensionStart = clock?.now
+    suspensionHooks?.onBegin?()
     let tail = await frameTailRenderer.renderRasterAsync(
       frameTailInput,
       layout: tailLayout,
       placed: placed,
       clock: clock
     )
+    suspensionHooks?.onEnd?()
+    let rasterSuspensionDuration =
+      if let rasterSuspensionStart, let clock {
+        rasterSuspensionStart.duration(to: clock.now)
+      } else {
+        Duration.zero
+      }
     var workerTimings = tail.diagnostics.workerTimings
     if var timings = workerTimings,
       let clock,
@@ -1057,6 +1098,13 @@ public struct DefaultRenderer {
         raster: tail.diagnostics.rasterDuration,
         commit: commitDuration
       )
+      let mainActorTimings = FrameMainActorTimings(
+        blocked: resolveDuration
+          + tail.diagnostics.measureDuration
+          + tail.diagnostics.placeDuration
+          + commitDuration,
+        suspended: rasterSuspensionDuration
+      )
       diagnostics = FrameDiagnostics.summarize(
         resolved: resolved,
         measured: tail.measured,
@@ -1070,6 +1118,7 @@ public struct DefaultRenderer {
         presentationSurfaceWidth: tail.raster.size.width,
         phaseTimings: phaseTimings,
         workerTimings: workerTimings,
+        mainActorTimings: mainActorTimings,
         measurementCache: tail.diagnostics.measurementCache
       )
     } else {
@@ -1151,5 +1200,12 @@ public struct DefaultRenderer {
     _ hooks: FrameTailRenderHooks?
   ) {
     frameTailRenderer.setRenderHooks(hooks)
+  }
+
+  @MainActor
+  package func setFrameRenderSuspensionHooks(
+    _ hooks: FrameRenderSuspensionHooks?
+  ) {
+    frameTailRenderer.setRenderSuspensionHooks(hooks)
   }
 }
