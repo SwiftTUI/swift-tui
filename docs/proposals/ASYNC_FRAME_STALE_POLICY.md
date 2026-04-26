@@ -2,8 +2,9 @@
 
 ## Status
 
-Stages 1, 2, and scheduler Stages 3A/3B implemented. Ordered commit remains
-the policy for future frame-tail cancellation or generation-dropping work.
+Stages 1, 2, and scheduler Stages 3A/3B/3C implemented. Ordered commit remains
+the policy for started or completed frame-tail work and all future
+generation-dropping work.
 
 See [`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md)
 for the concrete design needed before Stage 3 can safely cancel unstarted tail
@@ -258,6 +259,7 @@ Design prerequisite:
   [`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md).
 - [x] Coalesce not-yet-started render intent before starting the next render.
 - [x] Extract the async renderer frame-head and finish boundaries.
+- [x] Make prepared frame heads abortable before worker tail work commits.
 
 - Teach the serial worker to skip jobs that have not started and are superseded.
 - Restrict cancellation to jobs with no worker-owned mutation.
@@ -318,10 +320,10 @@ git commit -m "feat(runtime): reconcile skipped async frame results"
 
 ## Recommendation
 
-Keep the current ordered-commit policy until generation tagging, cancellation,
-eligibility classification, and reconciliation are all tested.
+Keep the current ordered-commit policy for any started or completed tail job
+until eligibility classification and reconciliation are both tested.
 
-The next concrete tranche should be Stage 1 or Stage 2. Do not start by
-dropping completed worker results. Cancellation before worker start is the
+The next concrete tranche should be Stage 3D: cancellation before worker start.
+Do not start by dropping completed worker results. Pre-start cancellation is the
 safest first optimization because it avoids reconciling already-computed frame
 artifacts and worker-owned cache effects.
