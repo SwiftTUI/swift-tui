@@ -2,7 +2,7 @@
 
 ## Status
 
-Stage 3A implemented. Draft design for the remaining stages after
+Stages 3A and 3B implemented. Draft design for the remaining stages after
 [`ASYNC_FRAME_STALE_POLICY.md`](ASYNC_FRAME_STALE_POLICY.md) Stage 2.
 
 The short version: do not implement worker-job cancellation directly inside
@@ -272,9 +272,19 @@ git commit -m "refactor(runtime): coalesce queued render intent"
 
 ### Stage 3B: Extract frame-head draft and finish boundary
 
-- Split `DefaultRenderer.renderViewAsync` into prepare-tail-finish helpers.
-- Keep behavior identical and still await every tail result.
-- Add tests proving sync and async render artifacts remain equivalent.
+- [x] Split `DefaultRenderer.renderViewAsync` into prepare-tail-finish helpers.
+- [x] Keep behavior identical and still await every tail result.
+- [x] Add tests proving sync and async render artifacts remain equivalent.
+
+Stage 3B result:
+
+- `DefaultRenderer.renderViewAsync` now prepares a `FrameHeadDraft`, awaits the
+  async tail, then finishes the frame through an explicit commit/diagnostics
+  boundary.
+- The split preserves ordered commit and does not add cancellation or abort
+  behavior.
+- Async frame-tail tests include a sync/async artifact parity check with
+  diagnostics disabled so timing fields cannot mask pipeline drift.
 
 Commit boundary:
 
