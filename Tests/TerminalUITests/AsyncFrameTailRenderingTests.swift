@@ -253,7 +253,48 @@ struct AsyncFrameTailRenderingTests {
       rows.allSatisfy { row in
         row["main_actor_blocked_ms"] != nil
           && row["main_actor_suspended_ms"] != nil
+          && row["custom_layout_fallbacks"] == "0"
+          && row["first_custom_layout_fallback"] == "-"
       })
+  }
+
+  @Test("custom layout falls back for layout while raster still suspends")
+  func customLayoutFallbackKeepsLayoutInlineButSuspendsRaster() async throws {
+    let rootIdentity = testIdentity("AsyncCustomLayoutFallbackRoot")
+    let gate = AsyncFrameTailBlockingGate()
+    let renderer = DefaultRenderer()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    let renderTask = Task {
+      await renderer.renderAsync(
+        AsyncFrameTailCustomLayout {
+          Text("custom")
+          Text("layout")
+        },
+        context: .init(identity: rootIdentity)
+      )
+    }
+
+    await gate.waitUntilBlocked()
+    gate.release()
+    let artifacts = await renderTask.value
+    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    let mainActorTimings = try #require(artifacts.diagnostics.mainActorTimings)
+
+    #expect(artifacts.diagnostics.customLayoutFallbackCount == 1)
+    #expect(artifacts.diagnostics.firstCustomLayoutFallbackIdentity == rootIdentity)
+    #expect(workerTimings.layoutEnqueueToStart == .zero)
+    #expect(workerTimings.layoutCompute == .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(mainActorTimings.suspended != .zero)
   }
 
   @Test("worker backlog commits blocked frame before later input batch")
@@ -393,6 +434,40 @@ private struct AsyncFrameTailStressView: View {
       }
     }
     .defaultFocus($focusedField, .button)
+  }
+}
+
+private struct AsyncFrameTailCustomLayout: Layout {
+  func makeCache(subviews _: LayoutSubviews) {}
+
+  func sizeThatFits(
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) -> LayoutSize {
+    let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    return .init(
+      width: sizes.map(\.width).max() ?? 0,
+      height: sizes.reduce(0) { $0 + $1.height }
+    )
+  }
+
+  func placeSubviews(
+    in bounds: LayoutRect,
+    proposal _: ProposedViewSize,
+    subviews: LayoutSubviews,
+    cache _: inout Void
+  ) {
+    var y = bounds.origin.y
+    for subview in subviews {
+      let size = subview.sizeThatFits(.unspecified)
+      subview.place(
+        at: .init(x: bounds.origin.x, y: y),
+        anchor: .topLeading,
+        proposal: .init(width: size.width, height: size.height)
+      )
+      y += size.height
+    }
   }
 }
 

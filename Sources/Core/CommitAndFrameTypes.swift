@@ -648,6 +648,8 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var workerTimings: FrameWorkerTimings?
   public var mainActorTimings: FrameMainActorTimings?
   public var measurementCache: MeasurementCacheMetrics?
+  public var customLayoutFallbackCount: Int
+  public var firstCustomLayoutFallbackIdentity: Identity?
 
   public init(
     proposal: ProposedSize = .unspecified,
@@ -670,7 +672,9 @@ public struct FrameDiagnostics: Equatable, Sendable {
     phaseTimings: FramePhaseTimings? = nil,
     workerTimings: FrameWorkerTimings? = nil,
     mainActorTimings: FrameMainActorTimings? = nil,
-    measurementCache: MeasurementCacheMetrics? = nil
+    measurementCache: MeasurementCacheMetrics? = nil,
+    customLayoutFallbackCount: Int = 0,
+    firstCustomLayoutFallbackIdentity: Identity? = nil
   ) {
     self.proposal = proposal
     self.invalidatedIdentities = invalidatedIdentities
@@ -693,6 +697,8 @@ public struct FrameDiagnostics: Equatable, Sendable {
     self.workerTimings = workerTimings
     self.mainActorTimings = mainActorTimings
     self.measurementCache = measurementCache
+    self.customLayoutFallbackCount = customLayoutFallbackCount
+    self.firstCustomLayoutFallbackIdentity = firstCustomLayoutFallbackIdentity
   }
 }
 
@@ -974,7 +980,8 @@ extension FrameDiagnostics {
     mainActorTimings: FrameMainActorTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil
   ) -> Self {
-    Self(
+    let customLayoutFallback = customLayoutFallbackSummary(resolved)
+    return Self(
       proposal: measured.proposal,
       invalidatedIdentities: invalidatedIdentities,
       resolvedNodeCount: resolved.subtreeNodeCount,
@@ -1000,7 +1007,43 @@ extension FrameDiagnostics {
       phaseTimings: phaseTimings,
       workerTimings: workerTimings,
       mainActorTimings: mainActorTimings,
-      measurementCache: measurementCache
+      measurementCache: measurementCache,
+      customLayoutFallbackCount: customLayoutFallback.count,
+      firstCustomLayoutFallbackIdentity: customLayoutFallback.firstIdentity
     )
+  }
+
+  private static func customLayoutFallbackSummary(
+    _ node: ResolvedNode
+  ) -> (count: Int, firstIdentity: Identity?) {
+    var count = 0
+    var firstIdentity: Identity?
+    collectCustomLayoutFallbacks(
+      in: node,
+      count: &count,
+      firstIdentity: &firstIdentity
+    )
+    return (count, firstIdentity)
+  }
+
+  private static func collectCustomLayoutFallbacks(
+    in node: ResolvedNode,
+    count: inout Int,
+    firstIdentity: inout Identity?
+  ) {
+    if case .custom = node.layoutBehavior {
+      count += 1
+      if firstIdentity == nil {
+        firstIdentity = node.identity
+      }
+    }
+
+    for child in node.children {
+      collectCustomLayoutFallbacks(
+        in: child,
+        count: &count,
+        firstIdentity: &firstIdentity
+      )
+    }
   }
 }

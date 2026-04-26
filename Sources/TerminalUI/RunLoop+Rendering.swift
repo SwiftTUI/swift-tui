@@ -264,6 +264,8 @@ extension RunLoop {
             phaseTimings: diag.phaseTimings,
             workerTimings: diag.workerTimings,
             mainActorTimings: diag.mainActorTimings,
+            customLayoutFallbackCount: diag.customLayoutFallbackCount,
+            firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
@@ -534,6 +536,8 @@ extension RunLoop {
             phaseTimings: diag.phaseTimings,
             workerTimings: diag.workerTimings,
             mainActorTimings: diag.mainActorTimings,
+            customLayoutFallbackCount: diag.customLayoutFallbackCount,
+            firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
