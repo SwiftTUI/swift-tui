@@ -954,6 +954,158 @@ struct AsyncFrameTailRenderingTests {
     #expect(recorder.events.contains("drop:1:1"))
   }
 
+  @Test("prepared frame head abort restores graph and live registrations")
+  func preparedFrameHeadAbortRestoresGraphAndLiveRegistrations() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadAbortRegistrationRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    )
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let renderer = DefaultRenderer()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: focusTracker,
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameHeadDraftRegistrationView(
+          value: value,
+          recorder: recorder
+        )
+      }
+    )
+    stateContainer.invalidator = runLoop.scheduler
+    focusTracker.invalidator = runLoop.scheduler
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+    focusLeafmostAsyncFrameHeadFocusRegion(in: runLoop)
+
+    let draftOnlyIdentity = testIdentity(
+      "AsyncFrameHeadDraftRegistrationValue",
+      "1"
+    )
+    #expect(!renderer.hasViewGraphNodeForCancellationTesting(draftOnlyIdentity))
+
+    _ = runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl))
+    runLoop.handlePaste(PasteEvent(content: "/tmp/frame-head-abort-before.txt"))
+    #expect(recorder.events.contains("key:0"))
+    #expect(recorder.events.contains("drop:0:1"))
+    recorder.reset()
+
+    stateContainer.replace(with: 1)
+    let scheduledFrame = try #require(runLoop.scheduler.consumeReadyFrame(at: .now()))
+    let prepared = renderer.prepareFrameHeadForCancellationTesting(
+      AsyncFrameHeadDraftRegistrationView(
+        value: stateContainer.state,
+        recorder: recorder
+      ),
+      context: runLoop.resolveContext(for: scheduledFrame),
+      proposal: runLoop.proposal()
+    )
+    #expect(renderer.hasViewGraphNodeForCancellationTesting(draftOnlyIdentity))
+
+    _ = runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl))
+    runLoop.handlePaste(PasteEvent(content: "/tmp/frame-head-abort-during.txt"))
+    #expect(recorder.events.contains("key:0"))
+    #expect(recorder.events.contains("drop:0:1"))
+    #expect(!recorder.events.contains("key:1"))
+    #expect(!recorder.events.contains("drop:1:1"))
+    recorder.reset()
+
+    renderer.abortPreparedFrameHeadForCancellationTesting(prepared)
+    #expect(!renderer.hasViewGraphNodeForCancellationTesting(draftOnlyIdentity))
+
+    _ = runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl))
+    runLoop.handlePaste(PasteEvent(content: "/tmp/frame-head-abort-after-abort.txt"))
+    #expect(recorder.events.contains("key:0"))
+    #expect(recorder.events.contains("drop:0:1"))
+    #expect(!recorder.events.contains("key:1"))
+    #expect(!recorder.events.contains("drop:1:1"))
+    recorder.reset()
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var committedFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &committedFrames)
+
+    _ = runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl))
+    runLoop.handlePaste(PasteEvent(content: "/tmp/frame-head-abort-after-commit.txt"))
+    #expect(recorder.events.contains("key:1"))
+    #expect(recorder.events.contains("drop:1:1"))
+  }
+
+  @Test("prepared frame head abort discards animation completions")
+  func preparedFrameHeadAbortDiscardsAnimationCompletions() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadAbortAnimationRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: AsyncFrameHeadAbortScaffoldState(),
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: terminal.proposal,
+      viewBuilder: { state, _ in
+        AsyncFrameHeadAbortScaffoldView(
+          state: state,
+          recorder: recorder
+        )
+      }
+    )
+    focusTracker.invalidator = runLoop.scheduler
+
+    try await withAsyncFrameHeadAbortAnimationSinks(runLoop.renderer) {
+      runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+      var initialFrames = 0
+      try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+      focusLeafmostAsyncFrameHeadAbortScaffoldRegion(in: runLoop)
+
+      recorder.reset()
+      _ = runLoop.handleKeyPress(KeyPress(.space, modifiers: []))
+      let scheduledFrame = try #require(runLoop.scheduler.consumeReadyFrame(at: .now()))
+      let context = runLoop.resolveContext(for: scheduledFrame)
+      let root = AsyncFrameHeadAbortScaffoldView(
+        state: runLoop.stateContainer.state,
+        recorder: recorder
+      )
+      let prepared = renderer.prepareFrameHeadForCancellationTesting(
+        root,
+        context: context,
+        proposal: runLoop.proposal()
+      )
+
+      #expect(recorder.events == ["action"])
+
+      renderer.abortPreparedFrameHeadForCancellationTesting(prepared)
+      #expect(recorder.events == ["action"])
+
+      _ = await renderer.renderAsync(
+        root,
+        context: context,
+        proposal: runLoop.proposal()
+      )
+
+      #expect(recorder.events.contains("animation-completion"))
+    }
+  }
+
   @Test("blocked async frame head defers animation completion until commit")
   func blockedAsyncFrameHeadDefersAnimationCompletionUntilCommit() async throws {
     let rootIdentity = testIdentity("AsyncFrameHeadAnimationCompletionRoot")
@@ -1218,6 +1370,7 @@ private struct AsyncFrameHeadDraftRegistrationView: View {
   var body: some View {
     Panel(id: "draft-registration") {
       Text("value \(value)")
+        .id(testIdentity("AsyncFrameHeadDraftRegistrationValue", "\(value)"))
         .focusable(true)
     }
     .keyCommand("Record value", key: .character("a"), modifiers: .ctrl) {
