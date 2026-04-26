@@ -10,6 +10,20 @@ import Synchronization
 #endif
 
 #if canImport(Darwin)
+  private func webSurfaceOpenRead(
+    _ path: String
+  ) -> Int32 {
+    unsafe path.withCString { pathPointer in
+      unsafe Darwin.open(pathPointer, O_RDONLY)
+    }
+  }
+
+  private func webSurfaceClose(
+    _ fileDescriptor: Int32
+  ) -> Int32 {
+    Darwin.close(fileDescriptor)
+  }
+
   private func webSurfaceRead(
     _ fileDescriptor: Int32,
     _ buffer: UnsafeMutableRawPointer?,
@@ -26,6 +40,20 @@ import Synchronization
     unsafe Darwin.write(fileDescriptor, buffer, count)
   }
 #elseif canImport(Glibc)
+  private func webSurfaceOpenRead(
+    _ path: String
+  ) -> Int32 {
+    unsafe path.withCString { pathPointer in
+      unsafe Glibc.open(pathPointer, Glibc.O_RDONLY)
+    }
+  }
+
+  private func webSurfaceClose(
+    _ fileDescriptor: Int32
+  ) -> Int32 {
+    Glibc.close(fileDescriptor)
+  }
+
   private func webSurfaceRead(
     _ fileDescriptor: Int32,
     _ buffer: UnsafeMutableRawPointer?,
@@ -42,6 +70,20 @@ import Synchronization
     unsafe Glibc.write(fileDescriptor, buffer, count)
   }
 #elseif canImport(WASILibc)
+  private func webSurfaceOpenRead(
+    _ path: String
+  ) -> Int32 {
+    unsafe path.withCString { pathPointer in
+      unsafe WASILibc.open(pathPointer, WASILibc.O_RDONLY)
+    }
+  }
+
+  private func webSurfaceClose(
+    _ fileDescriptor: Int32
+  ) -> Int32 {
+    WASILibc.close(fileDescriptor)
+  }
+
   private func webSurfaceRead(
     _ fileDescriptor: Int32,
     _ buffer: UnsafeMutableRawPointer?,
@@ -64,6 +106,7 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
     var surfaceSize: Size
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
+    var transmittedImageIDs: Set<String>
   }
 
   private let state: Mutex<State>
@@ -89,7 +132,8 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
       State(
         surfaceSize: surfaceSize,
         renderStyle: renderStyle,
-        graphicsCapabilities: .none
+        graphicsCapabilities: .none,
+        transmittedImageIDs: []
       )
     )
   }
@@ -142,7 +186,14 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
   func present(
     _ surface: RasterSurface
   ) throws -> TerminalPresentationMetrics {
-    let bytes = Array(WebSurfaceFrameEncoder.encode(surface).utf8)
+    let bytes = state.withLock { state in
+      Array(
+        WebSurfaceFrameEncoder.encode(
+          surface,
+          knownImageIDs: &state.transmittedImageIDs
+        ).utf8
+      )
+    }
     try writeBytes(bytes)
     return TerminalPresentationMetrics(
       bytesWritten: bytes.count,
@@ -541,6 +592,17 @@ package enum WebSurfaceFrameEncoder {
   package static func encode(
     _ surface: RasterSurface
   ) -> String {
+    var knownImageIDs: Set<String> = []
+    return encode(
+      surface,
+      knownImageIDs: &knownImageIDs
+    )
+  }
+
+  package static func encode(
+    _ surface: RasterSurface,
+    knownImageIDs: inout Set<String>
+  ) -> String {
     var styles: [ResolvedTextStyle?] = [nil]
     let rows = surface.cells.enumerated().map { y, row in
       encodeRow(
@@ -560,7 +622,12 @@ package enum WebSurfaceFrameEncoder {
     json += ",\"rows\":["
     json += rows.joined(separator: ",")
     json += "]"
-    json += ",\"images\":[]"
+    json += ",\"images\":["
+    json += encodeImages(
+      surface.imageAttachments,
+      knownImageIDs: &knownImageIDs
+    ).joined(separator: ",")
+    json += "]"
     json += "}\n"
     return json
   }
@@ -584,6 +651,127 @@ package enum WebSurfaceFrameEncoder {
     }
 
     return "[" + encodedCells.joined(separator: ",") + "]"
+  }
+
+  private static func encodeImages(
+    _ attachments: [RasterImageAttachment],
+    knownImageIDs: inout Set<String>
+  ) -> [String] {
+    attachments.compactMap { attachment in
+      encodeImage(
+        attachment,
+        knownImageIDs: &knownImageIDs
+      )
+    }
+  }
+
+  private static func encodeImage(
+    _ attachment: RasterImageAttachment,
+    knownImageIDs: inout Set<String>
+  ) -> String? {
+    guard let pngBytes = pngBytes(for: attachment), !attachment.visibleBounds.isEmpty else {
+      return nil
+    }
+
+    let imageID = webImageID(for: pngBytes)
+    let shouldTransmitData = knownImageIDs.insert(imageID).inserted
+    var fields = [
+      "\"id\":\(jsonString(imageID))",
+      "\"format\":\"png\"",
+      "\"bounds\":\(encodeRect(attachment.bounds))",
+      "\"visibleBounds\":\(encodeRect(attachment.visibleBounds))",
+      "\"scalingMode\":\(jsonString(attachment.scalingMode.rawValue))",
+    ]
+    if let pixelSize = attachment.pixelSize {
+      fields.append("\"pixelSize\":\(encodeSize(pixelSize))")
+    }
+    if shouldTransmitData {
+      fields.append("\"pngBase64\":\(jsonString(base64Encoded(pngBytes)))")
+    }
+    return "{" + fields.joined(separator: ",") + "}"
+  }
+
+  private static func pngBytes(
+    for attachment: RasterImageAttachment
+  ) -> [UInt8]? {
+    switch attachment.resolvedReference {
+    case .embeddedPNG(let bytes):
+      return bytes
+    case .filePath(let path):
+      return webSurfaceReadFileBytes(at: path)
+    case .namedResource, nil:
+      break
+    }
+
+    if case .pngData(let bytes) = attachment.source {
+      return bytes
+    }
+    return nil
+  }
+
+  private static func encodeRect(
+    _ rect: Rect
+  ) -> String {
+    "[\(rect.origin.x),\(rect.origin.y),\(rect.size.width),\(rect.size.height)]"
+  }
+
+  private static func encodeSize(
+    _ size: Size
+  ) -> String {
+    "[\(size.width),\(size.height)]"
+  }
+
+  private static func webImageID(
+    for bytes: [UInt8]
+  ) -> String {
+    "png:\(hexString(fnv1a64(bytes))):\(bytes.count)"
+  }
+
+  private static func fnv1a64(
+    _ bytes: [UInt8]
+  ) -> UInt64 {
+    var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+    for byte in bytes {
+      hash ^= UInt64(byte)
+      hash &*= 0x100_0000_01b3
+    }
+    return hash
+  }
+
+  private static func hexString(
+    _ value: UInt64
+  ) -> String {
+    var text = String(value, radix: 16, uppercase: false)
+    while text.count < 16 {
+      text = "0" + text
+    }
+    return text
+  }
+
+  private static func base64Encoded(
+    _ bytes: [UInt8]
+  ) -> String {
+    let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".utf8)
+    var result: [UInt8] = []
+    result.reserveCapacity(((bytes.count + 2) / 3) * 4)
+
+    var index = 0
+    while index < bytes.count {
+      let first = Int(bytes[index])
+      let second = index + 1 < bytes.count ? Int(bytes[index + 1]) : 0
+      let third = index + 2 < bytes.count ? Int(bytes[index + 2]) : 0
+      let combined = (first << 16) | (second << 8) | third
+
+      result.append(alphabet[(combined >> 18) & 0x3F])
+      result.append(alphabet[(combined >> 12) & 0x3F])
+      result.append(
+        index + 1 < bytes.count ? alphabet[(combined >> 6) & 0x3F] : UInt8(ascii: "=")
+      )
+      result.append(index + 2 < bytes.count ? alphabet[combined & 0x3F] : UInt8(ascii: "="))
+      index += 3
+    }
+
+    return String(decoding: result, as: UTF8.self)
   }
 
   private static func index(
@@ -669,6 +857,38 @@ package enum WebSurfaceFrameEncoder {
     }
     result += "\""
     return result
+  }
+}
+
+private func webSurfaceReadFileBytes(
+  at path: String
+) -> [UInt8]? {
+  let fileDescriptor = webSurfaceOpenRead(path)
+  guard fileDescriptor >= 0 else {
+    return nil
+  }
+  defer {
+    _ = webSurfaceClose(fileDescriptor)
+  }
+
+  var bytes: [UInt8] = []
+  var buffer = [UInt8](repeating: 0, count: 8 * 1024)
+  let bufferCount = buffer.count
+  while true {
+    let readCount = unsafe buffer.withUnsafeMutableBytes { rawBuffer in
+      unsafe webSurfaceRead(
+        fileDescriptor,
+        rawBuffer.baseAddress,
+        bufferCount
+      )
+    }
+    if readCount < 0 {
+      return nil
+    }
+    if readCount == 0 {
+      return bytes
+    }
+    bytes.append(contentsOf: buffer.prefix(readCount))
   }
 }
 

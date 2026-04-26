@@ -39,7 +39,7 @@ export async function resolveSwiftArtifacts(
     "--package-path",
     options.packagePath,
     "--swift-sdk",
-    "swift-6.3-RELEASE_wasm",
+    "swift-6.3.1-RELEASE_wasm",
     "-c",
     "release",
     ...requiredWasmSwiftFlags,

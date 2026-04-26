@@ -42,6 +42,29 @@ test("decoder returns multiple records from one stdout chunk", () => {
   expect(surfaceFrame(records[2]).styles).toHaveLength(4);
 });
 
+test("decoder preserves typed image records", () => {
+  const decoder = new WebTUIOutputDecoder();
+  const records = decoder.feed(encoder.encode(
+    '\u001Esurface:{"version":1,"width":2,"height":1,"styles":[null],"rows":[[]],'
+      + '"images":[{"id":"png:test","format":"png","bounds":[0,0,1,1],'
+      + '"visibleBounds":[0,0,1,1],"scalingMode":"stretch","pixelSize":[1,1],'
+      + '"pngBase64":"iVBORw=="}]}\n'
+  ));
+
+  const frame = surfaceFrame(records[0]);
+  expect(frame.images).toEqual([
+    {
+      id: "png:test",
+      format: "png",
+      bounds: [0, 0, 1, 1],
+      visibleBounds: [0, 0, 1, 1],
+      scalingMode: "stretch",
+      pixelSize: [1, 1],
+      pngBase64: "iVBORw==",
+    },
+  ]);
+});
+
 test("decoder keeps malformed surface output visible as text", () => {
   const decoder = new WebTUIOutputDecoder();
   const records = decoder.feed(encoder.encode('\u001Esurface:{"version":1,"width":2}\n'));

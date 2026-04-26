@@ -15,6 +15,7 @@ import {
   encodePasteInputMessage,
   type WebTUIKeyInput,
   type WebTUISurfaceFrame,
+  type WebTUISurfaceImage,
   type WebTUISurfaceStyle,
 } from "./WebTUISurfaceTransport.ts";
 import type { WebTUISceneDescriptor } from "./WebTUISceneManifest.ts";
@@ -28,6 +29,11 @@ export interface WebTUISceneRuntimeOptions {
   onInput(chunk: Uint8Array): void;
 }
 
+interface CachedWebTUIImage {
+  image?: CanvasImageSource;
+  promise?: Promise<CanvasImageSource>;
+}
+
 export class WebTUISceneRuntime {
   readonly descriptor: WebTUISceneDescriptor;
   readonly element: HTMLElement;
@@ -35,6 +41,7 @@ export class WebTUISceneRuntime {
 
   private readonly bridge?: BrowserWASIBridge;
   private readonly onInput: (chunk: Uint8Array) => void;
+  private readonly imageCache = new Map<string, CachedWebTUIImage>();
   private currentStyle: ResolvedWebTUITerminalStyle;
   private canvas?: HTMLCanvasElement;
   private diagnosticText?: HTMLElement;
@@ -412,6 +419,77 @@ export class WebTUISceneRuntime {
         this.drawCell(context, x, y, text, span, style);
       }
     }
+
+    this.drawImages(context, frame.images ?? []);
+  }
+
+  private drawImages(
+    context: CanvasRenderingContext2D,
+    images: WebTUISurfaceImage[]
+  ): void {
+    for (const image of images) {
+      this.drawImage(context, image);
+    }
+  }
+
+  private drawImage(
+    context: CanvasRenderingContext2D,
+    image: WebTUISurfaceImage
+  ): void {
+    const decodedImage = this.cachedImage(image);
+    if (!decodedImage) {
+      return;
+    }
+
+    const [boundsX, boundsY, boundsWidth, boundsHeight] = image.bounds;
+    const [clipX, clipY, clipWidth, clipHeight] = image.visibleBounds;
+    if (boundsWidth <= 0 || boundsHeight <= 0 || clipWidth <= 0 || clipHeight <= 0) {
+      return;
+    }
+
+    context.save();
+    context.beginPath();
+    context.rect(
+      clipX * this.cellWidth,
+      clipY * this.cellHeight,
+      clipWidth * this.cellWidth,
+      clipHeight * this.cellHeight
+    );
+    context.clip();
+    context.drawImage(
+      decodedImage,
+      boundsX * this.cellWidth,
+      boundsY * this.cellHeight,
+      boundsWidth * this.cellWidth,
+      boundsHeight * this.cellHeight
+    );
+    context.restore();
+  }
+
+  private cachedImage(
+    image: WebTUISurfaceImage
+  ): CanvasImageSource | undefined {
+    const cached = this.imageCache.get(image.id);
+    if (cached?.image) {
+      return cached.image;
+    }
+
+    if (!cached?.promise && image.pngBase64) {
+      const promise = decodePNGImage(image.pngBase64);
+      this.imageCache.set(image.id, { promise });
+      void promise.then((decodedImage) => {
+        const latest = this.imageCache.get(image.id);
+        if (latest?.promise !== promise) {
+          return;
+        }
+        this.imageCache.set(image.id, { image: decodedImage });
+        this.draw();
+      }).catch(() => {
+        this.imageCache.delete(image.id);
+      });
+    }
+
+    return undefined;
   }
 
   private drawCell(
@@ -515,6 +593,46 @@ export class WebTUISceneRuntime {
     }
     return { x, y };
   }
+}
+
+async function decodePNGImage(
+  pngBase64: string
+): Promise<CanvasImageSource> {
+  const bytes = decodeBase64Bytes(pngBase64);
+  const blob = new Blob([bytes], { type: "image/png" });
+
+  if (typeof createImageBitmap === "function") {
+    return createImageBitmap(blob);
+  }
+
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(blob);
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Failed to decode PNG image"));
+    };
+    image.src = url;
+  });
+}
+
+function decodeBase64Bytes(
+  value: string
+): Uint8Array {
+  if (typeof atob === "function") {
+    const binary = atob(value);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes;
+  }
+
+  return new Uint8Array(Buffer.from(value, "base64"));
 }
 
 function keyInputFromKeyboardEvent(
