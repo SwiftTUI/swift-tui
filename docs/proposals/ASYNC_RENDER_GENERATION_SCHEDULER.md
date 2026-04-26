@@ -294,6 +294,10 @@ git commit -m "refactor(renderer): split async frame head and commit"
 
 ### Stage 3C: Add frame-head abort or draft-only side effects
 
+Execution plan:
+
+- [`../plans/2026-04-26-002-frame-head-abort-plan.md`](../plans/2026-04-26-002-frame-head-abort-plan.md)
+
 - Add an abort path for prepared frame heads, or route resolve side effects into
   draft-only state.
 - Prove abort leaves `ViewGraph`, runtime registrations, focus sync, animation
