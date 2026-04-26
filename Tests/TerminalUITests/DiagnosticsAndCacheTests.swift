@@ -1020,6 +1020,8 @@ struct DiagnosticsAndCacheTests {
     #expect(snapshot.contains("measuredWork=computed:3 reused:0"))
     #expect(snapshot.contains("placedWork=computed:3 reused:0"))
     #expect(snapshot.contains("measurementCache=generation:0"))
+    #expect(snapshot.contains("customLayoutFallbacks=0"))
+    #expect(snapshot.contains("firstCustomLayoutFallback=nil"))
   }
 
   @Test("snapshot renderer formats scheduled wake causes and invalidations")

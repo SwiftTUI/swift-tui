@@ -56,6 +56,10 @@ public struct SnapshotRenderer {
     } else {
       lines.append("measurementCache=nil")
     }
+    lines.append("customLayoutFallbacks=\(diagnostics.customLayoutFallbackCount)")
+    lines.append(
+      "firstCustomLayoutFallback=\(diagnostics.firstCustomLayoutFallbackIdentity?.path ?? "nil")"
+    )
 
     return lines.joined(separator: "\n")
   }

@@ -162,10 +162,20 @@ set of internal test layouts.
 
 ### Stage 1: Preserve and expose the fallback
 
-- Keep `FrameTailRenderer.canOffloadLayout` conservative.
-- Add diagnostics for custom-layout fallback count and first fallback identity.
-- Add a regression test proving a tree with custom layout runs layout inline but
+- [x] Keep `FrameTailRenderer.canOffloadLayout` conservative.
+- [x] Add diagnostics for custom-layout fallback count and first fallback identity.
+- [x] Add a regression test proving a tree with custom layout runs layout inline but
   still offloads raster.
+
+Stage 1 result:
+
+- `FrameDiagnostics` reports `customLayoutFallbackCount` and
+  `firstCustomLayoutFallbackIdentity`.
+- `FrameDiagnosticsLogger` records the fallback count and first fallback
+  identity in the TSV stream.
+- `AsyncFrameTailRenderingTests` verifies that a custom-layout frame does not
+  enqueue layout work on the worker, but still suspends at the raster worker
+  boundary.
 
 Commit boundary:
 
