@@ -51,6 +51,20 @@ public struct BorderSet: Equatable, Sendable {
   }
 }
 
+extension BorderSet.Placement {
+  /// Maps `BorderSet.Placement` to its `StrokeStyle.Placement` equivalent
+  /// for call sites that have a `BorderSet` but not yet a `StrokeStyle`.
+  /// Used during the Task 2–3 migration window; removed in Task 4 when
+  /// `BorderSet.placement` itself is dropped.
+  var asStrokePlacement: StrokeStyle.Placement {
+    switch self {
+    case .outset: return .outset
+    case .decorative: return .outset  // .decorative ≡ .outset
+    case .inset: return .inset
+    }
+  }
+}
+
 extension BorderSet {
   public var topDisplayWidth: Int { Self.maxCellWidth(of: top) }
   public var bottomDisplayWidth: Int { Self.maxCellWidth(of: bottom) }

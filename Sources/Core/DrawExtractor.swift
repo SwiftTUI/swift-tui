@@ -311,7 +311,8 @@ extension DrawExtractor {
         blendPhase: blendPhase,
         sides: sides
       )
-      if set.placement == .inset {
+      let placement = set.placement.asStrokePlacement
+      if placement == .inset {
         postCommands.append(borderCommand)
       } else {
         commands.append(borderCommand)

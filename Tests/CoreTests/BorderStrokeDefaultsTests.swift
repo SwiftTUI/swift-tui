@@ -8,8 +8,6 @@ import Testing
 ///
 /// - `strokeStyleInitDefaultIsOuterHalfBlock` is INTENTIONALLY FAILING
 ///   today; it will pass once Task 6 changes the canonical default.
-/// - The placement test is commented out until Task 2 adds
-///   `StrokeStyle.placement`.
 /// - `strokeStyleInitDefaultLineWidth` is an invariant — it should
 ///   pass before *and* after the simplification lands; it's here to
 ///   anchor the file's purpose alongside the changing assertions.
@@ -21,12 +19,11 @@ func strokeStyleInitDefaultIsOuterHalfBlock() {
   #expect(style.borderSet == .outerHalfBlock)
 }
 
-// TODO(Task 2): uncomment once `StrokeStyle.placement` exists.
-// @Test("StrokeStyle.init defaults placement to .outset")
-// func strokeStyleInitDefaultPlacementIsOutset() {
-//   let style = StrokeStyle()
-//   #expect(style.placement == .outset)
-// }
+@Test("StrokeStyle.init defaults placement to .outset")
+func strokeStyleInitDefaultPlacementIsOutset() {
+  let style = StrokeStyle()
+  #expect(style.placement == .outset)
+}
 
 @Test("StrokeStyle.init lineWidth defaults to 1")
 func strokeStyleInitDefaultLineWidth() {

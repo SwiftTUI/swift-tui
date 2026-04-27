@@ -529,7 +529,8 @@ public struct LayoutEngine: Sendable {
       )
       return [baseMeasurement, insetMeasurement]
     case .border(let set, _, _, _, _, let sides):
-      let insets = borderLayoutInsets(set: set, sides: sides)
+      let insets = borderLayoutInsets(
+        set: set, placement: set.placement.asStrokePlacement, sides: sides)
       let childProposal = inset(parentProposal, by: insets)
       return resolved.children.map { child in
         measure(child, proposal: childProposal, passContext: passContext)
@@ -807,7 +808,8 @@ public struct LayoutEngine: Sendable {
         )
       }
     case .border(let set, _, _, _, _, let sides):
-      let insets = borderLayoutInsets(set: set, sides: sides)
+      let insets = borderLayoutInsets(
+        set: set, placement: set.placement.asStrokePlacement, sides: sides)
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
       return Size(
         width: contentSize.width + insets.horizontal,
@@ -1474,9 +1476,10 @@ public struct LayoutEngine: Sendable {
   /// request borders on a subset of edges (e.g. top only).
   package func borderLayoutInsets(
     set: BorderSet,
+    placement: StrokeStyle.Placement,
     sides: Edge.Set
   ) -> EdgeInsets {
-    guard set.placement != .inset else { return EdgeInsets() }
+    guard placement != .inset else { return EdgeInsets() }
     return EdgeInsets(
       top: sides.contains(.top) ? set.topDisplayWidth : 0,
       leading: sides.contains(.leading) ? set.leftDisplayWidth : 0,

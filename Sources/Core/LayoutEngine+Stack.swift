@@ -829,7 +829,8 @@ extension LayoutEngine {
       let contentMinimum = childMinimums.first ?? 0
       return contentMinimum + (axis == .horizontal ? insets.horizontal : insets.vertical)
     case .border(let set, _, _, _, _, let sides):
-      let insets = borderLayoutInsets(set: set, sides: sides)
+      let insets = borderLayoutInsets(
+        set: set, placement: set.placement.asStrokePlacement, sides: sides)
       let contentMinimum = childMinimums.first ?? 0
       return contentMinimum + (axis == .horizontal ? insets.horizontal : insets.vertical)
     case .frame(let width, let height, _):

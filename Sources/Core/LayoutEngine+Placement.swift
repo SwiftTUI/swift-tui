@@ -281,7 +281,8 @@ extension LayoutEngine {
         return []
       }
 
-      let insets = borderLayoutInsets(set: set, sides: sides)
+      let insets = borderLayoutInsets(
+        set: set, placement: set.placement.asStrokePlacement, sides: sides)
       let childBounds = Rect(
         origin: Point(
           x: bounds.origin.x + insets.leading,
