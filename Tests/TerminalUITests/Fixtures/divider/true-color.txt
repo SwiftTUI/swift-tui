@@ -3,4 +3,4 @@ configuration true-color
 surface 14x1
 capability glyph=unicode color=trueColor styles=true
 appearance fg=#ECEFF4 bg=#1E222A tint=#56B6C2 contrast=increased source=fallback
-01│\u{001B}[38;2;69;73;81m──────────────\u{001B}[0m
+01│\u{001B}[38;2;69;73;81m▀▀▀▀▀▀▀▀▀▀▀▀▀▀\u{001B}[0m

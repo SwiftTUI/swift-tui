@@ -118,7 +118,7 @@ struct MenuSurfaceTests {
     #expect(surface.contains("Item 1"))
     #expect(surface.contains("Item 2"))
     #expect(dividerNode?.kind == .view("Divider"))
-    #expect(surface.contains("────"))
+    #expect(surface.contains("▀▀▀▀"))
     #expect(
       expandedArtifacts.semanticSnapshot.focusRegions.map(\.identity) == [
         testIdentity("Menu")
