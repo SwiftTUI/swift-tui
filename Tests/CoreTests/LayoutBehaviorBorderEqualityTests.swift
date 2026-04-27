@@ -118,4 +118,75 @@ struct LayoutBehaviorBorderEqualityTests {
     )
     #expect(a != b)
   }
+
+  // MARK: - placement field in equivalence predicates
+
+  @Test("LayoutBehavior.border != when placement differs (.outset vs .inset)")
+  func layoutBehaviorBorderDifferentPlacementNotEqual() {
+    let outset = LayoutBehavior.border(
+      .single,
+      placement: .outset,
+      foreground: nil,
+      background: nil,
+      blend: nil,
+      blendPhase: 0,
+      sides: .all
+    )
+    let inset = LayoutBehavior.border(
+      .single,
+      placement: .inset,
+      foreground: nil,
+      background: nil,
+      blend: nil,
+      blendPhase: 0,
+      sides: .all
+    )
+    #expect(outset != inset)
+  }
+
+  @Test("isEquivalentForMeasurement returns false when placement differs")
+  func isEquivalentForMeasurementFalseWhenPlacementDiffers() {
+    let outset = LayoutBehavior.border(
+      .single,
+      placement: .outset,
+      foreground: nil,
+      background: nil,
+      blend: nil,
+      blendPhase: 0,
+      sides: .all
+    )
+    let inset = LayoutBehavior.border(
+      .single,
+      placement: .inset,
+      foreground: nil,
+      background: nil,
+      blend: nil,
+      blendPhase: 0,
+      sides: .all
+    )
+    #expect(!outset.isEquivalentForMeasurement(to: inset))
+  }
+
+  @Test("isEquivalentForPlacement returns false when placement differs")
+  func isEquivalentForPlacementFalseWhenPlacementDiffers() {
+    let outset = LayoutBehavior.border(
+      .single,
+      placement: .outset,
+      foreground: nil,
+      background: nil,
+      blend: nil,
+      blendPhase: 0,
+      sides: .all
+    )
+    let inset = LayoutBehavior.border(
+      .single,
+      placement: .inset,
+      foreground: nil,
+      background: nil,
+      blend: nil,
+      blendPhase: 0,
+      sides: .all
+    )
+    #expect(!outset.isEquivalentForPlacement(to: inset))
+  }
 }

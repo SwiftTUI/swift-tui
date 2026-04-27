@@ -547,6 +547,10 @@ extension StrokeStyle {
 }
 
 extension StrokeStyle {
+  /// Transitional shim — currently has zero callers in `Sources/`. Kept until Task 4
+  /// of `docs/plans/2026-04-26-003-border-stroke-simplification-plan.md` deletes
+  /// `BorderSet.placement`, at which point this helper is also removed.
+  ///
   /// The placement that drives layout/draw decisions during the
   /// migration window. While `BorderSet.placement` still exists
   /// (Tasks 2-3), this prefers a non-default `BorderSet.placement`
