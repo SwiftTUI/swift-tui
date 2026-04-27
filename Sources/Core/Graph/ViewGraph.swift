@@ -792,26 +792,6 @@ package final class ViewGraph {
     )
   }
 
-  package func restoreRuntimeRegistrations(
-    rootedAt roots: [Identity],
-    for resolved: ResolvedNode,
-    into registrations: RuntimeRegistrationSet
-  ) {
-    guard !roots.isEmpty else {
-      return
-    }
-
-    for root in roots {
-      guard let subtree = resolved.descendant(with: root) else {
-        continue
-      }
-      restoreRuntimeRegistrations(
-        for: subtree,
-        registrations: registrations
-      )
-    }
-  }
-
   private func restoreRuntimeRegistrations(
     for resolved: ResolvedNode,
     registrations: RuntimeRegistrationSet

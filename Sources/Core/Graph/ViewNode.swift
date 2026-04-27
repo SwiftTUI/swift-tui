@@ -577,36 +577,6 @@ package final class ViewNode {
     registeredHandlers.recordPreferenceObservation(registration)
   }
 
-  package func recordKeyCommandRegistration(
-    scope: Identity,
-    command: RegisteredKeyCommand
-  ) {
-    registeredHandlers.recordKeyCommand(
-      scope: scope,
-      command: command
-    )
-  }
-
-  package func recordPaletteCommandRegistration(
-    scope: Identity,
-    command: RegisteredPaletteCommand
-  ) {
-    registeredHandlers.recordPaletteCommand(
-      scope: scope,
-      command: command
-    )
-  }
-
-  package func recordDropDestinationRegistration(
-    scope: Identity,
-    handler: @escaping DropDestinationHandler
-  ) {
-    registeredHandlers.recordDropDestination(
-      scope: scope,
-      handler: handler
-    )
-  }
-
   package func restoreRuntimeRegistrations(
     into registrations: RuntimeRegistrationSet
   ) {

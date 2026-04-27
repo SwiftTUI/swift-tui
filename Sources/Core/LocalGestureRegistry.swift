@@ -111,24 +111,9 @@ package final class LocalGestureRegistry: Equatable {
   /// Re-populates the registry from a snapshot captured by `NodeHandlers`.
   /// Used during cache-hit frames where resolve doesn't run but
   /// registrations must still be live.
-  package func snapshot() -> [Identity: AnyGestureRecognizer] {
-    recognizers
-  }
-
   package func restore(_ snapshot: [Identity: AnyGestureRecognizer]) {
     guard !snapshot.isEmpty else { return }
     for (identity, recognizer) in snapshot {
-      if let existing = recognizers[identity] {
-        if existing.isActive {
-          if existing !== recognizer {
-            recognizer.tearDown()
-          }
-          continue
-        }
-        if existing !== recognizer {
-          existing.tearDown()
-        }
-      }
       recognizers[identity] = recognizer
     }
   }

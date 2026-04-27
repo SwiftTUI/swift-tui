@@ -137,87 +137,7 @@ private struct FrameHeadDraft {
   var frameTailInput: FrameTailInput
   var animationTimestamp: MonotonicInstant
   var resolveDuration: Duration
-  var runtimeRegistrationDraft: RuntimeRegistrationDraft
-  var runtimeRegistrationMutation: RuntimeRegistrationMutation
   var animationCheckpoint: AnimationController.Checkpoint
-}
-
-@MainActor
-private struct RuntimeRegistrationDraft {
-  var live: RuntimeRegistrationSet
-  let actionRegistry = LocalActionRegistry()
-  let keyHandlerRegistry = LocalKeyHandlerRegistry()
-  let pointerHandlerRegistry = LocalPointerHandlerRegistry()
-  let gestureRegistry = LocalGestureRegistry()
-  let gestureStateRegistry = LocalGestureStateRegistry()
-  let focusBindingRegistry = LocalFocusBindingRegistry()
-  let focusedValuesRegistry = LocalFocusedValuesRegistry()
-  let scrollPositionRegistry = LocalScrollPositionRegistry()
-  let lifecycleRegistry = LocalLifecycleRegistry()
-  let taskRegistry = LocalTaskRegistry()
-  let preferenceObservationRegistry = LocalPreferenceObservationRegistry()
-  let commandRegistry = CommandRegistry()
-  let dropDestinationRegistry = DropDestinationRegistry()
-
-  func apply(to context: inout ResolveContext) {
-    context.localActionRegistry = actionRegistry
-    context.localKeyHandlerRegistry = keyHandlerRegistry
-    context.localPointerHandlerRegistry = pointerHandlerRegistry
-    context.localGestureRegistry = gestureRegistry
-    context.localGestureStateRegistry = gestureStateRegistry
-    context.localFocusBindingRegistry = focusBindingRegistry
-    context.localFocusedValuesRegistry = focusedValuesRegistry
-    context.localScrollPositionRegistry = scrollPositionRegistry
-    context.localLifecycleRegistry = lifecycleRegistry
-    context.localTaskRegistry = taskRegistry
-    context.localPreferenceObservationRegistry = preferenceObservationRegistry
-    context.commandRegistry = commandRegistry
-    context.dropDestinationRegistry = dropDestinationRegistry
-  }
-
-  func restoreAllIntoLive() {
-    live.actionRegistry?.restore(actionRegistry.snapshot())
-    live.keyHandlerRegistry?.restore(keyHandlerRegistry.snapshot())
-    live.keyHandlerRegistry?.restoreKeyPressHandlers(
-      keyHandlerRegistry.snapshotKeyPressHandlers()
-    )
-    live.pointerHandlerRegistry?.restore(pointerHandlerRegistry.snapshot())
-    live.gestureRegistry?.restore(gestureRegistry.snapshot())
-    live.gestureStateRegistry?.restore(gestureStateRegistry.snapshot())
-    live.focusBindingRegistry?.restore(focusBindingRegistry.snapshot())
-    live.focusedValuesRegistry?.restore(focusedValuesRegistry.snapshot())
-    live.scrollPositionRegistry?.restore(scrollPositionRegistry.snapshot())
-    live.lifecycleRegistry?.restore(lifecycleRegistry.snapshot())
-    live.taskRegistry?.restore(taskRegistry.snapshot())
-    live.preferenceObservationRegistry?.restore(
-      preferenceObservationRegistry.snapshot()
-    )
-    live.commandRegistry?.restoreKeyCommands(
-      commandRegistry.snapshotKeyCommands()
-    )
-    live.commandRegistry?.restorePaletteCommands(
-      commandRegistry.snapshotPaletteCommands()
-    )
-    live.dropDestinationRegistry?.restore(dropDestinationRegistry.snapshot())
-  }
-}
-
-private enum RuntimeRegistrationMutation: Equatable {
-  case none
-  case resetAll
-  case removeSubtrees([Identity])
-
-  @MainActor
-  func apply(to registrations: RuntimeRegistrationSet) {
-    switch self {
-    case .none:
-      break
-    case .resetAll:
-      registrations.resetAll()
-    case .removeSubtrees(let roots):
-      registrations.removeSubtrees(rootedAt: roots)
-    }
-  }
 }
 
 private struct AsyncFrameTailDraftOutput {
@@ -1475,10 +1395,7 @@ public struct DefaultRenderer {
     let renderGeneration = renderGenerationSequencer.next()
 
     var resolveContext = context
-    let runtimeRegistrationDraft = RuntimeRegistrationDraft(
-      live: resolveContext.runtimeRegistrations
-    )
-    runtimeRegistrationDraft.apply(to: &resolveContext)
+    let runtimeRegistrations = resolveContext.runtimeRegistrations
     resolveContext.imageAssetResolver = imageRepository.resolver()
     resolveContext.frameState = frameState
     frameState.update(from: resolveContext, proposal: proposal)
@@ -1506,7 +1423,6 @@ public struct DefaultRenderer {
       _ = resolver.resolve(wrappedRoot, in: resolveContext)
     }
     let (_, resolveDuration): (Void, Duration)
-    var runtimeRegistrationMutation = RuntimeRegistrationMutation.none
     let animationCheckpoint = animationController.beginFrameHeadTransaction()
     animationController.beginTransitionCollection()
     if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
@@ -1514,11 +1430,11 @@ public struct DefaultRenderer {
     } else {
       let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
       if let dirtyEvaluationPlan {
-        runtimeRegistrationMutation = .removeSubtrees(
-          dirtyEvaluationPlan.frontierIdentities
+        runtimeRegistrations.removeSubtrees(
+          rootedAt: dirtyEvaluationPlan.frontierIdentities
         )
       } else {
-        runtimeRegistrationMutation = .resetAll
+        runtimeRegistrations.resetAll()
       }
 
       (_, resolveDuration) = measurePhase(clock: clock) {
@@ -1591,8 +1507,6 @@ public struct DefaultRenderer {
       frameTailInput: frameTailInput,
       animationTimestamp: animationTimestamp,
       resolveDuration: resolveDuration,
-      runtimeRegistrationDraft: runtimeRegistrationDraft,
-      runtimeRegistrationMutation: runtimeRegistrationMutation,
       animationCheckpoint: animationCheckpoint
     )
   }
@@ -1680,7 +1594,6 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
-    commitRuntimeRegistrations(for: draft)
     animationController.commitFrameHeadTransaction(draft.animationCheckpoint)
     applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
@@ -1749,17 +1662,6 @@ public struct DefaultRenderer {
       baselinePlacedTree: tail.baselinePlaced
     )
     return artifacts
-  }
-
-  @MainActor
-  private func commitRuntimeRegistrations(
-    for draft: FrameHeadDraft
-  ) {
-    let liveRegistrations = draft.runtimeRegistrationDraft.live
-    draft.runtimeRegistrationMutation.apply(to: liveRegistrations)
-    if draft.runtimeRegistrationMutation != .none {
-      draft.runtimeRegistrationDraft.restoreAllIntoLive()
-    }
   }
 
   @MainActor
