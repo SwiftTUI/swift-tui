@@ -152,11 +152,17 @@ extension View {
 
   /// Draws a border around this view.
   ///
-  /// The border lives **outside** the view's content frame for outset
-  /// and decorative border sets — the wrapped view grows by the border
-  /// set's per-side display widths so that content is never occluded.
-  /// For `.inset` border sets the frame stays the same and glyphs are
-  /// drawn into the outermost child cells.
+  /// The default chrome is ``BorderSet/outerHalfBlock`` in
+  /// ``StrokeStyle/Placement/outset`` placement — the wrapped view's
+  /// frame grows by the border set's per-side display widths so that
+  /// content is never occluded.
+  ///
+  /// Pass `placement: .inset` to draw the border into the outermost
+  /// cells of the content frame instead of reserving extra space; use
+  /// this with inset-style border sets like ``BorderSet/innerHalfBlock``.
+  ///
+  /// For other glyph palettes (single-line, double-line, heavy, etc.)
+  /// pass an explicit `set:`. See ``BorderSet`` for the full catalog.
   public func border<S: ShapeStyle>(
     _ style: S = SemanticShapeStyle.foreground,
     set: BorderSet = .outerHalfBlock,
