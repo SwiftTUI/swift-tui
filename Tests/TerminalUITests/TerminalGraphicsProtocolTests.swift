@@ -552,8 +552,15 @@ struct TerminalGraphicsProtocolTests {
     #expect(updateWrite == "\u{001B}_Ga=d,q=2\u{001B}\\")
   }
 
-  @Test("kitty image placement preserves bottom overflow instead of shrinking to the viewport")
-  func kittyImagePlacementPreservesBottomOverflow() throws {
+  @Test("kitty image placement crops bottom overflow so it does not paint over sibling regions")
+  func kittyImagePlacementCropsBottomOverflow() throws {
+    // When an ancestor (e.g. a ScrollView clip rect, or a safeAreaInset
+    // toolbar) trims the bottom of an image, the rasterizer reports a
+    // visibleBounds whose height is smaller than the logical bounds. The
+    // host must shrink the kitty placement (c/r) to the visible rect AND
+    // crop the source pixels proportionally — otherwise the image paints
+    // into cells that were just rendered for whatever lives below
+    // (toolbar text, a footer, etc).
     let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
@@ -598,11 +605,65 @@ struct TerminalGraphicsProtocolTests {
       }
     )
 
+    // Cursor is parked at the top-left of the visible bounds.
     #expect(kittyWrite.contains("\u{001B}[2;1H"))
-    #expect(kittyWrite.contains(",c=4,r=4,"))
-    #expect(!kittyWrite.contains(",c=4,r=2,"))
-    #expect(!kittyWrite.contains(",x="))
-    #expect(!kittyWrite.contains(",y="))
+    // Placement matches the visible rect, not the (taller) logical rect.
+    #expect(kittyWrite.contains(",c=4,r=2,"))
+    #expect(!kittyWrite.contains(",c=4,r=4,"))
+    // Source rect crops the bottom half of the image: 2 visible rows of 4
+    // logical rows → keep the top half (h=2 of 4 source pixels). The top
+    // and left edges aren't clipped, so x=0,y=0,w=4 are unchanged.
+    #expect(kittyWrite.contains(",x=0,y=0,w=4,h=2,"))
+  }
+
+  @Test("kitty image placement crops right-edge overflow with a source rect")
+  func kittyImagePlacementCropsRightEdgeOverflow() throws {
+    let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [
+        Array("\u{001B}_Gi=\(kittyQueryID);OK\u{001B}\\".utf8),
+        [],
+      ],
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 10, height: 4),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    let pngBytes = try makePNGBytes(
+      width: 4,
+      height: 4,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 255, blue: 255), count: 16)
+    )
+    let surface = RasterSurface(
+      size: .init(width: 3, height: 4),
+      lines: ["   ", "   ", "   ", "   "],
+      imageAttachments: [
+        makeRasterImageAttachment(
+          pngBytes: pngBytes,
+          pixelSize: .init(width: 4, height: 4),
+          bounds: .init(origin: .init(x: 0, y: 0), size: .init(width: 4, height: 4)),
+          visibleBounds: .init(origin: .init(x: 0, y: 0), size: .init(width: 2, height: 4))
+        )
+      ]
+    )
+
+    _ = try host.present(surface)
+    try host.drainPendingPresentation()
+
+    let kittyWrite = try #require(
+      controller.writes.first { write in
+        write.contains("_Ga=T")
+      }
+    )
+
+    #expect(kittyWrite.contains(",c=2,r=4,"))
+    #expect(kittyWrite.contains(",x=0,y=0,w=2,h=4,"))
   }
 
   @Test("graphics protocols clear background colors in image area cells")

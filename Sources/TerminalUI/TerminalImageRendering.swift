@@ -706,19 +706,40 @@ private func kittyPlacement(
     return nil
   }
 
+  // Cells of the logical placement that are clipped away by an ancestor
+  // (e.g. a ScrollView's content rect, or a sibling toolbar reserving
+  // space via safeAreaInset). Both top/left AND bottom/right must be
+  // honored: cells written before the kitty stream remain in the buffer,
+  // so any kitty rows extending into a sibling region (toolbar, footer)
+  // would paint over those cells. Limiting cellRows/cellColumns to the
+  // visible rect — and cropping the source pixels proportionally — keeps
+  // the on-screen scale identical to the unclipped case while preventing
+  // overdraw.
   let hiddenLeft = max(0, visibleBounds.origin.x - logicalBounds.origin.x)
   let hiddenTop = max(0, visibleBounds.origin.y - logicalBounds.origin.y)
+  let hiddenRight = max(
+    0,
+    (logicalBounds.origin.x + logicalBounds.size.width)
+      - (visibleBounds.origin.x + visibleBounds.size.width)
+  )
+  let hiddenBottom = max(
+    0,
+    (logicalBounds.origin.y + logicalBounds.size.height)
+      - (visibleBounds.origin.y + visibleBounds.size.height)
+  )
 
   let placement = KittyPlacement(
     origin: .init(
       x: logicalBounds.origin.x + hiddenLeft,
       y: logicalBounds.origin.y + hiddenTop
     ),
-    cellColumns: max(1, logicalBounds.size.width - hiddenLeft),
-    cellRows: max(1, logicalBounds.size.height - hiddenTop),
+    cellColumns: max(1, logicalBounds.size.width - hiddenLeft - hiddenRight),
+    cellRows: max(1, logicalBounds.size.height - hiddenTop - hiddenBottom),
     sourceRect: kittySourceRect(
       hiddenLeftCells: hiddenLeft,
       hiddenTopCells: hiddenTop,
+      hiddenRightCells: hiddenRight,
+      hiddenBottomCells: hiddenBottom,
       logicalCellSize: logicalBounds.size,
       imagePixelSize: imagePixelSize
     )
@@ -729,10 +750,15 @@ private func kittyPlacement(
 private func kittySourceRect(
   hiddenLeftCells: Int,
   hiddenTopCells: Int,
+  hiddenRightCells: Int,
+  hiddenBottomCells: Int,
   logicalCellSize: Size,
   imagePixelSize: Size
 ) -> KittySourceRect? {
-  guard hiddenLeftCells > 0 || hiddenTopCells > 0 else {
+  guard
+    hiddenLeftCells > 0 || hiddenTopCells > 0
+      || hiddenRightCells > 0 || hiddenBottomCells > 0
+  else {
     return nil
   }
 
@@ -746,11 +772,21 @@ private func kittySourceRect(
     totalCells: logicalCellSize.height,
     totalPixels: imagePixelSize.height
   )
+  let trimRight = proportionalPixelOffset(
+    hiddenCells: hiddenRightCells,
+    totalCells: logicalCellSize.width,
+    totalPixels: imagePixelSize.width
+  )
+  let trimBottom = proportionalPixelOffset(
+    hiddenCells: hiddenBottomCells,
+    totalCells: logicalCellSize.height,
+    totalPixels: imagePixelSize.height
+  )
   return KittySourceRect(
     x: sourceX,
     y: sourceY,
-    width: max(1, imagePixelSize.width - sourceX),
-    height: max(1, imagePixelSize.height - sourceY)
+    width: max(1, imagePixelSize.width - sourceX - trimRight),
+    height: max(1, imagePixelSize.height - sourceY - trimBottom)
   )
 }
 
