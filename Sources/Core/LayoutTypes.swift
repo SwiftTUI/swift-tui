@@ -23,7 +23,7 @@ public enum LayoutBehavior: Sendable {
   case safeAreaInset(edge: Edge, alignment: Alignment, spacing: Int, safeArea: EdgeInsets)
   /// A border that reserves layout insets for its own glyphs.
   ///
-  /// For `.outset` and `.decorative` placements the layout engine
+  /// For `.outset` placements the layout engine
   /// treats this like a `.padding` whose insets are derived from the
   /// border set's per-side display widths (masked by `sides`), so the
   /// child's content is never occluded by border glyphs.  For `.inset`

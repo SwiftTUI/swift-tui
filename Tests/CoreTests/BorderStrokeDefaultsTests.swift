@@ -2,20 +2,17 @@ import Testing
 
 @testable import Core
 
-/// Baseline test capturing the framework's canonical border/stroke
-/// defaults. Tracks the pre-vs-post-simplification flip planned in
-/// `docs/plans/2026-04-26-003-border-stroke-simplification-plan.md`:
+/// Anchors the framework's canonical border/stroke defaults so any
+/// regression in the implicit `StrokeStyle()` defaults is caught
+/// immediately.
 ///
-/// - `strokeStyleInitDefaultIsOuterHalfBlock` is INTENTIONALLY FAILING
-///   today; it will pass once Task 6 changes the canonical default.
-/// - `strokeStyleInitDefaultLineWidth` is an invariant — it should
-///   pass before *and* after the simplification lands; it's here to
-///   anchor the file's purpose alongside the changing assertions.
+/// See `docs/plans/2026-04-26-003-border-stroke-simplification-plan.md`
+/// and `docs/proposals/BORDERS_AND_STROKES.md` for the migration
+/// history that established these defaults.
 @Test("StrokeStyle.init produces outerHalfBlock by default")
 func strokeStyleInitDefaultIsOuterHalfBlock() {
   let style = StrokeStyle()
-  // PRE-SIMPLIFICATION: this is `.single` and FAILS.
-  // POST-TASK-6: expected to be `.outerHalfBlock`.
+  // Canonical default: outerHalfBlock with .outset placement.
   #expect(style.borderSet == .outerHalfBlock)
 }
 
