@@ -666,8 +666,10 @@ struct TerminalGraphicsProtocolTests {
     #expect(kittyWrite.contains(",x=0,y=0,w=2,h=4,"))
   }
 
-  @Test("graphics protocols clear background colors in image area cells")
-  func graphicsProtocolsClearBackgroundColorsInImageArea() throws {
+  @Test(
+    "graphics protocols preserve background colors in image area cells so transparent pixels show the immediate container background"
+  )
+  func graphicsProtocolsPreserveBackgroundColorsInImageArea() throws {
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
       readResponses: [
@@ -697,7 +699,10 @@ struct TerminalGraphicsProtocolTests {
     )
 
     // Build a surface where image area cells have background colors,
-    // mimicking ZStack { RoundedRectangle.fill(); Image() }
+    // mimicking ZStack { RoundedRectangle.fill(); Image() }. The cell
+    // background must survive into the rendered output, otherwise
+    // transparent pixels in the kitty/sixel image reveal the terminal's
+    // default surface color instead of the immediate container background.
     let bgStyle = ResolvedTextStyle(
       backgroundColor: .init(
         red: 40.0 / 255.0,
@@ -737,21 +742,173 @@ struct TerminalGraphicsProtocolTests {
       controller.writes.contains { $0.contains("\u{001B}P0;1;0q") }
     )
 
-    // Text writes for cells OUTSIDE the image bounds should contain
-    // background color escape codes (48;2;40;40;40)
-    let textWrites = controller.writes.filter { write in
+    // The container background colour (48;2;40;40;40) must show up
+    // somewhere — without this, the rest of the surface around the
+    // image would be terminal default.
+    let bgWrites = controller.writes.filter { write in
       write.contains("48;2;40;40;40")
     }
-    #expect(!textWrites.isEmpty)
+    #expect(!bgWrites.isEmpty)
 
-    // The image area cells should NOT produce background color codes
-    // spanning the full row width — styles should be cleared inside
-    // the image bounds.
+    // And critically, the background must extend across the FULL row
+    // (10 cells) — including the 6 cells inside the image rectangle.
+    // Transparent pixels in the kitty/sixel image rely on those cells
+    // already being painted with the container background colour so
+    // the image's see-through regions inherit it.
     let fullRowBg = String(repeating: " ", count: 10)
     let fullRowBgWrites = controller.writes.filter { write in
       write.contains("48;2;40;40;40") && write.contains(fullRowBg)
     }
-    #expect(fullRowBgWrites.isEmpty)
+    #expect(!fullRowBgWrites.isEmpty)
+  }
+
+  @Test(
+    "fallback dithered overlay does not paint outside its visible rect onto sibling regions"
+  )
+  func fallbackDitheredOverlayDoesNotPaintOutsideVisibleRect() throws {
+    // No graphics protocol available — the renderer takes the
+    // ANSI half-block fallback path. This used to paint the full
+    // logical bounds, which let a clipped image overflow into
+    // adjacent siblings (e.g. the toolbar reserved by safeAreaInset).
+    let controller = GraphicsProtocolMockTerminalController(isTTY: false)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 4, height: 4),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    let pngBytes = try makePNGBytes(
+      width: 4,
+      height: 4,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 0, blue: 0), count: 16)
+    )
+    // The image's logical bounds claim 4 rows but the parent only made
+    // 2 rows visible (rows 0..<2). Rows 2..<4 are reserved for a
+    // sibling region — the fallback overlay must NOT paint there.
+    let surface = RasterSurface(
+      size: .init(width: 4, height: 4),
+      lines: ["    ", "    ", "....", "...."],
+      imageAttachments: [
+        makeRasterImageAttachment(
+          pngBytes: pngBytes,
+          pixelSize: .init(width: 4, height: 4),
+          bounds: .init(origin: .zero, size: .init(width: 4, height: 4)),
+          visibleBounds: .init(origin: .zero, size: .init(width: 4, height: 2))
+        )
+      ]
+    )
+
+    _ = try host.present(surface)
+    try host.drainPendingPresentation()
+
+    // Cell row 2 (the "....") must remain intact — the fallback overlay
+    // must not have replaced its dots with half-block image cells.
+    let combined = controller.writes.joined()
+    #expect(combined.contains("...."))
+  }
+
+  @Test(
+    "fallback dithered overlay clips horizontally to visibleBounds"
+  )
+  func fallbackDitheredOverlayClipsHorizontallyToVisibleBounds() throws {
+    let controller = GraphicsProtocolMockTerminalController(isTTY: false)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 4, height: 2),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    let pngBytes = try makePNGBytes(
+      width: 4,
+      height: 4,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 0, blue: 0), count: 16)
+    )
+    // Image claims columns 0..<4 but only columns 0..<2 are visible.
+    // Columns 2..<4 are reserved for a sibling — must not be painted.
+    let surface = RasterSurface(
+      size: .init(width: 4, height: 2),
+      lines: ["..XX", "..XX"],
+      imageAttachments: [
+        makeRasterImageAttachment(
+          pngBytes: pngBytes,
+          pixelSize: .init(width: 4, height: 4),
+          bounds: .init(origin: .zero, size: .init(width: 4, height: 2)),
+          visibleBounds: .init(origin: .zero, size: .init(width: 2, height: 2))
+        )
+      ]
+    )
+
+    _ = try host.present(surface)
+    try host.drainPendingPresentation()
+
+    // The 'XX' siblings in columns 2..<4 must remain — the fallback
+    // overlay must not have replaced them with half-block image cells.
+    let combined = controller.writes.joined()
+    #expect(combined.contains("XX"))
+  }
+
+  @Test(
+    "kitty support probe still detects kitty when the terminal's first read poll comes back empty"
+  )
+  func kittySupportProbeIsRobustAgainstSlowFirstResponse() throws {
+    // Reproduces the original non-determinism: same kitty terminal,
+    // but the first read poll returns 0 bytes (the response just hasn't
+    // arrived in the first 40ms window). The probe must keep polling
+    // until the DA synchronizer arrives instead of giving up after one
+    // empty poll, otherwise kitty silently goes undetected and the app
+    // permanently falls back to the dithered half-block path for the
+    // entire session.
+    let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [
+        // First poll: nothing yet — terminal is still composing the response.
+        [],
+        // Second poll: the kitty OK + DA primary attributes arrive.
+        Array("\u{001B}_Gi=\(kittyQueryID);OK\u{001B}\\\u{001B}[?62;c".utf8),
+      ],
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 4, height: 2),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    let pngBytes = try makePNGBytes(
+      width: 2,
+      height: 2,
+      pixels: Array(repeating: rgbaPixel(red: 255, green: 0, blue: 0), count: 4)
+    )
+    let surface = RasterSurface(
+      size: .init(width: 4, height: 2),
+      lines: ["    ", "    "],
+      imageAttachments: [
+        makeRasterImageAttachment(
+          pngBytes: pngBytes,
+          pixelSize: .init(width: 2, height: 2),
+          bounds: .init(origin: .zero, size: .init(width: 3, height: 2))
+        )
+      ]
+    )
+
+    _ = try host.present(surface)
+    try host.drainPendingPresentation()
+
+    // Kitty payload must be transmitted, NOT the dithered half-block
+    // fallback. If this fails, the probe is once again giving up on
+    // the first empty poll.
+    #expect(
+      controller.writes.contains { write in
+        write.contains("_Ga=T") && write.contains("f=100")
+      }
+    )
   }
 }
 

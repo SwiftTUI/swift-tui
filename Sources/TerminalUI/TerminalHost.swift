@@ -1278,16 +1278,46 @@ extension TerminalHosting {
     ) throws -> [UInt8] {
       try writeSynchronously(query.request)
       var buffer: [UInt8] = []
-      let timeoutMilliseconds = 40
+      // The kitty/DA combined probe is the one we cannot afford to give up
+      // on early. A modern terminal usually replies in microseconds, but
+      // `swift run` cold starts, system load, and PTY scheduling can push
+      // the first byte well past 40ms. Quitting the read loop the moment
+      // a single poll returns empty made the protocol detection
+      // non-deterministic across runs of the same binary in the same
+      // terminal — sometimes kitty was detected, sometimes the renderer
+      // fell back to the dithered half-block path. Use a longer total
+      // budget for the kitty probe and never break early on it; for the
+      // narrower follow-up queries (sixel registers, cell pixels) we
+      // already know the terminal is responsive, so the original
+      // break-on-empty heuristic still applies.
+      let initialTimeoutMilliseconds: Int
+      let followUpTimeoutMilliseconds = 40
+      let breaksOnEmptyRead: Bool
+      let maxIterations: Int
+      switch query {
+      case .kittySupport:
+        initialTimeoutMilliseconds = 250
+        breaksOnEmptyRead = false
+        maxIterations = 8
+      default:
+        initialTimeoutMilliseconds = 40
+        breaksOnEmptyRead = true
+        maxIterations = 6
+      }
 
-      for _ in 0..<6 {
+      for iteration in 0..<maxIterations {
+        let timeoutMilliseconds =
+          iteration == 0 ? initialTimeoutMilliseconds : followUpTimeoutMilliseconds
         let bytes = try controller.read(
           from: inputFileDescriptor,
           maxBytes: 512,
           timeoutMilliseconds: timeoutMilliseconds
         )
-        guard !bytes.isEmpty else {
-          break
+        if bytes.isEmpty {
+          if breaksOnEmptyRead {
+            break
+          }
+          continue
         }
         buffer.append(contentsOf: bytes)
 
