@@ -156,7 +156,13 @@ export function canRenderBoxDrawing(
   text: string
 ): boolean {
   const codePoint = singleCodePoint(text);
-  return codePoint !== undefined && codePoint >= 0x2500 && codePoint <= 0x259f;
+  if (codePoint === undefined) {
+    return false;
+  }
+  return (
+    (codePoint >= 0x2500 && codePoint <= 0x259f) ||
+    (codePoint >= 0x2800 && codePoint <= 0x28ff)
+  );
 }
 
 export function drawBoxDrawing(
@@ -174,6 +180,9 @@ export function drawBoxDrawing(
   }
   if (codePoint >= 0x2580 && codePoint <= 0x259f) {
     return drawBlockElement(context, codePoint, rect);
+  }
+  if (codePoint >= 0x2800 && codePoint <= 0x28ff) {
+    return drawBraille(context, codePoint, rect);
   }
   return false;
 }
@@ -534,4 +543,43 @@ function drawShade(
       }
     }
   }
+}
+
+// Bit -> (column, row) layout for the 2x4 braille mosaic. Mirrors
+// `BrailleCell.bit(x:y:)` in `Sources/Core/BrailleCanvas.swift` so that
+// every glyph emitted by `BrailleCanvas` round-trips visually. Each set
+// bit fills its sub-cell rectangle solid (rather than drawing a font-style
+// dot) so that adjacent set bits — both within and across cells — connect
+// without visible mid-fill spacing, and a fully-set mask renders identical
+// to U+2588 FULL BLOCK.
+const brailleSubpixels: ReadonlyArray<readonly [bit: number, col: number, row: number]> = [
+  [0x01, 0, 0], [0x08, 1, 0],
+  [0x02, 0, 1], [0x10, 1, 1],
+  [0x04, 0, 2], [0x20, 1, 2],
+  [0x40, 0, 3], [0x80, 1, 3],
+];
+
+function drawBraille(
+  context: BoxDrawingCanvasContext,
+  codePoint: number,
+  rect: Rect
+): boolean {
+  const mask = codePoint - 0x2800;
+  if (mask === 0) {
+    // U+2800 (BRAILLE PATTERN BLANK) renders as whitespace.
+    return true;
+  }
+
+  const cellWidth = rect.width / 2;
+  const rowHeight = rect.height / 4;
+
+  for (const [bit, col, row] of brailleSubpixels) {
+    if ((mask & bit) === 0) {
+      continue;
+    }
+    const x = rect.x + col * cellWidth;
+    const y = rect.y + row * rowHeight;
+    context.fillRect(x, y, cellWidth, rowHeight);
+  }
+  return true;
 }
