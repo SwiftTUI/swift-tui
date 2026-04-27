@@ -32,6 +32,7 @@ public struct FrameDiagnosticRecord: Sendable {
   public var customLayoutFallbackCount: Int
   public var firstCustomLayoutFallbackIdentity: String?
   public var staleFramePolicy: String
+  public var dropEligibilityBlockers: Set<FrameDropEligibility.Blocker>
   public var inputEventsQueuedDuringRenderSuspension: Int
   public var presentationStrategy: String
   public var presentationBytesWritten: Int
@@ -171,6 +172,7 @@ public final class FrameDiagnosticsLogger {
       String(record.customLayoutFallbackCount),
       record.firstCustomLayoutFallbackIdentity ?? "-",
       record.staleFramePolicy,
+      formatDropBlockers(record.dropEligibilityBlockers),
       String(record.inputEventsQueuedDuringRenderSuspension),
       // presentation
       record.presentationStrategy,
@@ -237,6 +239,7 @@ public final class FrameDiagnosticsLogger {
       "custom_layout_fallbacks",
       "first_custom_layout_fallback",
       "stale_frame_policy",
+      "drop_blockers",
       "input_events_during_render_suspension",
       "present_strategy",
       "present_ms",
@@ -284,5 +287,14 @@ public final class FrameDiagnosticsLogger {
 
   private func formatGeneration(_ generation: RenderGeneration?) -> String {
     generation.map { String($0.rawValue) } ?? "-"
+  }
+
+  private func formatDropBlockers(
+    _ blockers: Set<FrameDropEligibility.Blocker>
+  ) -> String {
+    guard !blockers.isEmpty else {
+      return "-"
+    }
+    return blockers.map(\.rawValue).sorted().joined(separator: "+")
   }
 }

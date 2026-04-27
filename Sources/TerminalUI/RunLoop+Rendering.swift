@@ -303,6 +303,7 @@ extension RunLoop {
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
             firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
             staleFramePolicy: "commit_ordered",
+            dropEligibilityBlockers: FrameDropEligibility.classify(artifacts).blockers,
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
@@ -583,6 +584,7 @@ extension RunLoop {
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
             firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
             staleFramePolicy: "commit_ordered",
+            dropEligibilityBlockers: FrameDropEligibility.classify(artifacts).blockers,
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
