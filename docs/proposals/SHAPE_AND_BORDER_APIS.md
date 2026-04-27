@@ -383,6 +383,12 @@ This gives ~15 ready-to-use sets. The user never needs to remember a
 
 A custom border:
 
+> **Note (2026-04-26):** As part of the border/stroke simplification
+> (see `docs/proposals/BORDERS_AND_STROKES.md`), `placement` was moved
+> from `BorderSet` to `StrokeStyle`. The code example below predates
+> that change and shows the historical `BorderSet(placement:)` form;
+> use `StrokeStyle(borderSet:placement:)` in current code.
+
 ```swift
 let stars = BorderSet(
   top: "★", bottom: "★",

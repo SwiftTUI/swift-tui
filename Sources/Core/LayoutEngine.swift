@@ -1470,7 +1470,7 @@ public struct LayoutEngine: Sendable {
   /// For `.inset` placements the border occupies the content's own
   /// outermost rows and columns and therefore adds zero layout insets;
   /// the rasterizer will draw border glyphs into those existing cells.
-  /// For `.outset` (and `.decorative`) placements the insets reserve
+  /// For `.outset` placements the insets reserve
   /// frame cells around the content so no glyph ever lands on the
   /// child's drawable area.  `sides` masks the result so callers can
   /// request borders on a subset of edges (e.g. top only).

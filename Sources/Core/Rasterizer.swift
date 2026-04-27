@@ -1488,7 +1488,7 @@ extension Rasterizer {
   /// reserved during the layout pass.
   ///
   /// The entry point for the new layout-aware `.border(...)` view
-  /// modifier.  For `.outset` and `.decorative` border sets the frame
+  /// modifier.  For `.outset` border sets the frame
   /// grew by the per-side display widths and the glyphs are written
   /// into those reserved outer cells without ever touching the child's
   /// interior.  For `.inset` sets no frame insets were reserved and
@@ -1585,7 +1585,7 @@ extension Rasterizer {
     // For `.inset` placements the border draws into the view's
     // outermost rows and columns (so the `inner` region equals the
     // outer minus zero — the border overdraws the outer frame).  For
-    // `.outset` and `.decorative` placements the outer frame already
+    // `.outset` placements the outer frame already
     // grew by the per-side display widths, so the top/bottom/left/right
     // sides lie entirely within the reserved inset and the content
     // sits in the interior rectangle `[leftWidth..width-rightWidth,
