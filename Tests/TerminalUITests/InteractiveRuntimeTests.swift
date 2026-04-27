@@ -902,16 +902,16 @@ struct InteractiveRuntimeTests {
     // The list reserves a 2-cell selection gutter unconditionally so that
     // toggling focus does not shift row content sideways; row text therefore
     // sits two columns inside the corner glyph rather than butting against it.
-    #expect(firstFrame.contains("│╭  -5"))
-    #expect(firstFrame.contains("│ ↑"))
-    #expect(firstFrame.contains("│ ↓"))
+    #expect(firstFrame.contains("▌╭  -5"))
+    #expect(firstFrame.contains("▌ ↑"))
+    #expect(firstFrame.contains("▌ ↓"))
     #expect(
       terminal.frames.contains(where: {
-        $0.contains("│ ↑")
-          && $0.contains("││▌ 2")
+        $0.contains("▌ ↑")
+          && $0.contains("▌│▌ 2")
       }))
     let lastFrame = try #require(terminal.frames.last)
-    #expect(lastFrame.contains("││▌ 2 *"))
+    #expect(lastFrame.contains("▌│▌ 2 *"))
   }
 
   @MainActor

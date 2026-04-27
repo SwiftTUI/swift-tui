@@ -506,11 +506,10 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
 /// Stroke settings used when drawing outlines and rules.
 ///
 /// `StrokeStyle` pairs a numeric line width with a ``BorderSet`` whose glyph
-/// table drives the rasterizer. The default (``single``) produces
-/// single-line box-drawing glyphs. When the default is used against a
-/// shape with a positive corner radius the rasterizer upgrades it to
-/// ``BorderSet/rounded`` so container chrome keeps its curved corners
-/// without callers having to pass `.rounded` explicitly.
+/// table drives the rasterizer. The default (``outerHalfBlock``) produces
+/// half-block glyphs (`▀▄▌▐▛▜▙▟`). Callers that want single-line box-drawing
+/// glyphs should pass `borderSet: .single` explicitly; callers that want
+/// rounded corners should pass `borderSet: .rounded` explicitly.
 public struct StrokeStyle: Equatable, Sendable {
   public var lineWidth: Int
   public var borderSet: BorderSet
@@ -523,7 +522,7 @@ public struct StrokeStyle: Equatable, Sendable {
 
   public init(
     lineWidth: Int = 1,
-    borderSet: BorderSet = .single,
+    borderSet: BorderSet = .outerHalfBlock,
     placement: Placement = .outset
   ) {
     self.lineWidth = max(1, lineWidth)

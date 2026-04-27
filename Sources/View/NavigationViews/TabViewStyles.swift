@@ -1063,7 +1063,10 @@ private struct LiteralTabsStripBackgroundView: View {
         .frame(height: presentation.stripHeight - 1)
       Divider(
         drawMetadata: .init(
-          foregroundStyle: .semantic(.foreground)
+          foregroundStyle: .semantic(.foreground),
+          // Use single-line glyphs to stay visually consistent with the
+          // box-drawing tab chrome (╭─╮ │ │ ┴──┴).
+          borderStrokeStyle: .normal
         )
       )
       .frame(maxWidth: .infinity, minHeight: 1, maxHeight: 1, alignment: .leading)

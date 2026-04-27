@@ -1350,10 +1350,7 @@ extension Rasterizer {
         continue
       }
 
-      let resolvedSet = resolvedStrokeBorderSet(
-        for: geometry,
-        strokeStyle: strokeStyle
-      )
+      let resolvedSet = strokeStyle.borderSet
       let glyphs = BorderGlyphSet(borderSet: resolvedSet)
 
       let minX = insetRect.origin.x
@@ -2020,10 +2017,7 @@ extension Rasterizer {
       from: style,
       environment: environment
     )
-    let resolvedSet = resolvedStrokeBorderSet(
-      for: .rectangle,
-      strokeStyle: strokeStyle
-    )
+    let resolvedSet = strokeStyle.borderSet
     let glyphs = BorderGlyphSet(borderSet: resolvedSet)
     let drawsHorizontal =
       switch stackAxis {
@@ -2790,28 +2784,6 @@ extension Rasterizer {
       origin: Point(x: minX, y: minY),
       size: Size(width: maxX - minX, height: maxY - minY)
     )
-  }
-
-  /// Resolves the border set used to stroke `geometry` for `strokeStyle`.
-  ///
-  /// Preserves the legacy "single-line → rounded corners" auto-upgrade for
-  /// rounded rectangles: when the default ``StrokeStyle/normal``
-  /// (i.e. ``BorderSet/single``) is applied to a shape with a positive
-  /// corner radius, the rasterizer silently upgrades it to
-  /// ``BorderSet/rounded`` so container chrome (Button, Picker, Menu…)
-  /// keeps its curved corners without every call site needing to pass
-  /// `.rounded` explicitly.
-  private func resolvedStrokeBorderSet(
-    for geometry: ShapeGeometry,
-    strokeStyle: StrokeStyle
-  ) -> BorderSet {
-    if strokeStyle.borderSet == .single,
-      case .roundedRectangle(let radius) = geometry,
-      radius > 0
-    {
-      return .rounded
-    }
-    return strokeStyle.borderSet
   }
 
   /// Thin single-character adapter over ``BorderSet`` used by the
