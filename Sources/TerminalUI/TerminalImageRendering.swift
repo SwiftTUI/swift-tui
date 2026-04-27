@@ -87,19 +87,19 @@ final class TerminalImageRenderer: Sendable {
 
     // When a graphics protocol (Kitty, Sixel) is active, the image is
     // rendered via escape sequences AFTER the text cells are written.
-    // Any background colors on cells in the image area will paint over
-    // the image, hiding it. Clear styles from those cells so the
-    // terminal's default background shows through and the image is visible.
+    // Both protocols paint the image *on top of* the cells in their
+    // rectangle — Kitty as an explicit graphics layer above text,
+    // Sixel as direct pixel writes — so the cell content does not need
+    // to be erased. Crucially, transparent pixels in a Kitty image
+    // reveal whatever color was already written to that cell. If we
+    // clear the cell style here, those transparent pixels show the
+    // terminal's default background instead of the immediate container
+    // background (e.g. the dark gray of a card behind the image), which
+    // is the bug behind "kitty image transparency shows the wrong
+    // color". Sixel images replace pixels in their footprint, so this
+    // pass-through is at worst a no-op for sixel.
     if graphicsCapabilities.preferredProtocol != nil {
-      var prepared = surface
-      for attachment in prepared.imageAttachments {
-        clearCellStyles(
-          in: attachment.visibleBounds,
-          from: &prepared.cells,
-          surfaceSize: prepared.size
-        )
-      }
-      return prepared
+      return surface
     }
 
     var prepared = surface
@@ -120,6 +120,7 @@ final class TerminalImageRenderer: Sendable {
       apply(
         overlay: overlay,
         for: attachment.bounds,
+        clippedTo: attachment.visibleBounds,
         to: &prepared.cells,
         surfaceSize: prepared.size
       )
@@ -579,6 +580,7 @@ private func halfBlockOverlay(
 private func apply(
   overlay: RasterImageOverlay,
   for bounds: Rect,
+  clippedTo visibleBounds: Rect,
   to cells: inout [[RasterCell]],
   surfaceSize: Size
 ) {
@@ -586,9 +588,24 @@ private func apply(
     return
   }
 
+  // Pre-compute the visible cell window. Cells of the overlay falling
+  // outside `visibleBounds` belong to a region that an ancestor clipped
+  // away (a ScrollView's content rect, or a sibling region — toolbar,
+  // safeAreaInset). The kitty path crops the source rect to mirror this;
+  // the fallback path historically didn't, so the dithered overlay would
+  // overwrite a sibling toolbar cell-for-cell. Skipping clipped cells
+  // here gives the fallback path the same clipping behavior.
+  let visibleMinX = visibleBounds.origin.x
+  let visibleMinY = visibleBounds.origin.y
+  let visibleMaxX = visibleBounds.origin.x + visibleBounds.size.width
+  let visibleMaxY = visibleBounds.origin.y + visibleBounds.size.height
+
   for y in 0..<overlay.size.height {
     let targetY = bounds.origin.y + y
     guard targetY >= 0, targetY < surfaceSize.height else {
+      continue
+    }
+    guard targetY >= visibleMinY, targetY < visibleMaxY else {
       continue
     }
 
@@ -597,42 +614,15 @@ private func apply(
       guard targetX >= 0, targetX < surfaceSize.width else {
         continue
       }
+      guard targetX >= visibleMinX, targetX < visibleMaxX else {
+        continue
+      }
 
       let cell = overlay.cells[y][x]
       guard imageFallbackCellIsVisible(cell) else {
         continue
       }
       cells[targetY][targetX] = cell
-    }
-  }
-}
-
-private func clearCellStyles(
-  in bounds: Rect,
-  from cells: inout [[RasterCell]],
-  surfaceSize: Size
-) {
-  guard surfaceSize.width > 0, surfaceSize.height > 0 else {
-    return
-  }
-
-  for y in 0..<bounds.size.height {
-    let targetY = bounds.origin.y + y
-    guard targetY >= 0, targetY < surfaceSize.height,
-      targetY < cells.count
-    else {
-      continue
-    }
-
-    for x in 0..<bounds.size.width {
-      let targetX = bounds.origin.x + x
-      guard targetX >= 0, targetX < surfaceSize.width,
-        targetX < cells[targetY].count
-      else {
-        continue
-      }
-
-      cells[targetY][targetX].style = nil
     }
   }
 }
