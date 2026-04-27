@@ -15,14 +15,6 @@ public struct BorderSet: Equatable, Sendable {
   public var middleTop: String
   public var middleBottom: String
 
-  public var placement: Placement
-
-  public enum Placement: Equatable, Sendable {
-    case outset
-    case inset
-    case decorative
-  }
-
   public init(
     top: String, bottom: String, left: String, right: String,
     topLeading: String, topTrailing: String,
@@ -31,8 +23,7 @@ public struct BorderSet: Equatable, Sendable {
     middleTrailing: String = "",
     middle: String = "",
     middleTop: String = "",
-    middleBottom: String = "",
-    placement: Placement = .outset
+    middleBottom: String = ""
   ) {
     self.top = top
     self.bottom = bottom
@@ -47,33 +38,6 @@ public struct BorderSet: Equatable, Sendable {
     self.middle = middle
     self.middleTop = middleTop
     self.middleBottom = middleBottom
-    self.placement = placement
-  }
-}
-
-extension BorderSet.Placement {
-  /// Maps `BorderSet.Placement` to its `StrokeStyle.Placement` equivalent
-  /// for call sites that have a `BorderSet` but not yet a `StrokeStyle`.
-  /// Used during the Task 2–3 migration window; removed in Task 4 when
-  /// `BorderSet.placement` itself is dropped.
-  var asStrokePlacement: StrokeStyle.Placement {
-    switch self {
-    case .outset: return .outset
-    case .decorative: return .outset  // .decorative ≡ .outset
-    case .inset: return .inset
-    }
-  }
-}
-
-extension BorderSet {
-  /// The `StrokeStyle.Placement` that this `BorderSet` implies when used
-  /// as a default via `View.border(set:)` without an explicit placement.
-  /// Reads `self.placement` (in `BorderSet.swift`, excluded from the
-  /// Task 3 migration grep) so that `StyleModifiers.swift` can derive a
-  /// backwards-compatible default without itself reading `BorderSet.placement`.
-  /// Removed in Task 4 alongside `BorderSet.placement`.
-  package var impliedStrokePlacement: StrokeStyle.Placement {
-    placement.asStrokePlacement
   }
 }
 
@@ -141,28 +105,25 @@ extension BorderSet {
   public static let outerHalfBlock = BorderSet(
     top: "▀", bottom: "▄", left: "▌", right: "▐",
     topLeading: "▛", topTrailing: "▜",
-    bottomLeading: "▙", bottomTrailing: "▟",
-    placement: .decorative)
+    bottomLeading: "▙", bottomTrailing: "▟")
 
   /// An inset half-block border that draws into the view's outermost rows and
   /// columns, trimming a cell off content on every side rather than expanding.
   public static let innerHalfBlock = BorderSet(
     top: "▄", bottom: "▀", left: "▐", right: "▌",
     topLeading: "▗", topTrailing: "▖",
-    bottomLeading: "▝", bottomTrailing: "▘",
-    placement: .inset)
+    bottomLeading: "▝", bottomTrailing: "▘")
 
   /// An inset half-block border used internally for presentation chrome
   /// (popovers, menus, toasts, sheets). Shares glyphs with
-  /// ``innerHalfBlock`` but keeps a distinct `.decorative` placement so the
+  /// ``innerHalfBlock`` but keeps a distinct placement so the
   /// rasterizer can sample the interior fill when resolving per-cell
   /// backgrounds. External callers should usually prefer ``single`` or
   /// ``rounded``.
   public static let presentationChrome = BorderSet(
     top: "▄", bottom: "▀", left: "▐", right: "▌",
     topLeading: "▗", topTrailing: "▖",
-    bottomLeading: "▝", bottomTrailing: "▘",
-    placement: .decorative)
+    bottomLeading: "▝", bottomTrailing: "▘")
 
   public static let singleDouble = BorderSet(
     top: "─", bottom: "─", left: "║", right: "║",

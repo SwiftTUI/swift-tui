@@ -160,7 +160,7 @@ extension View {
   public func border<S: ShapeStyle>(
     _ style: S = SemanticShapeStyle.foreground,
     set: BorderSet = .outerHalfBlock,
-    placement: StrokeStyle.Placement? = nil,
+    placement: StrokeStyle.Placement = .outset,
     sides: Edge.Set = .all
   ) -> some View {
     borderModified(
@@ -178,7 +178,7 @@ extension View {
   public func border(
     _ style: BorderEdgeStyle,
     set: BorderSet = .outerHalfBlock,
-    placement: StrokeStyle.Placement? = nil,
+    placement: StrokeStyle.Placement = .outset,
     sides: Edge.Set = .all
   ) -> some View {
     borderModified(
@@ -205,7 +205,7 @@ extension View {
   public func border(
     blend: BorderBlend,
     set: BorderSet = .outerHalfBlock,
-    placement: StrokeStyle.Placement? = nil,
+    placement: StrokeStyle.Placement = .outset,
     sides: Edge.Set = .all,
     phase: Double = 0
   ) -> some View {
@@ -222,7 +222,7 @@ extension View {
 
   private func borderModified(
     set: BorderSet,
-    placement: StrokeStyle.Placement?,
+    placement: StrokeStyle.Placement,
     foreground: BorderEdgeStyle?,
     background: BorderBackgroundStyle?,
     blend: BorderBlend?,
@@ -232,7 +232,7 @@ extension View {
     modifier(
       BorderModifier(
         set: set,
-        placement: placement ?? set.impliedStrokePlacement,
+        placement: placement,
         foreground: foreground,
         background: background,
         blend: blend,
