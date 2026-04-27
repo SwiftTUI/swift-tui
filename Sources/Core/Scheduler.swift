@@ -17,6 +17,14 @@ public struct ScheduledFrame: Equatable, Sendable {
   public var nextDeadline: MonotonicInstant?
   package var animationRequest: AnimationRequest
   package var animationBatchID: AnimationBatchID?
+  /// Total number of `request*` calls (input, invalidation, signal,
+  /// external, deadline) that the scheduler coalesced into this
+  /// frame.  Used as a cancellation-pressure proxy for the
+  /// `ASYNC_RENDER_GENERATION_SCHEDULER` Stage 3D rollout: when a
+  /// frame's `intentRequestCount > 1`, multiple distinct intents
+  /// merged into one render — meaning a hypothetical pre-start
+  /// cancellation could have superseded an in-flight tail job here.
+  public var intentRequestCount: Int
 
   public init(
     causes: Set<WakeCause>,
@@ -34,6 +42,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     self.nextDeadline = nextDeadline
     self.animationRequest = .inherit
     self.animationBatchID = nil
+    self.intentRequestCount = 0
   }
 
   package init(
@@ -44,7 +53,8 @@ public struct ScheduledFrame: Equatable, Sendable {
     triggeredDeadline: MonotonicInstant?,
     nextDeadline: MonotonicInstant?,
     animationRequest: AnimationRequest,
-    animationBatchID: AnimationBatchID? = nil
+    animationBatchID: AnimationBatchID? = nil,
+    intentRequestCount: Int = 0
   ) {
     self.causes = causes
     self.invalidatedIdentities = invalidatedIdentities
@@ -54,6 +64,7 @@ public struct ScheduledFrame: Equatable, Sendable {
     self.nextDeadline = nextDeadline
     self.animationRequest = animationRequest
     self.animationBatchID = animationBatchID
+    self.intentRequestCount = intentRequestCount
   }
 }
 
@@ -87,28 +98,36 @@ public final class FrameScheduler: FrameScheduling {
   private var nextDeadline: MonotonicInstant?
   private var pendingAnimationRequest: AnimationRequest = .inherit
   private var pendingAnimationBatchID: AnimationBatchID?
+  /// Tally of `request*` calls received since the last
+  /// `consumeReadyFrame`.  Drained into the produced `ScheduledFrame`
+  /// for cancellation-pressure diagnostics; reset to 0 on consume.
+  private var pendingIntentRequestCount: Int = 0
   private let wakeHandlerLock = OSAllocatedUnfairLock<(@Sendable () -> Void)?>(uncheckedState: nil)
 
   public init() {}
 
   public func requestInput() {
     pendingCauses.insert(.input)
+    pendingIntentRequestCount += 1
   }
 
   public func requestInvalidation(of identities: Set<Identity>) {
     pendingCauses.insert(.invalidation)
     invalidatedIdentities.formUnion(identities)
+    pendingIntentRequestCount += 1
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
   public func requestSignal(named name: String) {
     pendingCauses.insert(.signal)
     signalNames.insert(name)
+    pendingIntentRequestCount += 1
   }
 
   public func requestExternalWake(reason: String) {
     pendingCauses.insert(.external)
     externalReasons.insert(reason)
+    pendingIntentRequestCount += 1
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
@@ -118,6 +137,7 @@ public final class FrameScheduler: FrameScheduling {
     } else {
       nextDeadline = deadline
     }
+    pendingIntentRequestCount += 1
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
 
@@ -159,7 +179,8 @@ public final class FrameScheduler: FrameScheduling {
       triggeredDeadline: deadlineDue ? nextDeadline : nil,
       nextDeadline: deadlineDue ? nil : nextDeadline,
       animationRequest: pendingAnimationRequest,
-      animationBatchID: pendingAnimationBatchID
+      animationBatchID: pendingAnimationBatchID,
+      intentRequestCount: pendingIntentRequestCount
     )
 
     pendingCauses.removeAll(keepingCapacity: true)
@@ -168,6 +189,7 @@ public final class FrameScheduler: FrameScheduling {
     externalReasons.removeAll(keepingCapacity: true)
     pendingAnimationRequest = .inherit
     pendingAnimationBatchID = nil
+    pendingIntentRequestCount = 0
     if deadlineDue {
       nextDeadline = nil
     }
@@ -182,6 +204,7 @@ public final class FrameScheduler: FrameScheduling {
     externalReasons.removeAll(keepingCapacity: true)
     pendingAnimationRequest = .inherit
     pendingAnimationBatchID = nil
+    pendingIntentRequestCount = 0
     nextDeadline = nil
   }
 }
@@ -200,6 +223,7 @@ extension FrameScheduler: AnimationAwareInvalidating {
   ) {
     pendingCauses.insert(.invalidation)
     invalidatedIdentities.formUnion(identities)
+    pendingIntentRequestCount += 1
     // Coalescing rule: latest explicit request wins; `.inherit` never
     // overrides an explicit pending request.  Batch ID coalesces the
     // same way — latest wins, a nil batch ID never overrides an

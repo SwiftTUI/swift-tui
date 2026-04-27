@@ -27,6 +27,9 @@ public struct FrameDiagnosticRecord: Sendable {
   public var desiredGeneration: UInt64
   public var coalescedEventBatches: Int
   public var coalescedWakeCauses: String
+  /// Total `request*` calls the scheduler coalesced into this frame.
+  /// `> 1` indicates cancellation pressure for Stage 3D rollout.
+  public var coalescedIntentRequests: Int
   public var workerTimings: FrameWorkerTimings?
   public var mainActorTimings: FrameMainActorTimings?
   public var customLayoutFallbackCount: Int
@@ -162,6 +165,7 @@ public final class FrameDiagnosticsLogger {
       formatGeneration(renderGenerations.rasterOutput),
       String(record.coalescedEventBatches),
       record.coalescedWakeCauses,
+      String(record.coalescedIntentRequests),
       layoutEnqueueMs,
       layoutComputeMs,
       rasterEnqueueMs,
@@ -229,6 +233,7 @@ public final class FrameDiagnosticsLogger {
       "raster_output_generation",
       "coalesced_event_batches",
       "coalesced_wake_causes",
+      "coalesced_intent_requests",
       "worker_layout_enqueue_ms",
       "worker_layout_compute_ms",
       "worker_raster_enqueue_ms",
