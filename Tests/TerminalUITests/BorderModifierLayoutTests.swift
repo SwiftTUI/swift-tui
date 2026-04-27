@@ -38,16 +38,16 @@ struct BorderModifierLayoutTests {
     #expect(artifacts.rasterSurface.size.height == 2)
   }
 
-  @Test("public .border with .innerHalfBlock (inset placement) does not grow the frame")
+  @Test("public .border with .innerHalfBlock and explicit inset placement does not grow the frame")
   func borderInsetDoesNotGrow() {
     let artifacts = DefaultRenderer().render(
-      Text("hello").border(set: .innerHalfBlock),
+      Text("hello").border(set: .innerHalfBlock, placement: .inset),
       context: .init(identity: testIdentity("BorderInset"))
     )
 
-    // "hello" is 5x1.  `.innerHalfBlock` has `.inset` placement so the
-    // border glyphs overdraw the outermost child cells rather than
-    // reserving new ones.  Frame stays 5x1.
+    // "hello" is 5x1.  Explicit `.inset` placement means the border
+    // glyphs overdraw the outermost child cells rather than reserving
+    // new ones.  Frame stays 5x1.
     #expect(artifacts.rasterSurface.size.width == 5)
     #expect(artifacts.rasterSurface.size.height == 1)
   }

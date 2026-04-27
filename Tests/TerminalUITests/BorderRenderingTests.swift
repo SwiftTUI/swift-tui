@@ -88,13 +88,13 @@ struct BorderRenderingTests {
     )
   }
 
-  @Test(".border(set: .innerHalfBlock) draws into the view's outermost cells")
+  @Test(".border(set: .innerHalfBlock, placement: .inset) draws into the view's outermost cells")
   func innerHalfBlockDrawsIntoOutermostCells() {
-    // .innerHalfBlock is an inset border, so the frame does not grow —
+    // Explicit .inset placement means the frame does not grow —
     // the border glyphs overdraw the outermost child cells.  Rendering
     // should paint the inset glyphs without pushing the content around.
     let artifacts = DefaultRenderer().render(
-      Text("hello").border(set: .innerHalfBlock),
+      Text("hello").border(set: .innerHalfBlock, placement: .inset),
       context: .init(identity: testIdentity("BorderInnerHalfBlock"))
     )
 
@@ -149,7 +149,7 @@ struct BorderRenderingTests {
         Text("mid")
         Text("bot")
       }
-      .border(set: .innerHalfBlock),
+      .border(set: .innerHalfBlock, placement: .inset),
       context: .init(identity: testIdentity("BorderInsetMultiRow"))
     )
 
