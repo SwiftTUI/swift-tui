@@ -54,6 +54,10 @@ packages `GUI/SwiftUITUIGUI`, `GUI/WebTUIGUI`, and `GUI/XtermWebTUIGUI`.
 - ``WindowIdentifier``
 - ``WindowGroup``
 
-### Guide
+### Guides
 
+- <doc:Architecture>
+- <doc:Runtime>
+- <doc:Vision>
+- <doc:Host-Integration>
 - <doc:Running-Apps>

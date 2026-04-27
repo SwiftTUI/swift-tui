@@ -34,6 +34,10 @@ const backtabSequence = new TextEncoder().encode("\u001B[Z");
 const repositoryUrl = "https://github.com/GoodHatsLLC/swift-terminal-ui";
 const architectureUrl = `${repositoryUrl}/blob/main/docs/ARCHITECTURE.md`;
 const runtimeUrl = `${repositoryUrl}/blob/main/docs/RUNTIME.md`;
+// Live API reference (DocC) is published alongside this marketing page by
+// `pages-build.yml`. The path is namespaced under `/docs/` to avoid
+// collision with WebExample assets at the gh-pages root.
+const docsUrl = "https://goodhatsllc.github.io/swift-terminal-ui/docs/documentation/terminalui/";
 
 const pipelinePhases = [
   "resolve",
@@ -248,6 +252,7 @@ async function bootstrap(): Promise<void> {
           <a href="#syntax">Syntax</a>
           <a href="#platforms">Platforms</a>
           <a href="#why-swiftui">Why SwiftUI</a>
+          <a href="${docsUrl}">Docs</a>
         </nav>
         <a
           class="header-cta"
@@ -394,6 +399,7 @@ async function bootstrap(): Promise<void> {
       <footer class="site-footer" data-reveal>
         <span>TerminalUI</span>
         <div class="site-footer-links">
+          <a href="${docsUrl}">API Reference</a>
           <a href="${architectureUrl}" target="_blank" rel="noreferrer">Architecture</a>
           <a href="${runtimeUrl}" target="_blank" rel="noreferrer">Runtime</a>
           <a href="${repositoryUrl}" target="_blank" rel="noreferrer">GitHub</a>

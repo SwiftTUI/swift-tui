@@ -134,6 +134,42 @@ jobs:
           set -euo pipefail
           bun -e 'const wasmPath = "./pages-dist/TerminalApp/dist/assets/app.wasm"; try { await WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer()); console.log(`Validated ${wasmPath}`); } catch (error) { console.error(`Failed to validate ${wasmPath}: ${error instanceof Error ? error.message : String(error)}`); process.exit(1); }'
 
+      - name: Build DocC archive (combined View + TerminalUI + TerminalUICharts)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .build-docs
+          # `--enable-experimental-combined-documentation` (swift-docc-plugin 1.4+)
+          # merges all listed targets into one archive with a single navigator,
+          # which matches the way users actually import the package.
+          # `--hosting-base-path swift-terminal-ui/docs` rewrites every internal
+          # link to be served at `/swift-terminal-ui/docs/...` under the project
+          # GitHub Pages site, namespaced cleanly under the WebExample assets.
+          swiftly run swift package \
+            --allow-writing-to-directory .build-docs \
+            generate-documentation \
+            --target View \
+            --target TerminalUI \
+            --target TerminalUICharts \
+            --enable-experimental-combined-documentation \
+            --transform-for-static-hosting \
+            --hosting-base-path swift-terminal-ui/docs \
+            --output-path .build-docs
+
+      - name: Merge DocC output into pages-dist and inject brand CSS
+        shell: bash
+        env:
+          DOCS_ROOT: ${{ github.workspace }}/Examples/WebExample/pages-dist/docs
+          HOSTING_BASE_PATH: /swift-terminal-ui/docs
+        run: |
+          set -euo pipefail
+          mkdir -p "$DOCS_ROOT"
+          cp -R .build-docs/. "$DOCS_ROOT/"
+          # Project-owned CSS overrides on top of theme-settings.json. See
+          # Examples/WebExample/src/inject-docs-css.ts for the contract; the
+          # script is idempotent and safe to re-run.
+          bun run Examples/WebExample/src/inject-docs-css.ts
+
       - name: Upload Pages artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
