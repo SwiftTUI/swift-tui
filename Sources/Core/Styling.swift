@@ -514,13 +514,21 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
 public struct StrokeStyle: Equatable, Sendable {
   public var lineWidth: Int
   public var borderSet: BorderSet
+  public var placement: Placement
+
+  public enum Placement: Equatable, Sendable {
+    case outset
+    case inset
+  }
 
   public init(
     lineWidth: Int = 1,
-    borderSet: BorderSet = .single
+    borderSet: BorderSet = .single,
+    placement: Placement = .outset
   ) {
     self.lineWidth = max(1, lineWidth)
     self.borderSet = borderSet
+    self.placement = placement
   }
 }
 
@@ -536,6 +544,22 @@ extension StrokeStyle {
   public static let presentationChrome = StrokeStyle(borderSet: .presentationChrome)
   public static let hidden = StrokeStyle(borderSet: .hidden)
   public static let markdown = StrokeStyle(borderSet: .markdown)
+}
+
+extension StrokeStyle {
+  /// The placement that drives layout/draw decisions during the
+  /// migration window. While `BorderSet.placement` still exists
+  /// (Tasks 2-3), this prefers a non-default `BorderSet.placement`
+  /// over the StrokeStyle's own, preserving behavior for callers that
+  /// haven't migrated yet. After Task 4 removes `BorderSet.placement`,
+  /// this becomes a thin alias for `placement` and can be removed.
+  var effectivePlacement: Placement {
+    switch borderSet.placement {
+    case .outset: return placement
+    case .decorative: return placement  // .decorative ≡ .outset
+    case .inset: return .inset
+    }
+  }
 }
 
 /// Per-edge background styling used behind stroked borders.

@@ -205,7 +205,8 @@ extension LayoutEngine {
         )
       }
     case .border(let set, _, _, _, _, let sides):
-      let insets = borderLayoutInsets(set: set, sides: sides)
+      let insets = borderLayoutInsets(
+        set: set, placement: set.placement.asStrokePlacement, sides: sides)
       if let child = resolved.children.first,
         let childMeasurement = measured.childMeasurements.first
       {
