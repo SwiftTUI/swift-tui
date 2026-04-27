@@ -23,6 +23,12 @@ extension RunLoop {
     package var desiredGeneration: UInt64
     package var coalescedEventBatches: Int
     package var coalescedWakeCauses: Set<WakeCause>
+    /// Number of `request*` calls (input, invalidation, signal,
+    /// external, deadline) the scheduler coalesced into the active
+    /// frame.  When > 1, multiple intents merged — a Stage 3D
+    /// pre-start cancellation could have superseded the older
+    /// in-flight tail job.
+    package var intentRequestCount: Int
   }
 
   private enum AnimationWakeTiming {
@@ -49,7 +55,8 @@ extension RunLoop {
     return RenderIntentCoalescingDiagnostics(
       desiredGeneration: nextRenderIntentGeneration,
       coalescedEventBatches: pendingCoalescedEventBatches,
-      coalescedWakeCauses: pendingCoalescedWakeCauses.union(scheduledFrame.causes)
+      coalescedWakeCauses: pendingCoalescedWakeCauses.union(scheduledFrame.causes),
+      intentRequestCount: scheduledFrame.intentRequestCount
     )
   }
 
@@ -298,6 +305,7 @@ extension RunLoop {
             coalescedWakeCauses: formattedWakeCauses(
               renderIntentDiagnostics.coalescedWakeCauses
             ),
+            coalescedIntentRequests: renderIntentDiagnostics.intentRequestCount,
             workerTimings: diag.workerTimings,
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
@@ -579,6 +587,7 @@ extension RunLoop {
             coalescedWakeCauses: formattedWakeCauses(
               renderIntentDiagnostics.coalescedWakeCauses
             ),
+            coalescedIntentRequests: renderIntentDiagnostics.intentRequestCount,
             workerTimings: diag.workerTimings,
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
