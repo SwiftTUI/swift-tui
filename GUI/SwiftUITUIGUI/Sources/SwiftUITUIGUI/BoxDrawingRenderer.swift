@@ -1,8 +1,8 @@
 import CoreGraphics
 import Foundation
 
-/// Procedural renderer for Unicode box-drawing characters (U+2500–U+257F)
-/// and block elements (U+2580–U+259F).
+/// Procedural renderer for Unicode box-drawing characters (U+2500–U+257F),
+/// block elements (U+2580–U+259F), and braille patterns (U+2800–U+28FF).
 ///
 /// Glyphs from these blocks are designed to fill the em-square exactly and
 /// tile seamlessly between adjacent cells. Most fonts ship them at the em
@@ -10,6 +10,11 @@ import Foundation
 /// which produces a visible vertical gap when rendering box-drawing columns
 /// from the font. Painting them procedurally to the cell rect guarantees
 /// pixel-perfect tiling regardless of font metrics or cell dimensions.
+///
+/// Braille glyphs are treated as a 2×4 sub-pixel mosaic (matching
+/// `BrailleCanvas`): each set bit fills its sub-cell rectangle solid rather
+/// than drawing a font-style dot, so partial fills connect to their
+/// neighbours and `⣿` becomes pixel-identical to `█`.
 enum BoxDrawingRenderer {
   static func canRender(_ character: Character) -> Bool {
     guard character.unicodeScalars.count == 1,
@@ -18,7 +23,7 @@ enum BoxDrawingRenderer {
       return false
     }
     let value = scalar.value
-    return (0x2500...0x259F).contains(value)
+    return (0x2500...0x259F).contains(value) || (0x2800...0x28FF).contains(value)
   }
 
   /// Paints `character` into `rect` using `color`. Returns `true` if the
@@ -48,6 +53,9 @@ enum BoxDrawingRenderer {
     }
     if (0x2580...0x259F).contains(codePoint) {
       return drawBlockElement(codePoint: codePoint, rect: rect, context: context)
+    }
+    if (0x2800...0x28FF).contains(codePoint) {
+      return drawBraille(codePoint: codePoint, rect: rect, context: context)
     }
     return false
   }
@@ -633,5 +641,44 @@ extension BoxDrawingRenderer {
       }
       y += block
     }
+  }
+}
+
+// MARK: - Braille patterns (U+2800–U+28FF)
+
+extension BoxDrawingRenderer {
+  /// Bit → (column, row) layout for the 2×4 braille mosaic. Mirrors
+  /// `BrailleCell.bit(x:y:)` in `Sources/Core/BrailleCanvas.swift`. Listed
+  /// in raster order (left-to-right, top-to-bottom) so adjacent rectangles
+  /// are drawn next to each other and a fully-set mask paints the cell in
+  /// four contiguous horizontal strips.
+  fileprivate static let brailleSubpixels: [(bit: UInt8, col: Int, row: Int)] = [
+    (0x01, 0, 0), (0x08, 1, 0),
+    (0x02, 0, 1), (0x10, 1, 1),
+    (0x04, 0, 2), (0x20, 1, 2),
+    (0x40, 0, 3), (0x80, 1, 3),
+  ]
+
+  fileprivate static func drawBraille(
+    codePoint: UInt32,
+    rect: CGRect,
+    context: CGContext
+  ) -> Bool {
+    let mask = UInt8(codePoint - 0x2800)
+    if mask == 0 {
+      // U+2800 (BRAILLE PATTERN BLANK) is whitespace — render nothing,
+      // matching the empty mask in BrailleCanvas.
+      return true
+    }
+
+    let cellWidth = rect.width / 2
+    let rowHeight = rect.height / 4
+
+    for sub in brailleSubpixels where mask & sub.bit != 0 {
+      let x = rect.minX + CGFloat(sub.col) * cellWidth
+      let y = rect.minY + CGFloat(sub.row) * rowHeight
+      context.fill(CGRect(x: x, y: y, width: cellWidth, height: rowHeight))
+    }
+    return true
   }
 }
