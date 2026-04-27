@@ -489,6 +489,9 @@ package struct PromptPresentationSurface: View, ActionScope {
           RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.terminalSurfaceBackground)
         }
         .overlay {
+          // .outset: chrome reserves layout space (frame grows). The rasterizer's
+          // interior-fill sampling for presentation chrome is a separate
+          // glyph-identity check, not a placement check.
           RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
             .terminalBorder(.accent),
             style: StrokeStyle(borderSet: .presentationChrome, placement: .outset)

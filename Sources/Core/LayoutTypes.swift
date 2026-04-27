@@ -720,13 +720,18 @@ extension LayoutBehavior {
       return true
     }
 
-    // `.border` measurement only depends on the chosen ``BorderSet`` and
-    // the active ``Edge.Set`` — both feed ``borderLayoutInsets``, the
-    // single function the layout engine consults at lines 489 and 733
-    // of ``LayoutEngine``.  The other payload fields (foreground colour,
-    // background colour, blend, blendPhase) are draw-time concerns:
-    // the rasterizer reads them when painting glyphs, but they never
-    // change a node's measured size or its child proposal.
+    // `.border` measurement depends on the chosen ``BorderSet``,
+    // the ``Placement``, and the active ``Edge.Set`` — all three feed
+    // ``borderLayoutInsets``, the single function the layout engine
+    // consults at lines 489 and 733 of ``LayoutEngine``.
+    // Specifically: `.inset` placement returns zero ``EdgeInsets()``,
+    // while `.outset` returns non-zero insets, so two borders with
+    // identical set and sides but different placement produce different
+    // measured sizes and must not be treated as equivalent.
+    // The other payload fields (foreground colour, background colour,
+    // blend, blendPhase) are draw-time concerns: the rasterizer reads
+    // them when painting glyphs, but they never change a node's measured
+    // size or its child proposal.
     //
     // Treating two borders that differ only in those cosmetic fields as
     // measurement-equivalent lets the layout cache reuse measurements
@@ -737,10 +742,10 @@ extension LayoutBehavior {
     // ``ResolvedNode.isEquivalentForPlacement``) would invalidate on
     // every frame.  That cascades up the ancestor chain because each
     // ancestor's ``isEquivalentForMeasurement`` walks its children.
-    if case .border(let lhsSet, _, _, _, _, _, let lhsSides) = self,
-      case .border(let rhsSet, _, _, _, _, _, let rhsSides) = other
+    if case .border(let lhsSet, let lhsPlacement, _, _, _, _, let lhsSides) = self,
+      case .border(let rhsSet, let rhsPlacement, _, _, _, _, let rhsSides) = other
     {
-      return lhsSet == rhsSet && lhsSides == rhsSides
+      return lhsSet == rhsSet && lhsPlacement == rhsPlacement && lhsSides == rhsSides
     }
 
     guard case .custom(let lhsHandle) = self,
@@ -761,10 +766,10 @@ extension LayoutBehavior {
       return true
     }
 
-    if case .border(let lhsSet, _, _, _, _, _, let lhsSides) = self,
-      case .border(let rhsSet, _, _, _, _, _, let rhsSides) = other
+    if case .border(let lhsSet, let lhsPlacement, _, _, _, _, let lhsSides) = self,
+      case .border(let rhsSet, let rhsPlacement, _, _, _, _, let rhsSides) = other
     {
-      return lhsSet == rhsSet && lhsSides == rhsSides
+      return lhsSet == rhsSet && lhsPlacement == rhsPlacement && lhsSides == rhsSides
     }
 
     guard case .custom(let lhsHandle) = self,
