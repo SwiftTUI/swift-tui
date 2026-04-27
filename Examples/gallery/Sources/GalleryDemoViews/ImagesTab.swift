@@ -93,14 +93,17 @@ struct ImagesTab: View {
   //    cropped top/bottom by the clip.
   private var scaledToFillSection: some View {
     VStack(alignment: .leading, spacing: 0) {
+      VStack(alignment: .leading, spacing: 0) {
+        Image(pngData: Self.brnPNGBytes)
+          .scaledToFill()
+      }
+      .frame(width: 10, height: 8)
+      .clipped()
+      .background(Color.black)
       Text("4. .scaledToFill() + .clipped() — fills frame, clip crops overflow")
         .foregroundStyle(.muted)
-      Image(pngData: Self.brnPNGBytes)
-        .scaledToFill()
-        .frame(width: 14, height: 8)
-        .clipped()
-        .border(.separator)
     }
+    .background(Color.black)
   }
 }
 
