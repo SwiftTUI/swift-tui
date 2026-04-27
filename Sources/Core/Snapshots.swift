@@ -284,7 +284,7 @@ extension SnapshotRenderer {
     case .safeAreaInset(let edge, let alignment, let spacing, let safeArea):
       return
         "safeAreaInset(\(edge),\(alignment.rawValue),spacing:\(spacing),safeArea:\(safeArea.top),\(safeArea.leading),\(safeArea.bottom),\(safeArea.trailing))"
-    case .border(_, _, _, _, _, let sides):
+    case .border(_, _, _, _, _, _, let sides):
       var names: [String] = []
       if sides.contains(.top) { names.append("top") }
       if sides.contains(.leading) { names.append("leading") }

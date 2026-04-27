@@ -66,6 +66,18 @@ extension BorderSet.Placement {
 }
 
 extension BorderSet {
+  /// The `StrokeStyle.Placement` that this `BorderSet` implies when used
+  /// as a default via `View.border(set:)` without an explicit placement.
+  /// Reads `self.placement` (in `BorderSet.swift`, excluded from the
+  /// Task 3 migration grep) so that `StyleModifiers.swift` can derive a
+  /// backwards-compatible default without itself reading `BorderSet.placement`.
+  /// Removed in Task 4 alongside `BorderSet.placement`.
+  package var impliedStrokePlacement: StrokeStyle.Placement {
+    placement.asStrokePlacement
+  }
+}
+
+extension BorderSet {
   public var topDisplayWidth: Int { Self.maxCellWidth(of: top) }
   public var bottomDisplayWidth: Int { Self.maxCellWidth(of: bottom) }
   public var leftDisplayWidth: Int { Self.maxCellWidth(of: left) }

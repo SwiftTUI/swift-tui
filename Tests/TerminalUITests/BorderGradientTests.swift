@@ -104,6 +104,7 @@ struct BorderGradientTests {
         kind: .view("Border"),
         layoutBehavior: .border(
           .single,
+          placement: .outset,
           foreground: nil,
           background: nil,
           blend: blend,
@@ -136,7 +137,7 @@ struct BorderGradientTests {
     #expect(result.redrawIdentities.contains(leafIdentity))
 
     guard
-      case .border(_, _, _, _, let interpolatedPhase, _) = frame2.layoutBehavior
+      case .border(_, _, _, _, _, let interpolatedPhase, _) = frame2.layoutBehavior
     else {
       Issue.record("layoutBehavior should still be .border after interpolation")
       return

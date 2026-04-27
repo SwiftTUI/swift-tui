@@ -893,6 +893,7 @@ public struct SafeAreaInsetModifier<Inset: View>: PrimitiveViewModifier {
 /// rasterizer paints them into the reserved cells.
 public struct BorderModifier: PrimitiveViewModifier {
   package var set: BorderSet
+  package var placement: StrokeStyle.Placement
   package var foreground: BorderEdgeStyle?
   package var background: BorderBackgroundStyle?
   package var blend: BorderBlend?
@@ -917,6 +918,7 @@ public struct BorderModifier: PrimitiveViewModifier {
         transactionSnapshot: context.transaction,
         layoutBehavior: .border(
           set,
+          placement: placement,
           foreground: foreground,
           background: background,
           blend: blend,

@@ -8,6 +8,7 @@ struct LayoutBehaviorBorderEqualityTests {
   func layoutBehaviorBorderEquality() {
     let a = LayoutBehavior.border(
       .single,
+      placement: .outset,
       foreground: BorderEdgeStyle(Color.red),
       background: nil,
       blend: nil,
@@ -16,6 +17,7 @@ struct LayoutBehaviorBorderEqualityTests {
     )
     let b = LayoutBehavior.border(
       .single,
+      placement: .outset,
       foreground: BorderEdgeStyle(Color.red),
       background: nil,
       blend: nil,
@@ -29,6 +31,7 @@ struct LayoutBehaviorBorderEqualityTests {
   func layoutBehaviorBorderDifferentSet() {
     let a = LayoutBehavior.border(
       .single,
+      placement: .outset,
       foreground: nil,
       background: nil,
       blend: nil,
@@ -37,6 +40,7 @@ struct LayoutBehaviorBorderEqualityTests {
     )
     let b = LayoutBehavior.border(
       .rounded,
+      placement: .outset,
       foreground: nil,
       background: nil,
       blend: nil,
@@ -50,6 +54,7 @@ struct LayoutBehaviorBorderEqualityTests {
   func layoutBehaviorBorderDifferentPhase() {
     let a = LayoutBehavior.border(
       .single,
+      placement: .outset,
       foreground: nil,
       background: nil,
       blend: nil,
@@ -58,6 +63,7 @@ struct LayoutBehaviorBorderEqualityTests {
     )
     let b = LayoutBehavior.border(
       .single,
+      placement: .outset,
       foreground: nil,
       background: nil,
       blend: nil,
@@ -71,6 +77,7 @@ struct LayoutBehaviorBorderEqualityTests {
   func layoutBehaviorBorderDifferentSides() {
     let a = LayoutBehavior.border(
       .single,
+      placement: .outset,
       foreground: nil,
       background: nil,
       blend: nil,
@@ -79,6 +86,7 @@ struct LayoutBehaviorBorderEqualityTests {
     )
     let b = LayoutBehavior.border(
       .single,
+      placement: .outset,
       foreground: nil,
       background: nil,
       blend: nil,
@@ -92,6 +100,7 @@ struct LayoutBehaviorBorderEqualityTests {
   func layoutBehaviorBorderDifferentForeground() {
     let a = LayoutBehavior.border(
       .single,
+      placement: .outset,
       foreground: nil,
       background: nil,
       blend: nil,
@@ -100,6 +109,7 @@ struct LayoutBehaviorBorderEqualityTests {
     )
     let b = LayoutBehavior.border(
       .single,
+      placement: .outset,
       foreground: BorderEdgeStyle(Color.red),
       background: nil,
       blend: nil,

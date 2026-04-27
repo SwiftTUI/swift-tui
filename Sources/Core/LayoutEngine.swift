@@ -528,9 +528,9 @@ public struct LayoutEngine: Sendable {
         passContext: passContext
       )
       return [baseMeasurement, insetMeasurement]
-    case .border(let set, _, _, _, _, let sides):
+    case .border(let set, let placement, _, _, _, _, let sides):
       let insets = borderLayoutInsets(
-        set: set, placement: set.placement.asStrokePlacement, sides: sides)
+        set: set, placement: placement, sides: sides)
       let childProposal = inset(parentProposal, by: insets)
       return resolved.children.map { child in
         measure(child, proposal: childProposal, passContext: passContext)
@@ -807,9 +807,9 @@ public struct LayoutEngine: Sendable {
           height: max(baseSize.height, insetSize.height)
         )
       }
-    case .border(let set, _, _, _, _, let sides):
+    case .border(let set, let placement, _, _, _, _, let sides):
       let insets = borderLayoutInsets(
-        set: set, placement: set.placement.asStrokePlacement, sides: sides)
+        set: set, placement: placement, sides: sides)
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
       return Size(
         width: contentSize.width + insets.horizontal,

@@ -43,6 +43,7 @@ public enum LayoutBehavior: Sendable {
   /// (see the 1024-deep ResolvedNode regression tests).
   indirect case border(
     BorderSet,
+    placement: StrokeStyle.Placement,
     foreground: BorderEdgeStyle?,
     background: BorderBackgroundStyle?,
     blend: BorderBlend?,
@@ -115,15 +116,16 @@ extension LayoutBehavior: Equatable {
         && lhsSafeArea == rhsSafeArea
     case (
       .border(
-        let lhsSet, let lhsFg, let lhsBg,
+        let lhsSet, let lhsPlacement, let lhsFg, let lhsBg,
         let lhsBlend, let lhsPhase, let lhsSides
       ),
       .border(
-        let rhsSet, let rhsFg, let rhsBg,
+        let rhsSet, let rhsPlacement, let rhsFg, let rhsBg,
         let rhsBlend, let rhsPhase, let rhsSides
       )
     ):
       return lhsSet == rhsSet
+        && lhsPlacement == rhsPlacement
         && lhsFg == rhsFg
         && lhsBg == rhsBg
         && lhsBlend == rhsBlend
@@ -735,8 +737,8 @@ extension LayoutBehavior {
     // ``ResolvedNode.isEquivalentForPlacement``) would invalidate on
     // every frame.  That cascades up the ancestor chain because each
     // ancestor's ``isEquivalentForMeasurement`` walks its children.
-    if case .border(let lhsSet, _, _, _, _, let lhsSides) = self,
-      case .border(let rhsSet, _, _, _, _, let rhsSides) = other
+    if case .border(let lhsSet, _, _, _, _, _, let lhsSides) = self,
+      case .border(let rhsSet, _, _, _, _, _, let rhsSides) = other
     {
       return lhsSet == rhsSet && lhsSides == rhsSides
     }
@@ -759,8 +761,8 @@ extension LayoutBehavior {
       return true
     }
 
-    if case .border(let lhsSet, _, _, _, _, let lhsSides) = self,
-      case .border(let rhsSet, _, _, _, _, let rhsSides) = other
+    if case .border(let lhsSet, _, _, _, _, _, let lhsSides) = self,
+      case .border(let rhsSet, _, _, _, _, _, let rhsSides) = other
     {
       return lhsSet == rhsSet && lhsSides == rhsSides
     }

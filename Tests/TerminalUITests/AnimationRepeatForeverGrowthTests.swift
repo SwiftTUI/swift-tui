@@ -53,6 +53,7 @@ struct AnimationRepeatForeverGrowthTests {
   func borderLayoutBehaviorEquivalenceIgnoresPhase() {
     let phaseA = LayoutBehavior.border(
       .rounded,
+      placement: .outset,
       foreground: nil,
       background: nil,
       blend: BorderBlend([.red, .blue, .red]),
@@ -61,6 +62,7 @@ struct AnimationRepeatForeverGrowthTests {
     )
     let phaseB = LayoutBehavior.border(
       .rounded,
+      placement: .outset,
       foreground: nil,
       background: nil,
       blend: BorderBlend([.red, .blue, .red]),
@@ -80,6 +82,7 @@ struct AnimationRepeatForeverGrowthTests {
     // actually do affect layout (set or sides).
     let differentSet = LayoutBehavior.border(
       .double,
+      placement: .outset,
       foreground: nil,
       background: nil,
       blend: BorderBlend([.red, .blue, .red]),
@@ -92,6 +95,7 @@ struct AnimationRepeatForeverGrowthTests {
     )
     let differentSides = LayoutBehavior.border(
       .rounded,
+      placement: .outset,
       foreground: nil,
       background: nil,
       blend: BorderBlend([.red, .blue, .red]),
