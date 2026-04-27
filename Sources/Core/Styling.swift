@@ -505,11 +505,21 @@ public struct StyleEnvironmentSnapshot: Equatable, Sendable {
 
 /// Stroke settings used when drawing outlines and rules.
 ///
-/// `StrokeStyle` pairs a numeric line width with a ``BorderSet`` whose glyph
-/// table drives the rasterizer. The default (``outerHalfBlock``) produces
-/// half-block glyphs (`▀▄▌▐▛▜▙▟`). Callers that want single-line box-drawing
-/// glyphs should pass `borderSet: .single` explicitly; callers that want
-/// rounded corners should pass `borderSet: .rounded` explicitly.
+/// `StrokeStyle` pairs:
+/// - a numeric `lineWidth` (currently always 1, reserved for future use)
+/// - a ``BorderSet`` (the glyph palette — see ``BorderSet`` for details)
+/// - a ``Placement`` (`.outset` reserves a cell on each side for the
+///   border to live in; `.inset` draws the border into the outermost
+///   cells of the content frame).
+///
+/// The default (``init(lineWidth:borderSet:placement:)`` with no
+/// arguments) produces ``BorderSet/outerHalfBlock`` glyphs in
+/// `.outset` placement. Use this for the framework-canonical look.
+///
+/// For a single-line look matching pre-2026-04 framework defaults,
+/// pass `borderSet: .single` explicitly. For curved corners on a
+/// radiused rectangle, pass `borderSet: .rounded` — there is no
+/// implicit upgrade; what you ask for is what you get drawn.
 public struct StrokeStyle: Equatable, Sendable {
   public var lineWidth: Int
   public var borderSet: BorderSet

@@ -1,3 +1,20 @@
+/// A glyph palette for drawing rectangular borders around content.
+///
+/// `BorderSet` is one of the two systems that define the framework's
+/// border/stroke story (the other is ``StrokeStyle``):
+///
+/// - **`BorderSet`** — *what* glyphs to draw. Top, bottom, side, and
+///   corner characters; optional middle-junction glyphs for tables and
+///   subdivided containers.
+/// - **`StrokeStyle`** — *how* to draw them: line width, layout
+///   placement (``StrokeStyle/Placement/outset`` or
+///   ``StrokeStyle/Placement/inset``), and which `BorderSet` to use.
+///
+/// The framework's canonical default (``StrokeStyle/init(lineWidth:borderSet:placement:)``
+/// with no arguments) selects ``outerHalfBlock``. Callers who want
+/// the legacy single-line look pass ``single`` explicitly. There is
+/// *no* implicit transformation between `BorderSet`s — what you ask
+/// for is what you get drawn.
 public struct BorderSet: Equatable, Sendable {
   public var top: String
   public var bottom: String
