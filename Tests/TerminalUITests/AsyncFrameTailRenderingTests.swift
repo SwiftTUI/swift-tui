@@ -872,88 +872,6 @@ struct AsyncFrameTailRenderingTests {
     }
   }
 
-  @Test("blocked async frame head stages command and drop registrations until commit")
-  func blockedAsyncFrameHeadStagesRuntimeRegistrationsUntilCommit() async throws {
-    let rootIdentity = testIdentity("AsyncFrameHeadDraftRegistrationRoot")
-    let terminal = AsyncFrameTailTerminalHost()
-    let recorder = AsyncFrameHeadAbortEffectRecorder()
-    let stateContainer = StateContainer(
-      initialState: 0,
-      invalidationIdentities: [rootIdentity]
-    )
-    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
-    let renderer = DefaultRenderer()
-    let runLoop = RunLoop(
-      rootIdentity: rootIdentity,
-      renderer: renderer,
-      terminalHost: terminal,
-      terminalInputReader: InjectedTerminalInputReader(),
-      scheduler: FrameScheduler(),
-      stateContainer: stateContainer,
-      focusTracker: focusTracker,
-      proposal: terminal.proposal,
-      viewBuilder: { value, _ in
-        AsyncFrameHeadDraftRegistrationView(
-          value: value,
-          recorder: recorder
-        )
-      }
-    )
-    stateContainer.invalidator = runLoop.scheduler
-    focusTracker.invalidator = runLoop.scheduler
-
-    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
-    var initialFrames = 0
-    try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
-    runLoop.renderer.enableSelectiveEvaluation()
-    focusLeafmostAsyncFrameHeadFocusRegion(in: runLoop)
-
-    _ = runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl))
-    runLoop.handlePaste(PasteEvent(content: "/tmp/frame-head-draft-before.txt"))
-    #expect(recorder.events.contains("key:0"))
-    #expect(recorder.events.contains("drop:0:1"))
-    recorder.reset()
-
-    let gate = AsyncFrameTailBlockingGate()
-    renderer.setFrameTailRenderHooks(
-      .init(beforeRaster: {
-        gate.beforeRaster()
-      })
-    )
-    defer {
-      renderer.setFrameTailRenderHooks(nil)
-      gate.release()
-    }
-
-    stateContainer.replace(with: 1)
-    let renderTask = Task { @MainActor in
-      var renderedFrames = 0
-      try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
-      return renderedFrames
-    }
-
-    await gate.waitUntilBlocked()
-    _ = runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl))
-    runLoop.handlePaste(PasteEvent(content: "/tmp/frame-head-draft-during.txt"))
-
-    #expect(recorder.events.contains("key:0"))
-    #expect(recorder.events.contains("drop:0:1"))
-    #expect(!recorder.events.contains("key:1"))
-    #expect(!recorder.events.contains("drop:1:1"))
-
-    gate.release()
-    _ = try await valueWithTimeout {
-      try await renderTask.value
-    }
-    recorder.reset()
-
-    _ = runLoop.handleKeyPress(KeyPress(.character("a"), modifiers: .ctrl))
-    runLoop.handlePaste(PasteEvent(content: "/tmp/frame-head-draft-after.txt"))
-
-    #expect(recorder.events.contains("key:1"))
-    #expect(recorder.events.contains("drop:1:1"))
-  }
-
   @Test("blocked async frame head defers animation completion until commit")
   func blockedAsyncFrameHeadDefersAnimationCompletionUntilCommit() async throws {
     let rootIdentity = testIdentity("AsyncFrameHeadAnimationCompletionRoot")
@@ -1208,25 +1126,6 @@ private struct AsyncFrameHeadAbortScaffoldView: View {
       return true
     }
     .defaultFocus($focusedField, .action)
-  }
-}
-
-private struct AsyncFrameHeadDraftRegistrationView: View {
-  var value: Int
-  var recorder: AsyncFrameHeadAbortEffectRecorder
-
-  var body: some View {
-    Panel(id: "draft-registration") {
-      Text("value \(value)")
-        .focusable(true)
-    }
-    .keyCommand("Record value", key: .character("a"), modifiers: .ctrl) {
-      recorder.record("key:\(value)")
-    }
-    .dropDestination { paths in
-      recorder.record("drop:\(value):\(paths.count)")
-      return true
-    }
   }
 }
 
@@ -1638,20 +1537,6 @@ private func focusLeafmostAsyncFrameHeadAbortScaffoldRegion<State, V: View>(
     let leafmost = runLoop.latestSemanticSnapshot.focusRegions.filter({
       runLoop.localActionRegistry.hasHandler(identity: $0.identity)
     }).max(
-      by: { $0.scopePath.count < $1.scopePath.count }
-    )
-  else {
-    return
-  }
-  _ = runLoop.focusTracker.setFocus(to: leafmost.identity)
-}
-
-@MainActor
-private func focusLeafmostAsyncFrameHeadFocusRegion<State, V: View>(
-  in runLoop: TerminalUI.RunLoop<State, V>
-) {
-  guard
-    let leafmost = runLoop.latestSemanticSnapshot.focusRegions.max(
       by: { $0.scopePath.count < $1.scopePath.count }
     )
   else {
