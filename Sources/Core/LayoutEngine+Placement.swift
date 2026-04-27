@@ -274,7 +274,7 @@ extension LayoutEngine {
           passContext: passContext
         ),
       ]
-    case .border(let set, _, _, _, _, let sides):
+    case .border(let set, let placement, _, _, _, _, let sides):
       guard let childMeasurement = measured.childMeasurements.first,
         let child = resolved.children.first
       else {
@@ -282,7 +282,7 @@ extension LayoutEngine {
       }
 
       let insets = borderLayoutInsets(
-        set: set, placement: set.placement.asStrokePlacement, sides: sides)
+        set: set, placement: placement, sides: sides)
       let childBounds = Rect(
         origin: Point(
           x: bounds.origin.x + insets.leading,

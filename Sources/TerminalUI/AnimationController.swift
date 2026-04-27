@@ -174,7 +174,7 @@ package struct AnimatableSnapshot: Sendable {
     case .frame(let width, let height, _):
       if let width { snapshot[.frameWidth] = AnyAnimatable(width) }
       if let height { snapshot[.frameHeight] = AnyAnimatable(height) }
-    case .border(_, _, _, let blend, let blendPhase, _):
+    case .border(_, _, _, _, let blend, let blendPhase, _):
       // Only populate the phase slot when a ``BorderBlend`` is attached.
       // `.border` layouts without a blend have nothing to animate here —
       // the static zero default would otherwise create a phantom
@@ -2185,6 +2185,7 @@ package final class AnimationController: Sendable {
       // unchanged — we just rotate the gradient start.
       if case .border(
         let set,
+        let placement,
         let foreground,
         let background,
         let blend,
@@ -2194,6 +2195,7 @@ package final class AnimationController: Sendable {
         node.setLayoutBehaviorPreservingDerivedState(
           .border(
             set,
+            placement: placement,
             foreground: foreground,
             background: background,
             blend: blend,

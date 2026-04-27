@@ -491,7 +491,7 @@ package struct PromptPresentationSurface: View, ActionScope {
         .overlay {
           RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
             .terminalBorder(.accent),
-            style: .presentationChrome
+            style: StrokeStyle(borderSet: .presentationChrome, placement: .outset)
           )
         }
         .frame(

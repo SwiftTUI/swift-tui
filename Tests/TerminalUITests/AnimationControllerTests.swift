@@ -3258,6 +3258,7 @@ struct Phase3ParityTests {
       kind: .view("Leaf"),
       layoutBehavior: .border(
         BorderSet.single,
+        placement: .outset,
         foreground: nil,
         background: nil,
         blend: blend,
@@ -3273,6 +3274,7 @@ struct Phase3ParityTests {
       kind: .view("Leaf"),
       layoutBehavior: .border(
         BorderSet.single,
+        placement: .outset,
         foreground: nil,
         background: nil,
         blend: blend,
@@ -3288,7 +3290,7 @@ struct Phase3ParityTests {
     _ = controller.applyInterpolations(to: &frame2, at: halfway)
 
     guard
-      case .border(_, _, _, _, let interpolatedPhase, _) = frame2.layoutBehavior
+      case .border(_, _, _, _, _, let interpolatedPhase, _) = frame2.layoutBehavior
     else {
       Issue.record("apply must preserve the border layoutBehavior")
       return
