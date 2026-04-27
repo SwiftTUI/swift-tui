@@ -6,22 +6,6 @@ package import Core
 /// invalidation data so that re-used evaluators see fresh values.
 @MainActor
 package final class FrameResolveState {
-  package struct Checkpoint {
-    fileprivate var invalidatedIdentities: Set<Identity>
-    fileprivate var invalidationSummary: InvalidationSummary
-    fileprivate var environmentValues: EnvironmentValues
-    fileprivate var environment: EnvironmentSnapshot
-    fileprivate var focusedValues: FocusedValues
-    fileprivate var transaction: TransactionSnapshot
-    fileprivate var proposal: ProposedSize
-    fileprivate var selectiveEvaluationEnabled: Bool
-    fileprivate var forceRootEvaluation: Bool
-    fileprivate var previousFocusedIdentity: Identity?
-    fileprivate var previousPressedIdentity: Identity?
-    fileprivate var previousProposal: ProposedSize?
-    fileprivate var environmentRequiresRootEvaluation: Bool
-  }
-
   package var invalidatedIdentities: Set<Identity>
   package var invalidationSummary: InvalidationSummary
   package var environmentValues: EnvironmentValues
@@ -55,40 +39,6 @@ package final class FrameResolveState {
     transaction = .init()
     proposal = .unspecified
     selectiveEvaluationEnabled = false
-  }
-
-  package func makeCheckpoint() -> Checkpoint {
-    Checkpoint(
-      invalidatedIdentities: invalidatedIdentities,
-      invalidationSummary: invalidationSummary,
-      environmentValues: environmentValues,
-      environment: environment,
-      focusedValues: focusedValues,
-      transaction: transaction,
-      proposal: proposal,
-      selectiveEvaluationEnabled: selectiveEvaluationEnabled,
-      forceRootEvaluation: forceRootEvaluation,
-      previousFocusedIdentity: previousFocusedIdentity,
-      previousPressedIdentity: previousPressedIdentity,
-      previousProposal: previousProposal,
-      environmentRequiresRootEvaluation: environmentRequiresRootEvaluation
-    )
-  }
-
-  package func restore(_ checkpoint: Checkpoint) {
-    invalidatedIdentities = checkpoint.invalidatedIdentities
-    invalidationSummary = checkpoint.invalidationSummary
-    environmentValues = checkpoint.environmentValues
-    environment = checkpoint.environment
-    focusedValues = checkpoint.focusedValues
-    transaction = checkpoint.transaction
-    proposal = checkpoint.proposal
-    selectiveEvaluationEnabled = checkpoint.selectiveEvaluationEnabled
-    forceRootEvaluation = checkpoint.forceRootEvaluation
-    previousFocusedIdentity = checkpoint.previousFocusedIdentity
-    previousPressedIdentity = checkpoint.previousPressedIdentity
-    previousProposal = checkpoint.previousProposal
-    environmentRequiresRootEvaluation = checkpoint.environmentRequiresRootEvaluation
   }
 
   package func update(from context: ResolveContext, proposal: ProposedSize) {

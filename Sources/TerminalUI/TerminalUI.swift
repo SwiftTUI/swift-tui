@@ -12,11 +12,6 @@ import Synchronization
 #endif
 
 private final class FrameTailRetainedState: Sendable {
-  struct Checkpoint: Sendable {
-    var previousFrameIndex: RetainedFrameIndex?
-    var previousRasterSurface: RasterSurface?
-  }
-
   private struct State: Sendable {
     var previousFrameIndex: RetainedFrameIndex?
     var previousRasterSurface: RasterSurface?
@@ -35,22 +30,6 @@ private final class FrameTailRetainedState: Sendable {
         ),
         previousRasterSurface: state.previousRasterSurface
       )
-    }
-  }
-
-  func makeCheckpoint() -> Checkpoint {
-    state.withLock { state in
-      Checkpoint(
-        previousFrameIndex: state.previousFrameIndex,
-        previousRasterSurface: state.previousRasterSurface
-      )
-    }
-  }
-
-  func restore(_ checkpoint: Checkpoint) {
-    state.withLock { state in
-      state.previousFrameIndex = checkpoint.previousFrameIndex
-      state.previousRasterSurface = checkpoint.previousRasterSurface
     }
   }
 
@@ -149,20 +128,7 @@ private struct FrameTailOutput {
   var workerCompletedAt: ContinuousClock.Instant?
 }
 
-private struct FrameHeadAbortCheckpoint {
-  var viewGraph: ViewGraph.Checkpoint
-  var frameState: FrameResolveState.Checkpoint
-  var animation: AnimationController.Checkpoint
-  var frameTailRetainedState: FrameTailRetainedState.Checkpoint
-}
-
-@MainActor
-private final class FrameHeadDraft {
-  private enum ConsumptionState {
-    case pending(FrameHeadAbortCheckpoint)
-    case consumed(String)
-  }
-
+private struct FrameHeadDraft {
   var clock: ContinuousClock?
   var renderGeneration: RenderGeneration
   var resolveContext: ResolveContext
@@ -173,58 +139,7 @@ private final class FrameHeadDraft {
   var resolveDuration: Duration
   var runtimeRegistrationDraft: RuntimeRegistrationDraft
   var runtimeRegistrationMutation: RuntimeRegistrationMutation
-
-  private var consumptionState: ConsumptionState
-
-  init(
-    clock: ContinuousClock?,
-    renderGeneration: RenderGeneration,
-    resolveContext: ResolveContext,
-    frameContext: FrameContext,
-    resolved: ResolvedNode,
-    frameTailInput: FrameTailInput,
-    animationTimestamp: MonotonicInstant,
-    resolveDuration: Duration,
-    runtimeRegistrationDraft: RuntimeRegistrationDraft,
-    runtimeRegistrationMutation: RuntimeRegistrationMutation,
-    abortCheckpoint: FrameHeadAbortCheckpoint
-  ) {
-    self.clock = clock
-    self.renderGeneration = renderGeneration
-    self.resolveContext = resolveContext
-    self.frameContext = frameContext
-    self.resolved = resolved
-    self.frameTailInput = frameTailInput
-    self.animationTimestamp = animationTimestamp
-    self.resolveDuration = resolveDuration
-    self.runtimeRegistrationDraft = runtimeRegistrationDraft
-    self.runtimeRegistrationMutation = runtimeRegistrationMutation
-    consumptionState = .pending(abortCheckpoint)
-  }
-
-  func consumeForFinish() -> FrameHeadAbortCheckpoint {
-    consume("finish")
-  }
-
-  func consumeForAbort() -> FrameHeadAbortCheckpoint {
-    consume("abort")
-  }
-
-  private func consume(_ operation: String) -> FrameHeadAbortCheckpoint {
-    switch consumptionState {
-    case .pending(let checkpoint):
-      consumptionState = .consumed(operation)
-      return checkpoint
-    case .consumed(let previousOperation):
-      preconditionFailure(
-        "FrameHeadDraft cannot \(operation) after it was already \(previousOperation)ed."
-      )
-    }
-  }
-}
-
-package struct PreparedFrameHeadForCancellationTesting {
-  fileprivate var draft: FrameHeadDraft
+  var animationCheckpoint: AnimationController.Checkpoint
 }
 
 @MainActor
@@ -591,20 +506,6 @@ private final class FrameTailRenderer: Sendable {
       retainedState.input(
         invalidatedIdentities: invalidatedIdentities
       )
-    }
-  }
-
-  func retainedStateCheckpoint() -> FrameTailRetainedState.Checkpoint {
-    sync {
-      retainedState.makeCheckpoint()
-    }
-  }
-
-  func restoreRetainedState(
-    _ checkpoint: FrameTailRetainedState.Checkpoint
-  ) {
-    sync {
-      retainedState.restore(checkpoint)
     }
   }
 
@@ -1572,12 +1473,6 @@ public struct DefaultRenderer {
   ) -> FrameHeadDraft {
     let clock: ContinuousClock? = collectsDiagnostics ? ContinuousClock() : nil
     let renderGeneration = renderGenerationSequencer.next()
-    let abortCheckpoint = FrameHeadAbortCheckpoint(
-      viewGraph: viewGraph.makeCheckpoint(),
-      frameState: frameState.makeCheckpoint(),
-      animation: animationController.beginFrameHeadTransaction(),
-      frameTailRetainedState: frameTailRenderer.retainedStateCheckpoint()
-    )
 
     var resolveContext = context
     let runtimeRegistrationDraft = RuntimeRegistrationDraft(
@@ -1612,6 +1507,7 @@ public struct DefaultRenderer {
     }
     let (_, resolveDuration): (Void, Duration)
     var runtimeRegistrationMutation = RuntimeRegistrationMutation.none
+    let animationCheckpoint = animationController.beginFrameHeadTransaction()
     animationController.beginTransitionCollection()
     if canUseSelectiveEvaluation, !viewGraph.hasDirtyWork {
       resolveDuration = .zero
@@ -1697,7 +1593,7 @@ public struct DefaultRenderer {
       resolveDuration: resolveDuration,
       runtimeRegistrationDraft: runtimeRegistrationDraft,
       runtimeRegistrationMutation: runtimeRegistrationMutation,
-      abortCheckpoint: abortCheckpoint
+      animationCheckpoint: animationCheckpoint
     )
   }
 
@@ -1760,7 +1656,6 @@ public struct DefaultRenderer {
     tailOutput: AsyncFrameTailDraftOutput,
     collectsDiagnostics: Bool
   ) -> FrameArtifacts {
-    let abortCheckpoint = draft.consumeForFinish()
     let layout = tailOutput.layout
     let tail = tailOutput.tail
     var workerTimings = tail.diagnostics.workerTimings
@@ -1786,7 +1681,7 @@ public struct DefaultRenderer {
       )
     }
     commitRuntimeRegistrations(for: draft)
-    animationController.commitFrameHeadTransaction(abortCheckpoint.animation)
+    animationController.commitFrameHeadTransaction(draft.animationCheckpoint)
     applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
@@ -1854,15 +1749,6 @@ public struct DefaultRenderer {
       baselinePlacedTree: tail.baselinePlaced
     )
     return artifacts
-  }
-
-  @MainActor
-  private func abortFrameHead(_ draft: FrameHeadDraft) {
-    let abortCheckpoint = draft.consumeForAbort()
-    viewGraph.restore(abortCheckpoint.viewGraph)
-    frameState.restore(abortCheckpoint.frameState)
-    animationController.abortFrameHeadTransaction(abortCheckpoint.animation)
-    frameTailRenderer.restoreRetainedState(abortCheckpoint.frameTailRetainedState)
   }
 
   @MainActor
@@ -1958,37 +1844,6 @@ public struct DefaultRenderer {
   @MainActor
   package func liveIdentitySnapshot() -> Set<Identity> {
     viewGraph.liveIdentitySnapshot()
-  }
-
-  @MainActor
-  package func prepareFrameHeadForCancellationTesting<V: View>(
-    _ root: V,
-    context: ResolveContext,
-    proposal: ProposedSize,
-    collectsDiagnostics: Bool = true
-  ) -> PreparedFrameHeadForCancellationTesting {
-    PreparedFrameHeadForCancellationTesting(
-      draft: prepareFrameHead(
-        root,
-        context: context,
-        proposal: proposal,
-        collectsDiagnostics: collectsDiagnostics
-      )
-    )
-  }
-
-  @MainActor
-  package func abortPreparedFrameHeadForCancellationTesting(
-    _ prepared: PreparedFrameHeadForCancellationTesting
-  ) {
-    abortFrameHead(prepared.draft)
-  }
-
-  @MainActor
-  package func hasViewGraphNodeForCancellationTesting(
-    _ identity: Identity
-  ) -> Bool {
-    viewGraph.nodeForIdentity(identity) != nil
   }
 
   @MainActor
