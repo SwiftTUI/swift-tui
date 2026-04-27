@@ -5180,15 +5180,6 @@ struct SwiftUISurfaceTests {
         },
       context: .init(identity: testIdentity("InnerHalfBlock"))
     )
-    let presentationChromeArtifacts = DefaultRenderer().render(
-      Text("Hi")
-        .padding(1)
-        .overlay {
-          Rectangle()
-            .stroke(.separator, style: .init(borderSet: .presentationChrome))
-        },
-      context: .init(identity: testIdentity("PresentationChrome"))
-    )
     let hiddenArtifacts = DefaultRenderer().render(
       Text("Hi")
         .padding(1)
@@ -5222,12 +5213,6 @@ struct SwiftUISurfaceTests {
       ])
     #expect(
       innerHalfBlockArtifacts.rasterSurface.lines == [
-        "▗▄▄▖",
-        "▐Hi▌",
-        "▝▀▀▘",
-      ])
-    #expect(
-      presentationChromeArtifacts.rasterSurface.lines == [
         "▗▄▄▖",
         "▐Hi▌",
         "▝▀▀▘",

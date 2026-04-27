@@ -541,7 +541,6 @@ extension StrokeStyle {
   public static let block = StrokeStyle(borderSet: .block)
   public static let outerHalfBlock = StrokeStyle(borderSet: .outerHalfBlock)
   public static let innerHalfBlock = StrokeStyle(borderSet: .innerHalfBlock)
-  public static let presentationChrome = StrokeStyle(borderSet: .presentationChrome)
   public static let hidden = StrokeStyle(borderSet: .hidden)
   public static let markdown = StrokeStyle(borderSet: .markdown)
 }

@@ -745,7 +745,6 @@ extension SnapshotRenderer {
     case .block: return "block"
     case .outerHalfBlock: return "outerHalfBlock"
     case .innerHalfBlock: return "innerHalfBlock"
-    case .presentationChrome: return "presentationChrome"
     case .singleDouble: return "singleDouble"
     case .doubleSingle: return "doubleSingle"
     case .ascii: return "ascii"
