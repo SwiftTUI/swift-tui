@@ -86,16 +86,19 @@ struct ImagesTab: View {
     }
   }
 
-  // 4. scaledToFill — preserves aspect but covers the frame entirely,
-  //    clipping the overflowing axis. The frame below is nearly square,
-  //    so the tall source image is cropped top/bottom.
+  // 4. scaledToFill — preserves aspect and covers the frame entirely;
+  //    the longer axis overflows the frame on its own. `.clipped()` is
+  //    what actually trims the overflow to the frame's bounds. The
+  //    frame below is nearly square, so the tall source image is
+  //    cropped top/bottom by the clip.
   private var scaledToFillSection: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("4. .scaledToFill() — preserves aspect, crops overflow")
+      Text("4. .scaledToFill() + .clipped() — fills frame, clip crops overflow")
         .foregroundStyle(.muted)
       Image(pngData: Self.brnPNGBytes)
         .scaledToFill()
         .frame(width: 14, height: 8)
+        .clipped()
         .border(.separator)
     }
   }

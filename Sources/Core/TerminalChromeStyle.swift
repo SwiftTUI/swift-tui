@@ -103,7 +103,13 @@ extension Theme {
     case .surface(let tone):
       return terminalSurfaceStyle(tone: tone, appearance: appearance)
     case .surfaceBackground:
-      return .color(background)
+      // Chrome surface fill — toolbars, alerts, sheets, popovers,
+      // dropdowns. Resolve to the same neutral-tinted treatment as
+      // `terminalSurface(.neutral)` so chrome is visually distinct
+      // from the bare page background; the previous `.color(background)`
+      // produced a fill identical to the terminal background, which made
+      // these surfaces invisible against their content.
+      return terminalSurfaceStyle(tone: .neutral, appearance: appearance)
     case .border(let tone):
       return terminalBorderStyle(tone: tone, appearance: appearance)
     case .tile(let tone):
