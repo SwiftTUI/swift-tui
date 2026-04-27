@@ -494,7 +494,7 @@ package struct PromptPresentationSurface: View, ActionScope {
           // glyph-identity check, not a placement check.
           RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
             .terminalBorder(.accent),
-            style: StrokeStyle(borderSet: .presentationChrome, placement: .outset)
+            style: StrokeStyle(borderSet: .innerHalfBlock, placement: .outset)
           )
         }
         .frame(

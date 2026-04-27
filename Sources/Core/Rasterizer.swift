@@ -2132,11 +2132,11 @@ extension Rasterizer {
       )
     }
 
-    // Presentation chrome borders draw into the inset region of their
-    // owning container (popovers, toasts, menus), so their glyph cells
-    // should inherit the interior fill rather than the surrounding
-    // background.
-    if borderSet == .presentationChrome {
+    // Inner half-block borders (used for presentation chrome) draw into the
+    // inset region of their owning container (popovers, toasts, menus), so
+    // their glyph cells should inherit the interior fill rather than the
+    // surrounding background.
+    if borderSet == .innerHalfBlock {
       for side in fallbackSides {
         if let inferred = sampledBackgroundColor(
           inside: side,
