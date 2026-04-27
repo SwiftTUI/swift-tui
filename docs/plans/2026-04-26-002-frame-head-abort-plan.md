@@ -1,7 +1,7 @@
 ---
 title: "refactor: make prepared frame heads abortable"
 type: refactor
-status: completed
+status: reverted
 date: 2026-04-26
 proposal: "../proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md"
 ---
@@ -51,6 +51,111 @@ Stage 3C is implemented.
 - `AsyncFrameTailRenderingTests` covers normal committed scaffold effects,
   draft registration staging, graph/registration rollback after abort, and
   animation completion discard on abort.
+
+## Post-mortem (2026-04-26)
+
+**Status: reverted on `frame-head-wip`.** Two reverts (`56995ff` of `16e4917`,
+then `263003f` of `40a17fc`) and a follow-up cleanup commit (`c30c5fe`) backed
+this tranche out. Animation-completion deferral (`0cacb9e`) is kept; the
+checkpoint scaffolding on `ViewGraph` / `ViewNode` / `DependencyTracker` /
+`FrameResolveState` was deleted as dead code by the cleanup.
+
+### What broke
+
+Real-terminal scrolling and clicking regressed. Behavior was demonstrably
+worse against the gallery example by hand. Reverting just the registration
+staging restored expected behavior; keeping the abort scaffolding around the
+revert was incompatible with the staging-removal because the abort path
+depended on `FrameHeadDraft` being a class with consume/restore mechanics, so
+the abort path had to come out too.
+
+### Root cause (most likely)
+
+The implementation of step 4 below diverged from the plan in one critical way:
+
+- **The plan said**: at `finishFrame`, apply the recorded live mutation
+  (`.resetAll` / `.removeSubtrees` / `.none`) and then **restore handlers from
+  the committed graph** by walking `ResolvedNode`s and replaying each node's
+  `NodeHandlers` into the live registries.
+- **The implementation did**: apply the live mutation, then call
+  `RuntimeRegistrationDraft.restoreAllIntoLive()` which merges the
+  *per-frame draft registry snapshots* into live.
+
+The two are not equivalent. The draft registries only contain what was
+*touched during the current frame's resolve* — the dirty frontier's evaluator
+plus any cache-hits restored via `ViewGraph.restoreRuntimeRegistrations(for:
+into:)`. They omit:
+
+- Subtrees outside the dirty frontier whose evaluators never ran.
+- Alias-only nodes (e.g. ScrollView vertical/horizontal indicator identities)
+  promoted out of the dirty frontier.
+- Anything that exists in `nodesByIdentity` but whose evaluator chain wasn't
+  walked this frame.
+
+For `.removeSubtrees(roots)` the bug is mostly self-cancelling because the
+mutation only clears live under `roots` and the draft contains exactly that
+subtree's re-resolve output. For `.resetAll` the bug is direct: live is
+wiped, but the draft only carries what `rootEvaluator?()` walked, and any
+alias node that didn't sit on that walk silently disappears from the live
+registry until the next full re-resolve.
+
+The user-visible symptom is hard to predict from the model: scroll-indicator
+clicks miss, drag-tracking fires against stale handlers, `keyCommand` /
+`dropDestination` fall through to the wrong scope. Real terminal use trips it;
+deterministic tests don't.
+
+### Why the test suite didn't catch it
+
+Documented for future-us so we don't relearn this:
+
+- **Sync vs async paths**: most existing scroll/click tests
+  (`InteractiveRuntimeTests`, the `runLoopBatchesQueuedScrollBursts` family)
+  drive `runLoop.handleMouseEvent(...)` directly + `renderPendingFrames`
+  (sync). They never enter `renderViewAsync` so they never exercise the
+  staging code path.
+- **Async-path coverage gap**: tests that *do* use the async path
+  (`runTerminalInputHarness` → `runLoop.run()`, `realInputReader…` family)
+  exercise it correctly under selective evaluation, but the scenarios they
+  cover (a single ScrollView, a single Button) keep the dirty subtree's
+  evaluator walking exactly the nodes whose handlers matter, so the
+  staging-vs-graph divergence happens to produce the same registry contents.
+- **No invariant test**: nothing asserted "live registries equal what
+  `restoreRuntimeRegistrations(rootedAt: liveIdentities, into: live)` would
+  build". A property of that shape would have caught it.
+
+I attempted to write such an invariant test against a `bisect-staging-only`
+branch (just `40a17fc` cherry-picked on top of `main`); the simple
+"pointer routes don't disappear" formulation passed on both branches. The
+failing-mode is more nuanced than the simple invariant captures.
+
+### Guidance for the next attempt
+
+When re-implementing step 4:
+
+1. **Restore from the graph, not from the draft.** At `finishFrame`, after
+   `runtimeRegistrationMutation.apply(to: live)`, walk the just-finalized
+   `ResolvedNode` tree and call
+   `viewGraph.restoreRuntimeRegistrations(for: resolved, into: live)` (the
+   helper added in `40a17fc` is still useful — it walks `nodesByIdentity` and
+   honors `registrationAliasesByIdentity`). This guarantees live is a
+   superset of what the committed graph specifies, regardless of which
+   evaluators actually ran.
+2. **Keep the draft as a side-channel for `register()` calls during resolve.**
+   Its only purpose is to capture *new* registrations from the dirty
+   frontier's evaluator without contaminating live mid-frame. Do not use it
+   as the source of truth at commit.
+3. **Validate by hand, not by `swift test`.** Run `gallery-demo` interactively
+   alongside `main` in another terminal. Scroll a tab. Click a button. Drag a
+   slider. If it doesn't *feel* identical, do not merge.
+4. **Add the invariant test once you can see the bug.** Easier to write a
+   test that fails red against an observed symptom than to construct one
+   blind.
+
+The dead checkpoint scaffolding (`ViewGraph.Checkpoint`, `ViewNode.Checkpoint`,
+`DependencyTracker.Checkpoint`) was deleted in `c30c5fe` so the next attempt
+starts from a clean slate. Animation-completion deferral
+(`AnimationController.Checkpoint`) survives because it's in active use and
+its tests pass.
 
 ## Problem Frame
 
