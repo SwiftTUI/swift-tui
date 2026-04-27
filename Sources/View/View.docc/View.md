@@ -75,3 +75,5 @@ Lowering helpers remain package-only implementation details.
 
 - <doc:Authoring-Views>
 - <doc:State-Environment-And-Focus>
+- <doc:State-Keying>
+- <doc:Focus>

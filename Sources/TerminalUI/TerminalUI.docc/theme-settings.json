@@ -1,0 +1,181 @@
+{
+  "meta": {
+    "titleSuffix": " | TerminalUI"
+  },
+  "theme": {
+    "border-radius": "2px",
+    "colors": {
+      "text": {
+        "light": "#1a1a1a",
+        "dark": "#e8e8e8"
+      },
+      "background": {
+        "light": "#ffffff",
+        "dark": "#000000"
+      },
+      "fill": {
+        "light": "#ffffff",
+        "dark": "#0a0a0a"
+      },
+      "fill-secondary": {
+        "light": "#f5f5f5",
+        "dark": "#141414"
+      },
+      "fill-tertiary": {
+        "light": "#ebebeb",
+        "dark": "#1c1c1c"
+      },
+      "fill-blue": {
+        "light": "#d71921",
+        "dark": "#d71921"
+      },
+      "figure-blue": {
+        "light": "#d71921",
+        "dark": "#d71921"
+      },
+      "figure-gray": {
+        "light": "#555555",
+        "dark": "#8a8a8a"
+      },
+      "figure-gray-secondary": {
+        "light": "#888888",
+        "dark": "#555555"
+      },
+      "figure-gray-secondary-alt": {
+        "light": "#aaaaaa",
+        "dark": "#3a3a3a"
+      },
+      "figure-gray-tertiary": {
+        "light": "#bbbbbb",
+        "dark": "#2e2e2e"
+      },
+      "header": {
+        "light": "#ffffff",
+        "dark": "#0a0a0a"
+      },
+      "nav": {
+        "light": "#ffffff",
+        "dark": "#0a0a0a"
+      },
+      "nav-color": {
+        "light": "#1a1a1a",
+        "dark": "#e8e8e8"
+      },
+      "nav-current-link": {
+        "light": "#d71921",
+        "dark": "#d71921"
+      },
+      "nav-link-color": {
+        "light": "#1a1a1a",
+        "dark": "#e8e8e8"
+      },
+      "nav-link-color-hover": {
+        "light": "#d71921",
+        "dark": "#d71921"
+      },
+      "nav-rule": {
+        "light": "#ebebeb",
+        "dark": "#1c1c1c"
+      },
+      "nav-solid-background": {
+        "light": "#ffffff",
+        "dark": "#0a0a0a"
+      },
+      "border": {
+        "light": "#ebebeb",
+        "dark": "#2e2e2e"
+      },
+      "grid": {
+        "light": "#ebebeb",
+        "dark": "#1c1c1c"
+      },
+      "form-error": {
+        "light": "#d71921",
+        "dark": "#d71921"
+      },
+      "link": {
+        "light": "#d71921",
+        "dark": "#d71921"
+      },
+      "documentation-intro-fill": {
+        "light": "linear-gradient(180deg, #ffffff 0%, #f5f5f5 100%)",
+        "dark": "linear-gradient(180deg, #0a0a0a 0%, #000000 100%)"
+      },
+      "documentation-intro-accent": {
+        "light": "#d71921",
+        "dark": "#d71921"
+      },
+      "documentation-intro-eyebrow": {
+        "light": "#555555",
+        "dark": "#8a8a8a"
+      },
+      "documentation-intro-figure": {
+        "light": "#1a1a1a",
+        "dark": "#e8e8e8"
+      },
+      "code-collected-background": {
+        "light": "#f5f5f5",
+        "dark": "#0a0a0a"
+      },
+      "code-line-highlight": {
+        "light": "rgba(215, 25, 33, 0.10)",
+        "dark": "rgba(215, 25, 33, 0.18)"
+      },
+      "syntax-string": {
+        "light": "#a3271c",
+        "dark": "#d99094"
+      },
+      "syntax-keyword": {
+        "light": "#9b2393",
+        "dark": "#fc6ab4"
+      },
+      "syntax-type-annotation": {
+        "light": "#1a64a3",
+        "dark": "#7fb1f2"
+      },
+      "syntax-other-type-name": {
+        "light": "#3e8dbe",
+        "dark": "#9bd8ff"
+      },
+      "syntax-comment": {
+        "light": "#5d6c79",
+        "dark": "#7d8b97"
+      },
+      "syntax-number": {
+        "light": "#1c00cf",
+        "dark": "#a78bfa"
+      },
+      "syntax-attribute": {
+        "light": "#a3271c",
+        "dark": "#d99094"
+      },
+      "callout-information": {
+        "light": "#1a64a3",
+        "dark": "#7fb1f2"
+      },
+      "callout-important": {
+        "light": "#d71921",
+        "dark": "#d71921"
+      },
+      "callout-tip": {
+        "light": "#2c8a6f",
+        "dark": "#7be0b8"
+      },
+      "callout-warning": {
+        "light": "#a3651c",
+        "dark": "#e8b56a"
+      }
+    },
+    "typography": {
+      "html-font": "'Space Grotesk', 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
+      "html-font-mono-spaced": "'Space Mono', 'JetBrains Mono', 'SF Mono', 'IBM Plex Mono', monospace"
+    }
+  },
+  "features": {
+    "docs": {
+      "i18n": {
+        "enable": false
+      }
+    }
+  }
+}

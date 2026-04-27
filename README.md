@@ -161,12 +161,32 @@ and Bun environment first. On Linux, it exports
 already using the repo's root Bun workspace, `bun run test` is a thin
 entrypoint to the same script.
 
-## Generate API Docs
+## API Documentation
 
-Generate per-module DocC archives with:
+Live API reference is published at:
+
+- <https://goodhatsllc.github.io/swift-terminal-ui/docs/documentation/terminalui/>
+
+The same content is mirrored by the Swift Package Index:
+
+- <https://swiftpackageindex.com/GoodHatsLLC/swift-terminal-ui/documentation/terminalui>
+
+To build the docs locally, generate per-module DocC archives with:
 
 ```bash
 swiftly run swift package generate-documentation --target TerminalUI
+```
+
+Or build the combined archive that powers the public site:
+
+```bash
+swiftly run swift package \
+  --allow-writing-to-directory .build-docs \
+  generate-documentation \
+  --target View --target TerminalUI --target TerminalUICharts \
+  --enable-experimental-combined-documentation \
+  --transform-for-static-hosting \
+  --output-path .build-docs
 ```
 
 ## Current Constraints
