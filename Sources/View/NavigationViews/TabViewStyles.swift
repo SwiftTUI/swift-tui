@@ -1066,7 +1066,7 @@ private struct LiteralTabsStripBackgroundView: View {
           foregroundStyle: .semantic(.foreground),
           // Use single-line glyphs to stay visually consistent with the
           // box-drawing tab chrome (╭─╮ │ │ ┴──┴).
-          borderStrokeStyle: .normal
+          borderStrokeStyle: StrokeStyle(borderSet: .single)
         )
       )
       .frame(maxWidth: .infinity, minHeight: 1, maxHeight: 1, alignment: .leading)
