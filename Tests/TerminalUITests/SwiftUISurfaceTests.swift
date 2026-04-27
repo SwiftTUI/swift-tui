@@ -5235,13 +5235,13 @@ struct SwiftUISurfaceTests {
   @Test(
     "StrokeStyle exposes lipgloss border presets with the expected glyph families",
     arguments: [
-      (StrokeStyle.normal, ["┌──┐", "│Hi│", "└──┘"]),
+      (StrokeStyle(borderSet: .single), ["┌──┐", "│Hi│", "└──┘"]),
       (StrokeStyle.rounded, ["╭──╮", "│Hi│", "╰──╯"]),
       (StrokeStyle.thick, ["┏━━┓", "┃Hi┃", "┗━━┛"]),
       (StrokeStyle.double, ["╔══╗", "║Hi║", "╚══╝"]),
       (StrokeStyle.ascii, ["+--+", "|Hi|", "+--+"]),
       (StrokeStyle.block, ["████", "█Hi█", "████"]),
-      (StrokeStyle.outerHalfBlock, ["▛▀▀▜", "▌Hi▐", "▙▄▄▟"]),
+      (StrokeStyle(), ["▛▀▀▜", "▌Hi▐", "▙▄▄▟"]),
       (StrokeStyle.innerHalfBlock, ["▗▄▄▖", "▐Hi▌", "▝▀▀▘"]),
       (StrokeStyle.hidden, ["    ", " Hi ", "    "]),
       (StrokeStyle.markdown, ["|--|", "|Hi|", "|--|"]),
