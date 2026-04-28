@@ -1,0 +1,83 @@
+// swift-tools-version: 6.3
+
+import PackageDescription
+
+// Example app split across four targets:
+//
+//   * GIFEditorCore — pure value-type model, GIF89a encoder, and bridge
+//     to the vendored swift-gif decoder. Has no TerminalUI dependency,
+//     so a future SwiftUI / UIKit / web port can reuse it verbatim.
+//   * GIFEditorUI — TerminalUI-shaped view tree and view model. The
+//     terminal-only authoring surface lives here; a sibling
+//     GIFEditorUI_SwiftUI target would slot in alongside.
+//   * GIFEditor — composition root. Today it just exposes the root
+//     view; tomorrow it can wire alternative UIs to the same core.
+//   * gifeditor — the executable. Hosts the App via TerminalUICLI.
+let package = Package(
+  name: "gifeditor",
+  platforms: [
+    .macOS(.v15),
+    .iOS(.v18),
+  ],
+  products: [
+    .executable(
+      name: "gifeditor",
+      targets: ["GIFEditorApp"]
+    ),
+    .library(
+      name: "GIFEditor",
+      targets: ["GIFEditor"]
+    ),
+    .library(
+      name: "GIFEditorUI",
+      targets: ["GIFEditorUI"]
+    ),
+    .library(
+      name: "GIFEditorCore",
+      targets: ["GIFEditorCore"]
+    ),
+  ],
+  dependencies: [
+    .package(name: "swift-terminal-ui", path: "../.."),
+    .package(path: "../../Runners/TerminalUICLI"),
+    .package(path: "../../Vendor/swift-gif"),
+  ],
+  targets: [
+    .target(
+      name: "GIFEditorCore",
+      dependencies: [
+        .product(name: "GIF", package: "swift-gif")
+      ]
+    ),
+    .target(
+      name: "GIFEditorUI",
+      dependencies: [
+        "GIFEditorCore",
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+      ]
+    ),
+    .target(
+      name: "GIFEditor",
+      dependencies: [
+        "GIFEditorUI",
+        "GIFEditorCore",
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+      ]
+    ),
+    .executableTarget(
+      name: "GIFEditorApp",
+      dependencies: [
+        "GIFEditor",
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "TerminalUICLI", package: "TerminalUICLI"),
+      ]
+    ),
+    .testTarget(
+      name: "GIFEditorCoreTests",
+      dependencies: [
+        "GIFEditorCore",
+        .product(name: "GIF", package: "swift-gif"),
+      ]
+    ),
+  ]
+)
