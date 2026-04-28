@@ -317,12 +317,12 @@ final class TerminalImageRenderer: Sendable {
 
   private func kittyPayload(
     for reference: ImageAssetReference,
-    image: DecodedPNGImage
+    image: DecodedImage
   ) -> KittyPayload? {
     // Transmit the original PNG bytes with `f=100`. Kitty decodes and scales
     // natively, which is both smaller on the wire than raw RGBA and avoids
     // any software-scaling artifacts.
-    guard !image.pngBytes.isEmpty else {
+    guard !image.encodedBytes.isEmpty else {
       return nil
     }
 
@@ -338,7 +338,7 @@ final class TerminalImageRenderer: Sendable {
     }
 
     let payload = KittyPayload(
-      encodedData: base64Encoded(image.pngBytes),
+      encodedData: base64Encoded(image.encodedBytes),
       format: 100
     )
 
@@ -350,7 +350,7 @@ final class TerminalImageRenderer: Sendable {
 
   private func sixelPayload(
     for attachment: RasterImageAttachment,
-    image: DecodedPNGImage,
+    image: DecodedImage,
     capabilityProfile: TerminalCapabilityProfile,
     graphicsCapabilities: TerminalGraphicsCapabilities
   ) -> String? {
@@ -428,7 +428,7 @@ private func fallbackRenderMode(
 }
 
 private func directColorOverlay(
-  for image: DecodedPNGImage,
+  for image: DecodedImage,
   cellSize: Size
 ) -> RasterImageOverlay? {
   guard cellSize.width > 0, cellSize.height > 0 else {
@@ -446,7 +446,7 @@ private func directColorOverlay(
 }
 
 private func indexedColorOverlay(
-  for image: DecodedPNGImage,
+  for image: DecodedImage,
   cellSize: Size,
   palette: [Color]
 ) -> RasterImageOverlay? {
@@ -477,7 +477,7 @@ private func indexedColorOverlay(
 }
 
 private func asciiOverlay(
-  for image: DecodedPNGImage,
+  for image: DecodedImage,
   cellSize: Size
 ) -> RasterImageOverlay? {
   guard cellSize.width > 0, cellSize.height > 0 else {
@@ -794,7 +794,7 @@ private func proportionalPixelOffset(
 }
 
 private func scaledPixels(
-  from image: DecodedPNGImage,
+  from image: DecodedImage,
   outputSize: Size
 ) -> [RGBAImagePixel?] {
   guard
