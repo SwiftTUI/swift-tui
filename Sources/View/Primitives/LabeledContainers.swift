@@ -199,7 +199,7 @@ public struct GroupBox<Label: View, Content: View>: View, ResolvableView {
           groupBoxContent()
             .padding(.init(horizontal: 1, vertical: 1))
             .overlay {
-              RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(chrome.borderStyle)
+              RoundedRectangle(cornerRadius: 1).strokeBorder(chrome.borderStyle)
             }
             .foregroundStyle(chrome.foregroundStyle)
         }

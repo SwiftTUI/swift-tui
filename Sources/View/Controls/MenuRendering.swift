@@ -23,10 +23,10 @@ extension Menu {
             RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(chrome.backgroundStyle)
           }
           .overlay {
-            RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+            RoundedRectangle(cornerRadius: 1).strokeBorder(
               chrome.borderStyle,
-              style: isFocused ? .thick : .init(),
-              backgroundStyle: chrome.borderBackgroundStyle
+              style: isFocused ? .heavy : .init(),
+              background: chrome.borderBackgroundStyle
             )
           }
           .padding(.init(top: 0, leading: 1, bottom: 0, trailing: 0))

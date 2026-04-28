@@ -967,7 +967,7 @@ private struct FrameworkHostedTabOverflowMenuView: View {
     .overlay {
       if let borderStyle = overflow.borderStyle {
         RoundedRectangle(cornerRadius: overflow.cornerRadius)
-          .chromeStrokeBorder(borderStyle)
+          .strokeBorder(borderStyle)
       }
     }
     .fixedSize(horizontal: true, vertical: true)

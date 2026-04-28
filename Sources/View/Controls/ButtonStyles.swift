@@ -648,19 +648,19 @@ private struct ButtonStyleChromeBorder: View {
 
   @ViewBuilder
   var body: some View {
-    let strokeStyle: StrokeStyle = focusActive ? .thick : .init()
+    let strokeStyle: StrokeStyle = focusActive ? .heavy : .init()
     switch (borderShape, prominence) {
     case (.roundedRectangle, _), (.automatic, .increased):
-      RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+      RoundedRectangle(cornerRadius: 1).strokeBorder(
         chrome.borderStyle,
         style: strokeStyle,
-        backgroundStyle: chrome.borderBackgroundStyle
+        background: chrome.borderBackgroundStyle
       )
     default:
-      Rectangle().chromeStrokeBorder(
+      Rectangle().strokeBorder(
         chrome.borderStyle,
         style: strokeStyle,
-        backgroundStyle: chrome.borderBackgroundStyle
+        background: chrome.borderBackgroundStyle
       )
     }
   }

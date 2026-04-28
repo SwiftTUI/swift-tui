@@ -492,7 +492,7 @@ package struct PromptPresentationSurface: View, ActionScope {
           // .outset: chrome reserves layout space (frame grows). The rasterizer's
           // interior-fill sampling for presentation chrome is a separate
           // glyph-identity check, not a placement check.
-          RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+          RoundedRectangle(cornerRadius: 1).strokeBorder(
             .terminalBorder(.accent),
             style: StrokeStyle(borderSet: .innerHalfBlock, placement: .outset)
           )
@@ -953,7 +953,7 @@ private struct ToastPresentationView: View {
       Rectangle().fill(item.presentation.backgroundStyle)
     }
     .overlay {
-      Rectangle().chromeStrokeBorder(
+      Rectangle().strokeBorder(
         item.presentation.borderStyle
       )
     }

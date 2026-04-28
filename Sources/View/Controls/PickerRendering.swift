@@ -127,10 +127,10 @@ package struct InlinePickerStyleBody: View {
         RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(containerFillStyle)
       }
       .overlay {
-        RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+        RoundedRectangle(cornerRadius: 1).strokeBorder(
           containerChrome.borderStyle,
-          style: configuration.isFocused && configuration.showsFocusEffect ? .thick : .init(),
-          backgroundStyle: containerChrome.borderBackgroundStyle
+          style: configuration.isFocused && configuration.showsFocusEffect ? .heavy : .init(),
+          background: containerChrome.borderBackgroundStyle
         )
       }
     }
@@ -175,10 +175,10 @@ package struct SegmentedPickerStyleBody: View {
         RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(containerChrome.backgroundStyle)
       }
       .overlay {
-        RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+        RoundedRectangle(cornerRadius: 1).strokeBorder(
           containerChrome.borderStyle,
-          style: configuration.isFocused && configuration.showsFocusEffect ? .thick : .init(),
-          backgroundStyle: containerChrome.borderBackgroundStyle
+          style: configuration.isFocused && configuration.showsFocusEffect ? .heavy : .init(),
+          background: containerChrome.borderBackgroundStyle
         )
       }
     }
@@ -223,10 +223,10 @@ package struct RadioGroupPickerStyleBody: View {
         RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(containerChrome.backgroundStyle)
       }
       .overlay {
-        RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+        RoundedRectangle(cornerRadius: 1).strokeBorder(
           containerChrome.borderStyle,
-          style: configuration.isFocused && configuration.showsFocusEffect ? .thick : .init(),
-          backgroundStyle: containerChrome.borderBackgroundStyle
+          style: configuration.isFocused && configuration.showsFocusEffect ? .heavy : .init(),
+          background: containerChrome.borderBackgroundStyle
         )
       }
     }
