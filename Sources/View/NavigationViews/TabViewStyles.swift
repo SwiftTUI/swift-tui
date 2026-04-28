@@ -1061,16 +1061,31 @@ private struct LiteralTabsStripBackgroundView: View {
     VStack(alignment: .leading, spacing: 0) {
       Spacer(minLength: 0)
         .frame(height: presentation.stripHeight - 1)
-      Divider(
-        drawMetadata: .init(
-          foregroundStyle: .semantic(.foreground),
-          // Use single-line glyphs to stay visually consistent with the
-          // box-drawing tab chrome (╭─╮ │ │ ┴──┴).
-          borderStrokeStyle: StrokeStyle(borderSet: .single)
-        )
-      )
-      .frame(maxWidth: .infinity, minHeight: 1, maxHeight: 1, alignment: .leading)
+      // Single-line `─` rule that completes the box-drawing tab chrome
+      // (╭─╮ │ │ ┴──┴) along the bottom of the strip. Resolved as its own
+      // leaf node rather than via `Divider` so we can pin the foreground
+      // color to `.foreground` without leaking `DrawMetadata` through a
+      // public Divider parameter.
+      LiteralTabsStripBaseRule()
+        .frame(maxWidth: .infinity, minHeight: 1, maxHeight: 1, alignment: .leading)
     }
+  }
+}
+
+private struct LiteralTabsStripBaseRule: View, ResolvableView {
+  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
+    var drawMetadata = DrawMetadata()
+    drawMetadata.foregroundStyle = .semantic(.foreground)
+    drawMetadata.ruleStackAxis = context.environmentValues.stackAxis
+    return [
+      resolveLeafNode(
+        kindName: "LiteralTabsStripBaseRule",
+        intrinsicSize: .init(width: 1, height: 1),
+        drawMetadata: drawMetadata,
+        drawPayload: .rule(.single),
+        in: context
+      )
+    ]
   }
 }
 

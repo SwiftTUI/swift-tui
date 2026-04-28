@@ -544,6 +544,7 @@ public struct StrokeStyle: Equatable, Sendable {
 extension StrokeStyle {
   public static let rounded = StrokeStyle(borderSet: .rounded)
   public static let thick = StrokeStyle(borderSet: .heavy)
+  public static let single = StrokeStyle(borderSet: .single)
   public static let double = StrokeStyle(borderSet: .double)
   public static let ascii = StrokeStyle(borderSet: .ascii)
   public static let block = StrokeStyle(borderSet: .block)
