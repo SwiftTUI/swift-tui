@@ -56,6 +56,7 @@ Active design proposals that are still shaping decisions:
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`active`, `design-approved`, or `shipped`). Current active plans:
 
 - [plans/2026-04-26-002-frame-head-abort-plan.md](plans/2026-04-26-002-frame-head-abort-plan.md) — Stage 3C plan for making prepared frame heads abortable before cancellable frame-tail jobs
+- [plans/2026-04-28-001-canvas-adaptation-plan.md](plans/2026-04-28-001-canvas-adaptation-plan.md) — extending Canvas for dense pixel grids, half-block rendering, and optional sub-cell pointer precision
 
 Implementation records retained for context (landed work that still informs reviews):
 

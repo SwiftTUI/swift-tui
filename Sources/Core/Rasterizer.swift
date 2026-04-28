@@ -980,13 +980,11 @@ extension Rasterizer {
 
   /// Paints a ``Canvas`` view's drawing into the raster buffer.
   ///
-  /// Canvas is the Braille-subpixel escape hatch that sits alongside
-  /// the shape pipeline: the layout engine reserves the cell frame,
-  /// and here we build a ``BrailleCanvas`` sized to those cells, hand
-  /// it to the user via a ``CanvasContext``, and copy the resulting
-  /// lit cells out. The context's final foreground/background values
-  /// are used for every lit cell — per-primitive colour tracking is
-  /// not part of M6.
+  /// Canvas is the arbitrary-drawing escape hatch that sits alongside
+  /// the shape pipeline: the layout engine reserves the cell frame, and
+  /// here we build a ``CanvasContext`` sized to those cells, invoke the
+  /// user's drawing, and copy its direct-cell and Braille layers into
+  /// the raster buffer.
   private func paintCanvasDrawing(
     in bounds: Rect,
     payload: CanvasPayload,
@@ -1021,29 +1019,51 @@ extension Rasterizer {
     }
     payload.drawing.draw(into: &context)
 
+    let originX = bounds.origin.x
+    let originY = bounds.origin.y
+
+    // Direct cells paint first so Braille drawing can layer foreground
+    // dots over dense per-cell backgrounds.
+    for cellY in 0..<cellH {
+      for cellX in 0..<cellW {
+        guard let cell = context.directCells[cellY][cellX] else {
+          continue
+        }
+        let cellStyle = ResolvedTextStyle(
+          foregroundColor: cell.foreground,
+          backgroundColor: cell.background
+        )
+        write(
+          cell.character,
+          style: cellStyle.isDefault ? nil : cellStyle,
+          atX: originX + cellX,
+          y: originY + cellY,
+          cells: &cells,
+          clip: clip
+        )
+      }
+    }
+
     // Walk the Braille canvas and emit a glyph for every cell the
-    // drawing touched.  The rasterizer uses the context's *final*
-    // foreground/background values for every lit cell — mutating
-    // `context.foreground` during drawing changes the terminal colour
-    // for the whole canvas, not per-primitive.  This keeps M6 simple
-    // and lets the drawing focus on "what dots to light up".
+    // drawing touched. Styled subpixel writes carry one style per
+    // terminal cell; unstyled cells fall back to the context's final
+    // foreground/background values.
     let finalForeground = context.foreground
     let finalBackground = context.background
-    let resolvedStyle = ResolvedTextStyle(
+    let fallbackStyle = ResolvedTextStyle(
       foregroundColor: finalForeground,
       backgroundColor: finalBackground
     )
-    let styleToWrite: ResolvedTextStyle? =
-      resolvedStyle.isDefault ? nil : resolvedStyle
 
-    let originX = bounds.origin.x
-    let originY = bounds.origin.y
     for cellY in 0..<cellH {
       for cellX in 0..<cellW {
         let cell = context.canvas.cell(x: cellX, y: cellY)
         guard cell.mask != 0 else {
           continue
         }
+        let resolvedStyle = context.brailleCellStyles[cellY][cellX] ?? fallbackStyle
+        let styleToWrite: ResolvedTextStyle? =
+          resolvedStyle.isDefault ? nil : resolvedStyle
         write(
           cell.glyph,
           style: styleToWrite,

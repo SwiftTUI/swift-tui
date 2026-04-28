@@ -35,6 +35,44 @@ private struct CornerPixel: CanvasDrawing, Equatable {
   }
 }
 
+private struct UniformStyledPixel: CanvasDrawing, Equatable {
+  func draw(into context: inout CanvasContext) {
+    context.foreground = .red
+    context.background = .blue
+    context.setPixel(x: 0, y: 0)
+  }
+}
+
+private struct DirectCellGrid: CanvasDrawing, Equatable {
+  func draw(into context: inout CanvasContext) {
+    context.fillCell(x: 0, y: 0, color: .red)
+    context.fillCell(x: 1, y: 0, color: .blue)
+    context.setCell(x: 0, y: 1, character: "x", foreground: .green)
+    context.fillCell(x: 99, y: 99, color: .white)
+  }
+}
+
+private struct BrailleCellsWithStyles: CanvasDrawing, Equatable {
+  func draw(into context: inout CanvasContext) {
+    context.setPixel(x: 0, y: 0, foreground: .red)
+    context.setPixel(x: 2, y: 0, foreground: .blue)
+  }
+}
+
+private struct BrailleSameCellStyleConflict: CanvasDrawing, Equatable {
+  func draw(into context: inout CanvasContext) {
+    context.setPixel(x: 0, y: 0, foreground: .red)
+    context.setPixel(x: 1, y: 0, foreground: .blue)
+  }
+}
+
+private struct DirectCellsUnderBraille: CanvasDrawing, Equatable {
+  func draw(into context: inout CanvasContext) {
+    context.fillCell(x: 0, y: 0, color: .blue)
+    context.setPixel(x: 0, y: 0, foreground: .red)
+  }
+}
+
 @MainActor
 @Suite("Canvas view + CanvasDrawing protocol")
 struct CanvasViewTests {
@@ -101,6 +139,111 @@ struct CanvasViewTests {
     let scalar = cell.character.unicodeScalars.first?.value ?? 0
     #expect(scalar >= 0x2800 && scalar <= 0x28FF)
     #expect((scalar - 0x2800) & 0x80 != 0)
+  }
+
+  @Test("Canvas keeps the uniform foreground/background fallback for unstyled Braille")
+  func canvasUniformStyleFallback() {
+    let artifacts = DefaultRenderer().render(
+      Canvas(UniformStyledPixel()).frame(width: 1, height: 1),
+      context: .init(identity: testIdentity("CanvasUniformStyle"))
+    )
+    let cell = artifacts.rasterSurface.cells[0][0]
+    #expect(cell.style?.foregroundColor == Color.red)
+    #expect(cell.style?.backgroundColor == Color.blue)
+  }
+
+  @Test("CanvasContext can write direct terminal cells with independent styles")
+  func canvasDirectCellGrid() {
+    let artifacts = DefaultRenderer().render(
+      Canvas(DirectCellGrid()).frame(width: 2, height: 2),
+      context: .init(identity: testIdentity("CanvasDirectCells"))
+    )
+    let cells = artifacts.rasterSurface.cells
+    #expect(cells[0][0].character == " ")
+    #expect(cells[0][0].style?.backgroundColor == Color.red)
+    #expect(cells[0][1].style?.backgroundColor == Color.blue)
+    #expect(cells[1][0].character == "x")
+    #expect(cells[1][0].style?.foregroundColor == Color.green)
+    #expect(cells[1][1] == RasterCell.empty)
+  }
+
+  @Test("Styled Braille writes can color separate terminal cells")
+  func canvasStyledBrailleCells() {
+    let artifacts = DefaultRenderer().render(
+      Canvas(BrailleCellsWithStyles()).frame(width: 2, height: 1),
+      context: .init(identity: testIdentity("CanvasStyledBraille"))
+    )
+    let cells = artifacts.rasterSurface.cells
+    #expect(cells[0][0].style?.foregroundColor == Color.red)
+    #expect(cells[0][1].style?.foregroundColor == Color.blue)
+  }
+
+  @Test("Styled Braille uses last-writer-wins inside one terminal cell")
+  func canvasStyledBrailleSameCellConflict() {
+    let artifacts = DefaultRenderer().render(
+      Canvas(BrailleSameCellStyleConflict()).frame(width: 1, height: 1),
+      context: .init(identity: testIdentity("CanvasStyledBrailleConflict"))
+    )
+    let cell = artifacts.rasterSurface.cells[0][0]
+    #expect(cell.style?.foregroundColor == Color.blue)
+    let scalar = cell.character.unicodeScalars.first?.value ?? 0
+    #expect((scalar - 0x2800) & 0x01 != 0)
+    #expect((scalar - 0x2800) & 0x08 != 0)
+  }
+
+  @Test("Braille output composes over direct cell backgrounds")
+  func canvasDirectCellsUnderBraille() {
+    let artifacts = DefaultRenderer().render(
+      Canvas(DirectCellsUnderBraille()).frame(width: 1, height: 1),
+      context: .init(identity: testIdentity("CanvasLayerComposition"))
+    )
+    let cell = artifacts.rasterSurface.cells[0][0]
+    #expect(cell.style?.foregroundColor == Color.red)
+    #expect(cell.style?.backgroundColor == Color.blue)
+  }
+
+  @Test("Full-cell pixel grids render one logical pixel per terminal cell")
+  func canvasFullCellPixelGrid() {
+    let pixels: [Color?] = [
+      .red, nil,
+      .blue, .green,
+    ]
+    let artifacts = DefaultRenderer().render(
+      Canvas(pixelGridWidth: 2, height: 2, pixels: pixels, mode: .fullCell)
+        .frame(width: 2, height: 2),
+      context: .init(identity: testIdentity("CanvasFullCellPixelGrid"))
+    )
+    let cells = artifacts.rasterSurface.cells
+    #expect(cells[0][0].style?.backgroundColor == Color.red)
+    #expect(cells[0][1] == RasterCell.empty)
+    #expect(cells[1][0].style?.backgroundColor == Color.blue)
+    #expect(cells[1][1].style?.backgroundColor == Color.green)
+  }
+
+  @Test("Vertical half-block pixel grids pack two logical rows into one terminal row")
+  func canvasVerticalHalfBlockPixelGrid() {
+    let pixels: [Color?] = [
+      .red, .green,
+      .blue, .green,
+      .white, nil,
+    ]
+    let mode = CanvasPixelGridMode.verticalHalfBlock
+    let artifacts = DefaultRenderer().render(
+      Canvas(pixelGridWidth: 2, height: 3, pixels: pixels, mode: mode)
+        .frame(width: 2, height: mode.cellHeight(for: 3)),
+      context: .init(identity: testIdentity("CanvasHalfBlockPixelGrid"))
+    )
+    let cells = artifacts.rasterSurface.cells
+    #expect(cells.count == 2)
+    #expect(cells[0][0].character == "▀")
+    #expect(cells[0][0].style?.foregroundColor == Color.red)
+    #expect(cells[0][0].style?.backgroundColor == Color.blue)
+    #expect(cells[0][1].character == " ")
+    #expect(cells[0][1].style?.backgroundColor == Color.green)
+    #expect(cells[1][0].character == "▀")
+    #expect(cells[1][0].style?.foregroundColor == Color.white)
+    #expect(cells[1][0].style?.backgroundColor == nil)
+    #expect(cells[1][1] == RasterCell.empty)
   }
 
   @Test("Canvas Equatable identity dedups structurally equal drawings")
