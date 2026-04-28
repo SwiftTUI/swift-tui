@@ -21,7 +21,7 @@ public struct AnimatableArray<Element: VectorArithmetic & Sendable>:
   public static var zero: Self { .init([]) }
 
   /// Returns `true` when this array and `other` have the same element
-  /// count and can therefore be composed under ``+`` / ``-``.
+  /// count and can therefore be composed under `+` / `-`.
   public func isInterpolable(to other: Self) -> Bool {
     elements.count == other.elements.count
   }

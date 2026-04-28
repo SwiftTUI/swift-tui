@@ -43,7 +43,7 @@ public struct TransitionContent<T: Transition>: Sendable {
 /// of the transition.
 ///
 /// - Note: The current runtime palette is limited to opacity and offset
-///   effects (see ``TransitionModifiers``).  Other modifiers applied
+///   effects (see `TransitionModifiers`).  Other modifiers applied
 ///   inside `body` are silently ignored until the palette is expanded.
 ///
 /// Marked `@MainActor` for parity with `View` — user-authored

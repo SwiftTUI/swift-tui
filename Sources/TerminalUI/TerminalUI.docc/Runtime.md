@@ -81,7 +81,7 @@ The shipped ownership model is split into three categories:
 - Main-actor authoring and body evaluation:
   - `View`, ``Scene``, and ``App``
   - `Resolver.resolve(...)`
-  - ``DefaultRenderer/render(_:proposal:)``
+  - ``DefaultRenderer/render(_:context:proposal:collectsDiagnostics:)``
   - scene collection helpers, typed ``WindowIdentifier`` values, and ``WindowGroup`` root-view construction
   - action-bearing authoring APIs such as `Binding.init(get:set:)`, button actions, `OpenLinkAction` over typed `LinkDestination` values, `.onAppear`, `.onDisappear`, `.onChange(of:initial:_:)`, and `.task(...)`
 - Main-actor runtime coordination and ownership:
@@ -129,7 +129,7 @@ Observation is built on the same invalidation path as `@State`, not on a separat
 - observable callbacks invalidate the exact observed identity on the main actor
 - generation tracking suppresses stale callbacks from older frames
 - committed-frame pruning stops removed identities from continuing to invalidate hidden subtrees
-- the package provides its own ``Bindable``
+- the package provides its own `Bindable`
 
 Supported scenarios include body-driven reads, environment-driven observable reads, bindable editing, and rerenders after observable edits.
 
