@@ -39,6 +39,12 @@ let packageDependencies: [Package.Dependency] = [
   .package(
     path: "Vendor/swift-png"
   ),
+  .package(
+    path: "Vendor/swift-jpeg"
+  ),
+  .package(
+    path: "Vendor/swift-gif"
+  ),
 ]
 
 let terminalUIDependencies: [Target.Dependency] = [
@@ -54,6 +60,14 @@ let terminalUIDependencies: [Target.Dependency] = [
     name: "PNG",
     package: "swift-png"
   ),
+  .product(
+    name: "JPEG",
+    package: "swift-jpeg"
+  ),
+  .product(
+    name: "GIF",
+    package: "swift-gif"
+  ),
 ]
 
 let terminalUITestDependencies: [Target.Dependency] = [
@@ -64,6 +78,14 @@ let terminalUITestDependencies: [Target.Dependency] = [
   .product(
     name: "PNG",
     package: "swift-png"
+  ),
+  .product(
+    name: "JPEG",
+    package: "swift-jpeg"
+  ),
+  .product(
+    name: "GIF",
+    package: "swift-gif"
   ),
 ]
 

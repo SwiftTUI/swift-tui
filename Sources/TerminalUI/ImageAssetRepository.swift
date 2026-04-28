@@ -4,6 +4,14 @@ import Core
   import PNG
 #endif
 
+#if canImport(JPEG)
+  import JPEG
+#endif
+
+#if canImport(GIF)
+  import GIF
+#endif
+
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
@@ -41,6 +49,32 @@ struct RGBAImagePixel: Equatable, Hashable, Sendable {
   #if canImport(PNG)
     init(
       _ pixel: PNG.RGBA<UInt8>
+    ) {
+      self.init(
+        red: Int(pixel.r),
+        green: Int(pixel.g),
+        blue: Int(pixel.b),
+        alpha: Int(pixel.a)
+      )
+    }
+  #endif
+
+  #if canImport(JPEG)
+    init(
+      _ pixel: JPEG.RGBA<UInt8>
+    ) {
+      self.init(
+        red: Int(pixel.r),
+        green: Int(pixel.g),
+        blue: Int(pixel.b),
+        alpha: Int(pixel.a)
+      )
+    }
+  #endif
+
+  #if canImport(GIF)
+    init(
+      _ pixel: GIF.RGBA<UInt8>
     ) {
       self.init(
         red: Int(pixel.r),
@@ -103,6 +137,75 @@ extension ImageLookupKey: Hashable {
     }
   }
 #endif
+
+#if canImport(JPEG)
+  private struct InMemoryJPEGSource: JPEG.BytestreamSource {
+    private let buffer: [UInt8]
+    private var index = 0
+
+    init(
+      _ buffer: [UInt8]
+    ) {
+      self.buffer = buffer
+    }
+
+    mutating func read(
+      count: Int
+    ) -> [UInt8]? {
+      guard count >= 0, index + count <= buffer.count else {
+        return nil
+      }
+      let chunk = Array(buffer[index..<(index + count)])
+      index += count
+      return chunk
+    }
+  }
+#endif
+
+#if canImport(GIF)
+  private struct InMemoryGIFSource: GIF.BytestreamSource {
+    private let buffer: [UInt8]
+    private var index = 0
+
+    init(
+      _ buffer: [UInt8]
+    ) {
+      self.buffer = buffer
+    }
+
+    mutating func read(
+      count: Int
+    ) -> [UInt8]? {
+      guard count >= 0, index + count <= buffer.count else {
+        return nil
+      }
+      let chunk = Array(buffer[index..<(index + count)])
+      index += count
+      return chunk
+    }
+  }
+#endif
+
+/// Returns `true` if `bytes` begins with the JPEG SOI marker (`FF D8 FF`).
+private func isJPEGBytes(_ bytes: [UInt8]) -> Bool {
+  bytes.count >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF
+}
+
+/// Returns `true` if `bytes` begins with the PNG signature
+/// (`89 50 4E 47 0D 0A 1A 0A`).
+private func isPNGBytes(_ bytes: [UInt8]) -> Bool {
+  bytes.count >= 8
+    && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47
+    && bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A
+}
+
+/// Returns `true` if `bytes` begins with the GIF signature
+/// (`47 49 46 38 37 61` for GIF87a or `47 49 46 38 39 61` for GIF89a).
+private func isGIFBytes(_ bytes: [UInt8]) -> Bool {
+  bytes.count >= 6
+    && bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38
+    && (bytes[4] == 0x37 || bytes[4] == 0x39) && bytes[5] == 0x61
+}
 
 final class ImageAssetRepository: Sendable {
   private struct Storage {
@@ -202,24 +305,60 @@ final class ImageAssetRepository: Sendable {
   private func loadDecodedImage(
     for reference: ImageAssetReference
   ) -> DecodedPNGImage? {
-    #if canImport(PNG)
-      switch reference {
-      case .namedResource:
+    let bytes: [UInt8]
+    switch reference {
+    case .namedResource:
+      return nil
+    case .filePath(let path):
+      guard let read = readFileBytes(at: path) else {
         return nil
-      case .filePath(let path):
-        guard let pngBytes = readFileBytes(at: path) else {
-          return nil
-        }
-        var source = InMemoryPNGSource(pngBytes)
-        guard let image = try? PNG.Image.decompress(stream: &source) else {
+      }
+      bytes = read
+    case .embeddedPNG(let read):
+      // Despite the case name, this carries any supported image format.
+      bytes = read
+    }
+
+    return decodeImageBytes(bytes)
+  }
+
+  /// Decodes a raster image from its bytes, dispatching by magic bytes
+  /// between PNG (89 50 4E 47…), JPEG (FF D8 FF…), and GIF (47 49 46 38 …).
+  /// Returns `nil` if the bytes are none of those, or the matching decoder
+  /// fails.
+  private func decodeImageBytes(_ bytes: [UInt8]) -> DecodedPNGImage? {
+    if isJPEGBytes(bytes) {
+      #if canImport(JPEG)
+        var source = InMemoryJPEGSource(bytes)
+        guard let image = try? JPEG.Image.decompress(stream: &source) else {
           return nil
         }
         return DecodedPNGImage(
-          pngBytes: pngBytes,
+          pngBytes: bytes,
           pixelSize: .init(width: image.size.x, height: image.size.y),
-          pixels: image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
+          pixels: image.unpack(as: JPEG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
         )
-      case .embeddedPNG(let bytes):
+      #else
+        return nil
+      #endif
+    }
+    if isGIFBytes(bytes) {
+      #if canImport(GIF)
+        var source = InMemoryGIFSource(bytes)
+        guard let image = try? GIF.Image.decompress(stream: &source) else {
+          return nil
+        }
+        return DecodedPNGImage(
+          pngBytes: bytes,
+          pixelSize: .init(width: image.size.x, height: image.size.y),
+          pixels: image.unpack(as: GIF.RGBA<UInt8>.self).map(RGBAImagePixel.init)
+        )
+      #else
+        return nil
+      #endif
+    }
+    if isPNGBytes(bytes) {
+      #if canImport(PNG)
         var source = InMemoryPNGSource(bytes)
         guard let image = try? PNG.Image.decompress(stream: &source) else {
           return nil
@@ -229,11 +368,11 @@ final class ImageAssetRepository: Sendable {
           pixelSize: .init(width: image.size.x, height: image.size.y),
           pixels: image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
         )
-      }
-    #else
-      _ = reference
-      return nil
-    #endif
+      #else
+        return nil
+      #endif
+    }
+    return nil
   }
 
   private func intrinsicCellSize(

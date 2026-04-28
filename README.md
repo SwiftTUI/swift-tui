@@ -88,7 +88,7 @@ executable product or default `App.main()`.
 
 - Layout and containers: `VStack`, `HStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `ViewThatFits`, and custom `Layout`
 - State and focus: `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, focused values, focus effect controls, and default-focus modifiers
-- Controls and content: `Text`, `TextFigure` (banner text backed by embedded FIGlet fonts), `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `GroupBox`, `ControlGroup`, `TabView`, and `Image` (PNG)
+- Controls and content: `Text`, `TextFigure` (banner text backed by embedded FIGlet fonts), `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, `ProgressView`, `Label`, `GroupBox`, `ControlGroup`, `TabView`, and `Image` (PNG, JPEG, and GIF, dispatched on magic bytes)
 - Presentation and workflow surfaces: `alert`, `confirmationDialog`, `sheet`, `toast`
 - Action scopes and commands: `Panel`, `.keyCommand`, `.paletteCommand`, `.toolbar`, `.toolbarItem`, with shallowest-wins focus-chain dispatch
 - Runtime integration: `Resolver`, `DefaultRenderer`, `RunLoop`, terminal input parsing, signal handling, alternate-screen ownership, capability-aware presentation, and lifecycle or task staging
@@ -198,7 +198,7 @@ swiftly run swift package \
 
 - `NavigationStack` and richer popover-style presentation beyond the current sheet support
 - Richer focus ergonomics and scroll control
-- Broader media formats and animation beyond the current PNG image surface
+- Animated GIF playback, broader media formats (WebP, AVIF, video), remote fetching, and asset bundles beyond the current PNG / JPEG / GIF still-image surface
 
 ## Documentation
 

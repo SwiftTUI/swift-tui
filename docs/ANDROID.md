@@ -42,3 +42,7 @@ swiftly run swift build --target TerminalUI --swift-sdk aarch64-unknown-linux-an
 `x86_64-unknown-linux-android28` currently fails in the `swift-png` dependency
 while importing `_Builtin_intrinsics.intel` for `LZ77/SIMD16 (ext).swift`, so
 the Android emulator-oriented `x86_64` path is not yet considered supported.
+
+The vendored `swift-jpeg` and `swift-gif` decoders are pure Swift with no
+SIMD or platform-intrinsic dependencies, so they do not contribute to this
+caveat — the failure surface is isolated to swift-png's LZ77 SIMD path.
