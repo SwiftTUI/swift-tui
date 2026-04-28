@@ -103,6 +103,17 @@ That ordering is visible in `DefaultRenderer`, `FrameArtifacts`, `Pipeline`, and
   unrelated retained content
 - Public `.onAppear`, `.onDisappear`, and `.task` hooks lower into this phase rather than firing during resolve
 
+## Why The Phase Split Matters
+
+Keeping the phases explicit gives the project a few durable advantages:
+
+- tests can pin exact behavior at the right abstraction boundary
+- layout and semantics do not need terminal escape-sequence knowledge
+- runtime presentation can evolve without rewriting layout
+- diagnostics can report where work was computed versus reused
+
+The first and last bullets are what motivates the strict phase order in code. Collapsing two phases would force regression tests to overspecify (asserting on combined output instead of one phase) and would blur the diagnostic signal that distinguishes "we reused this" from "we recomputed this." Both costs accrue silently and only show up when a regression resists localization. The split is the cheaper path.
+
 ## Runtime Model
 
 `RunLoop` wraps the pure frame pipeline in an interactive session.

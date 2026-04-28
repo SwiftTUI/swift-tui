@@ -7,7 +7,7 @@
 ///
 /// `init(_:content:animation:)` starts a background task that walks
 /// the phases in a loop forever, advancing after each animation
-/// completes via the ``withAnimation(_:_:completion:)`` batch drain.
+/// completes via the ``withAnimation(_:completionCriteria:_:completion:)`` batch drain.
 ///
 ///     PhaseAnimator([Phase.a, .b, .c]) { phase in
 ///       Text("hello").foregroundStyle(phase.color)

@@ -385,7 +385,7 @@ public struct ResolvedNode: Equatable, Sendable {
   package private(set) var subtreeNodeCount: Int
   public var supportsRetainedReuse: Bool
   /// Matched-geometry configuration set by
-  /// ``View/matchedGeometryEffect(id:in:isSource:)``.  When two
+  /// `View.matchedGeometryEffect(id:in:isSource:)`.  When two
   /// views in different frames (typically behind an `if`/`else`
   /// branch) share the same key, the animation controller treats
   /// the swap as a single view moving from the previous frame's
@@ -738,7 +738,7 @@ public struct PlacedNode: Equatable, Sendable {
   @_spi(Testing) public var drawPayload: DrawPayload
   /// Mirror of ``ResolvedNode/layoutBehavior`` for cases that need to
   /// flow through to the draw extractor / rasterizer (currently just
-  /// ``LayoutBehavior/border(_:foreground:background:blend:blendPhase:sides:)``).
+  /// `LayoutBehavior.border(...)`).
   ///
   /// Boxed and optional on purpose — storing a bare `LayoutBehavior`
   /// inline would grow ``PlacedNode`` by ~1.6 kB per node (because
@@ -1039,7 +1039,7 @@ public indirect enum DrawCommand: Equatable, Sendable {
   )
   case rule(bounds: Rect, style: AnyShapeStyle, strokeStyle: StrokeStyle, stackAxis: Axis?)
   /// A layout-reserved border drawn by the rasterizer into the cells
-  /// that ``LayoutBehavior/border(_:foreground:background:blend:blendPhase:sides:)``
+  /// that `LayoutBehavior.border(...)`
   /// reserved during layout.  The outer `bounds` is the full wrapper
   /// frame, including the reserved border rows/cols — the rasterizer
   /// inset this by the border set's per-side display widths to compute
@@ -1059,10 +1059,10 @@ public indirect enum DrawCommand: Equatable, Sendable {
     blendPhase: Double,
     sides: Edge.Set
   )
-  /// A ``Canvas`` view's draw payload + the cell bounds the rasterizer
+  /// A `Canvas` view's draw payload + the cell bounds the rasterizer
   /// should size a ``BrailleCanvas`` to before invoking the user's
   /// ``CanvasDrawing/draw(into:)``. The rasterizer resolves the
-  /// ``foregroundStyle`` to a concrete ``Color`` at paint time and
+  /// `foregroundStyle` to a concrete ``Color`` at paint time and
   /// passes it to the ``CanvasContext`` as its initial foreground.
   case canvas(
     bounds: Rect,
