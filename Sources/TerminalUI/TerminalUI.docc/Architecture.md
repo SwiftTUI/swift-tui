@@ -62,7 +62,7 @@ That ordering is visible in ``DefaultRenderer``, `FrameArtifacts`, `Pipeline`, a
 
 ### Resolve
 
-- Public ``View`` values are lowered into `ResolvedNode` trees
+- Public `View` values are lowered into `ResolvedNode` trees
 - Structural views such as `Group`, `ForEach`, and conditionals affect the resolved child set
 - Environment and metadata are merged here
 - Root-hoisted presentations are declared during normal base resolution, then composed around the resolved base tree afterward so the displayed base subtree keeps its authored identity space
@@ -140,16 +140,9 @@ CLI scene management is executable-runner policy rather than an authored-scene r
 - Presentation lowers raster surfaces into ASCII, ANSI16, ANSI256, or true-color output
 - Terminal capability affects presentation, not layout semantics
 
-## Topics
-
-### Related Articles
+## See Also
 
 - <doc:Runtime>
 - <doc:Vision>
 - <doc:Host-Integration>
-
-## See Also
-
-Internal coordinators, transitional package-only seams, and presentation-host reconciliation rules:
-
 - [Architecture details](https://github.com/adamz/swift-terminal-ui/blob/main/docs/ARCHITECTURE.md)

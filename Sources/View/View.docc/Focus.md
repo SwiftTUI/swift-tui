@@ -435,9 +435,7 @@ This aligns with the project's design intent:
 
 Focus highlight in `List` is row-shaped, not container-shaped. The active row (the focused-or-selected row) gets its row chrome resolved with `isFocused: true, isSelected: true`; the list container itself stays neutral. See [docs/FOCUS.md](https://github.com/adamz/swift-terminal-ui/blob/main/docs/FOCUS.md) for the rationale and what the decision does and does not cover.
 
-## Topics
-
-### Related Articles
+## See Also
 
 - <doc:State-Environment-And-Focus>
 - <doc:State-Keying>

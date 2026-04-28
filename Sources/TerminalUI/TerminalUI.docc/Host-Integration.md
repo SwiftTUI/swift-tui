@@ -12,17 +12,10 @@ The same authored ``App``, ``Scene``, and ``WindowGroup`` values run unchanged a
 
 All three modes flow through the same runtime invalidation path. Resize, terminal style, and lifecycle events are normalized into the same control-message contract regardless of where the host fetches them.
 
-## Topics
-
-### Related Articles
+## See Also
 
 - <doc:Running-Apps>
 - <doc:Architecture>
 - <doc:Runtime>
 - <doc:Vision>
-
-## See Also
-
-The package contract between the root package and peer host packages, including non-negotiable decisions and out-of-scope items:
-
 - [Host Packages](https://github.com/adamz/swift-terminal-ui/blob/main/docs/HOST_PACKAGES.md)

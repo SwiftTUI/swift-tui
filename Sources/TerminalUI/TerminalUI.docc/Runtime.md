@@ -4,7 +4,7 @@ The shipped lifecycle rules, state and observation model, input handling, and th
 
 ## Overview
 
-This article is the stable reference for how ``RunLoop`` and the surrounding runtime behave once your authored ``View``, ``Scene``, and ``App`` values have been resolved into frame artifacts.
+This article is the stable reference for how ``RunLoop`` and the surrounding runtime behave once your authored `View`, ``Scene``, and ``App`` values have been resolved into frame artifacts.
 
 ## Runtime Shape
 
@@ -79,7 +79,7 @@ The package uses `.defaultIsolation(.none)` in its package settings. That is del
 The shipped ownership model is split into three categories:
 
 - Main-actor authoring and body evaluation:
-  - ``View``, ``Scene``, and ``App``
+  - `View`, ``Scene``, and ``App``
   - `Resolver.resolve(...)`
   - ``DefaultRenderer/render(_:proposal:)``
   - scene collection helpers, typed ``WindowIdentifier`` values, and ``WindowGroup`` root-view construction
@@ -141,17 +141,10 @@ The runtime is materially incremental in common steady-state paths: idle rerende
 
 The CLI runner installs a crash guard before the session enters raw mode. If the process crashes from `fatalError`, segmentation fault, or another fatal signal, the guard resets the terminal (disables mouse reporting, shows the cursor, resets style, exits the alternate screen, restores termios) before re-raising the signal. The terminal is left usable instead of stuck in raw mode.
 
-## Topics
-
-### Related Articles
+## See Also
 
 - <doc:Architecture>
 - <doc:Vision>
 - <doc:Host-Integration>
 - <doc:Running-Apps>
-
-## See Also
-
-The full incremental cost model with deterministic scenario checks and known full-repaint fallbacks, plus the crash-recovery implementation including signal-by-signal handling, alternate-stack install, and POSIX caveats:
-
 - [Runtime details](https://github.com/adamz/swift-terminal-ui/blob/main/docs/RUNTIME.md)

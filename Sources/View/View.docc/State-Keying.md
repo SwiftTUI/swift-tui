@@ -29,16 +29,9 @@ Practical consequences:
 - Root-hoisted presentation churn should be transparent to the currently selected tab. If opening or dismissing a palette resets the active tab's local state without the palette changing selection, that is a presentation bug rather than an expected lazy-tab reset.
 - When a child is resolved lazily, prefer parent-owned state plus explicit bindings over child-local `@State` for data that must persist across activation changes.
 
-## Topics
-
-### Related Articles
+## See Also
 
 - <doc:State-Environment-And-Focus>
 - <doc:Focus>
 - <doc:Authoring-Views>
-
-## See Also
-
-The full strategy comparison, attribute-graph discussion, and tradeoffs table:
-
 - [State Keying: Ordinal vs Source-Location](https://github.com/adamz/swift-terminal-ui/blob/main/docs/STATE_KEYING.md)
