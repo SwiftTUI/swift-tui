@@ -9,8 +9,8 @@ runtime metadata that tells you how those cells map to pixels on the current
 terminal — so you can apply aspect correction to shapes, motion, or image
 sizing without reinventing the fallback.
 
-Access via ``GeometryProxy/cellPixelMetrics`` inside a `GeometryReader`,
-or via ``EnvironmentValues/cellPixelMetrics`` anywhere an environment
+Access via `GeometryProxy.cellPixelMetrics` inside a `GeometryReader`,
+or via `EnvironmentValues.cellPixelMetrics` anywhere an environment
 is available.
 
 The value always has honest dimensions: either the terminal reported them
