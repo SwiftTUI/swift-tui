@@ -703,7 +703,7 @@ package enum WebSurfaceFrameEncoder {
       break
     }
 
-    if case .pngData(let bytes) = attachment.source {
+    if case .data(let bytes) = attachment.source {
       return bytes
     }
     return nil

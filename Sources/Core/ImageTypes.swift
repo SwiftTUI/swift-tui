@@ -2,7 +2,7 @@
 public enum ImageSource: Equatable, Hashable, Sendable {
   case path(String)
   case fileURL(String)
-  case pngData([UInt8])
+  case data([UInt8])
 }
 
 /// A normalized image reference used by the renderer and host runtime.

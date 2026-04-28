@@ -14,6 +14,7 @@ fseek
 ftell
 genericize
 getenv
+nyan
 O_CREAT
 O_TRUNC
 O_WRONLY

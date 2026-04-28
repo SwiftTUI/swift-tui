@@ -129,7 +129,7 @@ struct TerminalGraphicsProtocolTests {
     ) {
       VStack(alignment: .leading, spacing: 0) {
         Text("Top ")
-        Image(pngData: pngBytes)
+        Image(data: pngBytes)
           .resizable()
           .frame(width: 4, height: 4)
         Text("Tail")

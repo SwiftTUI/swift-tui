@@ -107,7 +107,7 @@ TerminalUI ships a narrow image surface covering the three most common
 still-image formats:
 
 - SwiftUI-shaped `Image` authoring for explicit named resources, local `file://` URLs, and embedded `[UInt8]` bytes
-- format detection by leading magic bytes — `Image(pngData:)`, `Image(jpegData:)`, and `Image(gifData:)` are convenience initializers that all route through the same byte-bag storage; the decoder picks PNG, baseline-sequential JPEG, or GIF on its own
+- format detection by leading magic bytes via `Image(data:)`; the decoder picks PNG, baseline-sequential JPEG, or GIF on its own
 - pure-Swift decoders vendored alongside the project (`Vendor/swift-png`, `Vendor/swift-jpeg`, `Vendor/swift-gif`) — no system imaging frameworks, so the surface works identically across macOS, Linux, Android, and WASI
 - runtime-hosted terminal presentation through Kitty graphics or Sixel when the terminal advertises support
 - capability-aware fallback rendering into terminal cells when graphics protocols are unavailable

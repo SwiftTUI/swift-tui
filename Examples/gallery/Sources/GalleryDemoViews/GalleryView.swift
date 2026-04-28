@@ -1,3 +1,4 @@
+import Foundation
 import TerminalUI
 
 /// A reference-type box for the latest non-empty palette-commands list.
@@ -19,7 +20,10 @@ private final class PaletteCommandHolder {
 public struct GalleryView: View {
   public init() {}
 
-  @State private var selection: GalleryTab = .counter
+  // The initial tab honors `GALLERY_INITIAL_TAB` (e.g. "images") so
+  // verification scripts and screenshot harnesses can land on a
+  // specific tab without driving the command palette.
+  @State private var selection: GalleryTab = GalleryView.initialTabFromEnvironment()
   @State private var isPaletteOpen: Bool = false
   @State private var paletteHolder = PaletteCommandHolder()
 
@@ -169,5 +173,29 @@ extension GalleryView {
     case animations
     case fileDrop
     case physics
+
+    init?(environmentName: String) {
+      switch environmentName.lowercased() {
+      case "counter": self = .counter
+      case "todo": self = .todo
+      case "calculator", "calc": self = .calculator
+      case "borders", "bordersandshapes", "borders-and-shapes", "shapes":
+        self = .bordersAndShapes
+      case "images", "image": self = .images
+      case "animations", "animation": self = .animations
+      case "filedrop", "file-drop", "files": self = .fileDrop
+      case "physics": self = .physics
+      default: return nil
+      }
+    }
+  }
+
+  fileprivate static func initialTabFromEnvironment() -> GalleryTab {
+    guard let raw = ProcessInfo.processInfo.environment["GALLERY_INITIAL_TAB"],
+      let tab = GalleryTab(environmentName: raw)
+    else {
+      return .counter
+    }
+    return tab
   }
 }
