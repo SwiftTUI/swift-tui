@@ -79,5 +79,12 @@ let package = Package(
         .product(name: "GIF", package: "swift-gif"),
       ]
     ),
+    .testTarget(
+      name: "GIFEditorUITests",
+      dependencies: [
+        "GIFEditorUI",
+        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+      ]
+    ),
   ]
 )

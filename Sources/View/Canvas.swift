@@ -44,3 +44,28 @@ public struct Canvas<Drawing: CanvasDrawing>: View, ResolvableView {
     ]
   }
 }
+
+extension Canvas where Drawing == CanvasPixelGridDrawing {
+  /// Creates a dense pixel grid backed by Canvas.
+  ///
+  /// Pixels are row-major and pre-resolved to terminal colors. `nil`
+  /// pixels are transparent. In `.fullCell` mode the caller should size
+  /// the view to `(width, height)` cells; in `.verticalHalfBlock` mode
+  /// the caller should use `mode.cellHeight(for: height)` for the frame
+  /// height.
+  public init(
+    pixelGridWidth width: Int,
+    height: Int,
+    pixels: [Color?],
+    mode: CanvasPixelGridMode = .fullCell
+  ) {
+    self.init(
+      CanvasPixelGridDrawing(
+        width: width,
+        height: height,
+        pixels: pixels,
+        mode: mode
+      )
+    )
+  }
+}
