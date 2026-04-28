@@ -1,7 +1,7 @@
 import GIFEditorCore
 import TerminalUI
 
-/// Key-command chains for the editor.
+/// Focused-key and key-command chains for the editor.
 ///
 /// `keyCommand` is only callable on a view that conforms to
 /// `ActionScope` (e.g. one that has been wrapped with `.panel(id:)`),
@@ -17,45 +17,55 @@ extension View where Self: ActionScope & Sendable {
     refresh: @escaping @MainActor @Sendable () -> Void
   ) -> some View & ActionScope & Sendable {
     self
-      .keyCommand("Pen", key: .character("p"), modifiers: .ctrl) {
+      .onKeyPress(.character("p")) { _ in
         model.selectTool(.pen)
         refresh()
+        return .handled
       }
-      .keyCommand("Eraser", key: .character("e"), modifiers: .ctrl) {
+      .onKeyPress(.character("e")) { _ in
         model.selectTool(.eraser)
         refresh()
+        return .handled
       }
-      .keyCommand("Bucket fill", key: .character("b"), modifiers: .ctrl) {
+      .onKeyPress(.character("b")) { _ in
         model.selectTool(.fill)
         refresh()
+        return .handled
       }
-      .keyCommand("Gradient", key: .character("g"), modifiers: .ctrl) {
+      .onKeyPress(.character("g")) { _ in
         model.selectTool(.gradient)
         refresh()
+        return .handled
       }
-      .keyCommand("Marquee", key: .character("m"), modifiers: .ctrl) {
+      .onKeyPress(.character("m")) { _ in
         model.selectTool(.marquee)
         refresh()
+        return .handled
       }
-      .keyCommand("Eyedropper", key: .character("i"), modifiers: .ctrl) {
+      .onKeyPress(.character("i")) { _ in
         model.selectTool(.eyedropper)
         refresh()
+        return .handled
       }
-      .keyCommand("Swap colors", key: .character("x"), modifiers: .ctrl) {
+      .onKeyPress(.character("x")) { _ in
         model.swapPrimaryAndSecondary()
         refresh()
+        return .handled
       }
-      .keyCommand("Apply tool", key: .space, modifiers: .shift) {
+      .onKeyPress(.space) { _ in
         model.applyToolAtCursor()
         refresh()
+        return .handled
       }
-      .keyCommand("Confirm marquee", key: .return, modifiers: .shift) {
+      .onKeyPress(.return) { _ in
         model.applyToolAtCursor()
         refresh()
+        return .handled
       }
-      .keyCommand("Clear selection", key: .escape, modifiers: .shift) {
+      .onKeyPress(.escape) { _ in
         model.clearSelection()
         refresh()
+        return .handled
       }
   }
 

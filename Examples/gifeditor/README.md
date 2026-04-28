@@ -31,21 +31,23 @@ After making edits, press `Ctrl+S` to save (back to the source path or to
 
 ## Keybindings
 
-Single-letter shortcuts without a modifier are reserved by the framework for
-typing, arrow navigation, Tab, Enter and Escape, so every editor command
-includes a modifier.
+Focused editor commands use bare keys where they map to ordinary pixel-editor
+actions.
 
-### Tools (`Ctrl+<letter>`)
+### Tools
 
 | Shortcut      | Tool                                    |
 | ------------- | --------------------------------------- |
-| `Ctrl+P`      | **P**en — paint the primary color      |
-| `Ctrl+E`      | **E**raser — clear to transparent       |
-| `Ctrl+B`      | **B**ucket fill (4-connected)           |
-| `Ctrl+G`      | **G**radient between primary/secondary |
-| `Ctrl+M`      | **M**arquee — rectangular selection    |
-| `Ctrl+I`      | Eyedropper — pick color from cursor    |
-| `Ctrl+X`      | Swap primary and secondary color       |
+| `P`           | **P**en — paint the primary color      |
+| `E`           | **E**raser — clear to transparent       |
+| `B`           | **B**ucket fill (4-connected)           |
+| `G`           | **G**radient between primary/secondary |
+| `M`           | **M**arquee — rectangular selection    |
+| `I`           | Eyedropper — pick color from cursor    |
+| `X`           | Swap primary and secondary color       |
+| `Space`       | Apply the current tool at the cursor    |
+| `Enter`       | Confirm marquee (commit selection rect) |
+| `Escape`      | Clear selection                         |
 
 ### Cursor (within the canvas)
 
@@ -57,8 +59,6 @@ movement uses Shift+Arrow / Ctrl+Arrow / Vi-style movement with Shift.
 | `Shift+←/→/↑/↓`   | Move cursor by 1 pixel                   |
 | `Ctrl+←/→/↑/↓`    | Move cursor by 8 pixels                  |
 | `Shift+H/J/K/L`   | Vi-style 1-pixel movement                |
-| `Shift+Space`     | Apply the current tool at the cursor     |
-| `Shift+Enter`     | Confirm marquee (commit selection rect)  |
 
 ### Frames / timeline
 
@@ -121,39 +121,30 @@ movement uses Shift+Arrow / Ctrl+Arrow / Vi-style movement with Shift.
   disposal so frames fully replace their predecessors — easy to reason about
   and matches the editor's "fully painted frame" mental model.
 
-## Known framework gaps (documented as instructed; not patched here)
+## Remaining framework gaps
 
-These would meaningfully improve the editor; the user asked for no changes
-to the framework on this pass, so they are listed here instead.
+These still meaningfully improve the editor.
 
-1. **Single-key shortcuts inside an active scope.** Today
-   `keyCommand(_:key:modifiers:action:)` requires a non-empty modifier set
-   (single-key bindings are reserved for typing/arrow nav/Tab/Enter/Escape).
-   That forces every tool shortcut into `Ctrl+<letter>`. A typical pixel
-   editor wants bare letters (`p`, `e`, `b`, `g`, `m`) when the canvas owns
-   focus. A scope-local `onKeyPress(when: focused) { … }` hook, or letting
-   `keyCommand` opt-in to single-key bindings inside a focus-bounded scope,
-   would fix this.
-2. **Bare arrow keys for cursor movement.** Same root cause: arrow keys are
+1. **Bare arrow keys for cursor movement.** Arrow keys are
    framework-reserved for focus navigation, so cursor movement uses
    `Shift+Arrow` / Vi-keys-with-Shift. A canvas-style view that consumes
    arrow keys when focused would let the editor use plain arrows.
-3. **Pointer/mouse input on the pixel grid.** The `Image` primitive renders
+2. **Pointer/mouse input on the pixel grid.** The `Image` primitive renders
    to terminal-graphics protocols, but the per-cell `Rectangle` grid the
    editor uses for "1 GIF pixel = 1 terminal cell" doesn't have a public
    pointer-hit-test entry yet. Adding a `.onPointerTap { local in … }` or
    exposing the existing pointer registry as a public modifier would let
    us click-to-paint.
-4. **`swift-gif` is decode-only.** The vendored decoder has no encoder
+3. **`swift-gif` is decode-only.** The vendored decoder has no encoder
    pair, so the editor ships its own GIF89a encoder (LZW + sub-block
    framing) inside `GIFEditorCore`. Promoting that into
    `Vendor/swift-gif` would benefit anything else that wants to write GIFs.
-5. **Per-cell colored fills.** Drawing thousands of `Rectangle().fill(c)
+4. **Per-cell colored fills.** Drawing thousands of `Rectangle().fill(c)
    .frame(1×1)` views per row/column is correct but pays per-node resolve
    cost. A `PixelMap(width:height:colors:)` primitive that takes a flat
    `[Color]` and rasterizes one cell per entry would be a perfect fit
    here. (We cap canvases at 64×64 today partly for this reason.)
-6. **Lifecycle for "save before quit".** The framework currently exits on
+5. **Lifecycle for "save before quit".** The framework currently exits on
    the host's quit keys without firing a Stop hook a view can intercept;
    the editor handles dirty-document save in-app via `Ctrl+S`, but a
    `WindowGroup.onTerminate { … }` would close the loop.

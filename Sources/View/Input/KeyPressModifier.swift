@@ -49,7 +49,7 @@ extension View {
   public func onKeyPress(
     _ match: KeyPressMatch = .any,
     perform action: @escaping @MainActor @Sendable (KeyPress) -> KeyPressResult
-  ) -> some View {
+  ) -> ModifiedContent<Self, KeyPressModifier> {
     modifier(
       KeyPressModifier(
         match: match,
@@ -66,7 +66,7 @@ extension View {
     _ key: KeyEvent,
     modifiers: EventModifiers = [],
     perform action: @escaping @MainActor @Sendable (KeyPress) -> KeyPressResult
-  ) -> some View {
+  ) -> ModifiedContent<Self, KeyPressModifier> {
     onKeyPress(.key(key, modifiers: modifiers), perform: action)
   }
 }
