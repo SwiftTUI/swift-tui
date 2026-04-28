@@ -121,10 +121,11 @@ movement uses Shift+Arrow / Ctrl+Arrow / Vi-style movement with Shift.
   disposal so frames fully replace their predecessors — easy to reason about
   and matches the editor's "fully painted frame" mental model.
 
-## Known framework gaps (documented as instructed; not patched here)
+## Remaining framework gaps
 
-These would meaningfully improve the editor; the user asked for no changes
-to the framework on this pass, so they are listed here instead.
+The editor's pixel grid now renders through `Canvas` instead of building one
+`Rectangle` view per pixel. The remaining gaps are structural/input lifecycle
+work outside this Canvas-adaptation branch.
 
 1. **Single-key shortcuts inside an active scope.** Today
    `keyCommand(_:key:modifiers:action:)` requires a non-empty modifier set
@@ -138,22 +139,16 @@ to the framework on this pass, so they are listed here instead.
    framework-reserved for focus navigation, so cursor movement uses
    `Shift+Arrow` / Vi-keys-with-Shift. A canvas-style view that consumes
    arrow keys when focused would let the editor use plain arrows.
-3. **Pointer/mouse input on the pixel grid.** The `Image` primitive renders
-   to terminal-graphics protocols, but the per-cell `Rectangle` grid the
-   editor uses for "1 GIF pixel = 1 terminal cell" doesn't have a public
-   pointer-hit-test entry yet. Adding a `.onPointerTap { local in … }` or
-   exposing the existing pointer registry as a public modifier would let
-   us click-to-paint.
+3. **Pointer/mouse input on the pixel grid.** Canvas can render full-cell and
+   half-block pixel grids, but the editor still needs a public pointer-hit-test
+   entry to click-to-paint. Full-cell editing can work from cell mouse
+   coordinates; half-block editing needs sub-cell pointer offsets from hosts
+   that support them.
 4. **`swift-gif` is decode-only.** The vendored decoder has no encoder
    pair, so the editor ships its own GIF89a encoder (LZW + sub-block
    framing) inside `GIFEditorCore`. Promoting that into
    `Vendor/swift-gif` would benefit anything else that wants to write GIFs.
-5. **Per-cell colored fills.** Drawing thousands of `Rectangle().fill(c)
-   .frame(1×1)` views per row/column is correct but pays per-node resolve
-   cost. A `PixelMap(width:height:colors:)` primitive that takes a flat
-   `[Color]` and rasterizes one cell per entry would be a perfect fit
-   here. (We cap canvases at 64×64 today partly for this reason.)
-6. **Lifecycle for "save before quit".** The framework currently exits on
+5. **Lifecycle for "save before quit".** The framework currently exits on
    the host's quit keys without firing a Stop hook a view can intercept;
    the editor handles dirty-document save in-app via `Ctrl+S`, but a
    `WindowGroup.onTerminate { … }` would close the loop.
@@ -171,3 +166,5 @@ The core test suite verifies:
   pixel-for-pixel for a hand-built document and a round-trip of `nyan.gif`.
 * Document edits (pen, fill, gradient, marquee copy/paste) leave the model
   in expected states.
+* The terminal UI renders the editor canvas through Canvas-backed full-cell
+  and half-block pixel grids.

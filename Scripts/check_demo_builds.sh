@@ -15,6 +15,7 @@ Usage: Scripts/check_demo_builds.sh [--skip-clean] [--skip-bun-install]
 
 Builds the repository's demo packages and host shells, then runs stack-safety
 input harnesses against the terminal examples:
+  - Examples/canvas
   - Examples/gallery
   - Examples/layouts
   - Examples/SwiftUIExample/TerminalApp
@@ -110,6 +111,7 @@ fi
 
 if [ "$skip_clean" -eq 0 ]; then
   for package_path in \
+    "Examples/canvas" \
     "Examples/gallery" \
     "Examples/layouts" \
     "Examples/SwiftUIExample/TerminalApp" \
@@ -121,6 +123,16 @@ if [ "$skip_clean" -eq 0 ]; then
       swift package clean --package-path "$package_path"
   done
 fi
+
+run_step \
+  "Build Examples/canvas" \
+  "$repo_root" \
+  swift build --package-path Examples/canvas
+
+run_step \
+  "Build Examples/canvas (release)" \
+  "$repo_root" \
+  swift build -c release --package-path Examples/canvas
 
 run_step \
   "Build Examples/gallery" \

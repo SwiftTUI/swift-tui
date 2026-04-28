@@ -36,6 +36,7 @@ Runs the full checked-in repo verification surface:
   - Runners/TerminalUIWASI tests
   - GUI/SwiftUITUIGUI tests
   - GUI/WebTUIGUI Bun tests
+  - Examples/canvas tests
   - Examples/gallery tests
   - Examples/layouts tests
   - Examples/WebExample Bun tests
@@ -277,6 +278,10 @@ fi
 #  "Run GUI/WebTUIGUI Bun tests" \
 #  "$repo_root/GUI/WebTUIGUI" \
 #  bun test
+
+run_function_step \
+  "Run Examples/canvas tests" \
+  run_swift test --package-path Examples/canvas
 
 run_function_step \
   "Run Examples/gallery tests" \
