@@ -37,9 +37,6 @@ let packageDependencies: [Package.Dependency] = [
     from: "1.1.3"
   ),
   .package(
-    path: "Vendor/swift-png"
-  ),
-  .package(
     path: "Vendor/swift-jpeg"
   ),
   .package(
@@ -57,10 +54,6 @@ let terminalUIDependencies: [Target.Dependency] = [
     condition: .when(platforms: nativeRuntimePlatforms),
   ),
   .product(
-    name: "PNG",
-    package: "swift-png"
-  ),
-  .product(
     name: "JPEG",
     package: "swift-jpeg"
   ),
@@ -75,10 +68,6 @@ let terminalUITestDependencies: [Target.Dependency] = [
   "Core",
   "View",
   "TerminalUICharts",
-  .product(
-    name: "PNG",
-    package: "swift-png"
-  ),
   .product(
     name: "JPEG",
     package: "swift-jpeg"

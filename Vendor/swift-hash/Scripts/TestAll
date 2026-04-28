@@ -1,6 +1,0 @@
-#!/bin/bash
-set -e
-
-swift --version
-swift build -c release --build-tests
-swift test -c release --skip-build
