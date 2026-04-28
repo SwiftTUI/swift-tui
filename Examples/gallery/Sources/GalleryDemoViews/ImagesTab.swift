@@ -17,8 +17,7 @@ struct ImagesTab: View {
       VStack(alignment: .leading, spacing: 1) {
         ImagesHeader()
         Divider()
-        Image(data: Self.gifBytes)
-          .border(.separator)
+        formatRow
         Divider()
         intrinsicSection
         Divider()
@@ -30,6 +29,32 @@ struct ImagesTab: View {
         Spacer(minLength: 0)
       }
       .padding(1)
+    }
+  }
+
+  // 0. Format dispatch — three Image(data:) instances side by side,
+  //    one per supported container. The renderer's magic-byte sniff
+  //    picks the right decoder, and the kitty path either ships PNG
+  //    bytes verbatim (f=100) or serializes the decoded RGBA pixels
+  //    (f=32). Visually identical output across formats is the proof.
+  private var formatRow: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Text("0. Format dispatch — PNG, JPEG, GIF")
+        .foregroundStyle(.muted)
+      HStack(spacing: 2) {
+        formatCard(name: "PNG", bytes: Self.pngBytes)
+        formatCard(name: "JPEG", bytes: Self.jpegBytes)
+        formatCard(name: "GIF (frame 0)", bytes: Self.gifBytes)
+      }
+    }
+  }
+
+  private func formatCard(name: String, bytes: [UInt8]) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Image(data: bytes)
+        .border(.separator)
+      Text(name)
+        .foregroundStyle(.separator)
     }
   }
 
@@ -132,6 +157,14 @@ extension ImagesTab {
 
   fileprivate static let gifBytes: [UInt8] = {
     let joined = gifBase64.joined()
+    guard let data = Data(base64Encoded: joined) else {
+      return []
+    }
+    return Array(data)
+  }()
+
+  fileprivate static let jpegBytes: [UInt8] = {
+    let joined = jpegBase64.joined()
     guard let data = Data(base64Encoded: joined) else {
       return []
     }
@@ -353,5 +386,60 @@ extension ImagesTab {
     "LCACBHz3mH1MB+KiyZMoLR4CeMzAx1oQYY5EkbJmSj0c/yAbE2+FxQFAgwJNKRToFzlx7OFbUbSp",
     "06bxeEod0+KpVac9e1bIKpFFUAlAnm5lFQDMBbNlyXZZy7at27dw48qdS7euXStG7urdy7evXyV3",
     "8/7dQmKE4MFZDrtVfCMCADs=",
+  ]
+
+  /// Base64-encoded JPEG (70×70 baseline) — first frame of nyan.gif
+  /// re-encoded via `sips -s format jpeg --resampleWidth 70 nyan.gif`.
+  /// Drives the renderer's JPEG path through the kitty f=32 RGBA
+  /// transmission so all three formats are exercised side by side.
+  fileprivate static let jpegBase64 = [
+    "/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAA",
+    "A6ABAAMAAAABAAEAAKACAAQAAAABAAAARqADAAQAAAABAAAARgAAAAD/7QA4UGhvdG9zaG9wIDMu",
+    "MAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgARgBGAwEiAAIR",
+    "AQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAAB",
+    "fQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5",
+    "OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeo",
+    "qaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMB",
+    "AQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYS",
+    "QVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNU",
+    "VVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5",
+    "usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICAwICAwUDAwMF",
+    "BgUFBQUGCAYGBgYGCAoICAgICAgKCgoKCgoKCgwMDAwMDA4ODg4ODw8PDw8PDw8PD//bAEMBAgIC",
+    "BAQEBwQEBxALCQsQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+    "EBAQEP/dAAQABf/aAAwDAQACEQMRAD8A/Keiiiv6IPwcK9d0z4nGx0Nbh7PT28Q6bLpsOnhtA0aW",
+    "xaxtre9inN2ktqzT3BaeIh3D+ZgvMWkht2TyKis6lOMlaSLp1JRd4sKKKK0ILsem6jLp0+sRWsr2",
+    "FrLFBLcBGMMc06yNFG742q8ixSFFJywRiAQpxSrqIbrSTPD4hks9PCafLYRtpDm923ypGRNKzq+5",
+    "UkaLM4W4iYNMPs6qgPlcvUxdypKwUUUVRJ//0Pynor6/1T9k3xpBfSxWlgbiJduJLe6hERyATtEx",
+    "WTg8HcOuccYrf0v9kLxJPYxS3a2dvK27MdxcyGUYJA3GFWj5HI2npjPOaWI+lJwjTpRq+3bvbRct",
+    "1dX1XN02eu59xR+h7xC6jjUxuFjHpJ1m0+1lGEpq6196Kts7PQ+IaK+v9U/ZN8aQX0sVpYG4iXbi",
+    "S3uoREcgE7RMVk4PB3DrnHGK9d+Dn7E/gPx54Dt/FXjbX9dsNTvNS1OyWz01rRYrddNu5rJhLJLa",
+    "3O93ktnfeCiAMsYBZd8n1vC3jXkedzVHK5SqTsnyrlur9/esvm7dL7X+V4j+jPxBlrjz1aNRSbS5",
+    "KnNdLXmtZNL/ABJPXVb2/OOiv1R1/wDYa+AHhTTZ9b8U+MvEmj6VayKk17eajo1vbRq4AV3kksVC",
+    "q0jCIZ+YuQAMHNeCftQ/sv8Agf4H+CtC8Z+CPEWp6smo6sdJurfUmtptrtBPMskUttDbhdhtnR0Z",
+    "WJLAgpsIk+9lnzhOMa1CcVJpXfK0m9FfllJpN6Xta/U+HznwkzfA4aeKrKLjBXdpXdv6T+4+KaKi",
+    "gnguYlntpFljbOGQhlOODgjjrUte8mmro/MmmnZn0l8B/hj8O/EmuQ3HxkvJYfD2pafdzWY0jX/D",
+    "1jfLc21xDFi5TVrqJYUKu5RJAssvDxBo1dh9Xf8ACgv2Iv8AoKeK/wDwsfh//wDLCvg/4TfGb4lf",
+    "A3xHc+LfhbrH9iard2j2Ms32e3ud1vJJHKybLiOVBl4kOQM8YzgkH6F/4eI/ti/9FA/8pWl//Ilc",
+    "FWlXcm4tW9Wv8zvpVaKilJa+i/zP/9H7Tt/jp4K1OJb7VdJ0y7upc75XdImbacDKSozjAAHJPqOM",
+    "VTuP2ktM0yVrHSorG0tYsbIkjllVdwycPFtQ5JJ4A9Dzmvyb8VfGTwbpeoQ2vgzUtR1Ox+zwu8tx",
+    "bxq4mdcsvzEHI4LrgrHIWiSW4jjS5m88vPjdevcu1vBO8ZxgmfyieP7iAgfgeeteRgv2c/hoputi",
+    "c2rui78sVZSjrpe9OS0V07QjrtZaP8Hr43jepBUMRn0PZx+HlTctNFe1NPbe8nr33P118Q/tZ+BN",
+    "PkuFufBw8U6taWi6hfNaLBbpb2RaVFnnuNQMNvGB5LDY05kIUuE8sMy0f2afEtx4x+DeleKILCLS",
+    "/wC3dV8Sag0MM0d5bWwn8QX0pgSaIosoCuVjlQbCF3YwQp/I6/8AiV4a8RW1svivRk1KS23+WLq2",
+    "t7wR7yN2x5hn5sDPA6AdhXe+Bv2xPiV8OfDdj4T8O2djqGn2+p6nfudY04TzW3269lm/0F7S+tt4",
+    "aKV2ZJwrCVmUTGJlEP0nC30Z8h8PsZ9f4crSxKqtpptucYWbV01GCabS0Ub+Xwn7t4X8dYnAcv8A",
+    "buNVZKLSd09bq3u+zg1db3lJp73V2fo18Xpn1nxv8PPDFknmRJNqviSC4jla4MyWlqtj5QUjgOdW",
+    "MisGZVWEKFw/7vwG/wDCfhPxro2h2PiTUNcfwJpGqzz6foV1pkn2KE2KXUKSm3SxbU1tGi8x4LaV",
+    "gpR4oFgAMduPl7xZ+2Z8YvGNzZai2m6Bpl9pFzI1jfQWF5DepbtIBJE+NSmj8u5jRRNES6g7WVhL",
+    "FFKniV58Qp9X1R5dV0xRZ30N1/aHkvqqjzNTd5r6G2tk1+OF7eWYIz7mgEgJYxAoFb6LOsHjsTWd",
+    "aNGSjJKydr6JPVRb66q+t/M9bifjjAYzF1KuHraOyaemmit/e1u29Vszrv2grOWP4pTa/Lb3Nn/w",
+    "lul6Zra215Abe4tVmh+yiCVCW+dfsu5ueCxXHy7m8Yre8TeMfFPj/WH8V+M7lrjVbqNFZckx28a5",
+    "KW8C5ISGIsQqgnJJZizszNg1+h5FhqlHCU6dX4kv6+5H4TnuIpVcXUqUL8rel/T9WFFFFeseSf/S",
+    "/Keiiiv6IPwcKKu2um6jfQXl1Y2stxDp0QnunjRnWCFpEhEkpAIRDLIiBmwNzqucsAaVFx2Ciiig",
+    "QVdjtYH06e+a8iSaKWKNbUiTzpVkWQtKhCGIJGUVXDOrEyLsVgHKUq6iHxTqMU8Oum+1D/hJdPls",
+    "Dp+opeMrWsNhGY40X5TKHjCQCB0lQQrGVCtlTHMr9Co26nL0UUVRJ//T/Keiiiv6IPwc9r8GxXWt",
+    "6Fa6lpmt3fh+P4c51m+ezEzSwpPqNhaLqFkGugjagXuIkZFFpH5VrCfNaQsR5DqV1Bf6jdX1rZxa",
+    "dDcSvIlrAZGhgV2JEUZmeSUogO1S7u2ANzMck+vfCv8A5EX4xf8AYqWv/qR6NXilcmHd5S8jrxCt",
+    "GPmFFFFdZyBRRRQAUUUUAf/Z",
   ]
 }
