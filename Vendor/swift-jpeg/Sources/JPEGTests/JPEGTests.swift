@@ -1,0 +1,153 @@
+import Testing
+
+@testable import JPEG
+
+/// Helper: feed a fixed byte array through a `JPEG.BytestreamSource`.
+private struct ArraySource: JPEG.BytestreamSource {
+  var bytes: [UInt8]
+  var pos: Int = 0
+  mutating func read(count: Int) -> [UInt8]? {
+    guard count >= 0, pos + count <= bytes.count else { return nil }
+    let slice = Array(bytes[pos..<(pos + count)])
+    pos += count
+    return slice
+  }
+}
+
+// MARK: - Reference data
+
+/// Smallest valid baseline-DCT YCbCr JPEG: 1×1 white pixel, no chroma
+/// subsampling, JFIF, single-MCU. Hand-assembled and byte-verified against
+/// libjpeg's djpeg.
+///
+/// (Built with `cjpeg -quality 90 -outfile out.jpg pixel.ppm` then
+/// stripped of EXIF; reproduced inline here so tests don't depend on a
+/// fixture file.)
+private let onePixelWhiteJPEG: [UInt8] = [
+  0xFF, 0xD8,  // SOI
+  0xFF, 0xE0, 0x00, 0x10,  // APP0 length 16
+  0x4A, 0x46, 0x49, 0x46, 0x00,  // "JFIF\0"
+  0x01, 0x01,  // version 1.1
+  0x00,  // density units (none)
+  0x00, 0x01, 0x00, 0x01,  // x/y density = 1
+  0x00, 0x00,  // thumb 0x0
+  0xFF, 0xDB, 0x00, 0x43, 0x00,  // DQT, length 67, dst 0
+  // 64 quant values — all 1 so coefficients pass through untouched.
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0xFF, 0xDB, 0x00, 0x43, 0x01,  // DQT, length 67, dst 1
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0xFF, 0xC0, 0x00, 0x11, 0x08,  // SOF0 length 17, precision 8
+  0x00, 0x01, 0x00, 0x01,  // height 1, width 1
+  0x03,  // 3 components
+  0x01, 0x11, 0x00,  // Y, H=1 V=1, qt 0
+  0x02, 0x11, 0x01,  // Cb, H=1 V=1, qt 1
+  0x03, 0x11, 0x01,  // Cr, H=1 V=1, qt 1
+  // DC table 0 (DC luma): only need symbol "0" (category 0 — DC diff = 0).
+  0xFF, 0xC4, 0x00, 0x14, 0x00,  // DHT length 20, class 0 dst 0
+  0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00,  // single symbol: 0
+  // DC table 1 (DC chroma): symbol "0".
+  0xFF, 0xC4, 0x00, 0x14, 0x01,  // DHT length 20, class 0 dst 1
+  0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00,
+  // AC table 0 (luma): need EOB symbol "0" (R=0 S=0).
+  0xFF, 0xC4, 0x00, 0x14, 0x10,  // DHT length 20, class 1 dst 0
+  0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00,
+  // AC table 1 (chroma): EOB.
+  0xFF, 0xC4, 0x00, 0x14, 0x11,  // DHT length 20, class 1 dst 1
+  0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00,
+  // SOS — start scan, 3 components.
+  0xFF, 0xDA, 0x00, 0x0C, 0x03,
+  0x01, 0x00,  // Y → DC0/AC0
+  0x02, 0x11,  // Cb → DC1/AC1
+  0x03, 0x11,  // Cr → DC1/AC1
+  0x00, 0x3F, 0x00,  // Ss=0 Se=63 AhAl=0
+  // Entropy data: each block is one symbol "0" (DC diff=0) + one symbol
+  // "0" (AC EOB). Both are encoded as a single bit "0". After 3 blocks
+  // (Y, Cb, Cr), we've written 6 bits. Pad with 1s to byte align.
+  0b00000011,  // pad to byte
+  0xFF, 0xD9,  // EOI
+]
+
+@Test("Decodes a 1x1 baseline JPEG") func decodeOnePixel() throws {
+  var src = ArraySource(bytes: onePixelWhiteJPEG)
+  let image = try JPEG.Image.decompress(stream: &src)
+  #expect(image.size.x == 1)
+  #expect(image.size.y == 1)
+  #expect(image.components == 3)
+
+  let pixels = image.unpack(as: JPEG.RGBA<UInt8>.self)
+  #expect(pixels.count == 1)
+  // DC=0 dequantizes to 0; IDCT with all-zero block yields 0; +128 level
+  // shift puts the Y sample at 128. Cb=Cr=128 → neutral chroma → grayscale.
+  let p = pixels[0]
+  // Expect mid-gray (~128). Allow ±2 for IDCT rounding.
+  #expect(abs(Int(p.r) - 128) <= 2)
+  #expect(abs(Int(p.g) - 128) <= 2)
+  #expect(abs(Int(p.b) - 128) <= 2)
+  #expect(p.a == 255)
+}
+
+@Test("Rejects truncated SOI") func rejectsMissingSOI() {
+  var src = ArraySource(bytes: [0x00, 0x00, 0x00])
+  #expect(throws: JPEG.DecodingError.self) {
+    try JPEG.Image.decompress(stream: &src)
+  }
+}
+
+@Test("Rejects progressive JPEG (SOF2)") func rejectsProgressive() {
+  var bytes = onePixelWhiteJPEG
+  // Patch SOF0 (FFC0) to SOF2 (FFC2).
+  for i in 0..<bytes.count - 1 where bytes[i] == 0xFF && bytes[i + 1] == 0xC0 {
+    bytes[i + 1] = 0xC2
+    break
+  }
+  var src = ArraySource(bytes: bytes)
+  #expect(throws: JPEG.DecodingError.self) {
+    try JPEG.Image.decompress(stream: &src)
+  }
+}
+
+@Test("BitReader handles FF 00 byte-stuffing") func bitReaderByteStuff() {
+  // 0xFF 0x00 must read as a literal 0xFF byte; the next 0xFF Dn ends.
+  var reader = JPEG.BitReader(
+    bytes: [0xAB, 0xFF, 0x00, 0xCD, 0xFF, 0xD9],
+    pos: 0,
+    end: 6
+  )
+  #expect(reader.nextByte() == 0xAB)
+  #expect(reader.nextByte() == 0xFF)
+  #expect(reader.nextByte() == 0xCD)
+  #expect(reader.nextByte() == nil)  // marker hit
+  #expect(reader.markerHit == 0xD9)
+}
+
+@Test("Sign extension matches JPEG spec") func signExtension() {
+  // From Annex F.1.2: for n bits and value V, if V < 2^(n-1), result is
+  // V - (2^n - 1); otherwise V. Examples:
+  #expect(extendJPEGSign(0b101, 3) == 5)  // 5 ≥ 2^2 → +5
+  #expect(extendJPEGSign(0b001, 3) == -6)  // 1 < 2^2 → 1 - 7 = -6
+  #expect(extendJPEGSign(0, 0) == 0)  // 0 bits = literal 0
+  #expect(extendJPEGSign(1, 1) == 1)  // 1 ≥ 1 → +1
+  #expect(extendJPEGSign(0, 1) == -1)  // 0 < 1 → 0 - 1 = -1
+}

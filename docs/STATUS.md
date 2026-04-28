@@ -24,7 +24,7 @@ ergonomics, and a few still-conservative runtime paths.
 - SwiftUI-shaped `@MainActor`-isolated `View` authoring with body-only `View`, `@ViewBuilder`, `TupleView`, `ConditionalContent`, `AnyView`, and `Resolver`
 - Layout and containers including `VStack`, `HStack`, `LazyVStack`, `LazyHStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `ViewThatFits`, `GeometryReader`, and custom `Layout`, with `LazyVStack` and `LazyHStack` supporting viewport-lazy placement and single-`ForEach` full-lazy rows
 - Controls and primitives including `Text`, proposal-aware `TextFigure` backed by embedded FIGlet fonts, rich `Text` interpolation, `Link`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, determinate and indeterminate `ProgressView`, `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `Spacer`, `Divider`, and shapes
-- PNG-backed `Image` with named-resource, local-file-URL, and embedded-byte sources plus `.resizable()`, `.scaledToFit()`, and `.scaledToFill()`
+- `Image` backed by PNG, baseline JPEG, and GIF (first frame for animated GIFs), with named-resource, local-file-URL, and embedded-byte sources plus `.resizable()`, `.scaledToFit()`, and `.scaledToFill()`. Format is detected from magic bytes, so the `pngData(_:)` / `jpegData(_:)` / `gifData(_:)` initializers all accept any supported format.
 - Environment, observation, and focus including `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`, `@FocusedValue`, `@FocusedBinding`, `PreferenceKey`, subtree preference readers, `OpenLinkAction`, actor-context-aware `.task(...)`, and default-focus modifiers
 - Presentation and workflow surfaces including terminal-native `alert`, `confirmationDialog`, `sheet`, `toast`
 
@@ -63,7 +63,7 @@ ergonomics, and a few still-conservative runtime paths.
   can swap it at runtime; the root TUI app renders semantic tokens without
   knowing which host theme is active.
 - The runtime is keyboard-first, but mouse input is supported where the terminal advertises reporting. Pointer interaction should be treated as additive rather than as the primary design center.
-- Image decoding and terminal presentation are PNG-only in the current runtime. Broader media formats and animation remain deferred.
+- Image decoding covers PNG, baseline-sequential JPEG (`SOF0`, 8-bit, all common chroma subsamplings), and static GIF (first frame composited onto the logical screen). Animated GIF playback, progressive JPEG, and broader media formats remain deferred.
 - WASI builds use the `swiftly`-managed Swift 6.3.1 toolchain via `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through `Runners/TerminalUIWASI` / example-app build paths. The shorter `swift ...` form works from a shell where `swift` already resolves through `swiftly`; `xcrun swift` may resolve to an incompatible Xcode toolchain.
 - Some focus surfaces remain missing:
   - namespace-scoped default-focus APIs such as `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus`

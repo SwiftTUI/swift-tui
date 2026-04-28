@@ -12,7 +12,7 @@ future file moves.
 - `GUI/`: peer embedded host packages for SwiftUI hosting and Bun/browser hosting
 - `Examples/`: sibling example apps and example-specific package manifests
 - `Vendor/`: sibling vendored Swift packages such as `UnixSignals`, `swift-figlet`,
-  `swift-hash`, and `swift-png`
+  `swift-hash`, `swift-png`, `swift-jpeg`, and `swift-gif`
 - `Fixtures/`: shared transport fixtures consumed by both Swift and web tests
 - `Scripts/`: repository policy scripts and hook helpers
 - `docs/`: reference docs, plans, and historical implementation records
@@ -39,6 +39,11 @@ future file moves.
   - `Vendor/swift-figlet`
   - `Vendor/swift-hash`
   - `Vendor/swift-png`
+  - `Vendor/swift-jpeg` — pure-Swift baseline JPEG decoder, mirrors the
+    `PNG.Image` / `BytestreamSource` / `RGBA<T>` shape of swift-png
+  - `Vendor/swift-gif` — pure-Swift GIF decoder (LZW + frame compositor),
+    mirrors the same shape; static-frame `unpack(as:)` plus a `frames`
+    accessor for future animation support
 
 `Core` remains the shared pipeline target, but it is not exposed as a separate
 library product. Downstream package consumers reach those types through
@@ -69,7 +74,8 @@ library product. Downstream package consumers reach those types through
 - `TerminalAppearanceDetection.swift`: appearance probing
 - `TerminalGraphicsCapabilities.swift`: Kitty, Sixel, and cell-pixel capability detection
 - `TerminalImageRendering.swift`: image protocol emitters and cell fallback rendering
-- `ImageAssetRepository.swift`: shared PNG decode and metadata cache
+- `ImageAssetRepository.swift`: shared decode + metadata cache for PNG,
+  baseline JPEG, and GIF (format dispatched on the leading magic bytes)
 - `InputReader.swift`: keyboard and mouse input decoding
 - `InjectedTerminalInputReader.swift`: wrapper-managed input stream source that shares control-message parsing
 - `SignalReader.swift`: native and in-process signal readers

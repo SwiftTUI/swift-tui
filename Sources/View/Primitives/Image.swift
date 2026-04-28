@@ -1,8 +1,8 @@
 public import Core
 @_spi(Testing) import Core
 
-/// Displays a PNG image sourced from an explicit resource path, local file URL,
-/// or bytes embedded directly in the binary.
+/// Displays a PNG, JPEG, or GIF image sourced from an explicit resource
+/// path, local file URL, or bytes embedded directly in the binary.
 public struct Image: View, ResolvableView {
   public var source: ImageSource
   public var isResizable: Bool
@@ -28,6 +28,29 @@ public struct Image: View, ResolvableView {
     pngData: [UInt8]
   ) {
     source = .pngData(pngData)
+    isResizable = false
+    scalingMode = .stretch
+  }
+
+  /// Convenience initializer for JPEG bytes. Routes through the same backing
+  /// storage as ``init(pngData:)`` — the decoder dispatches on magic bytes,
+  /// so either constructor accepts either format.
+  public init(
+    jpegData: [UInt8]
+  ) {
+    source = .pngData(jpegData)
+    isResizable = false
+    scalingMode = .stretch
+  }
+
+  /// Convenience initializer for GIF bytes. Routes through the same
+  /// backing storage as ``init(pngData:)`` — the decoder dispatches on
+  /// magic bytes, so any constructor accepts any supported format. Only
+  /// the first frame of an animated GIF is rendered.
+  public init(
+    gifData: [UInt8]
+  ) {
+    source = .pngData(gifData)
     isResizable = false
     scalingMode = .stretch
   }

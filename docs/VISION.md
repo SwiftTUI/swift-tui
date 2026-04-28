@@ -97,19 +97,24 @@ Current implementation status and short-term constraints live in [STATUS.md](STA
 
 ### What Is Not In Scope Today
 
-- media-heavy surfaces beyond PNG image presentation
+- media-heavy surfaces beyond PNG, baseline JPEG, and static GIF presentation (animated GIF playback, video, remote fetching, asset bundles)
 - a full accessibility-tree or assistive-technology story
 - pixel-precise layout or a second, non-terminal presentation model
 
 ### Image Rendering
 
-TerminalUI now ships a narrow image surface for PNG content:
+TerminalUI ships a narrow image surface covering the three most common
+still-image formats:
 
-- SwiftUI-shaped `Image` authoring for explicit named resources, local `file://` URLs, and embedded `[UInt8]` PNG bytes
+- SwiftUI-shaped `Image` authoring for explicit named resources, local `file://` URLs, and embedded `[UInt8]` bytes
+- format detection by leading magic bytes — `Image(pngData:)`, `Image(jpegData:)`, and `Image(gifData:)` are convenience initializers that all route through the same byte-bag storage; the decoder picks PNG, baseline-sequential JPEG, or GIF on its own
+- pure-Swift decoders vendored alongside the project (`Vendor/swift-png`, `Vendor/swift-jpeg`, `Vendor/swift-gif`) — no system imaging frameworks, so the surface works identically across macOS, Linux, Android, and WASI
 - runtime-hosted terminal presentation through Kitty graphics or Sixel when the terminal advertises support
 - capability-aware fallback rendering into terminal cells when graphics protocols are unavailable
 
-That scope is intentionally tight. PNG images are in. Broader media playback, animation, remote fetching, or bundle-driven asset systems are still outside the core story.
+That scope is intentionally tight. Still images in PNG / JPEG / GIF are in.
+Animated GIF playback, progressive JPEG, broader media playback, remote
+fetching, and bundle-driven asset systems are still outside the core story.
 
 ## Aesthetic And Component Guidance
 
