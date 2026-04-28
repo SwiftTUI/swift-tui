@@ -10,6 +10,75 @@ public struct CanvasSketchPoint: Equatable, Hashable, Sendable {
   }
 }
 
+public enum CanvasSketchTool: Equatable, Hashable, Sendable {
+  case draw
+  case erase
+
+  public var label: String {
+    switch self {
+    case .draw:
+      "draw"
+    case .erase:
+      "erase"
+    }
+  }
+
+  fileprivate var writesOn: Bool {
+    switch self {
+    case .draw:
+      true
+    case .erase:
+      false
+    }
+  }
+}
+
+public enum CanvasDemoCanvasType: String, CaseIterable, Hashable, Sendable {
+  case subcell
+  case fullCell
+  case halfBlock
+
+  public var title: String {
+    switch self {
+    case .subcell:
+      "Subcell"
+    case .fullCell:
+      "Full Cell"
+    case .halfBlock:
+      "Half Block"
+    }
+  }
+}
+
+private func forEachLinePoint(
+  from start: CanvasSketchPoint,
+  to end: CanvasSketchPoint,
+  _ body: (CanvasSketchPoint) -> Void
+) {
+  var current = start
+  let dx = abs(end.x - current.x)
+  let dy = abs(end.y - current.y)
+  let stepX = current.x < end.x ? 1 : -1
+  let stepY = current.y < end.y ? 1 : -1
+  var error = dx - dy
+
+  while true {
+    body(current)
+    if current == end {
+      break
+    }
+    let doubledError = error * 2
+    if doubledError > -dy {
+      error -= dy
+      current.x += stepX
+    }
+    if doubledError < dx {
+      error += dx
+      current.y += stepY
+    }
+  }
+}
+
 public struct CanvasSketchDocument: Equatable, Sendable {
   public var cellSize: Size
   public private(set) var cursor: CanvasSketchPoint
@@ -58,6 +127,8 @@ public struct CanvasSketchDocument: Equatable, Sendable {
 
   public var subpixelWidth: Int { cellSize.width * 2 }
   public var subpixelHeight: Int { cellSize.height * 4 }
+  public var maxSubpixelX: Int { subpixelWidth - 1 }
+  public var maxSubpixelY: Int { subpixelHeight - 1 }
 
   public var litPixelCount: Int {
     pixels.reduce(0) { partial, isOn in partial + (isOn ? 1 : 0) }
@@ -103,6 +174,46 @@ public struct CanvasSketchDocument: Equatable, Sendable {
     )
   }
 
+  public mutating func moveCursor(to point: CanvasSketchPoint) {
+    cursor = CanvasSketchDocument.clamped(point, in: cellSize)
+  }
+
+  public mutating func apply(_ tool: CanvasSketchTool, at point: CanvasSketchPoint) {
+    let clampedPoint = CanvasSketchDocument.clamped(point, in: cellSize)
+    setPixel(clampedPoint, isOn: tool.writesOn)
+    cursor = clampedPoint
+  }
+
+  public mutating func apply(
+    _ tool: CanvasSketchTool, from start: CanvasSketchPoint, to end: CanvasSketchPoint
+  ) {
+    let start = CanvasSketchDocument.clamped(start, in: cellSize)
+    let target = CanvasSketchDocument.clamped(end, in: cellSize)
+    forEachLinePoint(from: start, to: target) { point in
+      setPixel(point, isOn: tool.writesOn)
+    }
+    cursor = target
+  }
+
+  public func subpixelPoint(forLocalCell point: Point) -> CanvasSketchPoint {
+    CanvasSketchDocument.subpixelPoint(forLocalCell: point, in: cellSize)
+  }
+
+  public static func subpixelPoint(
+    forLocalCell point: Point,
+    in cellSize: Size
+  ) -> CanvasSketchPoint {
+    guard cellSize.width > 0, cellSize.height > 0 else {
+      return CanvasSketchPoint(x: 0, y: 0)
+    }
+    let cellX = min(max(0, point.x), cellSize.width - 1)
+    let cellY = min(max(0, point.y), cellSize.height - 1)
+    return CanvasSketchPoint(
+      x: min(cellX * 2 + 1, cellSize.width * 2 - 1),
+      y: min(cellY * 4 + 2, cellSize.height * 4 - 1)
+    )
+  }
+
   public func forEachLitPixel(
     _ body: (CanvasSketchPoint) -> Void
   ) {
@@ -132,6 +243,158 @@ public struct CanvasSketchDocument: Equatable, Sendable {
   ) -> CanvasSketchPoint {
     let maxX = max(0, cellSize.width * 2 - 1)
     let maxY = max(0, cellSize.height * 4 - 1)
+    return CanvasSketchPoint(
+      x: min(max(0, point.x), maxX),
+      y: min(max(0, point.y), maxY)
+    )
+  }
+}
+
+public struct CanvasPixelSketchDocument: Equatable, Sendable {
+  public var size: Size
+  public private(set) var cursor: CanvasSketchPoint
+
+  private var pixels: [Bool]
+
+  public init(
+    size: Size = Size(width: 24, height: 10),
+    cursor: CanvasSketchPoint = CanvasSketchPoint(x: 0, y: 0)
+  ) {
+    let safeSize = Size(
+      width: max(0, size.width),
+      height: max(0, size.height)
+    )
+    self.size = safeSize
+    self.cursor = CanvasPixelSketchDocument.clamped(cursor, in: safeSize)
+    pixels = [Bool](repeating: false, count: safeSize.width * safeSize.height)
+  }
+
+  public static func sample(
+    size: Size = Size(width: 24, height: 10),
+    cursor: CanvasSketchPoint = CanvasSketchPoint(x: 8, y: 4)
+  ) -> Self {
+    var document = Self(size: size, cursor: cursor)
+    guard document.width > 0, document.height > 0 else {
+      return document
+    }
+
+    let diagonalCount = min(document.width, document.height)
+    for offset in 0..<diagonalCount {
+      document.setPixel(CanvasSketchPoint(x: offset, y: offset), isOn: true)
+    }
+    for x in 2..<min(document.width, 18) {
+      document.setPixel(CanvasSketchPoint(x: x, y: min(2, document.height - 1)), isOn: true)
+    }
+    for y in 2..<min(document.height, 8) {
+      document.setPixel(CanvasSketchPoint(x: min(18, document.width - 1), y: y), isOn: true)
+    }
+    return document
+  }
+
+  public var width: Int { size.width }
+  public var height: Int { size.height }
+  public var maxPixelX: Int { width - 1 }
+  public var maxPixelY: Int { height - 1 }
+
+  public var litPixelCount: Int {
+    pixels.reduce(0) { partial, isOn in partial + (isOn ? 1 : 0) }
+  }
+
+  public func contains(_ point: CanvasSketchPoint) -> Bool {
+    point.x >= 0 && point.x < width && point.y >= 0 && point.y < height
+  }
+
+  public func isPixelSet(_ point: CanvasSketchPoint) -> Bool {
+    guard let index = index(of: point) else {
+      return false
+    }
+    return pixels[index]
+  }
+
+  public func colorPixels(color: Color = .cyan) -> [Color?] {
+    pixels.map { isOn in isOn ? color : nil }
+  }
+
+  public mutating func setPixel(
+    _ point: CanvasSketchPoint,
+    isOn: Bool = true
+  ) {
+    guard let index = index(of: point) else {
+      return
+    }
+    pixels[index] = isOn
+  }
+
+  public mutating func clear() {
+    pixels = [Bool](repeating: false, count: pixels.count)
+  }
+
+  public mutating func moveCursor(dx: Int, dy: Int) {
+    cursor = CanvasPixelSketchDocument.clamped(
+      CanvasSketchPoint(x: cursor.x + dx, y: cursor.y + dy),
+      in: size
+    )
+  }
+
+  public mutating func apply(_ tool: CanvasSketchTool, at point: CanvasSketchPoint) {
+    let clampedPoint = CanvasPixelSketchDocument.clamped(point, in: size)
+    setPixel(clampedPoint, isOn: tool.writesOn)
+    cursor = clampedPoint
+  }
+
+  public mutating func apply(
+    _ tool: CanvasSketchTool,
+    from start: CanvasSketchPoint,
+    to end: CanvasSketchPoint
+  ) {
+    let start = CanvasPixelSketchDocument.clamped(start, in: size)
+    let target = CanvasPixelSketchDocument.clamped(end, in: size)
+    forEachLinePoint(from: start, to: target) { point in
+      setPixel(point, isOn: tool.writesOn)
+    }
+    cursor = target
+  }
+
+  public func pixelPoint(
+    forLocalCell point: Point,
+    mode: CanvasPixelGridMode
+  ) -> CanvasSketchPoint {
+    CanvasPixelSketchDocument.pixelPoint(forLocalCell: point, mode: mode, in: size)
+  }
+
+  public static func pixelPoint(
+    forLocalCell point: Point,
+    mode: CanvasPixelGridMode,
+    in size: Size
+  ) -> CanvasSketchPoint {
+    guard size.width > 0, size.height > 0 else {
+      return CanvasSketchPoint(x: 0, y: 0)
+    }
+    let cellX = min(max(0, point.x), size.width - 1)
+    let cellY = min(max(0, point.y), mode.cellHeight(for: size.height) - 1)
+    let y =
+      switch mode {
+      case .fullCell:
+        cellY
+      case .verticalHalfBlock:
+        min(cellY * 2, size.height - 1)
+      }
+    return CanvasSketchPoint(x: cellX, y: y)
+  }
+
+  private func index(of point: CanvasSketchPoint) -> Int? {
+    guard contains(point) else {
+      return nil
+    }
+    return (point.y * width) + point.x
+  }
+
+  private static func clamped(
+    _ point: CanvasSketchPoint,
+    in size: Size
+  ) -> CanvasSketchPoint {
+    let maxX = max(0, size.width - 1)
+    let maxY = max(0, size.height - 1)
     return CanvasSketchPoint(
       x: min(max(0, point.x), maxX),
       y: min(max(0, point.y), maxY)
@@ -175,170 +438,374 @@ public struct CanvasCursorDrawing: CanvasDrawing, Equatable {
 }
 
 public struct CanvasDemoSurface: View {
-  public var document: CanvasSketchDocument
-
-  public init(document: CanvasSketchDocument) {
-    self.document = document
-  }
-
-  public var body: some View {
-    ZStack(alignment: .topLeading) {
-      Canvas(CanvasSketchDrawing(document: document))
-        .foregroundStyle(Color.cyan)
-        .frame(width: document.cellSize.width, height: document.cellSize.height)
-      Canvas(CanvasCursorDrawing(cursor: document.cursor))
-        .foregroundStyle(Color.yellow)
-        .frame(width: document.cellSize.width, height: document.cellSize.height)
-    }
-    .border(.separator)
-  }
-}
-
-public struct CanvasDemoPixelPreview: View {
-  public var mode: CanvasPixelGridMode
-
-  public init(mode: CanvasPixelGridMode) {
-    self.mode = mode
-  }
-
-  public var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Text("pixel grid \(modeLabel)").foregroundStyle(.muted)
-      Canvas(
-        pixelGridWidth: Self.width,
-        height: Self.height,
-        pixels: Self.pixels,
-        mode: mode
-      )
-      .frame(width: Self.width, height: mode.cellHeight(for: Self.height))
-      .border(.separator)
-    }
-  }
-
-  private var modeLabel: String {
-    switch mode {
-    case .fullCell:
-      "full-cell"
-    case .verticalHalfBlock:
-      "half-block"
-    }
-  }
-
-  private static let width = 12
-  private static let height = 6
-
-  private static let pixels: [Color?] = {
-    var output = [Color?]()
-    for y in 0..<height {
-      for x in 0..<width {
-        if (x + y) % 5 == 0 {
-          output.append(nil)
-        } else if x < width / 3 {
-          output.append(.red)
-        } else if x < (width * 2) / 3 {
-          output.append(.green)
-        } else {
-          output.append(y.isMultiple(of: 2) ? .blue : .yellow)
-        }
-      }
-    }
-    return output
-  }()
-}
-
-public struct CanvasDemoView: View {
-  @State private var document: CanvasSketchDocument
-  @State private var pixelMode: CanvasPixelGridMode
+  @Binding private var document: CanvasSketchDocument
+  public var tool: CanvasSketchTool
+  @State private var lastDragPoint: CanvasSketchPoint?
 
   public init(
-    document: CanvasSketchDocument = .sample(),
-    pixelMode: CanvasPixelGridMode = .fullCell
+    document: Binding<CanvasSketchDocument>,
+    tool: CanvasSketchTool = .draw
   ) {
-    _document = State(initialValue: document)
-    _pixelMode = State(initialValue: pixelMode)
+    _document = document
+    self.tool = tool
+  }
+
+  public init(
+    document: CanvasSketchDocument,
+    tool: CanvasSketchTool = .draw
+  ) {
+    _document = .constant(document)
+    self.tool = tool
   }
 
   public var body: some View {
     let snapshot = document
-    let modeSnapshot = pixelMode
+    return ZStack(alignment: .topLeading) {
+      Canvas(CanvasSketchDrawing(document: snapshot))
+        .foregroundStyle(Color.cyan)
+        .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
+      Canvas(CanvasCursorDrawing(cursor: snapshot.cursor))
+        .foregroundStyle(Color.yellow)
+        .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
+    }
+    .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
+    .border(.separator)
+    .focusable(true, interactions: .edit)
+    .gesture(
+      DragGesture(minimumDistance: 0, coordinateSpace: .local)
+        .onChanged { value in
+          applyDragChange(value)
+        }
+        .onEnded { value in
+          applyDragEnd(value)
+        }
+    )
+  }
+
+  private func applyDragChange(_ value: DragGesture.Value) {
+    let start = lastDragPoint ?? document.subpixelPoint(forLocalCell: value.startLocation)
+    let end = document.subpixelPoint(forLocalCell: value.location)
+    document.apply(tool, from: start, to: end)
+    lastDragPoint = end
+  }
+
+  private func applyDragEnd(_ value: DragGesture.Value) {
+    let start = lastDragPoint ?? document.subpixelPoint(forLocalCell: value.startLocation)
+    let end = document.subpixelPoint(forLocalCell: value.location)
+    document.apply(tool, from: start, to: end)
+    lastDragPoint = nil
+  }
+}
+
+public struct CanvasPixelCursorDrawing: CanvasDrawing, Equatable {
+  public var cursor: CanvasSketchPoint
+  public var mode: CanvasPixelGridMode
+
+  public init(
+    cursor: CanvasSketchPoint,
+    mode: CanvasPixelGridMode
+  ) {
+    self.cursor = cursor
+    self.mode = mode
+  }
+
+  public func draw(into context: inout CanvasContext) {
+    switch mode {
+    case .fullCell:
+      context.setCell(
+        x: cursor.x,
+        y: cursor.y,
+        character: "█",
+        foreground: .yellow
+      )
+    case .verticalHalfBlock:
+      context.setCell(
+        x: cursor.x,
+        y: cursor.y / 2,
+        character: cursor.y.isMultiple(of: 2) ? "▀" : "▄",
+        foreground: .yellow
+      )
+    }
+  }
+}
+
+public struct CanvasDemoPixelSurface: View {
+  @Binding private var document: CanvasPixelSketchDocument
+  public var mode: CanvasPixelGridMode
+  public var tool: CanvasSketchTool
+  @State private var lastDragPoint: CanvasSketchPoint?
+
+  public init(
+    document: Binding<CanvasPixelSketchDocument>,
+    mode: CanvasPixelGridMode,
+    tool: CanvasSketchTool = .draw
+  ) {
+    _document = document
+    self.mode = mode
+    self.tool = tool
+  }
+
+  public init(
+    document: CanvasPixelSketchDocument,
+    mode: CanvasPixelGridMode,
+    tool: CanvasSketchTool = .draw
+  ) {
+    _document = .constant(document)
+    self.mode = mode
+    self.tool = tool
+  }
+
+  public var body: some View {
+    let snapshot = document
+    let cellHeight = mode.cellHeight(for: snapshot.height)
+    return ZStack(alignment: .topLeading) {
+      Canvas(
+        pixelGridWidth: snapshot.width,
+        height: snapshot.height,
+        pixels: snapshot.colorPixels(),
+        mode: mode
+      )
+      .frame(width: snapshot.width, height: cellHeight)
+      Canvas(CanvasPixelCursorDrawing(cursor: snapshot.cursor, mode: mode))
+        .frame(width: snapshot.width, height: cellHeight)
+    }
+    .frame(width: snapshot.width, height: cellHeight)
+    .border(.separator)
+    .focusable(true, interactions: .edit)
+    .gesture(
+      DragGesture(minimumDistance: 0, coordinateSpace: .local)
+        .onChanged { value in
+          applyDragChange(value)
+        }
+        .onEnded { value in
+          applyDragEnd(value)
+        }
+    )
+  }
+
+  private func applyDragChange(_ value: DragGesture.Value) {
+    let start = lastDragPoint ?? document.pixelPoint(forLocalCell: value.startLocation, mode: mode)
+    let end = document.pixelPoint(forLocalCell: value.location, mode: mode)
+    document.apply(tool, from: start, to: end)
+    lastDragPoint = end
+  }
+
+  private func applyDragEnd(_ value: DragGesture.Value) {
+    let start = lastDragPoint ?? document.pixelPoint(forLocalCell: value.startLocation, mode: mode)
+    let end = document.pixelPoint(forLocalCell: value.location, mode: mode)
+    document.apply(tool, from: start, to: end)
+    lastDragPoint = nil
+  }
+}
+
+public struct CanvasDemoView: View {
+  @State private var document: CanvasSketchDocument
+  @State private var fullCellDocument: CanvasPixelSketchDocument
+  @State private var halfBlockDocument: CanvasPixelSketchDocument
+  @State private var selectedCanvas: CanvasDemoCanvasType
+  @State private var tool: CanvasSketchTool
+  @FocusState private var focusedCanvas: CanvasDemoCanvasType?
+
+  public init(
+    document: CanvasSketchDocument = .sample(),
+    fullCellDocument: CanvasPixelSketchDocument = .sample(),
+    halfBlockDocument: CanvasPixelSketchDocument = .sample(
+      size: Size(width: 24, height: 18),
+      cursor: CanvasSketchPoint(x: 8, y: 8)
+    ),
+    selectedCanvas: CanvasDemoCanvasType = .subcell,
+    tool: CanvasSketchTool = .draw
+  ) {
+    _document = State(initialValue: document)
+    _fullCellDocument = State(initialValue: fullCellDocument)
+    _halfBlockDocument = State(initialValue: halfBlockDocument)
+    _selectedCanvas = State(initialValue: selectedCanvas)
+    _tool = State(initialValue: tool)
+  }
+
+  public var body: some View {
+    let snapshot = document
+    let fullCellSnapshot = fullCellDocument
+    let halfBlockSnapshot = halfBlockDocument
+    let selectionSnapshot = selectedCanvas
+    let toolSnapshot = tool
+    let activeLitPixelCount =
+      switch selectionSnapshot {
+      case .subcell:
+        snapshot.litPixelCount
+      case .fullCell:
+        fullCellSnapshot.litPixelCount
+      case .halfBlock:
+        halfBlockSnapshot.litPixelCount
+      }
     return VStack(alignment: .leading, spacing: 0) {
       HStack(spacing: 2) {
         Text("canvas-demo").foregroundStyle(.foreground)
-        Text("Canvas verification surface").foregroundStyle(.muted)
+        Text(selectionSnapshot.title).foregroundStyle(.muted)
         Spacer(minLength: 1)
-        Text("\(snapshot.litPixelCount) dots").foregroundStyle(.cyan)
+        Text("\(activeLitPixelCount) dots").foregroundStyle(.cyan)
       }
       Divider()
-      HStack(alignment: .top, spacing: 2) {
-        CanvasDemoSurface(document: snapshot)
-        CanvasDemoPixelPreview(mode: modeSnapshot)
+      TabView(selection: $selectedCanvas) {
+        Tab("Subcell", value: CanvasDemoCanvasType.subcell) {
+          VStack(alignment: .leading, spacing: 0) {
+            CanvasDemoSurface(document: $document, tool: toolSnapshot)
+              .focused($focusedCanvas, equals: .subcell)
+              .defaultFocus($focusedCanvas, .subcell)
+              .onKeyPress(.any) { keyPress in
+                handleSubcellKeyPress(keyPress)
+              }
+            Text("Braille subpixels max \(snapshot.maxSubpixelX),\(snapshot.maxSubpixelY)")
+              .foregroundStyle(.muted)
+          }
+        }
+
+        Tab("Full Cell", value: CanvasDemoCanvasType.fullCell) {
+          VStack(alignment: .leading, spacing: 0) {
+            CanvasDemoPixelSurface(
+              document: $fullCellDocument,
+              mode: .fullCell,
+              tool: toolSnapshot
+            )
+            .focused($focusedCanvas, equals: .fullCell)
+            .defaultFocus($focusedCanvas, .fullCell)
+            .onKeyPress(.any) { keyPress in
+              handleFullCellKeyPress(keyPress)
+            }
+            Text(
+              "full-cell pixel grid max \(fullCellSnapshot.maxPixelX),\(fullCellSnapshot.maxPixelY)"
+            )
+            .foregroundStyle(.muted)
+          }
+        }
+
+        Tab("Half Block", value: CanvasDemoCanvasType.halfBlock) {
+          VStack(alignment: .leading, spacing: 0) {
+            CanvasDemoPixelSurface(
+              document: $halfBlockDocument,
+              mode: .verticalHalfBlock,
+              tool: toolSnapshot
+            )
+            .focused($focusedCanvas, equals: .halfBlock)
+            .defaultFocus($focusedCanvas, .halfBlock)
+            .onKeyPress(.any) { keyPress in
+              handleHalfBlockKeyPress(keyPress)
+            }
+            Text(
+              "half-block pixel grid max \(halfBlockSnapshot.maxPixelX),\(halfBlockSnapshot.maxPixelY)"
+            )
+            .foregroundStyle(.muted)
+          }
+        }
       }
+      .tabViewStyle(.literalTabs)
       Divider()
-      Text(statusLine(for: snapshot, pixelMode: modeSnapshot)).foregroundStyle(.muted)
       Text(
-        "Shift+arrows move  Ctrl+p draw  Ctrl+E erase  Ctrl+K clear  Ctrl+M mode  Ctrl+C quit"
+        statusLine(
+          selectedCanvas: selectionSnapshot,
+          subcellDocument: snapshot,
+          fullCellDocument: fullCellSnapshot,
+          halfBlockDocument: halfBlockSnapshot,
+          tool: toolSnapshot
+        )
+      )
+      .foregroundStyle(.muted)
+      Text(
+        "arrows/hjkl move  space paint  d draw  e erase  c clear  drag paints  Ctrl+C quit"
       )
       .foregroundStyle(.separator)
     }
     .padding(1)
     .panel(id: "canvas-demo")
-    .keyCommand("Move cursor left", key: .arrowLeft, modifiers: .shift) {
-      document.moveCursor(dx: -1, dy: 0)
+  }
+
+  private func handleSubcellKeyPress(_ keyPress: KeyPress) -> KeyPressResult {
+    handleDrawingKeyPress(
+      keyPress,
+      moveCursor: { dx, dy in document.moveCursor(dx: dx, dy: dy) },
+      paint: { document.apply(tool, at: document.cursor) },
+      clear: { document.clear() }
+    )
+  }
+
+  private func handleFullCellKeyPress(_ keyPress: KeyPress) -> KeyPressResult {
+    handleDrawingKeyPress(
+      keyPress,
+      moveCursor: { dx, dy in fullCellDocument.moveCursor(dx: dx, dy: dy) },
+      paint: { fullCellDocument.apply(tool, at: fullCellDocument.cursor) },
+      clear: { fullCellDocument.clear() }
+    )
+  }
+
+  private func handleHalfBlockKeyPress(_ keyPress: KeyPress) -> KeyPressResult {
+    handleDrawingKeyPress(
+      keyPress,
+      moveCursor: { dx, dy in halfBlockDocument.moveCursor(dx: dx, dy: dy) },
+      paint: { halfBlockDocument.apply(tool, at: halfBlockDocument.cursor) },
+      clear: { halfBlockDocument.clear() }
+    )
+  }
+
+  private func handleDrawingKeyPress(
+    _ keyPress: KeyPress,
+    moveCursor: (Int, Int) -> Void,
+    paint: () -> Void,
+    clear: () -> Void
+  ) -> KeyPressResult {
+    guard keyPress.modifiers.isEmpty else {
+      return .ignored
     }
-    .keyCommand("Move cursor right", key: .arrowRight, modifiers: .shift) {
-      document.moveCursor(dx: 1, dy: 0)
+
+    switch keyPress.key {
+    case .arrowLeft, .character("h"):
+      moveCursor(-1, 0)
+    case .arrowRight, .character("l"):
+      moveCursor(1, 0)
+    case .arrowUp, .character("k"):
+      moveCursor(0, -1)
+    case .arrowDown, .character("j"):
+      moveCursor(0, 1)
+    case .space, .return:
+      paint()
+    case .character("d"), .character("p"):
+      tool = .draw
+    case .character("e"):
+      tool = .erase
+    case .character("c"), .backspace:
+      clear()
+    default:
+      return .ignored
     }
-    .keyCommand("Move cursor up", key: .arrowUp, modifiers: .shift) {
-      document.moveCursor(dx: 0, dy: -1)
-    }
-    .keyCommand("Move cursor down", key: .arrowDown, modifiers: .shift) {
-      document.moveCursor(dx: 0, dy: 1)
-    }
-    .keyCommand("Jump cursor left", key: .arrowLeft, modifiers: .ctrl) {
-      document.moveCursor(dx: -8, dy: 0)
-    }
-    .keyCommand("Jump cursor right", key: .arrowRight, modifiers: .ctrl) {
-      document.moveCursor(dx: 8, dy: 0)
-    }
-    .keyCommand("Jump cursor up", key: .arrowUp, modifiers: .ctrl) {
-      document.moveCursor(dx: 0, dy: -8)
-    }
-    .keyCommand("Jump cursor down", key: .arrowDown, modifiers: .ctrl) {
-      document.moveCursor(dx: 0, dy: 8)
-    }
-    .keyCommand("Draw at cursor", key: .character("p"), modifiers: .ctrl) {
-      document.drawAtCursor()
-    }
-    .keyCommand("Erase at cursor", key: .character("e"), modifiers: .ctrl) {
-      document.eraseAtCursor()
-    }
-    .keyCommand("Clear drawing", key: .character("k"), modifiers: .ctrl) {
-      document.clear()
-    }
-    .keyCommand("Toggle pixel grid mode", key: .character("x"), modifiers: .ctrl) {
-      pixelMode =
-        switch pixelMode {
-        case .fullCell:
-          .verticalHalfBlock
-        case .verticalHalfBlock:
-          .fullCell
-        }
-    }
+
+    return .handled
   }
 
   private func statusLine(
-    for document: CanvasSketchDocument,
-    pixelMode: CanvasPixelGridMode
+    selectedCanvas: CanvasDemoCanvasType,
+    subcellDocument: CanvasSketchDocument,
+    fullCellDocument: CanvasPixelSketchDocument,
+    halfBlockDocument: CanvasPixelSketchDocument,
+    tool: CanvasSketchTool
   ) -> String {
-    let cursor = document.cursor
-    let modeLabel =
-      switch pixelMode {
-      case .fullCell:
-        "full-cell"
-      case .verticalHalfBlock:
-        "half-block"
-      }
-    return
-      "cursor \(cursor.x),\(cursor.y) of \(document.subpixelWidth)x\(document.subpixelHeight) Braille subpixels  pixel grid \(modeLabel)"
+    switch selectedCanvas {
+    case .subcell:
+      let cursor = subcellDocument.cursor
+      let maxIndex = "\(subcellDocument.maxSubpixelX),\(subcellDocument.maxSubpixelY)"
+      return
+        "canvas \(selectedCanvas.title)  tool \(tool.label)  "
+        + "cursor \(cursor.x),\(cursor.y) of max \(maxIndex) Braille subpixels"
+    case .fullCell:
+      let cursor = fullCellDocument.cursor
+      let maxIndex = "\(fullCellDocument.maxPixelX),\(fullCellDocument.maxPixelY)"
+      return
+        "canvas \(selectedCanvas.title)  tool \(tool.label)  "
+        + "cursor \(cursor.x),\(cursor.y) of max \(maxIndex) pixels"
+    case .halfBlock:
+      let cursor = halfBlockDocument.cursor
+      let maxIndex = "\(halfBlockDocument.maxPixelX),\(halfBlockDocument.maxPixelY)"
+      return
+        "canvas \(selectedCanvas.title)  tool \(tool.label)  "
+        + "cursor \(cursor.x),\(cursor.y) of max \(maxIndex) pixels"
+    }
   }
 }
