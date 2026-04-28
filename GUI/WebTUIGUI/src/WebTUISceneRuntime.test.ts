@@ -186,7 +186,7 @@ test("runtime decodes surface images once and reuses the cached image", async ()
           visibleBounds: [1, 0, 1, 2],
           scalingMode: "stretch",
           pixelSize: [2, 2],
-          pngBase64: "iVBORw==",
+          dataBase64: "iVBORw==",
         },
         {
           id: "png:test",

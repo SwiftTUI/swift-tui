@@ -48,7 +48,7 @@ test("decoder preserves typed image records", () => {
     '\u001Esurface:{"version":1,"width":2,"height":1,"styles":[null],"rows":[[]],'
       + '"images":[{"id":"png:test","format":"png","bounds":[0,0,1,1],'
       + '"visibleBounds":[0,0,1,1],"scalingMode":"stretch","pixelSize":[1,1],'
-      + '"pngBase64":"iVBORw=="}]}\n'
+      + '"dataBase64":"iVBORw=="}]}\n'
   ));
 
   const frame = surfaceFrame(records[0]);
@@ -60,7 +60,7 @@ test("decoder preserves typed image records", () => {
       visibleBounds: [0, 0, 1, 1],
       scalingMode: "stretch",
       pixelSize: [1, 1],
-      pngBase64: "iVBORw==",
+      dataBase64: "iVBORw==",
     },
   ]);
 });

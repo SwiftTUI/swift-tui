@@ -36,14 +36,16 @@ export type WebTUISurfaceSize = [
   height: number,
 ];
 
+export type WebTUISurfaceImageFormat = "png" | "jpeg" | "gif";
+
 export interface WebTUISurfaceImage {
   id: string;
-  format: "png";
+  format: WebTUISurfaceImageFormat;
   bounds: WebTUISurfaceRect;
   visibleBounds: WebTUISurfaceRect;
   scalingMode: "stretch" | "fit" | "fill";
   pixelSize?: WebTUISurfaceSize;
-  pngBase64?: string;
+  dataBase64?: string;
 }
 
 export interface WebTUISurfaceFrame {
@@ -236,12 +238,18 @@ function isWebTUISurfaceImage(
   }
   const image = value as Partial<WebTUISurfaceImage>;
   return typeof image.id === "string"
-    && image.format === "png"
+    && isWebTUISurfaceImageFormat(image.format)
     && isWebTUISurfaceRect(image.bounds)
     && isWebTUISurfaceRect(image.visibleBounds)
     && isWebTUISurfaceScalingMode(image.scalingMode)
     && (image.pixelSize === undefined || isWebTUISurfaceSize(image.pixelSize))
-    && (image.pngBase64 === undefined || typeof image.pngBase64 === "string");
+    && (image.dataBase64 === undefined || typeof image.dataBase64 === "string");
+}
+
+function isWebTUISurfaceImageFormat(
+  value: unknown
+): value is WebTUISurfaceImageFormat {
+  return value === "png" || value === "jpeg" || value === "gif";
 }
 
 function isWebTUISurfaceRect(
