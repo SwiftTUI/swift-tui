@@ -39,11 +39,31 @@ private struct RasterImageOverlay: Sendable {
   var cells: [[RasterCell]]
 }
 
+/// Container format for a Kitty graphics payload. Maps directly onto
+/// the protocol's `f=` key plus the supplemental `s=`/`v=` pixel-size
+/// keys required for raw pixel buffers.
+///
+/// Kitty's `f=` only knows three values: 100 (PNG), 32 (RGBA), 24 (RGB).
+/// JPEG and GIF aren't decodable by the terminal — we serialize their
+/// already-decoded pixels as RGBA and ship those instead.
+private enum KittyPayloadFormat: Sendable, Equatable {
+  case png
+  case rgba(pixelSize: Size)
+
+  /// Numeric value emitted as `f=` in the kitty control data.
+  var formatKey: Int {
+    switch self {
+    case .png: return 100
+    case .rgba: return 32
+    }
+  }
+}
+
 private struct KittyPayload: Sendable {
   /// Base64-encoded image payload.
   var encodedData: String
-  /// Kitty graphics protocol format key (`f`). 100 for PNG, 32 for RGBA, 24 for RGB.
-  var format: Int
+  /// Container format the payload is shipped in.
+  var format: KittyPayloadFormat
 }
 
 private struct KittySourceRect: Sendable, Equatable {
@@ -319,9 +339,6 @@ final class TerminalImageRenderer: Sendable {
     for reference: ImageAssetReference,
     image: DecodedImage
   ) -> KittyPayload? {
-    // Transmit the original PNG bytes with `f=100`. Kitty decodes and scales
-    // natively, which is both smaller on the wire than raw RGBA and avoids
-    // any software-scaling artifacts.
     guard !image.encodedBytes.isEmpty else {
       return nil
     }
@@ -337,15 +354,45 @@ final class TerminalImageRenderer: Sendable {
       return cached
     }
 
-    let payload = KittyPayload(
-      encodedData: base64Encoded(image.encodedBytes),
-      format: 100
-    )
+    let payload: KittyPayload
+    switch image.encodedFormat {
+    case .png:
+      // Ship the PNG bytes as `f=100`. Kitty decodes and scales them
+      // natively — smaller on the wire than RGBA and avoids any
+      // software-scaling artifacts on our side.
+      payload = KittyPayload(
+        encodedData: base64Encoded(image.encodedBytes),
+        format: .png
+      )
+    case .jpeg, .gif:
+      // Kitty has no JPEG/GIF decoder. Serialize the already-decoded
+      // pixels (which is the first frame composited onto the logical
+      // screen for animated GIFs) as raw RGBA and let kitty ingest
+      // them via `f=32` with explicit pixel-size keys (`s=`, `v=`).
+      payload = KittyPayload(
+        encodedData: base64Encoded(rgbaBytes(from: image.pixels)),
+        format: .rgba(pixelSize: image.pixelSize)
+      )
+    }
 
     storage.withLockUnchecked { storage in
       storage.kittyPayloads[key] = payload
     }
     return payload
+  }
+
+  /// Flattens an array of decoded RGBA pixels into the row-major byte
+  /// stream Kitty expects under `f=32` (4 bytes per pixel: R, G, B, A).
+  private func rgbaBytes(from pixels: [RGBAImagePixel]) -> [UInt8] {
+    var out = [UInt8]()
+    out.reserveCapacity(pixels.count * 4)
+    for pixel in pixels {
+      out.append(UInt8(pixel.red))
+      out.append(UInt8(pixel.green))
+      out.append(UInt8(pixel.blue))
+      out.append(UInt8(pixel.alpha))
+    }
+    return out
   }
 
   private func sixelPayload(
@@ -1269,12 +1316,17 @@ private func kittyTransmitAndPlaceCommands(
       //   q=2  suppress all responses (we already probed for support)
       //   t=d  direct transmission (payload is base64 in this escape code)
       //   f    pixel format (100 for PNG, 32 for RGBA, 24 for RGB)
+      //   s,v  source-image pixel width/height — required by `f=32`
+      //        and `f=24`, ignored for `f=100`
       //   C=1  do not advance the cursor after placement
       //   c,r  display rectangle in terminal cells (Kitty scales to fit)
       //   i    stable image id so we can re-place the image by id later
       //   m    1 if more chunks follow, 0 otherwise
       var controlData =
-        "_Ga=T,q=2,t=d,f=\(payload.format),C=1,c=\(cellColumns),r=\(cellRows),i=\(imageID)"
+        "_Ga=T,q=2,t=d,f=\(payload.format.formatKey),C=1,c=\(cellColumns),r=\(cellRows),i=\(imageID)"
+      if case .rgba(let pixelSize) = payload.format {
+        controlData.append(",s=\(pixelSize.width),v=\(pixelSize.height)")
+      }
       if let sourceRect {
         controlData.append(
           ",x=\(sourceRect.x),y=\(sourceRect.y),w=\(sourceRect.width),h=\(sourceRect.height)"
