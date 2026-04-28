@@ -101,7 +101,7 @@ public struct TransactionSnapshot: Equatable, Sendable {
 }
 
 /// Identifies the high-level role of a node in the resolved tree.
-public enum NodeKind: Equatable, Sendable {
+package enum NodeKind: Equatable, Sendable {
   case root
   case scene(String)
   case view(String)

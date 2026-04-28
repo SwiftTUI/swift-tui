@@ -294,7 +294,7 @@ public struct MatchedGeometryConfig: Equatable, Sendable {
 /// A node produced by the resolve phase before measurement.
 public struct ResolvedNode: Equatable, Sendable {
   public var identity: Identity
-  public var kind: NodeKind
+  package var kind: NodeKind
   /// Stable per-Swift-type discriminator carried alongside `kind`.
   ///
   /// `NodeKind.view(String)` is a human-readable role name (e.g. `"Text"`,
@@ -719,7 +719,7 @@ public enum SemanticRole: String, Equatable, Sendable {
 /// A node after layout has assigned concrete bounds.
 public struct PlacedNode: Equatable, Sendable {
   public var identity: Identity
-  public var kind: NodeKind
+  package var kind: NodeKind
   public var environmentSnapshot: EnvironmentSnapshot
   public var bounds: Rect
   public var contentBounds: Rect
