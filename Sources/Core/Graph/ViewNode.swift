@@ -386,6 +386,16 @@ package final class ViewNode {
     )
   }
 
+  package func recordTerminationHandlerRegistration(
+    identity: Identity,
+    handler: @escaping LocalTerminationRegistry.Handler
+  ) {
+    registeredHandlers.recordTerminationHandler(
+      identity: identity,
+      handler: handler
+    )
+  }
+
   package func recordPointerHandlerRegistration(
     routeID: RouteID,
     handler: @escaping LocalPointerHandlerRegistry.Handler

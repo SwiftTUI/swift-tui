@@ -173,6 +173,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package let localScrollPositionRegistry = LocalScrollPositionRegistry()
   package let localPreferenceObservationRegistry = LocalPreferenceObservationRegistry()
   package let localKeyHandlerRegistry = LocalKeyHandlerRegistry()
+  package let localTerminationRegistry = LocalTerminationRegistry()
   package let localLifecycleRegistry = LocalLifecycleRegistry()
   package let localTaskRegistry = LocalTaskRegistry()
   package let commandRegistry = CommandRegistry()
@@ -185,6 +186,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     RuntimeRegistrationSet(
       actionRegistry: localActionRegistry,
       keyHandlerRegistry: localKeyHandlerRegistry,
+      terminationRegistry: localTerminationRegistry,
       pointerHandlerRegistry: localPointerHandlerRegistry,
       gestureRegistry: localGestureRegistry,
       gestureStateRegistry: localGestureStateRegistry,
@@ -466,6 +468,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
           if shouldFlushBeforeExit {
             try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
           }
+          if terminationDisposition(for: exitReason) == .cancel {
+            scheduler.requestInvalidation(of: [rootIdentity])
+            handledNonExitEvent = true
+            continue
+          }
           return RunLoopResult(
             finalState: stateContainer.state,
             renderedFrames: renderedFrames,
@@ -485,6 +492,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       }
     }
 
+    _ = terminationDisposition(for: .inputEnded)
     return RunLoopResult(
       finalState: stateContainer.state,
       renderedFrames: renderedFrames,
@@ -505,6 +513,28 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     let sleepDuration = now.duration(to: nextWake)
     if sleepDuration > .zero {
       eventPump.scheduleDeadlineWake(sleepDuration)
+    }
+  }
+
+  package func terminationDisposition(
+    for exitReason: RunLoopExitReason
+  ) -> TerminationDisposition {
+    localTerminationRegistry.dispatch(
+      TerminationRequest(exitReason),
+      preferredPath: currentFocusScopePath()
+    )
+  }
+}
+
+extension TerminationRequest {
+  package init(_ exitReason: RunLoopExitReason) {
+    switch exitReason {
+    case .userExit(let keyPress):
+      self = .userExit(keyPress)
+    case .signal(let name):
+      self = .signal(name)
+    case .inputEnded:
+      self = .inputEnded
     }
   }
 }

@@ -221,6 +221,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var localGestureRegistry: LocalGestureRegistry?
   package var localGestureStateRegistry: LocalGestureStateRegistry?
   package var localPointerHandlerRegistry: LocalPointerHandlerRegistry?
+  package var localTerminationRegistry: LocalTerminationRegistry?
   package var localFocusBindingRegistry: LocalFocusBindingRegistry?
   package var localFocusedValuesRegistry: LocalFocusedValuesRegistry?
   package var localScrollPositionRegistry: LocalScrollPositionRegistry?
@@ -244,6 +245,7 @@ public struct ResolveContext: Equatable, Sendable {
     RuntimeRegistrationSet(
       actionRegistry: localActionRegistry,
       keyHandlerRegistry: localKeyHandlerRegistry,
+      terminationRegistry: localTerminationRegistry,
       pointerHandlerRegistry: localPointerHandlerRegistry,
       gestureRegistry: localGestureRegistry,
       gestureStateRegistry: localGestureStateRegistry,
@@ -489,6 +491,7 @@ extension ResolveContext {
     self.localGestureRegistry = nil
     self.localGestureStateRegistry = nil
     self.localPointerHandlerRegistry = nil
+    localTerminationRegistry = nil
     self.localFocusBindingRegistry = nil
     self.localFocusedValuesRegistry = localFocusedValuesRegistry
     localScrollPositionRegistry = nil
