@@ -74,21 +74,45 @@ extension View where Self: ActionScope & Sendable {
     refresh: @escaping @MainActor @Sendable () -> Void
   ) -> some View & ActionScope & Sendable {
     self
-      .keyCommand("Cursor left", key: .arrowLeft, modifiers: .shift) {
+      .onKeyPress(.arrowLeft) { _ in
         model.moveCursor(dx: -1, dy: 0)
         refresh()
+        return .handled
       }
-      .keyCommand("Cursor right", key: .arrowRight, modifiers: .shift) {
+      .onKeyPress(.arrowRight) { _ in
         model.moveCursor(dx: 1, dy: 0)
         refresh()
+        return .handled
       }
-      .keyCommand("Cursor up", key: .arrowUp, modifiers: .shift) {
+      .onKeyPress(.arrowUp) { _ in
         model.moveCursor(dx: 0, dy: -1)
         refresh()
+        return .handled
       }
-      .keyCommand("Cursor down", key: .arrowDown, modifiers: .shift) {
+      .onKeyPress(.arrowDown) { _ in
         model.moveCursor(dx: 0, dy: 1)
         refresh()
+        return .handled
+      }
+      .onKeyPress(.character("h")) { _ in
+        model.moveCursor(dx: -1, dy: 0)
+        refresh()
+        return .handled
+      }
+      .onKeyPress(.character("j")) { _ in
+        model.moveCursor(dx: 0, dy: 1)
+        refresh()
+        return .handled
+      }
+      .onKeyPress(.character("k")) { _ in
+        model.moveCursor(dx: 0, dy: -1)
+        refresh()
+        return .handled
+      }
+      .onKeyPress(.character("l")) { _ in
+        model.moveCursor(dx: 1, dy: 0)
+        refresh()
+        return .handled
       }
       .keyCommand("Jump left", key: .arrowLeft, modifiers: .ctrl) {
         model.moveCursor(dx: -8, dy: 0)
@@ -104,22 +128,6 @@ extension View where Self: ActionScope & Sendable {
       }
       .keyCommand("Jump down", key: .arrowDown, modifiers: .ctrl) {
         model.moveCursor(dx: 0, dy: 8)
-        refresh()
-      }
-      .keyCommand("Cursor h", key: .character("h"), modifiers: .shift) {
-        model.moveCursor(dx: -1, dy: 0)
-        refresh()
-      }
-      .keyCommand("Cursor j", key: .character("j"), modifiers: .shift) {
-        model.moveCursor(dx: 0, dy: 1)
-        refresh()
-      }
-      .keyCommand("Cursor k", key: .character("k"), modifiers: .shift) {
-        model.moveCursor(dx: 0, dy: -1)
-        refresh()
-      }
-      .keyCommand("Cursor l", key: .character("l"), modifiers: .shift) {
-        model.moveCursor(dx: 1, dy: 0)
         refresh()
       }
   }
