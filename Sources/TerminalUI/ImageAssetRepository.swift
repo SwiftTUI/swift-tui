@@ -314,7 +314,7 @@ final class ImageAssetRepository: Sendable {
     case .fileURL(let value):
       return parseFileURL(value).map(ImageAssetReference.filePath)
     case .data(let bytes):
-      return .embeddedPNG(bytes)
+      return .embeddedImage(bytes)
     }
   }
 
@@ -330,7 +330,7 @@ final class ImageAssetRepository: Sendable {
         return nil
       }
       bytes = read
-    case .embeddedPNG(let read):
+    case .embeddedImage(let read):
       // Despite the case name, this carries any supported image format.
       bytes = read
     }

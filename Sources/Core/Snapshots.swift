@@ -555,8 +555,8 @@ extension SnapshotRenderer {
       return "namedResource(\(name))"
     case .filePath(let path):
       return "filePath(\(path))"
-    case .embeddedPNG(let bytes):
-      return "embeddedPNG(\(bytes.count)b)"
+    case .embeddedImage(let bytes):
+      return "embeddedImage(\(bytes.count)b)"
     }
   }
 

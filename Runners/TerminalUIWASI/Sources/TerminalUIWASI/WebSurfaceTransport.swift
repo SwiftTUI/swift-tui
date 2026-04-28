@@ -695,7 +695,7 @@ package enum WebSurfaceFrameEncoder {
     for attachment: RasterImageAttachment
   ) -> [UInt8]? {
     switch attachment.resolvedReference {
-    case .embeddedPNG(let bytes):
+    case .embeddedImage(let bytes):
       return bytes
     case .filePath(let path):
       return webSurfaceReadFileBytes(at: path)
