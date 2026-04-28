@@ -1,8 +1,6 @@
 # swift-gif
 
-A pure-Swift GIF decoder. The public surface mirrors
-[`swift-png`](../swift-png) and [`swift-jpeg`](../swift-jpeg) so call sites
-are nearly identical:
+A pure-Swift GIF decoder.
 
 ```swift
 import GIF

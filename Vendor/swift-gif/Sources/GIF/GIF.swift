@@ -1,7 +1,6 @@
 /// A namespace for the GIF decoder.
 ///
-/// Mirrors the swift-png / swift-jpeg shapes: nested ``RGBA``,
-/// ``BytestreamSource``, ``Image``, and ``DecodingError``, with
+/// Nested ``RGBA``, ``BytestreamSource``, ``Image``, and ``DecodingError``, with
 /// ``Image/decompress(stream:)`` as the primary entry point.
 public enum GIF {
 

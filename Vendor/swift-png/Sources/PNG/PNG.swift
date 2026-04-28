@@ -1,8 +1,12 @@
-/// A namespace for the baseline JPEG decoder.
+/// A namespace for the PNG decoder.
 ///
-/// ``RGBA``, ``BytestreamSource``, and ``Image`` are nested under this namespace, and
-/// ``Image/decompress(stream:)`` is the primary entry point.
-public enum JPEG {
+/// ``RGBA``, ``BytestreamSource``, and ``Image`` are nested under this
+/// namespace, and ``Image/decompress(stream:)`` is the primary entry
+/// point. The public surface is the same shape as `JPEG.Image` and
+/// `GIF.Image` — the same generic pixel type, the same source protocol,
+/// the same `decompress` / `unpack` methods — so a single adapter can
+/// dispatch into all three decoders.
+public enum PNG {
 
   /// A four-component pixel.
   @frozen
@@ -23,8 +27,9 @@ public enum JPEG {
   /// A source bytestream.
   ///
   /// Conform a type to this protocol to feed bytes to the decoder. The
-  /// protocol is identical in shape to `PNG.BytestreamSource` so the same
-  /// adapter type can serve both decoders.
+  /// protocol is identical in shape to `JPEG.BytestreamSource` and
+  /// `GIF.BytestreamSource` so the same adapter can serve all three
+  /// decoders.
   public protocol BytestreamSource {
     /// Reads the next `count` bytes from the stream, or returns `nil` if
     /// fewer than `count` bytes remain.
@@ -32,8 +37,12 @@ public enum JPEG {
   }
 }
 
-extension JPEG.RGBA {
+extension PNG.RGBA {
   /// The fully-opaque alpha value for this integer type (`T.max`).
   @inlinable
   public static var opaqueAlpha: T { T.max }
+
+  /// The fully-transparent alpha value (zero).
+  @inlinable
+  public static var clearAlpha: T { 0 }
 }
