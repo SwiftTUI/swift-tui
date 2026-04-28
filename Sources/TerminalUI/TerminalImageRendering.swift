@@ -222,6 +222,25 @@ final class TerminalImageRenderer: Sendable {
               sourceRect: placement.sourceRect
             )
           )
+          // Multi-frame images: transmit additional frames after the
+          // initial `a=T`, set the root-frame gap (kitty ignores `z=`
+          // on the initial transmit), and start the animation loop.
+          // Single-frame images skip all three.
+          if image.animationFrames.count > 1 {
+            writeSteps.append(
+              contentsOf: kittyAnimationFrameCommands(
+                for: image,
+                imageID: imageID
+              )
+            )
+            if let rootGap = kittyRootFrameGapCommand(
+              imageID: imageID,
+              delayMilliseconds: image.animationFrames.first?.delayMilliseconds ?? 0
+            ) {
+              writeSteps.append(rootGap)
+            }
+            writeSteps.append(kittyAnimationStartCommand(imageID: imageID))
+          }
           transmittedKittyImages.insert(imageID)
         }
 
@@ -381,18 +400,10 @@ final class TerminalImageRenderer: Sendable {
     return payload
   }
 
-  /// Flattens an array of decoded RGBA pixels into the row-major byte
-  /// stream Kitty expects under `f=32` (4 bytes per pixel: R, G, B, A).
+  /// Forwards to the free `rgbaBytes(from:)` packer so animation
+  /// transmits and first-frame transmits share one implementation.
   private func rgbaBytes(from pixels: [RGBAImagePixel]) -> [UInt8] {
-    var out = [UInt8]()
-    out.reserveCapacity(pixels.count * 4)
-    for pixel in pixels {
-      out.append(UInt8(pixel.red))
-      out.append(UInt8(pixel.green))
-      out.append(UInt8(pixel.blue))
-      out.append(UInt8(pixel.alpha))
-    }
-    return out
+    TerminalUI_rgbaBytes(from: pixels)
   }
 
   private func sixelPayload(
@@ -1327,6 +1338,10 @@ private func kittyTransmitAndPlaceCommands(
       if case .rgba(let pixelSize) = payload.format {
         controlData.append(",s=\(pixelSize.width),v=\(pixelSize.height)")
       }
+      // Note: the kitty protocol explicitly says the root-frame gap
+      // *must* be set via a follow-up `a=a,r=1,z=...` control message
+      // (see Animation in graphics-protocol.rst). `z=` on the initial
+      // transmit applies only to additional frames, not frame 1.
       if let sourceRect {
         controlData.append(
           ",x=\(sourceRect.x),y=\(sourceRect.y),w=\(sourceRect.width),h=\(sourceRect.height)"
@@ -1337,6 +1352,128 @@ private func kittyTransmitAndPlaceCommands(
     }
     // Continuation chunks may only carry the `m` (and optionally `q`) key.
     return "\u{001B}_Gm=\(hasMore);\(chunk)\u{001B}\\"
+  }
+}
+
+/// Flattens an array of decoded RGBA pixels into the row-major byte
+/// stream Kitty expects under `f=32` (4 bytes per pixel: R, G, B, A).
+/// Free function so both first-frame and animation-frame transmits
+/// can share it without crossing actor isolation boundaries.
+private func TerminalUI_rgbaBytes(from pixels: [RGBAImagePixel]) -> [UInt8] {
+  var out = [UInt8]()
+  out.reserveCapacity(pixels.count * 4)
+  for pixel in pixels {
+    out.append(UInt8(pixel.red))
+    out.append(UInt8(pixel.green))
+    out.append(UInt8(pixel.blue))
+    out.append(UInt8(pixel.alpha))
+  }
+  return out
+}
+
+/// For an animated image, transmits frames 2…N as kitty `a=f` extra-
+/// frame commands. Each frame is shipped as raw RGBA (`f=32`) chunked
+/// into 4 KiB base64 segments, exactly like the first-frame transmit.
+/// Returns an empty array for single-frame images.
+private func kittyAnimationFrameCommands(
+  for image: DecodedImage,
+  imageID: UInt32
+) -> [String] {
+  guard image.animationFrames.count > 1 else {
+    return []
+  }
+  var commands: [String] = []
+  // Frame 1 was already shipped via `a=T`. Frames 2..N append via
+  // `a=f` (no `r=` — `r` *edits* an existing frame, not appends).
+  for frame in image.animationFrames.dropFirst() {
+    let encoded = base64Encoded(TerminalUI_rgbaBytes(from: frame.pixels))
+    commands.append(
+      contentsOf: kittyAdditionalFrameTransmitCommands(
+        encodedData: encoded,
+        imageID: imageID,
+        delayMilliseconds: frame.delayMilliseconds,
+        pixelSize: image.pixelSize
+      )
+    )
+  }
+  return commands
+}
+
+/// The root frame's gap must be set via a follow-up `a=a,r=1,z=…`
+/// control message — kitty ignores `z=` on the initial `a=T`. Returns
+/// nil when the first frame has no explicit gap (kitty's default of
+/// ~40 ms then applies).
+private func kittyRootFrameGapCommand(
+  imageID: UInt32,
+  delayMilliseconds: Int
+) -> String? {
+  guard delayMilliseconds > 0 else {
+    return nil
+  }
+  return "\u{001B}_Ga=a,q=2,i=\(imageID),r=1,z=\(delayMilliseconds)\u{001B}\\"
+}
+
+/// Issues the kitty `a=a,s=3,v=1` action — start the named image's
+/// animation in normal-loop mode (`s=3`) with infinite looping
+/// (`v=1`). Note: `v=0` is *ignored* by kitty per the protocol, which
+/// silently dropped the animation in earlier drafts.
+private func kittyAnimationStartCommand(imageID: UInt32) -> String {
+  "\u{001B}_Ga=a,q=2,i=\(imageID),s=3,v=1\u{001B}\\"
+}
+
+/// Builds the chunked escape sequences for an `a=f` (additional frame)
+/// transmission. Same chunking discipline as the first-frame transmit:
+/// 4 KiB base64 segments, multiple-of-4 boundaries on non-final
+/// chunks, terminator `m=0` on the last.
+private func kittyAdditionalFrameTransmitCommands(
+  encodedData: String,
+  imageID: UInt32,
+  delayMilliseconds: Int,
+  pixelSize: Size
+) -> [String] {
+  let chunkSize = 4096
+  let chunks = stride(from: 0, to: encodedData.count, by: chunkSize).map { index in
+    let start = encodedData.index(encodedData.startIndex, offsetBy: index)
+    let end =
+      encodedData.index(
+        start,
+        offsetBy: min(chunkSize, encodedData.count - index),
+        limitedBy: encodedData.endIndex
+      ) ?? encodedData.endIndex
+    return String(encodedData[start..<end])
+  }
+
+  guard !chunks.isEmpty else {
+    return []
+  }
+
+  return chunks.enumerated().map { index, chunk in
+    let hasMore = index + 1 < chunks.count ? 1 : 0
+    if index == 0 {
+      // First chunk of an additional frame carries:
+      //   a=f  append an animation frame (no `r=` — `r` *edits* an
+      //        existing frame, while we want to append)
+      //   q=2  silent
+      //   i    image id (must match the one transmitted via a=T)
+      //   X=1  composition mode: replace pixels onto the canvas
+      //        (the default is alpha blend with the canvas color)
+      //   z    per-frame display duration in ms
+      //   f=32 raw RGBA bytes
+      //   s,v  source pixel dimensions
+      //   m    1 if more chunks follow, 0 otherwise
+      var controlData =
+        "_Ga=f,q=2,i=\(imageID),X=1,f=32,s=\(pixelSize.width),v=\(pixelSize.height)"
+      if delayMilliseconds > 0 {
+        controlData.append(",z=\(delayMilliseconds)")
+      }
+      controlData.append(",m=\(hasMore)")
+      return "\u{001B}\(controlData);\(chunk)\u{001B}\\"
+    }
+    // Continuation chunks of an additional-frame transmission still
+    // use `_Gm=` — the transmit boundaries are identical. Note: per
+    // the protocol, continuation chunks for an `a=f` transmission
+    // also need to specify `a=f` to keep the receiver in frame mode.
+    return "\u{001B}_Gm=\(hasMore),a=f;\(chunk)\u{001B}\\"
   }
 }
 
