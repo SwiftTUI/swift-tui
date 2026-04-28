@@ -366,7 +366,7 @@ public struct ResolvedNode: Equatable, Sendable {
   package mutating func setLayoutBehaviorPreservingDerivedState(_ newBehavior: LayoutBehavior) {
     _storedLayoutBehavior = newBehavior
   }
-  public var layoutMetadata: LayoutMetadata
+  package var layoutMetadata: LayoutMetadata
   package var drawMetadata: DrawMetadata {
     get { _boxedDrawMetadata.value }
     set { _boxedDrawMetadata.value = newValue }
@@ -731,7 +731,7 @@ public struct PlacedNode: Equatable, Sendable {
     }
   }
   public var semanticRole: SemanticRole
-  public var layoutMetadata: LayoutMetadata
+  package var layoutMetadata: LayoutMetadata
   package var drawMetadata: DrawMetadata
   public var semanticMetadata: SemanticMetadata
   public var lifecycleMetadata: LifecycleMetadata

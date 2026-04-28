@@ -1,12 +1,12 @@
 /// Grouped metadata for layout-relevant properties of a resolved node.
 /// Used by `MeasurementCache` to compare only the fields that affect measurement,
 /// avoiding unnecessary cache misses from unrelated metadata changes.
-public struct NodeLayoutInfo: Equatable, Sendable {
-  public var layoutBehavior: LayoutBehavior
-  public var layoutMetadata: LayoutMetadata
-  public var intrinsicSize: Size?
+package struct NodeLayoutInfo: Equatable, Sendable {
+  package var layoutBehavior: LayoutBehavior
+  package var layoutMetadata: LayoutMetadata
+  package var intrinsicSize: Size?
 
-  public init(
+  package init(
     layoutBehavior: LayoutBehavior = .intrinsic,
     layoutMetadata: LayoutMetadata = .init(),
     intrinsicSize: Size? = nil
@@ -18,7 +18,7 @@ public struct NodeLayoutInfo: Equatable, Sendable {
 
   /// Equivalence check for measurement caching. Uses the relaxed
   /// `isEquivalentForMeasurement` comparison for `LayoutBehavior`.
-  public func isEquivalentForMeasurement(to other: Self) -> Bool {
+  package func isEquivalentForMeasurement(to other: Self) -> Bool {
     layoutBehavior.isEquivalentForMeasurement(to: other.layoutBehavior)
       && layoutMetadata == other.layoutMetadata
       && intrinsicSize == other.intrinsicSize
@@ -69,7 +69,7 @@ public struct NodeLifecycleInfo: Equatable, Sendable {
 
 extension ResolvedNode {
   /// Grouped layout metadata for this node.
-  public var layoutInfo: NodeLayoutInfo {
+  package var layoutInfo: NodeLayoutInfo {
     get {
       NodeLayoutInfo(
         layoutBehavior: layoutBehavior,
