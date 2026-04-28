@@ -21,16 +21,9 @@ Deliberately deferred:
 - Pixel-precise layout or any second, non-terminal presentation model
 - Media-heavy surfaces beyond PNG image presentation
 
-## Topics
-
-### Related Articles
+## See Also
 
 - <doc:Architecture>
 - <doc:Runtime>
 - <doc:Host-Integration>
-
-## See Also
-
-The full philosophy, deviation rules, and reasoning behind which SwiftUI concepts ship today:
-
 - [Project Vision](https://github.com/adamz/swift-terminal-ui/blob/main/docs/VISION.md)
