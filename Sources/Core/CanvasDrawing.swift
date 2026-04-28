@@ -7,12 +7,12 @@
 /// doesn't fit the shape fill/stroke algebra (sparklines, plots,
 /// hand-drawn meters, arbitrary curves).
 ///
-/// Conformance requires both ``Sendable`` (so drawings can cross
+/// Conformance requires both `Sendable` (so drawings can cross
 /// isolation boundaries between the view tree, layout, and rasterizer
-/// passes) and ``Equatable`` (so two canvas views carrying structurally
+/// passes) and `Equatable` (so two canvas views carrying structurally
 /// identical drawings compare equal in the draw tree and can dedup
 /// across re-renders). Most drawings are small value types where
-/// ``Equatable`` is synthesised automatically, for example:
+/// `Equatable` is synthesised automatically, for example:
 ///
 /// ```swift
 /// struct Sparkline: CanvasDrawing, Equatable {

@@ -62,11 +62,10 @@ That ordering is visible in ``DefaultRenderer``, `FrameArtifacts`, `Pipeline`, a
 
 ### Resolve
 
-- Public ``View`` values are lowered into `ResolvedNode` trees through package-only lowering helpers
+- Public `View` values are lowered into `ResolvedNode` trees
 - Structural views such as `Group`, `ForEach`, and conditionals affect the resolved child set
 - Environment and metadata are merged here
 - Root-hoisted presentations are declared during normal base resolution, then composed around the resolved base tree afterward so the displayed base subtree keeps its authored identity space
-- Presentation hosts reconcile any host-owned mirrored presentation state from the current resolved base tree before choosing overlay entries; selective dirty evaluation can re-resolve only the declaring subtree, especially under wrapper and scene hosts
 - Reuse is conservative and keyed by identity, invalidation scope, and compatible context
 
 ### Measure
@@ -99,25 +98,11 @@ That ordering is visible in ``DefaultRenderer``, `FrameArtifacts`, `Pipeline`, a
 
 - The commit planner packages semantic, lifecycle, and handler-installation work into a `CommitPlan`
 - The view graph owns lifecycle state and emits explicit appear, disappear, task-start, and task-cancel operations during frame finalization
-- Presentation dismissal cleanup must stay scoped to the dismissed overlay subtree identities instead of broad stale-subtree sweeps that can tear down unrelated retained content
 - Public `.onAppear`, `.onDisappear`, and `.task` hooks lower into this phase rather than firing during resolve
 
 ## Runtime Model
 
-``RunLoop`` wraps the pure frame pipeline in an interactive session.
-
-It coordinates:
-
-- a terminal host for raw mode, alternate-screen ownership, surface sizing, and writes
-- a streaming terminal host for embedded hosts that need the same presentation contract without owning a file descriptor
-- ``HostedSceneSession`` native surface hosting for embedded SwiftUI hosts that consume `RasterSurface` directly
-- input readers and signal readers for event streams
-- an injected terminal input reader for wrapper-managed byte or event delivery that still shares the terminal control-message contract
-- a frame scheduler for invalidations, deadlines, signals, and wakeups
-- a state container plus dynamic state storage for local state changes
-- focus, action, key, lifecycle, task, pointer, and focused-value registries
-- lifecycle and task coordinators for post-present lifecycle reconciliation
-- a package-private window host that makes each ``WindowGroup`` fill and clip to the terminal canvas
+``RunLoop`` wraps the pure frame pipeline in an interactive session, coordinating terminal I/O, input parsing, signal handling, frame scheduling, state invalidation, focus routing, and lifecycle staging around the pure frame products.
 
 The core runtime is intentionally narrow today:
 
@@ -155,19 +140,9 @@ CLI scene management is executable-runner policy rather than an authored-scene r
 - Presentation lowers raster surfaces into ASCII, ANSI16, ANSI256, or true-color output
 - Terminal capability affects presentation, not layout semantics
 
-## Transitional Seams
-
-The repository still carries a few package-only seams:
-
-- lowerer protocols such as `ViewNode` and `ResolvableView`
-- internal resolver and lifecycle seams used by tests and runtime plumbing
-
-Those seams should remain adapters. They are not part of the public authoring story and should not leak back into the supported surface.
-
-## Topics
-
-### Related Articles
+## See Also
 
 - <doc:Runtime>
 - <doc:Vision>
 - <doc:Host-Integration>
+- [Architecture details](https://github.com/adamz/swift-terminal-ui/blob/main/docs/ARCHITECTURE.md)

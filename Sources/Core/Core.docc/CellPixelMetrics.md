@@ -31,6 +31,6 @@ require pixel accuracy.
 
 - ``estimated``
 
-### Related discussion
+## See Also
 
 - [Cell Pixel Geometry Research](https://github.com/adamz/swift-terminal-ui/blob/main/docs/CELL_PIXEL_GEOMETRY_RESEARCH.md)
