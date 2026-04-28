@@ -25,38 +25,28 @@ struct TabBorderRenderingTests {
   func counterTabHasOuterHalfBlockCardFrame() throws {
     let surface = renderCounterTab()
 
-    // Pull the first row that contains both top corners — asserting
-    // its shape directly avoids hard-coding row indices that can
-    // drift with branding header tweaks.
-    let topLine = try #require(
-      surface.lines.first { $0.contains("▛") && $0.contains("▜") }
+    let topEdge = try #require(
+      widestFrameEdge(in: surface, leftCorner: "▛", rightCorner: "▜", fill: "▀")
     )
-    let topBetween =
-      topLine
-      .drop(while: { $0 != "▛" })
-      .dropFirst()
-      .prefix(while: { $0 != "▜" })
-    #expect(!topBetween.isEmpty)
-    #expect(topBetween.allSatisfy { $0 == "▀" })
-
-    let bottomLine = try #require(
-      surface.lines.first { $0.contains("▙") && $0.contains("▟") }
+    let bottomEdge = try #require(
+      widestFrameEdge(in: surface, leftCorner: "▙", rightCorner: "▟", fill: "▄")
     )
-    let bottomBetween =
-      bottomLine
-      .drop(while: { $0 != "▙" })
-      .dropFirst()
-      .prefix(while: { $0 != "▟" })
-    #expect(!bottomBetween.isEmpty)
-    #expect(bottomBetween.allSatisfy { $0 == "▄" })
 
     // Top and bottom card edges are the same width.
-    #expect(topBetween.count == bottomBetween.count)
+    #expect(topEdge.interiorWidth == bottomEdge.interiorWidth)
+    #expect(topEdge.leftColumn == bottomEdge.leftColumn)
+    #expect(topEdge.rightColumn == bottomEdge.rightColumn)
 
     // The card must have at least one interior row with the left /
     // right edge glyphs, confirming a closed frame.
-    let interiorLine = surface.lines.first { $0.contains("▌") && $0.contains("▐") }
-    #expect(interiorLine != nil)
+    let hasInteriorEdge =
+      topEdge.row < bottomEdge.row
+      && ((topEdge.row + 1)..<bottomEdge.row).contains { rowIndex in
+        let row = surface.cells[rowIndex]
+        return row[topEdge.leftColumn].character == "▌"
+          && row[topEdge.rightColumn].character == "▐"
+      }
+    #expect(hasInteriorEdge)
   }
 
   @Test("CounterTab card frame cells share a uniform foreground style")
@@ -66,18 +56,18 @@ struct TabBorderRenderingTests {
     // All four corners should render with the same non-nil foreground
     // color — that pins the `.border(.separator, ...)` call-site without
     // tying the test to the exact appearance-derived color resolution.
-    let rowIndex = try #require(
-      surface.lines.firstIndex { $0.contains("▛") && $0.contains("▜") }
+    let topEdge = try #require(
+      widestFrameEdge(in: surface, leftCorner: "▛", rightCorner: "▜", fill: "▀")
     )
-    let bottomRowIndex = try #require(
-      surface.lines.firstIndex { $0.contains("▙") && $0.contains("▟") }
+    let bottomEdge = try #require(
+      widestFrameEdge(in: surface, leftCorner: "▙", rightCorner: "▟", fill: "▄")
     )
-    let topRow = surface.cells[rowIndex]
-    let bottomRow = surface.cells[bottomRowIndex]
-    let topLeft = try #require(topRow.first { $0.character == "▛" })
-    let topRight = try #require(topRow.first { $0.character == "▜" })
-    let bottomLeft = try #require(bottomRow.first { $0.character == "▙" })
-    let bottomRight = try #require(bottomRow.first { $0.character == "▟" })
+    let topRow = surface.cells[topEdge.row]
+    let bottomRow = surface.cells[bottomEdge.row]
+    let topLeft = topRow[topEdge.leftColumn]
+    let topRight = topRow[topEdge.rightColumn]
+    let bottomLeft = bottomRow[bottomEdge.leftColumn]
+    let bottomRight = bottomRow[bottomEdge.rightColumn]
 
     let topLeftFg = topLeft.style?.foregroundColor
     #expect(topLeftFg != nil)
@@ -137,5 +127,52 @@ struct TabBorderRenderingTests {
       proposal: .init(width: terminalSize.width, height: terminalSize.height)
     )
     return artifacts.rasterSurface
+  }
+
+  private struct FrameEdge {
+    var row: Int
+    var leftColumn: Int
+    var rightColumn: Int
+
+    var interiorWidth: Int {
+      rightColumn - leftColumn - 1
+    }
+  }
+
+  private func widestFrameEdge(
+    in surface: RasterSurface,
+    leftCorner: Character,
+    rightCorner: Character,
+    fill: Character
+  ) -> FrameEdge? {
+    var bestEdge: FrameEdge?
+
+    for rowIndex in surface.cells.indices {
+      let row = surface.cells[rowIndex]
+      for leftColumn in row.indices where row[leftColumn].character == leftCorner {
+        for rightColumn in row.indices where rightColumn > leftColumn {
+          guard row[rightColumn].character == rightCorner else { continue }
+
+          let interiorColumns = (leftColumn + 1)..<rightColumn
+          guard
+            !interiorColumns.isEmpty,
+            interiorColumns.allSatisfy({ row[$0].character == fill })
+          else {
+            continue
+          }
+
+          let candidate = FrameEdge(
+            row: rowIndex,
+            leftColumn: leftColumn,
+            rightColumn: rightColumn
+          )
+          if bestEdge.map({ candidate.interiorWidth > $0.interiorWidth }) ?? true {
+            bestEdge = candidate
+          }
+        }
+      }
+    }
+
+    return bestEdge
   }
 }

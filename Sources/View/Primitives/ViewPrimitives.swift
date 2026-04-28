@@ -249,7 +249,7 @@ public struct Spacer: View, ResolvableView {
 public struct Divider: View, ResolvableView {
   public var strokeStyle: StrokeStyle
 
-  public init(strokeStyle: StrokeStyle = .single) {
+  public init(strokeStyle: StrokeStyle = .init()) {
     self.strokeStyle = strokeStyle
   }
 
