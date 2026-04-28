@@ -1,7 +1,7 @@
 # Aspect-correct shapes in terminals
 
 TerminalUI's Braille-subpixel shape rasterizer consumes
-``Core/CellPixelMetrics`` from the resolve environment so that
+``/Core/CellPixelMetrics`` from the resolve environment so that
 ``Circle``, ``Ellipse``, and ``Capsule`` render honestly regardless of
 the terminal's cell aspect ratio.
 
