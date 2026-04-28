@@ -64,10 +64,51 @@ struct WebSurfaceTransportTests {
     #expect(firstImage["visibleBounds"] as? [Int] == [2, 0, 2, 2])
     #expect(firstImage["pixelSize"] as? [Int] == [3, 2])
     #expect(firstImage["scalingMode"] as? String == "stretch")
-    #expect(firstImage["pngBase64"] as? String == "iVBORw==")
+    #expect(firstImage["dataBase64"] as? String == "iVBORw==")
 
     #expect(secondImage["id"] as? String == firstImage["id"] as? String)
-    #expect(secondImage["pngBase64"] == nil)
+    #expect(secondImage["dataBase64"] == nil)
+  }
+
+  @Test("encoder advertises gif format and ships dataBase64 for animated GIF inputs")
+  func encoderAdvertisesGIFFormatAndShipsDataBase64() throws {
+    // GIF89a header followed by a few palette/data bytes — short, but
+    // long enough to trip the 6-byte magic check so the encoder picks
+    // .gif over the .png default.
+    let gifBytes: [UInt8] = [
+      0x47, 0x49, 0x46, 0x38, 0x39, 0x61,  // GIF89a
+      0x01, 0x00, 0x01, 0x00,  // 1x1 logical screen
+      0x80, 0x00, 0x00,
+    ]
+    let surface = RasterSurface(
+      size: .init(width: 4, height: 2),
+      lines: ["    ", "    "],
+      imageAttachments: [
+        RasterImageAttachment(
+          identity: .init(components: [.named("gif")]),
+          bounds: .init(origin: .zero, size: .init(width: 3, height: 2)),
+          visibleBounds: nil,
+          source: .data(gifBytes),
+          resolvedReference: .embeddedImage(gifBytes),
+          pixelSize: .init(width: 1, height: 1),
+          isResizable: false
+        )
+      ]
+    )
+
+    var knownImageIDs: Set<String> = []
+    let frame = try Self.decodedSurfaceFrame(
+      WebSurfaceFrameEncoder.encode(
+        surface,
+        knownImageIDs: &knownImageIDs
+      )
+    )
+    let image = try #require((frame["images"] as? [[String: Any]])?.first)
+
+    #expect(image["format"] as? String == "gif")
+    let id = try #require(image["id"] as? String)
+    #expect(id.hasPrefix("gif:"))
+    #expect(image["dataBase64"] as? String == "R0lGODlhAQABAIAAAA==")
   }
 
   @Test("parser handles resize and style commands split across chunks")

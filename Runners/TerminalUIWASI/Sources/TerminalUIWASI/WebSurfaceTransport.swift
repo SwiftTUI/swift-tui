@@ -1,6 +1,26 @@
 import Synchronization
 @_spi(Runners) import TerminalUI
 
+/// Container format the web-surface transport advertises to the JS
+/// side. Mirrors the JSON `format` field on each transmitted image
+/// record, and disambiguates the MIME type that the consumer will
+/// pass to `Blob`/`<img>` when decoding.
+enum WebSurfaceImageFormat: Sendable, Equatable {
+  case png
+  case jpeg
+  case gif
+
+  /// String that appears in the surface JSON's `format` field — and
+  /// becomes the suffix of `image/<value>` in the consumer's MIME.
+  var jsonValue: String {
+    switch self {
+    case .png: return "png"
+    case .jpeg: return "jpeg"
+    case .gif: return "gif"
+    }
+  }
+}
+
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
@@ -669,15 +689,16 @@ package enum WebSurfaceFrameEncoder {
     _ attachment: RasterImageAttachment,
     knownImageIDs: inout Set<String>
   ) -> String? {
-    guard let pngBytes = pngBytes(for: attachment), !attachment.visibleBounds.isEmpty else {
+    guard let bytes = imageBytes(for: attachment), !attachment.visibleBounds.isEmpty else {
       return nil
     }
+    let format = imageFormat(for: bytes)
 
-    let imageID = webImageID(for: pngBytes)
+    let imageID = webImageID(for: bytes, format: format)
     let shouldTransmitData = knownImageIDs.insert(imageID).inserted
     var fields = [
       "\"id\":\(jsonString(imageID))",
-      "\"format\":\"png\"",
+      "\"format\":\(jsonString(format.jsonValue))",
       "\"bounds\":\(encodeRect(attachment.bounds))",
       "\"visibleBounds\":\(encodeRect(attachment.visibleBounds))",
       "\"scalingMode\":\(jsonString(attachment.scalingMode.rawValue))",
@@ -686,12 +707,12 @@ package enum WebSurfaceFrameEncoder {
       fields.append("\"pixelSize\":\(encodeSize(pixelSize))")
     }
     if shouldTransmitData {
-      fields.append("\"pngBase64\":\(jsonString(base64Encoded(pngBytes)))")
+      fields.append("\"dataBase64\":\(jsonString(base64Encoded(bytes)))")
     }
     return "{" + fields.joined(separator: ",") + "}"
   }
 
-  private static func pngBytes(
+  private static func imageBytes(
     for attachment: RasterImageAttachment
   ) -> [UInt8]? {
     switch attachment.resolvedReference {
@@ -709,6 +730,31 @@ package enum WebSurfaceFrameEncoder {
     return nil
   }
 
+  /// Detects the container format from the leading magic bytes. Used
+  /// to set the JSON `format` field and pick a MIME type on the JS
+  /// side. Defaults to PNG so unknown blobs at least try the most
+  /// common path.
+  private static func imageFormat(
+    for bytes: [UInt8]
+  ) -> WebSurfaceImageFormat {
+    if bytes.count >= 8,
+      bytes[0] == 0x89, bytes[1] == 0x50, bytes[2] == 0x4E, bytes[3] == 0x47,
+      bytes[4] == 0x0D, bytes[5] == 0x0A, bytes[6] == 0x1A, bytes[7] == 0x0A
+    {
+      return .png
+    }
+    if bytes.count >= 3, bytes[0] == 0xFF, bytes[1] == 0xD8, bytes[2] == 0xFF {
+      return .jpeg
+    }
+    if bytes.count >= 6,
+      bytes[0] == 0x47, bytes[1] == 0x49, bytes[2] == 0x46, bytes[3] == 0x38,
+      bytes[4] == 0x37 || bytes[4] == 0x39, bytes[5] == 0x61
+    {
+      return .gif
+    }
+    return .png
+  }
+
   private static func encodeRect(
     _ rect: Rect
   ) -> String {
@@ -722,9 +768,10 @@ package enum WebSurfaceFrameEncoder {
   }
 
   private static func webImageID(
-    for bytes: [UInt8]
+    for bytes: [UInt8],
+    format: WebSurfaceImageFormat
   ) -> String {
-    "png:\(hexString(fnv1a64(bytes))):\(bytes.count)"
+    "\(format.jsonValue):\(hexString(fnv1a64(bytes))):\(bytes.count)"
   }
 
   private static func fnv1a64(

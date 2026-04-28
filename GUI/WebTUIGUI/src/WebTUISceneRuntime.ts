@@ -16,6 +16,7 @@ import {
   type WebTUIKeyInput,
   type WebTUISurfaceFrame,
   type WebTUISurfaceImage,
+  type WebTUISurfaceImageFormat,
   type WebTUISurfaceStyle,
 } from "./WebTUISurfaceTransport.ts";
 import type { WebTUISceneDescriptor } from "./WebTUISceneManifest.ts";
@@ -474,8 +475,8 @@ export class WebTUISceneRuntime {
       return cached.image;
     }
 
-    if (!cached?.promise && image.pngBase64) {
-      const promise = decodePNGImage(image.pngBase64);
+    if (!cached?.promise && image.dataBase64) {
+      const promise = decodeImage(image.dataBase64, image.format);
       this.imageCache.set(image.id, { promise });
       void promise.then((decodedImage) => {
         const latest = this.imageCache.get(image.id);
@@ -595,13 +596,17 @@ export class WebTUISceneRuntime {
   }
 }
 
-async function decodePNGImage(
-  pngBase64: string
+async function decodeImage(
+  dataBase64: string,
+  format: WebTUISurfaceImageFormat
 ): Promise<CanvasImageSource> {
-  const bytes = decodeBase64Bytes(pngBase64);
-  const blob = new Blob([bytes], { type: "image/png" });
+  const bytes = decodeBase64Bytes(dataBase64);
+  const blob = new Blob([bytes], { type: `image/${format}` });
 
   if (typeof createImageBitmap === "function") {
+    // Animated GIFs collapse to their first frame in createImageBitmap
+    // — that matches the Kitty path's first-frame composite. Phase 7
+    // will replace this with a frame ticker.
     return createImageBitmap(blob);
   }
 
@@ -614,7 +619,7 @@ async function decodePNGImage(
     };
     image.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Failed to decode PNG image"));
+      reject(new Error(`Failed to decode ${format} image`));
     };
     image.src = url;
   });
