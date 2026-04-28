@@ -1,7 +1,6 @@
 # swift-jpeg
 
-A pure-Swift baseline JPEG decoder. The public surface mirrors
-[`swift-png`](../swift-png) so call sites are nearly identical:
+A pure-Swift baseline JPEG decoder.
 
 ```swift
 import JPEG

@@ -25,9 +25,10 @@ let packagePlatforms: [SupportedPlatform]? = {
 }()
 
 let packageDependencies: [Package.Dependency] = [
-  .package(path: "Vendor/UnixSignals"),
-  .package(path: "Vendor/swift-figlet"),
-  .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.6"),
+  .package(
+    url: "https://github.com/swiftlang/swift-docc-plugin.git",
+    from: "1.4.6"
+  ),
   .package(
     url: "https://github.com/apple/swift-collections.git",
     from: "1.4.1"
@@ -37,10 +38,19 @@ let packageDependencies: [Package.Dependency] = [
     from: "1.1.3"
   ),
   .package(
-    path: "Vendor/swift-jpeg"
+    path: "Vendor/UnixSignals"
+  ),
+  .package(
+    path: "Vendor/swift-figlet"
   ),
   .package(
     path: "Vendor/swift-gif"
+  ),
+  .package(
+    path: "Vendor/swift-jpeg"
+  ),
+  .package(
+    path: "Vendor/swift-png"
   ),
 ]
 
@@ -54,12 +64,16 @@ let terminalUIDependencies: [Target.Dependency] = [
     condition: .when(platforms: nativeRuntimePlatforms),
   ),
   .product(
+    name: "GIF",
+    package: "swift-gif"
+  ),
+  .product(
     name: "JPEG",
     package: "swift-jpeg"
   ),
   .product(
-    name: "GIF",
-    package: "swift-gif"
+    name: "PNG",
+    package: "swift-png"
   ),
 ]
 
@@ -69,12 +83,16 @@ let terminalUITestDependencies: [Target.Dependency] = [
   "View",
   "TerminalUICharts",
   .product(
+    name: "GIF",
+    package: "swift-gif"
+  ),
+  .product(
     name: "JPEG",
     package: "swift-jpeg"
   ),
   .product(
-    name: "GIF",
-    package: "swift-gif"
+    name: "PNG",
+    package: "swift-png"
   ),
 ]
 
