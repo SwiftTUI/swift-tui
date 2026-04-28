@@ -454,7 +454,7 @@ private func selectionSummary(
       RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.windowBackground)
     }
     .overlay {
-      RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(.separator)
+      RoundedRectangle(cornerRadius: 1).strokeBorder(.separator)
     }
   )
 }
@@ -531,7 +531,7 @@ private func textLabColumn(
               RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(.windowBackground)
             }
             .overlay {
-              RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+              RoundedRectangle(cornerRadius: 1).strokeBorder(
                 state.accentPreviewEnabled ? .success : .info
               )
             }

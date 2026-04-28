@@ -31,14 +31,14 @@ public struct ControlChrome: Equatable, Sendable {
   public var foregroundStyle: AnyShapeStyle
   public var contentBackgroundStyle: AnyShapeStyle
   public var borderForegroundStyle: AnyShapeStyle
-  public var borderBackgroundStyle: AnyShapeStyle?
+  public var borderBackgroundStyle: BorderBackgroundStyle?
   public var opacity: Double
 
   public init(
     foregroundStyle: AnyShapeStyle,
     contentBackgroundStyle: AnyShapeStyle,
     borderForegroundStyle: AnyShapeStyle,
-    borderBackgroundStyle: AnyShapeStyle? = nil,
+    borderBackgroundStyle: BorderBackgroundStyle? = nil,
     opacity: Double = 1
   ) {
     self.foregroundStyle = foregroundStyle

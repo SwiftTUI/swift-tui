@@ -235,10 +235,10 @@ package struct RoundedBorderTextFieldStyleBody: View {
         )
       }
       .overlay {
-        RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+        RoundedRectangle(cornerRadius: 1).strokeBorder(
           configuration.chrome.borderStyle,
-          style: configuration.focusActive ? .thick : .init(),
-          backgroundStyle: configuration.chrome.borderBackgroundStyle
+          style: configuration.focusActive ? .heavy : .init(),
+          background: configuration.chrome.borderBackgroundStyle
         )
       }
 

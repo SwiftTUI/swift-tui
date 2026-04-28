@@ -1361,7 +1361,7 @@ struct SwiftUISurfaceTests {
   func explicitBorderBackgroundOnlyStylesBorderRing() {
     let artifacts = DefaultRenderer().render(
       RoundedRectangle(cornerRadius: 1)
-        .chromeStrokeBorder(.danger, backgroundStyle: AnyShapeStyle(.warning))
+        .strokeBorder(.danger, background: AnyShapeStyle(.warning))
         .frame(width: 5, height: 3, alignment: .topLeading),
       context: .init(identity: testIdentity("BorderBackground"))
     )
@@ -5132,7 +5132,7 @@ struct SwiftUISurfaceTests {
     )
     let ruleArtifacts = DefaultRenderer().render(
       VStack(alignment: .leading, spacing: 0) {
-        Divider(strokeStyle: .thick)
+        Divider(strokeStyle: .heavy)
       },
       context: .init(identity: testIdentity("Rule")),
       proposal: .init(width: 4, height: nil)
@@ -5233,7 +5233,7 @@ struct SwiftUISurfaceTests {
     arguments: [
       (StrokeStyle(borderSet: .single), ["┌──┐", "│Hi│", "└──┘"]),
       (StrokeStyle.rounded, ["╭──╮", "│Hi│", "╰──╯"]),
-      (StrokeStyle.thick, ["┏━━┓", "┃Hi┃", "┗━━┛"]),
+      (StrokeStyle.heavy, ["┏━━┓", "┃Hi┃", "┗━━┛"]),
       (StrokeStyle.double, ["╔══╗", "║Hi║", "╚══╝"]),
       (StrokeStyle.ascii, ["+--+", "|Hi|", "+--+"]),
       (StrokeStyle.block, ["████", "█Hi█", "████"]),

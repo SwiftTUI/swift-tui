@@ -179,26 +179,6 @@ extension InsettableShape {
   }
 }
 
-extension Shape {
-  package func chromeStrokeBorder<S: ShapeStyle>(
-    _ style: S,
-    style strokeStyle: StrokeStyle = .init(),
-    backgroundStyle: AnyShapeStyle? = nil
-  ) -> some View {
-    ShapeRenderView(
-      kindName: kindName,
-      geometry: geometry,
-      insetAmount: insetAmount,
-      operation: .stroke(
-        style: AnyShapeStyle(style),
-        strokeStyle: strokeStyle,
-        strokeBorder: true,
-        backgroundStyle: backgroundStyle.map { .init(all: $0) }
-      )
-    )
-  }
-}
-
 private struct ShapeRenderView: View, ResolvableView {
   var kindName: String
   var geometry: ShapeGeometry

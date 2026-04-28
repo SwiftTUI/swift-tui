@@ -706,10 +706,10 @@ package func textEditorBody(
     RoundedRectangle(cornerRadius: 1).inset(by: 1).fill(chrome.backgroundStyle)
   }
   .overlay {
-    RoundedRectangle(cornerRadius: 1).chromeStrokeBorder(
+    RoundedRectangle(cornerRadius: 1).strokeBorder(
       chrome.borderStyle,
-      style: focusActive ? .thick : .init(),
-      backgroundStyle: chrome.borderBackgroundStyle
+      style: focusActive ? .heavy : .init(),
+      background: chrome.borderBackgroundStyle
     )
   }
   .layoutMetadata(.init(minimumHeight: 3))
