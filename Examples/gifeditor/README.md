@@ -118,22 +118,6 @@ actions.
   disposal so frames fully replace their predecessors — easy to reason about
   and matches the editor's "fully painted frame" mental model.
 
-## Remaining framework gaps
-
-These still meaningfully improve the editor.
-
-1. **Pointer/mouse input on the pixel grid.** The `Image` primitive renders
-   to terminal-graphics protocols, but the per-cell `Rectangle` grid the
-   editor uses for "1 GIF pixel = 1 terminal cell" doesn't have a public
-   pointer-hit-test entry yet. Adding a `.onPointerTap { local in … }` or
-   exposing the existing pointer registry as a public modifier would let
-   us click-to-paint.
-2. **Per-cell colored fills.** Drawing thousands of `Rectangle().fill(c)
-   .frame(1×1)` views per row/column is correct but pays per-node resolve
-   cost. A `PixelMap(width:height:colors:)` primitive that takes a flat
-   `[Color]` and rasterizes one cell per entry would be a perfect fit
-   here. (We cap canvases at 64×64 today partly for this reason.)
-
 ## Tests
 
 ```bash
@@ -147,3 +131,5 @@ The core test suite verifies:
   pixel-for-pixel for a hand-built document and a round-trip of `nyan.gif`.
 * Document edits (pen, fill, gradient, marquee copy/paste) leave the model
   in expected states.
+* The terminal UI renders the editor canvas through Canvas-backed full-cell
+  and half-block pixel grids.
