@@ -374,7 +374,7 @@ public struct ResolvedNode: Equatable, Sendable {
   package var _boxedDrawMetadata: Boxed<DrawMetadata>
   public var semanticMetadata: SemanticMetadata
   public var lifecycleMetadata: LifecycleMetadata
-  public var drawPayload: DrawPayload
+  @_spi(Testing) public var drawPayload: DrawPayload
   public var intrinsicSize: Size?
   package var indexedChildSource: (any IndexedChildSource)? {
     didSet {
@@ -735,7 +735,7 @@ public struct PlacedNode: Equatable, Sendable {
   package var drawMetadata: DrawMetadata
   public var semanticMetadata: SemanticMetadata
   public var lifecycleMetadata: LifecycleMetadata
-  public var drawPayload: DrawPayload
+  @_spi(Testing) public var drawPayload: DrawPayload
   /// Mirror of ``ResolvedNode/layoutBehavior`` for cases that need to
   /// flow through to the draw extractor / rasterizer (currently just
   /// ``LayoutBehavior/border(_:foreground:background:blend:blendPhase:sides:)``).

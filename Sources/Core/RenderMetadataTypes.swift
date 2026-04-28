@@ -1,5 +1,5 @@
 /// The payload attached to a draw node.
-public indirect enum DrawPayload: Equatable, Sendable {
+@_spi(Testing) public indirect enum DrawPayload: Equatable, Sendable {
   case none
   case text(String)
   case textFigure(TextFigurePayload)

@@ -1,6 +1,6 @@
 import Testing
 
-@testable import Core
+@_spi(Testing) @testable import Core
 
 @Suite
 struct LayoutEngineTests {

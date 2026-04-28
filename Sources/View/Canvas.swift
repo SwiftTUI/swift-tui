@@ -1,4 +1,5 @@
 public import Core
+@_spi(Testing) import Core
 
 /// A view that renders a user-provided drawing into a Braille subpixel
 /// canvas sized to its frame.

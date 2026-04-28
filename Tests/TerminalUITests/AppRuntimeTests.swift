@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import Core
+@_spi(Testing) @testable import Core
 @_spi(Runners) @testable import TerminalUI
 @testable import View
 

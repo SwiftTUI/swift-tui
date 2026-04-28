@@ -1,5 +1,5 @@
 import Dispatch
-@_spi(Runners) import TerminalUI
+@_spi(Runners) @_spi(Testing) import TerminalUI
 import Testing
 
 @testable import GalleryDemoViews
