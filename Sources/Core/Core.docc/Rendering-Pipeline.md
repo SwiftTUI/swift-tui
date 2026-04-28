@@ -42,12 +42,7 @@ Packages lifecycle and handler-installation work into `CommitPlan`.
 
 ## Why The Split Matters
 
-Keeping the phases explicit gives the project a few durable advantages:
-
-- tests can pin exact behavior at the right abstraction boundary
-- layout and semantics do not need terminal escape-sequence knowledge
-- runtime presentation can evolve without rewriting layout
-- diagnostics can report where work was computed versus reused
+Keeping the phases explicit means layout and semantics do not need terminal escape-sequence knowledge, and runtime presentation can evolve without rewriting layout.
 
 ## Related Symbols
 
