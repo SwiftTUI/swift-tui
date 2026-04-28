@@ -9,7 +9,7 @@ public enum ImageSource: Equatable, Hashable, Sendable {
 public enum ImageAssetReference: Equatable, Hashable, Sendable {
   case namedResource(String)
   case filePath(String)
-  case embeddedPNG([UInt8])
+  case embeddedImage([UInt8])
 }
 
 /// Layout behavior used when an image participates in resizable measurement.

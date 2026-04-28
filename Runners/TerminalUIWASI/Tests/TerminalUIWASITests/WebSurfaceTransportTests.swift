@@ -216,7 +216,7 @@ struct WebSurfaceTransportTests {
           bounds: .init(origin: .init(x: 1, y: 0), size: .init(width: 3, height: 2)),
           visibleBounds: .init(origin: .init(x: 2, y: 0), size: .init(width: 2, height: 2)),
           source: .data(bytes),
-          resolvedReference: .embeddedPNG(bytes),
+          resolvedReference: .embeddedImage(bytes),
           pixelSize: .init(width: 3, height: 2),
           isResizable: true
         )

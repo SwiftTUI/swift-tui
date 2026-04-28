@@ -58,7 +58,7 @@ func makeRasterImageAttachment(
     bounds: bounds,
     visibleBounds: visibleBounds,
     source: .data(pngBytes),
-    resolvedReference: .embeddedPNG(pngBytes),
+    resolvedReference: .embeddedImage(pngBytes),
     pixelSize: pixelSize,
     isResizable: false,
     scalingMode: .stretch

@@ -9,7 +9,7 @@ import Testing
 @Suite
 struct ImageSurfaceTests {
   @Test("embedded PNG bytes resolve into a raster image attachment")
-  func embeddedPNGBytesResolveIntoAttachment() throws {
+  func embeddedImageBytesResolveIntoAttachment() throws {
     let pngBytes = try makePNGBytes(
       width: 2,
       height: 2,
@@ -28,7 +28,7 @@ struct ImageSurfaceTests {
 
     #expect(artifacts.rasterSurface.imageAttachments.count == 1)
     #expect(attachment.source == .data(pngBytes))
-    #expect(attachment.resolvedReference == .embeddedPNG(pngBytes))
+    #expect(attachment.resolvedReference == .embeddedImage(pngBytes))
     #expect(attachment.pixelSize == .init(width: 2, height: 2))
     #expect(attachment.bounds.size == .init(width: 1, height: 1))
   }
