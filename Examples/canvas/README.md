@@ -1,12 +1,13 @@
 # canvas-demo
 
-A small verification app for the current `Canvas` API. It exists to pin the
-baseline before Canvas grows per-cell color, pixel-grid, and half-block
-rendering modes.
+A small verification app for the current `Canvas` API. It exercises the
+interactive Braille subcell canvas and the dense pixel-grid canvas variants.
 
 The drawing surface deliberately uses `Canvas(Drawing)` and
 `CanvasDrawing.draw(into:)` with Braille subpixel coordinates. The cursor is a
 second Canvas overlay so the app stays inside today's public Canvas surface.
+The pixel-grid tabs use the same drawing controls while rendering through the
+full-cell and vertical half-block Canvas modes.
 
 ## Run
 
@@ -17,14 +18,16 @@ swift run canvas-demo
 
 ## Controls
 
-| Shortcut      | Action                 |
-| ------------- | ---------------------- |
-| Shift+Arrows  | Move cursor by 1 dot   |
-| Ctrl+Arrows   | Move cursor by 8 dots  |
-| Shift+Space   | Draw at cursor         |
-| Ctrl+E        | Erase at cursor        |
-| Ctrl+K        | Clear drawing          |
-| Ctrl+C        | Quit via host shell    |
+| Input       | Action                            |
+| ----------- | --------------------------------- |
+| Arrows      | Move cursor by 1 Braille subpixel |
+| H/J/K/L     | Move cursor by 1 Braille subpixel |
+| Space/Enter | Paint with the selected tool      |
+| D or P      | Select draw tool                  |
+| E           | Select erase tool                 |
+| C/Backspace | Clear the sketch                  |
+| Drag/click  | Paint or erase on the active tab  |
+| Ctrl+C      | Quit via host shell               |
 
 ## Tests
 
