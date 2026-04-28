@@ -1,4 +1,5 @@
 public import Core
+@_spi(Testing) import Core
 
 public struct AnyTabViewStyle: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
   package let snapshotLabel: String

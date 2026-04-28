@@ -1,4 +1,5 @@
 import Core
+@_spi(Testing) import Core
 
 func resolvedNodeLabelText(
   from node: ResolvedNode

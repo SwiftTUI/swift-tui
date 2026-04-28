@@ -2,7 +2,7 @@ import Foundation
 import Synchronization
 import Testing
 
-@testable import Core
+@_spi(Testing) @testable import Core
 @testable import TerminalUI
 @testable import View
 

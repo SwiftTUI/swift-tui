@@ -1,4 +1,5 @@
 package import Core
+@_spi(Testing) import Core
 
 /// Groups related collection content with optional header and footer content.
 public struct Section<Content: View, Header: View, Footer: View>: View,

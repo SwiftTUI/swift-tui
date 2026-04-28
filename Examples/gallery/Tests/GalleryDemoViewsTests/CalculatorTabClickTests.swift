@@ -1,5 +1,5 @@
 import Foundation
-import TerminalUI
+@_spi(Testing) import TerminalUI
 import Testing
 
 @testable import GalleryDemoViews

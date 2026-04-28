@@ -1,4 +1,5 @@
 public import Core
+@_spi(Testing) import Core
 
 /// A view that renders a geometric shape using fill or stroke operations.
 public protocol Shape: View {
