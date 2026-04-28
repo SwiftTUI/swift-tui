@@ -153,5 +153,93 @@ extension GIF {
         prevCode = Int32(code)
       }
     }
+
+    /// Compresses a row-major stream of palette indices into GIF LZW payload bytes.
+    static func encode(indices: [UInt8], minCodeSize: Int) -> [UInt8] {
+      precondition((2...8).contains(minCodeSize), "minCodeSize must be 2...8")
+
+      let clearCode = 1 << minCodeSize
+      let eoiCode = clearCode + 1
+      let maxDictSize = 1 << 12
+
+      var writer = BitWriter()
+      var codeSize = minCodeSize + 1
+
+      var dictionary: [DictKey: Int] = [:]
+      dictionary.reserveCapacity(4096)
+
+      func resetDictionary() {
+        dictionary.removeAll(keepingCapacity: true)
+        codeSize = minCodeSize + 1
+      }
+
+      writer.writeCode(clearCode, bits: codeSize)
+      resetDictionary()
+
+      var nextCode = eoiCode + 1
+      var currentCode: Int? = nil
+
+      for byte in indices {
+        if currentCode == nil {
+          currentCode = Int(byte)
+          continue
+        }
+        let key = DictKey(prefix: currentCode!, suffix: byte)
+        if let existing = dictionary[key] {
+          currentCode = existing
+        } else {
+          writer.writeCode(currentCode!, bits: codeSize)
+          if nextCode < maxDictSize {
+            dictionary[key] = nextCode
+            nextCode += 1
+            if nextCode == (1 << codeSize) + 1 && codeSize < 12 {
+              codeSize += 1
+            }
+          } else {
+            writer.writeCode(clearCode, bits: codeSize)
+            resetDictionary()
+            nextCode = eoiCode + 1
+          }
+          currentCode = Int(byte)
+        }
+      }
+
+      if let last = currentCode {
+        writer.writeCode(last, bits: codeSize)
+      }
+      writer.writeCode(eoiCode, bits: codeSize)
+
+      return writer.flushed()
+    }
+
+    private struct DictKey: Hashable {
+      var prefix: Int
+      var suffix: UInt8
+    }
+
+    private struct BitWriter {
+      var output: [UInt8] = []
+      var buffer: UInt32 = 0
+      var bitCount: Int = 0
+
+      mutating func writeCode(_ code: Int, bits: Int) {
+        buffer |= UInt32(code & ((1 << bits) - 1)) << bitCount
+        bitCount += bits
+        while bitCount >= 8 {
+          output.append(UInt8(buffer & 0xFF))
+          buffer >>= 8
+          bitCount -= 8
+        }
+      }
+
+      consuming func flushed() -> [UInt8] {
+        if bitCount > 0 {
+          output.append(UInt8(buffer & 0xFF))
+          buffer = 0
+          bitCount = 0
+        }
+        return output
+      }
+    }
   }
 }
