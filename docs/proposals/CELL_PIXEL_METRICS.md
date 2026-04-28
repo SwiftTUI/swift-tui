@@ -361,6 +361,10 @@ Existing `Circle` / `Ellipse` / `Capsule` fixture snapshots were captured agains
 
 The concrete plan: run the fixture regeneration with `.estimated` metrics only. Any fixture that changes visibly is a bug in the new rasterizer, not a legitimate change. Fixtures for aspect ratios other than 2.0 are added fresh as part of stage 2.
 
+### Quantization caveat for sub-pixel dimensions
+
+Because sub-pixel dimensions are computed via integer division (`metrics.width / 2`, `metrics.height / 4`), some non-default metrics produce the same sub-pixel aspect as 8x16. For example, 6x14 produces sub-pixels that are 3x3 — square — so the rasterizer output matches 8x16 even though the cell itself is different. Aspect correction produces visibly different output only when the integer-divided sub-pixel dimensions differ. This is worth keeping in mind when picking metrics for fixture coverage: 6x14 will not exercise the aspect-correction path even though its `aspectRatio` is not 2.0.
+
 ## Testing
 
 ### Unit — sub-pixel conversion
