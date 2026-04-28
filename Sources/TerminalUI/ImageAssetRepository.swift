@@ -86,8 +86,24 @@ struct RGBAImagePixel: Equatable, Hashable, Sendable {
   #endif
 }
 
+/// Compressed-image container format detected from magic bytes by
+/// ``ImageAssetRepository``. Surfaces on ``DecodedPNGImage`` so the
+/// terminal renderer can pick the right Kitty graphics format key
+/// (`f=100` for PNG, `f=32` raw RGBA for everything else) and the
+/// WASI/web transport can pick the right MIME type.
+enum ImageEncodedFormat: Sendable, Equatable {
+  case png
+  case jpeg
+  case gif
+}
+
 struct DecodedPNGImage: Sendable {
   var pngBytes: [UInt8]
+  /// The source container format the bytes in ``pngBytes`` came in as.
+  /// Despite the field's historical name, ``pngBytes`` carries any
+  /// supported format — this enum disambiguates without a second
+  /// magic-byte sniff downstream.
+  var encodedFormat: ImageEncodedFormat
   var pixelSize: Size
   var pixels: [RGBAImagePixel]
 }
@@ -335,6 +351,7 @@ final class ImageAssetRepository: Sendable {
         }
         return DecodedPNGImage(
           pngBytes: bytes,
+          encodedFormat: .jpeg,
           pixelSize: .init(width: image.size.x, height: image.size.y),
           pixels: image.unpack(as: JPEG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
         )
@@ -350,6 +367,7 @@ final class ImageAssetRepository: Sendable {
         }
         return DecodedPNGImage(
           pngBytes: bytes,
+          encodedFormat: .gif,
           pixelSize: .init(width: image.size.x, height: image.size.y),
           pixels: image.unpack(as: GIF.RGBA<UInt8>.self).map(RGBAImagePixel.init)
         )
@@ -365,6 +383,7 @@ final class ImageAssetRepository: Sendable {
         }
         return DecodedPNGImage(
           pngBytes: bytes,
+          encodedFormat: .png,
           pixelSize: .init(width: image.size.x, height: image.size.y),
           pixels: image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
         )
