@@ -105,7 +105,25 @@ struct DecodedImage: Sendable {
   /// magic-byte sniff downstream.
   var encodedFormat: ImageEncodedFormat
   var pixelSize: Size
+  /// Row-major RGBA pixels for the image's primary frame (first frame
+  /// composited onto the logical screen for animated GIFs). The kitty
+  /// renderer ships these as `f=32` for non-PNG sources.
   var pixels: [RGBAImagePixel]
+  /// All animation frames, in source order, with per-frame display
+  /// duration. Always non-empty: a single-frame image carries one
+  /// entry whose pixels match ``pixels``. Multi-frame entries surface
+  /// for animated GIFs so the kitty renderer can issue `a=f` follow-up
+  /// transmissions and start the animation loop.
+  var animationFrames: [AnimationFrame]
+}
+
+/// A single composited frame of an animated image. ``pixels`` is
+/// row-major RGBA at the image's full ``DecodedImage/pixelSize``.
+struct AnimationFrame: Sendable {
+  var pixels: [RGBAImagePixel]
+  /// Display duration in milliseconds. Zero means "use the renderer
+  /// default" — kitty falls back to ~40 ms.
+  var delayMilliseconds: Int
 }
 
 private struct ImageLookupKey: Sendable {
@@ -349,11 +367,13 @@ final class ImageAssetRepository: Sendable {
         guard let image = try? JPEG.Image.decompress(stream: &source) else {
           return nil
         }
+        let pixels = image.unpack(as: JPEG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
         return DecodedImage(
           encodedBytes: bytes,
           encodedFormat: .jpeg,
           pixelSize: .init(width: image.size.x, height: image.size.y),
-          pixels: image.unpack(as: JPEG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
+          pixels: pixels,
+          animationFrames: [AnimationFrame(pixels: pixels, delayMilliseconds: 0)]
         )
       #else
         return nil
@@ -365,11 +385,26 @@ final class ImageAssetRepository: Sendable {
         guard let image = try? GIF.Image.decompress(stream: &source) else {
           return nil
         }
+        let firstFramePixels = image.unpack(as: GIF.RGBA<UInt8>.self)
+          .map(RGBAImagePixel.init)
+        // Composite every frame onto the logical screen so the kitty
+        // animation pipeline can ship a uniform stream of full-size
+        // RGBA buffers. swift-gif's per-frame `delayCentiseconds`
+        // converts to ms; zero means "use the renderer default".
+        let frames: [AnimationFrame] = image.frames.indices.map { index in
+          let pixels = image.composited(frameIndex: index, as: GIF.RGBA<UInt8>.self)
+            .map(RGBAImagePixel.init)
+          let delayMs = max(0, image.frames[index].delayCentiseconds) * 10
+          return AnimationFrame(pixels: pixels, delayMilliseconds: delayMs)
+        }
         return DecodedImage(
           encodedBytes: bytes,
           encodedFormat: .gif,
           pixelSize: .init(width: image.size.x, height: image.size.y),
-          pixels: image.unpack(as: GIF.RGBA<UInt8>.self).map(RGBAImagePixel.init)
+          pixels: firstFramePixels,
+          animationFrames: frames.isEmpty
+            ? [AnimationFrame(pixels: firstFramePixels, delayMilliseconds: 0)]
+            : frames
         )
       #else
         return nil
@@ -381,11 +416,13 @@ final class ImageAssetRepository: Sendable {
         guard let image = try? PNG.Image.decompress(stream: &source) else {
           return nil
         }
+        let pixels = image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
         return DecodedImage(
           encodedBytes: bytes,
           encodedFormat: .png,
           pixelSize: .init(width: image.size.x, height: image.size.y),
-          pixels: image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
+          pixels: pixels,
+          animationFrames: [AnimationFrame(pixels: pixels, delayMilliseconds: 0)]
         )
       #else
         return nil
