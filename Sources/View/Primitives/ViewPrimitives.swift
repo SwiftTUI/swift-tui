@@ -8,7 +8,7 @@ public struct Text: View, ResolvableView {
   }
 
   package var storage: Storage
-  public var drawMetadata: DrawMetadata {
+  package var drawMetadata: DrawMetadata {
     get { _boxedDrawMetadata.value }
     set { _boxedDrawMetadata.value = newValue }
   }
@@ -24,8 +24,38 @@ public struct Text: View, ResolvableView {
     }
   }
 
+  // Public surface deliberately omits `drawMetadata` — visual styling is
+  // applied through view modifiers (`.foregroundStyle(_:)`, `.bold()`,
+  // `.italic()`, `.underline()`, `.opacity(_:)`, etc.) so that styling
+  // composes through the environment the way SwiftUI canonically does it,
+  // rather than being passed as an opaque metadata bag at construction.
+  // See `Sources/View/Primitives/TextStyles.swift` for the modifier set.
+
   @_disfavoredOverload
   public init(
+    _ content: String,
+    semanticMetadata: SemanticMetadata = SemanticMetadata()
+  ) {
+    self.init(
+      content,
+      drawMetadata: DrawMetadata(),
+      semanticMetadata: semanticMetadata
+    )
+  }
+
+  public init(
+    _ content: RichContent,
+    semanticMetadata: SemanticMetadata = SemanticMetadata()
+  ) {
+    self.init(
+      content,
+      drawMetadata: DrawMetadata(),
+      semanticMetadata: semanticMetadata
+    )
+  }
+
+  @_disfavoredOverload
+  package init(
     _ content: String,
     drawMetadata: DrawMetadata = DrawMetadata(),
     semanticMetadata: SemanticMetadata = SemanticMetadata()
@@ -35,7 +65,7 @@ public struct Text: View, ResolvableView {
     self.semanticMetadata = semanticMetadata
   }
 
-  public init(
+  package init(
     _ content: RichContent,
     drawMetadata: DrawMetadata = DrawMetadata(),
     semanticMetadata: SemanticMetadata = SemanticMetadata()
