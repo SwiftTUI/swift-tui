@@ -5,16 +5,131 @@ set -eu
 repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 cd "$repo_root"
 
+write_full_log_report() {
+  body_log=$1
+  results_report=$2
+  full_log_path=$3
+  command_text=$4
+  exit_code=$5
+
+  generated_at=$(date '+%Y-%m-%d %H:%M:%S %z')
+  marker_file=$(mktemp "/tmp/swift-terminal-ui-test-all-markers.XXXXXX")
+
+  awk '
+    /^==> / {
+      title = substr($0, 5)
+      if (!(title in seen)) {
+        seen[title] = 1
+        print title "|" NR
+      }
+    }
+  ' "$body_log" >"$marker_file"
+
+  result_count=$(awk 'END { print NR + 0 }' "$results_report" 2>/dev/null || echo 0)
+  failure_count=$(awk -F '|' '$2 == "FAIL" { count += 1 } END { print count + 0 }' \
+    "$results_report" 2>/dev/null || echo 0)
+  line_offset=$((6 + result_count + failure_count + 2))
+
+  {
+    echo "swift-terminal-ui test log"
+    echo "Generated: $generated_at"
+    echo "Command: $command_text"
+    echo "Exit status: $exit_code"
+    echo ""
+    echo "Sub-suite summary:"
+
+    while IFS='|' read -r title status step_exit step_failures rerun_command log_file detail; do
+      body_line=$(awk -F '|' -v title="$title" '$1 == title { print $2; exit }' "$marker_file")
+      if [ -n "$body_line" ]; then
+        report_line=$((line_offset + body_line))
+      else
+        report_line="?"
+      fi
+
+      printf '  %-4s  exit=%-3s  failures=%-3s  log=line %-5s  %s' \
+        "$status" "$step_exit" "$step_failures" "$report_line" "$title"
+      if [ "$status" = "SKIP" ] && [ -n "$detail" ]; then
+        printf ' (%s)' "$detail"
+      fi
+      printf '\n'
+
+      if [ "$status" = "FAIL" ]; then
+        printf '        rerun: %s\n' "$rerun_command"
+      fi
+    done <"$results_report"
+
+    echo ""
+    echo "Raw run log:"
+    cat "$body_log"
+  } >"$full_log_path"
+
+  rm -f "$marker_file"
+}
+
+if [ "${STUI_TEST_ALL_CAPTURED:-0}" != "1" ]; then
+  timestamp=$(date '+%Y%m%d-%H%M%S')
+  full_log_path="/tmp/swift-terminal-ui-test-all-$timestamp-$$.log"
+  body_log=$(mktemp "/tmp/swift-terminal-ui-test-all-body.XXXXXX")
+  status_file=$(mktemp "/tmp/swift-terminal-ui-test-all-status.XXXXXX")
+  results_report=$(mktemp "/tmp/swift-terminal-ui-test-all-results.XXXXXX")
+  command_text="sh $0"
+
+  for argument do
+    command_text="$command_text $argument"
+  done
+
+  cleanup_capture() {
+    rm -f "$body_log" "$status_file" "$results_report"
+  }
+
+  trap cleanup_capture EXIT
+
+  : >"$full_log_path"
+  : >"$results_report"
+
+  export STUI_TEST_ALL_CAPTURED=1
+  export STUI_TEST_ALL_FINAL_LOG=$full_log_path
+  export STUI_TEST_ALL_RESULTS_REPORT=$results_report
+
+  (
+    set +e
+    sh "$0" "$@"
+    child_status=$?
+    printf '%s\n' "$child_status" >"$status_file"
+  ) 2>&1 | tee "$body_log"
+
+  if [ -f "$status_file" ]; then
+    captured_status=$(cat "$status_file")
+  else
+    captured_status=1
+  fi
+
+  write_full_log_report \
+    "$body_log" \
+    "$results_report" \
+    "$full_log_path" \
+    "$command_text" \
+    "$captured_status"
+
+  exit "$captured_status"
+fi
+
 skip_bun_install=0
 host_os=$(uname -s)
 is_linux=0
-failures=""
 step_index=0
 
 tmp_root=${TMPDIR:-/tmp}
 log_root=$(mktemp -d "$tmp_root/swift-terminal-ui-test-all.XXXXXX")
+results_file=$log_root/results.txt
+any_failed=0
+
+: >"$results_file"
 
 cleanup() {
+  if [ -n "${STUI_TEST_ALL_RESULTS_REPORT:-}" ] && [ -f "$results_file" ]; then
+    cp "$results_file" "$STUI_TEST_ALL_RESULTS_REPORT" || true
+  fi
   rm -rf "$log_root"
 }
 
@@ -54,18 +169,18 @@ Pass --skip-bun-install to reuse the existing Bun install state.
 EOF
 }
 
-add_failure() {
+record_result() {
   title=$1
-  exit_code=$2
-  log_file=$3
-  failure_record=$title'|'$exit_code'|'$log_file
+  status=$2
+  exit_code=$3
+  failure_count=$4
+  rerun_command=$5
+  log_file=$6
+  detail=$7
 
-  if [ -z "$failures" ]; then
-    failures=$failure_record
-  else
-    failures=$failures'
-'$failure_record
-  fi
+  printf '%s|%s|%s|%s|%s|%s|%s\n' \
+    "$title" "$status" "$exit_code" "$failure_count" "$rerun_command" "$log_file" "$detail" \
+    >>"$results_file"
 }
 
 read_step_exit_code() {
@@ -95,6 +210,74 @@ run_logged_command() {
 
   command_status=$(read_step_exit_code "$status_file")
   [ "$command_status" -eq 0 ]
+}
+
+swift_command_text() {
+  if [ "$is_linux" -eq 1 ]; then
+    printf 'DISABLE_EXPLICIT_PLATFORMS=1 '
+  fi
+
+  if [ "$SWIFT_LAUNCHER" = "swiftly" ]; then
+    printf 'swiftly run swift'
+  else
+    printf 'swift'
+  fi
+
+  for argument do
+    printf ' %s' "$argument"
+  done
+}
+
+derive_failure_count() {
+  log_file=$1
+
+  if [ ! -f "$log_file" ]; then
+    echo "?"
+    return
+  fi
+
+  count=$(
+    awk '
+      function first_number(text) {
+        if (match(text, /[0-9]+/)) {
+          return substr(text, RSTART, RLENGTH)
+        }
+        return ""
+      }
+
+      {
+        line = tolower($0)
+
+        if (match(line, /[0-9]+[[:space:]]+tests?[[:space:]]+failed/)) {
+          candidate = first_number(substr(line, RSTART, RLENGTH))
+        }
+        if (match(line, /with[[:space:]]+[0-9]+[[:space:]]+(failure|failures|issue|issues)/)) {
+          candidate = first_number(substr(line, RSTART, RLENGTH))
+        }
+        if (match(line, /[0-9]+[[:space:]]+(failure|failures)/)) {
+          candidate = first_number(substr(line, RSTART, RLENGTH))
+        }
+        if (match(line, /[0-9]+[[:space:]]+fail/)) {
+          candidate = first_number(substr(line, RSTART, RLENGTH))
+        }
+        if (match(line, /(fail|failed):[[:space:]]+[0-9]+/)) {
+          candidate = first_number(substr(line, RSTART, RLENGTH))
+        }
+      }
+
+      END {
+        if (candidate != "" && candidate != "0") {
+          print candidate
+        }
+      }
+    ' "$log_file"
+  )
+
+  if [ -n "$count" ]; then
+    echo "$count"
+  else
+    echo "?"
+  fi
 }
 
 for argument in "$@"; do
@@ -151,7 +334,8 @@ require_command() {
 run_step() {
   title=$1
   workdir=$2
-  shift 2
+  rerun_command=$3
+  shift 3
   step_index=$((step_index + 1))
   log_file=$log_root/step-$step_index.log
   status_file=$log_root/step-$step_index.status
@@ -165,17 +349,21 @@ run_step() {
   ); then
     rm -f "$status_file"
     echo "PASS: $title"
+    record_result "$title" "PASS" "0" "-" "$rerun_command" "$log_file" ""
   else
     exit_code=$(read_step_exit_code "$status_file")
     rm -f "$status_file"
+    failure_count=$(derive_failure_count "$log_file")
     >&2 echo "FAIL: $title"
-    add_failure "$title" "$exit_code" "$log_file"
+    any_failed=1
+    record_result "$title" "FAIL" "$exit_code" "$failure_count" "$rerun_command" "$log_file" ""
   fi
 }
 
 run_function_step() {
   title=$1
-  shift
+  rerun_command=$2
+  shift 2
   step_index=$((step_index + 1))
   log_file=$log_root/step-$step_index.log
   status_file=$log_root/step-$step_index.status
@@ -186,11 +374,14 @@ run_function_step() {
   if run_logged_command "$log_file" "$status_file" "$@"; then
     rm -f "$status_file"
     echo "PASS: $title"
+    record_result "$title" "PASS" "0" "-" "$rerun_command" "$log_file" ""
   else
     exit_code=$(read_step_exit_code "$status_file")
     rm -f "$status_file"
+    failure_count=$(derive_failure_count "$log_file")
     >&2 echo "FAIL: $title"
-    add_failure "$title" "$exit_code" "$log_file"
+    any_failed=1
+    record_result "$title" "FAIL" "$exit_code" "$failure_count" "$rerun_command" "$log_file" ""
   fi
 }
 
@@ -201,6 +392,7 @@ skip_step() {
   echo ""
   echo "==> $title"
   echo "SKIP: $title ($reason)"
+  record_result "$title" "SKIP" "-" "-" "-" "" "$reason"
 }
 
 check_swift_environment() {
@@ -224,6 +416,57 @@ check_bun_environment() {
   bun --version
 }
 
+print_failure_logs() {
+  while IFS='|' read -r title status exit_code failure_count rerun_command log_file detail; do
+    [ "$status" = "FAIL" ] || continue
+
+    >&2 echo ""
+    >&2 echo "===== $title (exit $exit_code) ====="
+    if [ -f "$log_file" ]; then
+      cat "$log_file" >&2
+    else
+      >&2 echo "Missing captured log: $log_file"
+    fi
+  done <"$results_file"
+}
+
+print_summary() {
+  echo ""
+  echo "Repo test summary:"
+
+  while IFS='|' read -r title status exit_code failure_count rerun_command log_file detail; do
+    case "$status" in
+    PASS)
+      printf '  %-4s  exit=%-3s  failures=%-3s  %s\n' \
+        "$status" "$exit_code" "$failure_count" "$title"
+      ;;
+    FAIL)
+      printf '  %-4s  exit=%-3s  failures=%-3s  %s\n' \
+        "$status" "$exit_code" "$failure_count" "$title"
+      printf '        rerun: %s\n' "$rerun_command"
+      ;;
+    SKIP)
+      printf '  %-4s  exit=%-3s  failures=%-3s  %s' \
+        "$status" "$exit_code" "$failure_count" "$title"
+      if [ -n "$detail" ]; then
+        printf ' (%s)' "$detail"
+      fi
+      printf '\n'
+      ;;
+    esac
+  done <"$results_file"
+
+  if [ -n "${STUI_TEST_ALL_FINAL_LOG:-}" ]; then
+    echo "Full log: $STUI_TEST_ALL_FINAL_LOG"
+  fi
+
+  if [ "$any_failed" -eq 0 ]; then
+    echo "Result: PASS"
+  else
+    echo "Result: FAIL"
+  fi
+}
+
 detect_swift_command
 require_command bun
 
@@ -231,36 +474,51 @@ if [ "$is_linux" -eq 1 ]; then
   echo "Linux host detected; exporting DISABLE_EXPLICIT_PLATFORMS=1 and skipping Apple-only SwiftUI host tests."
 fi
 
-run_function_step "Check Swift toolchain" check_swift_environment
-run_function_step "Check Bun availability" check_bun_environment
+swift_version_command=$(swift_command_text --version)
+
+run_function_step \
+  "Check Swift toolchain" \
+  "$swift_version_command" \
+  check_swift_environment
+
+run_function_step \
+  "Check Bun availability" \
+  "bun --version" \
+  check_bun_environment
 
 if [ -f "$repo_root/package.json" ] && [ -f "$repo_root/bun.lock" ] && [ "$skip_bun_install" -eq 0 ]; then
   run_step \
     "Install Bun workspace dependencies" \
     "$repo_root" \
+    "bun install --frozen-lockfile" \
     bun install --frozen-lockfile
 fi
 
 run_step \
   "Check public-surface policies" \
   "$repo_root" \
+  "./Scripts/check_public_surface_policies.sh" \
   ./Scripts/check_public_surface_policies.sh
 
 run_step \
   "Check concurrency-safety policies" \
   "$repo_root" \
+  "./Scripts/check_concurrency_safety_policies.sh" \
   ./Scripts/check_concurrency_safety_policies.sh
 
 run_function_step \
   "Run root SwiftPM tests" \
+  "$(swift_command_text test)" \
   run_swift test
 
 run_function_step \
   "Run Runners/TerminalUICLI tests" \
+  "$(swift_command_text test --package-path Runners/TerminalUICLI)" \
   run_swift test --package-path Runners/TerminalUICLI
 
 run_function_step \
   "Run Runners/TerminalUIWASI tests" \
+  "$(swift_command_text test --package-path Runners/TerminalUIWASI)" \
   run_swift test --package-path Runners/TerminalUIWASI
 
 if [ "$is_linux" -eq 1 ]; then
@@ -270,66 +528,46 @@ if [ "$is_linux" -eq 1 ]; then
 else
   run_function_step \
     "Run GUI/SwiftUITUIGUI tests" \
+    "$(swift_command_text test --package-path GUI/SwiftUITUIGUI)" \
     run_swift test --package-path GUI/SwiftUITUIGUI
 fi
 
 #run_step \
 #  "Run GUI/WebTUIGUI Bun tests" \
 #  "$repo_root/GUI/WebTUIGUI" \
+#  "cd GUI/WebTUIGUI && bun test" \
 #  bun test
 
 run_function_step \
   "Run Examples/gallery tests" \
+  "$(swift_command_text test --package-path Examples/gallery)" \
   run_swift test --package-path Examples/gallery
 
 run_function_step \
   "Run Examples/layouts tests" \
+  "$(swift_command_text test --package-path Examples/layouts)" \
   run_swift test --package-path Examples/layouts
 
 # run_step \
 #   "Run Examples/WebExample Bun tests" \
 #   "$repo_root/Examples/WebExample" \
+#   "cd Examples/WebExample && bun test" \
 #   bun test
 #
 # run_step \
 #   "Run Examples/WebExample browser integration test" \
 #   "$repo_root/Examples/WebExample" \
+#   "cd Examples/WebExample && bun run test:browser" \
 #   bun run test:browser
 
-echo ""
-
-if [ -z "$failures" ]; then
-  echo "All repo tests succeeded."
+if [ "$any_failed" -eq 0 ]; then
+  print_summary
   exit 0
 fi
 
->&2 echo "Repo test failures:"
-OLD_IFS=$IFS
-IFS='
-'
-for failure_record in $failures; do
-  title=${failure_record%%|*}
-  remainder=${failure_record#*|}
-  exit_code=${remainder%%|*}
-  log_file=${remainder#*|}
-
-  >&2 echo "  - $title (exit $exit_code)"
-done
-
-for failure_record in $failures; do
-  title=${failure_record%%|*}
-  remainder=${failure_record#*|}
-  exit_code=${remainder%%|*}
-  log_file=${remainder#*|}
-
-  >&2 echo ""
-  >&2 echo "===== $title (exit $exit_code) ====="
-  if [ -f "$log_file" ]; then
-    cat "$log_file" >&2
-  else
-    >&2 echo "Missing captured log: $log_file"
-  fi
-done
-IFS=$OLD_IFS
+>&2 echo ""
+>&2 echo "Failure logs:"
+print_failure_logs
+print_summary >&2
 
 exit 1
