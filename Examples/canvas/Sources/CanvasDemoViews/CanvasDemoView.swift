@@ -276,7 +276,7 @@ public struct CanvasDemoView: View {
       Divider()
       Text(statusLine(for: snapshot, pixelMode: modeSnapshot)).foregroundStyle(.muted)
       Text(
-        "Shift+arrows move  Shift+Space draw  Ctrl+E erase  Ctrl+K clear  Ctrl+M mode  Ctrl+C quit"
+        "Shift+arrows move  Ctrl+p draw  Ctrl+E erase  Ctrl+K clear  Ctrl+M mode  Ctrl+C quit"
       )
       .foregroundStyle(.separator)
     }
@@ -306,7 +306,7 @@ public struct CanvasDemoView: View {
     .keyCommand("Jump cursor down", key: .arrowDown, modifiers: .ctrl) {
       document.moveCursor(dx: 0, dy: 8)
     }
-    .keyCommand("Draw at cursor", key: .space, modifiers: .shift) {
+    .keyCommand("Draw at cursor", key: .character("p"), modifiers: .ctrl) {
       document.drawAtCursor()
     }
     .keyCommand("Erase at cursor", key: .character("e"), modifiers: .ctrl) {
@@ -315,7 +315,7 @@ public struct CanvasDemoView: View {
     .keyCommand("Clear drawing", key: .character("k"), modifiers: .ctrl) {
       document.clear()
     }
-    .keyCommand("Toggle pixel grid mode", key: .character("m"), modifiers: .ctrl) {
+    .keyCommand("Toggle pixel grid mode", key: .character("x"), modifiers: .ctrl) {
       pixelMode =
         switch pixelMode {
         case .fullCell:
