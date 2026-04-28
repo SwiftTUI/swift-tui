@@ -1,3 +1,4 @@
+import Foundation
 import PNG
 import Testing
 
@@ -87,6 +88,93 @@ struct TerminalGraphicsProtocolTests {
         write.contains("\u{001B}P0;1;0q")
       }
     )
+  }
+
+  @Test(
+    "terminal host emits Kitty RGBA payloads (f=32 with s/v) for non-PNG inputs"
+  )
+  func terminalHostEmitsKittyRGBAPayloadForNonPNGInputs() throws {
+    // Kitty's `f=` only supports PNG (100), RGBA (32), RGB (24). For
+    // GIF or JPEG inputs the renderer must serialize the decoded
+    // pixels as raw RGBA and tag the payload with `f=32` plus the
+    // pixel-size keys `s=` and `v=`. This test pins that contract using
+    // the repo's nyan.gif fixture.
+    let packageRoot = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let gifURL = packageRoot.appendingPathComponent("nyan.gif")
+    let gifBytes = try [UInt8](Data(contentsOf: gifURL))
+    // Sanity: nyan.gif logical screen is 70x70.
+    #expect(gifBytes.count > 0)
+
+    let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [
+        Array("\u{001B}_Gi=\(kittyQueryID);OK\u{001B}\\".utf8),
+        [],
+      ],
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 20, height: 12),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    // 70x70 pixels at an 8x16 cell pixel size is roughly ceil(70/8)=9 cells
+    // wide and ceil(70/16)=5 cells tall — this drives the intrinsic-size
+    // placement that the renderer would compute for an unframed Image.
+    let surface = RasterSurface(
+      size: .init(width: 20, height: 12),
+      lines: Array(repeating: "                    ", count: 12),
+      imageAttachments: [
+        RasterImageAttachment(
+          identity: testIdentity("Root", "Image"),
+          bounds: .init(origin: .zero, size: .init(width: 9, height: 5)),
+          visibleBounds: nil,
+          source: .data(gifBytes),
+          resolvedReference: .embeddedImage(gifBytes),
+          pixelSize: .init(width: 70, height: 70),
+          isResizable: false,
+          scalingMode: .stretch
+        )
+      ]
+    )
+
+    _ = try host.present(surface)
+    try host.drainPendingPresentation()
+
+    let firstKittyWrite = try #require(
+      controller.writes.first { write in
+        write.contains("_Ga=T")
+      }
+    )
+
+    // The transmit-and-display header must declare RGBA, not PNG, and
+    // must carry the source pixel dimensions kitty needs to deserialize
+    // the buffer.
+    #expect(firstKittyWrite.contains("_Ga=T,q=2,t=d,f=32,C=1,"))
+    #expect(firstKittyWrite.contains(",s=70,v=70,"))
+    #expect(!firstKittyWrite.contains("f=100"))
+
+    // Concatenate every base64 chunk we emitted for this image (first
+    // chunk plus any `_Gm=...` continuations) and verify it decodes to
+    // exactly width * height * 4 bytes — proof we shipped a complete
+    // RGBA buffer rather than truncating mid-stream.
+    let output = controller.writes.joined()
+    let graphicsChunks = chunksForKittyProtocol(in: output)
+    // First chunk + continuations only — exclude the kitty-support probe
+    // escape (`_Gi=...`) and any unrelated graphics sequences.
+    let payloadChunks = graphicsChunks.filter { chunk in
+      chunk.contains("_Ga=T,") || chunk.contains("_Gm=")
+    }
+    let combined = payloadChunks.map(payloadForKittyChunk).joined()
+    let decoded = try #require(Data(base64Encoded: combined))
+    #expect(decoded.count == 70 * 70 * 4)
   }
 
   @Test("kitty image placement crops source pixels for negative scroll offsets")
