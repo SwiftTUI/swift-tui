@@ -38,27 +38,24 @@ actions.
 
 | Shortcut      | Tool                                    |
 | ------------- | --------------------------------------- |
-| `P`           | **P**en — paint the primary color      |
-| `E`           | **E**raser — clear to transparent       |
-| `B`           | **B**ucket fill (4-connected)           |
-| `G`           | **G**radient between primary/secondary |
-| `M`           | **M**arquee — rectangular selection    |
-| `I`           | Eyedropper — pick color from cursor    |
-| `X`           | Swap primary and secondary color       |
+| `p`           | **P**en — paint the primary color      |
+| `e`           | **E**raser — clear to transparent       |
+| `b`           | **B**ucket fill (4-connected)           |
+| `g`           | **G**radient between primary/secondary |
+| `m`           | **M**arquee — rectangular selection    |
+| `i`           | Eyedropper — pick color from cursor    |
+| `x`           | Swap primary and secondary color       |
 | `Space`       | Apply the current tool at the cursor    |
 | `Enter`       | Confirm marquee (commit selection rect) |
 | `Escape`      | Clear selection                         |
 
 ### Cursor (within the canvas)
 
-The framework reserves bare arrow keys for focus navigation, so cursor
-movement uses Shift+Arrow / Ctrl+Arrow / Vi-style movement with Shift.
-
 | Shortcut          | Action                                    |
 | ----------------- | ----------------------------------------- |
-| `Shift+←/→/↑/↓`   | Move cursor by 1 pixel                   |
+| `←/→/↑/↓`         | Move cursor by 1 pixel                   |
 | `Ctrl+←/→/↑/↓`    | Move cursor by 8 pixels                  |
-| `Shift+H/J/K/L`   | Vi-style 1-pixel movement                |
+| `h/j/k/l`         | Vi-style 1-pixel movement                |
 
 ### Frames / timeline
 
@@ -125,26 +122,22 @@ movement uses Shift+Arrow / Ctrl+Arrow / Vi-style movement with Shift.
 
 These still meaningfully improve the editor.
 
-1. **Bare arrow keys for cursor movement.** Arrow keys are
-   framework-reserved for focus navigation, so cursor movement uses
-   `Shift+Arrow` / Vi-keys-with-Shift. A canvas-style view that consumes
-   arrow keys when focused would let the editor use plain arrows.
-2. **Pointer/mouse input on the pixel grid.** The `Image` primitive renders
+1. **Pointer/mouse input on the pixel grid.** The `Image` primitive renders
    to terminal-graphics protocols, but the per-cell `Rectangle` grid the
    editor uses for "1 GIF pixel = 1 terminal cell" doesn't have a public
    pointer-hit-test entry yet. Adding a `.onPointerTap { local in … }` or
    exposing the existing pointer registry as a public modifier would let
    us click-to-paint.
-3. **`swift-gif` is decode-only.** The vendored decoder has no encoder
+2. **`swift-gif` is decode-only.** The vendored decoder has no encoder
    pair, so the editor ships its own GIF89a encoder (LZW + sub-block
    framing) inside `GIFEditorCore`. Promoting that into
    `Vendor/swift-gif` would benefit anything else that wants to write GIFs.
-4. **Per-cell colored fills.** Drawing thousands of `Rectangle().fill(c)
+3. **Per-cell colored fills.** Drawing thousands of `Rectangle().fill(c)
    .frame(1×1)` views per row/column is correct but pays per-node resolve
    cost. A `PixelMap(width:height:colors:)` primitive that takes a flat
    `[Color]` and rasterizes one cell per entry would be a perfect fit
    here. (We cap canvases at 64×64 today partly for this reason.)
-5. **Lifecycle for "save before quit".** The framework currently exits on
+4. **Lifecycle for "save before quit".** The framework currently exits on
    the host's quit keys without firing a Stop hook a view can intercept;
    the editor handles dirty-document save in-app via `Ctrl+S`, but a
    `WindowGroup.onTerminate { … }` would close the loop.
