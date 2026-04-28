@@ -216,21 +216,21 @@ public struct Spacer: View, ResolvableView {
 
 /// A one-cell rule that adapts to its surrounding layout direction.
 public struct Divider: View, ResolvableView {
-  public var drawMetadata: DrawMetadata
+  public var strokeStyle: StrokeStyle
 
-  public init(drawMetadata: DrawMetadata = DrawMetadata()) {
-    self.drawMetadata = drawMetadata
+  public init(strokeStyle: StrokeStyle = .single) {
+    self.strokeStyle = strokeStyle
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    var resolvedDrawMetadata = drawMetadata
+    var resolvedDrawMetadata = DrawMetadata()
     resolvedDrawMetadata.ruleStackAxis = context.environmentValues.stackAxis
     return [
       resolveLeafNode(
         kindName: "Divider",
         intrinsicSize: .init(width: 1, height: 1),
         drawMetadata: resolvedDrawMetadata,
-        drawPayload: .rule(nil),
+        drawPayload: .rule(strokeStyle),
         in: context
       )
     ]

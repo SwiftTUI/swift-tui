@@ -5132,11 +5132,7 @@ struct SwiftUISurfaceTests {
     )
     let ruleArtifacts = DefaultRenderer().render(
       VStack(alignment: .leading, spacing: 0) {
-        Divider(
-          drawMetadata: .init(
-            borderStrokeStyle: .init(borderSet: .heavy)
-          )
-        )
+        Divider(strokeStyle: .thick)
       },
       context: .init(identity: testIdentity("Rule")),
       proposal: .init(width: 4, height: nil)
