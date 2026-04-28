@@ -25,32 +25,9 @@ public struct Image: View, ResolvableView {
   }
 
   public init(
-    pngData: [UInt8]
+    data: [UInt8]
   ) {
-    source = .pngData(pngData)
-    isResizable = false
-    scalingMode = .stretch
-  }
-
-  /// Convenience initializer for JPEG bytes. Routes through the same backing
-  /// storage as ``init(pngData:)`` — the decoder dispatches on magic bytes,
-  /// so either constructor accepts either format.
-  public init(
-    jpegData: [UInt8]
-  ) {
-    source = .pngData(jpegData)
-    isResizable = false
-    scalingMode = .stretch
-  }
-
-  /// Convenience initializer for GIF bytes. Routes through the same
-  /// backing storage as ``init(pngData:)`` — the decoder dispatches on
-  /// magic bytes, so any constructor accepts any supported format. Only
-  /// the first frame of an animated GIF is rendered.
-  public init(
-    gifData: [UInt8]
-  ) {
-    source = .pngData(gifData)
+    source = .data(data)
     isResizable = false
     scalingMode = .stretch
   }

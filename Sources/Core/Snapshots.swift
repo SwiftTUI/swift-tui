@@ -536,8 +536,8 @@ extension SnapshotRenderer {
       return "path(\(name))"
     case .fileURL(let value):
       return "fileURL(\(value))"
-    case .pngData(let bytes):
-      return "pngData(\(bytes.count)b)"
+    case .data(let bytes):
+      return "data(\(bytes.count)b)"
     }
   }
 

@@ -22,12 +22,12 @@ struct ImageSurfaceTests {
     )
 
     let artifacts = DefaultRenderer().render(
-      Image(pngData: pngBytes)
+      Image(data: pngBytes)
     )
     let attachment = try #require(artifacts.rasterSurface.imageAttachments.first)
 
     #expect(artifacts.rasterSurface.imageAttachments.count == 1)
-    #expect(attachment.source == .pngData(pngBytes))
+    #expect(attachment.source == .data(pngBytes))
     #expect(attachment.resolvedReference == .embeddedPNG(pngBytes))
     #expect(attachment.pixelSize == .init(width: 2, height: 2))
     #expect(attachment.bounds.size == .init(width: 1, height: 1))
@@ -145,12 +145,12 @@ struct ImageSurfaceTests {
     )
 
     let fitArtifacts = DefaultRenderer().render(
-      Image(pngData: pngBytes)
+      Image(data: pngBytes)
         .scaledToFit()
         .frame(width: 6, height: 2)
     )
     let fillArtifacts = DefaultRenderer().render(
-      Image(pngData: pngBytes)
+      Image(data: pngBytes)
         .scaledToFill()
         .frame(width: 6, height: 2)
     )

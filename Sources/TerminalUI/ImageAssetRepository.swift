@@ -297,7 +297,7 @@ final class ImageAssetRepository: Sendable {
       return nil
     case .fileURL(let value):
       return parseFileURL(value).map(ImageAssetReference.filePath)
-    case .pngData(let bytes):
+    case .data(let bytes):
       return .embeddedPNG(bytes)
     }
   }

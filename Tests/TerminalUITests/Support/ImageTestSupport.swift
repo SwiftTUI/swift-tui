@@ -39,7 +39,7 @@ func makeRasterImageAttachment(
     identity: identity,
     bounds: bounds,
     visibleBounds: visibleBounds,
-    source: .pngData(pngBytes),
+    source: .data(pngBytes),
     resolvedReference: .embeddedPNG(pngBytes),
     pixelSize: pixelSize,
     isResizable: false,

@@ -686,7 +686,7 @@ private enum NativeRasterSurfaceRenderer {
           return nil
         }
         return NSImage(contentsOf: url)
-      case .pngData(let bytes):
+      case .data(let bytes):
         return NSImage(data: Data(bytes))
       }
     }
@@ -844,7 +844,7 @@ private enum NativeRasterSurfaceRenderer {
           return nil
         }
         return UIImage(contentsOfFile: url.path)
-      case .pngData(let bytes):
+      case .data(let bytes):
         return UIImage(data: Data(bytes))
       }
     }
