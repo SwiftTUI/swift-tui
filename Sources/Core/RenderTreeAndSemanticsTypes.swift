@@ -367,7 +367,7 @@ public struct ResolvedNode: Equatable, Sendable {
     _storedLayoutBehavior = newBehavior
   }
   public var layoutMetadata: LayoutMetadata
-  public var drawMetadata: DrawMetadata {
+  package var drawMetadata: DrawMetadata {
     get { _boxedDrawMetadata.value }
     set { _boxedDrawMetadata.value = newValue }
   }
@@ -405,7 +405,7 @@ public struct ResolvedNode: Equatable, Sendable {
   /// routing?" axis must filter transient nodes out.
   public var isTransient: Bool = false
 
-  public init(
+  package init(
     identity: Identity,
     kind: NodeKind,
     children: [ResolvedNode] = [],
@@ -732,7 +732,7 @@ public struct PlacedNode: Equatable, Sendable {
   }
   public var semanticRole: SemanticRole
   public var layoutMetadata: LayoutMetadata
-  public var drawMetadata: DrawMetadata
+  package var drawMetadata: DrawMetadata
   public var semanticMetadata: SemanticMetadata
   public var lifecycleMetadata: LifecycleMetadata
   public var drawPayload: DrawPayload
@@ -770,7 +770,7 @@ public struct PlacedNode: Equatable, Sendable {
   /// capture+diff.
   public var matchedGeometry: MatchedGeometryConfig?
 
-  public init(
+  package init(
     identity: Identity,
     kind: NodeKind = .view("Unknown"),
     environmentSnapshot: EnvironmentSnapshot = .init(),
@@ -1078,7 +1078,7 @@ public struct DrawNode: Equatable, Sendable {
   public var environmentSnapshot: EnvironmentSnapshot
   public var bounds: Rect
   public var clipBounds: Rect?
-  public var metadata: DrawMetadata
+  package var metadata: DrawMetadata
   public var commands: [DrawCommand]
   /// Commands that must paint **after** this node's children have been
   /// fully painted.  Used by features that overdraw their children, such
@@ -1093,7 +1093,7 @@ public struct DrawNode: Equatable, Sendable {
   }
   package private(set) var subtreeNodeCount: Int
 
-  public init(
+  package init(
     identity: Identity,
     environmentSnapshot: EnvironmentSnapshot = .init(),
     bounds: Rect,

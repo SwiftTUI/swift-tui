@@ -176,17 +176,17 @@ public struct BaseStyle: Equatable, Sendable {
 }
 
 /// Visual metadata attached to a resolved node before draw extraction.
-public struct DrawMetadata: Equatable, Sendable {
+package struct DrawMetadata: Equatable, Sendable {
   /// List-specific styling preferences carried by draw metadata.
-  public struct ListStyleMetadata: Equatable, Sendable {
-    public var rowForegroundStyle: AnyShapeStyle?
-    public var rowBackgroundStyle: AnyShapeStyle?
-    public var rowSeparatorTopVisibility: Visibility?
-    public var rowSeparatorBottomVisibility: Visibility?
-    public var sectionSeparatorTopVisibility: Visibility?
-    public var sectionSeparatorBottomVisibility: Visibility?
+  package struct ListStyleMetadata: Equatable, Sendable {
+    package var rowForegroundStyle: AnyShapeStyle?
+    package var rowBackgroundStyle: AnyShapeStyle?
+    package var rowSeparatorTopVisibility: Visibility?
+    package var rowSeparatorBottomVisibility: Visibility?
+    package var sectionSeparatorTopVisibility: Visibility?
+    package var sectionSeparatorBottomVisibility: Visibility?
 
-    public init(
+    package init(
       rowForegroundStyle: AnyShapeStyle? = nil,
       rowBackgroundStyle: AnyShapeStyle? = nil,
       rowSeparatorTopVisibility: Visibility? = nil,
@@ -202,7 +202,7 @@ public struct DrawMetadata: Equatable, Sendable {
       self.sectionSeparatorBottomVisibility = sectionSeparatorBottomVisibility
     }
 
-    public var isDefault: Bool {
+    package var isDefault: Bool {
       rowForegroundStyle == nil
         && rowBackgroundStyle == nil
         && rowSeparatorTopVisibility == nil
@@ -211,7 +211,7 @@ public struct DrawMetadata: Equatable, Sendable {
         && sectionSeparatorBottomVisibility == nil
     }
 
-    public func merging(_ other: Self) -> Self {
+    package func merging(_ other: Self) -> Self {
       .init(
         rowForegroundStyle: other.rowForegroundStyle ?? rowForegroundStyle,
         rowBackgroundStyle: other.rowBackgroundStyle ?? rowBackgroundStyle,
@@ -291,13 +291,13 @@ public struct DrawMetadata: Equatable, Sendable {
   }
 
   package var heavyFields: Boxed<HeavyFields>
-  public var clipsToBounds: Bool
-  public var clipIdentifier: String?
-  public var compositingHint: String?
-  public var imagePreference: String?
+  package var clipsToBounds: Bool
+  package var clipIdentifier: String?
+  package var compositingHint: String?
+  package var imagePreference: String?
   package var ruleStackAxis: Axis?
 
-  public init(
+  package init(
     foregroundStyle: AnyShapeStyle? = nil,
     backgroundStyle: AnyShapeStyle? = nil,
     borderShapeStyle: AnyShapeStyle? = nil,
@@ -363,47 +363,47 @@ public struct DrawMetadata: Equatable, Sendable {
     ruleStackAxis = nil
   }
 
-  public var baseStyle: BaseStyle {
+  package var baseStyle: BaseStyle {
     get { heavyFields.value.baseStyle }
     set { heavyFields.value.baseStyle = newValue }
   }
 
-  public var foregroundStyle: AnyShapeStyle? {
+  package var foregroundStyle: AnyShapeStyle? {
     get { baseStyle.foregroundStyle }
     set { baseStyle.foregroundStyle = newValue }
   }
 
-  public var backgroundStyle: AnyShapeStyle? {
+  package var backgroundStyle: AnyShapeStyle? {
     get { baseStyle.backgroundStyle }
     set { baseStyle.backgroundStyle = newValue }
   }
 
-  public var emphasis: TextStyle.TextEmphasis {
+  package var emphasis: TextStyle.TextEmphasis {
     get { baseStyle.emphasis }
     set { baseStyle.emphasis = newValue }
   }
 
-  public var underlineStyle: TextLineStyle? {
+  package var underlineStyle: TextLineStyle? {
     get { baseStyle.underlineStyle }
     set { baseStyle.underlineStyle = newValue }
   }
 
-  public var strikethroughStyle: TextLineStyle? {
+  package var strikethroughStyle: TextLineStyle? {
     get { baseStyle.strikethroughStyle }
     set { baseStyle.strikethroughStyle = newValue }
   }
 
-  public var opacity: Double {
+  package var opacity: Double {
     get { baseStyle.opacity }
     set { baseStyle.opacity = newValue }
   }
 
-  public var explicitOpacity: Double? {
+  package var explicitOpacity: Double? {
     get { baseStyle.explicitOpacity }
     set { baseStyle.explicitOpacity = newValue }
   }
 
-  public var listRowForegroundStyle: AnyShapeStyle? {
+  package var listRowForegroundStyle: AnyShapeStyle? {
     get { listStyle?.rowForegroundStyle }
     set {
       var updated = listStyle ?? .init()
@@ -412,7 +412,7 @@ public struct DrawMetadata: Equatable, Sendable {
     }
   }
 
-  public var listRowBackgroundStyle: AnyShapeStyle? {
+  package var listRowBackgroundStyle: AnyShapeStyle? {
     get { listStyle?.rowBackgroundStyle }
     set {
       var updated = listStyle ?? .init()
@@ -421,7 +421,7 @@ public struct DrawMetadata: Equatable, Sendable {
     }
   }
 
-  public var listRowSeparatorTopVisibility: Visibility? {
+  package var listRowSeparatorTopVisibility: Visibility? {
     get { listStyle?.rowSeparatorTopVisibility }
     set {
       var updated = listStyle ?? .init()
@@ -430,7 +430,7 @@ public struct DrawMetadata: Equatable, Sendable {
     }
   }
 
-  public var listRowSeparatorBottomVisibility: Visibility? {
+  package var listRowSeparatorBottomVisibility: Visibility? {
     get { listStyle?.rowSeparatorBottomVisibility }
     set {
       var updated = listStyle ?? .init()
@@ -439,7 +439,7 @@ public struct DrawMetadata: Equatable, Sendable {
     }
   }
 
-  public var listSectionSeparatorTopVisibility: Visibility? {
+  package var listSectionSeparatorTopVisibility: Visibility? {
     get { listStyle?.sectionSeparatorTopVisibility }
     set {
       var updated = listStyle ?? .init()
@@ -448,7 +448,7 @@ public struct DrawMetadata: Equatable, Sendable {
     }
   }
 
-  public var listSectionSeparatorBottomVisibility: Visibility? {
+  package var listSectionSeparatorBottomVisibility: Visibility? {
     get { listStyle?.sectionSeparatorBottomVisibility }
     set {
       var updated = listStyle ?? .init()
@@ -457,7 +457,7 @@ public struct DrawMetadata: Equatable, Sendable {
     }
   }
 
-  public func merging(_ other: Self) -> Self {
+  package func merging(_ other: Self) -> Self {
     var merged = self
     merged.heavyFields.value = heavyFields.value.merging(other.heavyFields.value)
     merged.clipsToBounds = clipsToBounds || other.clipsToBounds
@@ -468,32 +468,32 @@ public struct DrawMetadata: Equatable, Sendable {
     return merged
   }
 
-  public var borderShapeStyle: AnyShapeStyle? {
+  package var borderShapeStyle: AnyShapeStyle? {
     get { heavyFields.value.borderShapeStyle }
     set { heavyFields.value.borderShapeStyle = newValue }
   }
 
-  public var borderStrokeStyle: StrokeStyle? {
+  package var borderStrokeStyle: StrokeStyle? {
     get { heavyFields.value.borderStrokeStyle }
     set { heavyFields.value.borderStrokeStyle = newValue }
   }
 
-  public var scrollIndicatorAxes: AxisSet? {
+  package var scrollIndicatorAxes: AxisSet? {
     get { heavyFields.value.scrollIndicatorAxes }
     set { heavyFields.value.scrollIndicatorAxes = newValue }
   }
 
-  public var focusedScrollIndicatorAxes: AxisSet? {
+  package var focusedScrollIndicatorAxes: AxisSet? {
     get { heavyFields.value.focusedScrollIndicatorAxes }
     set { heavyFields.value.focusedScrollIndicatorAxes = newValue }
   }
 
-  public var scrollIndicatorForegroundStyle: AnyShapeStyle? {
+  package var scrollIndicatorForegroundStyle: AnyShapeStyle? {
     get { heavyFields.value.scrollIndicatorForegroundStyle }
     set { heavyFields.value.scrollIndicatorForegroundStyle = newValue }
   }
 
-  public var listStyle: ListStyleMetadata? {
+  package var listStyle: ListStyleMetadata? {
     get { heavyFields.value.listStyle }
     set { heavyFields.value.listStyle = newValue }
   }

@@ -26,11 +26,11 @@ public struct NodeLayoutInfo: Equatable, Sendable {
 }
 
 /// Grouped metadata for draw-relevant properties of a resolved node.
-public struct NodeDrawInfo: Equatable, Sendable {
-  public var drawMetadata: DrawMetadata
-  public var drawPayload: DrawPayload
+package struct NodeDrawInfo: Equatable, Sendable {
+  package var drawMetadata: DrawMetadata
+  package var drawPayload: DrawPayload
 
-  public init(
+  package init(
     drawMetadata: DrawMetadata = DrawMetadata(),
     drawPayload: DrawPayload = .none
   ) {
@@ -85,7 +85,7 @@ extension ResolvedNode {
   }
 
   /// Grouped draw metadata for this node.
-  public var drawInfo: NodeDrawInfo {
+  package var drawInfo: NodeDrawInfo {
     get {
       NodeDrawInfo(
         drawMetadata: drawMetadata,
