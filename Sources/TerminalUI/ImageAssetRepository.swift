@@ -87,7 +87,7 @@ struct RGBAImagePixel: Equatable, Hashable, Sendable {
 }
 
 /// Compressed-image container format detected from magic bytes by
-/// ``ImageAssetRepository``. Surfaces on ``DecodedPNGImage`` so the
+/// ``ImageAssetRepository``. Surfaces on ``DecodedImage`` so the
 /// terminal renderer can pick the right Kitty graphics format key
 /// (`f=100` for PNG, `f=32` raw RGBA for everything else) and the
 /// WASI/web transport can pick the right MIME type.
@@ -97,10 +97,10 @@ enum ImageEncodedFormat: Sendable, Equatable {
   case gif
 }
 
-struct DecodedPNGImage: Sendable {
-  var pngBytes: [UInt8]
-  /// The source container format the bytes in ``pngBytes`` came in as.
-  /// Despite the field's historical name, ``pngBytes`` carries any
+struct DecodedImage: Sendable {
+  var encodedBytes: [UInt8]
+  /// The source container format the bytes in ``encodedBytes`` came in as.
+  /// Despite the field's historical name, ``encodedBytes`` carries any
   /// supported format — this enum disambiguates without a second
   /// magic-byte sniff downstream.
   var encodedFormat: ImageEncodedFormat
@@ -226,7 +226,7 @@ private func isGIFBytes(_ bytes: [UInt8]) -> Bool {
 final class ImageAssetRepository: Sendable {
   private struct Storage {
     var resolutions: [ImageLookupKey: ResolvedImageAsset] = [:]
-    var decodedImages: [ImageAssetReference: DecodedPNGImage] = [:]
+    var decodedImages: [ImageAssetReference: DecodedImage] = [:]
   }
 
   private let storage = OSAllocatedUnfairLock(uncheckedState: Storage())
@@ -280,7 +280,7 @@ final class ImageAssetRepository: Sendable {
 
   func decodedImage(
     for reference: ImageAssetReference
-  ) -> DecodedPNGImage? {
+  ) -> DecodedImage? {
     if let cached = storage.withLockUnchecked({ $0.decodedImages[reference] }) {
       return cached
     }
@@ -320,7 +320,7 @@ final class ImageAssetRepository: Sendable {
 
   private func loadDecodedImage(
     for reference: ImageAssetReference
-  ) -> DecodedPNGImage? {
+  ) -> DecodedImage? {
     let bytes: [UInt8]
     switch reference {
     case .namedResource:
@@ -342,15 +342,15 @@ final class ImageAssetRepository: Sendable {
   /// between PNG (89 50 4E 47…), JPEG (FF D8 FF…), and GIF (47 49 46 38 …).
   /// Returns `nil` if the bytes are none of those, or the matching decoder
   /// fails.
-  private func decodeImageBytes(_ bytes: [UInt8]) -> DecodedPNGImage? {
+  private func decodeImageBytes(_ bytes: [UInt8]) -> DecodedImage? {
     if isJPEGBytes(bytes) {
       #if canImport(JPEG)
         var source = InMemoryJPEGSource(bytes)
         guard let image = try? JPEG.Image.decompress(stream: &source) else {
           return nil
         }
-        return DecodedPNGImage(
-          pngBytes: bytes,
+        return DecodedImage(
+          encodedBytes: bytes,
           encodedFormat: .jpeg,
           pixelSize: .init(width: image.size.x, height: image.size.y),
           pixels: image.unpack(as: JPEG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
@@ -365,8 +365,8 @@ final class ImageAssetRepository: Sendable {
         guard let image = try? GIF.Image.decompress(stream: &source) else {
           return nil
         }
-        return DecodedPNGImage(
-          pngBytes: bytes,
+        return DecodedImage(
+          encodedBytes: bytes,
           encodedFormat: .gif,
           pixelSize: .init(width: image.size.x, height: image.size.y),
           pixels: image.unpack(as: GIF.RGBA<UInt8>.self).map(RGBAImagePixel.init)
@@ -381,8 +381,8 @@ final class ImageAssetRepository: Sendable {
         guard let image = try? PNG.Image.decompress(stream: &source) else {
           return nil
         }
-        return DecodedPNGImage(
-          pngBytes: bytes,
+        return DecodedImage(
+          encodedBytes: bytes,
           encodedFormat: .png,
           pixelSize: .init(width: image.size.x, height: image.size.y),
           pixels: image.unpack(as: PNG.RGBA<UInt8>.self).map(RGBAImagePixel.init)
