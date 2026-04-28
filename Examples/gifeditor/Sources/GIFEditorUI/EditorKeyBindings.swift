@@ -334,4 +334,17 @@ extension View where Self: ActionScope & Sendable {
         refresh()
       }
   }
+
+  func applyTerminationHandling(
+    model: EditorViewModel,
+    refresh: @escaping @MainActor @Sendable () -> Void
+  ) -> some View & ActionScope & Sendable {
+    onTerminationRequest { _ in
+      if model.isDirty {
+        model.save()
+        refresh()
+      }
+      return .allow
+    }
+  }
 }

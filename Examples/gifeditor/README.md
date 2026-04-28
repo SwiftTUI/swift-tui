@@ -133,10 +133,6 @@ These still meaningfully improve the editor.
    cost. A `PixelMap(width:height:colors:)` primitive that takes a flat
    `[Color]` and rasterizes one cell per entry would be a perfect fit
    here. (We cap canvases at 64×64 today partly for this reason.)
-3. **Lifecycle for "save before quit".** The framework currently exits on
-   the host's quit keys without firing a Stop hook a view can intercept;
-   the editor handles dirty-document save in-app via `Ctrl+S`, but a
-   `WindowGroup.onTerminate { … }` would close the loop.
 
 ## Tests
 

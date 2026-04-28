@@ -698,6 +698,7 @@ extension RunLoop {
       applyEnvironmentValues: true
     )
     context.localPointerHandlerRegistry = localPointerHandlerRegistry
+    context.localTerminationRegistry = localTerminationRegistry
     context.localGestureRegistry = localGestureRegistry
     context.localGestureStateRegistry = localGestureStateRegistry
     context.localFocusBindingRegistry = localFocusBindingRegistry

@@ -9,5 +9,9 @@ struct GIFEditorApp: App {
     WindowGroup {
       GIFEditor.makeRootView(arguments: CommandLine.arguments)
     }
+    .exitOnKeys([
+      KeyPress(.character("c"), modifiers: .ctrl),
+      KeyPress(.character("q"), modifiers: .ctrl),
+    ])
   }
 }

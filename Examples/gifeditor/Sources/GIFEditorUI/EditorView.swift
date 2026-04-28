@@ -78,6 +78,7 @@ public struct EditorView: View {
     .applyClipboardBindings(model: model, refresh: refresh)
     .applyPaletteBindings(model: model, refresh: refresh)
     .applyFileBindings(model: model, refresh: refresh)
+    .applyTerminationHandling(model: model, refresh: refresh)
   }
 
   private var headerRow: some View {

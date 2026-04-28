@@ -2,6 +2,7 @@ package struct NodeHandlers {
   package var actionRegistrations: [Identity: LocalActionRegistry.Registration]
   package var keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler]
   package var keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]]
+  package var terminationHandlerRegistrations: [Identity: [LocalTerminationRegistry.Handler]]
   package var pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler]
   package var gestureRegistrations: [Identity: AnyGestureRecognizer]
   package var gestureStateRegistrations: [Identity: [AnyGestureStateBinding]]
@@ -16,6 +17,7 @@ package struct NodeHandlers {
     actionRegistrations: [Identity: LocalActionRegistry.Registration] = [:],
     keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler] = [:],
     keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]] = [:],
+    terminationHandlerRegistrations: [Identity: [LocalTerminationRegistry.Handler]] = [:],
     pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
     gestureRegistrations: [Identity: AnyGestureRecognizer] = [:],
     gestureStateRegistrations: [Identity: [AnyGestureStateBinding]] = [:],
@@ -29,6 +31,7 @@ package struct NodeHandlers {
     self.actionRegistrations = actionRegistrations
     self.keyHandlerRegistrations = keyHandlerRegistrations
     self.keyPressHandlerRegistrations = keyPressHandlerRegistrations
+    self.terminationHandlerRegistrations = terminationHandlerRegistrations
     self.pointerHandlerRegistrations = pointerHandlerRegistrations
     self.gestureRegistrations = gestureRegistrations
     self.gestureStateRegistrations = gestureStateRegistrations
@@ -67,6 +70,13 @@ package struct NodeHandlers {
     handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
   ) {
     keyPressHandlerRegistrations[identity, default: []].append(handler)
+  }
+
+  package mutating func recordTerminationHandler(
+    identity: Identity,
+    handler: @escaping LocalTerminationRegistry.Handler
+  ) {
+    terminationHandlerRegistrations[identity, default: []].append(handler)
   }
 
   package mutating func recordPointerHandler(

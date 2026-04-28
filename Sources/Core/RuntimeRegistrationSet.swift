@@ -2,6 +2,7 @@
 package struct RuntimeRegistrationSet {
   package let actionRegistry: LocalActionRegistry?
   package let keyHandlerRegistry: LocalKeyHandlerRegistry?
+  package let terminationRegistry: LocalTerminationRegistry?
   package let pointerHandlerRegistry: LocalPointerHandlerRegistry?
   package let gestureRegistry: LocalGestureRegistry?
   package let gestureStateRegistry: LocalGestureStateRegistry?
@@ -17,6 +18,7 @@ package struct RuntimeRegistrationSet {
   package init(
     actionRegistry: LocalActionRegistry? = nil,
     keyHandlerRegistry: LocalKeyHandlerRegistry? = nil,
+    terminationRegistry: LocalTerminationRegistry? = nil,
     pointerHandlerRegistry: LocalPointerHandlerRegistry? = nil,
     gestureRegistry: LocalGestureRegistry? = nil,
     gestureStateRegistry: LocalGestureStateRegistry? = nil,
@@ -31,6 +33,7 @@ package struct RuntimeRegistrationSet {
   ) {
     self.actionRegistry = actionRegistry
     self.keyHandlerRegistry = keyHandlerRegistry
+    self.terminationRegistry = terminationRegistry
     self.pointerHandlerRegistry = pointerHandlerRegistry
     self.gestureRegistry = gestureRegistry
     self.gestureStateRegistry = gestureStateRegistry
@@ -47,6 +50,7 @@ package struct RuntimeRegistrationSet {
   package func resetAll() {
     actionRegistry?.reset()
     keyHandlerRegistry?.reset()
+    terminationRegistry?.reset()
     pointerHandlerRegistry?.reset()
     gestureRegistry?.reset()
     gestureStateRegistry?.reset()
@@ -72,6 +76,7 @@ package struct RuntimeRegistrationSet {
 
     actionRegistry?.removeSubtrees(rootedAt: roots)
     keyHandlerRegistry?.removeSubtrees(rootedAt: roots)
+    terminationRegistry?.removeSubtrees(rootedAt: roots)
     pointerHandlerRegistry?.removeSubtrees(rootedAt: roots)
     gestureRegistry?.removeSubtrees(
       rootedAt: roots,
@@ -106,6 +111,7 @@ package struct RuntimeRegistrationSet {
     keyHandlerRegistry?.restoreKeyPressHandlers(
       handlers.keyPressHandlerRegistrations
     )
+    terminationRegistry?.restore(handlers.terminationHandlerRegistrations)
     pointerHandlerRegistry?.restore(handlers.pointerHandlerRegistrations)
     gestureRegistry?.restore(handlers.gestureRegistrations)
     gestureStateRegistry?.restore(handlers.gestureStateRegistrations)
