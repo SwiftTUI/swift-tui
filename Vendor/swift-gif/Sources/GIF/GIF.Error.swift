@@ -1,4 +1,44 @@
 extension GIF {
+  /// An error raised while encoding indexed GIF data.
+  public enum EncodingError: Error, Equatable, Sendable, CustomStringConvertible {
+    /// The image had zero width, zero height, or no frames.
+    case emptyImage
+    /// The logical screen dimensions exceeded GIF's UInt16 limits.
+    case dimensionsTooLarge(width: Int, height: Int)
+    /// The global color table, including required index padding, exceeded 256 entries.
+    case tooManyColors(count: Int)
+    /// The background index did not reference the authored global color table.
+    case invalidBackgroundIndex(Int)
+    /// A frame's bounds were empty or extended outside the logical screen.
+    case frameOutOfBounds(left: Int, top: Int, width: Int, height: Int)
+    /// A frame did not provide exactly `width * height` indices.
+    case invalidIndexCount(expected: Int, actual: Int)
+    /// An opaque pixel index referenced no color table entry.
+    case colorIndexOutOfBounds(index: Int, paletteSize: Int)
+    /// A frame's transparent index was outside GIF's UInt8 range.
+    case invalidTransparentIndex(Int)
+
+    public var description: String {
+      switch self {
+      case .emptyImage:
+        return "GIF: empty image (zero size or no frames)"
+      case .dimensionsTooLarge(let width, let height):
+        return "GIF: dimensions \(width)x\(height) exceed UInt16 limits"
+      case .tooManyColors(let count):
+        return "GIF: color table requires \(count) entries (maximum 256)"
+      case .invalidBackgroundIndex(let index):
+        return "GIF: background index \(index) does not reference the color table"
+      case .frameOutOfBounds(let left, let top, let width, let height):
+        return "GIF: frame at (\(left),\(top)) size \(width)x\(height) is out of bounds"
+      case .invalidIndexCount(let expected, let actual):
+        return "GIF: frame has \(actual) indices, expected \(expected)"
+      case .colorIndexOutOfBounds(let index, let paletteSize):
+        return "GIF: color index \(index) outside palette of size \(paletteSize)"
+      case .invalidTransparentIndex(let index):
+        return "GIF: transparent index \(index) is outside 0...255"
+      }
+    }
+  }
 
   /// An error raised while decoding a GIF bytestream.
   public enum DecodingError: Error, Equatable, Sendable, CustomStringConvertible {

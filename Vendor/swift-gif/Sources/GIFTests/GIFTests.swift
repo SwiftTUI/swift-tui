@@ -73,6 +73,70 @@ private let redPixelGIF: [UInt8] = [
   #expect(p.a == 255)
 }
 
+@Test("Encodes a 1x1 indexed GIF") func encodeOnePixelRed() throws {
+  let bytes = try GIF.Encoder.encode(
+    GIF.IndexedImage(
+      size: (x: 1, y: 1),
+      globalColorTable: [(r: 255, g: 0, b: 0)],
+      frames: [
+        GIF.IndexedFrame(width: 1, height: 1, indices: [0])
+      ]
+    )
+  )
+
+  var src = ArraySource(bytes: bytes)
+  let image = try GIF.Image.decompress(stream: &src)
+  #expect(image.size.x == 1)
+  #expect(image.size.y == 1)
+  #expect(image.frames.count == 1)
+
+  let pixels = image.unpack(as: GIF.RGBA<UInt8>.self)
+  #expect(pixels == [GIF.RGBA<UInt8>(255, 0, 0, 255)])
+}
+
+@Test("Encodes multi-frame delay and transparency") func encodeAnimationMetadata() throws {
+  let bytes = try GIF.Encoder.encode(
+    GIF.IndexedImage(
+      size: (x: 2, y: 1),
+      globalColorTable: [
+        (r: 0, g: 0, b: 0),
+        (r: 255, g: 255, b: 255),
+      ],
+      loopCount: 0,
+      frames: [
+        GIF.IndexedFrame(
+          width: 2,
+          height: 1,
+          indices: [0, 1],
+          transparentIndex: nil,
+          delayCentiseconds: 5,
+          disposal: .background
+        ),
+        GIF.IndexedFrame(
+          width: 2,
+          height: 1,
+          indices: [1, 0],
+          transparentIndex: 0,
+          delayCentiseconds: 12,
+          disposal: .background
+        ),
+      ]
+    )
+  )
+
+  var src = ArraySource(bytes: bytes)
+  let image = try GIF.Image.decompress(stream: &src)
+  #expect(image.frames.count == 2)
+  #expect(image.frames[0].delayCentiseconds == 5)
+  #expect(image.frames[1].delayCentiseconds == 12)
+  #expect(image.frames[1].transparentIndex == 0)
+  #expect(image.frames[1].indices == [1, 0])
+
+  let frame1 = image.composited(frameIndex: 1, as: GIF.RGBA<UInt8>.self)
+  #expect(frame1[0] == GIF.RGBA<UInt8>(255, 255, 255, 255))
+  #expect(frame1[1] == GIF.RGBA<UInt8>(0, 0, 0, 255))
+}
+
 @Test("Rejects bad signature") func rejectsBadSig() {
   var src = ArraySource(bytes: [0x00, 0x01, 0x02, 0x03, 0x04, 0x05])
   #expect(throws: GIF.DecodingError.self) {
@@ -110,7 +174,7 @@ func lzwGrowth() throws {
 }
 
 @Test("Deinterlace reorders rows correctly") func deinterlace() {
-  var dec = GIF.Decoder(bytes: [])
+  let dec = GIF.Decoder(bytes: [])
   // 8-row image; in interlaced storage rows are: pass1(0,8 rows), pass2(4),
   // pass3(2,6), pass4(1,3,5,7) → for height 8, rows in storage order are:
   //   pass1: y=0

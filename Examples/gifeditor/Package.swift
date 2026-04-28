@@ -4,8 +4,8 @@ import PackageDescription
 
 // Example app split across four targets:
 //
-//   * GIFEditorCore — pure value-type model, GIF89a encoder, and bridge
-//     to the vendored swift-gif decoder. Has no TerminalUI dependency,
+//   * GIFEditorCore — pure value-type model plus bridge to the vendored
+//     swift-gif encoder/decoder. Has no TerminalUI dependency,
 //     so a future SwiftUI / UIKit / web port can reuse it verbatim.
 //   * GIFEditorUI — TerminalUI-shaped view tree and view model. The
 //     terminal-only authoring surface lives here; a sibling

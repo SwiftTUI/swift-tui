@@ -10,7 +10,7 @@ multi-platform app later without restructuring:
 
 | Target           | Role                                         | Depends on             |
 | ---------------- | -------------------------------------------- | ---------------------- |
-| `GIFEditorCore`  | Pure model + GIF89a encoder/decoder bridge   | `GIF` (decoder), Foundation |
+| `GIFEditorCore`  | Pure model + GIF encoder/decoder bridge      | `GIF`, Foundation |
 | `GIFEditorUI`    | Terminal `View` tree + view model            | `TerminalUI`, `GIFEditorCore` |
 | `GIFEditor`      | Composition root (entry point factory)       | `GIFEditorUI`, `TerminalUI` |
 | `gifeditor`      | Executable that hosts the terminal app       | `GIFEditor`, `TerminalUICLI` |
@@ -128,16 +128,12 @@ These still meaningfully improve the editor.
    pointer-hit-test entry yet. Adding a `.onPointerTap { local in … }` or
    exposing the existing pointer registry as a public modifier would let
    us click-to-paint.
-2. **`swift-gif` is decode-only.** The vendored decoder has no encoder
-   pair, so the editor ships its own GIF89a encoder (LZW + sub-block
-   framing) inside `GIFEditorCore`. Promoting that into
-   `Vendor/swift-gif` would benefit anything else that wants to write GIFs.
-3. **Per-cell colored fills.** Drawing thousands of `Rectangle().fill(c)
+2. **Per-cell colored fills.** Drawing thousands of `Rectangle().fill(c)
    .frame(1×1)` views per row/column is correct but pays per-node resolve
    cost. A `PixelMap(width:height:colors:)` primitive that takes a flat
    `[Color]` and rasterizes one cell per entry would be a perfect fit
    here. (We cap canvases at 64×64 today partly for this reason.)
-4. **Lifecycle for "save before quit".** The framework currently exits on
+3. **Lifecycle for "save before quit".** The framework currently exits on
    the host's quit keys without firing a Stop hook a view can intercept;
    the editor handles dirty-document save in-app via `Ctrl+S`, but a
    `WindowGroup.onTerminate { … }` would close the loop.
@@ -151,7 +147,7 @@ swift test
 
 The core test suite verifies:
 
-* GIF89a encoder produces output the (vendored) decoder can read back
+* The `swift-gif` encoder bridge produces output the decoder can read back
   pixel-for-pixel for a hand-built document and a round-trip of `nyan.gif`.
 * Document edits (pen, fill, gradient, marquee copy/paste) leave the model
   in expected states.
