@@ -51,7 +51,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
   package typealias KeyPressHandler = @MainActor (KeyPress) -> Bool
 
   private var handlers: [Identity: Handler] = [:]
-  private var keyPressHandlers: [Identity: KeyPressHandler] = [:]
+  private var keyPressHandlers: [Identity: [KeyPressHandler]] = [:]
 
   package init() {}
 
@@ -76,7 +76,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
     identity: Identity,
     keyPressHandler: @escaping KeyPressHandler
   ) {
-    keyPressHandlers[identity] = keyPressHandler
+    keyPressHandlers[identity, default: []].append(keyPressHandler)
     ViewNodeContext.current?.recordKeyPressHandlerRegistration(
       identity: identity,
       handler: keyPressHandler
@@ -96,8 +96,12 @@ package final class LocalKeyHandlerRegistry: Equatable {
     identity: Identity,
     keyPress: KeyPress
   ) -> Bool {
-    if let handler = keyPressHandlers[identity], handler(keyPress) {
-      return true
+    if let handlers = keyPressHandlers[identity] {
+      for handler in handlers.reversed() {
+        if handler(keyPress) {
+          return true
+        }
+      }
     }
     return handlers[identity]?(keyPress.key) ?? false
   }
@@ -105,7 +109,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
   package func hasHandler(
     identity: Identity
   ) -> Bool {
-    handlers[identity] != nil || keyPressHandlers[identity] != nil
+    handlers[identity] != nil || keyPressHandlers[identity]?.isEmpty == false
   }
 
   package func reset() {
@@ -136,7 +140,7 @@ package final class LocalKeyHandlerRegistry: Equatable {
     handlers
   }
 
-  package func snapshotKeyPressHandlers() -> [Identity: KeyPressHandler] {
+  package func snapshotKeyPressHandlers() -> [Identity: [KeyPressHandler]] {
     keyPressHandlers
   }
 
@@ -150,13 +154,13 @@ package final class LocalKeyHandlerRegistry: Equatable {
     }
   }
 
-  package func restoreKeyPressHandlers(_ snapshot: [Identity: KeyPressHandler]) {
+  package func restoreKeyPressHandlers(_ snapshot: [Identity: [KeyPressHandler]]) {
     guard !snapshot.isEmpty else {
       return
     }
 
-    for (identity, handler) in snapshot {
-      keyPressHandlers[identity] = handler
+    for (identity, handlers) in snapshot {
+      keyPressHandlers[identity] = handlers
     }
   }
 }

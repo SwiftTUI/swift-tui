@@ -1,7 +1,7 @@
 package struct NodeHandlers {
   package var actionRegistrations: [Identity: LocalActionRegistry.Registration]
   package var keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler]
-  package var keyPressHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.KeyPressHandler]
+  package var keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]]
   package var pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler]
   package var gestureRegistrations: [Identity: AnyGestureRecognizer]
   package var gestureStateRegistrations: [Identity: [AnyGestureStateBinding]]
@@ -15,7 +15,7 @@ package struct NodeHandlers {
   package init(
     actionRegistrations: [Identity: LocalActionRegistry.Registration] = [:],
     keyHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.Handler] = [:],
-    keyPressHandlerRegistrations: [Identity: LocalKeyHandlerRegistry.KeyPressHandler] = [:],
+    keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]] = [:],
     pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
     gestureRegistrations: [Identity: AnyGestureRecognizer] = [:],
     gestureStateRegistrations: [Identity: [AnyGestureStateBinding]] = [:],
@@ -66,7 +66,7 @@ package struct NodeHandlers {
     identity: Identity,
     handler: @escaping LocalKeyHandlerRegistry.KeyPressHandler
   ) {
-    keyPressHandlerRegistrations[identity] = handler
+    keyPressHandlerRegistrations[identity, default: []].append(handler)
   }
 
   package mutating func recordPointerHandler(
