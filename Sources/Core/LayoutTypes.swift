@@ -174,23 +174,23 @@ extension LayoutBehavior: Equatable {
 }
 
 /// Modifier-driven layout metadata attached to a resolved node.
-public struct LayoutMetadata: Sendable {
-  public var layoutPriority: Double
-  public var fixedSizeHorizontal: Bool
-  public var fixedSizeVertical: Bool
-  public var minimumWidth: Int?
-  public var minimumHeight: Int?
-  public var lineLimit: Int?
-  public var textTruncationMode: TextTruncationMode?
-  public var textWrappingStrategy: TextWrappingStrategy?
-  public var spacing: Spacing
-  public var alignmentKeys: [String]
-  public var layoutValues: [String: String]
+package struct LayoutMetadata: Sendable {
+  package var layoutPriority: Double
+  package var fixedSizeHorizontal: Bool
+  package var fixedSizeVertical: Bool
+  package var minimumWidth: Int?
+  package var minimumHeight: Int?
+  package var lineLimit: Int?
+  package var textTruncationMode: TextTruncationMode?
+  package var textWrappingStrategy: TextWrappingStrategy?
+  package var spacing: Spacing
+  package var alignmentKeys: [String]
+  package var layoutValues: [String: String]
   private var layoutValueStorage: [ObjectIdentifier: any Sendable]
   private var horizontalAlignmentGuideStorage: [ObjectIdentifier: @Sendable (ViewDimensions) -> Int]
   private var verticalAlignmentGuideStorage: [ObjectIdentifier: @Sendable (ViewDimensions) -> Int]
 
-  public init(
+  package init(
     layoutPriority: Double = 0,
     fixedSizeHorizontal: Bool = false,
     fixedSizeVertical: Bool = false,
@@ -222,7 +222,7 @@ public struct LayoutMetadata: Sendable {
     self.verticalAlignmentGuideStorage = verticalAlignmentGuideStorage
   }
 
-  public func merging(_ other: Self) -> Self {
+  package func merging(_ other: Self) -> Self {
     var merged = self
     if other.layoutPriority != 0 {
       merged.layoutPriority = other.layoutPriority
@@ -248,7 +248,7 @@ public struct LayoutMetadata: Sendable {
     return merged
   }
 
-  public func settingLayoutValue<Value: Sendable>(
+  package func settingLayoutValue<Value: Sendable>(
     _ value: Value,
     for keyIdentifier: ObjectIdentifier,
     debugName: String,
@@ -260,14 +260,14 @@ public struct LayoutMetadata: Sendable {
     return copy
   }
 
-  public func layoutValue<Value: Sendable>(
+  package func layoutValue<Value: Sendable>(
     for keyIdentifier: ObjectIdentifier,
     as _: Value.Type = Value.self
   ) -> Value? {
     layoutValueStorage[keyIdentifier] as? Value
   }
 
-  public func settingHorizontalAlignmentGuide(
+  package func settingHorizontalAlignmentGuide(
     _ alignment: HorizontalAlignment,
     debugName: String,
     computeValue: @escaping @Sendable (ViewDimensions) -> Int
@@ -280,7 +280,7 @@ public struct LayoutMetadata: Sendable {
     return copy
   }
 
-  public func settingVerticalAlignmentGuide(
+  package func settingVerticalAlignmentGuide(
     _ alignment: VerticalAlignment,
     debugName: String,
     computeValue: @escaping @Sendable (ViewDimensions) -> Int
@@ -293,19 +293,19 @@ public struct LayoutMetadata: Sendable {
     return copy
   }
 
-  public func hasExplicitHorizontalAlignmentGuide(
+  package func hasExplicitHorizontalAlignmentGuide(
     _ alignment: HorizontalAlignment
   ) -> Bool {
     horizontalAlignmentGuideStorage[alignment.key] != nil
   }
 
-  public func hasExplicitVerticalAlignmentGuide(
+  package func hasExplicitVerticalAlignmentGuide(
     _ alignment: VerticalAlignment
   ) -> Bool {
     verticalAlignmentGuideStorage[alignment.key] != nil
   }
 
-  public func applyingGuides(to base: ViewDimensions) -> ViewDimensions {
+  package func applyingGuides(to base: ViewDimensions) -> ViewDimensions {
     let horizontalGuideStorage = horizontalAlignmentGuideStorage
     let verticalGuideStorage = verticalAlignmentGuideStorage
 
@@ -323,13 +323,13 @@ public struct LayoutMetadata: Sendable {
       }
   }
 
-  public func viewDimensions(for size: Size) -> ViewDimensions {
+  package func viewDimensions(for size: Size) -> ViewDimensions {
     applyingGuides(to: ViewDimensions(width: size.width, height: size.height))
   }
 }
 
 extension LayoutMetadata: Equatable {
-  public static func == (lhs: Self, rhs: Self) -> Bool {
+  package static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.layoutPriority == rhs.layoutPriority
       && lhs.fixedSizeHorizontal == rhs.fixedSizeHorizontal
       && lhs.fixedSizeVertical == rhs.fixedSizeVertical

@@ -26,7 +26,7 @@ extension View {
     modifier(IDModifier(identity: identity))
   }
 
-  public func layoutMetadata(_ metadata: LayoutMetadata) -> some View {
+  package func layoutMetadata(_ metadata: LayoutMetadata) -> some View {
     modifier(LayoutMetadataModifier(metadata: metadata))
   }
 
@@ -497,7 +497,7 @@ public struct IDModifier: PrimitiveViewModifier {
   }
 }
 
-public struct LayoutMetadataModifier: PrimitiveViewModifier {
+package struct LayoutMetadataModifier: PrimitiveViewModifier {
   package var metadata: LayoutMetadata
 
   package func resolve<Base: View>(
