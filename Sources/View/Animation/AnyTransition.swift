@@ -39,7 +39,7 @@ package struct TransitionModifiers: Sendable, Equatable {
 ///
 /// Built-in transitions (``opacity``, ``move(edge:)``, etc.) construct
 /// `AnyTransition` values directly.  Custom ``Transition`` conformances
-/// are wrapped via ``AnyTransition/init(_:)-<A: Transition>``.
+/// are wrapped via ``AnyTransition/init(_:)``.
 public struct AnyTransition: Sendable {
   package let insertionModifiers: @Sendable () -> TransitionModifiers
   package let removalModifiers: @Sendable () -> TransitionModifiers
@@ -147,7 +147,7 @@ public struct AnyTransition: Sendable {
   }
 
   /// Walks a custom ``Transition/body`` output tree and aggregates
-  /// opacity/offset effects into a single ``TransitionModifiers``
+  /// opacity/offset effects into a single `TransitionModifiers`
   /// value.
   ///
   /// Preferred traversal order:
@@ -157,7 +157,7 @@ public struct AnyTransition: Sendable {
   ///   cannot yet expose a structured traversal hook
   ///
   /// Effects from modifiers the runtime does not yet understand are
-  /// silently ignored; the ``TransitionModifiers`` type documents the
+  /// silently ignored; the `TransitionModifiers` type documents the
   /// current palette (opacity + offset).
   @MainActor
   private static func extractModifiers<V: View>(from view: V) -> TransitionModifiers {

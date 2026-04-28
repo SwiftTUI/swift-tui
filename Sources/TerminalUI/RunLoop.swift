@@ -25,7 +25,7 @@ public enum KeyHandlingResult: Equatable, Sendable {
 /// Why an interactive run loop stopped.
 ///
 /// - ``userExit(_:)``: a key press configured in ``ExitKeyBindings``
-///   was received. The associated ``KeyPress`` identifies which key.
+///   was received. The associated `KeyPress` identifies which key.
 /// - ``signal(_:)``: the run loop terminated in response to an OS
 ///   signal (for example `SIGTERM`).
 /// - ``inputEnded``: the input stream reached end-of-file.

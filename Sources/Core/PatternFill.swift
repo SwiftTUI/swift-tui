@@ -19,7 +19,7 @@
 ///
 /// Pattern fills write their glyph on every cell inside the shape's
 /// fill region — whether rectangular, rounded, or curved.  On
-/// ``Circle``, ``Ellipse``, and ``Capsule``, cell-level containment
+/// `Circle`, `Ellipse`, and `Capsule`, cell-level containment
 /// is tested at each cell's visual center (projected into the same
 /// Braille subpixel grid the curved-shape renderer uses), so the
 /// glyph is written at exactly the cells the curved-shape rasterizer
@@ -104,7 +104,7 @@ extension PatternFill.Paint {
   /// A representative scalar color — the first stop of a gradient, or
   /// the flat color.  Used by call sites that can't evaluate a gradient
   /// spatially (snapshot debug dumps, the one-color fallback in
-  /// ``resolveStyleColorResult``).
+  /// `resolveStyleColorResult`).
   public var representativeColor: Color? {
     switch self {
     case .color(let color):

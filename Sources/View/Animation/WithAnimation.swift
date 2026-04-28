@@ -19,7 +19,7 @@ public struct AnimationCompletionCriteria: Equatable, Sendable {
   public static let removed = AnimationCompletionCriteria(kind: .removed)
 }
 
-/// Monotonic allocator for ``AnimationBatchID`` values.  Each call to
+/// Monotonic allocator for `AnimationBatchID` values.  Each call to
 /// `withAnimation` gets a fresh ID so the animation controller can
 /// associate every animation enqueued in that scope with a single
 /// completion closure.
@@ -69,7 +69,7 @@ public func withAnimation<Result>(
 /// Executes `body` with the specified animation and fires `completion`
 /// when the animation completes.
 ///
-/// A fresh ``AnimationBatchID`` is allocated for the scope; every state
+/// A fresh `AnimationBatchID` is allocated for the scope; every state
 /// write performed inside `body` travels through the scheduler tagged
 /// with that batch ID, and the animation controller fires `completion`
 /// once every animation and every removal overlay in the batch has
