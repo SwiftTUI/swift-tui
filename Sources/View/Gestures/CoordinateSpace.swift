@@ -2,10 +2,9 @@ public import Core
 
 /// A reference frame for gesture event locations.
 ///
-/// Terminal UI ships `.local` (origin at the gesture's target rect) and
-/// `.global` (origin at the terminal canvas). `.named(_:)` is reserved
-/// in SwiftUI's shape but is not yet supported — calling it at resolve
-/// time traps with a clear message.
+/// Terminal UI ships `.local` (origin at the gesture's target rect), `.global`
+/// (origin at the terminal canvas), and `.named(_:)` for frames recorded by
+/// ``View/coordinateSpace(name:)``.
 public struct CoordinateSpace: Equatable, Sendable {
   public enum Kind: Equatable, Sendable {
     case local
@@ -32,6 +31,20 @@ public struct CoordinateSpace: Equatable, Sendable {
     terminalPoint: Point,
     targetRect: CellRect
   ) -> Point {
+    resolve(
+      terminalPoint: terminalPoint,
+      targetRect: targetRect,
+      namedCoordinateSpaces: [:]
+    )
+  }
+
+  /// Resolves a terminal-global continuous point into this coordinate space,
+  /// using the named coordinate-space frames extracted for the current frame.
+  package func resolve(
+    terminalPoint: Point,
+    targetRect: CellRect,
+    namedCoordinateSpaces: [String: CellRect]
+  ) -> Point {
     switch kind {
     case .local:
       return Point(
@@ -41,10 +54,12 @@ public struct CoordinateSpace: Equatable, Sendable {
     case .global:
       return terminalPoint
     case .named(let name):
-      fatalError(
-        "CoordinateSpace.named(\"\(name)\") is not yet supported in "
-          + "TerminalUI. Use .local or .global, or file an issue if "
-          + "you need named coordinate frames."
+      guard let frame = namedCoordinateSpaces[name] else {
+        return terminalPoint
+      }
+      return Point(
+        x: terminalPoint.x - Double(frame.origin.x),
+        y: terminalPoint.y - Double(frame.origin.y)
       )
     }
   }

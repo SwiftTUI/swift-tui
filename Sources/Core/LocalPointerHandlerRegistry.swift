@@ -30,6 +30,7 @@ package struct LocalPointerEvent: Equatable, Sendable {
   package var location: PointerLocation
   package var targetRect: CellRect
   package var scrollContext: LocalPointerScrollContext?
+  package var namedCoordinateSpaces: [String: CellRect]
   package var timestamp: MonotonicInstant
 
   package init(
@@ -37,12 +38,14 @@ package struct LocalPointerEvent: Equatable, Sendable {
     location: PointerLocation,
     targetRect: CellRect,
     scrollContext: LocalPointerScrollContext? = nil,
+    namedCoordinateSpaces: [String: CellRect] = [:],
     timestamp: MonotonicInstant = .now()
   ) {
     self.kind = kind
     self.location = location
     self.targetRect = targetRect
     self.scrollContext = scrollContext
+    self.namedCoordinateSpaces = namedCoordinateSpaces
     self.timestamp = timestamp
   }
 
@@ -54,6 +57,7 @@ package struct LocalPointerEvent: Equatable, Sendable {
     location: Point,
     targetRect: CellRect,
     scrollContext: LocalPointerScrollContext? = nil,
+    namedCoordinateSpaces: [String: CellRect] = [:],
     timestamp: MonotonicInstant = .now()
   ) {
     self.init(
@@ -61,6 +65,7 @@ package struct LocalPointerEvent: Equatable, Sendable {
       location: .cellFallback(location.containingCell),
       targetRect: targetRect,
       scrollContext: scrollContext,
+      namedCoordinateSpaces: namedCoordinateSpaces,
       timestamp: timestamp
     )
   }
@@ -69,8 +74,10 @@ package struct LocalPointerEvent: Equatable, Sendable {
 @MainActor
 package final class LocalPointerHandlerRegistry: Equatable {
   package typealias Handler = @MainActor (LocalPointerEvent) -> Bool
+  package typealias HoverHandler = @MainActor @Sendable (HoverPhase) -> Void
 
   private var handlers: [RouteID: Handler] = [:]
+  private var hoverHandlers: [RouteID: HoverHandler] = [:]
 
   package init() {}
 
@@ -93,10 +100,31 @@ package final class LocalPointerHandlerRegistry: Equatable {
     )
   }
 
+  package func registerHover(
+    routeID: RouteID,
+    handler: @escaping HoverHandler
+  ) {
+    hoverHandlers[routeID] = handler
+    ViewNodeContext.current?.recordPointerHoverHandlerRegistration(
+      routeID: routeID,
+      handler: handler
+    )
+  }
+
   package func hasHandler(
     routeID: RouteID
   ) -> Bool {
     handlers[routeID] != nil
+  }
+
+  package func hasHoverHandler(
+    routeID: RouteID
+  ) -> Bool {
+    hoverHandlers[routeID] != nil
+  }
+
+  package var hasHoverSubscribers: Bool {
+    !hoverHandlers.isEmpty
   }
 
   @discardableResult
@@ -107,8 +135,16 @@ package final class LocalPointerHandlerRegistry: Equatable {
     handlers[routeID]?(event) ?? false
   }
 
+  package func dispatchHover(
+    routeID: RouteID,
+    phase: HoverPhase
+  ) {
+    hoverHandlers[routeID]?(phase)
+  }
+
   package func reset() {
     handlers.removeAll(keepingCapacity: true)
+    hoverHandlers.removeAll(keepingCapacity: true)
   }
 
   package func removeSubtrees(
@@ -123,6 +159,11 @@ package final class LocalPointerHandlerRegistry: Equatable {
     }) {
       handlers.removeValue(forKey: routeID)
     }
+    for routeID in hoverHandlers.keys.filter({
+      identityMatchesAnySubtreeRoot($0.identity, roots: roots)
+    }) {
+      hoverHandlers.removeValue(forKey: routeID)
+    }
   }
 
   package func snapshot() -> [RouteID: Handler] {
@@ -136,6 +177,16 @@ package final class LocalPointerHandlerRegistry: Equatable {
 
     for (routeID, handler) in snapshot {
       handlers[routeID] = handler
+    }
+  }
+
+  package func restoreHover(_ snapshot: [RouteID: HoverHandler]) {
+    guard !snapshot.isEmpty else {
+      return
+    }
+
+    for (routeID, handler) in snapshot {
+      hoverHandlers[routeID] = handler
     }
   }
 }

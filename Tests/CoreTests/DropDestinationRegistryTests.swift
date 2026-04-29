@@ -72,6 +72,36 @@ struct DropDestinationRegistryTests {
     #expect(consumed == false)
   }
 
+  @Test("Dispatch forwards spatial drop context to handlers")
+  func dispatchForwardsContext() {
+    let registry = DropDestinationRegistry()
+    let scope = Identity(components: ["panel"])
+    let expectedContext = DropContext(
+      location: Point(x: 1.5, y: 2.25),
+      pointer: .subCell(
+        location: Point(x: 1.5, y: 2.25),
+        source: .nativePixels,
+        metrics: CellPixelMetrics(width: 8, height: 16, source: .reported)
+      ),
+      modifiers: [.shift, .ctrl]
+    )
+    var receivedContext: DropContext?
+
+    registry.register(at: scope) { _, context in
+      receivedContext = context
+      return true
+    }
+
+    let consumed = registry.dispatch(
+      paths: [DroppedPath("/a")],
+      context: expectedContext,
+      along: [scope]
+    )
+
+    #expect(consumed)
+    #expect(receivedContext == expectedContext)
+  }
+
   @Test("reset clears all registrations")
   func resetClears() {
     let registry = DropDestinationRegistry()

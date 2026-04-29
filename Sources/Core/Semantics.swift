@@ -9,6 +9,7 @@ public struct SemanticExtractor: Sendable {
     var focusRegions: [FocusRegion] = []
     var scrollRoutes: [ScrollRoute] = []
     var selectionRoutes: [SelectionRoute] = []
+    var namedCoordinateSpaces: [String: CellRect] = [:]
     var hitTestOrder = 0
 
     walk(
@@ -29,6 +30,10 @@ public struct SemanticExtractor: Sendable {
 
         let participatesInTopLevelFocus = node.participatesInTopLevelFocus
 
+        if isEnabled, let name = node.semanticMetadata.namedCoordinateSpaceName {
+          namedCoordinateSpaces[name] = node.bounds
+        }
+
         if participatesInTopLevelFocus, isEnabled, hitsAllowed, !sealingParentOnChain {
           focusRegions.append(
             FocusRegion(
@@ -47,8 +52,12 @@ public struct SemanticExtractor: Sendable {
             || node.semanticMetadata.participatesInPointerHitTesting)
         {
           let computedRect = interactionRect(for: node, clippedTo: clipRect)
+          let explicitPath = transformedExplicitInteractionPath(for: node)
+          let pathRect = explicitPath.flatMap { interactionRect(for: $0, clippedTo: clipRect) }
           let finalRect =
-            transformedExplicitInteractionRect(for: node) ?? computedRect
+            pathRect
+            ?? transformedExplicitInteractionRect(for: node)
+            ?? computedRect
           if let finalRect {
             interactionRegions.append(
               InteractionRegion(
@@ -56,7 +65,8 @@ public struct SemanticExtractor: Sendable {
                 rect: finalRect,
                 routeID: routeID,
                 hitTestOrder: order,
-                captureOnPress: node.semanticMetadata.captureOnPress
+                captureOnPress: node.semanticMetadata.captureOnPress,
+                contentShape: explicitPath
               )
             )
           }
@@ -118,7 +128,8 @@ public struct SemanticExtractor: Sendable {
       interactionRegions: interactionRegions,
       focusRegions: focusRegions,
       scrollRoutes: scrollRoutes,
-      selectionRoutes: selectionRoutes
+      selectionRoutes: selectionRoutes,
+      namedCoordinateSpaces: namedCoordinateSpaces
     )
   }
 }
@@ -291,6 +302,45 @@ extension SemanticExtractor {
     default:
       return rect
     }
+  }
+
+  private func transformedExplicitInteractionPath(
+    for node: PlacedNode
+  ) -> Path? {
+    guard let path = node.semanticMetadata.explicitInteractionPath else {
+      return nil
+    }
+
+    let bounds = semanticBounds(for: node)
+    return path.translatedBy(
+      dx: Double(bounds.origin.x),
+      dy: Double(bounds.origin.y)
+    )
+  }
+
+  private func interactionRect(
+    for path: Path,
+    clippedTo clipRect: CellRect?
+  ) -> CellRect? {
+    guard let bounds = path.boundingRect else {
+      return nil
+    }
+
+    let minX = Int(bounds.origin.x.rounded(.down))
+    let minY = Int(bounds.origin.y.rounded(.down))
+    let maxX = Int(bounds.maxX.rounded(.up))
+    let maxY = Int(bounds.maxY.rounded(.up))
+    let rect = CellRect(
+      origin: CellPoint(x: minX, y: minY),
+      size: CellSize(width: maxX - minX, height: maxY - minY)
+    )
+    guard !rect.isEmpty else {
+      return nil
+    }
+    guard let clipRect else {
+      return rect
+    }
+    return rect.intersection(clipRect)
   }
 
   private func appendPayloadSemantics(

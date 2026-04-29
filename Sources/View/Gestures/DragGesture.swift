@@ -105,6 +105,7 @@ final class DragGestureRecognizer: GestureRecognizer {
   private var startLocation: Point?
   private var startTime: MonotonicInstant?
   private var targetRect: CellRect = CellRect(origin: .zero, size: .zero)
+  private var namedCoordinateSpaces: [String: CellRect] = [:]
   private var samples: [Sample] = []
   private var lastValue: DragGesture.Value?
 
@@ -130,6 +131,7 @@ final class DragGestureRecognizer: GestureRecognizer {
       startLocation = location
       startTime = event.timestamp
       targetRect = event.targetRect
+      namedCoordinateSpaces = event.namedCoordinateSpaces
       samples = [
         Sample(
           location: location,
@@ -147,6 +149,7 @@ final class DragGestureRecognizer: GestureRecognizer {
           pointer: event.location
         )
       )
+      namedCoordinateSpaces = event.namedCoordinateSpaces
       let dx = location.x - start.x
       let dy = location.y - start.y
       let distance = max(abs(dx), abs(dy))
@@ -169,6 +172,7 @@ final class DragGestureRecognizer: GestureRecognizer {
           pointer: event.location
         )
       )
+      namedCoordinateSpaces = event.namedCoordinateSpaces
       phase = .ended
       lastValue = makeValue(
         now: event.timestamp,
@@ -189,22 +193,26 @@ final class DragGestureRecognizer: GestureRecognizer {
     guard let value = lastValue else { return nil }
     let loc = coordinateSpace.resolve(
       terminalPoint: value.location,
-      targetRect: targetRect
+      targetRect: targetRect,
+      namedCoordinateSpaces: namedCoordinateSpaces
     )
     let start = coordinateSpace.resolve(
       terminalPoint: value.startLocation,
-      targetRect: targetRect
+      targetRect: targetRect,
+      namedCoordinateSpaces: namedCoordinateSpaces
     )
     let predEnd = coordinateSpace.resolve(
       terminalPoint: value.predictedEndLocation,
-      targetRect: targetRect
+      targetRect: targetRect,
+      namedCoordinateSpaces: namedCoordinateSpaces
     )
     let path = PointerPath(
       value.path.map { sample in
         PointerPath.Sample(
           location: coordinateSpace.resolve(
             terminalPoint: sample.location,
-            targetRect: targetRect
+            targetRect: targetRect,
+            namedCoordinateSpaces: namedCoordinateSpaces
           ),
           time: sample.time,
           pointer: sample.pointer
@@ -227,6 +235,7 @@ final class DragGestureRecognizer: GestureRecognizer {
   func tearDown() {
     if !phase.isTerminal { phase = .cancelled }
     samples.removeAll()
+    namedCoordinateSpaces.removeAll(keepingCapacity: true)
   }
 
   private func makeValue(

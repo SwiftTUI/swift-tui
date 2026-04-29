@@ -115,6 +115,7 @@ extension RunLoop {
         runtimeRegistrations.pruneOrphanedGestures(
           keeping: renderer.liveIdentitySnapshot()
         )
+        try updateTerminalPointerHoverModeIfNeeded()
 
         // Release pointer capture if the captured region disappeared from
         // the rendered tree (e.g. a view with an active gesture was removed
@@ -125,6 +126,11 @@ extension RunLoop {
           capturedPointerRouteID = nil
           armedPointerRouteID = nil
           armedPointerRouteUsesPointerHandler = false
+        }
+        if let hoveredPointerRouteID,
+          interactionRegion(routeID: hoveredPointerRouteID) == nil
+        {
+          self.hoveredPointerRouteID = nil
         }
 
         let focusChanged = focusTracker.updateRegions(
@@ -349,6 +355,15 @@ extension RunLoop {
     }
   }
 
+  package func updateTerminalPointerHoverModeIfNeeded() throws {
+    let shouldEnable = localPointerHandlerRegistry.hasHoverSubscribers
+    guard shouldEnable != terminalPointerHoverEnabled else {
+      return
+    }
+    try terminalHost.setPointerHoverEnabled(shouldEnable)
+    terminalPointerHoverEnabled = shouldEnable
+  }
+
   package func renderPendingFramesAsync(renderedFrames: inout Int) async throws {
     observationBridge.attachInvalidator(scheduler)
 
@@ -397,6 +412,7 @@ extension RunLoop {
         runtimeRegistrations.pruneOrphanedGestures(
           keeping: renderer.liveIdentitySnapshot()
         )
+        try updateTerminalPointerHoverModeIfNeeded()
 
         // Release pointer capture if the captured region disappeared from
         // the rendered tree (e.g. a view with an active gesture was removed
@@ -407,6 +423,11 @@ extension RunLoop {
           capturedPointerRouteID = nil
           armedPointerRouteID = nil
           armedPointerRouteUsesPointerHandler = false
+        }
+        if let hoveredPointerRouteID,
+          interactionRegion(routeID: hoveredPointerRouteID) == nil
+        {
+          self.hoveredPointerRouteID = nil
         }
 
         let focusChanged = focusTracker.updateRegions(

@@ -117,6 +117,7 @@ public enum InputEvent: Equatable, Sendable {
   case key(KeyPress)
   case mouse(MouseEvent)
   case paste(PasteEvent)
+  case drop(paths: [DroppedPath], context: DropContext)
 
   /// Convenience for creating a key event with optional modifiers.
   public static func key(
@@ -151,7 +152,7 @@ func coalescedInputEvents(
     case .key:
       flushPendingMouseEvent()
       coalesced.append(event)
-    case .paste:
+    case .paste, .drop:
       flushPendingMouseEvent()
       coalesced.append(event)
     case .mouse(let mouseEvent):

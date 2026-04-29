@@ -61,6 +61,7 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
   private var lastTerminalLocation: Point?
   private var lastPointer: PointerLocation?
   private var lastTargetRect: CellRect = CellRect(origin: .zero, size: .zero)
+  private var lastNamedCoordinateSpaces: [String: CellRect] = [:]
 
   init(count: Int, coordinateSpace: CoordinateSpace) {
     self.requiredCount = count
@@ -78,6 +79,7 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
     case .down(.primary):
       pressStart = location
       lastTargetRect = event.targetRect
+      lastNamedCoordinateSpaces = event.namedCoordinateSpaces
       return .handled
     case .up(.primary):
       guard pressStart != nil else { return .ignored }
@@ -89,6 +91,7 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
           lastTerminalLocation = location
           lastPointer = event.location
           lastTargetRect = event.targetRect
+          lastNamedCoordinateSpaces = event.namedCoordinateSpaces
         }
         return .handled
       } else {
@@ -117,7 +120,8 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
     return SpatialTapGesture.Value(
       location: coordinateSpace.resolve(
         terminalPoint: loc,
-        targetRect: lastTargetRect
+        targetRect: lastTargetRect,
+        namedCoordinateSpaces: lastNamedCoordinateSpaces
       ),
       pointer: pointer
     )

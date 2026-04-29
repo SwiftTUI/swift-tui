@@ -16,7 +16,7 @@ extension ActionScope where Self: View & Sendable {
   /// resolve.
   @MainActor
   public func dropDestination(
-    action: @escaping @MainActor @Sendable ([DroppedPath]) -> Bool
+    action: @escaping @MainActor @Sendable ([DroppedPath], DropContext) -> Bool
   ) -> some View & ActionScope & Sendable {
     modifier(
       DropDestinationRegistrationModifier(
@@ -25,15 +25,25 @@ extension ActionScope where Self: View & Sendable {
       )
     )
   }
+
+  /// Declares this scope as a file-drop destination without spatial context.
+  @MainActor
+  public func dropDestination(
+    action: @escaping @MainActor @Sendable ([DroppedPath]) -> Bool
+  ) -> some View & ActionScope & Sendable {
+    dropDestination { paths, _ in
+      action(paths)
+    }
+  }
 }
 
 public struct DropDestinationRegistrationModifier: PrimitiveViewModifier, Sendable {
   package let authoringContext: ImperativeAuthoringContextSnapshot?
-  package let action: @MainActor @Sendable ([DroppedPath]) -> Bool
+  package let action: @MainActor @Sendable ([DroppedPath], DropContext) -> Bool
 
   package init(
     authoringContext: ImperativeAuthoringContextSnapshot?,
-    action: @escaping @MainActor @Sendable ([DroppedPath]) -> Bool
+    action: @escaping @MainActor @Sendable ([DroppedPath], DropContext) -> Bool
   ) {
     self.authoringContext = authoringContext
     self.action = action
@@ -47,9 +57,9 @@ public struct DropDestinationRegistrationModifier: PrimitiveViewModifier, Sendab
     let dynamicPropertyScope = currentImperativeAuthoringContextSnapshot() ?? authoringContext
     context.dropDestinationRegistry?.register(
       at: node.identity,
-      handler: { paths in
+      handler: { paths, dropContext in
         withImperativeAuthoringContext(dynamicPropertyScope) {
-          action(paths)
+          action(paths, dropContext)
         }
       }
     )

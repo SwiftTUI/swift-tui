@@ -4,6 +4,7 @@ package struct NodeHandlers {
   package var keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]]
   package var terminationHandlerRegistrations: [Identity: [LocalTerminationRegistry.Handler]]
   package var pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler]
+  package var pointerHoverHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.HoverHandler]
   package var gestureRegistrations: [Identity: AnyGestureRecognizer]
   package var gestureStateRegistrations: [Identity: [AnyGestureStateBinding]]
   package var focusBindingRegistrations: [FocusBindingRegistrationSnapshot]
@@ -19,6 +20,7 @@ package struct NodeHandlers {
     keyPressHandlerRegistrations: [Identity: [LocalKeyHandlerRegistry.KeyPressHandler]] = [:],
     terminationHandlerRegistrations: [Identity: [LocalTerminationRegistry.Handler]] = [:],
     pointerHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.Handler] = [:],
+    pointerHoverHandlerRegistrations: [RouteID: LocalPointerHandlerRegistry.HoverHandler] = [:],
     gestureRegistrations: [Identity: AnyGestureRecognizer] = [:],
     gestureStateRegistrations: [Identity: [AnyGestureStateBinding]] = [:],
     focusBindingRegistrations: [FocusBindingRegistrationSnapshot] = [],
@@ -33,6 +35,7 @@ package struct NodeHandlers {
     self.keyPressHandlerRegistrations = keyPressHandlerRegistrations
     self.terminationHandlerRegistrations = terminationHandlerRegistrations
     self.pointerHandlerRegistrations = pointerHandlerRegistrations
+    self.pointerHoverHandlerRegistrations = pointerHoverHandlerRegistrations
     self.gestureRegistrations = gestureRegistrations
     self.gestureStateRegistrations = gestureStateRegistrations
     self.focusBindingRegistrations = focusBindingRegistrations
@@ -84,6 +87,13 @@ package struct NodeHandlers {
     handler: @escaping LocalPointerHandlerRegistry.Handler
   ) {
     pointerHandlerRegistrations[routeID] = handler
+  }
+
+  package mutating func recordPointerHoverHandler(
+    routeID: RouteID,
+    handler: @escaping LocalPointerHandlerRegistry.HoverHandler
+  ) {
+    pointerHoverHandlerRegistrations[routeID] = handler
   }
 
   package mutating func recordGesture(

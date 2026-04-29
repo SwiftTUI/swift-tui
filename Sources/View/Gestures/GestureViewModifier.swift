@@ -112,23 +112,73 @@ extension View {
       )
     )
   }
+
+  /// Overrides the hit-test region for gesture recognition with a continuous path.
+  public func contentShape(_ path: Path) -> some View {
+    modifier(
+      ContentShapeModifier(
+        explicitPath: path
+      )
+    )
+  }
+
+  /// Names this view's placed frame so gestures can resolve locations in it.
+  public func coordinateSpace(name: some Hashable & Sendable) -> some View {
+    modifier(
+      NamedCoordinateSpaceModifier(
+        name: String(describing: name)
+      )
+    )
+  }
 }
 
 @MainActor
 public struct ContentShapeModifier: PrimitiveViewModifier {
   let explicitRect: CellRect?
+  let explicitPath: Path?
+
+  init(
+    explicitRect: CellRect?
+  ) {
+    self.explicitRect = explicitRect
+    explicitPath = nil
+  }
+
+  init(
+    explicitPath: Path
+  ) {
+    explicitRect = nil
+    self.explicitPath = explicitPath
+  }
 
   package func resolve<Content: View>(
     content: ModifierContentInputs<Content>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
-    guard let explicitRect else { return [node] }
+    guard explicitRect != nil || explicitPath != nil else { return [node] }
     node.semanticMetadata = node.semanticMetadata.merging(
       SemanticMetadata(
         participatesInPointerHitTesting: true,
-        explicitInteractionRect: explicitRect
+        explicitInteractionRect: explicitRect,
+        explicitInteractionPath: explicitPath
       )
+    )
+    return [node]
+  }
+}
+
+@MainActor
+public struct NamedCoordinateSpaceModifier: PrimitiveViewModifier {
+  let name: String
+
+  package func resolve<Content: View>(
+    content: ModifierContentInputs<Content>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    var node = content.resolve(in: context)
+    node.semanticMetadata = node.semanticMetadata.merging(
+      SemanticMetadata(namedCoordinateSpaceName: name)
     )
     return [node]
   }

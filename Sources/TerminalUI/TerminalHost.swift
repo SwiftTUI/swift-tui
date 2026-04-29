@@ -303,6 +303,7 @@ public protocol TerminalHosting: AnyObject {
   func write(_ output: String) throws
   func clearScreen() throws
   func moveCursor(to point: CellPoint) throws
+  func setPointerHoverEnabled(_ enabled: Bool) throws
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics
 }
@@ -327,6 +328,8 @@ extension TerminalHosting {
   public var pointerInputCapabilities: PointerInputCapabilities {
     .cellOnly
   }
+
+  public func setPointerHoverEnabled(_: Bool) throws {}
 
   @discardableResult
   public func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
@@ -731,6 +734,7 @@ extension TerminalHosting {
     private var processExitCleanupToken: UInt64?
     private var rawModeEnabled = false
     private var activeMouseCoordinateMode = MouseCoordinateMode.cells
+    private var activePointerHoverEnabled = false
     private var capabilityProbe = CapabilityProbeState()
     private var presentationSession = PresentationSession()
 
@@ -836,6 +840,7 @@ extension TerminalHosting {
           self.savedInputFileStatusFlags = nil
           rawModeEnabled = false
           activeMouseCoordinateMode = .cells
+          activePointerHoverEnabled = false
           presentationSession.reset()
           if let savedInputFileStatusFlags {
             try? controller.setFileStatusFlags(savedInputFileStatusFlags, on: inputFileDescriptor)
@@ -865,6 +870,7 @@ extension TerminalHosting {
       let savedAttributes = self.savedAttributes
       let savedInputFileStatusFlags = self.savedInputFileStatusFlags
       let mouseCoordinateModeToDisable = activeMouseCoordinateMode
+      let pointerHoverToDisable = activePointerHoverEnabled
       #if !canImport(WASILibc)
         TerminalProcessExitCleanupRegistry.unregister(processExitCleanupToken)
         processExitCleanupToken = nil
@@ -873,6 +879,7 @@ extension TerminalHosting {
       self.savedInputFileStatusFlags = nil
       rawModeEnabled = false
       activeMouseCoordinateMode = .cells
+      activePointerHoverEnabled = false
       presentationSession.reset()
 
       var attributesToRestore = savedAttributes
@@ -892,7 +899,12 @@ extension TerminalHosting {
       try writeSynchronously(clearScreenSequence())
       try writeSynchronously(cursorSequence(to: .zero))
       if capabilityProfile.supportsMouseReporting {
-        try writeSynchronously(disableMouseReportingSequence(for: mouseCoordinateModeToDisable))
+        try writeSynchronously(
+          disableMouseReportingSequence(
+            for: mouseCoordinateModeToDisable,
+            hoverEnabled: pointerHoverToDisable
+          )
+        )
       }
       try writeSynchronously("\u{001B}[?2004l")  // disable bracketed paste
       try writeSynchronously(resetStyleSequence())
@@ -921,6 +933,22 @@ extension TerminalHosting {
 
     public func moveCursor(to point: CellPoint) throws {
       try write(cursorSequence(to: point))
+    }
+
+    public func setPointerHoverEnabled(_ enabled: Bool) throws {
+      guard capabilityProfile.supportsMouseReporting else {
+        activePointerHoverEnabled = false
+        return
+      }
+      guard activePointerHoverEnabled != enabled else {
+        return
+      }
+
+      if rawModeEnabled {
+        try write(enabled ? "\u{001B}[?1003h" : "\u{001B}[?1003l")
+      }
+      activePointerHoverEnabled = enabled
+      refreshProcessExitCleanupRegistration()
     }
 
     @discardableResult
@@ -1452,28 +1480,60 @@ extension TerminalHosting {
       if activeMouseCoordinateMode.usesTerminalPixels {
         sequence += "\u{001B}[?1016h"
       }
+      if activePointerHoverEnabled {
+        sequence += "\u{001B}[?1003h"
+      }
       return sequence
     }
 
     private func disableMouseReportingSequence(
-      for mouseCoordinateMode: MouseCoordinateMode
+      for mouseCoordinateMode: MouseCoordinateMode,
+      hoverEnabled: Bool
     ) -> String {
+      var sequence = hoverEnabled ? "\u{001B}[?1003l" : ""
       if mouseCoordinateMode.usesTerminalPixels {
-        return "\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"
+        sequence += "\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"
+      } else {
+        sequence += "\u{001B}[?1002l\u{001B}[?1006l"
       }
-      return "\u{001B}[?1002l\u{001B}[?1006l"
+      return sequence
     }
 
     private func processExitResetSequence() -> String {
       var reset = ""
       if capabilityProfile.supportsMouseReporting {
-        reset += disableMouseReportingSequence(for: activeMouseCoordinateMode)
+        reset += disableMouseReportingSequence(
+          for: activeMouseCoordinateMode,
+          hoverEnabled: activePointerHoverEnabled
+        )
       }
       reset += "\u{001B}[?2004l"  // disable bracketed paste
       reset += showCursorSequence()
       reset += resetStyleSequence()
       reset += exitAlternateScreenSequence()
       return reset
+    }
+
+    private func refreshProcessExitCleanupRegistration() {
+      guard rawModeEnabled,
+        let savedAttributes,
+        let savedInputFileStatusFlags
+      else {
+        return
+      }
+
+      #if !canImport(WASILibc)
+        TerminalProcessExitCleanupRegistry.unregister(processExitCleanupToken)
+        processExitCleanupToken = TerminalProcessExitCleanupRegistry.register(
+          .init(
+            inputFileDescriptor: inputFileDescriptor,
+            outputFileDescriptor: outputFileDescriptor,
+            inputFileStatusFlags: savedInputFileStatusFlags,
+            savedAttributes: savedAttributes,
+            resetBytes: Array(processExitResetSequence().utf8)
+          )
+        )
+      #endif
     }
 
     private func resetStyleSequence() -> String {
