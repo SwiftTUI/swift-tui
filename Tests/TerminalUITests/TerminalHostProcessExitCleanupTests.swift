@@ -42,6 +42,38 @@ struct TerminalHostProcessExitCleanupTests {
     )
   }
 
+  @Test("process-exit cleanup disables active terminal-pixel mouse mode")
+  func processExitCleanupDisablesActiveTerminalPixelMouseMode() throws {
+    let controller = ProcessExitCleanupController(cellPixelSize: .init(width: 8, height: 16))
+    var inputPipe = try makePipe()
+    var outputPipe = try makePipe()
+    defer {
+      closePipe(&inputPipe)
+      closePipe(&outputPipe)
+      TerminalProcessExitCleanupRegistry.runForTesting()
+    }
+
+    let host = TerminalHost(
+      inputFileDescriptor: inputPipe.readEnd,
+      outputFileDescriptor: outputPipe.writeEnd,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor,
+      pointerPrecisionPolicy: .forceTerminalPixels
+    )
+
+    try host.enableRawMode()
+
+    TerminalProcessExitCleanupRegistry.runForTesting()
+    closeFileDescriptor(&outputPipe.writeEnd)
+
+    let output = try readUTF8(from: outputPipe.readEnd)
+    #expect(
+      output
+        == "\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l\u{001B}[?2004l\u{001B}[?25h\u{001B}[0m\u{001B}[?1049l"
+    )
+  }
+
   @Test("process-exit cleanup unregisters when raw mode is disabled normally")
   func processExitCleanupDoesNotDoubleRestoreAfterDisable() throws {
     let controller = ProcessExitCleanupController()
@@ -78,6 +110,12 @@ private struct PipeEnds {
 }
 
 private final class ProcessExitCleanupController: TerminalControlling {
+  private let cellPixelSizeValue: PixelSize?
+
+  init(cellPixelSize: PixelSize? = nil) {
+    cellPixelSizeValue = cellPixelSize
+  }
+
   func isATTY(_: Int32) -> Bool {
     true
   }
@@ -98,7 +136,7 @@ private final class ProcessExitCleanupController: TerminalControlling {
   }
 
   func cellPixelSize(of _: Int32) throws -> PixelSize? {
-    nil
+    cellPixelSizeValue
   }
 
   func getFileStatusFlags(of _: Int32) throws -> Int32 {

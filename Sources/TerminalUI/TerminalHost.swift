@@ -713,12 +713,16 @@ extension TerminalHosting {
     public var graphicsCapabilities: TerminalGraphicsCapabilities {
       resolvedGraphicsCapabilities(probingProtocols: false)
     }
+    public var pointerInputCapabilities: PointerInputCapabilities {
+      activeMouseCoordinateMode.pointerInputCapabilities
+    }
 
     private let inputFileDescriptor: Int32
     private let outputFileDescriptor: Int32
     private let fallbackSize: CellSize
     private let controller: any TerminalControlling
     private let environment: [String: String]
+    private let pointerPrecisionPolicy: PointerPrecisionPolicy
     private let usesTerminalEditOperations: Bool
     private let imageRenderer: TerminalImageRenderer
 
@@ -726,6 +730,7 @@ extension TerminalHosting {
     private var savedInputFileStatusFlags: Int32?
     private var processExitCleanupToken: UInt64?
     private var rawModeEnabled = false
+    private var activeMouseCoordinateMode = MouseCoordinateMode.cells
     private var capabilityProbe = CapabilityProbeState()
     private var presentationSession = PresentationSession()
 
@@ -735,7 +740,8 @@ extension TerminalHosting {
       fallbackSize: CellSize = .init(width: 80, height: 24),
       capabilityProfile: TerminalCapabilityProfile? = nil,
       environment: [String: String]? = nil,
-      usesTerminalEditOperations: Bool? = nil
+      usesTerminalEditOperations: Bool? = nil,
+      pointerPrecisionPolicy: PointerPrecisionPolicy = .subCellWhenKnown
     ) {
       self.init(
         inputFileDescriptor: inputFileDescriptor,
@@ -744,7 +750,8 @@ extension TerminalHosting {
         controller: POSIXTerminalController(),
         capabilityProfile: capabilityProfile,
         environment: environment ?? currentProcessEnvironment(),
-        usesTerminalEditOperations: usesTerminalEditOperations
+        usesTerminalEditOperations: usesTerminalEditOperations,
+        pointerPrecisionPolicy: pointerPrecisionPolicy
       )
     }
 
@@ -755,7 +762,8 @@ extension TerminalHosting {
       controller: any TerminalControlling,
       capabilityProfile: TerminalCapabilityProfile? = nil,
       environment: [String: String]? = nil,
-      usesTerminalEditOperations: Bool? = nil
+      usesTerminalEditOperations: Bool? = nil,
+      pointerPrecisionPolicy: PointerPrecisionPolicy = .subCellWhenKnown
     ) {
       let environment = environment ?? currentProcessEnvironment()
       self.inputFileDescriptor = inputFileDescriptor
@@ -763,6 +771,7 @@ extension TerminalHosting {
       self.fallbackSize = fallbackSize
       self.controller = controller
       self.environment = environment
+      self.pointerPrecisionPolicy = pointerPrecisionPolicy
       self.usesTerminalEditOperations =
         usesTerminalEditOperations ?? controller.isATTY(outputFileDescriptor)
       imageRenderer = .init(repository: sharedImageAssetRepository)
@@ -800,6 +809,7 @@ extension TerminalHosting {
       )
       savedAttributes = currentAttributes
       savedInputFileStatusFlags = currentFileStatusFlags
+      activeMouseCoordinateMode = resolvedMouseCoordinateMode()
       #if !canImport(WASILibc)
         processExitCleanupToken = TerminalProcessExitCleanupRegistry.register(
           .init(
@@ -825,6 +835,7 @@ extension TerminalHosting {
           savedAttributes = nil
           self.savedInputFileStatusFlags = nil
           rawModeEnabled = false
+          activeMouseCoordinateMode = .cells
           presentationSession.reset()
           if let savedInputFileStatusFlags {
             try? controller.setFileStatusFlags(savedInputFileStatusFlags, on: inputFileDescriptor)
@@ -853,6 +864,7 @@ extension TerminalHosting {
       let presentationWriter = presentationSession.writer
       let savedAttributes = self.savedAttributes
       let savedInputFileStatusFlags = self.savedInputFileStatusFlags
+      let mouseCoordinateModeToDisable = activeMouseCoordinateMode
       #if !canImport(WASILibc)
         TerminalProcessExitCleanupRegistry.unregister(processExitCleanupToken)
         processExitCleanupToken = nil
@@ -860,6 +872,7 @@ extension TerminalHosting {
       self.savedAttributes = nil
       self.savedInputFileStatusFlags = nil
       rawModeEnabled = false
+      activeMouseCoordinateMode = .cells
       presentationSession.reset()
 
       var attributesToRestore = savedAttributes
@@ -879,7 +892,7 @@ extension TerminalHosting {
       try writeSynchronously(clearScreenSequence())
       try writeSynchronously(cursorSequence(to: .zero))
       if capabilityProfile.supportsMouseReporting {
-        try writeSynchronously(disableMouseReportingSequence())
+        try writeSynchronously(disableMouseReportingSequence(for: mouseCoordinateModeToDisable))
       }
       try writeSynchronously("\u{001B}[?2004l")  // disable bracketed paste
       try writeSynchronously(resetStyleSequence())
@@ -1196,6 +1209,42 @@ extension TerminalHosting {
       return capabilities
     }
 
+    private func resolvedMouseCoordinateMode() -> MouseCoordinateMode {
+      guard capabilityProfile.supportsMouseReporting else {
+        return .cells
+      }
+
+      if pointerPrecisionPolicy != .forceTerminalPixels, isInsideTerminalMultiplexer {
+        return .cells
+      }
+
+      return .resolving(
+        policy: pointerPrecisionPolicy,
+        metrics: trustedCellPixelMetrics()
+      )
+    }
+
+    private var isInsideTerminalMultiplexer: Bool {
+      if environment["TMUX"] != nil {
+        return true
+      }
+      guard let term = environment["TERM"]?.lowercased() else {
+        return false
+      }
+      return term.hasPrefix("screen") || term.hasPrefix("tmux")
+    }
+
+    private func trustedCellPixelMetrics() -> CellPixelMetrics? {
+      guard let cellPixelSize = baselineGraphicsCapabilities().cellPixelSize else {
+        return nil
+      }
+      return CellPixelMetrics(
+        width: max(1, cellPixelSize.width),
+        height: max(1, cellPixelSize.height),
+        source: .reported
+      )
+    }
+
     private func probeGraphicsCapabilitiesIfNeeded() -> TerminalGraphicsCapabilities {
       if capabilityProbe.hasProbedGraphicsCapabilities {
         return baselineGraphicsCapabilities()
@@ -1399,17 +1448,26 @@ extension TerminalHosting {
     }
 
     private func enableMouseReportingSequence() -> String {
-      "\u{001B}[?1002h\u{001B}[?1006h"
+      var sequence = "\u{001B}[?1002h\u{001B}[?1006h"
+      if activeMouseCoordinateMode.usesTerminalPixels {
+        sequence += "\u{001B}[?1016h"
+      }
+      return sequence
     }
 
-    private func disableMouseReportingSequence() -> String {
-      "\u{001B}[?1002l\u{001B}[?1006l"
+    private func disableMouseReportingSequence(
+      for mouseCoordinateMode: MouseCoordinateMode
+    ) -> String {
+      if mouseCoordinateMode.usesTerminalPixels {
+        return "\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"
+      }
+      return "\u{001B}[?1002l\u{001B}[?1006l"
     }
 
     private func processExitResetSequence() -> String {
       var reset = ""
       if capabilityProfile.supportsMouseReporting {
-        reset += disableMouseReportingSequence()
+        reset += disableMouseReportingSequence(for: activeMouseCoordinateMode)
       }
       reset += "\u{001B}[?2004l"  // disable bracketed paste
       reset += showCursorSequence()

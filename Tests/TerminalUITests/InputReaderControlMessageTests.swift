@@ -144,6 +144,69 @@ struct InputReaderControlMessageTests {
     #expect(receivedMessages.withLock { $0 } == [.style(style)])
     #expect(events == [KeyPress(.character("q"))])
   }
+
+  @Test("input reader parses terminal-pixel mouse coordinates when forced")
+  func inputReaderParsesTerminalPixelMouseCoordinatesWhenForced() async throws {
+    var descriptors: [Int32] = [0, 0]
+    #expect(unsafe pipe(&descriptors) == 0)
+
+    let readDescriptor = descriptors[0]
+    let writeDescriptor = descriptors[1]
+    var didCloseReadDescriptor = false
+    var didCloseWriteDescriptor = false
+    defer {
+      if !didCloseReadDescriptor {
+        _ = close(readDescriptor)
+      }
+      if !didCloseWriteDescriptor {
+        _ = close(writeDescriptor)
+      }
+    }
+
+    let currentFlags = fcntl(readDescriptor, F_GETFL)
+    #expect(currentFlags >= 0)
+    #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
+
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    let inputReader = InputReader(
+      fileDescriptor: readDescriptor,
+      pointerPrecisionPolicy: .forceTerminalPixels,
+      cellPixelMetrics: metrics
+    )
+
+    let eventsTask = Task {
+      var events: [InputEvent] = []
+      for await event in inputReader.inputEvents() {
+        events.append(event)
+      }
+      return events
+    }
+
+    try writeAllBytes(Array("\u{001B}[<0;17;33Mq".utf8), to: writeDescriptor)
+    _ = close(writeDescriptor)
+    didCloseWriteDescriptor = true
+
+    let events = await eventsTask.value
+
+    _ = close(readDescriptor)
+    didCloseReadDescriptor = true
+
+    #expect(
+      events == [
+        .mouse(
+          MouseEvent(
+            kind: .down(.primary),
+            location: .subCell(
+              location: Point(x: 2.0, y: 2.0),
+              source: .terminalPixels,
+              metrics: metrics,
+              rawPixel: PixelPoint(x: 16, y: 32)
+            )
+          )
+        ),
+        .key(.character("q")),
+      ])
+  }
 }
 
 private func writeAllBytes(

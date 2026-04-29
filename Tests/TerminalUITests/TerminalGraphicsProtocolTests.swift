@@ -14,6 +14,106 @@ import Testing
 @MainActor
 @Suite
 struct TerminalGraphicsProtocolTests {
+  @Test("terminal host enables SGR-Pixels only when terminal pixels are forced")
+  func terminalHostEnablesSGRPixelsOnlyWhenForced() throws {
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor,
+      pointerPrecisionPolicy: .forceTerminalPixels
+    )
+
+    try host.enableRawMode()
+
+    #expect(
+      host.pointerInputCapabilities.precision
+        == .subCell(
+          source: .terminalPixels,
+          metrics: CellPixelMetrics(width: 8, height: 16, source: .reported)
+        )
+    )
+
+    try host.disableRawMode()
+
+    let output = controller.writes.joined()
+    #expect(output.contains("\u{001B}[?1002h\u{001B}[?1006h\u{001B}[?1016h"))
+    #expect(output.contains("\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"))
+  }
+
+  @Test("terminal host keeps default sub-cell policy cell-only without support proof")
+  func terminalHostDefaultSubCellPolicyStaysCellOnlyWithoutSupportProof() throws {
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    try host.enableRawMode()
+    #expect(host.pointerInputCapabilities == .cellOnly)
+    try host.disableRawMode()
+
+    #expect(!controller.writes.joined().contains("1016"))
+  }
+
+  @Test("terminal host cell-only policy never emits SGR-Pixels")
+  func terminalHostCellOnlyPolicyNeverEmitsSGRPixels() throws {
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor,
+      pointerPrecisionPolicy: .cellOnly
+    )
+
+    try host.enableRawMode()
+    #expect(host.pointerInputCapabilities == .cellOnly)
+    try host.disableRawMode()
+
+    #expect(!controller.writes.joined().contains("1016"))
+  }
+
+  @Test("terminal host force-pixel policy overrides tmux safety default")
+  func terminalHostForcePixelPolicyOverridesTMUXSafetyDefault() throws {
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor,
+      environment: [
+        "TERM": "tmux-256color",
+        "TMUX": "/tmp/tmux-501/default,1,0",
+      ],
+      pointerPrecisionPolicy: .forceTerminalPixels
+    )
+
+    try host.enableRawMode()
+    try host.disableRawMode()
+
+    #expect(controller.writes.joined().contains("\u{001B}[?1016h"))
+  }
+
   @Test(
     "terminal host emits Kitty PNG payloads when Kitty graphics are available")
   func terminalHostEmitsKittyPayloads() throws {

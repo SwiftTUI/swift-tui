@@ -126,6 +126,9 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     setup += "\u{001B}[?25l"
     if capabilityProfile.supportsMouseReporting {
       setup += "\u{001B}[?1002h\u{001B}[?1006h"
+      if usesTerminalPixelMouseReporting {
+        setup += "\u{001B}[?1016h"
+      }
     }
     setup += "\u{001B}[?2004h"  // enable bracketed paste
     try write(setup)
@@ -134,13 +137,26 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   package func disableRawMode() throws {
     var teardown = ""
     if capabilityProfile.supportsMouseReporting {
-      teardown += "\u{001B}[?1002l\u{001B}[?1006l"
+      if usesTerminalPixelMouseReporting {
+        teardown += "\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"
+      } else {
+        teardown += "\u{001B}[?1002l\u{001B}[?1006l"
+      }
     }
     teardown += "\u{001B}[?2004l"  // disable bracketed paste
     teardown += "\u{001B}[?25h"
     teardown += "\u{001B}[0m"
     teardown += "\u{001B}[?1049l"
     try write(teardown)
+  }
+
+  private var usesTerminalPixelMouseReporting: Bool {
+    switch state.withLock(\.pointerInputCapabilities.precision) {
+    case .cell:
+      return false
+    case .subCell(let source, metrics: _):
+      return source == .terminalPixels
+    }
   }
 
   package func write(

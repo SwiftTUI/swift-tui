@@ -139,4 +139,41 @@ struct InjectedTerminalInputReaderTests {
       } == 20
     )
   }
+
+  @Test("injected input reader parses terminal-pixel mouse coordinates when configured")
+  func injectedReaderParsesTerminalPixelMouseCoordinatesWhenConfigured() async {
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    let inputReader = InjectedTerminalInputReader(
+      mouseCoordinateMode: .pixels(metrics: metrics, source: .terminalPixels)
+    )
+
+    let eventsTask = Task {
+      var events: [InputEvent] = []
+      for await event in inputReader.inputEvents() {
+        events.append(event)
+      }
+      return events
+    }
+
+    inputReader.send(Array("\u{001B}[<0;17;33Mq".utf8))
+    inputReader.finish()
+
+    let events = await eventsTask.value
+
+    #expect(
+      events == [
+        .mouse(
+          MouseEvent(
+            kind: .down(.primary),
+            location: .subCell(
+              location: Point(x: 2.0, y: 2.0),
+              source: .terminalPixels,
+              metrics: metrics,
+              rawPixel: PixelPoint(x: 16, y: 32)
+            )
+          )
+        ),
+        .key(.character("q")),
+      ])
+  }
 }

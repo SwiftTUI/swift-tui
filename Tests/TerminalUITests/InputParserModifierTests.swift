@@ -170,4 +170,79 @@ struct InputParserModifierTests {
     #expect(event.location.precision == .cell)
     #expect(event.location.rawPixel == nil)
   }
+
+  @Test("SGR pixel-mode mouse parser emits terminal-pixel pointer locations")
+  func sgrPixelModeMouseParserEmitsTerminalPixelLocations() {
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    var parser = TerminalInputParser(
+      mouseCoordinateMode: .pixels(metrics: metrics, source: .terminalPixels)
+    )
+
+    let events = parser.feed(Array("\u{001B}[<0;17;33M".utf8))
+
+    #expect(
+      events == [
+        .mouse(
+          MouseEvent(
+            kind: .down(.primary),
+            location: .subCell(
+              location: Point(x: 2.0, y: 2.0),
+              source: .terminalPixels,
+              metrics: metrics,
+              rawPixel: PixelPoint(x: 16, y: 32)
+            )
+          )
+        )
+      ])
+  }
+
+  @Test("SGR pixel-mode mouse parser preserves zero and negative coordinates")
+  func sgrPixelModeMouseParserPreservesZeroAndNegativeCoordinates() {
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    var parser = TerminalInputParser(
+      mouseCoordinateMode: .pixels(metrics: metrics, source: .terminalPixels)
+    )
+
+    let events = parser.feed(Array("\u{001B}[<32;0;-7M".utf8))
+
+    #expect(
+      events == [
+        .mouse(
+          MouseEvent(
+            kind: .dragged(.primary),
+            location: .subCell(
+              location: Point(x: -0.125, y: -0.5),
+              source: .terminalPixels,
+              metrics: metrics,
+              rawPixel: PixelPoint(x: -1, y: -8)
+            )
+          )
+        )
+      ])
+  }
+
+  @Test("SGR pixel-mode wheel events preserve pointer precision metadata")
+  func sgrPixelModeWheelEventsPreservePointerPrecisionMetadata() {
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    var parser = TerminalInputParser(
+      mouseCoordinateMode: .pixels(metrics: metrics, source: .terminalPixels)
+    )
+
+    let events = parser.feed(Array("\u{001B}[<64;17;33M".utf8))
+
+    #expect(
+      events == [
+        .mouse(
+          MouseEvent(
+            kind: .scrolled(deltaX: 0, deltaY: -1),
+            location: .subCell(
+              location: Point(x: 2.0, y: 2.0),
+              source: .terminalPixels,
+              metrics: metrics,
+              rawPixel: PixelPoint(x: 16, y: 32)
+            )
+          )
+        )
+      ])
+  }
 }
