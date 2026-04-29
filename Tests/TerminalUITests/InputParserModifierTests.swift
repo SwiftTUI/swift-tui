@@ -66,6 +66,27 @@ struct InputParserModifierTests {
     #expect(events == [.key(KeyPress(.space, modifiers: .alt))])
   }
 
+  @Test("Alt+punctuation and Alt+digit emit printable keys with alt modifier")
+  func altPunctuationAndDigit() {
+    var parser = TerminalInputParser()
+    let events = parser.feed([
+      0x1B, 0x2C,  // Alt+,
+      0x1B, 0x2E,  // Alt+.
+      0x1B, 0x2D,  // Alt+-
+      0x1B, 0x3D,  // Alt+=
+      0x1B, 0x30,  // Alt+0
+    ])
+    #expect(
+      events == [
+        .key(KeyPress(.character(","), modifiers: .alt)),
+        .key(KeyPress(.character("."), modifiers: .alt)),
+        .key(KeyPress(.character("-"), modifiers: .alt)),
+        .key(KeyPress(.character("="), modifiers: .alt)),
+        .key(KeyPress(.character("0"), modifiers: .alt)),
+      ]
+    )
+  }
+
   // MARK: - CSI modifier sequences
 
   @Test("Ctrl+Up emits arrowUp with control modifier")

@@ -11,6 +11,7 @@ public struct EditorView: View {
   // framework treats this view as having local-owned state.
   @State private var model: EditorViewModel
   @State private var revision: Int = 0
+  @State private var isHelpPresented = false
 
   public init(document: GIFDocument) {
     _model = State(initialValue: EditorViewModel(document: document))
@@ -48,6 +49,11 @@ public struct EditorView: View {
             model: model,
             refresh: refresh
           )
+          .applyFocusedEditorBindings(
+            model: model,
+            isHelpPresented: $isHelpPresented,
+            refresh: refresh
+          )
           TimelineView(
             frames: timelineFrames,
             currentFrameIndex: model.currentFrameIndex
@@ -69,7 +75,11 @@ public struct EditorView: View {
       footer
     }
     .panel(id: "gifeditor")
-    .applyToolBindings(model: model, refresh: refresh)
+    .applyFocusedEditorBindings(
+      model: model,
+      isHelpPresented: $isHelpPresented,
+      refresh: refresh
+    )
     .applyCursorBindings(model: model, refresh: refresh)
     .applyFrameBindings(model: model, refresh: refresh)
     .applyLayerBindings(model: model, refresh: refresh)
@@ -77,6 +87,9 @@ public struct EditorView: View {
     .applyPaletteBindings(model: model, refresh: refresh)
     .applyFileBindings(model: model, refresh: refresh)
     .applyTerminationHandling(model: model, refresh: refresh)
+    .sheet("Keyboard help", isPresented: $isHelpPresented) {
+      EditorHelpView()
+    }
   }
 
   private var headerRow: some View {
@@ -92,7 +105,7 @@ public struct EditorView: View {
 
   private var footer: some View {
     HStack(spacing: 2) {
-      Text(model.statusMessage.isEmpty ? "Ctrl+? for help" : model.statusMessage)
+      Text(model.statusMessage.isEmpty ? "Press ? for help" : model.statusMessage)
         .foregroundStyle(.muted)
       Spacer(minLength: 1)
       Text(

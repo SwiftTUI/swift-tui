@@ -3,7 +3,7 @@ import TerminalUI
 
 /// Two-row palette: meaningful colors first, then padding indicator.
 /// Each entry is a 2×1 colored block that the user can pick via
-/// `Ctrl+1..9` (primary) or `Alt+1..9` (secondary).
+/// `1..9` (primary) or `Alt+1..9` (secondary).
 ///
 /// We only render the first 32 distinct slots — enough to cover the
 /// default palette plus headroom; users editing a loaded GIF still

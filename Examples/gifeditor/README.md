@@ -27,12 +27,17 @@ swift run gifeditor ../../nyan.gif        # launch editing a real GIF
 ```
 
 After making edits, press `Ctrl+S` to save (back to the source path or to
-`./untitled.gif` for new documents). Use `Ctrl+Shift+S` to save-as a new path.
+`./untitled.gif` for new documents). Use `Alt+S` to save-as a new path.
 
 ## Keybindings
 
 Focused editor commands use bare keys where they map to ordinary pixel-editor
 actions.
+
+The bindings avoid terminal-ambiguous chords such as `Ctrl+Shift+letter`,
+`Ctrl+digit`, `Ctrl+[` / `Ctrl+]`, and `Alt+[`, because the current terminal
+input path does not receive those as distinct key presses. Press `?` in the
+editor to open the same shortcut reference in-app.
 
 ### Tools
 
@@ -48,6 +53,7 @@ actions.
 | `Space`       | Apply the current tool at the cursor    |
 | `Enter`       | Confirm marquee (commit selection rect) |
 | `Escape`      | Clear selection                         |
+| `?`           | Open keyboard help                      |
 
 The canvas also supports direct pointer editing. Drag with **Pen** or
 **Eraser** to paint connected strokes, drag with **Marquee** to select a
@@ -69,24 +75,24 @@ cell.
 
 | Shortcut          | Action                                    |
 | ----------------- | ----------------------------------------- |
-| `Ctrl+,`          | Previous frame                           |
-| `Ctrl+.`          | Next frame                               |
+| `Alt+,`           | Previous frame                           |
+| `Alt+.`           | Next frame                               |
 | `Ctrl+N`          | New blank frame after current            |
 | `Ctrl+D`          | Duplicate current frame after current    |
-| `Ctrl+Shift+D`    | Delete current frame                     |
-| `Ctrl+[`          | Decrease current frame delay (10 cs)     |
-| `Ctrl+]`          | Increase current frame delay (10 cs)     |
-| `Ctrl+0`          | Reset all frame delays to current value  |
+| `Alt+D`           | Delete current frame                     |
+| `Alt+-`           | Decrease current frame delay (10 cs)     |
+| `Alt+=`           | Increase current frame delay (10 cs)     |
+| `Alt+0`           | Reset all frame delays to current value  |
 
 ### Layers
 
 | Shortcut          | Action                                    |
 | ----------------- | ----------------------------------------- |
-| `Ctrl+Shift+N`    | New empty layer above current            |
-| `Ctrl+Shift+J`    | Select layer below                       |
-| `Ctrl+Shift+K`    | Select layer above                       |
-| `Ctrl+Shift+H`    | Toggle current layer visibility          |
-| `Ctrl+Shift+X`    | Delete current layer                     |
+| `Alt+N`           | New empty layer above current            |
+| `Alt+J`           | Select layer below                       |
+| `Alt+K`           | Select layer above                       |
+| `Alt+H`           | Toggle current layer visibility          |
+| `Alt+X`           | Delete current layer                     |
 
 ### Clipboard
 
@@ -94,11 +100,12 @@ cell.
 | ----------------- | ----------------------------------------- |
 | `Ctrl+C`          | Copy selection (or whole layer if none)  |
 | `Ctrl+V`          | Paste at cursor                          |
+
 ### Palette / colors
 
 | Shortcut          | Action                                    |
 | ----------------- | ----------------------------------------- |
-| `Ctrl+1`..`Ctrl+9`| Pick palette slot 1..9 as primary        |
+| `1`..`9`          | Pick palette slot 1..9 as primary        |
 | `Alt+1`..`Alt+9`  | Pick palette slot 1..9 as secondary      |
 
 ### File / app
@@ -106,9 +113,10 @@ cell.
 | Shortcut          | Action                                    |
 | ----------------- | ----------------------------------------- |
 | `Ctrl+S`          | Save                                     |
-| `Ctrl+Shift+S`    | Save As (writes `./untitled.gif`)        |
+| `Alt+S`           | Save As (writes `./untitled.gif`)        |
 | `Ctrl+R`          | Resize canvas (cycles 16/24/32/48/64)    |
-| `Ctrl+Q`          | Quit (also `Ctrl+C` on the host shell)   |
+| `Ctrl+Q`          | Quit                                     |
+| `?`               | Open keyboard help                       |
 
 ## Editing model
 

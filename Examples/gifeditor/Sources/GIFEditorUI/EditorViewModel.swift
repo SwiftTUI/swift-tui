@@ -46,8 +46,8 @@ public final class EditorViewModel {
 
   // MARK: - Pending interactions
 
-  /// Marquee tool's first corner, captured on `Shift+Space` and
-  /// committed into a `selection` on `Shift+Enter`.
+  /// Marquee tool's first corner, captured on `Space` or `Enter` and
+  /// committed into a `selection` by pressing either key again.
   public var pendingMarqueeAnchor: GIFEditorCore.PixelPoint? = nil
   /// Gradient tool's first endpoint.
   public var pendingGradientAnchor: GIFEditorCore.PixelPoint? = nil
@@ -115,7 +115,7 @@ public final class EditorViewModel {
         announce("Gradient committed")
       } else {
         pendingGradientAnchor = cursor
-        announce("Gradient: anchor at \(cursor.x),\(cursor.y), move and press Shift+Space again")
+        announce("Gradient: anchor at \(cursor.x),\(cursor.y), move and press Space again")
       }
     case .marquee:
       if let anchor = pendingMarqueeAnchor {
@@ -124,7 +124,7 @@ public final class EditorViewModel {
         announce("Selection committed")
       } else {
         pendingMarqueeAnchor = cursor
-        announce("Marquee: anchor at \(cursor.x),\(cursor.y), move and press Shift+Space again")
+        announce("Marquee: anchor at \(cursor.x),\(cursor.y), move and press Space again")
       }
     case .eyedropper:
       // Walk top-to-bottom and pick the first opaque pixel on any

@@ -24,6 +24,7 @@ struct TimelineView: View {
           }
         }
       }
+      .focusable(false)
     }
     .padding(.horizontal, 1)
     .border(.separator, set: .single)
