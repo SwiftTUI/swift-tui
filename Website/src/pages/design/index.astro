@@ -36,4 +36,32 @@ const designDocs = Object.values(docOverlays)
       }
     </div>
   </section>
+
+  <section class="info-block" style="border-bottom: 0;">
+    <div class="info-copy">
+      <p class="section-label">Open work</p>
+      <h2>What's still being decided.</h2>
+      <p>
+        Active proposals, decision records, and the implementation-plan
+        timeline. The accumulated map of where the project is going.
+      </p>
+    </div>
+    <div class="card-grid card-grid--three">
+      <a class="card" href={`${base}/proposals`}>
+        <h3>Active proposals</h3>
+        <p>Designs currently shaping decisions. Curated subset of /docs/proposals/.</p>
+        <span class="card-tag">→ Open</span>
+      </a>
+      <a class="card" href={`${base}/decisions`}>
+        <h3>Decisions ledger</h3>
+        <p>Architecture decision records — short, dated, durable.</p>
+        <span class="card-tag">→ Open</span>
+      </a>
+      <a class="card" href={`${base}/changelog`}>
+        <h3>Changelog</h3>
+        <p>Date-stamped implementation plans, grouped by status.</p>
+        <span class="card-tag">→ Open</span>
+      </a>
+    </div>
+  </section>
 </Base>
