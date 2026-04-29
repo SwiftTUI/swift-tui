@@ -1,46 +1,42 @@
 # State: claude
 
-Updated: 2026-04-29T02:00:00Z
+Updated: 2026-04-29T04:05:00Z
 
 Current task:
 
-CONVERGED. JOINT_PROPOSAL.md is the final joint outcome.
-
-Files touched:
-
-- .agent-comms/messages/20260429T013000Z--claude--codex--convergence-reply--c4a1.md
-- .agent-comms/messages/20260429T015500Z--claude--codex--joint-review--7e2b.md (redundant; sent before realizing codex had already incorporated the Canvas authoring point)
-- .agent-comms/messages/20260429T020000Z--claude--codex--converged--d8f3.md (final done)
-- .agent-comms/acks/20260429T011522Z--codex--claude--convergence-proposal--75fa--ack-by-claude
-- .agent-comms/acks/20260429T011917Z--codex--claude--joint-proposal--a16c--ack-by-claude
-- .agent-comms/state/claude.md
-- (read-only) JOINT_PROPOSAL.md, CODEX_PROPOSAL.md, CLAUDE_PROPOSAL.md
+DONE. Implementation plan complete and synced. JOINT_IMPLEMENTATION_PLAN.md (1593 lines) is the final artifact.
 
 Final outcome:
 
-Outcome (1) achieved: single converged JOINT_PROPOSAL.md.
+Comprehensive implementation plan delivered through cross-agent collaboration:
 
-The joint proposal incorporates:
-- Type naming: Point/Size/Rect/Vector (Double, continuous), CellPoint/CellSize/CellRect (Int, layout)
-- PointerLocation rich provenance wrapper
-- PointerPrecision.subCell(source:metrics:) nested enum
-- PointerPrecisionPolicy explicit knob
-- Cell-center fallback (x+0.5, y+0.5) for cell-only input
-- PointerPath samples on DragGesture
-- Hover as opt-in via reference-counted DECSET 1003
-- Tmux 1016 disable by default
-- CanvasGrid with pixelExact mode
-- Dual Canvas authoring (protocol + closure)
-- Pixel-origin 1-based normalization in parser
-- Drop destination location
-- CoordinateSpace.named implementation
-- Path/Shape/Canvas future direction
-- 8-phase implementation plan, native/web first
-- Reasonable open questions for implementation phase
+  Phase 0: Baseline inventory and branch prep
+  Phase 1: Coordinate type split
+  Phase 2: PointerLocation and capability plumbing
+  Phase 3: Gesture migration
+  Phase 4: Native and web host precision (ships first)
+  Phase 5: CanvasGrid and Canvas redesign (8 grid styles, dual authoring forms)
+  Phase 6: Controls (Slider, scroll indicators, charts)
+  Phase 7: Terminal 1016 (with PointerPrecisionPolicy and MouseCoordinateMode)
+  Phase 8: Hover, drop location, path, named coordinate spaces
+  Phase 9: Docs, examples, public-surface governance
+  Phase 10: Test matrix and completion gate
+  Phase 11: Rollout boundaries and PR slicing
 
-No unresolveable disagreements. Both agents converged on a single proposal that's
-better than either original.
+Plus: working agreements, cross-cutting prerequisites, risks, open questions, definition of done.
+
+Collaboration history:
+  - Round 1: Convergence on JOINT_PROPOSAL.md (design contract). Both proposals reconciled into a single document better than either input.
+  - Round 2: Implementation plan with split ownership. Codex owned §5/§7/§8/§9/§10; Claude owned §0-§4/§6/§11. Both drafted in parallel via .agent-comms/scratch/, codex merged + synced, claude reviewed, codex applied final nit.
+
+No unresolveable disagreements at any stage.
+
+Artifacts at repo root:
+  - JOINT_PROPOSAL.md (835 lines, design contract, immutable)
+  - JOINT_IMPLEMENTATION_PLAN.md (1593 lines, comprehensive plan)
+  - CLAUDE_PROPOSAL.md (773 lines, preserved input)
+  - CODEX_PROPOSAL.md (732 lines, preserved input)
 
 Next planned step:
 
-None. Awaiting any final user direction.
+None. Awaiting any further user direction.
