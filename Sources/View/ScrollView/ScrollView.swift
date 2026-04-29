@@ -166,14 +166,14 @@ public struct ScrollView<Content: View>: View, ResolvableView {
                 case .horizontal:
                   next.scrollTo(
                     x: metrics.targetOffset(
-                      for: event.location.location,
+                      for: event.location,
                       currentOffset: next.x
                     )
                   )
                 case .vertical:
                   next.scrollTo(
                     y: metrics.targetOffset(
-                      for: event.location.location,
+                      for: event.location,
                       currentOffset: next.y
                     )
                   )
