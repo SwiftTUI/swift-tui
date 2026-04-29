@@ -273,8 +273,28 @@ struct CanvasDemoViewTests {
     #expect(lines.contains("Half Block"))
     #expect(lines.contains("half-block pixel grid max 7,5"))
     #expect(lines.contains("cursor 1,2 of max 7,5 pixels"))
+    #expect(lines.contains("pointer cell fallback"))
     #expect(lines.contains("space paint"))
     #expect(lines.contains("drag paints"))
+  }
+
+  @Test("root view reports pointer precision and cell metrics")
+  func rootViewReportsPointerPrecisionAndCellMetrics() {
+    let metrics = CellPixelMetrics(width: 10, height: 20, source: .reported)
+    let raster = render(
+      CanvasDemoView(selectedCanvas: .subcell),
+      width: 80,
+      height: 20
+    ) { environmentValues in
+      environmentValues.cellPixelMetrics = metrics
+      environmentValues.pointerInputCapabilities = PointerInputCapabilities(
+        precision: .subCell(source: .webPixels, metrics: metrics)
+      )
+    }.rasterSurface
+    let lines = raster.lines.joined(separator: "\n")
+
+    #expect(lines.contains("pointer web pixels"))
+    #expect(lines.contains("cell 10x20 reported"))
   }
 
   @Test("root view reports max indices for each canvas type")
@@ -328,10 +348,12 @@ private func render(
   _ view: some View,
   width: Int,
   height: Int,
-  id: String = "\(#fileID).\(#function)"
+  id: String = "\(#fileID).\(#function)",
+  configureEnvironment: (inout EnvironmentValues) -> Void = { _ in }
 ) -> FrameArtifacts {
   var env = EnvironmentValues()
   env.terminalSize = CellSize(width: width, height: height)
+  configureEnvironment(&env)
   return DefaultRenderer().render(
     view,
     context: ResolveContext(

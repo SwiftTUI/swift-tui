@@ -22,11 +22,13 @@ Calculates subtree sizes under proposals through `LayoutEngine`.
 
 ### Place
 
-Turns measured trees into final geometry, which becomes the authoritative source for interaction regions and content bounds.
+Turns measured trees into final integer-cell geometry, which becomes the
+authoritative source for interaction regions and content bounds.
 
 ### Semantics
 
-Extracts focus, interaction, action, selection, and scroll routing into `SemanticSnapshot`.
+Extracts focus, interaction, action, selection, scroll, named coordinate-space,
+and pointer routing into `SemanticSnapshot`.
 
 ### Draw
 
@@ -43,6 +45,10 @@ Packages lifecycle and handler-installation work into `CommitPlan`.
 ## Why The Split Matters
 
 Keeping the phases explicit means layout and semantics do not need terminal escape-sequence knowledge, and runtime presentation can evolve without rewriting layout.
+
+Layout products are integer-cell based. Pointer and Canvas APIs can still carry
+continuous ``Point`` values because the runtime normalizes pointer input after
+semantic routing and Canvas packs continuous cell-space samples during raster.
 
 ## Related Symbols
 

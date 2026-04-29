@@ -4,10 +4,12 @@ A small verification app for the current `Canvas` API. It exercises the
 interactive Braille subcell canvas and the dense pixel-grid canvas variants.
 
 The drawing surface deliberately uses `Canvas(Drawing)` and
-`CanvasDrawing.draw(into:)` with Braille subpixel coordinates. The cursor is a
-second Canvas overlay so the app stays inside today's public Canvas surface.
-The pixel-grid tabs use the same drawing controls while rendering through the
-full-cell and vertical half-block Canvas modes.
+`CanvasDrawing.draw(into:)` with Braille subpixel coordinates. Drag input stores
+the fractional `Point` samples delivered by `DragGesture`, then maps them into
+the active canvas grid. The cursor and hover crosshair are Canvas overlays so
+the app stays inside today's public Canvas surface. The pixel-grid tabs use the
+same drawing controls while rendering through the full-cell and vertical
+half-block Canvas modes.
 
 ## Run
 
@@ -27,6 +29,7 @@ swift run canvas-demo
 | E           | Select erase tool                 |
 | C/Backspace | Clear the sketch                  |
 | Drag/click  | Paint or erase on the active tab  |
+| Hover       | Show sub-cell crosshair when supported |
 | Ctrl+C      | Quit via host shell               |
 
 ## Tests

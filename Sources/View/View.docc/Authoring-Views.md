@@ -40,6 +40,8 @@ Most familiar modifier categories are available:
 - layout modifiers such as padding, frame, spacing, fixed-size, and clipping
 - style modifiers such as foreground style, tint, and disabled state
 - focus modifiers such as `.focused(...)`, `.defaultFocus(...)`, and `.focusEffectDisabled()`
+- pointer modifiers such as gestures, `.contentShape(...)`, named coordinate
+  spaces, and `.onPointerHover(...)`
 - environment modifiers such as `.environment(...)` and `.transformEnvironment(...)`
 - lifecycle modifiers such as `.onAppear`, `.onDisappear`, `.onChange(of:initial:_:)`, and `.task(...)`
 
@@ -53,5 +55,6 @@ When you want to inspect authored output without running a full terminal session
 
 See also:
 
+- <doc:Pointer-And-Canvas>
 - <doc:State-Environment-And-Focus>
 - ``Resolver``

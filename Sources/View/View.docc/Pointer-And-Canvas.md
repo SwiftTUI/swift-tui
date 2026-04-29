@@ -1,0 +1,81 @@
+# Pointer And Canvas Coordinates
+
+## Overview
+
+TerminalUI uses one coordinate space for authored interaction and drawing:
+continuous terminal cells.
+
+`Point(x: 4.25, y: 2.5)` means the middle of the cell at column 4, row 2. It
+does not mean device pixels. Layout still uses integer `CellSize` and
+`CellRect`, but direct-manipulation APIs carry the fractional point when the
+runtime can obtain it.
+
+## Pointer Input
+
+Use gestures when the interaction has a recognisable shape:
+
+```swift
+Canvas(SketchDrawing(points: points))
+  .frame(width: 40, height: 12)
+  .gesture(
+    DragGesture(minimumDistance: 0, coordinateSpace: .local)
+      .onChanged { value in
+        points.append(value.location)
+      }
+  )
+```
+
+`DragGesture.Value.location`, `startLocation`, and `translation` are continuous
+cell-space values. On a cell-only terminal, the runtime supplies the center of
+the reported cell. On native, web, or terminal-pixel input paths, the same API
+can carry sub-cell positions.
+
+For hover-only affordances, use ``View/onPointerHover(_:)``:
+
+```swift
+view.onPointerHover { phase in
+  switch phase {
+  case .entered(let point), .moved(let point):
+    hover = point
+  case .exited:
+    hover = nil
+  }
+}
+```
+
+Hover events are local to the view that installed the handler. The terminal
+runtime enables high-volume all-motion reporting only while the rendered tree
+contains hover subscribers.
+
+## Coordinate Spaces And Hit Testing
+
+Local and global coordinate spaces preserve fractional values. Named spaces are
+available with ``View/coordinateSpace(name:)``; unresolved names fall back to
+global coordinates so authored code keeps working while views are refactored.
+
+Use ``View/contentShape(_:)`` when a view's pointer target is not its full
+placed rectangle. Rectangular shapes remain cell-denominated through
+`CellRect`; path shapes use continuous ``Path`` values.
+
+## Runtime Capability Display
+
+Read ``GeometryReader`` or `EnvironmentReader` when an app needs to show or
+adapt to runtime precision:
+
+- `GeometryProxy.pointerInputCapabilities` describes whether events are
+  cell-only or sub-cell.
+- `GeometryProxy.cellPixelMetrics` describes the runtime's current cell-pixel
+  estimate or reported value.
+
+These values are metadata. They should guide optional affordances, not change
+the base layout contract.
+
+## Canvas
+
+``Canvas`` drawings receive a ``CanvasContext`` sized in terminal cells.
+Drawing methods such as `setPixel(at:)` and `line(from:to:)` accept continuous
+cell-space ``Point`` values and pack them into the selected ``CanvasGrid``.
+
+Dense pixel-grid helpers are still terminal-cell abstractions. Use them for
+editor-like surfaces, heatmaps, and previews where each logical pixel is meant
+to occupy a full cell or half-block.

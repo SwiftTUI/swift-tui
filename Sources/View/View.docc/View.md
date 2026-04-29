@@ -18,6 +18,9 @@ It provides:
 - layout composition through ``Layout``, ``AnyLayout``, the built-in stack layouts,
   and viewport-lazy containers such as ``LazyVStack`` and ``LazyHStack``, including
   the single-``ForEach`` full-lazy path
+- continuous cell-space gestures and drawing through ``DragGesture``,
+  ``SpatialTapGesture``, ``View/onPointerHover(_:)``, ``Canvas``, and
+  ``CanvasDrawing``
 - the controls, containers, metrics, and modifiers that make up most authored terminal interfaces, including single-line and multiline text entry, split navigation, tab shells, and terminal-native presentation (`alert`, `confirmationDialog`, `sheet`, `toast`)
 - ASCII-art banner text through ``TextFigure``, backed by embedded FIGlet fonts that participate in normal layout proposals without requiring external font files
 
@@ -71,9 +74,20 @@ Lowering helpers remain package-only implementation details.
 - ``LazyHStack``
 - ``ZStackLayout``
 
+### Input And Drawing
+
+- ``Canvas``
+- ``CanvasDrawing``
+- ``CanvasContext``
+- ``DragGesture``
+- ``SpatialTapGesture``
+- ``HoverPhase``
+- <doc:Pointer-And-Canvas>
+
 ### Guides
 
 - <doc:Authoring-Views>
+- <doc:Pointer-And-Canvas>
 - <doc:State-Environment-And-Focus>
 - <doc:State-Keying>
 - <doc:Focus>
