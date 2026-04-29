@@ -30,7 +30,7 @@ struct PaletteView: View {
       legend
     }
     .padding(1)
-    .border(.separator)
+    .border(.separator, set: .single)
   }
 
   private func swatch(for index: PaletteIndex) -> some View {

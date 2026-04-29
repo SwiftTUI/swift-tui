@@ -17,7 +17,7 @@ struct LayerListView: View {
       }
     }
     .padding(1)
-    .border(.separator)
+    .border(.separator, set: .single)
   }
 
   private func row(layer: EditorLayer, isSelected: Bool) -> some View {
