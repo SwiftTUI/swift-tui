@@ -22,7 +22,8 @@ struct CanvasViewTests {
         cursor: GIFEditorCore.PixelPoint(x: 0, y: 0),
         selection: nil,
         pendingMarqueeAnchor: nil,
-        pendingGradientAnchor: nil
+        pendingGradientAnchor: nil,
+        mode: .fullCell
       ),
       width: 8,
       height: 6
@@ -62,6 +63,55 @@ struct CanvasViewTests {
     #expect(raster.cells[1][1].style?.backgroundColor == blue.toTerminalColor())
     #expect(raster.cells[2][1].character == "▀")
     #expect(raster.cells[2][1].style?.foregroundColor == red.toTerminalColor())
+    #expect(raster.cells[2][2].character == "▀")
+    #expect(raster.cells[2][2].style?.foregroundColor == Color.cyan)
+    #expect(raster.cells[2][2].style?.backgroundColor == nil)
+  }
+
+  @Test("Canvas pixel mapping preserves sub-cell half-block rows")
+  func canvasPixelMappingUsesSubCellPrecision() {
+    let metrics = CellPixelMetrics(width: 10, height: 20, source: .reported)
+    let precision = PointerPrecision.subCell(source: .terminalPixels, metrics: metrics)
+    let size = GIFEditorCore.PixelSize(width: 4, height: 4)
+
+    #expect(
+      canvasPixelPoint(
+        forLocalCell: Point(x: 1.25, y: 0.20),
+        precision: precision,
+        mode: .verticalHalfBlock,
+        size: size
+      ) == GIFEditorCore.PixelPoint(x: 1, y: 0)
+    )
+    #expect(
+      canvasPixelPoint(
+        forLocalCell: Point(x: 1.25, y: 0.75),
+        precision: precision,
+        mode: .verticalHalfBlock,
+        size: size
+      ) == GIFEditorCore.PixelPoint(x: 1, y: 1)
+    )
+    #expect(
+      canvasPixelPoint(
+        forLocalCell: Point(x: 1.25, y: 1.25),
+        precision: precision,
+        mode: .verticalHalfBlock,
+        size: size
+      ) == GIFEditorCore.PixelPoint(x: 1, y: 2)
+    )
+  }
+
+  @Test("Canvas pixel mapping anchors cell-only input to a stable half-cell")
+  func canvasPixelMappingCellFallbackUsesCellOrigin() {
+    let size = GIFEditorCore.PixelSize(width: 4, height: 4)
+
+    #expect(
+      canvasPixelPoint(
+        forLocalCell: Point(x: 1.5, y: 0.5),
+        precision: .cell,
+        mode: .verticalHalfBlock,
+        size: size
+      ) == GIFEditorCore.PixelPoint(x: 1, y: 0)
+    )
   }
 }
 

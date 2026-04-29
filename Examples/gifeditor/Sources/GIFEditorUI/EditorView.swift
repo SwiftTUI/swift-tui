@@ -42,13 +42,11 @@ public struct EditorView: View {
           pendingGradientAnchor: model.pendingGradientAnchor
         )
         VStack(alignment: .leading, spacing: 0) {
-          CanvasView(
+          InteractiveCanvasView(
             size: model.document.size,
             cells: frameColors,
-            cursor: model.cursor,
-            selection: model.selection,
-            pendingMarqueeAnchor: model.pendingMarqueeAnchor,
-            pendingGradientAnchor: model.pendingGradientAnchor
+            model: model,
+            refresh: refresh
           )
           TimelineView(
             frames: timelineFrames,
@@ -99,7 +97,8 @@ public struct EditorView: View {
       Spacer(minLength: 1)
       Text(
         "[\(model.cursor.x),\(model.cursor.y)]  "
-          + "L\(model.currentLayerIndex + 1)/\(model.currentFrame.layers.count)"
+          + "L\(model.currentLayerIndex + 1)/\(model.currentFrame.layers.count)  "
+          + "half-cell"
       )
       .foregroundStyle(.separator)
     }

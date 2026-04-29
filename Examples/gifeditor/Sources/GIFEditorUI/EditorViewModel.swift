@@ -175,6 +175,84 @@ public final class EditorViewModel {
     cursor = GIFEditorCore.PixelPoint(x: cursor.x + dx, y: cursor.y + dy)
   }
 
+  public func beginCanvasDrag(at point: GIFEditorCore.PixelPoint) {
+    cursor = point
+    switch tool {
+    case .pen:
+      strokeCurrentLayer(from: point, to: point, color: primaryColorIndex)
+      announce("Painting \(point.x),\(point.y)")
+    case .eraser:
+      strokeCurrentLayer(from: point, to: point, color: nil)
+      announce("Erasing \(point.x),\(point.y)")
+    case .fill, .eyedropper:
+      announce("Target \(point.x),\(point.y)")
+    case .gradient:
+      pendingGradientAnchor = point
+      announce("Gradient anchor \(point.x),\(point.y)")
+    case .marquee:
+      pendingMarqueeAnchor = point
+      selection = Selection(rect: PixelRect.bounding(point, point))
+      announce("Selecting from \(point.x),\(point.y)")
+    }
+  }
+
+  public func updateCanvasDrag(
+    startingAt anchor: GIFEditorCore.PixelPoint,
+    from previous: GIFEditorCore.PixelPoint?,
+    to point: GIFEditorCore.PixelPoint
+  ) {
+    cursor = point
+    switch tool {
+    case .pen:
+      strokeCurrentLayer(from: previous ?? anchor, to: point, color: primaryColorIndex)
+      announce("Painting \(point.x),\(point.y)")
+    case .eraser:
+      strokeCurrentLayer(from: previous ?? anchor, to: point, color: nil)
+      announce("Erasing \(point.x),\(point.y)")
+    case .fill, .eyedropper:
+      announce("Target \(point.x),\(point.y)")
+    case .gradient:
+      pendingGradientAnchor = anchor
+      announce("Gradient \(anchor.x),\(anchor.y) -> \(point.x),\(point.y)")
+    case .marquee:
+      pendingMarqueeAnchor = anchor
+      selection = Selection(rect: PixelRect.bounding(anchor, point))
+      announce("Selection \(anchor.x),\(anchor.y) -> \(point.x),\(point.y)")
+    }
+  }
+
+  public func endCanvasDrag(
+    startingAt anchor: GIFEditorCore.PixelPoint,
+    from previous: GIFEditorCore.PixelPoint?,
+    to point: GIFEditorCore.PixelPoint
+  ) {
+    if previous == nil {
+      beginCanvasDrag(at: anchor)
+    }
+
+    cursor = point
+    switch tool {
+    case .pen:
+      if let previous, previous != point {
+        strokeCurrentLayer(from: previous, to: point, color: primaryColorIndex)
+      }
+      announce("Painted to \(point.x),\(point.y)")
+    case .eraser:
+      if let previous, previous != point {
+        strokeCurrentLayer(from: previous, to: point, color: nil)
+      }
+      announce("Erased to \(point.x),\(point.y)")
+    case .fill, .eyedropper:
+      applyToolAtCursor()
+    case .gradient:
+      pendingGradientAnchor = anchor
+      applyToolAtCursor()
+    case .marquee:
+      pendingMarqueeAnchor = anchor
+      applyToolAtCursor()
+    }
+  }
+
   // MARK: - Frames
 
   public func nextFrame() {
@@ -366,6 +444,16 @@ public final class EditorViewModel {
     layer.pixels = transform(layer.pixels)
     document.frames[currentFrameIndex].layers[currentLayerIndex] = layer
     isDirty = true
+  }
+
+  private func strokeCurrentLayer(
+    from start: GIFEditorCore.PixelPoint,
+    to end: GIFEditorCore.PixelPoint,
+    color: PaletteIndex?
+  ) {
+    mutateCurrentLayer { buffer in
+      ToolOps.line(on: buffer, from: start, to: end, color: color)
+    }
   }
 
   private func markDirty(_ message: String) {

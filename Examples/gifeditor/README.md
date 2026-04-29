@@ -1,9 +1,9 @@
 # gifeditor
 
 A terminal-native GIF editor built on **swift-terminal-ui**. Read and write
-animated GIFs, edit them frame-by-frame on a pixel grid where one GIF pixel
-maps to one terminal cell, and use a small toolbox of pen / eraser / fill /
-gradient / marquee tools.
+animated GIFs, edit them frame-by-frame on a color canvas where one GIF pixel
+maps to one terminal half-cell, and use a small toolbox of pen / eraser / fill /
+gradient / marquee tools with keyboard or pointer input.
 
 This example is intentionally split across four targets so it can grow into a
 multi-platform app later without restructuring:
@@ -49,6 +49,14 @@ actions.
 | `Enter`       | Confirm marquee (commit selection rect) |
 | `Escape`      | Clear selection                         |
 
+The canvas also supports direct pointer editing. Drag with **Pen** or
+**Eraser** to paint connected strokes, drag with **Marquee** to select a
+rectangle, drag with **Gradient** to apply a gradient between the drag endpoints,
+and click with **Fill** or **Eyedropper** to target a single pixel. Hosts that
+report terminal-pixel pointer locations can address the top and bottom half of a
+cell independently; cell-only hosts fall back to the top half of each terminal
+cell.
+
 ### Cursor (within the canvas)
 
 | Shortcut          | Action                                    |
@@ -86,9 +94,6 @@ actions.
 | ----------------- | ----------------------------------------- |
 | `Ctrl+C`          | Copy selection (or whole layer if none)  |
 | `Ctrl+V`          | Paste at cursor                          |
-| `Ctrl+Z`          | Undo last edit                           |
-| `Ctrl+Shift+Z`    | Redo                                     |
-
 ### Palette / colors
 
 | Shortcut          | Action                                    |
@@ -131,5 +136,5 @@ The core test suite verifies:
   pixel-for-pixel for a hand-built document and a round-trip of `nyan.gif`.
 * Document edits (pen, fill, gradient, marquee copy/paste) leave the model
   in expected states.
-* The terminal UI renders the editor canvas through Canvas-backed full-cell
-  and half-block pixel grids.
+* The terminal UI renders the editor canvas through a Canvas-backed half-block
+  color grid and maps sub-cell pointer locations onto GIF pixels.
