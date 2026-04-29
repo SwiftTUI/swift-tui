@@ -1,5 +1,4 @@
-public import Core
-@_spi(Testing) import Core
+@_spi(Testing) public import Core
 
 /// Displays a string of terminal text.
 public struct Text: View, ResolvableView {

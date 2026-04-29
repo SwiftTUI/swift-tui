@@ -1,5 +1,4 @@
-public import Core
-@_spi(Testing) import Core
+@_spi(Testing) public import Core
 
 /// Displays a PNG, JPEG, or GIF image sourced from an explicit resource
 /// path, local file URL, or bytes embedded directly in the binary.

@@ -1,5 +1,4 @@
-package import Core
-@_spi(Testing) import Core
+@_spi(Testing) package import Core
 
 /// Declares the cell content for a row in a ``Table``.
 public struct TableRow<Content: View>: View, ResolvableView {

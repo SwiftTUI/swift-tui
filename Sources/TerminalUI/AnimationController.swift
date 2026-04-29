@@ -1,5 +1,4 @@
-package import Core
-@_spi(Testing) import Core
+@_spi(Testing) package import Core
 package import View
 
 /// Identifies a logical animatable slot on a ``ResolvedNode``.  Each

@@ -1,5 +1,4 @@
-public import Core
-@_spi(Testing) import Core
+@_spi(Testing) public import Core
 
 /// A view that renders a user-provided drawing into a cell-space canvas sized
 /// to its frame.
