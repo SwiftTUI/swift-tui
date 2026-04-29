@@ -246,12 +246,61 @@ public protocol TerminalInputReading: AnyObject {
   func inputEvents() -> AsyncStream<InputEvent>
 }
 
+package enum MouseCoordinateMode: Equatable, Sendable {
+  case cells
+  case pixels(metrics: CellPixelMetrics, source: PointerPrecisionSource)
+
+  package static func resolving(
+    policy: PointerPrecisionPolicy,
+    metrics: CellPixelMetrics?
+  ) -> Self {
+    switch policy {
+    case .cellOnly, .subCellWhenKnown:
+      return .cells
+    case .forceTerminalPixels:
+      guard let metrics else {
+        return .cells
+      }
+      return .pixels(metrics: metrics, source: .terminalPixels)
+    }
+  }
+
+  package var pointerInputCapabilities: PointerInputCapabilities {
+    switch self {
+    case .cells:
+      return .cellOnly
+    case .pixels(let metrics, let source):
+      return .init(
+        precision: .subCell(source: source, metrics: metrics)
+      )
+    }
+  }
+
+  package var usesTerminalPixels: Bool {
+    switch self {
+    case .cells:
+      return false
+    case .pixels(_, let source):
+      return source == .terminalPixels
+    }
+  }
+}
+
 /// Incrementally parses terminal bytes into normalized keyboard and mouse
 /// events.
 public struct TerminalInputParser: Sendable {
   private var bufferedBytes: [UInt8] = []
+  private var mouseCoordinateMode: MouseCoordinateMode
 
-  public init() {}
+  public init() {
+    self.init(mouseCoordinateMode: .cells)
+  }
+
+  package init(
+    mouseCoordinateMode: MouseCoordinateMode
+  ) {
+    self.mouseCoordinateMode = mouseCoordinateMode
+  }
 
   /// Feeds raw bytes into the parser and returns any completed input events.
   public mutating func feed(_ bytes: [UInt8]) -> [InputEvent] {
@@ -503,7 +552,7 @@ extension TerminalInputParser {
       bufferedBytes[index] != 0x6D
     {
       let byte = bufferedBytes[index]
-      guard (0x30...0x39).contains(byte) || byte == 0x3B else {
+      guard (0x30...0x39).contains(byte) || byte == 0x2D || byte == 0x3B else {
         bufferedBytes.removeFirst(index + 1)
         return nil
       }
@@ -521,18 +570,13 @@ extension TerminalInputParser {
     let parameters = parameterBytes.split(separator: 0x3B)
     guard parameters.count == 3,
       let encodedButton = asciiInteger(from: parameters[0]),
-      let encodedX = asciiInteger(from: parameters[1]),
-      let encodedY = asciiInteger(from: parameters[2])
+      let encodedX = asciiSignedInteger(from: parameters[1]),
+      let encodedY = asciiSignedInteger(from: parameters[2])
     else {
       return nil
     }
 
-    let location = PointerLocation.cellFallback(
-      CellPoint(
-        x: max(0, encodedX - 1),
-        y: max(0, encodedY - 1)
-      )
-    )
+    let location = pointerLocation(encodedX: encodedX, encodedY: encodedY)
     let modifiers = mouseModifiers(from: encodedButton)
     let baseCode = encodedButton & 0b11
     let isMotion = (encodedButton & 32) != 0
@@ -625,6 +669,57 @@ extension TerminalInputParser {
     return value
   }
 
+  private func asciiSignedInteger(
+    from bytes: ArraySlice<UInt8>
+  ) -> Int? {
+    guard !bytes.isEmpty else {
+      return nil
+    }
+
+    var bytes = bytes
+    let isNegative = bytes.first == 0x2D
+    if isNegative {
+      bytes = bytes.dropFirst()
+      guard !bytes.isEmpty else {
+        return nil
+      }
+    }
+
+    guard let value = asciiInteger(from: bytes) else {
+      return nil
+    }
+    return isNegative ? -value : value
+  }
+
+  private func pointerLocation(
+    encodedX: Int,
+    encodedY: Int
+  ) -> PointerLocation {
+    switch mouseCoordinateMode {
+    case .cells:
+      return .cellFallback(
+        CellPoint(
+          x: max(0, encodedX - 1),
+          y: max(0, encodedY - 1)
+        )
+      )
+    case .pixels(let metrics, let source):
+      let pixelX = encodedX - 1
+      let pixelY = encodedY - 1
+      let cellWidth = max(1, metrics.width)
+      let cellHeight = max(1, metrics.height)
+      return .subCell(
+        location: Point(
+          x: Double(pixelX) / Double(cellWidth),
+          y: Double(pixelY) / Double(cellHeight)
+        ),
+        source: source,
+        metrics: metrics,
+        rawPixel: PixelPoint(x: Double(pixelX), y: Double(pixelY))
+      )
+    }
+  }
+
   private func mouseButton(
     from baseCode: Int
   ) -> MouseButton? {
@@ -660,14 +755,21 @@ extension TerminalInputParser {
 /// Reads terminal input from a file descriptor.
 public final class InputReader: InputReading, TerminalInputReading {
   private let fileDescriptor: Int32
+  private let mouseCoordinateMode: MouseCoordinateMode
   private let controlHandler: @Sendable (TerminalControlMessage) -> Void
 
   /// Creates an input reader bound to `fileDescriptor`.
   public init(
     fileDescriptor: Int32 = 0,
+    pointerPrecisionPolicy: PointerPrecisionPolicy = .cellOnly,
+    cellPixelMetrics: CellPixelMetrics? = nil,
     controlHandler: @escaping @Sendable (TerminalControlMessage) -> Void = { _ in }
   ) {
     self.fileDescriptor = fileDescriptor
+    self.mouseCoordinateMode = .resolving(
+      policy: pointerPrecisionPolicy,
+      metrics: cellPixelMetrics
+    )
     self.controlHandler = controlHandler
   }
 
@@ -694,6 +796,7 @@ extension InputReader {
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
+      let mouseCoordinateMode = self.mouseCoordinateMode
 
       return makeTaskBackedAsyncStream(
         launch: { operation in
@@ -702,7 +805,7 @@ extension InputReader {
           }
         }
       ) { continuation in
-        var parser = TerminalInputParser()
+        var parser = TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)
         var controlParser = ControlMessageParser()
         var pendingMouseEvents: [InputEvent] = []
 
@@ -763,6 +866,7 @@ extension InputReader {
     ) -> AsyncStream<Event> {
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
+      let mouseCoordinateMode = self.mouseCoordinateMode
 
       return makeTaskBackedAsyncStream(
         launch: { operation in
@@ -771,7 +875,7 @@ extension InputReader {
           }
         }
       ) { continuation in
-        var parser = TerminalInputParser()
+        var parser = TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)
         var controlParser = ControlMessageParser()
 
         while !Task.isCancelled {
@@ -808,9 +912,10 @@ extension InputReader {
       makeManagedAsyncStream { continuation in
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
+        let mouseCoordinateMode = self.mouseCoordinateMode
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
-        var parser = TerminalInputParser()
+        var parser = TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)
         var controlParser = ControlMessageParser()
         let coalescingState = MouseEventCoalescingState()
         var scheduledFlush: DispatchWorkItem?
@@ -923,9 +1028,10 @@ extension InputReader {
       makeManagedAsyncStream { continuation in
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
+        let mouseCoordinateMode = self.mouseCoordinateMode
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
-        var parser = TerminalInputParser()
+        var parser = TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)
         var controlParser = ControlMessageParser()
 
         source.setEventHandler {

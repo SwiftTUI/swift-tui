@@ -2,7 +2,7 @@ import Synchronization
 
 package final class InjectedTerminalInputReader: TerminalInputReading, Sendable {
   private struct State: Sendable {
-    var parser = TerminalInputParser()
+    var parser: TerminalInputParser
     var controlParser = ControlMessageParser()
     var continuation: AsyncStream<InputEvent>.Continuation?
     var continuationGeneration: UInt64 = 0
@@ -13,12 +13,14 @@ package final class InjectedTerminalInputReader: TerminalInputReading, Sendable 
     var finished = false
   }
 
-  private let state = Mutex(State())
+  private let state: Mutex<State>
   private let controlHandler: @Sendable (TerminalControlMessage) -> Void
 
   package init(
+    mouseCoordinateMode: MouseCoordinateMode = .cells,
     controlHandler: @escaping @Sendable (TerminalControlMessage) -> Void = { _ in }
   ) {
+    state = Mutex(State(parser: TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)))
     self.controlHandler = controlHandler
   }
 

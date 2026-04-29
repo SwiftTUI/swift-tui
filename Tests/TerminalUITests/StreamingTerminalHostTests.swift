@@ -38,6 +38,32 @@ struct StreamingTerminalHostTests {
     #expect(host.appearance == updatedAppearance)
   }
 
+  @Test("streaming terminal host toggles SGR-Pixels for terminal-pixel input")
+  func streamingTerminalHostTogglesSGRPixelsForTerminalPixelInput() throws {
+    let writes = Mutex<[String]>([])
+    let host = StreamingTerminalHost(
+      surfaceSize: .init(width: 10, height: 4),
+      pointerInputCapabilities: .init(
+        precision: .subCell(
+          source: .terminalPixels,
+          metrics: CellPixelMetrics(width: 8, height: 16, source: .reported)
+        )
+      ),
+      outputHandler: { output in
+        writes.withLock { capturedWrites in
+          capturedWrites.append(output)
+        }
+      }
+    )
+
+    try host.enableRawMode()
+    try host.disableRawMode()
+
+    let output = writes.withLock { $0.joined() }
+    #expect(output.contains("\u{001B}[?1002h\u{001B}[?1006h\u{001B}[?1016h"))
+    #expect(output.contains("\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"))
+  }
+
   @Test("streaming terminal host stores host-owned theme updates")
   func streamingTerminalHostStoresThemeUpdates() {
     let host = StreamingTerminalHost(

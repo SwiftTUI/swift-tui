@@ -121,6 +121,43 @@ struct GestureRunLoopDispatchTests {
     #expect(box.location == Point(x: 3, y: 0))
   }
 
+  @Test("Terminal-pixel mouse input reaches DragGesture as fractional location")
+  func terminalPixelMouseInputReachesDragGestureAsFractionalLocation() async throws {
+    @MainActor final class Box {
+      var location: Point?
+    }
+
+    let box = Box()
+    let terminalSize = CellSize(width: 20, height: 5)
+    let rootIdentity = Identity(components: [.named("GestureRunLoopTerminalPixelDrag")])
+    let view = Text("Drag")
+      .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
+      .gesture(
+        DragGesture().onChanged { value in
+          box.location = value.location
+        }
+      )
+
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    var parser = TerminalInputParser(
+      mouseCoordinateMode: .pixels(metrics: metrics, source: .terminalPixels)
+    )
+    let events = parser.feed(
+      Array("\u{001B}[<0;5;9M\u{001B}[<32;13;9M\u{001B}[<0;13;9m".utf8)
+    )
+
+    let result = try await runHarness(
+      host: RecordingGestureTerminalHost(size: terminalSize),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      schedule: events.map { ScheduledGestureInputEvent(event: $0) },
+      viewBuilder: { view }
+    )
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(box.location == Point(x: 1.5, y: 0.5))
+  }
+
   @Test("LongPressGesture fires through the full RunLoop deadline path")
   func longPressGestureFiresThroughRunLoop() async throws {
     @MainActor final class Box {
