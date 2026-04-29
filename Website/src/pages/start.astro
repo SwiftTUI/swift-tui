@@ -1,0 +1,216 @@
+---
+import Base from "@layouts/Base.astro";
+import CodeSample from "@components/CodeSample.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const packageSwift = `// swift-tools-version:6.0
+import PackageDescription
+
+let package = Package(
+  name: "HelloTerminal",
+  platforms: [.macOS(.v15)],
+  dependencies: [
+    .package(
+      url: "https://github.com/GoodHatsLLC/swift-terminal-ui.git",
+      branch: "main"
+    ),
+  ],
+  targets: [
+    .executableTarget(
+      name: "HelloTerminal",
+      dependencies: [
+        .product(
+          name: "TerminalUICLI",
+          package: "swift-terminal-ui"
+        ),
+      ]
+    ),
+  ]
+)`;
+
+const helloApp = `import TerminalUI
+import TerminalUICLI
+
+@main
+struct HelloApp: App {
+  var body: some Scene {
+    WindowGroup("Hello") {
+      GreetingView()
+    }
+  }
+}
+
+struct GreetingView: View {
+  @State private var name = "world"
+  @FocusState private var nameFocus: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Hello, \\(name)!").bold()
+      TextField("name", text: $name)
+        .focused($nameFocus)
+      Text("Press Tab to focus the field. ⌘C to quit.")
+        .foregroundStyle(.secondary)
+    }
+    .padding(.init(horizontal: 1, vertical: 0))
+  }
+}`;
+
+const runCommand = `# From your project directory
+swiftly run swift run HelloTerminal`;
+---
+
+<Base
+  title="Get started"
+  description="Install TerminalUI, run a hello world, and find the next thing to read."
+  pageKey="start"
+>
+  <article class="prose article-body" style="margin-top: var(--space-2xl);">
+    <p class="eyebrow">Getting started</p>
+    <h1>Five minutes to a running TUI.</h1>
+
+    <p>
+      This page assumes you want a terminal-native app written in Swift.
+      For other targets — embedding in macOS/iOS, hosting in the browser,
+      cross-compiling for Android — see
+      <a href={`${base}/platforms`}>platforms</a> after you have a hello world
+      running.
+    </p>
+
+    <h2 id="prerequisites">1 — Prerequisites</h2>
+
+    <ul>
+      <li>
+        <strong>Swift 6.3.1</strong> via
+        <a href="https://www.swift.org/install/macos/swiftly/">swiftly</a>.
+        The repo pins this exact version.
+      </li>
+      <li>
+        <strong>macOS 15+</strong> for local Apple-platform development.
+      </li>
+      <li>
+        <strong>A terminal that supports raw mode and ANSI escapes.</strong>
+        Any modern macOS Terminal, iTerm2, Alacritty, kitty, WezTerm, or Ghostty.
+      </li>
+    </ul>
+
+    <p>
+      For the full toolchain story (wasm SDK, Bun, Xcode, Android NDK), see
+      <a href={`${base}/contribute/toolchains`}>toolchains</a>.
+    </p>
+  </article>
+
+  <section class="info-block">
+    <div class="info-copy">
+      <p class="section-label">2 — Install</p>
+      <h2>Add the dependency.</h2>
+      <p>
+        TerminalUI is delivered as a Swift package. The
+        <code>TerminalUICLI</code> product owns the default terminal-native
+        <code>App.main()</code> story and is what you want for executable
+        apps. The root <code>TerminalUI</code> package is library-only.
+      </p>
+    </div>
+    <CodeSample filename="Package.swift" language="swift" code={packageSwift} />
+  </section>
+
+  <section class="info-block">
+    <div class="info-copy">
+      <p class="section-label">3 — Hello world</p>
+      <h2>A real, runnable, ~30-line app.</h2>
+      <p>
+        Save this as <code>Sources/HelloTerminal/HelloApp.swift</code>. Note
+        the four pieces: <code>@main App</code> declaration, a single
+        <code>Scene</code>, the <code>WindowGroup</code> root, and the
+        <code>View</code> that draws the body.
+      </p>
+    </div>
+    <CodeSample filename="HelloApp.swift" language="swift" code={helloApp} />
+  </section>
+
+  <section class="info-block">
+    <div class="info-copy">
+      <p class="section-label">4 — Run</p>
+      <h2>From the project directory.</h2>
+      <p>
+        First run takes a minute as Swift Package Manager fetches and compiles
+        the dependencies. Subsequent runs are incremental.
+      </p>
+    </div>
+    <CodeSample filename="zsh" language="bash" code={runCommand} />
+  </section>
+
+  <article class="prose article-body">
+    <h2 id="anatomy">Anatomy</h2>
+
+    <p>The four pieces above each play a specific role:</p>
+
+    <ul>
+      <li>
+        <code>@main App</code> — the root. <code>TerminalUICLI</code>
+        provides the default <code>App.main()</code> implementation, which
+        owns terminal raw-mode acquisition, the alternate-screen buffer, and
+        the run loop. You don't write a <code>main.swift</code>.
+      </li>
+      <li>
+        <code>Scene</code> — the unit of presentation. The shipped runtime
+        renders one active scene per host. Multi-scene apps are supported,
+        but only one is on screen at a time.
+      </li>
+      <li>
+        <code>WindowGroup</code> — the full-canvas container. It sizes itself
+        to the current terminal proposal and clips drawing to terminal bounds.
+      </li>
+      <li>
+        <code>View</code> — body-only, identity-keyed. Modifier order matters.
+        <code>@State</code> persists across rerenders by identity-path plus
+        source location.
+      </li>
+    </ul>
+
+    <p>
+      That's the model. The same authored <code>App</code> can flow into
+      three execution modes: terminal-native (above), WASI, or
+      host-managed embedding inside macOS / iOS / web shells.
+    </p>
+
+    <h2 id="next">5 — Five next things</h2>
+  </article>
+
+  <section class="info-block" style="border-top: 0;">
+    <div class="info-copy" style="display: none;"></div>
+    <div class="card-grid card-grid--three" style="grid-column: 1 / -1;">
+      <a class="card" href={`${base}/learn/lists-and-selection`} data-index="01">
+        <h3>Add a list</h3>
+        <p>Build a List with selection and a detail panel — the canonical TUI pattern.</p>
+        <span class="card-tag">Tutorial · 8 min</span>
+      </a>
+      <a class="card" href={`${base}/learn/focus-and-keybindings`} data-index="02">
+        <h3>Add focus & keybindings</h3>
+        <p>Wire @FocusState and the .keyCommand modifier for keyboard-driven flow.</p>
+        <span class="card-tag">Tutorial · 10 min</span>
+      </a>
+      <a class="card" href={`${base}/learn/presentations`} data-index="03">
+        <h3>Add a sheet</h3>
+        <p>Use alert, confirmationDialog, sheet, and toast for terminal-native overlays.</p>
+        <span class="card-tag">Tutorial · 6 min</span>
+      </a>
+      <a class="card" href={`${base}/platforms/macos-and-ios`} data-index="04">
+        <h3>Embed in macOS / iOS</h3>
+        <p>Drop a TerminalUI scene into a SwiftUI app with GUI/SwiftUITUIGUI.</p>
+        <span class="card-tag">Platform · 12 min</span>
+      </a>
+      <a class="card" href={`${base}/platforms/web`} data-index="05">
+        <h3>Run in the browser</h3>
+        <p>Build for WASI and host the terminal in a Bun-served browser app.</p>
+        <span class="card-tag">Platform · 15 min</span>
+      </a>
+      <a class="card" href={`${base}/principles`} data-index="00">
+        <h3>Read the principles</h3>
+        <p>Why SwiftUI-shaped, why terminal-native, what won't ship.</p>
+        <span class="card-tag">Doctrine · 6 min</span>
+      </a>
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,100 @@
+---
+import Base from "@layouts/Base.astro";
+import { docOverlays } from "@/lib/doc-overlays";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const platforms = Object.values(docOverlays)
+  .filter((o) => o.section === "platforms")
+  .sort((a, b) => a.order - b.order);
+
+const decision = [
+  {
+    if: "You want a terminal-native binary.",
+    then: "Use Runners/TerminalUICLI.",
+    href: `${base}/platforms/overview`,
+  },
+  {
+    if: "You want to ship a TerminalUI scene inside a SwiftUI macOS or iOS app.",
+    then: "Use GUI/SwiftUITUIGUI.",
+    href: `${base}/platforms/overview`,
+  },
+  {
+    if: "You want the same TUI to run in a browser.",
+    then: "Build for WASI and host with GUI/WebTUIGUI.",
+    href: `${base}/platforms/overview`,
+  },
+  {
+    if: "You need to cross-compile for Android.",
+    then: "Set up the Android NDK toolchain.",
+    href: `${base}/platforms/android`,
+  },
+];
+---
+
+<Base
+  title="Platforms"
+  description="Terminal-native, WASI, embedded SwiftUI, embedded web, Android. One authored app, multiple execution modes."
+  pageKey="platforms"
+>
+  <article class="prose article-body" style="margin-top: var(--space-2xl);">
+    <p class="eyebrow">Platforms</p>
+    <h1>One app, four execution modes.</h1>
+    <p>
+      Authored <code>App</code>, <code>Scene</code>, and <code>View</code>
+      values feed the same TerminalUI runtime regardless of where they
+      eventually render. A peer platform integration package connects that
+      runtime to the concrete shell.
+    </p>
+  </article>
+
+  <section class="info-block">
+    <div class="info-copy">
+      <p class="section-label">Decision tree</p>
+      <h2>What ships you?</h2>
+      <p>
+        Use the matrix below to pick the right host package, then jump into
+        the platform page for full setup.
+      </p>
+    </div>
+    <div class="info-panel">
+      <div class="info-panel-header">
+        <span class="info-panel-header-file">Decision</span>
+        <span>If / then</span>
+      </div>
+      <div style="padding: var(--space-xl); display: grid; gap: var(--space-md);">
+        {
+          decision.map((d) => (
+            <a href={d.href} style="display: grid; grid-template-columns: auto 1fr; gap: var(--space-md); padding: var(--space-md); border: 1px solid var(--border); text-decoration: none; color: inherit;">
+              <span style="font-family: var(--font-mono); font-size: 11px; letter-spacing: var(--label-tracking); text-transform: uppercase; color: var(--accent); padding-top: 2px;">if</span>
+              <div>
+                <div style="font-family: var(--font-body); color: var(--text-primary);">{d.if}</div>
+                <div style="margin-top: var(--space-sm); font-family: var(--font-mono); font-size: 11px; letter-spacing: var(--label-tracking); text-transform: uppercase; color: var(--text-disabled);">→ {d.then}</div>
+              </div>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="info-block" style="border-bottom: 0;">
+    <div class="info-copy">
+      <p class="section-label">Platform pages</p>
+      <h2>Setup, build, and ship.</h2>
+      <p>
+        Each platform has its own page covering toolchain prerequisites,
+        build commands, host integration, and deployment notes.
+      </p>
+    </div>
+    <div class="card-grid" style="grid-column: 2;">
+      {
+        platforms.map((d, i) => (
+          <a class="card" href={`${base}/${d.slug}`} data-index={String(i + 1).padStart(2, "0")}>
+            <h3>{d.title}</h3>
+            <p>{d.description}</p>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+</Base>

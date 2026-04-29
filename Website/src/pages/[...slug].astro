@@ -1,0 +1,68 @@
+---
+// Catch-all route for /docs/-sourced essays. The overlay map in
+// src/lib/doc-overlays.ts decides which docs publish, what their slugs are,
+// and how they're framed. Every essay rendered here lives canonically in
+// /docs/*.md — the site is a projection, not a copy.
+import { getCollection, render, type CollectionEntry } from "astro:content";
+import Base from "@layouts/Base.astro";
+import ArticleHeader from "@components/ArticleHeader.astro";
+import { docOverlays, type DocOverlay } from "@/lib/doc-overlays";
+
+export async function getStaticPaths() {
+  const docs = await getCollection("docs");
+  const paths: Array<{
+    params: { slug: string };
+    props: { entry: CollectionEntry<"docs">; overlay: DocOverlay };
+  }> = [];
+  for (const entry of docs) {
+    const overlay = docOverlays[entry.id];
+    if (!overlay) continue;
+    paths.push({
+      params: { slug: overlay.slug },
+      props: { entry, overlay },
+    });
+  }
+  return paths;
+}
+
+interface Props {
+  entry: CollectionEntry<"docs">;
+  overlay: DocOverlay;
+}
+
+const { entry, overlay } = Astro.props;
+const { Content } = await render(entry);
+
+// Map a doc's overlay section to the nav highlight key.
+const navKeyFor: Record<DocOverlay["section"], Props["overlay"]["section"] | "principles" | "design" | "policy" | "research" | "platforms" | "contribute"> = {
+  principles: "principles",
+  design: "design",
+  policy: "policy",
+  research: "research",
+  platforms: "platforms",
+  contribute: "contribute",
+  reference: "design",
+};
+
+const eyebrow = `${overlay.section} · ${overlay.audience}`.toUpperCase();
+const sourcePath = `docs/${entry.id.replace(/_/g, "_").toUpperCase()}.md`;
+// /docs/ filenames use various casing schemes (VISION.md, async_rendering →
+// ASYNC_RENDERING.md). We can't perfectly reverse-map without storing the
+// original, so we expose the github source on a best-effort basis.
+---
+
+<Base
+  title={overlay.title}
+  description={overlay.description}
+  pageKey={navKeyFor[overlay.section] as any}
+>
+  <ArticleHeader
+    eyebrow={eyebrow}
+    title={overlay.title}
+    description={overlay.description}
+    source={sourcePath}
+  />
+  <article class="prose article-body">
+    <Content />
+  </article>
+</Base>
