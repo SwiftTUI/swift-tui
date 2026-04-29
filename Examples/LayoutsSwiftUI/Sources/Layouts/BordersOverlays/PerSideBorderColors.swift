@@ -9,7 +9,7 @@ import SwiftUI
 /// reaches the divergence by stacking four `.overlay` rectangles, one
 /// per edge. Layout shape is intentionally preserved; readers of
 /// BEHAVIOUR_FINDINGS comparing rasters should expect SwiftUI to
-/// paint thin coloured strokes rather than `━ ┃ ┏ ┓ ┗ ┛` glyphs.
+/// paint thin colored strokes rather than `━ ┃ ┏ ┓ ┗ ┛` glyphs.
 public struct PerSideBorderColors: View {
   public init() {}
 

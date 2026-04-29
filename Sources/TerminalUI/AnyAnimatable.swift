@@ -88,7 +88,7 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
 
     // Defensive: non-finite `t` upstream (e.g. a curve evaluator
     // returning .nan) would otherwise propagate into
-    // `animatableData` arithmetic and trap inside colour-space
+    // `animatableData` arithmetic and trap inside color-space
     // constructors.  Snap to the target instead.
     guard t.isFinite else {
       return AnyAnimatable(other.value)

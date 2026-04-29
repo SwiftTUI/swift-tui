@@ -1025,7 +1025,7 @@ struct AnimationPipelineIntegrationTests {
     // change: resolve → animation → measure → place →
     // applyPlacedOverlays → capturePlacedTree → semantics → draw
     // → raster. The test has no testable clock so it cannot pin
-    // an exact interpolated colour, but it can assert that the
+    // an exact interpolated color, but it can assert that the
     // controller observed the diff and transitioned into an active
     // state (activeAnimationCount > 0) after frame 2.
     let renderer = DefaultRenderer()
@@ -1048,7 +1048,7 @@ struct AnimationPipelineIntegrationTests {
 
     // Frame 2: text with blue foreground under an explicit animate
     // transaction.  The controller's diff path should enqueue an
-    // active animation for the foreground colour.
+    // active animation for the foreground color.
     var transaction = TransactionSnapshot()
     transaction.animationRequest = .animate(animation.animationBox)
     _ = renderer.render(
@@ -1060,7 +1060,7 @@ struct AnimationPipelineIntegrationTests {
     )
     #expect(
       controller.activeAnimationCount > 0,
-      "controller must hold an active animation after the animated colour change"
+      "controller must hold an active animation after the animated color change"
     )
   }
 
@@ -2312,7 +2312,7 @@ struct AnimationControllerPropertyTests {
     // This enqueues the active animation.
     var frame2Metadata = DrawMetadata()
     frame2Metadata.baseStyle.explicitOpacity = 0.0
-    var frame2 = ResolvedNode(
+    let frame2 = ResolvedNode(
       identity: leafIdentity,
       kind: .view("Leaf"),
       drawMetadata: frame2Metadata

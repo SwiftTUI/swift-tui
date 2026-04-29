@@ -4,9 +4,9 @@ import Testing
 @testable import Layouts
 
 /// A/B variant: swap the two capsules' frame sizes (and therefore
-/// their colours' axes). The wide capsule is now drawn green and the
+/// their colors' axes). The wide capsule is now drawn green and the
 /// tall capsule blue. This proves the row-count invariant is genuinely
-/// keyed off the per-capsule frame size, not off colour identity.
+/// keyed off the per-capsule frame size, not off color identity.
 @MainActor
 private struct CapsuleAxisFlipSwappedVariant: View {
   var body: some View {
@@ -74,12 +74,12 @@ struct CapsuleAxisFlipBehaviourTests {
   }
 
   /// A/B vacuity: swap the capsules' frame sizes (and therefore which
-  /// colour gets the wide/tall frame). Now the BLUE capsule is the
+  /// color gets the wide/tall frame). Now the BLUE capsule is the
   /// tall one (20 rows) and GREEN is the wide one (3 rows). Pinning
   /// both rasters together proves the row-count invariant is keyed off
-  /// the frame, not off some accident of colour ordering or HStack
+  /// the frame, not off some accident of color ordering or HStack
   /// position.
-  @Test("swapping the two frame sizes swaps which colour paints 3 vs 20 rows")
+  @Test("swapping the two frame sizes swaps which color paints 3 vs 20 rows")
   func rowCountInvariantIsNonVacuous() {
     let baseRaster = render(
       CapsuleAxisFlip(),
@@ -136,12 +136,12 @@ struct CapsuleAxisFlipBehaviourTests {
 }
 
 /// Returns the row indices that contain at least one cell whose style
-/// foreground equals `colour`.
-private func rows(in raster: RasterSurface, withForeground colour: Color) -> [Int] {
+/// foreground equals `color`.
+private func rows(in raster: RasterSurface, withForeground color: Color) -> [Int] {
   var hits: [Int] = []
   for (r, row) in raster.cells.enumerated() {
     for cell in row {
-      if cell.style?.foregroundColor == colour {
+      if cell.style?.foregroundColor == color {
         hits.append(r)
         break
       }

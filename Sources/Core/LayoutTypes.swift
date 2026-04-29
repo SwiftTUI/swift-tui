@@ -729,7 +729,7 @@ extension LayoutBehavior {
     // while `.outset` returns non-zero insets, so two borders with
     // identical set and sides but different placement produce different
     // measured sizes and must not be treated as equivalent.
-    // The other payload fields (foreground colour, background colour,
+    // The other payload fields (foreground color, background color,
     // blend, blendPhase) are draw-time concerns: the rasterizer reads
     // them when painting glyphs, but they never change a node's measured
     // size or its child proposal.
