@@ -1,0 +1,122 @@
+---
+import Base from "@layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const decisions = [
+  {
+    n: "0001",
+    title: "SwiftUI-shaped, not Bubble Tea-shaped",
+    status: "accepted",
+    summary: "Why the project chose to be a faithful SwiftUI subset instead of an idiomatic-TUI runtime.",
+  },
+  {
+    n: "0002",
+    title: "Seven-phase pipeline, not collapsed",
+    status: "accepted",
+    summary: "Why resolve / measure / place / semantics / draw / raster / commit are kept strictly separated.",
+  },
+  {
+    n: "0003",
+    title: "ActionScope-based commands, not global hotkeys",
+    status: "accepted",
+    summary: "Why the project rejected the global-hotkey shape and tied commands to focus-chain scopes.",
+  },
+  {
+    n: "0004",
+    title: "Frame-head abort attempted and reverted",
+    status: "reverted",
+    summary: "Post-mortem: what frame-head abort tried to solve, why it broke scrolling and clicking, what to try next.",
+  },
+  {
+    n: "0005",
+    title: "AnyView/AnyScene as escape hatches, not defaults",
+    status: "accepted",
+    summary: "Why public APIs prefer typed @ViewBuilder closures and generic Content: View over erased storage.",
+  },
+  {
+    n: "0006",
+    title: "Cell-only fallback synthesizes pointer location at cell center",
+    status: "accepted",
+    summary: "How TerminalUI gives gestures continuous coordinates even on terminals that only report cells.",
+  },
+  {
+    n: "0007",
+    title: "Embedded host packages are peers, not root products",
+    status: "accepted",
+    summary: "Why GUI/SwiftUITUIGUI and GUI/WebTUIGUI live as peer packages instead of inside the main package.",
+  },
+  {
+    n: "0008",
+    title: "TerminalUI is library-only; runners own App.main()",
+    status: "accepted",
+    summary: "Why default executable launch lives in Runners/TerminalUICLI and not in the root TerminalUI library.",
+  },
+  {
+    n: "0009",
+    title: "Theme is host-owned; views write semantic tokens",
+    status: "accepted",
+    summary: "How styling avoids host-coupled branching by routing every authored color through semantic roles.",
+  },
+  {
+    n: "0010",
+    title: "Crash guard lives in the CLI runner, not in TerminalUI",
+    status: "accepted",
+    summary: "Why the synchronous signal handler that resets termios on crash is part of the runner package.",
+  },
+];
+
+const statusStyle: Record<string, string> = {
+  accepted: "color: var(--text-display);",
+  proposed: "color: var(--accent);",
+  superseded: "color: var(--text-disabled);",
+  reverted: "color: var(--accent);",
+};
+---
+
+<Base
+  title="Decisions"
+  description="Architecture decision records — short, dated, and durable. The accumulated wisdom of the project at a glance."
+  pageKey="design"
+>
+  <article class="prose article-body" style="margin-top: var(--space-2xl);">
+    <p class="eyebrow">Decisions</p>
+    <h1>What we ruled in. What we ruled out.</h1>
+    <p>
+      Each entry below is a short architecture decision record (ADR). Read
+      them in any order — they're written to be durable, dated, and
+      independently legible. A new contributor who reads ten ADRs has more
+      useful context than one who reads three full proposals.
+    </p>
+    <p style="color: var(--text-disabled); font-size: 0.9rem;">
+      ADR pages are still being written as part of the documentation
+      rollout. Status and summaries below are sourced from the existing
+      proposals, plans, and post-mortems in the repo.
+    </p>
+  </article>
+  <section class="info-block" style="border-top: 1px solid var(--border); border-bottom: 0;">
+    <div class="info-copy" style="display: none;"></div>
+    <div style="grid-column: 1 / -1; display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border);">
+      {
+        decisions.map((d) => (
+          <article style="display: grid; grid-template-columns: 80px 1fr auto; gap: var(--space-md); padding: var(--space-lg) var(--space-xl); background: var(--black);">
+            <span style="font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--text-disabled); padding-top: 4px;">
+              ADR-{d.n}
+            </span>
+            <div>
+              <h3 style="margin: 0; font-family: var(--font-body); font-size: 1.125rem; font-weight: 500; color: var(--text-display);">
+                {d.title}
+              </h3>
+              <p style="margin: var(--space-sm) 0 0; font-family: var(--font-body); font-size: 0.9375rem; color: var(--text-secondary);">
+                {d.summary}
+              </p>
+            </div>
+            <span style={`font-family: var(--font-mono); font-size: 11px; letter-spacing: var(--label-tracking); text-transform: uppercase; ${statusStyle[d.status] ?? ""} padding-top: 4px;`}>
+              {d.status}
+            </span>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+</Base>

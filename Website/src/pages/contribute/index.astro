@@ -1,0 +1,46 @@
+---
+import Base from "@layouts/Base.astro";
+import { docOverlays } from "@/lib/doc-overlays";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const contribute = Object.values(docOverlays)
+  .filter((o) => o.section === "contribute")
+  .sort((a, b) => a.order - b.order);
+---
+
+<Base
+  title="Contribute"
+  description="Set up your environment, learn the codebase, and ship your first PR to TerminalUI."
+  pageKey="contribute"
+>
+  <article class="prose article-body" style="margin-top: var(--space-2xl);">
+    <p class="eyebrow">Contribute</p>
+    <h1>Your first 30 minutes.</h1>
+    <p>
+      TerminalUI is a Swift package with a strict frame pipeline, peer host
+      packages, and a vendored set of pure-Swift media decoders. The pages
+      below get you to a clean local build and an opinionated tour of the
+      source tree.
+    </p>
+    <p>
+      If you're an agentic assistant rather than a human, start with
+      <a href="https://github.com/GoodHatsLLC/swift-terminal-ui/blob/main/AGENTS.md">
+        AGENTS.md
+      </a>
+      instead.
+    </p>
+  </article>
+  <section class="info-block" style="border-top: 1px solid var(--border);">
+    <div class="info-copy" style="display: none;"></div>
+    <div class="card-grid" style="grid-column: 1 / -1;">
+      {
+        contribute.map((d, i) => (
+          <a class="card" href={`${base}/${d.slug}`} data-index={String(i + 1).padStart(2, "0")}>
+            <h3>{d.title}</h3>
+            <p>{d.description}</p>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+</Base>
