@@ -59,21 +59,35 @@ test("bridge resize updates environment, emits control input, and notifies liste
     columns: 80,
     rows: 24,
   });
-  const seen: Array<[number, number]> = [];
-  const unsubscribe = bridge.subscribeResize((columns, rows) => {
-    seen.push([columns, rows]);
+  const seen: Array<[number, number, number | undefined, number | undefined]> = [];
+  const unsubscribe = bridge.subscribeResize((columns, rows, cellWidth, cellHeight) => {
+    seen.push([columns, rows, cellWidth, cellHeight]);
   });
 
-  bridge.resize(132, 41);
+  expect(seen).toEqual([[80, 24, undefined, undefined]]);
+
+  bridge.resize(132, 41, 9, 18);
 
   expect(bridge.environment.TUIGUI_COLUMNS).toBe("132");
   expect(bridge.environment.TUIGUI_ROWS).toBe("41");
-  expect(seen).toEqual([[132, 41]]);
+  expect(seen).toEqual([
+    [80, 24, undefined, undefined],
+    [132, 41, 9, 18],
+  ]);
 
   const input = await bridge.stdin.read();
-  expect(Array.from(input ?? [])).toEqual(Array.from(encodeResizeControlMessage(132, 41)));
+  expect(Array.from(input ?? [])).toEqual(Array.from(encodeResizeControlMessage(132, 41, 9, 18)));
 
   unsubscribe();
   bridge.resize(90, 30);
-  expect(seen).toEqual([[132, 41]]);
+  expect(seen).toEqual([
+    [80, 24, undefined, undefined],
+    [132, 41, 9, 18],
+  ]);
+
+  const replayed: Array<[number, number, number | undefined, number | undefined]> = [];
+  bridge.subscribeResize((columns, rows, cellWidth, cellHeight) => {
+    replayed.push([columns, rows, cellWidth, cellHeight]);
+  })();
+  expect(replayed).toEqual([[90, 30, undefined, undefined]]);
 });

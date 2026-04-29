@@ -14,6 +14,7 @@ final class NativeSceneBridge {
   private var manualKeyboardPresentationRequested = false
   private(set) var lastViewportSize: CellSize?
   private(set) var lastCellPixelSize: PixelSize?
+  private(set) var lastPointerInputCapabilities: PointerInputCapabilities = .cellOnly
 
   init(
     descriptor: SwiftUITUISceneDescriptor,
@@ -52,13 +53,24 @@ final class NativeSceneBridge {
       return
     }
 
-    guard size != lastViewportSize || cellPixelSize != lastCellPixelSize else {
+    let pointerInputCapabilities = Self.pointerInputCapabilities(
+      for: cellPixelSize
+    )
+    guard
+      size != lastViewportSize || cellPixelSize != lastCellPixelSize
+        || pointerInputCapabilities != lastPointerInputCapabilities
+    else {
       return
     }
 
     lastViewportSize = size
     lastCellPixelSize = cellPixelSize
-    session?.resize(to: size, cellPixelSize: cellPixelSize)
+    lastPointerInputCapabilities = pointerInputCapabilities
+    session?.resize(
+      to: size,
+      cellPixelSize: cellPixelSize,
+      pointerInputCapabilities: pointerInputCapabilities
+    )
   }
 
   func send(
@@ -79,6 +91,24 @@ final class NativeSceneBridge {
     session?.updateStyle(style.renderStyle)
   }
 
+  private static func pointerInputCapabilities(
+    for cellPixelSize: PixelSize?
+  ) -> PointerInputCapabilities {
+    guard let cellPixelSize else {
+      return .cellOnly
+    }
+    return PointerInputCapabilities(
+      precision: .subCell(
+        source: .nativePixels,
+        metrics: CellPixelMetrics(
+          width: cellPixelSize.width,
+          height: cellPixelSize.height,
+          source: .reported
+        )
+      )
+    )
+  }
+
   private var allowsExpandedKeyboardPresentation: Bool {
     focusPresentation.prefersTextInput || manualKeyboardPresentationRequested
   }
@@ -96,7 +126,11 @@ final class NativeSceneBridge {
 protocol HostedSceneSessionHandling: AnyObject {
   func start() async throws -> RunLoopExitReason
   func send(_ event: InputEvent)
-  func resize(to size: CellSize, cellPixelSize: PixelSize?)
+  func resize(
+    to size: CellSize,
+    cellPixelSize: PixelSize?,
+    pointerInputCapabilities: PointerInputCapabilities
+  )
   func updateStyle(_ style: TerminalRenderStyle)
   func stop()
 }

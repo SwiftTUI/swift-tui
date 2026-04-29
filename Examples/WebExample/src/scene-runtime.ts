@@ -132,7 +132,7 @@ class WasmSceneRuntime extends WebTUISceneRuntime {
 
     const initialColumns = Number(this.bridge?.environment.TUIGUI_COLUMNS ?? "0") || 0;
     const initialRows = Number(this.bridge?.environment.TUIGUI_ROWS ?? "0") || 0;
-    if (initialColumns > 0 && initialRows > 0) {
+    if (!this.bridge && initialColumns > 0 && initialRows > 0) {
       this.onSceneResize?.({
         sceneId: this.descriptor.id,
         columns: initialColumns,

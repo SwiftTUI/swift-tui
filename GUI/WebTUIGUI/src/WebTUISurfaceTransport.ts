@@ -199,14 +199,20 @@ export function encodeMouseInputMessage(
     recordPrefix + [
       "mouse",
       input.kind,
-      Math.max(0, Math.floor(input.x)),
-      Math.max(0, Math.floor(input.y)),
+      formatCellCoordinate(input.x),
+      formatCellCoordinate(input.y),
       input.button ?? "none",
       Math.round(input.deltaX ?? 0),
       Math.round(input.deltaY ?? 0),
       Math.max(0, Math.round(input.modifiers ?? 0)),
     ].join(":") + "\n"
   );
+}
+
+function formatCellCoordinate(
+  value: number
+): string {
+  return Number.isFinite(value) ? String(value) : "0";
 }
 
 function isWebTUISurfaceFrame(

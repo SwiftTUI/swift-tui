@@ -2,12 +2,14 @@ import { expect, test } from "bun:test";
 
 import {
   WebTUIOutputDecoder,
+  encodeMouseInputMessage,
   type WebTUIOutputRecord,
   type WebTUISurfaceFrame,
 } from "./WebTUISurfaceTransport.ts";
 import { transportFixture } from "./WebTUITestFixtures.ts";
 
 const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
 test("decoder reads shared web-surface fixtures across chunk boundaries", () => {
   const decoder = new WebTUIOutputDecoder();
@@ -87,6 +89,21 @@ test("decoder flushes partial buffered text as diagnostic output", () => {
       text: "partial diagnostic\n",
     },
   ]);
+});
+
+test("mouse input encoder preserves fractional cell coordinates", () => {
+  expect(decoder.decode(encodeMouseInputMessage({
+    kind: "dragged",
+    x: 2.125,
+    y: 1.75,
+    button: "primary",
+  }))).toBe("\u001Emouse:dragged:2.125:1.75:primary:0:0:0\n");
+
+  expect(decoder.decode(encodeMouseInputMessage({
+    kind: "moved",
+    x: -0.25,
+    y: 99.5,
+  }))).toBe("\u001Emouse:moved:-0.25:99.5:none:0:0:0\n");
 });
 
 function surfaceFrame(

@@ -38,6 +38,12 @@ export class BrowserWASIBridge {
     cellWidth?: number,
     cellHeight?: number
   ) => void>();
+  private latestResize: {
+    columns: number;
+    rows: number;
+    cellWidth?: number;
+    cellHeight?: number;
+  };
 
   constructor(options: BrowserWASIBridgeOptions) {
     this.environment = {
@@ -54,6 +60,10 @@ export class BrowserWASIBridge {
             ),
           }
         : {}),
+    };
+    this.latestResize = {
+      columns: Math.max(1, options.columns),
+      rows: Math.max(1, options.rows),
     };
   }
 
@@ -90,6 +100,12 @@ export class BrowserWASIBridge {
     const normalizedRows = Math.max(1, rows);
     this.environment.TUIGUI_COLUMNS = String(normalizedColumns);
     this.environment.TUIGUI_ROWS = String(normalizedRows);
+    this.latestResize = {
+      columns: normalizedColumns,
+      rows: normalizedRows,
+      cellWidth,
+      cellHeight,
+    };
     this.stdin.write(encodeResizeControlMessage(columns, rows, cellWidth, cellHeight));
     for (const listener of this.resizeListeners) {
       listener(normalizedColumns, normalizedRows, cellWidth, cellHeight);
@@ -118,6 +134,12 @@ export class BrowserWASIBridge {
     ) => void
   ): () => void {
     this.resizeListeners.add(listener);
+    listener(
+      this.latestResize.columns,
+      this.latestResize.rows,
+      this.latestResize.cellWidth,
+      this.latestResize.cellHeight
+    );
     return () => {
       this.resizeListeners.delete(listener);
     };

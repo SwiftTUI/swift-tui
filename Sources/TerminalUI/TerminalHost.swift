@@ -296,6 +296,7 @@ public protocol TerminalHosting: AnyObject {
   var appearance: TerminalAppearance { get }
   var theme: Theme? { get }
   var graphicsCapabilities: TerminalGraphicsCapabilities { get }
+  var pointerInputCapabilities: PointerInputCapabilities { get }
 
   func enableRawMode() throws
   func disableRawMode() throws
@@ -321,6 +322,10 @@ extension TerminalHosting {
 
   public var graphicsCapabilities: TerminalGraphicsCapabilities {
     .none
+  }
+
+  public var pointerInputCapabilities: PointerInputCapabilities {
+    .cellOnly
   }
 
   @discardableResult

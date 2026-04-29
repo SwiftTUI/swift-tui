@@ -25,6 +25,7 @@ private protocol HostedSceneTerminalHosting: TerminalHosting, DamageAwareTermina
   func updateTheme(_ theme: Theme?)
   func updateStyle(_ style: TerminalRenderStyle)
   func updateCellPixelSize(_ cellPixelSize: PixelSize?)
+  func updatePointerInputCapabilities(_ pointerInputCapabilities: PointerInputCapabilities)
 }
 
 extension StreamingTerminalHost: HostedSceneTerminalHosting {}
@@ -266,8 +267,21 @@ public final class HostedSceneSession {
     to size: CellSize,
     cellPixelSize: PixelSize?
   ) {
+    resize(
+      to: size,
+      cellPixelSize: cellPixelSize,
+      pointerInputCapabilities: .cellOnly
+    )
+  }
+
+  public func resize(
+    to size: CellSize,
+    cellPixelSize: PixelSize?,
+    pointerInputCapabilities: PointerInputCapabilities
+  ) {
     host.updateSurfaceSize(size)
     host.updateCellPixelSize(cellPixelSize)
+    host.updatePointerInputCapabilities(pointerInputCapabilities)
     signalReader.send("SIGWINCH")
   }
 
@@ -315,6 +329,7 @@ private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
     var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
+    var pointerInputCapabilities: PointerInputCapabilities
     var lastSubmittedSurface: RasterSurface?
   }
 
@@ -339,6 +354,10 @@ private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
     state.withLock(\.graphicsCapabilities)
   }
 
+  var pointerInputCapabilities: PointerInputCapabilities {
+    state.withLock(\.pointerInputCapabilities)
+  }
+
   init(
     surfaceSize: CellSize,
     appearance: TerminalAppearance,
@@ -356,6 +375,7 @@ private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
           theme: theme
         ),
         graphicsCapabilities: .none,
+        pointerInputCapabilities: .cellOnly,
         lastSubmittedSurface: nil
       )
     )
@@ -402,6 +422,15 @@ private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
   ) {
     state.withLock { state in
       state.graphicsCapabilities.cellPixelSize = cellPixelSize
+      state.lastSubmittedSurface = nil
+    }
+  }
+
+  func updatePointerInputCapabilities(
+    _ pointerInputCapabilities: PointerInputCapabilities
+  ) {
+    state.withLock { state in
+      state.pointerInputCapabilities = pointerInputCapabilities
       state.lastSubmittedSurface = nil
     }
   }
