@@ -70,7 +70,7 @@ struct TerminalHostProcessExitCleanupTests {
     let output = try readUTF8(from: outputPipe.readEnd)
     #expect(
       output
-        == "\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l\u{001B}[?2004l\u{001B}[?25h\u{001B}[0m\u{001B}[?1049l"
+        == "\u{001B}[?1002l\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?2004l\u{001B}[?25h\u{001B}[0m\u{001B}[?1049l"
     )
   }
 

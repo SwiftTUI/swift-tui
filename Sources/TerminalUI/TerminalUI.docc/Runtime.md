@@ -53,10 +53,14 @@ The runtime writes `PointerInputCapabilities` and `CellPixelMetrics` into the
 environment before each render. Use those values for optional precision
 indicators or direct-manipulation affordances. Layout itself remains cell-based.
 
-Terminal-native sessions enable SGR-Pixels 1016 only when terminal-pixel input
-is explicitly selected and trustworthy cell metrics are available. All-motion
-hover reporting is enabled only while rendered views have `onPointerHover`
-subscribers, then disabled again when the subscribers disappear.
+Terminal-native sessions resolve mouse precision before the event pump starts.
+`TerminalMouseInputResolution.preResolved` skips probing and uses the supplied
+answer. Automatic resolution requires trustworthy cell metrics, then checks
+SGR-Pixels 1016 with `CSI ? 1016 $ p`, then uses the documented compatibility
+matrix only when the selected `TerminalMouseInputTrustPolicy` allows it.
+All-motion hover reporting is enabled only while rendered views have
+`onPointerHover` subscribers, then disabled again when the subscribers
+disappear.
 
 For the deeper focus model, see the `Focus` article in the `View` module.
 

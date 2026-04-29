@@ -249,6 +249,7 @@ public protocol TerminalInputReading: AnyObject {
 }
 
 package enum MouseCoordinateMode: Equatable, Sendable {
+  case disabled
   case cells
   case pixels(metrics: CellPixelMetrics, source: PointerPrecisionSource)
 
@@ -269,7 +270,7 @@ package enum MouseCoordinateMode: Equatable, Sendable {
 
   package var pointerInputCapabilities: PointerInputCapabilities {
     switch self {
-    case .cells:
+    case .disabled, .cells:
       return .cellOnly
     case .pixels(let metrics, let source):
       return .init(
@@ -280,10 +281,19 @@ package enum MouseCoordinateMode: Equatable, Sendable {
 
   package var usesTerminalPixels: Bool {
     switch self {
-    case .cells:
+    case .disabled, .cells:
       return false
     case .pixels(_, let source):
       return source == .terminalPixels
+    }
+  }
+
+  package var reportsMouseInput: Bool {
+    switch self {
+    case .disabled:
+      return false
+    case .cells, .pixels:
+      return true
     }
   }
 }
@@ -720,7 +730,7 @@ extension TerminalInputParser {
     encodedY: Int
   ) -> PointerLocation {
     switch mouseCoordinateMode {
-    case .cells:
+    case .disabled, .cells:
       return .cellFallback(
         CellPoint(
           x: max(0, encodedX - 1),

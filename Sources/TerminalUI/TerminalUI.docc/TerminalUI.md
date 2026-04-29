@@ -45,6 +45,9 @@ packages `GUI/SwiftUITUIGUI`, `GUI/WebTUIGUI`, and `GUI/XtermWebTUIGUI`.
 - ``RunLoopResult``
 - ``RunLoopExitReason``
 - ``SignalReader``
+- ``TerminalMouseInputResolution``
+- ``TerminalMouseInputTrustPolicy``
+- ``TerminalMouseInputCompatibilityMatrix``
 
 ### App And Scene Declarations
 

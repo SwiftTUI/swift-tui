@@ -60,8 +60,8 @@ struct StreamingTerminalHostTests {
     try host.disableRawMode()
 
     let output = writes.withLock { $0.joined() }
-    #expect(output.contains("\u{001B}[?1002h\u{001B}[?1006h\u{001B}[?1016h"))
-    #expect(output.contains("\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"))
+    #expect(output.contains("\u{001B}[?1006h\u{001B}[?1016h\u{001B}[?1002h"))
+    #expect(output.contains("\u{001B}[?1002l\u{001B}[?1016l\u{001B}[?1006l"))
   }
 
   @Test("streaming terminal host toggles all-motion mode for hover")
@@ -80,8 +80,8 @@ struct StreamingTerminalHostTests {
     try host.setPointerHoverEnabled(false)
 
     let output = writes.withLock { $0.joined() }
-    #expect(output.contains("\u{001B}[?1002h\u{001B}[?1006h\u{001B}[?1003h"))
-    #expect(output.contains("\u{001B}[?1003l\u{001B}[?1002h\u{001B}[?1006h"))
+    #expect(output.contains("\u{001B}[?1006h\u{001B}[?1002h\u{001B}[?1003h"))
+    #expect(output.contains("\u{001B}[?1003l\u{001B}[?1006h\u{001B}[?1002h"))
   }
 
   @Test("streaming terminal host stores host-owned theme updates")
