@@ -16,6 +16,8 @@ struct EditorHelpViewTests {
     #expect(shortcuts.contains("Alt+S"))
     #expect(shortcuts.contains("Alt+-"))
     #expect(shortcuts.contains("Alt+="))
+    #expect(shortcuts.contains("Ctrl+Z"))
+    #expect(shortcuts.contains("Ctrl+Y"))
     #expect(!shortcuts.contains(where: { $0.contains("Ctrl+Shift") }))
     #expect(!shortcuts.contains(where: { $0.contains("Ctrl+1") }))
     #expect(!shortcuts.contains("Alt+["))

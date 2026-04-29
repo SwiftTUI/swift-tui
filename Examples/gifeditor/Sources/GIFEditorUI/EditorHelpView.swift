@@ -73,6 +73,13 @@ enum EditorShortcutHelp {
       ]
     ),
     EditorShortcutSection(
+      title: "History",
+      rows: [
+        EditorShortcutRow(shortcut: "Ctrl+Z", action: "Undo last document edit"),
+        EditorShortcutRow(shortcut: "Ctrl+Y", action: "Redo last undone edit"),
+      ]
+    ),
+    EditorShortcutSection(
       title: "Palette",
       rows: [
         EditorShortcutRow(shortcut: "1..9", action: "Pick primary color slot"),
