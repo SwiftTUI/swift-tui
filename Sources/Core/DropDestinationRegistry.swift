@@ -3,8 +3,24 @@
 /// focus chain. The final outer scope that returns `false` yields
 /// overall consumption=false, and the runtime falls back to re-emitting
 /// the paste as ordinary characters.
+public struct DropContext: Equatable, Sendable {
+  public var location: Point?
+  public var pointer: PointerLocation?
+  public var modifiers: EventModifiers
+
+  public init(
+    location: Point? = nil,
+    pointer: PointerLocation? = nil,
+    modifiers: EventModifiers = []
+  ) {
+    self.location = location
+    self.pointer = pointer
+    self.modifiers = modifiers
+  }
+}
+
 package typealias DropDestinationHandler =
-  @MainActor @Sendable ([DroppedPath]) -> Bool
+  @MainActor @Sendable ([DroppedPath], DropContext) -> Bool
 
 /// Stores file-drop destinations keyed by scope `Identity` and
 /// dispatches a single drop event leafmost-first along the current
@@ -37,6 +53,15 @@ package final class DropDestinationRegistry: Equatable {
     handlersByScope[scope] = handler
   }
 
+  package func register(
+    at scope: Identity,
+    handler: @escaping @MainActor @Sendable ([DroppedPath]) -> Bool
+  ) {
+    register(at: scope) { paths, _ in
+      handler(paths)
+    }
+  }
+
   /// Returns the registered handler at `scope`, if any.
   package func handler(at scope: Identity) -> DropDestinationHandler? {
     handlersByScope[scope]
@@ -54,11 +79,12 @@ package final class DropDestinationRegistry: Equatable {
   @discardableResult
   package func dispatch(
     paths: [DroppedPath],
+    context: DropContext = .init(),
     along scopePath: [Identity]
   ) -> Bool {
     for scope in scopePath.reversed() {
       guard let handler = handlersByScope[scope] else { continue }
-      if handler(paths) {
+      if handler(paths, context) {
         return true
       }
     }

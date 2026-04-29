@@ -32,6 +32,10 @@ extension RunLoop {
         scheduler.requestInput()
         handlePaste(pasteEvent)
         return nil
+      case .drop(let paths, let context):
+        scheduler.requestInput()
+        _ = handleDrop(paths: paths, context: context)
+        return nil
       }
     }
   }
@@ -177,6 +181,7 @@ extension RunLoop {
     if !paths.isEmpty {
       let consumed = dropDestinationRegistry.dispatch(
         paths: paths,
+        context: .init(),
         along: currentFocusScopePath()
       )
       if consumed { return }
@@ -211,6 +216,38 @@ extension RunLoop {
     default:
       return .exit(.signal(name))
     }
+  }
+
+  @discardableResult
+  package func handleDrop(
+    paths: [DroppedPath],
+    context: DropContext
+  ) -> Bool {
+    let scopePath = spatialDropScopePath(for: context) ?? currentFocusScopePath()
+    return dropDestinationRegistry.dispatch(
+      paths: paths,
+      context: context,
+      along: scopePath
+    )
+  }
+
+  package func spatialDropScopePath(
+    for context: DropContext
+  ) -> [Identity]? {
+    let point: Point?
+    if let pointer = context.pointer {
+      point = pointer.location
+    } else {
+      point = context.location
+    }
+    guard let point else {
+      return nil
+    }
+
+    return latestSemanticSnapshot.focusRegions
+      .filter { region in region.rect.contains(point) }
+      .max { lhs, rhs in lhs.scopePath.count < rhs.scopePath.count }?
+      .scopePath
   }
 
   /// Returns the scope path for the currently focused region, or an

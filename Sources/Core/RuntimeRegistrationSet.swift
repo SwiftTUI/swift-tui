@@ -113,6 +113,7 @@ package struct RuntimeRegistrationSet {
     )
     terminationRegistry?.restore(handlers.terminationHandlerRegistrations)
     pointerHandlerRegistry?.restore(handlers.pointerHandlerRegistrations)
+    pointerHandlerRegistry?.restoreHover(handlers.pointerHoverHandlerRegistrations)
     gestureRegistry?.restore(handlers.gestureRegistrations)
     gestureStateRegistry?.restore(handlers.gestureStateRegistrations)
     focusBindingRegistry?.restore(handlers.focusBindingRegistrations)

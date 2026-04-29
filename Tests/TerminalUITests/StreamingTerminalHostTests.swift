@@ -64,6 +64,26 @@ struct StreamingTerminalHostTests {
     #expect(output.contains("\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"))
   }
 
+  @Test("streaming terminal host toggles all-motion mode for hover")
+  func streamingTerminalHostTogglesAllMotionModeForHover() throws {
+    let writes = Mutex<[String]>([])
+    let host = StreamingTerminalHost(
+      surfaceSize: .init(width: 10, height: 4),
+      outputHandler: { output in
+        writes.withLock { capturedWrites in
+          capturedWrites.append(output)
+        }
+      }
+    )
+
+    try host.setPointerHoverEnabled(true)
+    try host.setPointerHoverEnabled(false)
+
+    let output = writes.withLock { $0.joined() }
+    #expect(output.contains("\u{001B}[?1003h"))
+    #expect(output.contains("\u{001B}[?1003l"))
+  }
+
   @Test("streaming terminal host stores host-owned theme updates")
   func streamingTerminalHostStoresThemeUpdates() {
     let host = StreamingTerminalHost(

@@ -6,6 +6,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
     var pointerInputCapabilities: PointerInputCapabilities
+    var pointerHoverEnabled: Bool
     var lastSubmittedSurface: RasterSurface?
   }
 
@@ -52,6 +53,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
         ),
         graphicsCapabilities: graphicsCapabilities,
         pointerInputCapabilities: pointerInputCapabilities,
+        pointerHoverEnabled: false,
         lastSubmittedSurface: nil
       )
     )
@@ -129,6 +131,9 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
       if usesTerminalPixelMouseReporting {
         setup += "\u{001B}[?1016h"
       }
+      if state.withLock(\.pointerHoverEnabled) {
+        setup += "\u{001B}[?1003h"
+      }
     }
     setup += "\u{001B}[?2004h"  // enable bracketed paste
     try write(setup)
@@ -137,6 +142,9 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   package func disableRawMode() throws {
     var teardown = ""
     if capabilityProfile.supportsMouseReporting {
+      if state.withLock(\.pointerHoverEnabled) {
+        teardown += "\u{001B}[?1003l"
+      }
       if usesTerminalPixelMouseReporting {
         teardown += "\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"
       } else {
@@ -148,6 +156,26 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     teardown += "\u{001B}[0m"
     teardown += "\u{001B}[?1049l"
     try write(teardown)
+  }
+
+  package func setPointerHoverEnabled(_ enabled: Bool) throws {
+    guard capabilityProfile.supportsMouseReporting else {
+      state.withLock { state in
+        state.pointerHoverEnabled = false
+      }
+      return
+    }
+
+    let shouldWrite = state.withLock { state in
+      guard state.pointerHoverEnabled != enabled else {
+        return false
+      }
+      state.pointerHoverEnabled = enabled
+      return true
+    }
+    if shouldWrite {
+      try write(enabled ? "\u{001B}[?1003h" : "\u{001B}[?1003l")
+    }
   }
 
   private var usesTerminalPixelMouseReporting: Bool {

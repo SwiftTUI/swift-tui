@@ -406,6 +406,16 @@ package final class ViewNode {
     )
   }
 
+  package func recordPointerHoverHandlerRegistration(
+    routeID: RouteID,
+    handler: @escaping LocalPointerHandlerRegistry.HoverHandler
+  ) {
+    registeredHandlers.recordPointerHoverHandler(
+      routeID: routeID,
+      handler: handler
+    )
+  }
+
   package func recordGestureRegistration(
     identity: Identity,
     recognizer: AnyGestureRecognizer

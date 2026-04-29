@@ -22,12 +22,14 @@ struct DropDestinationDispatchTests {
   @Test("A paste of a single path routes to a Panel's dropDestination")
   func singlePathDispatched() throws {
     let received = Box<[DroppedPath]>([])
+    let receivedContext = Box<DropContext?>(nil)
     let runLoop = makeDropRunLoop {
       Panel(id: "inbox") {
         Text("body").focusable(true)
       }
-      .dropDestination { paths in
+      .dropDestination { paths, context in
         received.value = paths
+        receivedContext.value = context
         return true
       }
     }
@@ -41,6 +43,68 @@ struct DropDestinationDispatchTests {
 
     runLoop.handlePaste(PasteEvent(content: "/Users/me/file.txt"))
     #expect(received.value == [DroppedPath("/Users/me/file.txt")])
+    #expect(receivedContext.value?.location == nil)
+    #expect(receivedContext.value?.pointer == nil)
+  }
+
+  @Test("Spatial drop dispatch supplies location and modifiers without focus")
+  func spatialDropDispatchSuppliesContext() throws {
+    let received = Box<DropContext?>(nil)
+    let runLoop = makeDropRunLoop {
+      Panel(id: "inbox") {
+        Text("body").focusable(true)
+      }
+      .dropDestination { _, context in
+        received.value = context
+        return true
+      }
+    }
+    try renderInitial(runLoop)
+
+    let pointer = PointerLocation.subCell(
+      location: Point(x: 1.25, y: 0.5),
+      source: .webPixels,
+      metrics: CellPixelMetrics(width: 8, height: 16, source: .reported)
+    )
+    let consumed = runLoop.handleDrop(
+      paths: [DroppedPath("/Users/me/file.txt")],
+      context: DropContext(
+        location: pointer.location,
+        pointer: pointer,
+        modifiers: .shift
+      )
+    )
+
+    #expect(consumed)
+    #expect(received.value?.location == Point(x: 1.25, y: 0.5))
+    #expect(received.value?.pointer == pointer)
+    #expect(received.value?.modifiers == .shift)
+  }
+
+  @Test("InputEvent.drop routes through spatial drop dispatch")
+  func inputEventDropRoutesThroughSpatialDispatch() throws {
+    let received = Box<[DroppedPath]>([])
+    let runLoop = makeDropRunLoop {
+      Panel(id: "inbox") {
+        Text("body").focusable(true)
+      }
+      .dropDestination { paths, _ in
+        received.value = paths
+        return true
+      }
+    }
+    try renderInitial(runLoop)
+
+    _ = runLoop.handle(
+      .input(
+        .drop(
+          paths: [DroppedPath("/Users/me/native.txt")],
+          context: DropContext(location: Point(x: 1, y: 0))
+        )
+      )
+    )
+
+    #expect(received.value == [DroppedPath("/Users/me/native.txt")])
   }
 
   @Test("Inner scope consumes before outer scope (leafmost-first)")

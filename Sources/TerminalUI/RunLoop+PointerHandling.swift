@@ -29,7 +29,8 @@ extension RunLoop {
   ) -> Bool {
     switch mouseEvent.kind {
     case .moved:
-      return armedPointerRouteID != nil || capturedPointerRouteID != nil
+      return localPointerHandlerRegistry.hasHoverSubscribers
+        || armedPointerRouteID != nil || capturedPointerRouteID != nil
     case .down, .up, .dragged:
       return true
     case .scrolled:
@@ -59,7 +60,8 @@ extension RunLoop {
       kind: .down(.primary),
       location: location,
       targetRect: hitTarget.region.rect,
-      scrollContext: scrollContext(for: hitTarget.region.identity)
+      scrollContext: scrollContext(for: hitTarget.region.identity),
+      namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
     )
 
     let customHandled = dispatchPointerEvent(
@@ -130,7 +132,8 @@ extension RunLoop {
           kind: .up(.primary),
           location: location,
           targetRect: region.rect,
-          scrollContext: scrollContext(for: region.identity)
+          scrollContext: scrollContext(for: region.identity),
+          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
         )
       )
       return
@@ -152,7 +155,8 @@ extension RunLoop {
         kind: .up(.primary),
         location: location,
         targetRect: region.rect,
-        scrollContext: scrollContext(for: region.identity)
+        scrollContext: scrollContext(for: region.identity),
+        namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
       )
     )
     if pointerHandled {
@@ -183,6 +187,8 @@ extension RunLoop {
   package func handleMouseMove(
     location: PointerLocation
   ) {
+    updatePointerHover(at: location)
+
     guard armedPointerRouteID != nil else {
       return
     }
@@ -197,7 +203,8 @@ extension RunLoop {
           kind: .dragged(.primary),
           location: location,
           targetRect: region.rect,
-          scrollContext: scrollContext(for: region.identity)
+          scrollContext: scrollContext(for: region.identity),
+          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
         )
       )
       if handled {
@@ -226,7 +233,8 @@ extension RunLoop {
           kind: .dragged(.primary),
           location: location,
           targetRect: region.rect,
-          scrollContext: scrollContext(for: region.identity)
+          scrollContext: scrollContext(for: region.identity),
+          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
         )
       )
       return
@@ -254,7 +262,8 @@ extension RunLoop {
           scrollContext: .init(
             viewportRect: scrollRoute.viewportRect,
             contentBounds: scrollRoute.contentBounds
-          )
+          ),
+          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
         )
       )
       if handled {
@@ -270,7 +279,8 @@ extension RunLoop {
           kind: .scrolled(deltaX: deltaX, deltaY: deltaY),
           location: location,
           targetRect: hitTarget.region.rect,
-          scrollContext: scrollContext(for: hitTarget.region.identity)
+          scrollContext: scrollContext(for: hitTarget.region.identity),
+          namedCoordinateSpaces: latestSemanticSnapshot.namedCoordinateSpaces
         )
       )
       if handled {
@@ -363,7 +373,7 @@ extension RunLoop {
   ) -> HitTarget? {
     guard
       let region = latestSemanticSnapshot.interactionRegions
-        .filter({ $0.rect.contains(location.cell) })
+        .filter({ $0.contains(location) })
         .max(by: { $0.hitTestOrder < $1.hitTestOrder })
     else {
       return nil
@@ -434,6 +444,78 @@ extension RunLoop {
     }
 
     return false
+  }
+
+  package func updatePointerHover(
+    at location: PointerLocation
+  ) {
+    guard localPointerHandlerRegistry.hasHoverSubscribers else {
+      clearPointerHover()
+      return
+    }
+
+    let hoveredRouteID =
+      hitTarget(at: location)
+      .flatMap { hitTarget in
+        pointerHoverRouteID(
+          startingAt: hitTarget.region.identity,
+          preferredRouteID: hitTarget.region.routeID
+        )
+      }
+
+    guard let hoveredRouteID,
+      let hoveredRegion = interactionRegion(routeID: hoveredRouteID)
+    else {
+      clearPointerHover()
+      return
+    }
+
+    let localLocation = Point(
+      x: location.location.x - Double(hoveredRegion.rect.origin.x),
+      y: location.location.y - Double(hoveredRegion.rect.origin.y)
+    )
+
+    if hoveredPointerRouteID == hoveredRouteID {
+      localPointerHandlerRegistry.dispatchHover(
+        routeID: hoveredRouteID,
+        phase: .moved(localLocation)
+      )
+    } else {
+      clearPointerHover()
+      hoveredPointerRouteID = hoveredRouteID
+      localPointerHandlerRegistry.dispatchHover(
+        routeID: hoveredRouteID,
+        phase: .entered(localLocation)
+      )
+    }
+  }
+
+  package func clearPointerHover() {
+    guard let hoveredPointerRouteID else {
+      return
+    }
+    self.hoveredPointerRouteID = nil
+    localPointerHandlerRegistry.dispatchHover(
+      routeID: hoveredPointerRouteID,
+      phase: .exited
+    )
+  }
+
+  package func pointerHoverRouteID(
+    startingAt identity: Identity,
+    preferredRouteID: RouteID
+  ) -> RouteID? {
+    if localPointerHandlerRegistry.hasHoverHandler(routeID: preferredRouteID) {
+      return preferredRouteID
+    }
+
+    return fallbackPrimaryRouteIDs(
+      startingAt: identity,
+      excluding: preferredRouteID
+    )
+    .first { routeID in
+      localPointerHandlerRegistry.hasHoverHandler(routeID: routeID)
+    }
   }
 
   package func fallbackPrimaryRouteIDs(

@@ -89,6 +89,38 @@ struct TerminalGraphicsProtocolTests {
     #expect(!controller.writes.joined().contains("1016"))
   }
 
+  @Test("terminal host enables all-motion mode only when hover is active")
+  func terminalHostEnablesAllMotionOnlyForHover() throws {
+    let controller = GraphicsProtocolMockTerminalController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    try host.enableRawMode()
+    try host.disableRawMode()
+    #expect(!controller.writes.joined().contains("1003"))
+
+    let hoverController = GraphicsProtocolMockTerminalController(isTTY: true)
+    let hoverHost = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: hoverController,
+      capabilityProfile: .trueColor
+    )
+    try hoverHost.setPointerHoverEnabled(true)
+    try hoverHost.enableRawMode()
+    try hoverHost.disableRawMode()
+
+    let output = hoverController.writes.joined()
+    #expect(output.contains("\u{001B}[?1002h\u{001B}[?1006h\u{001B}[?1003h"))
+    #expect(output.contains("\u{001B}[?1003l\u{001B}[?1002l\u{001B}[?1006l"))
+  }
+
   @Test("terminal host force-pixel policy overrides tmux safety default")
   func terminalHostForcePixelPolicyOverridesTMUXSafetyDefault() throws {
     let controller = GraphicsProtocolMockTerminalController(

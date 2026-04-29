@@ -51,6 +51,8 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var selectionTag: SelectionTag?
   public var tabItemLabel: TabItemLabel?
   public var explicitInteractionRect: CellRect?
+  public var explicitInteractionPath: Path?
+  public var namedCoordinateSpaceName: String?
 
   public var isFocusable: Bool {
     get { explicitFocusability ?? false }
@@ -79,7 +81,9 @@ public struct SemanticMetadata: Equatable, Sendable {
     presentationRole: PresentationRole? = nil,
     selectionTag: SelectionTag? = nil,
     tabItemLabel: TabItemLabel? = nil,
-    explicitInteractionRect: CellRect? = nil
+    explicitInteractionRect: CellRect? = nil,
+    explicitInteractionPath: Path? = nil,
+    namedCoordinateSpaceName: String? = nil
   ) {
     self.init(
       isFocusable: isFocusable,
@@ -95,7 +99,9 @@ public struct SemanticMetadata: Equatable, Sendable {
       presentationRole: presentationRole,
       selectionTag: selectionTag,
       tabItemLabel: tabItemLabel,
-      explicitInteractionRect: explicitInteractionRect
+      explicitInteractionRect: explicitInteractionRect,
+      explicitInteractionPath: explicitInteractionPath,
+      namedCoordinateSpaceName: namedCoordinateSpaceName
     )
   }
 
@@ -113,7 +119,9 @@ public struct SemanticMetadata: Equatable, Sendable {
     presentationRole: PresentationRole? = nil,
     selectionTag: SelectionTag? = nil,
     tabItemLabel: TabItemLabel? = nil,
-    explicitInteractionRect: CellRect? = nil
+    explicitInteractionRect: CellRect? = nil,
+    explicitInteractionPath: Path? = nil,
+    namedCoordinateSpaceName: String? = nil
   ) {
     explicitFocusability = isFocusable
     self.focusScopeBoundary = focusScopeBoundary
@@ -129,6 +137,8 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.selectionTag = selectionTag
     self.tabItemLabel = tabItemLabel
     self.explicitInteractionRect = explicitInteractionRect
+    self.explicitInteractionPath = explicitInteractionPath
+    self.namedCoordinateSpaceName = namedCoordinateSpaceName
   }
 
   public func merging(_ other: Self) -> Self {
@@ -149,7 +159,9 @@ public struct SemanticMetadata: Equatable, Sendable {
       presentationRole: other.presentationRole ?? presentationRole,
       selectionTag: other.selectionTag ?? selectionTag,
       tabItemLabel: other.tabItemLabel ?? tabItemLabel,
-      explicitInteractionRect: other.explicitInteractionRect ?? explicitInteractionRect
+      explicitInteractionRect: other.explicitInteractionRect ?? explicitInteractionRect,
+      explicitInteractionPath: other.explicitInteractionPath ?? explicitInteractionPath,
+      namedCoordinateSpaceName: other.namedCoordinateSpaceName ?? namedCoordinateSpaceName
     )
   }
 }
@@ -854,19 +866,29 @@ public struct InteractionRegion: Equatable, Sendable {
   public var routeID: RouteID
   public var hitTestOrder: Int
   public var captureOnPress: Bool
+  public var contentShape: Path?
 
   public init(
     identity: Identity,
     rect: CellRect,
     routeID: RouteID,
     hitTestOrder: Int = 0,
-    captureOnPress: Bool = false
+    captureOnPress: Bool = false,
+    contentShape: Path? = nil
   ) {
     self.identity = identity
     self.rect = rect
     self.routeID = routeID
     self.hitTestOrder = hitTestOrder
     self.captureOnPress = captureOnPress
+    self.contentShape = contentShape
+  }
+
+  public func contains(_ location: PointerLocation) -> Bool {
+    guard rect.contains(location.location) else {
+      return false
+    }
+    return contentShape?.contains(location.location) ?? true
   }
 }
 
@@ -937,19 +959,22 @@ public struct SemanticSnapshot: Equatable, Sendable {
   public var navigationRoutes: [NavigationRoute]
   public var scrollRoutes: [ScrollRoute]
   public var selectionRoutes: [SelectionRoute]
+  public var namedCoordinateSpaces: [String: CellRect]
 
   public init(
     interactionRegions: [InteractionRegion] = [],
     focusRegions: [FocusRegion] = [],
     navigationRoutes: [NavigationRoute] = [],
     scrollRoutes: [ScrollRoute] = [],
-    selectionRoutes: [SelectionRoute] = []
+    selectionRoutes: [SelectionRoute] = [],
+    namedCoordinateSpaces: [String: CellRect] = [:]
   ) {
     self.interactionRegions = interactionRegions
     self.focusRegions = focusRegions
     self.navigationRoutes = navigationRoutes
     self.scrollRoutes = scrollRoutes
     self.selectionRoutes = selectionRoutes
+    self.namedCoordinateSpaces = namedCoordinateSpaces
   }
 }
 
