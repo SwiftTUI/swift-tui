@@ -69,9 +69,18 @@ content collection.
 
 ## Deployment
 
-The static site builds to `Website/dist/`. Deployment alongside the DocC
-export is handled by the repo's `pages-build.yml` workflow (out of scope
-for this README).
+The repo's `.github/workflows/pages-build.yml` workflow composes a single
+GitHub Pages artifact:
+
+```
+/                ← Website/dist/        (this Astro project)
+/docs/           ← .build-docs/         (combined DocC archive)
+/webexample/     ← Examples/WebExample/pages-dist/  (live WASI demo)
+```
+
+The `/docs/` path is historical — DocC has been served there since before
+this site existed. Existing bookmarks survive. The site's `/api` landing
+deep-links into the DocC archive at `/docs/documentation/<module>/`.
 
 ## Project structure
 
