@@ -10,13 +10,19 @@ import Testing
   @Test
   func native_surface_view_emits_mouse_down_before_mouse_up() throws {
     let view = NativeTerminalSurfaceView(frame: NSRect(x: 0, y: 0, width: 160, height: 80))
+    let metrics = NativeTerminalMetrics(style: .default)
     var events: [InputEvent] = []
     view.onInputEvent = { events.append($0) }
 
+    let localPoint = NSPoint(
+      x: metrics.cellSize.width * 2.5,
+      y: metrics.cellSize.height * 1.5
+    )
+    let point = windowPoint(forLocal: localPoint, in: view)
     view.mouseDown(
       with: mouseEvent(
         type: .leftMouseDown,
-        location: NSPoint(x: 12, y: 10),
+        location: point,
         eventNumber: 1
       )
     )
@@ -24,18 +30,23 @@ import Testing
     #expect(events.count == 1)
     #expect(events.first?.mouseKind == .down(.primary))
     let downLocation = try #require(events.first?.mouseLocation)
-    #expect(downLocation.precision == .cell)
-    #expect(
-      downLocation.location
-        == Point(
-          x: Double(downLocation.cell.x) + 0.5,
-          y: Double(downLocation.cell.y) + 0.5
-        ))
+    #expect(downLocation.cell == CellPoint(x: 2, y: 1))
+    #expect(abs(downLocation.location.x - 2.5) < 0.0001)
+    #expect(abs(downLocation.location.y - 1.5) < 0.0001)
+    guard
+      case .subCell(source: .nativePixels, metrics: let precisionMetrics) =
+        downLocation.precision
+    else {
+      Issue.record("expected native sub-cell precision")
+      return
+    }
+    #expect(precisionMetrics.source == .reported)
+    #expect(downLocation.rawPixel != nil)
 
     view.mouseUp(
       with: mouseEvent(
         type: .leftMouseUp,
-        location: NSPoint(x: 12, y: 10),
+        location: point,
         eventNumber: 2
       )
     )
@@ -47,19 +58,25 @@ import Testing
   @Test
   func native_surface_view_emits_drag_and_scroll_events() throws {
     let view = NativeTerminalSurfaceView(frame: NSRect(x: 0, y: 0, width: 160, height: 80))
+    let metrics = NativeTerminalMetrics(style: .default)
     var events: [InputEvent] = []
     view.onInputEvent = { events.append($0) }
+    let localPoint = NSPoint(
+      x: metrics.cellSize.width * 3.25,
+      y: metrics.cellSize.height * 1.75
+    )
+    let point = windowPoint(forLocal: localPoint, in: view)
 
     view.mouseDragged(
       with: mouseEvent(
         type: .leftMouseDragged,
-        location: NSPoint(x: 24, y: 18),
+        location: point,
         eventNumber: 1
       )
     )
     view.scrollWheel(
       with: scrollEvent(
-        location: NSPoint(x: 24, y: 18),
+        location: point,
         scrollingDeltaX: 0,
         scrollingDeltaY: -3
       )
@@ -68,14 +85,68 @@ import Testing
     #expect(events.count == 2)
     #expect(events[0].mouseKind == .dragged(.primary))
     #expect(events[1].mouseKind == .scrolled(deltaX: 0, deltaY: 3))
+    let dragLocation = try #require(events[0].mouseLocation)
+    #expect(dragLocation.cell == CellPoint(x: 3, y: 1))
+    #expect(abs(dragLocation.location.x - 3.25) < 0.0001)
+    #expect(abs(dragLocation.location.y - 1.75) < 0.0001)
     let scrollLocation = try #require(events[1].mouseLocation)
-    #expect(scrollLocation.precision == .cell)
-    #expect(
-      scrollLocation.location
-        == Point(
-          x: Double(scrollLocation.cell.x) + 0.5,
-          y: Double(scrollLocation.cell.y) + 0.5
-        ))
+    guard case .subCell(source: .nativePixels, metrics: _) = scrollLocation.precision else {
+      Issue.record("expected native sub-cell precision")
+      return
+    }
+  }
+
+  @MainActor
+  @Test
+  func native_surface_view_preserves_sub_cell_drag_inside_one_cell() throws {
+    let view = NativeTerminalSurfaceView(frame: NSRect(x: 0, y: 0, width: 160, height: 80))
+    let metrics = NativeTerminalMetrics(style: .default)
+    var events: [InputEvent] = []
+    view.onInputEvent = { events.append($0) }
+
+    view.mouseDragged(
+      with: mouseEvent(
+        type: .leftMouseDragged,
+        location: windowPoint(
+          forLocal: NSPoint(
+            x: metrics.cellSize.width * 2.10,
+            y: metrics.cellSize.height * 1.40
+          ),
+          in: view
+        ),
+        eventNumber: 1
+      )
+    )
+    view.mouseDragged(
+      with: mouseEvent(
+        type: .leftMouseDragged,
+        location: windowPoint(
+          forLocal: NSPoint(
+            x: metrics.cellSize.width * 2.70,
+            y: metrics.cellSize.height * 1.40
+          ),
+          in: view
+        ),
+        eventNumber: 2
+      )
+    )
+
+    let first = try #require(events.first?.mouseLocation)
+    let second = try #require(events.dropFirst().first?.mouseLocation)
+    #expect(first.cell == CellPoint(x: 2, y: 1))
+    #expect(second.cell == CellPoint(x: 2, y: 1))
+    #expect(first.location != second.location)
+  }
+
+  @MainActor
+  private func windowPoint(
+    forLocal local: NSPoint,
+    in view: NativeTerminalSurfaceView
+  ) -> NSPoint {
+    NSPoint(
+      x: local.x,
+      y: view.bounds.height - local.y
+    )
   }
 
   private func mouseEvent(

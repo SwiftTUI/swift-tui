@@ -126,6 +126,7 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
     var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
+    var pointerInputCapabilities: PointerInputCapabilities
     var transmittedImageIDs: Set<String>
   }
 
@@ -153,6 +154,7 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
         surfaceSize: surfaceSize,
         renderStyle: renderStyle,
         graphicsCapabilities: .none,
+        pointerInputCapabilities: .cellOnly,
         transmittedImageIDs: []
       )
     )
@@ -174,6 +176,10 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
     state.withLock(\.graphicsCapabilities)
   }
 
+  var pointerInputCapabilities: PointerInputCapabilities {
+    state.withLock(\.pointerInputCapabilities)
+  }
+
   func updateSurfaceSize(
     _ surfaceSize: CellSize,
     cellPixelSize: PixelSize? = nil
@@ -181,7 +187,28 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
     state.withLock { state in
       state.surfaceSize = surfaceSize
       state.graphicsCapabilities.cellPixelSize = cellPixelSize
+      state.pointerInputCapabilities = Self.pointerInputCapabilities(
+        for: cellPixelSize
+      )
     }
+  }
+
+  private static func pointerInputCapabilities(
+    for cellPixelSize: PixelSize?
+  ) -> PointerInputCapabilities {
+    guard let cellPixelSize else {
+      return .cellOnly
+    }
+    return PointerInputCapabilities(
+      precision: .subCell(
+        source: .webPixels,
+        metrics: CellPixelMetrics(
+          width: cellPixelSize.width,
+          height: cellPixelSize.height,
+          source: .reported
+        )
+      )
+    )
   }
 
   func updateStyle(
@@ -317,6 +344,7 @@ package struct WebSurfaceInputParser {
 
   private var bufferedCommand: [UInt8]?
   private var terminalInputParser = TerminalInputParser()
+  private var cellPixelSize: PixelSize?
 
   package init() {}
 
@@ -361,7 +389,7 @@ package struct WebSurfaceInputParser {
     return (events, controlMessages)
   }
 
-  private func parseCommand(
+  private mutating func parseCommand(
     _ text: String
   ) -> (events: [InputEvent], controlMessages: [WebSurfaceInputControlMessage]) {
     if let resize = parseResizeCommand(text) {
@@ -376,7 +404,7 @@ package struct WebSurfaceInputParser {
     return ([], [])
   }
 
-  private func parseResizeCommand(
+  private mutating func parseResizeCommand(
     _ text: String
   ) -> WebSurfaceInputControlMessage? {
     let components = splitCommand(text)
@@ -400,6 +428,7 @@ package struct WebSurfaceInputParser {
     } else {
       cellPixelSize = nil
     }
+    self.cellPixelSize = cellPixelSize
 
     return .resize(
       .init(width: max(1, width), height: max(1, height)),
@@ -452,8 +481,8 @@ package struct WebSurfaceInputParser {
     let components = splitCommand(text)
     guard components.count == 8,
       components[0] == "mouse",
-      let x = Int(components[2]),
-      let y = Int(components[3]),
+      let x = Double(components[2]),
+      let y = Double(components[3]),
       let deltaX = Int(components[5]),
       let deltaY = Int(components[6])
     else {
@@ -483,8 +512,31 @@ package struct WebSurfaceInputParser {
     return .mouse(
       MouseEvent(
         kind: kind,
-        location: PointerLocation.cellFallback(CellPoint(x: max(0, x), y: max(0, y))),
+        location: pointerLocation(x: x, y: y),
         modifiers: parseModifiers(components[7])
+      )
+    )
+  }
+
+  private func pointerLocation(
+    x: Double,
+    y: Double
+  ) -> PointerLocation {
+    guard let cellPixelSize else {
+      return .cellFallback(Point(x: x, y: y).containingCell)
+    }
+    let location = Point(x: x, y: y)
+    return .subCell(
+      location: location,
+      source: .webPixels,
+      metrics: CellPixelMetrics(
+        width: cellPixelSize.width,
+        height: cellPixelSize.height,
+        source: .reported
+      ),
+      rawPixel: PixelPoint(
+        x: x * Double(cellPixelSize.width),
+        y: y * Double(cellPixelSize.height)
       )
     )
   }

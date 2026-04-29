@@ -664,6 +664,7 @@ extension RunLoop {
     } else {
       effectiveEnvironmentValues.cellPixelMetrics = .estimated
     }
+    effectiveEnvironmentValues.pointerInputCapabilities = terminalHost.pointerInputCapabilities
     effectiveEnvironmentValues.focusedIdentity = focusTracker.currentFocusIdentity
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity

@@ -132,9 +132,15 @@ import TerminalUI
       for windowPoint: NSPoint
     ) -> PointerLocation {
       let local = convert(windowPoint, from: nil)
-      return PointerLocation.cellFallback(
-        metrics.cellPoint(for: CGPoint(x: local.x, y: local.y), in: bounds).containingCell
+      return metrics.pointerLocation(
+        for: CGPoint(x: local.x, y: local.y),
+        in: bounds,
+        scale: backingScale
       )
+    }
+
+    private var backingScale: CGFloat {
+      window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
     }
 
     private func updateMetrics() {
@@ -148,8 +154,7 @@ import TerminalUI
       }
 
       let grid = metrics.gridSize(for: bounds.size)
-      let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
-      let cellPixelSize = metrics.cellPixelSize(scale: scale)
+      let cellPixelSize = metrics.cellPixelSize(scale: backingScale)
       guard grid != lastPublishedGrid || cellPixelSize != lastPublishedCellPixelSize else {
         return
       }
@@ -323,7 +328,15 @@ import TerminalUI
     private func pointerLocation(
       for local: CGPoint
     ) -> PointerLocation {
-      PointerLocation.cellFallback(metrics.cellPoint(for: local, in: bounds).containingCell)
+      metrics.pointerLocation(
+        for: local,
+        in: bounds,
+        scale: backingScale
+      )
+    }
+
+    private var backingScale: CGFloat {
+      window?.screen.scale ?? UIScreen.main.scale
     }
 
     private func updateMetrics() {
@@ -337,7 +350,7 @@ import TerminalUI
       }
 
       let grid = metrics.gridSize(for: bounds.size)
-      let cellPixelSize = metrics.cellPixelSize(scale: window?.screen.scale ?? UIScreen.main.scale)
+      let cellPixelSize = metrics.cellPixelSize(scale: backingScale)
       guard grid != lastPublishedGrid || cellPixelSize != lastPublishedCellPixelSize else {
         return
       }
@@ -349,11 +362,11 @@ import TerminalUI
   }
 #endif
 
-private struct NativeTerminalMetrics {
-  let font: NativePlatformFont
-  let boldFont: NativePlatformFont
-  let italicFont: NativePlatformFont
-  let boldItalicFont: NativePlatformFont
+struct NativeTerminalMetrics {
+  fileprivate let font: NativePlatformFont
+  fileprivate let boldFont: NativePlatformFont
+  fileprivate let italicFont: NativePlatformFont
+  fileprivate let boldItalicFont: NativePlatformFont
   let cellSize: CGSize
   let textOffset: CGPoint
 
@@ -396,16 +409,38 @@ private struct NativeTerminalMetrics {
     )
   }
 
-  func cellPoint(
-    for local: CGPoint,
-    in bounds: CGRect
-  ) -> Point {
-    let x = max(0, min(Int(local.x / cellSize.width), Int(bounds.width / cellSize.width)))
-    let y = max(0, min(Int(local.y / cellSize.height), Int(bounds.height / cellSize.height)))
-    return Point(CellPoint(x: x, y: y))
+  func cellPixelMetrics(
+    scale: CGFloat
+  ) -> CellPixelMetrics {
+    let pixelSize = cellPixelSize(scale: scale)
+    return CellPixelMetrics(
+      width: pixelSize.width,
+      height: pixelSize.height,
+      source: .reported
+    )
   }
 
-  func font(
+  func pointerLocation(
+    for local: CGPoint,
+    in _: CGRect,
+    scale: CGFloat
+  ) -> PointerLocation {
+    PointerLocation.subCell(
+      location: Point(
+        x: Double(local.x / cellSize.width),
+        y: Double(local.y / cellSize.height)
+      ),
+      source: .nativePixels,
+      metrics: cellPixelMetrics(scale: scale),
+      // Native hosts store backing-pixel coordinates for diagnostics.
+      rawPixel: PixelPoint(
+        x: Double(local.x * scale),
+        y: Double(local.y * scale)
+      )
+    )
+  }
+
+  fileprivate func font(
     for emphasis: TerminalUI.TextStyle.TextEmphasis
   ) -> NativePlatformFont {
     switch (emphasis.contains(.bold), emphasis.contains(.italic)) {

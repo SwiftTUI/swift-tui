@@ -517,9 +517,48 @@ test("runtime maps browser input events to web-surface messages", async () => {
     expect(inputs).toEqual([
       "\u001Ekey:character:a:5\n",
       "\u001Epaste:hello%20world\n",
-      "\u001Emouse:down:2:0:primary:0:0:0\n",
-      "\u001Emouse:dragged:3:1:primary:0:0:0\n",
-      "\u001Emouse:scrolled:3:1:none:0:1:2\n",
+      "\u001Emouse:down:2.5:0.37037037037037035:primary:0:0:0\n",
+      "\u001Emouse:dragged:3.5:1.1111111111111112:primary:0:0:0\n",
+      "\u001Emouse:scrolled:3.5:1.1111111111111112:none:0:1:2\n",
+    ]);
+  } finally {
+    dom.restore();
+  }
+});
+
+test("runtime preserves pointer movement within one cell", async () => {
+  const dom = installFakeDOM();
+  try {
+    const inputs: string[] = [];
+    const mount = new FakeElement("div");
+    const runtime = new WebTUISceneRuntime({
+      mount: mount as unknown as HTMLElement,
+      descriptor: { id: "main", title: "Main", isDefault: true },
+      style: { fontSize: 20 },
+      onInput: (chunk) => {
+        inputs.push(decoder.decode(chunk));
+      },
+    });
+
+    await runtime.mount();
+    runtime.resize(10, 4);
+
+    runtime.terminalMount.dispatch("pointermove", pointerEvent({
+      buttons: 1,
+      clientX: 21,
+      clientY: 27,
+      pointerId: 7,
+    }));
+    runtime.terminalMount.dispatch("pointermove", pointerEvent({
+      buttons: 1,
+      clientX: 27,
+      clientY: 27,
+      pointerId: 7,
+    }));
+
+    expect(inputs).toEqual([
+      "\u001Emouse:dragged:2.1:1:primary:0:0:0\n",
+      "\u001Emouse:dragged:2.7:1:primary:0:0:0\n",
     ]);
   } finally {
     dom.restore();

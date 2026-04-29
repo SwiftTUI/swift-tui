@@ -587,9 +587,11 @@ export class WebTUISceneRuntime {
       return undefined;
     }
 
-    const x = Math.floor((event.clientX - rect.left) / this.cellWidth);
-    const y = Math.floor((event.clientY - rect.top) / this.cellHeight);
-    if (x < 0 || y < 0 || x >= this.columns || y >= this.rows) {
+    const x = (event.clientX - rect.left) / this.cellWidth;
+    const y = (event.clientY - rect.top) / this.cellHeight;
+    const cellX = Math.floor(x);
+    const cellY = Math.floor(y);
+    if (cellX < 0 || cellY < 0 || cellX >= this.columns || cellY >= this.rows) {
       return undefined;
     }
     return { x, y };

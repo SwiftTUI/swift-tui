@@ -130,6 +130,63 @@ func hosted_surface_animation_publishes_intermediate_frames() async throws {
 }
 
 @MainActor
+@Test
+func hosted_surface_drag_gesture_receives_fractional_location() async throws {
+  let recorder = SurfaceRecorder()
+  let session = try HostedSceneSession(
+    for: FractionalDragSurfaceApp(),
+    sceneID: "main",
+    initialSize: .init(width: 32, height: 8),
+    appearance: .fallback,
+    onSurface: { surface in
+      recorder.record(surface)
+    }
+  )
+
+  let runTask = Task { try await session.start() }
+  defer {
+    session.stop()
+  }
+
+  _ = try await recorder.waitForSurface("initial fractional drag frame") { surface in
+    surface.renderedText.contains("drag idle")
+  }
+
+  let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+  session.send(
+    .mouse(
+      .init(
+        kind: .down(.primary),
+        location: .subCell(
+          location: Point(x: 1.25, y: 0.50),
+          source: .nativePixels,
+          metrics: metrics
+        )
+      )
+    )
+  )
+  session.send(
+    .mouse(
+      .init(
+        kind: .dragged(.primary),
+        location: .subCell(
+          location: Point(x: 1.75, y: 0.50),
+          source: .nativePixels,
+          metrics: metrics
+        )
+      )
+    )
+  )
+
+  _ = try await recorder.waitForSurface("fractional drag update") { surface in
+    surface.renderedText.contains("drag 175:50")
+  }
+
+  _ = try await session.stopAndWait()
+  _ = await runTask.result
+}
+
+@MainActor
 private struct PressedButtonApp: TerminalUI.App {
   var body: some TerminalUI.Scene {
     WindowGroup("Main", id: "main") {
@@ -166,6 +223,15 @@ private struct AnimationSurfaceApp: TerminalUI.App {
 }
 
 @MainActor
+private struct FractionalDragSurfaceApp: TerminalUI.App {
+  var body: some TerminalUI.Scene {
+    WindowGroup("Main", id: "main") {
+      FractionalDragSurfaceView()
+    }
+  }
+}
+
+@MainActor
 private struct AnimationSurfaceView: TerminalUI.View {
   @State private var shifted = false
 
@@ -179,6 +245,24 @@ private struct AnimationSurfaceView: TerminalUI.View {
       Text("Marker")
         .offset(x: shifted ? 8 : 0)
     }
+  }
+}
+
+@MainActor
+private struct FractionalDragSurfaceView: TerminalUI.View {
+  @State private var label = "drag idle"
+
+  var body: some TerminalUI.View {
+    Text(label)
+      .frame(width: 24, height: 1, alignment: .leading)
+      .gesture(
+        DragGesture(minimumDistance: 0)
+          .onChanged { value in
+            let x = Int((value.location.x * 100).rounded())
+            let y = Int((value.location.y * 100).rounded())
+            label = "drag \(x):\(y)"
+          }
+      )
   }
 }
 

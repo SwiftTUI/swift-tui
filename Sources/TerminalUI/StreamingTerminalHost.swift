@@ -5,6 +5,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
+    var pointerInputCapabilities: PointerInputCapabilities
     var lastSubmittedSurface: RasterSurface?
   }
 
@@ -18,12 +19,17 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     state.withLock(\.graphicsCapabilities)
   }
 
+  package var pointerInputCapabilities: PointerInputCapabilities {
+    state.withLock(\.pointerInputCapabilities)
+  }
+
   package init(
     surfaceSize: CellSize,
     appearance: TerminalAppearance? = nil,
     theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
     graphicsCapabilities: TerminalGraphicsCapabilities = .none,
+    pointerInputCapabilities: PointerInputCapabilities = .cellOnly,
     environment: [String: String]? = nil,
     outputHandler: @escaping @Sendable (String) -> Void
   ) {
@@ -45,6 +51,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
           theme: theme
         ),
         graphicsCapabilities: graphicsCapabilities,
+        pointerInputCapabilities: pointerInputCapabilities,
         lastSubmittedSurface: nil
       )
     )
@@ -101,6 +108,15 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   package func updateCellPixelSize(_ cellPixelSize: PixelSize?) {
     state.withLock { state in
       state.graphicsCapabilities.cellPixelSize = cellPixelSize
+      state.lastSubmittedSurface = nil
+    }
+  }
+
+  package func updatePointerInputCapabilities(
+    _ pointerInputCapabilities: PointerInputCapabilities
+  ) {
+    state.withLock { state in
+      state.pointerInputCapabilities = pointerInputCapabilities
       state.lastSubmittedSurface = nil
     }
   }

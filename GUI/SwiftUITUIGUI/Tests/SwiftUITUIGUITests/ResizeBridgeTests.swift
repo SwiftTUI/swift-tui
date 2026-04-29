@@ -8,6 +8,7 @@ private final class FakeSceneSession: HostedSceneSessionHandling {
   var startCount = 0
   var stopCount = 0
   var receivedResizes: [(size: CellSize, cellPixelSize: PixelSize?)] = []
+  var receivedPointerInputCapabilities: [PointerInputCapabilities] = []
   var receivedStyles: [TerminalRenderStyle] = []
   var receivedEvents: [InputEvent] = []
 
@@ -20,8 +21,13 @@ private final class FakeSceneSession: HostedSceneSessionHandling {
     receivedEvents.append(event)
   }
 
-  func resize(to size: CellSize, cellPixelSize: PixelSize?) {
+  func resize(
+    to size: CellSize,
+    cellPixelSize: PixelSize?,
+    pointerInputCapabilities: PointerInputCapabilities
+  ) {
     receivedResizes.append((size, cellPixelSize))
+    receivedPointerInputCapabilities.append(pointerInputCapabilities)
   }
 
   func updateStyle(_ style: TerminalRenderStyle) {
@@ -54,6 +60,15 @@ func bridge_forwards_resize_and_style_updates() async throws {
   )
   #expect(session.receivedResizes.map(\.size) == [.init(width: 120, height: 40)])
   #expect(session.receivedResizes.map(\.cellPixelSize) == [.init(width: 8, height: 16)])
+  #expect(
+    session.receivedPointerInputCapabilities == [
+      PointerInputCapabilities(
+        precision: .subCell(
+          source: .nativePixels,
+          metrics: .init(width: 8, height: 16, source: .reported)
+        )
+      )
+    ])
 
   bridge.send(.key(.init(.character("x"))))
   #expect(session.receivedEvents == [.key(.init(.character("x")))])

@@ -167,6 +167,58 @@ struct WebSurfaceTransportTests {
     )
   }
 
+  @Test("parser maps fractional mouse coordinates to web sub-cell pointer locations")
+  func parserMapsFractionalMouseToSubCellPointerLocation() throws {
+    var parser = WebSurfaceInputParser()
+    let parsed = parser.feed(
+      bytes(
+        "\u{001E}resize:12:3:10:20\n"
+          + "\u{001E}mouse:dragged:2.75:1.25:primary:0:0:0\n"
+      )
+    )
+
+    #expect(
+      parsed.controlMessages == [
+        .resize(.init(width: 12, height: 3), cellPixelSize: .init(width: 10, height: 20))
+      ])
+
+    guard case .mouse(let mouse) = try #require(parsed.events.first) else {
+      Issue.record("expected mouse event")
+      return
+    }
+
+    #expect(mouse.kind == .dragged(.primary))
+    #expect(mouse.location.location == Point(x: 2.75, y: 1.25))
+    #expect(mouse.location.cell == CellPoint(x: 2, y: 1))
+    #expect(mouse.location.rawPixel == PixelPoint(x: 27.5, y: 25))
+    #expect(
+      mouse.location.precision
+        == .subCell(
+          source: .webPixels,
+          metrics: .init(width: 10, height: 20, source: .reported)
+        ))
+  }
+
+  @Test("parser preserves out-of-grid fractional coordinates for hit-test rejection")
+  func parserPreservesOutOfGridFractionalCoordinates() throws {
+    var parser = WebSurfaceInputParser()
+    let parsed = parser.feed(
+      bytes(
+        "\u{001E}resize:12:3:10:20\n"
+          + "\u{001E}mouse:moved:-0.25:3.10:none:0:0:0\n"
+      )
+    )
+
+    guard case .mouse(let mouse) = try #require(parsed.events.first) else {
+      Issue.record("expected mouse event")
+      return
+    }
+
+    #expect(mouse.location.location == Point(x: -0.25, y: 3.10))
+    #expect(mouse.location.cell == CellPoint(x: -1, y: 3))
+    #expect(mouse.location.precision.isSubCell)
+  }
+
   @Test("parser ignores malformed web-surface commands")
   func parserIgnoresMalformedCommands() {
     var parser = WebSurfaceInputParser()
