@@ -80,6 +80,8 @@ private func forEachLinePoint(
 }
 
 public struct CanvasSketchDocument: Equatable, Sendable {
+  private static let grid = CanvasGrid.braille2x4
+
   public var cellSize: CellSize
   public private(set) var cursor: CanvasSketchPoint
 
@@ -97,7 +99,8 @@ public struct CanvasSketchDocument: Equatable, Sendable {
     self.cursor = CanvasSketchDocument.clamped(cursor, in: safeCellSize)
     self.pixels = [Bool](
       repeating: false,
-      count: safeCellSize.width * 2 * safeCellSize.height * 4
+      count: safeCellSize.width * Self.grid.subdivisionsX * safeCellSize.height
+        * Self.grid.subdivisionsY
     )
   }
 
@@ -125,8 +128,8 @@ public struct CanvasSketchDocument: Equatable, Sendable {
     return document
   }
 
-  public var subpixelWidth: Int { cellSize.width * 2 }
-  public var subpixelHeight: Int { cellSize.height * 4 }
+  public var subpixelWidth: Int { cellSize.width * Self.grid.subdivisionsX }
+  public var subpixelHeight: Int { cellSize.height * Self.grid.subdivisionsY }
   public var maxSubpixelX: Int { subpixelWidth - 1 }
   public var maxSubpixelY: Int { subpixelHeight - 1 }
 
@@ -199,6 +202,13 @@ public struct CanvasSketchDocument: Equatable, Sendable {
     CanvasSketchDocument.subpixelPoint(forLocalCell: point, in: cellSize)
   }
 
+  public func cellLocation(for point: CanvasSketchPoint) -> Point {
+    Point(
+      x: (Double(point.x) + 0.5) / Double(Self.grid.subdivisionsX),
+      y: (Double(point.y) + 0.5) / Double(Self.grid.subdivisionsY)
+    )
+  }
+
   public static func subpixelPoint(
     forLocalCell point: Point,
     in cellSize: CellSize
@@ -206,12 +216,17 @@ public struct CanvasSketchDocument: Equatable, Sendable {
     guard cellSize.width > 0, cellSize.height > 0 else {
       return CanvasSketchPoint(x: 0, y: 0)
     }
-    let cell = point.containingCell
-    let cellX = min(max(0, cell.x), cellSize.width - 1)
-    let cellY = min(max(0, cell.y), cellSize.height - 1)
     return CanvasSketchPoint(
-      x: min(cellX * 2 + 1, cellSize.width * 2 - 1),
-      y: min(cellY * 4 + 2, cellSize.height * 4 - 1)
+      x: gridCoordinate(
+        point.x,
+        subdivisions: Self.grid.subdivisionsX,
+        maxIndex: cellSize.width * Self.grid.subdivisionsX - 1
+      ),
+      y: gridCoordinate(
+        point.y,
+        subdivisions: Self.grid.subdivisionsY,
+        maxIndex: cellSize.height * Self.grid.subdivisionsY - 1
+      )
     )
   }
 
@@ -242,12 +257,27 @@ public struct CanvasSketchDocument: Equatable, Sendable {
     _ point: CanvasSketchPoint,
     in cellSize: CellSize
   ) -> CanvasSketchPoint {
-    let maxX = max(0, cellSize.width * 2 - 1)
-    let maxY = max(0, cellSize.height * 4 - 1)
+    let maxX = max(0, cellSize.width * Self.grid.subdivisionsX - 1)
+    let maxY = max(0, cellSize.height * Self.grid.subdivisionsY - 1)
     return CanvasSketchPoint(
       x: min(max(0, point.x), maxX),
       y: min(max(0, point.y), maxY)
     )
+  }
+
+  private static func gridCoordinate(
+    _ value: Double,
+    subdivisions: Int,
+    maxIndex: Int
+  ) -> Int {
+    guard maxIndex > 0 else {
+      return 0
+    }
+    let scaled = (value * Double(subdivisions)).rounded(.down)
+    guard scaled.isFinite else {
+      return scaled.sign == .minus || scaled.isNaN ? 0 : maxIndex
+    }
+    return min(max(0, Int(scaled)), maxIndex)
   }
 }
 
@@ -371,17 +401,15 @@ public struct CanvasPixelSketchDocument: Equatable, Sendable {
     guard size.width > 0, size.height > 0 else {
       return CanvasSketchPoint(x: 0, y: 0)
     }
-    let cell = point.containingCell
-    let cellX = min(max(0, cell.x), size.width - 1)
-    let cellY = min(max(0, cell.y), mode.cellHeight(for: size.height) - 1)
-    let y =
+    let ySubdivisions =
       switch mode {
-      case .fullCell:
-        cellY
-      case .verticalHalfBlock:
-        min(cellY * 2, size.height - 1)
+      case .fullCell: 1
+      case .verticalHalfBlock: 2
       }
-    return CanvasSketchPoint(x: cellX, y: y)
+    return CanvasSketchPoint(
+      x: gridCoordinate(point.x, subdivisions: 1, maxIndex: size.width - 1),
+      y: gridCoordinate(point.y, subdivisions: ySubdivisions, maxIndex: size.height - 1)
+    )
   }
 
   private func index(of point: CanvasSketchPoint) -> Int? {
@@ -402,6 +430,21 @@ public struct CanvasPixelSketchDocument: Equatable, Sendable {
       y: min(max(0, point.y), maxY)
     )
   }
+
+  private static func gridCoordinate(
+    _ value: Double,
+    subdivisions: Int,
+    maxIndex: Int
+  ) -> Int {
+    guard maxIndex > 0 else {
+      return 0
+    }
+    let scaled = (value * Double(subdivisions)).rounded(.down)
+    guard scaled.isFinite else {
+      return scaled.sign == .minus || scaled.isNaN ? 0 : maxIndex
+    }
+    return min(max(0, Int(scaled)), maxIndex)
+  }
 }
 
 public struct CanvasSketchDrawing: CanvasDrawing, Equatable {
@@ -413,7 +456,7 @@ public struct CanvasSketchDrawing: CanvasDrawing, Equatable {
 
   public func draw(into context: inout CanvasContext) {
     document.forEachLitPixel { point in
-      context.setPixel(x: point.x, y: point.y)
+      context.setPixel(at: document.cellLocation(for: point))
     }
   }
 }
@@ -434,7 +477,12 @@ public struct CanvasCursorDrawing: CanvasDrawing, Equatable {
       CanvasSketchPoint(x: cursor.x, y: cursor.y + 1),
     ]
     for point in points {
-      context.setPixel(x: point.x, y: point.y)
+      context.setPixel(
+        at: Point(
+          x: (Double(point.x) + 0.5) / Double(CanvasGrid.braille2x4.subdivisionsX),
+          y: (Double(point.y) + 0.5) / Double(CanvasGrid.braille2x4.subdivisionsY)
+        )
+      )
     }
   }
 }
@@ -463,10 +511,10 @@ public struct CanvasDemoSurface: View {
   public var body: some View {
     let snapshot = document
     return ZStack(alignment: .topLeading) {
-      Canvas(CanvasSketchDrawing(document: snapshot))
+      Canvas(grid: .braille2x4, CanvasSketchDrawing(document: snapshot))
         .foregroundStyle(Color.cyan)
         .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
-      Canvas(CanvasCursorDrawing(cursor: snapshot.cursor))
+      Canvas(grid: .braille2x4, CanvasCursorDrawing(cursor: snapshot.cursor))
         .foregroundStyle(Color.yellow)
         .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
     }
@@ -657,7 +705,7 @@ public struct CanvasDemoView: View {
               .onKeyPress(.any) { keyPress in
                 handleSubcellKeyPress(keyPress)
               }
-            Text("Braille subpixels max \(snapshot.maxSubpixelX),\(snapshot.maxSubpixelY)")
+            Text("Braille grid max \(snapshot.maxSubpixelX),\(snapshot.maxSubpixelY)")
               .foregroundStyle(.muted)
           }
         }
@@ -795,7 +843,7 @@ public struct CanvasDemoView: View {
       let maxIndex = "\(subcellDocument.maxSubpixelX),\(subcellDocument.maxSubpixelY)"
       return
         "canvas \(selectedCanvas.title)  tool \(tool.label)  "
-        + "cursor \(cursor.x),\(cursor.y) of max \(maxIndex) Braille subpixels"
+        + "cursor \(cursor.x),\(cursor.y) of max \(maxIndex) Braille grid"
     case .fullCell:
       let cursor = fullCellDocument.cursor
       let maxIndex = "\(fullCellDocument.maxPixelX),\(fullCellDocument.maxPixelY)"

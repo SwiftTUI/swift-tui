@@ -4,12 +4,11 @@ import TerminalUI
 /// frame, with `.clipped()` ensuring only cells inside the frame
 /// reach the raster.
 ///
-/// The drawing stretches a horizontal line to `context.width * 3`
-/// subpixels — three times wider than the 10-cell frame allows. In
-/// **subpixel** coordinates that overflow is silently clipped by the
-/// `BrailleCanvas` itself (the context is sized to the frame), so
-/// `Canvas` already cannot paint outside its frame at the subpixel
-/// level. `.clipped()` is the cell-level guarantee: it ensures any
+/// The drawing stretches a horizontal line to three times the canvas's
+/// cell-space width. That overflow is silently clipped by the canvas grid
+/// itself (the context is sized to the frame), so `Canvas` already cannot
+/// paint outside its own drawing buffer. `.clipped()` is the cell-level
+/// guarantee: it ensures any
 /// cells the canvas does paint (or would paint via overflow modifiers
 /// downstream) cannot escape the 10-cell frame in the raster.
 ///
@@ -41,14 +40,14 @@ public struct CanvasHonorsClipped: View {
 }
 
 /// Drawing that paints a horizontal line at the canvas's vertical
-/// midline extending to `context.width * 3` subpixels — i.e. three
-/// times the canvas's own width. The overflow is what `.clipped()`
-/// (and the canvas subpixel bounds) must drop.
+/// midline extending to three times the canvas's own cell-space width. The
+/// overflow is what `.clipped()` (and the canvas grid bounds) must drop.
 private struct LineDrawing: CanvasDrawing, Equatable {
   func draw(into context: inout CanvasContext) {
+    let y = Double(context.size.height) / 2
     context.line(
-      from: (x: 0, y: context.height / 2),
-      to: (x: context.width * 3, y: context.height / 2)
+      from: Point(x: 0, y: y),
+      to: Point(x: Double(context.size.width * 3), y: y)
     )
   }
 }

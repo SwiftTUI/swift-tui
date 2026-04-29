@@ -6,20 +6,26 @@ import Testing
 
 private struct DiagonalLine: CanvasDrawing, Equatable {
   func draw(into context: inout CanvasContext) {
+    let end = Point(
+      x: max(0, Double(context.size.width) - 0.25),
+      y: max(0, Double(context.size.height) - 0.125)
+    )
     context.line(
-      from: (x: 0, y: 0),
-      to: (x: context.width - 1, y: context.height - 1)
+      from: .zero,
+      to: end
     )
   }
 }
 
 private struct FilledCircle: CanvasDrawing, Equatable {
-  let radius: Int
+  let radius: Double
 
   func draw(into context: inout CanvasContext) {
     context.fillCircle(
-      centerX: context.width / 2,
-      centerY: context.height / 2,
+      center: Point(
+        x: Double(context.size.width) / 2,
+        y: Double(context.size.height) / 2
+      ),
       radius: radius
     )
   }
@@ -31,7 +37,12 @@ private struct NoOpDrawing: CanvasDrawing, Equatable {
 
 private struct CornerPixel: CanvasDrawing, Equatable {
   func draw(into context: inout CanvasContext) {
-    context.setPixel(x: context.width - 1, y: context.height - 1)
+    context.setPixel(
+      at: Point(
+        x: max(0, Double(context.size.width) - 0.25),
+        y: max(0, Double(context.size.height) - 0.125)
+      )
+    )
   }
 }
 
@@ -39,7 +50,7 @@ private struct UniformStyledPixel: CanvasDrawing, Equatable {
   func draw(into context: inout CanvasContext) {
     context.foreground = .red
     context.background = .blue
-    context.setPixel(x: 0, y: 0)
+    context.setPixel(at: .zero)
   }
 }
 
@@ -54,22 +65,47 @@ private struct DirectCellGrid: CanvasDrawing, Equatable {
 
 private struct BrailleCellsWithStyles: CanvasDrawing, Equatable {
   func draw(into context: inout CanvasContext) {
-    context.setPixel(x: 0, y: 0, foreground: .red)
-    context.setPixel(x: 2, y: 0, foreground: .blue)
+    context.setPixel(at: .zero, foreground: .red)
+    context.setPixel(at: Point(x: 1, y: 0), foreground: .blue)
   }
 }
 
 private struct BrailleSameCellStyleConflict: CanvasDrawing, Equatable {
   func draw(into context: inout CanvasContext) {
-    context.setPixel(x: 0, y: 0, foreground: .red)
-    context.setPixel(x: 1, y: 0, foreground: .blue)
+    context.setPixel(at: .zero, foreground: .red)
+    context.setPixel(at: Point(x: 0.5, y: 0), foreground: .blue)
   }
 }
 
 private struct DirectCellsUnderBraille: CanvasDrawing, Equatable {
   func draw(into context: inout CanvasContext) {
     context.fillCell(x: 0, y: 0, color: .blue)
-    context.setPixel(x: 0, y: 0, foreground: .red)
+    context.setPixel(at: .zero, foreground: .red)
+  }
+}
+
+private struct QuadrantCellSpaceMarks: CanvasDrawing, Equatable {
+  func draw(into context: inout CanvasContext) {
+    context.setPixel(at: Point(x: 0.25, y: 0.25))
+    context.setPixel(at: Point(x: 0.75, y: 0.75))
+  }
+}
+
+private struct VerticalHalfCellSpaceMark: CanvasDrawing, Equatable {
+  enum Half: Equatable, Sendable {
+    case top
+    case bottom
+  }
+
+  var half: Half
+
+  func draw(into context: inout CanvasContext) {
+    switch half {
+    case .top:
+      context.setPixel(at: Point(x: 0.5, y: 0.25))
+    case .bottom:
+      context.setPixel(at: Point(x: 0.5, y: 0.75))
+    }
   }
 }
 
@@ -101,7 +137,7 @@ struct CanvasViewTests {
   @Test("Canvas renders a filled circle in its frame")
   func canvasFilledCircle() {
     let artifacts = DefaultRenderer().render(
-      Canvas(FilledCircle(radius: 8)).frame(width: 10, height: 5),
+      Canvas(FilledCircle(radius: 2)).frame(width: 10, height: 5),
       context: .init(identity: testIdentity("CanvasCircle"))
     )
     // The center cell should be fully lit (⣿ = U+28FF).
@@ -202,6 +238,33 @@ struct CanvasViewTests {
     #expect(cell.style?.backgroundColor == Color.blue)
   }
 
+  @Test("Canvas grid maps fractional cell coordinates into quadrant blocks")
+  func canvasQuadrantGridCellSpaceDrawing() {
+    let artifacts = DefaultRenderer().render(
+      Canvas(grid: .quadrant2x2, QuadrantCellSpaceMarks()).frame(width: 1, height: 1),
+      context: .init(identity: testIdentity("CanvasQuadrantGrid"))
+    )
+
+    #expect(artifacts.rasterSurface.cells[0][0].character == "▚")
+  }
+
+  @Test("Canvas grid maps fractional cell coordinates into vertical half blocks")
+  func canvasVerticalHalfBlockCellSpaceDrawing() {
+    let top = DefaultRenderer().render(
+      Canvas(grid: .verticalHalfBlock, VerticalHalfCellSpaceMark(half: .top))
+        .frame(width: 1, height: 1),
+      context: .init(identity: testIdentity("CanvasVerticalHalfTop"))
+    )
+    let bottom = DefaultRenderer().render(
+      Canvas(grid: .verticalHalfBlock, VerticalHalfCellSpaceMark(half: .bottom))
+        .frame(width: 1, height: 1),
+      context: .init(identity: testIdentity("CanvasVerticalHalfBottom"))
+    )
+
+    #expect(top.rasterSurface.cells[0][0].character == "▀")
+    #expect(bottom.rasterSurface.cells[0][0].character == "▄")
+  }
+
   @Test("Full-cell pixel grids render one logical pixel per terminal cell")
   func canvasFullCellPixelGrid() {
     let pixels: [Color?] = [
@@ -273,10 +336,12 @@ struct CanvasViewTests {
     let a = CanvasPayload(drawing: DiagonalLine())
     let b = CanvasPayload(drawing: DiagonalLine())
     let c = CanvasPayload(drawing: NoOpDrawing())
-    let d = CanvasPayload(drawing: FilledCircle(radius: 5))
-    let e = CanvasPayload(drawing: FilledCircle(radius: 8))
+    let d = CanvasPayload(drawing: FilledCircle(radius: 1.25))
+    let e = CanvasPayload(drawing: FilledCircle(radius: 2))
+    let f = CanvasPayload(drawing: DiagonalLine(), grid: .quadrant2x2)
     #expect(a == b)
     #expect(a != c)
     #expect(d != e)
+    #expect(a != f)
   }
 }

@@ -48,7 +48,7 @@ public struct BrailleCell: Equatable, Sendable {
     Character(UnicodeScalar(0x2800 + Int(mask))!)
   }
 
-  private static func bit(x: Int, y: Int) -> UInt8? {
+  package static func bitMask(x: Int, y: Int) -> UInt8? {
     switch (x, y) {
     case (0, 0): return 0x01
     case (0, 1): return 0x02
@@ -60,6 +60,10 @@ public struct BrailleCell: Equatable, Sendable {
     case (1, 3): return 0x80
     default: return nil
     }
+  }
+
+  private static func bit(x: Int, y: Int) -> UInt8? {
+    bitMask(x: x, y: y)
   }
 }
 

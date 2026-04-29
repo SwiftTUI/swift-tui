@@ -69,33 +69,38 @@ struct CanvasDemoViewTests {
     #expect(document.litPixelCount == 0)
   }
 
-  @Test("pointer cells map into the center of Braille subcells")
-  func pointerCellsMapToSubpixels() {
-    let point = CanvasSketchDocument.subpixelPoint(
-      forLocalCell: Point(x: 2, y: 1),
+  @Test("fractional pointer locations map into Braille grid samples")
+  func pointerLocationsMapToSubpixels() {
+    let upperLeft = CanvasSketchDocument.subpixelPoint(
+      forLocalCell: Point(x: 2.1, y: 1.1),
+      in: CellSize(width: 4, height: 3)
+    )
+    let lowerRight = CanvasSketchDocument.subpixelPoint(
+      forLocalCell: Point(x: 2.9, y: 1.9),
       in: CellSize(width: 4, height: 3)
     )
 
-    #expect(point == CanvasSketchPoint(x: 5, y: 6))
+    #expect(upperLeft == CanvasSketchPoint(x: 4, y: 4))
+    #expect(lowerRight == CanvasSketchPoint(x: 5, y: 7))
   }
 
-  @Test("pointer cells map into full-cell and half-block pixels")
-  func pointerCellsMapToPixelGridPoints() {
+  @Test("fractional pointer locations map into full-cell and half-block pixels")
+  func pointerLocationsMapToPixelGridPoints() {
     let size = CellSize(width: 5, height: 6)
 
     #expect(
       CanvasPixelSketchDocument.pixelPoint(
-        forLocalCell: Point(x: 2, y: 1),
+        forLocalCell: Point(x: 2.75, y: 1.25),
         mode: .fullCell,
         in: size
       ) == CanvasSketchPoint(x: 2, y: 1)
     )
     #expect(
       CanvasPixelSketchDocument.pixelPoint(
-        forLocalCell: Point(x: 2, y: 1),
+        forLocalCell: Point(x: 2.75, y: 1.75),
         mode: .verticalHalfBlock,
         in: size
-      ) == CanvasSketchPoint(x: 2, y: 2)
+      ) == CanvasSketchPoint(x: 2, y: 3)
     )
   }
 
@@ -285,8 +290,8 @@ struct CanvasDemoViewTests {
       width: 80,
       height: 20
     ).rasterSurface.lines.joined(separator: "\n")
-    #expect(subcellLines.contains("Braille subpixels max 7,7"))
-    #expect(subcellLines.contains("cursor 1,2 of max 7,7 Braille subpixels"))
+    #expect(subcellLines.contains("Braille grid max 7,7"))
+    #expect(subcellLines.contains("cursor 1,2 of max 7,7 Braille grid"))
 
     let fullCellLines = render(
       CanvasDemoView(
