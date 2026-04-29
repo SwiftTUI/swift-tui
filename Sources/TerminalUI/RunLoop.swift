@@ -509,7 +509,6 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     else {
       return
     }
-
     configurableReader.updateInputCapabilities(provider.resolvedInputCapabilities)
   }
 

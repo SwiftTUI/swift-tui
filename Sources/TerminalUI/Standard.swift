@@ -137,6 +137,12 @@ public enum Standard {
         _ = writeAll(to: 2, string: string)
       }
     }
+
+    public func dump<T>(file: String = #file, line: UInt = #line, _ value: T) {
+      var text = "\(file):\(line)\n"
+      Swift.dump(value, to: &text)
+      write(text)
+    }
   }
 
   /// A `TextOutputStream` to standard output.
@@ -153,46 +159,56 @@ public enum Standard {
         _ = writeAll(to: 1, string: string)
       }
     }
-  }
-}
-
-public final class File: TextOutputStream, Sendable {
-  private let descriptor: CInt
-  private let lock = Mutex(())
-
-  /// Opens `path` for appending.
-  ///
-  /// `create: false` more closely matches `FileHandle(forUpdating:)`,
-  /// because the file must already exist.
-  ///
-  /// Use `create: true` if you want the file to be created when missing.
-  public init(
-    path: String,
-    create: Bool = false,
-    permissions: UInt16 = 0o666
-  ) throws {
-    let fd = unsafe path.withCString { pathPointer in
-      unsafe systemOpen(
-        pathPointer,
-        appendOpenFlags(create: create),
-        permissions
-      )
-    }
-
-    guard fd >= 0 else {
-      throw FileOpenError.failed(path: path, errno: currentErrno())
-    }
-
-    self.descriptor = fd
-  }
-
-  public func write(_ string: String) {
-    lock.withLock { _ -> Void in
-      _ = writeAll(to: descriptor, string: string)
+    public func dump<T>(file: String = #file, line: UInt = #line, _ value: T) {
+      var text = "\(file):\(line)\n"
+      Swift.dump(value, to: &text)
+      write(text)
     }
   }
 
-  deinit {
-    _ = systemClose(descriptor)
+  public final class File: TextOutputStream, Sendable {
+    private let descriptor: CInt
+    private let lock = Mutex(())
+
+    /// Opens `path` for appending.
+    ///
+    /// `create: false` more closely matches `FileHandle(forUpdating:)`,
+    /// because the file must already exist.
+    ///
+    /// Use `create: true` if you want the file to be created when missing.
+    public init(
+      path: String,
+      create: Bool = false,
+      permissions: UInt16 = 0o666
+    ) throws {
+      let fd = unsafe path.withCString { pathPointer in
+        unsafe systemOpen(
+          pathPointer,
+          appendOpenFlags(create: create),
+          permissions
+        )
+      }
+
+      guard fd >= 0 else {
+        throw FileOpenError.failed(path: path, errno: currentErrno())
+      }
+
+      self.descriptor = fd
+    }
+
+    public func write(_ string: String) {
+      lock.withLock { _ -> Void in
+        _ = writeAll(to: descriptor, string: string)
+      }
+    }
+    public func dump<T>(file: String = #file, line: UInt = #line, _ value: T) {
+      var text = "\(file):\(line)\n"
+      Swift.dump(value, to: &text)
+      write(text)
+    }
+
+    deinit {
+      _ = systemClose(descriptor)
+    }
   }
 }

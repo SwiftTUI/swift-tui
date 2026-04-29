@@ -347,7 +347,7 @@ Introduce:
 ```swift
 public enum PointerPrecisionPolicy: Equatable, Sendable {
   case cellOnly
-  case subCellWhenKnown
+  case useHostSubCellWhenAvailable
   case forceTerminalPixels
 }
 ```
@@ -438,7 +438,7 @@ Use a conservative sequence:
 5. Enable 1016 only if both 1016 support and metrics are trusted.
 
 If DECRQM support is not implemented in the first pass, allow
-`forceTerminalPixels` for manual experiments and keep `subCellWhenKnown`
+`forceTerminalPixels` for manual experiments and keep `useHostSubCellWhenAvailable`
 cell-only for unknown terminals.
 
 DEC 2048 in-band reports are useful but should not block the first terminal

@@ -2,7 +2,7 @@ import Core
 import Synchronization
 
 #if canImport(Dispatch)
-  @unsafe @preconcurrency import Dispatch
+  import Dispatch
 #endif
 
 #if canImport(Darwin)
@@ -257,7 +257,7 @@ package enum MouseCoordinateMode: Equatable, Sendable {
     metrics: CellPixelMetrics?
   ) -> Self {
     switch policy {
-    case .cellOnly, .subCellWhenKnown:
+    case .cellOnly, .useHostSubCellWhenAvailable:
       return .cells
     case .forceTerminalPixels:
       guard let metrics else {

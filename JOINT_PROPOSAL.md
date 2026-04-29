@@ -419,7 +419,7 @@ Recommended policy:
 ```swift
 public enum PointerPrecisionPolicy: Equatable, Sendable {
   case cellOnly
-  case subCellWhenKnown
+  case useHostSubCellWhenAvailable
   case forceTerminalPixels
 }
 ```

@@ -85,6 +85,7 @@ public struct TerminalCapabilityProfile: Equatable, Sendable {
     environment: [String: String],
     isTTY: Bool
   ) -> Self {
+
     let term = environment["TERM"]?.lowercased() ?? ""
     let colorTerm = environment["COLORTERM"]?.lowercased() ?? ""
     let localeValues = [

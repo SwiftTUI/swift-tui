@@ -1077,7 +1077,7 @@ Add:
 ```swift
 public enum PointerPrecisionPolicy: Equatable, Sendable {
   case cellOnly
-  case subCellWhenKnown
+  case useHostSubCellWhenAvailable
   case forceTerminalPixels
 }
 ```
@@ -1165,7 +1165,7 @@ Preferred metric sources are in-band, ordered reports such as DEC 2048 or
 CSI-style cell-size queries. Do not enable 1016 from estimated metrics.
 
 If DECRQM support is not implemented in the first pass, allow
-`.forceTerminalPixels` for manual experiments and keep `.subCellWhenKnown`
+`.forceTerminalPixels` for manual experiments and keep `.useHostSubCellWhenAvailable`
 cell-only for unknown terminals.
 
 ### Tests

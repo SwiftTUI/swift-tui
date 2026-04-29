@@ -753,7 +753,7 @@ extension TerminalHosting {
       capabilityProfile: TerminalCapabilityProfile? = nil,
       environment: [String: String]? = nil,
       usesTerminalEditOperations: Bool? = nil,
-      pointerPrecisionPolicy: PointerPrecisionPolicy = .subCellWhenKnown
+      pointerPrecisionPolicy: PointerPrecisionPolicy = .useHostSubCellWhenAvailable
     ) {
       self.init(
         inputFileDescriptor: inputFileDescriptor,
@@ -775,7 +775,7 @@ extension TerminalHosting {
       capabilityProfile: TerminalCapabilityProfile? = nil,
       environment: [String: String]? = nil,
       usesTerminalEditOperations: Bool? = nil,
-      pointerPrecisionPolicy: PointerPrecisionPolicy = .subCellWhenKnown
+      pointerPrecisionPolicy: PointerPrecisionPolicy = .useHostSubCellWhenAvailable
     ) {
       let environment = environment ?? currentProcessEnvironment()
       self.inputFileDescriptor = inputFileDescriptor
