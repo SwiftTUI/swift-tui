@@ -127,13 +127,9 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     var setup = "\u{001B}[?1049h"
     setup += "\u{001B}[?25l"
     if capabilityProfile.supportsMouseReporting {
-      setup += "\u{001B}[?1002h\u{001B}[?1006h"
-      if usesTerminalPixelMouseReporting {
-        setup += "\u{001B}[?1016h"
-      }
-      if state.withLock(\.pointerHoverEnabled) {
-        setup += "\u{001B}[?1003h"
-      }
+      setup += enableMouseReportingSequence(
+        hoverEnabled: state.withLock(\.pointerHoverEnabled)
+      )
     }
     setup += "\u{001B}[?2004h"  // enable bracketed paste
     try write(setup)
@@ -174,8 +170,25 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
       return true
     }
     if shouldWrite {
-      try write(enabled ? "\u{001B}[?1003h" : "\u{001B}[?1003l")
+      let sequence =
+        if enabled {
+          enableMouseReportingSequence(hoverEnabled: true)
+        } else {
+          "\u{001B}[?1003l" + enableMouseReportingSequence(hoverEnabled: false)
+        }
+      try write(sequence)
     }
+  }
+
+  private func enableMouseReportingSequence(hoverEnabled: Bool) -> String {
+    var sequence = "\u{001B}[?1002h\u{001B}[?1006h"
+    if usesTerminalPixelMouseReporting {
+      sequence += "\u{001B}[?1016h"
+    }
+    if hoverEnabled {
+      sequence += "\u{001B}[?1003h"
+    }
+    return sequence
   }
 
   private var usesTerminalPixelMouseReporting: Bool {

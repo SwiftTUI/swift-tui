@@ -121,6 +121,27 @@ struct TerminalGraphicsProtocolTests {
     #expect(output.contains("\u{001B}[?1003l\u{001B}[?1002l\u{001B}[?1006l"))
   }
 
+  @Test("terminal host restores button-event reporting after hover turns off")
+  func terminalHostRestoresButtonEventReportingAfterHoverTurnsOff() throws {
+    let controller = GraphicsProtocolMockTerminalController(isTTY: true)
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor
+    )
+
+    try host.enableRawMode()
+    try host.setPointerHoverEnabled(true)
+    try host.setPointerHoverEnabled(false)
+    try host.disableRawMode()
+
+    let output = controller.writes.joined()
+    #expect(output.contains("\u{001B}[?1002h\u{001B}[?1006h\u{001B}[?1003h"))
+    #expect(output.contains("\u{001B}[?1003l\u{001B}[?1002h\u{001B}[?1006h"))
+  }
+
   @Test("terminal host force-pixel policy overrides tmux safety default")
   func terminalHostForcePixelPolicyOverridesTMUXSafetyDefault() throws {
     let controller = GraphicsProtocolMockTerminalController(

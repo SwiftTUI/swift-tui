@@ -80,8 +80,8 @@ struct StreamingTerminalHostTests {
     try host.setPointerHoverEnabled(false)
 
     let output = writes.withLock { $0.joined() }
-    #expect(output.contains("\u{001B}[?1003h"))
-    #expect(output.contains("\u{001B}[?1003l"))
+    #expect(output.contains("\u{001B}[?1002h\u{001B}[?1006h\u{001B}[?1003h"))
+    #expect(output.contains("\u{001B}[?1003l\u{001B}[?1002h\u{001B}[?1006h"))
   }
 
   @Test("streaming terminal host stores host-owned theme updates")

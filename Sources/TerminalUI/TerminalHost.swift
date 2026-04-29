@@ -945,7 +945,13 @@ extension TerminalHosting {
       }
 
       if rawModeEnabled {
-        try write(enabled ? "\u{001B}[?1003h" : "\u{001B}[?1003l")
+        let sequence =
+          if enabled {
+            enableMouseReportingSequence(hoverEnabled: true)
+          } else {
+            "\u{001B}[?1003l" + enableMouseReportingSequence(hoverEnabled: false)
+          }
+        try write(sequence)
       }
       activePointerHoverEnabled = enabled
       refreshProcessExitCleanupRegistration()
@@ -1476,11 +1482,15 @@ extension TerminalHosting {
     }
 
     private func enableMouseReportingSequence() -> String {
+      enableMouseReportingSequence(hoverEnabled: activePointerHoverEnabled)
+    }
+
+    private func enableMouseReportingSequence(hoverEnabled: Bool) -> String {
       var sequence = "\u{001B}[?1002h\u{001B}[?1006h"
       if activeMouseCoordinateMode.usesTerminalPixels {
         sequence += "\u{001B}[?1016h"
       }
-      if activePointerHoverEnabled {
+      if hoverEnabled {
         sequence += "\u{001B}[?1003h"
       }
       return sequence
