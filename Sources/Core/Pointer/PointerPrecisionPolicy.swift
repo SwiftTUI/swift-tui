@@ -11,7 +11,7 @@ public enum PointerPrecisionPolicy: Equatable, Sendable {
 /// Runtime pointer input capabilities exposed to authored views.
 public struct PointerInputCapabilities: Equatable, Sendable {
   public var precision: PointerPrecision
-  public var supportsSubCellLocation: Bool
+  public var supportsSubCellLocation: Bool { precision.isSubCell }
   public var supportsHover: Bool
   public var supportsPreciseScroll: Bool
 
@@ -21,7 +21,6 @@ public struct PointerInputCapabilities: Equatable, Sendable {
     supportsPreciseScroll: Bool = false
   ) {
     self.precision = precision
-    self.supportsSubCellLocation = precision.isSubCell
     self.supportsHover = supportsHover
     self.supportsPreciseScroll = supportsPreciseScroll
   }

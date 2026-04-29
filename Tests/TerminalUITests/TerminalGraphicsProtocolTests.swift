@@ -61,7 +61,8 @@ struct TerminalGraphicsProtocolTests {
     )
 
     try host.enableRawMode()
-    #expect(host.pointerInputCapabilities == .cellOnly)
+    #expect(host.pointerInputCapabilities.precision == .cell)
+    #expect(host.pointerInputCapabilities.supportsHover)
     try host.disableRawMode()
 
     #expect(!controller.writes.joined().contains("1016"))
@@ -83,7 +84,8 @@ struct TerminalGraphicsProtocolTests {
     )
 
     try host.enableRawMode()
-    #expect(host.pointerInputCapabilities == .cellOnly)
+    #expect(host.pointerInputCapabilities.precision == .cell)
+    #expect(host.pointerInputCapabilities.supportsHover)
     try host.disableRawMode()
 
     #expect(!controller.writes.joined().contains("1016"))

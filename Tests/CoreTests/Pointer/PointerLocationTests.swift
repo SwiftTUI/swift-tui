@@ -56,4 +56,14 @@ struct PointerLocationTests {
     #expect(capabilities.supportsHover)
     #expect(capabilities.supportsPreciseScroll)
   }
+
+  @Test("sub-cell support follows precision mutations")
+  func subCellSupportFollowsPrecisionMutations() {
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    var capabilities = PointerInputCapabilities.cellOnly
+
+    capabilities.precision = .subCell(source: .terminalPixels, metrics: metrics)
+
+    #expect(capabilities.supportsSubCellLocation)
+  }
 }

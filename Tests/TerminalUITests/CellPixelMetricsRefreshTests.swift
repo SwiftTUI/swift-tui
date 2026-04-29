@@ -81,7 +81,12 @@ struct CellPixelMetricsRefreshTests {
 
     #expect(host.graphicsCapabilities.cellPixelSize == PixelSize(width: 8, height: 16))
 
-    host.updateCellPixelSize(PixelSize(width: 12, height: 24))
+    host.updateSurfaceCapabilities(
+      TerminalSurfaceCapabilities(
+        cellPixelSize: PixelSize(width: 12, height: 24),
+        pointerInputCapabilities: host.pointerInputCapabilities
+      )
+    )
 
     #expect(host.graphicsCapabilities.cellPixelSize == PixelSize(width: 12, height: 24))
   }
@@ -96,7 +101,12 @@ struct CellPixelMetricsRefreshTests {
       outputHandler: { _ in }
     )
 
-    host.updateCellPixelSize(nil as PixelSize?)
+    host.updateSurfaceCapabilities(
+      TerminalSurfaceCapabilities(
+        cellPixelSize: nil,
+        pointerInputCapabilities: host.pointerInputCapabilities
+      )
+    )
 
     #expect(host.graphicsCapabilities.cellPixelSize == nil)
   }

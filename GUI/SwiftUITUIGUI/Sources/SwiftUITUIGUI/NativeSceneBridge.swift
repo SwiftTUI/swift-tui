@@ -105,7 +105,8 @@ final class NativeSceneBridge {
           height: cellPixelSize.height,
           source: .reported
         )
-      )
+      ),
+      supportsHover: true
     )
   }
 

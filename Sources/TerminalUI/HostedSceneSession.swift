@@ -24,8 +24,7 @@ private protocol HostedSceneTerminalHosting: TerminalHosting, DamageAwareTermina
   func updateAppearance(_ appearance: TerminalAppearance)
   func updateTheme(_ theme: Theme?)
   func updateStyle(_ style: TerminalRenderStyle)
-  func updateCellPixelSize(_ cellPixelSize: PixelSize?)
-  func updatePointerInputCapabilities(_ pointerInputCapabilities: PointerInputCapabilities)
+  func updateSurfaceCapabilities(_ capabilities: TerminalSurfaceCapabilities)
 }
 
 extension StreamingTerminalHost: HostedSceneTerminalHosting {}
@@ -280,8 +279,12 @@ public final class HostedSceneSession {
     pointerInputCapabilities: PointerInputCapabilities
   ) {
     host.updateSurfaceSize(size)
-    host.updateCellPixelSize(cellPixelSize)
-    host.updatePointerInputCapabilities(pointerInputCapabilities)
+    host.updateSurfaceCapabilities(
+      TerminalSurfaceCapabilities(
+        cellPixelSize: cellPixelSize,
+        pointerInputCapabilities: pointerInputCapabilities
+      )
+    )
     signalReader.send("SIGWINCH")
   }
 
@@ -417,20 +420,12 @@ private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
     }
   }
 
-  func updateCellPixelSize(
-    _ cellPixelSize: PixelSize?
+  func updateSurfaceCapabilities(
+    _ capabilities: TerminalSurfaceCapabilities
   ) {
     state.withLock { state in
-      state.graphicsCapabilities.cellPixelSize = cellPixelSize
-      state.lastSubmittedSurface = nil
-    }
-  }
-
-  func updatePointerInputCapabilities(
-    _ pointerInputCapabilities: PointerInputCapabilities
-  ) {
-    state.withLock { state in
-      state.pointerInputCapabilities = pointerInputCapabilities
+      state.graphicsCapabilities.cellPixelSize = capabilities.cellPixelSize
+      state.pointerInputCapabilities = capabilities.pointerInputCapabilities
       state.lastSubmittedSurface = nil
     }
   }

@@ -207,7 +207,8 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
           height: cellPixelSize.height,
           source: .reported
         )
-      )
+      ),
+      supportsHover: true
     )
   }
 

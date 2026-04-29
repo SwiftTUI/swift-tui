@@ -38,6 +38,19 @@ public struct TerminalGraphicsCapabilities: Equatable, Sendable {
   }
 }
 
+package struct TerminalSurfaceCapabilities: Equatable, Sendable {
+  package var cellPixelSize: PixelSize?
+  package var pointerInputCapabilities: PointerInputCapabilities
+
+  package init(
+    cellPixelSize: PixelSize? = nil,
+    pointerInputCapabilities: PointerInputCapabilities = .cellOnly
+  ) {
+    self.cellPixelSize = cellPixelSize
+    self.pointerInputCapabilities = pointerInputCapabilities
+  }
+}
+
 enum TerminalGraphicsQuery {
   case kittySupport(id: UInt32)
   case primaryDeviceAttributes

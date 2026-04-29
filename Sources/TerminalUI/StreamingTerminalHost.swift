@@ -1,6 +1,8 @@
 import Synchronization
 
-package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalHosting, Sendable {
+package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalHosting,
+  TerminalInputCapabilityProviding, Sendable
+{
   private struct State: Sendable {
     var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
@@ -22,6 +24,31 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
 
   package var pointerInputCapabilities: PointerInputCapabilities {
     state.withLock(\.pointerInputCapabilities)
+  }
+
+  package var resolvedInputCapabilities: ResolvedTerminalInputCapabilities {
+    state.withLock { state in
+      ResolvedTerminalInputCapabilities(
+        mouseCoordinateMode: Self.mouseCoordinateMode(
+          for: state.pointerInputCapabilities
+        ),
+        pointerInputCapabilities: state.pointerInputCapabilities
+      )
+    }
+  }
+
+  private static func mouseCoordinateMode(
+    for pointerInputCapabilities: PointerInputCapabilities
+  ) -> MouseCoordinateMode {
+    switch pointerInputCapabilities.precision {
+    case .cell:
+      return .cells
+    case .subCell(let source, let metrics):
+      guard source == .terminalPixels else {
+        return .cells
+      }
+      return .pixels(metrics: metrics, source: source)
+    }
   }
 
   package init(
@@ -107,18 +134,12 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     }
   }
 
-  package func updateCellPixelSize(_ cellPixelSize: PixelSize?) {
-    state.withLock { state in
-      state.graphicsCapabilities.cellPixelSize = cellPixelSize
-      state.lastSubmittedSurface = nil
-    }
-  }
-
-  package func updatePointerInputCapabilities(
-    _ pointerInputCapabilities: PointerInputCapabilities
+  package func updateSurfaceCapabilities(
+    _ capabilities: TerminalSurfaceCapabilities
   ) {
     state.withLock { state in
-      state.pointerInputCapabilities = pointerInputCapabilities
+      state.graphicsCapabilities.cellPixelSize = capabilities.cellPixelSize
+      state.pointerInputCapabilities = capabilities.pointerInputCapabilities
       state.lastSubmittedSurface = nil
     }
   }

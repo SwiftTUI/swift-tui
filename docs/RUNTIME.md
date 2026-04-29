@@ -71,6 +71,11 @@ policy requests terminal-pixel coordinates and the runtime has trustworthy cell
 pixel metrics. Known terminal multiplexers fall back to cell coordinates unless
 terminal pixels are explicitly forced.
 
+The raw-mode host resolves a single terminal input capability value before the
+event pump starts. The run loop copies that resolved mouse-coordinate mode into
+configurable input readers so the escape sequences enabled by the host and the
+coordinate parser used by the reader stay in lockstep.
+
 ### Pointer Modes And Hover Volume
 
 Raw-mode setup enables terminal mouse reporting only for the precision mode the
