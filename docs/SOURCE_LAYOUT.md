@@ -59,7 +59,7 @@ library product. Downstream package consumers reach those types through
 - `SceneSession.swift`: shared scene-session bootstrap used by hosted sessions and compatibility launch paths
 - `RunLoop.swift`: runtime coordinator and shared runtime state
 - `RunLoop+EventDispatch.swift`: keyboard, signal, focus, action, and scroll dispatch
-- `RunLoop+PointerHandling.swift`: pointer routing, activation, capture, and scroll-wheel handling
+- `RunLoop+PointerHandling.swift`: pointer routing, activation, hover, capture, and scroll-wheel handling
 - `RunLoop+EventPump.swift`: event buffering and coalescing
 - `RunLoop+Rendering.swift`: render scheduling, resolve-context assembly, and focus application
 - `LifecycleCoordinator.swift`: post-present lifecycle staging
@@ -76,7 +76,7 @@ library product. Downstream package consumers reach those types through
 - `TerminalImageRendering.swift`: image protocol emitters and cell fallback rendering
 - `ImageAssetRepository.swift`: shared decode + metadata cache for PNG,
   baseline JPEG, and GIF (format dispatched on the leading magic bytes)
-- `InputReader.swift`: keyboard and mouse input decoding
+- `InputReader.swift`: keyboard, mouse, pointer, paste, and drop input decoding
 - `InjectedTerminalInputReader.swift`: wrapper-managed input stream source that shares control-message parsing
 - `SignalReader.swift`: native and in-process signal readers
 - `TerminalControlMessages.swift`: shared resize/control-message parsing
@@ -108,10 +108,13 @@ library product. Downstream package consumers reach those types through
 ## `Core`
 
 - `Geometry/Point.swift`, `Geometry/CellGeometry.swift`,
-  `Geometry/PixelGeometry.swift`, `GeometryTypes.swift`,
+  `Geometry/PixelGeometry.swift`, `Geometry/Path.swift`, `GeometryTypes.swift`,
   `EnvironmentAndNodeTypes.swift`, and `LayoutTypes.swift`: continuous
   authored geometry, integer terminal-cell geometry, pixel geometry, proposals,
-  placement, layout metadata, and node infrastructure
+  path hit-testing geometry, placement, layout metadata, and node infrastructure
+- `Pointer/PointerLocation.swift`, `Pointer/PointerPrecisionPolicy.swift`, and
+  `Pointer/HoverPhase.swift`: normalized pointer locations, public runtime
+  capability metadata, precision policy, and hover phases
 - `RenderTreeAndSemanticsTypes.swift`: resolved-tree, semantic snapshot, and draw-tree data types, including `TextFigure` draw payload support
 - `CommitAndFrameTypes.swift`: commit plans, refined presentation-damage diagnostics, retained
   resolve frames, and frame artifacts
@@ -131,6 +134,8 @@ library product. Downstream package consumers reach those types through
 - `Appearance.swift`, `Styling.swift`, `TerminalChromeStyle.swift`, and `ViewStyleTypes.swift`: styling and appearance support
 - `TextLayout.swift`, `RichText.swift`, `ImageTypes.swift`, `RasterTypes.swift`, `ScrollIndicatorSupport.swift`, `TableSupport.swift`, and `TableDrawSupport.swift`: supporting model types
 - `LocalActionRegistry.swift`, `LocalFocusBindingRegistry.swift`, `LocalFocusedValuesRegistry.swift`, `LocalKeyHandlerRegistry.swift`, `LocalLifecycleRegistry.swift`, `LocalPointerHandlerRegistry.swift`, `LocalPreferenceObservationRegistry.swift`, and `LocalTaskRegistry.swift`: package-only runtime registries
+- `DropDestinationRegistry.swift`: action-scope drop routing plus optional
+  spatial drop context
 - `ActionScope.swift` and `CommandRegistry.swift`: ActionScope scaffolding and the scope-identity-keyed command registry wired into the runtime (see [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md))
 - `MonotonicInstant.swift`, `PlatformLock.swift`, `PlatformMath.swift`, and `StringUtilities.swift`: low-level support helpers
 - `Core.docc/`: target-level pipeline guides
@@ -143,7 +148,11 @@ library product. Downstream package consumers reach those types through
 - `Environment/Environment.swift`, `Environment/ImageEnvironment.swift`, `Environment/Observation.swift`, and `Environment/StyleEnvironment.swift`: environment storage, repo-owned `@Bindable`, image resource roots, and style environment plumbing
 - `Focus/DefaultFocus.swift`: default-focus modifiers and focus defaults
 - `Layout/Layout.swift`, `Stacks/*.swift`, `ScrollView/*.swift`, `GeometryReading/*.swift`, `Collections/*.swift`, and `NavigationViews/*.swift`: layout, stack, scroll, geometry, collection, and navigation surfaces
-- `ActionScopes/Panel.swift`, `ActionScopes/KeyCommandModifier.swift`, `ActionScopes/PaletteCommandModifier.swift`, `ActionScopes/Toolbar.swift`, and `ActionScopes/ToolbarItem.swift`: the `Panel` primitive with `.panel(id:)` / `.panel()` / `FocusContainment`; the `.keyCommand(...)` modifier for shallowest-wins keybindings; the `.paletteCommand(...)` modifier plus `ActivePaletteCommand` + `EnvironmentValues.activePaletteCommands` for consumer-queryable palette surfaces; and the `.toolbar(style:)` absorber, `.toolbarItem(...)` hoisting contribution, `ToolbarStyle` protocol, and `DefaultTopToolbarStyle` / `DefaultBottomToolbarStyle` defaults. See [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
+- `Canvas.swift`: public Canvas view construction over `CanvasDrawing` and dense
+  pixel-grid drawings
+- `Gestures/*.swift`: gestures, pointer paths, coordinate-space resolution,
+  content shapes, and hover modifiers
+- `ActionScopes/Panel.swift`, `ActionScopes/DropDestinationModifier.swift`, `ActionScopes/KeyCommandModifier.swift`, `ActionScopes/PaletteCommandModifier.swift`, `ActionScopes/Toolbar.swift`, and `ActionScopes/ToolbarItem.swift`: the `Panel` primitive with `.panel(id:)` / `.panel()` / `FocusContainment`; `.dropDestination(...)` scoped path drops with optional spatial context; the `.keyCommand(...)` modifier for shallowest-wins keybindings; the `.paletteCommand(...)` modifier plus `ActivePaletteCommand` + `EnvironmentValues.activePaletteCommands` for consumer-queryable palette surfaces; and the `.toolbar(style:)` absorber, `.toolbarItem(...)` hoisting contribution, `ToolbarStyle` protocol, and `DefaultTopToolbarStyle` / `DefaultBottomToolbarStyle` defaults. See [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
 - `Primitives/*.swift` and `Shapes/*.swift`: text/image primitives including `TextFigure`, labeled containers, tile backgrounds, and basic shapes
 - `Controls/*.swift`: control surfaces, rendering helpers, and shared control support
 - `Presentation/PresentationCoordinator.swift` and `Presentation/PresentationModifiers.swift`: shared presentation host, single-pass overlay composition, family coordinators, package-only declaration reconciliation, and built-in alert/confirmation-dialog/sheet/toast surfaces

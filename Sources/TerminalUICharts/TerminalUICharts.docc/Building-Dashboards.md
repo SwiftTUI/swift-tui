@@ -26,3 +26,11 @@ Terminal dashboards are narrow compared to pixel-based UIs. Prefer:
 - explicit widths when comparison matters
 - summary text outside the chart when the chart body is already dense
 - stacked layouts that degrade cleanly under reduced width
+
+## Pointer Coordinates
+
+Chart helper math follows the package-wide coordinate split. Plot bounds are
+integer `CellRect` values from layout, and pointer or hover locations are
+continuous cell-space `Point` values. Convert from the continuous point into a
+domain value at the chart boundary; keep chart layout itself cell-denominated
+so the same view works with cell-only pointer fallback.

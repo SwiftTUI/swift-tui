@@ -83,6 +83,29 @@ extensible style protocols rather than closed public enums.
   previously removed enum-backed style families should not be reintroduced as
   compatibility shims.
 
+## Geometry, Pointer, And Canvas Policy
+
+Public naming should keep coordinate roles visible.
+
+- Use `Cell*` names for integer terminal-cell geometry that participates in
+  layout, semantic bounds, raster surfaces, and terminal output.
+- Use `Point`, `Size`, `Rect`, and `Vector` for continuous cell-space geometry
+  delivered to gestures, hover, Canvas drawing, interpolation, and hit-test
+  paths.
+- Use `Pixel*` only for host/device-pixel provenance or graphics interop.
+  Public app code should not need device pixels to place normal views.
+
+Pointer capability APIs should describe runtime input quality without changing
+the layout contract. Prefer `PointerLocation`, `PointerInputCapabilities`, and
+`CellPixelMetrics` over adding terminal-protocol-specific public modifiers.
+Cell-only fallback behavior must remain supported for every pointer-facing
+authoring API.
+
+Canvas is the public arbitrary-drawing escape hatch. Prefer value drawings that
+conform to `CanvasDrawing` and draw in continuous cell space through
+`CanvasContext`. Keep dense terminal-cell pixel helpers as value APIs rather
+than style enums or public erasure seams.
+
 ## Transitional Runtime Policy
 
 Runtime bridges and staging adapters are acceptable while the package is still reconciling old host shapes with the current commit model.

@@ -54,6 +54,27 @@ resolve -> measure -> place -> semantics -> draw -> raster -> commit
 
 That ordering is visible in `DefaultRenderer`, `FrameArtifacts`, `Pipeline`, and the regression suites.
 
+## Coordinate Domains
+
+TerminalUI keeps layout and raster placement integer-cell based while pointer,
+drawing, and interpolation APIs use continuous cell-space geometry.
+
+- `CellPoint`, `CellSize`, and `CellRect` describe integer terminal cells.
+  They are the units for layout placement, semantic bounds, raster surfaces,
+  terminal output, and compatibility hit regions.
+- `Point`, `Size`, `Rect`, and `Vector` describe continuous positions in the
+  same terminal cell coordinate space. A `Point(x: 2.25, y: 1.5)` is inside
+  cell `(2, 1)`, not in device pixels.
+- `PixelPoint`, `PixelSize`, and `CellPixelMetrics` are provenance and host
+  metadata. They explain how a host or terminal mapped device pixels into
+  cell-space input, but they do not change layout units.
+
+The semantics phase still routes through cell-denominated regions so controls
+remain stable on cell-only terminals. Pointer handlers receive the original
+continuous `PointerLocation` after routing, and authored gesture values expose
+continuous `Point` values even when the runtime had to synthesize the center of
+an integer cell as a fallback.
+
 ### Resolve
 
 - Public `View` values are lowered into `ResolvedNode` trees through package-only lowering helpers
@@ -136,7 +157,8 @@ The core runtime is intentionally narrow today:
 - one terminal host
 - one active root scene in `TerminalUI`
 - one full-canvas `WindowGroup` per session
-- keyboard-first interaction with optional mouse input when the terminal supports reporting
+- keyboard-first interaction with optional pointer input when the host or
+  terminal supports reporting
 
 Platform integration and multi-scene orchestration are packaged separately in
 peer platform integration packages rather than in the root `TerminalUI`

@@ -35,6 +35,22 @@ That means this module can be reused for:
 - ``CommitPlan``
 - ``FrameDiagnostics``
 
+### Geometry And Pointer Metadata
+
+- ``CellPoint``
+- ``CellSize``
+- ``CellRect``
+- ``Point``
+- ``Size``
+- ``Rect``
+- ``Vector``
+- ``Path``
+- ``PixelPoint``
+- ``PixelSize``
+- ``CellPixelMetrics``
+- ``PointerLocation``
+- ``PointerInputCapabilities``
+
 ### Execution Components
 
 - ``LayoutEngine``

@@ -60,6 +60,18 @@ resolve -> measure -> place -> semantics -> draw -> raster -> commit
 
 That ordering is visible in ``DefaultRenderer``, `FrameArtifacts`, `Pipeline`, and the regression suites.
 
+## Coordinate Domains
+
+Layout and raster placement use integer terminal cells: `CellPoint`,
+`CellSize`, and `CellRect`. Pointer input, gestures, Canvas drawing, and
+interpolation use continuous cell-space values: `Point`, `Size`, `Rect`, and
+`Vector`. Pixel geometry is host metadata, not the normal authoring unit.
+
+This split lets the same authored app run on cell-only terminals and on native,
+web, or terminal-pixel hosts. The semantic snapshot can route against stable
+cell regions while the handler receives the most precise point the runtime can
+provide.
+
 ### Resolve
 
 - Public `View` values are lowered into `ResolvedNode` trees

@@ -46,6 +46,45 @@ The runtime is keyboard-first, but it is not keyboard-only.
 
 That means control activation, selection changes, scrolling, and editing can all flow through the same semantic and lifecycle system regardless of whether the initiating event came from the keyboard or the mouse-reporting stream.
 
+### Pointer Coordinates And Capabilities
+
+The runtime normalizes every pointer event into `PointerLocation`.
+
+- `PointerLocation.cell` is the containing integer terminal cell used for
+  routing through the semantic snapshot.
+- `PointerLocation.location` is the continuous cell-space point delivered to
+  gestures, hover handlers, spatial taps, drags, and drop contexts.
+- Cell-only terminals synthesize `location` at the center of the reported cell.
+  Native hosts, web hosts, and terminal SGR-Pixels mode can provide sub-cell
+  locations derived from pixel coordinates.
+- `PointerInputCapabilities` and `CellPixelMetrics` are copied into
+  `EnvironmentValues` before each render so authored views and `GeometryReader`
+  can display precision state or adapt direct-manipulation affordances without
+  changing layout.
+
+The policy is conservative in terminal-native sessions. SGR 1006 cell mouse
+reporting remains the default. SGR-Pixels 1016 is enabled only when the host
+policy requests terminal-pixel coordinates and the runtime has trustworthy cell
+pixel metrics. Known terminal multiplexers fall back to cell coordinates unless
+terminal pixels are explicitly forced.
+
+### Pointer Modes And Hover Volume
+
+Raw-mode setup enables terminal mouse reporting only for the precision mode the
+runtime has selected:
+
+- cell fallback: `CSI ? 1002 h` plus `CSI ? 1006 h`
+- terminal pixels: `CSI ? 1002 h`, `CSI ? 1006 h`, and `CSI ? 1016 h`
+- hover subscribers: `CSI ? 1003 h` is added while at least one rendered view
+  has `onPointerHover`
+
+Teardown disables the active modes in reverse so the shell is restored on normal
+exit and in the CLI crash guard. Hover is intentionally subscriber-gated because
+all-motion mouse reporting can produce high event volume. The run loop tracks
+the current hovered route, delivers `.entered`, `.moved`, and `.exited` phases
+with local continuous coordinates, and removes hover mode again when a render no
+longer contains hover subscribers.
+
 ## Commit, Lifecycle, And Tasks
 
 Lifecycle is identity-driven.
