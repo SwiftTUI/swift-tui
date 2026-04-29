@@ -3,13 +3,14 @@ import Testing
 
 @testable import Layouts
 
-/// Drawing reused by the A/B vacuity variant — paints a horizontal
-/// line spanning `context.width * 3` subpixels.
+/// Drawing reused by the A/B vacuity variant — paints a horizontal line
+/// spanning three times the canvas's cell-space width.
 private struct OverflowLine: CanvasDrawing, Equatable {
   func draw(into context: inout CanvasContext) {
+    let y = Double(context.size.height) / 2
     context.line(
-      from: (x: 0, y: context.height / 2),
-      to: (x: context.width * 3, y: context.height / 2)
+      from: Point(x: 0, y: y),
+      to: Point(x: Double(context.size.width * 3), y: y)
     )
   }
 }
@@ -51,8 +52,8 @@ struct CanvasHonorsClippedBehaviourTests {
   /// ```
   ///
   /// The drawing tries to paint a horizontal line spanning
-  /// `context.width * 3` subpixels — well past the 10-cell canvas
-  /// frame. With `.clipped()` (and the canvas's own subpixel-bounds
+  /// three times the canvas's cell-space width — well past the 10-cell canvas
+  /// frame. With `.clipped()` (and the canvas's own grid-bounds
   /// auto-clipping; see Finding below) the visible painted region is
   /// strictly contained inside the 10 interior columns of the canvas
   /// frame.

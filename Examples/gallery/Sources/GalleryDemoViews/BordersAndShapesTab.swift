@@ -343,10 +343,9 @@ private enum GradientDirection: Hashable, CaseIterable {
   }
 }
 
-/// Minimal ``CanvasDrawing`` that plots an array of values as a
-/// Bresenham polyline in the Braille subpixel grid. Scales both axes
-/// to fit the canvas context, leaving one subpixel of margin on the
-/// right so the final sample is reachable without clipping.
+/// Minimal ``CanvasDrawing`` that plots an array of values as a polyline in
+/// continuous cell space. Scales both axes to fit the canvas context, leaving
+/// enough in-cell margin for the final sample to land inside the active grid.
 struct Sparkline: CanvasDrawing, Equatable {
   let values: [Double]
 
@@ -355,17 +354,15 @@ struct Sparkline: CanvasDrawing, Equatable {
     let maxV = values.max() ?? 1
     let minV = values.min() ?? 0
     let range = max(0.001, maxV - minV)
-    let xStep = Double(context.width - 1) / Double(values.count - 1)
+    let maxX = max(0, Double(context.size.width) - 0.5 / Double(context.grid.subdivisionsX))
+    let maxY = max(0, Double(context.size.height) - 0.5 / Double(context.grid.subdivisionsY))
+    let xStep = maxX / Double(values.count - 1)
     for i in 0..<(values.count - 1) {
-      let x0 = Int(Double(i) * xStep)
-      let x1 = Int(Double(i + 1) * xStep)
-      let y0 =
-        context.height - 1
-        - Int(((values[i] - minV) / range) * Double(context.height - 1))
-      let y1 =
-        context.height - 1
-        - Int(((values[i + 1] - minV) / range) * Double(context.height - 1))
-      context.line(from: (x0, y0), to: (x1, y1))
+      let x0 = Double(i) * xStep
+      let x1 = Double(i + 1) * xStep
+      let y0 = maxY - ((values[i] - minV) / range) * maxY
+      let y1 = maxY - ((values[i + 1] - minV) / range) * maxY
+      context.line(from: Point(x: x0, y: y0), to: Point(x: x1, y: y1))
     }
   }
 }

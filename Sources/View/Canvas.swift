@@ -1,23 +1,28 @@
 public import Core
 @_spi(Testing) import Core
 
-/// A view that renders a user-provided drawing into a Braille subpixel
-/// canvas sized to its frame.
+/// A view that renders a user-provided drawing into a cell-space canvas sized
+/// to its frame.
 ///
 /// `Canvas` is the arbitrary-drawing escape hatch that sits alongside
 /// the `Shape` protocol — reach for it when you need to draw a
 /// sparkline, plot, hand-drawn meter, or arbitrary curve that doesn't
 /// fit the shape fill/stroke algebra. The drawing conforms to
 /// ``CanvasDrawing`` and is invoked at paint time with a
-/// ``CanvasContext`` sized to the frame in **Braille subpixels** (each
-/// terminal cell is a 2×4 dot grid).
+/// ``CanvasContext`` sized to the frame in terminal cells. The selected
+/// ``CanvasGrid`` controls how fractional in-cell samples pack into terminal
+/// glyphs.
 ///
 /// ```swift
 /// struct DiagonalLine: CanvasDrawing, Equatable {
 ///   func draw(into context: inout CanvasContext) {
+///     let end = Point(
+///       x: max(0, Double(context.size.width) - 0.25),
+///       y: max(0, Double(context.size.height) - 0.125)
+///     )
 ///     context.line(
-///       from: (x: 0, y: 0),
-///       to: (x: context.width - 1, y: context.height - 1)
+///       from: .zero,
+///       to: end
 ///     )
 ///   }
 /// }
@@ -30,15 +35,22 @@ public struct Canvas<Drawing: CanvasDrawing>: View, ResolvableView {
   /// The drawing this canvas will rasterize at paint time.
   public let drawing: Drawing
 
-  public init(_ drawing: Drawing) {
+  /// Grid used when rasterizing the drawing.
+  public let grid: CanvasGrid
+
+  public init(
+    grid: CanvasGrid = .braille2x4,
+    _ drawing: Drawing
+  ) {
     self.drawing = drawing
+    self.grid = grid
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
     [
       resolveLeafNode(
         kindName: "Canvas",
-        drawPayload: .canvas(CanvasPayload(drawing: drawing)),
+        drawPayload: .canvas(CanvasPayload(drawing: drawing, grid: grid)),
         in: context
       )
     ]

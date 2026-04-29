@@ -983,7 +983,7 @@ extension Rasterizer {
   /// Canvas is the arbitrary-drawing escape hatch that sits alongside
   /// the shape pipeline: the layout engine reserves the cell frame, and
   /// here we build a ``CanvasContext`` sized to those cells, invoke the
-  /// user's drawing, and copy its direct-cell and Braille layers into
+  /// user's drawing, and copy its direct-cell and grid-glyph layers into
   /// the raster buffer.
   private func paintCanvasDrawing(
     in bounds: CellRect,
@@ -1010,11 +1010,14 @@ extension Rasterizer {
       ?? environment.theme.foreground
 
     var context = CanvasContext(
-      canvas: BrailleCanvas(width: cellW, height: cellH),
+      canvas: CanvasGridBuffer(
+        size: CellSize(width: cellW, height: cellH),
+        grid: payload.grid
+      ),
       foreground: initialForeground,
       background: nil
     )
-    guard context.width > 0, context.height > 0 else {
+    guard context.size.width > 0, context.size.height > 0 else {
       return
     }
     payload.drawing.draw(into: &context)
@@ -1044,10 +1047,10 @@ extension Rasterizer {
       }
     }
 
-    // Walk the Braille canvas and emit a glyph for every cell the
-    // drawing touched. Styled subpixel writes carry one style per
-    // terminal cell; unstyled cells fall back to the context's final
-    // foreground/background values.
+    // Walk the grid canvas and emit a glyph for every cell the drawing
+    // touched. Styled sample writes carry one style per terminal cell;
+    // unstyled cells fall back to the context's final foreground/background
+    // values.
     let finalForeground = context.foreground
     let finalBackground = context.background
     let fallbackStyle = ResolvedTextStyle(
@@ -1057,15 +1060,14 @@ extension Rasterizer {
 
     for cellY in 0..<cellH {
       for cellX in 0..<cellW {
-        let cell = context.canvas.cell(x: cellX, y: cellY)
-        guard cell.mask != 0 else {
+        guard let character = context.canvas.character(x: cellX, y: cellY) else {
           continue
         }
-        let resolvedStyle = context.brailleCellStyles[cellY][cellX] ?? fallbackStyle
+        let resolvedStyle = context.gridCellStyles[cellY][cellX] ?? fallbackStyle
         let styleToWrite: ResolvedTextStyle? =
           resolvedStyle.isDefault ? nil : resolvedStyle
         write(
-          cell.glyph,
+          character,
           style: styleToWrite,
           atX: originX + cellX,
           y: originY + cellY,

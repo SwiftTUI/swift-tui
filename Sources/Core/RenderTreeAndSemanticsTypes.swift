@@ -1060,7 +1060,7 @@ public indirect enum DrawCommand: Equatable, Sendable {
     sides: Edge.Set
   )
   /// A `Canvas` view's draw payload + the cell bounds the rasterizer
-  /// should size a ``BrailleCanvas`` to before invoking the user's
+  /// should size a ``CanvasGrid`` buffer to before invoking the user's
   /// ``CanvasDrawing/draw(into:)``. The rasterizer resolves the
   /// `foregroundStyle` to a concrete ``Color`` at paint time and
   /// passes it to the ``CanvasContext`` as its initial foreground.
