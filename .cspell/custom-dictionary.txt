@@ -6,6 +6,8 @@ Borderless
 closedir
 codegen
 dedup
+EINTR
+errno
 fclose
 figfonts
 Figlet
@@ -25,6 +27,7 @@ Pressable
 Rasterizer
 Rasterizes
 Renderable
+sixel
 smush
 smushed
 subview
@@ -37,3 +40,4 @@ UICLI
 wasi
 xcrun
 Xlinker
+XTSM
