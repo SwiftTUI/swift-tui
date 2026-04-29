@@ -483,7 +483,7 @@ package struct WebSurfaceInputParser {
     return .mouse(
       MouseEvent(
         kind: kind,
-        location: Point(CellPoint(x: max(0, x), y: max(0, y))),
+        location: PointerLocation.cellFallback(CellPoint(x: max(0, x), y: max(0, y))),
         modifiers: parseModifiers(components[7])
       )
     )
@@ -988,18 +988,25 @@ private func mergeWebSurfaceMouseEvents(
   _ lhs: MouseEvent,
   _ rhs: MouseEvent
 ) -> MouseEvent? {
-  guard lhs.location == rhs.location, lhs.modifiers == rhs.modifiers else {
+  guard lhs.location.precision == rhs.location.precision,
+    lhs.modifiers == rhs.modifiers
+  else {
     return nil
   }
 
   switch (lhs.kind, rhs.kind) {
-  case (.scrolled(let lhsDeltaX, let lhsDeltaY), .scrolled(let rhsDeltaX, let rhsDeltaY)):
+  case (.scrolled(let lhsDeltaX, let lhsDeltaY), .scrolled(let rhsDeltaX, let rhsDeltaY))
+  where lhs.location.cell == rhs.location.cell:
     return .init(
       kind: .scrolled(deltaX: lhsDeltaX + rhsDeltaX, deltaY: lhsDeltaY + rhsDeltaY),
       location: rhs.location,
       modifiers: rhs.modifiers
     )
-  default:
+  case (.moved, .moved):
     return rhs
+  case (.dragged(let lhsButton), .dragged(let rhsButton)) where lhsButton == rhsButton:
+    return rhs
+  default:
+    return nil
   }
 }

@@ -124,7 +124,8 @@ struct InjectedTerminalInputReaderTests {
         }
         return deltaX == 0
           && deltaY > 0
-          && mouseEvent.location == .init(x: 4, y: 6)
+          && mouseEvent.location.cell == CellPoint(x: 4, y: 6)
+          && mouseEvent.location.precision == .cell
       }
     )
     #expect(

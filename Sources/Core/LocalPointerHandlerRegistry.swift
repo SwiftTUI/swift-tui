@@ -27,14 +27,14 @@ package struct LocalPointerEvent: Equatable, Sendable {
   }
 
   package var kind: Kind
-  package var location: Point
+  package var location: PointerLocation
   package var targetRect: CellRect
   package var scrollContext: LocalPointerScrollContext?
   package var timestamp: MonotonicInstant
 
   package init(
     kind: Kind,
-    location: Point,
+    location: PointerLocation,
     targetRect: CellRect,
     scrollContext: LocalPointerScrollContext? = nil,
     timestamp: MonotonicInstant = .now()
@@ -44,6 +44,25 @@ package struct LocalPointerEvent: Equatable, Sendable {
     self.targetRect = targetRect
     self.scrollContext = scrollContext
     self.timestamp = timestamp
+  }
+
+  /// Builds a cell-only fallback event for the cell containing `location`.
+  ///
+  /// Callers with fractional input should pass a ``PointerLocation`` directly.
+  package init(
+    kind: Kind,
+    location: Point,
+    targetRect: CellRect,
+    scrollContext: LocalPointerScrollContext? = nil,
+    timestamp: MonotonicInstant = .now()
+  ) {
+    self.init(
+      kind: kind,
+      location: .cellFallback(location.containingCell),
+      targetRect: targetRect,
+      scrollContext: scrollContext,
+      timestamp: timestamp
+    )
   }
 }
 

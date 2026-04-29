@@ -57,14 +57,15 @@ final class TapGestureRecognizer: GestureRecognizer {
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     guard !phase.isTerminal else { return .ignored }
+    let location = event.location.location
 
     switch event.kind {
     case .down(.primary):
-      pressStart = event.location
+      pressStart = location
       return .handled
     case .up(.primary):
       guard pressStart != nil else { return .ignored }
-      if event.targetRect.contains(event.location) {
+      if event.targetRect.contains(event.location.cell) {
         completedTaps += 1
         pressStart = nil
         if completedTaps >= requiredCount {
@@ -77,8 +78,8 @@ final class TapGestureRecognizer: GestureRecognizer {
       }
     case .dragged(.primary):
       if let start = pressStart {
-        let dx = abs(event.location.x - start.x)
-        let dy = abs(event.location.y - start.y)
+        let dx = abs(location.x - start.x)
+        let dy = abs(location.y - start.y)
         if dx > 0 || dy > 0 {
           phase = .failed
           return .failed

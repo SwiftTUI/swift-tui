@@ -1,5 +1,6 @@
 import Testing
 
+@testable import Core
 @testable import TerminalUI
 
 @MainActor
@@ -142,5 +143,31 @@ struct InputParserModifierTests {
   func inputEventConvenience() {
     let event = InputEvent.key(.character("q"))
     #expect(event == .key(KeyPress(.character("q"))))
+  }
+
+  @Test("SGR 1006 mouse parser emits centered cell fallback")
+  func sgrMouseParserEmitsCenteredCellFallback() {
+    var parser = TerminalInputParser()
+    let events = parser.feed([0x1B, 0x5B, 0x3C, 0x30, 0x3B, 0x35, 0x3B, 0x37, 0x4D])
+
+    #expect(
+      events == [
+        .mouse(
+          MouseEvent(
+            kind: .down(.primary),
+            location: .cellFallback(CellPoint(x: 4, y: 6))
+          )
+        )
+      ])
+
+    guard case .mouse(let event)? = events.first else {
+      Issue.record("expected mouse event")
+      return
+    }
+
+    #expect(event.location.cell == CellPoint(x: 4, y: 6))
+    #expect(event.location.location == Point(x: 4.5, y: 6.5))
+    #expect(event.location.precision == .cell)
+    #expect(event.location.rawPixel == nil)
   }
 }

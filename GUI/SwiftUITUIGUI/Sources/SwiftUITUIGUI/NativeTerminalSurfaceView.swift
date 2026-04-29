@@ -79,7 +79,7 @@ import TerminalUI
         .mouse(
           .init(
             kind: .down(.primary),
-            location: cellPoint(for: event.locationInWindow),
+            location: pointerLocation(for: event.locationInWindow),
             modifiers: NativeInputMapper.modifiers(for: event)
           )
         )
@@ -91,7 +91,7 @@ import TerminalUI
         .mouse(
           .init(
             kind: .dragged(.primary),
-            location: cellPoint(for: event.locationInWindow),
+            location: pointerLocation(for: event.locationInWindow),
             modifiers: NativeInputMapper.modifiers(for: event)
           )
         )
@@ -103,7 +103,7 @@ import TerminalUI
         .mouse(
           .init(
             kind: .up(.primary),
-            location: cellPoint(for: event.locationInWindow),
+            location: pointerLocation(for: event.locationInWindow),
             modifiers: NativeInputMapper.modifiers(for: event)
           )
         )
@@ -121,18 +121,20 @@ import TerminalUI
         .mouse(
           .init(
             kind: .scrolled(deltaX: deltaX, deltaY: deltaY),
-            location: cellPoint(for: event.locationInWindow),
+            location: pointerLocation(for: event.locationInWindow),
             modifiers: NativeInputMapper.modifiers(for: event)
           )
         )
       )
     }
 
-    private func cellPoint(
+    private func pointerLocation(
       for windowPoint: NSPoint
-    ) -> Point {
+    ) -> PointerLocation {
       let local = convert(windowPoint, from: nil)
-      return metrics.cellPoint(for: CGPoint(x: local.x, y: local.y), in: bounds)
+      return PointerLocation.cellFallback(
+        metrics.cellPoint(for: CGPoint(x: local.x, y: local.y), in: bounds).containingCell
+      )
     }
 
     private func updateMetrics() {
@@ -268,7 +270,7 @@ import TerminalUI
         .mouse(
           .init(
             kind: .down(.primary),
-            location: cellPoint(for: touch.location(in: self))
+            location: pointerLocation(for: touch.location(in: self))
           )
         )
       )
@@ -282,7 +284,7 @@ import TerminalUI
         .mouse(
           .init(
             kind: .dragged(.primary),
-            location: cellPoint(for: touch.location(in: self))
+            location: pointerLocation(for: touch.location(in: self))
           )
         )
       )
@@ -296,7 +298,7 @@ import TerminalUI
         .mouse(
           .init(
             kind: .up(.primary),
-            location: cellPoint(for: touch.location(in: self))
+            location: pointerLocation(for: touch.location(in: self))
           )
         )
       )
@@ -318,10 +320,10 @@ import TerminalUI
       }
     }
 
-    private func cellPoint(
+    private func pointerLocation(
       for local: CGPoint
-    ) -> Point {
-      metrics.cellPoint(for: local, in: bounds)
+    ) -> PointerLocation {
+      PointerLocation.cellFallback(metrics.cellPoint(for: local, in: bounds).containingCell)
     }
 
     private func updateMetrics() {

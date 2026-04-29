@@ -70,17 +70,32 @@ public struct MouseEvent: Equatable, Sendable {
   }
 
   public var kind: Kind
-  public var location: Point
+  public var location: PointerLocation
   public var modifiers: Modifiers
 
   public init(
     kind: Kind,
-    location: Point,
+    location: PointerLocation,
     modifiers: Modifiers = []
   ) {
     self.kind = kind
     self.location = location
     self.modifiers = modifiers
+  }
+
+  /// Builds a cell-only fallback event for the cell containing `location`.
+  ///
+  /// Callers with fractional input should pass a ``PointerLocation`` directly.
+  public init(
+    kind: Kind,
+    location: Point,
+    modifiers: Modifiers = []
+  ) {
+    self.init(
+      kind: kind,
+      location: .cellFallback(location.containingCell),
+      modifiers: modifiers
+    )
   }
 }
 
@@ -512,9 +527,11 @@ extension TerminalInputParser {
       return nil
     }
 
-    let location = Point(
-      x: Double(max(0, encodedX - 1)),
-      y: Double(max(0, encodedY - 1))
+    let location = PointerLocation.cellFallback(
+      CellPoint(
+        x: max(0, encodedX - 1),
+        y: max(0, encodedY - 1)
+      )
     )
     let modifiers = mouseModifiers(from: encodedButton)
     let baseCode = encodedButton & 0b11
@@ -982,7 +999,9 @@ extension MouseEvent {
   func merged(
     with next: MouseEvent
   ) -> MouseEvent? {
-    guard modifiers == next.modifiers else {
+    guard modifiers == next.modifiers,
+      location.precision == next.location.precision
+    else {
       return nil
     }
 
@@ -992,13 +1011,13 @@ extension MouseEvent {
     case (.dragged(let lhsButton), .dragged(let rhsButton)) where lhsButton == rhsButton:
       return next
     case (.scrolled(let lhsDeltaX, let lhsDeltaY), .scrolled(let rhsDeltaX, let rhsDeltaY))
-    where location == next.location:
+    where location.cell == next.location.cell && location.precision == next.location.precision:
       return .init(
         kind: .scrolled(
           deltaX: lhsDeltaX + rhsDeltaX,
           deltaY: lhsDeltaY + rhsDeltaY
         ),
-        location: location,
+        location: next.location,
         modifiers: modifiers
       )
     default:

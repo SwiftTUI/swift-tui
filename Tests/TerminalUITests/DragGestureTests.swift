@@ -24,10 +24,14 @@ struct DragGestureTests {
   ) -> LocalPointerEvent {
     .init(
       kind: kind,
-      location: point,
+      location: precise(point),
       targetRect: CellRect(origin: .zero, size: CellSize(width: 20, height: 5)),
       timestamp: time
     )
+  }
+
+  private func precise(_ point: Point) -> PointerLocation {
+    .subCell(location: point, source: .nativePixels, metrics: .estimated)
   }
 
   @Test("DragGesture values track translation and startLocation")

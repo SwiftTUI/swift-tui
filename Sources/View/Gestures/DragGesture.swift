@@ -118,35 +118,36 @@ final class DragGestureRecognizer: GestureRecognizer {
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     guard !phase.isTerminal else { return .ignored }
+    let location = event.location.location
     switch event.kind {
     case .down(.primary):
-      startLocation = event.location
+      startLocation = location
       startTime = event.timestamp
       targetRect = event.targetRect
-      samples = [Sample(location: event.location, time: event.timestamp)]
+      samples = [Sample(location: location, time: event.timestamp)]
       return .handled
     case .dragged(.primary):
       guard let start = startLocation, let t0 = startTime else { return .ignored }
-      samples.append(Sample(location: event.location, time: event.timestamp))
-      let dx = event.location.x - start.x
-      let dy = event.location.y - start.y
+      samples.append(Sample(location: location, time: event.timestamp))
+      let dx = location.x - start.x
+      let dy = location.y - start.y
       let distance = max(abs(dx), abs(dy))
       guard distance >= Double(minimumDistance) else { return .handled }
       if phase == .possible { phase = .began } else { phase = .changed }
       lastValue = makeValue(
         now: event.timestamp,
-        location: event.location,
+        location: location,
         start: start,
         startTime: t0
       )
       return .handled
     case .up(.primary):
       guard let start = startLocation, let t0 = startTime else { return .ignored }
-      samples.append(Sample(location: event.location, time: event.timestamp))
+      samples.append(Sample(location: location, time: event.timestamp))
       phase = .ended
       lastValue = makeValue(
         now: event.timestamp,
-        location: event.location,
+        location: location,
         start: start,
         startTime: t0
       )

@@ -359,7 +359,7 @@ struct InteractiveRuntimeTests {
         .mouse(
           .init(
             kind: .down(.primary),
-            location: .init(x: 9, y: 11),
+            location: .cellFallback(CellPoint(x: 9, y: 11)),
             modifiers: [.shift, .ctrl]
           )
         ),
@@ -367,25 +367,25 @@ struct InteractiveRuntimeTests {
         .mouse(
           .init(
             kind: .scrolled(deltaX: 0, deltaY: 1),
-            location: .init(x: 4, y: 6)
+            location: .cellFallback(CellPoint(x: 4, y: 6))
           )
         ),
         .mouse(
           .init(
             kind: .dragged(.secondary),
-            location: .init(x: 4, y: 6)
+            location: .cellFallback(CellPoint(x: 4, y: 6))
           )
         ),
         .mouse(
           .init(
             kind: .moved,
-            location: .init(x: 4, y: 6)
+            location: .cellFallback(CellPoint(x: 4, y: 6))
           )
         ),
         .mouse(
           .init(
             kind: .up(.primary),
-            location: .init(x: 4, y: 6)
+            location: .cellFallback(CellPoint(x: 4, y: 6))
           )
         ),
       ])
@@ -465,7 +465,7 @@ struct InteractiveRuntimeTests {
         .mouse(
           .init(
             kind: .scrolled(deltaX: 0, deltaY: 52),
-            location: .init(x: 4, y: 6)
+            location: .cellFallback(CellPoint(x: 4, y: 6))
           )
         )
       ])
@@ -535,7 +535,8 @@ struct InteractiveRuntimeTests {
         }
         return deltaX == 0
           && deltaY > 0
-          && mouseEvent.location == .init(x: 4, y: 6)
+          && mouseEvent.location.cell == CellPoint(x: 4, y: 6)
+          && mouseEvent.location.precision == .cell
       }
     )
     #expect(

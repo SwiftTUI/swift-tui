@@ -7,6 +7,10 @@ import Testing
 @MainActor
 @Suite
 struct SpatialTapGestureTests {
+  private func precise(_ point: Point) -> PointerLocation {
+    .subCell(location: point, source: .nativePixels, metrics: .estimated)
+  }
+
   @Test("SpatialTapGesture carries tap location in its value (local coords)")
   func carriesLocation() throws {
     let g = SpatialTapGesture()
@@ -21,13 +25,13 @@ struct SpatialTapGestureTests {
     _ = rec.handle(
       event: .init(
         kind: .down(.primary),
-        location: Point(x: 6, y: 3),
+        location: precise(Point(x: 6, y: 3)),
         targetRect: rect
       ))
     _ = rec.handle(
       event: .init(
         kind: .up(.primary),
-        location: Point(x: 6, y: 3),
+        location: precise(Point(x: 6, y: 3)),
         targetRect: rect
       ))
     let v: SpatialTapGesture.Value? = rec.currentValue()
@@ -49,13 +53,13 @@ struct SpatialTapGestureTests {
     _ = rec.handle(
       event: .init(
         kind: .down(.primary),
-        location: Point(x: 6, y: 3),
+        location: precise(Point(x: 6, y: 3)),
         targetRect: rect
       ))
     _ = rec.handle(
       event: .init(
         kind: .up(.primary),
-        location: Point(x: 6, y: 3),
+        location: precise(Point(x: 6, y: 3)),
         targetRect: rect
       ))
     let v: SpatialTapGesture.Value? = rec.currentValue()
