@@ -95,7 +95,7 @@ struct ToolOpsTests {
       rect: PixelRect(x: 0, y: 0, width: 2, height: 1)
     )!
 
-    var blank = PixelBuffer(size: PixelSize(width: 4, height: 2))
+    let blank = PixelBuffer(size: PixelSize(width: 4, height: 2))
     let pasted = ToolOps.paste(
       onto: blank,
       clipboard: clipboard,
@@ -104,7 +104,6 @@ struct ToolOpsTests {
     #expect(pasted[PixelPoint(x: 2, y: 1)] == 1)
     #expect(pasted[PixelPoint(x: 3, y: 1)] == 2)
     // Untouched cells stay nil.
-    _ = blank
     #expect(pasted[PixelPoint(x: 0, y: 0)] == nil)
   }
 }
