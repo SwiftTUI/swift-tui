@@ -66,7 +66,8 @@ func bridge_forwards_resize_and_style_updates() async throws {
         precision: .subCell(
           source: .nativePixels,
           metrics: .init(width: 8, height: 16, source: .reported)
-        )
+        ),
+        supportsHover: true
       )
     ])
 

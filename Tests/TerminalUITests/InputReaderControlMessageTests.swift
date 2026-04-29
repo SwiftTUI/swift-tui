@@ -145,8 +145,8 @@ struct InputReaderControlMessageTests {
     #expect(events == [KeyPress(.character("q"))])
   }
 
-  @Test("input reader parses terminal-pixel mouse coordinates when forced")
-  func inputReaderParsesTerminalPixelMouseCoordinatesWhenForced() async throws {
+  @Test("input reader applies resolved terminal-pixel mouse coordinates")
+  func inputReaderAppliesResolvedTerminalPixelMouseCoordinates() async throws {
     var descriptors: [Int32] = [0, 0]
     #expect(unsafe pipe(&descriptors) == 0)
 
@@ -169,9 +169,12 @@ struct InputReaderControlMessageTests {
 
     let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
     let inputReader = InputReader(
-      fileDescriptor: readDescriptor,
-      pointerPrecisionPolicy: .forceTerminalPixels,
-      cellPixelMetrics: metrics
+      fileDescriptor: readDescriptor
+    )
+    inputReader.updateInputCapabilities(
+      ResolvedTerminalInputCapabilities(
+        mouseCoordinateMode: .pixels(metrics: metrics, source: .terminalPixels)
+      )
     )
 
     let eventsTask = Task {

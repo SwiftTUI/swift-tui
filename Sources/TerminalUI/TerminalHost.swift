@@ -665,7 +665,9 @@ extension TerminalHosting {
   }
 
   /// Default terminal-backed host that owns raw mode and screen presentation.
-  public final class TerminalHost: TerminalHosting, DamageAwareTerminalHosting {
+  public final class TerminalHost: TerminalHosting, DamageAwareTerminalHosting,
+    TerminalInputCapabilityProviding
+  {
     private struct CapabilityProbeState {
       var hasProbedAppearance = false
       var hasProbedGraphicsCapabilities = false
@@ -717,7 +719,13 @@ extension TerminalHosting {
       resolvedGraphicsCapabilities(probingProtocols: false)
     }
     public var pointerInputCapabilities: PointerInputCapabilities {
-      activeMouseCoordinateMode.pointerInputCapabilities
+      resolvedPointerInputCapabilities
+    }
+    package var resolvedInputCapabilities: ResolvedTerminalInputCapabilities {
+      ResolvedTerminalInputCapabilities(
+        mouseCoordinateMode: activeMouseCoordinateMode,
+        pointerInputCapabilities: resolvedPointerInputCapabilities
+      )
     }
 
     private let inputFileDescriptor: Int32
@@ -1266,6 +1274,12 @@ extension TerminalHosting {
         return false
       }
       return term.hasPrefix("screen") || term.hasPrefix("tmux")
+    }
+
+    private var resolvedPointerInputCapabilities: PointerInputCapabilities {
+      var capabilities = activeMouseCoordinateMode.pointerInputCapabilities
+      capabilities.supportsHover = capabilityProfile.supportsMouseReporting
+      return capabilities
     }
 
     private func trustedCellPixelMetrics() -> CellPixelMetrics? {

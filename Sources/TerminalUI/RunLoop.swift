@@ -404,6 +404,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     observationBridge.attachInvalidator(scheduler)
 
     try terminalHost.enableRawMode()
+    synchronizeInputCapabilities()
     defer {
       lifecycleCoordinator.shutdown()
       try? terminalHost.disableRawMode()
@@ -500,6 +501,16 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       renderedFrames: renderedFrames,
       exitReason: .inputEnded
     )
+  }
+
+  private func synchronizeInputCapabilities() {
+    guard let provider = terminalHost as? any TerminalInputCapabilityProviding,
+      let configurableReader = terminalInputReader as? any TerminalInputCapabilityConfiguring
+    else {
+      return
+    }
+
+    configurableReader.updateInputCapabilities(provider.resolvedInputCapabilities)
   }
 
   package func scheduleNextWakeIfNeeded(

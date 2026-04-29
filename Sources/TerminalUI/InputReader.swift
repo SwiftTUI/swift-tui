@@ -1,4 +1,5 @@
 import Core
+import Synchronization
 
 #if canImport(Dispatch)
   @unsafe @preconcurrency import Dispatch
@@ -285,6 +286,28 @@ package enum MouseCoordinateMode: Equatable, Sendable {
       return source == .terminalPixels
     }
   }
+}
+
+package struct ResolvedTerminalInputCapabilities: Equatable, Sendable {
+  package var mouseCoordinateMode: MouseCoordinateMode
+  package var pointerInputCapabilities: PointerInputCapabilities
+
+  package init(
+    mouseCoordinateMode: MouseCoordinateMode = .cells,
+    pointerInputCapabilities: PointerInputCapabilities? = nil
+  ) {
+    self.mouseCoordinateMode = mouseCoordinateMode
+    self.pointerInputCapabilities =
+      pointerInputCapabilities ?? mouseCoordinateMode.pointerInputCapabilities
+  }
+}
+
+package protocol TerminalInputCapabilityProviding: AnyObject {
+  var resolvedInputCapabilities: ResolvedTerminalInputCapabilities { get }
+}
+
+package protocol TerminalInputCapabilityConfiguring: AnyObject {
+  func updateInputCapabilities(_ capabilities: ResolvedTerminalInputCapabilities)
 }
 
 /// Incrementally parses terminal bytes into normalized keyboard and mouse
@@ -754,9 +777,11 @@ extension TerminalInputParser {
 }
 
 /// Reads terminal input from a file descriptor.
-public final class InputReader: InputReading, TerminalInputReading {
+public final class InputReader: InputReading, TerminalInputReading,
+  TerminalInputCapabilityConfiguring
+{
   private let fileDescriptor: Int32
-  private let mouseCoordinateMode: MouseCoordinateMode
+  private let mouseCoordinateMode: Mutex<MouseCoordinateMode>
   private let controlHandler: @Sendable (TerminalControlMessage) -> Void
 
   /// Creates an input reader bound to `fileDescriptor`.
@@ -767,11 +792,21 @@ public final class InputReader: InputReading, TerminalInputReading {
     controlHandler: @escaping @Sendable (TerminalControlMessage) -> Void = { _ in }
   ) {
     self.fileDescriptor = fileDescriptor
-    self.mouseCoordinateMode = .resolving(
-      policy: pointerPrecisionPolicy,
-      metrics: cellPixelMetrics
+    self.mouseCoordinateMode = Mutex(
+      .resolving(
+        policy: pointerPrecisionPolicy,
+        metrics: cellPixelMetrics
+      )
     )
     self.controlHandler = controlHandler
+  }
+
+  package func updateInputCapabilities(
+    _ capabilities: ResolvedTerminalInputCapabilities
+  ) {
+    mouseCoordinateMode.withLock { mode in
+      mode = capabilities.mouseCoordinateMode
+    }
   }
 
   /// Reads keyboard-only events.
@@ -797,7 +832,7 @@ extension InputReader {
     private func makeTerminalInputEventStream() -> AsyncStream<InputEvent> {
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
-      let mouseCoordinateMode = self.mouseCoordinateMode
+      let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
 
       return makeTaskBackedAsyncStream(
         launch: { operation in
@@ -867,7 +902,7 @@ extension InputReader {
     ) -> AsyncStream<Event> {
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler
-      let mouseCoordinateMode = self.mouseCoordinateMode
+      let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
 
       return makeTaskBackedAsyncStream(
         launch: { operation in
@@ -913,7 +948,7 @@ extension InputReader {
       makeManagedAsyncStream { continuation in
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
-        let mouseCoordinateMode = self.mouseCoordinateMode
+        let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
         var parser = TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)
@@ -1029,7 +1064,7 @@ extension InputReader {
       makeManagedAsyncStream { continuation in
         let fileDescriptor = self.fileDescriptor
         let controlHandler = self.controlHandler
-        let mouseCoordinateMode = self.mouseCoordinateMode
+        let mouseCoordinateMode = self.mouseCoordinateMode.withLock { $0 }
         let queue = DispatchQueue(label: "InputReader.\(fileDescriptor)")
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
         var parser = TerminalInputParser(mouseCoordinateMode: mouseCoordinateMode)
