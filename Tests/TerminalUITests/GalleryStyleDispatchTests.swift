@@ -437,7 +437,7 @@ private struct GalleryStyleOuter: View {
 
 @MainActor
 private func makeRunLoopLocal<V: View>(
-  terminalSize: Size = .init(width: 40, height: 10),
+  terminalSize: CellSize = .init(width: 40, height: 10),
   @ViewBuilder content: @escaping () -> V
 ) -> RunLoop<Int, V> {
   let terminal = GalleryStyleTerminalHost(surfaceSizeProvider: { terminalSize })
@@ -494,16 +494,16 @@ private func latestSurfaceText<State, V: View>(
 }
 
 private final class GalleryStyleTerminalHost: TerminalHosting {
-  var surfaceSize: Size { surfaceSizeProvider() }
+  var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
   var graphicsCapabilities: TerminalGraphicsCapabilities { .init() }
   var theme: Theme? { nil }
   private(set) var latestSurface: RasterSurface?
-  private let surfaceSizeProvider: () -> Size
+  private let surfaceSizeProvider: () -> CellSize
 
   init(
-    surfaceSizeProvider: @escaping () -> Size,
+    surfaceSizeProvider: @escaping () -> CellSize,
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
     appearance: TerminalAppearance = .fallback
   ) {
@@ -516,7 +516,7 @@ private final class GalleryStyleTerminalHost: TerminalHosting {
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {

@@ -5,8 +5,8 @@ import TerminalUI
 /// The active tool is highlighted; non-active rows are muted.
 struct ToolboxView: View {
   let tool: EditorTool
-  let pendingMarqueeAnchor: PixelPoint?
-  let pendingGradientAnchor: PixelPoint?
+  let pendingMarqueeAnchor: GIFEditorCore.PixelPoint?
+  let pendingGradientAnchor: GIFEditorCore.PixelPoint?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {

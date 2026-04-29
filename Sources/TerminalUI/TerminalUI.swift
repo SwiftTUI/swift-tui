@@ -868,7 +868,7 @@ private final class FrameTailRenderer: Sendable {
 
   private func minimumRasterSurfaceSize(
     for proposal: ProposedSize
-  ) -> Size {
+  ) -> CellSize {
     guard
       case .finite(let width) = proposal.width,
       case .finite(let height) = proposal.height
@@ -1004,7 +1004,7 @@ private final class FrameTailRenderer: Sendable {
   }
 
   private func textRows(
-    for bounds: Rect,
+    for bounds: CellRect,
     into textRowRanges: inout [Int: [Range<Int>]]
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {

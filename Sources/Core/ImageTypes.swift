@@ -22,19 +22,19 @@ public enum ImageScalingMode: String, Equatable, Sendable {
 /// Image metadata resolved before layout and presentation.
 public struct ResolvedImageAsset: Equatable, Sendable {
   public var reference: ImageAssetReference
-  public var pixelSize: Size
-  public var intrinsicCellSize: Size
+  public var pixelSize: PixelSize
+  public var intrinsicCellSize: CellSize
   /// Pixel dimensions of a single terminal cell at the time of resolution.
   /// Carried here so the layout engine can reconcile pixel-space aspect
   /// ratios (source image) with cell-space frames (parent proposals) when
   /// measuring `.scaledToFit()` / `.scaledToFill()` images.
-  public var cellPixelSize: Size
+  public var cellPixelSize: PixelSize
 
   public init(
     reference: ImageAssetReference,
-    pixelSize: Size,
-    intrinsicCellSize: Size,
-    cellPixelSize: Size
+    pixelSize: PixelSize,
+    intrinsicCellSize: CellSize,
+    cellPixelSize: PixelSize
   ) {
     self.reference = reference
     self.pixelSize = pixelSize
@@ -62,7 +62,7 @@ public struct ImagePayload: Equatable, Sendable {
     self.scalingMode = scalingMode
   }
 
-  public var intrinsicCellSize: Size {
+  public var intrinsicCellSize: CellSize {
     resolvedAsset?.intrinsicCellSize ?? .zero
   }
 }
@@ -71,22 +71,22 @@ public struct ImagePayload: Equatable, Sendable {
 public struct RasterImageAttachment: Equatable, Sendable {
   /// The full logical destination rect in terminal cells before viewport clipping.
   public var identity: Identity
-  public var bounds: Rect
+  public var bounds: CellRect
   /// The portion of ``bounds`` currently visible after ancestor clipping.
-  public var visibleBounds: Rect
+  public var visibleBounds: CellRect
   public var source: ImageSource
   public var resolvedReference: ImageAssetReference?
-  public var pixelSize: Size?
+  public var pixelSize: PixelSize?
   public var isResizable: Bool
   public var scalingMode: ImageScalingMode
 
   public init(
     identity: Identity,
-    bounds: Rect,
-    visibleBounds: Rect? = nil,
+    bounds: CellRect,
+    visibleBounds: CellRect? = nil,
     source: ImageSource,
     resolvedReference: ImageAssetReference? = nil,
-    pixelSize: Size? = nil,
+    pixelSize: PixelSize? = nil,
     isResizable: Bool = false,
     scalingMode: ImageScalingMode = .stretch
   ) {

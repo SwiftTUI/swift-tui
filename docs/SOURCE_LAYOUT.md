@@ -107,7 +107,11 @@ library product. Downstream package consumers reach those types through
 
 ## `Core`
 
-- `GeometryTypes.swift`, `EnvironmentAndNodeTypes.swift`, and `LayoutTypes.swift`: geometry, proposals, placement, layout metadata, and node infrastructure
+- `Geometry/Point.swift`, `Geometry/CellGeometry.swift`,
+  `Geometry/PixelGeometry.swift`, `GeometryTypes.swift`,
+  `EnvironmentAndNodeTypes.swift`, and `LayoutTypes.swift`: continuous
+  authored geometry, integer terminal-cell geometry, pixel geometry, proposals,
+  placement, layout metadata, and node infrastructure
 - `RenderTreeAndSemanticsTypes.swift`: resolved-tree, semantic snapshot, and draw-tree data types, including `TextFigure` draw payload support
 - `CommitAndFrameTypes.swift`: commit plans, refined presentation-damage diagnostics, retained
   resolve frames, and frame artifacts

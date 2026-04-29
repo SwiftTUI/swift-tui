@@ -305,15 +305,15 @@ struct KeyCommandDispatchTests {
       })
     let rowRegion = try #require(
       runLoop.latestSemanticSnapshot.interactionRegions.first { $0.identity == rowIdentity })
-    let rowCenter = Point(
+    let rowCenter = CellPoint(
       x: rowRegion.rect.origin.x + rowRegion.rect.size.width / 2,
       y: rowRegion.rect.origin.y + rowRegion.rect.size.height / 2
     )
 
-    _ = runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: rowCenter))))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: Point(rowCenter)))))
     var renderedFrames = 0
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
-    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: rowCenter))))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: Point(rowCenter)))))
     renderedFrames = 0
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     #expect(latestSurfaceText(for: runLoop).contains("detail"))
@@ -340,13 +340,13 @@ struct KeyCommandDispatchTests {
       })
     let rowRegion = try #require(
       runLoop.latestSemanticSnapshot.interactionRegions.first { $0.identity == rowIdentity })
-    let rowCenter = Point(
+    let rowCenter = CellPoint(
       x: rowRegion.rect.origin.x + rowRegion.rect.size.width / 2,
       y: rowRegion.rect.origin.y + rowRegion.rect.size.height / 2
     )
 
-    _ = runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: rowCenter))))
-    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: rowCenter))))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: Point(rowCenter)))))
+    _ = runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: Point(rowCenter)))))
     var renderedFrames = 0
     try runLoop.renderPendingFrames(renderedFrames: &renderedFrames)
     #expect(latestSurfaceText(for: runLoop).contains("detail"))
@@ -372,7 +372,7 @@ struct KeyCommandDispatchTests {
 private func makeRunLoop<V: View>(
   @ViewBuilder content: @escaping () -> V
 ) -> RunLoop<Int, V> {
-  let terminalSize = Size(width: 30, height: 8)
+  let terminalSize = CellSize(width: 30, height: 8)
   let terminal = KeyCommandTerminalHost(surfaceSizeProvider: { terminalSize })
   let rootIdentity = testIdentity("KeyCommandRoot")
   var environmentValues = EnvironmentValues()
@@ -478,16 +478,16 @@ private struct KeyCommandListRouteFixture: View {
 }
 
 private final class KeyCommandTerminalHost: TerminalHosting {
-  var surfaceSize: Size { surfaceSizeProvider() }
+  var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
   var graphicsCapabilities: TerminalGraphicsCapabilities { .init() }
   var theme: Theme? { nil }
   private(set) var latestSurface: RasterSurface?
-  private let surfaceSizeProvider: () -> Size
+  private let surfaceSizeProvider: () -> CellSize
 
   init(
-    surfaceSizeProvider: @escaping () -> Size,
+    surfaceSizeProvider: @escaping () -> CellSize,
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
     appearance: TerminalAppearance = .fallback
   ) {
@@ -500,7 +500,7 @@ private final class KeyCommandTerminalHost: TerminalHosting {
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {

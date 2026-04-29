@@ -101,7 +101,7 @@ private final class Phase5PresentationController: TerminalControlling {
 
   func setAttributes(_: termios, on _: Int32) throws {}
 
-  func windowSize(of _: Int32) throws -> Size {
+  func windowSize(of _: Int32) throws -> CellSize {
     .init(width: 16, height: 2)
   }
 

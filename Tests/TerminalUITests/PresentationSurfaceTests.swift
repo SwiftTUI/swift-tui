@@ -363,7 +363,7 @@ private struct RenderTimePresentationMutationProbe: View, ResolvableView {
 
 private func hasFillCommand(
   in node: DrawNode,
-  bounds: Rect
+  bounds: CellRect
 ) -> Bool {
   if node.commands.contains(where: { hasFillCommand($0, bounds: bounds) }) {
     return true
@@ -374,7 +374,7 @@ private func hasFillCommand(
 
 private func hasFillCommand(
   _ command: DrawCommand,
-  bounds: Rect
+  bounds: CellRect
 ) -> Bool {
   switch command {
   case .group(_, let children):

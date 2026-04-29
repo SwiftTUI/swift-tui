@@ -206,7 +206,7 @@ public struct CollectionStylePresentation:
 extension CollectionStylePresentation {
   package func visibleListLayout(
     for payload: ListPayload,
-    in bounds: Rect
+    in bounds: CellRect
   ) -> ListVisibleLayout {
     let contentBounds = listContentBounds(in: bounds)
     let lines = visibleListLines(
@@ -223,8 +223,8 @@ extension CollectionStylePresentation {
 
   package func listChromeBounds(
     for layout: ListVisibleLayout,
-    in bounds: Rect
-  ) -> [Rect] {
+    in bounds: CellRect
+  ) -> [CellRect] {
     guard listContainer != nil else {
       return []
     }
@@ -239,7 +239,7 @@ extension CollectionStylePresentation {
 
   package func measuredListIdealSize(
     for payload: ListPayload
-  ) -> Size {
+  ) -> CellSize {
     let horizontalInset = listContentInsets.leading + listContentInsets.trailing
     let perSectionVerticalInset = listContentInsets.top + listContentInsets.bottom
     let usesSectionChrome = listContainer != nil && listChromeScope == .eachSection
@@ -303,20 +303,20 @@ extension CollectionStylePresentation {
         perSectionVerticalInset
       }
 
-    return Size(
+    return CellSize(
       width: lineMetrics.width + horizontalInset,
       height: lineMetrics.height + verticalInset
     )
   }
 
   private func listContentBounds(
-    in bounds: Rect
-  ) -> Rect {
+    in bounds: CellRect
+  ) -> CellRect {
     let verticalInsets =
       listContainer != nil && listChromeScope == .eachSection
       ? (top: 0, bottom: 0)
       : (top: listContentInsets.top, bottom: listContentInsets.bottom)
-    return Rect(
+    return CellRect(
       origin: .init(
         x: bounds.origin.x + listContentInsets.leading,
         y: bounds.origin.y + verticalInsets.top
@@ -577,13 +577,13 @@ extension CollectionStylePresentation {
 
   private func listChromeBounds(
     for lines: [ListDisplayLine],
-    in contentBounds: Rect
-  ) -> [Rect] {
+    in contentBounds: CellRect
+  ) -> [CellRect] {
     guard listContainer != nil, listChromeScope == .eachSection, !lines.isEmpty else {
       return []
     }
 
-    var bounds: [Rect] = []
+    var bounds: [CellRect] = []
     var rangeStart: Int?
     var activeSectionIndex: Int?
 
@@ -592,7 +592,7 @@ extension CollectionStylePresentation {
         return
       }
       bounds.append(
-        Rect(
+        CellRect(
           origin: .init(
             x: contentBounds.origin.x - listContentInsets.leading,
             y: contentBounds.origin.y + start

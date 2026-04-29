@@ -91,8 +91,8 @@ public final class SwiftUITUISceneHost {
   }
 
   public func resize(
-    to size: Size,
-    cellPixelSize: Size?
+    to size: CellSize,
+    cellPixelSize: PixelSize?
   ) {
     bridge.resize(to: size, cellPixelSize: cellPixelSize)
   }

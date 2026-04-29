@@ -24,7 +24,7 @@ struct ExclusiveGestureTests {
     LocalPointerEvent(
       kind: kind,
       location: location,
-      targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1))
+      targetRect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1))
     )
   }
 
@@ -95,7 +95,7 @@ struct ExclusiveGestureTests {
     let downEvent = LocalPointerEvent(
       kind: .down(.primary),
       location: .zero,
-      targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1)),
+      targetRect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)),
       timestamp: t0
     )
     _ = firstRec.handle(event: downEvent)

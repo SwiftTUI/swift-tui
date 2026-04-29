@@ -5,7 +5,7 @@ private enum ImageResourceRootsKey: EnvironmentKey {
 }
 
 package typealias ImageAssetResolver =
-  @Sendable (ImageSource, [String], Size) -> ResolvedImageAsset?
+  @Sendable (ImageSource, [String], PixelSize) -> ResolvedImageAsset?
 
 extension EnvironmentValues {
   public var imageResourceRoots: [String] {

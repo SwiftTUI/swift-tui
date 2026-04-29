@@ -80,16 +80,16 @@ private func forEachLinePoint(
 }
 
 public struct CanvasSketchDocument: Equatable, Sendable {
-  public var cellSize: Size
+  public var cellSize: CellSize
   public private(set) var cursor: CanvasSketchPoint
 
   private var pixels: [Bool]
 
   public init(
-    cellSize: Size = Size(width: 36, height: 12),
+    cellSize: CellSize = CellSize(width: 36, height: 12),
     cursor: CanvasSketchPoint = CanvasSketchPoint(x: 0, y: 0)
   ) {
-    let safeCellSize = Size(
+    let safeCellSize = CellSize(
       width: max(0, cellSize.width),
       height: max(0, cellSize.height)
     )
@@ -103,7 +103,7 @@ public struct CanvasSketchDocument: Equatable, Sendable {
 
   public static func sample() -> Self {
     var document = Self(
-      cellSize: Size(width: 36, height: 12),
+      cellSize: CellSize(width: 36, height: 12),
       cursor: CanvasSketchPoint(x: 12, y: 8)
     )
     let maxX = document.subpixelWidth - 1
@@ -201,13 +201,14 @@ public struct CanvasSketchDocument: Equatable, Sendable {
 
   public static func subpixelPoint(
     forLocalCell point: Point,
-    in cellSize: Size
+    in cellSize: CellSize
   ) -> CanvasSketchPoint {
     guard cellSize.width > 0, cellSize.height > 0 else {
       return CanvasSketchPoint(x: 0, y: 0)
     }
-    let cellX = min(max(0, point.x), cellSize.width - 1)
-    let cellY = min(max(0, point.y), cellSize.height - 1)
+    let cell = point.containingCell
+    let cellX = min(max(0, cell.x), cellSize.width - 1)
+    let cellY = min(max(0, cell.y), cellSize.height - 1)
     return CanvasSketchPoint(
       x: min(cellX * 2 + 1, cellSize.width * 2 - 1),
       y: min(cellY * 4 + 2, cellSize.height * 4 - 1)
@@ -239,7 +240,7 @@ public struct CanvasSketchDocument: Equatable, Sendable {
 
   private static func clamped(
     _ point: CanvasSketchPoint,
-    in cellSize: Size
+    in cellSize: CellSize
   ) -> CanvasSketchPoint {
     let maxX = max(0, cellSize.width * 2 - 1)
     let maxY = max(0, cellSize.height * 4 - 1)
@@ -251,16 +252,16 @@ public struct CanvasSketchDocument: Equatable, Sendable {
 }
 
 public struct CanvasPixelSketchDocument: Equatable, Sendable {
-  public var size: Size
+  public var size: CellSize
   public private(set) var cursor: CanvasSketchPoint
 
   private var pixels: [Bool]
 
   public init(
-    size: Size = Size(width: 24, height: 10),
+    size: CellSize = CellSize(width: 24, height: 10),
     cursor: CanvasSketchPoint = CanvasSketchPoint(x: 0, y: 0)
   ) {
-    let safeSize = Size(
+    let safeSize = CellSize(
       width: max(0, size.width),
       height: max(0, size.height)
     )
@@ -270,7 +271,7 @@ public struct CanvasPixelSketchDocument: Equatable, Sendable {
   }
 
   public static func sample(
-    size: Size = Size(width: 24, height: 10),
+    size: CellSize = CellSize(width: 24, height: 10),
     cursor: CanvasSketchPoint = CanvasSketchPoint(x: 8, y: 4)
   ) -> Self {
     var document = Self(size: size, cursor: cursor)
@@ -365,13 +366,14 @@ public struct CanvasPixelSketchDocument: Equatable, Sendable {
   public static func pixelPoint(
     forLocalCell point: Point,
     mode: CanvasPixelGridMode,
-    in size: Size
+    in size: CellSize
   ) -> CanvasSketchPoint {
     guard size.width > 0, size.height > 0 else {
       return CanvasSketchPoint(x: 0, y: 0)
     }
-    let cellX = min(max(0, point.x), size.width - 1)
-    let cellY = min(max(0, point.y), mode.cellHeight(for: size.height) - 1)
+    let cell = point.containingCell
+    let cellX = min(max(0, cell.x), size.width - 1)
+    let cellY = min(max(0, cell.y), mode.cellHeight(for: size.height) - 1)
     let y =
       switch mode {
       case .fullCell:
@@ -391,7 +393,7 @@ public struct CanvasPixelSketchDocument: Equatable, Sendable {
 
   private static func clamped(
     _ point: CanvasSketchPoint,
-    in size: Size
+    in size: CellSize
   ) -> CanvasSketchPoint {
     let maxX = max(0, size.width - 1)
     let maxY = max(0, size.height - 1)
@@ -610,7 +612,7 @@ public struct CanvasDemoView: View {
     document: CanvasSketchDocument = .sample(),
     fullCellDocument: CanvasPixelSketchDocument = .sample(),
     halfBlockDocument: CanvasPixelSketchDocument = .sample(
-      size: Size(width: 24, height: 18),
+      size: CellSize(width: 24, height: 18),
       cursor: CanvasSketchPoint(x: 8, y: 8)
     ),
     selectedCanvas: CanvasDemoCanvasType = .subcell,

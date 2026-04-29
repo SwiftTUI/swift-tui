@@ -7,7 +7,7 @@ import Testing
 private final class FakeSceneSession: HostedSceneSessionHandling {
   var startCount = 0
   var stopCount = 0
-  var receivedResizes: [(size: Size, cellPixelSize: Size?)] = []
+  var receivedResizes: [(size: CellSize, cellPixelSize: PixelSize?)] = []
   var receivedStyles: [TerminalRenderStyle] = []
   var receivedEvents: [InputEvent] = []
 
@@ -20,7 +20,7 @@ private final class FakeSceneSession: HostedSceneSessionHandling {
     receivedEvents.append(event)
   }
 
-  func resize(to size: Size, cellPixelSize: Size?) {
+  func resize(to size: CellSize, cellPixelSize: PixelSize?) {
     receivedResizes.append((size, cellPixelSize))
   }
 

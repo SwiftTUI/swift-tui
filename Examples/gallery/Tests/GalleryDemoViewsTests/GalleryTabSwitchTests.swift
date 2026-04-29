@@ -34,7 +34,7 @@ struct GalleryTabSwitchTests {
 
   @Test("clicking a gallery tab switches tabs without crashing")
   func clickingGalleryTabSwitchesSelection() async throws {
-    let terminalSize = Size(width: 80, height: 24)
+    let terminalSize = CellSize(width: 80, height: 24)
     let rootIdentity = Identity(components: [.named("GalleryTabSwitchClickTest")])
     let view = GalleryView()
 
@@ -47,10 +47,7 @@ struct GalleryTabSwitchTests {
     )
 
     let todoBounds = try #require(Self.boundsOfText("Todo", in: initial.placedTree))
-    let clickCenter = Point(
-      x: todoBounds.origin.x + todoBounds.size.width / 2,
-      y: todoBounds.origin.y + todoBounds.size.height / 2
-    )
+    let clickCenter = Self.centerPoint(of: todoBounds)
 
     let host = GalleryTabSwitchRecordingHost(size: terminalSize)
     _ = try await Self.runHarness(
@@ -74,7 +71,7 @@ struct GalleryTabSwitchTests {
 
   @Test("deleting the top todo row does not switch the gallery back to Counter")
   func deletingTopTodoRowKeepsTodoSelected() async throws {
-    let terminalSize = Size(width: 80, height: 24)
+    let terminalSize = CellSize(width: 80, height: 24)
     let rootIdentity = Identity(components: [.named("GalleryTodoDeleteSelectionRegression")])
     let view = GallerySelectionSeedHarness(initialSelection: .counter)
 
@@ -87,10 +84,7 @@ struct GalleryTabSwitchTests {
     )
 
     let todoBounds = try #require(Self.boundsOfText("Todo", in: initial.placedTree))
-    let todoClickCenter = Point(
-      x: todoBounds.origin.x + todoBounds.size.width / 2,
-      y: todoBounds.origin.y + todoBounds.size.height / 2
-    )
+    let todoClickCenter = Self.centerPoint(of: todoBounds)
 
     let todoSelected = DefaultRenderer().render(
       GallerySelectionSeedHarness(initialSelection: .todo),
@@ -100,10 +94,7 @@ struct GalleryTabSwitchTests {
     let deleteBounds = try #require(
       Self.boundsOfText("×", in: todoSelected.placedTree, chooseTopMost: true)
     )
-    let deleteClickCenter = Point(
-      x: deleteBounds.origin.x + deleteBounds.size.width / 2,
-      y: deleteBounds.origin.y + deleteBounds.size.height / 2
-    )
+    let deleteClickCenter = Self.centerPoint(of: deleteBounds)
 
     let host = GalleryTabSwitchRecordingHost(size: terminalSize)
     _ = try await Self.runHarness(
@@ -128,7 +119,7 @@ struct GalleryTabSwitchTests {
 
   @Test("real terminal host stays on Todo after deleting the top todo row")
   func realTerminalHostDeletingTopTodoRowKeepsTodoVisible() async throws {
-    let terminalSize = Size(width: 80, height: 24)
+    let terminalSize = CellSize(width: 80, height: 24)
     let rootIdentity = Identity(components: [.named("GalleryTodoDeleteRealTerminalHost")])
     let view = GallerySelectionSeedHarness(initialSelection: .counter)
 
@@ -141,10 +132,7 @@ struct GalleryTabSwitchTests {
     )
 
     let todoBounds = try #require(Self.boundsOfText("Todo", in: initial.placedTree))
-    let todoClickCenter = Point(
-      x: todoBounds.origin.x + todoBounds.size.width / 2,
-      y: todoBounds.origin.y + todoBounds.size.height / 2
-    )
+    let todoClickCenter = Self.centerPoint(of: todoBounds)
 
     let todoSelected = DefaultRenderer().render(
       GallerySelectionSeedHarness(initialSelection: .todo),
@@ -154,10 +142,7 @@ struct GalleryTabSwitchTests {
     let deleteBounds = try #require(
       Self.boundsOfText("×", in: todoSelected.placedTree, chooseTopMost: true)
     )
-    let deleteClickCenter = Point(
-      x: deleteBounds.origin.x + deleteBounds.size.width / 2,
-      y: deleteBounds.origin.y + deleteBounds.size.height / 2
-    )
+    let deleteClickCenter = Self.centerPoint(of: deleteBounds)
 
     let pty = try #require(Self.makePseudoTerminal(size: terminalSize))
     defer {
@@ -257,7 +242,7 @@ struct GalleryTabSwitchTests {
   @Test(
     "opening and dismissing the palette keeps Physics progress while Physics stays selected")
   func paletteOpenAndDismissKeepsPhysicsProgress() async throws {
-    let terminalSize = Size(width: 80, height: 24)
+    let terminalSize = CellSize(width: 80, height: 24)
     let rootIdentity = Identity(components: [.named("GalleryPhysicsPaletteContinuity")])
     let view = GallerySelectionSeedHarness(initialSelection: .physics)
     let host = GalleryTabSwitchRecordingHost(size: terminalSize)
@@ -321,7 +306,7 @@ struct GalleryTabSwitchTests {
 
   @Test("scene-hosted gallery stays on Todo after deleting the top todo row")
   func sceneHostedGalleryDeletingTopTodoRowKeepsTodoVisible() async throws {
-    let terminalSize = Size(width: 80, height: 24)
+    let terminalSize = CellSize(width: 80, height: 24)
     let rootIdentity = Identity(components: [.named("GalleryTodoDeleteSceneHostedBounds")])
 
     var env = EnvironmentValues()
@@ -333,10 +318,7 @@ struct GalleryTabSwitchTests {
     )
 
     let todoBounds = try #require(Self.boundsOfText("Todo", in: initial.placedTree))
-    let todoClickCenter = Point(
-      x: todoBounds.origin.x + todoBounds.size.width / 2,
-      y: todoBounds.origin.y + todoBounds.size.height / 2
-    )
+    let todoClickCenter = Self.centerPoint(of: todoBounds)
 
     let todoSelected = DefaultRenderer().render(
       GallerySelectionSeedHarness(initialSelection: .todo),
@@ -346,10 +328,7 @@ struct GalleryTabSwitchTests {
     let deleteBounds = try #require(
       Self.boundsOfText("×", in: todoSelected.placedTree, chooseTopMost: true)
     )
-    let deleteClickCenter = Point(
-      x: deleteBounds.origin.x + deleteBounds.size.width / 2,
-      y: deleteBounds.origin.y + deleteBounds.size.height / 2
-    )
+    let deleteClickCenter = Self.centerPoint(of: deleteBounds)
 
     let pty = try #require(Self.makePseudoTerminal(size: terminalSize))
     defer {
@@ -451,8 +430,8 @@ struct GalleryTabSwitchTests {
     _ target: String,
     in node: PlacedNode,
     chooseTopMost: Bool = false
-  ) -> Rect? {
-    var matches: [Rect] = []
+  ) -> CellRect? {
+    var matches: [CellRect] = []
     collectBoundsOfText(target, in: node, into: &matches)
     guard !matches.isEmpty else {
       return nil
@@ -471,7 +450,7 @@ struct GalleryTabSwitchTests {
   private static func collectBoundsOfText(
     _ target: String,
     in node: PlacedNode,
-    into matches: inout [Rect]
+    into matches: inout [CellRect]
   ) {
     if case .text(let content) = node.drawPayload, content == target {
       matches.append(node.bounds)
@@ -481,10 +460,19 @@ struct GalleryTabSwitchTests {
     }
   }
 
+  private static func centerPoint(of rect: CellRect) -> Point {
+    Point(
+      CellPoint(
+        x: rect.origin.x + rect.size.width / 2,
+        y: rect.origin.y + rect.size.height / 2
+      )
+    )
+  }
+
   @MainActor
   private static func runHarness<V: View>(
     host: GalleryTabSwitchRecordingHost,
-    terminalSize: Size,
+    terminalSize: CellSize,
     events: [InputEvent],
     rootIdentity: Identity,
     viewBuilder: @escaping () -> V
@@ -502,7 +490,7 @@ struct GalleryTabSwitchTests {
   private static func runHarness<V: View>(
     terminalHost: any TerminalHosting,
     terminalInputReader: any TerminalInputReading,
-    terminalSize: Size,
+    terminalSize: CellSize,
     rootIdentity: Identity,
     viewBuilder: @escaping () -> V
   ) async throws -> RunLoopResult<Int> {
@@ -562,7 +550,7 @@ struct GalleryTabSwitchTests {
   }
 
   private static func makePseudoTerminal(
-    size: Size
+    size: CellSize
   ) -> (master: Int32, slave: Int32)? {
     var master: Int32 = -1
     var slave: Int32 = -1
@@ -626,8 +614,9 @@ struct GalleryTabSwitchTests {
   private static func sgrPrimaryClick(
     at point: Point
   ) -> [UInt8] {
-    Array(
-      "\u{001B}[<0;\(point.x + 1);\(point.y + 1)M\u{001B}[<0;\(point.x + 1);\(point.y + 1)m"
+    let cell = point.containingCell
+    return Array(
+      "\u{001B}[<0;\(cell.x + 1);\(cell.y + 1)M\u{001B}[<0;\(cell.x + 1);\(cell.y + 1)m"
         .utf8
     )
   }
@@ -951,13 +940,13 @@ private final class GalleryTabSwitchEmptySignals: SignalReading {
 }
 
 private final class GalleryTabSwitchRecordingHost: TerminalHosting {
-  let surfaceSize: Size
+  let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   private(set) var surfaces: [RasterSurface] = []
   private(set) var lastPresentedSurface: RasterSurface?
 
-  init(size: Size) {
+  init(size: CellSize) {
     surfaceSize = size
   }
 
@@ -965,7 +954,7 @@ private final class GalleryTabSwitchRecordingHost: TerminalHosting {
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
@@ -994,12 +983,12 @@ private func deduplicated(
 }
 
 private struct PTYVisibleScreen {
-  private var size: Size
+  private var size: CellSize
   private var cells: [[Character]]
-  private var cursor = Point.zero
+  private var cursor = CellPoint.zero
   private var pendingBytes: [UInt8] = []
 
-  init(size: Size) {
+  init(size: CellSize) {
     self.size = size
     cells = Array(
       repeating: Array(repeating: " ", count: max(1, size.width)),
@@ -1139,7 +1128,7 @@ private struct PTYVisibleScreen {
     case 0x48, 0x66:  // H, f
       let row = max(1, values.first ?? 1) - 1
       let column = max(1, values.dropFirst().first ?? 1) - 1
-      cursor = Point(
+      cursor = CellPoint(
         x: min(max(0, size.width - 1), column),
         y: min(max(0, size.height - 1), row)
       )

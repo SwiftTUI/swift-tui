@@ -1,5 +1,5 @@
 public enum TerminalControlMessage: Equatable, Sendable {
-  case resize(Size)
+  case resize(CellSize)
   case style(TerminalRenderStyle)
 }
 

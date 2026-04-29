@@ -286,11 +286,11 @@ func pointerValueDelta(
 
 func sliderValue<Value: AdjustableControlValue>(
   at locationX: Int,
-  in trackRect: Rect,
+  in trackRect: CellRect,
   bounds: ClosedRange<Value>,
   step: Value
 ) -> Value {
-  let usableRect: Rect =
+  let usableRect: CellRect =
     if trackRect.size.width > 2 {
       .init(
         origin: .init(x: trackRect.origin.x + 1, y: trackRect.origin.y),

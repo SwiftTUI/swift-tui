@@ -50,7 +50,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var presentationRole: PresentationRole?
   public var selectionTag: SelectionTag?
   public var tabItemLabel: TabItemLabel?
-  public var explicitInteractionRect: Rect?
+  public var explicitInteractionRect: CellRect?
 
   public var isFocusable: Bool {
     get { explicitFocusability ?? false }
@@ -79,7 +79,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     presentationRole: PresentationRole? = nil,
     selectionTag: SelectionTag? = nil,
     tabItemLabel: TabItemLabel? = nil,
-    explicitInteractionRect: Rect? = nil
+    explicitInteractionRect: CellRect? = nil
   ) {
     self.init(
       isFocusable: isFocusable,
@@ -113,7 +113,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     presentationRole: PresentationRole? = nil,
     selectionTag: SelectionTag? = nil,
     tabItemLabel: TabItemLabel? = nil,
-    explicitInteractionRect: Rect? = nil
+    explicitInteractionRect: CellRect? = nil
   ) {
     explicitFocusability = isFocusable
     self.focusScopeBoundary = focusScopeBoundary
@@ -375,7 +375,7 @@ public struct ResolvedNode: Equatable, Sendable {
   public var semanticMetadata: SemanticMetadata
   public var lifecycleMetadata: LifecycleMetadata
   @_spi(Testing) public var drawPayload: DrawPayload
-  public var intrinsicSize: Size?
+  public var intrinsicSize: CellSize?
   package var indexedChildSource: (any IndexedChildSource)? {
     didSet {
       recomputeSupportsRetainedReuse()
@@ -417,7 +417,7 @@ public struct ResolvedNode: Equatable, Sendable {
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
-    intrinsicSize: Size? = nil
+    intrinsicSize: CellSize? = nil
   ) {
     self.identity = identity
     self.kind = kind
@@ -457,7 +457,7 @@ public struct ResolvedNode: Equatable, Sendable {
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
-    intrinsicSize: Size? = nil,
+    intrinsicSize: CellSize? = nil,
     indexedChildSource: (any IndexedChildSource)? = nil
   ) {
     self.identity = identity
@@ -721,9 +721,9 @@ public struct PlacedNode: Equatable, Sendable {
   public var identity: Identity
   package var kind: NodeKind
   public var environmentSnapshot: EnvironmentSnapshot
-  public var bounds: Rect
-  public var contentBounds: Rect
-  public var clipBounds: Rect?
+  public var bounds: CellRect
+  public var contentBounds: CellRect
+  public var clipBounds: CellRect?
   public var zIndex: Double
   public var children: [PlacedNode] {
     didSet {
@@ -774,9 +774,9 @@ public struct PlacedNode: Equatable, Sendable {
     identity: Identity,
     kind: NodeKind = .view("Unknown"),
     environmentSnapshot: EnvironmentSnapshot = .init(),
-    bounds: Rect,
-    contentBounds: Rect? = nil,
-    clipBounds: Rect? = nil,
+    bounds: CellRect,
+    contentBounds: CellRect? = nil,
+    clipBounds: CellRect? = nil,
     zIndex: Double = 0,
     children: [PlacedNode] = [],
     semanticRole: SemanticRole = .generic,
@@ -850,14 +850,14 @@ public struct PlacedNode: Equatable, Sendable {
 /// A rectangular hit region for keyboard or pointer interaction.
 public struct InteractionRegion: Equatable, Sendable {
   public var identity: Identity
-  public var rect: Rect
+  public var rect: CellRect
   public var routeID: RouteID
   public var hitTestOrder: Int
   public var captureOnPress: Bool
 
   public init(
     identity: Identity,
-    rect: Rect,
+    rect: CellRect,
     routeID: RouteID,
     hitTestOrder: Int = 0,
     captureOnPress: Bool = false
@@ -873,14 +873,14 @@ public struct InteractionRegion: Equatable, Sendable {
 /// A focusable region extracted from the placed tree.
 public struct FocusRegion: Equatable, Sendable {
   public var identity: Identity
-  public var rect: Rect
+  public var rect: CellRect
   public var focusInteractions: FocusInteractions
   package var scopePath: [Identity]
   package var sectionIdentity: Identity?
 
   public init(
     identity: Identity,
-    rect: Rect,
+    rect: CellRect,
     focusInteractions: FocusInteractions = .automatic,
     scopePath: [Identity] = [],
     sectionIdentity: Identity? = nil
@@ -896,13 +896,13 @@ public struct FocusRegion: Equatable, Sendable {
 /// Scroll metadata extracted for a scrollable node.
 public struct ScrollRoute: Equatable, Sendable {
   public var identity: Identity
-  public var viewportRect: Rect
-  public var contentBounds: Rect
+  public var viewportRect: CellRect
+  public var contentBounds: CellRect
 
   public init(
     identity: Identity,
-    viewportRect: Rect,
-    contentBounds: Rect
+    viewportRect: CellRect,
+    contentBounds: CellRect
   ) {
     self.identity = identity
     self.viewportRect = viewportRect
@@ -994,9 +994,9 @@ public struct PreformattedTextLine: Equatable, Sendable {
 }
 
 public indirect enum DrawCommand: Equatable, Sendable {
-  case group(bounds: Rect, children: [DrawCommand])
+  case group(bounds: CellRect, children: [DrawCommand])
   case text(
-    bounds: Rect,
+    bounds: CellRect,
     content: String,
     style: TextStyle,
     lineLimit: Int?,
@@ -1004,32 +1004,32 @@ public indirect enum DrawCommand: Equatable, Sendable {
     wrappingStrategy: TextWrappingStrategy
   )
   case preformattedText(
-    bounds: Rect,
+    bounds: CellRect,
     lines: [String],
     style: TextStyle
   )
   case styledPreformattedText(
-    bounds: Rect,
+    bounds: CellRect,
     lines: [PreformattedTextLine],
     style: TextStyle
   )
   case richText(
-    bounds: Rect,
+    bounds: CellRect,
     payload: RichTextPayload,
     lineLimit: Int?,
     truncationMode: TextTruncationMode,
     wrappingStrategy: TextWrappingStrategy
   )
-  case image(bounds: Rect, identity: Identity, payload: ImagePayload)
+  case image(bounds: CellRect, identity: Identity, payload: ImagePayload)
   case fill(
-    bounds: Rect,
+    bounds: CellRect,
     geometry: ShapeGeometry,
     insetAmount: Int,
     style: AnyShapeStyle,
     mode: ShapeFillMode
   )
   case stroke(
-    bounds: Rect,
+    bounds: CellRect,
     geometry: ShapeGeometry,
     insetAmount: Int,
     style: AnyShapeStyle,
@@ -1037,7 +1037,7 @@ public indirect enum DrawCommand: Equatable, Sendable {
     strokeBorder: Bool,
     backgroundStyle: BorderBackgroundStyle? = nil
   )
-  case rule(bounds: Rect, style: AnyShapeStyle, strokeStyle: StrokeStyle, stackAxis: Axis?)
+  case rule(bounds: CellRect, style: AnyShapeStyle, strokeStyle: StrokeStyle, stackAxis: Axis?)
   /// A layout-reserved border drawn by the rasterizer into the cells
   /// that `LayoutBehavior.border(...)`
   /// reserved during layout.  The outer `bounds` is the full wrapper
@@ -1051,7 +1051,7 @@ public indirect enum DrawCommand: Equatable, Sendable {
   /// the cells clockwise.  `blendPhase` rotates the gradient start
   /// point around the perimeter for chasing-light animation.
   case border(
-    bounds: Rect,
+    bounds: CellRect,
     set: BorderSet,
     foreground: BorderEdgeStyle?,
     background: BorderBackgroundStyle?,
@@ -1065,19 +1065,19 @@ public indirect enum DrawCommand: Equatable, Sendable {
   /// `foregroundStyle` to a concrete ``Color`` at paint time and
   /// passes it to the ``CanvasContext`` as its initial foreground.
   case canvas(
-    bounds: Rect,
+    bounds: CellRect,
     payload: CanvasPayload,
     foregroundStyle: AnyShapeStyle
   )
-  case clip(bounds: Rect, child: DrawCommand)
+  case clip(bounds: CellRect, child: DrawCommand)
 }
 
 /// A node in the draw tree emitted before rasterization.
 public struct DrawNode: Equatable, Sendable {
   public var identity: Identity
   public var environmentSnapshot: EnvironmentSnapshot
-  public var bounds: Rect
-  public var clipBounds: Rect?
+  public var bounds: CellRect
+  public var clipBounds: CellRect?
   package var metadata: DrawMetadata
   public var commands: [DrawCommand]
   /// Commands that must paint **after** this node's children have been
@@ -1096,8 +1096,8 @@ public struct DrawNode: Equatable, Sendable {
   package init(
     identity: Identity,
     environmentSnapshot: EnvironmentSnapshot = .init(),
-    bounds: Rect,
-    clipBounds: Rect? = nil,
+    bounds: CellRect,
+    clipBounds: CellRect? = nil,
     metadata: DrawMetadata = .init(),
     commands: [DrawCommand] = [],
     postCommands: [DrawCommand] = [],

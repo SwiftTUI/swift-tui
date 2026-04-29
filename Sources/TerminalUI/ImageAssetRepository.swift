@@ -104,7 +104,7 @@ struct DecodedImage: Sendable {
   /// supported format — this enum disambiguates without a second
   /// magic-byte sniff downstream.
   var encodedFormat: ImageEncodedFormat
-  var pixelSize: Size
+  var pixelSize: PixelSize
   /// Row-major RGBA pixels for the image's primary frame (first frame
   /// composited onto the logical screen for animated GIFs). The kitty
   /// renderer ships these as `f=32` for non-PNG sources.
@@ -129,7 +129,7 @@ struct AnimationFrame: Sendable {
 private struct ImageLookupKey: Sendable {
   var source: ImageSource
   var resourceRoots: [String]
-  var cellPixelSize: Size
+  var cellPixelSize: PixelSize
 }
 
 extension ImageLookupKey: Hashable {
@@ -262,7 +262,7 @@ final class ImageAssetRepository: Sendable {
   func resolve(
     _ source: ImageSource,
     resourceRoots: [String],
-    cellPixelSize: Size
+    cellPixelSize: PixelSize
   ) -> ResolvedImageAsset? {
     let lookupKey = ImageLookupKey(
       source: source,
@@ -432,9 +432,9 @@ final class ImageAssetRepository: Sendable {
   }
 
   private func intrinsicCellSize(
-    pixelSize: Size,
-    cellPixelSize: Size
-  ) -> Size {
+    pixelSize: PixelSize,
+    cellPixelSize: PixelSize
+  ) -> CellSize {
     guard pixelSize.width > 0, pixelSize.height > 0 else {
       return .zero
     }

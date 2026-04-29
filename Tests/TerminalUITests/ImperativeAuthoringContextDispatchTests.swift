@@ -101,8 +101,9 @@ struct ImperativeAuthoringContextDispatchTests {
     try renderInitial(secondary.runLoop)
 
     let region = try #require(primary.runLoop.latestSemanticSnapshot.interactionRegions.first)
-    let start = centerPoint(of: region.rect)
-    let dragged = Point(x: start.x + 4, y: start.y + 1)
+    let startCell = centerPoint(of: region.rect)
+    let start = Point(startCell)
+    let dragged = Point(CellPoint(x: startCell.x + 4, y: startCell.y + 1))
 
     _ = primary.runLoop.handle(.input(.mouse(.init(kind: .down(.primary), location: start))))
     try renderPending(primary.runLoop)
@@ -112,16 +113,16 @@ struct ImperativeAuthoringContextDispatchTests {
     try renderPending(secondary.runLoop)
 
     #expect(surfaceText(primary.host).contains("changed"))
-    #expect(surfaceText(primary.host).contains("offset:4,1"))
+    #expect(surfaceText(primary.host).contains("offset:4.0,1.0"))
     #expect(surfaceText(secondary.host).contains("idle"))
-    #expect(surfaceText(secondary.host).contains("offset:0,0"))
+    #expect(surfaceText(secondary.host).contains("offset:0.0,0.0"))
 
     _ = primary.runLoop.handle(.input(.mouse(.init(kind: .up(.primary), location: dragged))))
     try renderPending(primary.runLoop)
     try renderPending(secondary.runLoop)
 
     #expect(surfaceText(primary.host).contains("ended"))
-    #expect(surfaceText(primary.host).contains("offset:0,0"))
+    #expect(surfaceText(primary.host).contains("offset:0.0,0.0"))
     #expect(surfaceText(primary.host).contains("commits:1"))
     #expect(surfaceText(secondary.host).contains("idle"))
     #expect(surfaceText(secondary.host).contains("commits:0"))
@@ -786,7 +787,7 @@ private func makeRunLoop<V: View>(
   rootName: String,
   @ViewBuilder content: @escaping () -> V
 ) -> (runLoop: RunLoop<Int, V>, host: ImperativeScopeTerminalHost) {
-  let terminalSize = Size(width: 60, height: 8)
+  let terminalSize = CellSize(width: 60, height: 8)
   let host = ImperativeScopeTerminalHost(surfaceSizeProvider: { terminalSize })
   let rootIdentity = testIdentity(rootName)
   var environmentValues = EnvironmentValues()
@@ -841,8 +842,8 @@ private func focusLeafmostFocusable<State, V: View>(
   _ = runLoop.focusTracker.setFocus(to: leafmost.identity)
 }
 
-private func centerPoint(of rect: Rect) -> Point {
-  Point(
+private func centerPoint(of rect: CellRect) -> CellPoint {
+  CellPoint(
     x: rect.origin.x + rect.size.width / 2,
     y: rect.origin.y + rect.size.height / 2
   )
@@ -882,16 +883,16 @@ private func surfaceText(_ host: ImperativeScopeTerminalHost) -> String {
 }
 
 private final class ImperativeScopeTerminalHost: TerminalHosting {
-  var surfaceSize: Size { surfaceSizeProvider() }
+  var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
   var graphicsCapabilities: TerminalGraphicsCapabilities { .init() }
   var theme: Theme? { nil }
   private(set) var latestSurface: RasterSurface?
-  private let surfaceSizeProvider: () -> Size
+  private let surfaceSizeProvider: () -> CellSize
 
   init(
-    surfaceSizeProvider: @escaping () -> Size,
+    surfaceSizeProvider: @escaping () -> CellSize,
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
     appearance: TerminalAppearance = .fallback
   ) {
@@ -904,7 +905,7 @@ private final class ImperativeScopeTerminalHost: TerminalHosting {
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {

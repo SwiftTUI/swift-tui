@@ -14,7 +14,7 @@ struct OnLongPressGestureTests {
     let box = Box()
     let root = Identity(components: [IdentityComponent(rawValue: "r")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 10, height: 3)
+    env.terminalSize = CellSize(width: 10, height: 3)
 
     let pointerRegistry = LocalPointerHandlerRegistry()
     let gestureRegistry = LocalGestureRegistry()
@@ -42,7 +42,7 @@ struct OnLongPressGestureTests {
       routeID: region.routeID,
       event: .init(
         kind: .down(.primary),
-        location: region.rect.origin,
+        location: Point(region.rect.origin),
         targetRect: region.rect
       )
     )

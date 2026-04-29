@@ -83,14 +83,14 @@ private func runTerminationHarness(
 }
 
 private final class TerminationTestTerminalHost: TerminalHosting {
-  var surfaceSize: Size { Size(width: 20, height: 4) }
+  var surfaceSize: CellSize { CellSize(width: 20, height: 4) }
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
 
   func enableRawMode() throws {}
   func disableRawMode() throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
   func write(_: String) throws {}
 
   @discardableResult

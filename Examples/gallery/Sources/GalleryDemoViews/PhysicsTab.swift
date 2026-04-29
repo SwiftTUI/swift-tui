@@ -17,6 +17,7 @@ struct PhysicsTab: View {
         in: playfieldBounds,
         metrics: metrics
       )
+      let currentCell = current.snapped(.toNearestOrAwayFromZero)
       let height = max(
         1,
         Int((Double(FullScreenToyPhysics.diameter) / metrics.aspectRatio).rounded())
@@ -25,7 +26,7 @@ struct PhysicsTab: View {
       ZStack(alignment: .topLeading) {
         Circle()
           .frame(width: FullScreenToyPhysics.diameter, height: height)
-          .offset(x: current.x, y: current.y)
+          .offset(x: currentCell.x, y: currentCell.y)
           .foregroundStyle(.cyan)
           .gesture(dragGesture(in: playfieldBounds, metrics: metrics))
       }
@@ -40,7 +41,7 @@ struct PhysicsTab: View {
   }
 
   private func dragGesture(
-    in bounds: Size,
+    in bounds: CellSize,
     metrics: CellPixelMetrics
   ) -> some Gesture {
     DragGesture()
@@ -63,7 +64,7 @@ struct PhysicsTab: View {
 
   @MainActor
   private func runToyLoop(
-    in bounds: Size,
+    in bounds: CellSize,
     metrics: CellPixelMetrics
   ) async {
     if !didSeedInitialPosition {
@@ -116,7 +117,7 @@ struct FullScreenToyPhysics {
     let width: Int
     let height: Int
 
-    init(size: Size) {
+    init(size: CellSize) {
       width = size.width
       height = size.height
     }
@@ -144,17 +145,17 @@ struct FullScreenToyPhysics {
   static func displayPosition(
     for state: State,
     dragOffset: Size,
-    in bounds: Size,
+    in bounds: CellSize,
     metrics: CellPixelMetrics
   ) -> Point {
     let dragged = FixedPoint(
-      x: state.position.x + dragOffset.width * fixedScale,
-      y: state.position.y + dragOffset.height * fixedScale
+      x: state.position.x + Int((dragOffset.width * Double(fixedScale)).rounded()),
+      y: state.position.y + Int((dragOffset.height * Double(fixedScale)).rounded())
     )
     let clampedPoint = clamped(dragged, in: bounds, metrics: metrics)
     return Point(
-      x: clampedPoint.x / fixedScale,
-      y: clampedPoint.y / fixedScale
+      x: Double(clampedPoint.x) / Double(fixedScale),
+      y: Double(clampedPoint.y) / Double(fixedScale)
     )
   }
 
@@ -162,17 +163,17 @@ struct FullScreenToyPhysics {
     to state: inout State,
     translation: Size,
     velocity: Size,
-    in bounds: Size,
+    in bounds: CellSize,
     metrics: CellPixelMetrics
   ) {
-    state.position.x += translation.width * fixedScale
-    state.position.y += translation.height * fixedScale
+    state.position.x += Int((translation.width * Double(fixedScale)).rounded())
+    state.position.y += Int((translation.height * Double(fixedScale)).rounded())
     state = clamped(state, in: bounds, metrics: metrics)
     state.velocity = releaseVelocity(from: velocity, metrics: metrics)
   }
 
   static func spawnState(
-    in bounds: Size,
+    in bounds: CellSize,
     metrics: CellPixelMetrics
   ) -> State {
     let maximumOrigin = maximumOrigin(in: bounds, metrics: metrics)
@@ -189,9 +190,9 @@ struct FullScreenToyPhysics {
   }
 
   static func playfieldBounds(
-    from bounds: Size
-  ) -> Size {
-    Size(
+    from bounds: CellSize
+  ) -> CellSize {
+    CellSize(
       width: max(0, bounds.width - playfieldWidthInset),
       height: max(0, bounds.height - playfieldHeightInset)
     )
@@ -204,16 +205,14 @@ struct FullScreenToyPhysics {
     FixedVelocity(
       x: fixedVelocityComponent(fromCellsPerSecond: gestureVelocity.width),
       y: fixedVelocityComponent(
-        fromCellsPerSecond: Int(
-          (Double(gestureVelocity.height) / metrics.aspectRatio).rounded()
-        )
+        fromCellsPerSecond: gestureVelocity.height / metrics.aspectRatio
       )
     )
   }
 
   static func step(
     _ state: inout State,
-    in bounds: Size,
+    in bounds: CellSize,
     metrics: CellPixelMetrics
   ) {
     state = clamped(state, in: bounds, metrics: metrics)
@@ -283,7 +282,7 @@ struct FullScreenToyPhysics {
 
   static func clamped(
     _ state: State,
-    in bounds: Size,
+    in bounds: CellSize,
     metrics: CellPixelMetrics
   ) -> State {
     var state = state
@@ -292,7 +291,7 @@ struct FullScreenToyPhysics {
   }
 
   static func maximumOrigin(
-    in bounds: Size,
+    in bounds: CellSize,
     metrics: CellPixelMetrics
   ) -> FixedPoint {
     let height = max(1, Int((Double(diameter) / metrics.aspectRatio).rounded()))
@@ -304,7 +303,7 @@ struct FullScreenToyPhysics {
 
   private static func clamped(
     _ point: FixedPoint,
-    in bounds: Size,
+    in bounds: CellSize,
     metrics: CellPixelMetrics
   ) -> FixedPoint {
     let maximumOrigin = maximumOrigin(in: bounds, metrics: metrics)
@@ -315,7 +314,7 @@ struct FullScreenToyPhysics {
   }
 
   private static func fixedVelocityComponent(
-    fromCellsPerSecond component: Int
+    fromCellsPerSecond component: Double
   ) -> Int {
     Int(
       (Double(component) * Double(fixedScale) * Double(tickNanoseconds)

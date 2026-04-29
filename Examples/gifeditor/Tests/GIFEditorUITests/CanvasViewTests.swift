@@ -11,7 +11,7 @@ struct CanvasViewTests {
   func canvasViewRendersPixelGridAndOverlay() {
     let red = EditorColor(rgbHex: 0xE05757)
     let blue = EditorColor(rgbHex: 0x5BA3FF)
-    let size = PixelSize(width: 2, height: 2)
+    let size = GIFEditorCore.PixelSize(width: 2, height: 2)
     let raster = render(
       CanvasView(
         size: size,
@@ -19,7 +19,7 @@ struct CanvasViewTests {
           red, nil,
           blue, .white,
         ],
-        cursor: PixelPoint(x: 0, y: 0),
+        cursor: GIFEditorCore.PixelPoint(x: 0, y: 0),
         selection: nil,
         pendingMarqueeAnchor: nil,
         pendingGradientAnchor: nil
@@ -38,7 +38,7 @@ struct CanvasViewTests {
   func canvasViewRendersHalfBlockMode() {
     let red = EditorColor(rgbHex: 0xE05757)
     let blue = EditorColor(rgbHex: 0x5BA3FF)
-    let size = PixelSize(width: 2, height: 3)
+    let size = GIFEditorCore.PixelSize(width: 2, height: 3)
     let raster = render(
       CanvasView(
         size: size,
@@ -47,7 +47,7 @@ struct CanvasViewTests {
           blue, .white,
           red, nil,
         ],
-        cursor: PixelPoint(x: 1, y: 2),
+        cursor: GIFEditorCore.PixelPoint(x: 1, y: 2),
         selection: nil,
         pendingMarqueeAnchor: nil,
         pendingGradientAnchor: nil,
@@ -73,7 +73,7 @@ private func render(
   id: String = "\(#fileID).\(#function)"
 ) -> FrameArtifacts {
   var env = EnvironmentValues()
-  env.terminalSize = Size(width: width, height: height)
+  env.terminalSize = CellSize(width: width, height: height)
   return DefaultRenderer().render(
     view,
     context: ResolveContext(

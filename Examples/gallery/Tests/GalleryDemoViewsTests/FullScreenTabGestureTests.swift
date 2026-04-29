@@ -10,7 +10,7 @@ struct PhysicsTabGestureTests {
 
   @Test("fullscreen toy starts at bottom center with its initial launch velocity")
   func spawnStateStartsAtBottomCenter() {
-    let terminalSize = Size(width: 40, height: 12)
+    let terminalSize = CellSize(width: 40, height: 12)
     let playfield = FullScreenToyPhysics.playfieldBounds(from: terminalSize)
     let floor = FullScreenToyPhysics.maximumOrigin(in: playfield, metrics: .estimated)
 
@@ -24,7 +24,7 @@ struct PhysicsTabGestureTests {
 
   @Test("fullscreen toy physics applies gravity and bounces off the floor")
   func physicsBouncesOffFloor() {
-    let terminalSize = Size(width: 40, height: 12)
+    let terminalSize = CellSize(width: 40, height: 12)
     let floor = FullScreenToyPhysics.maximumOrigin(in: terminalSize, metrics: .estimated)
     var state = FullScreenToyPhysics.State(
       position: .init(x: 10 * FullScreenToyPhysics.fixedScale, y: floor.y - 1),
@@ -39,7 +39,7 @@ struct PhysicsTabGestureTests {
 
   @Test("fullscreen toy physics reflects from the right wall")
   func physicsReflectsOffRightWall() {
-    let terminalSize = Size(width: 40, height: 12)
+    let terminalSize = CellSize(width: 40, height: 12)
     let wall = FullScreenToyPhysics.maximumOrigin(in: terminalSize, metrics: .estimated)
     var state = FullScreenToyPhysics.State(
       position: .init(x: wall.x - 2, y: 4 * FullScreenToyPhysics.fixedScale),
@@ -54,7 +54,7 @@ struct PhysicsTabGestureTests {
 
   @Test("fullscreen toy release converts gesture velocity into physics velocity")
   func releaseConvertsGestureVelocity() {
-    let terminalSize = Size(width: 40, height: 12)
+    let terminalSize = CellSize(width: 40, height: 12)
     var state = FullScreenToyPhysics.State()
 
     FullScreenToyPhysics.applyRelease(
@@ -70,7 +70,7 @@ struct PhysicsTabGestureTests {
 
   @Test("fullscreen demo keeps presenting frames while gravity runs")
   func gravityLoopSchedulesRuntimeFrames() async throws {
-    let terminalSize = Size(width: 40, height: 12)
+    let terminalSize = CellSize(width: 40, height: 12)
     let rootIdentity = Identity(components: [.named("PhysicsTabGravityLoop")])
     let host = GestureRecordingHost(size: terminalSize)
     let result = try await runHarness(
@@ -96,7 +96,7 @@ struct PhysicsTabGestureTests {
 
   @Test("dragging the fullscreen demo rectangle updates the rendered surface and commits position")
   func draggingRectangleUpdatesAndCommits() async throws {
-    let terminalSize = Size(width: 40, height: 12)
+    let terminalSize = CellSize(width: 40, height: 12)
     let rootIdentity = Identity(components: [.named("PhysicsTabGestureTest")])
     let view = PhysicsTab()
 
@@ -142,7 +142,7 @@ struct PhysicsTabGestureTests {
 
   @Test("fullscreen demo rectangle remains draggable after its offset changes")
   func draggingRectangleTwiceTracksItsMovedPosition() async throws {
-    let terminalSize = Size(width: 40, height: 12)
+    let terminalSize = CellSize(width: 40, height: 12)
     let rootIdentity = Identity(components: [.named("PhysicsTabGestureTwiceTest")])
     let view = PhysicsTab()
 
@@ -199,7 +199,7 @@ struct PhysicsTabGestureTests {
 
   @Test("fullscreen tab wrapped in a bottom toolbar renders the palette item")
   func fullscreenToolbarRendersPaletteItem() {
-    let terminalSize = Size(width: 40, height: 12)
+    let terminalSize = CellSize(width: 40, height: 12)
     var env = EnvironmentValues()
     env.terminalSize = terminalSize
 
@@ -223,7 +223,7 @@ struct PhysicsTabGestureTests {
 
   @Test("fullscreen toolbar stays present in the rendered surface while animation ticks")
   func fullscreenToolbarStaysPresentAcrossAnimationFrames() async throws {
-    let terminalSize = Size(width: 40, height: 12)
+    let terminalSize = CellSize(width: 40, height: 12)
     let rootIdentity = Identity(components: [.named("FullScreenToolbarAnimationVisibility")])
     let host = GestureRecordingHost(size: terminalSize)
 
@@ -340,12 +340,12 @@ private final class AwaitedTerminalInputReader: TerminalInputReading {
 }
 
 private final class GestureRecordingHost: TerminalHosting {
-  let surfaceSize: Size
+  let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   private(set) var surfaces: [RasterSurface] = []
 
-  init(size: Size) {
+  init(size: CellSize) {
     self.surfaceSize = size
   }
 
@@ -353,7 +353,7 @@ private final class GestureRecordingHost: TerminalHosting {
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
@@ -365,7 +365,7 @@ private final class GestureRecordingHost: TerminalHosting {
 @MainActor
 private func runHarness<V: View>(
   host: GestureRecordingHost,
-  terminalSize: Size,
+  terminalSize: CellSize,
   rootIdentity: Identity,
   viewBuilder: @escaping () -> V,
   eventSchedule: [ScheduledInputEvent]
@@ -382,7 +382,7 @@ private func runHarness<V: View>(
 @MainActor
 private func runHarness<V: View>(
   host: GestureRecordingHost,
-  terminalSize: Size,
+  terminalSize: CellSize,
   rootIdentity: Identity,
   viewBuilder: @escaping () -> V,
   terminalInputReader: any TerminalInputReading
@@ -409,14 +409,16 @@ private func runHarness<V: View>(
   return try await runLoop.run()
 }
 
-private func centerPoint(of rect: Rect) -> Point {
+private func centerPoint(of rect: CellRect) -> Point {
   Point(
-    x: rect.origin.x + rect.size.width / 2,
-    y: rect.origin.y + rect.size.height / 2
+    CellPoint(
+      x: rect.origin.x + rect.size.width / 2,
+      y: rect.origin.y + rect.size.height / 2
+    )
   )
 }
 
-private func firstShapeBounds(in node: PlacedNode) -> Rect? {
+private func firstShapeBounds(in node: PlacedNode) -> CellRect? {
   if case .shape = node.drawPayload {
     return node.bounds
   }

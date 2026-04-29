@@ -2,10 +2,10 @@ extension LayoutEngine {
   package func measuredTableSize(
     for payload: TablePayload,
     proposal: ProposedSize
-  ) -> Size {
+  ) -> CellSize {
     let idealSize = measuredTableIdealSize(for: payload)
 
-    return Size(
+    return CellSize(
       width: resolvedExpandingListDimension(idealSize.width, proposal: proposal.width),
       height: resolvedExpandingListDimension(idealSize.height, proposal: proposal.height)
     )
@@ -13,7 +13,7 @@ extension LayoutEngine {
 
   package func measuredTableIdealSize(
     for payload: TablePayload
-  ) -> Size {
+  ) -> CellSize {
     let widths = measureTableColumnWidths(
       columns: payload.columns,
       rows: payload.rows
@@ -40,7 +40,7 @@ extension LayoutEngine {
       }
     }
 
-    return Size(
+    return CellSize(
       width: lineMetrics.width,
       height: lineMetrics.height
     )

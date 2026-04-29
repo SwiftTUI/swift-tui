@@ -30,15 +30,15 @@ package struct ListDisplayLine {
 }
 
 package struct ListVisibleLayout {
-  package var contentBounds: Rect
+  package var contentBounds: CellRect
   package var lines: [ListDisplayLine]
-  package var sectionChromeBounds: [Rect]
+  package var sectionChromeBounds: [CellRect]
 }
 
 extension DrawExtractor {
   func listCommands(
     for payload: ListPayload,
-    in bounds: Rect
+    in bounds: CellRect
   ) -> [DrawCommand] {
     let layout = payload.style.visibleListLayout(
       for: payload,
@@ -53,7 +53,7 @@ extension DrawExtractor {
     let lines = layout.lines
 
     for (index, line) in lines.enumerated() {
-      let lineBounds = Rect(
+      let lineBounds = CellRect(
         origin: .init(x: contentBounds.origin.x, y: contentBounds.origin.y + index),
         size: .init(width: contentBounds.size.width, height: 1)
       )
@@ -84,11 +84,11 @@ extension DrawExtractor {
         }
 
         let markerWidth = layoutText(for: marker, width: nil).size.width
-        let markerBounds = Rect(
+        let markerBounds = CellRect(
           origin: lineBounds.origin,
           size: .init(width: min(lineBounds.size.width, markerWidth), height: 1)
         )
-        let textBounds = Rect(
+        let textBounds = CellRect(
           origin: .init(x: lineBounds.origin.x + markerBounds.size.width, y: lineBounds.origin.y),
           size: .init(width: max(0, lineBounds.size.width - markerBounds.size.width), height: 1)
         )
@@ -134,7 +134,7 @@ extension DrawExtractor {
 
   private func listChromeCommands(
     for payload: ListPayload,
-    in bounds: Rect,
+    in bounds: CellRect,
     layout: ListVisibleLayout
   ) -> [DrawCommand] {
     guard let container = payload.style.listContainer else {
@@ -165,7 +165,7 @@ extension DrawExtractor {
   }
 
   func scrollIndicatorCommands(
-    bounds: Rect,
+    bounds: CellRect,
     drawMetadata: DrawMetadata,
     children: [PlacedNode]
   ) -> [DrawCommand] {

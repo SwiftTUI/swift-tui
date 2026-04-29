@@ -145,7 +145,7 @@ private final class Box<Value> {
 private func makeDropRunLoop<V: View>(
   @ViewBuilder content: @escaping () -> V
 ) -> RunLoop<Int, V> {
-  let terminalSize = Size(width: 40, height: 10)
+  let terminalSize = CellSize(width: 40, height: 10)
   let terminal = DropDispatchTerminalHost(surfaceSizeProvider: { terminalSize })
   let rootIdentity = testIdentity("DropDispatchRoot")
   var environmentValues = EnvironmentValues()
@@ -177,16 +177,16 @@ private func renderInitial<State, V: View>(_ runLoop: RunLoop<State, V>) throws 
 }
 
 private final class DropDispatchTerminalHost: TerminalHosting {
-  var surfaceSize: Size { surfaceSizeProvider() }
+  var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
   var graphicsCapabilities: TerminalGraphicsCapabilities { .init() }
   var theme: Theme? { nil }
   private(set) var latestSurface: RasterSurface?
-  private let surfaceSizeProvider: () -> Size
+  private let surfaceSizeProvider: () -> CellSize
 
   init(
-    surfaceSizeProvider: @escaping () -> Size,
+    surfaceSizeProvider: @escaping () -> CellSize,
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
     appearance: TerminalAppearance = .fallback
   ) {
@@ -199,7 +199,7 @@ private final class DropDispatchTerminalHost: TerminalHosting {
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {

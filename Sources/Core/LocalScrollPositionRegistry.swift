@@ -121,7 +121,7 @@ package final class LocalScrollPositionRegistry: Equatable {
 
   private func adjustedOffset(
     _ currentOffset: ScrollOffset,
-    revealing focusRect: Rect,
+    revealing focusRect: CellRect,
     in route: ScrollRoute
   ) -> ScrollOffset {
     var next = currentOffset

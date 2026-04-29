@@ -105,7 +105,7 @@ public struct GestureAttachmentModifier<G: Gesture>: PrimitiveViewModifier {
 extension View {
   /// Overrides the hit-test region for gesture recognition.
   /// Pass `nil` to use the view's natural bounds.
-  public func contentShape(_ rect: Rect?) -> some View {
+  public func contentShape(_ rect: CellRect?) -> some View {
     modifier(
       ContentShapeModifier(
         explicitRect: rect
@@ -116,7 +116,7 @@ extension View {
 
 @MainActor
 public struct ContentShapeModifier: PrimitiveViewModifier {
-  let explicitRect: Rect?
+  let explicitRect: CellRect?
 
   package func resolve<Content: View>(
     content: ModifierContentInputs<Content>,

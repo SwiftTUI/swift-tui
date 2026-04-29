@@ -15,7 +15,7 @@ struct GestureRunLoopDispatchTests {
     }
 
     let box = Box()
-    let terminalSize = Size(width: 20, height: 5)
+    let terminalSize = CellSize(width: 20, height: 5)
     let rootIdentity = Identity(components: [.named("GestureRunLoopTap")])
     let view = Text("Tap")
       .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
@@ -64,7 +64,7 @@ struct GestureRunLoopDispatchTests {
     }
 
     let box = Box()
-    let terminalSize = Size(width: 20, height: 5)
+    let terminalSize = CellSize(width: 20, height: 5)
     let rootIdentity = Identity(components: [.named("GestureRunLoopSpatialTap")])
     let view = Text("Tap")
       .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
@@ -90,7 +90,10 @@ struct GestureRunLoopDispatchTests {
     )
 
     let region = try #require(initial.semanticSnapshot.interactionRegions.first)
-    let point = Point(x: region.rect.origin.x + 3, y: region.rect.origin.y)
+    let point = Point(
+      x: Double(region.rect.origin.x + 3),
+      y: Double(region.rect.origin.y)
+    )
 
     let host = RecordingGestureTerminalHost(size: terminalSize)
     let result = try await runHarness(
@@ -115,7 +118,7 @@ struct GestureRunLoopDispatchTests {
     }
 
     let box = Box()
-    let terminalSize = Size(width: 20, height: 5)
+    let terminalSize = CellSize(width: 20, height: 5)
     let rootIdentity = Identity(components: [.named("GestureRunLoopLongPress")])
     let view = Text("Hold")
       .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
@@ -168,7 +171,7 @@ struct GestureRunLoopDispatchTests {
     }
 
     let counts = Counts()
-    let terminalSize = Size(width: 20, height: 5)
+    let terminalSize = CellSize(width: 20, height: 5)
     let rootIdentity = Identity(components: [.named("GestureRunLoopExclusiveTap")])
     let view = Text("Tap")
       .frame(minWidth: 5, maxWidth: 5, minHeight: 1, maxHeight: 1)
@@ -218,7 +221,7 @@ struct GestureRunLoopDispatchTests {
 @MainActor
 private func runHarness<V: View>(
   host: RecordingGestureTerminalHost,
-  terminalSize: Size,
+  terminalSize: CellSize,
   rootIdentity: Identity,
   schedule: [ScheduledGestureInputEvent],
   viewBuilder: @escaping () -> V
@@ -255,10 +258,10 @@ private struct ScheduledGestureInputEvent {
   }
 }
 
-private func centerPoint(of rect: Rect) -> Point {
+private func centerPoint(of rect: CellRect) -> Point {
   Point(
-    x: rect.origin.x + rect.size.width / 2,
-    y: rect.origin.y + rect.size.height / 2
+    x: Double(rect.origin.x + rect.size.width / 2),
+    y: Double(rect.origin.y + rect.size.height / 2)
   )
 }
 
@@ -298,11 +301,11 @@ private final class EmptyGestureSignals: SignalReading {
 }
 
 private final class RecordingGestureTerminalHost: TerminalHosting {
-  let surfaceSize: Size
+  let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
 
-  init(size: Size) {
+  init(size: CellSize) {
     self.surfaceSize = size
   }
 
@@ -310,7 +313,7 @@ private final class RecordingGestureTerminalHost: TerminalHosting {
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_: RasterSurface) throws -> TerminalPresentationMetrics {

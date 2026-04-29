@@ -19,12 +19,12 @@ import TerminalUI
 
     var focusPresentation: FocusPresentation = .none
     var allowsTextInput = false
-    var onResize: ((Size, Size?) -> Void)?
+    var onResize: ((CellSize, PixelSize?) -> Void)?
     var onInputEvent: ((InputEvent) -> Void)?
 
     private var metrics = NativeTerminalMetrics(style: .default)
-    private var lastPublishedGrid: Size?
-    private var lastPublishedCellPixelSize: Size?
+    private var lastPublishedGrid: CellSize?
+    private var lastPublishedCellPixelSize: PixelSize?
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -180,12 +180,12 @@ import TerminalUI
       didSet { syncFirstResponder() }
     }
 
-    var onResize: ((Size, Size?) -> Void)?
+    var onResize: ((CellSize, PixelSize?) -> Void)?
     var onInputEvent: ((InputEvent) -> Void)?
 
     private var metrics = NativeTerminalMetrics(style: .default)
-    private var lastPublishedGrid: Size?
-    private var lastPublishedCellPixelSize: Size?
+    private var lastPublishedGrid: CellSize?
+    private var lastPublishedCellPixelSize: PixelSize?
 
     override init(frame: CGRect) {
       super.init(frame: frame)
@@ -378,8 +378,8 @@ private struct NativeTerminalMetrics {
 
   func gridSize(
     for boundsSize: CGSize
-  ) -> Size {
-    Size(
+  ) -> CellSize {
+    CellSize(
       width: max(1, Int(boundsSize.width / cellSize.width)),
       height: max(1, Int(boundsSize.height / cellSize.height))
     )
@@ -387,8 +387,8 @@ private struct NativeTerminalMetrics {
 
   func cellPixelSize(
     scale: CGFloat
-  ) -> Size {
-    Size(
+  ) -> PixelSize {
+    PixelSize(
       width: max(1, Int((cellSize.width * scale).rounded())),
       height: max(1, Int((cellSize.height * scale).rounded()))
     )
@@ -400,7 +400,7 @@ private struct NativeTerminalMetrics {
   ) -> Point {
     let x = max(0, min(Int(local.x / cellSize.width), Int(bounds.width / cellSize.width)))
     let y = max(0, min(Int(local.y / cellSize.height), Int(bounds.height / cellSize.height)))
-    return Point(x: x, y: y)
+    return Point(CellPoint(x: x, y: y))
   }
 
   func font(

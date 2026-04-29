@@ -355,14 +355,14 @@ extension SnapshotRenderer {
     }
   }
 
-  private func describe(_ size: Size?) -> String {
+  private func describe(_ size: CellSize?) -> String {
     guard let size else {
       return "nil"
     }
     return "\(size.width)x\(size.height)"
   }
 
-  private func describe(_ rect: Rect) -> String {
+  private func describe(_ rect: CellRect) -> String {
     "@(\(rect.origin.x),\(rect.origin.y)) \(rect.size.width)x\(rect.size.height)"
   }
 

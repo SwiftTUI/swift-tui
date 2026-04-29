@@ -12,7 +12,7 @@ struct PointerEventTimestampTests {
     let event = LocalPointerEvent(
       kind: .down(.primary),
       location: .zero,
-      targetRect: Rect(origin: .zero, size: Size(width: 1, height: 1)),
+      targetRect: CellRect(origin: .zero, size: CellSize(width: 1, height: 1)),
       timestamp: now
     )
     #expect(event.timestamp == now)
@@ -24,7 +24,7 @@ struct PointerEventTimestampTests {
     let event = LocalPointerEvent(
       kind: .down(.primary),
       location: .zero,
-      targetRect: Rect(origin: .zero, size: Size(width: 1, height: 1))
+      targetRect: CellRect(origin: .zero, size: CellSize(width: 1, height: 1))
     )
     let after = MonotonicInstant.now()
     #expect(event.timestamp >= before && event.timestamp <= after)

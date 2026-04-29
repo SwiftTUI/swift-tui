@@ -323,7 +323,7 @@ package struct LayoutMetadata: Sendable {
       }
   }
 
-  package func viewDimensions(for size: Size) -> ViewDimensions {
+  package func viewDimensions(for size: CellSize) -> ViewDimensions {
     applyingGuides(to: ViewDimensions(width: size.width, height: size.height))
   }
 }
@@ -347,9 +347,9 @@ extension LayoutMetadata: Equatable {
 /// The measured size assigned to a child during container layout.
 public struct ChildAllocation: Equatable, Sendable {
   public var identity: Identity
-  public var size: Size
+  public var size: CellSize
 
-  public init(identity: Identity, size: Size) {
+  public init(identity: Identity, size: CellSize) {
     self.identity = identity
     self.size = size
   }
@@ -405,7 +405,7 @@ package typealias LazyStackViewportContext = ScrollViewportContext
 public struct MeasuredNode: Equatable, Sendable {
   public var identity: Identity
   public var proposal: ProposedSize
-  public var measuredSize: Size
+  public var measuredSize: CellSize
   public var childMeasurements: [MeasuredNode] {
     didSet {
       recomputeSubtreeNodeCount()
@@ -417,7 +417,7 @@ public struct MeasuredNode: Equatable, Sendable {
   public init(
     identity: Identity,
     proposal: ProposedSize,
-    measuredSize: Size,
+    measuredSize: CellSize,
     childMeasurements: [MeasuredNode] = [],
     containerAllocationSnapshot: ContainerAllocationSnapshot? = nil
   ) {
@@ -443,7 +443,7 @@ public protocol CustomLayoutProxy: AnyObject, Sendable {
     engine: LayoutEngine,
     node: ResolvedNode,
     proposal: ProposedSize
-  ) -> Size
+  ) -> CellSize
 
   func measureChildren(
     engine: LayoutEngine,
@@ -455,7 +455,7 @@ public protocol CustomLayoutProxy: AnyObject, Sendable {
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect
+    in bounds: CellRect
   ) -> [PlacedNode]
 }
 
@@ -487,7 +487,7 @@ package protocol WorkerCustomLayoutProxy: Sendable {
     node: ResolvedNode,
     proposal: ProposedSize,
     passContext: LayoutPassContext?
-  ) -> Size
+  ) -> CellSize
 
   func measureChildren(
     engine: LayoutEngine,
@@ -500,7 +500,7 @@ package protocol WorkerCustomLayoutProxy: Sendable {
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     passContext: LayoutPassContext?
   ) -> [PlacedNode]
 }
@@ -522,11 +522,11 @@ extension WorkerCustomLayoutProxy {
 /// frame-tail worker.
 package struct WorkerCustomLayoutSnapshot: WorkerCustomLayoutProxy {
   package typealias MeasureContainerHandler =
-    @Sendable (LayoutEngine, ResolvedNode, ProposedSize, LayoutPassContext?) -> Size
+    @Sendable (LayoutEngine, ResolvedNode, ProposedSize, LayoutPassContext?) -> CellSize
   package typealias MeasureChildrenHandler =
     @Sendable (LayoutEngine, ResolvedNode, ProposedSize, LayoutPassContext?) -> [MeasuredNode]
   package typealias PlaceSubviewsHandler =
-    @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) ->
+    @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, CellRect, LayoutPassContext?) ->
     [PlacedNode]
 
   package var debugName: String
@@ -551,7 +551,7 @@ package struct WorkerCustomLayoutSnapshot: WorkerCustomLayoutProxy {
     node: ResolvedNode,
     proposal: ProposedSize,
     passContext: LayoutPassContext?
-  ) -> Size {
+  ) -> CellSize {
     measureContainerHandler(engine, node, proposal, passContext)
   }
 
@@ -573,7 +573,7 @@ package struct WorkerCustomLayoutSnapshot: WorkerCustomLayoutProxy {
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
     placeSubviewsHandler(engine, node, measured, bounds, passContext)
@@ -588,7 +588,8 @@ public final class CustomLayoutHandle: Sendable {
   package let placementReuseSignature: String?
   package let placementHandler:
     (
-      @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) -> [PlacedNode]
+      @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, CellRect, LayoutPassContext?) ->
+        [PlacedNode]
     )?
 
   public init(
@@ -610,7 +611,7 @@ public final class CustomLayoutHandle: Sendable {
     workerProxy: (any WorkerCustomLayoutProxy)? = nil,
     placementHandler:
       (
-        @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Rect, LayoutPassContext?) ->
+        @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, CellRect, LayoutPassContext?) ->
           [PlacedNode]
       )? = nil
   ) {
@@ -641,7 +642,7 @@ public final class CustomLayoutHandle: Sendable {
     node: ResolvedNode,
     proposal: ProposedSize,
     passContext: LayoutPassContext?
-  ) -> Size {
+  ) -> CellSize {
     if let workerProxy {
       return workerProxy.measureContainer(
         engine: engine,
@@ -682,7 +683,7 @@ public final class CustomLayoutHandle: Sendable {
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
     if let workerProxy {

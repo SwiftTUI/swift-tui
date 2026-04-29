@@ -10,15 +10,15 @@ public struct TerminalGraphicsCapabilities: Equatable, Sendable {
   public var supportedProtocols: [GraphicsProtocol]
   public var preferredProtocol: GraphicsProtocol?
   public var sixelColorRegisters: Int?
-  public var sixelGeometry: Size?
-  public var cellPixelSize: Size?
+  public var sixelGeometry: PixelSize?
+  public var cellPixelSize: PixelSize?
 
   public init(
     supportedProtocols: [GraphicsProtocol] = [],
     preferredProtocol: GraphicsProtocol? = nil,
     sixelColorRegisters: Int? = nil,
-    sixelGeometry: Size? = nil,
-    cellPixelSize: Size? = nil
+    sixelGeometry: PixelSize? = nil,
+    cellPixelSize: PixelSize? = nil
   ) {
     self.supportedProtocols = supportedProtocols
     self.preferredProtocol = preferredProtocol
@@ -138,7 +138,7 @@ func parseXTSMGraphicsResponse(
 func parseWindowSizeResponse(
   from bytes: [UInt8],
   expectedCode: Int
-) -> Size? {
+) -> PixelSize? {
   guard let response = terminalStrictUTF8String(from: bytes) else {
     return nil
   }

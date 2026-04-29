@@ -127,14 +127,14 @@ extension InteractiveDemoState {
 }
 
 package enum InteractiveDemoLayout {
-  package static let frameSize = Size(width: 72, height: 40)
+  package static let frameSize = CellSize(width: 72, height: 40)
   package static let interiorWidth = 70
   package static let controlsColumnWidth = 24
   package static let showcaseColumnWidth = 44
-  package static let listBoxSize = Size(width: 24, height: 7)
-  package static let textFieldSize = Size(width: 24, height: 3)
-  package static let textLabBoxSize = Size(width: 44, height: 8)
-  package static let buttonSize = Size(width: 9, height: 3)
+  package static let listBoxSize = CellSize(width: 24, height: 7)
+  package static let textFieldSize = CellSize(width: 24, height: 3)
+  package static let textLabBoxSize = CellSize(width: 44, height: 8)
+  package static let buttonSize = CellSize(width: 9, height: 3)
 }
 
 package enum InteractiveDemoIdentity {

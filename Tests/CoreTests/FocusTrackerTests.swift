@@ -16,12 +16,12 @@ struct FocusTrackerTests {
     let regions = [
       FocusRegion(
         identity: testIdentity("button1"),
-        rect: Rect(origin: .zero, size: Size(width: 10, height: 1)),
+        rect: CellRect(origin: .zero, size: CellSize(width: 10, height: 1)),
         focusInteractions: .automatic
       ),
       FocusRegion(
         identity: testIdentity("button2"),
-        rect: Rect(origin: Point(x: 0, y: 1), size: Size(width: 10, height: 1)),
+        rect: CellRect(origin: CellPoint(x: 0, y: 1), size: CellSize(width: 10, height: 1)),
         focusInteractions: .automatic
       ),
     ]
@@ -38,12 +38,12 @@ struct FocusTrackerTests {
     let regions = [
       FocusRegion(
         identity: testIdentity("a"),
-        rect: Rect(origin: .zero, size: Size(width: 10, height: 1)),
+        rect: CellRect(origin: .zero, size: CellSize(width: 10, height: 1)),
         focusInteractions: .automatic
       ),
       FocusRegion(
         identity: testIdentity("b"),
-        rect: Rect(origin: Point(x: 0, y: 1), size: Size(width: 10, height: 1)),
+        rect: CellRect(origin: CellPoint(x: 0, y: 1), size: CellSize(width: 10, height: 1)),
         focusInteractions: .automatic
       ),
     ]
@@ -196,9 +196,9 @@ struct FocusTrackerTests {
       let (name, section) = entry
       return FocusRegion(
         identity: testIdentity(name),
-        rect: Rect(
-          origin: Point(x: 0, y: index),
-          size: Size(width: 10, height: 1)
+        rect: CellRect(
+          origin: CellPoint(x: 0, y: index),
+          size: CellSize(width: 10, height: 1)
         ),
         focusInteractions: .automatic,
         scopePath: [],

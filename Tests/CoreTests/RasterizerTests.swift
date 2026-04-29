@@ -9,7 +9,7 @@ struct RasterizerTests {
     let rasterizer = Rasterizer()
     let draw = DrawNode(
       identity: testIdentity("empty"),
-      bounds: Rect(origin: .zero, size: .zero)
+      bounds: CellRect(origin: .zero, size: .zero)
     )
 
     let surface = rasterizer.rasterize(draw)
@@ -21,7 +21,7 @@ struct RasterizerTests {
     let rasterizer = Rasterizer()
     let draw = DrawNode(
       identity: testIdentity("sized"),
-      bounds: Rect(origin: .zero, size: Size(width: 10, height: 5))
+      bounds: CellRect(origin: .zero, size: CellSize(width: 10, height: 5))
     )
 
     let surface = rasterizer.rasterize(draw)
@@ -34,7 +34,7 @@ struct RasterizerTests {
   @Test("default-styled text preserves filled background when rasterized over it")
   func defaultStyledTextPreservesFilledBackground() {
     let rasterizer = Rasterizer()
-    let bounds = Rect(origin: .zero, size: Size(width: 1, height: 1))
+    let bounds = CellRect(origin: .zero, size: CellSize(width: 1, height: 1))
     let draw = DrawNode(
       identity: testIdentity("overlay"),
       bounds: bounds,
@@ -66,7 +66,7 @@ struct RasterizerTests {
   @Test("fully clipped descendants do not expand the raster surface extent")
   func clippedDescendantsDoNotExpandSurfaceExtent() {
     let rasterizer = Rasterizer()
-    let viewportBounds = Rect(origin: .zero, size: .init(width: 3, height: 2))
+    let viewportBounds = CellRect(origin: .zero, size: .init(width: 3, height: 2))
     let draw = DrawNode(
       identity: testIdentity("viewport"),
       bounds: viewportBounds,
@@ -112,9 +112,9 @@ struct RasterizerTests {
   @Test("image attachments preserve logical bounds and record visible clip rects")
   func imageAttachmentsPreserveLogicalBoundsAndVisibleClipRects() throws {
     let rasterizer = Rasterizer()
-    let viewportBounds = Rect(origin: .zero, size: .init(width: 4, height: 3))
+    let viewportBounds = CellRect(origin: .zero, size: .init(width: 4, height: 3))
     let imageIdentity = testIdentity("scrollContent", "image")
-    let imageBounds = Rect(origin: .init(x: 0, y: -1), size: .init(width: 4, height: 4))
+    let imageBounds = CellRect(origin: .init(x: 0, y: -1), size: .init(width: 4, height: 4))
     let draw = DrawNode(
       identity: testIdentity("viewport"),
       bounds: viewportBounds,
@@ -139,13 +139,13 @@ struct RasterizerTests {
 
     #expect(surface.imageAttachments.count == 1)
     #expect(attachment.bounds == imageBounds)
-    #expect(attachment.visibleBounds == Rect(origin: .zero, size: .init(width: 4, height: 3)))
+    #expect(attachment.visibleBounds == CellRect(origin: .zero, size: .init(width: 4, height: 3)))
   }
 
   @Test("incremental raster reuse refines row damage to actual changed spans")
   func incrementalRasterReuseRefinesDamageToActualChangedSpans() {
     let rasterizer = Rasterizer()
-    let rowBounds = Rect(origin: .zero, size: .init(width: 10, height: 1))
+    let rowBounds = CellRect(origin: .zero, size: .init(width: 10, height: 1))
     let previousDraw = DrawNode(
       identity: testIdentity("row"),
       bounds: rowBounds,
@@ -193,7 +193,7 @@ struct RasterizerTests {
   @Test("incremental raster reuse preserves clears inside refined damage spans")
   func incrementalRasterReusePreservesClearRanges() {
     let rasterizer = Rasterizer()
-    let rowBounds = Rect(origin: .zero, size: .init(width: 4, height: 1))
+    let rowBounds = CellRect(origin: .zero, size: .init(width: 4, height: 1))
     let previousDraw = DrawNode(
       identity: testIdentity("row"),
       bounds: rowBounds,
@@ -252,7 +252,7 @@ struct RasterizerTests {
     let viewportIdentity = testIdentity("scrollViewport")
     let visibleIdentity = testIdentity("scrollContent", "visibleRow")
     let clippedIdentity = testIdentity("scrollContent", "clippedRow")
-    let viewportBounds = Rect(origin: .zero, size: .init(width: 3, height: 2))
+    let viewportBounds = CellRect(origin: .zero, size: .init(width: 3, height: 2))
     let draw = DrawNode(
       identity: viewportIdentity,
       bounds: viewportBounds,
@@ -311,7 +311,7 @@ struct RasterizerTests {
     let viewportIdentity = testIdentity("scrollViewport")
     let movingIdentity = testIdentity("scrollContent", "movingRow")
     func drawTree(clipHeight: Int) -> DrawNode {
-      let clip = Rect(origin: .zero, size: .init(width: 3, height: clipHeight))
+      let clip = CellRect(origin: .zero, size: .init(width: 3, height: clipHeight))
       return DrawNode(
         identity: viewportIdentity,
         bounds: clip,

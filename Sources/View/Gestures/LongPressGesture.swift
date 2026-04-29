@@ -83,7 +83,7 @@ final class LongPressGestureRecognizer: GestureRecognizer {
       guard let start = pressStart else { return .ignored }
       let dx = abs(event.location.x - start.x)
       let dy = abs(event.location.y - start.y)
-      if dx > maximumDistance || dy > maximumDistance {
+      if dx > Double(maximumDistance) || dy > Double(maximumDistance) {
         phase = .failed
         return .failed
       }

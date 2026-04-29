@@ -327,12 +327,12 @@ public struct LayoutEngine: Sendable {
   public func place(
     _ resolved: ResolvedNode,
     measured: MeasuredNode,
-    origin: Point = .zero
+    origin: CellPoint = .zero
   ) -> PlacedNode {
     place(
       resolved,
       measured: measured,
-      in: Rect(origin: origin, size: measured.measuredSize),
+      in: CellRect(origin: origin, size: measured.measuredSize),
       passContext: nil
     )
   }
@@ -341,7 +341,7 @@ public struct LayoutEngine: Sendable {
   public func place(
     _ resolved: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect
+    in bounds: CellRect
   ) -> PlacedNode {
     place(
       resolved,
@@ -354,13 +354,13 @@ public struct LayoutEngine: Sendable {
   package func place(
     _ resolved: ResolvedNode,
     measured: MeasuredNode,
-    origin: Point = .zero,
+    origin: CellPoint = .zero,
     passContext: LayoutPassContext?
   ) -> PlacedNode {
     place(
       resolved,
       measured: measured,
-      in: Rect(origin: origin, size: measured.measuredSize),
+      in: CellRect(origin: origin, size: measured.measuredSize),
       viewportContext: passContext?.scrollViewportContext,
       passContext: passContext
     )
@@ -369,7 +369,7 @@ public struct LayoutEngine: Sendable {
   package func place(
     _ resolved: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     passContext: LayoutPassContext?
   ) -> PlacedNode {
     place(
@@ -384,7 +384,7 @@ public struct LayoutEngine: Sendable {
   package func place(
     _ resolved: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     viewportContext: LazyStackViewportContext?,
     passContext: LayoutPassContext? = nil
   ) -> PlacedNode {
@@ -604,14 +604,14 @@ public struct LayoutEngine: Sendable {
     }
   }
 
-  // MARK: - Size computation
+  // MARK: - CellSize computation
 
   private func measuredSize(
     for resolved: ResolvedNode,
     childMeasurements: [MeasuredNode],
     proposal: ProposedSize,
     passContext: LayoutPassContext?
-  ) -> Size {
+  ) -> CellSize {
     switch resolved.layoutBehavior {
     case .intrinsic:
       switch resolved.drawPayload {
@@ -672,7 +672,7 @@ public struct LayoutEngine: Sendable {
         childMeasurements: childMeasurements,
         alignment: alignment
       )
-      return Size(
+      return CellSize(
         width: alignmentMetrics.leading + alignmentMetrics.trailing,
         height: alignmentMetrics.top + alignmentMetrics.bottom
       )
@@ -695,7 +695,7 @@ public struct LayoutEngine: Sendable {
       )
       let contentHeight = childMeasurements.reduce(0) { $0 + $1.measuredSize.height }
       let totalSpacing = stackSpacings.reduce(0, +)
-      return Size(
+      return CellSize(
         width: crossMetrics.leading + crossMetrics.trailing,
         height: contentHeight + totalSpacing
       )
@@ -718,7 +718,7 @@ public struct LayoutEngine: Sendable {
       )
       let contentHeight = childMeasurements.reduce(0) { $0 + $1.measuredSize.height }
       let totalSpacing = stackSpacings.reduce(0, +)
-      return Size(
+      return CellSize(
         width: crossMetrics.leading + crossMetrics.trailing,
         height: contentHeight + totalSpacing
       )
@@ -741,7 +741,7 @@ public struct LayoutEngine: Sendable {
       )
       let totalWidth = childMeasurements.reduce(0) { $0 + $1.measuredSize.width }
       let totalSpacing = stackSpacings.reduce(0, +)
-      return Size(
+      return CellSize(
         width: totalWidth + totalSpacing,
         height: crossMetrics.leading + crossMetrics.trailing
       )
@@ -764,19 +764,19 @@ public struct LayoutEngine: Sendable {
       )
       let totalWidth = childMeasurements.reduce(0) { $0 + $1.measuredSize.width }
       let totalSpacing = stackSpacings.reduce(0, +)
-      return Size(
+      return CellSize(
         width: totalWidth + totalSpacing,
         height: crossMetrics.leading + crossMetrics.trailing
       )
     case .padding(let insets):
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
-      return Size(
+      return CellSize(
         width: contentSize.width + insets.horizontal,
         height: contentSize.height + insets.vertical
       )
     case .safeAreaIgnoring:
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
-      return Size(
+      return CellSize(
         width: measuredDimension(
           proposal.width,
           fallback: contentSize.width
@@ -797,12 +797,12 @@ public struct LayoutEngine: Sendable {
       )
       switch edge {
       case .top, .bottom:
-        return Size(
+        return CellSize(
           width: max(baseSize.width, insetSize.width),
           height: baseSize.height + consumed
         )
       case .leading, .trailing:
-        return Size(
+        return CellSize(
           width: baseSize.width + consumed,
           height: max(baseSize.height, insetSize.height)
         )
@@ -811,13 +811,13 @@ public struct LayoutEngine: Sendable {
       let insets = borderLayoutInsets(
         set: set, placement: placement, sides: sides)
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
-      return Size(
+      return CellSize(
         width: contentSize.width + insets.horizontal,
         height: contentSize.height + insets.vertical
       )
     case .frame(let width, let height, _):
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
-      return Size(
+      return CellSize(
         width: width ?? contentSize.width,
         height: height ?? contentSize.height
       )
@@ -840,10 +840,10 @@ public struct LayoutEngine: Sendable {
         case .infinity: max(contentSize.height, 0)
         case .unspecified: contentSize.height
         }
-      return Size(width: width, height: height)
+      return CellSize(width: width, height: height)
     case .flexibleFrame(let minW, let idealW, let maxW, let minH, let idealH, let maxH, _):
       let contentSize = childMeasurements.first?.measuredSize ?? .zero
-      return Size(
+      return CellSize(
         width: flexibleFrameMeasuredDimension(
           proposal: proposal.width,
           child: contentSize.width,
@@ -996,8 +996,8 @@ public struct LayoutEngine: Sendable {
     return result
   }
 
-  private func overlaySize(from childMeasurements: [MeasuredNode]) -> Size {
-    Size(
+  private func overlaySize(from childMeasurements: [MeasuredNode]) -> CellSize {
+    CellSize(
       width: childMeasurements.map { $0.measuredSize.width }.max() ?? 0,
       height: childMeasurements.map { $0.measuredSize.height }.max() ?? 0
     )
@@ -1009,7 +1009,7 @@ public struct LayoutEngine: Sendable {
     for content: String,
     metadata: LayoutMetadata,
     proposal: ProposedSize
-  ) -> Size {
+  ) -> CellSize {
     let wrapWidth: Int? =
       switch proposal.width {
       case .finite(let width):
@@ -1029,7 +1029,7 @@ public struct LayoutEngine: Sendable {
   private func measuredTextFigureSize(
     for payload: TextFigurePayload,
     proposal: ProposedSize
-  ) -> Size {
+  ) -> CellSize {
     TextFigureSupport.measuredSize(
       for: payload,
       proposal: proposal
@@ -1039,7 +1039,7 @@ public struct LayoutEngine: Sendable {
   private func measuredRuleSize(
     for proposal: ProposedSize,
     stackAxis: Axis?
-  ) -> Size {
+  ) -> CellSize {
     let proposedWidth = finiteDimension(of: proposal.width)
     let proposedHeight = finiteDimension(of: proposal.height)
 
@@ -1047,32 +1047,32 @@ public struct LayoutEngine: Sendable {
       switch stackAxis {
       case .vertical:
         let width = max(0, proposedWidth ?? 1)
-        return Size(width: width, height: width > 0 ? 1 : 0)
+        return CellSize(width: width, height: width > 0 ? 1 : 0)
       case .horizontal:
         let height = max(0, proposedHeight ?? 1)
-        return Size(width: height > 0 ? 1 : 0, height: height)
+        return CellSize(width: height > 0 ? 1 : 0, height: height)
       }
     }
 
     switch (proposedWidth, proposedHeight) {
     case (let width?, nil):
-      return Size(width: max(0, width), height: width > 0 ? 1 : 0)
+      return CellSize(width: max(0, width), height: width > 0 ? 1 : 0)
     case (nil, let height?):
-      return Size(width: height > 0 ? 1 : 0, height: max(0, height))
+      return CellSize(width: height > 0 ? 1 : 0, height: max(0, height))
     case (let width?, let height?):
       if width >= height {
-        return Size(width: max(0, width), height: height > 0 ? 1 : 0)
+        return CellSize(width: max(0, width), height: height > 0 ? 1 : 0)
       }
-      return Size(width: width > 0 ? 1 : 0, height: max(0, height))
+      return CellSize(width: width > 0 ? 1 : 0, height: max(0, height))
     case (nil, nil):
-      return Size(width: 1, height: 1)
+      return CellSize(width: 1, height: 1)
     }
   }
 
   private func measuredShapeSize(
     for proposal: ProposedSize
-  ) -> Size {
-    Size(
+  ) -> CellSize {
+    CellSize(
       width: finiteDimension(of: proposal.width) ?? 0,
       height: finiteDimension(of: proposal.height) ?? 0
     )
@@ -1081,7 +1081,7 @@ public struct LayoutEngine: Sendable {
   private func measuredImageSize(
     for payload: ImagePayload,
     proposal: ProposedSize
-  ) -> Size {
+  ) -> CellSize {
     let intrinsicSize = payload.intrinsicCellSize
     guard payload.isResizable else {
       return intrinsicSize
@@ -1092,7 +1092,7 @@ public struct LayoutEngine: Sendable {
 
     switch payload.scalingMode {
     case .stretch:
-      return Size(
+      return CellSize(
         width: proposedWidth ?? intrinsicSize.width,
         height: proposedHeight ?? intrinsicSize.height
       )
@@ -1104,7 +1104,7 @@ public struct LayoutEngine: Sendable {
         resolvedAsset.cellPixelSize.width > 0,
         resolvedAsset.cellPixelSize.height > 0
       else {
-        return Size(
+        return CellSize(
           width: proposedWidth ?? intrinsicSize.width,
           height: proposedHeight ?? intrinsicSize.height
         )
@@ -1148,7 +1148,7 @@ public struct LayoutEngine: Sendable {
           : max(widthScale, heightScale)
         let targetPixelWidth = Double(pixelSize.width) * scale
         let targetPixelHeight = Double(pixelSize.height) * scale
-        return Size(
+        return CellSize(
           width: cellsFromPixels(targetPixelWidth, per: cellPixelWidth),
           height: cellsFromPixels(targetPixelHeight, per: cellPixelHeight)
         )
@@ -1156,7 +1156,7 @@ public struct LayoutEngine: Sendable {
         guard width > 0 else {
           return .zero
         }
-        return Size(
+        return CellSize(
           width: width,
           height: max(1, Int((Double(width) / cellAspect).rounded(rounding)))
         )
@@ -1164,7 +1164,7 @@ public struct LayoutEngine: Sendable {
         guard height > 0 else {
           return .zero
         }
-        return Size(
+        return CellSize(
           width: max(1, Int((Double(height) * cellAspect).rounded(rounding))),
           height: height
         )
@@ -1202,7 +1202,7 @@ public struct LayoutEngine: Sendable {
   private func retainedPlacement(
     for resolved: ResolvedNode,
     measured: MeasuredNode,
-    bounds: Rect,
+    bounds: CellRect,
     viewportContext: LazyStackViewportContext?,
     retainedLayout: RetainedLayoutSession?
   ) -> PlacedNode? {
@@ -1251,7 +1251,7 @@ public struct LayoutEngine: Sendable {
       return nil
     }
 
-    let delta = Point(
+    let delta = CellPoint(
       x: bounds.origin.x - previousPlaced.bounds.origin.x,
       y: bounds.origin.y - previousPlaced.bounds.origin.y
     )
@@ -1427,7 +1427,7 @@ public struct LayoutEngine: Sendable {
 
   private func safeAreaInsetConsumedAmount(
     edge: Edge,
-    contentSize: Size,
+    contentSize: CellSize,
     spacing: Int,
     safeArea: EdgeInsets
   ) -> Int {
@@ -1443,7 +1443,7 @@ public struct LayoutEngine: Sendable {
 
   private func safeAreaInsetConsumedInsets(
     edge: Edge,
-    contentSize: Size,
+    contentSize: CellSize,
     spacing: Int,
     safeArea: EdgeInsets
   ) -> EdgeInsets {

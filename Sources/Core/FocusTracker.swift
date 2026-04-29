@@ -316,8 +316,8 @@ extension FocusTracker {
   }
 
   private func directionalMetrics(
-    from current: Rect,
-    to candidate: Rect,
+    from current: CellRect,
+    to candidate: CellRect,
     direction: FocusDirection
   ) -> DirectionalMetrics? {
     let currentCenterX = current.origin.x * 2 + current.size.width
@@ -391,8 +391,8 @@ extension FocusTracker {
   }
 
   private func horizontalGap(
-    between lhs: Rect,
-    and rhs: Rect
+    between lhs: CellRect,
+    and rhs: CellRect
   ) -> Int {
     let lhsMaxX = lhs.origin.x + lhs.size.width
     let rhsMaxX = rhs.origin.x + rhs.size.width
@@ -406,8 +406,8 @@ extension FocusTracker {
   }
 
   private func verticalGap(
-    between lhs: Rect,
-    and rhs: Rect
+    between lhs: CellRect,
+    and rhs: CellRect
   ) -> Int {
     let lhsMaxY = lhs.origin.y + lhs.size.height
     let rhsMaxY = rhs.origin.y + rhs.size.height

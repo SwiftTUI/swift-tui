@@ -348,7 +348,7 @@ private func isKind(_ kind: NodeKind, named name: String) -> Bool {
 @MainActor
 private func render<V: View>(
   _ view: V,
-  terminalSize: Size,
+  terminalSize: CellSize,
   safeAreaInsets: EdgeInsets
 ) -> FrameArtifacts {
   var environmentValues = EnvironmentValues()

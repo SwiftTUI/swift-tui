@@ -10,7 +10,7 @@ struct GeometryReaderSurfaceTests {
   @Test("geometry reader exposes the current terminal surface size")
   func geometryReaderExposesTerminalSurfaceSize() {
     var environmentValues = EnvironmentValues()
-    environmentValues.terminalSize = Size(width: 52, height: 13)
+    environmentValues.terminalSize = CellSize(width: 52, height: 13)
 
     let artifacts = DefaultRenderer().render(
       GeometryReader { proxy in
@@ -28,7 +28,7 @@ struct GeometryReaderSurfaceTests {
   @Test("geometry reader exposes the environment cellPixelMetrics")
   func geometryReaderExposesCellPixelMetrics() {
     var environmentValues = EnvironmentValues()
-    environmentValues.terminalSize = Size(width: 40, height: 10)
+    environmentValues.terminalSize = CellSize(width: 40, height: 10)
     environmentValues.cellPixelMetrics = CellPixelMetrics(
       width: 10, height: 20, source: .reported
     )
@@ -50,7 +50,7 @@ struct GeometryReaderSurfaceTests {
   @Test("geometry reader exposes .estimated when environment is default")
   func geometryReaderDefaultMetrics() {
     var environmentValues = EnvironmentValues()
-    environmentValues.terminalSize = Size(width: 40, height: 10)
+    environmentValues.terminalSize = CellSize(width: 40, height: 10)
 
     let artifacts = DefaultRenderer().render(
       GeometryReader { proxy in

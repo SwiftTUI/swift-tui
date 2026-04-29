@@ -20,11 +20,11 @@ package typealias HostedSceneRunner =
   ) async throws -> RunLoopResult<TerminalUISceneSessionState>
 
 private protocol HostedSceneTerminalHosting: TerminalHosting, DamageAwareTerminalHosting, Sendable {
-  func updateSurfaceSize(_ surfaceSize: Size)
+  func updateSurfaceSize(_ surfaceSize: CellSize)
   func updateAppearance(_ appearance: TerminalAppearance)
   func updateTheme(_ theme: Theme?)
   func updateStyle(_ style: TerminalRenderStyle)
-  func updateCellPixelSize(_ cellPixelSize: Size?)
+  func updateCellPixelSize(_ cellPixelSize: PixelSize?)
 }
 
 extension StreamingTerminalHost: HostedSceneTerminalHosting {}
@@ -49,7 +49,7 @@ public final class HostedSceneSession {
   public convenience init<A: App>(
     for app: A,
     sceneID: WindowIdentifier,
-    initialSize: Size,
+    initialSize: CellSize,
     appearance: TerminalAppearance,
     theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
@@ -91,7 +91,7 @@ public final class HostedSceneSession {
     descriptor: TerminalUISceneDescriptor,
     rootIdentity: Identity,
     sessionName: String,
-    initialSize: Size,
+    initialSize: CellSize,
     appearance: TerminalAppearance,
     theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile,
@@ -119,7 +119,7 @@ public final class HostedSceneSession {
   public convenience init<A: App>(
     for app: A,
     sceneID: WindowIdentifier,
-    initialSize: Size,
+    initialSize: CellSize,
     appearance: TerminalAppearance,
     theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
@@ -256,15 +256,15 @@ public final class HostedSceneSession {
   }
 
   public func resize(
-    to size: Size
+    to size: CellSize
   ) {
     host.updateSurfaceSize(size)
     signalReader.send("SIGWINCH")
   }
 
   public func resize(
-    to size: Size,
-    cellPixelSize: Size?
+    to size: CellSize,
+    cellPixelSize: PixelSize?
   ) {
     host.updateSurfaceSize(size)
     host.updateCellPixelSize(cellPixelSize)
@@ -312,7 +312,7 @@ public final class HostedSceneSession {
 
 private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
   private struct State: Sendable {
-    var surfaceSize: Size
+    var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
     var lastSubmittedSurface: RasterSurface?
@@ -323,7 +323,7 @@ private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
 
   let capabilityProfile: TerminalCapabilityProfile
 
-  var surfaceSize: Size {
+  var surfaceSize: CellSize {
     state.withLock(\.surfaceSize)
   }
 
@@ -340,7 +340,7 @@ private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
   }
 
   init(
-    surfaceSize: Size,
+    surfaceSize: CellSize,
     appearance: TerminalAppearance,
     theme: Theme?,
     capabilityProfile: TerminalCapabilityProfile,
@@ -362,7 +362,7 @@ private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
   }
 
   func updateSurfaceSize(
-    _ surfaceSize: Size
+    _ surfaceSize: CellSize
   ) {
     state.withLock { state in
       state.surfaceSize = surfaceSize
@@ -398,7 +398,7 @@ private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
   }
 
   func updateCellPixelSize(
-    _ cellPixelSize: Size?
+    _ cellPixelSize: PixelSize?
   ) {
     state.withLock { state in
       state.graphicsCapabilities.cellPixelSize = cellPixelSize
@@ -414,7 +414,7 @@ private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
 
   func clearScreen() throws {}
 
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(

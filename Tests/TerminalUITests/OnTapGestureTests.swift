@@ -14,7 +14,7 @@ struct OnTapGestureTests {
     let box = Box()
     let root = Identity(components: [IdentityComponent(rawValue: "r")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 10, height: 3)
+    env.terminalSize = CellSize(width: 10, height: 3)
 
     let pointerRegistry = LocalPointerHandlerRegistry()
     let gestureRegistry = LocalGestureRegistry()
@@ -41,7 +41,7 @@ struct OnTapGestureTests {
       routeID: region.routeID,
       event: .init(
         kind: .down(.primary),
-        location: region.rect.origin,
+        location: Point(region.rect.origin),
         targetRect: region.rect
       )
     )
@@ -49,7 +49,7 @@ struct OnTapGestureTests {
       routeID: region.routeID,
       event: .init(
         kind: .up(.primary),
-        location: region.rect.origin,
+        location: Point(region.rect.origin),
         targetRect: region.rect
       )
     )
@@ -62,7 +62,7 @@ struct OnTapGestureTests {
     let box = Box()
     let root = Identity(components: [IdentityComponent(rawValue: "r")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 10, height: 3)
+    env.terminalSize = CellSize(width: 10, height: 3)
 
     let pointerRegistry = LocalPointerHandlerRegistry()
     let gestureRegistry = LocalGestureRegistry()
@@ -89,22 +89,26 @@ struct OnTapGestureTests {
     // First tap
     _ = pointerRegistry.dispatch(
       routeID: region.routeID,
-      event: .init(kind: .down(.primary), location: region.rect.origin, targetRect: region.rect)
+      event: .init(
+        kind: .down(.primary), location: Point(region.rect.origin), targetRect: region.rect)
     )
     _ = pointerRegistry.dispatch(
       routeID: region.routeID,
-      event: .init(kind: .up(.primary), location: region.rect.origin, targetRect: region.rect)
+      event: .init(
+        kind: .up(.primary), location: Point(region.rect.origin), targetRect: region.rect)
     )
     #expect(box.count == 0)  // not yet
 
     // Second tap
     _ = pointerRegistry.dispatch(
       routeID: region.routeID,
-      event: .init(kind: .down(.primary), location: region.rect.origin, targetRect: region.rect)
+      event: .init(
+        kind: .down(.primary), location: Point(region.rect.origin), targetRect: region.rect)
     )
     _ = pointerRegistry.dispatch(
       routeID: region.routeID,
-      event: .init(kind: .up(.primary), location: region.rect.origin, targetRect: region.rect)
+      event: .init(
+        kind: .up(.primary), location: Point(region.rect.origin), targetRect: region.rect)
     )
     #expect(box.count == 1)
   }

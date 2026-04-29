@@ -177,7 +177,7 @@ private struct PaletteProbeView: View {
 private func makePaletteTestRunLoop<V: View>(
   @ViewBuilder content: @escaping () -> V
 ) -> RunLoop<Int, V> {
-  let terminalSize = Size(width: 30, height: 8)
+  let terminalSize = CellSize(width: 30, height: 8)
   let terminal = PaletteTerminalHost(surfaceSizeProvider: { terminalSize })
   let rootIdentity = testIdentity("PaletteRoot")
   var environmentValues = EnvironmentValues()
@@ -201,16 +201,16 @@ private func makePaletteTestRunLoop<V: View>(
 }
 
 private final class PaletteTerminalHost: TerminalHosting {
-  var surfaceSize: Size { surfaceSizeProvider() }
+  var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
   var graphicsCapabilities: TerminalGraphicsCapabilities { .init() }
   var theme: Theme? { nil }
   private(set) var latestSurface: RasterSurface?
-  private let surfaceSizeProvider: () -> Size
+  private let surfaceSizeProvider: () -> CellSize
 
   init(
-    surfaceSizeProvider: @escaping () -> Size,
+    surfaceSizeProvider: @escaping () -> CellSize,
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
     appearance: TerminalAppearance = .fallback
   ) {
@@ -223,7 +223,7 @@ private final class PaletteTerminalHost: TerminalHosting {
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {

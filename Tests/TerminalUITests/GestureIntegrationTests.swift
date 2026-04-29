@@ -39,7 +39,7 @@ struct GestureIntegrationTests {
 
     let root = Identity(components: [IdentityComponent(rawValue: "r")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 40, height: 10)
+    env.terminalSize = CellSize(width: 40, height: 10)
 
     let pointerRegistry = LocalPointerHandlerRegistry()
     let gestureRegistry = LocalGestureRegistry()
@@ -63,7 +63,7 @@ struct GestureIntegrationTests {
       routeID: region.routeID,
       event: .init(
         kind: .down(.primary),
-        location: start,
+        location: Point(start),
         targetRect: region.rect
       )
     )
@@ -71,7 +71,7 @@ struct GestureIntegrationTests {
       routeID: region.routeID,
       event: .init(
         kind: .dragged(.primary),
-        location: Point(x: start.x + 5, y: start.y + 2),
+        location: Point(CellPoint(x: start.x + 5, y: start.y + 2)),
         targetRect: region.rect
       )
     )
@@ -79,7 +79,7 @@ struct GestureIntegrationTests {
       routeID: region.routeID,
       event: .init(
         kind: .up(.primary),
-        location: Point(x: start.x + 5, y: start.y + 2),
+        location: Point(CellPoint(x: start.x + 5, y: start.y + 2)),
         targetRect: region.rect
       )
     )
@@ -108,7 +108,7 @@ struct GestureIntegrationTests {
 
     let root = Identity(components: [IdentityComponent(rawValue: "r")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 10, height: 3)
+    env.terminalSize = CellSize(width: 10, height: 3)
 
     let pointerRegistry = LocalPointerHandlerRegistry()
     let gestureRegistry = LocalGestureRegistry()
@@ -129,11 +129,13 @@ struct GestureIntegrationTests {
     for _ in 0..<2 {
       _ = pointerRegistry.dispatch(
         routeID: region.routeID,
-        event: .init(kind: .down(.primary), location: region.rect.origin, targetRect: region.rect)
+        event: .init(
+          kind: .down(.primary), location: Point(region.rect.origin), targetRect: region.rect)
       )
       _ = pointerRegistry.dispatch(
         routeID: region.routeID,
-        event: .init(kind: .up(.primary), location: region.rect.origin, targetRect: region.rect)
+        event: .init(
+          kind: .up(.primary), location: Point(region.rect.origin), targetRect: region.rect)
       )
     }
     #expect(counts.double == 1)

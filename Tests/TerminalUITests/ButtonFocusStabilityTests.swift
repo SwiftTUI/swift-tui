@@ -23,7 +23,7 @@ import Testing
 struct ButtonFocusStabilityTests {
   @Test("plain Button bounds stay stable across focus transitions")
   func plainButtonFocusDoesNotShiftBounds() throws {
-    let size = Size(width: 20, height: 3)
+    let size = CellSize(width: 20, height: 3)
     let rootIdentity = testIdentity("PlainButtonFocus")
 
     func render(focus: Identity?) -> FrameArtifacts {
@@ -65,7 +65,7 @@ struct ButtonFocusStabilityTests {
 
   @Test("click on a plain Button wrapped by a custom view updates the outer view's @State")
   func plainButtonInsideWrapperMutatesOwnerState() async throws {
-    let terminalSize = Size(width: 20, height: 3)
+    let terminalSize = CellSize(width: 20, height: 3)
     let rootIdentity = testIdentity("WrappedButtonStateRepro")
     let tapCount = LockedBox<Int>(0)
 
@@ -118,7 +118,7 @@ struct ButtonFocusStabilityTests {
         return false
       }
     )
-    let center = Point(x: goNode.bounds.origin.x, y: goNode.bounds.origin.y)
+    let center = Point(CellPoint(x: goNode.bounds.origin.x, y: goNode.bounds.origin.y))
 
     let host = RecordingTerminalHostLocal(size: terminalSize)
     _ = try await Self.runHarness(
@@ -143,7 +143,7 @@ struct ButtonFocusStabilityTests {
 
   @Test("fixedSize VStack reconciles inner row Spacer against widest sibling")
   func fixedSizeReconcilesInnerRowSpacer() throws {
-    let size = Size(width: 40, height: 10)
+    let size = CellSize(width: 40, height: 10)
     let rootIdentity = testIdentity("FixedSizeSpacer")
     var env = EnvironmentValues()
     env.terminalSize = size
@@ -196,7 +196,7 @@ struct ButtonFocusStabilityTests {
     host: RecordingTerminalHostLocal,
     events: [InputEvent],
     rootIdentity: Identity,
-    terminalSize: Size,
+    terminalSize: CellSize,
     viewBuilder: @escaping () -> V
   ) async throws -> RunLoopResult<Int> {
     var env = EnvironmentValues()
@@ -244,18 +244,18 @@ private final class LocalEmptySignals: SignalReading {
 }
 
 private final class RecordingTerminalHostLocal: TerminalHosting {
-  let surfaceSize: Size
+  let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   private(set) var lastPresentedSurface: RasterSurface?
 
-  init(size: Size) { self.surfaceSize = size }
+  init(size: CellSize) { self.surfaceSize = size }
 
   func enableRawMode() throws {}
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {

@@ -1162,7 +1162,7 @@ private final class GraphicsProtocolMockTerminalController:
   TerminalControlling
 {
   private let isTTYValue: Bool
-  private let cellPixelSizeValue: Size?
+  private let cellPixelSizeValue: PixelSize?
   private let queuedReadResponsesStorage: LockedBox<[[UInt8]]>
   private let writesStorage = LockedBox<[String]>([])
 
@@ -1174,7 +1174,7 @@ private final class GraphicsProtocolMockTerminalController:
   init(
     isTTY: Bool,
     readResponses: [[UInt8]] = [],
-    cellPixelSize: Size? = nil
+    cellPixelSize: PixelSize? = nil
   ) {
     isTTYValue = isTTY
     cellPixelSizeValue = cellPixelSize
@@ -1191,11 +1191,11 @@ private final class GraphicsProtocolMockTerminalController:
 
   func setAttributes(_: termios, on _: Int32) throws {}
 
-  func windowSize(of _: Int32) throws -> Size {
+  func windowSize(of _: Int32) throws -> CellSize {
     .init(width: 80, height: 24)
   }
 
-  func cellPixelSize(of _: Int32) throws -> Size? {
+  func cellPixelSize(of _: Int32) throws -> PixelSize? {
     cellPixelSizeValue
   }
 

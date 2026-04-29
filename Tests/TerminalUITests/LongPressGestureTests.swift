@@ -26,7 +26,7 @@ struct LongPressGestureTests {
       event: .init(
         kind: .down(.primary),
         location: .zero,
-        targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1)),
+        targetRect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)),
         timestamp: t0
       ))
     let scheduled = try #require(scheduledDeadline)
@@ -45,7 +45,7 @@ struct LongPressGestureTests {
     )
     let g = LongPressGesture(minimumDuration: .seconds(1), maximumDistance: 0)
     let rec = g._makeRecognizer(context: ctx)
-    let rect = Rect(origin: .zero, size: Size(width: 4, height: 4))
+    let rect = CellRect(origin: .zero, size: CellSize(width: 4, height: 4))
     _ = rec.handle(
       event: .init(
         kind: .down(.primary),
@@ -70,7 +70,7 @@ struct LongPressGestureTests {
     )
     let g = LongPressGesture(minimumDuration: .seconds(1))
     let rec = g._makeRecognizer(context: ctx)
-    let rect = Rect(origin: .zero, size: Size(width: 4, height: 1))
+    let rect = CellRect(origin: .zero, size: CellSize(width: 4, height: 1))
     _ = rec.handle(
       event: .init(
         kind: .down(.primary),
@@ -101,7 +101,7 @@ struct LongPressGestureTests {
       event: .init(
         kind: .down(.primary),
         location: .zero,
-        targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1)),
+        targetRect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)),
         timestamp: t0
       ))
     let scheduled = try #require(scheduledDeadline)
@@ -110,7 +110,7 @@ struct LongPressGestureTests {
       event: .init(
         kind: .up(.primary),
         location: .zero,
-        targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1)),
+        targetRect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)),
         timestamp: scheduled.advanced(by: .milliseconds(1))
       ))
 
@@ -134,7 +134,7 @@ struct LongPressGestureTests {
       event: .init(
         kind: .down(.primary),
         location: .zero,
-        targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1)),
+        targetRect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)),
         timestamp: t0
       ))
     let scheduled = try #require(scheduledDeadline)

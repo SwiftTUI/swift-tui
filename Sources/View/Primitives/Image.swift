@@ -59,7 +59,7 @@ public struct Image: View, ResolvableView {
     let resolvedAsset = context.imageAssetResolver?(
       source,
       context.environmentValues.imageResourceRoots,
-      Size(
+      PixelSize(
         width: context.environmentValues.cellPixelMetrics.width,
         height: context.environmentValues.cellPixelMetrics.height
       )

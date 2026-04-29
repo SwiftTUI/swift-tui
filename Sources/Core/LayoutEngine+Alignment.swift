@@ -1,9 +1,9 @@
 extension LayoutEngine {
   package func alignedOrigin(
     for childDimensions: ViewDimensions,
-    in bounds: Rect,
+    in bounds: CellRect,
     alignment: Alignment
-  ) -> Point {
+  ) -> CellPoint {
     alignedOrigin(
       for: childDimensions,
       referenceDimensions: ViewDimensions(width: bounds.size.width, height: bounds.size.height),
@@ -15,9 +15,9 @@ extension LayoutEngine {
   package func alignedOrigin(
     for childDimensions: ViewDimensions,
     referenceDimensions: ViewDimensions,
-    in bounds: Rect,
+    in bounds: CellRect,
     alignment: Alignment
-  ) -> Point {
+  ) -> CellPoint {
     let x =
       if alignment.horizontal == .center,
         referenceDimensions.explicitValue(for: HorizontalAlignment.center) == nil,
@@ -42,7 +42,7 @@ extension LayoutEngine {
           - childDimensions[alignment.vertical]
       }
 
-    return Point(
+    return CellPoint(
       x: x,
       y: y
     )
@@ -51,9 +51,9 @@ extension LayoutEngine {
   package func simpleAlignedOrigin(
     for child: ResolvedNode,
     measured childMeasurement: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     alignment: Alignment
-  ) -> Point? {
+  ) -> CellPoint? {
     guard
       let x = simpleAlignedCoordinate(
         childSize: childMeasurement.measuredSize.width,
@@ -229,7 +229,7 @@ extension LayoutEngine {
         let childDimensions = viewDimensions(for: child, measured: childMeasurement)
         let childOrigin = alignedOrigin(
           for: childDimensions,
-          in: Rect(origin: .zero, size: measured.measuredSize),
+          in: CellRect(origin: .zero, size: measured.measuredSize),
           alignment: alignment
         )
         baseDimensions = propagatedViewDimensions(
@@ -314,7 +314,7 @@ extension LayoutEngine {
   }
 
   package func propagatedViewDimensions(
-    size: Size,
+    size: CellSize,
     from childDimensions: ViewDimensions,
     offsetX: Int,
     offsetY: Int

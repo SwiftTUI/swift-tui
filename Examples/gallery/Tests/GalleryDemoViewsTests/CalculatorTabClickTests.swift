@@ -15,7 +15,7 @@ import Testing
 struct CalculatorTabClickTests {
   @Test("clicking the 7 button in the real CalculatorTab flips the display from 0 to 7")
   func clickingSevenFiresEnterDigit() async throws {
-    let terminalSize = Size(width: 80, height: 24)
+    let terminalSize = CellSize(width: 80, height: 24)
     let rootIdentity = Identity(components: [.named("CalcTabClickTest")])
 
     let view = CalculatorTab()
@@ -29,10 +29,7 @@ struct CalculatorTabClickTests {
     )
 
     let sevenBounds = try #require(Self.boundsOfText("7", in: initial.placedTree))
-    let clickCenter = Point(
-      x: sevenBounds.origin.x + sevenBounds.size.width / 2,
-      y: sevenBounds.origin.y + sevenBounds.size.height / 2
-    )
+    let clickCenter = centerPoint(of: sevenBounds)
 
     let host = RecordingHost(size: terminalSize)
     _ = try await Self.runHarness(
@@ -61,7 +58,7 @@ struct CalculatorTabClickTests {
 
   // MARK: - Helpers
 
-  private static func boundsOfText(_ target: String, in node: PlacedNode) -> Rect? {
+  private static func boundsOfText(_ target: String, in node: PlacedNode) -> CellRect? {
     if case .text(let content) = node.drawPayload, content == target {
       return node.bounds
     }
@@ -87,7 +84,7 @@ struct CalculatorTabClickTests {
   @MainActor
   private static func runHarness<V: View>(
     host: RecordingHost,
-    terminalSize: Size,
+    terminalSize: CellSize,
     events: [InputEvent],
     rootIdentity: Identity,
     viewBuilder: @escaping () -> V
@@ -115,6 +112,15 @@ struct CalculatorTabClickTests {
   }
 }
 
+private func centerPoint(of rect: CellRect) -> Point {
+  Point(
+    CellPoint(
+      x: rect.origin.x + rect.size.width / 2,
+      y: rect.origin.y + rect.size.height / 2
+    )
+  )
+}
+
 private final class ScriptedInput: TerminalInputReading {
   private let scriptedEvents: [InputEvent]
   init(events: [InputEvent]) { self.scriptedEvents = events }
@@ -137,18 +143,18 @@ private final class EmptySignals: SignalReading {
 }
 
 private final class RecordingHost: TerminalHosting {
-  let surfaceSize: Size
+  let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   private(set) var lastPresentedSurface: RasterSurface?
 
-  init(size: Size) { self.surfaceSize = size }
+  init(size: CellSize) { self.surfaceSize = size }
 
   func enableRawMode() throws {}
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {

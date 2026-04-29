@@ -100,7 +100,7 @@ struct TabBorderRenderingTests {
   // MARK: - Helpers
 
   private func renderCounterTab() -> RasterSurface {
-    let terminalSize = Size(width: 80, height: 28)
+    let terminalSize = CellSize(width: 80, height: 28)
     var env = EnvironmentValues()
     env.terminalSize = terminalSize
     let artifacts = DefaultRenderer().render(
@@ -115,7 +115,7 @@ struct TabBorderRenderingTests {
   }
 
   private func renderCalculatorTab() -> RasterSurface {
-    let terminalSize = Size(width: 80, height: 28)
+    let terminalSize = CellSize(width: 80, height: 28)
     var env = EnvironmentValues()
     env.terminalSize = terminalSize
     let artifacts = DefaultRenderer().render(

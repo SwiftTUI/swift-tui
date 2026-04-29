@@ -16,7 +16,7 @@ import Testing
 struct BordersAndShapesTabTests {
   @Test("BordersAndShapesTab resolves and rasterises to a non-empty surface")
   func rendersNonEmptySurface() {
-    let terminalSize = Size(width: 80, height: 28)
+    let terminalSize = CellSize(width: 80, height: 28)
     var env = EnvironmentValues()
     env.terminalSize = terminalSize
 
@@ -40,7 +40,7 @@ struct BordersAndShapesTabTests {
   @Test(
     "BordersAndShapesTab keeps presenting frames after onAppear starts the chasing-light animation")
   func chasingLightSchedulesVisibleRuntimeFrames() async throws {
-    let terminalSize = Size(width: 80, height: 28)
+    let terminalSize = CellSize(width: 80, height: 28)
     let rootIdentity = Identity(components: [.named("BordersAndShapesRunLoop")])
     let quitGate = GalleryAsyncEventGate()
     let host = GalleryCountingTerminalHost(
@@ -101,14 +101,14 @@ struct BordersAndShapesTabTests {
 }
 
 private final class GalleryCountingTerminalHost: TerminalHosting {
-  let surfaceSize: Size
+  let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   private let presentObserver: @Sendable (Int) -> Void
   private(set) var presentCount = 0
 
   init(
-    surfaceSize: Size,
+    surfaceSize: CellSize,
     presentObserver: @escaping @Sendable (Int) -> Void = { _ in }
   ) {
     self.surfaceSize = surfaceSize
@@ -118,7 +118,7 @@ private final class GalleryCountingTerminalHost: TerminalHosting {
   func enableRawMode() throws {}
   func disableRawMode() throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
