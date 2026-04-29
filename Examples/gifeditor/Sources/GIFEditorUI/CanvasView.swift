@@ -19,6 +19,31 @@ struct CanvasView: View {
   var mode: CanvasPixelGridMode = .verticalHalfBlock
 
   var body: some View {
+    CanvasSurfaceView(
+      size: size,
+      cells: cells,
+      cursor: cursor,
+      selection: selection,
+      pendingMarqueeAnchor: pendingMarqueeAnchor,
+      pendingGradientAnchor: pendingGradientAnchor,
+      hover: hover,
+      mode: mode
+    )
+    .border(.separator, set: .single)
+  }
+}
+
+private struct CanvasSurfaceView: View {
+  let size: GIFEditorCore.PixelSize
+  let cells: [EditorColor?]
+  let cursor: GIFEditorCore.PixelPoint
+  let selection: Selection?
+  let pendingMarqueeAnchor: GIFEditorCore.PixelPoint?
+  let pendingGradientAnchor: GIFEditorCore.PixelPoint?
+  var hover: GIFEditorCore.PixelPoint? = nil
+  var mode: CanvasPixelGridMode = .verticalHalfBlock
+
+  var body: some View {
     ZStack(alignment: .topLeading) {
       Canvas(
         pixelGridWidth: size.width,
@@ -42,7 +67,7 @@ struct CanvasView: View {
       )
       .frame(width: size.width, height: mode.cellHeight(for: size.height))
     }
-    .border(.separator, set: .single)
+    .frame(width: size.width, height: mode.cellHeight(for: size.height))
   }
 
   private var resolvedPixels: [Color?] {
@@ -217,7 +242,7 @@ struct InteractiveCanvasView: View {
 
   var body: some View {
     EnvironmentReader(\.pointerInputCapabilities) { pointerInputCapabilities in
-      CanvasView(
+      CanvasSurfaceView(
         size: size,
         cells: cells,
         cursor: model.cursor,
@@ -245,6 +270,7 @@ struct InteractiveCanvasView: View {
       .onPointerHover { phase in
         updateHover(phase, precision: pointerInputCapabilities.precision)
       }
+      .border(.separator, set: .single)
       .focusable(true, interactions: .edit)
     }
   }

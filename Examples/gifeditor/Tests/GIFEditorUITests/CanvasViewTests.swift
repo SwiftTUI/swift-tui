@@ -68,6 +68,36 @@ struct CanvasViewTests {
     #expect(raster.cells[2][2].style?.backgroundColor == nil)
   }
 
+  @Test("Interactive canvas pointer drawing region excludes the border")
+  func interactiveCanvasPointerDrawingRegionExcludesBorder() throws {
+    let size = GIFEditorCore.PixelSize(width: 8, height: 6)
+    let model = EditorViewModel(document: GIFDocument.blank(size: size))
+    let artifacts = render(
+      InteractiveCanvasView(
+        size: size,
+        cells: Array(repeating: Optional<EditorColor>.none, count: size.area),
+        model: model,
+        refresh: {},
+        mode: .verticalHalfBlock
+      ),
+      width: 16,
+      height: 8
+    )
+
+    let drawingRegion = try #require(
+      artifacts.semanticSnapshot.interactionRegions.first {
+        $0.rect.size == CellSize(width: 8, height: 3)
+      }
+    )
+    #expect(
+      drawingRegion.rect
+        == CellRect(
+          origin: CellPoint(x: 1, y: 1),
+          size: CellSize(width: 8, height: 3)
+        )
+    )
+  }
+
   @Test("Canvas pixel mapping preserves sub-cell half-block rows")
   func canvasPixelMappingUsesSubCellPrecision() {
     let metrics = CellPixelMetrics(width: 10, height: 20, source: .reported)
