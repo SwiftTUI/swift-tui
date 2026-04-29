@@ -26,7 +26,7 @@ struct TimelineView: View {
       }
     }
     .padding(.horizontal, 1)
-    .border(.separator)
+    .border(.separator, set: .single)
   }
 
   private func thumbnail(frame: TimelineFrame, index: Int) -> some View {

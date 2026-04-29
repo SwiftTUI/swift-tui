@@ -19,7 +19,7 @@ struct ToolboxView: View {
     }
     .padding(1)
     .frame(width: 18, alignment: .leading)
-    .border(.separator)
+    .border(.separator, set: .single)
   }
 
   private func row(for entry: EditorTool) -> some View {

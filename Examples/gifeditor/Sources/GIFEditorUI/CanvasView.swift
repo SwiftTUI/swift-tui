@@ -42,7 +42,7 @@ struct CanvasView: View {
       )
       .frame(width: size.width, height: mode.cellHeight(for: size.height))
     }
-    .border(.separator)
+    .border(.separator, set: .single)
   }
 
   private var resolvedPixels: [Color?] {
