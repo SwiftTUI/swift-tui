@@ -31,13 +31,41 @@ const docs = defineCollection({
   }).passthrough(),
 });
 
-// Site-native essays that genuinely live in the Website (not /docs/).
+// /docs/plans/**/*.md — date-stamped implementation plans.
+// All plans currently carry frontmatter with title/type/status/date keys.
+// The site renders them at /changelog grouped by status.
+const plans = defineCollection({
+  loader: glob({
+    pattern: "**/*.md",
+    base: "../docs/plans",
+    generateId: ({ entry }) => entry.replace(/\.md$/, "").toLowerCase(),
+  }),
+  schema: z.object({
+    title: z.string(),
+    type: z.enum(["feature", "refactor", "fix", "docs", "test", "chore"]),
+    status: z.enum(["active", "design-approved", "shipped", "reverted"]),
+    date: z.coerce.date(),
+    proposal: z.string().optional(),
+  }).passthrough(),
+});
+
+// /docs/proposals/**/*.md — design proposals.
 //
-// /docs/proposals/ and /docs/plans/ collections will be wired in when we
-// build /proposals/ and /changelog pages. They are intentionally absent
-// today — the proposals folder is partly archive, and a few plan files
-// carry frontmatter with unquoted colons that need cleaning before they
-// pass YAML validation. Those fixes belong in their own PRs.
+// These files don't carry frontmatter today; we render only the curated
+// active subset on /proposals (defined by the activeProposals list in
+// src/lib/proposal-status.ts). Archive proposals stay in the repo but are
+// not published.
+const proposals = defineCollection({
+  loader: glob({
+    pattern: "**/*.md",
+    base: "../docs/proposals",
+    generateId: ({ entry }) => entry.replace(/\.md$/, "").toLowerCase(),
+  }),
+  // No schema — proposal content varies wildly by author and era.
+  schema: z.object({}).passthrough(),
+});
+
+// Site-native essays that genuinely live in the Website (not /docs/).
 // Examples: tutorials, decisions (ADRs), curated component pages.
 const essays = defineCollection({
   loader: glob({
@@ -64,4 +92,4 @@ const essays = defineCollection({
   }),
 });
 
-export const collections = { docs, essays };
+export const collections = { docs, plans, proposals, essays };
