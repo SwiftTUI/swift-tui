@@ -213,11 +213,27 @@ struct CollectionSupportTests {
     )
     #expect(
       sliderValue(
-        at: 5,
+        at: 5.5,
         in: .init(origin: .zero, size: .init(width: 11, height: 1)),
         bounds: 0.0...1.0,
         step: 0.25
       ) == 0.5
+    )
+    #expect(
+      sliderValue(
+        at: 1.75,
+        in: .init(origin: .zero, size: .init(width: 4, height: 1)),
+        bounds: 0.0...1.0,
+        step: 0.01
+      ) == 0.25
+    )
+    #expect(
+      sliderValue(
+        at: PointerLocation.cellFallback(.init(x: 2, y: 0)).location.x,
+        in: .init(origin: .zero, size: .init(width: 4, height: 1)),
+        bounds: 0.0...1.0,
+        step: 0.01
+      ) == 1.0
     )
     #expect(formattedControlValue(0.30000000000000004, bounds: 0.0...1.0, step: 0.1) == "0.3")
     #expect(formattedControlValue(0.45, bounds: 0.0...1.0, step: 0.1) == "0.45")

@@ -63,7 +63,7 @@ package struct ScrollIndicatorMetrics: Equatable, Sendable {
   }
 
   package func targetOffset(
-    for location: Point,
+    for location: PointerLocation,
     currentOffset: Int
   ) -> Int {
     guard maxOffset > 0 else {
@@ -77,8 +77,12 @@ package struct ScrollIndicatorMetrics: Equatable, Sendable {
     }
 
     let coordinate = axisCoordinate(for: location)
-    let clampedCoordinate = min(max(coordinate, trackRange.lowerBound), trackRange.upperBound - 1)
-    let progress = Double(clampedCoordinate - trackRange.lowerBound) / Double(trackLength - 1)
+    let clampedCoordinate = min(
+      max(coordinate, Double(trackRange.lowerBound)),
+      Double(trackRange.upperBound - 1)
+    )
+    let progress =
+      (clampedCoordinate - Double(trackRange.lowerBound)) / Double(trackLength - 1)
     return Int((progress * Double(maxOffset)).rounded())
   }
 
@@ -101,15 +105,19 @@ package struct ScrollIndicatorMetrics: Equatable, Sendable {
   }
 
   private func axisCoordinate(
-    for location: Point
-  ) -> Int {
-    let cell = location.containingCell
+    for location: PointerLocation
+  ) -> Double {
+    let fallback: Int
+    let coordinate: Double
     switch axis {
     case .horizontal:
-      return cell.x
+      fallback = location.cell.x
+      coordinate = location.precision.isSubCell ? location.location.x : Double(location.cell.x)
     case .vertical:
-      return cell.y
+      fallback = location.cell.y
+      coordinate = location.precision.isSubCell ? location.location.y : Double(location.cell.y)
     }
+    return coordinate.isFinite ? coordinate : Double(fallback)
   }
 
   private var thumbTrackRange: Range<Int> {

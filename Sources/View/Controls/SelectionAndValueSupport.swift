@@ -285,7 +285,7 @@ func pointerValueDelta(
 }
 
 func sliderValue<Value: AdjustableControlValue>(
-  at locationX: Int,
+  at locationX: Double,
   in trackRect: CellRect,
   bounds: ClosedRange<Value>,
   step: Value
@@ -300,11 +300,6 @@ func sliderValue<Value: AdjustableControlValue>(
       trackRect
     }
 
-  let clampedX = min(
-    max(locationX, usableRect.origin.x),
-    usableRect.origin.x + max(0, usableRect.size.width - 1)
-  )
-
   guard usableRect.size.width > 1 else {
     return Value.controlValueFromTrack(
       bounds.lowerBound.controlDoubleValue,
@@ -313,9 +308,14 @@ func sliderValue<Value: AdjustableControlValue>(
     )
   }
 
+  let firstCenter = Double(usableRect.origin.x) + 0.5
+  let lastCenter =
+    Double(usableRect.origin.x + max(0, usableRect.size.width - 1)) + 0.5
+  let finiteLocationX = locationX.isFinite ? locationX : firstCenter
+  let clampedX = min(max(finiteLocationX, firstCenter), lastCenter)
   let normalized =
-    Double(clampedX - usableRect.origin.x)
-    / Double(max(1, usableRect.size.width - 1))
+    (clampedX - firstCenter)
+    / max(leastMeaningfulControlDelta, lastCenter - firstCenter)
   let rawValue =
     bounds.lowerBound.controlDoubleValue
     + normalized * (bounds.upperBound.controlDoubleValue - bounds.lowerBound.controlDoubleValue)

@@ -1942,6 +1942,64 @@ struct SwiftUISurfaceTests {
     #expect(sliderBox.value == 0.55)
   }
 
+  @Test("Slider track uses fractional pointer locations")
+  func sliderTrackUsesFractionalPointerLocations() {
+    final class SliderBox {
+      var value = 0.0
+    }
+
+    let box = SliderBox()
+    let pointerRegistry = LocalPointerHandlerRegistry()
+    let controlIdentity = testIdentity("PreciseSlider")
+    var context = ResolveContext(identity: testIdentity("Root"))
+    context.localPointerHandlerRegistry = pointerRegistry
+    _ = DefaultRenderer().render(
+      Slider(
+        "Precision",
+        value: Binding(
+          get: { box.value },
+          set: { box.value = $0 }
+        ),
+        in: 0.0...1.0,
+        step: 0.01
+      )
+      .id(controlIdentity),
+      context: context
+    )
+
+    let routeID = primaryRouteID(for: sliderTrackIdentity(for: controlIdentity))
+    let targetRect = CellRect(origin: .zero, size: .init(width: 4, height: 1))
+    let metrics = CellPixelMetrics(width: 10, height: 20, source: .reported)
+
+    #expect(
+      pointerRegistry.dispatch(
+        routeID: routeID,
+        event: .init(
+          kind: .down(.primary),
+          location: .subCell(
+            location: Point(x: 1.75, y: 0.5),
+            source: .nativePixels,
+            metrics: metrics
+          ),
+          targetRect: targetRect
+        )
+      )
+    )
+    #expect(box.value == 0.25)
+
+    #expect(
+      pointerRegistry.dispatch(
+        routeID: routeID,
+        event: .init(
+          kind: .dragged(.primary),
+          location: .cellFallback(.init(x: 2, y: 0)),
+          targetRect: targetRect
+        )
+      )
+    )
+    #expect(box.value == 1.0)
+  }
+
   @Test("Stepper renders its editing chrome directly from focus")
   func stepperRendersEditingChromeFromFocus() {
     func render(focused: Bool) -> RasterSurface {
