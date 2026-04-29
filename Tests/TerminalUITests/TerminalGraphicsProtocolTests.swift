@@ -1065,7 +1065,7 @@ struct TerminalGraphicsProtocolTests {
       controller.writes.contains { $0.contains("\u{001B}P0;1;0q") }
     )
 
-    // The container background colour (48;2;40;40;40) must show up
+    // The container background color (48;2;40;40;40) must show up
     // somewhere — without this, the rest of the surface around the
     // image would be terminal default.
     let bgWrites = controller.writes.filter { write in
@@ -1076,7 +1076,7 @@ struct TerminalGraphicsProtocolTests {
     // And critically, the background must extend across the FULL row
     // (10 cells) — including the 6 cells inside the image rectangle.
     // Transparent pixels in the kitty/sixel image rely on those cells
-    // already being painted with the container background colour so
+    // already being painted with the container background color so
     // the image's see-through regions inherit it.
     let fullRowBg = String(repeating: " ", count: 10)
     let fullRowBgWrites = controller.writes.filter { write in

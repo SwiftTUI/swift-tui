@@ -5,6 +5,7 @@ bjorn
 Borderless
 closedir
 codegen
+dedup
 fclose
 figfonts
 Figlet

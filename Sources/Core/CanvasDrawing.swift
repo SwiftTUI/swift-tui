@@ -12,7 +12,7 @@
 /// passes) and `Equatable` (so two canvas views carrying structurally
 /// identical drawings compare equal in the draw tree and can dedup
 /// across re-renders). Most drawings are small value types where
-/// `Equatable` is synthesised automatically, for example:
+/// `Equatable` is synthesized automatically, for example:
 ///
 /// ```swift
 /// struct Sparkline: CanvasDrawing, Equatable {
@@ -196,9 +196,9 @@ public struct CanvasPixelGridDrawing: CanvasDrawing, Equatable {
 /// silently clipped.
 ///
 /// A context also carries the default ``foreground`` and ``background``
-/// colours that the rasterizer writes for every lit cell the drawing
+/// colors that the rasterizer writes for every lit cell the drawing
 /// touches. The rasterizer reads the context's **final** values after
-/// ``CanvasDrawing/draw(into:)`` returns, so mutating either colour
+/// ``CanvasDrawing/draw(into:)`` returns, so mutating either color
 /// during drawing applies to every unstyled grid cell.
 public struct CanvasContext: Sendable {
   /// The terminal-cell size of the drawing surface.
@@ -219,11 +219,11 @@ public struct CanvasContext: Sendable {
   /// coordinates to primary cell-space APIs.
   public let height: Int
 
-  /// The default foreground colour written to every cell the drawing
-  /// touches. Starts as the environment's resolved foreground colour.
+  /// The default foreground color written to every cell the drawing
+  /// touches. Starts as the environment's resolved foreground color.
   public var foreground: Color
 
-  /// Optional default background colour written to every cell the
+  /// Optional default background color written to every cell the
   /// drawing touches. Starts `nil` (transparent).
   public var background: Color?
 
