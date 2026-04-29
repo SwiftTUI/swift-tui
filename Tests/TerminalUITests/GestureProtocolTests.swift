@@ -20,8 +20,8 @@ struct GestureProtocolTests {
       }
     }
 
-    let fake = Fake()
-    #expect(fake is (any Gesture))
+    let gesture: any Gesture = Fake()
+    _ = gesture
   }
 
   @Test("Accessing Never body traps")
