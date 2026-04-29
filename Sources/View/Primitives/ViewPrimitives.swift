@@ -244,11 +244,11 @@ public struct Spacer: View, ResolvableView {
   }
 }
 
-/// A one-cell rule that adapts to its surrounding layout direction.
+/// A one-cell single-line rule that adapts to its surrounding layout direction.
 public struct Divider: View, ResolvableView {
   public var strokeStyle: StrokeStyle
 
-  public init(strokeStyle: StrokeStyle = .init()) {
+  public init(strokeStyle: StrokeStyle = .single) {
     self.strokeStyle = strokeStyle
   }
 

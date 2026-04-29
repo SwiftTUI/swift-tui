@@ -5124,10 +5124,10 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(verticalArtifacts.measuredTree.measuredSize == .init(width: 4, height: 3))
-    #expect(verticalArtifacts.rasterSurface.lines == ["A", "▀▀▀▀", "B"])
+    #expect(verticalArtifacts.rasterSurface.lines == ["A", "────", "B"])
 
     #expect(horizontalArtifacts.measuredTree.measuredSize == .init(width: 3, height: 3))
-    #expect(horizontalArtifacts.rasterSurface.lines == ["A▌B", " ▌", " ▌"])
+    #expect(horizontalArtifacts.rasterSurface.lines == ["A│B", " │", " │"])
   }
 
   @Test("Divider keeps the enclosing stack direction when framed")
@@ -5150,10 +5150,10 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(verticalArtifacts.measuredTree.measuredSize == .init(width: 3, height: 6))
-    #expect(verticalArtifacts.rasterSurface.lines == ["A", "", "▀▀▀", "", "", "B"])
+    #expect(verticalArtifacts.rasterSurface.lines == ["A", "", "───", "", "", "B"])
 
     #expect(horizontalArtifacts.measuredTree.measuredSize == .init(width: 6, height: 3))
-    #expect(horizontalArtifacts.rasterSurface.lines == ["A ▌  B", "  ▌", "  ▌"])
+    #expect(horizontalArtifacts.rasterSurface.lines == ["A │  B", "  │", "  │"])
   }
 
   @Test("Divider inherits stack direction through lazy indexed child sources")
@@ -5174,7 +5174,7 @@ struct SwiftUISurfaceTests {
     )
 
     #expect(artifacts.measuredTree.measuredSize == .init(width: 6, height: 3))
-    #expect(artifacts.rasterSurface.lines == ["A ▌  B", "  ▌", "  ▌"])
+    #expect(artifacts.rasterSurface.lines == ["A │  B", "  │", "  │"])
   }
 
   @Test("border and divider styles lower through richer raster families")
