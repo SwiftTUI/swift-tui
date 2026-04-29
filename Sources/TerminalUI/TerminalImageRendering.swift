@@ -12,7 +12,7 @@ private enum TerminalImageRenderMode: String, Hashable, Sendable {
 private struct TerminalImageVariantKey: Sendable {
   var reference: ImageAssetReference
   var mode: TerminalImageRenderMode
-  var outputSize: Size
+  var outputSize: PixelSize
   var paletteSize: Int
 }
 
@@ -35,7 +35,7 @@ extension TerminalImageVariantKey: Hashable {
 }
 
 private struct RasterImageOverlay: Sendable {
-  var size: Size
+  var size: CellSize
   var cells: [[RasterCell]]
 }
 
@@ -48,7 +48,7 @@ private struct RasterImageOverlay: Sendable {
 /// already-decoded pixels as RGBA and ship those instead.
 private enum KittyPayloadFormat: Sendable, Equatable {
   case png
-  case rgba(pixelSize: Size)
+  case rgba(pixelSize: PixelSize)
 
   /// Numeric value emitted as `f=` in the kitty control data.
   var formatKey: Int {
@@ -74,7 +74,7 @@ private struct KittySourceRect: Sendable, Equatable {
 }
 
 private struct KittyPlacement: Sendable, Equatable {
-  var origin: Point
+  var origin: CellPoint
   var cellColumns: Int
   var cellRows: Int
   var sourceRect: KittySourceRect?
@@ -280,7 +280,7 @@ final class TerminalImageRenderer: Sendable {
     }
 
     let mode = fallbackRenderMode(for: capabilityProfile)
-    let outputSize: Size =
+    let outputSize: PixelSize =
       switch mode {
       case .fallbackASCII:
         .init(
@@ -417,7 +417,7 @@ final class TerminalImageRenderer: Sendable {
     }
 
     let cellPixelSize = graphicsCapabilities.cellPixelSize ?? .init(width: 8, height: 16)
-    let pixelSize = Size(
+    let pixelSize = PixelSize(
       width: max(1, attachment.visibleBounds.size.width * max(1, cellPixelSize.width)),
       height: max(1, attachment.visibleBounds.size.height * max(1, cellPixelSize.height))
     )
@@ -487,7 +487,7 @@ private func fallbackRenderMode(
 
 private func directColorOverlay(
   for image: DecodedImage,
-  cellSize: Size
+  cellSize: CellSize
 ) -> RasterImageOverlay? {
   guard cellSize.width > 0, cellSize.height > 0 else {
     return nil
@@ -505,14 +505,14 @@ private func directColorOverlay(
 
 private func indexedColorOverlay(
   for image: DecodedImage,
-  cellSize: Size,
+  cellSize: CellSize,
   palette: [Color]
 ) -> RasterImageOverlay? {
   guard cellSize.width > 0, cellSize.height > 0, !palette.isEmpty else {
     return nil
   }
 
-  let sampleSize = Size(
+  let sampleSize = PixelSize(
     width: cellSize.width,
     height: cellSize.height * 2
   )
@@ -536,7 +536,7 @@ private func indexedColorOverlay(
 
 private func asciiOverlay(
   for image: DecodedImage,
-  cellSize: Size
+  cellSize: CellSize
 ) -> RasterImageOverlay? {
   guard cellSize.width > 0, cellSize.height > 0 else {
     return nil
@@ -544,7 +544,7 @@ private func asciiOverlay(
 
   let samples = scaledPixels(
     from: image,
-    outputSize: cellSize
+    outputSize: .init(width: cellSize.width, height: cellSize.height)
   )
   let ramp = Array(" .:-=+*#%@")
   var rows: [[RasterCell]] = Array(
@@ -577,7 +577,7 @@ private func asciiOverlay(
 
 private func halfBlockOverlay(
   colors: [Color?],
-  cellSize: Size
+  cellSize: CellSize
 ) -> RasterImageOverlay? {
   guard
     cellSize.width > 0,
@@ -637,10 +637,10 @@ private func halfBlockOverlay(
 
 private func apply(
   overlay: RasterImageOverlay,
-  for bounds: Rect,
-  clippedTo visibleBounds: Rect,
+  for bounds: CellRect,
+  clippedTo visibleBounds: CellRect,
   to cells: inout [[RasterCell]],
-  surfaceSize: Size
+  surfaceSize: CellSize
 ) {
   guard surfaceSize.width > 0, surfaceSize.height > 0 else {
     return
@@ -687,7 +687,7 @@ private func apply(
 
 private func normalizedCells(
   _ existing: [[RasterCell]],
-  size: Size
+  size: CellSize
 ) -> [[RasterCell]] {
   guard size.width > 0, size.height > 0 else {
     return []
@@ -744,7 +744,7 @@ private func compareImageAttachments(
 
 private func kittyPlacement(
   for attachment: RasterImageAttachment,
-  imagePixelSize: Size
+  imagePixelSize: PixelSize
 ) -> KittyPlacement? {
   let logicalBounds = attachment.bounds
   let visibleBounds = attachment.visibleBounds
@@ -800,8 +800,8 @@ private func kittySourceRect(
   hiddenTopCells: Int,
   hiddenRightCells: Int,
   hiddenBottomCells: Int,
-  logicalCellSize: Size,
-  imagePixelSize: Size
+  logicalCellSize: CellSize,
+  imagePixelSize: PixelSize
 ) -> KittySourceRect? {
   guard
     hiddenLeftCells > 0 || hiddenTopCells > 0
@@ -853,7 +853,7 @@ private func proportionalPixelOffset(
 
 private func scaledPixels(
   from image: DecodedImage,
-  outputSize: Size
+  outputSize: PixelSize
 ) -> [RGBAImagePixel?] {
   guard
     outputSize.width > 0,
@@ -898,7 +898,7 @@ private func scaledPixels(
 
 private func floydSteinbergQuantizedIndices(
   pixels: [RGBAImagePixel?],
-  size: Size,
+  size: PixelSize,
   palette: [Color]
 ) -> [Int?] {
   guard
@@ -1002,7 +1002,7 @@ private func diffuseError(
   blue errorBlue: Double,
   x: Int,
   y: Int,
-  size: Size,
+  size: PixelSize,
   factor: Double,
   redBuffer: inout [Double],
   greenBuffer: inout [Double],
@@ -1175,7 +1175,7 @@ private func sixelPaletteBudget(
 private func sixelCommand(
   indices: [Int?],
   palette: [Color],
-  size: Size
+  size: PixelSize
 ) -> String {
   var result = "\u{001B}P0;1;0q"
   result += "\"1;1;\(size.width);\(size.height)"
@@ -1231,7 +1231,7 @@ private func bandHasColor(
   indices: [Int?],
   paletteIndex: Int,
   bandStart: Int,
-  size: Size
+  size: PixelSize
 ) -> Bool {
   for y in bandStart..<min(size.height, bandStart + 6) {
     for x in 0..<size.width {
@@ -1247,7 +1247,7 @@ private func encodedSixelLine(
   indices: [Int?],
   paletteIndex: Int,
   bandStart: Int,
-  size: Size
+  size: PixelSize
 ) -> String {
   var result = ""
   var currentScalar: UnicodeScalar?
@@ -1429,7 +1429,7 @@ private func kittyAdditionalFrameTransmitCommands(
   encodedData: String,
   imageID: UInt32,
   delayMilliseconds: Int,
-  pixelSize: Size
+  pixelSize: PixelSize
 ) -> [String] {
   let chunkSize = 4096
   let chunks = stride(from: 0, to: encodedData.count, by: chunkSize).map { index in
@@ -1533,7 +1533,7 @@ private func terminalRestoreCursorSequence() -> String {
 }
 
 private func terminalCursorSequence(
-  to point: Point
+  to point: CellPoint
 ) -> String {
   let row = max(1, point.y + 1)
   let column = max(1, point.x + 1)

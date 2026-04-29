@@ -12,11 +12,11 @@ struct ContentShapeTests {
   func contentShapeOverrides() throws {
     let root = Identity(components: [IdentityComponent(rawValue: "root")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 20, height: 3)
+    env.terminalSize = CellSize(width: 20, height: 3)
 
-    let shapeRect = Rect(
+    let shapeRect = CellRect(
       origin: .zero,
-      size: Size(width: 10, height: 3)
+      size: CellSize(width: 10, height: 3)
     )
 
     // Same pattern as GestureViewModifierTests: construct registries,
@@ -49,7 +49,7 @@ struct ContentShapeTests {
   func contentShapeNilRestoresDefault() throws {
     let root = Identity(components: [IdentityComponent(rawValue: "root")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 20, height: 3)
+    env.terminalSize = CellSize(width: 20, height: 3)
 
     let pointerRegistry = LocalPointerHandlerRegistry()
     let gestureRegistry = LocalGestureRegistry()

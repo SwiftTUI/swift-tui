@@ -22,7 +22,7 @@ struct CaptureOnPressTests {
 
     let region = InteractionRegion(
       identity: identity,
-      rect: Rect(origin: .zero, size: Size(width: 4, height: 1)),
+      rect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1)),
       routeID: RouteID(identity: identity),
       hitTestOrder: 0,
       captureOnPress: true
@@ -38,7 +38,7 @@ struct CaptureOnPressTests {
     let model = Model()
     let identity = Identity(components: [IdentityComponent(rawValue: "root")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 20, height: 3)
+    env.terminalSize = CellSize(width: 20, height: 3)
 
     let artifacts = DefaultRenderer().render(
       Slider(
@@ -66,7 +66,7 @@ struct CaptureOnPressTests {
   func buttonRegionDoesNotCapture() throws {
     let identity = Identity(components: [IdentityComponent(rawValue: "root")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 10, height: 3)
+    env.terminalSize = CellSize(width: 10, height: 3)
 
     let artifacts = DefaultRenderer().render(
       Button("OK", action: {}),

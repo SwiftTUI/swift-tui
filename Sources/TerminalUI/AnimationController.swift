@@ -288,7 +288,7 @@ package enum AnimationKind: Sendable {
   /// bounds.  At progress 0 the target identity renders at
   /// `fromBounds`; at progress 1 it renders at its natural new
   /// bounds (looked up in the current placed tree).
-  case matchedGeometry(fromBounds: Rect)
+  case matchedGeometry(fromBounds: CellRect)
 }
 
 /// An animation currently in flight for one ``AnimationKey``.
@@ -548,24 +548,24 @@ private func translateBounds(
   dx: Int,
   dy: Int
 ) {
-  let delta = Point(x: dx, y: dy)
-  node.bounds = Rect(
-    origin: Point(
+  let delta = CellPoint(x: dx, y: dy)
+  node.bounds = CellRect(
+    origin: CellPoint(
       x: node.bounds.origin.x + delta.x,
       y: node.bounds.origin.y + delta.y
     ),
     size: node.bounds.size
   )
-  node.contentBounds = Rect(
-    origin: Point(
+  node.contentBounds = CellRect(
+    origin: CellPoint(
       x: node.contentBounds.origin.x + delta.x,
       y: node.contentBounds.origin.y + delta.y
     ),
     size: node.contentBounds.size
   )
   if let clip = node.clipBounds {
-    node.clipBounds = Rect(
-      origin: Point(
+    node.clipBounds = CellRect(
+      origin: CellPoint(
         x: clip.origin.x + delta.x,
         y: clip.origin.y + delta.y
       ),
@@ -604,7 +604,7 @@ package final class AnimationController: Sendable {
     fileprivate var previousSnapshots: [Identity: AnimatableSnapshot]
     fileprivate var previousTreeRoot: ResolvedNode?
     fileprivate var previousPlacedRoot: PlacedNode?
-    fileprivate var previousMatchedGeometryBounds: [MatchedGeometryKey: Rect]
+    fileprivate var previousMatchedGeometryBounds: [MatchedGeometryKey: CellRect]
     fileprivate var previousMatchedKeyIdentities: [MatchedGeometryKey: Identity]
     fileprivate var previousParentByIdentity: [Identity: Identity]
     fileprivate var previousChildIndexByIdentity: [Identity: Int]
@@ -636,7 +636,7 @@ package final class AnimationController: Sendable {
   /// Placed bounds for every matched-geometry key observed in the
   /// previous frame's placed tree.  Seeded by ``capturePlacedTree``
   /// and consulted by the next frame's match detection.
-  private var previousMatchedGeometryBounds: [MatchedGeometryKey: Rect] = [:]
+  private var previousMatchedGeometryBounds: [MatchedGeometryKey: CellRect] = [:]
   /// Which identity held each matched-geometry key in the previous
   /// frame.  A match fires when the current frame maps the same key
   /// to a *different* identity — regardless of whether either
@@ -784,7 +784,7 @@ package final class AnimationController: Sendable {
   /// removal overlays are pending this is a cheap reference copy.
   package func capturePlacedTree(_ placed: PlacedNode) {
     previousPlacedRoot = placed
-    var matchedBounds: [MatchedGeometryKey: Rect] = [:]
+    var matchedBounds: [MatchedGeometryKey: CellRect] = [:]
     var matchedIdentities: [MatchedGeometryKey: Identity] = [:]
     Self.collectMatchedGeometry(
       placed,
@@ -807,7 +807,7 @@ package final class AnimationController: Sendable {
   /// entry wins.
   private static func collectMatchedGeometry(
     _ node: PlacedNode,
-    bounds: inout [MatchedGeometryKey: Rect],
+    bounds: inout [MatchedGeometryKey: CellRect],
     identities: inout [MatchedGeometryKey: Identity]
   ) {
     if let config = node.matchedGeometry, config.isSource {
@@ -1021,7 +1021,7 @@ package final class AnimationController: Sendable {
   private static func findBounds(
     in node: PlacedNode,
     identity: Identity
-  ) -> Rect? {
+  ) -> CellRect? {
     if node.identity == identity { return node.bounds }
     for child in node.children {
       if let found = findBounds(in: child, identity: identity) {

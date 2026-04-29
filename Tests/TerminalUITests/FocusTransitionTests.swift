@@ -249,7 +249,7 @@ struct FocusTransitionTests {
 
   @Test("Tab/Shift-Tab transitions update both controls' focus highlights correctly")
   func tabTransitionsUpdateBothHighlights() throws {
-    let terminalSize = Size(width: 50, height: 10)
+    let terminalSize = CellSize(width: 50, height: 10)
     let terminal = FocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("HighlightSync")
 
@@ -326,7 +326,7 @@ struct FocusTransitionTests {
 
   @Test("Multiple rapid Tab/Shift-Tab cycles maintain correct highlights")
   func multipleRapidCyclesMaintainHighlights() throws {
-    let terminalSize = Size(width: 50, height: 10)
+    let terminalSize = CellSize(width: 50, height: 10)
     let terminal = FocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("RapidCycles")
 
@@ -394,7 +394,7 @@ struct FocusTransitionTests {
 
   @Test("Tab key in RunLoop moves focus and changes rendered frame styling")
   func tabKeyRunLoopProducesDifferentFrame() throws {
-    let terminalSize = Size(width: 50, height: 10)
+    let terminalSize = CellSize(width: 50, height: 10)
     let terminal = FocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("FocusTransition")
 
@@ -456,7 +456,7 @@ struct FocusTransitionTests {
 
   @Test("TabView arrow navigation moves focus without auto-selecting and Enter commits selection")
   func tabViewArrowNavigationSeparatesFocusFromSelection() throws {
-    let terminalSize = Size(width: 50, height: 8)
+    let terminalSize = CellSize(width: 50, height: 8)
     let terminal = FocusTestTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("TabbedSelection")
 
@@ -516,16 +516,16 @@ struct FocusTransitionTests {
 // MARK: - Test support types
 
 private final class FocusTestTerminalHost: TerminalHosting {
-  var surfaceSize: Size { surfaceSizeProvider() }
+  var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
   var graphicsCapabilities: TerminalGraphicsCapabilities { .init() }
   var theme: Theme? { nil }
   private(set) var latestSurface: RasterSurface?
-  private let surfaceSizeProvider: () -> Size
+  private let surfaceSizeProvider: () -> CellSize
 
   init(
-    surfaceSizeProvider: @escaping () -> Size,
+    surfaceSizeProvider: @escaping () -> CellSize,
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
     appearance: TerminalAppearance = .fallback
   ) {
@@ -538,7 +538,7 @@ private final class FocusTestTerminalHost: TerminalHosting {
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {

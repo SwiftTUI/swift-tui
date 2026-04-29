@@ -1108,7 +1108,7 @@ struct InteractiveRuntimeTests {
   func mouseActivationOpensLinksThroughRuntimeActionPath() async throws {
     let rootIdentity = testIdentity("MouseLinkRuntime")
     let linkIdentity = testIdentity("MouseLinkRuntime", "Link")
-    let terminalSize = Size(width: 20, height: 1)
+    let terminalSize = CellSize(width: 20, height: 1)
     let view = Link("Docs", destination: "https://example.com")
       .id(linkIdentity)
     let rect = try #require(
@@ -1311,8 +1311,8 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("app runtime rerenders on SIGWINCH without exiting")
   func appRuntimeRerendersOnSIGWINCHWithoutExiting() async throws {
-    let initialSize = Size(width: 24, height: 6)
-    let resizedSize = Size(width: 32, height: 8)
+    let initialSize = CellSize(width: 24, height: 6)
+    let resizedSize = CellSize(width: 32, height: 8)
     var currentSize = initialSize
     var appliedResize = false
     var presentationCount = 0
@@ -1356,8 +1356,8 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("literal tab overflow updates on SIGWINCH without requiring additional input")
   func literalTabOverflowUpdatesOnSIGWINCHWithoutAdditionalInput() async throws {
-    let initialSize = Size(width: 40, height: 8)
-    let resizedSize = Size(width: 24, height: 8)
+    let initialSize = CellSize(width: 40, height: 8)
+    let resizedSize = CellSize(width: 24, height: 8)
     var currentSize = initialSize
     var appliedResize = false
     var presentationCount = 0
@@ -1407,7 +1407,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("toast auto-dismiss rerenders without additional input")
   func toastAutoDismissRerendersWithoutAdditionalInput() async throws {
-    let terminalSize = Size(width: 32, height: 8)
+    let terminalSize = CellSize(width: 32, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("ToastRuntimeRoot")
     let stateContainer = StateContainer(
@@ -1457,7 +1457,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("imperative presentation handle mutations invalidate and render on the next frame")
   func imperativePresentationHandleMutationRerendersOnNextFrame() async throws {
-    let terminalSize = Size(width: 40, height: 10)
+    let terminalSize = CellSize(width: 40, height: 10)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("ImperativePresentationRuntimeRoot")
     let stateContainer = StateContainer(
@@ -1499,7 +1499,7 @@ struct InteractiveRuntimeTests {
   @Test("mouse input updates built-in controls through click drag and wheel paths")
   func mouseInputUpdatesBuiltInControls() async throws {
     let box = MouseControlBox()
-    let terminalSize = Size(width: 72, height: 48)
+    let terminalSize = CellSize(width: 72, height: 48)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("MouseFixture")
     let view = mouseControlFixture(box: box)
@@ -1647,7 +1647,7 @@ struct InteractiveRuntimeTests {
   @Test("mouse click on a ScrollView indicator jumps scrolling to that location")
   func mouseClickOnScrollIndicatorJumpsToLocation() async throws {
     let box = MouseControlBox()
-    let terminalSize = Size(width: 16, height: 8)
+    let terminalSize = CellSize(width: 16, height: 8)
     let rootIdentity = testIdentity("ScrollIndicatorClickFixture")
     let view =
       ScrollView(
@@ -1697,7 +1697,7 @@ struct InteractiveRuntimeTests {
   @Test("mouse drag on a ScrollView indicator tracks the dragged scroll position")
   func mouseDragOnScrollIndicatorTracksDraggedPosition() async throws {
     let box = MouseControlBox()
-    let terminalSize = Size(width: 16, height: 8)
+    let terminalSize = CellSize(width: 16, height: 8)
     let rootIdentity = testIdentity("ScrollIndicatorDragFixture")
     let view =
       ScrollView(
@@ -1751,7 +1751,7 @@ struct InteractiveRuntimeTests {
       var position = ScrollPosition.zero
     }
 
-    let terminalSize = Size(width: 20, height: 8)
+    let terminalSize = CellSize(width: 20, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("FocusDrivenScrollFixture")
     let scrollIdentity = testIdentity("FocusDrivenScrollFixture", "Scroll")
@@ -1823,7 +1823,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("ScrollView without an explicit position binding manages keyboard scrolling internally")
   func scrollViewWithoutExplicitPositionHandlesKeyboardScrolling() async throws {
-    let terminalSize = Size(width: 20, height: 8)
+    let terminalSize = CellSize(width: 20, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("ImplicitKeyboardScrollFixture")
     let view =
@@ -1866,7 +1866,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("ScrollView without an explicit position binding manages pointer scrolling internally")
   func scrollViewWithoutExplicitPositionHandlesPointerScrolling() async throws {
-    let terminalSize = Size(width: 20, height: 8)
+    let terminalSize = CellSize(width: 20, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("ImplicitPointerScrollFixture")
     let view =
@@ -1925,7 +1925,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("ScrollView without an explicit position binding manages pointer scrolling with LazyVStack")
   func scrollViewWithoutExplicitPositionHandlesPointerScrollingWithLazyVStack() async throws {
-    let terminalSize = Size(width: 20, height: 8)
+    let terminalSize = CellSize(width: 20, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("ImplicitPointerLazyScrollFixture")
     let view =
@@ -1984,7 +1984,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("ScrollView internal pointer scrolling preserves outer stateful content scope")
   func scrollViewInternalPointerScrollingPreservesOuterStatefulContentScope() async throws {
-    let terminalSize = Size(width: 20, height: 8)
+    let terminalSize = CellSize(width: 20, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("ImplicitPointerStatefulScrollFixture")
     let view = StatefulImplicitPointerScrollFixture()
@@ -2018,7 +2018,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("gallery-like ScrollView content survives pointer scrolling")
   func galleryLikeScrollViewContentSurvivesPointerScrolling() async throws {
-    let terminalSize = Size(width: 80, height: 24)
+    let terminalSize = CellSize(width: 80, height: 24)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("GalleryLikeScrollFixture")
     let view = GalleryLikeScrollFixture()
@@ -2050,7 +2050,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("root-alias ScrollView content survives pointer scrolling")
   func rootAliasScrollViewContentSurvivesPointerScrolling() async throws {
-    let terminalSize = Size(width: 80, height: 24)
+    let terminalSize = CellSize(width: 80, height: 24)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("RootAliasGalleryLikeScrollFixture")
     let view = RootAliasGalleryLikeScrollFixture()
@@ -2082,7 +2082,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("layout-hosted ScrollView content survives pointer scrolling")
   func layoutHostedScrollViewContentSurvivesPointerScrolling() async throws {
-    let terminalSize = Size(width: 80, height: 24)
+    let terminalSize = CellSize(width: 80, height: 24)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("LayoutHostedGalleryLikeScrollFixture")
     let view = LayoutHostedGalleryLikeScrollFixture()
@@ -2120,7 +2120,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("pointer scroll advances external position binding through full run loop")
   func pointerScrollAdvancesExternalBindingThroughFullRunLoop() async throws {
-    let terminalSize = Size(width: 30, height: 8)
+    let terminalSize = CellSize(width: 30, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("PointerScrollExternalBinding")
     let scrollIdentity = testIdentity("PointerScrollExternalBinding", "Scroll")
@@ -2175,7 +2175,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("pointer scroll advances binding while a PhaseAnimator is cycling")
   func pointerScrollAdvancesWhilePhaseAnimatorCycling() async throws {
-    let terminalSize = Size(width: 40, height: 12)
+    let terminalSize = CellSize(width: 40, height: 12)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("PointerScrollWithAnimation")
     let scrollIdentity = testIdentity("PointerScrollWithAnimation", "Scroll")
@@ -2230,7 +2230,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("gallery-shaped ScrollView (.frame maxWidth/.maxHeight) advances on pointer scroll")
   func galleryShapedScrollViewAdvancesOnPointerScroll() async throws {
-    let terminalSize = Size(width: 60, height: 20)
+    let terminalSize = CellSize(width: 60, height: 20)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("GalleryShapedScroll")
     let scrollIdentity = testIdentity("GalleryShapedScroll", "Scroll")
@@ -2289,7 +2289,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("pointer scroll causes a follow-up render that reflects the new offset")
   func pointerScrollProducesObservableFollowUpFrame() async throws {
-    let terminalSize = Size(width: 30, height: 8)
+    let terminalSize = CellSize(width: 30, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("PointerScrollVisibleFrame")
     let scrollIdentity = testIdentity("PointerScrollVisibleFrame", "Scroll")
@@ -2345,7 +2345,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("pointer scroll updates the visible surface for a TabView-hosted scroll pane")
   func pointerScrollUpdatesVisibleSurfaceForTabHostedScrollPane() async throws {
-    let terminalSize = Size(width: 36, height: 10)
+    let terminalSize = CellSize(width: 36, height: 10)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("TabHostedScrollVisibleFrame")
     let scrollIdentity = testIdentity("TabHostedScrollVisibleFrame", "Scroll")
@@ -2396,7 +2396,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("pointer scroll updates the visible surface for a WindowGroup-hosted scroll pane")
   func pointerScrollUpdatesVisibleSurfaceForWindowGroupHostedScrollPane() async throws {
-    let terminalSize = Size(width: 36, height: 10)
+    let terminalSize = CellSize(width: 36, height: 10)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let scrollIdentity = testIdentity("SceneHostedScrollVisibleFrame", "Scroll")
     let positionBox = LockedBox(ScrollPosition.zero)
@@ -2473,7 +2473,7 @@ struct InteractiveRuntimeTests {
     "scroll on TabView-hosted internal-@State ScrollView updates the rendered surface without a follow-up click"
   )
   func scrollOnTabViewHostedInternalStateScrollViewUpdatesRenderedSurface() async throws {
-    let terminalSize = Size(width: 60, height: 20)
+    let terminalSize = CellSize(width: 60, height: 20)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("InternalStateTabScrollFixture")
 
@@ -2539,7 +2539,7 @@ struct InteractiveRuntimeTests {
     #expect(currentFlags >= 0)
     #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) >= 0)
 
-    let terminalSize = Size(width: 60, height: 20)
+    let terminalSize = CellSize(width: 60, height: 20)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let scrollIdentity = testIdentity("RealInputReaderGalleryScroll", "Scroll")
     let positionBox = LockedBox(ScrollPosition.zero)
@@ -2633,7 +2633,7 @@ struct InteractiveRuntimeTests {
     "injected terminal input scroll bursts update the visible gallery pane before any follow-up click"
   )
   func injectedTerminalInputScrollBurstsUpdateVisibleGalleryPaneBeforeFollowUpClick() async throws {
-    let terminalSize = Size(width: 60, height: 20)
+    let terminalSize = CellSize(width: 60, height: 20)
     let terminal = DamageRecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let scrollIdentity = testIdentity("InjectedInputGalleryScroll", "Scroll")
     let positionBox = LockedBox(ScrollPosition.zero)
@@ -2721,7 +2721,7 @@ struct InteractiveRuntimeTests {
   @Test(
     "handled pointer scrolling invalidates the scroll route even for external position bindings")
   func handledPointerScrollingInvalidatesScrollRouteForExternalBindings() throws {
-    let terminalSize = Size(width: 20, height: 8)
+    let terminalSize = CellSize(width: 20, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("ExternalPointerScrollInvalidation")
     let scrollIdentity = testIdentity("ExternalPointerScrollInvalidation", "Scroll")
@@ -2801,7 +2801,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("handled pointer scrolling updates ScrollView internal state before follow-up input")
   func handledPointerScrollingUpdatesInternalScrollStateBeforeFollowUpInput() throws {
-    let terminalSize = Size(width: 20, height: 8)
+    let terminalSize = CellSize(width: 20, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("InternalPointerScrollInvalidation")
     let scrollIdentity = testIdentity("InternalPointerScrollInvalidation", "Scroll")
@@ -2871,7 +2871,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("handled pointer scrolling repaints ScrollView wrapping a List before follow-up input")
   func handledPointerScrollingRepaintsScrollViewWrappingListBeforeFollowUpInput() throws {
-    let terminalSize = Size(width: 40, height: 10)
+    let terminalSize = CellSize(width: 40, height: 10)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("InternalListScrollInvalidation")
     let scrollIdentity = testIdentity("InternalListScrollInvalidation", "Scroll")
@@ -2935,7 +2935,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("handled pointer scrolling repaints LayoutPicker-shaped structural ScrollView")
   func handledPointerScrollingRepaintsLayoutPickerShapedStructuralScrollView() async throws {
-    let terminalSize = Size(width: 56, height: 14)
+    let terminalSize = CellSize(width: 56, height: 14)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("LayoutPickerShapedScrollInvalidation")
     let view = LayoutsRootShapedScrollFixture()
@@ -2968,7 +2968,7 @@ struct InteractiveRuntimeTests {
   @MainActor
   @Test("clamped pointer scrolling does not schedule a frame when nothing changes")
   func clampedPointerScrollingDoesNotScheduleFrameWhenNothingChanges() throws {
-    let terminalSize = Size(width: 20, height: 8)
+    let terminalSize = CellSize(width: 20, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("ClampedPointerScroll")
     let scrollIdentity = testIdentity("ClampedPointerScroll", "Scroll")
@@ -3060,7 +3060,7 @@ struct InteractiveRuntimeTests {
   @Test("button drag-out cancel prevents activation")
   func mouseDragOutCancelsButtonActivation() async throws {
     let box = MouseControlBox()
-    let terminalSize = Size(width: 24, height: 8)
+    let terminalSize = CellSize(width: 24, height: 8)
     let rootIdentity = testIdentity("CancelFixture")
     let view = Button("Tap") {
       box.buttonTaps += 1
@@ -3083,19 +3083,21 @@ struct InteractiveRuntimeTests {
         .mouse(
           .init(
             kind: .dragged(.primary),
-            location: .init(
-              x: buttonRect.origin.x + buttonRect.size.width + 4,
-              y: buttonRect.origin.y
-            )
+            location: Point(
+              CellPoint(
+                x: buttonRect.origin.x + buttonRect.size.width + 4,
+                y: buttonRect.origin.y
+              ))
           )
         ),
         .mouse(
           .init(
             kind: .up(.primary),
-            location: .init(
-              x: buttonRect.origin.x + buttonRect.size.width + 4,
-              y: buttonRect.origin.y
-            )
+            location: Point(
+              CellPoint(
+                x: buttonRect.origin.x + buttonRect.size.width + 4,
+                y: buttonRect.origin.y
+              ))
           )
         ),
       ],
@@ -3111,7 +3113,7 @@ struct InteractiveRuntimeTests {
   @Test("passive hover motion does not trigger an extra frame")
   func passiveHoverDoesNotTriggerExtraFrame() async throws {
     let box = MouseControlBox()
-    let terminalSize = Size(width: 24, height: 8)
+    let terminalSize = CellSize(width: 24, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("HoverFixture")
     let view = Button("Tap") {
@@ -3155,7 +3157,7 @@ struct InteractiveRuntimeTests {
     }
 
     let box = ScrollPositionBox()
-    let terminalSize = Size(width: 24, height: 10)
+    let terminalSize = CellSize(width: 24, height: 10)
     let terminal = RecordingTerminalHost(
       surfaceSizeProvider: { terminalSize },
       presentObserver: {
@@ -3225,7 +3227,7 @@ struct InteractiveRuntimeTests {
     }
 
     let box = ScrollPositionBox()
-    let terminalSize = Size(width: 24, height: 10)
+    let terminalSize = CellSize(width: 24, height: 10)
     let terminal = RecordingTerminalHost(
       surfaceSizeProvider: { terminalSize },
       presentObserver: {
@@ -3286,7 +3288,7 @@ struct InteractiveRuntimeTests {
   @Test("run loop emits viewport lifecycle transitions for full-lazy ForEach rows")
   func runLoopEmitsViewportLifecycleTransitionsForFullLazyRows() async throws {
     let recorder = RuntimeLifecycleRecorder()
-    let terminalSize = Size(width: 24, height: 8)
+    let terminalSize = CellSize(width: 24, height: 8)
     let terminal = RecordingTerminalHost(surfaceSizeProvider: { terminalSize })
     let rootIdentity = testIdentity("LazyForEachLifecycleRuntime")
     let scrollIdentity = testIdentity("LazyForEachLifecycleRuntime", "Scroll")
@@ -3385,7 +3387,7 @@ private final class MockTerminalController: TerminalControlling {
     setAttributesCallsStorage.withLock { $0.append(attributes) }
   }
 
-  func windowSize(of _: Int32) throws -> Size {
+  func windowSize(of _: Int32) throws -> CellSize {
     .init(width: 80, height: 24)
   }
 
@@ -3411,20 +3413,20 @@ private final class MockTerminalController: TerminalControlling {
 }
 
 private final class RecordingTerminalHost: TerminalHosting {
-  var surfaceSize: Size {
+  var surfaceSize: CellSize {
     surfaceSizeProvider()
   }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
   private(set) var frames: [String] = []
   private(set) var presentationMetrics: [TerminalPresentationMetrics] = []
-  private(set) var presentedSurfaceSizes: [Size] = []
+  private(set) var presentedSurfaceSizes: [CellSize] = []
   private var lastPresentedSurface: RasterSurface?
-  private let surfaceSizeProvider: () -> Size
+  private let surfaceSizeProvider: () -> CellSize
   private let presentObserver: (() -> Void)?
 
   init(
-    surfaceSizeProvider: @escaping () -> Size = { InteractiveDemoLayout.frameSize },
+    surfaceSizeProvider: @escaping () -> CellSize = { InteractiveDemoLayout.frameSize },
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
     appearance: TerminalAppearance = .fallback,
     presentObserver: (() -> Void)? = nil
@@ -3438,7 +3440,7 @@ private final class RecordingTerminalHost: TerminalHosting {
   func enableRawMode() throws {}
   func disableRawMode() throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
@@ -3490,7 +3492,7 @@ private final class RecordingTerminalHost: TerminalHosting {
 }
 
 private final class DamageRecordingTerminalHost: TerminalHosting, DamageAwareTerminalHosting {
-  var surfaceSize: Size {
+  var surfaceSize: CellSize {
     surfaceSizeProvider()
   }
   let capabilityProfile: TerminalCapabilityProfile
@@ -3499,10 +3501,10 @@ private final class DamageRecordingTerminalHost: TerminalHosting, DamageAwareTer
   private(set) var presentationMetrics: [TerminalPresentationMetrics] = []
   private var lastSubmittedSurface: RasterSurface?
   private var visibleSurface: RasterSurface?
-  private let surfaceSizeProvider: () -> Size
+  private let surfaceSizeProvider: () -> CellSize
 
   init(
-    surfaceSizeProvider: @escaping () -> Size = { InteractiveDemoLayout.frameSize },
+    surfaceSizeProvider: @escaping () -> CellSize = { InteractiveDemoLayout.frameSize },
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
     appearance: TerminalAppearance = .fallback
   ) {
@@ -3514,7 +3516,7 @@ private final class DamageRecordingTerminalHost: TerminalHosting, DamageAwareTer
   func enableRawMode() throws {}
   func disableRawMode() throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
@@ -3677,14 +3679,16 @@ private func waitUntil(
 private func sgrScrollDown(
   at point: Point
 ) -> [UInt8] {
-  Array("\u{001B}[<65;\(point.x + 1);\(point.y + 1)M".utf8)
+  let cell = point.containingCell
+  return Array("\u{001B}[<65;\(cell.x + 1);\(cell.y + 1)M".utf8)
 }
 
 private func sgrPrimaryClick(
   at point: Point
 ) -> [UInt8] {
-  Array(
-    "\u{001B}[<0;\(point.x + 1);\(point.y + 1)M\u{001B}[<0;\(point.x + 1);\(point.y + 1)m"
+  let cell = point.containingCell
+  return Array(
+    "\u{001B}[<0;\(cell.x + 1);\(cell.y + 1)M\u{001B}[<0;\(cell.x + 1);\(cell.y + 1)m"
       .utf8
   )
 }
@@ -4476,7 +4480,7 @@ private func scopeSectionFixture() -> some View {
 }
 
 private struct ToastAutoDismissHarnessView: View {
-  let terminalSize: Size
+  let terminalSize: CellSize
 
   @State private var isToastPresented = true
 
@@ -4497,7 +4501,7 @@ private struct ToastAutoDismissHarnessView: View {
 }
 
 private struct ImperativeAlertPresentationHarnessView: View {
-  let terminalSize: Size
+  let terminalSize: CellSize
 
   var body: some View {
     EnvironmentReader(\.alertPresentationCoordinator) { coordinator in
@@ -4541,7 +4545,7 @@ private func runTerminalInputHarness<V: View>(
   terminal: RecordingTerminalHost,
   events: [InputEvent],
   rootIdentity: Identity,
-  terminalSize: Size,
+  terminalSize: CellSize,
   configureEnvironmentValues: ((inout EnvironmentValues) -> Void)? = nil,
   viewBuilder: @escaping () -> V
 ) async throws -> RunLoopResult<Int> {
@@ -4578,9 +4582,9 @@ private func renderedInteractionRect<V: View>(
   for routeID: RouteID,
   in view: V,
   rootIdentity: Identity,
-  terminalSize: Size,
+  terminalSize: CellSize,
   focusedIdentity: Identity? = nil
-) -> Rect? {
+) -> CellRect? {
   var environmentValues = EnvironmentValues()
   environmentValues.terminalSize = terminalSize
   environmentValues.focusedIdentity = focusedIdentity
@@ -4603,8 +4607,8 @@ private func renderedInteractionRect<V: View>(
 private func renderedFirstScrollViewportRect<V: View>(
   in view: V,
   rootIdentity: Identity,
-  terminalSize: Size
-) -> Rect? {
+  terminalSize: CellSize
+) -> CellRect? {
   var environmentValues = EnvironmentValues()
   environmentValues.terminalSize = terminalSize
 
@@ -4625,8 +4629,8 @@ private func renderedScrollViewportRect<V: View>(
   for identity: Identity,
   in view: V,
   rootIdentity: Identity,
-  terminalSize: Size
-) -> Rect? {
+  terminalSize: CellSize
+) -> CellRect? {
   var environmentValues = EnvironmentValues()
   environmentValues.terminalSize = terminalSize
 
@@ -4645,48 +4649,53 @@ private func renderedScrollViewportRect<V: View>(
 }
 
 private func centerPoint(
-  of rect: Rect
+  of rect: CellRect
 ) -> Point {
-  .init(
-    x: rect.origin.x + max(0, rect.size.width / 2),
-    y: rect.origin.y + max(0, rect.size.height / 2)
-  )
+  Point(
+    CellPoint(
+      x: rect.origin.x + max(0, rect.size.width / 2),
+      y: rect.origin.y + max(0, rect.size.height / 2)
+    ))
 }
 
 private func leadingPoint(
-  of rect: Rect
+  of rect: CellRect
 ) -> Point {
-  .init(
-    x: rect.origin.x,
-    y: rect.origin.y + max(0, rect.size.height / 2)
-  )
+  Point(
+    CellPoint(
+      x: rect.origin.x,
+      y: rect.origin.y + max(0, rect.size.height / 2)
+    ))
 }
 
 private func trailingPoint(
-  of rect: Rect
+  of rect: CellRect
 ) -> Point {
-  .init(
-    x: rect.origin.x + max(0, rect.size.width - 1),
-    y: rect.origin.y + max(0, rect.size.height / 2)
-  )
+  Point(
+    CellPoint(
+      x: rect.origin.x + max(0, rect.size.width - 1),
+      y: rect.origin.y + max(0, rect.size.height / 2)
+    ))
 }
 
 private func topPoint(
-  of rect: Rect
+  of rect: CellRect
 ) -> Point {
-  .init(
-    x: rect.origin.x + max(0, rect.size.width / 2),
-    y: rect.origin.y
-  )
+  Point(
+    CellPoint(
+      x: rect.origin.x + max(0, rect.size.width / 2),
+      y: rect.origin.y
+    ))
 }
 
 private func bottomPoint(
-  of rect: Rect
+  of rect: CellRect
 ) -> Point {
-  .init(
-    x: rect.origin.x + max(0, rect.size.width / 2),
-    y: rect.origin.y + max(0, rect.size.height - 1)
-  )
+  Point(
+    CellPoint(
+      x: rect.origin.x + max(0, rect.size.width / 2),
+      y: rect.origin.y + max(0, rect.size.height - 1)
+    ))
 }
 
 @MainActor

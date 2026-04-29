@@ -48,9 +48,9 @@ func makePNGBytes(
 
 func makeRasterImageAttachment(
   pngBytes: [UInt8],
-  pixelSize: Size,
-  bounds: Rect,
-  visibleBounds: Rect? = nil,
+  pixelSize: PixelSize,
+  bounds: CellRect,
+  visibleBounds: CellRect? = nil,
   identity: Identity = testIdentity("Root", "Image")
 ) -> RasterImageAttachment {
   RasterImageAttachment(

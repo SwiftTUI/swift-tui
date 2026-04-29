@@ -9,7 +9,7 @@ struct RasterizerAspectCorrectionTests {
   @Test("8x16 metrics produce equal sub-pixel radii for a square frame")
   func squareFrameAtDefaultMetrics() {
     let radii = Rasterizer.subpixelCircleRadii(
-      frameCells: Size(width: 6, height: 3),
+      frameCells: CellSize(width: 6, height: 3),
       metrics: .estimated
     )
     // Frame pixel dims: 6*8=48 wide, 3*16=48 tall. Diameter=48. Radius=24px.
@@ -24,7 +24,7 @@ struct RasterizerAspectCorrectionTests {
   @Test("stretched-width metrics produce unequal sub-pixel radii")
   func stretchedWidthMetrics() {
     let radii = Rasterizer.subpixelCircleRadii(
-      frameCells: Size(width: 6, height: 6),
+      frameCells: CellSize(width: 6, height: 6),
       metrics: CellPixelMetrics(width: 10, height: 16, source: .reported)
     )
     // Frame pixel dims: 6*10=60 wide, 6*16=96 tall. Diameter=60. Radius=30px.
@@ -38,7 +38,7 @@ struct RasterizerAspectCorrectionTests {
   /// Circle fixtures at the default metrics are preserved.
   @Test("aspectRatio 2.0 produces symmetric radii")
   func aspectRatio2IsSymmetric() {
-    let frame = Size(width: 10, height: 5)
+    let frame = CellSize(width: 10, height: 5)
     let radii = Rasterizer.subpixelCircleRadii(
       frameCells: frame,
       metrics: .estimated

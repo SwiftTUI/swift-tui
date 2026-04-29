@@ -509,7 +509,7 @@ extension Slider {
         case .down(.primary), .dragged(.primary), .up(.primary):
           return withAuthoringContext(dynamicPropertyScope) {
             binding.wrappedValue = sliderValue(
-              at: event.location.x,
+              at: event.location.containingCell.x,
               in: event.targetRect,
               bounds: bounds,
               step: step

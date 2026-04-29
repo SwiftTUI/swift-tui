@@ -268,13 +268,13 @@ public struct Divider: View, ResolvableView {
   }
 }
 
-private func idealTextSize(for content: String) -> Size {
+private func idealTextSize(for content: String) -> CellSize {
   layoutText(for: content, width: Optional<Int>.none).size
 }
 @MainActor
 func resolveLeafNode(
   kindName: String,
-  intrinsicSize: Size? = nil,
+  intrinsicSize: CellSize? = nil,
   layoutBehavior: LayoutBehavior = .intrinsic,
   layoutMetadata: LayoutMetadata = .init(),
   drawMetadata: DrawMetadata = DrawMetadata(),

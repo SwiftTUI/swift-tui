@@ -18,7 +18,7 @@ struct TapGestureTests {
     LocalPointerEvent(
       kind: kind,
       location: point,
-      targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1))
+      targetRect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1))
     )
   }
 

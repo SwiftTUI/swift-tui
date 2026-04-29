@@ -1285,7 +1285,7 @@ private final class PresentationMockTerminalController: TerminalControlling {
 
   func setAttributes(_: termios, on _: Int32) throws {}
 
-  func windowSize(of _: Int32) throws -> Size {
+  func windowSize(of _: Int32) throws -> CellSize {
     .init(width: 80, height: 24)
   }
 
@@ -1356,14 +1356,14 @@ private func readAllBytes(
 }
 
 private final class FallbackPresentationHost: TerminalHosting {
-  let surfaceSize: Size
+  let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
 
   private(set) var writes: [String] = []
 
   init(
-    surfaceSize: Size,
+    surfaceSize: CellSize,
     capabilityProfile: TerminalCapabilityProfile
   ) {
     self.surfaceSize = surfaceSize
@@ -1386,7 +1386,7 @@ private final class FallbackPresentationHost: TerminalHosting {
     writes.append("\u{001B}[2J")
   }
 
-  func moveCursor(to point: Point) throws {
+  func moveCursor(to point: CellPoint) throws {
     let row = max(1, point.y + 1)
     let column = max(1, point.x + 1)
     writes.append("\u{001B}[\(row);\(column)H")

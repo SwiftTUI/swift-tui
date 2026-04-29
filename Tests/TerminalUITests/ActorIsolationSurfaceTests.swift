@@ -113,7 +113,7 @@ struct ActorIsolationSurfaceTests {
   @Test("RunLoop typed builders still accept AnyView via Content == AnyView")
   func runLoopTypedBuilderStillAcceptsAnyView() {
     final class SurfaceTerminalHost: TerminalHosting {
-      let surfaceSize: Size = .init(width: 40, height: 12)
+      let surfaceSize: CellSize = .init(width: 40, height: 12)
       let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
       let appearance: TerminalAppearance = .fallback
 
@@ -121,7 +121,7 @@ struct ActorIsolationSurfaceTests {
       func disableRawMode() throws {}
       func write(_: String) throws {}
       func clearScreen() throws {}
-      func moveCursor(to _: Point) throws {}
+      func moveCursor(to _: CellPoint) throws {}
     }
 
     final class SurfaceInputReader: InputReading {

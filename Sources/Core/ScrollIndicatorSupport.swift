@@ -15,14 +15,14 @@ package struct ScrollIndicatorInsets: Equatable, Sendable {
 
 package struct ScrollIndicatorMetrics: Equatable, Sendable {
   package var axis: ScrollIndicatorAxis
-  package var rect: Rect
+  package var rect: CellRect
   package var maxOffset: Int
   package var viewportLength: Int
   package var contentLength: Int
 
   package init(
     axis: ScrollIndicatorAxis,
-    rect: Rect,
+    rect: CellRect,
     maxOffset: Int,
     viewportLength: Int,
     contentLength: Int
@@ -103,11 +103,12 @@ package struct ScrollIndicatorMetrics: Equatable, Sendable {
   private func axisCoordinate(
     for location: Point
   ) -> Int {
+    let cell = location.containingCell
     switch axis {
     case .horizontal:
-      location.x
+      return cell.x
     case .vertical:
-      location.y
+      return cell.y
     }
   }
 
@@ -133,8 +134,8 @@ package struct ScrollIndicatorMetrics: Equatable, Sendable {
 }
 
 package func resolvedScrollIndicatorInsets(
-  viewportRect: Rect,
-  contentBounds: Rect,
+  viewportRect: CellRect,
+  contentBounds: CellRect,
   axes: AxisSet
 ) -> ScrollIndicatorInsets {
   var trailing = 0
@@ -158,8 +159,8 @@ package func resolvedScrollIndicatorInsets(
 }
 
 package func resolvedScrollIndicatorMetrics(
-  viewportRect: Rect,
-  contentBounds: Rect,
+  viewportRect: CellRect,
+  contentBounds: CellRect,
   axes: AxisSet,
   axis: ScrollIndicatorAxis
 ) -> ScrollIndicatorMetrics? {

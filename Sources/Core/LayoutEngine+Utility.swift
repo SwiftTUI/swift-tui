@@ -1,9 +1,9 @@
 extension LayoutEngine {
   package func clampedSize(
-    _ size: Size,
+    _ size: CellSize,
     proposal: ProposedSize
-  ) -> Size {
-    Size(
+  ) -> CellSize {
+    CellSize(
       width: clamp(size.width, to: proposal.width),
       height: clamp(size.height, to: proposal.height)
     )
@@ -78,7 +78,7 @@ extension LayoutEngine {
   }
 
   package func fits(
-    _ size: Size,
+    _ size: CellSize,
     within proposal: ProposedSize,
     axes: AxisSet
   ) -> Bool {

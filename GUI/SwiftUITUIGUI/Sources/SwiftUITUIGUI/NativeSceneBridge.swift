@@ -12,8 +12,8 @@ final class NativeSceneBridge {
   private var session: (any HostedSceneSessionHandling)?
   private var focusPresentation: FocusPresentation = .none
   private var manualKeyboardPresentationRequested = false
-  private(set) var lastViewportSize: Size?
-  private(set) var lastCellPixelSize: Size?
+  private(set) var lastViewportSize: CellSize?
+  private(set) var lastCellPixelSize: PixelSize?
 
   init(
     descriptor: SwiftUITUISceneDescriptor,
@@ -45,8 +45,8 @@ final class NativeSceneBridge {
   }
 
   func resize(
-    to size: Size,
-    cellPixelSize: Size?
+    to size: CellSize,
+    cellPixelSize: PixelSize?
   ) {
     guard size.width > 0, size.height > 0 else {
       return
@@ -96,7 +96,7 @@ final class NativeSceneBridge {
 protocol HostedSceneSessionHandling: AnyObject {
   func start() async throws -> RunLoopExitReason
   func send(_ event: InputEvent)
-  func resize(to size: Size, cellPixelSize: Size?)
+  func resize(to size: CellSize, cellPixelSize: PixelSize?)
   func updateStyle(_ style: TerminalRenderStyle)
   func stop()
 }

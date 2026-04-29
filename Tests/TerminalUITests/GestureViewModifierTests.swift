@@ -16,7 +16,7 @@ struct GestureViewModifierTests {
 
     let root = Identity(components: [IdentityComponent(rawValue: "root")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 10, height: 3)
+    env.terminalSize = CellSize(width: 10, height: 3)
 
     // Create the registries and wire them into the resolve context.
     let pointerRegistry = LocalPointerHandlerRegistry()
@@ -47,7 +47,7 @@ struct GestureViewModifierTests {
       routeID: region.routeID,
       event: .init(
         kind: .down(.primary),
-        location: region.rect.origin,
+        location: Point(region.rect.origin),
         targetRect: region.rect
       )
     )
@@ -55,7 +55,7 @@ struct GestureViewModifierTests {
       routeID: region.routeID,
       event: .init(
         kind: .up(.primary),
-        location: region.rect.origin,
+        location: Point(region.rect.origin),
         targetRect: region.rect
       )
     )
@@ -67,7 +67,7 @@ struct GestureViewModifierTests {
   func dragCaptures() throws {
     let root = Identity(components: [IdentityComponent(rawValue: "r")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 10, height: 3)
+    env.terminalSize = CellSize(width: 10, height: 3)
 
     let pointerRegistry = LocalPointerHandlerRegistry()
     let gestureRegistry = LocalGestureRegistry()
@@ -94,7 +94,7 @@ struct GestureViewModifierTests {
   func longPressCaptures() throws {
     let root = Identity(components: [IdentityComponent(rawValue: "r")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 10, height: 3)
+    env.terminalSize = CellSize(width: 10, height: 3)
 
     let pointerRegistry = LocalPointerHandlerRegistry()
     let gestureRegistry = LocalGestureRegistry()
@@ -121,7 +121,7 @@ struct GestureViewModifierTests {
   func gestureAfterOffsetMovesInteractionRegion() throws {
     let root = Identity(components: [IdentityComponent(rawValue: "offset-root")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 20, height: 6)
+    env.terminalSize = CellSize(width: 20, height: 6)
 
     let pointerRegistry = LocalPointerHandlerRegistry()
     let gestureRegistry = LocalGestureRegistry()
@@ -153,7 +153,7 @@ struct GestureViewModifierTests {
 
     let root = Identity(components: [IdentityComponent(rawValue: "root")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 10, height: 3)
+    env.terminalSize = CellSize(width: 10, height: 3)
 
     // Create the registries and wire them into the resolve context.
     let pointerRegistry = LocalPointerHandlerRegistry()

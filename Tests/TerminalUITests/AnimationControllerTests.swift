@@ -457,7 +457,7 @@ struct AnimationPipelineIntegrationTests {
   private static func findBoundsForMatchedKey(
     _ node: PlacedNode,
     keyID: String
-  ) -> Rect? {
+  ) -> CellRect? {
     if let config = node.matchedGeometry, config.key.id == keyID {
       return node.bounds
     }
@@ -508,7 +508,7 @@ struct AnimationPipelineIntegrationTests {
     }
   }
 
-  private static func findPositionContainerChildBounds(_ placed: PlacedNode) -> Rect? {
+  private static func findPositionContainerChildBounds(_ placed: PlacedNode) -> CellRect? {
     if case .view(let name) = placed.kind, name == "Position" {
       return placed.children.first?.bounds
     }
@@ -688,7 +688,7 @@ struct AnimationPipelineIntegrationTests {
   /// and returns its single child's bounds.  Used by the offset
   /// animation probe to verify the child has been placed at the
   /// interpolated offset.
-  private static func findOffsetContainerChildBounds(_ placed: PlacedNode) -> Rect? {
+  private static func findOffsetContainerChildBounds(_ placed: PlacedNode) -> CellRect? {
     if case .view(let name) = placed.kind, name == "Offset" {
       return placed.children.first?.bounds
     }
@@ -1102,12 +1102,12 @@ struct AnimationPipelineIntegrationTests {
     let priorPlaced = PlacedNode(
       identity: rootIdentity,
       kind: .view("Root"),
-      bounds: Rect(origin: .zero, size: Size(width: 10, height: 1)),
+      bounds: CellRect(origin: .zero, size: CellSize(width: 10, height: 1)),
       children: [
         PlacedNode(
           identity: leafIdentity,
           kind: .view("Leaf"),
-          bounds: Rect(origin: .zero, size: Size(width: 5, height: 1))
+          bounds: CellRect(origin: .zero, size: CellSize(width: 5, height: 1))
         )
       ]
     )
@@ -1134,7 +1134,7 @@ struct AnimationPipelineIntegrationTests {
     var livePlaced = PlacedNode(
       identity: rootIdentity,
       kind: .view("Root"),
-      bounds: Rect(origin: .zero, size: Size(width: 10, height: 1)),
+      bounds: CellRect(origin: .zero, size: CellSize(width: 10, height: 1)),
       children: []
     )
     controller.applyPlacedOverlays(
@@ -1604,12 +1604,12 @@ struct AnimationControllerPropertyTests {
     var placed = PlacedNode(
       identity: rootIdentity,
       kind: .view("Root"),
-      bounds: Rect(origin: .zero, size: Size(width: 20, height: 5)),
+      bounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 5)),
       children: [
         PlacedNode(
           identity: leafIdentity,
           kind: .view("Leaf"),
-          bounds: Rect(origin: .zero, size: Size(width: 5, height: 1))
+          bounds: CellRect(origin: .zero, size: CellSize(width: 5, height: 1))
         )
       ]
     )
@@ -1631,12 +1631,12 @@ struct AnimationControllerPropertyTests {
     var placedHalf = PlacedNode(
       identity: rootIdentity,
       kind: .view("Root"),
-      bounds: Rect(origin: .zero, size: Size(width: 20, height: 5)),
+      bounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 5)),
       children: [
         PlacedNode(
           identity: leafIdentity,
           kind: .view("Leaf"),
-          bounds: Rect(origin: .zero, size: Size(width: 5, height: 1))
+          bounds: CellRect(origin: .zero, size: CellSize(width: 5, height: 1))
         )
       ]
     )
@@ -1656,12 +1656,12 @@ struct AnimationControllerPropertyTests {
     var placedDone = PlacedNode(
       identity: rootIdentity,
       kind: .view("Root"),
-      bounds: Rect(origin: .zero, size: Size(width: 20, height: 5)),
+      bounds: CellRect(origin: .zero, size: CellSize(width: 20, height: 5)),
       children: [
         PlacedNode(
           identity: leafIdentity,
           kind: .view("Leaf"),
-          bounds: Rect(origin: .zero, size: Size(width: 5, height: 1))
+          bounds: CellRect(origin: .zero, size: CellSize(width: 5, height: 1))
         )
       ]
     )

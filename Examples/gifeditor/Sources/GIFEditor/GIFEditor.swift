@@ -27,7 +27,7 @@ public enum GIFEditor {
     // starting with `-`.
     let positional = arguments.dropFirst().first { !$0.hasPrefix("-") }
     guard let path = positional else {
-      return GIFDocument.blank(size: PixelSize(width: 32, height: 32))
+      return GIFDocument.blank(size: GIFEditorCore.PixelSize(width: 32, height: 32))
     }
     let url = URL(fileURLWithPath: path)
     do {
@@ -35,7 +35,7 @@ public enum GIFEditor {
     } catch {
       // Fall back to a blank document anchored at the requested path so
       // a future Ctrl+S writes there.
-      var doc = GIFDocument.blank(size: PixelSize(width: 32, height: 32))
+      var doc = GIFDocument.blank(size: GIFEditorCore.PixelSize(width: 32, height: 32))
       doc.path = url
       return doc
     }

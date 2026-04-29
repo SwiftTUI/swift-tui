@@ -550,7 +550,7 @@ extension LayoutEngine {
   }
 
   package func mainDimension(
-    of size: Size,
+    of size: CellSize,
     for axis: Axis
   ) -> Int {
     switch axis {
@@ -562,7 +562,7 @@ extension LayoutEngine {
   }
 
   package func crossDimension(
-    of size: Size,
+    of size: CellSize,
     for axis: Axis
   ) -> Int {
     switch axis {
@@ -574,7 +574,7 @@ extension LayoutEngine {
   }
 
   package func mainDimension(
-    of point: Point,
+    of point: CellPoint,
     for axis: Axis
   ) -> Int {
     switch axis {
@@ -586,15 +586,15 @@ extension LayoutEngine {
   }
 
   package func settingMainDimension(
-    of size: Size,
+    of size: CellSize,
     for axis: Axis,
     to value: Int
-  ) -> Size {
+  ) -> CellSize {
     switch axis {
     case .horizontal:
-      return Size(width: value, height: size.height)
+      return CellSize(width: value, height: size.height)
     case .vertical:
-      return Size(width: size.width, height: value)
+      return CellSize(width: size.width, height: value)
     }
   }
 

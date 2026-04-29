@@ -9,7 +9,7 @@ public struct DrawExtractor: Sendable {
 }
 
 private struct BorderMask {
-  var bounds: Rect
+  var bounds: CellRect
   var geometry: ShapeGeometry
   var insetAmount: Int
   var strokeWidth: Int
@@ -402,12 +402,12 @@ extension DrawExtractor {
   }
 
   private func maskedBackgroundFillCommand(
-    bounds: Rect,
+    bounds: CellRect,
     style: AnyShapeStyle,
     defaultMode: ShapeFillMode,
     inheritedBorderMask: BorderMask?
   ) -> (
-    bounds: Rect,
+    bounds: CellRect,
     geometry: ShapeGeometry,
     insetAmount: Int,
     style: AnyShapeStyle,
@@ -436,7 +436,7 @@ extension DrawExtractor {
 
   private func maskedBackgroundCommands(
     _ commands: [DrawCommand],
-    in bounds: Rect,
+    in bounds: CellRect,
     inheritedBorderMask: BorderMask?,
     isInBackgroundSubtree: Bool
   ) -> [DrawCommand] {
@@ -457,7 +457,7 @@ extension DrawExtractor {
 
   private func maskedBackgroundCommand(
     _ command: DrawCommand,
-    in bounds: Rect,
+    in bounds: CellRect,
     inheritedBorderMask: BorderMask
   ) -> DrawCommand {
     switch command {

@@ -363,7 +363,7 @@ private final class BenchmarkPresentationController: TerminalControlling {
 
   func setAttributes(_: termios, on _: Int32) throws {}
 
-  func windowSize(of _: Int32) throws -> Size {
+  func windowSize(of _: Int32) throws -> CellSize {
     .init(width: 80, height: 24)
   }
 

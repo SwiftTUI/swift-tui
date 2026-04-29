@@ -55,7 +55,7 @@ struct RenderedTextFixtureTerminalConfiguration: Equatable, Sendable {
 @MainActor
 func assertRenderedTextFixtures<V: View>(
   named fixtureName: String,
-  size: Size,
+  size: CellSize,
   view: V,
   fixtureDirectory: URL? = nil,
   relativeTo sourceFilePath: StaticString = #filePath,
@@ -84,7 +84,7 @@ func assertRenderedTextFixtures<V: View>(
 @MainActor
 func assertRenderedTextFixtures<Content: View>(
   named fixtureName: String,
-  size: Size,
+  size: CellSize,
   fixtureDirectory: URL? = nil,
   relativeTo sourceFilePath: StaticString = #filePath,
   terminalConfigurations: [RenderedTextFixtureTerminalConfiguration] =
@@ -209,7 +209,7 @@ func assertRenderedTextFixtures<Content: View>(
 @MainActor
 private func renderFixtureSnapshot<V: View>(
   named fixtureName: String,
-  size: Size,
+  size: CellSize,
   configuration: RenderedTextFixtureTerminalConfiguration,
   identity: Identity,
   environmentValues: EnvironmentValues,
@@ -249,7 +249,7 @@ private func renderFixtureSnapshot<V: View>(
 private func serializeRenderedSnapshot(
   fixtureName: String,
   terminalOutput: String,
-  surfaceSize: Size,
+  surfaceSize: CellSize,
   configuration: RenderedTextFixtureTerminalConfiguration
 ) -> String {
   let normalizedOutput = normalizeNewlines(terminalOutput)

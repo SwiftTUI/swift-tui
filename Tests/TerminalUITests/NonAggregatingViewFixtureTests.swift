@@ -265,14 +265,14 @@ private let nonAggregatingFixtureNames = [
 
 private struct FixtureSpec {
   let name: String
-  let size: Size
+  let size: CellSize
   let identity: Identity
   let environmentValues: EnvironmentValues
   let view: AnyView
 
   init(
     name: String,
-    size: Size,
+    size: CellSize,
     identity: Identity = testIdentity("Fixture"),
     environmentValues: EnvironmentValues = .init(),
     view: AnyView

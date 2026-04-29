@@ -21,7 +21,7 @@ struct GestureModifiersTests {
     .init(
       kind: kind,
       location: .zero,
-      targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1))
+      targetRect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1))
     )
   }
 
@@ -45,7 +45,7 @@ struct GestureModifiersTests {
       event: .init(
         kind: .dragged(.primary),
         location: Point(x: 100, y: 100),
-        targetRect: Rect(origin: .zero, size: Size(width: 4, height: 1))
+        targetRect: CellRect(origin: .zero, size: CellSize(width: 4, height: 1))
       ))
     #expect(fired == 0)
   }

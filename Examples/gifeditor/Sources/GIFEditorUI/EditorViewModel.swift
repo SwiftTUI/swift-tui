@@ -35,7 +35,7 @@ public final class EditorViewModel {
   public var tool: EditorTool = .pen
   public var primaryColorIndex: PaletteIndex = 1
   public var secondaryColorIndex: PaletteIndex = 2
-  public var cursor: PixelPoint = .zero {
+  public var cursor: GIFEditorCore.PixelPoint = .zero {
     didSet {
       cursor.x = cursor.x.clamped(to: 0...max(0, document.size.width - 1))
       cursor.y = cursor.y.clamped(to: 0...max(0, document.size.height - 1))
@@ -48,9 +48,9 @@ public final class EditorViewModel {
 
   /// Marquee tool's first corner, captured on `Shift+Space` and
   /// committed into a `selection` on `Shift+Enter`.
-  public var pendingMarqueeAnchor: PixelPoint? = nil
+  public var pendingMarqueeAnchor: GIFEditorCore.PixelPoint? = nil
   /// Gradient tool's first endpoint.
-  public var pendingGradientAnchor: PixelPoint? = nil
+  public var pendingGradientAnchor: GIFEditorCore.PixelPoint? = nil
 
   // MARK: - Status / feedback
 
@@ -172,7 +172,7 @@ public final class EditorViewModel {
   // MARK: - Cursor
 
   public func moveCursor(dx: Int, dy: Int) {
-    cursor = PixelPoint(x: cursor.x + dx, y: cursor.y + dy)
+    cursor = GIFEditorCore.PixelPoint(x: cursor.x + dx, y: cursor.y + dy)
   }
 
   // MARK: - Frames
@@ -314,7 +314,7 @@ public final class EditorViewModel {
 
   // MARK: - Canvas resize
 
-  public func resizeCanvas(to size: PixelSize) {
+  public func resizeCanvas(to size: GIFEditorCore.PixelSize) {
     document.size = size
     for frameIndex in document.frames.indices {
       for layerIndex in document.frames[frameIndex].layers.indices {
@@ -323,7 +323,7 @@ public final class EditorViewModel {
         document.frames[frameIndex].layers[layerIndex] = layer
       }
     }
-    cursor = PixelPoint(
+    cursor = GIFEditorCore.PixelPoint(
       x: min(cursor.x, size.width - 1),
       y: min(cursor.y, size.height - 1)
     )

@@ -1,11 +1,11 @@
 /// A trivial root used by the generic ``Renderer`` helper.
 public struct NoOpRoot: Equatable, Sendable {
   public var identity: Identity
-  public var intrinsicSize: Size
+  public var intrinsicSize: CellSize
 
   public init(
     identity: Identity = .init(components: [] as [IdentityComponent]),
-    intrinsicSize: Size = .zero
+    intrinsicSize: CellSize = .zero
   ) {
     self.identity = identity
     self.intrinsicSize = intrinsicSize
@@ -119,7 +119,7 @@ extension Renderer where Root == NoOpRoot {
         )
       },
       placePhase: { measured, _ in
-        let bounds = Rect(origin: .zero, size: measured.measuredSize)
+        let bounds = CellRect(origin: .zero, size: measured.measuredSize)
         return PlacedNode(
           identity: measured.identity,
           bounds: bounds,

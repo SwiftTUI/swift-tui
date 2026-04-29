@@ -17,14 +17,14 @@ public struct Rasterizer: Sendable {
 
   package func rasterize(
     _ draw: DrawNode,
-    minimumSize: Size
+    minimumSize: CellSize
   ) -> RasterSurface {
     rasterize(draw, minimumSize: minimumSize, previousSurface: nil, damage: nil)
   }
 
   package func rasterize(
     _ draw: DrawNode,
-    minimumSize: Size,
+    minimumSize: CellSize,
     previousSurface: RasterSurface?,
     damage: PresentationDamage?
   ) -> RasterSurface {
@@ -54,7 +54,7 @@ public struct Rasterizer: Sendable {
   /// a geometric predicate on the placed tree.
   package func rasterizeCollectingVisibleIdentities(
     _ draw: DrawNode,
-    minimumSize: Size,
+    minimumSize: CellSize,
     previousSurface: RasterSurface?,
     damage: PresentationDamage?
   ) -> (
@@ -63,7 +63,7 @@ public struct Rasterizer: Sendable {
     presentationDamage: PresentationDamage?
   ) {
     let extent = maximumExtent(for: draw, clip: nil)
-    let surfaceSize = Size(
+    let surfaceSize = CellSize(
       width: max(extent.x, max(0, minimumSize.width)),
       height: max(extent.y, max(0, minimumSize.height))
     )
@@ -321,11 +321,11 @@ extension Rasterizer {
 extension Rasterizer {
   private func maximumExtent(
     for node: DrawNode,
-    clip: Rect?
+    clip: CellRect?
   ) -> (x: Int, y: Int) {
     struct Frame {
       let node: DrawNode
-      let clip: Rect?
+      let clip: CellRect?
     }
 
     var maxX = 0
@@ -335,7 +335,7 @@ extension Rasterizer {
 
     while let frame = stack.popLast() {
       let effectiveClip = intersect(frame.clip, frame.node.clipBounds)
-      let visibleBounds: Rect
+      let visibleBounds: CellRect
       if let effectiveClip {
         guard let clippedBounds = intersect(frame.node.bounds, effectiveClip) else {
           continue
@@ -368,7 +368,7 @@ extension Rasterizer {
     node: DrawNode,
     cells: inout [[RasterCell]],
     imageAttachments: inout [RasterImageAttachment],
-    clip: Rect?,
+    clip: CellRect?,
     dirtyRows: Set<Int>?,
     dirtyRowRange: (min: Int, max: Int)?,
     visibleIdentities: inout Set<Identity>
@@ -382,11 +382,11 @@ extension Rasterizer {
     // inset-placement borders need to correctly overdraw the outermost
     // cells of their subtree.
     enum Frame {
-      case visit(node: DrawNode, clip: Rect?)
+      case visit(node: DrawNode, clip: CellRect?)
       case post(
         commands: [DrawCommand],
         environment: StyleEnvironmentSnapshot,
-        clip: Rect?)
+        clip: CellRect?)
     }
 
     var stack: [Frame] = [.visit(node: node, clip: clip)]
@@ -404,7 +404,7 @@ extension Rasterizer {
         )
       case .visit(let node, let frameClip):
         let effectiveClip = intersect(frameClip, node.clipBounds)
-        let visibleBounds: Rect
+        let visibleBounds: CellRect
         if let effectiveClip {
           guard let clipped = intersect(node.bounds, effectiveClip) else {
             continue
@@ -477,12 +477,12 @@ extension Rasterizer {
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
     imageAttachments: inout [RasterImageAttachment],
-    clip: Rect?,
+    clip: CellRect?,
     dirtyRows: Set<Int>? = nil
   ) {
     struct Frame {
       let command: DrawCommand
-      let clip: Rect?
+      let clip: CellRect?
     }
 
     var stack: [Frame] = []
@@ -712,7 +712,7 @@ extension Rasterizer {
           }
         }
       case .image(let bounds, let identity, let payload):
-        let visibleBounds: Rect
+        let visibleBounds: CellRect
         if let clip = frame.clip {
           guard let clippedBounds = intersect(bounds, clip) else {
             continue
@@ -804,14 +804,14 @@ extension Rasterizer {
   }
 
   private func paintFill(
-    in bounds: Rect,
+    in bounds: CellRect,
     geometry: ShapeGeometry,
     insetAmount: Int,
     style: AnyShapeStyle,
     mode: ShapeFillMode,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: Rect?
+    clip: CellRect?
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
@@ -986,12 +986,12 @@ extension Rasterizer {
   /// user's drawing, and copy its direct-cell and Braille layers into
   /// the raster buffer.
   private func paintCanvasDrawing(
-    in bounds: Rect,
+    in bounds: CellRect,
     payload: CanvasPayload,
     foregroundStyle: AnyShapeStyle,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: Rect?
+    clip: CellRect?
   ) {
     let cellW = bounds.size.width
     let cellH = bounds.size.height
@@ -1084,12 +1084,12 @@ extension Rasterizer {
   ///   fills the interior.
   private func paintBrailleShape(
     geometry: ShapeGeometry,
-    shapeBounds: Rect,
+    shapeBounds: CellRect,
     colorMode: ResolvedShapeColorMode,
     stroke: Bool,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: Rect?,
+    clip: CellRect?,
     backgroundStyle: BorderBackgroundStyle? = nil
   ) {
     let cellW = shapeBounds.size.width
@@ -1112,7 +1112,7 @@ extension Rasterizer {
     switch geometry {
     case .circle:
       let radii = Self.subpixelCircleRadii(
-        frameCells: Size(width: cellW, height: cellH),
+        frameCells: CellSize(width: cellW, height: cellH),
         metrics: environment.cellPixelMetrics
       )
       // Preserve the (min-1)/2 inclusive-bound semantics of the pre-correction
@@ -1299,7 +1299,7 @@ extension Rasterizer {
     y: Int,
     with overlay: Color,
     cells: inout [[RasterCell]],
-    clip: Rect?
+    clip: CellRect?
   ) {
     if let clip {
       guard
@@ -1320,7 +1320,7 @@ extension Rasterizer {
   }
 
   private func paintStroke(
-    in bounds: Rect,
+    in bounds: CellRect,
     geometry: ShapeGeometry,
     insetAmount: Int,
     style: AnyShapeStyle,
@@ -1329,7 +1329,7 @@ extension Rasterizer {
     backgroundStyle: BorderBackgroundStyle?,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: Rect?
+    clip: CellRect?
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
@@ -1514,7 +1514,7 @@ extension Rasterizer {
   /// interior.  For `.inset` sets no frame insets were reserved and
   /// the glyphs overdraw the view's outermost rows / cols.
   private func drawLayoutBorder(
-    in outer: Rect,
+    in outer: CellRect,
     set: BorderSet,
     foreground: BorderEdgeStyle?,
     background: BorderBackgroundStyle?,
@@ -1523,7 +1523,7 @@ extension Rasterizer {
     sides: Edge.Set,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: Rect?
+    clip: CellRect?
   ) {
     guard outer.size.width > 0, outer.size.height > 0 else {
       return
@@ -1948,7 +1948,7 @@ extension Rasterizer {
   private func resolvedBorderSideColor(
     _ style: AnyShapeStyle?,
     environment: StyleEnvironmentSnapshot,
-    bounds: Rect
+    bounds: CellRect
   ) -> Color? {
     guard let style else {
       return nil
@@ -1972,7 +1972,7 @@ extension Rasterizer {
     atX x: Int,
     y: Int,
     cells: inout [[RasterCell]],
-    clip: Rect?
+    clip: CellRect?
   ) {
     var resolved = ResolvedTextStyle()
     resolved.foregroundColor = foreground
@@ -1998,7 +1998,7 @@ extension Rasterizer {
     foreground: Color?,
     background: Color?,
     cells: inout [[RasterCell]],
-    clip: Rect?
+    clip: CellRect?
   ) {
     guard !text.isEmpty else {
       return
@@ -2021,13 +2021,13 @@ extension Rasterizer {
   }
 
   private func paintRule(
-    in bounds: Rect,
+    in bounds: CellRect,
     style: AnyShapeStyle,
     strokeStyle: StrokeStyle,
     stackAxis: Axis?,
     environment: StyleEnvironmentSnapshot,
     cells: inout [[RasterCell]],
-    clip: Rect?
+    clip: CellRect?
   ) {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return
@@ -2092,11 +2092,11 @@ extension Rasterizer {
     backgroundStyle: AnyShapeStyle?,
     fallbackBackgroundSides: [BorderSide],
     environment: StyleEnvironmentSnapshot,
-    bounds: Rect,
+    bounds: CellRect,
     x: Int,
     y: Int,
     cells: inout [[RasterCell]],
-    clip: Rect?
+    clip: CellRect?
   ) {
     let resolvedStyle = ResolvedTextStyle(
       foregroundColor: resolveColor(
@@ -2131,7 +2131,7 @@ extension Rasterizer {
     explicitBackgroundStyle: AnyShapeStyle?,
     fallbackSides: [BorderSide],
     environment: StyleEnvironmentSnapshot,
-    bounds: Rect,
+    bounds: CellRect,
     x: Int,
     y: Int,
     cells: [[RasterCell]]
@@ -2180,11 +2180,11 @@ extension Rasterizer {
   private func shapeContains(
     pointX x: Int,
     pointY y: Int,
-    in bounds: Rect,
+    in bounds: CellRect,
     geometry: ShapeGeometry,
     fillMode: ShapeFillMode = .full
   ) -> Bool {
-    let targetBounds: Rect
+    let targetBounds: CellRect
     switch fillMode {
     case .full:
       targetBounds = bounds
@@ -2252,7 +2252,7 @@ extension Rasterizer {
   private func curvedShapeContains(
     pointX x: Int,
     pointY y: Int,
-    in bounds: Rect,
+    in bounds: CellRect,
     geometry: ShapeGeometry
   ) -> Bool {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
@@ -2346,16 +2346,16 @@ extension Rasterizer {
   }
 
   private func insetBounds(
-    _ bounds: Rect,
+    _ bounds: CellRect,
     by inset: Int,
     strokeBorder _: Bool
-  ) -> Rect {
-    Rect(
-      origin: Point(
+  ) -> CellRect {
+    CellRect(
+      origin: CellPoint(
         x: bounds.origin.x + inset,
         y: bounds.origin.y + inset
       ),
-      size: Size(
+      size: CellSize(
         width: max(0, bounds.size.width - (inset * 2)),
         height: max(0, bounds.size.height - (inset * 2))
       )
@@ -2380,7 +2380,7 @@ extension Rasterizer {
   private func resolveTextStyle(
     _ style: TextStyle,
     environment: StyleEnvironmentSnapshot,
-    bounds: Rect,
+    bounds: CellRect,
     sampleX: Int,
     sampleY: Int,
     width: Int,
@@ -2445,7 +2445,7 @@ extension Rasterizer {
   private func resolveColor(
     from style: AnyShapeStyle,
     environment: StyleEnvironmentSnapshot,
-    bounds: Rect,
+    bounds: CellRect,
     sampleX: Int,
     sampleY: Int,
     depth: Int = 0
@@ -2554,7 +2554,7 @@ extension Rasterizer {
 
   private func resolveColor(
     from mode: ResolvedShapeColorMode,
-    bounds: Rect,
+    bounds: CellRect,
     sampleX: Int,
     sampleY: Int
   ) -> Color? {
@@ -2586,7 +2586,7 @@ extension Rasterizer {
 
   private func resolvedPatternCellStyle(
     _ pattern: PatternFill,
-    bounds: Rect,
+    bounds: CellRect,
     sampleX: Int,
     sampleY: Int
   ) -> ResolvedTextStyle? {
@@ -2608,7 +2608,7 @@ extension Rasterizer {
 
   private func resolvePaint(
     _ paint: PatternFill.Paint,
-    bounds: Rect,
+    bounds: CellRect,
     sampleX: Int,
     sampleY: Int
   ) -> Color? {
@@ -2624,7 +2624,7 @@ extension Rasterizer {
 
   private func resolvedBackgroundTextStyle(
     colorMode: ResolvedShapeColorMode,
-    bounds: Rect,
+    bounds: CellRect,
     x: Int,
     y: Int
   ) -> ResolvedTextStyle? {
@@ -2655,7 +2655,7 @@ extension Rasterizer {
 
   private func sample(
     _ gradient: LinearGradient,
-    in bounds: Rect,
+    in bounds: CellRect,
     x: Int,
     y: Int
   ) -> Color? {
@@ -2718,7 +2718,7 @@ extension Rasterizer {
 
   private func sample(
     _ gradient: RadialGradient,
-    in bounds: Rect,
+    in bounds: CellRect,
     x: Int,
     y: Int
   ) -> Color? {
@@ -2774,9 +2774,9 @@ extension Rasterizer {
   }
 
   private func intersect(
-    _ lhs: Rect?,
-    _ rhs: Rect?
-  ) -> Rect? {
+    _ lhs: CellRect?,
+    _ rhs: CellRect?
+  ) -> CellRect? {
     switch (lhs, rhs) {
     case (nil, nil):
       return nil
@@ -2788,9 +2788,9 @@ extension Rasterizer {
   }
 
   private func intersect(
-    _ lhs: Rect,
-    _ rhs: Rect
-  ) -> Rect? {
+    _ lhs: CellRect,
+    _ rhs: CellRect
+  ) -> CellRect? {
     let minX = max(lhs.origin.x, rhs.origin.x)
     let minY = max(lhs.origin.y, rhs.origin.y)
     let maxX = min(lhs.origin.x + lhs.size.width, rhs.origin.x + rhs.size.width)
@@ -2800,9 +2800,9 @@ extension Rasterizer {
       return nil
     }
 
-    return Rect(
-      origin: Point(x: minX, y: minY),
-      size: Size(width: maxX - minX, height: maxY - minY)
+    return CellRect(
+      origin: CellPoint(x: minX, y: minY),
+      size: CellSize(width: maxX - minX, height: maxY - minY)
     )
   }
 
@@ -2844,7 +2844,7 @@ extension Rasterizer {
     atX x: Int,
     y: Int,
     cells: inout [[RasterCell]],
-    clip: Rect?
+    clip: CellRect?
   ) {
     let glyphWidth = max(1, width)
     guard y >= 0, y < cells.count, x >= 0, x < cells[y].count else {
@@ -2963,7 +2963,7 @@ extension Rasterizer {
   /// Sub-pixel dimensions are `cellPixelMetrics.width / 2` and
   /// `cellPixelMetrics.height / 4`.
   package static func subpixelCircleRadii(
-    frameCells: Size,
+    frameCells: CellSize,
     metrics: CellPixelMetrics
   ) -> SubpixelRadii {
     let subpixelPxWidth = max(1, metrics.width / 2)

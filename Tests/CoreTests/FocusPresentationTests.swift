@@ -79,9 +79,9 @@ private func makeFocusRegion(
 ) -> FocusRegion {
   FocusRegion(
     identity: identity,
-    rect: Rect(
-      origin: Point(x: 0, y: 0),
-      size: Size(width: 1, height: 1)
+    rect: CellRect(
+      origin: CellPoint(x: 0, y: 0),
+      size: CellSize(width: 1, height: 1)
     ),
     focusInteractions: interactions
   )

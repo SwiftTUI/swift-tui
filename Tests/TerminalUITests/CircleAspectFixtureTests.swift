@@ -55,7 +55,7 @@ private func renderShape<V: View>(
   var env = EnvironmentValues()
   // Give the renderer a canvas larger than the frame so the shape has
   // room; padding of 4 cells on each axis is sufficient.
-  env.terminalSize = Size(width: frameWidth + 4, height: frameHeight + 4)
+  env.terminalSize = CellSize(width: frameWidth + 4, height: frameHeight + 4)
   env.cellPixelMetrics = metrics
   return DefaultRenderer().render(
     view,

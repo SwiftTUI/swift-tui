@@ -51,7 +51,7 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
   private var completedTaps = 0
   private var pressStart: Point?
   private var lastTerminalLocation: Point?
-  private var lastTargetRect: Rect = Rect(origin: .zero, size: .zero)
+  private var lastTargetRect: CellRect = CellRect(origin: .zero, size: .zero)
 
   init(count: Int, coordinateSpace: CoordinateSpace) {
     self.requiredCount = count

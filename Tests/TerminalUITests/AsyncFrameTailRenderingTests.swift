@@ -1332,7 +1332,7 @@ private func asyncFrameTailWorkerCustomLayoutSnapshot(
           passContext: passContext
         ).measuredSize
       }
-      return Size(
+      return CellSize(
         width: sizes.map(\.width).max() ?? 0,
         height: sizes.reduce(0) { $0 + $1.height }
       )
@@ -1358,8 +1358,8 @@ private func asyncFrameTailWorkerCustomLayoutSnapshot(
         return engine.place(
           child,
           measured: childMeasurement,
-          in: Rect(
-            origin: Point(x: bounds.origin.x, y: y),
+          in: CellRect(
+            origin: CellPoint(x: bounds.origin.x, y: y),
             size: childMeasurement.measuredSize
           ),
           passContext: passContext
@@ -1378,7 +1378,7 @@ private final class AsyncFrameTailMainActorOnlyCustomLayoutProxy: CustomLayoutPr
     engine _: LayoutEngine,
     node _: ResolvedNode,
     proposal _: ProposedSize
-  ) -> Size {
+  ) -> CellSize {
     preconditionFailure("worker custom layout must use its worker proxy for measurement")
   }
 
@@ -1394,7 +1394,7 @@ private final class AsyncFrameTailMainActorOnlyCustomLayoutProxy: CustomLayoutPr
     engine _: LayoutEngine,
     node _: ResolvedNode,
     measured _: MeasuredNode,
-    in _: Rect
+    in _: CellRect
   ) -> [PlacedNode] {
     preconditionFailure("worker custom layout must use its worker proxy for placement")
   }
@@ -1606,10 +1606,10 @@ private final class AsyncFrameTailBlockingGate: Sendable {
 }
 
 private final class AsyncFrameTailTerminalHost: TerminalHosting {
-  var surfaceSize: Size {
+  var surfaceSize: CellSize {
     size
   }
-  let size = Size(width: 32, height: 6)
+  let size = CellSize(width: 32, height: 6)
   let proposal = ProposedSize(width: 32, height: 6)
   let capabilityProfile = TerminalCapabilityProfile.previewUnicode
   let appearance = TerminalAppearance.fallback
@@ -1618,7 +1618,7 @@ private final class AsyncFrameTailTerminalHost: TerminalHosting {
   func enableRawMode() throws {}
   func disableRawMode() throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   func write(_ output: String) throws {
     frames.append(output.replacingOccurrences(of: "\r\n", with: "\n"))

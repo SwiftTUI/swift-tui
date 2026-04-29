@@ -959,7 +959,7 @@ struct Phase4ObservationAndEnvironmentTests {
     let terminal = Phase4RecordingTerminalHost()
 
     let result = try await runTestSceneSession(
-      scene: WindowGroup("Terminal Size Probe") {
+      scene: WindowGroup("Terminal CellSize Probe") {
         TerminalSizeProbeView()
       },
       sessionName: "Phase4ObservationAndEnvironmentTests.TerminalSizeRuntime",
@@ -1585,7 +1585,7 @@ private final class Phase4ScopeRecorder {
 }
 
 private final class Phase4RecordingTerminalHost: TerminalHosting {
-  let surfaceSize = Size(width: 60, height: 18)
+  let surfaceSize = CellSize(width: 60, height: 18)
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   private(set) var frames: [String] = []
@@ -1595,7 +1595,7 @@ private final class Phase4RecordingTerminalHost: TerminalHosting {
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
@@ -1632,7 +1632,7 @@ private final class Phase4RecordingTerminalHost: TerminalHosting {
 }
 
 private final class Phase4MutableAppearanceTerminalHost: TerminalHosting {
-  let surfaceSize = Size(width: 60, height: 18)
+  let surfaceSize = CellSize(width: 60, height: 18)
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   private(set) var appearance: TerminalAppearance
   private let nextAppearance: TerminalAppearance
@@ -1652,7 +1652,7 @@ private final class Phase4MutableAppearanceTerminalHost: TerminalHosting {
   func disableRawMode() throws {}
   func write(_: String) throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
@@ -1777,8 +1777,8 @@ private func interactionRect<V: View>(
   containingText text: String,
   in view: V,
   rootIdentity: Identity,
-  terminalSize: Size
-) -> Rect? {
+  terminalSize: CellSize
+) -> CellRect? {
   var environmentValues = EnvironmentValues()
   environmentValues.terminalSize = terminalSize
 
@@ -1811,12 +1811,13 @@ private func interactionRect<V: View>(
 }
 
 private func centerPoint(
-  of rect: Rect
+  of rect: CellRect
 ) -> Point {
   Point(
-    x: rect.origin.x + max(0, rect.size.width - 1) / 2,
-    y: rect.origin.y + max(0, rect.size.height - 1) / 2
-  )
+    CellPoint(
+      x: rect.origin.x + max(0, rect.size.width - 1) / 2,
+      y: rect.origin.y + max(0, rect.size.height - 1) / 2
+    ))
 }
 
 extension ResolvedNode {

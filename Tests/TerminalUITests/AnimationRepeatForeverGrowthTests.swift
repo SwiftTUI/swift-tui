@@ -246,7 +246,7 @@ struct AnimationRepeatForeverGrowthTests {
 
   @Test("onAppear-started repeatForever keeps runtime bookkeeping bounded across tick frames")
   func onAppearStartedRepeatForeverKeepsRuntimeBookkeepingBounded() throws {
-    let terminalSize = Size(width: 40, height: 10)
+    let terminalSize = CellSize(width: 40, height: 10)
     let rootIdentity = testIdentity("OnAppearRepeatForeverGrowth", "Root")
     let terminal = RepeatForeverGrowthTerminalHost(surfaceSize: terminalSize)
     let scheduler = FrameScheduler()
@@ -396,7 +396,7 @@ struct AnimationRepeatForeverGrowthTests {
 
   @Test("tab-hosted repeatForever keeps runtime bookkeeping bounded across tick frames")
   func tabHostedRepeatForeverKeepsRuntimeBookkeepingBounded() throws {
-    let terminalSize = Size(width: 80, height: 24)
+    let terminalSize = CellSize(width: 80, height: 24)
     let rootIdentity = testIdentity("TabHostedRepeatForeverGrowth", "Root")
     let terminal = RepeatForeverGrowthTerminalHost(surfaceSize: terminalSize)
     let scheduler = FrameScheduler()
@@ -547,7 +547,7 @@ struct AnimationRepeatForeverGrowthTests {
 
   @Test("nested child-owned onAppear repeatForever enqueues the initial animation")
   func nestedChildOwnedOnAppearRepeatForeverEnqueuesInitialAnimation() throws {
-    let terminalSize = Size(width: 40, height: 10)
+    let terminalSize = CellSize(width: 40, height: 10)
     let rootIdentity = testIdentity("NestedChildOwnedRepeatForever", "Root")
     let terminal = RepeatForeverGrowthTerminalHost(surfaceSize: terminalSize)
     let scheduler = FrameScheduler()
@@ -607,7 +607,7 @@ struct AnimationRepeatForeverGrowthTests {
   @Test(
     "run loop keeps ticking repeatForever animations even when the next deadline is already due")
   func runLoopContinuesOverdueRepeatForeverDeadlines() async throws {
-    let terminalSize = Size(width: 40, height: 10)
+    let terminalSize = CellSize(width: 40, height: 10)
     let rootIdentity = testIdentity("OverdueRepeatForeverDeadline", "Root")
     let terminal = SlowPresentTerminalHost(
       surfaceSize: terminalSize,
@@ -744,18 +744,18 @@ private struct NestedChildOwnedRepeatForeverCard: View {
 }
 
 private final class RepeatForeverGrowthTerminalHost: TerminalHosting {
-  let surfaceSize: Size
+  let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
 
-  init(surfaceSize: Size) {
+  init(surfaceSize: CellSize) {
     self.surfaceSize = surfaceSize
   }
 
   func enableRawMode() throws {}
   func disableRawMode() throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
@@ -804,12 +804,12 @@ private final class DelayedQuitTerminalInputReader: TerminalInputReading {
 }
 
 private final class SlowPresentTerminalHost: TerminalHosting {
-  let surfaceSize: Size
+  let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
   let presentDelayMicroseconds: useconds_t
 
-  init(surfaceSize: Size, presentDelayMicroseconds: useconds_t) {
+  init(surfaceSize: CellSize, presentDelayMicroseconds: useconds_t) {
     self.surfaceSize = surfaceSize
     self.presentDelayMicroseconds = presentDelayMicroseconds
   }
@@ -817,7 +817,7 @@ private final class SlowPresentTerminalHost: TerminalHosting {
   func enableRawMode() throws {}
   func disableRawMode() throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {

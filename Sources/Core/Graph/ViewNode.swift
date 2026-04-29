@@ -664,7 +664,7 @@ extension ViewNode {
   package var semanticMetadata: SemanticMetadata { committed.semanticMetadata }
   package var lifecycleMetadata: LifecycleMetadata { committed.lifecycleMetadata }
   package var drawPayload: DrawPayload { committed.drawPayload }
-  package var intrinsicSize: Size? { committed.intrinsicSize }
+  package var intrinsicSize: CellSize? { committed.intrinsicSize }
   package var indexedChildSource: (any IndexedChildSource)? { committed.indexedChildSource }
   package var preferenceValues: PreferenceValues { committed.preferenceValues }
   package var supportsRetainedReuse: Bool { committed.supportsRetainedReuse }

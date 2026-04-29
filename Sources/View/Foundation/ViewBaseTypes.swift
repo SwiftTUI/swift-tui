@@ -4,11 +4,11 @@ public import Observation
 /// A proposed size passed into layout and rendering operations.
 public typealias ProposedViewSize = ProposedSize
 /// A layout-space point.
-public typealias LayoutPoint = Point
+public typealias LayoutPoint = CellPoint
 /// A layout-space size.
-public typealias LayoutSize = Size
+public typealias LayoutSize = CellSize
 /// A layout-space rectangle.
-public typealias LayoutRect = Rect
+public typealias LayoutRect = CellRect
 
 @dynamicMemberLookup
 @propertyWrapper

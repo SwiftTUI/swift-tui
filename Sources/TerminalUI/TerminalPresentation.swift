@@ -314,10 +314,10 @@ struct TerminalPresentationPlan: Sendable {
   var strategy: Strategy
   var rowBatches: [RowBatch]
   var graphicsReplay: GraphicsReplayPlan
-  var surfaceSize: Size
+  var surfaceSize: CellSize
 
   static func fullRepaint(
-    surfaceSize: Size
+    surfaceSize: CellSize
   ) -> Self {
     Self(
       strategy: .fullRepaint,
@@ -330,7 +330,7 @@ struct TerminalPresentationPlan: Sendable {
   static func incremental(
     rowBatches: [RowBatch],
     graphicsReplay: GraphicsReplayPlan,
-    surfaceSize: Size
+    surfaceSize: CellSize
   ) -> Self {
     Self(
       strategy: .incremental,

@@ -70,7 +70,7 @@ struct GestureResetAndReplayTests {
     let box = Box()
     let root = Identity(components: [IdentityComponent(rawValue: "r")])
     var env = EnvironmentValues()
-    env.terminalSize = Size(width: 10, height: 3)
+    env.terminalSize = CellSize(width: 10, height: 3)
 
     let pointerRegistry = LocalPointerHandlerRegistry()
     let gestureRegistry = LocalGestureRegistry()
@@ -112,11 +112,13 @@ struct GestureResetAndReplayTests {
     let region = try #require(artifacts2.semanticSnapshot.interactionRegions.first)
     _ = pointerRegistry.dispatch(
       routeID: region.routeID,
-      event: .init(kind: .down(.primary), location: region.rect.origin, targetRect: region.rect)
+      event: .init(
+        kind: .down(.primary), location: Point(region.rect.origin), targetRect: region.rect)
     )
     _ = pointerRegistry.dispatch(
       routeID: region.routeID,
-      event: .init(kind: .up(.primary), location: region.rect.origin, targetRect: region.rect)
+      event: .init(
+        kind: .up(.primary), location: Point(region.rect.origin), targetRect: region.rect)
     )
     #expect(box.count == 1)  // gesture still fires after reset+re-render
   }

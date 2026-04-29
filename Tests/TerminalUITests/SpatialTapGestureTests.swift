@@ -17,7 +17,7 @@ struct SpatialTapGestureTests {
         requestDeadline: { _ in }
       )
     )
-    let rect = Rect(origin: Point(x: 4, y: 2), size: Size(width: 8, height: 2))
+    let rect = CellRect(origin: CellPoint(x: 4, y: 2), size: CellSize(width: 8, height: 2))
     _ = rec.handle(
       event: .init(
         kind: .down(.primary),
@@ -45,7 +45,7 @@ struct SpatialTapGestureTests {
         requestDeadline: { _ in }
       )
     )
-    let rect = Rect(origin: Point(x: 4, y: 2), size: Size(width: 8, height: 2))
+    let rect = CellRect(origin: CellPoint(x: 4, y: 2), size: CellSize(width: 8, height: 2))
     _ = rec.handle(
       event: .init(
         kind: .down(.primary),
@@ -72,7 +72,7 @@ struct SpatialTapGestureTests {
         requestDeadline: { _ in }
       )
     )
-    let rect = Rect(origin: .zero, size: Size(width: 4, height: 4))
+    let rect = CellRect(origin: .zero, size: CellSize(width: 4, height: 4))
     _ = rec.handle(
       event: .init(
         kind: .down(.primary),

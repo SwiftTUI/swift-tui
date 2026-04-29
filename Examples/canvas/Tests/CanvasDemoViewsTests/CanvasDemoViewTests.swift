@@ -8,7 +8,7 @@ struct CanvasDemoViewTests {
   @Test("sketch document draw erase and clear mutate the backing dots")
   func sketchDocumentMutations() {
     var document = CanvasSketchDocument(
-      cellSize: Size(width: 4, height: 2),
+      cellSize: CellSize(width: 4, height: 2),
       cursor: CanvasSketchPoint(x: 2, y: 3)
     )
 
@@ -34,7 +34,7 @@ struct CanvasDemoViewTests {
   @Test("cursor movement clamps to the drawable subpixel bounds")
   func cursorMovementClampsToBounds() {
     var document = CanvasSketchDocument(
-      cellSize: Size(width: 3, height: 2),
+      cellSize: CellSize(width: 3, height: 2),
       cursor: CanvasSketchPoint(x: 2, y: 4)
     )
 
@@ -50,7 +50,7 @@ struct CanvasDemoViewTests {
   @Test("pixel document draw erase and clear mutate logical pixels")
   func pixelDocumentMutations() {
     var document = CanvasPixelSketchDocument(
-      size: Size(width: 4, height: 3),
+      size: CellSize(width: 4, height: 3),
       cursor: CanvasSketchPoint(x: 1, y: 1)
     )
 
@@ -73,7 +73,7 @@ struct CanvasDemoViewTests {
   func pointerCellsMapToSubpixels() {
     let point = CanvasSketchDocument.subpixelPoint(
       forLocalCell: Point(x: 2, y: 1),
-      in: Size(width: 4, height: 3)
+      in: CellSize(width: 4, height: 3)
     )
 
     #expect(point == CanvasSketchPoint(x: 5, y: 6))
@@ -81,7 +81,7 @@ struct CanvasDemoViewTests {
 
   @Test("pointer cells map into full-cell and half-block pixels")
   func pointerCellsMapToPixelGridPoints() {
-    let size = Size(width: 5, height: 6)
+    let size = CellSize(width: 5, height: 6)
 
     #expect(
       CanvasPixelSketchDocument.pixelPoint(
@@ -101,7 +101,7 @@ struct CanvasDemoViewTests {
 
   @Test("drawing from pointer samples fills a subpixel line")
   func pointerLineDrawingFillsSubpixelLine() {
-    var document = CanvasSketchDocument(cellSize: Size(width: 4, height: 3))
+    var document = CanvasSketchDocument(cellSize: CellSize(width: 4, height: 3))
 
     document.apply(
       .draw,
@@ -123,7 +123,7 @@ struct CanvasDemoViewTests {
   @Test("pixel surfaces render editable full-cell and half-block drawings")
   func pixelSurfacesRenderEditableDrawings() {
     var fullCell = CanvasPixelSketchDocument(
-      size: Size(width: 4, height: 3),
+      size: CellSize(width: 4, height: 3),
       cursor: CanvasSketchPoint(x: 2, y: 1)
     )
     fullCell.setPixel(CanvasSketchPoint(x: 1, y: 1))
@@ -149,7 +149,7 @@ struct CanvasDemoViewTests {
     )
 
     var halfBlock = CanvasPixelSketchDocument(
-      size: Size(width: 4, height: 6),
+      size: CellSize(width: 4, height: 6),
       cursor: CanvasSketchPoint(x: 2, y: 3)
     )
     halfBlock.setPixel(CanvasSketchPoint(x: 1, y: 0))
@@ -172,7 +172,7 @@ struct CanvasDemoViewTests {
   @Test("surface renders drawn pixels through Canvas with a cursor overlay")
   func surfaceRendersCanvasAndCursor() {
     var document = CanvasSketchDocument(
-      cellSize: Size(width: 6, height: 3),
+      cellSize: CellSize(width: 6, height: 3),
       cursor: CanvasSketchPoint(x: 10, y: 10)
     )
     document.setPixel(CanvasSketchPoint(x: 0, y: 0))
@@ -208,7 +208,7 @@ struct CanvasDemoViewTests {
     let artifacts = render(
       CanvasDemoSurface(
         document: CanvasSketchDocument(
-          cellSize: Size(width: 6, height: 3)
+          cellSize: CellSize(width: 6, height: 3)
         )
       ),
       width: 12,
@@ -222,7 +222,7 @@ struct CanvasDemoViewTests {
   @Test("pixel surface renders half-block Canvas pixels")
   func pixelSurfaceRendersHalfBlocks() {
     var document = CanvasPixelSketchDocument(
-      size: Size(width: 8, height: 6),
+      size: CellSize(width: 8, height: 6),
       cursor: CanvasSketchPoint(x: 3, y: 2)
     )
     document.setPixel(CanvasSketchPoint(x: 1, y: 0))
@@ -248,11 +248,11 @@ struct CanvasDemoViewTests {
     let raster = render(
       CanvasDemoView(
         document: CanvasSketchDocument(
-          cellSize: Size(width: 4, height: 2),
+          cellSize: CellSize(width: 4, height: 2),
           cursor: CanvasSketchPoint(x: 1, y: 2)
         ),
         halfBlockDocument: CanvasPixelSketchDocument(
-          size: Size(width: 8, height: 6),
+          size: CellSize(width: 8, height: 6),
           cursor: CanvasSketchPoint(x: 1, y: 2)
         ),
         selectedCanvas: .halfBlock
@@ -277,7 +277,7 @@ struct CanvasDemoViewTests {
     let subcellLines = render(
       CanvasDemoView(
         document: CanvasSketchDocument(
-          cellSize: Size(width: 4, height: 2),
+          cellSize: CellSize(width: 4, height: 2),
           cursor: CanvasSketchPoint(x: 1, y: 2)
         ),
         selectedCanvas: .subcell
@@ -291,7 +291,7 @@ struct CanvasDemoViewTests {
     let fullCellLines = render(
       CanvasDemoView(
         fullCellDocument: CanvasPixelSketchDocument(
-          size: Size(width: 8, height: 6),
+          size: CellSize(width: 8, height: 6),
           cursor: CanvasSketchPoint(x: 1, y: 2)
         ),
         selectedCanvas: .fullCell
@@ -305,7 +305,7 @@ struct CanvasDemoViewTests {
     let halfBlockLines = render(
       CanvasDemoView(
         halfBlockDocument: CanvasPixelSketchDocument(
-          size: Size(width: 8, height: 6),
+          size: CellSize(width: 8, height: 6),
           cursor: CanvasSketchPoint(x: 1, y: 2)
         ),
         selectedCanvas: .halfBlock
@@ -326,7 +326,7 @@ private func render(
   id: String = "\(#fileID).\(#function)"
 ) -> FrameArtifacts {
   var env = EnvironmentValues()
-  env.terminalSize = Size(width: width, height: height)
+  env.terminalSize = CellSize(width: width, height: height)
   return DefaultRenderer().render(
     view,
     context: ResolveContext(

@@ -16,9 +16,9 @@ struct CoordinateSpaceTests {
 
   @Test(".local resolves a terminal-global point to a region-relative point")
   func localResolution() {
-    let region = Rect(
-      origin: Point(x: 4, y: 2),
-      size: Size(width: 10, height: 3)
+    let region = CellRect(
+      origin: CellPoint(x: 4, y: 2),
+      size: CellSize(width: 10, height: 3)
     )
     let terminalPoint = Point(x: 6, y: 3)
     let resolved = CoordinateSpace.local.resolve(
@@ -30,9 +30,9 @@ struct CoordinateSpaceTests {
 
   @Test(".global resolves to the raw terminal point")
   func globalResolution() {
-    let region = Rect(
-      origin: Point(x: 4, y: 2),
-      size: Size(width: 10, height: 3)
+    let region = CellRect(
+      origin: CellPoint(x: 4, y: 2),
+      size: CellSize(width: 10, height: 3)
     )
     let terminalPoint = Point(x: 6, y: 3)
     let resolved = CoordinateSpace.global.resolve(

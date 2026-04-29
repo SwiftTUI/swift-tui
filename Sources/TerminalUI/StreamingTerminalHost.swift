@@ -2,7 +2,7 @@ import Synchronization
 
 package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalHosting, Sendable {
   private struct State: Sendable {
-    var surfaceSize: Size
+    var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
     var lastSubmittedSurface: RasterSurface?
@@ -19,7 +19,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   }
 
   package init(
-    surfaceSize: Size,
+    surfaceSize: CellSize,
     appearance: TerminalAppearance? = nil,
     theme: Theme? = nil,
     capabilityProfile: TerminalCapabilityProfile = .trueColor,
@@ -50,7 +50,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     )
   }
 
-  package var surfaceSize: Size {
+  package var surfaceSize: CellSize {
     state.withLock(\.surfaceSize)
   }
 
@@ -63,7 +63,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   }
 
   package func updateSurfaceSize(
-    _ surfaceSize: Size
+    _ surfaceSize: CellSize
   ) {
     state.withLock { state in
       state.surfaceSize = surfaceSize
@@ -98,7 +98,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
     }
   }
 
-  package func updateCellPixelSize(_ cellPixelSize: Size?) {
+  package func updateCellPixelSize(_ cellPixelSize: PixelSize?) {
     state.withLock { state in
       state.graphicsCapabilities.cellPixelSize = cellPixelSize
       state.lastSubmittedSurface = nil
@@ -140,7 +140,7 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   }
 
   package func moveCursor(
-    to point: Point
+    to point: CellPoint
   ) throws {
     let row = max(1, point.y + 1)
     let column = max(1, point.x + 1)

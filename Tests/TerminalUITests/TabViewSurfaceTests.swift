@@ -97,7 +97,7 @@ struct TabViewSurfaceTests {
     proposalWidth: Int = 24
   ) -> FrameArtifacts {
     var environmentValues = EnvironmentValues()
-    environmentValues.terminalSize = Size(width: terminalWidth, height: 8)
+    environmentValues.terminalSize = CellSize(width: terminalWidth, height: 8)
     if focused {
       environmentValues.focusedIdentity = testIdentity("Tabs")
     }
@@ -114,7 +114,7 @@ struct TabViewSurfaceTests {
 
   private func stripBounds(
     for style: AnyTabViewStyle
-  ) -> Rect {
+  ) -> CellRect {
     let height: Int =
       switch style.debugDescription {
       case "AnyTabViewStyle.powerline":
@@ -125,7 +125,7 @@ struct TabViewSurfaceTests {
         2
       }
 
-    return Rect(
+    return CellRect(
       origin: .zero,
       size: .init(
         width: 40,
@@ -543,7 +543,7 @@ struct TabViewSurfaceTests {
   func literalTabsRecomputeOverflowWhenProposalChangesUnderSelectiveEvaluation() {
     let renderer = DefaultRenderer()
     var environmentValues = EnvironmentValues()
-    environmentValues.terminalSize = Size(width: 80, height: 8)
+    environmentValues.terminalSize = CellSize(width: 80, height: 8)
     let context = ResolveContext(
       identity: testIdentity("Root"),
       environmentValues: environmentValues
@@ -590,7 +590,7 @@ struct TabViewSurfaceTests {
     let renderer = DefaultRenderer()
     let pointerRegistry = LocalPointerHandlerRegistry()
     var environmentValues = EnvironmentValues()
-    environmentValues.terminalSize = Size(width: 24, height: 8)
+    environmentValues.terminalSize = CellSize(width: 24, height: 8)
 
     var context = ResolveContext(
       identity: testIdentity("Root"),
@@ -790,7 +790,7 @@ private func trimTrailingSpaces(
 
 private func hasFillCommand(
   in node: DrawNode,
-  bounds: Rect
+  bounds: CellRect
 ) -> Bool {
   if node.commands.contains(where: { hasFillCommand($0, bounds: bounds) }) {
     return true
@@ -801,7 +801,7 @@ private func hasFillCommand(
 
 private func hasFillCommand(
   _ command: DrawCommand,
-  bounds: Rect
+  bounds: CellRect
 ) -> Bool {
   switch command {
   case .group(_, let children):

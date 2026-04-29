@@ -4487,7 +4487,7 @@ struct SwiftUISurfaceTests {
   @Test("toast auto-dismiss registers a lifecycle task on first render")
   func toastAutoDismissRegistersLifecycleTask() {
     struct ToastTaskProbe: View {
-      let terminalSize: Size
+      let terminalSize: CellSize
       @State private var isPresented = true
 
       var body: some View {
@@ -4506,7 +4506,7 @@ struct SwiftUISurfaceTests {
       }
     }
 
-    let terminalSize = Size(width: 20, height: 8)
+    let terminalSize = CellSize(width: 20, height: 8)
     var environmentValues = EnvironmentValues()
     environmentValues.terminalSize = terminalSize
     let taskRegistry = LocalTaskRegistry()
@@ -4876,7 +4876,7 @@ struct SwiftUISurfaceTests {
     #expect(focusRegion.identity == testIdentity("RichWrap", "InlineLink[0]"))
     #expect(
       focusRegion.rect
-        == Rect(
+        == CellRect(
           origin: .init(x: 0, y: 1),
           size: .init(width: 4, height: 1)
         )
@@ -5296,7 +5296,7 @@ struct SwiftUISurfaceTests {
     }
 
     #expect(
-      bounds == Rect(origin: Point.zero, size: Size(width: 2, height: 1)))
+      bounds == CellRect(origin: CellPoint.zero, size: CellSize(width: 2, height: 1)))
     #expect(content == "Hi")
     #expect(
       style

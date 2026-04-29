@@ -740,7 +740,7 @@ struct LayoutEngineTests {
     )
 
     let measured = engine.measure(resolved, proposal: .init(width: 8, height: 3))
-    let initialBounds = Rect(origin: .zero, size: measured.measuredSize)
+    let initialBounds = CellRect(origin: .zero, size: measured.measuredSize)
     let initialPlaced = engine.place(
       resolved,
       measured: measured,
@@ -787,7 +787,7 @@ struct LayoutEngineTests {
 
 private func leaf(
   _ name: String,
-  size: Size,
+  size: CellSize,
   layoutMetadata: LayoutMetadata = .init(),
   drawPayload: DrawPayload = .none
 ) -> ResolvedNode {
@@ -877,7 +877,7 @@ private final class NoOpCustomLayoutProxy: CustomLayoutProxy {
     engine _: LayoutEngine,
     node _: ResolvedNode,
     proposal _: ProposedSize
-  ) -> Size {
+  ) -> CellSize {
     .zero
   }
 
@@ -885,7 +885,7 @@ private final class NoOpCustomLayoutProxy: CustomLayoutProxy {
     engine _: LayoutEngine,
     node _: ResolvedNode,
     measured _: MeasuredNode,
-    in _: Rect
+    in _: CellRect
   ) -> [PlacedNode] {
     []
   }
@@ -901,7 +901,7 @@ private struct NoOpWorkerCustomLayoutProxy: WorkerCustomLayoutProxy {
     node _: ResolvedNode,
     proposal _: ProposedSize,
     passContext _: LayoutPassContext?
-  ) -> Size {
+  ) -> CellSize {
     .zero
   }
 
@@ -909,7 +909,7 @@ private struct NoOpWorkerCustomLayoutProxy: WorkerCustomLayoutProxy {
     engine _: LayoutEngine,
     node _: ResolvedNode,
     measured _: MeasuredNode,
-    in _: Rect,
+    in _: CellRect,
     passContext _: LayoutPassContext?
   ) -> [PlacedNode] {
     []

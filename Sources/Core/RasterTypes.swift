@@ -63,14 +63,14 @@ public struct RasterCell: Equatable, Sendable {
 
 /// A 2D grid of terminal cells produced by rasterization.
 public struct RasterSurface: Equatable, Sendable {
-  public var size: Size
+  public var size: CellSize
   public var cells: [[RasterCell]]
   public var attachments: [String]
   public var imageAttachments: [RasterImageAttachment]
   public var metadata: [String: String]
 
   public init(
-    size: Size = .zero,
+    size: CellSize = .zero,
     cells: [[RasterCell]] = [],
     attachments: [String] = [],
     imageAttachments: [RasterImageAttachment] = [],
@@ -84,7 +84,7 @@ public struct RasterSurface: Equatable, Sendable {
   }
 
   public init(
-    size: Size = .zero,
+    size: CellSize = .zero,
     lines: [String],
     styleRuns: [RasterStyleRun] = [],
     attachments: [String] = [],
@@ -107,7 +107,7 @@ public struct RasterSurface: Equatable, Sendable {
   }
 
   private static func makeCells(
-    size: Size,
+    size: CellSize,
     lines: [String],
     styleRuns: [RasterStyleRun]
   ) -> [[RasterCell]] {

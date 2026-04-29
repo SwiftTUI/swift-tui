@@ -178,7 +178,7 @@ extension View {
     drawMetadata(.init(clipsToBounds: true))
   }
 
-  public func offset(_ offset: Size) -> some View {
+  public func offset(_ offset: CellSize) -> some View {
     modifier(
       OffsetModifier(
         x: offset.width,

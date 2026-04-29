@@ -254,7 +254,7 @@ private func makeDeepPlacedNodeTree(depth: Int) -> DeepPlacedTree {
 
 private func makeDeepDrawTree(depth: Int) -> DrawNode {
   let leafIdentity = testIdentity("draw", "leaf")
-  let textBounds = Rect(origin: .zero, size: .init(width: 1, height: 1))
+  let textBounds = CellRect(origin: .zero, size: .init(width: 1, height: 1))
   var command: DrawCommand = .text(
     bounds: textBounds,
     content: "A",

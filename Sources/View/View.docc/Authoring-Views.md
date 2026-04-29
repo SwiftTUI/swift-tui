@@ -6,7 +6,8 @@ Use the `View` module the same way you would approach a small SwiftUI feature: c
 
 The main difference is that TerminalUI eventually renders into a cell surface instead of a pixel buffer. That means you should think in terms of:
 
-- integer sizes rather than fractional points
+- integer cell sizes for layout, with continuous cell-space points reserved for
+  input, drawing, and interpolation
 - text width and wrapping rather than arbitrary text bounds
 - keyboard-first focus and selection
 - terminal-safe incremental updates instead of animation-heavy transitions

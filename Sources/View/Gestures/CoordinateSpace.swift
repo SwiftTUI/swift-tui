@@ -30,13 +30,13 @@ public struct CoordinateSpace: Equatable, Sendable {
   /// given the hit-tested target rect.
   public func resolve(
     terminalPoint: Point,
-    targetRect: Rect
+    targetRect: CellRect
   ) -> Point {
     switch kind {
     case .local:
       return Point(
-        x: terminalPoint.x - targetRect.origin.x,
-        y: terminalPoint.y - targetRect.origin.y
+        x: terminalPoint.x - Double(targetRect.origin.x),
+        y: terminalPoint.y - Double(targetRect.origin.y)
       )
     case .global:
       return terminalPoint

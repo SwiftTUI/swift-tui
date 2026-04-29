@@ -128,10 +128,10 @@ extension SemanticExtractor {
     _ node: PlacedNode,
     scopePath: [Identity] = [],
     sectionIdentity: Identity? = nil,
-    clipRect: Rect? = nil,
+    clipRect: CellRect? = nil,
     hitTestOrder: inout Int,
-    preVisit: (PlacedNode, [Identity], Identity?, Rect?, Int, Bool, inout Int) -> Void,
-    postVisit: (PlacedNode, [Identity], Identity?, Rect?, Bool, inout Int) -> Void
+    preVisit: (PlacedNode, [Identity], Identity?, CellRect?, Int, Bool, inout Int) -> Void,
+    postVisit: (PlacedNode, [Identity], Identity?, CellRect?, Bool, inout Int) -> Void
   ) {
     enum Phase {
       case enter
@@ -142,7 +142,7 @@ extension SemanticExtractor {
       let node: PlacedNode
       let scopePath: [Identity]
       let sectionIdentity: Identity?
-      let clipRect: Rect?
+      let clipRect: CellRect?
       /// `true` when an ancestor on the current walk chain is marked
       /// `sealsFocusDescendants`. Propagated to descendants so focus
       /// region emission can skip them even though the sealing node
@@ -235,9 +235,9 @@ extension SemanticExtractor {
   }
 
   private func combinedClipRect(
-    inherited: Rect?,
-    next: Rect?
-  ) -> Rect? {
+    inherited: CellRect?,
+    next: CellRect?
+  ) -> CellRect? {
     switch (inherited, next) {
     case (.none, .none):
       nil
@@ -252,8 +252,8 @@ extension SemanticExtractor {
 
   private func interactionRect(
     for node: PlacedNode,
-    clippedTo clipRect: Rect?
-  ) -> Rect? {
+    clippedTo clipRect: CellRect?
+  ) -> CellRect? {
     let semanticBounds = semanticBounds(for: node)
     guard let clipRect else {
       return semanticBounds.isEmpty ? nil : semanticBounds
@@ -263,7 +263,7 @@ extension SemanticExtractor {
 
   private func semanticBounds(
     for node: PlacedNode
-  ) -> Rect {
+  ) -> CellRect {
     switch node.layoutBehavior {
     case .offset(let x, let y):
       return translated(
@@ -277,7 +277,7 @@ extension SemanticExtractor {
 
   private func transformedExplicitInteractionRect(
     for node: PlacedNode
-  ) -> Rect? {
+  ) -> CellRect? {
     guard let rect = node.semanticMetadata.explicitInteractionRect else {
       return nil
     }
@@ -297,7 +297,7 @@ extension SemanticExtractor {
     for node: PlacedNode,
     scopePath: [Identity],
     sectionIdentity: Identity?,
-    clippedTo clipRect: Rect?,
+    clippedTo clipRect: CellRect?,
     sealingParentOnChain: Bool,
     interactionRegions: inout [InteractionRegion],
     focusRegions: inout [FocusRegion],
@@ -329,7 +329,7 @@ extension SemanticExtractor {
           continue
         }
 
-        let lineRect = Rect(
+        let lineRect = CellRect(
           origin: .init(
             x: layout.contentBounds.origin.x,
             y: layout.contentBounds.origin.y + lineIndex
@@ -383,7 +383,7 @@ extension SemanticExtractor {
           continue
         }
 
-        let lineRect = Rect(
+        let lineRect = CellRect(
           origin: .init(
             x: node.bounds.origin.x,
             y: node.bounds.origin.y + lineIndex
@@ -422,7 +422,7 @@ extension SemanticExtractor {
     payload: RichTextPayload,
     scopePath: [Identity],
     sectionIdentity: Identity?,
-    clippedTo clipRect: Rect?,
+    clippedTo clipRect: CellRect?,
     sealingParentOnChain: Bool,
     interactionRegions: inout [InteractionRegion],
     focusRegions: inout [FocusRegion],
@@ -458,7 +458,7 @@ extension SemanticExtractor {
           return
         }
 
-        let rect = Rect(
+        let rect = CellRect(
           origin: .init(
             x: node.bounds.origin.x + fragmentStartX,
             y: node.bounds.origin.y + lineIndex
@@ -548,7 +548,7 @@ extension SemanticExtractor {
     for node: PlacedNode,
     scopePath: [Identity],
     sectionIdentity: Identity?,
-    clippedTo clipRect: Rect?,
+    clippedTo clipRect: CellRect?,
     interactionRegions: inout [InteractionRegion],
     focusRegions: inout [FocusRegion],
     nextHitTestOrder: inout Int
@@ -601,9 +601,9 @@ extension SemanticExtractor {
   }
 
   private func clippedRect(
-    for rect: Rect,
-    clippedTo clipRect: Rect?
-  ) -> Rect? {
+    for rect: CellRect,
+    clippedTo clipRect: CellRect?
+  ) -> CellRect? {
     if rect.isEmpty {
       return nil
     }
@@ -614,25 +614,25 @@ extension SemanticExtractor {
   }
 
   private func union(
-    _ lhs: Rect,
-    _ rhs: Rect
-  ) -> Rect {
+    _ lhs: CellRect,
+    _ rhs: CellRect
+  ) -> CellRect {
     let minX = min(lhs.origin.x, rhs.origin.x)
     let minY = min(lhs.origin.y, rhs.origin.y)
     let maxX = max(lhs.maxX, rhs.maxX)
     let maxY = max(lhs.maxY, rhs.maxY)
 
-    return Rect(
+    return CellRect(
       origin: .init(x: minX, y: minY),
       size: .init(width: maxX - minX, height: maxY - minY)
     )
   }
 
   private func translated(
-    _ rect: Rect,
-    by delta: Point
-  ) -> Rect {
-    Rect(
+    _ rect: CellRect,
+    by delta: CellPoint
+  ) -> CellRect {
+    CellRect(
       origin: .init(
         x: rect.origin.x + delta.x,
         y: rect.origin.y + delta.y

@@ -123,7 +123,7 @@ enum WebSurfaceImageFormat: Sendable, Equatable {
 
 final class WebSurfaceTransportHost: TerminalHosting, Sendable {
   private struct State: Sendable {
-    var surfaceSize: Size
+    var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
     var graphicsCapabilities: TerminalGraphicsCapabilities
     var transmittedImageIDs: Set<String>
@@ -143,7 +143,7 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
   )
 
   init(
-    surfaceSize: Size,
+    surfaceSize: CellSize,
     outputFileDescriptor: Int32 = STDOUT_FILENO,
     renderStyle: TerminalRenderStyle
   ) {
@@ -158,7 +158,7 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
     )
   }
 
-  var surfaceSize: Size {
+  var surfaceSize: CellSize {
     state.withLock(\.surfaceSize)
   }
 
@@ -175,8 +175,8 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
   }
 
   func updateSurfaceSize(
-    _ surfaceSize: Size,
-    cellPixelSize: Size? = nil
+    _ surfaceSize: CellSize,
+    cellPixelSize: PixelSize? = nil
   ) {
     state.withLock { state in
       state.surfaceSize = surfaceSize
@@ -200,7 +200,7 @@ final class WebSurfaceTransportHost: TerminalHosting, Sendable {
 
   func clearScreen() throws {}
 
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(
@@ -308,7 +308,7 @@ final class WebSurfaceInputReader: TerminalInputReading, Sendable {
 }
 
 package enum WebSurfaceInputControlMessage: Equatable, Sendable {
-  case resize(Size, cellPixelSize: Size?)
+  case resize(CellSize, cellPixelSize: PixelSize?)
   case style(TerminalRenderStyle)
 }
 
@@ -388,7 +388,7 @@ package struct WebSurfaceInputParser {
       return nil
     }
 
-    let cellPixelSize: Size?
+    let cellPixelSize: PixelSize?
     if components.count == 5,
       let cellWidth = Int(components[3]),
       let cellHeight = Int(components[4])
@@ -483,7 +483,7 @@ package struct WebSurfaceInputParser {
     return .mouse(
       MouseEvent(
         kind: kind,
-        location: .init(x: max(0, x), y: max(0, y)),
+        location: Point(CellPoint(x: max(0, x), y: max(0, y))),
         modifiers: parseModifiers(components[7])
       )
     )
@@ -756,13 +756,13 @@ package enum WebSurfaceFrameEncoder {
   }
 
   private static func encodeRect(
-    _ rect: Rect
+    _ rect: CellRect
   ) -> String {
     "[\(rect.origin.x),\(rect.origin.y),\(rect.size.width),\(rect.size.height)]"
   }
 
   private static func encodeSize(
-    _ size: Size
+    _ size: PixelSize
   ) -> String {
     "[\(size.width),\(size.height)]"
   }

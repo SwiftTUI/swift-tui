@@ -2,7 +2,7 @@ extension LayoutEngine {
   package func childPlacements(
     for resolved: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     viewportContext: LazyStackViewportContext?,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
@@ -17,7 +17,7 @@ extension LayoutEngine {
           place(
             resolved.children[index],
             measured: childMeasurement,
-            in: Rect(origin: bounds.origin, size: childMeasurement.measuredSize),
+            in: CellRect(origin: bounds.origin, size: childMeasurement.measuredSize),
             passContext: passContext
           )
         )
@@ -37,8 +37,8 @@ extension LayoutEngine {
         return place(
           resolved.children[index],
           measured: childMeasurement,
-          in: Rect(
-            origin: Point(
+          in: CellRect(
+            origin: CellPoint(
               x: bounds.origin.x + alignmentMetrics.leading - childDimensions[alignment.horizontal],
               y: bounds.origin.y + alignmentMetrics.top - childDimensions[alignment.vertical]
             ),
@@ -112,12 +112,12 @@ extension LayoutEngine {
         return []
       }
 
-      let childBounds = Rect(
-        origin: Point(
+      let childBounds = CellRect(
+        origin: CellPoint(
           x: bounds.origin.x + insets.leading,
           y: bounds.origin.y + insets.top
         ),
-        size: Size(
+        size: CellSize(
           width: max(0, bounds.size.width - insets.horizontal),
           height: max(0, bounds.size.height - insets.vertical)
         )
@@ -138,12 +138,12 @@ extension LayoutEngine {
         return []
       }
 
-      let childBounds = Rect(
-        origin: Point(
+      let childBounds = CellRect(
+        origin: CellPoint(
           x: bounds.origin.x - insets.leading,
           y: bounds.origin.y - insets.top
         ),
-        size: Size(
+        size: CellSize(
           width: bounds.size.width + insets.horizontal,
           height: bounds.size.height + insets.vertical
         )
@@ -164,7 +164,7 @@ extension LayoutEngine {
           return place(
             resolved.children[index],
             measured: childMeasurement,
-            in: Rect(origin: bounds.origin, size: childMeasurement.measuredSize),
+            in: CellRect(origin: bounds.origin, size: childMeasurement.measuredSize),
             passContext: passContext
           )
         }
@@ -183,34 +183,34 @@ extension LayoutEngine {
         }
       let consumed = max(0, insetLength + spacing - safeArea.value(for: edge))
 
-      let baseBounds: Rect =
+      let baseBounds: CellRect =
         switch edge {
         case .top:
-          Rect(
-            origin: Point(x: bounds.origin.x, y: bounds.origin.y + consumed),
-            size: Size(width: bounds.size.width, height: max(0, bounds.size.height - consumed))
+          CellRect(
+            origin: CellPoint(x: bounds.origin.x, y: bounds.origin.y + consumed),
+            size: CellSize(width: bounds.size.width, height: max(0, bounds.size.height - consumed))
           )
         case .leading:
-          Rect(
-            origin: Point(x: bounds.origin.x + consumed, y: bounds.origin.y),
-            size: Size(width: max(0, bounds.size.width - consumed), height: bounds.size.height)
+          CellRect(
+            origin: CellPoint(x: bounds.origin.x + consumed, y: bounds.origin.y),
+            size: CellSize(width: max(0, bounds.size.width - consumed), height: bounds.size.height)
           )
         case .bottom:
-          Rect(
+          CellRect(
             origin: bounds.origin,
-            size: Size(width: bounds.size.width, height: max(0, bounds.size.height - consumed))
+            size: CellSize(width: bounds.size.width, height: max(0, bounds.size.height - consumed))
           )
         case .trailing:
-          Rect(
+          CellRect(
             origin: bounds.origin,
-            size: Size(width: max(0, bounds.size.width - consumed), height: bounds.size.height)
+            size: CellSize(width: max(0, bounds.size.width - consumed), height: bounds.size.height)
           )
         }
 
-      let insetOrigin: Point =
+      let insetOrigin: CellPoint =
         switch edge {
         case .top:
-          Point(
+          CellPoint(
             x: simpleAlignedCoordinate(
               childSize: insetMeasurement.measuredSize.width,
               availableSize: bounds.size.width,
@@ -221,7 +221,7 @@ extension LayoutEngine {
             y: bounds.origin.y - safeArea.top
           )
         case .bottom:
-          Point(
+          CellPoint(
             x: simpleAlignedCoordinate(
               childSize: insetMeasurement.measuredSize.width,
               availableSize: bounds.size.width,
@@ -232,7 +232,7 @@ extension LayoutEngine {
             y: bounds.maxY - insetMeasurement.measuredSize.height + safeArea.bottom
           )
         case .leading:
-          Point(
+          CellPoint(
             x: bounds.origin.x - safeArea.leading,
             y: simpleAlignedCoordinate(
               childSize: insetMeasurement.measuredSize.height,
@@ -243,7 +243,7 @@ extension LayoutEngine {
             ) ?? bounds.origin.y
           )
         case .trailing:
-          Point(
+          CellPoint(
             x: bounds.maxX - insetMeasurement.measuredSize.width + safeArea.trailing,
             y: simpleAlignedCoordinate(
               childSize: insetMeasurement.measuredSize.height,
@@ -255,7 +255,7 @@ extension LayoutEngine {
           )
         }
 
-      let insetBounds = Rect(
+      let insetBounds = CellRect(
         origin: insetOrigin,
         size: insetMeasurement.measuredSize
       )
@@ -283,12 +283,12 @@ extension LayoutEngine {
 
       let insets = borderLayoutInsets(
         set: set, placement: placement, sides: sides)
-      let childBounds = Rect(
-        origin: Point(
+      let childBounds = CellRect(
+        origin: CellPoint(
           x: bounds.origin.x + insets.leading,
           y: bounds.origin.y + insets.top
         ),
-        size: Size(
+        size: CellSize(
           width: max(0, bounds.size.width - insets.horizontal),
           height: max(0, bounds.size.height - insets.vertical)
         )
@@ -325,7 +325,7 @@ extension LayoutEngine {
         place(
           child,
           measured: childMeasurement,
-          in: Rect(
+          in: CellRect(
             origin: childOrigin,
             size: childMeasurement.measuredSize
           ),
@@ -343,7 +343,7 @@ extension LayoutEngine {
         place(
           child,
           measured: childMeasurement,
-          in: Rect(
+          in: CellRect(
             origin: .init(
               x: bounds.origin.x + x,
               y: bounds.origin.y + y
@@ -368,7 +368,7 @@ extension LayoutEngine {
         place(
           child,
           measured: childMeasurement,
-          in: Rect(
+          in: CellRect(
             origin: .init(
               x: bounds.origin.x + x - childSize.width / 2,
               y: bounds.origin.y + y - childSize.height / 2
@@ -405,7 +405,7 @@ extension LayoutEngine {
         return place(
           resolved.children[index],
           measured: childMeasurement,
-          in: Rect(
+          in: CellRect(
             origin: childOrigin,
             size: childMeasurement.measuredSize
           ),
@@ -426,7 +426,7 @@ extension LayoutEngine {
         place(
           resolved.children[selectedIndex],
           measured: childMeasurement,
-          in: Rect(
+          in: CellRect(
             origin: bounds.origin,
             size: childMeasurement.measuredSize
           ),
@@ -447,7 +447,7 @@ extension LayoutEngine {
   private func placeStackChildren(
     for resolved: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     axis: Axis,
     spacing: Int?,
     horizontalAlignment: HorizontalAlignment,
@@ -485,8 +485,8 @@ extension LayoutEngine {
         return place(
           stackChildren[index],
           measured: childMeasurement,
-          in: Rect(
-            origin: Point(
+          in: CellRect(
+            origin: CellPoint(
               x: bounds.origin.x + crossMetrics.leading - dimensions[horizontalAlignment],
               y: nextY
             ),
@@ -512,8 +512,8 @@ extension LayoutEngine {
         return place(
           stackChildren[index],
           measured: childMeasurement,
-          in: Rect(
-            origin: Point(
+          in: CellRect(
+            origin: CellPoint(
               x: nextX,
               y: bounds.origin.y + crossMetrics.leading - dimensions[verticalAlignment]
             ),
@@ -529,7 +529,7 @@ extension LayoutEngine {
   private func placeLazyStackChildren(
     for resolved: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     axis: Axis,
     spacing: Int?,
     horizontalAlignment: HorizontalAlignment,
@@ -631,8 +631,8 @@ extension LayoutEngine {
         return place(
           stackChildren[index],
           measured: childMeasurement,
-          in: Rect(
-            origin: Point(
+          in: CellRect(
+            origin: CellPoint(
               x: bounds.origin.x + crossMetrics.leading - dimensions[horizontalAlignment],
               y: childOriginY
             ),
@@ -653,8 +653,8 @@ extension LayoutEngine {
         return place(
           stackChildren[index],
           measured: childMeasurement,
-          in: Rect(
-            origin: Point(
+          in: CellRect(
+            origin: CellPoint(
               x: childOriginX,
               y: bounds.origin.y + crossMetrics.leading - dimensions[verticalAlignment]
             ),
@@ -670,7 +670,7 @@ extension LayoutEngine {
     source: any IndexedChildSource,
     childSizes: [ChildAllocation],
     measured: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     axis: Axis,
     horizontalAlignment: HorizontalAlignment,
     verticalAlignment: VerticalAlignment,
@@ -702,7 +702,7 @@ extension LayoutEngine {
         measured: childMeasurement
       )
 
-      let origin: Point =
+      let origin: CellPoint =
         switch axis {
         case .vertical:
           .init(
@@ -719,7 +719,7 @@ extension LayoutEngine {
       return place(
         child,
         measured: childMeasurement,
-        in: Rect(
+        in: CellRect(
           origin: origin,
           size: childMeasurement.measuredSize
         ),
@@ -730,7 +730,7 @@ extension LayoutEngine {
 
   package func placedNode(
     from resolved: ResolvedNode,
-    bounds: Rect,
+    bounds: CellRect,
     measured: MeasuredNode,
     children: [PlacedNode]
   ) -> PlacedNode {
@@ -761,24 +761,24 @@ extension LayoutEngine {
   }
 
   package func combinedContentBounds(
-    parentBounds: Rect,
+    parentBounds: CellRect,
     children: [PlacedNode]
-  ) -> Rect {
+  ) -> CellRect {
     children.reduce(parentBounds) { partial, child in
       union(partial, child.contentBounds)
     }
   }
 
   package func union(
-    _ lhs: Rect,
-    _ rhs: Rect
-  ) -> Rect {
+    _ lhs: CellRect,
+    _ rhs: CellRect
+  ) -> CellRect {
     let minX = min(lhs.origin.x, rhs.origin.x)
     let minY = min(lhs.origin.y, rhs.origin.y)
     let maxX = max(lhs.origin.x + lhs.size.width, rhs.origin.x + rhs.size.width)
     let maxY = max(lhs.origin.y + lhs.size.height, rhs.origin.y + rhs.size.height)
 
-    return Rect(
+    return CellRect(
       origin: .init(x: minX, y: minY),
       size: .init(width: maxX - minX, height: maxY - minY)
     )
@@ -786,10 +786,10 @@ extension LayoutEngine {
 
   package func resolvedContentBounds(
     for resolved: ResolvedNode,
-    bounds: Rect,
+    bounds: CellRect,
     measured: MeasuredNode,
     children: [PlacedNode]
-  ) -> Rect {
+  ) -> CellRect {
     let childContentBounds = combinedContentBounds(
       parentBounds: bounds,
       children: children
@@ -801,7 +801,7 @@ extension LayoutEngine {
     case .list(let payload):
       return union(
         childContentBounds,
-        Rect(
+        CellRect(
           origin: bounds.origin,
           size: measuredListIdealSize(for: payload)
         )
@@ -809,7 +809,7 @@ extension LayoutEngine {
     case .table(let payload):
       return union(
         childContentBounds,
-        Rect(
+        CellRect(
           origin: bounds.origin,
           size: measuredTableIdealSize(for: payload)
         )
@@ -844,7 +844,7 @@ extension LayoutEngine {
         return union(childContentBounds, bounds)
       }
 
-      let contentSize: Size =
+      let contentSize: CellSize =
         switch axis {
         case .vertical:
           .init(
@@ -857,7 +857,7 @@ extension LayoutEngine {
             height: snapshot.crossLeading + snapshot.crossTrailing
           )
         }
-      let contentBounds = Rect(origin: bounds.origin, size: contentSize)
+      let contentBounds = CellRect(origin: bounds.origin, size: contentSize)
       return union(childContentBounds, contentBounds)
     default:
       return childContentBounds
@@ -884,7 +884,7 @@ extension LayoutEngine {
 
   package func translatedPlacement(
     _ node: PlacedNode,
-    by delta: Point
+    by delta: CellPoint
   ) -> PlacedNode {
     let translatedBounds = translated(node.bounds, by: delta)
     let translatedChildren = node.children.map { child in
@@ -913,10 +913,10 @@ extension LayoutEngine {
   }
 
   private func translated(
-    _ rect: Rect,
-    by delta: Point
-  ) -> Rect {
-    Rect(
+    _ rect: CellRect,
+    by delta: CellPoint
+  ) -> CellRect {
+    CellRect(
       origin: .init(
         x: rect.origin.x + delta.x,
         y: rect.origin.y + delta.y

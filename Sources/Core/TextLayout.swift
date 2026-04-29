@@ -229,8 +229,8 @@ public struct TextLayoutResult: Equatable, Sendable {
     self.wasTruncated = wasTruncated
   }
 
-  public var size: Size {
-    Size(
+  public var size: CellSize {
+    CellSize(
       width: lines.map(\.cellWidth).max() ?? 0,
       height: lines.count
     )

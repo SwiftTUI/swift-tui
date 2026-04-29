@@ -17,7 +17,7 @@ private enum TerminalAppearanceKey: EnvironmentKey {
 }
 
 private enum TerminalSizeKey: EnvironmentKey {
-  static let defaultValue = Size(width: 80, height: 24)
+  static let defaultValue = CellSize(width: 80, height: 24)
 }
 
 private enum SafeAreaInsetsKey: EnvironmentKey {
@@ -94,7 +94,7 @@ extension EnvironmentValues {
     set { self[TerminalAppearanceKey.self] = newValue }
   }
 
-  public var terminalSize: Size {
+  public var terminalSize: CellSize {
     get { self[TerminalSizeKey.self] }
     set { self[TerminalSizeKey.self] = newValue }
   }

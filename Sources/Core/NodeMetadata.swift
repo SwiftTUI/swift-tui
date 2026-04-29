@@ -4,12 +4,12 @@
 package struct NodeLayoutInfo: Equatable, Sendable {
   package var layoutBehavior: LayoutBehavior
   package var layoutMetadata: LayoutMetadata
-  package var intrinsicSize: Size?
+  package var intrinsicSize: CellSize?
 
   package init(
     layoutBehavior: LayoutBehavior = .intrinsic,
     layoutMetadata: LayoutMetadata = .init(),
-    intrinsicSize: Size? = nil
+    intrinsicSize: CellSize? = nil
   ) {
     self.layoutBehavior = layoutBehavior
     self.layoutMetadata = layoutMetadata

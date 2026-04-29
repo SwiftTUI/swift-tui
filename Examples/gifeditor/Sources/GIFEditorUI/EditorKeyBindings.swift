@@ -330,7 +330,7 @@ extension View where Self: ActionScope & Sendable {
         let progression = [16, 24, 32, 48, 64]
         let current = model.document.size.width
         let next = progression.first { $0 > current } ?? progression[0]
-        model.resizeCanvas(to: PixelSize(width: next, height: next))
+        model.resizeCanvas(to: GIFEditorCore.PixelSize(width: next, height: next))
         refresh()
       }
   }

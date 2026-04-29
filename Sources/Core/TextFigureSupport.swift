@@ -57,13 +57,13 @@ public struct TextFigurePayload: Equatable, Hashable, Sendable {
 
 package struct TextFigureLayoutMetrics: Equatable, Sendable {
   var minimumWidth: Int
-  var idealSize: Size
+  var idealSize: CellSize
 }
 
 package struct TextFigureRenderResult: Equatable, Sendable {
   var lines: [String]
   var styledLines: [PreformattedTextLine]
-  var size: Size
+  var size: CellSize
 }
 
 package enum TextFigureSupport {
@@ -110,7 +110,7 @@ package enum TextFigureSupport {
   package static func measuredSize(
     for payload: TextFigurePayload,
     proposal: ProposedSize
-  ) -> Size {
+  ) -> CellSize {
     let metrics = layoutMetrics(for: payload)
 
     let renderedWidth: Int? =

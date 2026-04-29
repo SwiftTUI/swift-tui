@@ -513,8 +513,8 @@ extension TerminalInputParser {
     }
 
     let location = Point(
-      x: max(0, encodedX - 1),
-      y: max(0, encodedY - 1)
+      x: Double(max(0, encodedX - 1)),
+      y: Double(max(0, encodedY - 1))
     )
     let modifiers = mouseModifiers(from: encodedButton)
     let baseCode = encodedButton & 0b11

@@ -9,12 +9,12 @@ import TerminalUI
 /// reuse a single flatten pass for both the canvas and the timeline
 /// thumbnail.
 struct CanvasView: View {
-  let size: PixelSize
+  let size: GIFEditorCore.PixelSize
   let cells: [EditorColor?]
-  let cursor: PixelPoint
+  let cursor: GIFEditorCore.PixelPoint
   let selection: Selection?
-  let pendingMarqueeAnchor: PixelPoint?
-  let pendingGradientAnchor: PixelPoint?
+  let pendingMarqueeAnchor: GIFEditorCore.PixelPoint?
+  let pendingGradientAnchor: GIFEditorCore.PixelPoint?
   var mode: CanvasPixelGridMode = .fullCell
 
   var body: some View {
@@ -47,7 +47,7 @@ struct CanvasView: View {
     output.reserveCapacity(size.area)
     for y in 0..<size.height {
       for x in 0..<size.width {
-        output.append(fillColor(at: PixelPoint(x: x, y: y)))
+        output.append(fillColor(at: GIFEditorCore.PixelPoint(x: x, y: y)))
       }
     }
     return output
@@ -56,7 +56,7 @@ struct CanvasView: View {
   /// Resolves the color a pixel paints. Falls back to a checkerboard
   /// background pattern for transparent cells so the user can tell
   /// transparent from "actually painted in their bg color".
-  private func fillColor(at point: PixelPoint) -> Color {
+  private func fillColor(at point: GIFEditorCore.PixelPoint) -> Color {
     if let color = cells[size.indexOf(point)] {
       return color.toTerminalColor()
     }
@@ -67,11 +67,11 @@ struct CanvasView: View {
 }
 
 private struct CanvasOverlayDrawing: CanvasDrawing, Equatable {
-  var size: PixelSize
-  var cursor: PixelPoint
+  var size: GIFEditorCore.PixelSize
+  var cursor: GIFEditorCore.PixelPoint
   var selection: Selection?
-  var pendingMarqueeAnchor: PixelPoint?
-  var pendingGradientAnchor: PixelPoint?
+  var pendingMarqueeAnchor: GIFEditorCore.PixelPoint?
+  var pendingGradientAnchor: GIFEditorCore.PixelPoint?
   var mode: CanvasPixelGridMode
 
   func draw(into context: inout CanvasContext) {
@@ -93,7 +93,7 @@ private struct CanvasOverlayDrawing: CanvasDrawing, Equatable {
   ) {
     for y in rect.minY..<rect.maxY {
       for x in rect.minX..<rect.maxX {
-        let point = PixelPoint(x: x, y: y)
+        let point = GIFEditorCore.PixelPoint(x: x, y: y)
         guard isOnSelectionBorder(point: point, rect: rect) else {
           continue
         }
@@ -102,14 +102,14 @@ private struct CanvasOverlayDrawing: CanvasDrawing, Equatable {
     }
   }
 
-  private func isOnSelectionBorder(point: PixelPoint, rect: PixelRect) -> Bool {
+  private func isOnSelectionBorder(point: GIFEditorCore.PixelPoint, rect: PixelRect) -> Bool {
     guard rect.contains(point) else { return false }
     return point.x == rect.minX || point.x == rect.maxX - 1
       || point.y == rect.minY || point.y == rect.maxY - 1
   }
 
   private func mark(
-    _ point: PixelPoint,
+    _ point: GIFEditorCore.PixelPoint,
     character: Character,
     color: Color,
     into context: inout CanvasContext
@@ -126,12 +126,12 @@ private struct CanvasOverlayDrawing: CanvasDrawing, Equatable {
     )
   }
 
-  private func cellPoint(for point: PixelPoint) -> PixelPoint {
+  private func cellPoint(for point: GIFEditorCore.PixelPoint) -> GIFEditorCore.PixelPoint {
     switch mode {
     case .fullCell:
       return point
     case .verticalHalfBlock:
-      return PixelPoint(x: point.x, y: point.y / 2)
+      return GIFEditorCore.PixelPoint(x: point.x, y: point.y / 2)
     }
   }
 }

@@ -25,7 +25,7 @@ struct DragGestureTests {
     .init(
       kind: kind,
       location: point,
-      targetRect: Rect(origin: .zero, size: Size(width: 20, height: 5)),
+      targetRect: CellRect(origin: .zero, size: CellSize(width: 20, height: 5)),
       timestamp: time
     )
   }

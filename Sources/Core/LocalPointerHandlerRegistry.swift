@@ -5,12 +5,12 @@ package enum LocalPointerButton: Equatable, Sendable {
 }
 
 package struct LocalPointerScrollContext: Equatable, Sendable {
-  package var viewportRect: Rect
-  package var contentBounds: Rect
+  package var viewportRect: CellRect
+  package var contentBounds: CellRect
 
   package init(
-    viewportRect: Rect,
-    contentBounds: Rect
+    viewportRect: CellRect,
+    contentBounds: CellRect
   ) {
     self.viewportRect = viewportRect
     self.contentBounds = contentBounds
@@ -28,14 +28,14 @@ package struct LocalPointerEvent: Equatable, Sendable {
 
   package var kind: Kind
   package var location: Point
-  package var targetRect: Rect
+  package var targetRect: CellRect
   package var scrollContext: LocalPointerScrollContext?
   package var timestamp: MonotonicInstant
 
   package init(
     kind: Kind,
     location: Point,
-    targetRect: Rect,
+    targetRect: CellRect,
     scrollContext: LocalPointerScrollContext? = nil,
     timestamp: MonotonicInstant = .now()
   ) {

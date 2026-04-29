@@ -5,12 +5,13 @@ public import Core
 /// The proxy reports the size proposed by the nearest resolved container when
 /// that container can tighten the geometry environment.
 public struct GeometryProxy: Equatable, Sendable {
-  public var size: Size
+  /// The proposed terminal-cell extent for the current geometry scope.
+  public var size: CellSize
   public var safeAreaInsets: EdgeInsets
   public var cellPixelMetrics: CellPixelMetrics
 
   public init(
-    size: Size,
+    size: CellSize,
     safeAreaInsets: EdgeInsets = .zero,
     cellPixelMetrics: CellPixelMetrics = .estimated
   ) {

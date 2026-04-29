@@ -98,7 +98,7 @@ final class DragGestureRecognizer: GestureRecognizer {
   private(set) var phase: GestureRecognizerPhase = .possible
   private var startLocation: Point?
   private var startTime: MonotonicInstant?
-  private var targetRect: Rect = Rect(origin: .zero, size: .zero)
+  private var targetRect: CellRect = CellRect(origin: .zero, size: .zero)
   private var samples: [Sample] = []
   private var lastValue: DragGesture.Value?
 
@@ -131,7 +131,7 @@ final class DragGestureRecognizer: GestureRecognizer {
       let dx = event.location.x - start.x
       let dy = event.location.y - start.y
       let distance = max(abs(dx), abs(dy))
-      guard distance >= minimumDistance else { return .handled }
+      guard distance >= Double(minimumDistance) else { return .handled }
       if phase == .possible { phase = .began } else { phase = .changed }
       lastValue = makeValue(
         now: event.timestamp,
@@ -242,8 +242,8 @@ final class DragGestureRecognizer: GestureRecognizer {
     let dt = seconds(from: reference.time, to: last.time)
     guard dt > 0 else { return .zero }
     return Size(
-      width: Int(Double(last.location.x - reference.location.x) / dt),
-      height: Int(Double(last.location.y - reference.location.y) / dt)
+      width: (last.location.x - reference.location.x) / dt,
+      height: (last.location.y - reference.location.y) / dt
     )
   }
 

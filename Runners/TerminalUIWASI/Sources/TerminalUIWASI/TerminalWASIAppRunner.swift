@@ -202,7 +202,7 @@ public enum TerminalWASIAppRunner {
       return CommandLine.arguments.dropFirst().first
     }
 
-    private static func wasiSurfaceSize() -> Size {
+    private static func wasiSurfaceSize() -> CellSize {
       let width = max(
         40,
         integerEnvironmentValue(named: "COLUMNS")

@@ -1,7 +1,7 @@
 extension DrawExtractor {
   func tableCommands(
     for payload: TablePayload,
-    in bounds: Rect
+    in bounds: CellRect
   ) -> [DrawCommand] {
     guard bounds.size.width > 0, bounds.size.height > 0 else {
       return []
@@ -26,7 +26,7 @@ extension DrawExtractor {
     ).lines
 
     for (index, line) in lines.enumerated() {
-      let lineBounds = Rect(
+      let lineBounds = CellRect(
         origin: .init(x: bounds.origin.x, y: bounds.origin.y + index),
         size: .init(width: bounds.size.width, height: 1)
       )
@@ -82,7 +82,7 @@ extension DrawExtractor {
 
   func visibleTableLayout(
     for payload: TablePayload,
-    in bounds: Rect
+    in bounds: CellRect
   ) -> (lines: [TableDisplayLine], widths: [Int]) {
     let widths = measureTableColumnWidths(
       columns: payload.columns,

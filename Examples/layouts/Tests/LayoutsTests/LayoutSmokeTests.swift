@@ -15,7 +15,7 @@ struct LayoutSmokeTests {
     arguments: LayoutCatalog.all
   )
   func rasterisesAndShowsMarker(entry: LayoutEntry) {
-    let size = Size(width: 80, height: 28)
+    let size = CellSize(width: 80, height: 28)
     var env = EnvironmentValues()
     env.terminalSize = size
     let artifacts = DefaultRenderer().render(

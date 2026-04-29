@@ -340,7 +340,7 @@ private final class SendableLayoutWorkerProxy<L: SendableLayout>: WorkerCustomLa
     node: ResolvedNode,
     proposal: ProposedSize,
     passContext: LayoutPassContext?
-  ) -> Size {
+  ) -> CellSize {
     let subviews = layoutSubviews(
       for: node,
       engine: engine,
@@ -364,7 +364,7 @@ private final class SendableLayoutWorkerProxy<L: SendableLayout>: WorkerCustomLa
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
     let placementRecorder = LayoutSubviewPlacementRecorder()
@@ -881,7 +881,7 @@ private final class LayoutProxyBox: CustomLayoutProxy {
     engine: LayoutEngine,
     node: ResolvedNode,
     proposal: ProposedSize
-  ) -> Size {
+  ) -> CellSize {
     MainActor.assumeIsolated {
       let subviews = node.children.map { child in
         LayoutSubview(child: child, engine: engine)
@@ -905,7 +905,7 @@ private final class LayoutProxyBox: CustomLayoutProxy {
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect
+    in bounds: CellRect
   ) -> [PlacedNode] {
     MainActor.assumeIsolated {
       placeSubviews(
@@ -922,7 +922,7 @@ private final class LayoutProxyBox: CustomLayoutProxy {
     engine: LayoutEngine,
     node: ResolvedNode,
     measured: MeasuredNode,
-    in bounds: Rect,
+    in bounds: CellRect,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
     MainActor.assumeIsolated {

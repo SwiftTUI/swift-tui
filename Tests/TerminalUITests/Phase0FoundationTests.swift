@@ -47,7 +47,7 @@ private struct CommitBoundaryHarness {
 private func sampleResolvedNode(
   identity: Identity = testIdentity("Root"),
   context: FrameContext = .init(),
-  intrinsicSize: Size = .init(width: 12, height: 4)
+  intrinsicSize: CellSize = .init(width: 12, height: 4)
 ) -> ResolvedNode {
   ResolvedNode(
     identity: identity,
@@ -60,7 +60,7 @@ private func sampleResolvedNode(
 
 private func sampleMeasuredNode(
   identity: Identity = testIdentity("Root"),
-  size: Size = .init(width: 12, height: 4)
+  size: CellSize = .init(width: 12, height: 4)
 ) -> MeasuredNode {
   MeasuredNode(
     identity: identity,

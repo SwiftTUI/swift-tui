@@ -261,7 +261,7 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
   static func fullRepaint(
     for surface: RasterSurface,
     capabilityProfile: TerminalCapabilityProfile,
-    origin: Point = .zero
+    origin: CellPoint = .zero
   ) -> Self {
     let cellCount = max(0, surface.size.width) * max(0, surface.size.height)
     let writeSteps = fullRepaintWriteSteps(
@@ -291,7 +291,7 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
 
 /// Abstraction over a terminal device used by `RunLoop`.
 public protocol TerminalHosting: AnyObject {
-  var surfaceSize: Size { get }
+  var surfaceSize: CellSize { get }
   var capabilityProfile: TerminalCapabilityProfile { get }
   var appearance: TerminalAppearance { get }
   var theme: Theme? { get }
@@ -301,7 +301,7 @@ public protocol TerminalHosting: AnyObject {
   func disableRawMode() throws
   func write(_ output: String) throws
   func clearScreen() throws
-  func moveCursor(to point: Point) throws
+  func moveCursor(to point: CellPoint) throws
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics
 }
@@ -325,7 +325,7 @@ extension TerminalHosting {
 
   @discardableResult
   public func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
-    let origin = Point.zero
+    let origin = CellPoint.zero
     let writeSteps = fullRepaintWriteSteps(
       for: surface,
       capabilityProfile: capabilityProfile
@@ -355,8 +355,8 @@ extension TerminalHosting {
     func isATTY(_ fileDescriptor: Int32) -> Bool
     func getAttributes(from fileDescriptor: Int32) throws -> termios
     func setAttributes(_ attributes: termios, on fileDescriptor: Int32) throws
-    func windowSize(of fileDescriptor: Int32) throws -> Size
-    func cellPixelSize(of fileDescriptor: Int32) throws -> Size?
+    func windowSize(of fileDescriptor: Int32) throws -> CellSize
+    func cellPixelSize(of fileDescriptor: Int32) throws -> PixelSize?
     func getFileStatusFlags(of fileDescriptor: Int32) throws -> Int32
     func setFileStatusFlags(_ flags: Int32, on fileDescriptor: Int32) throws
     func write(_ output: String, to fileDescriptor: Int32) throws
@@ -368,7 +368,7 @@ extension TerminalHosting {
   }
 
   extension TerminalControlling {
-    func cellPixelSize(of _: Int32) throws -> Size? {
+    func cellPixelSize(of _: Int32) throws -> PixelSize? {
       nil
     }
   }
@@ -393,19 +393,19 @@ extension TerminalHosting {
       }
     }
 
-    func windowSize(of fileDescriptor: Int32) throws -> Size {
+    func windowSize(of fileDescriptor: Int32) throws -> CellSize {
       var windowSize = winsize()
       guard unsafe ioctl(fileDescriptor, UInt(TIOCGWINSZ), &windowSize) == 0 else {
         throw TerminalHostError.failedToReadWindowSize(errno: errno)
       }
 
-      return Size(
+      return CellSize(
         width: max(1, Int(windowSize.ws_col)),
         height: max(1, Int(windowSize.ws_row))
       )
     }
 
-    func cellPixelSize(of fileDescriptor: Int32) throws -> Size? {
+    func cellPixelSize(of fileDescriptor: Int32) throws -> PixelSize? {
       var windowSize = winsize()
       guard unsafe ioctl(fileDescriptor, UInt(TIOCGWINSZ), &windowSize) == 0 else {
         throw TerminalHostError.failedToReadWindowSize(errno: errno)
@@ -699,7 +699,7 @@ extension TerminalHosting {
       }
     }
 
-    public var surfaceSize: Size {
+    public var surfaceSize: CellSize {
       (try? controller.windowSize(of: outputFileDescriptor)) ?? fallbackSize
     }
     public let capabilityProfile: TerminalCapabilityProfile
@@ -711,7 +711,7 @@ extension TerminalHosting {
 
     private let inputFileDescriptor: Int32
     private let outputFileDescriptor: Int32
-    private let fallbackSize: Size
+    private let fallbackSize: CellSize
     private let controller: any TerminalControlling
     private let environment: [String: String]
     private let usesTerminalEditOperations: Bool
@@ -727,7 +727,7 @@ extension TerminalHosting {
     public convenience init(
       inputFileDescriptor: Int32 = 0,
       outputFileDescriptor: Int32 = 1,
-      fallbackSize: Size = .init(width: 80, height: 24),
+      fallbackSize: CellSize = .init(width: 80, height: 24),
       capabilityProfile: TerminalCapabilityProfile? = nil,
       environment: [String: String]? = nil,
       usesTerminalEditOperations: Bool? = nil
@@ -746,7 +746,7 @@ extension TerminalHosting {
     package init(
       inputFileDescriptor: Int32,
       outputFileDescriptor: Int32,
-      fallbackSize: Size,
+      fallbackSize: CellSize,
       controller: any TerminalControlling,
       capabilityProfile: TerminalCapabilityProfile? = nil,
       environment: [String: String]? = nil,
@@ -901,7 +901,7 @@ extension TerminalHosting {
       try write(clearScreenSequence())
     }
 
-    public func moveCursor(to point: Point) throws {
+    public func moveCursor(to point: CellPoint) throws {
       try write(cursorSequence(to: point))
     }
 
@@ -942,7 +942,7 @@ extension TerminalHosting {
       presentationSession.forceFullRepaint = false
 
       var bytesWritten = 0
-      let origin = Point.zero
+      let origin = CellPoint.zero
       var bufferedOutput = String()
       var graphicsReplayScope = TerminalPresentationMetrics.GraphicsReplayScope.none
       var graphicsAttachmentsReplayed = 0
@@ -1417,7 +1417,7 @@ extension TerminalHosting {
       "\u{001B}[0m"
     }
 
-    private func cursorSequence(to point: Point) -> String {
+    private func cursorSequence(to point: CellPoint) -> String {
       let row = max(1, point.y + 1)
       let column = max(1, point.x + 1)
       return "\u{001B}[\(row);\(column)H"
@@ -1443,7 +1443,7 @@ extension TerminalHosting {
 #else
   public final class WebTerminalHost: TerminalHosting, Sendable {
     private struct State {
-      var surfaceSize: Size
+      var surfaceSize: CellSize
       var renderStyle: TerminalRenderStyle
     }
 
@@ -1455,7 +1455,7 @@ extension TerminalHosting {
     public let graphicsCapabilities: TerminalGraphicsCapabilities
 
     public convenience init(
-      surfaceSize: Size,
+      surfaceSize: CellSize,
       theme: Theme? = nil,
       capabilityProfile: TerminalCapabilityProfile = .trueColor,
       graphicsCapabilities: TerminalGraphicsCapabilities = .none,
@@ -1472,7 +1472,7 @@ extension TerminalHosting {
     }
 
     public init(
-      surfaceSize: Size,
+      surfaceSize: CellSize,
       outputFileDescriptor: Int32,
       theme: Theme? = nil,
       capabilityProfile: TerminalCapabilityProfile = .trueColor,
@@ -1497,7 +1497,7 @@ extension TerminalHosting {
       )
     }
 
-    public var surfaceSize: Size {
+    public var surfaceSize: CellSize {
       state.withLock(\.surfaceSize)
     }
 
@@ -1509,7 +1509,7 @@ extension TerminalHosting {
       state.withLock(\.renderStyle.theme)
     }
 
-    public func updateSurfaceSize(_ surfaceSize: Size) {
+    public func updateSurfaceSize(_ surfaceSize: CellSize) {
       state.withLock { state in
         state.surfaceSize = surfaceSize
       }
@@ -1562,7 +1562,7 @@ extension TerminalHosting {
       try write("\u{001B}[2J")
     }
 
-    public func moveCursor(to point: Point) throws {
+    public func moveCursor(to point: CellPoint) throws {
       try write(cursorSequence(to: point))
     }
 
@@ -1620,7 +1620,7 @@ extension TerminalHosting {
       "\u{001B}[0m"
     }
 
-    private func cursorSequence(to point: Point) -> String {
+    private func cursorSequence(to point: CellPoint) -> String {
       let row = max(1, point.y + 1)
       let column = max(1, point.x + 1)
       return "\u{001B}[\(row);\(column)H"
@@ -1658,7 +1658,7 @@ func fullRepaintWriteSteps(
 func fullRepaintOutput(
   for surface: RasterSurface,
   capabilityProfile: TerminalCapabilityProfile,
-  origin: Point = .zero
+  origin: CellPoint = .zero
 ) -> String {
   let writeSteps = fullRepaintWriteSteps(
     for: surface,
@@ -1681,7 +1681,7 @@ func fullRepaintOutput(
 
 func fullRepaintBytesWritten(
   writeSteps: [String],
-  origin: Point
+  origin: CellPoint
 ) -> Int {
   let clearSequence = "\u{001B}[2J"
   let cursorSequence = fullRepaintCursorSequence(to: origin)
@@ -1693,7 +1693,7 @@ func fullRepaintBytesWritten(
 }
 
 func fullRepaintCursorSequence(
-  to point: Point
+  to point: CellPoint
 ) -> String {
   "\u{001B}[\(max(1, point.y + 1));\(max(1, point.x + 1))H"
 }

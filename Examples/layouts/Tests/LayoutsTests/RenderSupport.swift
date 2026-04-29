@@ -17,7 +17,7 @@ func render(
   id: String = "\(#fileID).\(#function)"
 ) -> FrameArtifacts {
   var env = EnvironmentValues()
-  env.terminalSize = Size(width: width, height: height)
+  env.terminalSize = CellSize(width: width, height: height)
   return DefaultRenderer().render(
     view,
     context: ResolveContext(
@@ -36,7 +36,7 @@ func renderAsync(
   id: String = "\(#fileID).\(#function)"
 ) async -> FrameArtifacts {
   var env = EnvironmentValues()
-  env.terminalSize = Size(width: width, height: height)
+  env.terminalSize = CellSize(width: width, height: height)
   return await DefaultRenderer().renderAsync(
     view,
     context: ResolveContext(

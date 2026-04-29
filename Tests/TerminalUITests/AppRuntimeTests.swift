@@ -1059,16 +1059,16 @@ private final class ActionRecorder: Sendable {
 }
 
 private final class RecordingTerminalHost: TerminalHosting {
-  let surfaceSize: Size
+  let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
   private(set) var frames: [String] = []
   private(set) var presentationMetrics: [TerminalPresentationMetrics] = []
-  private(set) var presentedSurfaceSizes: [Size] = []
+  private(set) var presentedSurfaceSizes: [CellSize] = []
   private var lastPresentedSurface: RasterSurface?
 
   init(
-    surfaceSize: Size = .init(width: 60, height: 18),
+    surfaceSize: CellSize = .init(width: 60, height: 18),
     capabilityProfile: TerminalCapabilityProfile = .previewUnicode,
     appearance: TerminalAppearance = .fallback
   ) {
@@ -1080,7 +1080,7 @@ private final class RecordingTerminalHost: TerminalHosting {
   func enableRawMode() throws {}
   func disableRawMode() throws {}
   func clearScreen() throws {}
-  func moveCursor(to _: Point) throws {}
+  func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {

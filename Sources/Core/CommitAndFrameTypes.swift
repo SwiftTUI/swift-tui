@@ -198,13 +198,13 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
 
 package struct ScrollViewportContext: Equatable, Sendable {
   package var axes: AxisSet
-  package var viewportRect: Rect
-  package var contentOffset: Point
+  package var viewportRect: CellRect
+  package var contentOffset: CellPoint
 
   package init(
     axes: AxisSet,
-    viewportRect: Rect,
-    contentOffset: Point
+    viewportRect: CellRect,
+    contentOffset: CellPoint
   ) {
     self.axes = axes
     self.viewportRect = viewportRect
