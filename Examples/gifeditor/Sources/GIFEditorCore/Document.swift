@@ -56,7 +56,7 @@ public struct EditorFrame: Hashable, Sendable, Codable, Identifiable {
 ///
 /// `path` is non-nil when the document was loaded from disk or has been
 /// saved at least once; it drives the `Ctrl+S` "save back" behaviour.
-public struct GIFDocument: Sendable, Codable {
+public struct GIFDocument: Hashable, Sendable, Codable {
   public var size: PixelSize
   public var palette: ColorPalette
   public var frames: [EditorFrame]

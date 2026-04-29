@@ -84,6 +84,7 @@ public struct EditorView: View {
     .applyFrameBindings(model: model, refresh: refresh)
     .applyLayerBindings(model: model, refresh: refresh)
     .applyClipboardBindings(model: model, refresh: refresh)
+    .applyHistoryBindings(model: model, refresh: refresh)
     .applyPaletteBindings(model: model, refresh: refresh)
     .applyFileBindings(model: model, refresh: refresh)
     .applyTerminationHandling(model: model, refresh: refresh)

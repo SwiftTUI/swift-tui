@@ -14,6 +14,45 @@ public final class EditorViewModel {
 
   public private(set) var document: GIFDocument
 
+  public var canUndo: Bool {
+    !undoStack.isEmpty
+  }
+
+  public var canRedo: Bool {
+    !redoStack.isEmpty
+  }
+
+  public var isDirty: Bool {
+    currentHistoryGeneration != cleanHistoryGeneration
+  }
+
+  private struct EditorSnapshot: Equatable {
+    var document: GIFDocument
+    var currentFrameIndex: Int
+    var currentLayerIndex: Int
+    var cursor: GIFEditorCore.PixelPoint
+    var selection: Selection?
+    var historyGeneration: Int
+  }
+
+  private struct HistoryEntry {
+    var snapshot: EditorSnapshot
+    var label: String
+  }
+
+  private struct ActiveUndoGroup {
+    var snapshot: EditorSnapshot
+    var label: String
+  }
+
+  private var undoStack: [HistoryEntry] = []
+  private var redoStack: [HistoryEntry] = []
+  private var activeUndoGroup: ActiveUndoGroup?
+  private var currentHistoryGeneration: Int = 0
+  private var cleanHistoryGeneration: Int = 0
+  private var nextHistoryGeneration: Int = 1
+  private let historyLimit: Int = 100
+
   // MARK: - Selection state
 
   public var currentFrameIndex: Int = 0 {
@@ -55,10 +94,35 @@ public final class EditorViewModel {
   // MARK: - Status / feedback
 
   public var statusMessage: String = ""
-  public var isDirty: Bool = false
 
   public init(document: GIFDocument) {
     self.document = document
+  }
+
+  // MARK: - History
+
+  public func undo() {
+    guard let entry = undoStack.popLast() else {
+      announce("Nothing to undo")
+      return
+    }
+
+    activeUndoGroup = nil
+    redoStack.append(HistoryEntry(snapshot: snapshotState(), label: entry.label))
+    restore(entry.snapshot)
+    announce("Undid \(entry.label)")
+  }
+
+  public func redo() {
+    guard let entry = redoStack.popLast() else {
+      announce("Nothing to redo")
+      return
+    }
+
+    activeUndoGroup = nil
+    undoStack.append(HistoryEntry(snapshot: snapshotState(), label: entry.label))
+    restore(entry.snapshot)
+    announce("Redid \(entry.label)")
   }
 
   // MARK: - Frame & layer accessors
@@ -79,37 +143,45 @@ public final class EditorViewModel {
   public func applyToolAtCursor() {
     switch tool {
     case .pen:
-      mutateCurrentLayer { buffer in
-        ToolOps.pen(on: buffer, at: cursor, color: primaryColorIndex)
+      recordUndoableEdit("Paint pixel") {
+        mutateCurrentLayer { buffer in
+          ToolOps.pen(on: buffer, at: cursor, color: primaryColorIndex)
+        }
       }
       announce("Painted at \(cursor.x),\(cursor.y)")
     case .eraser:
-      mutateCurrentLayer { buffer in
-        ToolOps.erase(on: buffer, at: cursor)
+      recordUndoableEdit("Erase pixel") {
+        mutateCurrentLayer { buffer in
+          ToolOps.erase(on: buffer, at: cursor)
+        }
       }
       announce("Erased \(cursor.x),\(cursor.y)")
     case .fill:
-      mutateCurrentLayer { buffer in
-        ToolOps.fill(
-          on: buffer,
-          at: cursor,
-          color: primaryColorIndex,
-          selection: selection
-        )
+      recordUndoableEdit("Fill region") {
+        mutateCurrentLayer { buffer in
+          ToolOps.fill(
+            on: buffer,
+            at: cursor,
+            color: primaryColorIndex,
+            selection: selection
+          )
+        }
       }
       announce("Filled region")
     case .gradient:
       if let anchor = pendingGradientAnchor {
-        mutateCurrentLayer { buffer in
-          ToolOps.gradient(
-            on: buffer,
-            from: anchor,
-            to: cursor,
-            startColor: document.palette[primaryColorIndex],
-            endColor: document.palette[secondaryColorIndex],
-            palette: document.palette,
-            selection: selection
-          )
+        recordUndoableEdit("Apply gradient") {
+          mutateCurrentLayer { buffer in
+            ToolOps.gradient(
+              on: buffer,
+              from: anchor,
+              to: cursor,
+              startColor: document.palette[primaryColorIndex],
+              endColor: document.palette[secondaryColorIndex],
+              palette: document.palette,
+              selection: selection
+            )
+          }
         }
         pendingGradientAnchor = nil
         announce("Gradient committed")
@@ -179,14 +251,17 @@ public final class EditorViewModel {
     cursor = point
     switch tool {
     case .pen:
+      beginUndoGroup("Paint stroke")
       strokeCurrentLayer(from: point, to: point, color: primaryColorIndex)
       announce("Painting \(point.x),\(point.y)")
     case .eraser:
+      beginUndoGroup("Erase stroke")
       strokeCurrentLayer(from: point, to: point, color: nil)
       announce("Erasing \(point.x),\(point.y)")
     case .fill, .eyedropper:
       announce("Target \(point.x),\(point.y)")
     case .gradient:
+      beginUndoGroup("Apply gradient")
       pendingGradientAnchor = point
       announce("Gradient anchor \(point.x),\(point.y)")
     case .marquee:
@@ -236,17 +311,20 @@ public final class EditorViewModel {
       if let previous, previous != point {
         strokeCurrentLayer(from: previous, to: point, color: primaryColorIndex)
       }
+      finishUndoGroup()
       announce("Painted to \(point.x),\(point.y)")
     case .eraser:
       if let previous, previous != point {
         strokeCurrentLayer(from: previous, to: point, color: nil)
       }
+      finishUndoGroup()
       announce("Erased to \(point.x),\(point.y)")
     case .fill, .eyedropper:
       applyToolAtCursor()
     case .gradient:
       pendingGradientAnchor = anchor
       applyToolAtCursor()
+      finishUndoGroup()
     case .marquee:
       pendingMarqueeAnchor = anchor
       applyToolAtCursor()
@@ -271,28 +349,32 @@ public final class EditorViewModel {
   }
 
   public func insertBlankFrameAfterCurrent() {
-    let layer = EditorLayer(name: "Layer 1", pixels: PixelBuffer(size: document.size))
-    let frame = EditorFrame(
-      layers: [layer],
-      delayCentiseconds: currentFrame.delayCentiseconds
-    )
-    document.frames.insert(frame, at: currentFrameIndex + 1)
-    currentFrameIndex += 1
-    markDirty("Inserted blank frame")
+    recordUndoableEdit("Insert blank frame") {
+      let layer = EditorLayer(name: "Layer 1", pixels: PixelBuffer(size: document.size))
+      let frame = EditorFrame(
+        layers: [layer],
+        delayCentiseconds: currentFrame.delayCentiseconds
+      )
+      document.frames.insert(frame, at: currentFrameIndex + 1)
+      currentFrameIndex += 1
+    }
+    announce("Inserted blank frame")
   }
 
   public func duplicateCurrentFrame() {
-    let copy = currentFrame
-    let dup = EditorFrame(
-      layers: copy.layers.map {
-        EditorLayer(name: $0.name, isVisible: $0.isVisible, pixels: $0.pixels)
-      },
-      delayCentiseconds: copy.delayCentiseconds,
-      disposal: copy.disposal
-    )
-    document.frames.insert(dup, at: currentFrameIndex + 1)
-    currentFrameIndex += 1
-    markDirty("Duplicated frame")
+    recordUndoableEdit("Duplicate frame") {
+      let copy = currentFrame
+      let dup = EditorFrame(
+        layers: copy.layers.map {
+          EditorLayer(name: $0.name, isVisible: $0.isVisible, pixels: $0.pixels)
+        },
+        delayCentiseconds: copy.delayCentiseconds,
+        disposal: copy.disposal
+      )
+      document.frames.insert(dup, at: currentFrameIndex + 1)
+      currentFrameIndex += 1
+    }
+    announce("Duplicated frame")
   }
 
   public func deleteCurrentFrame() {
@@ -300,38 +382,48 @@ public final class EditorViewModel {
       announce("Can't delete the last frame")
       return
     }
-    document.frames.remove(at: currentFrameIndex)
-    if currentFrameIndex >= document.frames.count {
-      currentFrameIndex = document.frames.count - 1
+    recordUndoableEdit("Delete frame") {
+      document.frames.remove(at: currentFrameIndex)
+      if currentFrameIndex >= document.frames.count {
+        currentFrameIndex = document.frames.count - 1
+      }
     }
-    markDirty("Deleted frame")
+    announce("Deleted frame")
   }
 
   public func adjustCurrentFrameDelay(by delta: Int) {
-    var frame = currentFrame
-    frame.delayCentiseconds = max(1, frame.delayCentiseconds + delta)
-    document.frames[currentFrameIndex] = frame
-    markDirty("Frame delay: \(frame.delayCentiseconds)cs")
+    var updatedDelay = currentFrame.delayCentiseconds
+    recordUndoableEdit("Adjust frame delay") {
+      var frame = currentFrame
+      frame.delayCentiseconds = max(1, frame.delayCentiseconds + delta)
+      updatedDelay = frame.delayCentiseconds
+      document.frames[currentFrameIndex] = frame
+    }
+    announce("Frame delay: \(updatedDelay)cs")
   }
 
   public func setAllFrameDelaysToCurrent() {
     let target = currentFrame.delayCentiseconds
-    for i in document.frames.indices {
-      document.frames[i].delayCentiseconds = target
+    recordUndoableEdit("Equalize frame delays") {
+      for i in document.frames.indices {
+        document.frames[i].delayCentiseconds = target
+      }
     }
-    markDirty("All frame delays = \(target)cs")
+    announce("All frame delays = \(target)cs")
   }
 
   // MARK: - Layers
 
   public func addLayer() {
-    let layer = EditorLayer(
-      name: "Layer \(currentFrame.layers.count + 1)",
-      pixels: PixelBuffer(size: document.size)
-    )
-    document.frames[currentFrameIndex].layers.append(layer)
-    currentLayerIndex = document.frames[currentFrameIndex].layers.count - 1
-    markDirty("New layer")
+    recordUndoableEdit("Add layer") {
+      let layer = EditorLayer(
+        name: "Layer \(currentFrame.layers.count + 1)",
+        pixels: PixelBuffer(size: document.size)
+      )
+      document.frames[currentFrameIndex].layers.append(layer)
+      currentLayerIndex = document.frames[currentFrameIndex].layers.count - 1
+    }
+    announce("New layer")
   }
 
   public func selectLayerBelow() {
@@ -349,10 +441,14 @@ public final class EditorViewModel {
   }
 
   public func toggleCurrentLayerVisibility() {
-    var layer = currentLayer
-    layer.isVisible.toggle()
-    document.frames[currentFrameIndex].layers[currentLayerIndex] = layer
-    markDirty(layer.isVisible ? "Layer shown" : "Layer hidden")
+    var isVisible = currentLayer.isVisible
+    recordUndoableEdit("Toggle layer visibility") {
+      var layer = currentLayer
+      layer.isVisible.toggle()
+      isVisible = layer.isVisible
+      document.frames[currentFrameIndex].layers[currentLayerIndex] = layer
+    }
+    announce(isVisible ? "Layer shown" : "Layer hidden")
   }
 
   public func deleteCurrentLayer() {
@@ -360,11 +456,13 @@ public final class EditorViewModel {
       announce("Can't delete the last layer in a frame")
       return
     }
-    document.frames[currentFrameIndex].layers.remove(at: currentLayerIndex)
-    if currentLayerIndex >= currentFrame.layers.count {
-      currentLayerIndex = currentFrame.layers.count - 1
+    recordUndoableEdit("Delete layer") {
+      document.frames[currentFrameIndex].layers.remove(at: currentLayerIndex)
+      if currentLayerIndex >= currentFrame.layers.count {
+        currentLayerIndex = currentFrame.layers.count - 1
+      }
     }
-    markDirty("Deleted layer")
+    announce("Deleted layer")
   }
 
   // MARK: - Clipboard
@@ -384,8 +482,10 @@ public final class EditorViewModel {
       announce("Clipboard empty")
       return
     }
-    mutateCurrentLayer { buffer in
-      ToolOps.paste(onto: buffer, clipboard: clipboard, at: cursor)
+    recordUndoableEdit("Paste") {
+      mutateCurrentLayer { buffer in
+        ToolOps.paste(onto: buffer, clipboard: clipboard, at: cursor)
+      }
     }
     announce("Pasted at \(cursor.x),\(cursor.y)")
   }
@@ -393,20 +493,22 @@ public final class EditorViewModel {
   // MARK: - Canvas resize
 
   public func resizeCanvas(to size: GIFEditorCore.PixelSize) {
-    document.size = size
-    for frameIndex in document.frames.indices {
-      for layerIndex in document.frames[frameIndex].layers.indices {
-        var layer = document.frames[frameIndex].layers[layerIndex]
-        layer.pixels = layer.pixels.resized(to: size)
-        document.frames[frameIndex].layers[layerIndex] = layer
+    recordUndoableEdit("Resize canvas") {
+      document.size = size
+      for frameIndex in document.frames.indices {
+        for layerIndex in document.frames[frameIndex].layers.indices {
+          var layer = document.frames[frameIndex].layers[layerIndex]
+          layer.pixels = layer.pixels.resized(to: size)
+          document.frames[frameIndex].layers[layerIndex] = layer
+        }
       }
+      cursor = GIFEditorCore.PixelPoint(
+        x: min(cursor.x, size.width - 1),
+        y: min(cursor.y, size.height - 1)
+      )
+      selection = nil
     }
-    cursor = GIFEditorCore.PixelPoint(
-      x: min(cursor.x, size.width - 1),
-      y: min(cursor.y, size.height - 1)
-    )
-    selection = nil
-    markDirty("Canvas resized to \(size.width)×\(size.height)")
+    announce("Canvas resized to \(size.width)×\(size.height)")
   }
 
   // MARK: - Save / load
@@ -420,7 +522,7 @@ public final class EditorViewModel {
       let bytes = try GIFEncoder.encode(document: document)
       try Data(bytes).write(to: target, options: .atomic)
       document.path = target
-      isDirty = false
+      cleanHistoryGeneration = currentHistoryGeneration
       announce("Saved to \(target.path)")
     } catch {
       announce("Save failed: \(error)")
@@ -437,13 +539,68 @@ public final class EditorViewModel {
 
   // MARK: - Helpers
 
+  private func recordUndoableEdit(_ label: String, _ edit: () -> Void) {
+    if activeUndoGroup != nil {
+      edit()
+      return
+    }
+
+    let before = snapshotState()
+    edit()
+    commitUndoStep(from: before, label: label)
+  }
+
+  private func beginUndoGroup(_ label: String) {
+    guard activeUndoGroup == nil else { return }
+    activeUndoGroup = ActiveUndoGroup(snapshot: snapshotState(), label: label)
+  }
+
+  private func finishUndoGroup(label: String? = nil) {
+    guard let group = activeUndoGroup else { return }
+    activeUndoGroup = nil
+    commitUndoStep(from: group.snapshot, label: label ?? group.label)
+  }
+
+  private func commitUndoStep(from before: EditorSnapshot, label: String) {
+    guard document != before.document else { return }
+
+    undoStack.append(HistoryEntry(snapshot: before, label: label))
+    if undoStack.count > historyLimit {
+      undoStack.removeFirst(undoStack.count - historyLimit)
+    }
+    redoStack.removeAll()
+    currentHistoryGeneration = nextHistoryGeneration
+    nextHistoryGeneration += 1
+  }
+
+  private func snapshotState() -> EditorSnapshot {
+    EditorSnapshot(
+      document: document,
+      currentFrameIndex: currentFrameIndex,
+      currentLayerIndex: currentLayerIndex,
+      cursor: cursor,
+      selection: selection,
+      historyGeneration: currentHistoryGeneration
+    )
+  }
+
+  private func restore(_ snapshot: EditorSnapshot) {
+    document = snapshot.document
+    currentFrameIndex = snapshot.currentFrameIndex
+    currentLayerIndex = snapshot.currentLayerIndex
+    cursor = snapshot.cursor
+    selection = snapshot.selection
+    pendingMarqueeAnchor = nil
+    pendingGradientAnchor = nil
+    currentHistoryGeneration = snapshot.historyGeneration
+  }
+
   /// Replaces the current layer's pixel buffer with the result of
-  /// `transform`. Marks the document dirty.
+  /// `transform`. Callers own history grouping.
   private func mutateCurrentLayer(_ transform: (PixelBuffer) -> PixelBuffer) {
     var layer = currentLayer
     layer.pixels = transform(layer.pixels)
     document.frames[currentFrameIndex].layers[currentLayerIndex] = layer
-    isDirty = true
   }
 
   private func strokeCurrentLayer(
@@ -454,11 +611,6 @@ public final class EditorViewModel {
     mutateCurrentLayer { buffer in
       ToolOps.line(on: buffer, from: start, to: end, color: color)
     }
-  }
-
-  private func markDirty(_ message: String) {
-    isDirty = true
-    statusMessage = message
   }
 
   private func announce(_ message: String) {

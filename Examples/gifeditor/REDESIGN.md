@@ -186,16 +186,19 @@ HStack(spacing: 2) {
 }
 ```
 
-`Menu` already renders as a focusable label that expands inline when
-activated — clicking the label or pressing Enter on it opens the
-content. Each `Button` inside the menu is independently clickable,
-keyboard-focusable, and scrolls into view.
+`Menu` opens as an overlay floating above the canvas and panels and
+**does not reflow surrounding content** when expanded — the canvas,
+right panel, and timeline stay put while the menu draws on top. This
+behavior is delivered by **Blocker 1** below; today's inline-expanding
+`Menu` is unsuitable for the top menu bar because every open/close
+would reshape the editor.
 
-> **Convention:** `systemHint` (the gray right-aligned suffix in menu
-> rows) shows the keyboard shortcut. Today `Button` doesn't carry that
-> field; either add a `Button.systemHint` overload, or render the
-> button label as `HStack { Text(action); Spacer(); Text(hint).muted }`.
-> The latter requires no framework change.
+Each `Button` inside an open menu is independently clickable,
+keyboard-focusable, and scrolls into view. The `systemHint` form
+shown above (the gray, right-aligned shortcut suffix) is delivered by
+**Blocker 2** below; it renders consistently across menu rows and
+toolbar items without the menu definitions having to hand-compose
+layout.
 
 ### 2. Options bar (row 1)
 
@@ -510,6 +513,11 @@ during the redesign.
 These are **ordered**: each phase compiles, tests pass, and the editor
 remains usable.
 
+> **Phase 0 is the blockers below.** Phase 1 must not begin until all
+> four blockers have landed and shipped on `main` — every later phase
+> assumes overlay-rendering menus, `Button.systemHint`, working
+> `model.undo()` / `model.redo()`, and `model.brushSize`.
+
 ### Phase 1 — Layout skeleton
 
 1. Replace the body's `VStack` with the new 6-region layout.
@@ -551,8 +559,9 @@ clickable in one place.
 ### Phase 4 — Tool options bar
 
 1. Add `ToolOptionsBar` (row 1).
-2. Wire up `brushSize`, `fillRespectsSelection`,
-   `gradientRespectsSelection` model fields.
+2. Wire up `fillRespectsSelection`, `gradientRespectsSelection` model
+   fields. (`model.brushSize` is already in place via Blocker 4 — the
+   options-bar stepper just binds to it.)
 3. Add `Confirm` / `Clear` buttons that mirror `Enter` / `Esc` for
    marquee mode.
 
@@ -569,52 +578,141 @@ clickable in one place.
 
 ---
 
-## Open questions / decisions
+## Blockers — must land before redesign work begins
 
-1. **Undo/redo.** The current model has no undo stack. The Edit menu
-   reserves space for `Undo` / `Redo` — wiring them up is out of scope
-   here but the redesign assumes they will arrive. Suggest a simple
-   "stack of GIFDocument snapshots" given small canvas sizes (<= 64²
-   means <= 4 KB per snapshot).
-   
-   [review: undo/redo will be implemented before beginning redesign.]
-   
-2. **Right-click on swatches.** swift-terminal-ui's pointer model
-   exposes click events; secondary-button events are host-dependent.
-   The spec falls back to `shift+click`, which is reliable. Right-click
-   can be added later as a progressive enhancement.
-   
-   [review: accepted.]
-   
-3. **Color picker beyond the 32 visible slots.** A 4×8 grid covers slot
-   0..31. Loaded GIFs may use any of the 256 slots, currently reachable
-   only with the eyedropper. Suggest: if `palette` has more than 32
-   non-default slots, add a `▼ More…` button at the bottom of the
-   palette panel that opens a 16×16 sheet.
-   
-   [review: accepted]
-   
-4. **Brush size > 1.** Today every stroke is 1 pixel wide. The
-   options-bar stepper anticipates a `ToolOps.line(thickness:)`
-   refactor. For phase 1, render the stepper but disable it (`.disabled(true)`)
-   until the model gains a `brushSize`.
-   
-   [review: we will add a brush size before redesign]
-   
-5. **Status hints become redundant.** The current `toolHint` text
-   ("Space paints", "Space again") was the only on-screen prompt. The
-   new options bar absorbs that role. Decide whether to keep the hint
-   in the bottom status strip too (recommended) or drop it (saves a
-   row).
-   
-   [review: remove unless it provides notable value]
-   
-6. **Menu-item shortcut suffix.** Add `Button.systemHint(_:)` to
-   `swift-terminal-ui` for consistent right-aligned shortcut hints
-   inside menus, or compose by hand with `HStack { … Spacer() … }` per
-   item. The first option is cleaner but is a framework-level change.
-   
-   [review: accepted. we will add this and integrate it with the toolbar before design work.]
+Every blocker below has been promoted from "open question" by review.
+None of them can be deferred into the phased plan: each one is
+load-bearing for the very first phase of the redesign and would leave
+the editor visibly broken if shipped together with the layout changes
+without the underlying capability.
+
+### Blocker 1 — Framework: dropdown menus must render as overlays
+
+`swift-terminal-ui`'s `Menu` today expands **inline** — when activated,
+it pushes every sibling below it downward to make room for its
+contents. In the new layout the top-row menus sit directly above the
+options bar, the canvas, the right panel, and the timeline; an
+inline-expanding menu would reflow all four every time a menu opens
+or closes. That is not acceptable Photoshop-flavored chrome.
+
+**Required:** an overlay/popover rendering for `Menu` such that:
+
+- The menu's content draws **on top of** sibling views without
+  changing the parent layout (the canvas, panels, and timeline keep
+  their cell positions while a menu is open).
+- The overlay is anchored to its label and reflects/clips so it
+  remains on-screen near the right and bottom edges of the terminal.
+- Keyboard navigation (`↓` / `↑` to move, `Enter` to activate, `Esc`
+  to close) and click-outside-to-dismiss both work.
+- The implementation is structurally extensible enough for nested
+  submenus to be added later without another framework change.
+
+**Where:** `Sources/View/Controls/Menu.swift`,
+`Sources/View/Controls/MenuRendering.swift`, plus whatever overlay
+primitive the framework gains for Phase 0.
+
+### Blocker 2 — Framework: `Button.systemHint(_:)` integrated with the toolbar
+
+Every menu item and every toolbar button in the redesign needs a
+muted, right-aligned shortcut hint (`Save · Ctrl+S`,
+`New Layer · Alt+N`). Hand-composing this per row with
+`HStack { Text(label); Spacer(); Text(hint).muted }` would leak layout
+into every menu definition and would diverge in spacing from one menu
+to the next.
+
+**Required:**
+
+- A `Button.systemHint(_:)` view modifier on `Button` that renders the
+  hint right-aligned in the row's available width, styled as muted by
+  the active control chrome.
+- The same modifier renders consistently inside `Toolbar { … }` items,
+  so a single button definition like
+  `Button("Save") { … }.systemHint("Ctrl+S")` works identically in a
+  menu, in a toolbar, and as a free-standing labeled button.
+- A nil/empty hint suppresses the trailing spacer entirely (no ghost
+  whitespace).
+
+**Where:** `Sources/View/Controls/Button.swift`,
+`Sources/View/Controls/ButtonStyles.swift`,
+`Sources/View/ActionScopes/Toolbar.swift`.
+
+### Blocker 3 — App: undo/redo on `EditorViewModel`
+
+The `Edit` menu in the new layout reserves `Undo` and `Redo` items
+with `Ctrl+Z` / `Ctrl+Y` shortcut hints. Shipping the menu without a
+working undo stack would expose two permanently-disabled rows from
+day one — and undo is *the* feature users will reach for the first
+time they mis-paint a pixel.
+
+**Required:**
+
+- A snapshot-based undo stack on `EditorViewModel`. Canvas sizes are
+  bounded (`<= 64² = 4 KB per snapshot`), so a full-document snapshot
+  per edit is cheap; no need for diff-based history.
+- `model.undo()` / `model.redo()` `@MainActor` methods that restore a
+  snapshot in place.
+- `Ctrl+Z` and `Ctrl+Y` keyboard bindings in `EditorKeyBindings`.
+- Snapshots taken at every `mutateCurrentLayer`, frame insert/delete,
+  layer add/delete, paste, and resize — i.e. every place that
+  currently calls `markDirty(_:)` or `isDirty = true`.
+- A configurable history depth (default 64; clamp memory growth on
+  pathologically long sessions).
+
+**Where:** `Sources/GIFEditorUI/EditorViewModel.swift`, plus a new
+`Sources/GIFEditorUI/UndoStack.swift`. New tests in
+`Tests/GIFEditorUITests/UndoStackTests.swift`.
+
+### Blocker 4 — App: variable brush size
+
+The options-bar stepper assumes `model.brushSize` exists and that
+pen/eraser strokes honor it. Without this, the stepper is dead UI on
+day one and the keyboard shortcuts `[` / `]` (decrease / increase
+brush size) — which the redesign treats as standard pixel-editor
+keys — would have nothing to bind to.
+
+**Required:**
+
+- `EditorViewModel.brushSize: Int` clamped to `1...8`, default `1`.
+- `ToolOps.line(…, thickness:)` — pen and eraser strokes apply the
+  thickness to every segment of a drag, not just the stamp endpoints.
+- Keyboard bindings: `[` decrease, `]` increase. Mouse parity:
+  options-bar `⊖` / `⊕` buttons that call the same model methods.
+- The brush stamp respects selection clipping when a selection is
+  active (consistent with the existing fill/gradient behavior).
+
+**Where:** `Sources/GIFEditorCore/Tools.swift`,
+`Sources/GIFEditorUI/EditorViewModel.swift`,
+`Sources/GIFEditorUI/EditorKeyBindings.swift`. New tests in
+`Tests/GIFEditorCoreTests/ToolOpsTests.swift` for thickness and
+selection clipping.
+
+---
+
+## Accepted decisions
+
+(Items reviewed and accepted as-is; **no work required before the
+redesign**. They are recorded here so future readers know they were
+considered explicitly.)
+
+1. **Right-click on swatches.** swift-terminal-ui's pointer model
+   exposes click events reliably; secondary-button events are
+   host-dependent. The spec uses `Shift+click` for "set as secondary,"
+   with right-click added opportunistically on hosts that report it,
+   and a long-press fallback that opens a swatch `Menu` (now overlay,
+   per Blocker 1).
+
+2. **Color picker beyond the 32 visible slots.** A 4×8 grid covers
+   slots 0..31. When a loaded GIF uses palette indices `>= 32`, the
+   palette panel grows a `▼ More…` button at its bottom that opens a
+   16×16 (256-slot) `Menu` overlay. For default 32-slot documents,
+   that button is absent.
+
+3. **Status hints removed from the bottom strip.** The bottom status
+   strip drops the "Space paints" / "Space again" prompts because the
+   new options bar surfaces tool state directly. The strip remains
+   for cursor coordinates, layer counter, render mode, and
+   `model.statusMessage`. The current `toolHint` text in
+   `ToolboxView.swift` is deleted as part of Phase 1.
 
 ---
 
@@ -635,8 +733,9 @@ Expected diffs (UI only — `GIFEditorCore` is untouched):
 - **new** `MenuBarView.swift` — top-row menus.
 - **new** `ToolOptionsBar.swift` — context-sensitive options.
 - **new** `ColorChipButton.swift` — primary/secondary chip control.
-- `EditorViewModel.swift` — add `brushSize`,
-  `fillRespectsSelection`, `gradientRespectsSelection` (phase 4 only).
+- `EditorViewModel.swift` — add `fillRespectsSelection`,
+  `gradientRespectsSelection` (phase 4 only). `brushSize`, `undo`,
+  and `redo` already exist via Blockers 3 and 4.
 - `EditorTool.swift` (in `GIFEditorCore`) — add `iconGlyph` returning
   the new unicode glyph (the existing `glyph` returns letters and is
   used by the help screen; keep both).
@@ -646,8 +745,9 @@ Expected diffs (UI only — `GIFEditorCore` is untouched):
 Tests:
 
 - `CanvasViewTests` — unchanged.
-- `EditorViewModelTests` — add coverage for `brushSize`,
-  `respectSelection` toggles when those land.
+- `EditorViewModelTests` — add coverage for `respectSelection`
+  toggles when those land. (`brushSize` and undo/redo coverage
+  already in place via Blockers 3 and 4.)
 - **new** `MenuBarTests.swift` — assert each menu item invokes the same
   model method the equivalent keyboard binding does (parity test).
 - **new** `ToolOptionsBarTests.swift` — assert that switching tools

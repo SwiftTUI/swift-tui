@@ -143,6 +143,21 @@ extension View where Self: ActionScope & Sendable {
       }
   }
 
+  func applyHistoryBindings(
+    model: EditorViewModel,
+    refresh: @escaping @MainActor @Sendable () -> Void
+  ) -> some View & ActionScope & Sendable {
+    self
+      .keyCommand("Undo", key: .character("z"), modifiers: .ctrl) {
+        model.undo()
+        refresh()
+      }
+      .keyCommand("Redo", key: .character("y"), modifiers: .ctrl) {
+        model.redo()
+        refresh()
+      }
+  }
+
   func applyPaletteBindings(
     model: EditorViewModel,
     refresh: @escaping @MainActor @Sendable () -> Void

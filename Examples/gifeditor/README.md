@@ -101,6 +101,13 @@ cell.
 | `Ctrl+C`          | Copy selection (or whole layer if none)  |
 | `Ctrl+V`          | Paste at cursor                          |
 
+### History
+
+| Shortcut          | Action                                    |
+| ----------------- | ----------------------------------------- |
+| `Ctrl+Z`          | Undo last document edit                   |
+| `Ctrl+Y`          | Redo last undone edit                     |
+
 ### Palette / colors
 
 | Shortcut          | Action                                    |
@@ -126,6 +133,8 @@ cell.
   layer's transparent pixels show the canvas's background color; higher
   layers' transparent pixels show whatever painted below them on the same
   frame.
+* Document edits are captured in a bounded undo / redo stack. Pointer strokes
+  and pointer-applied gradients are grouped as single history entries.
 * The exporter flattens layers per frame, then writes a GIF89a file using a
   single global color table. Each frame is written with `.background`
   disposal so frames fully replace their predecessors — easy to reason about
