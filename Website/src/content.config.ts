@@ -65,6 +65,26 @@ const proposals = defineCollection({
   schema: z.object({}).passthrough(),
 });
 
+// /docs/decisions/**/*.md — architecture decision records.
+// Each ADR carries explicit frontmatter (adr, title, status, date,
+// optional sources). The README.md in that directory documents the
+// convention and is excluded from the collection by an underscore-style
+// filter on the basename.
+const decisions = defineCollection({
+  loader: glob({
+    pattern: "[0-9]*.md",
+    base: "../docs/decisions",
+    generateId: ({ entry }) => entry.replace(/\.md$/, "").toLowerCase(),
+  }),
+  schema: z.object({
+    adr: z.string(),
+    title: z.string(),
+    status: z.enum(["proposed", "accepted", "superseded", "reverted"]),
+    date: z.coerce.date(),
+    sources: z.array(z.string()).optional(),
+  }),
+});
+
 // Site-native essays that genuinely live in the Website (not /docs/).
 // Examples: tutorials, decisions (ADRs), curated component pages.
 const essays = defineCollection({
@@ -92,4 +112,4 @@ const essays = defineCollection({
   }),
 });
 
-export const collections = { docs, plans, proposals, essays };
+export const collections = { docs, plans, proposals, decisions, essays };
