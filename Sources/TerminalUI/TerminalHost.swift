@@ -672,6 +672,8 @@ extension TerminalHosting {
       var hasProbedAppearance = false
       var hasProbedGraphicsCapabilities = false
       var cachedGraphicsCapabilities: TerminalGraphicsCapabilities?
+      var hasProbedSGRPixelsMode = false
+      var cachedSGRPixelsModeSupport: Bool?
     }
 
     private struct PresentationSession {
@@ -733,7 +735,7 @@ extension TerminalHosting {
     private let fallbackSize: CellSize
     private let controller: any TerminalControlling
     private let environment: [String: String]
-    private let pointerPrecisionPolicy: PointerPrecisionPolicy
+    private let mouseInputResolution: TerminalMouseInputResolution
     private let usesTerminalEditOperations: Bool
     private let imageRenderer: TerminalImageRenderer
 
@@ -753,7 +755,7 @@ extension TerminalHosting {
       capabilityProfile: TerminalCapabilityProfile? = nil,
       environment: [String: String]? = nil,
       usesTerminalEditOperations: Bool? = nil,
-      pointerPrecisionPolicy: PointerPrecisionPolicy = .useHostSubCellWhenAvailable
+      mouseInputResolution: TerminalMouseInputResolution = .defaultAutomatic
     ) {
       self.init(
         inputFileDescriptor: inputFileDescriptor,
@@ -763,7 +765,7 @@ extension TerminalHosting {
         capabilityProfile: capabilityProfile,
         environment: environment ?? currentProcessEnvironment(),
         usesTerminalEditOperations: usesTerminalEditOperations,
-        pointerPrecisionPolicy: pointerPrecisionPolicy
+        mouseInputResolution: mouseInputResolution
       )
     }
 
@@ -775,7 +777,7 @@ extension TerminalHosting {
       capabilityProfile: TerminalCapabilityProfile? = nil,
       environment: [String: String]? = nil,
       usesTerminalEditOperations: Bool? = nil,
-      pointerPrecisionPolicy: PointerPrecisionPolicy = .useHostSubCellWhenAvailable
+      mouseInputResolution: TerminalMouseInputResolution = .defaultAutomatic
     ) {
       let environment = environment ?? currentProcessEnvironment()
       self.inputFileDescriptor = inputFileDescriptor
@@ -783,7 +785,7 @@ extension TerminalHosting {
       self.fallbackSize = fallbackSize
       self.controller = controller
       self.environment = environment
-      self.pointerPrecisionPolicy = pointerPrecisionPolicy
+      self.mouseInputResolution = mouseInputResolution
       self.usesTerminalEditOperations =
         usesTerminalEditOperations ?? controller.isATTY(outputFileDescriptor)
       imageRenderer = .init(repository: sharedImageAssetRepository)
@@ -796,6 +798,48 @@ extension TerminalHosting {
       self.appearance = TerminalAppearance.detect(
         environment: environment,
         capabilityProfile: self.capabilityProfile
+      )
+    }
+
+    public convenience init(
+      inputFileDescriptor: Int32 = 0,
+      outputFileDescriptor: Int32 = 1,
+      fallbackSize: CellSize = .init(width: 80, height: 24),
+      capabilityProfile: TerminalCapabilityProfile? = nil,
+      environment: [String: String]? = nil,
+      usesTerminalEditOperations: Bool? = nil,
+      pointerPrecisionPolicy: PointerPrecisionPolicy
+    ) {
+      self.init(
+        inputFileDescriptor: inputFileDescriptor,
+        outputFileDescriptor: outputFileDescriptor,
+        fallbackSize: fallbackSize,
+        capabilityProfile: capabilityProfile,
+        environment: environment,
+        usesTerminalEditOperations: usesTerminalEditOperations,
+        mouseInputResolution: pointerPrecisionPolicy.terminalMouseInputResolution
+      )
+    }
+
+    package convenience init(
+      inputFileDescriptor: Int32,
+      outputFileDescriptor: Int32,
+      fallbackSize: CellSize,
+      controller: any TerminalControlling,
+      capabilityProfile: TerminalCapabilityProfile? = nil,
+      environment: [String: String]? = nil,
+      usesTerminalEditOperations: Bool? = nil,
+      pointerPrecisionPolicy: PointerPrecisionPolicy
+    ) {
+      self.init(
+        inputFileDescriptor: inputFileDescriptor,
+        outputFileDescriptor: outputFileDescriptor,
+        fallbackSize: fallbackSize,
+        controller: controller,
+        capabilityProfile: capabilityProfile,
+        environment: environment,
+        usesTerminalEditOperations: usesTerminalEditOperations,
+        mouseInputResolution: pointerPrecisionPolicy.terminalMouseInputResolution
       )
     }
 
@@ -862,7 +906,7 @@ extension TerminalHosting {
       try write(clearScreenSequence())
       try write(cursorSequence(to: .zero))
       try write(hideCursorSequence())
-      if capabilityProfile.supportsMouseReporting {
+      if activeMouseCoordinateMode.reportsMouseInput {
         try write(enableMouseReportingSequence())
       }
       try write("\u{001B}[?2004h")  // enable bracketed paste
@@ -906,7 +950,7 @@ extension TerminalHosting {
 
       try writeSynchronously(clearScreenSequence())
       try writeSynchronously(cursorSequence(to: .zero))
-      if capabilityProfile.supportsMouseReporting {
+      if mouseCoordinateModeToDisable.reportsMouseInput {
         try writeSynchronously(
           disableMouseReportingSequence(
             for: mouseCoordinateModeToDisable,
@@ -944,7 +988,11 @@ extension TerminalHosting {
     }
 
     public func setPointerHoverEnabled(_ enabled: Bool) throws {
-      guard capabilityProfile.supportsMouseReporting else {
+      let reportsMouseInput =
+        rawModeEnabled
+        ? activeMouseCoordinateMode.reportsMouseInput
+        : initialConfigurationAllowsMouseReporting
+      guard reportsMouseInput else {
         activePointerHoverEnabled = false
         return
       }
@@ -963,6 +1011,16 @@ extension TerminalHosting {
       }
       activePointerHoverEnabled = enabled
       refreshProcessExitCleanupRegistration()
+    }
+
+    private var initialConfigurationAllowsMouseReporting: Bool {
+      guard capabilityProfile.supportsMouseReporting else {
+        return false
+      }
+      if case .preResolved(.disabled) = mouseInputResolution {
+        return false
+      }
+      return true
     }
 
     @discardableResult
@@ -1253,17 +1311,66 @@ extension TerminalHosting {
 
     private func resolvedMouseCoordinateMode() -> MouseCoordinateMode {
       guard capabilityProfile.supportsMouseReporting else {
+        return .disabled
+      }
+
+      switch mouseInputResolution {
+      case .preResolved(let mode):
+        return mouseCoordinateMode(for: mode)
+      case .automatic(let policy):
+        return automaticMouseCoordinateMode(policy: policy)
+      }
+    }
+
+    private func mouseCoordinateMode(
+      for mode: TerminalMouseInputMode
+    ) -> MouseCoordinateMode {
+      switch mode {
+      case .disabled:
+        return .disabled
+      case .cell:
+        return .cells
+      case .sgrPixels(let metrics):
+        return .pixels(metrics: metrics, source: .terminalPixels)
+      }
+    }
+
+    private func automaticMouseCoordinateMode(
+      policy: TerminalMouseInputTrustPolicy
+    ) -> MouseCoordinateMode {
+      guard let metrics = trustedCellPixelMetrics() else {
         return .cells
       }
 
-      if pointerPrecisionPolicy != .forceTerminalPixels, isInsideTerminalMultiplexer {
-        return .cells
+      if policy == .assumeWhenCellMetricsKnown {
+        return .pixels(metrics: metrics, source: .terminalPixels)
       }
 
-      return .resolving(
-        policy: pointerPrecisionPolicy,
-        metrics: trustedCellPixelMetrics()
-      )
+      if let liveSupport = probeSGRPixelsModeSupport() {
+        return liveSupport ? .pixels(metrics: metrics, source: .terminalPixels) : .cells
+      }
+
+      switch policy {
+      case .liveProbeOnly:
+        return .cells
+      case .liveProbeOrDocumentedSupport:
+        guard documentedMatrixSupportsSGRPixels(includingKnownCompatible: false) else {
+          return .cells
+        }
+        return .pixels(metrics: metrics, source: .terminalPixels)
+      case .liveProbeOrKnownTerminalIdentity:
+        guard documentedMatrixSupportsSGRPixels(includingKnownCompatible: true) else {
+          return .cells
+        }
+        return .pixels(metrics: metrics, source: .terminalPixels)
+      case .roughTerminalIdentityHeuristics:
+        guard roughTerminalIdentitySupportsSGRPixels else {
+          return .cells
+        }
+        return .pixels(metrics: metrics, source: .terminalPixels)
+      case .assumeWhenCellMetricsKnown:
+        return .pixels(metrics: metrics, source: .terminalPixels)
+      }
     }
 
     private var isInsideTerminalMultiplexer: Bool {
@@ -1278,8 +1385,53 @@ extension TerminalHosting {
 
     private var resolvedPointerInputCapabilities: PointerInputCapabilities {
       var capabilities = activeMouseCoordinateMode.pointerInputCapabilities
-      capabilities.supportsHover = capabilityProfile.supportsMouseReporting
+      capabilities.supportsHover = activeMouseCoordinateMode.reportsMouseInput
       return capabilities
+    }
+
+    private func documentedMatrixSupportsSGRPixels(
+      includingKnownCompatible: Bool
+    ) -> Bool {
+      guard !isInsideTerminalMultiplexer else {
+        return false
+      }
+      let matrix =
+        includingKnownCompatible
+        ? TerminalMouseInputCompatibilityMatrix.knownCompatible
+        : TerminalMouseInputCompatibilityMatrix.documentedSupport
+      return matrix.supportingSGRPixels(
+        environment: environment,
+        includingKnownCompatible: includingKnownCompatible
+      ) != nil
+    }
+
+    private var roughTerminalIdentitySupportsSGRPixels: Bool {
+      if documentedMatrixSupportsSGRPixels(includingKnownCompatible: true) {
+        return true
+      }
+      guard !isInsideTerminalMultiplexer else {
+        return false
+      }
+      let identityValues = [
+        environment["TERM"],
+        environment["TERM_PROGRAM"],
+        environment["LC_TERMINAL"],
+        environment["COLORTERM"],
+      ]
+      .compactMap { $0?.lowercased() }
+      let roughMarkers = [
+        "ghostty",
+        "alacritty",
+        "rio",
+        "contour",
+        "xterm.js",
+        "xtermjs",
+      ]
+      return identityValues.contains { identity in
+        roughMarkers.contains { marker in
+          identity.contains(marker)
+        }
+      }
     }
 
     private func trustedCellPixelMetrics() -> CellPixelMetrics? {
@@ -1291,6 +1443,29 @@ extension TerminalHosting {
         height: max(1, cellPixelSize.height),
         source: .reported
       )
+    }
+
+    private func probeSGRPixelsModeSupport() -> Bool? {
+      if capabilityProbe.hasProbedSGRPixelsMode {
+        return capabilityProbe.cachedSGRPixelsModeSupport
+      }
+      capabilityProbe.hasProbedSGRPixelsMode = true
+
+      guard controller.isATTY(outputFileDescriptor) else {
+        capabilityProbe.cachedSGRPixelsModeSupport = nil
+        return nil
+      }
+
+      let response =
+        (try? performInputCapabilityQuery(.decPrivateMode(mode: 1016))) ?? []
+      guard let state = parseDECPrivateModeReport(from: response, mode: 1016) else {
+        capabilityProbe.cachedSGRPixelsModeSupport = nil
+        return nil
+      }
+
+      let supported = state.canEnable
+      capabilityProbe.cachedSGRPixelsModeSupport = supported
+      return supported
     }
 
     private func probeGraphicsCapabilitiesIfNeeded() -> TerminalGraphicsCapabilities {
@@ -1373,6 +1548,35 @@ extension TerminalHosting {
 
       capabilityProbe.cachedGraphicsCapabilities = capabilities
       return capabilities
+    }
+
+    private func performInputCapabilityQuery(
+      _ query: TerminalInputCapabilityQuery
+    ) throws -> [UInt8] {
+      try writeSynchronously(query.request)
+      var buffer: [UInt8] = []
+
+      for iteration in 0..<4 {
+        let timeoutMilliseconds = iteration == 0 ? 40 : 20
+        let bytes = try controller.read(
+          from: inputFileDescriptor,
+          maxBytes: 512,
+          timeoutMilliseconds: timeoutMilliseconds
+        )
+        if bytes.isEmpty {
+          break
+        }
+        buffer.append(contentsOf: bytes)
+
+        switch query {
+        case .decPrivateMode(let mode):
+          if parseDECPrivateModeReport(from: buffer, mode: mode) != nil {
+            return buffer
+          }
+        }
+      }
+
+      return buffer
     }
 
     private func performGraphicsQuery(
@@ -1500,10 +1704,11 @@ extension TerminalHosting {
     }
 
     private func enableMouseReportingSequence(hoverEnabled: Bool) -> String {
-      var sequence = "\u{001B}[?1002h\u{001B}[?1006h"
+      var sequence = "\u{001B}[?1006h"
       if activeMouseCoordinateMode.usesTerminalPixels {
         sequence += "\u{001B}[?1016h"
       }
+      sequence += "\u{001B}[?1002h"
       if hoverEnabled {
         sequence += "\u{001B}[?1003h"
       }
@@ -1515,17 +1720,18 @@ extension TerminalHosting {
       hoverEnabled: Bool
     ) -> String {
       var sequence = hoverEnabled ? "\u{001B}[?1003l" : ""
+      sequence += "\u{001B}[?1002l"
       if mouseCoordinateMode.usesTerminalPixels {
-        sequence += "\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"
+        sequence += "\u{001B}[?1016l\u{001B}[?1006l"
       } else {
-        sequence += "\u{001B}[?1002l\u{001B}[?1006l"
+        sequence += "\u{001B}[?1006l"
       }
       return sequence
     }
 
     private func processExitResetSequence() -> String {
       var reset = ""
-      if capabilityProfile.supportsMouseReporting {
+      if activeMouseCoordinateMode.reportsMouseInput {
         reset += disableMouseReportingSequence(
           for: activeMouseCoordinateMode,
           hoverEnabled: activePointerHoverEnabled
@@ -1756,7 +1962,7 @@ extension TerminalHosting {
     }
 
     private func enableMouseReportingSequence() -> String {
-      "\u{001B}[?1002h\u{001B}[?1006h"
+      "\u{001B}[?1006h\u{001B}[?1002h"
     }
 
     private func disableMouseReportingSequence() -> String {

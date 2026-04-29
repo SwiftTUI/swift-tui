@@ -77,6 +77,34 @@ enum TerminalGraphicsQuery {
   }
 }
 
+enum TerminalInputCapabilityQuery {
+  case decPrivateMode(mode: Int)
+
+  var request: String {
+    switch self {
+    case .decPrivateMode(let mode):
+      return "\u{001B}[?\(mode)$p"
+    }
+  }
+}
+
+enum DECPrivateModeState: Int, Equatable, Sendable {
+  case notRecognized = 0
+  case set = 1
+  case reset = 2
+  case permanentlySet = 3
+  case permanentlyReset = 4
+
+  var canEnable: Bool {
+    switch self {
+    case .set, .reset, .permanentlySet:
+      return true
+    case .notRecognized, .permanentlyReset:
+      return false
+    }
+  }
+}
+
 func terminalStrictUTF8String(
   from bytes: [UInt8]
 ) -> String? {
@@ -173,4 +201,32 @@ func parseWindowSizeResponse(
   }
 
   return .init(width: values[1], height: values[0])
+}
+
+func parseDECPrivateModeReport(
+  from bytes: [UInt8],
+  mode: Int
+) -> DECPrivateModeState? {
+  guard let response = terminalStrictUTF8String(from: bytes) else {
+    return nil
+  }
+  let prefix = "\u{001B}[?\(mode);"
+  guard let range = response.firstLiteralRange(of: prefix) else {
+    return nil
+  }
+
+  let suffix = response[range.upperBound...]
+  guard let dollarIndex = suffix.firstIndex(of: "$") else {
+    return nil
+  }
+  let yIndex = suffix.index(after: dollarIndex)
+  guard yIndex < suffix.endIndex, suffix[yIndex] == "y" else {
+    return nil
+  }
+
+  let stateValue = String(suffix[..<dollarIndex])
+  guard let rawValue = Int(stateValue) else {
+    return nil
+  }
+  return DECPrivateModeState(rawValue: rawValue)
 }

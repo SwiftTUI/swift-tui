@@ -14,10 +14,11 @@ import Testing
 @MainActor
 @Suite
 struct TerminalGraphicsProtocolTests {
-  @Test("terminal host enables SGR-Pixels only when terminal pixels are forced")
-  func terminalHostEnablesSGRPixelsOnlyWhenForced() throws {
+  @Test("terminal host enables SGR-Pixels after live mode-query support")
+  func terminalHostEnablesSGRPixelsAfterLiveModeQuerySupport() throws {
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
+      readResponses: [Array("\u{001B}[?1016;2$y".utf8)],
       cellPixelSize: .init(width: 8, height: 16)
     )
     let host = TerminalHost(
@@ -26,7 +27,7 @@ struct TerminalGraphicsProtocolTests {
       fallbackSize: .init(width: 80, height: 24),
       controller: controller,
       capabilityProfile: .trueColor,
-      pointerPrecisionPolicy: .forceTerminalPixels
+      environment: ["TERM": "unknown"]
     )
 
     try host.enableRawMode()
@@ -42,12 +43,13 @@ struct TerminalGraphicsProtocolTests {
     try host.disableRawMode()
 
     let output = controller.writes.joined()
-    #expect(output.contains("\u{001B}[?1002h\u{001B}[?1006h\u{001B}[?1016h"))
-    #expect(output.contains("\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"))
+    #expect(output.contains("\u{001B}[?1016$p"))
+    #expect(output.contains("\u{001B}[?1006h\u{001B}[?1016h\u{001B}[?1002h"))
+    #expect(output.contains("\u{001B}[?1002l\u{001B}[?1016l\u{001B}[?1006l"))
   }
 
-  @Test("terminal host keeps default sub-cell policy cell-only without support proof")
-  func terminalHostDefaultSubCellPolicyStaysCellOnlyWithoutSupportProof() throws {
+  @Test("terminal host uses documented matrix when live mode query is inconclusive")
+  func terminalHostUsesDocumentedMatrixWhenLiveModeQueryIsInconclusive() throws {
     let controller = GraphicsProtocolMockTerminalController(
       isTTY: true,
       cellPixelSize: .init(width: 8, height: 16)
@@ -57,7 +59,39 @@ struct TerminalGraphicsProtocolTests {
       outputFileDescriptor: 1,
       fallbackSize: .init(width: 80, height: 24),
       controller: controller,
-      capabilityProfile: .trueColor
+      capabilityProfile: .trueColor,
+      environment: ["TERM": "xterm-kitty"]
+    )
+
+    try host.enableRawMode()
+    #expect(
+      host.pointerInputCapabilities.precision
+        == .subCell(
+          source: .terminalPixels,
+          metrics: CellPixelMetrics(width: 8, height: 16, source: .reported)
+        )
+    )
+    try host.disableRawMode()
+
+    let output = controller.writes.joined()
+    #expect(output.contains("\u{001B}[?1016$p"))
+    #expect(output.contains("\u{001B}[?1016h"))
+  }
+
+  @Test("live-probe-only policy does not use documented matrix fallback")
+  func liveProbeOnlyPolicyDoesNotUseDocumentedMatrixFallback() throws {
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor,
+      environment: ["TERM": "xterm-kitty"],
+      mouseInputResolution: .automatic(.liveProbeOnly)
     )
 
     try host.enableRawMode()
@@ -65,7 +99,32 @@ struct TerminalGraphicsProtocolTests {
     #expect(host.pointerInputCapabilities.supportsHover)
     try host.disableRawMode()
 
-    #expect(!controller.writes.joined().contains("1016"))
+    let output = controller.writes.joined()
+    #expect(output.contains("\u{001B}[?1016$p"))
+    #expect(!output.contains("\u{001B}[?1016h"))
+  }
+
+  @Test("unsupported live mode-query response suppresses matrix fallback")
+  func unsupportedLiveModeQueryResponseSuppressesMatrixFallback() throws {
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      readResponses: [Array("\u{001B}[?1016;0$y".utf8)],
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor,
+      environment: ["TERM": "xterm-kitty"]
+    )
+
+    try host.enableRawMode()
+    #expect(host.pointerInputCapabilities.precision == .cell)
+    try host.disableRawMode()
+
+    #expect(!controller.writes.joined().contains("\u{001B}[?1016h"))
   }
 
   @Test("terminal host cell-only policy never emits SGR-Pixels")
@@ -80,7 +139,8 @@ struct TerminalGraphicsProtocolTests {
       fallbackSize: .init(width: 80, height: 24),
       controller: controller,
       capabilityProfile: .trueColor,
-      pointerPrecisionPolicy: .cellOnly
+      environment: ["TERM": "xterm-kitty"],
+      mouseInputResolution: .preResolved(.cell)
     )
 
     try host.enableRawMode()
@@ -88,7 +148,91 @@ struct TerminalGraphicsProtocolTests {
     #expect(host.pointerInputCapabilities.supportsHover)
     try host.disableRawMode()
 
-    #expect(!controller.writes.joined().contains("1016"))
+    let output = controller.writes.joined()
+    #expect(!output.contains("\u{001B}[?1016$p"))
+    #expect(!output.contains("\u{001B}[?1016h"))
+  }
+
+  @Test("terminal host pre-resolved SGR-Pixels skips probing and reported metrics")
+  func terminalHostPreResolvedSGRPixelsSkipsProbingAndReportedMetrics() throws {
+    let metrics = CellPixelMetrics(width: 9, height: 18, source: .reported)
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      cellPixelSize: nil
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor,
+      environment: ["TERM": "unknown"],
+      mouseInputResolution: .preResolved(.sgrPixels(metrics: metrics))
+    )
+
+    try host.enableRawMode()
+    #expect(
+      host.pointerInputCapabilities.precision
+        == .subCell(source: .terminalPixels, metrics: metrics)
+    )
+    try host.disableRawMode()
+
+    let output = controller.writes.joined()
+    #expect(!output.contains("\u{001B}[?1016$p"))
+    #expect(output.contains("\u{001B}[?1016h"))
+  }
+
+  @Test("terminal host pre-resolved disabled mouse input emits no mouse modes")
+  func terminalHostPreResolvedDisabledMouseInputEmitsNoMouseModes() throws {
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor,
+      environment: ["TERM": "xterm-kitty"],
+      mouseInputResolution: .preResolved(.disabled)
+    )
+
+    try host.setPointerHoverEnabled(true)
+    try host.enableRawMode()
+    #expect(host.pointerInputCapabilities.precision == .cell)
+    #expect(!host.pointerInputCapabilities.supportsHover)
+    try host.disableRawMode()
+
+    let output = controller.writes.joined()
+    #expect(!output.contains("\u{001B}[?1016$p"))
+    #expect(!output.contains("\u{001B}[?1006h"))
+    #expect(!output.contains("\u{001B}[?1002h"))
+  }
+
+  @Test("documented matrix fallback is suppressed inside terminal multiplexers")
+  func documentedMatrixFallbackIsSuppressedInsideTerminalMultiplexers() throws {
+    let controller = GraphicsProtocolMockTerminalController(
+      isTTY: true,
+      cellPixelSize: .init(width: 8, height: 16)
+    )
+    let host = TerminalHost(
+      inputFileDescriptor: 0,
+      outputFileDescriptor: 1,
+      fallbackSize: .init(width: 80, height: 24),
+      controller: controller,
+      capabilityProfile: .trueColor,
+      environment: [
+        "TERM": "xterm-kitty",
+        "TMUX": "/tmp/tmux-501/default,1,0",
+      ]
+    )
+
+    try host.enableRawMode()
+    #expect(host.pointerInputCapabilities.precision == .cell)
+    try host.disableRawMode()
+
+    #expect(!controller.writes.joined().contains("\u{001B}[?1016h"))
   }
 
   @Test("terminal host enables all-motion mode only when hover is active")
@@ -119,7 +263,7 @@ struct TerminalGraphicsProtocolTests {
     try hoverHost.disableRawMode()
 
     let output = hoverController.writes.joined()
-    #expect(output.contains("\u{001B}[?1002h\u{001B}[?1006h\u{001B}[?1003h"))
+    #expect(output.contains("\u{001B}[?1006h\u{001B}[?1002h\u{001B}[?1003h"))
     #expect(output.contains("\u{001B}[?1003l\u{001B}[?1002l\u{001B}[?1006l"))
   }
 
@@ -140,8 +284,8 @@ struct TerminalGraphicsProtocolTests {
     try host.disableRawMode()
 
     let output = controller.writes.joined()
-    #expect(output.contains("\u{001B}[?1002h\u{001B}[?1006h\u{001B}[?1003h"))
-    #expect(output.contains("\u{001B}[?1003l\u{001B}[?1002h\u{001B}[?1006h"))
+    #expect(output.contains("\u{001B}[?1006h\u{001B}[?1002h\u{001B}[?1003h"))
+    #expect(output.contains("\u{001B}[?1003l\u{001B}[?1006h\u{001B}[?1002h"))
   }
 
   @Test("terminal host force-pixel policy overrides tmux safety default")

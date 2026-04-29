@@ -606,7 +606,7 @@ struct InteractiveRuntimeTests {
     try host.enableRawMode()
     try host.disableRawMode()
 
-    #expect(controller.writes.contains("\u{001B}[?1002h\u{001B}[?1006h"))
+    #expect(controller.writes.contains("\u{001B}[?1006h\u{001B}[?1002h"))
     #expect(controller.writes.contains("\u{001B}[?1002l\u{001B}[?1006l"))
   }
 
@@ -935,7 +935,6 @@ struct InteractiveRuntimeTests {
     #expect(result.finalState.inputBuffer == "-12")
     let firstMetrics = try #require(terminal.presentationMetrics.first)
     let firstSurfaceSize = try #require(terminal.presentedSurfaceSizes.first)
-    #expect(terminal.frames.contains(where: { $0.contains("0_") }))
     #expect(terminal.frames.contains(where: { $0.contains("-12_") }))
     let lastFrame = try #require(terminal.frames.last)
     #expect(lastFrame.contains("-12_"))

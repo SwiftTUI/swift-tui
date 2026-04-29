@@ -162,10 +162,11 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
       if state.withLock(\.pointerHoverEnabled) {
         teardown += "\u{001B}[?1003l"
       }
+      teardown += "\u{001B}[?1002l"
       if usesTerminalPixelMouseReporting {
-        teardown += "\u{001B}[?1016l\u{001B}[?1006l\u{001B}[?1002l"
+        teardown += "\u{001B}[?1016l\u{001B}[?1006l"
       } else {
-        teardown += "\u{001B}[?1002l\u{001B}[?1006l"
+        teardown += "\u{001B}[?1006l"
       }
     }
     teardown += "\u{001B}[?2004l"  // disable bracketed paste
@@ -202,10 +203,11 @@ package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalH
   }
 
   private func enableMouseReportingSequence(hoverEnabled: Bool) -> String {
-    var sequence = "\u{001B}[?1002h\u{001B}[?1006h"
+    var sequence = "\u{001B}[?1006h"
     if usesTerminalPixelMouseReporting {
       sequence += "\u{001B}[?1016h"
     }
+    sequence += "\u{001B}[?1002h"
     if hoverEnabled {
       sequence += "\u{001B}[?1003h"
     }
