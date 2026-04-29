@@ -686,9 +686,10 @@ git commit -m "feat(core): change default StrokeStyle to outerHalfBlock; drop au
 Flips the framework's canonical border/stroke default from
 BorderSet.single (full-cell box-drawing glyphs) to
 BorderSet.outerHalfBlock (half-block glyphs with consistent
-corners). All implicit-default container chrome — Shape.stroke,
-chromeStrokeBorder, Button/Picker/Menu/TextField/GroupBox frames,
-Divider, etc. — now draws with the half-block palette.
+corners). Implicit-default container chrome backed by `StrokeStyle()`
+— Shape.stroke, chromeStrokeBorder, Button/Picker/Menu/TextField/GroupBox
+frames, etc. — now draws with the half-block palette. `Divider()` is now
+an explicit single-line exception.
 
 Also deletes the rasterizer's resolvedStrokeBorderSet helper that
 silently upgraded BorderSet.single to .rounded against
