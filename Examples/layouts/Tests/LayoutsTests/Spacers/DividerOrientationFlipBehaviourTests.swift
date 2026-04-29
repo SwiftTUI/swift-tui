@@ -49,7 +49,7 @@ struct DividerOrientationFlipBehaviourTests {
     // Find a row strictly between V-1 and V-2 that contains `─`.
     var foundHorizontalRuleRow: Int? = nil
     for row in (v1Row + 1)..<v2Row {
-      if let line = raster.row(at: row), line.contains("─") {
+      if let line = raster.row(at: row), line.contains("▀") {
         foundHorizontalRuleRow = row
         break
       }
@@ -58,7 +58,7 @@ struct DividerOrientationFlipBehaviourTests {
     #expect(
       foundHorizontalRuleRow != nil,
       """
-      expected a horizontal-rule row (containing `─`) between V-1 \
+      expected a horizontal-rule row (containing `▀`) between V-1 \
       (row \(v1Row)) and V-2 (row \(v2Row))
       \(joined)
       """
@@ -98,7 +98,7 @@ struct DividerOrientationFlipBehaviourTests {
     let searchEnd = colH2  // exclusive
     var foundVerticalRuleCol: Int? = nil
     if searchStart < searchEnd {
-      for col in searchStart..<searchEnd where chars[col] == "│" {
+      for col in searchStart..<searchEnd where chars[col] == "▌" {
         foundVerticalRuleCol = col
         break
       }
@@ -107,7 +107,7 @@ struct DividerOrientationFlipBehaviourTests {
     #expect(
       foundVerticalRuleCol != nil,
       """
-      expected a vertical-rule glyph (`│`) between H-1 (col \(colH1)) \
+      expected a vertical-rule glyph (`▌`) between H-1 (col \(colH1)) \
       and H-2 (col \(colH2)) on the H-row
       row: '\(line)'
       """
