@@ -16,7 +16,7 @@ struct GestureIntegrationTests {
     let model = Model()
 
     struct Pin: View {
-      @GestureState var dragOffset = Size(width: 0, height: 0)
+      @GestureState var dragOffset = Vector(dx: 0, dy: 0)
       let model: Model
 
       var body: some View {
@@ -29,8 +29,8 @@ struct GestureIntegrationTests {
               }
               .onEnded { value in
                 model.position = Point(
-                  x: model.position.x + value.translation.width,
-                  y: model.position.y + value.translation.height
+                  x: model.position.x + value.translation.dx,
+                  y: model.position.y + value.translation.dy
                 )
               }
           )

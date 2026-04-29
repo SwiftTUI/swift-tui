@@ -26,7 +26,7 @@ public struct CoordinateSpace: Equatable, Sendable {
     CoordinateSpace(kind: .named(String(describing: name)))
   }
 
-  /// Resolves a terminal-global cell point into this coordinate space,
+  /// Resolves a terminal-global continuous point into this coordinate space,
   /// given the hit-tested target rect.
   public func resolve(
     terminalPoint: Point,

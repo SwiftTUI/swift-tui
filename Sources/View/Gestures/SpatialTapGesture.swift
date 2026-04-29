@@ -10,7 +10,15 @@ public struct SpatialTapGesture: Gesture {
 
   public struct Value: Equatable, Sendable {
     public var location: Point
-    public init(location: Point) { self.location = location }
+    public var pointer: PointerLocation
+
+    public init(
+      location: Point,
+      pointer: PointerLocation
+    ) {
+      self.location = location
+      self.pointer = pointer
+    }
   }
 
   public let count: Int
@@ -51,6 +59,7 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
   private var completedTaps = 0
   private var pressStart: Point?
   private var lastTerminalLocation: Point?
+  private var lastPointer: PointerLocation?
   private var lastTargetRect: CellRect = CellRect(origin: .zero, size: .zero)
 
   init(count: Int, coordinateSpace: CoordinateSpace) {
@@ -78,6 +87,7 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
         if completedTaps >= requiredCount {
           phase = .ended
           lastTerminalLocation = location
+          lastPointer = event.location
           lastTargetRect = event.targetRect
         }
         return .handled
@@ -101,12 +111,15 @@ final class SpatialTapGestureRecognizer: GestureRecognizer {
   func handleDeadline(at instant: MonotonicInstant) -> Bool { false }
 
   func currentValue() -> SpatialTapGesture.Value? {
-    guard let loc = lastTerminalLocation else { return nil }
+    guard let loc = lastTerminalLocation,
+      let pointer = lastPointer
+    else { return nil }
     return SpatialTapGesture.Value(
       location: coordinateSpace.resolve(
         terminalPoint: loc,
         targetRect: lastTargetRect
-      )
+      ),
+      pointer: pointer
     )
   }
 

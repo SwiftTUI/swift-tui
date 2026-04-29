@@ -3,7 +3,7 @@ import TerminalUI
 struct PhysicsTab: View {
   @State private var toyState = FullScreenToyPhysics.State()
   @State private var didSeedInitialPosition = false
-  @GestureState private var dragOffset = Size.zero
+  @GestureState private var dragOffset = Vector.zero
   @GestureState private var gestureIsActive = false
 
   var body: some View {
@@ -144,13 +144,13 @@ struct FullScreenToyPhysics {
 
   static func displayPosition(
     for state: State,
-    dragOffset: Size,
+    dragOffset: Vector,
     in bounds: CellSize,
     metrics: CellPixelMetrics
   ) -> Point {
     let dragged = FixedPoint(
-      x: state.position.x + Int((dragOffset.width * Double(fixedScale)).rounded()),
-      y: state.position.y + Int((dragOffset.height * Double(fixedScale)).rounded())
+      x: state.position.x + Int((dragOffset.dx * Double(fixedScale)).rounded()),
+      y: state.position.y + Int((dragOffset.dy * Double(fixedScale)).rounded())
     )
     let clampedPoint = clamped(dragged, in: bounds, metrics: metrics)
     return Point(
@@ -161,13 +161,13 @@ struct FullScreenToyPhysics {
 
   static func applyRelease(
     to state: inout State,
-    translation: Size,
-    velocity: Size,
+    translation: Vector,
+    velocity: Vector,
     in bounds: CellSize,
     metrics: CellPixelMetrics
   ) {
-    state.position.x += Int((translation.width * Double(fixedScale)).rounded())
-    state.position.y += Int((translation.height * Double(fixedScale)).rounded())
+    state.position.x += Int((translation.dx * Double(fixedScale)).rounded())
+    state.position.y += Int((translation.dy * Double(fixedScale)).rounded())
     state = clamped(state, in: bounds, metrics: metrics)
     state.velocity = releaseVelocity(from: velocity, metrics: metrics)
   }
@@ -199,13 +199,13 @@ struct FullScreenToyPhysics {
   }
 
   private static func releaseVelocity(
-    from gestureVelocity: Size,
+    from gestureVelocity: Vector,
     metrics: CellPixelMetrics
   ) -> FixedVelocity {
     FixedVelocity(
-      x: fixedVelocityComponent(fromCellsPerSecond: gestureVelocity.width),
+      x: fixedVelocityComponent(fromCellsPerSecond: gestureVelocity.dx),
       y: fixedVelocityComponent(
-        fromCellsPerSecond: gestureVelocity.height / metrics.aspectRatio
+        fromCellsPerSecond: gestureVelocity.dy / metrics.aspectRatio
       )
     )
   }
