@@ -2,10 +2,9 @@ public import Core
 
 /// A gesture that recognizes pointer drag, producing translation and velocity.
 ///
-/// `Value` matches SwiftUI's `DragGesture.Value` shape (reinterpreted for
-/// integer cell coordinates): `time`, `location`, `startLocation`,
-/// `translation`, `velocity`, `predictedEndLocation`,
-/// `predictedEndTranslation`.
+/// `Value` matches SwiftUI's `DragGesture.Value` shape in continuous terminal
+/// cell coordinates and additionally carries pointer provenance plus the
+/// sampled path for the current drag.
 ///
 /// ## Terminal-faithful defaults
 ///
@@ -25,27 +24,31 @@ public struct DragGesture: Gesture {
     public var location: Point
     /// The location when the drag began.
     public var startLocation: Point
-    /// `location - startLocation`.
-    public var translation: Size
+    /// `location - startLocation`, in cells.
+    public var translation: Vector
     /// Instantaneous velocity in cells/second, computed from a
-    /// trailing ~100ms sample window. Integer arithmetic — velocities
-    /// below 1 cell/sec truncate to zero.
-    public var velocity: Size
-    /// `startLocation + predictedEndTranslation`. Integer truncation
-    /// means velocities below 4 cells/sec produce zero contribution.
+    /// trailing ~100ms sample window.
+    public var velocity: Vector
+    /// `startLocation + predictedEndTranslation`.
     public var predictedEndLocation: Point
     /// `translation + velocity/4` — projects ~250ms of current velocity
-    /// forward. Integer truncation as above.
-    public var predictedEndTranslation: Size
+    /// forward.
+    public var predictedEndTranslation: Vector
+    /// Original pointer location and precision for the current sample.
+    public var pointer: PointerLocation
+    /// Ordered pointer samples captured since the drag began.
+    public var path: PointerPath
 
     public init(
       time: MonotonicInstant,
       location: Point,
       startLocation: Point,
-      translation: Size,
-      velocity: Size,
+      translation: Vector,
+      velocity: Vector,
       predictedEndLocation: Point,
-      predictedEndTranslation: Size
+      predictedEndTranslation: Vector,
+      pointer: PointerLocation,
+      path: PointerPath
     ) {
       self.time = time
       self.location = location
@@ -54,14 +57,16 @@ public struct DragGesture: Gesture {
       self.velocity = velocity
       self.predictedEndLocation = predictedEndLocation
       self.predictedEndTranslation = predictedEndTranslation
+      self.pointer = pointer
+      self.path = path
     }
   }
 
-  public let minimumDistance: Int
+  public let minimumDistance: Double
   public let coordinateSpace: CoordinateSpace
 
   public init(
-    minimumDistance: Int = 0,
+    minimumDistance: Double = 0,
     coordinateSpace: CoordinateSpace = .local
   ) {
     self.minimumDistance = minimumDistance
@@ -91,9 +96,10 @@ final class DragGestureRecognizer: GestureRecognizer {
   struct Sample {
     let location: Point
     let time: MonotonicInstant
+    let pointer: PointerLocation
   }
 
-  let minimumDistance: Int
+  let minimumDistance: Double
   let coordinateSpace: CoordinateSpace
   private(set) var phase: GestureRecognizerPhase = .possible
   private var startLocation: Point?
@@ -102,7 +108,7 @@ final class DragGestureRecognizer: GestureRecognizer {
   private var samples: [Sample] = []
   private var lastValue: DragGesture.Value?
 
-  init(minimumDistance: Int, coordinateSpace: CoordinateSpace) {
+  init(minimumDistance: Double, coordinateSpace: CoordinateSpace) {
     self.minimumDistance = minimumDistance
     self.coordinateSpace = coordinateSpace
   }
@@ -124,32 +130,52 @@ final class DragGestureRecognizer: GestureRecognizer {
       startLocation = location
       startTime = event.timestamp
       targetRect = event.targetRect
-      samples = [Sample(location: location, time: event.timestamp)]
+      samples = [
+        Sample(
+          location: location,
+          time: event.timestamp,
+          pointer: event.location
+        )
+      ]
       return .handled
     case .dragged(.primary):
       guard let start = startLocation, let t0 = startTime else { return .ignored }
-      samples.append(Sample(location: location, time: event.timestamp))
+      samples.append(
+        Sample(
+          location: location,
+          time: event.timestamp,
+          pointer: event.location
+        )
+      )
       let dx = location.x - start.x
       let dy = location.y - start.y
       let distance = max(abs(dx), abs(dy))
-      guard distance >= Double(minimumDistance) else { return .handled }
+      guard distance >= minimumDistance else { return .handled }
       if phase == .possible { phase = .began } else { phase = .changed }
       lastValue = makeValue(
         now: event.timestamp,
         location: location,
         start: start,
-        startTime: t0
+        startTime: t0,
+        pointer: event.location
       )
       return .handled
     case .up(.primary):
       guard let start = startLocation, let t0 = startTime else { return .ignored }
-      samples.append(Sample(location: location, time: event.timestamp))
+      samples.append(
+        Sample(
+          location: location,
+          time: event.timestamp,
+          pointer: event.location
+        )
+      )
       phase = .ended
       lastValue = makeValue(
         now: event.timestamp,
         location: location,
         start: start,
-        startTime: t0
+        startTime: t0,
+        pointer: event.location
       )
       return .handled
     default:
@@ -173,6 +199,18 @@ final class DragGestureRecognizer: GestureRecognizer {
       terminalPoint: value.predictedEndLocation,
       targetRect: targetRect
     )
+    let path = PointerPath(
+      value.path.map { sample in
+        PointerPath.Sample(
+          location: coordinateSpace.resolve(
+            terminalPoint: sample.location,
+            targetRect: targetRect
+          ),
+          time: sample.time,
+          pointer: sample.pointer
+        )
+      }
+    )
     return DragGesture.Value(
       time: value.time,
       location: loc,
@@ -180,7 +218,9 @@ final class DragGestureRecognizer: GestureRecognizer {
       translation: value.translation,
       velocity: value.velocity,
       predictedEndLocation: predEnd,
-      predictedEndTranslation: value.predictedEndTranslation
+      predictedEndTranslation: value.predictedEndTranslation,
+      pointer: value.pointer,
+      path: path
     )
   }
 
@@ -193,21 +233,31 @@ final class DragGestureRecognizer: GestureRecognizer {
     now: MonotonicInstant,
     location: Point,
     start: Point,
-    startTime: MonotonicInstant
+    startTime: MonotonicInstant,
+    pointer: PointerLocation
   ) -> DragGesture.Value {
-    let translation = Size(
-      width: location.x - start.x,
-      height: location.y - start.y
+    let translation = Vector(
+      dx: location.x - start.x,
+      dy: location.y - start.y
     )
     let velocity = computeVelocity(now: now)
     // Predicted end = current + ~250ms of current velocity.
-    let predictedEndTranslation = Size(
-      width: translation.width + velocity.width / 4,
-      height: translation.height + velocity.height / 4
+    let predictedEndTranslation = Vector(
+      dx: translation.dx + velocity.dx / 4,
+      dy: translation.dy + velocity.dy / 4
     )
     let predictedEndLocation = Point(
-      x: start.x + predictedEndTranslation.width,
-      y: start.y + predictedEndTranslation.height
+      x: start.x + predictedEndTranslation.dx,
+      y: start.y + predictedEndTranslation.dy
+    )
+    let path = PointerPath(
+      samples.map { sample in
+        PointerPath.Sample(
+          location: sample.location,
+          time: sample.time,
+          pointer: sample.pointer
+        )
+      }
     )
     return DragGesture.Value(
       time: now,
@@ -216,7 +266,9 @@ final class DragGestureRecognizer: GestureRecognizer {
       translation: translation,
       velocity: velocity,
       predictedEndLocation: predictedEndLocation,
-      predictedEndTranslation: predictedEndTranslation
+      predictedEndTranslation: predictedEndTranslation,
+      pointer: pointer,
+      path: path
     )
   }
 
@@ -225,7 +277,7 @@ final class DragGestureRecognizer: GestureRecognizer {
   ///
   /// Uses `MonotonicInstant.duration(to:)` which returns a `Swift.Duration`,
   /// then converts via `components.seconds` + `components.attoseconds / 1e18`.
-  private func computeVelocity(now: MonotonicInstant) -> Size {
+  private func computeVelocity(now: MonotonicInstant) -> Vector {
     guard samples.count >= 2 else { return .zero }
     let last = samples[samples.count - 1]
 
@@ -242,9 +294,9 @@ final class DragGestureRecognizer: GestureRecognizer {
 
     let dt = seconds(from: reference.time, to: last.time)
     guard dt > 0 else { return .zero }
-    return Size(
-      width: (last.location.x - reference.location.x) / dt,
-      height: (last.location.y - reference.location.y) / dt
+    return Vector(
+      dx: (last.location.x - reference.location.x) / dt,
+      dy: (last.location.y - reference.location.y) / dt
     )
   }
 

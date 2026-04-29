@@ -10,18 +10,18 @@ public import Core
 /// ## Terminal-faithful defaults
 ///
 /// `maximumDistance` defaults to `0` cells. Unlike SwiftUI's 10-point
-/// default (continuous coordinates), any cell movement fails the
-/// gesture. Pass a positive value to allow pointer drift.
+/// default, any continuous cell movement fails the gesture. Pass a positive
+/// value to allow pointer drift.
 public struct LongPressGesture: Gesture {
   public typealias Value = Bool
   public typealias Body = Never
 
   public let minimumDuration: Duration
-  public let maximumDistance: Int
+  public let maximumDistance: Double
 
   public init(
     minimumDuration: Duration = .milliseconds(500),
-    maximumDistance: Int = 0
+    maximumDistance: Double = 0
   ) {
     self.minimumDuration = minimumDuration
     self.maximumDistance = maximumDistance
@@ -49,7 +49,7 @@ final class LongPressGestureRecognizer: GestureRecognizer {
   typealias Value = Bool
 
   let minimumDuration: Duration
-  let maximumDistance: Int
+  let maximumDistance: Double
   let requestDeadline: @MainActor @Sendable (MonotonicInstant) -> Void
   private(set) var phase: GestureRecognizerPhase = .possible
   private var pressStart: Point?
@@ -58,7 +58,7 @@ final class LongPressGestureRecognizer: GestureRecognizer {
 
   init(
     minimumDuration: Duration,
-    maximumDistance: Int,
+    maximumDistance: Double,
     requestDeadline: @escaping @MainActor @Sendable (MonotonicInstant) -> Void
   ) {
     self.minimumDuration = minimumDuration
@@ -84,7 +84,7 @@ final class LongPressGestureRecognizer: GestureRecognizer {
       guard let start = pressStart else { return .ignored }
       let dx = abs(location.x - start.x)
       let dy = abs(location.y - start.y)
-      if dx > Double(maximumDistance) || dy > Double(maximumDistance) {
+      if dx > maximumDistance || dy > maximumDistance {
         phase = .failed
         return .failed
       }

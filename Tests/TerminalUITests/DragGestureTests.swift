@@ -43,7 +43,8 @@ struct DragGestureTests {
     let v = try #require(value)
     #expect(v.startLocation == Point(x: 2, y: 1))
     #expect(v.location == Point(x: 5, y: 3))
-    #expect(v.translation == Size(width: 3, height: 2))
+    #expect(v.translation == Vector(dx: 3, dy: 2))
+    #expect(v.pointer.location == Point(x: 5, y: 3))
   }
 
   @Test("DragGesture ends on .up")
@@ -77,8 +78,64 @@ struct DragGestureTests {
     _ = rec.handle(event: event(.dragged(.primary), at: Point(x: 10, y: 0), at: t2))
     let value: DragGesture.Value? = rec.currentValue()
     let v = try #require(value)
-    #expect(v.velocity == Size(width: 100, height: 0))
-    #expect(v.predictedEndTranslation == Size(width: 35, height: 0))
+    #expect(v.velocity == Vector(dx: 100, dy: 0))
+    #expect(v.predictedEndTranslation == Vector(dx: 35, dy: 0))
     #expect(v.predictedEndLocation == Point(x: 35, y: 0))
+  }
+
+  @Test("DragGesture path preserves ordered sub-cell samples")
+  func pathPreservesSubCellSamples() throws {
+    let rec = DragGesture()._makeRecognizer(context: ctx())
+    let t0 = MonotonicInstant.now()
+    _ = rec.handle(event: event(.down(.primary), at: Point(x: 1.25, y: 1.25), at: t0))
+    _ = rec.handle(
+      event: event(
+        .dragged(.primary),
+        at: Point(x: 1.5, y: 1.25),
+        at: t0.advanced(by: .milliseconds(10))
+      ))
+    _ = rec.handle(
+      event: event(
+        .dragged(.primary),
+        at: Point(x: 1.75, y: 1.25),
+        at: t0.advanced(by: .milliseconds(20))
+      ))
+
+    let value: DragGesture.Value? = rec.currentValue()
+    let v = try #require(value)
+
+    #expect(v.location == Point(x: 1.75, y: 1.25))
+    #expect(v.translation == Vector(dx: 0.5, dy: 0))
+    #expect(
+      v.path.map(\.location) == [
+        Point(x: 1.25, y: 1.25),
+        Point(x: 1.5, y: 1.25),
+        Point(x: 1.75, y: 1.25),
+      ])
+    #expect(
+      v.path.map(\.pointer.cell) == [
+        CellPoint(x: 1, y: 1),
+        CellPoint(x: 1, y: 1),
+        CellPoint(x: 1, y: 1),
+      ])
+  }
+
+  @Test("DragGesture velocity preserves fractional cells per second")
+  func velocityPreservesFractionalCellsPerSecond() throws {
+    let rec = DragGesture()._makeRecognizer(context: ctx())
+    let t0 = MonotonicInstant.now()
+    _ = rec.handle(event: event(.down(.primary), at: Point(x: 0, y: 0), at: t0))
+    _ = rec.handle(
+      event: event(
+        .dragged(.primary),
+        at: Point(x: 0.05, y: 0),
+        at: t0.advanced(by: .milliseconds(100))
+      ))
+
+    let value: DragGesture.Value? = rec.currentValue()
+    let v = try #require(value)
+
+    #expect(abs(v.velocity.dx - 0.5) < 0.0001)
+    #expect(v.velocity.dy == 0)
   }
 }

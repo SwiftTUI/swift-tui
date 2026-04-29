@@ -530,10 +530,10 @@ private struct DropDestinationScopeFixture: View {
 private struct GestureCallbackScopeFixture: View {
   @State private var status = "idle"
   @State private var commits = 0
-  @GestureState private var dragOffset = Size.zero
+  @GestureState private var dragOffset = Vector.zero
 
   var body: some View {
-    Text("status:\(status)|offset:\(dragOffset.width),\(dragOffset.height)|commits:\(commits)")
+    Text("status:\(status)|offset:\(dragOffset.dx),\(dragOffset.dy)|commits:\(commits)")
       .frame(minWidth: 48, maxWidth: 48, minHeight: 1, maxHeight: 1)
       .gesture(
         DragGesture()

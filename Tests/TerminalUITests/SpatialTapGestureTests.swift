@@ -37,6 +37,7 @@ struct SpatialTapGestureTests {
     let v: SpatialTapGesture.Value? = rec.currentValue()
     // .local: location relative to rect.origin → (6-4, 3-2) = (2, 1)
     #expect(v?.location == Point(x: 2, y: 1))
+    #expect(v?.pointer.location == Point(x: 6, y: 3))
   }
 
   @Test("SpatialTapGesture .global returns raw terminal point")

@@ -60,7 +60,7 @@ struct PhysicsTabGestureTests {
     FullScreenToyPhysics.applyRelease(
       to: &state,
       translation: .zero,
-      velocity: Size(width: 100, height: -50),
+      velocity: Vector(dx: 100, dy: -50),
       in: terminalSize,
       metrics: .estimated
     )

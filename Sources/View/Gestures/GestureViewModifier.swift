@@ -163,7 +163,7 @@ extension View {
   ///           .onEnded { _ in action() })`.
   public func onLongPressGesture(
     minimumDuration: Duration = .milliseconds(500),
-    maximumDistance: Int = 0,
+    maximumDistance: Double = 0,
     perform action: @escaping @MainActor () -> Void
   ) -> some View {
     gesture(
