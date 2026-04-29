@@ -1,5 +1,4 @@
-public import Core
-@_spi(Testing) import Core
+@_spi(Testing) public import Core
 @_exported import EmbeddedFonts
 
 /// Displays ASCII-art text using embedded FIGlet fonts.

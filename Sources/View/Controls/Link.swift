@@ -1,5 +1,4 @@
-public import Core
-@_spi(Testing) import Core
+@_spi(Testing) public import Core
 
 /// Displays focusable hyperlink text.
 public struct Link: View, ResolvableView {
