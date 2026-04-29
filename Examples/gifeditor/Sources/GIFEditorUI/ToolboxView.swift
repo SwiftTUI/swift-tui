@@ -32,22 +32,22 @@ struct ToolboxView: View {
 
   private var toolHint: String {
     switch tool {
-    case .pen: return "Shift+Space paints"
-    case .eraser: return "Shift+Space erases"
-    case .fill: return "Shift+Space fills"
+    case .pen: return "Space paints"
+    case .eraser: return "Space erases"
+    case .fill: return "Space fills"
     case .gradient:
       if pendingGradientAnchor != nil {
-        return "Move; Shift+Space again"
+        return "Move; Space again"
       } else {
-        return "Shift+Space sets anchor"
+        return "Space sets anchor"
       }
     case .marquee:
       if pendingMarqueeAnchor != nil {
-        return "Move; Shift+Space again"
+        return "Move; Space again"
       } else {
-        return "Shift+Space sets anchor"
+        return "Space sets anchor"
       }
-    case .eyedropper: return "Shift+Space samples"
+    case .eyedropper: return "Space samples"
     }
   }
 }

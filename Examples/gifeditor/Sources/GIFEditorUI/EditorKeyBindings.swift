@@ -1,6 +1,33 @@
 import GIFEditorCore
 import TerminalUI
 
+extension View {
+  func applyFocusedEditorBindings(
+    model: EditorViewModel,
+    isHelpPresented: Binding<Bool>,
+    refresh: @escaping @MainActor @Sendable () -> Void
+  ) -> ModifiedContent<Self, KeyPressModifier> {
+    onKeyPress(.any) { keyPress in
+      guard keyPress.modifiers.isEmpty else {
+        return .ignored
+      }
+
+      guard
+        handleFocusedEditorKey(
+          keyPress.key,
+          model: model,
+          isHelpPresented: isHelpPresented
+        )
+      else {
+        return .ignored
+      }
+
+      refresh()
+      return .handled
+    }
+  }
+}
+
 /// Focused-key and key-command chains for the editor.
 ///
 /// `keyCommand` is only callable on a view that conforms to
@@ -9,111 +36,14 @@ import TerminalUI
 /// `ViewModifier.body` is a plain `View` without the action-scope
 /// conformance. Instead we expose generic functions that take an
 /// `ActionScope`-conforming view and return one. The editor view
-/// chains them onto its panel: `panel.applyToolBindings(...)
-/// .applyCursorBindings(...)`.
+/// chains modifier-bearing commands onto its panel, while bare focused
+/// keys are also applied to the focusable canvas.
 extension View where Self: ActionScope & Sendable {
-  func applyToolBindings(
-    model: EditorViewModel,
-    refresh: @escaping @MainActor @Sendable () -> Void
-  ) -> some View & ActionScope & Sendable {
-    self
-      .onKeyPress(.character("p")) { _ in
-        model.selectTool(.pen)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.character("e")) { _ in
-        model.selectTool(.eraser)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.character("b")) { _ in
-        model.selectTool(.fill)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.character("g")) { _ in
-        model.selectTool(.gradient)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.character("m")) { _ in
-        model.selectTool(.marquee)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.character("i")) { _ in
-        model.selectTool(.eyedropper)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.character("x")) { _ in
-        model.swapPrimaryAndSecondary()
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.space) { _ in
-        model.applyToolAtCursor()
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.return) { _ in
-        model.applyToolAtCursor()
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.escape) { _ in
-        model.clearSelection()
-        refresh()
-        return .handled
-      }
-  }
-
   func applyCursorBindings(
     model: EditorViewModel,
     refresh: @escaping @MainActor @Sendable () -> Void
   ) -> some View & ActionScope & Sendable {
     self
-      .onKeyPress(.arrowLeft) { _ in
-        model.moveCursor(dx: -1, dy: 0)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.arrowRight) { _ in
-        model.moveCursor(dx: 1, dy: 0)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.arrowUp) { _ in
-        model.moveCursor(dx: 0, dy: -1)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.arrowDown) { _ in
-        model.moveCursor(dx: 0, dy: 1)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.character("h")) { _ in
-        model.moveCursor(dx: -1, dy: 0)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.character("j")) { _ in
-        model.moveCursor(dx: 0, dy: 1)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.character("k")) { _ in
-        model.moveCursor(dx: 0, dy: -1)
-        refresh()
-        return .handled
-      }
-      .onKeyPress(.character("l")) { _ in
-        model.moveCursor(dx: 1, dy: 0)
-        refresh()
-        return .handled
-      }
       .keyCommand("Jump left", key: .arrowLeft, modifiers: .ctrl) {
         model.moveCursor(dx: -8, dy: 0)
         refresh()
@@ -137,11 +67,11 @@ extension View where Self: ActionScope & Sendable {
     refresh: @escaping @MainActor @Sendable () -> Void
   ) -> some View & ActionScope & Sendable {
     self
-      .keyCommand("Previous frame", key: .character(","), modifiers: .ctrl) {
+      .keyCommand("Previous frame", key: .character(","), modifiers: .alt) {
         model.previousFrame()
         refresh()
       }
-      .keyCommand("Next frame", key: .character("."), modifiers: .ctrl) {
+      .keyCommand("Next frame", key: .character("."), modifiers: .alt) {
         model.nextFrame()
         refresh()
       }
@@ -153,22 +83,19 @@ extension View where Self: ActionScope & Sendable {
         model.duplicateCurrentFrame()
         refresh()
       }
-      .keyCommand(
-        "Delete frame", key: .character("d"),
-        modifiers: EventModifiers([.ctrl, .shift])
-      ) {
+      .keyCommand("Delete frame", key: .character("d"), modifiers: .alt) {
         model.deleteCurrentFrame()
         refresh()
       }
-      .keyCommand("Decrease delay", key: .character("["), modifiers: .ctrl) {
+      .keyCommand("Decrease delay", key: .character("-"), modifiers: .alt) {
         model.adjustCurrentFrameDelay(by: -10)
         refresh()
       }
-      .keyCommand("Increase delay", key: .character("]"), modifiers: .ctrl) {
+      .keyCommand("Increase delay", key: .character("="), modifiers: .alt) {
         model.adjustCurrentFrameDelay(by: 10)
         refresh()
       }
-      .keyCommand("Equalize delays", key: .character("0"), modifiers: .ctrl) {
+      .keyCommand("Equalize delays", key: .character("0"), modifiers: .alt) {
         model.setAllFrameDelaysToCurrent()
         refresh()
       }
@@ -179,38 +106,23 @@ extension View where Self: ActionScope & Sendable {
     refresh: @escaping @MainActor @Sendable () -> Void
   ) -> some View & ActionScope & Sendable {
     self
-      .keyCommand(
-        "New layer", key: .character("n"),
-        modifiers: EventModifiers([.ctrl, .shift])
-      ) {
+      .keyCommand("New layer", key: .character("n"), modifiers: .alt) {
         model.addLayer()
         refresh()
       }
-      .keyCommand(
-        "Layer below", key: .character("j"),
-        modifiers: EventModifiers([.ctrl, .shift])
-      ) {
+      .keyCommand("Layer below", key: .character("j"), modifiers: .alt) {
         model.selectLayerBelow()
         refresh()
       }
-      .keyCommand(
-        "Layer above", key: .character("k"),
-        modifiers: EventModifiers([.ctrl, .shift])
-      ) {
+      .keyCommand("Layer above", key: .character("k"), modifiers: .alt) {
         model.selectLayerAbove()
         refresh()
       }
-      .keyCommand(
-        "Toggle layer", key: .character("h"),
-        modifiers: EventModifiers([.ctrl, .shift])
-      ) {
+      .keyCommand("Toggle layer", key: .character("h"), modifiers: .alt) {
         model.toggleCurrentLayerVisibility()
         refresh()
       }
-      .keyCommand(
-        "Delete layer", key: .character("x"),
-        modifiers: EventModifiers([.ctrl, .shift])
-      ) {
+      .keyCommand("Delete layer", key: .character("x"), modifiers: .alt) {
         model.deleteCurrentLayer()
         refresh()
       }
@@ -236,42 +148,6 @@ extension View where Self: ActionScope & Sendable {
     refresh: @escaping @MainActor @Sendable () -> Void
   ) -> some View & ActionScope & Sendable {
     self
-      .keyCommand("Slot 1", key: .character("1"), modifiers: .ctrl) {
-        model.setPrimaryColor(1)
-        refresh()
-      }
-      .keyCommand("Slot 2", key: .character("2"), modifiers: .ctrl) {
-        model.setPrimaryColor(2)
-        refresh()
-      }
-      .keyCommand("Slot 3", key: .character("3"), modifiers: .ctrl) {
-        model.setPrimaryColor(3)
-        refresh()
-      }
-      .keyCommand("Slot 4", key: .character("4"), modifiers: .ctrl) {
-        model.setPrimaryColor(4)
-        refresh()
-      }
-      .keyCommand("Slot 5", key: .character("5"), modifiers: .ctrl) {
-        model.setPrimaryColor(5)
-        refresh()
-      }
-      .keyCommand("Slot 6", key: .character("6"), modifiers: .ctrl) {
-        model.setPrimaryColor(6)
-        refresh()
-      }
-      .keyCommand("Slot 7", key: .character("7"), modifiers: .ctrl) {
-        model.setPrimaryColor(7)
-        refresh()
-      }
-      .keyCommand("Slot 8", key: .character("8"), modifiers: .ctrl) {
-        model.setPrimaryColor(8)
-        refresh()
-      }
-      .keyCommand("Slot 9", key: .character("9"), modifiers: .ctrl) {
-        model.setPrimaryColor(9)
-        refresh()
-      }
       .keyCommand("Secondary 1", key: .character("1"), modifiers: .alt) {
         model.setSecondaryColor(1)
         refresh()
@@ -321,7 +197,7 @@ extension View where Self: ActionScope & Sendable {
       }
       .keyCommand(
         "Save As", key: .character("s"),
-        modifiers: EventModifiers([.ctrl, .shift])
+        modifiers: .alt
       ) {
         model.saveAs()
         refresh()
@@ -347,4 +223,63 @@ extension View where Self: ActionScope & Sendable {
       return .allow
     }
   }
+}
+
+@MainActor
+private func handleFocusedEditorKey(
+  _ key: KeyEvent,
+  model: EditorViewModel,
+  isHelpPresented: Binding<Bool>
+) -> Bool {
+  switch key {
+  case .character("?"):
+    isHelpPresented.wrappedValue = true
+  case .character("p"):
+    model.selectTool(.pen)
+  case .character("e"):
+    model.selectTool(.eraser)
+  case .character("b"):
+    model.selectTool(.fill)
+  case .character("g"):
+    model.selectTool(.gradient)
+  case .character("m"):
+    model.selectTool(.marquee)
+  case .character("i"):
+    model.selectTool(.eyedropper)
+  case .character("x"):
+    model.swapPrimaryAndSecondary()
+  case .space, .return:
+    model.applyToolAtCursor()
+  case .escape:
+    model.clearSelection()
+  case .arrowLeft, .character("h"):
+    model.moveCursor(dx: -1, dy: 0)
+  case .arrowRight, .character("l"):
+    model.moveCursor(dx: 1, dy: 0)
+  case .arrowUp, .character("k"):
+    model.moveCursor(dx: 0, dy: -1)
+  case .arrowDown, .character("j"):
+    model.moveCursor(dx: 0, dy: 1)
+  case .character("1"):
+    model.setPrimaryColor(1)
+  case .character("2"):
+    model.setPrimaryColor(2)
+  case .character("3"):
+    model.setPrimaryColor(3)
+  case .character("4"):
+    model.setPrimaryColor(4)
+  case .character("5"):
+    model.setPrimaryColor(5)
+  case .character("6"):
+    model.setPrimaryColor(6)
+  case .character("7"):
+    model.setPrimaryColor(7)
+  case .character("8"):
+    model.setPrimaryColor(8)
+  case .character("9"):
+    model.setPrimaryColor(9)
+  default:
+    return false
+  }
+  return true
 }
