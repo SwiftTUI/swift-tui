@@ -23,6 +23,14 @@ import Testing
 
     #expect(events.count == 1)
     #expect(events.first?.mouseKind == .down(.primary))
+    let downLocation = try #require(events.first?.mouseLocation)
+    #expect(downLocation.precision == .cell)
+    #expect(
+      downLocation.location
+        == Point(
+          x: Double(downLocation.cell.x) + 0.5,
+          y: Double(downLocation.cell.y) + 0.5
+        ))
 
     view.mouseUp(
       with: mouseEvent(
@@ -60,6 +68,14 @@ import Testing
     #expect(events.count == 2)
     #expect(events[0].mouseKind == .dragged(.primary))
     #expect(events[1].mouseKind == .scrolled(deltaX: 0, deltaY: 3))
+    let scrollLocation = try #require(events[1].mouseLocation)
+    #expect(scrollLocation.precision == .cell)
+    #expect(
+      scrollLocation.location
+        == Point(
+          x: Double(scrollLocation.cell.x) + 0.5,
+          y: Double(scrollLocation.cell.y) + 0.5
+        ))
   }
 
   private func mouseEvent(
@@ -104,5 +120,12 @@ extension InputEvent {
       return nil
     }
     return mouseEvent.kind
+  }
+
+  fileprivate var mouseLocation: PointerLocation? {
+    guard case .mouse(let mouseEvent) = self else {
+      return nil
+    }
+    return mouseEvent.location
   }
 }

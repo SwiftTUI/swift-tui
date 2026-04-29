@@ -4,7 +4,7 @@
 /// story remain cell-denominated; this type exists so authors can apply
 /// aspect correction to shapes, motion, or image sizing without reinventing
 /// the fallback.
-public struct CellPixelMetrics: Equatable, Sendable {
+public struct CellPixelMetrics: Equatable, Hashable, Sendable {
   /// Width of a single cell in device pixels.
   public let width: Int
   /// Height of a single cell in device pixels.
@@ -24,7 +24,7 @@ public struct CellPixelMetrics: Equatable, Sendable {
     Double(height) / Double(width)
   }
 
-  public enum Source: Sendable, Equatable {
+  public enum Source: Equatable, Hashable, Sendable {
     /// The terminal reported its cell size via `ioctl` or an escape query.
     case reported
     /// No cell size was reported; this is the conventional 8x16 fallback.

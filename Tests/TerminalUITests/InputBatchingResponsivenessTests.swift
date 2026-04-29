@@ -192,6 +192,30 @@ struct InputBatchingResponsivenessTests {
         .mouse(.init(kind: .down(.primary), location: .init(x: 3, y: 1))),
       ])
   }
+
+  @Test("pointer burst coalescing flushes precision changes")
+  func coalescedPointerBurstsFlushPrecisionChanges() {
+    let metrics = CellPixelMetrics(width: 8, height: 16, source: .reported)
+    let cellScroll = MouseEvent(
+      kind: .scrolled(deltaX: 0, deltaY: 1),
+      location: .cellFallback(CellPoint(x: 2, y: 3))
+    )
+    let subCellScroll = MouseEvent(
+      kind: .scrolled(deltaX: 0, deltaY: 2),
+      location: .subCell(
+        location: Point(x: 2.25, y: 3.75),
+        source: .terminalPixels,
+        metrics: metrics,
+        rawPixel: PixelPoint(x: 18, y: 60)
+      )
+    )
+
+    #expect(
+      coalescedInputEvents([.mouse(cellScroll), .mouse(subCellScroll)]) == [
+        .mouse(cellScroll),
+        .mouse(subCellScroll),
+      ])
+  }
 }
 
 private struct EventBatchProbeState: Equatable, Sendable {}

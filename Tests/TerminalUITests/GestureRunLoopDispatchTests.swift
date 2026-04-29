@@ -42,13 +42,18 @@ struct GestureRunLoopDispatchTests {
     let point = centerPoint(of: region.rect)
 
     let host = RecordingGestureTerminalHost(size: terminalSize)
+    let pointer = PointerLocation.subCell(
+      location: point,
+      source: .nativePixels,
+      metrics: .estimated
+    )
     let result = try await runHarness(
       host: host,
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       schedule: [
-        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
-        .init(event: .mouse(.init(kind: .up(.primary), location: point))),
+        .init(event: .mouse(.init(kind: .down(.primary), location: pointer))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: pointer))),
       ],
       viewBuilder: { view }
     )
@@ -96,13 +101,18 @@ struct GestureRunLoopDispatchTests {
     )
 
     let host = RecordingGestureTerminalHost(size: terminalSize)
+    let pointer = PointerLocation.subCell(
+      location: point,
+      source: .nativePixels,
+      metrics: .estimated
+    )
     let result = try await runHarness(
       host: host,
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
       schedule: [
-        .init(event: .mouse(.init(kind: .down(.primary), location: point))),
-        .init(event: .mouse(.init(kind: .up(.primary), location: point))),
+        .init(event: .mouse(.init(kind: .down(.primary), location: pointer))),
+        .init(event: .mouse(.init(kind: .up(.primary), location: pointer))),
       ],
       viewBuilder: { view }
     )

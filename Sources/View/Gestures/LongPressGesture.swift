@@ -72,17 +72,18 @@ final class LongPressGestureRecognizer: GestureRecognizer {
 
   func handle(event: LocalPointerEvent) -> GestureRecognizerEventDisposition {
     guard !phase.isTerminal else { return .ignored }
+    let location = event.location.location
     switch event.kind {
     case .down(.primary):
-      pressStart = event.location
+      pressStart = location
       let target = event.timestamp.advanced(by: minimumDuration)
       deadline = target
       requestDeadline(target)
       return .handled
     case .dragged(.primary):
       guard let start = pressStart else { return .ignored }
-      let dx = abs(event.location.x - start.x)
-      let dy = abs(event.location.y - start.y)
+      let dx = abs(location.x - start.x)
+      let dy = abs(location.y - start.y)
       if dx > Double(maximumDistance) || dy > Double(maximumDistance) {
         phase = .failed
         return .failed

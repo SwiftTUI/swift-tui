@@ -126,7 +126,7 @@ struct AsyncLifecycleGenerationTests {
         .mouse(
           MouseEvent(
             kind: .scrolled(deltaX: 0, deltaY: 2),
-            location: .init(x: 4, y: 6)
+            location: .cellFallback(CellPoint(x: 4, y: 6))
           )
         )
       ]

@@ -39,7 +39,7 @@ extension RunLoop {
 
   package func handleMouseDown(
     _ button: MouseButton,
-    location: Point
+    location: PointerLocation
   ) {
     guard button == .primary else {
       return
@@ -107,7 +107,7 @@ extension RunLoop {
 
   package func handleMouseUp(
     _ button: MouseButton,
-    location: Point
+    location: PointerLocation
   ) {
     guard button == .primary else {
       return
@@ -181,7 +181,7 @@ extension RunLoop {
   }
 
   package func handleMouseMove(
-    location: Point
+    location: PointerLocation
   ) {
     guard armedPointerRouteID != nil else {
       return
@@ -210,7 +210,7 @@ extension RunLoop {
 
   package func handleMouseDrag(
     _ button: MouseButton,
-    location: Point
+    location: PointerLocation
   ) {
     guard button == .primary else {
       return
@@ -238,7 +238,7 @@ extension RunLoop {
   package func handleMouseScroll(
     deltaX: Int,
     deltaY: Int,
-    location: Point
+    location: PointerLocation
   ) {
     // Scroll events should not move keyboard focus — the scroll target
     // is resolved independently via scrollTarget(at:).
@@ -305,7 +305,7 @@ extension RunLoop {
   /// an overlay like a scroll indicator).
   package func shouldClickFocus(
     _ focusIdentity: Identity,
-    at location: Point
+    at location: PointerLocation
   ) -> Bool {
     if isActivationIdentity(focusIdentity) {
       return true
@@ -321,7 +321,7 @@ extension RunLoop {
     let candidateArea = candidateRect.size.width * candidateRect.size.height
     let hasSmallerDescendant = latestSemanticSnapshot.focusRegions.contains { region in
       guard region.identity != focusIdentity,
-        region.rect.contains(location),
+        region.rect.contains(location.cell),
         region.identity.isDescendant(of: focusIdentity)
       else {
         return false
@@ -333,13 +333,13 @@ extension RunLoop {
   }
 
   package func scrollTarget(
-    at point: Point,
+    at location: PointerLocation,
     deltaX: Int = 0,
     deltaY: Int = 0
   ) -> ScrollRoute? {
     let routes = latestSemanticSnapshot.scrollRoutes
       .filter { route in
-        guard route.viewportRect.contains(point) else {
+        guard route.viewportRect.contains(location.cell) else {
           return false
         }
         let scrollsHorizontally = route.contentBounds.size.width > route.viewportRect.size.width
@@ -359,11 +359,11 @@ extension RunLoop {
   }
 
   package func hitTarget(
-    at point: Point
+    at location: PointerLocation
   ) -> HitTarget? {
     guard
       let region = latestSemanticSnapshot.interactionRegions
-        .filter({ $0.rect.contains(point) })
+        .filter({ $0.rect.contains(location.cell) })
         .max(by: { $0.hitTestOrder < $1.hitTestOrder })
     else {
       return nil
@@ -467,7 +467,7 @@ extension RunLoop {
   }
 
   package func updateArmedPointerState(
-    at location: Point
+    at location: PointerLocation
   ) {
     guard let armedPointerRouteID else {
       return

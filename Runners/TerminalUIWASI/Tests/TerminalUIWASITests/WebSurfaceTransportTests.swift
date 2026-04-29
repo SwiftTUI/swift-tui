@@ -159,7 +159,7 @@ struct WebSurfaceTransportTests {
         .mouse(
           .init(
             kind: .scrolled(deltaX: 0, deltaY: -1),
-            location: .init(x: 2, y: 3),
+            location: .cellFallback(CellPoint(x: 2, y: 3)),
             modifiers: [.alt]
           )
         ),
