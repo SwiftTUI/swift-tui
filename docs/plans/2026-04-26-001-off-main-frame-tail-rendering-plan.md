@@ -10,6 +10,8 @@ proposal: "../proposals/OFF_MAIN_PIPELINE_RENDERING.md"
 
 > **Note:** Shipped through Stage 7. Follow-up cancellation work continues in
 > [2026-04-26-002-frame-head-abort-plan.md](2026-04-26-002-frame-head-abort-plan.md).
+> The consolidated current-state summary lives in
+> [../ASYNC_RENDERING.md](../ASYNC_RENDERING.md).
 
 ## Overview
 

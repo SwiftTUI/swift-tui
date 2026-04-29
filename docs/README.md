@@ -19,6 +19,7 @@ The repository [README.md](../README.md) is the public landing page.
 - [STATUS.md](STATUS.md) — shipped surface, current constraints, and short-term gaps
 - [ARCHITECTURE.md](ARCHITECTURE.md) — package boundaries and the frame pipeline
 - [RUNTIME.md](RUNTIME.md) — lifecycle, state, observation, and incremental rendering
+- [ASYNC_RENDERING.md](ASYNC_RENDERING.md) — async presentation and frame-tail offload
 - [VISION.md](VISION.md) — philosophy, scope, and deferred work
 - [TOOLCHAINS.md](TOOLCHAINS.md) — Swift, wasm, Bun, Xcode, Android toolchain story
 
@@ -45,21 +46,22 @@ The repository [README.md](../README.md) is the public landing page.
 
 Active design proposals that are still shaping decisions:
 
-- [proposals/ASYNC_PRESENTATION.md](proposals/ASYNC_PRESENTATION.md) — moving terminal writes off the main actor
-- [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — policy for future async pipeline frame cancellation and dropping
-- [proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md](proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md) — design for render-generation coalescing and safe pre-start cancellation
-- [proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md](proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md) — isolating custom layouts for future worker-side layout
-- [proposals/OFF_MAIN_PIPELINE_RENDERING.md](proposals/OFF_MAIN_PIPELINE_RENDERING.md) — evaluating off-main frame-tail rendering
+- [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — future cancellation and dropping policy
+- [proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md](proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md) — pre-start frame-tail cancellation design
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
 - [proposals/layout/BEHAVIOUR_FINDINGS.md](proposals/layout/BEHAVIOUR_FINDINGS.md) — behaviour-test findings from the layouts example
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`active`, `design-approved`, or `shipped`). Current active plans:
 
-- [plans/2026-04-26-002-frame-head-abort-plan.md](plans/2026-04-26-002-frame-head-abort-plan.md) — Stage 3C plan for making prepared frame heads abortable before cancellable frame-tail jobs
 - [plans/2026-04-28-001-canvas-adaptation-plan.md](plans/2026-04-28-001-canvas-adaptation-plan.md) — extending Canvas for dense pixel grids, half-block rendering, and optional sub-cell pointer precision
 
-Implementation records retained for context (landed work that still informs reviews):
+Implementation and post-mortem records retained for context:
 
+- [proposals/ASYNC_PRESENTATION.md](proposals/ASYNC_PRESENTATION.md) — POSIX terminal writer offload
+- [proposals/OFF_MAIN_PIPELINE_RENDERING.md](proposals/OFF_MAIN_PIPELINE_RENDERING.md) — guarded frame-tail worker implementation record
+- [proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md](proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md) — `SendableLayout` worker migration
+- [plans/2026-04-26-001-off-main-frame-tail-rendering-plan.md](plans/2026-04-26-001-off-main-frame-tail-rendering-plan.md) — shipped frame-tail worker plan
+- [plans/2026-04-26-002-frame-head-abort-plan.md](plans/2026-04-26-002-frame-head-abort-plan.md) — reverted frame-head abort attempt and post-mortem
 - [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md) — scope-based command, keybinding, and toolbar design
 - [proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md](proposals/ACTION_SCOPES_AND_COMMANDS_IMPLEMENTATION.md) — phase-by-phase implementation record
 - [proposals/ANIMATION_PLAN.md](proposals/ANIMATION_PLAN.md) — original animation rollout

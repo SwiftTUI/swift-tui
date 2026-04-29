@@ -4,6 +4,10 @@
 
 Implemented in narrowed form.
 
+For the consolidated async rendering status, see
+[`../ASYNC_RENDERING.md`](../ASYNC_RENDERING.md). This file is the detailed
+record for the initial guarded frame-tail worker.
+
 This document explores whether any part of the terminal render pipeline can run
 off the main actor. It does not propose moving the whole pipeline in one step.
 The viable first target was originally evaluated as the deterministic frame
@@ -14,24 +18,25 @@ measure -> place -> semantics -> draw -> raster
 ```
 
 Implementation proved that this target has to be conditional for the current
-runtime. Authored custom-layout callbacks still use main-actor-isolated
-`LayoutProxyBox` entry points, so custom `measure -> place` cannot move to a
-worker without a separate custom-layout isolation design. The retained first cut
-is:
+runtime. Ordinary authored custom-layout callbacks still use main-actor-isolated
+`LayoutProxyBox` entry points, while `SendableLayout` opt-in and framework-owned
+worker-safe layouts can avoid that bridge. The retained shape is:
 
 ```
 main actor: resolve -> animation interpolation
-worker when built-in-only: measure -> place
-main actor when custom layout is present: measure -> place
+worker when eligible: measure -> place
+main actor fallback: ordinary custom Layout measure -> place
 main actor: placed-animation overlay snapshot
 worker: overlay application -> semantics -> draw -> raster
 main actor: commit -> present -> lifecycle
 ```
 
-The worker is a private per-renderer serial queue. `resolve`, custom layout,
-focus synchronization, lifecycle commit, runtime registration mutation, and
-terminal presentation remain owned by the main actor. Built-in layout can run on
-the worker because it is value-shaped after resolve.
+The worker is a private per-renderer serial queue. `resolve`, ordinary custom
+layout fallback, focus synchronization, lifecycle commit, runtime registration
+mutation, and terminal presentation remain owned by the main actor. Built-in
+layout, explicitly opted-in `SendableLayout` custom layout, framework-owned
+`SendableLayout` containers, and snapshotted lazy indexed child sources can run
+on the worker because they are value-shaped after resolve.
 
 ## Implementation result
 
@@ -51,9 +56,10 @@ The staged migration landed behind the existing public runtime surface:
 
 Decision: keep the async runtime path, but treat it as a guarded frame-tail
 offload. It is a correct suspension boundary for built-in layout and
-semantics/draw/raster-heavy frames, and it gives custom layout an explicit
-fallback boundary. It is not evidence that custom layout measurement and
-placement are ready to leave the main actor.
+semantics/draw/raster-heavy frames, and it gives ordinary custom layout an
+explicit fallback boundary. Later `SendableLayout` work added an opt-in path for
+worker-safe custom layout; it is not evidence that all custom layout measurement
+and placement are ready to leave the main actor.
 
 ## Problem
 
@@ -613,7 +619,8 @@ authoring model:
 built-in measure -> built-in place -> overlay application -> semantics -> draw -> raster
 ```
 
-Treat off-main custom layout as a separate future project requiring an explicit
-custom-layout isolation design. Treat off-main `resolve` as a still larger
-future project requiring explicit authoring context, side-effect snapshots, and
-a main-actor registry apply phase.
+Treat ordinary public custom layout as a main-actor fallback unless it opts in
+through the `SendableLayout` contract described in
+[`CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md`](CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md).
+Treat off-main `resolve` as a still larger future project requiring explicit
+authoring context, side-effect snapshots, and a main-actor registry apply phase.

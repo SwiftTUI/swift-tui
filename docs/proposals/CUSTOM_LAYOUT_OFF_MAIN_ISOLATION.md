@@ -2,8 +2,13 @@
 
 ## Status
 
-Proposed follow-up to
-[`OFF_MAIN_PIPELINE_RENDERING.md`](OFF_MAIN_PIPELINE_RENDERING.md).
+Implemented follow-up to
+[`OFF_MAIN_PIPELINE_RENDERING.md`](OFF_MAIN_PIPELINE_RENDERING.md), with the
+ordinary public `Layout` fallback intentionally preserved.
+
+For the consolidated async rendering status, see
+[`../ASYNC_RENDERING.md`](../ASYNC_RENDERING.md). This file records the
+custom-layout worker eligibility model and migration history.
 
 The runtime now offloads built-in layout, post-layout frame-tail work,
 explicitly opted-in `SendableLayout` custom layout, framework-owned
