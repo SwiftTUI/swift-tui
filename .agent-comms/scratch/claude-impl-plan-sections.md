@@ -452,7 +452,7 @@ public struct PointerInputCapabilities: Equatable, Hashable, Sendable {
 
 public enum PointerPrecisionPolicy: Equatable, Hashable, Sendable {
   case cellOnly
-  case subCellWhenKnown
+  case useHostSubCellWhenAvailable
   case forceTerminalPixels
 }
 ```

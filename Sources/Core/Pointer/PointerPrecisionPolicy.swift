@@ -3,7 +3,8 @@ public enum PointerPrecisionPolicy: Equatable, Sendable {
   /// Always use integer terminal-cell mouse coordinates.
   case cellOnly
   /// Use sub-cell coordinates only when the host has proven support and metrics.
-  case subCellWhenKnown
+  case useHostSubCellWhenAvailable
+
   /// Enable terminal pixel coordinates when reported cell metrics are available.
   case forceTerminalPixels
 }

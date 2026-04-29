@@ -7,11 +7,22 @@ dictionaryDefinitions:
 dictionaries:
   - custom-dictionary
 words:
+  - cfmakeraw
+  - Coalescible
+  - COLORTERM
+  - CTYPE
   - Deque
+  - EAGAIN
+  - EWOULDBLOCK
   - Ghostty
+  - Libc
+  - NONBLOCK
   - Nonsending
+  - preconcurrency
   - Sparkline
   - Sparklines
+  - syscall
+  - truecolor
   - uppercased
 ignoreWords: []
 import: []
