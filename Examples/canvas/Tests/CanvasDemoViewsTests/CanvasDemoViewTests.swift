@@ -1,6 +1,7 @@
-import CanvasDemoViews
 import TerminalUI
 import Testing
+
+@testable import CanvasDemoViews
 
 @MainActor
 @Suite("Canvas demo")
@@ -98,6 +99,54 @@ struct CanvasDemoViewTests {
     #expect(
       CanvasPixelSketchDocument.pixelPoint(
         forLocalCell: Point(x: 2.75, y: 1.75),
+        mode: .verticalHalfBlock,
+        in: size
+      ) == CanvasSketchPoint(x: 2, y: 3)
+    )
+  }
+
+  @Test("cell fallback pointer locations anchor to the reported cell origin")
+  func cellFallbackPointerLocationsAnchorToCellOrigin() {
+    let size = CellSize(width: 5, height: 6)
+    let pointer = PointerLocation.cellFallback(CellPoint(x: 2, y: 1))
+
+    #expect(
+      CanvasSketchDocument.subpixelPoint(
+        forLocalCell: pointer.location,
+        precision: pointer.precision,
+        in: size
+      ) == CanvasSketchPoint(x: 4, y: 4)
+    )
+    #expect(
+      CanvasPixelSketchDocument.pixelPoint(
+        forLocalCell: pointer.location,
+        precision: pointer.precision,
+        mode: .verticalHalfBlock,
+        in: size
+      ) == CanvasSketchPoint(x: 2, y: 2)
+    )
+  }
+
+  @Test("sub-cell pointer locations preserve their fractional canvas position")
+  func subCellPointerLocationsPreserveFractionalPosition() {
+    let size = CellSize(width: 5, height: 6)
+    let pointer = PointerLocation.subCell(
+      location: Point(x: 2.5, y: 1.5),
+      source: .terminalPixels,
+      metrics: CellPixelMetrics(width: 8, height: 16, source: .reported)
+    )
+
+    #expect(
+      CanvasSketchDocument.subpixelPoint(
+        forLocalCell: pointer.location,
+        precision: pointer.precision,
+        in: size
+      ) == CanvasSketchPoint(x: 5, y: 6)
+    )
+    #expect(
+      CanvasPixelSketchDocument.pixelPoint(
+        forLocalCell: pointer.location,
+        precision: pointer.precision,
         mode: .verticalHalfBlock,
         in: size
       ) == CanvasSketchPoint(x: 2, y: 3)
@@ -209,7 +258,7 @@ struct CanvasDemoViewTests {
   }
 
   @Test("surface exposes a focusable pointer drawing region")
-  func surfaceExposesFocusablePointerRegion() {
+  func surfaceExposesFocusablePointerRegion() throws {
     let artifacts = render(
       CanvasDemoSurface(
         document: CanvasSketchDocument(
@@ -221,7 +270,18 @@ struct CanvasDemoViewTests {
     )
 
     #expect(!artifacts.semanticSnapshot.focusRegions.isEmpty)
-    #expect(!artifacts.semanticSnapshot.interactionRegions.isEmpty)
+    let drawingRegion = try #require(
+      artifacts.semanticSnapshot.interactionRegions.first {
+        $0.rect.size == CellSize(width: 6, height: 3)
+      }
+    )
+    #expect(
+      drawingRegion.rect
+        == CellRect(
+          origin: CellPoint(x: 1, y: 1),
+          size: CellSize(width: 6, height: 3)
+        )
+    )
   }
 
   @Test("pixel surface renders half-block Canvas pixels")
@@ -245,6 +305,31 @@ struct CanvasDemoViewTests {
             && (cell.style?.foregroundColor != nil || cell.style?.backgroundColor != nil)
         }
       }
+    )
+  }
+
+  @Test("pixel surface pointer drawing region excludes the border")
+  func pixelSurfacePointerDrawingRegionExcludesBorder() throws {
+    let artifacts = render(
+      CanvasDemoPixelSurface(
+        document: CanvasPixelSketchDocument(size: CellSize(width: 8, height: 6)),
+        mode: .verticalHalfBlock
+      ),
+      width: 16,
+      height: 8
+    )
+
+    let drawingRegion = try #require(
+      artifacts.semanticSnapshot.interactionRegions.first {
+        $0.rect.size == CellSize(width: 8, height: 3)
+      }
+    )
+    #expect(
+      drawingRegion.rect
+        == CellRect(
+          origin: CellPoint(x: 1, y: 1),
+          size: CellSize(width: 8, height: 3)
+        )
     )
   }
 
