@@ -4,6 +4,11 @@
 
 Implemented for the POSIX terminal host.
 
+For the consolidated async rendering status, see
+[`../ASYNC_RENDERING.md`](../ASYNC_RENDERING.md). This file records only the
+presentation-write layer; it does not cover frame-tail layout, draw, or raster
+offload.
+
 `TerminalHost.present(_:)` still runs the render-to-presentation planning step
 on the caller's actor, but it no longer performs the potentially blocking
 terminal write inline. The host now batches the planned output into one string

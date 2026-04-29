@@ -12,6 +12,9 @@ The package is usable for real terminal interfaces. The main gaps are not in
 the fundamental pipeline; they are in breadth of surface area, app-shell
 ergonomics, and a few still-conservative runtime paths.
 
+Current async presentation and frame-tail worker ownership is summarized in
+[ASYNC_RENDERING.md](ASYNC_RENDERING.md).
+
 `alert`, `confirmationDialog`, `sheet`, and `toast` are part of the public
 `View` surface. The full ActionScope/commands rollout — `Panel`,
 `.keyCommand`, `.paletteCommand`, `.toolbar`, and `.toolbarItem` — has shipped
@@ -30,7 +33,8 @@ ergonomics, and a few still-conservative runtime paths.
 
 ### Runtime surface
 
-- `DefaultRenderer` for one-shot rendering and pipeline inspection from the main actor
+- `DefaultRenderer` for one-shot rendering, async runtime rendering, and pipeline
+  inspection from the main actor
 - `RunLoop` for interactive terminal sessions
 - `TerminalHost`, terminal appearance detection, graphics-capability probing, capability-aware presentation, and OSC 8 hyperlink emission when supported
 - host-owned `Theme` and paired `TerminalRenderStyle` updates so hosted

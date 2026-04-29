@@ -2,13 +2,16 @@
 
 ## Status
 
-Stages 1, 2, and scheduler Stages 3A/3B/3C implemented. Ordered commit remains
-the policy for started or completed frame-tail work and all future
-generation-dropping work.
+Stages 1 and 2 are implemented. Scheduler Stages 3A and 3B are implemented.
+Stage 3C, abortable prepared frame heads, was attempted and reverted; see
+[`../plans/2026-04-26-002-frame-head-abort-plan.md`](../plans/2026-04-26-002-frame-head-abort-plan.md).
+Ordered commit remains the policy for started or completed frame-tail work and
+all future generation-dropping work.
 
 See [`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md)
-for the concrete design needed before Stage 3 can safely cancel unstarted tail
-work.
+for the remaining design needed before Stage 3 can safely cancel unstarted tail
+work. For the consolidated current status, see
+[`../ASYNC_RENDERING.md`](../ASYNC_RENDERING.md).
 
 The current async frame-tail renderer intentionally preserves ordered commit:
 when a worker frame finishes, the main actor commits it before newer input state
@@ -259,7 +262,8 @@ Design prerequisite:
   [`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md).
 - [x] Coalesce not-yet-started render intent before starting the next render.
 - [x] Extract the async renderer frame-head and finish boundaries.
-- [x] Make prepared frame heads abortable before worker tail work commits.
+- [ ] Redesign prepared-frame rollback or draft-only side effects before worker
+  tail work can be cancelled. The first abort implementation was reverted.
 
 - Teach the serial worker to skip jobs that have not started and are superseded.
 - Restrict cancellation to jobs with no worker-owned mutation.

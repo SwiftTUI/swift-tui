@@ -8,6 +8,9 @@ proposal: "../proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md"
 
 # refactor: make prepared frame heads abortable
 
+> **Note:** This implementation was reverted. The consolidated current-state
+> summary lives in [../ASYNC_RENDERING.md](../ASYNC_RENDERING.md).
+
 ## Overview
 
 Make `DefaultRenderer` frame-head preparation reversible so a future runtime

@@ -10,7 +10,10 @@ The runtime presents one committed frame at a time through the same strict pipel
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-`RunLoop` integrates terminal I/O, invalidation scheduling, input, signals, lifecycle staging, and task reconciliation around that pure frame pipeline.
+`RunLoop` integrates terminal I/O, invalidation scheduling, input, signals,
+lifecycle staging, and task reconciliation around that pure frame pipeline. See
+[ASYNC_RENDERING.md](ASYNC_RENDERING.md) for the current main-actor, worker, and
+writer-queue ownership split.
 
 For interactive sessions, the runtime owns the terminal alternate-screen buffer while running. That gives each `WindowGroup` a clean full-canvas presentation surface and restores the previous shell buffer on exit.
 
