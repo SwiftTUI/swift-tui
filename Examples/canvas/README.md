@@ -4,12 +4,13 @@ A small verification app for the current `Canvas` API. It exercises the
 interactive Braille subcell canvas and the dense pixel-grid canvas variants.
 
 The drawing surface deliberately uses `Canvas(Drawing)` and
-`CanvasDrawing.draw(into:)` with Braille subpixel coordinates. Drag input stores
-the fractional `Point` samples delivered by `DragGesture`, then maps them into
-the active canvas grid. The cursor and hover crosshair are Canvas overlays so
-the app stays inside today's public Canvas surface. The pixel-grid tabs use the
-same drawing controls while rendering through the full-cell and vertical
-half-block Canvas modes.
+`CanvasDrawing.draw(into:)` with Braille subpixel coordinates. Drag input maps
+`DragGesture` samples into the active canvas grid. Cell-only mouse samples
+anchor to the reported cell origin; true sub-cell samples keep their fractional
+position. The cursor and hover crosshair are Canvas overlays so the app stays
+inside today's public Canvas surface. The pixel-grid tabs use the same drawing
+controls while rendering through the full-cell and vertical half-block Canvas
+modes.
 
 ## Run
 

@@ -218,6 +218,17 @@ public struct CanvasSketchDocument: Equatable, Sendable {
     CanvasSketchDocument.subpixelPoint(forLocalCell: point, in: cellSize)
   }
 
+  func subpixelPoint(
+    forLocalCell point: Point,
+    precision: PointerPrecision
+  ) -> CanvasSketchPoint {
+    CanvasSketchDocument.subpixelPoint(
+      forLocalCell: point,
+      precision: precision,
+      in: cellSize
+    )
+  }
+
   public func cellLocation(for point: CanvasSketchPoint) -> Point {
     Point(
       x: (Double(point.x) + 0.5) / Double(Self.grid.subdivisionsX),
@@ -243,6 +254,17 @@ public struct CanvasSketchDocument: Equatable, Sendable {
         subdivisions: Self.grid.subdivisionsY,
         maxIndex: cellSize.height * Self.grid.subdivisionsY - 1
       )
+    )
+  }
+
+  static func subpixelPoint(
+    forLocalCell point: Point,
+    precision: PointerPrecision,
+    in cellSize: CellSize
+  ) -> CanvasSketchPoint {
+    subpixelPoint(
+      forLocalCell: canvasPointerLocation(point, precision: precision),
+      in: cellSize
     )
   }
 
@@ -295,6 +317,33 @@ public struct CanvasSketchDocument: Equatable, Sendable {
     }
     return min(max(0, Int(scaled)), maxIndex)
   }
+}
+
+private func canvasPointerLocation(
+  _ point: Point,
+  precision: PointerPrecision
+) -> Point {
+  switch precision {
+  case .cell:
+    Point(point.containingCell)
+  case .subCell:
+    point
+  }
+}
+
+private func canvasPointerTargetPath(width: Int, height: Int) -> Path {
+  let width = max(0, width)
+  let height = max(0, height)
+  var path = Path()
+  guard width > 0, height > 0 else {
+    return path
+  }
+  path.move(to: .zero)
+  path.addLine(to: Point(x: Double(width), y: 0))
+  path.addLine(to: Point(x: Double(width), y: Double(height)))
+  path.addLine(to: Point(x: 0, y: Double(height)))
+  path.close()
+  return path
 }
 
 public struct CanvasPixelSketchDocument: Equatable, Sendable {
@@ -430,6 +479,19 @@ public struct CanvasPixelSketchDocument: Equatable, Sendable {
     CanvasPixelSketchDocument.pixelPoint(forLocalCell: point, mode: mode, in: size)
   }
 
+  func pixelPoint(
+    forLocalCell point: Point,
+    precision: PointerPrecision,
+    mode: CanvasPixelGridMode
+  ) -> CanvasSketchPoint {
+    CanvasPixelSketchDocument.pixelPoint(
+      forLocalCell: point,
+      precision: precision,
+      mode: mode,
+      in: size
+    )
+  }
+
   public static func pixelPoint(
     forLocalCell point: Point,
     mode: CanvasPixelGridMode,
@@ -446,6 +508,19 @@ public struct CanvasPixelSketchDocument: Equatable, Sendable {
     return CanvasSketchPoint(
       x: gridCoordinate(point.x, subdivisions: 1, maxIndex: size.width - 1),
       y: gridCoordinate(point.y, subdivisions: ySubdivisions, maxIndex: size.height - 1)
+    )
+  }
+
+  static func pixelPoint(
+    forLocalCell point: Point,
+    precision: PointerPrecision,
+    mode: CanvasPixelGridMode,
+    in size: CellSize
+  ) -> CanvasSketchPoint {
+    pixelPoint(
+      forLocalCell: canvasPointerLocation(point, precision: precision),
+      mode: mode,
+      in: size
     )
   }
 
@@ -551,7 +626,7 @@ public struct CanvasCursorDrawing: CanvasDrawing, Equatable {
 public struct CanvasDemoSurface: View {
   @Binding private var document: CanvasSketchDocument
   public var tool: CanvasSketchTool
-  @State private var lastDragLocation: Point?
+  @State private var lastDragPoint: CanvasSketchPoint?
   @State private var hoverLocation: Point?
 
   public init(
@@ -571,53 +646,69 @@ public struct CanvasDemoSurface: View {
   }
 
   public var body: some View {
-    let snapshot = document
-    return ZStack(alignment: .topLeading) {
-      Canvas(grid: .braille2x4, CanvasSketchDrawing(document: snapshot))
-        .foregroundStyle(Color.cyan)
-        .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
-      Canvas(grid: .braille2x4, CanvasCursorDrawing(cursor: snapshot.cursor))
-        .foregroundStyle(Color.yellow)
-        .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
-      Canvas(grid: .braille2x4, CanvasHoverDrawing(location: hoverLocation))
-        .foregroundStyle(Color.magenta)
-        .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
-    }
-    .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
-    .border(.separator)
-    .focusable(true, interactions: .edit)
-    .gesture(
-      DragGesture(minimumDistance: 0, coordinateSpace: .local)
-        .onChanged { value in
-          applyDragChange(value)
-        }
-        .onEnded { value in
-          applyDragEnd(value)
-        }
-    )
-    .onPointerHover { phase in
-      updateHover(phase)
+    EnvironmentReader(\.pointerInputCapabilities) { pointerInputCapabilities in
+      let snapshot = document
+      ZStack(alignment: .topLeading) {
+        Canvas(grid: .braille2x4, CanvasSketchDrawing(document: snapshot))
+          .foregroundStyle(Color.cyan)
+          .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
+        Canvas(grid: .braille2x4, CanvasCursorDrawing(cursor: snapshot.cursor))
+          .foregroundStyle(Color.yellow)
+          .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
+        Canvas(grid: .braille2x4, CanvasHoverDrawing(location: hoverLocation))
+          .foregroundStyle(Color.magenta)
+          .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
+      }
+      .frame(width: snapshot.cellSize.width, height: snapshot.cellSize.height)
+      .contentShape(
+        canvasPointerTargetPath(
+          width: snapshot.cellSize.width,
+          height: snapshot.cellSize.height
+        )
+      )
+      .gesture(
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+          .onChanged { value in
+            applyDragChange(value)
+          }
+          .onEnded { value in
+            applyDragEnd(value)
+          }
+      )
+      .onPointerHover { phase in
+        updateHover(phase, precision: pointerInputCapabilities.precision)
+      }
+      .border(.separator)
+      .focusable(true, interactions: .edit)
     }
   }
 
   private func applyDragChange(_ value: DragGesture.Value) {
-    let start = lastDragLocation ?? value.startLocation
-    let end = value.location
-    document.apply(tool, fromLocalCell: start, toLocalCell: end)
-    lastDragLocation = end
+    let start =
+      lastDragPoint
+      ?? document.subpixelPoint(
+        forLocalCell: value.startLocation, precision: value.pointer.precision)
+    let end = document.subpixelPoint(
+      forLocalCell: value.location, precision: value.pointer.precision)
+    document.apply(tool, from: start, to: end)
+    lastDragPoint = end
   }
 
   private func applyDragEnd(_ value: DragGesture.Value) {
-    let start = lastDragLocation ?? value.startLocation
-    let end = value.location
-    document.apply(tool, fromLocalCell: start, toLocalCell: end)
-    lastDragLocation = nil
+    let start =
+      lastDragPoint
+      ?? document.subpixelPoint(
+        forLocalCell: value.startLocation, precision: value.pointer.precision)
+    let end = document.subpixelPoint(
+      forLocalCell: value.location, precision: value.pointer.precision)
+    document.apply(tool, from: start, to: end)
+    lastDragPoint = nil
   }
 
-  private func updateHover(_ phase: HoverPhase) {
+  private func updateHover(_ phase: HoverPhase, precision: PointerPrecision) {
     switch phase {
     case .entered(let location), .moved(let location):
-      hoverLocation = location
+      hoverLocation = canvasPointerLocation(location, precision: precision)
     case .exited:
       hoverLocation = nil
     }
@@ -660,7 +751,7 @@ public struct CanvasDemoPixelSurface: View {
   @Binding private var document: CanvasPixelSketchDocument
   public var mode: CanvasPixelGridMode
   public var tool: CanvasSketchTool
-  @State private var lastDragLocation: Point?
+  @State private var lastDragPoint: CanvasSketchPoint?
 
   public init(
     document: Binding<CanvasPixelSketchDocument>,
@@ -697,8 +788,12 @@ public struct CanvasDemoPixelSurface: View {
         .frame(width: snapshot.width, height: cellHeight)
     }
     .frame(width: snapshot.width, height: cellHeight)
-    .border(.separator)
-    .focusable(true, interactions: .edit)
+    .contentShape(
+      canvasPointerTargetPath(
+        width: snapshot.width,
+        height: cellHeight
+      )
+    )
     .gesture(
       DragGesture(minimumDistance: 0, coordinateSpace: .local)
         .onChanged { value in
@@ -708,20 +803,42 @@ public struct CanvasDemoPixelSurface: View {
           applyDragEnd(value)
         }
     )
+    .border(.separator)
+    .focusable(true, interactions: .edit)
   }
 
   private func applyDragChange(_ value: DragGesture.Value) {
-    let start = lastDragLocation ?? value.startLocation
-    let end = value.location
-    document.apply(tool, fromLocalCell: start, toLocalCell: end, mode: mode)
-    lastDragLocation = end
+    let start =
+      lastDragPoint
+      ?? document.pixelPoint(
+        forLocalCell: value.startLocation,
+        precision: value.pointer.precision,
+        mode: mode
+      )
+    let end = document.pixelPoint(
+      forLocalCell: value.location,
+      precision: value.pointer.precision,
+      mode: mode
+    )
+    document.apply(tool, from: start, to: end)
+    lastDragPoint = end
   }
 
   private func applyDragEnd(_ value: DragGesture.Value) {
-    let start = lastDragLocation ?? value.startLocation
-    let end = value.location
-    document.apply(tool, fromLocalCell: start, toLocalCell: end, mode: mode)
-    lastDragLocation = nil
+    let start =
+      lastDragPoint
+      ?? document.pixelPoint(
+        forLocalCell: value.startLocation,
+        precision: value.pointer.precision,
+        mode: mode
+      )
+    let end = document.pixelPoint(
+      forLocalCell: value.location,
+      precision: value.pointer.precision,
+      mode: mode
+    )
+    document.apply(tool, from: start, to: end)
+    lastDragPoint = nil
   }
 }
 
