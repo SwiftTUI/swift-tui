@@ -147,13 +147,13 @@ public enum ToolOps {
     return copy
   }
 
-  /// Bresenham line — used by the pen tool when the cursor jumps so
-  /// quickly that consecutive paint operations would leave gaps.
+  /// Bresenham line — used by pen/eraser strokes when consecutive
+  /// pointer samples would otherwise leave gaps. Pass `nil` to clear.
   public static func line(
     on buffer: PixelBuffer,
     from a: PixelPoint,
     to b: PixelPoint,
-    color: PaletteIndex
+    color: PaletteIndex?
   ) -> PixelBuffer {
     var copy = buffer
     var x0 = a.x
