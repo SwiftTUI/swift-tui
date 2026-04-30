@@ -12,5 +12,8 @@
   ],
   "dependencies": {
     "@openai/codex": "^0.121.0"
+  },
+  "devDependencies": {
+    "yaml": "^2.8.3"
   }
 }
