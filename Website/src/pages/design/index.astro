@@ -1,0 +1,67 @@
+---
+import Base from "@layouts/Base.astro";
+import { docOverlays } from "@/lib/doc-overlays";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const designDocs = Object.values(docOverlays)
+  .filter((o) => o.section === "design")
+  .sort((a, b) => a.order - b.order);
+---
+
+<Base
+  title="Design"
+  description="Engineering essays on the TerminalUI architecture, runtime, and pipeline."
+  pageKey="design"
+>
+  <article class="prose article-body" style="margin-top: var(--space-2xl);">
+    <p class="eyebrow">Design</p>
+    <h1>How it's built.</h1>
+    <p>
+      Each essay below is sourced directly from the canonical document in
+      <code>/docs/</code>. Updates to the repo flow through to this site at
+      build time — there is no copy, just one source of truth.
+    </p>
+  </article>
+  <section class="info-block" style="border-top: 1px solid var(--border);">
+    <div class="info-copy" style="display: none;"></div>
+    <div class="card-grid card-grid--three" style="grid-column: 1 / -1;">
+      {
+        designDocs.map((d, i) => (
+          <a class="card" href={`${base}/${d.slug}`} data-index={String(i + 1).padStart(2, "0")}>
+            <h3>{d.title}</h3>
+            <p>{d.description}</p>
+            <span class="card-tag">{d.audience === "collaborator" ? "Collaborator" : "Both audiences"}</span>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="info-block" style="border-bottom: 0;">
+    <div class="info-copy">
+      <p class="section-label">Open work</p>
+      <h2>What's still being decided.</h2>
+      <p>
+        Active proposals, decision records, and the implementation-plan
+        timeline. The accumulated map of where the project is going.
+      </p>
+    </div>
+    <div class="card-grid card-grid--three">
+      <a class="card" href={`${base}/proposals`}>
+        <h3>Active proposals</h3>
+        <p>Designs currently shaping decisions. Curated subset of /docs/proposals/.</p>
+        <span class="card-tag">→ Open</span>
+      </a>
+      <a class="card" href={`${base}/decisions`}>
+        <h3>Decisions ledger</h3>
+        <p>Architecture decision records — short, dated, durable.</p>
+        <span class="card-tag">→ Open</span>
+      </a>
+      <a class="card" href={`${base}/changelog`}>
+        <h3>Changelog</h3>
+        <p>Date-stamped implementation plans, grouped by status.</p>
+        <span class="card-tag">→ Open</span>
+      </a>
+    </div>
+  </section>
+</Base>

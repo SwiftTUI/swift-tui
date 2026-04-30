@@ -7,7 +7,8 @@
   },
   "workspaces": [
     "GUI/WebTUIGUI",
-    "Examples/WebExample"
+    "Examples/WebExample",
+    "Website"
   ],
   "dependencies": {
     "@openai/codex": "^0.121.0"

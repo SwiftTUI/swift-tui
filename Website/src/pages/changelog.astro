@@ -1,0 +1,157 @@
+---
+import { getCollection } from "astro:content";
+import Base from "@layouts/Base.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+// Pull plans from /docs/plans, sort newest first.
+const plans = await getCollection("plans");
+const sorted = plans.slice().sort((a, b) => {
+  const aDate = a.data.date as Date;
+  const bDate = b.data.date as Date;
+  return bDate.getTime() - aDate.getTime();
+});
+
+const groupedByStatus = {
+  active: sorted.filter((p) => p.data.status === "active"),
+  reverted: sorted.filter((p) => p.data.status === "reverted"),
+  shipped: sorted.filter((p) => p.data.status === "shipped"),
+} as const;
+
+const statusLabel: Record<string, string> = {
+  active: "Active",
+  shipped: "Shipped",
+  reverted: "Reverted",
+  "design-approved": "Design approved",
+};
+
+const statusColor: Record<string, string> = {
+  active: "var(--accent)",
+  shipped: "var(--text-display)",
+  reverted: "var(--accent)",
+  "design-approved": "var(--text-secondary)",
+};
+
+const formatDate = (d: Date) =>
+  d.toISOString().slice(0, 10);
+
+// Map plan id (e.g. "2026-04-26-001-off-main-frame-tail-rendering-plan")
+// to a github source link.
+const githubBaseUrl =
+  "https://github.com/GoodHatsLLC/swift-terminal-ui/blob/main/docs/plans";
+
+const planSourceUrl = (id: string) => `${githubBaseUrl}/${id.toUpperCase().replace(/^[A-Z]/, (c) => c.toLowerCase())}.md`;
+
+// The above mapping is messy because plan slugs come back lowercased. Let's
+// build a more reliable mapping by scanning known filenames.
+const planFilenames: Record<string, string> = {
+  "2026-04-18-001-refactor-terminal-paint-pipeline-plan": "2026-04-18-001-refactor-terminal-paint-pipeline-plan.md",
+  "2026-04-20-001-cell-pixel-metrics-plan": "2026-04-20-001-cell-pixel-metrics-plan.md",
+  "2026-04-20-002-drop-destination-plan": "2026-04-20-002-drop-destination-plan.md",
+  "2026-04-24-001-layouts-example-plan": "2026-04-24-001-layouts-example-plan.md",
+  "2026-04-26-001-off-main-frame-tail-rendering-plan": "2026-04-26-001-off-main-frame-tail-rendering-plan.md",
+  "2026-04-26-002-frame-head-abort-plan": "2026-04-26-002-frame-head-abort-plan.md",
+  "2026-04-26-003-border-stroke-simplification-plan": "2026-04-26-003-border-stroke-simplification-plan.md",
+  "2026-04-28-001-canvas-adaptation-plan": "2026-04-28-001-canvas-adaptation-plan.md",
+};
+---
+
+<Base
+  title="Changelog"
+  description="Implementation plans, ordered by date. The shipping ledger of TerminalUI."
+  pageKey="design"
+>
+  <article class="prose article-body" style="margin-top: var(--space-2xl);">
+    <p class="eyebrow">Changelog</p>
+    <h1>The shipping ledger.</h1>
+    <p>
+      Each entry below is a date-stamped implementation plan from
+      <code>/docs/plans/</code>. Active plans are still in flight; shipped
+      plans landed and the work is in <code>main</code>; reverted plans
+      capture attempts that didn't survive contact with the codebase.
+    </p>
+  </article>
+
+  {
+    (["active", "reverted", "shipped"] as const).map((status) => (
+      <section class="info-block" style="border-top: 1px solid var(--border);">
+        <div class="info-copy">
+          <p class="section-label" style={`color: ${statusColor[status]};`}>
+            {statusLabel[status]}
+          </p>
+          <h2>
+            {status === "active" && "Currently in flight"}
+            {status === "reverted" && "Tried, reverted, learned"}
+            {status === "shipped" && "Landed and live"}
+          </h2>
+          <p>
+            {status === "active" &&
+              "Plans being executed now. Status reflects the latest commit."}
+            {status === "reverted" &&
+              "These didn't land — but the post-mortems are some of the most useful institutional memory in the project."}
+            {status === "shipped" &&
+              "The accumulated record of what's been built. Each plan retained as a frozen artifact of how the work happened."}
+          </p>
+        </div>
+        <div style="display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border);">
+          {groupedByStatus[status].length === 0 && (
+            <div style="padding: var(--space-xl); background: var(--black); color: var(--text-disabled); font-family: var(--font-mono); font-size: 0.875rem;">
+              None.
+            </div>
+          )}
+          {groupedByStatus[status].map((plan) => {
+            const filename = planFilenames[plan.id] ?? `${plan.id}.md`;
+            const sourceUrl = `${githubBaseUrl}/${filename}`;
+            return (
+              <article style="display: grid; grid-template-columns: 100px 1fr auto; gap: var(--space-md); padding: var(--space-lg) var(--space-xl); background: var(--black);">
+                <span style="font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--text-disabled); padding-top: 4px;">
+                  {formatDate(plan.data.date as Date)}
+                </span>
+                <div>
+                  <h3 style="margin: 0; font-family: var(--font-body); font-size: 1.0625rem; font-weight: 500; color: var(--text-display); line-height: 1.3;">
+                    {plan.data.title}
+                  </h3>
+                  <p style="margin: var(--space-sm) 0 0; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--text-secondary);">
+                    {plan.data.type} · {plan.id}
+                  </p>
+                </div>
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style="font-family: var(--font-mono); font-size: 11px; letter-spacing: var(--label-tracking); text-transform: uppercase; color: var(--text-secondary); padding-top: 4px;"
+                >
+                  Source ↗
+                </a>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    ))
+  }
+
+  <section class="info-block" style="border-bottom: 0;">
+    <div class="info-copy">
+      <p class="section-label">Convention</p>
+      <h2>How plans work.</h2>
+      <p>
+        Plans are date-stamped (<code>YYYY-MM-DD-NNN-slug.md</code>) and
+        carry frontmatter declaring their status. The lifecycle is:
+        <strong style="color: var(--text-display);">active</strong>
+        → <strong style="color: var(--text-display);">shipped</strong>
+        (or → <strong style="color: var(--accent);">reverted</strong>
+        with a post-mortem). Shipped plans are not deleted — they're the
+        project's institutional memory.
+      </p>
+    </div>
+    <div class="info-panel" style="padding: var(--space-2xl); display: grid; gap: var(--space-md);">
+      <div>
+        <span style="font-family: var(--font-mono); font-size: 11px; letter-spacing: var(--label-tracking); text-transform: uppercase; color: var(--text-display);">Want to write a plan?</span>
+      </div>
+      <p style="margin: 0; color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6;">
+        See <a href={`${base}/contribute`} style="color: var(--text-display); border-bottom: 1px solid var(--border-visible);">Contribute</a> for the proposal-and-plan lifecycle, frontmatter shape, and how a plan graduates to a shipped record.
+      </p>
+    </div>
+  </section>
+</Base>
