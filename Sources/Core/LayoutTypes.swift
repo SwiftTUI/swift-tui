@@ -591,6 +591,10 @@ public final class CustomLayoutHandle: Sendable {
       @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, CellRect, LayoutPassContext?) ->
         [PlacedNode]
     )?
+  package let stackMinimumMainSizeHandler:
+    (
+      @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Axis, LayoutPassContext?) -> Int?
+    )?
 
   public init(
     _ proxy: some CustomLayoutProxy,
@@ -602,6 +606,7 @@ public final class CustomLayoutHandle: Sendable {
     self.measurementReuseSignature = measurementReuseSignature
     self.placementReuseSignature = placementReuseSignature
     placementHandler = nil
+    stackMinimumMainSizeHandler = nil
   }
 
   package init(
@@ -613,6 +618,10 @@ public final class CustomLayoutHandle: Sendable {
       (
         @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, CellRect, LayoutPassContext?) ->
           [PlacedNode]
+      )? = nil,
+    stackMinimumMainSizeHandler:
+      (
+        @Sendable (LayoutEngine, ResolvedNode, MeasuredNode, Axis, LayoutPassContext?) -> Int?
       )? = nil
   ) {
     self.proxy = proxy
@@ -620,6 +629,7 @@ public final class CustomLayoutHandle: Sendable {
     self.placementReuseSignature = placementReuseSignature
     self.workerProxy = workerProxy
     self.placementHandler = placementHandler
+    self.stackMinimumMainSizeHandler = stackMinimumMainSizeHandler
   }
 
   public var debugName: String {
@@ -704,6 +714,16 @@ public final class CustomLayoutHandle: Sendable {
       measured: measured,
       in: bounds
     )
+  }
+
+  package func stackMinimumMainSize(
+    engine: LayoutEngine,
+    node: ResolvedNode,
+    idealMeasurement: MeasuredNode,
+    axis: Axis,
+    passContext: LayoutPassContext?
+  ) -> Int? {
+    stackMinimumMainSizeHandler?(engine, node, idealMeasurement, axis, passContext)
   }
 }
 

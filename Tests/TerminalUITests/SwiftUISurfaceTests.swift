@@ -5633,6 +5633,33 @@ struct SwiftUISurfaceTests {
     #expect(priorityArtifacts.rasterSurface.lines == ["WideTe"])
   }
 
+  @Test("horizontal ScrollView preserves bordered content height in tight vertical stacks")
+  func horizontalScrollViewPreservesBorderedContentHeightInTightVerticalStacks() {
+    let artifacts = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("Header")
+          .frame(width: 8, height: 4, alignment: .topLeading)
+
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 0) {
+            Text("A")
+              .frame(width: 3, height: 1, alignment: .topLeading)
+              .border(.separator, set: .single)
+            Text("B")
+              .frame(width: 3, height: 1, alignment: .topLeading)
+              .border(.separator, set: .single)
+          }
+        }
+      },
+      context: .init(identity: testIdentity("TightHorizontalScrollBorder")),
+      proposal: .init(width: 8, height: 6)
+    )
+
+    #expect(artifacts.measuredTree.measuredSize.height == 7)
+    #expect(artifacts.rasterSurface.cells.indices.contains(6))
+    #expect(artifacts.rasterSurface.cells[6][0].character == "└")
+  }
+
   @Test(
     "finite vertical stacks allow unclipped children to overflow a constrained frame"
   )

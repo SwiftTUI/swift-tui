@@ -246,7 +246,7 @@ public struct ScrollView<Content: View>: View, ResolvableView {
   }
 }
 
-private struct ScrollViewLayout: SendableLayout {
+private struct ScrollViewLayout: SendableLayout, StackMinimumLayoutProviding {
   private struct IndicatorInsets: Equatable {
     var trailing: Int = 0
     var bottom: Int = 0
@@ -256,6 +256,19 @@ private struct ScrollViewLayout: SendableLayout {
   var position: ScrollPosition
   var showsIndicators: Bool
   func makeCache(subviews _: LayoutSubviews) {}
+
+  func stackMinimumMainSize(
+    axis: Core.Axis,
+    idealSize: LayoutSize
+  ) -> Int? {
+    switch axis {
+    case .horizontal:
+      return axes.contains(.horizontal) ? nil : idealSize.width
+    case .vertical:
+      return axes.contains(.vertical) ? nil : idealSize.height
+    }
+  }
+
   func sizeThatFits(
     proposal: ProposedViewSize,
     subviews: LayoutSubviews,
