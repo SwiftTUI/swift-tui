@@ -47,46 +47,12 @@ extension LayoutEngine {
       guard case .unspecified = crossDimension(of: parentProposal, for: axis) else {
         return idealMeasurements
       }
-      let maxIdealCross = idealMeasurements.reduce(0) { partial, measurement in
-        max(partial, crossDimension(of: measurement.measuredSize, for: axis))
-      }
-      guard maxIdealCross > 0 else {
-        return idealMeasurements
-      }
-      // Fast path: if every child's ideal cross already matches the
-      // max, there is no slack for a flexible child (Spacer,
-      // frame(maxWidth:.infinity)) to claim, so re-measuring with a
-      // finite cross produces the same result.  Skipping the second
-      // pass keeps homogeneous stacks out of the measurement cache's
-      // resize-cost path.
-      let needsReconciliation = idealMeasurements.contains { measurement in
-        crossDimension(of: measurement.measuredSize, for: axis) < maxIdealCross
-      }
-      guard needsReconciliation else {
-        return idealMeasurements
-      }
-      // Only re-measure children that could actually adapt to the
-      // wider cross axis.  Children already at the max have no slack
-      // to claim, and rigid text-like leaves (Text, TextFigure,
-      // RichText, Rule) return the same measurement at any cross that
-      // is wider than their ideal.  Skipping them keeps the clean
-      // siblings of an asymmetric stack out of the re-measurement
-      // path so their placed tree can still be reused across frames.
-      return idealMeasurements.enumerated().map { index, ideal in
-        let idealCross = crossDimension(of: ideal.measuredSize, for: axis)
-        guard idealCross < maxIdealCross else {
-          return ideal
-        }
-        if stackChildRemeasurementIsNoop(children[index], parentStackAxis: axis) {
-          return ideal
-        }
-        let reProposal = stackProposal(
-          axis: axis,
-          main: .finite(mainDimension(of: ideal.measuredSize, for: axis)),
-          cross: .finite(maxIdealCross)
-        )
-        return measure(children[index], proposal: reProposal, passContext: passContext)
-      }
+      return reconcileUnspecifiedStackCrossAxis(
+        children,
+        measurements: idealMeasurements,
+        axis: axis,
+        passContext: passContext
+      )
     }
 
     let spacingBudget = resolvedStackSpacings(
@@ -116,7 +82,7 @@ extension LayoutEngine {
       )
     }
 
-    return children.enumerated().map { index, child in
+    let allocatedMeasurements = children.enumerated().map { index, child in
       var measurement = measure(
         child,
         proposal: stackProposal(
@@ -135,6 +101,17 @@ extension LayoutEngine {
       }
       return measurement
     }
+
+    guard case .unspecified = crossDimension(of: parentProposal, for: axis) else {
+      return allocatedMeasurements
+    }
+
+    return reconcileUnspecifiedStackCrossAxis(
+      children,
+      measurements: allocatedMeasurements,
+      axis: axis,
+      passContext: passContext
+    )
   }
 
   package func stackChildren(
@@ -600,6 +577,55 @@ extension LayoutEngine {
 
   package func isSpacer(_ child: ResolvedNode) -> Bool {
     child.kind == .view("Spacer")
+  }
+
+  private func reconcileUnspecifiedStackCrossAxis(
+    _ children: [ResolvedNode],
+    measurements: [MeasuredNode],
+    axis: Axis,
+    passContext: LayoutPassContext?
+  ) -> [MeasuredNode] {
+    let maxCross = measurements.reduce(0) { partial, measurement in
+      max(partial, crossDimension(of: measurement.measuredSize, for: axis))
+    }
+    guard maxCross > 0 else {
+      return measurements
+    }
+
+    // Fast path: if every child's cross already matches the max, there
+    // is no slack for a flexible child (Spacer, frame(maxWidth:.infinity))
+    // to claim, so re-measuring with a finite cross produces the same
+    // result. Skipping the second pass keeps homogeneous stacks out of
+    // the measurement cache's resize-cost path.
+    let needsReconciliation = measurements.contains { measurement in
+      crossDimension(of: measurement.measuredSize, for: axis) < maxCross
+    }
+    guard needsReconciliation else {
+      return measurements
+    }
+
+    // Only re-measure children that could actually adapt to the wider
+    // cross axis. Children already at the max have no slack to claim,
+    // and rigid text-like leaves (Text, TextFigure, RichText, Rule)
+    // return the same measurement at any cross that is wider than their
+    // ideal. Skipping them keeps the clean siblings of an asymmetric
+    // stack out of the re-measurement path so their placed tree can
+    // still be reused across frames.
+    return measurements.enumerated().map { index, measurement in
+      let currentCross = crossDimension(of: measurement.measuredSize, for: axis)
+      guard currentCross < maxCross else {
+        return measurement
+      }
+      if stackChildRemeasurementIsNoop(children[index], parentStackAxis: axis) {
+        return measurement
+      }
+      let reProposal = stackProposal(
+        axis: axis,
+        main: .finite(mainDimension(of: measurement.measuredSize, for: axis)),
+        cross: .finite(maxCross)
+      )
+      return measure(children[index], proposal: reProposal, passContext: passContext)
+    }
   }
 
   /// Whether re-measuring `child` with a wider cross dimension (for
