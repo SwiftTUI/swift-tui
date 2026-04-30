@@ -1,12 +1,19 @@
 import { defineConfig } from "astro/config";
 import mdx from "@astrojs/mdx";
 
-// The site is published under https://goodhatsllc.github.io/swift-terminal-ui/
-// alongside the DocC export at /docs/. The site path uses the repo name as
-// `base`. Local previews run at http://localhost:4321/swift-terminal-ui/.
+// Deployment targets:
+//   - GitHub Pages (default):    https://goodhatsllc.github.io/swift-terminal-ui/
+//   - Cloudflare Pages:          override via ASTRO_SITE + ASTRO_BASE env vars
+//                                (typically ASTRO_BASE=/ for root-served deploys)
+//
+// Local previews run at http://localhost:4321/swift-terminal-ui/ unless ASTRO_BASE
+// is overridden in the environment.
+const site = process.env.ASTRO_SITE ?? "https://goodhatsllc.github.io";
+const base = process.env.ASTRO_BASE ?? "/swift-terminal-ui";
+
 export default defineConfig({
-  site: "https://goodhatsllc.github.io",
-  base: "/swift-terminal-ui",
+  site,
+  base,
   trailingSlash: "ignore",
   integrations: [mdx()],
   build: {
