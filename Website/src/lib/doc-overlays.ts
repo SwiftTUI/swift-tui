@@ -122,11 +122,20 @@ export const docOverlays: Record<string, DocOverlay> = {
   public_api_inventory: {
     title: "Public API Inventory",
     description:
-      "Canonical public surface, removed surface, and package-only seams.",
+      "Prose reference for the canonical public surface, removed surface, and package-only seams.",
     audience: "collaborator",
     section: "policy",
     order: 20,
     slug: "policy/api-inventory",
+  },
+  public_api_baseline: {
+    title: "Public API Baseline",
+    description:
+      "Generated enumeration of every public Swift symbol, classified through public_api_overrides.yml.",
+    audience: "collaborator",
+    section: "policy",
+    order: 25,
+    slug: "policy/api-baseline",
   },
   testing_and_fixture_policy: {
     title: "Testing & Fixture Policy",
