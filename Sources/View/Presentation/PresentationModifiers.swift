@@ -75,6 +75,45 @@ package func confirmationDialogPromptPresentationSpec() -> PromptPresentationSpe
   )
 }
 
+/// Spec for `Menu`'s expanded content. Routes through the same sheet
+/// presentation registry as `.sheet(...)` but with a unique `"menu"`
+/// token (so menu attachment IDs never collide with sheet attachment
+/// IDs on the same source identity) and `.menu` chrome (so the
+/// rendering surface is a compact, intrinsic-width bordered box with no
+/// header).
+///
+/// **v1 behavior caveats** — the menu is hosted by the sheet
+/// coordinator, so `disablesBaseInteractionWhenActive` (sheet's
+/// surrounding-content disable) applies while a menu is open. A future
+/// dedicated `MenuPresentationCoordinator` will let menus stay open
+/// without disabling the surrounding UI.
+package func menuPromptPresentationSpec() -> PromptPresentationSpec {
+  PromptPresentationSpec(
+    token: "menu",
+    descriptor: .init(
+      alignment: .topLeading,
+      presentationRole: .menu,
+      backdropOpacity: 0,
+      defaultDismissTitle: "Close",
+      headerTone: .accent,
+      minWidth: 0,
+      // Menus auto-size to content; the scroll bounds below act only as
+      // a safety cap if a menu's content grows past the visible area.
+      scrollMinHeight: 1,
+      scrollIdealHeight: 8,
+      scrollMaxHeight: 32,
+      bodyMode: .contentOnly,
+      chrome: .menu
+    ),
+    reconcile: { registry, sourceIdentity, item in
+      registry.sheet.sync(
+        sourceIdentity: sourceIdentity,
+        items: [item]
+      )
+    }
+  )
+}
+
 package func sheetPromptPresentationSpec(
   backdropOpacity: Double = 0,
   chrome: PresentationChrome = .surface
@@ -86,11 +125,16 @@ package func sheetPromptPresentationSpec(
     switch chrome {
     case .surface: .center
     case .dropdown: .topLeading
+    // .menu is dispatched through `menuPromptPresentationSpec()`; if a
+    // caller manually plumbs it through this sheet builder, fall back
+    // to the dropdown-flavored top-leading anchoring.
+    case .menu: .topLeading
     }
   let minWidth: Int =
     switch chrome {
     case .surface: 20
     case .dropdown: 0
+    case .menu: 0
     }
   return PromptPresentationSpec(
     token: "sheet",
@@ -415,6 +459,10 @@ package struct HostedPromptPresentation: View {
       switch item.descriptor.chrome {
       case .surface: .init(top: 1, leading: 1, bottom: 1, trailing: 1)
       case .dropdown: .init(top: 0, leading: 0, bottom: 0, trailing: 0)
+      // Menu chrome supplies its own padding around its bordered box;
+      // the host applies a small leading/top inset so the box doesn't
+      // kiss the terminal edge when the menu opens at top-leading.
+      case .menu: .init(top: 0, leading: 1, bottom: 0, trailing: 0)
       }
     return ZStack(alignment: .topLeading) {
       if item.descriptor.backdropOpacity > 0 {
@@ -502,6 +550,28 @@ package struct PromptPresentationSurface: View, ActionScope {
           maxWidth: maximumWidth,
           alignment: .leading
         )
+        .focusScope()
+        .semanticMetadata(
+          .init(
+            presentationRole: item.descriptor.presentationRole
+          )
+        )
+    case .menu:
+      // Menu chrome: compact, intrinsic-width bordered box. No header
+      // row (the trigger that opened it stays in place behind the
+      // overlay), no close button (Escape dismisses), no max-width cap
+      // (the menu sizes to its longest item).
+      menuContentBody
+        .padding(.init(horizontal: 1, vertical: 1))
+        .background {
+          Rectangle().fill(.terminalSurfaceBackground)
+        }
+        .overlay {
+          Rectangle().strokeBorder(
+            .terminalBorder(.accent),
+            style: StrokeStyle(borderSet: .innerHalfBlock, placement: .outset)
+          )
+        }
         .focusScope()
         .semanticMetadata(
           .init(
@@ -599,6 +669,24 @@ package struct PromptPresentationSurface: View, ActionScope {
       maxHeight: .finite(item.descriptor.scrollMaxHeight),
       alignment: .topLeading
     )
+  }
+
+  /// Menu rendering body — intrinsic-sized VStack of items with no
+  /// scrolling chrome. The menu sizes to its longest item; the
+  /// `scrollMaxHeight` from the descriptor is ignored intentionally so
+  /// short menus don't reserve extra empty rows below their last item.
+  ///
+  /// Iterates payloads via `ForEach` + per-item `DeferredPayloadView`
+  /// rather than `DeferredPayloadGroupView`. The group view returns a
+  /// single intrinsic-layout node when there are multiple payloads,
+  /// which would let menu items overlap in one row. Iterating gives
+  /// the VStack its own children to lay out vertically.
+  private var menuContentBody: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      ForEach(item.contentPayloads.indices, id: \.self) { index in
+        DeferredPayloadView(payload: item.contentPayloads[index])
+      }
+    }
   }
 
   private var presentationActions: some View {

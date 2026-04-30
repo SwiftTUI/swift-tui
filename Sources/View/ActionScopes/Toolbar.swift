@@ -246,6 +246,7 @@ private struct ToolbarItemButton: View {
         Text(config.title)
       }
     }
+    .systemHint(config.systemHint)
     .disabled(!config.isEnabled)
   }
 }

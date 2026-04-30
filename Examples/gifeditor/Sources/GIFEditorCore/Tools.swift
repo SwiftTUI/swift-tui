@@ -149,13 +149,24 @@ public enum ToolOps {
 
   /// Bresenham line — used by pen/eraser strokes when consecutive
   /// pointer samples would otherwise leave gaps. Pass `nil` to clear.
+  ///
+  /// `thickness` stamps a centered `thickness × thickness` square
+  /// (pencil-style square brush) at every Bresenham step, so a thick
+  /// stroke is gap-free even on diagonals. `thickness == 1` paints a
+  /// single pixel per step (the original behavior). When `selection` is
+  /// non-nil, the stamp is clipped to the selection rect.
   public static func line(
     on buffer: PixelBuffer,
     from a: PixelPoint,
     to b: PixelPoint,
-    color: PaletteIndex?
+    color: PaletteIndex?,
+    thickness: Int = 1,
+    selection: Selection? = nil
   ) -> PixelBuffer {
     var copy = buffer
+    let diameter = max(1, thickness)
+    let bounds = selection?.rect
+
     var x0 = a.x
     var y0 = a.y
     let x1 = b.x
@@ -166,7 +177,13 @@ public enum ToolOps {
     let sy = y0 < y1 ? 1 : -1
     var error = dx + dy
     while true {
-      copy[PixelPoint(x: x0, y: y0)] = color
+      stamp(
+        into: &copy,
+        at: PixelPoint(x: x0, y: y0),
+        diameter: diameter,
+        color: color,
+        bounds: bounds
+      )
       if x0 == x1 && y0 == y1 { break }
       let e2 = 2 * error
       if e2 >= dy {
@@ -181,6 +198,29 @@ public enum ToolOps {
       }
     }
     return copy
+  }
+
+  /// Stamps a centered `diameter × diameter` square of `color` into
+  /// `buffer`, clipped to `bounds` when non-nil. For even diameters the
+  /// square is biased one cell down/right of the geometric center (so a
+  /// 2×2 stamp at (3,3) covers (3,3)…(4,4)), keeping every diameter
+  /// stamping at least one pixel exactly at the requested center.
+  private static func stamp(
+    into buffer: inout PixelBuffer,
+    at center: PixelPoint,
+    diameter: Int,
+    color: PaletteIndex?,
+    bounds: PixelRect?
+  ) {
+    let lowOffset = (diameter - 1) / 2
+    let highOffset = diameter / 2
+    for dy in -lowOffset...highOffset {
+      for dx in -lowOffset...highOffset {
+        let point = PixelPoint(x: center.x + dx, y: center.y + dy)
+        if let bounds, !bounds.contains(point) { continue }
+        buffer[point] = color
+      }
+    }
   }
 
   /// Copies the rectangular region of `buffer` selected by `rect` into

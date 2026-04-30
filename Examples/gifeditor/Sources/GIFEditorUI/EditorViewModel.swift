@@ -74,6 +74,14 @@ public final class EditorViewModel {
   public var tool: EditorTool = .pen
   public var primaryColorIndex: PaletteIndex = 1
   public var secondaryColorIndex: PaletteIndex = 2
+  /// Pencil-style square brush diameter applied to pen and eraser
+  /// strokes. Clamped to 1...8 to keep stamps tractable on the small
+  /// canvas sizes the editor supports.
+  public var brushSize: Int = 1 {
+    didSet {
+      brushSize = brushSize.clamped(to: 1...8)
+    }
+  }
   public var cursor: GIFEditorCore.PixelPoint = .zero {
     didSet {
       cursor.x = cursor.x.clamped(to: 0...max(0, document.size.width - 1))
@@ -144,16 +152,12 @@ public final class EditorViewModel {
     switch tool {
     case .pen:
       recordUndoableEdit("Paint pixel") {
-        mutateCurrentLayer { buffer in
-          ToolOps.pen(on: buffer, at: cursor, color: primaryColorIndex)
-        }
+        strokeCurrentLayer(from: cursor, to: cursor, color: primaryColorIndex)
       }
       announce("Painted at \(cursor.x),\(cursor.y)")
     case .eraser:
       recordUndoableEdit("Erase pixel") {
-        mutateCurrentLayer { buffer in
-          ToolOps.erase(on: buffer, at: cursor)
-        }
+        strokeCurrentLayer(from: cursor, to: cursor, color: nil)
       }
       announce("Erased \(cursor.x),\(cursor.y)")
     case .fill:
@@ -239,6 +243,28 @@ public final class EditorViewModel {
   public func setSecondaryColor(_ index: PaletteIndex) {
     secondaryColorIndex = index
     announce("Secondary: slot \(Int(index))")
+  }
+
+  // MARK: - Brush
+
+  public func increaseBrushSize() {
+    let previous = brushSize
+    brushSize = min(8, previous + 1)
+    if brushSize == previous {
+      announce("Brush at maximum (\(brushSize))")
+    } else {
+      announce("Brush size: \(brushSize)")
+    }
+  }
+
+  public func decreaseBrushSize() {
+    let previous = brushSize
+    brushSize = max(1, previous - 1)
+    if brushSize == previous {
+      announce("Brush at minimum (\(brushSize))")
+    } else {
+      announce("Brush size: \(brushSize)")
+    }
   }
 
   // MARK: - Cursor
@@ -609,7 +635,13 @@ public final class EditorViewModel {
     color: PaletteIndex?
   ) {
     mutateCurrentLayer { buffer in
-      ToolOps.line(on: buffer, from: start, to: end, color: color)
+      ToolOps.line(
+        on: buffer,
+        from: start,
+        to: end,
+        color: color,
+        thickness: brushSize
+      )
     }
   }
 
