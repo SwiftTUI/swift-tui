@@ -1,0 +1,178 @@
+---
+import Base from "@layouts/Base.astro";
+import CodeSample from "@components/CodeSample.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const chartsExample = `import TerminalUI
+import TerminalUICLI
+import TerminalUICharts
+
+@main
+struct OpsDashboardApp: App {
+  var body: some Scene {
+    WindowGroup("Ops") {
+      OpsDashboard()
+    }
+  }
+}
+
+struct OpsDashboard: View {
+  let latency = [42, 38, 45, 51, 47, 44, 49, 53, 46, 43].map(Double.init)
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text("Production").bold()
+
+      HStack(alignment: .top, spacing: 2) {
+        VStack(alignment: .leading, spacing: 1) {
+          Meter("CPU", value: 73, total: 100, tone: .warning, barWidth: 16)
+          Sparkline("Latency", values: latency, tone: .info)
+          ThresholdGauge(
+            "SLO",
+            value: 99.92,
+            total: 100,
+            bands: [
+              ThresholdBand(upTo: 99.0, tone: .critical),
+              ThresholdBand(upTo: 99.9, tone: .warning),
+              ThresholdBand(upTo: 100, tone: .success),
+            ],
+            barWidth: 16
+          )
+        }
+
+        BarChart(
+          "Queue",
+          entries: [
+            BarChartEntry("ingest", value: 82, tone: .warning),
+            BarChartEntry("index", value: 38, tone: .success),
+            BarChartEntry("email", value: 12, tone: .info),
+          ],
+          barWidth: 14,
+          labelWidth: 7
+        )
+      }
+
+      Divider()
+
+      Timeline([
+        TimelineEntry("deploy started", detail: "api@1.4.0", tone: .info),
+        TimelineEntry("canary healthy", detail: "10% traffic", tone: .success),
+        TimelineEntry("queue elevated", detail: "watch ingest", tone: .warning),
+      ])
+
+      Legend(
+        "Legend",
+        items: [
+          LegendItem("healthy", tone: .success),
+          LegendItem("watch", tone: .warning),
+          LegendItem("info", tone: .info),
+        ]
+      )
+    }
+    .padding(.init(horizontal: 1, vertical: 0))
+  }
+}`;
+---
+
+<Base
+  title="Charts and dashboards"
+  description="Use TerminalUICharts for compact operational metrics, status views, sparklines, timelines, and legends."
+  pageKey="learn"
+>
+  <article class="prose article-body" style="margin-top: var(--space-2xl);">
+    <p class="eyebrow">Learn · 08 of 09</p>
+    <h1>Charts and dashboards.</h1>
+    <p>
+      <code>TerminalUICharts</code> is a separate product for dense
+      operational surfaces. It is intentionally compact: charts are meant
+      to sit next to controls, logs, tables, and status text inside a TUI,
+      not to become a full charting framework.
+    </p>
+    <p>
+      Add the product to your executable target, import it next to
+      <code>TerminalUI</code>, and compose charts like ordinary views.
+    </p>
+  </article>
+
+  <section class="info-block" style="border-top: 1px solid var(--border);">
+    <div class="info-copy">
+      <p class="section-label">Worked example</p>
+      <h2>A compact operations dashboard.</h2>
+      <p>
+        The dashboard combines current-value meters, a sparkline, a
+        threshold gauge, a bar chart, a timeline, and a legend. Every
+        chart uses semantic tones so host themes can decide the final
+        colors.
+      </p>
+    </div>
+    <CodeSample filename="OpsDashboard.swift" language="swift" code={chartsExample} />
+  </section>
+
+  <article class="prose article-body">
+    <h2 id="choose">Choose by job</h2>
+    <ul>
+      <li>
+        <code>Meter</code> and <code>ProgressView</code>: one current
+        value against a total.
+      </li>
+      <li>
+        <code>ThresholdGauge</code> and <code>BulletChart</code>: status
+        changes at explicit boundaries.
+      </li>
+      <li>
+        <code>Sparkline</code>, <code>Timeline</code>, and
+        <code>HeatStrip</code>: trend and sequence summaries.
+      </li>
+      <li>
+        <code>BarChart</code>, <code>ColumnChart</code>,
+        <code>ComparisonChart</code>, and <code>StackedBarChart</code>:
+        comparing labeled values.
+      </li>
+      <li>
+        <code>Legend</code>: explains tone and series labels when the
+        surrounding view needs it.
+      </li>
+    </ul>
+
+    <h2 id="tones">Tone, not hard-coded color</h2>
+    <p>
+      Charts use <code>BannerTone</code> values such as
+      <code>.success</code>, <code>.warning</code>, <code>.critical</code>,
+      and <code>.info</code>. That keeps chart intent separate from the
+      active theme. The terminal host, browser host, or embedded GUI host
+      resolves those tones into final display styles.
+    </p>
+
+    <h2 id="layout">Dashboard layout</h2>
+    <p>
+      Keep chart widths explicit. Terminal dashboards are scanned in a
+      fixed cell grid, so the best dashboards reserve stable columns and
+      let charts stay compact. Use <code>HStack</code>, <code>VStack</code>,
+      <code>Table</code>, and custom layouts to organize the surface.
+    </p>
+
+    <h2 id="next">Where to go next</h2>
+  </article>
+
+  <section class="info-block" style="border-top: 0; border-bottom: 0;">
+    <div class="info-copy" style="display: none;"></div>
+    <div class="card-grid card-grid--three" style="grid-column: 1 / -1;">
+      <a class="card" href={`${base}/learn/images`} data-index="09">
+        <h3>Next: Images</h3>
+        <p>Render PNG, JPEG, and GIF assets with capability-aware terminal output.</p>
+        <span class="card-tag">Tutorial</span>
+      </a>
+      <a class="card" href={`${base}/api`} data-index="·">
+        <h3>API: TerminalUICharts</h3>
+        <p>DocC reference for the chart product and compact dashboard primitives.</p>
+        <span class="card-tag">Reference</span>
+      </a>
+      <a class="card" href={`${base}/design/architecture`} data-index="·">
+        <h3>Design: Architecture</h3>
+        <p>Why charts live in a separate product instead of shaping core API.</p>
+        <span class="card-tag">Design essay</span>
+      </a>
+    </div>
+  </section>
+</Base>

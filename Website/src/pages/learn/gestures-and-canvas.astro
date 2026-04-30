@@ -1,0 +1,198 @@
+---
+import Base from "@layouts/Base.astro";
+import CodeSample from "@components/CodeSample.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const canvasExample = `import TerminalUI
+import TerminalUICLI
+
+@main
+struct TrendApp: App {
+  var body: some Scene {
+    WindowGroup("Trend") {
+      TrendEditor()
+    }
+  }
+}
+
+struct TrendEditor: View {
+  @State private var values = [2.0, 4.0, 3.0, 8.0, 6.0, 10.0, 9.0]
+  @State private var hover: Point?
+  @GestureState private var drag: DragGesture.Value?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Canvas(TrendLine(values: values))
+        .frame(width: 48, height: 10)
+        .foregroundStyle(.success)
+        .border(.separator)
+        .gesture(
+          DragGesture(minimumDistance: 0)
+            .updating($drag) { value, state, _ in
+              state = value
+            }
+            .onEnded { value in
+              appendSample(from: value.location, height: 10)
+            }
+        )
+        .onPointerHover { phase in
+          switch phase {
+          case .entered(let point), .moved(let point):
+            hover = point
+          case .exited:
+            hover = nil
+          }
+        }
+
+      if let drag {
+        Text("drag \\(drag.translation.x), \\(drag.translation.y)")
+          .foregroundStyle(.muted)
+      } else if let hover {
+        Text("hover \\(hover.x), \\(hover.y)")
+          .foregroundStyle(.muted)
+      } else {
+        Text("Drag inside the plot to append a sample.")
+          .foregroundStyle(.muted)
+      }
+    }
+    .padding(.init(horizontal: 1, vertical: 0))
+  }
+
+  func appendSample(from point: Point, height: Int) {
+    let clampedY = min(max(point.y, 0), Double(max(1, height - 1)))
+    let normalized = 1 - (clampedY / Double(max(1, height - 1)))
+    values.append((normalized * 10).rounded())
+    values = Array(values.suffix(24))
+  }
+}
+
+struct TrendLine: CanvasDrawing, Equatable {
+  var values: [Double]
+
+  func draw(into context: inout CanvasContext) {
+    guard values.count > 1 else { return }
+    let low = values.min() ?? 0
+    let high = values.max() ?? low
+    let spread = max(1, high - low)
+    let width = max(1, context.size.width - 1)
+    let height = max(1, context.size.height - 1)
+
+    func point(_ index: Int, _ value: Double) -> Point {
+      let x = Double(index) * Double(width) / Double(values.count - 1)
+      let normalized = (value - low) / spread
+      let y = (1 - normalized) * Double(height)
+      return Point(x: x, y: y)
+    }
+
+    var previous = point(0, values[0])
+    for index in values.indices.dropFirst() {
+      let next = point(index, values[index])
+      context.line(from: previous, to: next)
+      previous = next
+    }
+  }
+}`;
+---
+
+<Base
+  title="Gestures and Canvas"
+  description="Draw custom terminal graphics with Canvas and drive them with tap, drag, hover, and GestureState."
+  pageKey="learn"
+>
+  <article class="prose article-body" style="margin-top: var(--space-2xl);">
+    <p class="eyebrow">Learn · 07 of 09</p>
+    <h1>Gestures and Canvas.</h1>
+    <p>
+      <code>Canvas</code> is the escape hatch for drawings that do not fit
+      the shape protocol: sparklines, plots, editors, pixel grids, and
+      arbitrary curves. Gestures attach to ordinary views, including
+      canvases, and receive pointer data in terminal cell space.
+    </p>
+    <p>
+      The terminal remains keyboard-first. Pointer support is additive:
+      use it for direct manipulation and inspection, but keep the main
+      workflow available from focus and commands.
+    </p>
+  </article>
+
+  <section class="info-block" style="border-top: 1px solid var(--border);">
+    <div class="info-copy">
+      <p class="section-label">Worked example</p>
+      <h2>A draggable trend plot.</h2>
+      <p>
+        The drawing is a small value type that conforms to
+        <code>CanvasDrawing</code>. The view attaches a
+        <code>DragGesture</code> to append samples and an
+        <code>onPointerHover</code> handler to show inspection state.
+      </p>
+    </div>
+    <CodeSample filename="TrendEditor.swift" language="swift" code={canvasExample} />
+  </section>
+
+  <article class="prose article-body">
+    <h2 id="canvas">Canvas coordinates</h2>
+    <p>
+      <code>CanvasContext</code> exposes continuous terminal-cell
+      coordinates. A point at <code>x: 2.5</code> is halfway through the
+      third terminal cell. The active <code>CanvasGrid</code> decides how
+      those fractional samples are packed back into glyphs; the default
+      grid is Braille <code>2×4</code>.
+    </p>
+    <p>
+      For dense grid work, <code>Canvas(pixelGridWidth:height:pixels:mode:)</code>
+      lets you write pre-resolved colors as full-cell or vertical
+      half-block pixels. For curves and plots, implement
+      <code>CanvasDrawing.draw(into:)</code> and use methods like
+      <code>line(from:to:)</code>, <code>fillRect</code>, and
+      <code>setPixel</code>.
+    </p>
+
+    <h2 id="gestures">Gesture shape</h2>
+    <p>
+      TerminalUI includes the SwiftUI-shaped primitives:
+      <code>TapGesture</code>, <code>SpatialTapGesture</code>,
+      <code>LongPressGesture</code>, and <code>DragGesture</code>. Attach
+      them with <code>.gesture(...)</code>, or use convenience modifiers
+      like <code>.onTapGesture</code> and <code>.onLongPressGesture</code>.
+    </p>
+    <p>
+      <code>DragGesture.Value</code> carries current location, start
+      location, translation, velocity, predicted end, pointer precision,
+      and the sampled path. Values are in cell-space coordinates, so they
+      compose directly with layout and canvas sizes.
+    </p>
+
+    <h2 id="gesture-state"><code>@GestureState</code></h2>
+    <p>
+      <code>@GestureState</code> stores transient gesture state and resets
+      automatically when the gesture ends or the view leaves the tree. Use
+      it for "current drag" or "is pressing" state. Use <code>@State</code>
+      for committed model changes, like the appended samples in the
+      example.
+    </p>
+
+    <h2 id="next">Where to go next</h2>
+  </article>
+
+  <section class="info-block" style="border-top: 0; border-bottom: 0;">
+    <div class="info-copy" style="display: none;"></div>
+    <div class="card-grid card-grid--three" style="grid-column: 1 / -1;">
+      <a class="card" href={`${base}/learn/charts-and-dashboards`} data-index="08">
+        <h3>Next: Charts and dashboards</h3>
+        <p>Compose dense operational surfaces with <code>TerminalUICharts</code>.</p>
+        <span class="card-tag">Tutorial</span>
+      </a>
+      <a class="card" href={`${base}/design/focus`} data-index="·">
+        <h3>Design: Focus</h3>
+        <p>Keyboard focus remains the primary input model for terminal apps.</p>
+        <span class="card-tag">Design essay</span>
+      </a>
+      <a class="card" href={`${base}/api`} data-index="·">
+        <h3>API: Canvas / DragGesture</h3>
+        <p>Symbol reference for custom drawing and pointer gestures.</p>
+        <span class="card-tag">Reference</span>
+      </a>
+    </div>
+  </section>
+</Base>
