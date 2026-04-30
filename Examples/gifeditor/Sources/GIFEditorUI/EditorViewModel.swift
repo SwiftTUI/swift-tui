@@ -82,6 +82,15 @@ public final class EditorViewModel {
       brushSize = brushSize.clamped(to: 1...8)
     }
   }
+  /// When true (default), the bucket fill is clipped to the active
+  /// marquee selection. Toggle off via the options bar when you want
+  /// a fill to ignore the selection and flood the entire matching
+  /// region.
+  public var fillRespectsSelection: Bool = true
+  /// Mirror of `fillRespectsSelection` for the gradient tool. Toggle
+  /// off via the options bar when you want the gradient to span the
+  /// whole canvas regardless of the active marquee.
+  public var gradientRespectsSelection: Bool = true
   public var cursor: GIFEditorCore.PixelPoint = .zero {
     didSet {
       cursor.x = cursor.x.clamped(to: 0...max(0, document.size.width - 1))
@@ -167,7 +176,7 @@ public final class EditorViewModel {
             on: buffer,
             at: cursor,
             color: primaryColorIndex,
-            selection: selection
+            selection: fillRespectsSelection ? selection : nil
           )
         }
       }
@@ -183,7 +192,7 @@ public final class EditorViewModel {
               startColor: document.palette[primaryColorIndex],
               endColor: document.palette[secondaryColorIndex],
               palette: document.palette,
-              selection: selection
+              selection: gradientRespectsSelection ? selection : nil
             )
           }
         }
