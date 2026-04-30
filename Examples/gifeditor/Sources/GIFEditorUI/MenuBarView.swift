@@ -2,17 +2,18 @@ import GIFEditorCore
 import TerminalUI
 
 /// Top-row menu bar — File / Edit / Layer / Select / Frame / View /
-/// Help. Each `Menu` opens an overlay (Blocker 1) so opening or
+/// Help. Each dropdown opens as a menu-bar-local overlay so opening or
 /// closing a menu does not reflow the canvas, panels, or timeline.
 /// Every menu item is a clickable `Button` that calls the same model
-/// method as its keybinding, and carries a `.systemHint(...)` showing
-/// the shortcut hint (Blocker 2).
+/// method as its keybinding.
 ///
 /// Menu items without a backing model method or keybinding (e.g.
 /// "New", "Open…", "About gifeditor") are intentionally absent —
 /// skipping them keeps every visible item live (no grayed-out rows on
 /// day one) and avoids advertising features that don't exist yet.
 struct MenuBarView: View {
+  @State private var openMenu: MenuBarMenu?
+
   let model: EditorViewModel
   @Binding var isHelpPresented: Bool
   @Binding var showsToolDock: Bool
@@ -23,157 +24,160 @@ struct MenuBarView: View {
   let refresh: @MainActor @Sendable () -> Void
 
   var body: some View {
-    HStack(alignment: .center, spacing: 2) {
-      fileMenu
-      editMenu
-      layerMenu
-      selectMenu
-      frameMenu
-      viewMenu
-      helpMenu
-      Spacer(minLength: 1)
-      Text(documentLabel).foregroundStyle(.muted)
-      Text(model.isDirty ? "●" : "✓")
-        .foregroundStyle(model.isDirty ? .warning : .success)
+    ZStack(alignment: .topLeading) {
+      HStack(alignment: .center, spacing: 2) {
+        menuTrigger(.file)
+        menuTrigger(.edit)
+        menuTrigger(.layer)
+        menuTrigger(.select)
+        menuTrigger(.frame)
+        menuTrigger(.view)
+        menuTrigger(.help)
+        Spacer(minLength: 1)
+        Text(documentLabel).foregroundStyle(.muted)
+        Text(model.isDirty ? "●" : "✓")
+          .foregroundStyle(model.isDirty ? .warning : .success)
+      }
+      .frame(height: 1, alignment: .leading)
+
+      if let openMenu {
+        dropdown(for: openMenu)
+          .offset(x: dropdownOffset(for: openMenu), y: 1)
+      }
     }
+    .frame(height: 1, alignment: .topLeading)
     .padding(.horizontal, 1)
   }
 
   // MARK: - Menus
 
-  private var fileMenu: some View {
-    Menu("File") {
-      Button("Save", action: refreshAfter(model.save))
-        .systemHint("Ctrl+S")
-      Button("Save As…", action: refreshAfter(model.saveAs))
-        .systemHint("Alt+S")
-      Divider()
-      Button("Resize Canvas…") {
-        isResizeSheetPresented = true
-        refresh()
+  @ViewBuilder
+  private func dropdown(for menu: MenuBarMenu) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+      switch menu {
+      case .file:
+        menuItem("Save", action: refreshAfter(model.save))
+        menuItem("Save As…", action: refreshAfter(model.saveAs))
+        menuGap
+        menuItem("Resize Canvas…") {
+          isResizeSheetPresented = true
+          refresh()
+        }
+      case .edit:
+        menuItem("Undo", action: refreshAfter(model.undo))
+          .disabled(!model.canUndo)
+        menuItem("Redo", action: refreshAfter(model.redo))
+          .disabled(!model.canRedo)
+        menuGap
+        menuItem("Copy", action: refreshAfter(model.copySelection))
+        menuItem("Paste", action: refreshAfter(model.paste))
+        menuGap
+        menuItem("Clear Selection", action: refreshAfter(model.clearSelection))
+      case .layer:
+        menuItem("New Layer", action: refreshAfter(model.addLayer))
+        menuItem("Delete Layer", action: refreshAfter(model.deleteCurrentLayer))
+        menuGap
+        menuItem("Toggle Visibility", action: refreshAfter(model.toggleCurrentLayerVisibility))
+        menuItem("Layer Below", action: refreshAfter(model.selectLayerBelow))
+        menuItem("Layer Above", action: refreshAfter(model.selectLayerAbove))
+      case .select:
+        menuItem("Clear Selection", action: refreshAfter(model.clearSelection))
+        menuItem("Confirm Marquee", action: refreshAfter(model.applyToolAtCursor))
+      case .frame:
+        menuItem("New Frame", action: refreshAfter(model.insertBlankFrameAfterCurrent))
+        menuItem("Duplicate Frame", action: refreshAfter(model.duplicateCurrentFrame))
+        menuItem("Delete Frame", action: refreshAfter(model.deleteCurrentFrame))
+        menuGap
+        menuItem("Previous Frame", action: refreshAfter(model.previousFrame))
+        menuItem("Next Frame", action: refreshAfter(model.nextFrame))
+        menuGap
+        menuItem("Increase Delay") {
+          model.adjustCurrentFrameDelay(by: 10)
+          refresh()
+        }
+        menuItem("Decrease Delay") {
+          model.adjustCurrentFrameDelay(by: -10)
+          refresh()
+        }
+        menuItem("Equalize Delays", action: refreshAfter(model.setAllFrameDelaysToCurrent))
+      case .view:
+        // Visibility toggles — narrow terminals can claim canvas space
+        // back by hiding non-essential chrome.
+        menuItem(checkmark(showsToolDock) + " Show Tool Dock") {
+          showsToolDock.toggle()
+          refresh()
+        }
+        menuItem(checkmark(showsRightPanel) + " Show Right Panel") {
+          showsRightPanel.toggle()
+          refresh()
+        }
+        menuItem(checkmark(showsTimeline) + " Show Timeline") {
+          showsTimeline.toggle()
+          refresh()
+        }
+        menuGap
+        // Pixel grid mode — half-block doubles vertical resolution; full
+        // cell makes each pixel a square of one terminal cell.
+        menuItem(checkmark(pixelGridMode == .verticalHalfBlock) + " Half-block grid") {
+          pixelGridMode = .verticalHalfBlock
+          refresh()
+        }
+        menuItem(checkmark(pixelGridMode == .fullCell) + " Full-cell grid") {
+          pixelGridMode = .fullCell
+          refresh()
+        }
+        menuGap
+        menuItem("Increase Brush Size", action: refreshAfter(model.increaseBrushSize))
+        menuItem("Decrease Brush Size", action: refreshAfter(model.decreaseBrushSize))
+        menuItem("Swap Primary/Secondary", action: refreshAfter(model.swapPrimaryAndSecondary))
+      case .help:
+        menuItem("Keyboard Shortcuts…") {
+          isHelpPresented = true
+          refresh()
+        }
       }
-      .systemHint("Ctrl+R")
     }
+    .background {
+      Rectangle().fill(.terminalSurfaceBackground)
+    }
+    .fixedSize(horizontal: true, vertical: true)
   }
 
-  private var editMenu: some View {
-    Menu("Edit") {
-      Button("Undo", action: refreshAfter(model.undo))
-        .systemHint("Ctrl+Z")
-        .disabled(!model.canUndo)
-      Button("Redo", action: refreshAfter(model.redo))
-        .systemHint("Ctrl+Y")
-        .disabled(!model.canRedo)
-      Divider()
-      Button("Copy", action: refreshAfter(model.copySelection))
-        .systemHint("Ctrl+C")
-      Button("Paste", action: refreshAfter(model.paste))
-        .systemHint("Ctrl+V")
-      Divider()
-      Button("Clear Selection", action: refreshAfter(model.clearSelection))
-        .systemHint("Esc")
+  private func menuTrigger(_ menu: MenuBarMenu) -> some View {
+    Button(menu.triggerTitle(isOpen: openMenu == menu)) {
+      openMenu = openMenu == menu ? nil : menu
     }
+    .buttonStyle(.plain)
+    .fixedSize(horizontal: true, vertical: true)
   }
 
-  private var layerMenu: some View {
-    Menu("Layer") {
-      Button("New Layer", action: refreshAfter(model.addLayer))
-        .systemHint("Alt+N")
-      Button("Delete Layer", action: refreshAfter(model.deleteCurrentLayer))
-        .systemHint("Alt+X")
-      Divider()
-      Button("Toggle Visibility", action: refreshAfter(model.toggleCurrentLayerVisibility))
-        .systemHint("Alt+H")
-      Button("Layer Below", action: refreshAfter(model.selectLayerBelow))
-        .systemHint("Alt+J")
-      Button("Layer Above", action: refreshAfter(model.selectLayerAbove))
-        .systemHint("Alt+K")
+  private func menuItem(
+    _ title: String,
+    action: @escaping @MainActor @Sendable () -> Void
+  ) -> some View {
+    Button(title) {
+      action()
+      openMenu = nil
     }
+    .buttonStyle(.plain)
+    .fixedSize(horizontal: true, vertical: true)
   }
 
-  private var selectMenu: some View {
-    Menu("Select") {
-      Button("Clear Selection", action: refreshAfter(model.clearSelection))
-        .systemHint("Esc")
-      Button("Confirm Marquee", action: refreshAfter(model.applyToolAtCursor))
-        .systemHint("Enter")
-    }
+  private var menuGap: some View {
+    Text(" ")
+      .foregroundStyle(.separator)
+      .fixedSize(horizontal: true, vertical: true)
   }
 
-  private var frameMenu: some View {
-    Menu("Frame") {
-      Button("New Frame", action: refreshAfter(model.insertBlankFrameAfterCurrent))
-        .systemHint("Ctrl+N")
-      Button("Duplicate Frame", action: refreshAfter(model.duplicateCurrentFrame))
-        .systemHint("Ctrl+D")
-      Button("Delete Frame", action: refreshAfter(model.deleteCurrentFrame))
-        .systemHint("Alt+D")
-      Divider()
-      Button("Previous Frame", action: refreshAfter(model.previousFrame))
-        .systemHint("Alt+,")
-      Button("Next Frame", action: refreshAfter(model.nextFrame))
-        .systemHint("Alt+.")
-      Divider()
-      Button(
-        "Increase Delay",
-        action: refreshAfter { model.adjustCurrentFrameDelay(by: 10) }
-      )
-      .systemHint("Alt+=")
-      Button(
-        "Decrease Delay",
-        action: refreshAfter { model.adjustCurrentFrameDelay(by: -10) }
-      )
-      .systemHint("Alt+-")
-      Button("Equalize Delays", action: refreshAfter(model.setAllFrameDelaysToCurrent))
-        .systemHint("Alt+0")
+  private func dropdownOffset(for menu: MenuBarMenu) -> Int {
+    var offset = 0
+    for candidate in MenuBarMenu.allCases {
+      if candidate == menu {
+        return offset
+      }
+      offset += candidate.triggerWidth + 2
     }
-  }
-
-  private var viewMenu: some View {
-    Menu("View") {
-      // Visibility toggles — narrow terminals can claim canvas space
-      // back by hiding non-essential chrome.
-      Button(checkmark(showsToolDock) + " Show Tool Dock") {
-        showsToolDock.toggle()
-        refresh()
-      }
-      Button(checkmark(showsRightPanel) + " Show Right Panel") {
-        showsRightPanel.toggle()
-        refresh()
-      }
-      Button(checkmark(showsTimeline) + " Show Timeline") {
-        showsTimeline.toggle()
-        refresh()
-      }
-      Divider()
-      // Pixel grid mode — half-block doubles vertical resolution; full
-      // cell makes each pixel a square of one terminal cell.
-      Button(checkmark(pixelGridMode == .verticalHalfBlock) + " Half-block grid") {
-        pixelGridMode = .verticalHalfBlock
-        refresh()
-      }
-      Button(checkmark(pixelGridMode == .fullCell) + " Full-cell grid") {
-        pixelGridMode = .fullCell
-        refresh()
-      }
-      Divider()
-      Button("Increase Brush Size", action: refreshAfter(model.increaseBrushSize))
-        .systemHint("]")
-      Button("Decrease Brush Size", action: refreshAfter(model.decreaseBrushSize))
-        .systemHint("[")
-      Button("Swap Primary/Secondary", action: refreshAfter(model.swapPrimaryAndSecondary))
-        .systemHint("x")
-    }
-  }
-
-  private var helpMenu: some View {
-    Menu("Help") {
-      Button("Keyboard Shortcuts…") {
-        isHelpPresented = true
-        refresh()
-      }
-      .systemHint("?")
-    }
+    return offset
   }
 
   // MARK: - Helpers
@@ -202,5 +206,35 @@ struct MenuBarView: View {
       return path.lastPathComponent
     }
     return "untitled"
+  }
+}
+
+private enum MenuBarMenu: CaseIterable, Equatable, Sendable {
+  case file
+  case edit
+  case layer
+  case select
+  case frame
+  case view
+  case help
+
+  var title: String {
+    switch self {
+    case .file: "File"
+    case .edit: "Edit"
+    case .layer: "Layer"
+    case .select: "Select"
+    case .frame: "Frame"
+    case .view: "View"
+    case .help: "Help"
+    }
+  }
+
+  var triggerWidth: Int {
+    title.count + 2
+  }
+
+  func triggerTitle(isOpen: Bool) -> String {
+    title + " " + (isOpen ? "▴" : "▾")
   }
 }
