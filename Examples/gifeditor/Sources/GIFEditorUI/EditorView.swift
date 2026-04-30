@@ -213,7 +213,7 @@ public struct EditorView: View {
     let composited = model.document.flattenedColors(frameIndex: frameIndex)
     let srcSize = model.document.size
     let thumbWidth = 6
-    let thumbHeight = 4
+    let thumbHeight = 6
     var out: [EditorColor?] = []
     out.reserveCapacity(thumbWidth * thumbHeight)
     for ty in 0..<thumbHeight {

@@ -112,13 +112,13 @@ struct TimelineView: View {
         pixels: pixels,
         mode: .verticalHalfBlock
       )
-      .frame(width: frame.thumbnail.width, height: frame.thumbnail.height)
+      .frame(width: frame.thumbnail.width, height: frame.thumbnail.height / 2)
       .border(active ? .tint : .separator, set: .rounded)
-      .overlay(alignment: .bottomTrailing) {
-        Text(active ? "[\(index + 1)]" : "\(index + 1)")
-          .foregroundStyle(active ? .tint : .muted)
-          .background(.clear)
-      }
+      // .overlay(alignment: .bottomTrailing) {
+      //   Text(active ? "[\(index + 1)]" : "\(index + 1)")
+      //     .foregroundStyle(active ? .tint : .muted)
+      //     .background(.clear)
+      // }
     }
     .buttonStyle(.plain)
   }
