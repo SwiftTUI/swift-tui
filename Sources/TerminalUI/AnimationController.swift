@@ -8,7 +8,7 @@ package import View
 /// ``borderShapeStyle``, ``shapeFillStyle``, ``shapeStrokeStyle``) carry
 /// heterogeneous animatable values — the slot identifies the
 /// destination but the wrapped ``AnyAnimatable`` determines the concrete
-/// type (Color, LinearGradient, RadialGradient, PatternFill).
+/// type (Color, LinearGradient, RadialGradient, TileStyle).
 ///
 /// **Where is the slot stored on `ResolvedNode`?** Two separate paths
 /// reach the rasterizer:
@@ -250,8 +250,8 @@ package struct AnimatableSnapshot: Sendable {
       return AnyAnimatable(gradient)
     case .radialGradient(let gradient):
       return AnyAnimatable(gradient)
-    case .patternFill(let pattern):
-      return AnyAnimatable(pattern)
+    case .tileStyle(let tile):
+      return AnyAnimatable(tile)
     case .opacity(let inner, _):
       return extractAnimatableShapeStyle(from: inner)
     case .terminalChrome, .semantic:
@@ -2285,8 +2285,8 @@ package final class AnimationController: Sendable {
     if let radial = value.unwrap(as: RadialGradient.self) {
       return .radialGradient(radial)
     }
-    if let pattern = value.unwrap(as: PatternFill.self) {
-      return .patternFill(pattern)
+    if let tile = value.unwrap(as: TileStyle.self) {
+      return .tileStyle(tile)
     }
     return nil
   }

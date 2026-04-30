@@ -8,7 +8,7 @@ import Testing
 /// End-to-end integration coverage for gradient animation through
 /// the `AnimationController` value-interpolation path.  These tests
 /// pin the migration's whole-stack contract: a `LinearGradient`'s
-/// start and end points (and a `PatternFill` whose foreground is a
+/// start and end points (and a `TileStyle` whose foreground is a
 /// gradient) must interpolate halfway through an animation halfway
 /// through its duration.  Pre-Phase-3 the controller treated
 /// gradients as opaque values and snapped between phases; with
@@ -86,8 +86,8 @@ struct GradientAnimationIntegrationTests {
     #expect(abs(interpolated.endPoint.y - 1) < 0.05)
   }
 
-  @Test("PatternFill gradient foreground animates end-to-end")
-  func patternFillGradientForegroundAnimates() throws {
+  @Test("TileStyle gradient foreground animates end-to-end")
+  func tileStyleGradientForegroundAnimates() throws {
     let controller = AnimationController()
     let animation = Animation.linear(duration: .milliseconds(200))
     _ = controller.register(animation)
@@ -95,15 +95,13 @@ struct GradientAnimationIntegrationTests {
     let leafIdentity = Identity(components: [.named("pattern-leaf")])
 
     var frame1Metadata = DrawMetadata()
-    frame1Metadata.baseStyle.foregroundStyle = .patternFill(
-      PatternFill(
-        glyph: "░",
-        foreground: .linearGradient(
-          LinearGradient(
-            colors: [.red, .blue],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-          )
+    frame1Metadata.baseStyle.foregroundStyle = .tileStyle(
+      TileStyle(
+        .lightShade,
+        foreground: LinearGradient(
+          colors: [.red, .blue],
+          startPoint: .topLeading,
+          endPoint: .bottomTrailing
         )
       )
     )
@@ -116,15 +114,13 @@ struct GradientAnimationIntegrationTests {
     controller.processResolvedTree(frame1, transaction: .init(), timestamp: t0)
 
     var frame2Metadata = DrawMetadata()
-    frame2Metadata.baseStyle.foregroundStyle = .patternFill(
-      PatternFill(
-        glyph: "░",
-        foreground: .linearGradient(
-          LinearGradient(
-            colors: [.red, .blue],
-            startPoint: .topTrailing,
-            endPoint: .bottomLeading
-          )
+    frame2Metadata.baseStyle.foregroundStyle = .tileStyle(
+      TileStyle(
+        .lightShade,
+        foreground: LinearGradient(
+          colors: [.red, .blue],
+          startPoint: .topTrailing,
+          endPoint: .bottomLeading
         )
       )
     )
@@ -142,10 +138,10 @@ struct GradientAnimationIntegrationTests {
 
     guard
       let style = frame2.drawMetadata.baseStyle.foregroundStyle,
-      case .patternFill(let pattern) = style,
-      case .linearGradient(let gradient) = pattern.foreground
+      case .tileStyle(let tile) = style,
+      case .linearGradient(let gradient) = tile.foreground.style
     else {
-      Issue.record("expected interpolated pattern fill with gradient foreground")
+      Issue.record("expected interpolated tile style with gradient foreground")
       return
     }
     // Same midpoint test as the LinearGradient case: at t=0.5 the
@@ -250,15 +246,15 @@ struct GradientAnimationIntegrationTests {
     #expect(abs(gradient.endPoint.y - 1) < 0.05)
   }
 
-  @Test("Shape fill PatternFill gradient foreground animates through drawPayload path")
-  func shapeFillPatternFillGradientForegroundAnimates() throws {
+  @Test("Shape fill TileStyle gradient foreground animates through drawPayload path")
+  func shapeFillTileStyleGradientForegroundAnimates() throws {
     let controller = AnimationController()
     let animation = Animation.linear(duration: .milliseconds(200))
     _ = controller.register(animation)
 
     let leafIdentity = Identity(components: [.named("shape-fill-pattern-leaf")])
 
-    // Frame 1: Rectangle().fill(PatternFill(foreground: linear gradient)).
+    // Frame 1: Rectangle().fill(TileStyle(foreground: linear gradient)).
     // This matches the BordersAndShapesCurvedShapesSection PhaseAnimator
     // demo's exact shape.
     let frame1 = ResolvedNode(
@@ -269,15 +265,13 @@ struct GradientAnimationIntegrationTests {
           geometry: .rectangle,
           insetAmount: 0,
           operation: .fill(
-            style: .patternFill(
-              PatternFill(
-                glyph: "/",
-                foreground: .linearGradient(
-                  LinearGradient(
-                    colors: [.white, .red],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                  )
+            style: .tileStyle(
+              TileStyle(
+                .init(glyph: "/"),
+                foreground: LinearGradient(
+                  colors: [.white, .red],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
                 )
               )
             ),
@@ -297,15 +291,13 @@ struct GradientAnimationIntegrationTests {
           geometry: .rectangle,
           insetAmount: 0,
           operation: .fill(
-            style: .patternFill(
-              PatternFill(
-                glyph: "/",
-                foreground: .linearGradient(
-                  LinearGradient(
-                    colors: [.white, .red],
-                    startPoint: .topTrailing,
-                    endPoint: .bottomLeading
-                  )
+            style: .tileStyle(
+              TileStyle(
+                .init(glyph: "/"),
+                foreground: LinearGradient(
+                  colors: [.white, .red],
+                  startPoint: .topTrailing,
+                  endPoint: .bottomLeading
                 )
               )
             ),
@@ -324,11 +316,11 @@ struct GradientAnimationIntegrationTests {
     guard case .shape(let shapePayload) = frame2.drawPayload,
       case .fill(let interpolatedStyle, _) = shapePayload.operation,
       let style = interpolatedStyle,
-      case .patternFill(let pattern) = style,
-      case .linearGradient(let gradient) = pattern.foreground
+      case .tileStyle(let tile) = style,
+      case .linearGradient(let gradient) = tile.foreground.style
     else {
       Issue.record(
-        "expected interpolated PatternFill with gradient foreground inside drawPayload.shape.operation.fill"
+        "expected interpolated TileStyle with gradient foreground inside drawPayload.shape.operation.fill"
       )
       return
     }
@@ -336,9 +328,7 @@ struct GradientAnimationIntegrationTests {
     #expect(abs(gradient.startPoint.y - 0) < 0.05)
     #expect(abs(gradient.endPoint.x - 0.5) < 0.05)
     #expect(abs(gradient.endPoint.y - 1) < 0.05)
-    // Glyph must survive interpolation — PatternFill's glyph field is
-    // identity-preserved by the `PatternFill.interpolated(to:progress:)`
-    // helper.
-    #expect(pattern.glyph == "/")
+    // Pattern must survive interpolation.
+    #expect(tile.pattern.character(atX: 0, y: 0) == "/")
   }
 }

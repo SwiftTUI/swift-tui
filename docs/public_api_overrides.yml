@@ -350,7 +350,6 @@ classifications:
     - View.TabViewOverflowMenuPresentation
     - View.TabViewOverflowTriggerConfiguration
     - View.ScrollPosition
-    - View.TileBackground
     - View.Axis
     - View.VerticalEdge
     - View.ViewSpacing
