@@ -61,7 +61,11 @@ public struct EditorView: View {
         isHelpPresented: $isHelpPresented,
         refresh: refresh
       )
-      Divider()
+      ToolOptionsBar(
+        model: model,
+        isHelpPresented: $isHelpPresented,
+        refresh: refresh
+      )
       HStack(alignment: .top, spacing: 1) {
         ToolboxView(
           tool: model.tool,
