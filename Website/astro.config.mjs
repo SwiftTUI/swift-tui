@@ -1,15 +1,12 @@
 import { defineConfig } from "astro/config";
 import mdx from "@astrojs/mdx";
 
-// Deployment targets:
-//   - GitHub Pages (default):    https://goodhatsllc.github.io/swift-terminal-ui/
-//   - Cloudflare Pages:          override via ASTRO_SITE + ASTRO_BASE env vars
-//                                (typically ASTRO_BASE=/ for root-served deploys)
-//
-// Local previews run at http://localhost:4321/swift-terminal-ui/ unless ASTRO_BASE
-// is overridden in the environment.
-const site = process.env.ASTRO_SITE ?? "https://goodhatsllc.github.io";
-const base = process.env.ASTRO_BASE ?? "/swift-terminal-ui";
+// Deployed to Cloudflare Pages at the project root. CI overrides ASTRO_SITE
+// to the canonical URL (pages.dev or a custom domain via the
+// CLOUDFLARE_SITE_URL repo variable). ASTRO_BASE is overridable for any
+// future path-prefixed deploys; the default `/` serves at the root.
+const site = process.env.ASTRO_SITE ?? "http://localhost:4321";
+const base = process.env.ASTRO_BASE ?? "/";
 
 export default defineConfig({
   site,

@@ -1,8 +1,13 @@
 name: Deploy Website to Cloudflare Pages
 
-# Parallel to .github/workflows/pages-build.yml. Builds the same composed
-# artifact (Astro site + DocC + WebExample) but with root-relative paths,
-# then deploys it to Cloudflare Pages instead of GitHub Pages.
+# Builds the composed deployment artifact (Astro site + combined DocC
+# archive + WebExample WASI demo) at root-relative paths and uploads it
+# to Cloudflare Pages via Wrangler.
+#
+# Layout of the uploaded artifact:
+#   /              <- Astro site (Website/dist/)
+#   /docs/         <- DocC archive (.build-docs/)
+#   /webexample/   <- Examples/WebExample/pages-dist/
 #
 # One-time setup:
 #   1. Create the project in Cloudflare:
