@@ -107,10 +107,12 @@ public struct EditorView: View {
                 isHelpPresented: $isHelpPresented,
                 refresh: refresh
               )
+              .frame(maxWidth: .infinity, alignment: .leading)
               ColorPanelView(
                 primaryColor: primaryColor,
                 secondaryColor: secondaryColor
               )
+              .frame(maxWidth: .infinity, alignment: .leading)
               PaletteView(
                 palette: model.document.palette,
                 primaryIndex: model.primaryColorIndex,
@@ -118,15 +120,18 @@ public struct EditorView: View {
                 model: model,
                 refresh: refresh
               )
+              .frame(maxWidth: .infinity, alignment: .leading)
               LayerListView(
                 layers: model.currentFrame.layers,
                 selectedIndex: model.currentLayerIndex,
                 model: model,
                 refresh: refresh
               )
+              .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxHeight: .infinity, alignment: .top)
             .fixedSize(horizontal: true, vertical: false)
+            .background(.black.opacity(0.1))
           }
         }
         if showsTimeline {
