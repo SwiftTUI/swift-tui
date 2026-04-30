@@ -34,21 +34,96 @@ The mapping between repo doc files and site URLs lives in
 site is a one-line edit there. Removing one is a one-line deletion. Doc
 files don't need frontmatter.
 
-## Development
+## Local workflow
 
-Requires [Bun](https://bun.sh) ≥ 1.3.
+### Prerequisites
+
+| Tool | Required for | Notes |
+|------|--------------|-------|
+| [Bun](https://bun.sh) ≥ 1.3 | All site work | Pinned via [`mise.toml`](../mise.toml). `mise install` provisions it. |
+| Swift toolchain (release in [`.swift-version`](../.swift-version)) | Building the DocC archive locally | Optional. Most website edits don't need it. Install via [swiftly](https://www.swift.org/install/). |
+| Swift wasm SDK + Binaryen | Building the WebExample WASI demo locally | Optional. See `.github/workflows/cloudflare-pages.yml` for the exact SDK URL/checksum and `brew install binaryen`. |
+
+The repo is a [Bun workspace](../package.json) containing
+`GUI/WebTUIGUI`, `Examples/WebExample`, and this `Website` package. The
+shared lockfile lives at the repo root.
+
+### First-time setup
+
+From the repo root:
 
 ```bash
-bun install
-bun run dev      # http://localhost:4321/
-bun run build    # static export to dist/
-bun run preview  # serve dist/ locally
-bun run check    # astro check (TypeScript + content schema)
+bun install               # installs deps for every workspace
+cd Website                # all subsequent commands run from here
 ```
 
-The site is built with `base: "/"` (root-served on Cloudflare Pages).
-Override the base path via `ASTRO_BASE=/something bun run build` if you
-ever need a path-prefixed deploy.
+### Day-to-day commands
+
+```bash
+bun run dev               # http://localhost:4321/  — HMR, source maps, fast
+bun run check             # astro check: TS types + content collection schema
+bun run build             # static export → Website/dist/
+bun run preview           # serve dist/ locally (no HMR, closer to production)
+```
+
+**Source-of-truth note.** The site reads doc prose from `../docs/*.md` and
+plan prose from `../docs/plans/**/*.md` via Astro's content collection
+loader (see [`src/content.config.ts`](src/content.config.ts)). If `../docs/`
+is missing or out of sync, builds will surface schema errors from
+`bun run check` before they break `bun run build`.
+
+### Environment overrides
+
+Two variables are read by [`astro.config.mjs`](astro.config.mjs):
+
+- `ASTRO_SITE` — absolute origin used for canonical URLs, sitemaps, and
+  Open Graph tags. Defaults to `http://localhost:4321`. CI sets this to
+  the production URL.
+- `ASTRO_BASE` — path prefix. Defaults to `/`. Override only if you need
+  to preview a path-prefixed deploy: `ASTRO_BASE=/foo bun run dev`.
+
+### Previewing the full deployed artifact locally (optional)
+
+`bun run preview` only serves the Astro layer. Production also serves
+DocC at `/docs/` and the WASI demo at `/webexample/`. To rehearse the
+full Cloudflare layout end-to-end (rarely needed, useful when changing
+cross-artifact links):
+
+```bash
+# from repo root, with Swift + wasm SDK + Binaryen installed:
+
+# 1. Astro
+(cd Website && bun run build)
+
+# 2. DocC archive (root-relative, matches CI)
+swift package \
+  --allow-writing-to-directory .build-docs \
+  generate-documentation \
+  --target Core --target View \
+  --target TerminalUI --target TerminalUICharts \
+  --enable-experimental-combined-documentation \
+  --transform-for-static-hosting \
+  --hosting-base-path docs \
+  --output-path .build-docs
+
+# 3. WebExample (WASI demo)
+(cd Examples/WebExample && bun install && bun run build)
+
+# 4. Compose into one directory
+rm -rf _local-artifact
+mkdir -p _local-artifact/docs _local-artifact/webexample
+cp -R Website/dist/.                            _local-artifact/
+cp -R .build-docs/.                             _local-artifact/docs/
+cp -R Examples/WebExample/pages-dist/.          _local-artifact/webexample/
+bun run Examples/WebExample/src/inject-docs-css.ts
+
+# 5. Serve
+bunx serve _local-artifact -l 4321
+```
+
+Note: the [`public/_headers`](public/_headers) cache rules are
+Cloudflare-specific. Local servers (`astro preview`, `bunx serve`) ignore
+them, so caching behavior will differ between local and production.
 
 ## Adding a doc to the site
 
@@ -68,42 +143,127 @@ live in `src/pages/*.astro` for full control, or as MDX/markdown in
 `src/content/essays/` if they want to participate in the typed `essays`
 content collection.
 
-## Deployment
+## Production workflow
 
-`.github/workflows/cloudflare-pages.yml` builds and deploys to Cloudflare
-Pages on every push to `main`. The composed artifact uploaded to
-Cloudflare is:
+The site is hosted on Cloudflare Pages. The single source of deploy
+truth is
+[`.github/workflows/cloudflare-pages.yml`](../.github/workflows/cloudflare-pages.yml).
 
-```
-/                ← Website/dist/        (this Astro project)
-/docs/           ← .build-docs/         (combined DocC archive)
-/webexample/     ← Examples/WebExample/pages-dist/  (live WASI demo)
-```
+### Triggers
 
-The `/docs/` path is historical — DocC has been served there since before
-this site existed. The site's `/api` landing deep-links into the DocC
-archive at `/docs/documentation/<module>/`.
+| Event | Result |
+|-------|--------|
+| Push to `main` | **Production deploy** at the project URL (and any custom domain). |
+| Pull request | **Preview deploy** at `<branch>.<project>.pages.dev`. The workflow comments the URL on the PR. |
+| `workflow_dispatch` | Manual deploy from the GitHub Actions tab; treated as a branch deploy. |
 
-One-time setup:
+Concurrency is grouped per ref, so superseded runs cancel — only the
+latest commit on a branch ever lands.
 
-1. Create the Cloudflare Pages project (Direct Upload, no Git connection
-   needed since the GitHub workflow handles deploys):
+### What CI runs
+
+The workflow runs on `macos-26` because the deploy artifact requires the
+Swift toolchain. End to end:
+
+1. Install swiftly + the toolchain pinned in [`.swift-version`](../.swift-version).
+2. Set up Bun and restore SwiftPM + Bun caches.
+3. Install the Swift wasm SDK and Binaryen (for WebExample).
+4. Install workspace deps with `bun install --frozen-lockfile`.
+5. Build the WASI demo: `Examples/WebExample` → `pages-dist/`.
+6. Validate the emitted `.wasm` actually parses in `WebAssembly.compile`.
+7. Build the Astro site with `ASTRO_BASE=/` and `ASTRO_SITE` pointed at
+   the canonical production URL → `Website/dist/`.
+8. Build the combined DocC archive (Core + View + TerminalUI +
+   TerminalUICharts) with `--hosting-base-path docs` → `.build-docs/`.
+9. Compose the final upload tree:
+   ```
+   /              ← Website/dist/                       (Astro site)
+   /docs/         ← .build-docs/                        (DocC, combined)
+   /webexample/   ← Examples/WebExample/pages-dist/     (WASI demo)
+   ```
+10. Upload via `bunx wrangler pages deploy` with the right
+    `--branch` / `--commit-hash` so the Cloudflare deployment record
+    matches the Git commit.
+11. On PRs, parse the preview URL out of wrangler's output and post (or
+    update) a sticky comment on the PR.
+
+The `/docs/` path is historical — DocC has been served there since
+before this site existed. The site's `/api` landing deep-links into
+`/docs/documentation/<module>/`.
+
+Cold runs take roughly 8–12 minutes (toolchain install dominates).
+Warm runs with caches hit are 3–5 minutes.
+
+> **Cost note.** Every push to `main` rebuilds DocC, so changes that
+> only touch Swift sources also redeploy the site. That's intentional —
+> DocC contents change when symbols change — but worth knowing.
+
+### One-time Cloudflare setup
+
+1. Create the Cloudflare Pages project (Direct Upload — no Git
+   connection in the dashboard, since this workflow handles uploads):
    ```bash
    bunx wrangler@latest pages project create swift-terminal-ui \
      --production-branch main
    ```
-2. Add repo secrets in GitHub → Settings → Secrets and variables → Actions:
-   - `CLOUDFLARE_API_TOKEN` — token with `Cloudflare Pages: Edit` permission
-   - `CLOUDFLARE_ACCOUNT_ID` — account ID from the Cloudflare dashboard sidebar
+2. In GitHub → *Settings → Secrets and variables → Actions*, add:
+   - `CLOUDFLARE_API_TOKEN` — token with the **Cloudflare Pages: Edit**
+     template (My Profile → API Tokens).
+   - `CLOUDFLARE_ACCOUNT_ID` — from the right sidebar of the Cloudflare
+     dashboard.
 3. (Optional) Add repo variables:
-   - `CLOUDFLARE_PAGES_PROJECT` — defaults to `swift-terminal-ui`
-   - `CLOUDFLARE_SITE_URL` — absolute URL Astro should canonicalize to
-     (e.g. `https://swift-terminal-ui.example.com`); defaults to
-     `https://<project>.pages.dev`
+   - `CLOUDFLARE_PAGES_PROJECT` — defaults to `swift-terminal-ui`.
+   - `CLOUDFLARE_SITE_URL` — absolute URL Astro should canonicalize
+     against (canonical tags, sitemap, OG). Defaults to
+     `https://<project>.pages.dev`. Set this when you attach a custom
+     domain.
 
-Pushes to `main` deploy to production. PRs deploy to a preview URL and
-the workflow comments the URL on the PR. Cache headers (and any future
-redirects) live in [`public/_headers`](public/_headers).
+### Custom domain
+
+1. Cloudflare dashboard → *Workers & Pages → swift-terminal-ui →
+   Custom domains → Set up a custom domain.* Add the hostname (e.g.
+   `swift-terminal-ui.example.com`); Cloudflare provisions the
+   certificate.
+2. Set the GitHub repo variable `CLOUDFLARE_SITE_URL` to that absolute
+   URL so canonical metadata matches the user-facing origin.
+3. Re-run the workflow (push or `workflow_dispatch`) to bake the new
+   `ASTRO_SITE` into the next deploy.
+
+### Rolling back
+
+Cloudflare Pages keeps every prior deployment. To revert without
+shipping a new commit: dashboard → *swift-terminal-ui → Deployments*,
+hover any past deployment, **⋯ → Rollback to this deployment.** The
+production alias flips immediately.
+
+To revert *and* keep the rollback in Git, revert the offending commit
+on `main` — the next push redeploys to the older content.
+
+### Manual / out-of-band deploys
+
+If you need to push a build from your machine without going through CI
+(e.g. an emergency patch when Actions is down):
+
+```bash
+# Build the artifact locally using the same steps as the workflow
+# (see "Previewing the full deployed artifact locally" above), into
+# _local-artifact/. Then:
+
+bunx wrangler@latest pages deploy _local-artifact \
+  --project-name=swift-terminal-ui \
+  --branch=main \
+  --commit-hash="$(git rev-parse HEAD)"
+```
+
+You'll need `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` exported
+in your shell, scoped to your Cloudflare account.
+
+### Where to find logs and status
+
+- Build logs: GitHub repo → *Actions → Deploy Website to Cloudflare
+  Pages.*
+- Deployment history, traffic, custom domains: Cloudflare dashboard →
+  *Workers & Pages → swift-terminal-ui.*
 
 ## Project structure
 
