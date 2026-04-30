@@ -1,4 +1,4 @@
-name: Build and deploy WebExample
+name: Build and deploy Website
 
 on:
   push:
@@ -11,8 +11,8 @@ permissions:
 
 jobs:
 
-  build-web-example:
-    name: Build WebExample
+  build-website:
+    name: Build Website
     runs-on: macos-26
 
     steps:
@@ -53,9 +53,9 @@ jobs:
           path: |
             ~/.cache/org.swift.swiftpm
             ~/.swiftpm
-          key: ${{ runner.os }}-swiftpm-webexample-${{ hashFiles('Examples/WebExample/TerminalApp/Package.resolved') }}
+          key: ${{ runner.os }}-swiftpm-website-${{ hashFiles('Examples/WebExample/TerminalApp/Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-swiftpm-webexample-
+            ${{ runner.os }}-swiftpm-website-
 
       - name: Cache Bun deps
         uses: actions/cache@v4
@@ -65,9 +65,10 @@ jobs:
             node_modules
             GUI/WebTUIGUI/node_modules
             Examples/WebExample/node_modules
-          key: ${{ runner.os }}-bun-webexample-${{ hashFiles('bun.lock') }}
+            Website/node_modules
+          key: ${{ runner.os }}-bun-website-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-bun-webexample-
+            ${{ runner.os }}-bun-website-
 
 
       - name: Install wasm Swift SDK used by WebExample
@@ -87,7 +88,7 @@ jobs:
           set -euo pipefail
           brew install binaryen
 
-      - name: Log WebExample toolchain environment
+      - name: Log toolchain environment
         shell: bash
         run: |
           set -euo pipefail
@@ -118,6 +119,10 @@ jobs:
           hash -r
           bun install --frozen-lockfile
 
+      # Build the WebExample WASI app + browser bundle. This is the live demo
+      # the marketing site embeds (eventually — the current `Examples/WebExample`
+      # marketing fragment is in flight to be consumed as a pure embedding
+      # example by the new `Website`).
       - name: Build WebExample
         shell: bash
         working-directory: Examples/WebExample
@@ -133,6 +138,16 @@ jobs:
         run: |
           set -euo pipefail
           bun -e 'const wasmPath = "./pages-dist/TerminalApp/dist/assets/app.wasm"; try { await WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer()); console.log(`Validated ${wasmPath}`); } catch (error) { console.error(`Failed to validate ${wasmPath}: ${error instanceof Error ? error.message : String(error)}`); process.exit(1); }'
+
+      # Build the new Astro 6 marketing + docs site. This is the page tree
+      # that ships at the GitHub Pages root.
+      - name: Build Website
+        shell: bash
+        working-directory: Website
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          bun run build
 
       - name: Build DocC archive (combined View + TerminalUI + TerminalUICharts)
         shell: bash
@@ -156,31 +171,49 @@ jobs:
             --hosting-base-path swift-terminal-ui/docs \
             --output-path .build-docs
 
-      - name: Merge DocC output into pages-dist and inject brand CSS
+      # Compose the final Pages artifact:
+      #   /                ← Website (Astro 6 marketing + docs)
+      #   /docs/           ← DocC archive at its historical path; the /api/
+      #                       landing on the Website deep-links into it
+      #   /webexample/     ← Examples/WebExample marketing demo, kept
+      #                       available so the live-WASI iframe on the
+      #                       Website can mount it without a separate host
+      - name: Compose Pages artifact
         shell: bash
         env:
-          DOCS_ROOT: ${{ github.workspace }}/Examples/WebExample/pages-dist/docs
+          ARTIFACT_ROOT: ${{ github.workspace }}/_pages-artifact
+          DOCS_ROOT: ${{ github.workspace }}/_pages-artifact/docs
+          WEBEXAMPLE_ROOT: ${{ github.workspace }}/_pages-artifact/webexample
           HOSTING_BASE_PATH: /swift-terminal-ui/docs
         run: |
           set -euo pipefail
-          mkdir -p "$DOCS_ROOT"
+          rm -rf "$ARTIFACT_ROOT"
+          mkdir -p "$ARTIFACT_ROOT" "$DOCS_ROOT" "$WEBEXAMPLE_ROOT"
+          # Website is the new root.
+          cp -R Website/dist/. "$ARTIFACT_ROOT/"
+          # DocC at /docs/ — same path it has lived at historically.
           cp -R .build-docs/. "$DOCS_ROOT/"
           # Project-owned CSS overrides on top of theme-settings.json. See
           # Examples/WebExample/src/inject-docs-css.ts for the contract; the
           # script is idempotent and safe to re-run.
           bun run Examples/WebExample/src/inject-docs-css.ts
+          # WebExample at /webexample/. The Website embeds this as the
+          # live demo on the landing page.
+          cp -R Examples/WebExample/pages-dist/. "$WEBEXAMPLE_ROOT/"
+          # Pages won't serve hidden files unless we mark with .nojekyll.
+          touch "$ARTIFACT_ROOT/.nojekyll"
 
       - name: Upload Pages artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: Examples/WebExample/pages-dist
+          path: _pages-artifact
 
   deploy-pages:
     name: Deploy GitHub Pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
-      - build-web-example
+      - build-website
     runs-on: ubuntu-latest
     permissions:
       pages: write

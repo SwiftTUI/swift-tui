@@ -1,0 +1,35 @@
+---
+// The 7-phase pipeline strip from the existing marketing page.
+// Clicking a phase deep-links into /design/architecture#<phase>.
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const phases: ReadonlyArray<string> = [
+  "resolve",
+  "measure",
+  "place",
+  "semantics",
+  "draw",
+  "raster",
+  "commit",
+];
+---
+
+<div class="pipeline-strip" aria-label="Rendering pipeline">
+  <div class="pipeline-strip-label">
+    <span class="pipeline-strip-label-tag">Rendering pipeline</span>
+    <span class="pipeline-strip-label-count">07 / PHASES</span>
+  </div>
+  <div class="pipeline-phases">
+    {
+      phases.map((phase, i) => (
+        <a
+          class="pipeline-phase"
+          href={`${base}/design/architecture#${phase}`}
+        >
+          <span class="pipeline-phase-index">{String(i + 1).padStart(2, "0")}</span>
+          <span class="pipeline-phase-name">{phase}</span>
+        </a>
+      ))
+    }
+  </div>
+</div>

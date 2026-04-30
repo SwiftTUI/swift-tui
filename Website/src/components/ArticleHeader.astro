@@ -1,0 +1,44 @@
+---
+interface Props {
+  eyebrow: string;
+  title: string;
+  description?: string;
+  /** Repo path to the canonical source, e.g. "docs/RUNTIME.md". */
+  source?: string;
+  /** Last reviewed date if available. */
+  lastReviewed?: Date;
+}
+
+const { eyebrow, title, description, source, lastReviewed } = Astro.props;
+const sourceUrl = source
+  ? `https://github.com/GoodHatsLLC/swift-terminal-ui/blob/main/${source}`
+  : undefined;
+---
+
+<header class="article-header">
+  <p class="eyebrow">{eyebrow}</p>
+  <h1 style="margin: var(--space-md) 0 0; font-family: var(--font-display); font-size: clamp(2.5rem, 6vw, 4.5rem); font-weight: 400; line-height: 0.98; letter-spacing: 0; color: var(--text-display); text-transform: uppercase; text-wrap: balance;">
+    {title}
+  </h1>
+  {
+    description && (
+      <p style="margin: var(--space-lg) 0 0; max-width: 60ch; font-size: 1.125rem; line-height: 1.55; color: var(--text-secondary);">
+        {description}
+      </p>
+    )
+  }
+  {
+    (sourceUrl || lastReviewed) && (
+      <div class="article-meta">
+        {sourceUrl && (
+          <a class="article-meta-source" href={sourceUrl} target="_blank" rel="noreferrer">
+            Source: {source} ↗
+          </a>
+        )}
+        {lastReviewed && (
+          <span>Last reviewed: {lastReviewed.toISOString().slice(0, 10)}</span>
+        )}
+      </div>
+    )
+  }
+</header>

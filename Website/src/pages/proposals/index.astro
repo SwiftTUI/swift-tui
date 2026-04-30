@@ -1,0 +1,52 @@
+---
+import Base from "@layouts/Base.astro";
+import { proposalEntries, activeProposalSlugs } from "@/lib/proposal-status";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const activeSlugs = activeProposalSlugs();
+const active = activeSlugs.map((slug) => ({
+  slug,
+  ...proposalEntries[slug],
+}));
+---
+
+<Base
+  title="Proposals"
+  description="Active design proposals — what's still shaping decisions today."
+  pageKey="design"
+>
+  <article class="prose article-body" style="margin-top: var(--space-2xl);">
+    <p class="eyebrow">Proposals</p>
+    <h1>Currently shaping decisions.</h1>
+    <p>
+      The repo's <code>/docs/proposals/</code> folder is partly archive.
+      This page shows only what is genuinely shaping decisions today —
+      shipped proposals stay in the repo as historical record but aren't
+      republished here.
+    </p>
+    <p>
+      For the curation rule, see
+      <a href={`${base}/contribute`}>Contribute</a>.
+    </p>
+  </article>
+
+  <section class="info-block" style="border-top: 1px solid var(--border); border-bottom: 0;">
+    <div class="info-copy" style="display: none;"></div>
+    <div class="card-grid" style="grid-column: 1 / -1;">
+      {
+        active.map((entry, i) => (
+          <a
+            class="card"
+            href={`${base}/proposals/${entry.slug}`}
+            data-index={String(i + 1).padStart(2, "0")}
+          >
+            <h3>{entry.title}</h3>
+            <p>{entry.summary}</p>
+            <span class="card-tag">Active</span>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+</Base>

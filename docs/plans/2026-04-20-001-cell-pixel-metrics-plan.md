@@ -1,5 +1,5 @@
 ---
-title: feat: cell pixel metrics and shape aspect correction
+title: "feat: cell pixel metrics and shape aspect correction"
 type: feature
 status: shipped
 date: 2026-04-20
