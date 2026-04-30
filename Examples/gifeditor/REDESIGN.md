@@ -578,113 +578,141 @@ clickable in one place.
 
 ---
 
-## Blockers — must land before redesign work begins
+## Blockers — landed (Phase 0 complete)
 
-Every blocker below has been promoted from "open question" by review.
-None of them can be deferred into the phased plan: each one is
-load-bearing for the very first phase of the redesign and would leave
-the editor visibly broken if shipped together with the layout changes
-without the underlying capability.
+All four blockers below have shipped. Phase 1 of the redesign can
+begin.
+
+| # | Blocker                                            | Status |
+| - | -------------------------------------------------- | ------ |
+| 1 | Framework: dropdown menus render as overlays       | ✅ landed |
+| 2 | Framework: `Button.systemHint(_:)` modifier        | ✅ landed |
+| 3 | App: undo/redo on `EditorViewModel`                | ✅ landed (already existed) |
+| 4 | App: variable brush size                           | ✅ landed |
 
 ### Blocker 1 — Framework: dropdown menus must render as overlays
 
-`swift-terminal-ui`'s `Menu` today expands **inline** — when activated,
-it pushes every sibling below it downward to make room for its
-contents. In the new layout the top-row menus sit directly above the
-options bar, the canvas, the right panel, and the timeline; an
-inline-expanding menu would reflow all four every time a menu opens
-or closes. That is not acceptable Photoshop-flavored chrome.
+**Status: landed.**
 
-**Required:** an overlay/popover rendering for `Menu` such that:
+`Menu` no longer expands inline. Activating a menu emits a presentation
+declaration that the sheet coordinator picks up and renders as an
+overlay (chrome variant `.menu`) above sibling views. Opening or
+closing a menu does NOT reflow the canvas, right panel, or timeline.
 
-- The menu's content draws **on top of** sibling views without
-  changing the parent layout (the canvas, panels, and timeline keep
-  their cell positions while a menu is open).
-- The overlay is anchored to its label and reflects/clips so it
-  remains on-screen near the right and bottom edges of the terminal.
-- Keyboard navigation (`↓` / `↑` to move, `Enter` to activate, `Esc`
-  to close) and click-outside-to-dismiss both work.
-- The implementation is structurally extensible enough for nested
-  submenus to be added later without another framework change.
+**Delivered:**
 
-**Where:** `Sources/View/Controls/Menu.swift`,
-`Sources/View/Controls/MenuRendering.swift`, plus whatever overlay
-primitive the framework gains for Phase 0.
+- `Menu` wraps its trigger row with `BuiltinSheetPresentationModifier`
+  using a new `menuPromptPresentationSpec()` (token `"menu"`, chrome
+  `.menu`). The trigger row stays inline at exactly 1 cell of height;
+  expanded content lives in the overlay layer.
+- New `PresentationChrome.menu` case in `PresentationCoordinator.swift`
+  with rendering in `PromptPresentationSurface` — compact,
+  intrinsic-width bordered box with no header.
+- `MenuSurfaceTests.menuTriggerHeightDoesNotGrowWhenExpanded` pins the
+  no-pushdown invariant: a sentinel `Text("BELOW")` placed below the
+  menu sits at the same row whether the menu is closed or open.
+- Keyboard `Esc` dismissal works via the existing
+  `topmostEscapeDismissAction` route (sheet/menu/dialog precedence).
+
+**v1 caveats** (tracked as future work, not redesign-blocking):
+
+1. Menus anchor at the presentation host's top-leading rather than
+   tracking their source frame. Acceptable for top-row menu bars.
+   Source-anchored positioning needs a frame-plumbing change to the
+   presentation system.
+2. The menu shares the sheet coordinator, so opening a menu disables
+   interaction with surrounding controls until it closes (the sheet
+   coordinator's `disablesBaseInteractionWhenActive`). Pressing Escape
+   closes the menu and restores interaction. A dedicated
+   `MenuPresentationCoordinator` with non-disabling base interaction
+   is the v2 follow-up.
+3. Click-outside-to-dismiss is not yet wired up — Escape is the
+   canonical close. (Clicking another menu's trigger opens that menu;
+   the previously-open menu remains in the store but is no longer the
+   topmost item, so it doesn't render until the new menu closes.)
+
+**Touched:** `Sources/View/Controls/Menu.swift`,
+`Sources/View/Controls/MenuRendering.swift`,
+`Sources/View/Presentation/PresentationCoordinator.swift`,
+`Sources/View/Presentation/PresentationModifiers.swift`,
+`Tests/TerminalUITests/MenuSurfaceTests.swift`.
 
 ### Blocker 2 — Framework: `Button.systemHint(_:)` integrated with the toolbar
 
-Every menu item and every toolbar button in the redesign needs a
-muted, right-aligned shortcut hint (`Save · Ctrl+S`,
-`New Layer · Alt+N`). Hand-composing this per row with
-`HStack { Text(label); Spacer(); Text(hint).muted }` would leak layout
-into every menu definition and would diverge in spacing from one menu
-to the next.
+**Status: landed.**
 
-**Required:**
+`Button` gained a `systemHint(_:)` chaining method. The hint renders
+inside the button's label area as `HStack { label; Spacer(minLength: 1); Text(hint).muted }`,
+so chrome (focus highlight, press state, role coloring) covers it
+uniformly. `ToolbarItemConfig` gained an optional `systemHint:` field
+that the toolbar's per-item button picks up via the same modifier.
 
-- A `Button.systemHint(_:)` view modifier on `Button` that renders the
-  hint right-aligned in the row's available width, styled as muted by
-  the active control chrome.
-- The same modifier renders consistently inside `Toolbar { … }` items,
-  so a single button definition like
-  `Button("Save") { … }.systemHint("Ctrl+S")` works identically in a
-  menu, in a toolbar, and as a free-standing labeled button.
-- A nil/empty hint suppresses the trailing spacer entirely (no ghost
-  whitespace).
+**Delivered:**
 
-**Where:** `Sources/View/Controls/Button.swift`,
-`Sources/View/Controls/ButtonStyles.swift`,
-`Sources/View/ActionScopes/Toolbar.swift`.
+- `Button.systemHint(_:)` chaining method that stores normalized hint
+  text on a new `package var systemHintText: String?` field.
+- `Button.normalizeSystemHint(_:)` static helper that trims whitespace
+  and folds empty/whitespace-only hints to `nil` (no ghost spacer).
+- Hint rendering wired into `resolvedNode` so every existing
+  `ButtonStyle` paints it without per-style changes.
+- `ToolbarItemConfig.systemHint: String?` plumbed through
+  `ToolbarItemButton` to call `.systemHint(...)` on the rendered
+  button.
+- `ButtonSystemHintTests` (7 tests) covers: alongside-label rendering,
+  trailing-edge alignment when a row has spare width, flush rendering
+  when the row is intrinsically sized, suppression for nil/empty/
+  whitespace hints, normalization, and toolbar-item propagation.
+
+**Touched:** `Sources/View/Controls/Button.swift`,
+`Sources/View/ActionScopes/ToolbarItem.swift`,
+`Sources/View/ActionScopes/Toolbar.swift`,
+`Tests/TerminalUITests/ButtonSystemHintTests.swift`.
 
 ### Blocker 3 — App: undo/redo on `EditorViewModel`
 
-The `Edit` menu in the new layout reserves `Undo` and `Redo` items
-with `Ctrl+Z` / `Ctrl+Y` shortcut hints. Shipping the menu without a
-working undo stack would expose two permanently-disabled rows from
-day one — and undo is *the* feature users will reach for the first
-time they mis-paint a pixel.
+**Status: landed (already in place when the spec was reviewed).**
 
-**Required:**
-
-- A snapshot-based undo stack on `EditorViewModel`. Canvas sizes are
-  bounded (`<= 64² = 4 KB per snapshot`), so a full-document snapshot
-  per edit is cheap; no need for diff-based history.
-- `model.undo()` / `model.redo()` `@MainActor` methods that restore a
-  snapshot in place.
-- `Ctrl+Z` and `Ctrl+Y` keyboard bindings in `EditorKeyBindings`.
-- Snapshots taken at every `mutateCurrentLayer`, frame insert/delete,
-  layer add/delete, paste, and resize — i.e. every place that
-  currently calls `markDirty(_:)` or `isDirty = true`.
-- A configurable history depth (default 64; clamp memory growth on
-  pathologically long sessions).
-
-**Where:** `Sources/GIFEditorUI/EditorViewModel.swift`, plus a new
-`Sources/GIFEditorUI/UndoStack.swift`. New tests in
-`Tests/GIFEditorUITests/UndoStackTests.swift`.
+`EditorViewModel` already carries a snapshot-based history stack with
+`canUndo` / `canRedo`, `undo()` / `redo()` methods, dirty-tracking by
+generation counter, save-resets-clean-generation, drag-grouping (a pen
+or eraser stroke is one undo entry), and limit (`historyLimit = 100`).
+`Ctrl+Z` / `Ctrl+Y` are wired up in `EditorKeyBindings.applyHistoryBindings`.
+Coverage in `EditorViewModelTests` confirms drag grouping, redo
+clearing on new edit, and dirty interaction with save.
 
 ### Blocker 4 — App: variable brush size
 
-The options-bar stepper assumes `model.brushSize` exists and that
-pen/eraser strokes honor it. Without this, the stepper is dead UI on
-day one and the keyboard shortcuts `[` / `]` (decrease / increase
-brush size) — which the redesign treats as standard pixel-editor
-keys — would have nothing to bind to.
+**Status: landed.**
 
-**Required:**
+Pen and eraser strokes now stamp a centered `thickness × thickness`
+square (pencil-style square brush) at every Bresenham step, with
+selection-clipping support. Brush size is clamped to `1...8` on the
+view model and toggleable from the keyboard.
 
-- `EditorViewModel.brushSize: Int` clamped to `1...8`, default `1`.
-- `ToolOps.line(…, thickness:)` — pen and eraser strokes apply the
-  thickness to every segment of a drag, not just the stamp endpoints.
-- Keyboard bindings: `[` decrease, `]` increase. Mouse parity:
-  options-bar `⊖` / `⊕` buttons that call the same model methods.
-- The brush stamp respects selection clipping when a selection is
-  active (consistent with the existing fill/gradient behavior).
+**Delivered:**
 
-**Where:** `Sources/GIFEditorCore/Tools.swift`,
+- `ToolOps.line(on:from:to:color:thickness:selection:)` — adds two
+  defaulted parameters. `thickness == 1` preserves the original
+  single-pixel behavior; even diameters bias one cell down/right of
+  the geometric center so every stamp covers at least the requested
+  point.
+- `EditorViewModel.brushSize: Int` (1...8 clamped via didSet).
+- `EditorViewModel.increaseBrushSize()` / `decreaseBrushSize()` with
+  status-message announcements at min/max.
+- `[` / `]` keyboard bindings in `EditorKeyBindings.handleFocusedEditorKey`.
+- `applyToolAtCursor` for pen/eraser routes through `strokeCurrentLayer`
+  (a self-loop line) so the brush size always applies — single click
+  and drag use the same stamp pipeline.
+- Tests: 5 new ToolOps tests (3×3 stamp, even-2 bias, thick eraser
+  band, selection clipping, default-thickness preservation) and 4 new
+  view-model tests (clamp range, thick click, thick drag as one undo
+  entry, thick eraser drag as one undo entry).
+
+**Touched:** `Sources/GIFEditorCore/Tools.swift`,
 `Sources/GIFEditorUI/EditorViewModel.swift`,
-`Sources/GIFEditorUI/EditorKeyBindings.swift`. New tests in
-`Tests/GIFEditorCoreTests/ToolOpsTests.swift` for thickness and
-selection clipping.
+`Sources/GIFEditorUI/EditorKeyBindings.swift`,
+`Tests/GIFEditorCoreTests/ToolOpsTests.swift`,
+`Tests/GIFEditorUITests/EditorViewModelTests.swift`.
 
 ---
 

@@ -85,6 +85,111 @@ struct ToolOpsTests {
     }
   }
 
+  @Test("Line with thickness 3 paints a centered 3×3 stamp at every step")
+  func lineWithThickness3StampsAcrossDiagonal() {
+    let buffer = PixelBuffer(size: PixelSize(width: 7, height: 7))
+    let result = ToolOps.line(
+      on: buffer,
+      from: PixelPoint(x: 3, y: 3),
+      to: PixelPoint(x: 3, y: 3),
+      color: 5,
+      thickness: 3
+    )
+    // 3×3 stamp centered on (3,3) covers (2..4, 2..4).
+    for y in 2...4 {
+      for x in 2...4 {
+        #expect(result[PixelPoint(x: x, y: y)] == 5)
+      }
+    }
+    // Corners outside the stamp must remain blank.
+    #expect(result[PixelPoint(x: 0, y: 0)] == nil)
+    #expect(result[PixelPoint(x: 5, y: 3)] == nil)
+  }
+
+  @Test("Even thickness 2 stamp biases one cell down/right of the center")
+  func lineWithThickness2BiasesDownAndRight() {
+    let buffer = PixelBuffer(size: PixelSize(width: 5, height: 5))
+    let result = ToolOps.line(
+      on: buffer,
+      from: PixelPoint(x: 2, y: 2),
+      to: PixelPoint(x: 2, y: 2),
+      color: 4,
+      thickness: 2
+    )
+    // 2×2 stamp at (2,2) covers (2,2),(3,2),(2,3),(3,3) — biased +x/+y.
+    #expect(result[PixelPoint(x: 2, y: 2)] == 4)
+    #expect(result[PixelPoint(x: 3, y: 2)] == 4)
+    #expect(result[PixelPoint(x: 2, y: 3)] == 4)
+    #expect(result[PixelPoint(x: 3, y: 3)] == 4)
+    #expect(result[PixelPoint(x: 1, y: 2)] == nil)
+    #expect(result[PixelPoint(x: 2, y: 1)] == nil)
+  }
+
+  @Test("Thick eraser strokes (color: nil) clear every cell under the brush")
+  func thickEraserStrokeClearsUnderBrush() {
+    let buffer = PixelBuffer(size: PixelSize(width: 7, height: 7), fill: 8)
+    let result = ToolOps.line(
+      on: buffer,
+      from: PixelPoint(x: 1, y: 3),
+      to: PixelPoint(x: 5, y: 3),
+      color: nil,
+      thickness: 3
+    )
+    // The 3-wide horizontal stroke at y=3 erases rows y=2..4 across x=1..5
+    // (each step's 3×3 stamp covers ±1 around the center).
+    for y in 2...4 {
+      for x in 0...5 {
+        #expect(result[PixelPoint(x: x, y: y)] == nil)
+      }
+    }
+    // Cells outside the stamp band stay filled.
+    #expect(result[PixelPoint(x: 0, y: 0)] == 8)
+    #expect(result[PixelPoint(x: 0, y: 6)] == 8)
+  }
+
+  @Test("Thick line clipped to selection does not paint outside the rect")
+  func thickLineRespectsSelection() {
+    let buffer = PixelBuffer(size: PixelSize(width: 8, height: 8))
+    let selection = Selection(rect: PixelRect(x: 2, y: 2, width: 4, height: 4))
+    let result = ToolOps.line(
+      on: buffer,
+      from: PixelPoint(x: 4, y: 4),
+      to: PixelPoint(x: 4, y: 4),
+      color: 7,
+      thickness: 5,
+      selection: selection
+    )
+    // The 5×5 stamp centered on (4,4) would cover (2..6, 2..6); clipping
+    // to the 4×4 selection at (2,2) trims the right and bottom cells.
+    for y in 2..<6 {
+      for x in 2..<6 {
+        #expect(result[PixelPoint(x: x, y: y)] == 7)
+      }
+    }
+    // Outside the selection — must remain blank even though the brush
+    // intersected those cells.
+    #expect(result[PixelPoint(x: 6, y: 4)] == nil)
+    #expect(result[PixelPoint(x: 4, y: 6)] == nil)
+    #expect(result[PixelPoint(x: 1, y: 4)] == nil)
+  }
+
+  @Test("Default thickness 1 keeps single-pixel behavior")
+  func defaultThicknessIsOnePixel() {
+    let buffer = PixelBuffer(size: PixelSize(width: 5, height: 5))
+    let result = ToolOps.line(
+      on: buffer,
+      from: PixelPoint(x: 2, y: 2),
+      to: PixelPoint(x: 2, y: 2),
+      color: 1
+    )
+    #expect(result[PixelPoint(x: 2, y: 2)] == 1)
+    // No stamping into neighbors.
+    #expect(result[PixelPoint(x: 1, y: 2)] == nil)
+    #expect(result[PixelPoint(x: 3, y: 2)] == nil)
+    #expect(result[PixelPoint(x: 2, y: 1)] == nil)
+    #expect(result[PixelPoint(x: 2, y: 3)] == nil)
+  }
+
   @Test("Copy/paste round-trips a region's pixel values")
   func copyPasteRoundTrip() {
     var buffer = PixelBuffer(size: PixelSize(width: 4, height: 2))

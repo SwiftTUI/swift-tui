@@ -380,6 +380,14 @@ public enum PresentationChrome: Equatable, Sendable {
   /// that should read as part of the window chrome rather than a
   /// floating card.
   case dropdown
+
+  /// Compact, intrinsic-width bordered box with no header — the
+  /// rendering used by `Menu` to float its expanded content above the
+  /// surrounding layout without reflowing siblings. Smaller and
+  /// chromier than `.surface` (no title row, no close button), this
+  /// chrome anchors at the presentation's `alignment` and sizes to its
+  /// content rather than expanding to fill.
+  case menu
 }
 
 package struct PromptPresentationDescriptor: Equatable, Sendable {

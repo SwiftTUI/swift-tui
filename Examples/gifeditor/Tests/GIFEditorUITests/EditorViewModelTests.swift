@@ -128,6 +128,119 @@ struct EditorViewModelTests {
     #expect(model.currentLayer.pixels[GIFEditorCore.PixelPoint(x: 1, y: 0)] == 5)
   }
 
+  @Test("Brush size clamps to the supported range")
+  func brushSizeClampsToSupportedRange() {
+    let model = EditorViewModel(
+      document: GIFDocument.blank(size: GIFEditorCore.PixelSize(width: 4, height: 4))
+    )
+    model.brushSize = 0
+    #expect(model.brushSize == 1)
+
+    model.brushSize = 12
+    #expect(model.brushSize == 8)
+
+    model.decreaseBrushSize()
+    #expect(model.brushSize == 7)
+
+    for _ in 0..<10 {
+      model.decreaseBrushSize()
+    }
+    #expect(model.brushSize == 1)
+
+    for _ in 0..<10 {
+      model.increaseBrushSize()
+    }
+    #expect(model.brushSize == 8)
+  }
+
+  @Test("Thick pen click stamps a centered square")
+  func thickPenClickStampsCenteredSquare() {
+    let model = EditorViewModel(
+      document: GIFDocument.blank(size: GIFEditorCore.PixelSize(width: 7, height: 7))
+    )
+    model.primaryColorIndex = 4
+    model.brushSize = 3
+    model.cursor = GIFEditorCore.PixelPoint(x: 3, y: 3)
+    model.applyToolAtCursor()
+
+    let pixels = model.currentLayer.pixels
+    for y in 2...4 {
+      for x in 2...4 {
+        #expect(pixels[GIFEditorCore.PixelPoint(x: x, y: y)] == 4)
+      }
+    }
+    #expect(pixels[GIFEditorCore.PixelPoint(x: 0, y: 0)] == nil)
+  }
+
+  @Test("Thick pen drag paints a thick connected stroke as one undo entry")
+  func thickPenDragIsOneUndoEntry() {
+    let model = EditorViewModel(
+      document: GIFDocument.blank(size: GIFEditorCore.PixelSize(width: 9, height: 9))
+    )
+    model.primaryColorIndex = 6
+    model.brushSize = 3
+    let initial = model.currentLayer.pixels
+
+    let start = GIFEditorCore.PixelPoint(x: 1, y: 4)
+    let mid = GIFEditorCore.PixelPoint(x: 4, y: 4)
+    let end = GIFEditorCore.PixelPoint(x: 7, y: 4)
+    model.beginCanvasDrag(at: start)
+    model.updateCanvasDrag(startingAt: start, from: start, to: mid)
+    model.updateCanvasDrag(startingAt: start, from: mid, to: end)
+    model.endCanvasDrag(startingAt: start, from: end, to: end)
+
+    let painted = model.currentLayer.pixels
+    // Stroke center y=4 with brush 3 covers y=3..5 across x=0..8 (each
+    // step's stamp extends ±1 from the center, so the line from (1,4) to
+    // (7,4) reaches x=0 and x=8 at the start and end stamps).
+    for y in 3...5 {
+      for x in 0...8 {
+        #expect(painted[GIFEditorCore.PixelPoint(x: x, y: y)] == 6)
+      }
+    }
+    // Outside the stamp band stays blank.
+    #expect(painted[GIFEditorCore.PixelPoint(x: 4, y: 0)] == nil)
+    #expect(painted[GIFEditorCore.PixelPoint(x: 4, y: 8)] == nil)
+    #expect(painted[GIFEditorCore.PixelPoint(x: 4, y: 2)] == nil)
+
+    // The whole drag is one history entry — single undo restores the
+    // initial pre-stroke state.
+    #expect(model.canUndo)
+    #expect(!model.canRedo)
+    model.undo()
+    #expect(model.currentLayer.pixels == initial)
+    #expect(!model.canUndo)
+    #expect(model.canRedo)
+  }
+
+  @Test("Thick eraser drag clears the stamp band and is one undo entry")
+  func thickEraserDragClearsBandAsSingleEntry() {
+    var layer = PixelBuffer(size: GIFEditorCore.PixelSize(width: 9, height: 9), fill: 2)
+    let frame = EditorFrame(layers: [EditorLayer(name: "Layer 1", pixels: layer)])
+    let document = GIFDocument(size: layer.size, frames: [frame])
+    let model = EditorViewModel(document: document)
+    model.selectTool(.eraser)
+    model.brushSize = 3
+    layer = model.currentLayer.pixels  // initial fully-filled state
+
+    let start = GIFEditorCore.PixelPoint(x: 1, y: 4)
+    let end = GIFEditorCore.PixelPoint(x: 7, y: 4)
+    model.beginCanvasDrag(at: start)
+    model.updateCanvasDrag(startingAt: start, from: start, to: end)
+    model.endCanvasDrag(startingAt: start, from: end, to: end)
+
+    let pixels = model.currentLayer.pixels
+    for y in 3...5 {
+      for x in 1...7 {
+        #expect(pixels[GIFEditorCore.PixelPoint(x: x, y: y)] == nil)
+      }
+    }
+    #expect(pixels[GIFEditorCore.PixelPoint(x: 0, y: 0)] == 2)
+
+    model.undo()
+    #expect(model.currentLayer.pixels == layer)
+  }
+
   @Test("Undo after save marks the restored older state dirty")
   func undoAfterSaveMarksOlderStateDirty() {
     let url = FileManager.default.temporaryDirectory

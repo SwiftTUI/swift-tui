@@ -263,6 +263,10 @@ private func handleFocusedEditorKey(
     model.selectTool(.eyedropper)
   case .character("x"):
     model.swapPrimaryAndSecondary()
+  case .character("["):
+    model.decreaseBrushSize()
+  case .character("]"):
+    model.increaseBrushSize()
   case .space, .return:
     model.applyToolAtCursor()
   case .escape:

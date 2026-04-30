@@ -17,6 +17,7 @@ public struct ToolbarItemConfig: Sendable {
   public var icon: Image?
   public var position: Position
   public var isEnabled: Bool
+  public var systemHint: String?
   public var action: @MainActor @Sendable () -> Void
 
   @MainActor
@@ -25,6 +26,7 @@ public struct ToolbarItemConfig: Sendable {
     icon: Image? = nil,
     position: Position = .automatic,
     isEnabled: Bool = true,
+    systemHint: String? = nil,
     action: @escaping @MainActor @Sendable () -> Void
   ) {
     let authoringContext = currentImperativeAuthoringContextSnapshot()
@@ -32,6 +34,7 @@ public struct ToolbarItemConfig: Sendable {
     self.icon = icon
     self.position = position
     self.isEnabled = isEnabled
+    self.systemHint = Button<Text>.normalizeSystemHint(systemHint)
     self.action = {
       withImperativeAuthoringContext(authoringContext) {
         action()

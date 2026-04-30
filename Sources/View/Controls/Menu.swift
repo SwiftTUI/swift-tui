@@ -1,6 +1,23 @@
 package import Core
 
-/// A focusable command menu that expands inline when activated.
+/// A focusable command menu whose expanded content floats above the
+/// surrounding layout as an overlay — opening and closing the menu
+/// does NOT reflow sibling views.
+///
+/// The trigger row (`Label ▾` / `Label ▴`) always renders inline at
+/// the menu's site in the layout, taking exactly one cell of height.
+/// When activated, the user-supplied `content` is hosted by the sheet
+/// presentation coordinator with `.menu` chrome (a compact,
+/// intrinsic-width bordered box anchored at the host's top-leading).
+///
+/// **v1 caveats** (tracked as future work):
+/// - Anchoring is at the presentation host's top-leading rather than
+///   at the menu's source frame. A future enhancement will plumb
+///   source frames through the presentation system.
+/// - The menu shares the sheet coordinator, so opening a menu disables
+///   interaction with surrounding controls until it closes (Escape).
+///   A dedicated menu coordinator with non-disabling base interaction
+///   is the v2 follow-up.
 public struct Menu<Label: View, Content: View>: View, ResolvableView {
   @State private var isExpanded = false
   package var label: Label
@@ -65,12 +82,33 @@ extension Menu {
       )
     }
 
-    let child = menuBody(
+    // Wrap the trigger row with `BuiltinSheetPresentationModifier` so
+    // the menu's expanded content rides the same overlay infrastructure
+    // sheets do. Routing the modifier through the view tree (rather
+    // than imperatively attaching the preference inside this function)
+    // is critical: `ResolvedNode.children`'s setter recomputes
+    // `preferenceValues` from its children, so an imperative attach on
+    // the parent gets overwritten when `ViewNode.snapshot()` rebuilds.
+    // A modifier in the view tree re-applies on every resolve, so the
+    // preference is always present in the rebuilt snapshot.
+    let triggerView = menuTriggerRow(
       isExpanded: isExpanded,
       isFocused: isFocused,
       isPressed: isPressed,
       chrome: chrome
-    ).resolve(
+    )
+    let menuPresentation = triggerView.modifier(
+      BuiltinSheetPresentationModifier(
+        title: "",
+        isPresented: expansionBinding,
+        spec: menuPromptPresentationSpec(),
+        sheetContent: content,
+        sheetContentAuthoringContext: makeDeferredAuthoringContext(),
+        dismissAuthoringContext: makeDeferredAuthoringContext()
+      )
+    )
+
+    let child = menuPresentation.resolve(
       in: context.child(component: .named("MenuBody"))
     )
 

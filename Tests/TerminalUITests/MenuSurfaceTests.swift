@@ -18,6 +18,11 @@ extension ResolvedNode {
 
     return nil
   }
+
+  fileprivate func contains(predicate: (ResolvedNode) -> Bool) -> Bool {
+    if predicate(self) { return true }
+    return children.contains { $0.contains(predicate: predicate) }
+  }
 }
 
 @MainActor
@@ -72,7 +77,68 @@ struct MenuSurfaceTests {
     )
   }
 
-  @Test("Menu toggles open and renders authored commands")
+  @Test("Menu trigger row stays a single cell tall regardless of expansion state")
+  func menuTriggerHeightDoesNotGrowWhenExpanded() {
+    // The whole point of overlay rendering: opening a menu must NOT
+    // reflow surrounding layout. Stack the menu above a Text — with
+    // a tall spacer between them so the menu's overlay (which lives
+    // in the same screen region as the trigger's top-leading anchor)
+    // cannot visually cover the "BELOW" sentinel — and measure the
+    // Text's row before and after expansion. If the menu were
+    // inline-expanding, the Text would slide down by N rows.
+    let actionRegistry = LocalActionRegistry()
+    let menu =
+      VStack(alignment: .leading, spacing: 0) {
+        Menu("Actions") {
+          Button("Open") {}
+          Button("Save") {}
+          Button("Quit") {}
+        }
+        .id(testIdentity("Menu"))
+        Spacer().frame(height: 14)
+        Text("BELOW").id(testIdentity("Below"))
+      }
+
+    var env = EnvironmentValues()
+    env.terminalSize = CellSize(width: 30, height: 24)
+    let renderer = DefaultRenderer()
+
+    let collapsedArtifacts = renderer.render(
+      menu,
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: env,
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      ),
+      proposal: .init(width: 30, height: 24)
+    )
+    let collapsedLines = collapsedArtifacts.rasterSurface.lines
+    let belowRowCollapsed = collapsedLines.firstIndex(where: { $0.contains("BELOW") })
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("Menu")))
+
+    let expandedArtifacts = renderer.render(
+      menu,
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: env,
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      ),
+      proposal: .init(width: 30, height: 24)
+    )
+    let expandedLines = expandedArtifacts.rasterSurface.lines
+    let belowRowExpanded = expandedLines.firstIndex(where: { $0.contains("BELOW") })
+
+    // The exact row index depends on layout, but it must not change
+    // when the menu opens — that's the no-pushdown invariant.
+    #expect(belowRowCollapsed != nil)
+    #expect(belowRowExpanded != nil)
+    #expect(belowRowCollapsed == belowRowExpanded)
+  }
+
+  @Test("Menu toggles open and renders authored commands as an overlay")
   func menuTogglesOpenAndRendersAuthoredCommands() {
     let actionRegistry = LocalActionRegistry()
     let menu = Menu("Actions") {
@@ -87,14 +153,19 @@ struct MenuSurfaceTests {
     }
     .id(testIdentity("Menu"))
 
+    var env = EnvironmentValues()
+    env.terminalSize = CellSize(width: 30, height: 20)
     let renderer = DefaultRenderer()
+
     let collapsedArtifacts = renderer.render(
       menu,
       context: .init(
         identity: testIdentity("Root"),
+        environmentValues: env,
         localActionRegistry: actionRegistry,
         applyEnvironmentValues: true
-      )
+      ),
+      proposal: .init(width: 30, height: 20)
     )
 
     #expect(!collapsedArtifacts.rasterSurface.lines.joined(separator: "\n").contains("Save"))
@@ -104,9 +175,11 @@ struct MenuSurfaceTests {
       menu,
       context: .init(
         identity: testIdentity("Root"),
+        environmentValues: env,
         localActionRegistry: actionRegistry,
         applyEnvironmentValues: true
-      )
+      ),
+      proposal: .init(width: 30, height: 20)
     )
     let surface = expandedArtifacts.rasterSurface.lines.joined(separator: "\n")
     let dividerNode = expandedArtifacts.resolvedTree.descendant(
@@ -119,10 +192,15 @@ struct MenuSurfaceTests {
     #expect(surface.contains("Item 2"))
     #expect(dividerNode?.kind == .view("Divider"))
     #expect(surface.contains("────"))
-    #expect(
-      expandedArtifacts.semanticSnapshot.focusRegions.map(\.identity) == [
-        testIdentity("Menu")
-      ]
-    )
+    // Menu items render as part of the overlay's focus scope, not the
+    // base content's. The base trigger gets disabled while the overlay
+    // is active (sheet-coordinator semantics in v1), so the focus
+    // regions list now consists of overlay-rooted regions only.
+    let focusIdentities = expandedArtifacts.semanticSnapshot.focusRegions.map(\.identity)
+    let allOverlayRooted = focusIdentities.allSatisfy {
+      $0.path.contains("PresentationHost")
+    }
+    #expect(!focusIdentities.isEmpty)
+    #expect(allOverlayRooted)
   }
 }
