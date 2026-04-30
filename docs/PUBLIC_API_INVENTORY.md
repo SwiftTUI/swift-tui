@@ -2,6 +2,10 @@
 
 This page is the post-migration reference for the public surface of the package. It separates the canonical SwiftUI-shaped API and actor-isolation model from package-only seams that still exist in the codebase.
 
+> **Companion artefacts.** A machine-generated, complete enumeration of every public Swift symbol — derived from `swift package dump-symbol-graph` and classified through [`docs/public_api_overrides.yml`](public_api_overrides.yml) — lives in [`PUBLIC_API_BASELINE.md`](PUBLIC_API_BASELINE.md) (curated grouping) and [`.public-api-baseline.txt`](.public-api-baseline.txt) (flat sorted list, the machine-grep target). Both are committed and regenerated via `Scripts/generate_public_api_inventory.sh`. PRs that add or remove a public symbol see the change in those files.
+>
+> This inventory remains the prose reference: it explains *why* the API is shaped the way it is and groups symbols by purpose. The baseline answers "is symbol X public?" — this doc answers "should I be using X?".
+
 ## How To Read This
 
 - **Canonical public surface** means the API new app code should use first.
