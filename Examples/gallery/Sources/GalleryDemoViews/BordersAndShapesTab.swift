@@ -12,7 +12,7 @@ import TerminalUI
 ///   3. Per-side ``BorderEdgeStyle`` foregrounds — a traffic-light card
 ///      and a CSS-shorthand two-color card.
 ///   4. Curved shapes — ``Circle``, ``Ellipse``, and ``Capsule`` across
-///      fill / strokeBorder / ``PatternFill`` variants, including a
+///      fill / strokeBorder / ``TileStyle`` variants, including a
 ///      ``PhaseAnimator``-driven gradient that smoothly rotates
 ///      through the four corner orientations (the payoff for the
 ///      Animatable-protocol migration in
@@ -169,19 +169,19 @@ private struct BordersAndShapesCurvedShapesSection: View {
           .strokeBorder(Color.blue)
           .frame(width: 16, height: 3)
       }
-      Text("PatternFill — light / medium / heavy shade").foregroundStyle(.separator)
+      Text("TileStyle — light / medium / heavy shade").foregroundStyle(.separator)
       HStack(spacing: 2) {
         Circle()
-          .fill(PatternFill.lightShade)
+          .fill(TileStyle(.lightShade, foreground: .white))
           .frame(width: 10, height: 5)
         Ellipse()
-          .fill(PatternFill.mediumShade)
+          .fill(TileStyle(.mediumShade, foreground: .white))
           .frame(width: 14, height: 5)
         Capsule()
-          .fill(PatternFill.heavyShade)
+          .fill(TileStyle(.heavyShade, foreground: .white))
           .frame(width: 16, height: 3)
       }
-      // PhaseAnimator-driven PatternFill with a linear-gradient
+      // PhaseAnimator-driven TileStyle with a linear-gradient
       // foreground.  Pre-Animatable-protocol migration this row froze
       // on phase 0 (gradients had no diff signal) or, post-stranded-
       // completion fix, snapped between corners every 500 ms.  After
@@ -189,23 +189,21 @@ private struct BordersAndShapesCurvedShapesSection: View {
       // continuously across the 500 ms window so the diagonal sweep
       // visibly rotates through topLeading → topTrailing →
       // bottomTrailing → bottomLeading and back.
-      Text("Animated gradient pattern fill — rotates smoothly via PhaseAnimator")
+      Text("Animated gradient tile style — rotates smoothly via PhaseAnimator")
         .foregroundStyle(.separator)
       HStack(spacing: 2) {
         Rectangle()
-          .fill(PatternFill(glyph: "/", foreground: .yellow))
+          .fill(TileStyle(.init(glyph: "/"), foreground: .yellow))
           .frame(width: 5, height: 5)
         PhaseAnimator(GradientRotationPhase.allCases) { phase in
           Rectangle()
             .fill(
-              PatternFill(
-                glyph: "/",
-                foreground: .linearGradient(
-                  LinearGradient(
-                    colors: [.white, .red],
-                    startPoint: phase.startPoint,
-                    endPoint: phase.endPoint
-                  )
+              TileStyle(
+                .init(glyph: "/"),
+                foreground: LinearGradient(
+                  colors: [.white, .red],
+                  startPoint: phase.startPoint,
+                  endPoint: phase.endPoint
                 )
               )
             )
@@ -214,7 +212,7 @@ private struct BordersAndShapesCurvedShapesSection: View {
           .linear(duration: .milliseconds(500))
         }
         Rectangle()
-          .fill(PatternFill.dots)
+          .fill(TileStyle(.dots, foreground: .white))
           .frame(width: 5, height: 5)
       }
     }

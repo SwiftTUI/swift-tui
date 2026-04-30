@@ -5462,16 +5462,13 @@ struct SwiftUISurfaceTests {
         != artifacts.rasterSurface.styleRuns[1].style.foregroundColor)
   }
 
-  @Test("tile background renders tiled content with framework styles")
-  func tileBackgroundRendersTiledContent() {
+  @Test("tile style renders tiled content with framework styles")
+  func tileStyleRendersTiledContent() {
     let artifacts = DefaultRenderer().render(
-      TileBackground(
-        width: 6,
-        height: 2,
-        tiles: ["xo"],
-        style: .terminalTile(.info)
-      ),
-      context: .init(identity: testIdentity("TileBackground"))
+      Rectangle()
+        .fill(TileStyle(.init(rows: ["xo"]), foreground: .terminalTile(.info)))
+        .frame(width: 6, height: 2),
+      context: .init(identity: testIdentity("TileStyle"))
     )
 
     #expect(artifacts.rasterSurface.lines == ["xoxoxo", "xoxoxo"])

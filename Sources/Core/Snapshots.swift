@@ -601,8 +601,8 @@ extension SnapshotRenderer {
       return "linearGradient(\(describe(gradient)))"
     case .radialGradient(let gradient):
       return "radialGradient(\(describe(gradient)))"
-    case .patternFill(let pattern):
-      return "patternFill(\(describe(pattern)))"
+    case .tileStyle(let tile):
+      return "tileStyle(\(describe(tile)))"
     case .terminalChrome(let chromeStyle):
       return describe(chromeStyle)
     case .opacity(let inner, let amount):
@@ -610,24 +610,15 @@ extension SnapshotRenderer {
     }
   }
 
-  private func describe(_ pattern: PatternFill) -> String {
-    let glyph = String(pattern.glyph)
-    let fg = describe(pattern.foreground)
-    if let background = pattern.background {
-      return "glyph=\(glyph),fg=\(fg),bg=\(describe(background))"
+  private func describe(_ tile: TileStyle) -> String {
+    let rows = tile.pattern.rows.map { row in
+      String(row)
+    }.joined(separator: "/")
+    let fg = describe(tile.foreground.style)
+    if let background = tile.background {
+      return "rows=\(rows),fg=\(fg),bg=\(describe(background.style))"
     }
-    return "glyph=\(glyph),fg=\(fg)"
-  }
-
-  private func describe(_ paint: PatternFill.Paint) -> String {
-    switch paint {
-    case .color(let color):
-      return color.hexString(format: .rrggbbaa)
-    case .linearGradient(let gradient):
-      return "linearGradient(\(describe(gradient)))"
-    case .radialGradient(let gradient):
-      return "radialGradient(\(describe(gradient)))"
-    }
+    return "rows=\(rows),fg=\(fg)"
   }
 
   private func describe(_ style: TerminalChromeStyle) -> String {

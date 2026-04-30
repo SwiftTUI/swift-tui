@@ -18,9 +18,9 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | Module | Top-level | All public |
 |---|---:|---:|
 | `TerminalUI` | 46 | 399 |
-| `View` | 235 | 8177 |
+| `View` | 234 | 8061 |
 | `TerminalUICharts` | 17 | 1343 |
-| `Core` | 251 | 2471 |
+| `Core` | 251 | 2477 |
 
 ## TerminalUI
 
@@ -75,7 +75,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## View
 
-### Canonical surface (235)
+### Canonical surface (234)
 
 - `ActivePaletteCommand` — struct — 4 members
 - `Animation` — struct — 21 members
@@ -112,7 +112,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `BorderModifier` — struct — 2 members
 - `BuiltinPromptPresentationModifier` — struct — 2 members
 - `BuiltinSheetPresentationModifier` — struct — 2 members
-- `Button` — struct — 117 members
+- `Button` — struct — 118 members
 - `ButtonStyle` — protocol — 6 members
 - `ButtonStyleConfiguration` — struct — 123 members
 - `Canvas` — struct — 116 members
@@ -227,7 +227,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `PreferenceOverlayValueModifier` — struct — 2 members
 - `PreferenceTransformModifier` — struct — 2 members
 - `PreferenceWritingModifier` — struct — 2 members
-- `PresentationChrome` — enum — 3 members
+- `PresentationChrome` — enum — 4 members
 - `ProgressView` — struct — 122 members
 - `ProposedViewSize` — typealias
 - `RadioGroupPickerStyle` — struct — 5 members
@@ -275,13 +275,12 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TextFieldStyle` — protocol — 4 members
 - `TextFieldStyleConfiguration` — struct — 121 members
 - `TextFigure` — struct — 120 members
-- `TileBackground` — struct — 118 members
 - `ToastModifier` — struct — 2 members
 - `ToastStyle` — protocol — 3 members
 - `ToastStyleConfiguration` — struct — 1 member
 - `ToastStylePresentation` — struct — 11 members
 - `Toggle` — struct — 115 members
-- `ToolbarItemConfig` — struct — 11 members
+- `ToolbarItemConfig` — struct — 12 members
 - `ToolbarItemContributionModifier` — struct — 2 members
 - `ToolbarModifier` — struct — 2 members
 - `ToolbarPlacement` — enum — 3 members
@@ -482,7 +481,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `OutlineStylePresentation` — struct — 12 members
 - `parseDroppedPaths(_:)` — func
 - `Path` — struct — 15 members
-- `PatternFill` — struct — 24 members
 - `Phase` — enum — 11 members
 - `PixelPoint` — struct — 5 members
 - `PixelSize` — struct — 5 members
@@ -582,6 +580,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TextTruncationMode` — enum — 7 members
 - `TextWrappingStrategy` — enum — 5 members
 - `Theme` — struct — 21 members
+- `TileStyle` — struct — 30 members
 - `TransactionSnapshot` — struct — 3 members
 - `TransferFunction` — enum — 10 members
 - `UnitPoint` — struct — 15 members

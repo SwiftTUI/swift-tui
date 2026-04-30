@@ -5,7 +5,7 @@ public struct Rasterizer: Sendable {
     case constant(Color?)
     case sampled(LinearGradient)
     case sampledRadial(RadialGradient)
-    case pattern(PatternFill)
+    case tile(TileStyle)
   }
 
   public init() {}
@@ -832,13 +832,13 @@ extension Rasterizer {
     }
 
     // Curved shapes normally use a Braille subpixel canvas so their
-    // edges antialias onto the 2x4 dot grid. Pattern fills are the
+    // edges antialias onto the 2x4 dot grid. Tile styles are the
     // exception: they need per-cell glyph writes, so they fall through
     // to the general cell-walking loop below (which calls
     // `shapeContains`, and that now knows about curved geometry).
     switch geometry {
     case .circle, .ellipse, .capsule:
-      if case .pattern = colorMode {
+      if case .tile = colorMode {
         break
       }
       paintBrailleShape(
@@ -858,30 +858,22 @@ extension Rasterizer {
     // Detect whether this fill carries alpha for the tint path.
     let constantColor: Color?
     let isTranslucent: Bool
-    let patternFill: PatternFill?
+    let tileStyle: TileStyle?
     switch colorMode {
     case .constant(let color):
       constantColor = color
       isTranslucent = (color?.alpha ?? 0) < 1
-      patternFill = nil
+      tileStyle = nil
     case .sampled, .sampledRadial:
       constantColor = nil
       // Sampled (gradient) fills may have per-stop alpha.
       isTranslucent = false
-      patternFill = nil
-    case .pattern(let pattern):
+      tileStyle = nil
+    case .tile(let tile):
       constantColor = nil
       isTranslucent = false
-      patternFill = pattern
+      tileStyle = tile
     }
-
-    // Pre-compute the glyph cell width for pattern fills once so we
-    // handle wide characters (e.g. emoji) correctly inside the inner
-    // loop without paying the cost per cell.
-    let patternGlyphWidth: Int = {
-      guard let patternFill else { return 1 }
-      return max(1, cellWidth(of: patternFill.glyph))
-    }()
 
     for y in shapeBounds.origin.y..<(shapeBounds.origin.y + shapeBounds.size.height) {
       var x = shapeBounds.origin.x
@@ -900,32 +892,27 @@ extension Rasterizer {
           continue
         }
 
-        if let patternFill {
-          // Pattern fill: overwrite the cell with the glyph using the
-          // pattern's foreground and optional background, resolved
-          // per cell so gradient paints sample at the current point.
-          if x + patternGlyphWidth > rowEnd {
-            // Not enough horizontal room for a wide glyph (e.g. an
-            // emoji at the very right edge) — skip this cell rather
-            // than clipping the glyph in half.
-            x += 1
-            continue
-          }
+        if let tileStyle {
+          // Tile style: overwrite the cell with the pattern glyph using
+          // the tile's foreground and optional background, resolved per
+          // cell so gradient paints sample at the current point.
+          let localX = x - shapeBounds.origin.x
+          let localY = y - shapeBounds.origin.y
           write(
-            patternFill.glyph,
-            width: patternGlyphWidth,
-            style: resolvedPatternCellStyle(
-              patternFill,
+            tileStyle.pattern.character(atX: localX, y: localY),
+            style: resolvedTileCellStyle(
+              tileStyle,
               bounds: shapeBounds,
               sampleX: x,
-              sampleY: y
+              sampleY: y,
+              environment: environment
             ),
             atX: x,
             y: y,
             cells: &cells,
             clip: clip
           )
-          x += patternGlyphWidth
+          x += 1
           continue
         }
 
@@ -2480,8 +2467,8 @@ extension Rasterizer {
       return .sampled(gradient)
     case .radialGradient(let gradient):
       return .sampledRadial(gradient)
-    case .patternFill(let pattern):
-      return .pattern(pattern)
+    case .tileStyle(let tile):
+      return .tile(tile)
     case .terminalChrome(let chromeStyle):
       return resolvedColorMode(
         from: environment.theme.resolvedStyle(
@@ -2543,13 +2530,8 @@ extension Rasterizer {
           endRadius: gradient.endRadius
         )
         return .sampledRadial(faded)
-      case .pattern(let pattern):
-        let faded = PatternFill(
-          glyph: pattern.glyph,
-          foreground: pattern.foreground.opacity(amount),
-          background: pattern.background?.opacity(amount)
-        )
-        return .pattern(faded)
+      case .tile(let tile):
+        return .tile(tile.applyingOpacity(amount))
       }
     }
   }
@@ -2577,51 +2559,41 @@ extension Rasterizer {
         x: sampleX,
         y: sampleY
       )
-    case .pattern(let pattern):
-      // Callers that reduce a pattern fill to a scalar color use
-      // the foreground's representative color — the per-cell glyph
-      // write path bypasses this helper and consults the
-      // ``PatternFill`` directly via ``resolvedPatternCellStyle``.
-      return pattern.foreground.representativeColor
+    case .tile(let tile):
+      // Callers that reduce a tile style to a scalar color use the
+      // foreground's representative color when one is available. The
+      // per-cell glyph write path bypasses this helper and consults the
+      // ``TileStyle`` directly via ``resolvedTileCellStyle``.
+      return tile.foreground.representativeColor
     }
   }
 
-  private func resolvedPatternCellStyle(
-    _ pattern: PatternFill,
+  private func resolvedTileCellStyle(
+    _ tile: TileStyle,
     bounds: CellRect,
     sampleX: Int,
-    sampleY: Int
+    sampleY: Int,
+    environment: StyleEnvironmentSnapshot
   ) -> ResolvedTextStyle? {
-    let fg = resolvePaint(
-      pattern.foreground,
+    let fg = resolveColor(
+      from: resolvedColorMode(from: tile.foreground.style, environment: environment),
       bounds: bounds,
       sampleX: sampleX,
       sampleY: sampleY
     )
-    let bg = pattern.background.flatMap {
-      resolvePaint($0, bounds: bounds, sampleX: sampleX, sampleY: sampleY)
+    let bg = tile.background.flatMap {
+      resolveColor(
+        from: resolvedColorMode(from: $0.style, environment: environment),
+        bounds: bounds,
+        sampleX: sampleX,
+        sampleY: sampleY
+      )
     }
     let resolved = ResolvedTextStyle(
       foregroundColor: fg,
       backgroundColor: bg
     )
     return resolved.isDefault ? nil : resolved
-  }
-
-  private func resolvePaint(
-    _ paint: PatternFill.Paint,
-    bounds: CellRect,
-    sampleX: Int,
-    sampleY: Int
-  ) -> Color? {
-    switch paint {
-    case .color(let color):
-      return color
-    case .linearGradient(let gradient):
-      return sample(gradient, in: bounds, x: sampleX, y: sampleY)
-    case .radialGradient(let gradient):
-      return sample(gradient, in: bounds, x: sampleX, y: sampleY)
-    }
   }
 
   private func resolvedBackgroundTextStyle(

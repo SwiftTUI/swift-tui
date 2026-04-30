@@ -4,7 +4,7 @@ package import Core
 ///
 /// The animation controller stores heterogeneous animatable values
 /// per ``AnimatableSlot`` — opacity is a `Double`, foreground style
-/// is a `LinearGradient` or a `Color` or a `PatternFill`, padding is
+/// is a `LinearGradient` or a `Color` or a `TileStyle`, padding is
 /// an `EdgeInsets`, and so on — and needs a uniform storage
 /// representation that supports equality, same-type interpolation,
 /// and unwrapping back to the original type at apply time.  This is
@@ -22,10 +22,10 @@ package import Core
 ///   `nil` as a snap signal and writes the target value directly
 ///   without interpolating.  Same-type interpolation uses the
 ///   wrapped type's ``animatableData`` arithmetic: `a + (b - a) * t`.
-///   ``PatternFill`` is a special case — the variant-based type has
+///   ``TileStyle`` is a special case — the variant-based type has
 ///   no meaningful generic ``animatableData``, so the box intercepts
 ///   it and dispatches to the bespoke
-///   ``PatternFill/interpolated(to:progress:)`` helper.
+///   ``TileStyle/interpolated(to:progress:)`` helper.
 /// - **NaN defence:** if `progress` is non-finite the box returns the
 ///   target value directly rather than producing `.nan` deltas that
 ///   would downstream trap inside ``OklabColor.init``.
@@ -94,18 +94,18 @@ private struct _AnimatableBox<T: Animatable & Equatable & Sendable>: _AnyAnimata
       return AnyAnimatable(other.value)
     }
 
-    // Special case: ``PatternFill`` is variant-based (color vs
-    // linear vs radial vs glyph).  Cross-variant values have no
+    // Special case: ``TileStyle`` is variant-based (color vs
+    // linear vs radial vs tile pattern).  Cross-variant values have no
     // single well-formed ``animatableData`` — Phase 2 implemented a
-    // bespoke ``PatternFill.interpolated(to:progress:)`` that
+    // bespoke ``TileStyle.interpolated(to:progress:)`` that
     // handles the variant dispatch.  Route through it instead of
     // letting the generic ``animatableData`` path run against the
     // ``EmptyAnimatableData`` bridge.
-    if let selfPattern = value as? PatternFill,
-      let otherPattern = other.value as? PatternFill
+    if let selfTile = value as? TileStyle,
+      let otherTile = other.value as? TileStyle
     {
       return AnyAnimatable(
-        selfPattern.interpolated(to: otherPattern, progress: t)
+        selfTile.interpolated(to: otherTile, progress: t)
       )
     }
 

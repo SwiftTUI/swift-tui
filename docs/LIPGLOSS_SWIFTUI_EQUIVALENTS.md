@@ -128,7 +128,7 @@ This survey covers the upstream Lip Gloss source, especially `README.md`, `style
 | `LightDark(...)`, `HasDarkBackground(...)`, `BackgroundColor(...)` | `@Environment(\\.colorScheme)` and platform-specific color inspection when needed | SwiftUI exposes color scheme, not a terminal background probe. |
 | `Complete(...)` | Asset-catalog variants or your own palette-selection logic | SwiftUI does not downsample based on terminal color profiles. |
 | `Alpha(...)`, `Complementary(...)`, `Darken(...)`, `Lighten(...)` | Color helpers in your own theme layer, or UIKit/AppKit color math bridged into SwiftUI | These are utility-layer equivalents, not built-in SwiftUI modifiers. |
-| `Blend1D(...)`, `Blend2D(...)` | `LinearGradient`, `RadialGradient`, `PatternFill`, or `Canvas` | TerminalUI now ships `LinearGradient` / `RadialGradient` with Textual-style `(location, color)` stops and CIELAB blending, plus `PatternFill` for `░ ▒ ▓` shading. `BorderBlend` handles perimeter gradients specifically. |
+| `Blend1D(...)`, `Blend2D(...)` | `LinearGradient`, `RadialGradient`, `TileStyle`, or `Canvas` | TerminalUI now ships `LinearGradient` / `RadialGradient` with Textual-style `(location, color)` stops and CIELAB blending, plus `TileStyle` for glyph-cell shading. `BorderBlend` handles perimeter gradients specifically. |
 
 ### Introspection and Reset APIs
 

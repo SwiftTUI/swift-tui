@@ -198,7 +198,7 @@ public enum AnyShapeStyle: Equatable, Sendable {
   case color(Color)
   case linearGradient(LinearGradient)
   case radialGradient(RadialGradient)
-  case patternFill(PatternFill)
+  indirect case tileStyle(TileStyle)
   case terminalChrome(TerminalChromeStyle)
   indirect case opacity(AnyShapeStyle, Double)
 
@@ -240,13 +240,8 @@ extension ShapeStyle {
           startRadius: gradient.startRadius,
           endRadius: gradient.endRadius
         ))
-    case .patternFill(let pattern):
-      return .patternFill(
-        PatternFill(
-          glyph: pattern.glyph,
-          foreground: pattern.foreground.opacity(clamped),
-          background: pattern.background?.opacity(clamped)
-        ))
+    case .tileStyle(let tile):
+      return .tileStyle(tile.applyingOpacity(clamped))
     case let style:
       // Semantic/chrome styles can't carry alpha until resolved —
       // wrap for deferred resolution in the rasterizer.
@@ -891,15 +886,14 @@ private func resolveStyleColorResult(
       return .failure(.emptyGradient)
     }
     return .success(firstColor)
-  case .patternFill(let pattern):
-    // A pattern fill reduces to the representative color of its
-    // foreground paint (its flat color, or the gradient's first
-    // stop).  The rasterizer handles the glyph and optional
-    // background separately when painting.
-    guard let fg = pattern.foreground.representativeColor else {
-      return .failure(.emptyGradient)
-    }
-    return .success(fg)
+  case .tileStyle(let tile):
+    return resolveStyleColorResult(
+      style: tile.foreground.style,
+      theme: theme,
+      appearance: appearance,
+      depth: depth + 1,
+      depthLimit: depthLimit
+    )
   case .terminalChrome(let chromeStyle):
     return resolveStyleColorResult(
       style: theme.resolvedStyle(
