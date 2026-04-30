@@ -189,6 +189,47 @@ struct ButtonFocusStabilityTests {
     )
   }
 
+  @Test("horizontally fixed VStack reconciles cross width under finite height proposal")
+  func horizontallyFixedVStackReconcilesCrossWidthWithFiniteMainProposal() throws {
+    let size = CellSize(width: 40, height: 10)
+    let rootIdentity = testIdentity("HorizontallyFixedSpacer")
+    var env = EnvironmentValues()
+    env.terminalSize = size
+
+    let artifacts = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("abcdefghij")  // 10 wide
+        HStack(spacing: 0) {
+          Text("L")
+          Spacer()
+          Text("R")
+        }
+      }
+      .fixedSize(horizontal: true, vertical: false),
+      context: .init(identity: rootIdentity, environmentValues: env),
+      proposal: .init(width: size.width, height: size.height)
+    )
+
+    let innerRow = try #require(
+      artifacts.placedTree.flattenedDescendants.first { $0.kind == .view("HStack") }
+    )
+    #expect(innerRow.bounds.size.width == 10)
+
+    let texts = innerRow.flattenedDescendants.filter {
+      if case .text = $0.drawPayload { return true }
+      return false
+    }
+    let rightText = try #require(
+      texts.first { node in
+        if case .text(let content) = node.drawPayload { return content == "R" }
+        return false
+      })
+    #expect(
+      rightText.bounds.origin.x + rightText.bounds.size.width
+        == innerRow.bounds.origin.x + innerRow.bounds.size.width
+    )
+  }
+
   // MARK: - Harness plumbing
 
   @MainActor
