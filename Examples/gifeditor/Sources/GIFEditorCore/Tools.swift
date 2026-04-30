@@ -20,7 +20,11 @@ public enum EditorTool: String, Hashable, Sendable, CaseIterable, Codable {
     }
   }
 
-  /// 1-character glyph used by the toolbox for compact display.
+  /// 1-letter glyph used by the keyboard help screen — mirrors the
+  /// keypress shortcut that selects the tool (`P` for pen, `E` for
+  /// eraser, etc.). This stays in place for the help table even though
+  /// the redesigned tool dock uses richer unicode icons via
+  /// ``iconGlyph`` instead.
   public var glyph: String {
     switch self {
     case .pen: return "P"
@@ -29,6 +33,22 @@ public enum EditorTool: String, Hashable, Sendable, CaseIterable, Codable {
     case .gradient: return "G"
     case .marquee: return "M"
     case .eyedropper: return "I"
+    }
+  }
+
+  /// Single-cell unicode icon used by the redesigned tool dock. Picked
+  /// from the Basic Multilingual Plane so every cell is exactly 1
+  /// terminal column wide in Apple Terminal, iTerm2, Ghostty, and
+  /// Kitty — which keeps the half-block canvas grid aligned with the
+  /// surrounding chrome.
+  public var iconGlyph: String {
+    switch self {
+    case .pen: return "✎"  // U+270E pencil
+    case .eraser: return "⌫"  // U+232B erase to the left
+    case .fill: return "⬢"  // U+2B22 solid hexagon
+    case .gradient: return "◐"  // U+25D0 half-filled circle
+    case .marquee: return "▭"  // U+25AD rectangle outline
+    case .eyedropper: return "⊙"  // U+2299 circled dot
     }
   }
 }

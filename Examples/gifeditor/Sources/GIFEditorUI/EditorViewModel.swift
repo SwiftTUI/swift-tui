@@ -518,6 +518,21 @@ public final class EditorViewModel {
 
   // MARK: - Canvas resize
 
+  /// Square-canvas presets cycled through by `cycleCanvasSize()`.
+  public static let canvasSizeProgression: [Int] = [16, 24, 32, 48, 64]
+
+  /// Advances the canvas through the standard size progression (each
+  /// dimension `16 → 24 → 32 → 48 → 64 → 16 → …`). Used by both the
+  /// `Ctrl+R` keybinding and the File → Resize Canvas menu item so
+  /// they remain bit-identical.
+  public func cycleCanvasSize() {
+    let current = document.size.width
+    let next =
+      Self.canvasSizeProgression.first { $0 > current }
+      ?? Self.canvasSizeProgression[0]
+    resizeCanvas(to: GIFEditorCore.PixelSize(width: next, height: next))
+  }
+
   public func resizeCanvas(to size: GIFEditorCore.PixelSize) {
     recordUndoableEdit("Resize canvas") {
       document.size = size

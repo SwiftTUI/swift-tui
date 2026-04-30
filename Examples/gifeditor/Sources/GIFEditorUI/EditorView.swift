@@ -4,6 +4,26 @@ import TerminalUI
 /// Public root view of the editor. Owns one `EditorViewModel` for the
 /// document's lifetime; everything below it renders from that model
 /// and forwards user input back through it.
+///
+/// Phase 1 of the Photoshop redesign (see `REDESIGN.md`) lays out the
+/// editor in a 3-region body sandwiched between a timeline strip and
+/// a status strip:
+///
+/// ```
+/// ┌──┬───────────────────────┬────────┐
+/// │T │                       │ Color  │
+/// │o │       canvas          │ Palette│
+/// │o │                       │ Layers │
+/// │l │                       │        │
+/// ├──┴───────────────────────┴────────┤
+/// │ timeline                          │
+/// ├───────────────────────────────────┤
+/// │ status                            │
+/// └───────────────────────────────────┘
+/// ```
+///
+/// The menu bar (Phase 2) and contextual options bar (Phase 4) land
+/// above the body in subsequent phases.
 public struct EditorView: View {
   // The view-model is a reference type, so we just hold it as an
   // @State (the Reference Box pattern). Mutating @MainActor methods on
@@ -32,34 +52,38 @@ public struct EditorView: View {
         delayCentiseconds: model.document.frames[index].delayCentiseconds
       )
     }
+    let primaryColor = model.document.palette[model.primaryColorIndex]
+    let secondaryColor = model.document.palette[model.secondaryColorIndex]
 
     return VStack(alignment: .leading, spacing: 0) {
-      headerRow
+      MenuBarView(
+        model: model,
+        isHelpPresented: $isHelpPresented,
+        refresh: refresh
+      )
       Divider()
       HStack(alignment: .top, spacing: 1) {
         ToolboxView(
           tool: model.tool,
-          pendingMarqueeAnchor: model.pendingMarqueeAnchor,
-          pendingGradientAnchor: model.pendingGradientAnchor
+          primaryColor: primaryColor,
+          secondaryColor: secondaryColor
+        )
+        InteractiveCanvasView(
+          size: model.document.size,
+          cells: frameColors,
+          model: model,
+          refresh: refresh
+        )
+        .applyFocusedEditorBindings(
+          model: model,
+          isHelpPresented: $isHelpPresented,
+          refresh: refresh
         )
         VStack(alignment: .leading, spacing: 0) {
-          InteractiveCanvasView(
-            size: model.document.size,
-            cells: frameColors,
-            model: model,
-            refresh: refresh
+          ColorPanelView(
+            primaryColor: primaryColor,
+            secondaryColor: secondaryColor
           )
-          .applyFocusedEditorBindings(
-            model: model,
-            isHelpPresented: $isHelpPresented,
-            refresh: refresh
-          )
-          TimelineView(
-            frames: timelineFrames,
-            currentFrameIndex: model.currentFrameIndex
-          )
-        }
-        VStack(alignment: .leading, spacing: 0) {
           PaletteView(
             palette: model.document.palette,
             primaryIndex: model.primaryColorIndex,
@@ -71,6 +95,11 @@ public struct EditorView: View {
           )
         }
       }
+      Divider()
+      TimelineView(
+        frames: timelineFrames,
+        currentFrameIndex: model.currentFrameIndex
+      )
       Divider()
       footer
     }
@@ -93,17 +122,11 @@ public struct EditorView: View {
     }
   }
 
-  private var headerRow: some View {
-    HStack(spacing: 2) {
-      Text("gifeditor").foregroundStyle(.foreground)
-      Text(documentLabel).foregroundStyle(.muted)
-      Spacer(minLength: 1)
-      Text(model.isDirty ? "● modified" : "saved")
-        .foregroundStyle(model.isDirty ? .warning : .success)
-    }
-    .padding(.horizontal, 1)
-  }
-
+  /// Single-row status strip at the bottom of the editor. Holds the
+  /// transient `statusMessage` from the model on the left and the
+  /// cursor / layer / brush-size / render-mode readout on the right.
+  /// Document identity and dirty state live in the menu bar's
+  /// trailing slot instead.
   private var footer: some View {
     HStack(spacing: 2) {
       Text(model.statusMessage.isEmpty ? "Press ? for help" : model.statusMessage)
@@ -112,18 +135,11 @@ public struct EditorView: View {
       Text(
         "[\(model.cursor.x),\(model.cursor.y)]  "
           + "L\(model.currentLayerIndex + 1)/\(model.currentFrame.layers.count)  "
-          + "half-cell"
+          + "B\(model.brushSize)  half-cell"
       )
       .foregroundStyle(.separator)
     }
     .padding(.horizontal, 1)
-  }
-
-  private var documentLabel: String {
-    if let path = model.document.path {
-      return path.lastPathComponent
-    }
-    return "untitled"
   }
 
   /// 8-cell-wide thumbnail per frame, sampled with nearest-neighbor.

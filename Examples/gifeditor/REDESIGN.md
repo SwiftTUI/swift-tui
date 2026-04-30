@@ -518,6 +518,17 @@ remains usable.
 > assumes overlay-rendering menus, `Button.systemHint`, working
 > `model.undo()` / `model.redo()`, and `model.brushSize`.
 
+### Phase status
+
+| Phase | Status | Notes |
+| ----- | ------ | ----- |
+| 0 (blockers) | ✅ landed | All four blockers shipped. |
+| 1 — Layout skeleton | ✅ landed | 6-region body, 3-cell tool dock, right panel stack, bottom timeline + status. |
+| 2 — Menu bar | ✅ landed | 7 menus, 25+ clickable items, shortcut hints via `.systemHint`. |
+| 3 — Inline button affordances | ⏳ pending | Per-row Layers/Timeline/Palette buttons. |
+| 4 — Tool options bar | ⏳ pending | Contextual options + brush stepper + Confirm/Clear. |
+| 5 — Polish | ⏳ pending | View-menu visibility toggles, pixel grid mode picker, resize-canvas sheet, hover tooltips. |
+
 ### Phase 1 — Layout skeleton
 
 1. Replace the body's `VStack` with the new 6-region layout.
