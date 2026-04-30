@@ -218,10 +218,7 @@ extension View where Self: ActionScope & Sendable {
         refresh()
       }
       .keyCommand("Resize canvas", key: .character("r"), modifiers: .ctrl) {
-        let progression = [16, 24, 32, 48, 64]
-        let current = model.document.size.width
-        let next = progression.first { $0 > current } ?? progression[0]
-        model.resizeCanvas(to: GIFEditorCore.PixelSize(width: next, height: next))
+        model.cycleCanvasSize()
         refresh()
       }
   }

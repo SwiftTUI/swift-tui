@@ -1,33 +1,34 @@
 import GIFEditorCore
 import TerminalUI
 
-/// Two-row palette: meaningful colors first, then padding indicator.
-/// Each entry is a 2×1 colored block that the user can pick via
-/// `1..9` (primary) or `Alt+1..9` (secondary).
+/// Middle sub-panel of the right column — a 4×8 grid of the first 32
+/// palette slots. The active primary slot wears a `P` overlay; the
+/// secondary slot wears `S`. The grid layout mirrors Photoshop's
+/// "Swatches" panel.
 ///
-/// We only render the first 32 distinct slots — enough to cover the
-/// default palette plus headroom; users editing a loaded GIF still
-/// have the full 256 slots available via the eyedropper.
+/// Users editing a loaded GIF still have access to the full 256 slots
+/// via the eyedropper. Phase 5 of the redesign adds a `▼ More…`
+/// disclosure that opens an overflow grid when the document uses
+/// indices ≥ 32.
 struct PaletteView: View {
   let palette: ColorPalette
   let primaryIndex: PaletteIndex
   let secondaryIndex: PaletteIndex
 
+  private static let columns = 8
+  private static let rows = 4
+
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       Text("Palette").foregroundStyle(.muted)
-      HStack(spacing: 0) {
-        ForEach(0..<16, id: \.self) { index in
-          swatch(for: PaletteIndex(index))
+      ForEach(0..<Self.rows, id: \.self) { row in
+        HStack(spacing: 0) {
+          ForEach(0..<Self.columns, id: \.self) { column in
+            let slot = row * Self.columns + column
+            swatch(for: PaletteIndex(slot))
+          }
         }
       }
-      HStack(spacing: 0) {
-        ForEach(16..<32, id: \.self) { index in
-          swatch(for: PaletteIndex(index))
-        }
-      }
-      Spacer(minLength: 1)
-      legend
     }
     .padding(1)
     .border(.separator, set: .single)
@@ -47,30 +48,5 @@ struct PaletteView: View {
         Text("S").foregroundStyle(.foreground)
       }
     }
-  }
-
-  private var legend: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      let primary = palette[primaryIndex]
-      let secondary = palette[secondaryIndex]
-      HStack(spacing: 1) {
-        Text("Primary").foregroundStyle(.muted)
-        Rectangle()
-          .fill(primary.toTerminalColor())
-          .frame(width: 4, height: 1)
-        Text("#\(hex(primary))").foregroundStyle(.separator)
-      }
-      HStack(spacing: 1) {
-        Text("Second").foregroundStyle(.muted)
-        Rectangle()
-          .fill(secondary.toTerminalColor())
-          .frame(width: 4, height: 1)
-        Text("#\(hex(secondary))").foregroundStyle(.separator)
-      }
-    }
-  }
-
-  private func hex(_ c: EditorColor) -> String {
-    String(format: "%02X%02X%02X", c.red, c.green, c.blue)
   }
 }
