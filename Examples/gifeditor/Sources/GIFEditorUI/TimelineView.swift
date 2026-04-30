@@ -19,18 +19,22 @@ struct TimelineView: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: 1) {
-      Text("Frames").foregroundStyle(.muted)
-      navigationCluster
+      VStack {
+        Text("Frames").foregroundStyle(.muted)
+        navigationCluster
+      }
       ScrollView(.horizontal) {
-        HStack(spacing: 1) {
+        HStack {
           ForEach(Array(frames.enumerated()), id: \.offset) { index, frame in
             thumbnail(frame: frame, index: index)
           }
         }
       }
       .focusable(false)
-      frameOperations
-      delayCluster
+      VStack {
+        frameOperations
+        delayCluster
+      }
     }
     .padding(.horizontal, 1)
     .border(.separator, set: .single)
@@ -39,7 +43,7 @@ struct TimelineView: View {
   // MARK: - Navigation cluster (◀◀ ◀ ▶ ▶▶)
 
   private var navigationCluster: some View {
-    HStack(spacing: 0) {
+    HStack(spacing: 1) {
       navButton("◀◀", action: model.goToFirstFrame)
       navButton("◀", action: model.previousFrame)
       navButton("▶", action: model.nextFrame)
@@ -75,9 +79,9 @@ struct TimelineView: View {
   private var delayCluster: some View {
     HStack(spacing: 1) {
       Text("delay").foregroundStyle(.muted)
-      Text("\(currentDelay)cs").foregroundStyle(.foreground)
-      navButton("⊖") { model.adjustCurrentFrameDelay(by: -10) }
-      navButton("⊕") { model.adjustCurrentFrameDelay(by: 10) }
+      Text("\(currentDelay) cs").foregroundStyle(.foreground)
+      navButton("-") { model.adjustCurrentFrameDelay(by: -10) }
+      navButton("+") { model.adjustCurrentFrameDelay(by: 10) }
       Button {
         model.setAllFrameDelaysToCurrent()
         refresh()
@@ -97,26 +101,23 @@ struct TimelineView: View {
 
   private func thumbnail(frame: TimelineFrame, index: Int) -> some View {
     let active = index == currentFrameIndex
+    let pixels = frame.thumbnail.pixels.map { $0?.toTerminalColor() }
     return Button {
       model.selectFrame(at: index)
       refresh()
     } label: {
-      VStack(spacing: 0) {
+      Canvas(
+        pixelGridWidth: frame.thumbnail.width,
+        height: frame.thumbnail.height,
+        pixels: pixels,
+        mode: .verticalHalfBlock
+      )
+      .frame(width: frame.thumbnail.width, height: frame.thumbnail.height)
+      .border(active ? .tint : .separator, set: .rounded)
+      .overlay(alignment: .bottomTrailing) {
         Text(active ? "[\(index + 1)]" : "\(index + 1)")
           .foregroundStyle(active ? .tint : .muted)
-        VStack(spacing: 0) {
-          ForEach(0..<frame.thumbnail.height, id: \.self) { y in
-            HStack(spacing: 0) {
-              ForEach(0..<frame.thumbnail.width, id: \.self) { x in
-                let color = frame.thumbnail.pixels[y * frame.thumbnail.width + x]
-                Rectangle()
-                  .fill(color?.toTerminalColor() ?? .clear)
-                  .frame(width: 1, height: 1)
-              }
-            }
-          }
-        }
-        .border(active ? .tint : .separator)
+          .background(.clear)
       }
     }
     .buttonStyle(.plain)

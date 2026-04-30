@@ -37,6 +37,7 @@ public struct EditorView: View {
   @State private var showsTimeline = true
   @State private var pixelGridMode: CanvasPixelGridMode = .verticalHalfBlock
   @State private var isResizeSheetPresented = false
+  @State private var openMenu: MenuBarMenu?
 
   public init(document: GIFDocument) {
     _model = State(initialValue: EditorViewModel(document: document))
@@ -60,77 +61,96 @@ public struct EditorView: View {
     let primaryColor = model.document.palette[model.primaryColorIndex]
     let secondaryColor = model.document.palette[model.secondaryColorIndex]
 
-    return VStack(alignment: .leading, spacing: 0) {
-      MenuBarView(
-        model: model,
-        isHelpPresented: $isHelpPresented,
-        showsToolDock: $showsToolDock,
-        showsRightPanel: $showsRightPanel,
-        showsTimeline: $showsTimeline,
-        pixelGridMode: $pixelGridMode,
-        isResizeSheetPresented: $isResizeSheetPresented,
-        refresh: refresh
-      )
-      ToolOptionsBar(
-        model: model,
-        isHelpPresented: $isHelpPresented,
-        refresh: refresh
-      )
-      HStack(alignment: .top, spacing: 1) {
-        if showsToolDock {
-          ToolboxView(
-            tool: model.tool,
-            primaryColor: primaryColor,
-            secondaryColor: secondaryColor,
-            model: model,
-            refresh: refresh
-          )
-        }
-        InteractiveCanvasView(
-          size: model.document.size,
-          cells: frameColors,
+    return ZStack(alignment: .topLeading) {
+      VStack(alignment: .leading, spacing: 0) {
+        MenuBarView(
+          openMenu: $openMenu,
           model: model,
-          refresh: refresh,
-          mode: pixelGridMode
+          isHelpPresented: $isHelpPresented,
+          showsToolDock: $showsToolDock,
+          showsRightPanel: $showsRightPanel,
+          showsTimeline: $showsTimeline,
+          pixelGridMode: $pixelGridMode,
+          isResizeSheetPresented: $isResizeSheetPresented,
+          refresh: refresh
         )
-        .applyFocusedEditorBindings(
+        ToolOptionsBar(
           model: model,
           isHelpPresented: $isHelpPresented,
           refresh: refresh
         )
-        if showsRightPanel {
-          VStack(alignment: .leading, spacing: 0) {
-            ColorPanelView(
+        HStack(alignment: .top, spacing: 1) {
+          if showsToolDock {
+            ToolboxView(
+              tool: model.tool,
               primaryColor: primaryColor,
-              secondaryColor: secondaryColor
-            )
-            PaletteView(
-              palette: model.document.palette,
-              primaryIndex: model.primaryColorIndex,
-              secondaryIndex: model.secondaryColorIndex,
-              model: model,
-              refresh: refresh
-            )
-            LayerListView(
-              layers: model.currentFrame.layers,
-              selectedIndex: model.currentLayerIndex,
+              secondaryColor: secondaryColor,
               model: model,
               refresh: refresh
             )
           }
+          InteractiveCanvasView(
+            size: model.document.size,
+            cells: frameColors,
+            model: model,
+            refresh: refresh,
+            mode: pixelGridMode
+          )
+          .applyFocusedEditorBindings(
+            model: model,
+            isHelpPresented: $isHelpPresented,
+            refresh: refresh
+          )
+          if showsRightPanel {
+            VStack(alignment: .leading, spacing: 0) {
+              ColorPanelView(
+                primaryColor: primaryColor,
+                secondaryColor: secondaryColor
+              )
+              PaletteView(
+                palette: model.document.palette,
+                primaryIndex: model.primaryColorIndex,
+                secondaryIndex: model.secondaryColorIndex,
+                model: model,
+                refresh: refresh
+              )
+              LayerListView(
+                layers: model.currentFrame.layers,
+                selectedIndex: model.currentLayerIndex,
+                model: model,
+                refresh: refresh
+              )
+            }
+          }
         }
-      }
-      if showsTimeline {
+        if showsTimeline {
+          Divider()
+          TimelineView(
+            frames: timelineFrames,
+            currentFrameIndex: model.currentFrameIndex,
+            model: model,
+            refresh: refresh
+          )
+        }
         Divider()
-        TimelineView(
-          frames: timelineFrames,
-          currentFrameIndex: model.currentFrameIndex,
+        footer
+      }
+
+      if let openMenu {
+        MenuBarDropdownView(
+          menu: openMenu,
+          openMenu: $openMenu,
           model: model,
+          isHelpPresented: $isHelpPresented,
+          showsToolDock: $showsToolDock,
+          showsRightPanel: $showsRightPanel,
+          showsTimeline: $showsTimeline,
+          pixelGridMode: $pixelGridMode,
+          isResizeSheetPresented: $isResizeSheetPresented,
           refresh: refresh
         )
+        .offset(x: openMenu.dropdownOffset + 1, y: 1)
       }
-      Divider()
-      footer
     }
     .panel(id: "gifeditor")
     .applyFocusedEditorBindings(
