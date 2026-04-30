@@ -710,16 +710,19 @@ extension TerminalInputParser {
       return nil
     }
 
-    var bytes = bytes
+    // Avoid shadowing a `var ArraySlice<UInt8>` parameter and reassigning
+    // it through `dropFirst()`. Under -Osize that pattern crashed the
+    // OwnershipModelEliminator SIL pass on the wasm target in
+    // Swift 6.3.1. Computing the digit subslice as a `let` once
+    // sidesteps the bug and is also clearer.
     let isNegative = bytes.first == 0x2D
-    if isNegative {
-      bytes = bytes.dropFirst()
-      guard !bytes.isEmpty else {
-        return nil
-      }
+    let digits = isNegative ? bytes.dropFirst() : bytes
+
+    guard !digits.isEmpty else {
+      return nil
     }
 
-    guard let value = asciiInteger(from: bytes) else {
+    guard let value = asciiInteger(from: digits) else {
       return nil
     }
     return isNegative ? -value : value
