@@ -270,7 +270,6 @@ struct InteractiveCanvasView: View {
       .onPointerHover { phase in
         updateHover(phase, precision: pointerInputCapabilities.precision)
       }
-      .border(.separator, set: .single)
       .focusable(true, interactions: .edit)
     }
   }
