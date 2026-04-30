@@ -203,6 +203,7 @@ extension View where Self: ActionScope & Sendable {
 
   func applyFileBindings(
     model: EditorViewModel,
+    isResizeSheetPresented: Binding<Bool>,
     refresh: @escaping @MainActor @Sendable () -> Void
   ) -> some View & ActionScope & Sendable {
     self
@@ -218,7 +219,7 @@ extension View where Self: ActionScope & Sendable {
         refresh()
       }
       .keyCommand("Resize canvas", key: .character("r"), modifiers: .ctrl) {
-        model.cycleCanvasSize()
+        isResizeSheetPresented.wrappedValue = true
         refresh()
       }
   }

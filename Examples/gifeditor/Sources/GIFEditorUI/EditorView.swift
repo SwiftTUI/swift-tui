@@ -32,6 +32,11 @@ public struct EditorView: View {
   @State private var model: EditorViewModel
   @State private var revision: Int = 0
   @State private var isHelpPresented = false
+  @State private var showsToolDock = true
+  @State private var showsRightPanel = true
+  @State private var showsTimeline = true
+  @State private var pixelGridMode: CanvasPixelGridMode = .verticalHalfBlock
+  @State private var isResizeSheetPresented = false
 
   public init(document: GIFDocument) {
     _model = State(initialValue: EditorViewModel(document: document))
@@ -59,6 +64,11 @@ public struct EditorView: View {
       MenuBarView(
         model: model,
         isHelpPresented: $isHelpPresented,
+        showsToolDock: $showsToolDock,
+        showsRightPanel: $showsRightPanel,
+        showsTimeline: $showsTimeline,
+        pixelGridMode: $pixelGridMode,
+        isResizeSheetPresented: $isResizeSheetPresented,
         refresh: refresh
       )
       ToolOptionsBar(
@@ -67,51 +77,58 @@ public struct EditorView: View {
         refresh: refresh
       )
       HStack(alignment: .top, spacing: 1) {
-        ToolboxView(
-          tool: model.tool,
-          primaryColor: primaryColor,
-          secondaryColor: secondaryColor,
-          model: model,
-          refresh: refresh
-        )
+        if showsToolDock {
+          ToolboxView(
+            tool: model.tool,
+            primaryColor: primaryColor,
+            secondaryColor: secondaryColor,
+            model: model,
+            refresh: refresh
+          )
+        }
         InteractiveCanvasView(
           size: model.document.size,
           cells: frameColors,
           model: model,
-          refresh: refresh
+          refresh: refresh,
+          mode: pixelGridMode
         )
         .applyFocusedEditorBindings(
           model: model,
           isHelpPresented: $isHelpPresented,
           refresh: refresh
         )
-        VStack(alignment: .leading, spacing: 0) {
-          ColorPanelView(
-            primaryColor: primaryColor,
-            secondaryColor: secondaryColor
-          )
-          PaletteView(
-            palette: model.document.palette,
-            primaryIndex: model.primaryColorIndex,
-            secondaryIndex: model.secondaryColorIndex,
-            model: model,
-            refresh: refresh
-          )
-          LayerListView(
-            layers: model.currentFrame.layers,
-            selectedIndex: model.currentLayerIndex,
-            model: model,
-            refresh: refresh
-          )
+        if showsRightPanel {
+          VStack(alignment: .leading, spacing: 0) {
+            ColorPanelView(
+              primaryColor: primaryColor,
+              secondaryColor: secondaryColor
+            )
+            PaletteView(
+              palette: model.document.palette,
+              primaryIndex: model.primaryColorIndex,
+              secondaryIndex: model.secondaryColorIndex,
+              model: model,
+              refresh: refresh
+            )
+            LayerListView(
+              layers: model.currentFrame.layers,
+              selectedIndex: model.currentLayerIndex,
+              model: model,
+              refresh: refresh
+            )
+          }
         }
       }
-      Divider()
-      TimelineView(
-        frames: timelineFrames,
-        currentFrameIndex: model.currentFrameIndex,
-        model: model,
-        refresh: refresh
-      )
+      if showsTimeline {
+        Divider()
+        TimelineView(
+          frames: timelineFrames,
+          currentFrameIndex: model.currentFrameIndex,
+          model: model,
+          refresh: refresh
+        )
+      }
       Divider()
       footer
     }
@@ -127,10 +144,27 @@ public struct EditorView: View {
     .applyClipboardBindings(model: model, refresh: refresh)
     .applyHistoryBindings(model: model, refresh: refresh)
     .applyPaletteBindings(model: model, refresh: refresh)
-    .applyFileBindings(model: model, refresh: refresh)
+    .applyFileBindings(
+      model: model,
+      isResizeSheetPresented: $isResizeSheetPresented,
+      refresh: refresh
+    )
     .applyTerminationHandling(model: model, refresh: refresh)
     .sheet("Keyboard help", isPresented: $isHelpPresented) {
       EditorHelpView()
+    }
+    .sheet("Resize canvas", isPresented: $isResizeSheetPresented) {
+      ResizeCanvasSheetView(
+        currentSize: model.document.size,
+        onSelect: { size in
+          model.resizeCanvas(to: size)
+          isResizeSheetPresented = false
+          refresh()
+        },
+        onCancel: {
+          isResizeSheetPresented = false
+        }
+      )
     }
   }
 

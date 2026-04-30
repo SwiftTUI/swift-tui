@@ -9,14 +9,17 @@ import TerminalUI
 /// the shortcut hint (Blocker 2).
 ///
 /// Menu items without a backing model method or keybinding (e.g.
-/// "New", "Open…", "About gifeditor", the View-menu visibility
-/// toggles) are intentionally absent in Phase 2 — they land as Phase
-/// 3/5 work alongside their backing implementations. Skipping them
-/// keeps every visible item live (no grayed-out rows on day one) and
-/// avoids advertising features that don't exist yet.
+/// "New", "Open…", "About gifeditor") are intentionally absent —
+/// skipping them keeps every visible item live (no grayed-out rows on
+/// day one) and avoids advertising features that don't exist yet.
 struct MenuBarView: View {
   let model: EditorViewModel
   @Binding var isHelpPresented: Bool
+  @Binding var showsToolDock: Bool
+  @Binding var showsRightPanel: Bool
+  @Binding var showsTimeline: Bool
+  @Binding var pixelGridMode: CanvasPixelGridMode
+  @Binding var isResizeSheetPresented: Bool
   let refresh: @MainActor @Sendable () -> Void
 
   var body: some View {
@@ -45,8 +48,11 @@ struct MenuBarView: View {
       Button("Save As…", action: refreshAfter(model.saveAs))
         .systemHint("Alt+S")
       Divider()
-      Button("Resize Canvas", action: refreshAfter(model.cycleCanvasSize))
-        .systemHint("Ctrl+R")
+      Button("Resize Canvas…") {
+        isResizeSheetPresented = true
+        refresh()
+      }
+      .systemHint("Ctrl+R")
     }
   }
 
@@ -125,17 +131,36 @@ struct MenuBarView: View {
 
   private var viewMenu: some View {
     Menu("View") {
-      Button(
-        "Increase Brush Size",
-        action: refreshAfter(model.increaseBrushSize)
-      )
-      .systemHint("]")
-      Button(
-        "Decrease Brush Size",
-        action: refreshAfter(model.decreaseBrushSize)
-      )
-      .systemHint("[")
+      // Visibility toggles — narrow terminals can claim canvas space
+      // back by hiding non-essential chrome.
+      Button(checkmark(showsToolDock) + " Show Tool Dock") {
+        showsToolDock.toggle()
+        refresh()
+      }
+      Button(checkmark(showsRightPanel) + " Show Right Panel") {
+        showsRightPanel.toggle()
+        refresh()
+      }
+      Button(checkmark(showsTimeline) + " Show Timeline") {
+        showsTimeline.toggle()
+        refresh()
+      }
       Divider()
+      // Pixel grid mode — half-block doubles vertical resolution; full
+      // cell makes each pixel a square of one terminal cell.
+      Button(checkmark(pixelGridMode == .verticalHalfBlock) + " Half-block grid") {
+        pixelGridMode = .verticalHalfBlock
+        refresh()
+      }
+      Button(checkmark(pixelGridMode == .fullCell) + " Full-cell grid") {
+        pixelGridMode = .fullCell
+        refresh()
+      }
+      Divider()
+      Button("Increase Brush Size", action: refreshAfter(model.increaseBrushSize))
+        .systemHint("]")
+      Button("Decrease Brush Size", action: refreshAfter(model.decreaseBrushSize))
+        .systemHint("[")
       Button("Swap Primary/Secondary", action: refreshAfter(model.swapPrimaryAndSecondary))
         .systemHint("x")
     }
@@ -163,6 +188,13 @@ struct MenuBarView: View {
       action()
       refresh()
     }
+  }
+
+  /// Renders `✓` when `flag` is true, blank space otherwise. Aligns
+  /// menu rows whether checked or not so toggling doesn't shift the
+  /// label horizontally.
+  private func checkmark(_ flag: Bool) -> String {
+    flag ? "✓" : " "
   }
 
   private var documentLabel: String {

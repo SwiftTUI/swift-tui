@@ -527,7 +527,7 @@ remains usable.
 | 2 — Menu bar | ✅ landed | 7 menus, 25+ clickable items, shortcut hints via `.systemHint`. |
 | 3 — Inline button affordances | ✅ landed | Tool dock, palette, layers, and timeline are now fully clickable. |
 | 4 — Tool options bar | ✅ landed | Contextual row per tool: brush stepper, respect-selection toggles, marquee Confirm/Clear, eyedropper hex readout, trailing swap + help. |
-| 5 — Polish | ⏳ pending | View-menu visibility toggles, pixel grid mode picker, resize-canvas sheet, hover tooltips. |
+| 5 — Polish | ✅ landed | View-menu visibility toggles for tool dock / right panel / timeline, pixel grid mode picker, resize-canvas sheet replacing the silent Ctrl+R cycle. (Hover tooltips deferred — pointer-hover infrastructure for arbitrary buttons is a separate framework task.) |
 
 ### Phase 1 — Layout skeleton
 
