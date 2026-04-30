@@ -1,3 +1,11 @@
+---
+title: "feature: sub-cell pointer input"
+type: feature
+status: active
+date: 2026-04-28
+proposal: "../proposals/FRACTIONAL_COORDINATE_SPACE.md"
+---
+
 # Joint Implementation Plan: Sub-Cell Pointer Input
 
 ## Status
