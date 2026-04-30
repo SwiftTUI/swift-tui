@@ -217,11 +217,23 @@ private protocol BuiltinLayoutBehaviorProviding {
   var builtinLayoutBehavior: LayoutBehavior { get }
 }
 
+package protocol StackMinimumLayoutProviding {
+  func stackMinimumMainSize(
+    axis: Core.Axis,
+    idealSize: LayoutSize
+  ) -> Int?
+}
+
 private protocol AnyLayoutBox {
   var debugName: String { get }
   var builtinLayoutBehavior: LayoutBehavior? { get }
   var measurementReuseSignature: String? { get }
   var placementReuseSignature: String? { get }
+
+  func stackMinimumMainSize(
+    axis: Core.Axis,
+    idealSize: LayoutSize
+  ) -> Int?
 
   func makeCache(subviews: LayoutSubviews) -> Any
 
@@ -269,6 +281,14 @@ private struct ConcreteAnyLayoutBox<L: Layout>: AnyLayoutBox {
 
   var placementReuseSignature: String? {
     (layout as? any PlacementLayoutReuseProviding)?.placementLayoutReuseSignature
+  }
+
+  func stackMinimumMainSize(
+    axis: Core.Axis,
+    idealSize: LayoutSize
+  ) -> Int? {
+    (layout as? any StackMinimumLayoutProviding)?
+      .stackMinimumMainSize(axis: axis, idealSize: idealSize)
   }
 
   func makeCache(subviews: LayoutSubviews) -> Any {
@@ -358,6 +378,17 @@ private final class SendableLayoutWorkerProxy<L: SendableLayout>: WorkerCustomLa
     )
     storeCache(cache, for: node, proposal: proposal)
     return size
+  }
+
+  package func stackMinimumMainSize(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    idealMeasurement: MeasuredNode,
+    axis: Core.Axis,
+    passContext _: LayoutPassContext?
+  ) -> Int? {
+    (layout as? any StackMinimumLayoutProviding)?
+      .stackMinimumMainSize(axis: axis, idealSize: idealMeasurement.measuredSize)
   }
 
   func placeSubviews(
@@ -498,6 +529,15 @@ public struct AnyLayout: Layout {
             in: bounds,
             passContext: passContext
           )
+        },
+        stackMinimumMainSizeHandler: { engine, node, idealMeasurement, axis, passContext in
+          proxyBox.stackMinimumMainSize(
+            engine: engine,
+            node: node,
+            idealMeasurement: idealMeasurement,
+            axis: axis,
+            passContext: passContext
+          )
         }
       )
     } else {
@@ -512,17 +552,27 @@ public struct AnyLayout: Layout {
     self.box = box
     if box.builtinLayoutBehavior == nil {
       let proxyBox = LayoutProxyBox(box: box)
+      let workerProxy = SendableLayoutWorkerProxy(layout: layout)
       customLayoutHandle = CustomLayoutHandle(
         proxyBox,
         measurementReuseSignature: layout.measurementReuseSignature,
         placementReuseSignature: layout.placementReuseSignature,
-        workerProxy: SendableLayoutWorkerProxy(layout: layout),
+        workerProxy: workerProxy,
         placementHandler: { engine, node, measured, bounds, passContext in
           proxyBox.placeSubviews(
             engine: engine,
             node: node,
             measured: measured,
             in: bounds,
+            passContext: passContext
+          )
+        },
+        stackMinimumMainSizeHandler: { engine, node, idealMeasurement, axis, passContext in
+          workerProxy.stackMinimumMainSize(
+            engine: engine,
+            node: node,
+            idealMeasurement: idealMeasurement,
+            axis: axis,
             passContext: passContext
           )
         }
@@ -898,6 +948,18 @@ private final class LayoutProxyBox: CustomLayoutProxy {
       )
       cachedStates[CacheKey(identity: node.identity, proposal: proposal)] = cache
       return result
+    }
+  }
+
+  nonisolated package func stackMinimumMainSize(
+    engine _: LayoutEngine,
+    node _: ResolvedNode,
+    idealMeasurement: MeasuredNode,
+    axis: Core.Axis,
+    passContext _: LayoutPassContext?
+  ) -> Int? {
+    MainActor.assumeIsolated {
+      box.stackMinimumMainSize(axis: axis, idealSize: idealMeasurement.measuredSize)
     }
   }
 

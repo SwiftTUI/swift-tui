@@ -856,8 +856,14 @@ extension LayoutEngine {
       return childMinimums.first ?? 0
     case .viewThatFits:
       return childMinimums.max() ?? 0
-    case .custom:
-      return 0
+    case .custom(let handle):
+      return handle.stackMinimumMainSize(
+        engine: self,
+        node: node,
+        idealMeasurement: idealMeasurement,
+        axis: axis,
+        passContext: nil
+      ) ?? 0
     }
   }
 }

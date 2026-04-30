@@ -74,11 +74,6 @@ public struct EditorView: View {
           isResizeSheetPresented: $isResizeSheetPresented,
           refresh: refresh
         )
-        ToolOptionsBar(
-          model: model,
-          isHelpPresented: $isHelpPresented,
-          refresh: refresh
-        )
         HStack(alignment: .top, spacing: 1) {
           if showsToolDock {
             ToolboxView(
@@ -88,21 +83,30 @@ public struct EditorView: View {
               model: model,
               refresh: refresh
             )
+            .frame(maxHeight: .infinity, alignment: .top)
+            .fixedSize(horizontal: true, vertical: false)
           }
-          InteractiveCanvasView(
-            size: model.document.size,
-            cells: frameColors,
-            model: model,
-            refresh: refresh,
-            mode: pixelGridMode
-          )
-          .applyFocusedEditorBindings(
-            model: model,
-            isHelpPresented: $isHelpPresented,
-            refresh: refresh
-          )
+          ScrollView {
+            InteractiveCanvasView(
+              size: model.document.size,
+              cells: frameColors,
+              model: model,
+              refresh: refresh,
+              mode: pixelGridMode
+            )
+            .applyFocusedEditorBindings(
+              model: model,
+              isHelpPresented: $isHelpPresented,
+              refresh: refresh
+            )
+          }
           if showsRightPanel {
             VStack(alignment: .leading, spacing: 0) {
+              ToolOptionsBar(
+                model: model,
+                isHelpPresented: $isHelpPresented,
+                refresh: refresh
+              )
               ColorPanelView(
                 primaryColor: primaryColor,
                 secondaryColor: secondaryColor
@@ -121,10 +125,11 @@ public struct EditorView: View {
                 refresh: refresh
               )
             }
+            .frame(maxHeight: .infinity, alignment: .top)
+            .fixedSize(horizontal: true, vertical: false)
           }
         }
         if showsTimeline {
-          Divider()
           TimelineView(
             frames: timelineFrames,
             currentFrameIndex: model.currentFrameIndex,
