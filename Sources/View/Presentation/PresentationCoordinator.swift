@@ -390,6 +390,21 @@ public enum PresentationChrome: Equatable, Sendable {
   case menu
 }
 
+/// Controls how a prompt presentation surface accepts the full-screen
+/// overlay host's proposal.
+package enum PromptPresentationContentSizing: Equatable, Sendable {
+  /// Let the surface consume the host proposal. This preserves the
+  /// existing sheet/dropdown behavior where content can expand to the
+  /// available presentation area.
+  case fillAvailable
+
+  /// Measure the surface at its intrinsic size before placing it in the
+  /// full-screen overlay host. Used by compact floating presentations
+  /// such as menus, where internal spacers must not stretch rows to the
+  /// terminal width.
+  case intrinsic
+}
+
 package struct PromptPresentationDescriptor: Equatable, Sendable {
   package enum BodyMode: Equatable, Sendable {
     case contentOnly
@@ -408,6 +423,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
   package var scrollMaxHeight: Int
   package var bodyMode: BodyMode
   package var chrome: PresentationChrome
+  package var contentSizing: PromptPresentationContentSizing
 
   package init(
     alignment: Alignment,
@@ -421,7 +437,8 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
     scrollIdealHeight: Int,
     scrollMaxHeight: Int,
     bodyMode: BodyMode,
-    chrome: PresentationChrome = .surface
+    chrome: PresentationChrome = .surface,
+    contentSizing: PromptPresentationContentSizing = .fillAvailable
   ) {
     self.alignment = alignment
     self.presentationRole = presentationRole
@@ -435,6 +452,7 @@ package struct PromptPresentationDescriptor: Equatable, Sendable {
     self.scrollMaxHeight = scrollMaxHeight
     self.bodyMode = bodyMode
     self.chrome = chrome
+    self.contentSizing = contentSizing
   }
 }
 

@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import Core
@@ -202,5 +203,61 @@ struct MenuSurfaceTests {
     }
     #expect(!focusIdentities.isEmpty)
     #expect(allOverlayRooted)
+  }
+
+  @Test("Menu overlay measures intrinsically even when rows contain shortcut hint spacers")
+  func menuOverlayMeasuresIntrinsicallyWithShortcutHintSpacers() {
+    let actionRegistry = LocalActionRegistry()
+    let menu = Menu("Actions") {
+      Button("Save") {}
+        .systemHint("Ctrl+S")
+      Button("Save As") {}
+        .systemHint("Alt+S")
+    }
+    .id(testIdentity("Menu"))
+
+    var env = EnvironmentValues()
+    env.terminalSize = CellSize(width: 40, height: 12)
+    let renderer = DefaultRenderer()
+
+    _ = renderer.render(
+      menu,
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: env,
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      ),
+      proposal: .init(width: 40, height: 12)
+    )
+
+    #expect(actionRegistry.dispatch(identity: testIdentity("Menu")))
+
+    let expandedArtifacts = renderer.render(
+      menu,
+      context: .init(
+        identity: testIdentity("Root"),
+        environmentValues: env,
+        localActionRegistry: actionRegistry,
+        applyEnvironmentValues: true
+      ),
+      proposal: .init(width: 40, height: 12)
+    )
+    let saveLine = expandedArtifacts.rasterSurface.lines.first {
+      $0.contains("Save") && $0.contains("Ctrl+S")
+    }
+
+    guard let saveLine,
+      let labelRange = saveLine.range(of: "Save"),
+      let hintRange = saveLine.range(of: "Ctrl+S")
+    else {
+      Issue.record("expected menu row to render both the label and shortcut hint")
+      return
+    }
+
+    let labelEnd = saveLine.distance(from: saveLine.startIndex, to: labelRange.upperBound)
+    let hintStart = saveLine.distance(from: saveLine.startIndex, to: hintRange.lowerBound)
+
+    #expect(hintStart - labelEnd <= 3)
   }
 }

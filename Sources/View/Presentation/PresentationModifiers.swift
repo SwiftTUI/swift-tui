@@ -103,7 +103,8 @@ package func menuPromptPresentationSpec() -> PromptPresentationSpec {
       scrollIdealHeight: 8,
       scrollMaxHeight: 32,
       bodyMode: .contentOnly,
-      chrome: .menu
+      chrome: .menu,
+      contentSizing: .intrinsic
     ),
     reconcile: { registry, sourceIdentity, item in
       registry.sheet.sync(
@@ -452,27 +453,14 @@ package struct HostedPromptPresentation: View {
   }
 
   package var body: some View {
-    // Dropdown chrome lands flush against the window edges; surface
-    // chrome floats with a 1-cell inset so the stroked box never kisses
-    // the terminal edge.
-    let insetEdges: EdgeInsets =
-      switch item.descriptor.chrome {
-      case .surface: .init(top: 1, leading: 1, bottom: 1, trailing: 1)
-      case .dropdown: .init(top: 0, leading: 0, bottom: 0, trailing: 0)
-      // Menu chrome supplies its own padding around its bordered box;
-      // the host applies a small leading/top inset so the box doesn't
-      // kiss the terminal edge when the menu opens at top-leading.
-      case .menu: .init(top: 0, leading: 1, bottom: 0, trailing: 0)
-      }
-    return ZStack(alignment: .topLeading) {
+    ZStack(alignment: .topLeading) {
       if item.descriptor.backdropOpacity > 0 {
         Rectangle()
           .fill(.background.opacity(item.descriptor.backdropOpacity))
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       }
 
-      PromptPresentationSurface(item: item)
-        .padding(insetEdges)
+      sizedSurface
         .frame(
           maxWidth: .infinity,
           maxHeight: .infinity,
@@ -480,6 +468,36 @@ package struct HostedPromptPresentation: View {
         )
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  @ViewBuilder
+  private var sizedSurface: some View {
+    let surface = PromptPresentationSurface(item: item)
+      .padding(insetEdges)
+
+    switch item.descriptor.contentSizing {
+    case .fillAvailable:
+      surface
+    case .intrinsic:
+      surface.fixedSize(horizontal: true, vertical: true)
+    }
+  }
+
+  // Dropdown chrome lands flush against the window edges; surface
+  // chrome floats with a 1-cell inset so the stroked box never kisses
+  // the terminal edge.
+  private var insetEdges: EdgeInsets {
+    switch item.descriptor.chrome {
+    case .surface:
+      .init(top: 1, leading: 1, bottom: 1, trailing: 1)
+    case .dropdown:
+      .init(top: 0, leading: 0, bottom: 0, trailing: 0)
+    // Menu chrome supplies its own padding around its bordered box;
+    // the host applies a small leading/top inset so the box doesn't
+    // kiss the terminal edge when the menu opens at top-leading.
+    case .menu:
+      .init(top: 0, leading: 1, bottom: 0, trailing: 0)
+    }
   }
 }
 
