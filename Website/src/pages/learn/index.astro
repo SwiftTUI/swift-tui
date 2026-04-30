@@ -10,7 +10,6 @@ const tutorials = [
     body: "App / Scene / WindowGroup / View / @State.",
     href: `${base}/start`,
     duration: "5 min",
-    status: "ready",
   },
   {
     n: "02",
@@ -18,7 +17,6 @@ const tutorials = [
     body: "@State, @Binding, @Observable, and the repo-owned @Bindable.",
     href: `${base}/learn/state-and-bindings`,
     duration: "10 min",
-    status: "draft",
   },
   {
     n: "03",
@@ -26,7 +24,6 @@ const tutorials = [
     body: "Focus chain, .focusable, ActionScope, .keyCommand, .paletteCommand.",
     href: `${base}/learn/focus-and-keybindings`,
     duration: "12 min",
-    status: "draft",
   },
   {
     n: "04",
@@ -34,7 +31,6 @@ const tutorials = [
     body: "List, OutlineGroup, Table, selection bindings, the canonical TUI pattern.",
     href: `${base}/learn/lists-and-selection`,
     duration: "8 min",
-    status: "draft",
   },
   {
     n: "05",
@@ -42,7 +38,6 @@ const tutorials = [
     body: "alert, confirmationDialog, sheet, toast as terminal-native overlays.",
     href: `${base}/learn/presentations`,
     duration: "7 min",
-    status: "draft",
   },
   {
     n: "06",
@@ -50,7 +45,6 @@ const tutorials = [
     body: "Layout protocol, the parent-proposes-child-chooses contract, SendableLayout.",
     href: `${base}/learn/custom-layouts`,
     duration: "15 min",
-    status: "draft",
   },
   {
     n: "07",
@@ -58,7 +52,6 @@ const tutorials = [
     body: "Drag, hover, Canvas, Braille subpixels, half-block pixel grids.",
     href: `${base}/learn/gestures-and-canvas`,
     duration: "12 min",
-    status: "draft",
   },
   {
     n: "08",
@@ -66,7 +59,6 @@ const tutorials = [
     body: "BarChart, Sparkline, Meter, Timeline — composing dense status views.",
     href: `${base}/learn/charts-and-dashboards`,
     duration: "10 min",
-    status: "draft",
   },
   {
     n: "09",
@@ -74,7 +66,6 @@ const tutorials = [
     body: "PNG, JPEG, GIF + Kitty/Sixel + cell fallback. One Image type, capability-aware.",
     href: `${base}/learn/images`,
     duration: "8 min",
-    status: "draft",
   },
 ];
 ---
@@ -93,9 +84,8 @@ const tutorials = [
       have a hello world running.
     </p>
     <p style="color: var(--text-disabled); font-size: 0.9rem;">
-      Most tutorials are still drafts as the site rolls out. The first
-      tutorial — building a hello world — is included on the
-      <a href={`${base}/start`}>Get started</a> page.
+      Tutorial 01 lives on the <a href={`${base}/start`}>Get started</a>
+      page. The remaining pages continue from that same package setup.
     </p>
   </article>
   <section class="info-block" style="border-top: 1px solid var(--border);">
@@ -103,11 +93,11 @@ const tutorials = [
     <div class="card-grid card-grid--three" style="grid-column: 1 / -1;">
       {
         tutorials.map((t) => (
-          <a class="card" href={t.href} data-index={t.n} style={t.status === "draft" ? "opacity: 0.6;" : ""}>
+          <a class="card" href={t.href} data-index={t.n}>
             <h3>{t.title}</h3>
             <p>{t.body}</p>
             <span class="card-tag">
-              {t.status === "draft" ? "Draft" : "Tutorial"} · {t.duration}
+              Tutorial · {t.duration}
             </span>
           </a>
         ))
