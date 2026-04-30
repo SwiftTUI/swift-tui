@@ -2,7 +2,7 @@ import GIFEditorCore
 import TerminalUI
 
 /// Top-row menu bar — File / Edit / Layer / Select / Frame / View /
-/// Help. Each dropdown opens as a menu-bar-local overlay so opening or
+/// Help. Each dropdown opens from the editor-root overlay so opening or
 /// closing a menu does not reflow the canvas, panels, or timeline.
 /// Every menu item is a clickable `Button` that calls the same model
 /// method as its keybinding.
@@ -12,8 +12,7 @@ import TerminalUI
 /// skipping them keeps every visible item live (no grayed-out rows on
 /// day one) and avoids advertising features that don't exist yet.
 struct MenuBarView: View {
-  @State private var openMenu: MenuBarMenu?
-
+  @Binding var openMenu: MenuBarMenu?
   let model: EditorViewModel
   @Binding var isHelpPresented: Bool
   @Binding var showsToolDock: Bool
@@ -24,26 +23,18 @@ struct MenuBarView: View {
   let refresh: @MainActor @Sendable () -> Void
 
   var body: some View {
-    ZStack(alignment: .topLeading) {
-      HStack(alignment: .center, spacing: 2) {
-        menuTrigger(.file)
-        menuTrigger(.edit)
-        menuTrigger(.layer)
-        menuTrigger(.select)
-        menuTrigger(.frame)
-        menuTrigger(.view)
-        menuTrigger(.help)
-        Spacer(minLength: 1)
-        Text(documentLabel).foregroundStyle(.muted)
-        Text(model.isDirty ? "●" : "✓")
-          .foregroundStyle(model.isDirty ? .warning : .success)
-      }
-      .frame(height: 1, alignment: .leading)
-
-      if let openMenu {
-        dropdown(for: openMenu)
-          .offset(x: dropdownOffset(for: openMenu), y: 1)
-      }
+    HStack(alignment: .center, spacing: 2) {
+      menuTrigger(.file)
+      menuTrigger(.edit)
+      menuTrigger(.layer)
+      menuTrigger(.select)
+      menuTrigger(.frame)
+      menuTrigger(.view)
+      menuTrigger(.help)
+      Spacer(minLength: 1)
+      Text(documentLabel).foregroundStyle(.muted)
+      Text(model.isDirty ? "●" : "✓")
+        .foregroundStyle(model.isDirty ? .warning : .success)
     }
     .frame(height: 1, alignment: .topLeading)
     .padding(.horizontal, 1)
@@ -51,8 +42,35 @@ struct MenuBarView: View {
 
   // MARK: - Menus
 
-  @ViewBuilder
-  private func dropdown(for menu: MenuBarMenu) -> some View {
+  private func menuTrigger(_ menu: MenuBarMenu) -> some View {
+    Button(menu.triggerTitle(isOpen: openMenu == menu)) {
+      openMenu = openMenu == menu ? nil : menu
+    }
+    .buttonStyle(.plain)
+    .fixedSize(horizontal: true, vertical: true)
+  }
+
+  private var documentLabel: String {
+    if let path = model.document.path {
+      return path.lastPathComponent
+    }
+    return "untitled"
+  }
+}
+
+struct MenuBarDropdownView: View {
+  let menu: MenuBarMenu
+  @Binding var openMenu: MenuBarMenu?
+  let model: EditorViewModel
+  @Binding var isHelpPresented: Bool
+  @Binding var showsToolDock: Bool
+  @Binding var showsRightPanel: Bool
+  @Binding var showsTimeline: Bool
+  @Binding var pixelGridMode: CanvasPixelGridMode
+  @Binding var isResizeSheetPresented: Bool
+  let refresh: @MainActor @Sendable () -> Void
+
+  var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       switch menu {
       case .file:
@@ -143,14 +161,6 @@ struct MenuBarView: View {
     .fixedSize(horizontal: true, vertical: true)
   }
 
-  private func menuTrigger(_ menu: MenuBarMenu) -> some View {
-    Button(menu.triggerTitle(isOpen: openMenu == menu)) {
-      openMenu = openMenu == menu ? nil : menu
-    }
-    .buttonStyle(.plain)
-    .fixedSize(horizontal: true, vertical: true)
-  }
-
   private func menuItem(
     _ title: String,
     action: @escaping @MainActor @Sendable () -> Void
@@ -167,17 +177,6 @@ struct MenuBarView: View {
     Text(" ")
       .foregroundStyle(.separator)
       .fixedSize(horizontal: true, vertical: true)
-  }
-
-  private func dropdownOffset(for menu: MenuBarMenu) -> Int {
-    var offset = 0
-    for candidate in MenuBarMenu.allCases {
-      if candidate == menu {
-        return offset
-      }
-      offset += candidate.triggerWidth + 2
-    }
-    return offset
   }
 
   // MARK: - Helpers
@@ -200,16 +199,9 @@ struct MenuBarView: View {
   private func checkmark(_ flag: Bool) -> String {
     flag ? "✓" : " "
   }
-
-  private var documentLabel: String {
-    if let path = model.document.path {
-      return path.lastPathComponent
-    }
-    return "untitled"
-  }
 }
 
-private enum MenuBarMenu: CaseIterable, Equatable, Sendable {
+enum MenuBarMenu: CaseIterable, Equatable, Sendable {
   case file
   case edit
   case layer
@@ -232,6 +224,17 @@ private enum MenuBarMenu: CaseIterable, Equatable, Sendable {
 
   var triggerWidth: Int {
     title.count + 2
+  }
+
+  var dropdownOffset: Int {
+    var offset = 0
+    for candidate in Self.allCases {
+      if candidate == self {
+        return offset
+      }
+      offset += candidate.triggerWidth + 2
+    }
+    return offset
   }
 
   func triggerTitle(isOpen: Bool) -> String {
