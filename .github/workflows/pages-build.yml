@@ -149,7 +149,7 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
-      - name: Build DocC archive (combined View + TerminalUI + TerminalUICharts)
+      - name: Build DocC archive (combined Core + View + TerminalUI + TerminalUICharts)
         shell: bash
         run: |
           set -euo pipefail
@@ -163,6 +163,7 @@ jobs:
           swiftly run swift package \
             --allow-writing-to-directory .build-docs \
             generate-documentation \
+            --target Core \
             --target View \
             --target TerminalUI \
             --target TerminalUICharts \

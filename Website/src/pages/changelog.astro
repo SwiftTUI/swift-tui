@@ -36,14 +36,9 @@ const formatDate = (d: Date) =>
   d.toISOString().slice(0, 10);
 
 // Map plan id (e.g. "2026-04-26-001-off-main-frame-tail-rendering-plan")
-// to a github source link.
+// to a GitHub source link.
 const githubBaseUrl =
   "https://github.com/GoodHatsLLC/swift-terminal-ui/blob/main/docs/plans";
-
-const planSourceUrl = (id: string) => `${githubBaseUrl}/${id.toUpperCase().replace(/^[A-Z]/, (c) => c.toLowerCase())}.md`;
-
-// The above mapping is messy because plan slugs come back lowercased. Let's
-// build a more reliable mapping by scanning known filenames.
 const planFilenames: Record<string, string> = {
   "2026-04-18-001-refactor-terminal-paint-pipeline-plan": "2026-04-18-001-refactor-terminal-paint-pipeline-plan.md",
   "2026-04-20-001-cell-pixel-metrics-plan": "2026-04-20-001-cell-pixel-metrics-plan.md",
