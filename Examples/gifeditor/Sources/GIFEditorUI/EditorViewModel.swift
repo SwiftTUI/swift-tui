@@ -374,6 +374,28 @@ public final class EditorViewModel {
     }
   }
 
+  /// Jumps to the first frame. Used by the timeline's `◀◀` button.
+  public func goToFirstFrame() {
+    guard document.frames.count > 1 else { return }
+    currentFrameIndex = 0
+    announce("Frame 1/\(document.frames.count)")
+  }
+
+  /// Jumps to the last frame. Used by the timeline's `▶▶` button.
+  public func goToLastFrame() {
+    guard document.frames.count > 1 else { return }
+    currentFrameIndex = document.frames.count - 1
+    announce("Frame \(currentFrameIndex + 1)/\(document.frames.count)")
+  }
+
+  /// Selects the frame at `index`, clamping to valid range. Used when
+  /// the user clicks a specific timeline thumbnail.
+  public func selectFrame(at index: Int) {
+    guard document.frames.indices.contains(index) else { return }
+    currentFrameIndex = index
+    announce("Frame \(index + 1)/\(document.frames.count)")
+  }
+
   public func insertBlankFrameAfterCurrent() {
     recordUndoableEdit("Insert blank frame") {
       let layer = EditorLayer(name: "Layer 1", pixels: PixelBuffer(size: document.size))
@@ -467,25 +489,49 @@ public final class EditorViewModel {
   }
 
   public func toggleCurrentLayerVisibility() {
-    var isVisible = currentLayer.isVisible
+    toggleLayerVisibility(at: currentLayerIndex)
+  }
+
+  public func deleteCurrentLayer() {
+    deleteLayer(at: currentLayerIndex)
+  }
+
+  /// Selects the layer at `index`, clamping to valid range. Used by
+  /// the layers panel row body click target.
+  public func selectLayer(at index: Int) {
+    guard currentFrame.layers.indices.contains(index) else { return }
+    currentLayerIndex = index
+    announce("Layer \(index + 1)/\(currentFrame.layers.count)")
+  }
+
+  /// Toggles the visibility of the layer at `index` independent of
+  /// the current selection. Used by the per-row visibility button.
+  public func toggleLayerVisibility(at index: Int) {
+    guard currentFrame.layers.indices.contains(index) else { return }
+    var isVisible = currentFrame.layers[index].isVisible
     recordUndoableEdit("Toggle layer visibility") {
-      var layer = currentLayer
+      var layer = currentFrame.layers[index]
       layer.isVisible.toggle()
       isVisible = layer.isVisible
-      document.frames[currentFrameIndex].layers[currentLayerIndex] = layer
+      document.frames[currentFrameIndex].layers[index] = layer
     }
     announce(isVisible ? "Layer shown" : "Layer hidden")
   }
 
-  public func deleteCurrentLayer() {
+  /// Deletes the layer at `index`. Refuses to delete the last layer
+  /// in the frame (the editor invariant requires at least one).
+  public func deleteLayer(at index: Int) {
+    guard currentFrame.layers.indices.contains(index) else { return }
     guard currentFrame.layers.count > 1 else {
       announce("Can't delete the last layer in a frame")
       return
     }
     recordUndoableEdit("Delete layer") {
-      document.frames[currentFrameIndex].layers.remove(at: currentLayerIndex)
+      document.frames[currentFrameIndex].layers.remove(at: index)
       if currentLayerIndex >= currentFrame.layers.count {
         currentLayerIndex = currentFrame.layers.count - 1
+      } else if currentLayerIndex > index {
+        currentLayerIndex -= 1
       }
     }
     announce("Deleted layer")
