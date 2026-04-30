@@ -100,6 +100,8 @@ public struct EditorView: View {
               refresh: refresh
             )
           }
+          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+          .border(.separator, set: .single)
           if showsRightPanel {
             VStack(alignment: .leading, spacing: 0) {
               ToolOptionsBar(
@@ -131,7 +133,7 @@ public struct EditorView: View {
             }
             .frame(maxHeight: .infinity, alignment: .top)
             .fixedSize(horizontal: true, vertical: false)
-            .background(.black.opacity(0.1))
+            // .background(.black.opacity(0.1))
           }
         }
         if showsTimeline {

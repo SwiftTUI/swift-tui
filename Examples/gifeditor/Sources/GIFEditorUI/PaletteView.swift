@@ -36,7 +36,7 @@ struct PaletteView: View {
         }
       }
     }
-    .padding(1)
+    .frame(maxWidth: .infinity, alignment: .leading)
     .border(.separator, set: .single)
   }
 
