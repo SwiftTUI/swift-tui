@@ -4,8 +4,6 @@
 #   /              ← Astro site (this Website/ project)
 #   /docs/         ← DocC archive (combined Core + View + TerminalUI + TerminalUICharts)
 #   /webexample/   ← Examples/WebExample WASI demo
-#
-# GitHub Pages ignores this file, so it's safe to keep here in shared `public/`.
 
 # Baseline security headers for everything served from this origin.
 /*
