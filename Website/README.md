@@ -69,8 +69,8 @@ content collection.
 
 ## Deployment
 
-The repo's `.github/workflows/pages-build.yml` workflow composes a single
-GitHub Pages artifact:
+The site is deployed to two targets in parallel. Both publish the same
+composed artifact:
 
 ```
 /                ← Website/dist/        (this Astro project)
@@ -81,6 +81,51 @@ GitHub Pages artifact:
 The `/docs/` path is historical — DocC has been served there since before
 this site existed. Existing bookmarks survive. The site's `/api` landing
 deep-links into the DocC archive at `/docs/documentation/<module>/`.
+
+### GitHub Pages
+
+`.github/workflows/pages-build.yml` builds the artifact with the
+`/swift-terminal-ui/` path prefix (Astro's `base`) and DocC's
+`--hosting-base-path swift-terminal-ui/docs`. Published at
+<https://goodhatsllc.github.io/swift-terminal-ui/>.
+
+### Cloudflare Pages
+
+`.github/workflows/cloudflare-pages.yml` builds the same artifact with
+**root-relative** paths (Astro `base: /`, DocC `--hosting-base-path docs`)
+and uploads it via Wrangler to a Cloudflare Pages project.
+
+One-time setup:
+
+1. Create the Cloudflare Pages project (Direct Upload, no Git connection
+   needed since the GitHub workflow handles deploys):
+   ```bash
+   bunx wrangler@latest pages project create swift-terminal-ui \
+     --production-branch main
+   ```
+2. Add repo secrets in GitHub → Settings → Secrets and variables → Actions:
+   - `CLOUDFLARE_API_TOKEN` — token with `Cloudflare Pages: Edit` permission
+   - `CLOUDFLARE_ACCOUNT_ID` — account ID from the Cloudflare dashboard sidebar
+3. (Optional) Add repo variables:
+   - `CLOUDFLARE_PAGES_PROJECT` — defaults to `swift-terminal-ui`
+   - `CLOUDFLARE_SITE_URL` — absolute URL Astro should canonicalize to
+     (e.g. `https://swift-terminal-ui.example.com`); defaults to
+     `https://<project>.pages.dev`
+
+Pushes to `main` deploy to production. PRs deploy to a preview URL and the
+workflow comments the URL on the PR. Cache headers (and any future
+redirects) live in [`public/_headers`](public/_headers); GitHub Pages
+ignores that file, so it's safe to share.
+
+### Switching Astro's base path locally
+
+The dev server defaults to `/swift-terminal-ui/` to match the GH Pages
+deploy. To preview the root-served Cloudflare layout:
+
+```bash
+ASTRO_BASE=/ bun run dev      # http://localhost:4321/
+ASTRO_BASE=/ bun run build    # dist/ with root-relative URLs
+```
 
 ## Project structure
 

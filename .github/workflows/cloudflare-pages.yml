@@ -1,0 +1,266 @@
+name: Deploy Website to Cloudflare Pages
+
+# Parallel to .github/workflows/pages-build.yml. Builds the same composed
+# artifact (Astro site + DocC + WebExample) but with root-relative paths,
+# then deploys it to Cloudflare Pages instead of GitHub Pages.
+#
+# One-time setup:
+#   1. Create the project in Cloudflare:
+#        wrangler pages project create swift-terminal-ui --production-branch main
+#      (or via dashboard: Pages -> Create application -> Direct upload.)
+#   2. Add repo secrets:
+#        CLOUDFLARE_API_TOKEN     <- token with `Cloudflare Pages: Edit` permission
+#        CLOUDFLARE_ACCOUNT_ID    <- your account ID (Cloudflare dashboard sidebar)
+#   3. (Optional) Add repo variables:
+#        CLOUDFLARE_PAGES_PROJECT <- project name; defaults to `swift-terminal-ui`
+#        CLOUDFLARE_SITE_URL      <- absolute URL Astro should canonicalize to
+#                                    (e.g. https://swift-terminal-ui.example.com).
+#                                    Defaults to https://<project>.pages.dev.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+  pull-requests: write
+
+concurrency:
+  group: cloudflare-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy to Cloudflare Pages
+    runs-on: macos-26
+
+    env:
+      CF_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'swift-terminal-ui' }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve site URL
+        id: site
+        shell: bash
+        env:
+          CF_SITE_URL: ${{ vars.CLOUDFLARE_SITE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${CF_SITE_URL:-}" ]; then
+            printf 'url=%s\n' "$CF_SITE_URL" >> "$GITHUB_OUTPUT"
+          else
+            printf 'url=https://%s.pages.dev\n' "$CF_PROJECT" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install swiftly and Swift toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
+          hash -r
+          SWIFT_VERSION="$(tr -d '[:space:]' < .swift-version)"
+          swiftly install --use --assume-yes "$SWIFT_VERSION"
+          swiftly list
+          swiftly run swift --version
+          echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-cfpages-${{ hashFiles('Examples/WebExample/TerminalApp/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-cfpages-
+            ${{ runner.os }}-swiftpm-website-
+
+      - name: Cache Bun deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+            GUI/WebTUIGUI/node_modules
+            Examples/WebExample/node_modules
+            Website/node_modules
+          key: ${{ runner.os }}-bun-cfpages-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-cfpages-
+            ${{ runner.os }}-bun-website-
+
+      - name: Install wasm Swift SDK used by WebExample
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! swiftly run swift sdk list | grep -q "swift-6.3.1-RELEASE_wasm"; then
+            swiftly run swift sdk install \
+              https://download.swift.org/swift-6.3.1-release/wasm-sdk/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE_wasm.artifactbundle.tar.gz \
+              --checksum bd47baa20771f366d8beed7970afaa30742b2210097afd15f85427226d8f4cf2
+          fi
+
+      - name: Install Binaryen
+        shell: bash
+        run: brew install binaryen
+
+      - name: Install Bun workspace deps
+        shell: bash
+        run: |
+          set -euo pipefail
+          hash -r
+          bun install --frozen-lockfile
+
+      - name: Build WebExample
+        shell: bash
+        working-directory: Examples/WebExample
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Validate uploaded WebExample wasm parses in the browser API
+        shell: bash
+        working-directory: Examples/WebExample
+        run: |
+          set -euo pipefail
+          bun -e 'const wasmPath = "./pages-dist/TerminalApp/dist/assets/app.wasm"; try { await WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer()); console.log(`Validated ${wasmPath}`); } catch (error) { console.error(`Failed to validate ${wasmPath}: ${error instanceof Error ? error.message : String(error)}`); process.exit(1); }'
+
+      # Build Astro with root-relative URLs. ASTRO_BASE=/ removes the
+      # /swift-terminal-ui prefix that the GH Pages build keeps.
+      - name: Build Website (Cloudflare-targeted)
+        shell: bash
+        working-directory: Website
+        env:
+          ASTRO_SITE: ${{ steps.site.outputs.url }}
+          ASTRO_BASE: /
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          bun run build
+
+      # DocC archive served at /docs/. Root-relative deploy means the
+      # `--hosting-base-path` is just `docs` (vs. `swift-terminal-ui/docs` on GH Pages).
+      - name: Build DocC archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .build-docs
+          swiftly run swift package \
+            --allow-writing-to-directory .build-docs \
+            generate-documentation \
+            --target Core \
+            --target View \
+            --target TerminalUI \
+            --target TerminalUICharts \
+            --enable-experimental-combined-documentation \
+            --transform-for-static-hosting \
+            --hosting-base-path docs \
+            --output-path .build-docs
+
+      # Same artifact layout as GH Pages, just without the /swift-terminal-ui prefix.
+      - name: Compose Cloudflare Pages artifact
+        shell: bash
+        env:
+          ARTIFACT_ROOT: ${{ github.workspace }}/_cf-pages-artifact
+          DOCS_ROOT: ${{ github.workspace }}/_cf-pages-artifact/docs
+          WEBEXAMPLE_ROOT: ${{ github.workspace }}/_cf-pages-artifact/webexample
+          HOSTING_BASE_PATH: /docs
+        run: |
+          set -euo pipefail
+          rm -rf "$ARTIFACT_ROOT"
+          mkdir -p "$ARTIFACT_ROOT" "$DOCS_ROOT" "$WEBEXAMPLE_ROOT"
+          # Astro site at root.
+          cp -R Website/dist/. "$ARTIFACT_ROOT/"
+          # DocC at /docs/.
+          cp -R .build-docs/. "$DOCS_ROOT/"
+          # Project-owned CSS overrides on top of theme-settings.json.
+          # (idempotent; safe to re-run, see Examples/WebExample/src/inject-docs-css.ts)
+          bun run Examples/WebExample/src/inject-docs-css.ts
+          # WebExample at /webexample/.
+          cp -R Examples/WebExample/pages-dist/. "$WEBEXAMPLE_ROOT/"
+
+      - name: Resolve deploy branch
+        id: branch
+        shell: bash
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # `main` -> production deployment. PRs and other branches -> preview.
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            printf 'branch=%s\n' "$GITHUB_HEAD_REF" >> "$GITHUB_OUTPUT"
+          else
+            printf 'branch=%s\n' "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Run wrangler directly (rather than via wrangler-action's `command:` shim)
+      # so we have full control over argument quoting. All untrusted inputs are
+      # passed via env vars and double-quoted shell expansions.
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_BRANCH: ${{ steps.branch.outputs.branch }}
+          CF_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Capture wrangler stdout to extract the deployment URL for the PR comment.
+          deploy_log="$(bunx wrangler@latest pages deploy _cf-pages-artifact \
+            --project-name="$CF_PROJECT" \
+            --branch="$CF_BRANCH" \
+            --commit-hash="$CF_COMMIT_SHA" 2>&1 | tee /dev/stderr)"
+          # Wrangler prints something like: `✨  Deployment complete! Take a peek over at https://abc123.swift-terminal-ui.pages.dev`
+          deployment_url="$(printf '%s\n' "$deploy_log" | grep -Eo 'https://[^[:space:]]+\.pages\.dev' | tail -n1 || true)"
+          printf 'deployment-url=%s\n' "${deployment_url:-}" >> "$GITHUB_OUTPUT"
+
+      - name: Comment preview URL on PR
+        if: github.event_name == 'pull_request' && steps.deploy.outputs.deployment-url != ''
+        uses: actions/github-script@v7
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+        with:
+          script: |
+            const url = process.env.DEPLOY_URL;
+            const marker = '<!-- cloudflare-pages-preview -->';
+            const body = `${marker}\n\nCloudflare Pages preview: ${url}\n\n_Updated on every push to this PR._`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
