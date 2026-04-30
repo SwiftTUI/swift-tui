@@ -525,7 +525,7 @@ remains usable.
 | 0 (blockers) | ✅ landed | All four blockers shipped. |
 | 1 — Layout skeleton | ✅ landed | 6-region body, 3-cell tool dock, right panel stack, bottom timeline + status. |
 | 2 — Menu bar | ✅ landed | 7 menus, 25+ clickable items, shortcut hints via `.systemHint`. |
-| 3 — Inline button affordances | ⏳ pending | Per-row Layers/Timeline/Palette buttons. |
+| 3 — Inline button affordances | ✅ landed | Tool dock, palette, layers, and timeline are now fully clickable. |
 | 4 — Tool options bar | ⏳ pending | Contextual options + brush stepper + Confirm/Clear. |
 | 5 — Polish | ⏳ pending | View-menu visibility toggles, pixel grid mode picker, resize-canvas sheet, hover tooltips. |
 

@@ -66,7 +66,9 @@ public struct EditorView: View {
         ToolboxView(
           tool: model.tool,
           primaryColor: primaryColor,
-          secondaryColor: secondaryColor
+          secondaryColor: secondaryColor,
+          model: model,
+          refresh: refresh
         )
         InteractiveCanvasView(
           size: model.document.size,
@@ -87,18 +89,24 @@ public struct EditorView: View {
           PaletteView(
             palette: model.document.palette,
             primaryIndex: model.primaryColorIndex,
-            secondaryIndex: model.secondaryColorIndex
+            secondaryIndex: model.secondaryColorIndex,
+            model: model,
+            refresh: refresh
           )
           LayerListView(
             layers: model.currentFrame.layers,
-            selectedIndex: model.currentLayerIndex
+            selectedIndex: model.currentLayerIndex,
+            model: model,
+            refresh: refresh
           )
         }
       }
       Divider()
       TimelineView(
         frames: timelineFrames,
-        currentFrameIndex: model.currentFrameIndex
+        currentFrameIndex: model.currentFrameIndex,
+        model: model,
+        refresh: refresh
       )
       Divider()
       footer
