@@ -41,8 +41,8 @@ Computed pipeline frames are not dropped.
 - Lazy indexed child sources can be snapshotted on the main actor and then used
   by worker layout when their visible children are worker-safe.
 - Runtime diagnostics record render generations, worker timings, main-actor
-  blocked/suspended time, coalesced event batches, and
-  `stale_frame_policy=commit_ordered`.
+  blocked/suspended time, coalesced event batches, coalesced intent-request
+  pressure, drop blockers, and `stale_frame_policy=commit_ordered`.
 - Async stress tests cover blocked worker tails, queued input, ordered commit,
   sync/async artifact parity, `SendableLayout` worker execution, retained layout
   reuse, focus convergence, and framework layout worker paths.
@@ -72,8 +72,92 @@ That means the next cancellation step must be redesigned around draft-only
 side effects or another rollback model before `FrameTailRenderer` accepts
 cancellable submissions.
 
-Completed worker results are also not classified or dropped as visual-only
-frames. The default and only runtime policy is `mustCommit`.
+Completed worker results are classified conservatively by the observational
+`FrameDropEligibility` helper, but they are not dropped as visual-only frames.
+The default and only runtime policy is still `mustCommit`.
+
+## Proposal To Resume Work
+
+Restart the async pipeline work as a safety-first tranche, not as a replay of the
+reverted frame-head abort implementation.
+
+### Stage R0: Rebaseline Before Changing Behavior
+
+Start with evidence and coverage while preserving ordered commit:
+
+- Capture diagnostics for the gallery and layouts examples with
+  `TERMUI_DIAGNOSTICS`, focusing on `main_actor_blocked_ms`,
+  `main_actor_suspended_ms`, worker layout/raster timings,
+  `coalesced_intent_requests`, and `drop_blockers`.
+- Add or refresh composed `RunLoop.run()` tests for the interactions that broke
+  during the reverted attempt: gallery tab clicks, ScrollView indicator
+  click/drag, pointer scroll bursts, `.keyCommand`, `.dropDestination`, focus
+  sync, and lazy ScrollView content.
+- Keep focused renderer tests as local proof, but require the real async run-loop
+  path for any claim that runtime registrations, aliases, focus, or input
+  dispatch survived.
+- Produce a small inventory of which frames are currently blocked by
+  `.unobservable`, handler installations, lifecycle/task work, and custom-layout
+  fallback. This tells us whether cancellation pressure is real before adding a
+  cancellation path.
+
+Exit criteria: no runtime behavior changes, green focused async/runtime tests,
+and a diagnostics-backed list of the highest-value cancellation scenarios.
+
+### Stage R1: Redesign Prepared Frame Heads Around Draft-Only Effects
+
+Do not restore live registries from per-frame draft snapshots. The reverted
+implementation failed because a draft contains only the dirty frontier and cache
+hits from the current resolve pass, while live runtime state also includes
+untouched committed subtrees and alias identities.
+
+The new design should make prepared frame heads abortable by construction:
+
+- Resolve can still run on the main actor, but runtime registration mutations
+  should be collected as draft commit data. Do not call `resetAll` or
+  `removeSubtrees` on live registries until `finishFrame`.
+- If a live registry must be rebuilt, rebuild from the committed `ViewGraph`
+  using committed node handlers and aliases as the source of truth, not from the
+  current draft registry snapshot.
+- Animation completion deferral remains useful and should stay commit-gated:
+  completions collected during a prepared frame fire only when that frame
+  finishes.
+- Worker custom-layout cache updates remain commit-only; an aborted prepared
+  frame discards them before they reach main-actor cache state.
+- Any remaining `ViewGraph`, `FrameResolveState`, animation, or retained-tail
+  mutation that cannot be draft-only needs an explicit checkpoint/restore test
+  before it can participate in abort.
+
+Exit criteria: a package-internal prepared-frame test hook can prepare and abort
+a frame, then run a fresh normal render without stale graph state, missing live
+registrations, fired lifecycle/task effects, fired animation completions, or
+retained-cache drift.
+
+### Stage R2: Add Pre-Start Tail Cancellation Only
+
+After Stage R1, add a cancellable submission state to `FrameTailRenderer`:
+
+- `queued`: may cancel if a newer desired generation arrives before worker start.
+- `started`: must finish and commit in order.
+- `completed`: must finish and commit in order.
+
+The run loop may race event intake against a queued tail job only while the job
+is still cancellable. If cancellation succeeds, abort the prepared frame and
+prepare the newest generation. If worker work has started, preserve the current
+ordered-commit path.
+
+Diagnostics should switch from only measuring pressure to reporting actual
+behavior: queued, started, completed, cancelled-before-start, cancel reason, and
+`stale_frame_policy=cancel_pending_before_start`.
+
+### Stage R3: Revisit Completed Visual-Only Drops Later
+
+Do not drop completed worker results in this restart tranche. Once pre-start
+cancellation is proven, the existing `FrameDropEligibility` classifier can be
+expanded from observational to actionable for a narrow visual-only case. That
+requires explicit tests for lifecycle, task, focus, preference, scroll,
+animation, handler, custom-layout cache, retained baseline, and presentation
+repaint barriers.
 
 ## Progress Map
 
@@ -90,7 +174,7 @@ frames. The default and only runtime policy is `mustCommit`.
 | Lazy indexed child snapshots | Shipped | Main actor resolves visible children before worker use. |
 | Abortable prepared frame heads | Not shipped | Previous implementation was reverted. |
 | Cancellable pre-start tail jobs | Not shipped | Blocked on safe abort or draft-only effects. |
-| Visual-only completed-frame drops | Not shipped | Requires an eligibility classifier. |
+| Visual-only completed-frame drops | Not shipped | Classifier exists; no drops yet. |
 | Off-main resolve | Not planned near-term | Would require a new authoring and registration model. |
 
 ## Supporting Documents
@@ -103,7 +187,8 @@ frames. The default and only runtime policy is `mustCommit`.
   records the `SendableLayout` opt-in model, framework-layout migration, and lazy
   indexed-child snapshot work.
 - [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md)
-  defines why computed async pipeline frames still commit in order.
+  defines why computed async pipeline frames still commit in order and records
+  the conservative drop-blocker classifier.
 - [proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md](proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md)
   is the future-work design for render intent, abortability, and cancellable
   pre-start tail jobs.
@@ -120,7 +205,10 @@ frames. The default and only runtime policy is `mustCommit`.
 - `Sources/TerminalUI/RunLoop+Rendering.swift`: async render loop, input
   coalescing, ordered commit, and diagnostics emission.
 - `Sources/TerminalUI/FrameDiagnosticsLogger.swift`: TSV diagnostics fields for
-  generations, worker timings, main-actor timings, coalescing, and stale policy.
+  generations, worker timings, main-actor timings, coalescing, drop blockers,
+  and stale policy.
+- `Sources/Core/FrameDropEligibility.swift`: conservative observational
+  classifier for completed-frame drop blockers.
 - `Sources/View/Layout/Layout.swift`: public `SendableLayout` opt-in and
   worker-capable layout erasure.
 - `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`: async tail,
@@ -133,6 +221,8 @@ frames. The default and only runtime policy is `mustCommit`.
 - Do not force ordinary public `Layout` conformers onto the worker.
 - Do not drop a computed pipeline frame unless a tested eligibility classifier
   proves the frame has no side effects that need commit or reconciliation.
+- Do not treat the current observational `FrameDropEligibility` result as
+  permission to drop; it is diagnostic until an actionable policy is tested.
 - Do not add worker cancellation inside `FrameTailRenderer` until prepared frame
   side effects can be aborted or isolated in draft-only state.
 - Keep full `bun run test` as the completion gate for runtime or shared renderer

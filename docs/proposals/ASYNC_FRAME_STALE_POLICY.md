@@ -2,8 +2,10 @@
 
 ## Status
 
-Stages 1 and 2 are implemented. Scheduler Stages 3A and 3B are implemented.
-Stage 3C, abortable prepared frame heads, was attempted and reverted; see
+Stages 1 and 2 are implemented. The observational drop-blocker classifier
+described in Stage 4 is also implemented, but it is diagnostic only. Scheduler
+Stages 3A and 3B are implemented. Stage 3C, abortable prepared frame heads, was
+attempted and reverted; see
 [`../plans/2026-04-26-002-frame-head-abort-plan.md`](../plans/2026-04-26-002-frame-head-abort-plan.md).
 Ordered commit remains the policy for started or completed frame-tail work and
 all future generation-dropping work.
@@ -69,7 +71,9 @@ The current runtime contract is:
 
 - resolve runs on the main actor,
 - built-in layout may run on the frame-tail worker,
-- custom layout falls back to the main actor,
+- `SendableLayout` custom layout and worker-safe framework layouts may run on
+  the frame-tail worker,
+- ordinary custom layout falls back to the main actor,
 - overlay application, semantics, draw, and raster run on the worker,
 - the main actor awaits the worker,
 - frames commit in order,
@@ -191,12 +195,20 @@ If the runtime cannot produce that reconciliation, it must commit the frame.
 
 Before enabling stale-frame dropping, diagnostics should expose:
 
-- render generation,
-- worker queue generation,
-- worker result generation,
-- newest desired generation at result receipt,
-- drop eligibility,
-- drop reason,
+- render generation, layout generation, raster generation,
+- desired generation and coalesced intent-request pressure,
+- coalesced event batches and wake causes,
+- worker queue/result timings,
+- current stale-frame policy,
+- current drop blockers from `FrameDropEligibility`.
+
+Already-shipped diagnostics cover those passive signals. Before enabling actual
+cancellation or dropping, add:
+
+- tail job state (`queued`, `started`, `completed`, `cancelled_before_start`),
+- newest desired generation at tail start and at result receipt,
+- cancellation reason,
+- cancellation count,
 - whether reconciliation ran,
 - whether presentation needed full repaint recovery afterward.
 
@@ -265,6 +277,9 @@ Design prerequisite:
 - [ ] Redesign prepared-frame rollback or draft-only side effects before worker
   tail work can be cancelled. The first abort implementation was reverted.
 
+- Rebaseline diagnostics and runtime-path coverage before changing behavior.
+- Redesign prepared frame heads around draft-only side effects. Do not rebuild
+  live registries from per-frame draft snapshots.
 - Teach the serial worker to skip jobs that have not started and are superseded.
 - Restrict cancellation to jobs with no worker-owned mutation.
 - Rerender from newest state after cancellation.
@@ -278,12 +293,24 @@ git commit -m "feat(runtime): cancel superseded unstarted frame-tail jobs"
 
 ### Stage 4: Classify visual-only completed frames
 
-- Add a conservative `FrameDropEligibility` classifier.
-- Start with all completed frames classified as `mustCommit`.
-- Add tests for the barriers listed above.
-- Only then permit a narrow visual-only case, such as a superseded animation
+- [x] Add a conservative `FrameDropEligibility` classifier.
+- [x] Start with all completed frames classified as `mustCommit`.
+- [x] Add tests for the currently observable blockers.
+- [ ] Add signals for the currently-unobservable barriers: animation
+  completions, preference observation deltas, focus-binding drift relative to
+  the previous frame, retained baseline updates, and presentation repaint
+  dependencies.
+- [ ] Only then permit a narrow visual-only case, such as a superseded animation
   tick with no lifecycle, focus, preference, task, handler, custom-layout cache,
   or retained-baseline transition.
+
+Stage 4 result so far:
+
+- `FrameDropEligibility` classifies completed frames as diagnostic blockers.
+- `FrameDiagnosticsLogger` writes the classifier result as `drop_blockers`.
+- The classifier intentionally injects `.unobservable` when no specific blocker
+  is found, so `canDrop` remains false for every classified runtime frame.
+- No runtime behavior uses the classifier to drop or reconcile frames.
 
 Commit boundary:
 
@@ -327,7 +354,10 @@ git commit -m "feat(runtime): reconcile skipped async frame results"
 Keep the current ordered-commit policy for any started or completed tail job
 until eligibility classification and reconciliation are both tested.
 
-The next concrete tranche should be Stage 3D: cancellation before worker start.
-Do not start by dropping completed worker results. Pre-start cancellation is the
+The next concrete tranche should return to Stage 3C, not Stage 3D directly:
+first redesign prepared frame heads so side effects are draft-only or safely
+abortable, using the post-mortem from the reverted attempt as the starting
+constraint. Then implement Stage 3D as cancellation before worker start only. Do
+not start by dropping completed worker results. Pre-start cancellation is the
 safest first optimization because it avoids reconciling already-computed frame
 artifacts and worker-owned cache effects.

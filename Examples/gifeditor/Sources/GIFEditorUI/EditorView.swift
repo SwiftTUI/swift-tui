@@ -183,7 +183,8 @@ public struct EditorView: View {
     )
     .applyTerminationHandling(model: model, refresh: refresh)
     .sheet("Keyboard help", isPresented: $isHelpPresented) {
-      EditorHelpView()
+      Spinner()
+      // EditorHelpView()
     }
     .sheet("Resize canvas", isPresented: $isResizeSheetPresented) {
       ResizeCanvasSheetView(
