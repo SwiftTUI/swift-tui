@@ -53,6 +53,9 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`active`, `design-approved`, or `shipped`). Current active plans:
 
+- [plans/2026-05-01-001-layout-dependent-content-realization-plan.md](plans/2026-05-01-001-layout-dependent-content-realization-plan.md) —
+  generalized layout-time content realization for `GeometryReader`, geometry
+  preferences, and measurement-dependent containers
 - [plans/2026-04-28-001-canvas-adaptation-plan.md](plans/2026-04-28-001-canvas-adaptation-plan.md) — extending Canvas for dense pixel grids, half-block rendering, and optional sub-cell pointer precision
 
 Implementation and post-mortem records retained for context:
