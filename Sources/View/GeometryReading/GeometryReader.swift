@@ -46,7 +46,8 @@ public struct GeometryProxy: Equatable, Sendable {
     coordinateSpace.resolve(
       terminalRect: bounds.continuous,
       targetRect: bounds,
-      namedCoordinateSpaces: placedFrameTable.namedCoordinateSpaces
+      namedCoordinateSpaces: placedFrameTable.namedCoordinateSpaces,
+      diagnosticsRecorder: placedFrameTable.diagnosticsRecorder
     )
   }
 

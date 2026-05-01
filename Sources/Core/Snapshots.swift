@@ -68,6 +68,13 @@ public struct SnapshotRenderer {
     lines.append(
       "firstCustomLayoutFallback=\(diagnostics.firstCustomLayoutFallbackIdentity?.path ?? "nil")"
     )
+    let geometry = diagnostics.geometryResolutionDiagnostics
+    lines.append(
+      "geometryResolution=anchorMisses:\(geometry.anchorResolutionMissCount) missingNamed:\(geometry.missingNamedCoordinateSpaceCount) duplicateNamed:\(geometry.duplicateNamedCoordinateSpaceCount)"
+    )
+    lines.append(
+      "firstGeometryResolutionMiss=anchor:\(geometry.firstAnchorResolutionMissIdentity?.path ?? "nil") missingNamed:\(geometry.firstMissingNamedCoordinateSpaceName ?? "nil") duplicateNamed:\(geometry.firstDuplicateNamedCoordinateSpaceName ?? "nil")"
+    )
 
     return lines.joined(separator: "\n")
   }

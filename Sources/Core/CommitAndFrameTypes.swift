@@ -185,6 +185,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
   package var layoutDependentRealizations: Int
   package var layoutDependentRealizationCacheHits: Int
   package var layoutDependentMainActorFallbacks: Int
+  package var geometryResolutionDiagnostics: GeometryResolutionDiagnostics
 
   package init(
     measuredNodesComputed: Int = 0,
@@ -193,7 +194,8 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     placedNodesReused: Int = 0,
     layoutDependentRealizations: Int = 0,
     layoutDependentRealizationCacheHits: Int = 0,
-    layoutDependentMainActorFallbacks: Int = 0
+    layoutDependentMainActorFallbacks: Int = 0,
+    geometryResolutionDiagnostics: GeometryResolutionDiagnostics = .init()
   ) {
     self.measuredNodesComputed = measuredNodesComputed
     self.measuredNodesReused = measuredNodesReused
@@ -202,6 +204,7 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
     self.layoutDependentRealizations = layoutDependentRealizations
     self.layoutDependentRealizationCacheHits = layoutDependentRealizationCacheHits
     self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
+    self.geometryResolutionDiagnostics = geometryResolutionDiagnostics
   }
 }
 
@@ -474,13 +477,14 @@ package final class LayoutPassContext: Sendable {
   ) {
     self.retainedLayout = retainedLayout
     self.invalidatedIdentities = invalidatedIdentities
+    let geometryDiagnosticsRecorder = GeometryResolutionDiagnosticsRecorder()
     state = .init(
       .init(
         scrollViewportContext: scrollViewportContext,
         workMetrics: .init(),
         workerCustomLayoutCacheUpdates: [],
         layoutDependentRealizations: [],
-        placedFrameTable: .init()
+        placedFrameTable: .init(diagnosticsRecorder: geometryDiagnosticsRecorder)
       )
     )
   }
@@ -490,7 +494,11 @@ package final class LayoutPassContext: Sendable {
   }
 
   package var workMetrics: LayoutWorkMetrics {
-    state.withLock { $0.workMetrics }
+    state.withLock {
+      var metrics = $0.workMetrics
+      metrics.geometryResolutionDiagnostics = $0.placedFrameTable.geometryResolutionDiagnostics
+      return metrics
+    }
   }
 
   package var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate] {
@@ -827,6 +835,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var measurementCache: MeasurementCacheMetrics?
   public var customLayoutFallbackCount: Int
   public var firstCustomLayoutFallbackIdentity: Identity?
+  package var geometryResolutionDiagnostics: GeometryResolutionDiagnostics = .init()
 
   public init(
     proposal: ProposedSize = .unspecified,
@@ -1167,7 +1176,7 @@ extension FrameDiagnostics {
     measurementCache: MeasurementCacheMetrics? = nil
   ) -> Self {
     let customLayoutFallback = customLayoutFallbackSummary(resolved)
-    return Self(
+    var diagnostics = Self(
       proposal: measured.proposal,
       invalidatedIdentities: invalidatedIdentities,
       resolvedNodeCount: resolved.subtreeNodeCount,
@@ -1201,6 +1210,9 @@ extension FrameDiagnostics {
       customLayoutFallbackCount: customLayoutFallback.count,
       firstCustomLayoutFallbackIdentity: customLayoutFallback.firstIdentity
     )
+    diagnostics.geometryResolutionDiagnostics =
+      layoutWork?.geometryResolutionDiagnostics ?? .init()
+    return diagnostics
   }
 
   private static func customLayoutFallbackSummary(

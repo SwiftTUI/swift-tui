@@ -35,6 +35,9 @@ Shipped on 2026-05-01.
   `GeometryProxy.frame(in:)`.
 - Covered token publication, overlay resolution, point anchors, global/local
   frames, and named coordinate spaces in `AnchorPreferenceSurfaceTests`.
+- Follow-up hardening records diagnostics for missing anchors, missing named
+  spaces, and duplicate named spaces while preserving existing fallback and
+  last-writer-wins behavior.
 - Updated public API docs, baseline inputs, and current-status docs.
 
 ## Current State

@@ -45,6 +45,22 @@ public struct CoordinateSpace: Equatable, Sendable {
     targetRect: CellRect,
     namedCoordinateSpaces: [String: CellRect]
   ) -> Point {
+    resolve(
+      terminalPoint: terminalPoint,
+      targetRect: targetRect,
+      namedCoordinateSpaces: namedCoordinateSpaces,
+      diagnosticsRecorder: nil
+    )
+  }
+
+  /// Resolves a terminal-global continuous point into this coordinate space,
+  /// recording deterministic diagnostics for geometry-proxy fallbacks.
+  package func resolve(
+    terminalPoint: Point,
+    targetRect: CellRect,
+    namedCoordinateSpaces: [String: CellRect],
+    diagnosticsRecorder: GeometryResolutionDiagnosticsRecorder?
+  ) -> Point {
     switch kind {
     case .local:
       return Point(
@@ -55,6 +71,7 @@ public struct CoordinateSpace: Equatable, Sendable {
       return terminalPoint
     case .named(let name):
       guard let frame = namedCoordinateSpaces[name] else {
+        diagnosticsRecorder?.recordMissingNamedCoordinateSpace(name: name)
         return terminalPoint
       }
       return Point(
@@ -71,11 +88,28 @@ public struct CoordinateSpace: Equatable, Sendable {
     targetRect: CellRect,
     namedCoordinateSpaces: [String: CellRect]
   ) -> Rect {
+    resolve(
+      terminalRect: terminalRect,
+      targetRect: targetRect,
+      namedCoordinateSpaces: namedCoordinateSpaces,
+      diagnosticsRecorder: nil
+    )
+  }
+
+  /// Resolves a terminal-global continuous rect into this coordinate space,
+  /// recording deterministic diagnostics for geometry-proxy fallbacks.
+  package func resolve(
+    terminalRect: Rect,
+    targetRect: CellRect,
+    namedCoordinateSpaces: [String: CellRect],
+    diagnosticsRecorder: GeometryResolutionDiagnosticsRecorder?
+  ) -> Rect {
     Rect(
       origin: resolve(
         terminalPoint: terminalRect.origin,
         targetRect: targetRect,
-        namedCoordinateSpaces: namedCoordinateSpaces
+        namedCoordinateSpaces: namedCoordinateSpaces,
+        diagnosticsRecorder: diagnosticsRecorder
       ),
       size: terminalRect.size
     )
