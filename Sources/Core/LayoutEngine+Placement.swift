@@ -6,6 +6,15 @@ extension LayoutEngine {
     viewportContext: LazyStackViewportContext?,
     passContext: LayoutPassContext?
   ) -> [PlacedNode] {
+    if let boundary = resolved.layoutDependentContent {
+      return placeLayoutDependentContent(
+        boundary,
+        measured: measured,
+        in: bounds,
+        passContext: passContext
+      )
+    }
+
     switch resolved.layoutBehavior {
     case .intrinsic:
       let childCount = min(resolved.children.count, measured.childMeasurements.count)
@@ -439,6 +448,50 @@ extension LayoutEngine {
         node: resolved,
         measured: measured,
         in: bounds,
+        passContext: passContext
+      )
+    }
+  }
+
+  private func placeLayoutDependentContent(
+    _ boundary: LayoutDependentContentBoundary,
+    measured: MeasuredNode,
+    in bounds: CellRect,
+    passContext: LayoutPassContext?
+  ) -> [PlacedNode] {
+    let realizationContext = LayoutRealizationContext(
+      boundaryIdentity: boundary.identity,
+      proposal: measured.proposal,
+      bounds: bounds,
+      safeAreaInsets: boundary.safeAreaInsets,
+      cellPixelMetrics: boundary.cellPixelMetrics,
+      pointerInputCapabilities: boundary.pointerInputCapabilities
+    )
+    let realizedChildren =
+      passContext?.realizeLayoutDependentContent(
+        in: realizationContext,
+        using: {
+          boundary.handle.realize(in: realizationContext)
+        }
+      ) ?? boundary.handle.realize(in: realizationContext)
+    let childProposal = ProposedSize(
+      width: .finite(bounds.size.width),
+      height: .finite(bounds.size.height)
+    )
+
+    return realizedChildren.map { child in
+      let childMeasurement = measure(
+        child,
+        proposal: childProposal,
+        passContext: passContext
+      )
+      return place(
+        child,
+        measured: childMeasurement,
+        in: CellRect(
+          origin: bounds.origin,
+          size: childMeasurement.measuredSize
+        ),
         passContext: passContext
       )
     }

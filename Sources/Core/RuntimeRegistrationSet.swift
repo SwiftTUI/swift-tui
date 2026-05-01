@@ -124,5 +124,7 @@ package struct RuntimeRegistrationSet {
     preferenceObservationRegistry?.restore(
       handlers.preferenceObservationRegistrations
     )
+    commandRegistry?.restore(handlers.commandRegistrations)
+    dropDestinationRegistry?.restore(handlers.dropDestinationRegistrations)
   }
 }

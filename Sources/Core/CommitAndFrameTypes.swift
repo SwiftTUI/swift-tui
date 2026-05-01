@@ -182,17 +182,26 @@ package struct LayoutWorkMetrics: Equatable, Sendable {
   package var measuredNodesReused: Int
   package var placedNodesComputed: Int
   package var placedNodesReused: Int
+  package var layoutDependentRealizations: Int
+  package var layoutDependentRealizationCacheHits: Int
+  package var layoutDependentMainActorFallbacks: Int
 
   package init(
     measuredNodesComputed: Int = 0,
     measuredNodesReused: Int = 0,
     placedNodesComputed: Int = 0,
-    placedNodesReused: Int = 0
+    placedNodesReused: Int = 0,
+    layoutDependentRealizations: Int = 0,
+    layoutDependentRealizationCacheHits: Int = 0,
+    layoutDependentMainActorFallbacks: Int = 0
   ) {
     self.measuredNodesComputed = measuredNodesComputed
     self.measuredNodesReused = measuredNodesReused
     self.placedNodesComputed = placedNodesComputed
     self.placedNodesReused = placedNodesReused
+    self.layoutDependentRealizations = layoutDependentRealizations
+    self.layoutDependentRealizationCacheHits = layoutDependentRealizationCacheHits
+    self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
   }
 }
 
@@ -450,6 +459,7 @@ package final class LayoutPassContext: Sendable {
     var scrollViewportContext: ScrollViewportContext?
     var workMetrics: LayoutWorkMetrics
     var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
+    var layoutDependentRealizations: [LayoutDependentContentRealization]
   }
 
   package let retainedLayout: RetainedLayoutSession?
@@ -467,7 +477,8 @@ package final class LayoutPassContext: Sendable {
       .init(
         scrollViewportContext: scrollViewportContext,
         workMetrics: .init(),
-        workerCustomLayoutCacheUpdates: []
+        workerCustomLayoutCacheUpdates: [],
+        layoutDependentRealizations: []
       )
     )
   }
@@ -484,6 +495,14 @@ package final class LayoutPassContext: Sendable {
     state.withLock { $0.workerCustomLayoutCacheUpdates }
   }
 
+  package var layoutDependentRealizationsByIdentity: [Identity: [ResolvedNode]] {
+    state.withLock { state in
+      state.layoutDependentRealizations.reduce(into: [:]) { result, realization in
+        result[realization.signature.boundaryIdentity] = realization.children
+      }
+    }
+  }
+
   package func updateWorkMetrics(
     _ update: (inout LayoutWorkMetrics) -> Void
   ) {
@@ -494,6 +513,33 @@ package final class LayoutPassContext: Sendable {
     _ update: WorkerCustomLayoutCacheUpdate
   ) {
     state.withLock { $0.workerCustomLayoutCacheUpdates.append(update) }
+  }
+
+  package func realizeLayoutDependentContent(
+    in context: LayoutRealizationContext,
+    using realize: () -> [ResolvedNode]
+  ) -> [ResolvedNode] {
+    let signature = LayoutDependentContentSignature(context)
+    if let cached = state.withLock({
+      $0.layoutDependentRealizations.first(where: { $0.signature == signature })
+    }) {
+      updateWorkMetrics {
+        $0.layoutDependentRealizationCacheHits += 1
+      }
+      return cached.children
+    }
+
+    let children = realize()
+    state.withLock { state in
+      state.layoutDependentRealizations.append(
+        .init(
+          signature: signature,
+          children: children
+        )
+      )
+      state.workMetrics.layoutDependentRealizations += 1
+    }
+    return children
   }
 }
 
@@ -710,6 +756,9 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var measuredNodesReused: Int
   public var placedNodesComputed: Int
   public var placedNodesReused: Int
+  public var layoutDependentRealizations: Int
+  public var layoutDependentRealizationCacheHits: Int
+  public var layoutDependentMainActorFallbacks: Int
   public var drawNodeCount: Int
   public var interactionRegionCount: Int
   public var focusRegionCount: Int
@@ -736,6 +785,9 @@ public struct FrameDiagnostics: Equatable, Sendable {
     measuredNodesReused: Int = 0,
     placedNodesComputed: Int = 0,
     placedNodesReused: Int = 0,
+    layoutDependentRealizations: Int = 0,
+    layoutDependentRealizationCacheHits: Int = 0,
+    layoutDependentMainActorFallbacks: Int = 0,
     drawNodeCount: Int = 0,
     interactionRegionCount: Int = 0,
     focusRegionCount: Int = 0,
@@ -761,6 +813,9 @@ public struct FrameDiagnostics: Equatable, Sendable {
     self.measuredNodesReused = measuredNodesReused
     self.placedNodesComputed = placedNodesComputed
     self.placedNodesReused = placedNodesReused
+    self.layoutDependentRealizations = layoutDependentRealizations
+    self.layoutDependentRealizationCacheHits = layoutDependentRealizationCacheHits
+    self.layoutDependentMainActorFallbacks = layoutDependentMainActorFallbacks
     self.drawNodeCount = drawNodeCount
     self.interactionRegionCount = interactionRegionCount
     self.focusRegionCount = focusRegionCount
@@ -1069,6 +1124,9 @@ extension FrameDiagnostics {
       measuredNodesReused: layoutWork?.measuredNodesReused ?? 0,
       placedNodesComputed: layoutWork?.placedNodesComputed ?? 0,
       placedNodesReused: layoutWork?.placedNodesReused ?? 0,
+      layoutDependentRealizations: layoutWork?.layoutDependentRealizations ?? 0,
+      layoutDependentRealizationCacheHits: layoutWork?.layoutDependentRealizationCacheHits ?? 0,
+      layoutDependentMainActorFallbacks: layoutWork?.layoutDependentMainActorFallbacks ?? 0,
       drawNodeCount: draw.subtreeNodeCount,
       interactionRegionCount: semantics.interactionRegions.count,
       focusRegionCount: semantics.focusRegions.count,

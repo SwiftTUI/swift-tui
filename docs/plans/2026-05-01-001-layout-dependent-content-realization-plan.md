@@ -1,7 +1,7 @@
 ---
 title: "refactor: add layout-dependent content realization"
 type: refactor
-status: active
+status: shipped
 date: 2026-05-01
 proposal: "../../LAYOUT-RESOLVE-SPLIT.md"
 ---
@@ -74,6 +74,41 @@ SwiftUI reference points:
 The Apple sources do not expose SwiftUI's private implementation phases. The
 plan therefore targets the public semantic model rather than claiming to clone
 SwiftUI internals.
+
+## Implementation Status
+
+Shipped implementation:
+
+- Core carries `ResolvedNode.layoutDependentContent` as a sibling field rather
+  than a new `LayoutBehavior` case.
+- Measurement uses an explicit sizing policy and does not realize authored
+  content. Placement realizes content from final bounds, safe-area insets, cell
+  metrics, and pointer capabilities.
+- `GeometryReader` is the first public adopter. It uses a `10x10` ideal for
+  unspecified dimensions, remains flexible in stacks, and reports placement
+  geometry rather than a resolve-time `EnvironmentValues.terminalSize` shim.
+- Runtime registration restoration now includes command and drop handlers, and
+  graph restoration can publish the finalized realized subtree instead of a
+  partial draft snapshot.
+- Frame diagnostics expose layout-dependent realization counts, cache hits, and
+  main-actor fallback counts. Async frame-tail layout falls back to the main
+  actor when arbitrary authored content realization is present, while static
+  and `SendableLayout` worker paths remain eligible.
+- Static proposal-transforming modifiers no longer rewrite `terminalSize`;
+  that environment value is host/root surface metadata. Local geometry comes
+  from layout proposals and placed bounds.
+- `ViewThatFits` commits only the selected candidate's realized geometry
+  content; unselected geometry candidates may be measured without publishing
+  lifecycle, task, gesture, semantic, command, or drop side effects.
+- Ordinary preferences remain resolve-time. Public anchor and geometry-bound
+  preference APIs remain deferred until coordinate-space resolution is ready.
+
+Verification:
+
+- Focused layout-dependent geometry, safe-area, `ViewThatFits`, async fallback,
+  graph registration restoration, gallery physics, and layout example tests
+  passed.
+- `bun run test` passed after implementation.
 
 ## Problem Frame
 

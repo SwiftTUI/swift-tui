@@ -282,6 +282,18 @@ public struct LayoutEngine: Sendable {
       $0.measuredNodesComputed += 1
     }
 
+    if let boundary = resolved.layoutDependentContent {
+      let node = MeasuredNode(
+        identity: resolved.identity,
+        proposal: proposal,
+        measuredSize: boundary.sizingPolicy.measuredSize(for: proposal),
+        childMeasurements: [],
+        containerAllocationSnapshot: nil
+      )
+      cache?.store(node, for: resolved)
+      return node
+    }
+
     let effectiveProposal = proposalApplyingFixedSizeMetadata(
       resolved.layoutMetadata,
       to: proposal
@@ -406,7 +418,9 @@ public struct LayoutEngine: Sendable {
     }
 
     let hasChildren =
-      if let source = resolved.indexedChildSource {
+      if resolved.layoutDependentContent != nil {
+        true
+      } else if let source = resolved.indexedChildSource {
         source.count > 0
       } else {
         !resolved.children.isEmpty
@@ -460,6 +474,10 @@ public struct LayoutEngine: Sendable {
     parentProposal: ProposedSize,
     passContext: LayoutPassContext?
   ) -> [MeasuredNode] {
+    if resolved.layoutDependentContent != nil {
+      return []
+    }
+
     switch resolved.layoutBehavior {
     case .intrinsic, .overlay, .offset, .position:
       return resolved.children.map { child in
@@ -612,6 +630,10 @@ public struct LayoutEngine: Sendable {
     proposal: ProposedSize,
     passContext: LayoutPassContext?
   ) -> CellSize {
+    if let boundary = resolved.layoutDependentContent {
+      return boundary.sizingPolicy.measuredSize(for: proposal)
+    }
+
     switch resolved.layoutBehavior {
     case .intrinsic:
       switch resolved.drawPayload {

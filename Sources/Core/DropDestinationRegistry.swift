@@ -22,6 +22,20 @@ public struct DropContext: Equatable, Sendable {
 package typealias DropDestinationHandler =
   @MainActor @Sendable ([DroppedPath], DropContext) -> Bool
 
+package struct DropDestinationRegistrySnapshot: Sendable {
+  package var handlersByScope: [Identity: DropDestinationHandler]
+
+  package init(
+    handlersByScope: [Identity: DropDestinationHandler] = [:]
+  ) {
+    self.handlersByScope = handlersByScope
+  }
+
+  package var isEmpty: Bool {
+    handlersByScope.isEmpty
+  }
+}
+
 /// Stores file-drop destinations keyed by scope `Identity` and
 /// dispatches a single drop event leafmost-first along the current
 /// focus chain. Mirrors `CommandRegistry` in lifetime and lifecycle;
@@ -51,6 +65,11 @@ package final class DropDestinationRegistry: Equatable {
     handler: @escaping DropDestinationHandler
   ) {
     handlersByScope[scope] = handler
+    ViewNodeContext.current?.recordDropDestinationRegistration(
+      DropDestinationRegistrySnapshot(
+        handlersByScope: [scope: handler]
+      )
+    )
   }
 
   package func register(
@@ -94,6 +113,22 @@ package final class DropDestinationRegistry: Equatable {
   /// Clears every registration.
   package func reset() {
     handlersByScope.removeAll(keepingCapacity: true)
+  }
+
+  package func snapshot() -> DropDestinationRegistrySnapshot {
+    DropDestinationRegistrySnapshot(
+      handlersByScope: handlersByScope
+    )
+  }
+
+  package func restore(_ snapshot: DropDestinationRegistrySnapshot) {
+    guard !snapshot.isEmpty else {
+      return
+    }
+
+    for (identity, handler) in snapshot.handlersByScope {
+      handlersByScope[identity] = handler
+    }
   }
 
   /// Removes every registration whose identity sits under any of

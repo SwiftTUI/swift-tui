@@ -366,6 +366,20 @@ This is especially visible in custom layouts:
 
 That split is one of the cleanest design choices in SwiftUI layout.
 
+### 6.1 Geometry-Dependent Content Uses Placement Geometry
+
+`GeometryReader` follows the measurement/placement split. It participates in
+measurement with an explicit flexible sizing policy, but its authored content is
+realized only after layout has assigned concrete bounds. `GeometryProxy.size`
+therefore describes the reader's placed geometry, not a resolve-time
+`EnvironmentValues.terminalSize` guess.
+
+This matters for custom `Layout`: a parent may measure a reader under one
+proposal and later place it under another. The proxy should reflect the
+placement proposal and final bounds. Measuring the reader is not allowed to
+commit lifecycle, task, gesture, command, drop, or semantic side effects from
+the reader's content.
+
 ## 7. Alignment, Spacing, and Priority
 
 These are not separate subsystems. They are metadata that feed the same measurement-and-placement algorithm.

@@ -302,6 +302,10 @@ package final class ViewGraph {
       return
     }
 
+    let resolved = resolvedPreservingLayoutDependentChildren(
+      resolved,
+      for: node
+    )
     pruneDetachedResolvedRootIfNeeded(
       previousResolvedIdentity: previousResolvedIdentity,
       replacedBy: resolved.identity,
@@ -360,6 +364,45 @@ package final class ViewGraph {
       }
       node.setLifecycleState(.appearing)
     }
+  }
+
+  package func installLayoutDependentChildren(
+    for identity: Identity,
+    children: [ResolvedNode]
+  ) {
+    guard let node = nodesByIdentity[identity] else {
+      return
+    }
+
+    var resolved = node.snapshot()
+    resolved.children = children
+    let childNodes = children.map { child in
+      nodeForIdentity(for: child.identity)
+    }
+    applyStructuralChildDiff(
+      for: node,
+      resolved: resolved
+    )
+    node.apply(
+      resolved: resolved,
+      children: childNodes
+    )
+  }
+
+  private func resolvedPreservingLayoutDependentChildren(
+    _ resolved: ResolvedNode,
+    for node: ViewNode
+  ) -> ResolvedNode {
+    guard resolved.layoutDependentContent != nil,
+      resolved.children.isEmpty,
+      !node.children.isEmpty
+    else {
+      return resolved
+    }
+
+    var preserved = resolved
+    preserved.children = node.children.map { $0.snapshot() }
+    return preserved
   }
 
   private func pruneDetachedResolvedRootIfNeeded(

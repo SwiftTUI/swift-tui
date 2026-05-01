@@ -656,6 +656,10 @@ extension LayoutEngine {
     _ node: ResolvedNode,
     axis: Axis
   ) -> Bool {
+    if node.layoutDependentContent != nil {
+      return true
+    }
+
     switch node.layoutBehavior {
     case .intrinsic:
       switch node.drawPayload {

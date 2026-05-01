@@ -755,13 +755,9 @@ public struct PaddingModifier: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let contentContext = contextWithTerminalSize(
-      context.child(component: .named("content")),
-      insetBy: insets
-    )
     let contentNode = resolveModifierContent(
       content,
-      in: contentContext
+      in: context.child(component: .named("content"))
     )
     return [
       ResolvedNode(
@@ -791,13 +787,7 @@ public struct SafeAreaPaddingModifier: PrimitiveViewModifier {
       to: edges
     )
     let contentContext =
-      contextWithTerminalSize(
-        context.child(component: .named("content")),
-        insetBy: appliedInsets
-      )
-      .transformingEnvironment(\.terminalSizeAppliedSafeAreaInsets) { insets in
-        insets = insets.adding(appliedInsets)
-      }
+      context.child(component: .named("content"))
       .transformingEnvironment(\.safeAreaInsets) { safeAreaInsets in
         safeAreaInsets = safeAreaInsets.adding(appliedInsets)
       }
@@ -824,17 +814,8 @@ public struct IgnoreSafeAreaModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let reclaimedInsets = context.environmentValues.safeAreaInsets.masked(to: edges)
-    let terminalSizeInsets = context.environmentValues.terminalSizeAppliedSafeAreaInsets.masked(
-      to: edges
-    )
     let contentContext =
-      contextOutsettingTerminalSize(
-        context.child(component: .named("content")),
-        by: terminalSizeInsets
-      )
-      .transformingEnvironment(\.terminalSizeAppliedSafeAreaInsets) { insets in
-        insets = insets.zeroing(edges)
-      }
+      context.child(component: .named("content"))
       .transformingEnvironment(\.safeAreaInsets) { safeAreaInsets in
         safeAreaInsets = safeAreaInsets.zeroing(edges)
       }
@@ -922,13 +903,9 @@ public struct BorderModifier: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let contentContext = contextWithTerminalSize(
-      context.child(component: .named("content")),
-      insetBy: layoutInsets
-    )
     let contentNode = resolveModifierContent(
       content,
-      in: contentContext
+      in: context.child(component: .named("content"))
     )
     return [
       ResolvedNode(
@@ -974,20 +951,9 @@ public struct FrameModifier: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    var contentContext = context.child(component: .named("content"))
-    if width != nil || height != nil {
-      var terminalSize = contentContext.environmentValues.terminalSize
-      if let width {
-        terminalSize.width = width
-      }
-      if let height {
-        terminalSize.height = height
-      }
-      contentContext = contentContext.settingEnvironment(\.terminalSize, to: terminalSize)
-    }
     let contentNode = resolveModifierContent(
       content,
-      in: contentContext
+      in: context.child(component: .named("content"))
     )
     return [
       ResolvedNode(
@@ -1091,12 +1057,9 @@ public struct FlexibleFrameModifier: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
-    let contentContext = flexibleFrameContentContext(
-      from: context.child(component: .named("content"))
-    )
     let contentNode = resolveModifierContent(
       content,
-      in: contentContext
+      in: context.child(component: .named("content"))
     )
     return [
       ResolvedNode(
@@ -1112,58 +1075,6 @@ public struct FlexibleFrameModifier: PrimitiveViewModifier {
         )
       )
     ]
-  }
-
-  private func flexibleFrameContentContext(
-    from context: ResolveContext
-  ) -> ResolveContext {
-    let currentSize = context.environmentValues.terminalSize
-    let resolvedSize = CellSize(
-      width: flexibleFrameGeometryDimension(
-        parent: currentSize.width,
-        min: minWidth,
-        max: maxWidth
-      ),
-      height: flexibleFrameGeometryDimension(
-        parent: currentSize.height,
-        min: minHeight,
-        max: maxHeight
-      )
-    )
-
-    guard resolvedSize != currentSize else {
-      return context
-    }
-
-    return context.settingEnvironment(\.terminalSize, to: resolvedSize)
-  }
-
-  private func flexibleFrameGeometryDimension(
-    parent: Int,
-    min: ProposedDimension?,
-    max: ProposedDimension?
-  ) -> Int {
-    // With a finite terminal-size environment, ideal dimensions do not change
-    // the child proposal; they only matter for unspecified layout proposals.
-    guard finiteValue(min) != nil || finiteValue(max) != nil else {
-      return parent
-    }
-
-    var resolved = parent
-    if let minValue = finiteValue(min) {
-      resolved = Swift.max(minValue, resolved)
-    }
-    if let maxValue = finiteValue(max) {
-      resolved = Swift.min(maxValue, resolved)
-    }
-    return resolved
-  }
-
-  private func finiteValue(_ dimension: ProposedDimension?) -> Int? {
-    guard case .finite(let value) = dimension else {
-      return nil
-    }
-    return value
   }
 }
 
@@ -1206,48 +1117,6 @@ public struct OverlayModifier<OverlayContent: View>: PrimitiveViewModifier {
       )
     ]
   }
-}
-
-private func contextWithTerminalSize(
-  _ context: ResolveContext,
-  insetBy insets: EdgeInsets
-) -> ResolveContext {
-  guard !insets.isZero else {
-    return context
-  }
-
-  let currentSize = context.environmentValues.terminalSize
-  let resolvedSize = CellSize(
-    width: max(0, currentSize.width - insets.horizontal),
-    height: max(0, currentSize.height - insets.vertical)
-  )
-
-  guard resolvedSize != currentSize else {
-    return context
-  }
-
-  return context.settingEnvironment(\.terminalSize, to: resolvedSize)
-}
-
-private func contextOutsettingTerminalSize(
-  _ context: ResolveContext,
-  by insets: EdgeInsets
-) -> ResolveContext {
-  guard !insets.isZero else {
-    return context
-  }
-
-  let currentSize = context.environmentValues.terminalSize
-  let resolvedSize = CellSize(
-    width: max(0, currentSize.width + insets.horizontal),
-    height: max(0, currentSize.height + insets.vertical)
-  )
-
-  guard resolvedSize != currentSize else {
-    return context
-  }
-
-  return context.settingEnvironment(\.terminalSize, to: resolvedSize)
 }
 
 @inline(never)

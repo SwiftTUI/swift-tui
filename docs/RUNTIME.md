@@ -61,9 +61,10 @@ The runtime normalizes every pointer event into `PointerLocation`.
   Native hosts, web hosts, and terminal SGR-Pixels mode can provide sub-cell
   locations derived from pixel coordinates.
 - `PointerInputCapabilities` and `CellPixelMetrics` are copied into
-  `EnvironmentValues` before each render so authored views and `GeometryReader`
-  can display precision state or adapt direct-manipulation affordances without
-  changing layout.
+  `EnvironmentValues` before each render and into layout-time geometry
+  realization contexts so authored views and `GeometryReader` can display
+  precision state or adapt direct-manipulation affordances without changing
+  layout.
 
 Terminal-native sessions resolve mouse precision before the event pump starts.
 If `TerminalMouseInputResolution.preResolved` is supplied, the host uses that

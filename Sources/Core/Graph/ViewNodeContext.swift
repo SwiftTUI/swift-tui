@@ -15,4 +15,14 @@ package enum ViewNodeContext {
       apply()
     }
   }
+
+  @MainActor
+  package static func withCurrentValue<Result>(
+    _ node: ViewNode?,
+    _ apply: () -> Result
+  ) -> Result {
+    $current.withValue(node) {
+      apply()
+    }
+  }
 }

@@ -20,6 +20,9 @@ public struct SnapshotRenderer {
     lines.append(
       "placedWork=computed:\(diagnostics.placedNodesComputed) reused:\(diagnostics.placedNodesReused)"
     )
+    lines.append(
+      "layoutDependent=realized:\(diagnostics.layoutDependentRealizations) cacheHits:\(diagnostics.layoutDependentRealizationCacheHits) mainActorFallbacks:\(diagnostics.layoutDependentMainActorFallbacks)"
+    )
     lines.append("drawNodes=\(diagnostics.drawNodeCount)")
     lines.append("interactionRegions=\(diagnostics.interactionRegionCount)")
     lines.append("focusRegions=\(diagnostics.focusRegionCount)")

@@ -24,7 +24,7 @@ TerminalUI tracks observable reads through the same invalidation bridge used by 
 
 ## Environment
 
-Use ``EnvironmentValues`` and ``EnvironmentReader`` when values should be inherited structurally through the tree. Use ``GeometryReader`` when authored content should react to the current terminal surface size.
+Use ``EnvironmentValues`` and ``EnvironmentReader`` when values should be inherited structurally through the tree. Use ``GeometryReader`` when authored content should react to the geometry assigned by layout, including the root terminal surface when the reader is placed at the root.
 
 Environment updates can affect:
 
