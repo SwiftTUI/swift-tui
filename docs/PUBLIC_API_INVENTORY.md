@@ -25,13 +25,15 @@ The canonical authoring surface is the SwiftUI-shaped one:
 - `VStack`, `HStack`, `LazyVStack`, `LazyHStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `GeometryReader` (`LazyVStack` and `LazyHStack` support viewport-lazy placement and single-`ForEach` full-lazy rows)
 - `Tab`, `TabView`
 - `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `ViewThatFits`, `AnyLayout`
-- `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`
+- `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `Picker`, `Menu`, `DisclosureGroup`, `ProgressView`, `Spinner`
 - `ToastStyle`
-- `Layout`, `SendableLayout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `FocusInteractions`, `LinkDestination`, and `OpenLinkAction`
+- `Layout`, `SendableLayout`, `LayoutValueKey`, `Binding`, `EnvironmentValues`, `EnvironmentKey`, `EnvironmentReader`, `FocusedValues`, `FocusedValueKey`, `PreferenceKey`, `Anchor`, `AnchorSource`, `FocusInteractions`, `LinkDestination`, and `OpenLinkAction`
 - image-source environment configuration such as `EnvironmentValues.imageResourceRoots`
 - `@State`, `@Binding`, `@FocusState`, `@FocusedValue`, `@FocusedBinding`, and repo-owned `@Bindable`
-- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.offset(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.clipped()`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.onChange(of:initial:_:)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.toast(...)`
+- canonical layout and styling modifiers such as `.frame(...)`, `.padding(...)`, `.offset(...)`, `.layoutPriority(...)`, `.fixedSize(...)`, `.lineLimit(...)`, `.truncationMode(...)`, `.textWrappingStrategy(...)`, `.clipped()`, `.background(...)`, `.overlay(...)`, `.preference(key:value:)`, `.transformPreference(...)`, `.anchorPreference(key:value:transform:)`, `.transformAnchorPreference(_:value:transform:)`, `.onPreferenceChange(...)`, `.backgroundPreferenceValue(...)`, `.overlayPreferenceValue(...)`, `.semanticMetadata(...)`, `.drawMetadata(...)`, `.focusable(...)`, `.focusable(interactions:)`, `.focused(...)`, `.defaultFocus(...)`, `.focusedValue(...)`, `.focusedSceneValue(...)`, `.focusEffectDisabled()`, `.focusScope()`, `.focusSection()`, `.onChange(of:initial:_:)`, `.alert(...)`, `.confirmationDialog(...)`, `.sheet(...)`, `.toast(...)`
 - `Resolver` and the public `ResolveContext` configuration surface for low-level rendering entry points
+- low-level `Standard` output/file helpers and `FileOpenError` for runtime
+  integration paths that need direct stream writes
 
 Important public-surface rules after the lowering migration:
 
@@ -41,6 +43,10 @@ Important public-surface rules after the lowering migration:
 - Callback-bearing authoring APIs follow the same model: `Binding.init(get:set:)` and `.task(...)` use actor-inheriting closure signatures, while button actions, `OpenLinkAction` over typed `LinkDestination`s, `.onAppear`, `.onDisappear`, and `.onChange(of:initial:_:)` stay explicitly `@MainActor`. In ordinary authored view code those all still resolve to main-actor authoring because `View.body` is `@MainActor`.
 - `ViewBuilder` no longer exposes `[AnyView]` in public closure signatures.
 - `AnyView` remains public as `View` erasure, but `AnyView.init(erasing:)` is no longer public.
+- Anchor preferences are ordinary reduced preferences that carry opaque
+  `Anchor<Rect>` or `Anchor<Point>` tokens. Resolve them inside
+  `GeometryReader` using `GeometryProxy[anchor]`; use `GeometryProxy.frame(in:)`
+  for `.local`, `.global`, and `.named(_)` coordinate-space frames.
 - Public custom layouts run through the main-actor custom-layout bridge unless
   they explicitly conform to `SendableLayout`, which requires the layout value
   and its cache to be `Sendable` and requires stable measurement and placement

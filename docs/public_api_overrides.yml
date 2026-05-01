@@ -112,6 +112,7 @@ classifications:
     - View.SendableLayout
     - View.Slider
     - View.Spacer
+    - View.Spinner
     - View.SpatialTapGesture
     - View.State
     - View.Stepper
@@ -290,8 +291,14 @@ classifications:
     - View.NamedCoordinateSpaceModifier
     - View.ProposedViewSize
     - View.ResolveContext
+    - Core.Anchor
+    - Core.AnchorSource
+    - View.FileOpenError
+    - View.Standard
 
     # ─── View additional modifiers ────────────────────────────────────────
+    - View.AnchorPreferenceTransformModifier
+    - View.AnchorPreferenceWritingModifier
     - View.ChangeLifecycleModifier
     - View.DisappearLifecycleModifier
     - View.DrawMetadataModifier

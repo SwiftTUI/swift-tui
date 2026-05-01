@@ -380,6 +380,26 @@ placement proposal and final bounds. Measuring the reader is not allowed to
 commit lifecycle, task, gesture, command, drop, or semantic side effects from
 the reader's content.
 
+### 6.2 Preferences Split Values From Geometry Resolution
+
+Ordinary `PreferenceKey` values still reduce during resolve. That is the right
+phase for values such as labels, toolbar items, command descriptors, or other
+metadata that does not depend on final placement.
+
+Anchor preferences deliberately split the two concerns:
+
+- `anchorPreference(key:value:transform:)` and
+  `transformAnchorPreference(_:value:transform:)` publish opaque `Anchor`
+  tokens through the ordinary preference reducer.
+- `GeometryProxy[anchor]` resolves those tokens after placement using the
+  frame table for the current layout pass.
+- `GeometryProxy.frame(in:)` converts the current geometry scope into `.local`,
+  `.global`, or `.named(_)` coordinates without reading
+  `EnvironmentValues.terminalSize`.
+
+This keeps preference reduction deterministic while still letting overlays and
+backgrounds react to the actual frames assigned by layout.
+
 ## 7. Alignment, Spacing, and Priority
 
 These are not separate subsystems. They are metadata that feed the same measurement-and-placement algorithm.

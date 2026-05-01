@@ -63,4 +63,21 @@ public struct CoordinateSpace: Equatable, Sendable {
       )
     }
   }
+
+  /// Resolves a terminal-global continuous rect into this coordinate space,
+  /// using the named coordinate-space frames extracted for the current frame.
+  package func resolve(
+    terminalRect: Rect,
+    targetRect: CellRect,
+    namedCoordinateSpaces: [String: CellRect]
+  ) -> Rect {
+    Rect(
+      origin: resolve(
+        terminalPoint: terminalRect.origin,
+        targetRect: targetRect,
+        namedCoordinateSpaces: namedCoordinateSpaces
+      ),
+      size: terminalRect.size
+    )
+  }
 }

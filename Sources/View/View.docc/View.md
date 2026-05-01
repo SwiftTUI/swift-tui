@@ -14,6 +14,8 @@ It provides:
 - typed builders through ``ViewBuilder``
 - state and data flow through ``State``, ``Binding``, and ``Bindable``
 - environment and focused-value access through ``EnvironmentValues``, ``EnvironmentReader``, ``GeometryReader``, ``FocusedValue``, and ``FocusedBinding``
+- geometry-bound preferences through `Anchor`, `AnchorSource`, and
+  ``GeometryProxy``
 - focus coordination through ``FocusState``
 - layout composition through ``Layout``, ``AnyLayout``, the built-in stack layouts,
   and viewport-lazy containers such as ``LazyVStack`` and ``LazyHStack``, including
@@ -87,6 +89,7 @@ Lowering helpers remain package-only implementation details.
 ### Guides
 
 - <doc:Authoring-Views>
+- <doc:Geometry-And-Preferences>
 - <doc:Pointer-And-Canvas>
 - <doc:State-Environment-And-Focus>
 - <doc:State-Keying>

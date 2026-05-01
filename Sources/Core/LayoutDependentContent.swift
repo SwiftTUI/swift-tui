@@ -34,6 +34,7 @@ package struct LayoutRealizationContext: Equatable, Sendable {
   package var safeAreaInsets: EdgeInsets
   package var cellPixelMetrics: CellPixelMetrics
   package var pointerInputCapabilities: PointerInputCapabilities
+  package var placedFrameTable: PlacedFrameTable
 
   package init(
     boundaryIdentity: Identity,
@@ -41,7 +42,8 @@ package struct LayoutRealizationContext: Equatable, Sendable {
     bounds: CellRect,
     safeAreaInsets: EdgeInsets,
     cellPixelMetrics: CellPixelMetrics,
-    pointerInputCapabilities: PointerInputCapabilities
+    pointerInputCapabilities: PointerInputCapabilities,
+    placedFrameTable: PlacedFrameTable = .init()
   ) {
     self.boundaryIdentity = boundaryIdentity
     self.proposal = proposal
@@ -49,6 +51,7 @@ package struct LayoutRealizationContext: Equatable, Sendable {
     self.safeAreaInsets = safeAreaInsets
     self.cellPixelMetrics = cellPixelMetrics
     self.pointerInputCapabilities = pointerInputCapabilities
+    self.placedFrameTable = placedFrameTable
   }
 }
 
@@ -59,6 +62,7 @@ package struct LayoutDependentContentSignature: Equatable, Sendable {
   package var safeAreaInsets: EdgeInsets
   package var cellPixelMetrics: CellPixelMetrics
   package var pointerInputCapabilities: PointerInputCapabilities
+  package var placedFrameTable: PlacedFrameTable
 
   package init(_ context: LayoutRealizationContext) {
     boundaryIdentity = context.boundaryIdentity
@@ -67,6 +71,7 @@ package struct LayoutDependentContentSignature: Equatable, Sendable {
     safeAreaInsets = context.safeAreaInsets
     cellPixelMetrics = context.cellPixelMetrics
     pointerInputCapabilities = context.pointerInputCapabilities
+    placedFrameTable = context.placedFrameTable
   }
 }
 

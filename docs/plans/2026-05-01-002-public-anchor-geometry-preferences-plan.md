@@ -1,7 +1,7 @@
 ---
 title: "feat: public anchor and geometry-bound preference API"
 type: feature
-status: planned
+status: shipped
 date: 2026-05-01
 depends_on: "2026-05-01-001-layout-dependent-content-realization-plan.md"
 ---
@@ -20,6 +20,23 @@ now realize authored content during placement, but it still lacks a public
 geometry token that survives preference reduction and can be resolved against
 placed frames and named coordinate spaces.
 
+## Implementation Record
+
+Shipped on 2026-05-01.
+
+- Added public `Anchor<Value>` and `AnchorSource<Value>` tokens with bounds and
+  point sources.
+- Added `anchorPreference(key:value:transform:)` and
+  `transformAnchorPreference(_:value:transform:)` modifiers.
+- Added a layout-time placed-frame table and threaded it into
+  `LayoutRealizationContext` so `GeometryReader` content resolves against
+  placement geometry.
+- Added `GeometryProxy[Anchor<Rect>]`, `GeometryProxy[Anchor<Point>]`, and
+  `GeometryProxy.frame(in:)`.
+- Covered token publication, overlay resolution, point anchors, global/local
+  frames, and named coordinate spaces in `AnchorPreferenceSurfaceTests`.
+- Updated public API docs, baseline inputs, and current-status docs.
+
 ## Current State
 
 Already shipped:
@@ -32,15 +49,11 @@ Already shipped:
 - `CoordinateSpace.local`, `.global`, and `.named(_:)` exist for gestures.
 - `coordinateSpace(name:)` records placed named frames into
   `SemanticSnapshot.namedCoordinateSpaces`.
-
-Still deferred:
-
-- Public `Anchor` tokens.
-- `anchorPreference(...)` and `transformAnchorPreference(...)`.
-- `GeometryProxy` anchor resolution.
-- Public `GeometryProxy.frame(in:)`.
-- A general placed-frame table that can serve semantics, gestures, and geometry
-  resolution without making semantic extraction the source of layout truth.
+- Public `Anchor` tokens, `anchorPreference(...)`,
+  `transformAnchorPreference(...)`, `GeometryProxy` anchor resolution, and
+  `GeometryProxy.frame(in:)` have shipped.
+- A layout-time placed-frame table now serves geometry resolution without
+  making semantic extraction the source of layout truth.
 
 ## Requirements
 
