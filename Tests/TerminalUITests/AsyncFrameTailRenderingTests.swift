@@ -274,6 +274,9 @@ struct AsyncFrameTailRenderingTests {
           && row["first_geometry_missing_named_coordinate_space"] == "-"
           && row["geometry_duplicate_named_coordinate_spaces"] == "0"
           && row["first_geometry_duplicate_named_coordinate_space"] == "-"
+          && row["layout_dependent_realizations"] == "0"
+          && row["layout_dependent_cache_hits"] == "0"
+          && row["layout_dependent_main_actor_fallbacks"] == "0"
           && row["stale_frame_policy"] == "commit_ordered"
           && row["desired_generation"] != nil
           && row["render_generation"] != nil
@@ -365,6 +368,9 @@ struct AsyncFrameTailRenderingTests {
           && row["first_geometry_missing_named_coordinate_space"] == "missing-space"
           && row["geometry_duplicate_named_coordinate_spaces"] == "1"
           && row["first_geometry_duplicate_named_coordinate_space"] == "board"
+          && row["layout_dependent_realizations"] == "1"
+          && row["layout_dependent_cache_hits"] == "0"
+          && row["layout_dependent_main_actor_fallbacks"] == "1"
       })
   }
 

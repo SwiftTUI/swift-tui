@@ -317,6 +317,9 @@ extension RunLoop {
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
             firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
+            layoutDependentRealizations: diag.layoutDependentRealizations,
+            layoutDependentRealizationCacheHits: diag.layoutDependentRealizationCacheHits,
+            layoutDependentMainActorFallbacks: diag.layoutDependentMainActorFallbacks,
             geometryAnchorResolutionMissCount: geometryDiagnostics.anchorResolutionMissCount,
             firstGeometryAnchorResolutionMissIdentity: geometryDiagnostics
               .firstAnchorResolutionMissIdentity?.path,
@@ -626,6 +629,9 @@ extension RunLoop {
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
             firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
+            layoutDependentRealizations: diag.layoutDependentRealizations,
+            layoutDependentRealizationCacheHits: diag.layoutDependentRealizationCacheHits,
+            layoutDependentMainActorFallbacks: diag.layoutDependentMainActorFallbacks,
             geometryAnchorResolutionMissCount: geometryDiagnostics.anchorResolutionMissCount,
             firstGeometryAnchorResolutionMissIdentity: geometryDiagnostics
               .firstAnchorResolutionMissIdentity?.path,

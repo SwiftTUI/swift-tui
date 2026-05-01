@@ -34,6 +34,9 @@ public struct FrameDiagnosticRecord: Sendable {
   public var mainActorTimings: FrameMainActorTimings?
   public var customLayoutFallbackCount: Int
   public var firstCustomLayoutFallbackIdentity: String?
+  public var layoutDependentRealizations: Int
+  public var layoutDependentRealizationCacheHits: Int
+  public var layoutDependentMainActorFallbacks: Int
   public var geometryAnchorResolutionMissCount: Int
   public var firstGeometryAnchorResolutionMissIdentity: String?
   public var geometryMissingNamedCoordinateSpaceCount: Int
@@ -181,6 +184,9 @@ public final class FrameDiagnosticsLogger {
       mainActorSuspendedMs,
       String(record.customLayoutFallbackCount),
       record.firstCustomLayoutFallbackIdentity ?? "-",
+      String(record.layoutDependentRealizations),
+      String(record.layoutDependentRealizationCacheHits),
+      String(record.layoutDependentMainActorFallbacks),
       String(record.geometryAnchorResolutionMissCount),
       record.firstGeometryAnchorResolutionMissIdentity ?? "-",
       String(record.geometryMissingNamedCoordinateSpaceCount),
@@ -255,6 +261,9 @@ public final class FrameDiagnosticsLogger {
       "main_actor_suspended_ms",
       "custom_layout_fallbacks",
       "first_custom_layout_fallback",
+      "layout_dependent_realizations",
+      "layout_dependent_cache_hits",
+      "layout_dependent_main_actor_fallbacks",
       "geometry_anchor_resolution_misses",
       "first_geometry_anchor_resolution_miss",
       "geometry_missing_named_coordinate_spaces",
