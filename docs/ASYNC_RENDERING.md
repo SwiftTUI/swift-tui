@@ -372,6 +372,12 @@ repaint barriers.
   assumptions.
 - [plans/2026-05-01-004-layout-dependent-container-hardening-plan.md](plans/2026-05-01-004-layout-dependent-container-hardening-plan.md)
   records the container regression coverage around layout-dependent geometry.
+- [plans/2026-05-01-005-async-rendering-r0-inventory.md](plans/2026-05-01-005-async-rendering-r0-inventory.md)
+  records the R0 diagnostics and composed-runtime coverage checkpoint for
+  restarting async cancellation work.
+- [plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md](plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md)
+  is the design-approved Option 3 implementation plan for draft frame-head
+  transactions, prepared-frame abort proof, and queued-tail cancellation.
 
 ## Code Anchors
 
