@@ -51,15 +51,16 @@ Active design proposals that are still shaping decisions:
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
 - [proposals/layout/BEHAVIOUR_FINDINGS.md](proposals/layout/BEHAVIOUR_FINDINGS.md) — behaviour-test findings from the layouts example
 
-Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`active`, `design-approved`, or `shipped`). Current active plans:
+Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
-- [plans/2026-05-01-001-layout-dependent-content-realization-plan.md](plans/2026-05-01-001-layout-dependent-content-realization-plan.md) —
-  generalized layout-time content realization for `GeometryReader`, geometry
-  preferences, and measurement-dependent containers
+- [plans/2026-05-01-002-public-anchor-geometry-preferences-plan.md](plans/2026-05-01-002-public-anchor-geometry-preferences-plan.md) —
+  public anchor tokens, anchor preferences, `GeometryProxy` anchor resolution,
+  and geometry-bound preference overlays
 - [plans/2026-04-28-001-canvas-adaptation-plan.md](plans/2026-04-28-001-canvas-adaptation-plan.md) — extending Canvas for dense pixel grids, half-block rendering, and optional sub-cell pointer precision
 
 Implementation and post-mortem records retained for context:
 
+- [plans/2026-05-01-001-layout-dependent-content-realization-plan.md](plans/2026-05-01-001-layout-dependent-content-realization-plan.md) — shipped generalized layout-time content realization for `GeometryReader`, geometry preferences, and measurement-dependent containers
 - [proposals/ASYNC_PRESENTATION.md](proposals/ASYNC_PRESENTATION.md) — POSIX terminal writer offload
 - [proposals/OFF_MAIN_PIPELINE_RENDERING.md](proposals/OFF_MAIN_PIPELINE_RENDERING.md) — guarded frame-tail worker implementation record
 - [proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md](proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md) — `SendableLayout` worker migration
