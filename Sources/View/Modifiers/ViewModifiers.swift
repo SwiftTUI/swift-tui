@@ -795,6 +795,9 @@ public struct SafeAreaPaddingModifier: PrimitiveViewModifier {
         context.child(component: .named("content")),
         insetBy: appliedInsets
       )
+      .transformingEnvironment(\.terminalSizeAppliedSafeAreaInsets) { insets in
+        insets = insets.adding(appliedInsets)
+      }
       .transformingEnvironment(\.safeAreaInsets) { safeAreaInsets in
         safeAreaInsets = safeAreaInsets.adding(appliedInsets)
       }
@@ -821,9 +824,17 @@ public struct IgnoreSafeAreaModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     let reclaimedInsets = context.environmentValues.safeAreaInsets.masked(to: edges)
+    let terminalSizeInsets = context.environmentValues.terminalSizeAppliedSafeAreaInsets.masked(
+      to: edges
+    )
     let contentContext =
-      context
-      .child(component: .named("content"))
+      contextOutsettingTerminalSize(
+        context.child(component: .named("content")),
+        by: terminalSizeInsets
+      )
+      .transformingEnvironment(\.terminalSizeAppliedSafeAreaInsets) { insets in
+        insets = insets.zeroing(edges)
+      }
       .transformingEnvironment(\.safeAreaInsets) { safeAreaInsets in
         safeAreaInsets = safeAreaInsets.zeroing(edges)
       }
@@ -1209,6 +1220,27 @@ private func contextWithTerminalSize(
   let resolvedSize = CellSize(
     width: max(0, currentSize.width - insets.horizontal),
     height: max(0, currentSize.height - insets.vertical)
+  )
+
+  guard resolvedSize != currentSize else {
+    return context
+  }
+
+  return context.settingEnvironment(\.terminalSize, to: resolvedSize)
+}
+
+private func contextOutsettingTerminalSize(
+  _ context: ResolveContext,
+  by insets: EdgeInsets
+) -> ResolveContext {
+  guard !insets.isZero else {
+    return context
+  }
+
+  let currentSize = context.environmentValues.terminalSize
+  let resolvedSize = CellSize(
+    width: max(0, currentSize.width + insets.horizontal),
+    height: max(0, currentSize.height + insets.vertical)
   )
 
   guard resolvedSize != currentSize else {

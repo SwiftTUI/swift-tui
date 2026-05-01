@@ -43,7 +43,9 @@ struct SafeAreaSurfaceTests {
   func ignoresSafeAreaReclaimsSelectedEdgesAndZeroesGeometry() throws {
     let artifacts = render(
       GeometryReader { proxy in
-        Text("safe \(proxy.safeAreaInsets.top),\(proxy.safeAreaInsets.leading)")
+        Text(
+          "size \(proxy.size.width)x\(proxy.size.height) safe \(proxy.safeAreaInsets.top),\(proxy.safeAreaInsets.leading)"
+        )
       }
       .ignoresSafeArea([.top, .leading]),
       terminalSize: .init(width: 20, height: 8),
@@ -53,7 +55,43 @@ struct SafeAreaSurfaceTests {
     let ignoreWrapper = try #require(artifacts.placedTree.children.first)
     let content = try #require(ignoreWrapper.children.first)
     #expect(content.bounds.origin == .init(x: 0, y: 0))
-    #expect(artifacts.rasterSurface.lines.contains("safe 0,0"))
+    #expect(
+      artifacts.rasterSurface.lines.contains { line in
+        line.contains("size 20x8 safe 0,0")
+      }
+    )
+  }
+
+  @Test("ignoresSafeArea restores safeAreaPadding-tightened GeometryReader size")
+  func ignoresSafeAreaRestoresSafeAreaPaddingTightenedGeometrySize() throws {
+    let artifacts = render(
+      GeometryReader { proxy in
+        Text(proxy.size == CellSize(width: 20, height: 8) ? "Y" : "N")
+      }
+      .ignoresSafeArea([.top, .leading])
+      .safeAreaPadding([.top, .leading]),
+      terminalSize: .init(width: 20, height: 8),
+      safeAreaInsets: .init(top: 1, leading: 2, bottom: 0, trailing: 0)
+    )
+
+    #expect(artifacts.rasterSurface.lines.contains { $0.contains("Y") })
+    #expect(!artifacts.rasterSurface.lines.contains { $0.contains("N") })
+  }
+
+  @Test("ignoresSafeArea restores only selected safeAreaPadding geometry edges")
+  func ignoresSafeAreaRestoresOnlySelectedSafeAreaPaddingGeometryEdges() throws {
+    let artifacts = render(
+      GeometryReader { proxy in
+        Text(proxy.size == CellSize(width: 18, height: 8) ? "Y" : "N")
+      }
+      .ignoresSafeArea(.top)
+      .safeAreaPadding([.top, .leading]),
+      terminalSize: .init(width: 20, height: 8),
+      safeAreaInsets: .init(top: 1, leading: 2, bottom: 0, trailing: 0)
+    )
+
+    #expect(artifacts.rasterSurface.lines.contains { $0.contains("Y") })
+    #expect(!artifacts.rasterSurface.lines.contains { $0.contains("N") })
   }
 
   @Test("safeAreaPadding adds safe-area-derived layout space on selected edges")
