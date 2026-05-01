@@ -57,6 +57,8 @@ Dated, agent-executable implementation plans live in [`plans/`](plans/), front-m
 
 Implementation and post-mortem records retained for context:
 
+- [plans/2026-05-01-004-layout-dependent-container-hardening-plan.md](plans/2026-05-01-004-layout-dependent-container-hardening-plan.md) — shipped hardening record for layout-dependent container geometry tests and docs
+- [plans/2026-05-01-003-layout-dependent-container-audit.md](plans/2026-05-01-003-layout-dependent-container-audit.md) — audit of `safeAreaInset`, `ScrollView`, `ViewThatFits`, lazy stacks, and custom `Layout` for remaining resolve-time local-geometry assumptions
 - [plans/2026-05-01-002-public-anchor-geometry-preferences-plan.md](plans/2026-05-01-002-public-anchor-geometry-preferences-plan.md) — shipped public anchor tokens, anchor preferences, `GeometryProxy` anchor resolution, and geometry-bound preference overlays
 - [plans/2026-05-01-001-layout-dependent-content-realization-plan.md](plans/2026-05-01-001-layout-dependent-content-realization-plan.md) — shipped generalized layout-time content realization for `GeometryReader`, geometry preferences, and measurement-dependent containers
 - [proposals/ASYNC_PRESENTATION.md](proposals/ASYNC_PRESENTATION.md) — POSIX terminal writer offload
