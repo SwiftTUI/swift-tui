@@ -1,6 +1,6 @@
 ---
 title: "audit: layout-dependent container geometry assumptions"
-type: audit
+type: fix
 status: shipped
 date: 2026-05-01
 depends_on:
