@@ -984,6 +984,59 @@ struct AsyncFrameTailRenderingTests {
     }
   }
 
+  @Test("RunLoop.run dispatches frame-head scaffold registrations")
+  func runLoopRunDispatchesFrameHeadScaffoldRegistrations() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadRunLoopScaffoldRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let inputReader = InjectedTerminalInputReader()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: DefaultRenderer(),
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: AsyncFrameHeadAbortScaffoldState(),
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: terminal.proposal,
+      viewBuilder: { state, _ in
+        AsyncFrameHeadAbortScaffoldView(
+          state: state,
+          recorder: recorder
+        )
+      }
+    )
+
+    let runTask = Task {
+      try await runLoop.run()
+    }
+
+    try await waitUntil {
+      !terminal.frames.isEmpty
+        && runLoop.focusTracker.currentFocusIdentity != nil
+    }
+
+    inputReader.send(.key(.space))
+    inputReader.send(.key(.character("a"), modifiers: .ctrl))
+    inputReader.send(.paste(PasteEvent(content: "/tmp/frame-head-run-loop.txt")))
+    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.finish()
+
+    let result = try await valueWithTimeout {
+      try await runTask.value
+    }
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(recorder.events.contains("action"))
+    #expect(recorder.events.contains("change:true"))
+    #expect(recorder.events.contains("key-command"))
+    #expect(recorder.events.contains("drop:1"))
+  }
+
   @Test("blocked async frame head defers animation completion until commit")
   func blockedAsyncFrameHeadDefersAnimationCompletionUntilCommit() async throws {
     let rootIdentity = testIdentity("AsyncFrameHeadAnimationCompletionRoot")
