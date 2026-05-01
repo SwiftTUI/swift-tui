@@ -28,7 +28,11 @@ Current async presentation and frame-tail worker ownership is summarized in
 - Layout and containers including `VStack`, `HStack`, `LazyVStack`, `LazyHStack`, `ZStack`, `ScrollView`, `List`, `OutlineGroup`, `Table`, `Section`, `ViewThatFits`, `GeometryReader`, and custom `Layout`, with `LazyVStack` and `LazyHStack` supporting viewport-lazy placement and single-`ForEach` full-lazy rows
 - Controls and primitives including `Text`, proposal-aware `TextFigure` backed by embedded FIGlet fonts, rich `Text` interpolation, `Link`, `Button`, `Toggle`, `Stepper`, `Slider`, `TextField`, `TextEditor`, `SecureField`, `DisclosureGroup`, `Picker`, `Menu`, determinate and indeterminate `ProgressView`, `Label`, `LabeledContent`, `GroupBox`, `ControlGroup`, `Spacer`, `Divider`, and shapes
 - `Image` backed by PNG, baseline JPEG, and GIF (first frame for animated GIFs), with named-resource, local-file-URL, and embedded-byte sources plus `.resizable()`, `.scaledToFit()`, and `.scaledToFill()`. Format is detected from magic bytes, so the `data(_:)` / `jpegData(_:)` / `gifData(_:)` initializers all accept any supported format.
-- Environment, observation, and focus including `@State`, `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`, `@FocusedValue`, `@FocusedBinding`, `PreferenceKey`, subtree preference readers, `OpenLinkAction`, actor-context-aware `.task(...)`, and default-focus modifiers
+- Environment, observation, focus, and preferences including `@State`,
+  `@Binding`, repo-owned `@Bindable`, `@FocusState`, `FocusedValues`,
+  `@FocusedValue`, `@FocusedBinding`, `PreferenceKey`, subtree preference
+  readers, anchor preferences, `OpenLinkAction`, actor-context-aware
+  `.task(...)`, and default-focus modifiers
 - Presentation and workflow surfaces including terminal-native `alert`, `confirmationDialog`, `sheet`, `toast`
 
 ### Runtime surface
@@ -72,8 +76,6 @@ Current async presentation and frame-tail worker ownership is summarized in
 - Some focus surfaces remain missing:
   - namespace-scoped default-focus APIs such as `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus`
   - object-focused wrappers such as `@FocusedObject`
-- Some geometry-bound preference surfaces are deferred:
-  - anchor-based preference APIs such as `anchorPreference(...)` and `transformAnchorPreference(...)` until local coordinate spaces and anchor resolution ship
 - Some higher-level workflow surfaces are unsettled:
   - richer multiline editing behaviors beyond the current `TextEditor`
 - Some internal lowering seams remain package-only for runtime plumbing and tests:

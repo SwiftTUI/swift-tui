@@ -7,6 +7,8 @@ public struct GeometryProxy: Equatable, Sendable {
   public var safeAreaInsets: EdgeInsets
   public var cellPixelMetrics: CellPixelMetrics
   public var pointerInputCapabilities: PointerInputCapabilities
+  package var bounds: CellRect
+  package var placedFrameTable: PlacedFrameTable
 
   public init(
     size: CellSize,
@@ -18,6 +20,85 @@ public struct GeometryProxy: Equatable, Sendable {
     self.safeAreaInsets = safeAreaInsets
     self.cellPixelMetrics = cellPixelMetrics
     self.pointerInputCapabilities = pointerInputCapabilities
+    bounds = CellRect(origin: .zero, size: size)
+    placedFrameTable = .init()
+  }
+
+  package init(
+    bounds: CellRect,
+    safeAreaInsets: EdgeInsets = .zero,
+    cellPixelMetrics: CellPixelMetrics = .estimated,
+    pointerInputCapabilities: PointerInputCapabilities = .cellOnly,
+    placedFrameTable: PlacedFrameTable = .init()
+  ) {
+    size = bounds.size
+    self.safeAreaInsets = safeAreaInsets
+    self.cellPixelMetrics = cellPixelMetrics
+    self.pointerInputCapabilities = pointerInputCapabilities
+    self.bounds = bounds
+    self.placedFrameTable = placedFrameTable
+  }
+
+  /// Returns this geometry scope's frame in the supplied coordinate space.
+  public func frame(
+    in coordinateSpace: CoordinateSpace
+  ) -> Rect {
+    coordinateSpace.resolve(
+      terminalRect: bounds.continuous,
+      targetRect: bounds,
+      namedCoordinateSpaces: placedFrameTable.namedCoordinateSpaces
+    )
+  }
+
+  /// Resolves a bounds anchor in this proxy's local coordinate space.
+  public subscript(anchor: Anchor<Rect>) -> Rect {
+    guard let sourceFrame = placedFrameTable.frame(for: anchor.payload.identity) else {
+      return .zero
+    }
+
+    switch anchor.payload.kind {
+    case .bounds:
+      return localRect(sourceFrame.continuous)
+    case .point:
+      return .zero
+    }
+  }
+
+  /// Resolves a point anchor in this proxy's local coordinate space.
+  public subscript(anchor: Anchor<Point>) -> Point {
+    guard let sourceFrame = placedFrameTable.frame(for: anchor.payload.identity) else {
+      return .zero
+    }
+
+    switch anchor.payload.kind {
+    case .bounds:
+      return .zero
+    case .point(let unitPoint):
+      return localPoint(
+        Point(
+          x: Double(sourceFrame.origin.x) + Double(sourceFrame.size.width) * unitPoint.x,
+          y: Double(sourceFrame.origin.y) + Double(sourceFrame.size.height) * unitPoint.y
+        )
+      )
+    }
+  }
+
+  private func localRect(
+    _ rect: Rect
+  ) -> Rect {
+    Rect(
+      origin: localPoint(rect.origin),
+      size: rect.size
+    )
+  }
+
+  private func localPoint(
+    _ point: Point
+  ) -> Point {
+    Point(
+      x: point.x - Double(bounds.origin.x),
+      y: point.y - Double(bounds.origin.y)
+    )
   }
 }
 
@@ -86,10 +167,11 @@ private final class GeometryReaderLayoutDependentContent<Content: View>:
     in realizationContext: LayoutRealizationContext
   ) -> [ResolvedNode] {
     let proxy = GeometryProxy(
-      size: realizationContext.bounds.size,
+      bounds: realizationContext.bounds,
       safeAreaInsets: realizationContext.safeAreaInsets,
       cellPixelMetrics: realizationContext.cellPixelMetrics,
-      pointerInputCapabilities: realizationContext.pointerInputCapabilities
+      pointerInputCapabilities: realizationContext.pointerInputCapabilities,
+      placedFrameTable: realizationContext.placedFrameTable
     )
     let view = withAuthoringContext(authoringContext) {
       ViewNodeContext.withCurrentValue(authoringContext?.viewNode) {

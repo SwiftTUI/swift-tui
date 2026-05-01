@@ -460,6 +460,7 @@ package final class LayoutPassContext: Sendable {
     var workMetrics: LayoutWorkMetrics
     var workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
     var layoutDependentRealizations: [LayoutDependentContentRealization]
+    var placedFrameTable: PlacedFrameTable
   }
 
   package let retainedLayout: RetainedLayoutSession?
@@ -478,7 +479,8 @@ package final class LayoutPassContext: Sendable {
         scrollViewportContext: scrollViewportContext,
         workMetrics: .init(),
         workerCustomLayoutCacheUpdates: [],
-        layoutDependentRealizations: []
+        layoutDependentRealizations: [],
+        placedFrameTable: .init()
       )
     )
   }
@@ -503,6 +505,10 @@ package final class LayoutPassContext: Sendable {
     }
   }
 
+  package var placedFrameTable: PlacedFrameTable {
+    state.withLock { $0.placedFrameTable }
+  }
+
   package func updateWorkMetrics(
     _ update: (inout LayoutWorkMetrics) -> Void
   ) {
@@ -513,6 +519,55 @@ package final class LayoutPassContext: Sendable {
     _ update: WorkerCustomLayoutCacheUpdate
   ) {
     state.withLock { $0.workerCustomLayoutCacheUpdates.append(update) }
+  }
+
+  package func recordPlacedFrame(
+    identity: Identity,
+    bounds: CellRect,
+    namedCoordinateSpaceName: String?
+  ) {
+    state.withLock {
+      $0.placedFrameTable.record(
+        identity: identity,
+        bounds: bounds,
+        namedCoordinateSpaceName: namedCoordinateSpaceName
+      )
+    }
+  }
+
+  package func recordPlacedFrames(
+    in node: PlacedNode
+  ) {
+    state.withLock {
+      $0.placedFrameTable.record(
+        identity: node.identity,
+        bounds: node.bounds,
+        namedCoordinateSpaceName: node.semanticMetadata.namedCoordinateSpaceName
+      )
+      for child in node.children {
+        Self.recordPlacedFrames(
+          in: child,
+          table: &$0.placedFrameTable
+        )
+      }
+    }
+  }
+
+  private static func recordPlacedFrames(
+    in node: PlacedNode,
+    table: inout PlacedFrameTable
+  ) {
+    table.record(
+      identity: node.identity,
+      bounds: node.bounds,
+      namedCoordinateSpaceName: node.semanticMetadata.namedCoordinateSpaceName
+    )
+    for child in node.children {
+      recordPlacedFrames(
+        in: child,
+        table: &table
+      )
+    }
   }
 
   package func realizeLayoutDependentContent(

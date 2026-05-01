@@ -25,6 +25,35 @@ extension View {
     )
   }
 
+  /// Stores a geometry anchor preference for the modified view.
+  public func anchorPreference<Key: PreferenceKey, Value: Sendable>(
+    key: Key.Type = Key.self,
+    value: AnchorSource<Value>,
+    transform: @escaping (Anchor<Value>) -> Key.Value
+  ) -> some View {
+    modifier(
+      AnchorPreferenceWritingModifier<Key, Value>(
+        source: value,
+        transform: transform
+      )
+    )
+  }
+
+  /// Applies an in-place transformation using a geometry anchor for the
+  /// modified view.
+  public func transformAnchorPreference<Key: PreferenceKey, Value: Sendable>(
+    _ key: Key.Type = Key.self,
+    value: AnchorSource<Value>,
+    transform: @escaping (inout Key.Value, Anchor<Value>) -> Void
+  ) -> some View {
+    modifier(
+      AnchorPreferenceTransformModifier<Key, Value>(
+        source: value,
+        transform: transform
+      )
+    )
+  }
+
   /// Performs an action when a preference value changes across rendered frames.
   public func onPreferenceChange<Key: PreferenceKey>(
     _ key: Key.Type = Key.self,
@@ -63,6 +92,51 @@ extension View {
         transform: transform
       )
     )
+  }
+}
+
+public struct AnchorPreferenceWritingModifier<Key: PreferenceKey, Value: Sendable>:
+  PrimitiveViewModifier
+{
+  var source: AnchorSource<Value>
+  var transform: (Anchor<Value>) -> Key.Value
+
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    var node = content.resolve(in: context)
+    let anchor = Anchor<Value>(
+      identity: node.identity,
+      kind: source.kind
+    )
+    node.preferenceValues.merge(
+      Key.self,
+      value: transform(anchor)
+    )
+    return [node]
+  }
+}
+
+public struct AnchorPreferenceTransformModifier<Key: PreferenceKey, Value: Sendable>:
+  PrimitiveViewModifier
+{
+  var source: AnchorSource<Value>
+  var transform: (inout Key.Value, Anchor<Value>) -> Void
+
+  package func resolve<Base: View>(
+    content: ModifierContentInputs<Base>,
+    in context: ResolveContext
+  ) -> [ResolvedNode] {
+    var node = content.resolve(in: context)
+    let anchor = Anchor<Value>(
+      identity: node.identity,
+      kind: source.kind
+    )
+    node.preferenceValues.transform(Key.self) { value in
+      transform(&value, anchor)
+    }
+    return [node]
   }
 }
 

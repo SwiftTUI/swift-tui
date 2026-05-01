@@ -399,6 +399,21 @@ extension LayoutEngine {
         for: resolved.children[primaryIndex],
         measured: measured.childMeasurements[primaryIndex]
       )
+      let primaryOrigin = alignedOrigin(
+        for: primaryDimensions,
+        referenceDimensions: primaryDimensions,
+        in: bounds,
+        alignment: alignment
+      )
+      passContext?.recordPlacedFrame(
+        identity: resolved.children[primaryIndex].identity,
+        bounds: CellRect(
+          origin: primaryOrigin,
+          size: measured.childMeasurements[primaryIndex].measuredSize
+        ),
+        namedCoordinateSpaceName: resolved.children[primaryIndex]
+          .semanticMetadata.namedCoordinateSpaceName
+      )
 
       return measured.childMeasurements.enumerated().map { index, childMeasurement in
         let childDimensions = viewDimensions(
@@ -465,7 +480,8 @@ extension LayoutEngine {
       bounds: bounds,
       safeAreaInsets: boundary.safeAreaInsets,
       cellPixelMetrics: boundary.cellPixelMetrics,
-      pointerInputCapabilities: boundary.pointerInputCapabilities
+      pointerInputCapabilities: boundary.pointerInputCapabilities,
+      placedFrameTable: passContext?.placedFrameTable ?? .init()
     )
     let realizedChildren =
       passContext?.realizeLayoutDependentContent(

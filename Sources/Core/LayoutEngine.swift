@@ -410,12 +410,19 @@ public struct LayoutEngine: Sendable {
       passContext?.updateWorkMetrics {
         $0.placedNodesReused += retained.subtreeNodeCount
       }
+      passContext?.recordPlacedFrames(in: retained)
       return retained
     }
 
     passContext?.updateWorkMetrics {
       $0.placedNodesComputed += 1
     }
+
+    passContext?.recordPlacedFrame(
+      identity: resolved.identity,
+      bounds: bounds,
+      namedCoordinateSpaceName: resolved.semanticMetadata.namedCoordinateSpaceName
+    )
 
     let hasChildren =
       if resolved.layoutDependentContent != nil {
