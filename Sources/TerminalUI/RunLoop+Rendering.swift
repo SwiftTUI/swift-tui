@@ -274,6 +274,7 @@ extension RunLoop {
       if let diagnosticsLogger {
         let diag = artifacts.diagnostics
         let damageDiagnostics = diag.presentationDamage
+        let geometryDiagnostics = diag.geometryResolutionDiagnostics
         let cacheMetrics = diag.measurementCache
         let cacheHitRate: Double? =
           if let cacheMetrics, cacheMetrics.lookups > 0 {
@@ -316,6 +317,17 @@ extension RunLoop {
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
             firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
+            geometryAnchorResolutionMissCount: geometryDiagnostics.anchorResolutionMissCount,
+            firstGeometryAnchorResolutionMissIdentity: geometryDiagnostics
+              .firstAnchorResolutionMissIdentity?.path,
+            geometryMissingNamedCoordinateSpaceCount: geometryDiagnostics
+              .missingNamedCoordinateSpaceCount,
+            firstGeometryMissingNamedCoordinateSpaceName: geometryDiagnostics
+              .firstMissingNamedCoordinateSpaceName,
+            geometryDuplicateNamedCoordinateSpaceCount: geometryDiagnostics
+              .duplicateNamedCoordinateSpaceCount,
+            firstGeometryDuplicateNamedCoordinateSpaceName: geometryDiagnostics
+              .firstDuplicateNamedCoordinateSpaceName,
             staleFramePolicy: "commit_ordered",
             dropEligibilityBlockers: FrameDropEligibility.classify(artifacts).blockers,
             inputEventsQueuedDuringRenderSuspension:
@@ -571,6 +583,7 @@ extension RunLoop {
       if let diagnosticsLogger {
         let diag = artifacts.diagnostics
         let damageDiagnostics = diag.presentationDamage
+        let geometryDiagnostics = diag.geometryResolutionDiagnostics
         let cacheMetrics = diag.measurementCache
         let cacheHitRate: Double? =
           if let cacheMetrics, cacheMetrics.lookups > 0 {
@@ -613,6 +626,17 @@ extension RunLoop {
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
             firstCustomLayoutFallbackIdentity: diag.firstCustomLayoutFallbackIdentity?.path,
+            geometryAnchorResolutionMissCount: geometryDiagnostics.anchorResolutionMissCount,
+            firstGeometryAnchorResolutionMissIdentity: geometryDiagnostics
+              .firstAnchorResolutionMissIdentity?.path,
+            geometryMissingNamedCoordinateSpaceCount: geometryDiagnostics
+              .missingNamedCoordinateSpaceCount,
+            firstGeometryMissingNamedCoordinateSpaceName: geometryDiagnostics
+              .firstMissingNamedCoordinateSpaceName,
+            geometryDuplicateNamedCoordinateSpaceCount: geometryDiagnostics
+              .duplicateNamedCoordinateSpaceCount,
+            firstGeometryDuplicateNamedCoordinateSpaceName: geometryDiagnostics
+              .firstDuplicateNamedCoordinateSpaceName,
             staleFramePolicy: "commit_ordered",
             dropEligibilityBlockers: FrameDropEligibility.classify(artifacts).blockers,
             inputEventsQueuedDuringRenderSuspension:

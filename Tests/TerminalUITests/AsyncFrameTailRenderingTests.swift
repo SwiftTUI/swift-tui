@@ -268,6 +268,12 @@ struct AsyncFrameTailRenderingTests {
           && row["main_actor_suspended_ms"] != nil
           && row["custom_layout_fallbacks"] == "0"
           && row["first_custom_layout_fallback"] == "-"
+          && row["geometry_anchor_resolution_misses"] == "0"
+          && row["first_geometry_anchor_resolution_miss"] == "-"
+          && row["geometry_missing_named_coordinate_spaces"] == "0"
+          && row["first_geometry_missing_named_coordinate_space"] == "-"
+          && row["geometry_duplicate_named_coordinate_spaces"] == "0"
+          && row["first_geometry_duplicate_named_coordinate_space"] == "-"
           && row["stale_frame_policy"] == "commit_ordered"
           && row["desired_generation"] != nil
           && row["render_generation"] != nil
@@ -277,6 +283,88 @@ struct AsyncFrameTailRenderingTests {
           && row["raster_output_generation"] == row["render_generation"]
           && row["coalesced_event_batches"] != nil
           && row["coalesced_wake_causes"] != nil
+      })
+  }
+
+  @Test("runtime diagnostics logger records geometry resolution diagnostics")
+  func runtimeDiagnosticsLoggerRecordsGeometryResolutionDiagnostics() async throws {
+    let rootIdentity = testIdentity("RuntimeGeometryDiagnosticsRoot")
+    let missingAnchor = Anchor<Rect>(
+      identity: testIdentity("LoggedMissingAnchor"),
+      kind: .bounds
+    )
+    let inputReader = InjectedTerminalInputReader()
+    let terminal = AsyncFrameTailTerminalHost()
+    let diagnosticsURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-geometry-diagnostics-\(UUID().uuidString).tsv")
+    defer {
+      try? FileManager.default.removeItem(at: diagnosticsURL)
+    }
+
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: DefaultRenderer(),
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      keyHandler: { keyPress, _, _ in
+        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+          return .exit(.userExit(keyPress))
+        }
+        return .ignored
+      },
+      proposal: terminal.proposal,
+      viewBuilder: { _, _ in
+        VStack(alignment: .leading, spacing: 0) {
+          Text("First")
+            .frame(width: 10, height: 1)
+            .coordinateSpace(name: "board")
+          Text("Second")
+            .frame(width: 10, height: 1)
+            .coordinateSpace(name: "board")
+          GeometryReader { proxy in
+            let missingFrame = proxy.frame(in: .named("missing-space"))
+            let missingRect = proxy[missingAnchor]
+            Text(
+              "geometry \(Int(missingFrame.origin.x)) "
+                + "\(Int(missingRect.size.width))"
+            )
+          }
+          .frame(width: 20, height: 1)
+        }
+      }
+    )
+    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
+    #expect(runLoop.diagnosticsLogger != nil)
+
+    let runTask = Task {
+      try await runLoop.run()
+    }
+
+    try await waitUntil {
+      terminal.frames.contains { $0.contains("geometry") }
+    }
+
+    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.finish()
+
+    let result = try await valueWithTimeout {
+      try await runTask.value
+    }
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+
+    let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
+    let rows = diagnosticRows(diagnostics)
+    #expect(
+      rows.contains { row in
+        row["geometry_anchor_resolution_misses"] == "1"
+          && row["first_geometry_anchor_resolution_miss"] == "LoggedMissingAnchor"
+          && row["geometry_missing_named_coordinate_spaces"] == "1"
+          && row["first_geometry_missing_named_coordinate_space"] == "missing-space"
+          && row["geometry_duplicate_named_coordinate_spaces"] == "1"
+          && row["first_geometry_duplicate_named_coordinate_space"] == "board"
       })
   }
 
