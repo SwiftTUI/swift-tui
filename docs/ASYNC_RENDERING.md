@@ -76,6 +76,142 @@ Completed worker results are classified conservatively by the observational
 `FrameDropEligibility` helper, but they are not dropped as visual-only frames.
 The default and only runtime policy is still `mustCommit`.
 
+## Next Tranche Boundary
+
+The next pipeline-split tranche is a conservative cancellation tranche, not a
+restart of broad frame-head abort work and not completed-frame dropping.
+
+For this document, "pipeline split" means making the existing
+prepare-tail-finish seam precise enough that a prepared frame can be discarded
+only when its worker tail has not started. It does not mean moving `resolve`
+off the main actor, allowing multiple concurrent renders against one
+`DefaultRenderer`, or presenting newer state ahead of started/completed tail
+work.
+
+Keep these terms separate while implementing:
+
+- **Render intent**: scheduler/run-loop demand for a new frame. Coalescing
+  not-yet-started render intent has shipped.
+- **Frame head**: main-actor resolve, observation, registration collection,
+  animation interpolation, and tail-input preparation. Today this is split from
+  frame finish, but it is not generally abortable.
+- **Tail job**: the measure/place through raster work submitted to
+  `FrameTailRenderer`.
+- **Pre-start tail cancellation**: cancelling a queued tail job before the
+  worker begins layout. This still requires the corresponding frame head to be
+  draft-only or safely abortable because the frame head has already run.
+- **Started/completed tail work**: any tail job whose worker has begun layout
+  or returned output. These frames must still finish and commit in order.
+
+The implementation order for the next tranche should therefore be:
+
+1. Rebaseline diagnostics and runtime-path coverage with no behavior change.
+2. Make frame-head side effects draft-only or abortable enough for queued-tail
+   cancellation.
+3. Add dequeue-time cancellation for queued tail jobs only.
+4. Preserve ordered commit for every started or completed tail job.
+
+Do not skip directly to cancellable `FrameTailRenderer` submissions unless the
+frame-head abort/draft proof is already in place.
+
+### Required Evidence Before Behavior Changes
+
+Before changing runtime behavior, capture a short diagnostics inventory from
+real examples. At minimum, record gallery and layouts runs with
+`TERMUI_DIAGNOSTICS`:
+
+```bash
+cd Examples/gallery
+TERMUI_DIAGNOSTICS=/tmp/gallery-termui-diagnostics.tsv swiftly run swift run gallery-demo
+
+cd ../layouts
+TERMUI_DIAGNOSTICS=/tmp/layouts-termui-diagnostics.tsv swiftly run swift run layouts-demo
+```
+
+Summarize the columns that explain cancellation pressure:
+
+- `main_actor_blocked_ms`
+- `main_actor_suspended_ms`
+- `worker_layout_enqueue_ms`
+- `worker_layout_compute_ms`
+- `worker_raster_enqueue_ms`
+- `worker_raster_compute_ms`
+- `coalesced_intent_requests`
+- `coalesced_event_batches`
+- `drop_blockers`
+- `stale_frame_policy`
+
+The inventory should answer two questions:
+
+- Are input bursts or worker queue delays creating stale-generation pressure?
+- Which blockers keep the current frames on the ordered-commit path?
+
+Use that inventory to choose tests and scenarios. It is not enough to add a
+renderer-only unit test for this tranche; the failure mode from the reverted
+attempt appeared in the composed terminal runtime path.
+
+### Frame-Head Direction
+
+Prefer draft-only effects over broad checkpoint/restore. The reverted attempt
+failed because it restored live runtime registries from per-frame draft
+registries, which only represented the dirty frontier and cache hits walked by
+that frame. If live registries must be rebuilt, rebuild them from the committed
+`ViewGraph` and committed `NodeHandlers`/aliases, not from the draft registry.
+
+Frame-head work must keep these effects out of live state until finish, or
+prove rollback with focused tests:
+
+- runtime action, key, pointer, gesture, focus, scroll, command, drop, and
+  preference-observation registrations;
+- lifecycle and task commit effects;
+- animation completion closures;
+- retained tail inputs and worker custom-layout cache updates;
+- `ViewGraph` invalidation, dirty evaluation, and alias restoration.
+
+The minimum proof is:
+
+- prepare then abort a broad reset-shaped frame head;
+- prepare then abort a selective dirty-frontier frame head with untouched
+  siblings and aliases;
+- run a fresh normal render afterward and verify artifacts and live
+  registrations match the no-abort path;
+- exercise the async `RunLoop.run()` path for gallery tab clicks, ScrollView
+  indicator click/drag, pointer scroll bursts, key-command dispatch,
+  drop-destination dispatch, focus sync, and lazy ScrollView content.
+
+Manual gallery validation remains part of the acceptance bar for this tranche:
+scroll a tab, click a button, drag a slider, and compare against current `main`
+behavior before merging.
+
+### Tail-Cancellation Direction
+
+Once the frame head can be safely discarded, `FrameTailRenderer` may gain an
+explicit queued/started/completed state. The dequeue boundary is the only
+cancellation point:
+
+- `queued`: may cancel if superseded by a newer desired generation before the
+  worker starts.
+- `started`: must finish and commit in order.
+- `completed`: must finish and commit in order.
+- `cancelled-before-start`: abort the corresponding frame head and prepare the
+  newest generation.
+
+Diagnostics should distinguish pressure from behavior. Existing fields such as
+`coalesced_event_batches` and `coalesced_intent_requests` measure queued input
+and avoided renders; new cancellation fields should measure actual queued-tail
+cancellations. Add new fields before enabling cancellation:
+
+- `tail_job_state`
+- `tail_cancel_reason`
+- `cancelled_render_count`
+- `newest_desired_at_tail_start`
+- `newest_desired_at_tail_result`
+- `stale_frame_policy=cancel_pending_before_start`
+
+The TSV policy should remain `stale_frame_policy=commit_ordered` until the
+runtime actually cancels a queued tail job. Started/completed tail jobs must
+continue to report and follow ordered commit.
+
 ## Proposal To Resume Work
 
 Restart the async pipeline work as a safety-first tranche, not as a replay of the
