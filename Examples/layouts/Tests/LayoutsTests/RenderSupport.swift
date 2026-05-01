@@ -19,7 +19,7 @@ func render(
   var env = EnvironmentValues()
   env.terminalSize = CellSize(width: width, height: height)
   return DefaultRenderer().render(
-    view,
+    AnyView(view),
     context: ResolveContext(
       identity: Identity(components: ["layouts.behaviour.\(id)"]),
       environmentValues: env
@@ -38,7 +38,7 @@ func renderAsync(
   var env = EnvironmentValues()
   env.terminalSize = CellSize(width: width, height: height)
   return await DefaultRenderer().renderAsync(
-    view,
+    AnyView(view),
     context: ResolveContext(
       identity: Identity(components: ["layouts.behaviour.\(id)"]),
       environmentValues: env

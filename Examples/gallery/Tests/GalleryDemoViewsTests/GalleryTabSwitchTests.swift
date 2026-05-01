@@ -36,29 +36,25 @@ struct GalleryTabSwitchTests {
   func clickingGalleryTabSwitchesSelection() async throws {
     let terminalSize = CellSize(width: 80, height: 24)
     let rootIdentity = Identity(components: [.named("GalleryTabSwitchClickTest")])
-    let view = GalleryView()
-
-    var env = EnvironmentValues()
-    env.terminalSize = terminalSize
-    let initial = DefaultRenderer().render(
-      view,
-      context: .init(identity: rootIdentity, environmentValues: env),
-      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    let todoClickCenter = try Self.centerOfText(
+      "Todo",
+      in: GalleryView(),
+      terminalSize: terminalSize,
+      rootIdentity: Identity(components: [
+        .named("GalleryTabSwitchClickTest.BoundsProbe")
+      ])
     )
-
-    let todoBounds = try #require(Self.boundsOfText("Todo", in: initial.placedTree))
-    let clickCenter = Self.centerPoint(of: todoBounds)
 
     let host = GalleryTabSwitchRecordingHost(size: terminalSize)
     _ = try await Self.runHarness(
       host: host,
       terminalSize: terminalSize,
       events: [
-        .mouse(.init(kind: .down(.primary), location: clickCenter)),
-        .mouse(.init(kind: .up(.primary), location: clickCenter)),
+        .mouse(.init(kind: .down(.primary), location: todoClickCenter)),
+        .mouse(.init(kind: .up(.primary), location: todoClickCenter)),
       ],
       rootIdentity: rootIdentity,
-      viewBuilder: { view }
+      viewBuilder: { GalleryView() }
     )
 
     let lastPresented = try #require(host.lastPresentedSurface)
@@ -73,28 +69,23 @@ struct GalleryTabSwitchTests {
   func deletingTopTodoRowKeepsTodoSelected() async throws {
     let terminalSize = CellSize(width: 80, height: 24)
     let rootIdentity = Identity(components: [.named("GalleryTodoDeleteSelectionRegression")])
-    let view = GallerySelectionSeedHarness(initialSelection: .counter)
-
-    var env = EnvironmentValues()
-    env.terminalSize = terminalSize
-    let initial = DefaultRenderer().render(
-      view,
-      context: .init(identity: rootIdentity, environmentValues: env),
-      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    let todoClickCenter = try Self.centerOfText(
+      "Todo",
+      in: GallerySelectionSeedHarness(initialSelection: .counter),
+      terminalSize: terminalSize,
+      rootIdentity: Identity(
+        components: [.named("GalleryTodoDeleteSelectionRegression.TodoBoundsProbe")]
+      )
     )
-
-    let todoBounds = try #require(Self.boundsOfText("Todo", in: initial.placedTree))
-    let todoClickCenter = Self.centerPoint(of: todoBounds)
-
-    let todoSelected = DefaultRenderer().render(
-      GallerySelectionSeedHarness(initialSelection: .todo),
-      context: .init(identity: rootIdentity, environmentValues: env),
-      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    let deleteClickCenter = try Self.centerOfText(
+      "×",
+      in: GallerySelectionSeedHarness(initialSelection: .todo),
+      terminalSize: terminalSize,
+      rootIdentity: Identity(
+        components: [.named("GalleryTodoDeleteSelectionRegression.DeleteBoundsProbe")]
+      ),
+      chooseTopMost: true
     )
-    let deleteBounds = try #require(
-      Self.boundsOfText("×", in: todoSelected.placedTree, chooseTopMost: true)
-    )
-    let deleteClickCenter = Self.centerPoint(of: deleteBounds)
 
     let host = GalleryTabSwitchRecordingHost(size: terminalSize)
     _ = try await Self.runHarness(
@@ -107,7 +98,7 @@ struct GalleryTabSwitchTests {
         .mouse(.init(kind: .up(.primary), location: deleteClickCenter)),
       ],
       rootIdentity: rootIdentity,
-      viewBuilder: { view }
+      viewBuilder: { GallerySelectionSeedHarness(initialSelection: .counter) }
     )
 
     let surface = try #require(host.lastPresentedSurface).lines.joined(separator: "\n")
@@ -121,28 +112,23 @@ struct GalleryTabSwitchTests {
   func realTerminalHostDeletingTopTodoRowKeepsTodoVisible() async throws {
     let terminalSize = CellSize(width: 80, height: 24)
     let rootIdentity = Identity(components: [.named("GalleryTodoDeleteRealTerminalHost")])
-    let view = GallerySelectionSeedHarness(initialSelection: .counter)
-
-    var env = EnvironmentValues()
-    env.terminalSize = terminalSize
-    let initial = DefaultRenderer().render(
-      view,
-      context: .init(identity: rootIdentity, environmentValues: env),
-      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    let todoClickCenter = try Self.centerOfText(
+      "Todo",
+      in: GallerySelectionSeedHarness(initialSelection: .counter),
+      terminalSize: terminalSize,
+      rootIdentity: Identity(components: [
+        .named("GalleryTodoDeleteRealTerminalHost.TodoBoundsProbe")
+      ])
     )
-
-    let todoBounds = try #require(Self.boundsOfText("Todo", in: initial.placedTree))
-    let todoClickCenter = Self.centerPoint(of: todoBounds)
-
-    let todoSelected = DefaultRenderer().render(
-      GallerySelectionSeedHarness(initialSelection: .todo),
-      context: .init(identity: rootIdentity, environmentValues: env),
-      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    let deleteClickCenter = try Self.centerOfText(
+      "×",
+      in: GallerySelectionSeedHarness(initialSelection: .todo),
+      terminalSize: terminalSize,
+      rootIdentity: Identity(
+        components: [.named("GalleryTodoDeleteRealTerminalHost.DeleteBoundsProbe")]
+      ),
+      chooseTopMost: true
     )
-    let deleteBounds = try #require(
-      Self.boundsOfText("×", in: todoSelected.placedTree, chooseTopMost: true)
-    )
-    let deleteClickCenter = Self.centerPoint(of: deleteBounds)
 
     let pty = try #require(Self.makePseudoTerminal(size: terminalSize))
     defer {
@@ -164,7 +150,7 @@ struct GalleryTabSwitchTests {
         terminalInputReader: inputReader,
         terminalSize: terminalSize,
         rootIdentity: rootIdentity,
-        viewBuilder: { view }
+        viewBuilder: { GallerySelectionSeedHarness(initialSelection: .counter) }
       )
     }
 
@@ -307,28 +293,23 @@ struct GalleryTabSwitchTests {
   @Test("scene-hosted gallery stays on Todo after deleting the top todo row")
   func sceneHostedGalleryDeletingTopTodoRowKeepsTodoVisible() async throws {
     let terminalSize = CellSize(width: 80, height: 24)
-    let rootIdentity = Identity(components: [.named("GalleryTodoDeleteSceneHostedBounds")])
-
-    var env = EnvironmentValues()
-    env.terminalSize = terminalSize
-    let initial = DefaultRenderer().render(
-      GalleryView(),
-      context: .init(identity: rootIdentity, environmentValues: env),
-      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    let todoClickCenter = try Self.centerOfText(
+      "Todo",
+      in: GalleryView(),
+      terminalSize: terminalSize,
+      rootIdentity: Identity(components: [
+        .named("GalleryTodoDeleteSceneHostedBounds.TodoProbe")
+      ])
     )
-
-    let todoBounds = try #require(Self.boundsOfText("Todo", in: initial.placedTree))
-    let todoClickCenter = Self.centerPoint(of: todoBounds)
-
-    let todoSelected = DefaultRenderer().render(
-      GallerySelectionSeedHarness(initialSelection: .todo),
-      context: .init(identity: rootIdentity, environmentValues: env),
-      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    let deleteClickCenter = try Self.centerOfText(
+      "×",
+      in: GallerySelectionSeedHarness(initialSelection: .todo),
+      terminalSize: terminalSize,
+      rootIdentity: Identity(components: [
+        .named("GalleryTodoDeleteSceneHostedBounds.DeleteProbe")
+      ]),
+      chooseTopMost: true
     )
-    let deleteBounds = try #require(
-      Self.boundsOfText("×", in: todoSelected.placedTree, chooseTopMost: true)
-    )
-    let deleteClickCenter = Self.centerPoint(of: deleteBounds)
 
     let pty = try #require(Self.makePseudoTerminal(size: terminalSize))
     defer {
@@ -445,6 +426,26 @@ struct GalleryTabSwitchTests {
       })
     }
     return matches.first
+  }
+
+  private static func centerOfText(
+    _ target: String,
+    in view: some View,
+    terminalSize: CellSize,
+    rootIdentity: Identity,
+    chooseTopMost: Bool = false
+  ) throws -> Point {
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+    let artifacts = DefaultRenderer().render(
+      AnyView(view),
+      context: .init(identity: rootIdentity, environmentValues: env),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+    let bounds = try #require(
+      Self.boundsOfText(target, in: artifacts.placedTree, chooseTopMost: chooseTopMost)
+    )
+    return Self.centerPoint(of: bounds)
   }
 
   private static func collectBoundsOfText(
