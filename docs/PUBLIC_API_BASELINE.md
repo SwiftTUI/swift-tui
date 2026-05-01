@@ -34,7 +34,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `EmptyScene` — struct — 3 members
 - `ExitKeyBindings` — struct — 6 members
 - `FileOpenError` — enum — 3 members
-- `FrameDiagnosticRecord` — struct — 46 members
+- `FrameDiagnosticRecord` — struct — 52 members
 - `FrameDiagnosticsLogger` — class — 2 members
 - `HostedSceneSession` — class — 16 members
 - `HostedSceneSessionError` — enum — 4 members

@@ -206,7 +206,7 @@ repaint barriers.
   coalescing, ordered commit, and diagnostics emission.
 - `Sources/TerminalUI/FrameDiagnosticsLogger.swift`: TSV diagnostics fields for
   generations, worker timings, main-actor timings, coalescing, drop blockers,
-  and stale policy.
+  stale policy, and geometry resolution misses.
 - `Sources/Core/FrameDropEligibility.swift`: conservative observational
   classifier for completed-frame drop blockers.
 - `Sources/View/Layout/Layout.swift`: public `SendableLayout` opt-in and

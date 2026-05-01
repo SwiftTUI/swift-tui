@@ -34,6 +34,12 @@ public struct FrameDiagnosticRecord: Sendable {
   public var mainActorTimings: FrameMainActorTimings?
   public var customLayoutFallbackCount: Int
   public var firstCustomLayoutFallbackIdentity: String?
+  public var geometryAnchorResolutionMissCount: Int
+  public var firstGeometryAnchorResolutionMissIdentity: String?
+  public var geometryMissingNamedCoordinateSpaceCount: Int
+  public var firstGeometryMissingNamedCoordinateSpaceName: String?
+  public var geometryDuplicateNamedCoordinateSpaceCount: Int
+  public var firstGeometryDuplicateNamedCoordinateSpaceName: String?
   public var staleFramePolicy: String
   public var dropEligibilityBlockers: Set<FrameDropEligibility.Blocker>
   public var inputEventsQueuedDuringRenderSuspension: Int
@@ -175,6 +181,12 @@ public final class FrameDiagnosticsLogger {
       mainActorSuspendedMs,
       String(record.customLayoutFallbackCount),
       record.firstCustomLayoutFallbackIdentity ?? "-",
+      String(record.geometryAnchorResolutionMissCount),
+      record.firstGeometryAnchorResolutionMissIdentity ?? "-",
+      String(record.geometryMissingNamedCoordinateSpaceCount),
+      record.firstGeometryMissingNamedCoordinateSpaceName ?? "-",
+      String(record.geometryDuplicateNamedCoordinateSpaceCount),
+      record.firstGeometryDuplicateNamedCoordinateSpaceName ?? "-",
       record.staleFramePolicy,
       formatDropBlockers(record.dropEligibilityBlockers),
       String(record.inputEventsQueuedDuringRenderSuspension),
@@ -243,6 +255,12 @@ public final class FrameDiagnosticsLogger {
       "main_actor_suspended_ms",
       "custom_layout_fallbacks",
       "first_custom_layout_fallback",
+      "geometry_anchor_resolution_misses",
+      "first_geometry_anchor_resolution_miss",
+      "geometry_missing_named_coordinate_spaces",
+      "first_geometry_missing_named_coordinate_space",
+      "geometry_duplicate_named_coordinate_spaces",
+      "first_geometry_duplicate_named_coordinate_space",
       "stale_frame_policy",
       "drop_blockers",
       "input_events_during_render_suspension",
