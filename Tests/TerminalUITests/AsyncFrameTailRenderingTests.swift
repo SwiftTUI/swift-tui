@@ -1103,6 +1103,89 @@ struct AsyncFrameTailRenderingTests {
     }
   }
 
+  @Test("blocked async frame head keeps draft key commands out of live dispatch")
+  func blockedAsyncFrameHeadKeepsDraftKeyCommandsOutOfLiveDispatch() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadDraftKeyCommandRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let inputReader = InjectedTerminalInputReader()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameHeadDraftKeyCommandView(
+          value: value,
+          recorder: recorder
+        )
+      }
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+    #expect(terminal.frames.contains { $0.contains("value 0") })
+    #expect(runLoop.focusTracker.currentFocusIdentity != nil)
+    let initialBinding = KeyBinding(key: .character("i"), modifiers: .ctrl)
+    let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
+    let commandScope = try #require(
+      runLoop.currentFocusScopePath().first {
+        runLoop.commandRegistry.keyCommand(at: $0, matching: initialBinding) != nil
+      }
+    )
+
+    let gate = AsyncFrameTailBlockingGate()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    runLoop.stateContainer.mutate { value in
+      value = 1
+    }
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+
+    let renderTask = Task { @MainActor in
+      var renderedFrames = 0
+      try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+      return renderedFrames
+    }
+
+    await gate.waitUntilBlocked()
+
+    #expect(
+      runLoop.commandRegistry.keyCommand(at: commandScope, matching: draftBinding)?
+        .isEnabled == false
+    )
+
+    gate.release()
+    _ = try await valueWithTimeout {
+      try await renderTask.value
+    }
+
+    #expect(
+      runLoop.commandRegistry.keyCommand(at: commandScope, matching: draftBinding)?
+        .isEnabled == true
+    )
+    _ = runLoop.handleKeyPress(KeyPress(.character("d"), modifiers: .ctrl))
+    #expect(recorder.events.contains("draft"))
+  }
+
   @Test("async renderer tags monotonically increasing render generations")
   func asyncRendererTagsMonotonicallyIncreasingRenderGenerations() async {
     let renderer = DefaultRenderer()
@@ -1291,6 +1374,29 @@ private struct AsyncFrameHeadAbortScaffoldView: View {
       return true
     }
     .defaultFocus($focusedField, .action)
+  }
+}
+
+private struct AsyncFrameHeadDraftKeyCommandView: View {
+  var value: Int
+  var recorder: AsyncFrameHeadAbortEffectRecorder
+
+  var body: some View {
+    Panel(id: "draft-key-command") {
+      Text("value \(value)")
+        .focusable(true)
+    }
+    .keyCommand("Initial", key: .character("i"), modifiers: .ctrl) {
+      recorder.record("initial")
+    }
+    .keyCommand(
+      "Draft",
+      key: .character("d"),
+      modifiers: .ctrl,
+      isEnabled: value != 0
+    ) {
+      recorder.record("draft")
+    }
   }
 }
 

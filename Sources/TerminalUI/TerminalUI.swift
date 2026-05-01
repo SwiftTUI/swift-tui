@@ -131,6 +131,7 @@ private struct FrameTailOutput {
 private struct FrameHeadDraft {
   var clock: ContinuousClock?
   var renderGeneration: RenderGeneration
+  var registrationDraft: FrameHeadRegistrationDraft
   var resolveContext: ResolveContext
   var frameContext: FrameContext
   var resolved: ResolvedNode
@@ -1419,7 +1420,12 @@ public struct DefaultRenderer {
     let renderGeneration = renderGenerationSequencer.next()
 
     var resolveContext = context
-    let runtimeRegistrations = resolveContext.runtimeRegistrations
+    let registrationDraft = FrameHeadRegistrationDraft(
+      liveRegistrations: resolveContext.runtimeRegistrations
+    )
+    resolveContext = resolveContext.replacingRuntimeRegistrations(
+      registrationDraft.draftRegistrations
+    )
     resolveContext.imageAssetResolver = imageRepository.resolver()
     resolveContext.frameState = frameState
     frameState.update(from: resolveContext, proposal: proposal)
@@ -1454,11 +1460,11 @@ public struct DefaultRenderer {
     } else {
       let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
       if let dirtyEvaluationPlan {
-        runtimeRegistrations.removeSubtrees(
+        registrationDraft.recordRemoveSubtrees(
           rootedAt: dirtyEvaluationPlan.frontierIdentities
         )
       } else {
-        runtimeRegistrations.resetAll()
+        registrationDraft.recordResetAll()
       }
 
       (_, resolveDuration) = measurePhase(clock: clock) {
@@ -1525,6 +1531,7 @@ public struct DefaultRenderer {
     return FrameHeadDraft(
       clock: clock,
       renderGeneration: renderGeneration,
+      registrationDraft: registrationDraft,
       resolveContext: resolveContext,
       frameContext: frameContext,
       resolved: resolved,
@@ -1607,6 +1614,10 @@ public struct DefaultRenderer {
       timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
       workerTimings = timings
     }
+    draft.registrationDraft.commitRestoring(
+      from: viewGraph,
+      resolved: resolved
+    )
     let (commit, commitDuration) = measurePhase(clock: draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: draft.resolveContext.identity,
