@@ -192,6 +192,139 @@ struct AnchorPreferenceSurfaceTests {
     )
   }
 
+  @Test("Retained scroll translation updates resolved anchor frames across frames")
+  func retainedScrollTranslationUpdatesResolvedAnchorFramesAcrossFrames() {
+    let renderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    let position = LockedBox(ScrollPosition.zero)
+
+    func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(
+          get: { position.value },
+          set: { position.value = $0 }
+        )
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Row 0")
+          Text("Row 1")
+          Text("Target")
+            .anchorPreference(
+              key: BoundsAnchorPreferenceKey.self,
+              value: .bounds
+            ) { $0 }
+          Text("Row 3")
+        }
+      }
+      .frame(width: 20, height: 3, alignment: .topLeading)
+      .overlayPreferenceValue(
+        BoundsAnchorPreferenceKey.self,
+        alignment: .topLeading
+      ) { anchor in
+        GeometryReader { proxy in
+          let rect = anchor.map { proxy[$0] } ?? .zero
+          Text("anchor=\(Int(rect.origin.x)),\(Int(rect.origin.y))")
+        }
+      }
+    }
+
+    let first = renderer.render(
+      makeView(),
+      context: .init(identity: testIdentity("RetainedAnchorRoot")),
+      proposal: .init(width: 20, height: 3)
+    )
+
+    position.withLock {
+      $0.scrollBy(y: 1)
+    }
+
+    let second = renderer.render(
+      makeView(),
+      context: .init(identity: testIdentity("RetainedAnchorRoot")),
+      proposal: .init(width: 20, height: 3)
+    )
+
+    #expect(
+      first.rasterSurface.lines.contains { line in
+        line.contains("anchor=0,2")
+      }
+    )
+    #expect(
+      second.rasterSurface.lines.contains { line in
+        line.contains("anchor=0,1")
+      }
+    )
+    #expect(second.diagnostics.placedNodesReused > 0)
+    let diagnostics = second.diagnostics.geometryResolutionDiagnostics
+    #expect(diagnostics.anchorResolutionMissCount == 0)
+  }
+
+  @Test("Retained scroll translation updates named coordinate-space frames across frames")
+  func retainedScrollTranslationUpdatesNamedCoordinateSpaceFramesAcrossFrames() {
+    let renderer = DefaultRenderer(
+      layoutEngine: .init(cache: MeasurementCache())
+    )
+    let position = LockedBox(ScrollPosition.zero)
+
+    func makeView() -> some View {
+      ScrollView(
+        .vertical,
+        position: Binding(
+          get: { position.value },
+          set: { position.value = $0 }
+        )
+      ) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Row 0")
+          Text("Row 1")
+          Text("Board")
+            .coordinateSpace(name: "board")
+          Text("Row 3")
+        }
+      }
+      .frame(width: 20, height: 3, alignment: .topLeading)
+      .overlay(alignment: .topLeading) {
+        GeometryReader { proxy in
+          let frame = proxy.frame(in: .named("board"))
+          Text("space=\(Int(frame.origin.x)),\(Int(frame.origin.y))")
+        }
+      }
+    }
+
+    let first = renderer.render(
+      makeView(),
+      context: .init(identity: testIdentity("RetainedNamedSpaceRoot")),
+      proposal: .init(width: 20, height: 3)
+    )
+
+    position.withLock {
+      $0.scrollBy(y: 1)
+    }
+
+    let second = renderer.render(
+      makeView(),
+      context: .init(identity: testIdentity("RetainedNamedSpaceRoot")),
+      proposal: .init(width: 20, height: 3)
+    )
+
+    #expect(
+      first.rasterSurface.lines.contains { line in
+        line.contains("space=0,-2")
+      }
+    )
+    #expect(
+      second.rasterSurface.lines.contains { line in
+        line.contains("space=0,-1")
+      }
+    )
+    #expect(second.diagnostics.placedNodesReused > 0)
+    let diagnostics = second.diagnostics.geometryResolutionDiagnostics
+    #expect(diagnostics.missingNamedCoordinateSpaceCount == 0)
+    #expect(diagnostics.duplicateNamedCoordinateSpaceCount == 0)
+  }
+
   @Test("Missing named coordinate spaces fall back to global and record diagnostics")
   func missingNamedCoordinateSpaceFallbackRecordsDiagnostics() {
     let artifacts = DefaultRenderer().render(
