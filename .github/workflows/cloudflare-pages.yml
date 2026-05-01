@@ -23,16 +23,11 @@ name: Deploy Website to Cloudflare Pages
 #                                    Defaults to https://<project>.pages.dev.
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
   deployments: write
-  pull-requests: write
 
 concurrency:
   group: cloudflare-pages-${{ github.ref }}
@@ -204,17 +199,11 @@ jobs:
         id: branch
         shell: bash
         env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_HEAD_REF: ${{ github.head_ref }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          # `main` -> production deployment. PRs and other branches -> preview.
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            printf 'branch=%s\n' "$GITHUB_HEAD_REF" >> "$GITHUB_OUTPUT"
-          else
-            printf 'branch=%s\n' "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
-          fi
+          # `main` -> production deployment. Other branches -> preview.
+          printf 'branch=%s\n' "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
 
       # Run wrangler directly (rather than via wrangler-action's `command:` shim)
       # so we have full control over argument quoting. All untrusted inputs are
@@ -237,35 +226,3 @@ jobs:
           # Wrangler prints something like: `✨  Deployment complete! Take a peek over at https://abc123.swift-terminal-ui.pages.dev`
           deployment_url="$(printf '%s\n' "$deploy_log" | grep -Eo 'https://[^[:space:]]+\.pages\.dev' | tail -n1 || true)"
           printf 'deployment-url=%s\n' "${deployment_url:-}" >> "$GITHUB_OUTPUT"
-
-      - name: Comment preview URL on PR
-        if: github.event_name == 'pull_request' && steps.deploy.outputs.deployment-url != ''
-        uses: actions/github-script@v7
-        env:
-          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
-        with:
-          script: |
-            const url = process.env.DEPLOY_URL;
-            const marker = '<!-- cloudflare-pages-preview -->';
-            const body = `${marker}\n\nCloudflare Pages preview: ${url}\n\n_Updated on every push to this PR._`;
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = comments.find(c => c.body && c.body.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }
