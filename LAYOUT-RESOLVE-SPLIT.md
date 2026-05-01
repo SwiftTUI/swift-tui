@@ -85,9 +85,13 @@ Static inset wrappers had the same class of bug:
 - `.safeAreaPadding(...)` reduces the child proposal in layout.
 - Outset `.border(...)` reserves border cells and reduces the child proposal in
   layout.
+- Authored `.ignoresSafeArea(...)` can expand the child proposal again when it
+  reclaims safe-area padding that already tightened the resolve geometry.
 
-Before this patch, all three resolved their child under the unchanged
-`terminalSize`.
+Before this patch, the shrinking wrappers resolved their child under the
+unchanged `terminalSize`, and `ignoresSafeArea` had no way to distinguish safe
+area that had actually been subtracted from `terminalSize` from root safe area
+that was only carried as `safeAreaInsets`.
 
 ## Spot Fixes Applied
 
@@ -117,6 +121,21 @@ known layout insets from `terminalSize` before resolving child content.
 transform. The change only keeps `GeometryProxy.size` aligned with the
 proposal that layout will hand to the child.
 
+`safeAreaPadding` also tracks the safe-area insets that it has applied to the
+resolve-time terminal-size channel so a later `ignoresSafeArea` can restore the
+same geometry on matching edges.
+
+### Safe-area ignore
+
+`IgnoreSafeAreaModifier.resolve` now expands `terminalSize` only by safe-area
+insets that were previously tracked as having tightened the resolve-time
+geometry. It then clears those tracked insets on the ignored edges.
+
+This is intentionally narrower than adding all reclaimed `safeAreaInsets` to
+`terminalSize`: root safe area is exposed separately through
+`GeometryProxy.safeAreaInsets` and has not necessarily been subtracted from the
+root `terminalSize`.
+
 ### Outset border
 
 `BorderModifier.resolve` now computes the same static layout insets used by the
@@ -141,6 +160,9 @@ the child geometry environment.
 
 - `safeAreaPadding` tightens `GeometryReader` size while preserving the existing
   safe-area behavior.
+- `ignoresSafeArea` does not over-expand root geometry.
+- `ignoresSafeArea` restores safe-area-padding-tightened geometry on selected
+  edges.
 
 These are deliberately surface-level tests because the bug is visible at the
 public authoring API, not in raw `LayoutEngine` measurement alone.
@@ -162,6 +184,8 @@ same transform from values already available during resolve:
   when the current terminal size is known;
 - `.padding(...)`;
 - `.safeAreaPadding(...)`;
+- `.ignoresSafeArea(...)` when restoring safe-area geometry that an authored
+  static wrapper already subtracted;
 - outset `.border(...)`.
 
 For these, a spot fix is reasonable: rewrite the child resolve context's
@@ -321,7 +345,8 @@ Use `GeometryReader` today for:
 - terminal/root size;
 - exact frame-bounded content;
 - finite min/max flexible frames;
-- padding, safe-area padding, and outset-border bounded content;
+- padding, safe-area padding, matching safe-area ignore, and outset-border
+  bounded content;
 - cell pixel metrics and pointer capability display/adaptation.
 
 Be cautious with `GeometryReader` inside:
