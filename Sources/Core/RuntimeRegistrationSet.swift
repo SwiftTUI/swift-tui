@@ -47,6 +47,26 @@ package struct RuntimeRegistrationSet {
     self.dropDestinationRegistry = dropDestinationRegistry
   }
 
+  @MainActor
+  package static func scratch() -> RuntimeRegistrationSet {
+    RuntimeRegistrationSet(
+      actionRegistry: LocalActionRegistry(),
+      keyHandlerRegistry: LocalKeyHandlerRegistry(),
+      terminationRegistry: LocalTerminationRegistry(),
+      pointerHandlerRegistry: LocalPointerHandlerRegistry(),
+      gestureRegistry: LocalGestureRegistry(),
+      gestureStateRegistry: LocalGestureStateRegistry(),
+      focusBindingRegistry: LocalFocusBindingRegistry(),
+      focusedValuesRegistry: LocalFocusedValuesRegistry(),
+      scrollPositionRegistry: LocalScrollPositionRegistry(),
+      lifecycleRegistry: LocalLifecycleRegistry(),
+      taskRegistry: LocalTaskRegistry(),
+      preferenceObservationRegistry: LocalPreferenceObservationRegistry(),
+      commandRegistry: CommandRegistry(),
+      dropDestinationRegistry: DropDestinationRegistry()
+    )
+  }
+
   package func resetAll() {
     actionRegistry?.reset()
     keyHandlerRegistry?.reset()

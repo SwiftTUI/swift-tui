@@ -260,6 +260,28 @@ public struct ResolveContext: Equatable, Sendable {
     )
   }
 
+  @MainActor
+  package func replacingRuntimeRegistrations(
+    _ registrations: RuntimeRegistrationSet
+  ) -> Self {
+    var replaced = self
+    replaced.localActionRegistry = registrations.actionRegistry
+    replaced.localKeyHandlerRegistry = registrations.keyHandlerRegistry
+    replaced.localTerminationRegistry = registrations.terminationRegistry
+    replaced.localPointerHandlerRegistry = registrations.pointerHandlerRegistry
+    replaced.localGestureRegistry = registrations.gestureRegistry
+    replaced.localGestureStateRegistry = registrations.gestureStateRegistry
+    replaced.localFocusBindingRegistry = registrations.focusBindingRegistry
+    replaced.localFocusedValuesRegistry = registrations.focusedValuesRegistry
+    replaced.localScrollPositionRegistry = registrations.scrollPositionRegistry
+    replaced.localLifecycleRegistry = registrations.lifecycleRegistry
+    replaced.localTaskRegistry = registrations.taskRegistry
+    replaced.localPreferenceObservationRegistry = registrations.preferenceObservationRegistry
+    replaced.commandRegistry = registrations.commandRegistry
+    replaced.dropDestinationRegistry = registrations.dropDestinationRegistry
+    return replaced
+  }
+
   /// Creates a public resolve context from authored configuration only.
   public init(
     identity: Identity = .init(components: [] as [IdentityComponent]),
