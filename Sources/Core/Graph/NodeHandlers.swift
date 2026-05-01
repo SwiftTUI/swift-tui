@@ -13,6 +13,8 @@ package struct NodeHandlers {
   package var lifecycleRegistrations: LifecycleHandlerSnapshot
   package var taskRegistrations: [Identity: TaskRegistration]
   package var preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot]
+  package var commandRegistrations: CommandRegistrySnapshot
+  package var dropDestinationRegistrations: DropDestinationRegistrySnapshot
 
   package init(
     actionRegistrations: [Identity: LocalActionRegistry.Registration] = [:],
@@ -28,7 +30,9 @@ package struct NodeHandlers {
     scrollPositionRegistrations: [ScrollPositionRegistrationSnapshot] = [],
     lifecycleRegistrations: LifecycleHandlerSnapshot = .init(),
     taskRegistrations: [Identity: TaskRegistration] = [:],
-    preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot] = []
+    preferenceObservationRegistrations: [PreferenceObservationRegistrationSnapshot] = [],
+    commandRegistrations: CommandRegistrySnapshot = .init(),
+    dropDestinationRegistrations: DropDestinationRegistrySnapshot = .init()
   ) {
     self.actionRegistrations = actionRegistrations
     self.keyHandlerRegistrations = keyHandlerRegistrations
@@ -44,6 +48,8 @@ package struct NodeHandlers {
     self.lifecycleRegistrations = lifecycleRegistrations
     self.taskRegistrations = taskRegistrations
     self.preferenceObservationRegistrations = preferenceObservationRegistrations
+    self.commandRegistrations = commandRegistrations
+    self.dropDestinationRegistrations = dropDestinationRegistrations
   }
 
   package mutating func reset() {
@@ -175,5 +181,24 @@ package struct NodeHandlers {
     _ registration: PreferenceObservationRegistrationSnapshot
   ) {
     preferenceObservationRegistrations.append(registration)
+  }
+
+  package mutating func recordCommand(
+    _ registration: CommandRegistrySnapshot
+  ) {
+    for (identity, commands) in registration.keyCommandsByScope {
+      commandRegistrations.keyCommandsByScope[identity] = commands
+    }
+    for (identity, commands) in registration.paletteCommandsByScope {
+      commandRegistrations.paletteCommandsByScope[identity] = commands
+    }
+  }
+
+  package mutating func recordDropDestination(
+    _ registration: DropDestinationRegistrySnapshot
+  ) {
+    for (identity, handler) in registration.handlersByScope {
+      dropDestinationRegistrations.handlersByScope[identity] = handler
+    }
   }
 }

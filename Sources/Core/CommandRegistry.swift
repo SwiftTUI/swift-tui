@@ -57,6 +57,23 @@ package struct RegisteredPaletteCommand: Sendable {
   }
 }
 
+package struct CommandRegistrySnapshot: Sendable {
+  package var keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]]
+  package var paletteCommandsByScope: [Identity: [RegisteredPaletteCommand]]
+
+  package init(
+    keyCommandsByScope: [Identity: [KeyBinding: RegisteredKeyCommand]] = [:],
+    paletteCommandsByScope: [Identity: [RegisteredPaletteCommand]] = [:]
+  ) {
+    self.keyCommandsByScope = keyCommandsByScope
+    self.paletteCommandsByScope = paletteCommandsByScope
+  }
+
+  package var isEmpty: Bool {
+    keyCommandsByScope.isEmpty && paletteCommandsByScope.isEmpty
+  }
+}
+
 /// Collects commands declared at ActionScope roots and dispatches key
 /// events to the shallowest claiming scope along the current focus
 /// chain.
@@ -93,6 +110,11 @@ package final class CommandRegistry: Equatable {
       action: action
     )
     keyCommandsByScope[scope] = table
+    ViewNodeContext.current?.recordCommandRegistration(
+      CommandRegistrySnapshot(
+        keyCommandsByScope: [scope: table]
+      )
+    )
   }
 
   /// Appends a palette command at the given scope identity.
@@ -103,6 +125,11 @@ package final class CommandRegistry: Equatable {
     var list = paletteCommandsByScope[scope] ?? []
     list.append(command)
     paletteCommandsByScope[scope] = list
+    ViewNodeContext.current?.recordCommandRegistration(
+      CommandRegistrySnapshot(
+        paletteCommandsByScope: [scope: list]
+      )
+    )
   }
 
   /// Returns the registered key command at `scope` that matches
@@ -157,6 +184,26 @@ package final class CommandRegistry: Equatable {
   /// not rely on this from production code.
   package func paletteCommandCountsByScope() -> [Identity: Int] {
     paletteCommandsByScope.mapValues(\.count)
+  }
+
+  package func snapshot() -> CommandRegistrySnapshot {
+    CommandRegistrySnapshot(
+      keyCommandsByScope: keyCommandsByScope,
+      paletteCommandsByScope: paletteCommandsByScope
+    )
+  }
+
+  package func restore(_ snapshot: CommandRegistrySnapshot) {
+    guard !snapshot.isEmpty else {
+      return
+    }
+
+    for (identity, commands) in snapshot.keyCommandsByScope {
+      keyCommandsByScope[identity] = commands
+    }
+    for (identity, commands) in snapshot.paletteCommandsByScope {
+      paletteCommandsByScope[identity] = commands
+    }
   }
 
   /// Removes every key-command and palette-command registered at any

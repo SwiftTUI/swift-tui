@@ -443,6 +443,11 @@ private final class FrameTailRenderer: Sendable {
     _ input: FrameTailInput,
     clock: ContinuousClock?
   ) async -> FrameTailLayoutOutput {
+    if containsLayoutDependentContent(input.resolved) {
+      input.layoutPassContext.updateWorkMetrics {
+        $0.layoutDependentMainActorFallbacks += 1
+      }
+    }
     guard canOffloadLayout(input) else {
       return renderLayoutInline(
         input,
@@ -468,6 +473,7 @@ private final class FrameTailRenderer: Sendable {
   ) -> Bool {
     !containsMainActorOnlyCustomLayout(input.resolved)
       && !containsMainActorOnlyIndexedChildSource(input.resolved)
+      && !containsLayoutDependentContent(input.resolved)
   }
 
   func needsIndexedChildSourceWorkerSnapshot(
@@ -475,6 +481,7 @@ private final class FrameTailRenderer: Sendable {
   ) -> Bool {
     !containsMainActorOnlyCustomLayout(input.resolved)
       && containsMainActorOnlyIndexedChildSource(input.resolved)
+      && !containsLayoutDependentContent(input.resolved)
   }
 
   func renderRaster(
@@ -744,6 +751,20 @@ private final class FrameTailRenderer: Sendable {
       }
     }
     return node.children.contains { containsMainActorOnlyIndexedChildSource($0) }
+  }
+
+  private func containsLayoutDependentContent(
+    _ node: ResolvedNode
+  ) -> Bool {
+    if node.layoutDependentContent != nil {
+      return true
+    }
+    if let workerChildren = node.indexedChildSource?.workerResolvedChildren,
+      workerChildren.contains(where: containsLayoutDependentContent)
+    {
+      return true
+    }
+    return node.children.contains { containsLayoutDependentContent($0) }
   }
 
   private func renderRasterInline(
@@ -1247,6 +1268,9 @@ public struct DefaultRenderer {
       frameTailInput,
       clock: clock
     )
+    resolved = resolved.applyingLayoutDependentRealizations(
+      layoutPassContext.layoutDependentRealizationsByIdentity
+    )
     let placed = tailLayout.baselinePlaced
     // Capture the BASELINE placed tree (pre-overlay) for two things:
     // 1. The animation controller's removal-snapshot lookup on the
@@ -1572,6 +1596,9 @@ public struct DefaultRenderer {
   ) -> FrameArtifacts {
     let layout = tailOutput.layout
     let tail = tailOutput.tail
+    let resolved = draft.resolved.applyingLayoutDependentRealizations(
+      draft.frameTailInput.layoutPassContext.layoutDependentRealizationsByIdentity
+    )
     var workerTimings = tail.diagnostics.workerTimings
     if var timings = workerTimings,
       let clock = draft.clock,
@@ -1583,11 +1610,11 @@ public struct DefaultRenderer {
     let (commit, commitDuration) = measurePhase(clock: draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: draft.resolveContext.identity,
-        resolved: draft.resolved,
+        resolved: resolved,
         placed: tail.placed
       )
       return commitPlanner.plan(
-        resolved: draft.resolved,
+        resolved: resolved,
         placed: tail.placed,
         semantics: tail.semantics,
         transaction: draft.frameContext.transaction,
@@ -1619,7 +1646,7 @@ public struct DefaultRenderer {
         suspended: tailOutput.renderSuspensionDuration
       )
       diagnostics = FrameDiagnostics.summarize(
-        resolved: draft.resolved,
+        resolved: resolved,
         measured: tail.measured,
         placed: tail.placed,
         semantics: tail.semantics,
@@ -1645,7 +1672,7 @@ public struct DefaultRenderer {
       diagnostics = .init()
     }
     let artifacts = FrameArtifacts(
-      resolvedTree: draft.resolved,
+      resolvedTree: resolved,
       measuredTree: tail.measured,
       placedTree: tail.placed,
       semanticSnapshot: tail.semantics,

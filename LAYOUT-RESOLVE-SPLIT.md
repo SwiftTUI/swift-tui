@@ -1,11 +1,17 @@
 # Layout/Resolve Split And GeometryReader
 
+> Historical note: this document records the bug and the earlier bridge-based
+> mitigation path. The shipped implementation now realizes layout-dependent
+> `GeometryReader` content during placement, and `EnvironmentValues.terminalSize`
+> is host-surface metadata rather than local proposal geometry.
+
 ## Summary
 
-`GeometryReader` currently behaves like a resolve-time environment reader, not
-like a layout-time proposal reader. Its `GeometryProxy.size` is built from
-`EnvironmentValues.terminalSize` while the authored tree is being resolved.
-The actual layout proposal is computed later by `LayoutEngine`.
+Before layout-dependent content realization, `GeometryReader` behaved like a
+resolve-time environment reader, not like a layout-time proposal reader. Its
+`GeometryProxy.size` was built from `EnvironmentValues.terminalSize` while the
+authored tree was being resolved. The actual layout proposal was computed later
+by `LayoutEngine`.
 
 That split is the root of the spinner bug: a `GeometryReader` inside
 `.frame(minWidth: 1, idealWidth: 1, maxWidth: 1, minHeight: 1, idealHeight: 1,
@@ -14,11 +20,13 @@ layout later constrained the view to one cell. The spinner therefore took its
 wide rendering branch and then the outer frame clipped the same first cell on
 every tick.
 
-The spot fixes in this pass keep the current architecture but make the common
-static proposal-transforming wrappers maintain the same geometry environment
-contract that exact `.frame(width:height:)` already used.
+The original spot fixes kept the previous architecture by making common static
+proposal-transforming wrappers maintain the same geometry environment contract
+that exact `.frame(width:height:)` already used. That mitigation has been
+replaced by the layout-dependent boundary described in the implementation plan
+under `docs/plans/`.
 
-## Current Structure
+## Former Resolve-Time Structure
 
 The runtime pipeline is:
 
@@ -26,7 +34,7 @@ The runtime pipeline is:
 resolve -> measure -> place -> semantics -> draw -> raster -> commit
 ```
 
-`GeometryReader` lives entirely in the first phase:
+`GeometryReader` previously lived entirely in the first phase:
 
 ```swift
 GeometryProxy(
@@ -47,17 +55,17 @@ That second step makes the reader occupy available layout space once layout
 runs. It does not change where the proxy size came from. The proxy size has
 already been captured from the resolve context.
 
-This means `EnvironmentValues.terminalSize` is doing two jobs:
+This meant `EnvironmentValues.terminalSize` was doing two jobs:
 
 - At the root, it is the host surface size.
 - Inside certain containers, it is also the local geometry proposal that
   `GeometryReader` is expected to report.
 
-That second meaning is not automatic. Any modifier that changes its child's
-layout proposal before measurement must also update the resolve-time
-`terminalSize` if `GeometryReader` should observe the tightened size.
+That second meaning was not automatic. Any modifier that changed its child's
+layout proposal before measurement also had to update the resolve-time
+`terminalSize` if `GeometryReader` was expected to observe the tightened size.
 
-## Existing Behavior Before This Patch
+## Existing Behavior Before The Bridge Patch
 
 Exact frames already bridged the split:
 
@@ -93,11 +101,15 @@ unchanged `terminalSize`, and `ignoresSafeArea` had no way to distinguish safe
 area that had actually been subtracted from `terminalSize` from root safe area
 that was only carried as `safeAreaInsets`.
 
-## Spot Fixes Applied
+## Bridge Spot Fixes Previously Applied
+
+These notes explain the intermediate mitigation that existed before
+layout-dependent content realization shipped. The current implementation no
+longer rewrites `terminalSize` in these modifiers.
 
 ### Flexible frame
 
-`FlexibleFrameModifier.resolve` now resolves child content under a
+`FlexibleFrameModifier.resolve` was changed to resolve child content under a
 `terminalSize` clamped by finite `min` and `max` constraints.
 
 For a finite parent terminal size:
@@ -114,8 +126,9 @@ unspecified state to carry here.
 
 ### Padding and safe-area padding
 
-`PaddingModifier.resolve` and `SafeAreaPaddingModifier.resolve` now subtract the
-known layout insets from `terminalSize` before resolving child content.
+`PaddingModifier.resolve` and `SafeAreaPaddingModifier.resolve` were changed to
+subtract the known layout insets from `terminalSize` before resolving child
+content.
 
 `SafeAreaPaddingModifier` still applies its existing safe-area environment
 transform. The change only keeps `GeometryProxy.size` aligned with the
@@ -127,9 +140,10 @@ same geometry on matching edges.
 
 ### Safe-area ignore
 
-`IgnoreSafeAreaModifier.resolve` now expands `terminalSize` only by safe-area
-insets that were previously tracked as having tightened the resolve-time
-geometry. It then clears those tracked insets on the ignored edges.
+`IgnoreSafeAreaModifier.resolve` was changed to expand `terminalSize` only by
+safe-area insets that were previously tracked as having tightened the
+resolve-time geometry. It then cleared those tracked insets on the ignored
+edges.
 
 This is intentionally narrower than adding all reclaimed `safeAreaInsets` to
 `terminalSize`: root safe area is exposed separately through
@@ -138,8 +152,8 @@ root `terminalSize`.
 
 ### Outset border
 
-`BorderModifier.resolve` now computes the same static layout insets used by the
-layout engine for non-inset borders and subtracts those cells from
+`BorderModifier.resolve` was changed to compute the same static layout insets
+used by the layout engine for non-inset borders and subtract those cells from
 `terminalSize` before resolving child content.
 
 Inset borders continue to contribute zero layout insets, so they do not alter
@@ -147,7 +161,7 @@ the child geometry environment.
 
 ## Tests Added
 
-`Tests/TerminalUITests/GeometryReaderSurfaceTests.swift` now pins:
+`Tests/TerminalUITests/GeometryReaderSurfaceTests.swift` was expanded to pin:
 
 - root `GeometryReader` still reports the terminal surface size;
 - `GeometryReader` sees exact frame constraints;
@@ -156,7 +170,7 @@ the child geometry environment.
 - `GeometryReader` sees finite flexible-frame constraints;
 - unconstrained flexible axes keep the parent terminal size.
 
-`Tests/TerminalUITests/SafeAreaSurfaceTests.swift` now pins:
+`Tests/TerminalUITests/SafeAreaSurfaceTests.swift` was expanded to pin:
 
 - `safeAreaPadding` tightens `GeometryReader` size while preserving the existing
   safe-area behavior.
@@ -188,10 +202,8 @@ same transform from values already available during resolve:
   static wrapper already subtracted;
 - outset `.border(...)`.
 
-For these, a spot fix is reasonable: rewrite the child resolve context's
-`terminalSize` to match the proposal the layout engine will later use.
-
-That is what this patch does.
+For these, the bridge-era spot fix rewrote the child resolve context's
+`terminalSize` to match the proposal the layout engine would later use.
 
 ### 2. Measurement-dependent proposal transforms
 
@@ -216,15 +228,15 @@ may not exist yet when the child view's body is being evaluated.
 
 ## Why This Is Structurally Incorrect
 
-The framework exposes `GeometryReader` as though it reports local layout
-geometry, but its implementation currently reports a value from resolve context.
-That creates a hidden maintenance contract:
+The framework exposed `GeometryReader` as though it reported local layout
+geometry, but its implementation reported a value from resolve context. That
+created a hidden maintenance contract:
 
 > Any view or modifier that changes a child's local proposal must remember to
 > encode that proposal into `EnvironmentValues.terminalSize` before resolving
 > the child.
 
-That contract is fragile because the canonical source of layout truth is not
+That contract was fragile because the canonical source of layout truth is not
 the environment. It is `ProposedSize` during measurement and placement.
 
 The split also makes it easy for tests to pass at one layer and fail at the
@@ -278,7 +290,7 @@ the contract explicit:
 - document measurement-dependent containers as not providing fully local
   geometry during resolve.
 
-This is the smallest path and matches this patch.
+This was the smallest bridge path.
 
 ### Option B: Add an explicit resolve proposal field
 
@@ -312,53 +324,20 @@ registration channel.
 This could generalize beyond `GeometryReader`, but it would be a new framework
 capability. It should not be introduced as a bug fix.
 
-## Recommended Next Steps
+## Current Status
 
-Short term:
+Option C has shipped as the generalized layout-dependent content boundary
+tracked in the
+[layout-dependent content realization plan](docs/plans/2026-05-01-001-layout-dependent-content-realization-plan.md).
 
-- Keep the static spot fixes from this patch.
-- Add any new proposal-transforming modifiers to the same resolve-time geometry
-  contract.
-- Avoid using `GeometryReader` as proof of measurement-dependent local geometry
-  inside `ViewThatFits`, `safeAreaInset`, custom layouts, or stack allocation
-  edge cases.
+Current guidance:
 
-Medium term:
-
-- Move the terminal-size tightening helper out of `ViewModifiers.swift` if more
-  modifiers need it.
-- Add a small architecture note to the GeometryReader DocC explaining that it
-  reports the current resolve-time container geometry and that static containers
-  forward their deterministic child constraints.
-
-Long term:
-
-- Decide whether the framework wants `GeometryReader` to remain a resolve-time
-  convenience or become a true layout-time primitive.
-- If it becomes layout-time, design it alongside retained tree reuse and
-  lifecycle/registration staging rather than as an isolated view change.
-- The proposed full-fix approach is now tracked in the
-  [layout-dependent content realization plan](docs/plans/2026-05-01-001-layout-dependent-content-realization-plan.md).
-
-## Practical Guidance
-
-Use `GeometryReader` today for:
-
-- terminal/root size;
-- exact frame-bounded content;
-- finite min/max flexible frames;
-- padding, safe-area padding, matching safe-area ignore, and outset-border
-  bounded content;
-- cell pixel metrics and pointer capability display/adaptation.
-
-Be cautious with `GeometryReader` inside:
-
-- `ViewThatFits`;
-- `safeAreaInset`;
-- `ScrollView`;
-- stacks with competing flexible children;
-- custom layouts.
-
-Those cases can still be correct for simple trees, but their correctness is not
-guaranteed by the current architecture because the geometry value is resolved
-before measurement chooses the final child proposal.
+- Use `GeometryReader` for local placed geometry, including frame, padding,
+  safe-area, decoration, `ViewThatFits`, stack, and custom `Layout` contexts.
+- Use `EnvironmentValues.terminalSize` for the root host surface size, not local
+  proposal geometry.
+- Use `GeometryProxy.cellPixelMetrics` and
+  `GeometryProxy.pointerInputCapabilities` when authored content needs terminal
+  precision data tied to the realized geometry.
+- Keep ordinary preferences resolve-time. Public anchor and geometry-bound
+  preference APIs remain deferred until coordinate-space resolution is ready.

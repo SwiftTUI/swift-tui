@@ -500,6 +500,18 @@ package final class ViewNode {
     registeredHandlers.recordPreferenceObservation(registration)
   }
 
+  package func recordCommandRegistration(
+    _ registration: CommandRegistrySnapshot
+  ) {
+    registeredHandlers.recordCommand(registration)
+  }
+
+  package func recordDropDestinationRegistration(
+    _ registration: DropDestinationRegistrySnapshot
+  ) {
+    registeredHandlers.recordDropDestination(registration)
+  }
+
   package func restoreRuntimeRegistrations(
     into registrations: RuntimeRegistrationSet
   ) {
@@ -669,6 +681,9 @@ extension ViewNode {
   package var environmentSnapshot: EnvironmentSnapshot { committed.environmentSnapshot }
   package var transactionSnapshot: TransactionSnapshot { committed.transactionSnapshot }
   package var layoutBehavior: LayoutBehavior { committed.layoutBehavior }
+  package var layoutDependentContent: LayoutDependentContentBoundary? {
+    committed.layoutDependentContent
+  }
   package var layoutMetadata: LayoutMetadata { committed.layoutMetadata }
   package var drawMetadata: DrawMetadata { committed.drawMetadata }
   package var semanticMetadata: SemanticMetadata { committed.semanticMetadata }

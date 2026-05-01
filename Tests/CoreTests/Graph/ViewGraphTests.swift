@@ -338,12 +338,108 @@ struct ViewGraphTests {
     #expect(peerEvaluations == 1)
     #expect(unrelatedEvaluations == 0)
   }
+
+  @Test("runtime registration restore includes command and drop handlers")
+  func runtimeRegistrationRestoreIncludesCommandAndDropHandlers() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let childIdentity = testIdentity("Root", "Child")
+    let binding = KeyBinding(key: .character("s"), modifiers: .ctrl)
+    let commandCounter = RegistrationCounter()
+    let dropCounter = RegistrationCounter()
+
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let childNode = graph.beginEvaluation(identity: childIdentity, invalidator: nil)
+    childNode.recordCommandRegistration(
+      CommandRegistrySnapshot(
+        keyCommandsByScope: [
+          childIdentity: [
+            binding: RegisteredKeyCommand(
+              binding: binding,
+              description: "Save",
+              isEnabled: true,
+              action: { commandCounter.increment() }
+            )
+          ]
+        ],
+        paletteCommandsByScope: [
+          childIdentity: [
+            RegisteredPaletteCommand(
+              name: "Save",
+              description: nil,
+              isEnabled: true,
+              action: {}
+            )
+          ]
+        ]
+      )
+    )
+    childNode.recordDropDestinationRegistration(
+      DropDestinationRegistrySnapshot(
+        handlersByScope: [
+          childIdentity: { _, _ in
+            dropCounter.increment()
+            return true
+          }
+        ]
+      )
+    )
+    graph.finishEvaluation(
+      childNode,
+      resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
+      accessedStateSlots: 0
+    )
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(identity: childIdentity, kind: .view("Child"))
+        ]
+      ),
+      accessedStateSlots: 0
+    )
+    let snapshot = graph.snapshot(rootIdentity: rootIdentity)
+    let commandRegistry = CommandRegistry()
+    let dropDestinationRegistry = DropDestinationRegistry()
+    let registrations = RuntimeRegistrationSet(
+      commandRegistry: commandRegistry,
+      dropDestinationRegistry: dropDestinationRegistry
+    )
+
+    graph.restoreRuntimeRegistrations(
+      for: snapshot,
+      into: registrations
+    )
+
+    #expect(commandRegistry.paletteCommands(at: childIdentity).map(\.name) == ["Save"])
+    #expect(commandRegistry.dispatch(key: binding, along: [rootIdentity, childIdentity]))
+    #expect(commandCounter.count == 1)
+    #expect(
+      dropDestinationRegistry.dispatch(
+        paths: [DroppedPath("/tmp/example")],
+        along: [rootIdentity, childIdentity]
+      )
+    )
+    #expect(dropCounter.count == 1)
+  }
 }
 
 private enum DependencyKeyA {}
 private enum DependencyKeyB {}
 
 private final class DependencyObservableBox {}
+
+@MainActor
+private final class RegistrationCounter {
+  private(set) var count = 0
+
+  func increment() {
+    count += 1
+  }
+}
 
 @MainActor
 private func seedDependencyGraph(

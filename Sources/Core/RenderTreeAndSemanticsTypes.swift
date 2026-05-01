@@ -393,6 +393,11 @@ public struct ResolvedNode: Equatable, Sendable {
       recomputeSupportsRetainedReuse()
     }
   }
+  package var layoutDependentContent: LayoutDependentContentBoundary? {
+    didSet {
+      recomputeSupportsRetainedReuse()
+    }
+  }
   package var preferenceValues: PreferenceValues
   package private(set) var subtreeNodeCount: Int
   public var supportsRetainedReuse: Bool
@@ -429,7 +434,8 @@ public struct ResolvedNode: Equatable, Sendable {
     semanticMetadata: SemanticMetadata = SemanticMetadata(),
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
-    intrinsicSize: CellSize? = nil
+    intrinsicSize: CellSize? = nil,
+    layoutDependentContent: LayoutDependentContentBoundary? = nil
   ) {
     self.identity = identity
     self.kind = kind
@@ -449,6 +455,7 @@ public struct ResolvedNode: Equatable, Sendable {
     self.drawPayload = drawPayload
     self.intrinsicSize = intrinsicSize
     self.indexedChildSource = nil
+    self.layoutDependentContent = layoutDependentContent
     preferenceValues = Self.combinedPreferenceValues(for: children)
     subtreeNodeCount = 1
     self.supportsRetainedReuse = true
@@ -470,7 +477,8 @@ public struct ResolvedNode: Equatable, Sendable {
     lifecycleMetadata: LifecycleMetadata = .init(),
     drawPayload: DrawPayload = .none,
     intrinsicSize: CellSize? = nil,
-    indexedChildSource: (any IndexedChildSource)? = nil
+    indexedChildSource: (any IndexedChildSource)? = nil,
+    layoutDependentContent: LayoutDependentContentBoundary? = nil
   ) {
     self.identity = identity
     self.kind = kind
@@ -486,6 +494,7 @@ public struct ResolvedNode: Equatable, Sendable {
     self.drawPayload = drawPayload
     self.intrinsicSize = intrinsicSize
     self.indexedChildSource = indexedChildSource
+    self.layoutDependentContent = layoutDependentContent
     preferenceValues = Self.combinedPreferenceValues(for: children)
     subtreeNodeCount = 1
     self.supportsRetainedReuse = true
@@ -505,7 +514,8 @@ public struct ResolvedNode: Equatable, Sendable {
     supportsRetainedReuse = Self.computeSupportsRetainedReuse(
       layoutBehavior: layoutBehavior,
       children: children,
-      indexedChildSource: indexedChildSource
+      indexedChildSource: indexedChildSource,
+      layoutDependentContent: layoutDependentContent
     )
   }
 
@@ -522,9 +532,13 @@ public struct ResolvedNode: Equatable, Sendable {
   private static func computeSupportsRetainedReuse(
     layoutBehavior: LayoutBehavior,
     children: [ResolvedNode],
-    indexedChildSource: (any IndexedChildSource)?
+    indexedChildSource: (any IndexedChildSource)?,
+    layoutDependentContent: LayoutDependentContentBoundary?
   ) -> Bool {
     if indexedChildSource != nil {
+      return false
+    }
+    if layoutDependentContent != nil {
       return false
     }
 
@@ -647,6 +661,8 @@ public struct ResolvedNode: Equatable, Sendable {
       && environmentSnapshot == other.environmentSnapshot
       && layoutBehavior.isEquivalentForMeasurement(to: other.layoutBehavior)
       && layoutMetadata == other.layoutMetadata
+      && layoutDependentContent?.equivalenceSignature
+        == other.layoutDependentContent?.equivalenceSignature
       && drawPayload.isEquivalentForMeasurement(to: other.drawPayload)
       && intrinsicSize == other.intrinsicSize
       && indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature
@@ -670,6 +686,8 @@ public struct ResolvedNode: Equatable, Sendable {
       && environmentSnapshot == other.environmentSnapshot
       && layoutBehavior.isEquivalentForPlacement(to: other.layoutBehavior)
       && layoutMetadata == other.layoutMetadata
+      && layoutDependentContent?.equivalenceSignature
+        == other.layoutDependentContent?.equivalenceSignature
       && drawPayload == other.drawPayload
       && intrinsicSize == other.intrinsicSize
       && indexedChildSource?.measurementSignature == other.indexedChildSource?.measurementSignature
@@ -707,6 +725,8 @@ extension ResolvedNode {
       && lhs.transactionSnapshot == rhs.transactionSnapshot
       && lhs.layoutBehavior == rhs.layoutBehavior
       && lhs.layoutMetadata == rhs.layoutMetadata
+      && lhs.layoutDependentContent?.equivalenceSignature
+        == rhs.layoutDependentContent?.equivalenceSignature
       && lhs.drawMetadata == rhs.drawMetadata
       && lhs.semanticMetadata == rhs.semanticMetadata
       && lhs.lifecycleMetadata == rhs.lifecycleMetadata

@@ -21,7 +21,7 @@ struct SafeAreaSurfaceTests {
 
     #expect(
       artifacts.rasterSurface.lines.contains { line in
-        line.contains("size 40x12 safe 1,2,3,4")
+        line.contains("size 34x8 safe 1,2,3,4")
       }
     )
   }
@@ -82,7 +82,7 @@ struct SafeAreaSurfaceTests {
   func ignoresSafeAreaRestoresOnlySelectedSafeAreaPaddingGeometryEdges() throws {
     let artifacts = render(
       GeometryReader { proxy in
-        Text(proxy.size == CellSize(width: 18, height: 8) ? "Y" : "N")
+        Text(proxy.size == CellSize(width: 16, height: 8) ? "Y" : "N")
       }
       .ignoresSafeArea(.top)
       .safeAreaPadding([.top, .leading]),
@@ -112,7 +112,7 @@ struct SafeAreaSurfaceTests {
   func safeAreaPaddingTightensGeometryReaderSize() throws {
     let artifacts = render(
       GeometryReader { proxy in
-        Text(proxy.size == CellSize(width: 18, height: 7) ? "Y" : "N")
+        Text(proxy.size == CellSize(width: 16, height: 6) ? "Y" : "N")
       }
       .safeAreaPadding([.top, .leading]),
       terminalSize: .init(width: 20, height: 8),

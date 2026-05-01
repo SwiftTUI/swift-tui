@@ -367,6 +367,24 @@ struct AsyncFrameTailRenderingTests {
     #expect(artifacts.rasterSurface.lines.joined(separator: "\n").contains("layout"))
   }
 
+  @Test("layout-dependent content forces async layout onto the main actor")
+  func layoutDependentContentForcesAsyncLayoutOntoMainActor() async throws {
+    let artifacts = await DefaultRenderer().renderAsync(
+      GeometryReader { proxy in
+        Text("geometry \(proxy.size.width)x\(proxy.size.height)")
+      },
+      context: .init(identity: testIdentity("AsyncGeometryRoot")),
+      proposal: .init(width: 24, height: 5)
+    )
+
+    let workerTimings = try #require(artifacts.diagnostics.workerTimings)
+    #expect(artifacts.diagnostics.layoutDependentRealizations == 1)
+    #expect(artifacts.diagnostics.layoutDependentMainActorFallbacks == 1)
+    #expect(workerTimings.layoutCompute == .zero)
+    #expect(workerTimings.rasterCompute != .zero)
+    #expect(artifacts.rasterSurface.lines.contains { $0.contains("geometry 24x5") })
+  }
+
   @Test("public SendableLayout opt-in runs layout on the frame-tail worker")
   func publicSendableLayoutOptInRunsLayoutOnFrameTailWorker() async throws {
     let rootIdentity = testIdentity("AsyncSendableLayoutRoot")
