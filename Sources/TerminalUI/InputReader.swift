@@ -2,7 +2,7 @@ import Core
 import Synchronization
 
 #if canImport(Dispatch)
-  import Dispatch
+  @preconcurrency import Dispatch
 #endif
 
 #if canImport(Darwin)
