@@ -165,13 +165,9 @@ Summarize the columns that explain cancellation pressure:
 - `coalesced_event_batches`
 - `drop_blockers`
 - `stale_frame_policy`
-
-For focused renderer or runtime assertions, also record the frame-artifact
-diagnostics that explain layout-dependent fallback:
-
-- `layoutDependentRealizations`
-- `layoutDependentRealizationCacheHits`
-- `layoutDependentMainActorFallbacks`
+- `layout_dependent_realizations`
+- `layout_dependent_cache_hits`
+- `layout_dependent_main_actor_fallbacks`
 
 The inventory should answer:
 
