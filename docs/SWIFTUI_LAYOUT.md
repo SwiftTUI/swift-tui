@@ -400,6 +400,12 @@ Anchor preferences deliberately split the two concerns:
 This keeps preference reduction deterministic while still letting overlays and
 backgrounds react to the actual frames assigned by layout.
 
+Named coordinate-space names should be unique within a rendered frame. If a
+frame contains duplicate names, geometry resolution preserves the existing
+last-writer-wins behavior and records a diagnostic. Missing named spaces keep
+the gesture-compatible fallback to global coordinates, also with a diagnostic,
+so terminal overlays stay resilient without silently hiding the fallback.
+
 ## 7. Alignment, Spacing, and Priority
 
 These are not separate subsystems. They are metadata that feed the same measurement-and-placement algorithm.

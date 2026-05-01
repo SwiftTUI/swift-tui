@@ -1,3 +1,5 @@
+import Synchronization
+
 /// An opaque reference to a value derived from a view's placed geometry.
 ///
 /// Anchor values are safe to store in ordinary preferences. Resolve them
@@ -88,16 +90,103 @@ package struct AnchorPayload: Equatable, Hashable, Sendable {
   }
 }
 
+package struct GeometryResolutionDiagnostics: Equatable, Sendable {
+  package var anchorResolutionMissCount: Int
+  package var firstAnchorResolutionMissIdentity: Identity?
+  package var missingNamedCoordinateSpaceCount: Int
+  package var firstMissingNamedCoordinateSpaceName: String?
+  package var duplicateNamedCoordinateSpaceCount: Int
+  package var firstDuplicateNamedCoordinateSpaceName: String?
+
+  package init(
+    anchorResolutionMissCount: Int = 0,
+    firstAnchorResolutionMissIdentity: Identity? = nil,
+    missingNamedCoordinateSpaceCount: Int = 0,
+    firstMissingNamedCoordinateSpaceName: String? = nil,
+    duplicateNamedCoordinateSpaceCount: Int = 0,
+    firstDuplicateNamedCoordinateSpaceName: String? = nil
+  ) {
+    self.anchorResolutionMissCount = anchorResolutionMissCount
+    self.firstAnchorResolutionMissIdentity = firstAnchorResolutionMissIdentity
+    self.missingNamedCoordinateSpaceCount = missingNamedCoordinateSpaceCount
+    self.firstMissingNamedCoordinateSpaceName = firstMissingNamedCoordinateSpaceName
+    self.duplicateNamedCoordinateSpaceCount = duplicateNamedCoordinateSpaceCount
+    self.firstDuplicateNamedCoordinateSpaceName = firstDuplicateNamedCoordinateSpaceName
+  }
+}
+
+package final class GeometryResolutionDiagnosticsRecorder: Sendable {
+  private let state = Mutex(GeometryResolutionDiagnostics())
+
+  package init() {}
+
+  package var snapshot: GeometryResolutionDiagnostics {
+    state.withLock { $0 }
+  }
+
+  package func recordAnchorResolutionMiss(
+    identity: Identity
+  ) {
+    state.withLock {
+      $0.anchorResolutionMissCount += 1
+      if $0.firstAnchorResolutionMissIdentity == nil {
+        $0.firstAnchorResolutionMissIdentity = identity
+      }
+    }
+  }
+
+  package func recordMissingNamedCoordinateSpace(
+    name: String
+  ) {
+    state.withLock {
+      $0.missingNamedCoordinateSpaceCount += 1
+      if $0.firstMissingNamedCoordinateSpaceName == nil {
+        $0.firstMissingNamedCoordinateSpaceName = name
+      }
+    }
+  }
+
+  package func recordDuplicateNamedCoordinateSpace(
+    name: String
+  ) {
+    state.withLock {
+      $0.duplicateNamedCoordinateSpaceCount += 1
+      if $0.firstDuplicateNamedCoordinateSpaceName == nil {
+        $0.firstDuplicateNamedCoordinateSpaceName = name
+      }
+    }
+  }
+}
+
 package struct PlacedFrameTable: Equatable, Sendable {
   package private(set) var framesByIdentity: [Identity: CellRect]
   package private(set) var namedCoordinateSpaces: [String: CellRect]
+  package private(set) var namedCoordinateSpaceIdentities: [String: Identity]
+  package let diagnosticsRecorder: GeometryResolutionDiagnosticsRecorder?
 
   package init(
     framesByIdentity: [Identity: CellRect] = [:],
-    namedCoordinateSpaces: [String: CellRect] = [:]
+    namedCoordinateSpaces: [String: CellRect] = [:],
+    namedCoordinateSpaceIdentities: [String: Identity] = [:],
+    diagnosticsRecorder: GeometryResolutionDiagnosticsRecorder? = nil
   ) {
     self.framesByIdentity = framesByIdentity
     self.namedCoordinateSpaces = namedCoordinateSpaces
+    self.namedCoordinateSpaceIdentities = namedCoordinateSpaceIdentities
+    self.diagnosticsRecorder = diagnosticsRecorder
+  }
+
+  package static func == (
+    lhs: Self,
+    rhs: Self
+  ) -> Bool {
+    lhs.framesByIdentity == rhs.framesByIdentity
+      && lhs.namedCoordinateSpaces == rhs.namedCoordinateSpaces
+      && lhs.namedCoordinateSpaceIdentities == rhs.namedCoordinateSpaceIdentities
+  }
+
+  package var geometryResolutionDiagnostics: GeometryResolutionDiagnostics {
+    diagnosticsRecorder?.snapshot ?? .init()
   }
 
   package mutating func record(
@@ -108,6 +197,14 @@ package struct PlacedFrameTable: Equatable, Sendable {
     framesByIdentity[identity] = bounds
 
     if let namedCoordinateSpaceName {
+      if let existingIdentity = namedCoordinateSpaceIdentities[namedCoordinateSpaceName],
+        existingIdentity != identity
+      {
+        diagnosticsRecorder?.recordDuplicateNamedCoordinateSpace(
+          name: namedCoordinateSpaceName
+        )
+      }
+      namedCoordinateSpaceIdentities[namedCoordinateSpaceName] = identity
       namedCoordinateSpaces[namedCoordinateSpaceName] = bounds
     }
   }
@@ -115,6 +212,10 @@ package struct PlacedFrameTable: Equatable, Sendable {
   package func frame(
     for identity: Identity
   ) -> CellRect? {
-    framesByIdentity[identity]
+    guard let frame = framesByIdentity[identity] else {
+      diagnosticsRecorder?.recordAnchorResolutionMiss(identity: identity)
+      return nil
+    }
+    return frame
   }
 }

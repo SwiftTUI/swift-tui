@@ -54,6 +54,11 @@ VStack(alignment: .leading) {
 }
 ```
 
+Named coordinate-space names should be unique in a rendered frame. Duplicate
+names currently keep last-writer-wins behavior, and missing names fall back to
+global coordinates for compatibility with gesture resolution. Both cases are
+recorded in frame diagnostics.
+
 Anchor resolution is intentionally layout-time. Measuring a ``GeometryReader``
 or an unselected ``ViewThatFits`` candidate does not realize its authored
 content or commit lifecycle, task, gesture, command, drop, focus, or semantic

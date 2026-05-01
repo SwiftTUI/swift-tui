@@ -165,4 +165,113 @@ struct AnchorPreferenceSurfaceTests {
       }
     )
   }
+
+  @Test("GeometryProxy frame resolves named spaces inside layout-dependent content")
+  func geometryProxyFrameResolvesNamesInsideLayoutDependentContent() {
+    let artifacts = DefaultRenderer().render(
+      GeometryReader { _ in
+        VStack(alignment: .leading, spacing: 0) {
+          Text("Board")
+            .frame(width: 10, height: 1)
+            .coordinateSpace(name: "board")
+          GeometryReader { proxy in
+            let frame = proxy.frame(in: .named("board"))
+            Text("\(Int(frame.origin.x)),\(Int(frame.origin.y))")
+          }
+          .frame(width: 10, height: 1)
+        }
+      }
+      .frame(width: 10, height: 2),
+      proposal: .init(width: 20, height: 2)
+    )
+
+    #expect(
+      artifacts.rasterSurface.lines.contains { line in
+        line.contains("0,1")
+      }
+    )
+  }
+
+  @Test("Missing named coordinate spaces fall back to global and record diagnostics")
+  func missingNamedCoordinateSpaceFallbackRecordsDiagnostics() {
+    let artifacts = DefaultRenderer().render(
+      HStack(alignment: .top, spacing: 2) {
+        Text("A")
+          .frame(width: 3, height: 1)
+        GeometryReader { proxy in
+          let frame = proxy.frame(in: .named("missing"))
+          Text("\(Int(frame.origin.x)),\(Int(frame.origin.y))")
+        }
+        .frame(width: 10, height: 1)
+      },
+      proposal: .init(width: 20, height: 1)
+    )
+
+    #expect(
+      artifacts.rasterSurface.lines.contains { line in
+        line.contains("5,0")
+      }
+    )
+    let diagnostics = artifacts.diagnostics.geometryResolutionDiagnostics
+    #expect(diagnostics.missingNamedCoordinateSpaceCount == 1)
+    #expect(diagnostics.firstMissingNamedCoordinateSpaceName == "missing")
+  }
+
+  @Test("Duplicate named coordinate spaces are last-writer-wins and diagnostic")
+  func duplicateNamedCoordinateSpacesAreLastWriterWinsAndDiagnostic() {
+    let artifacts = DefaultRenderer().render(
+      VStack(alignment: .leading, spacing: 0) {
+        Text("First")
+          .frame(width: 10, height: 1)
+          .coordinateSpace(name: "board")
+        Text("Second")
+          .frame(width: 10, height: 1)
+          .coordinateSpace(name: "board")
+        GeometryReader { proxy in
+          let frame = proxy.frame(in: .named("board"))
+          Text("\(Int(frame.origin.x)),\(Int(frame.origin.y))")
+        }
+        .frame(width: 10, height: 1)
+      },
+      proposal: .init(width: 20, height: 3)
+    )
+
+    #expect(
+      artifacts.rasterSurface.lines.contains { line in
+        line.contains("0,1")
+      }
+    )
+    let diagnostics = artifacts.diagnostics.geometryResolutionDiagnostics
+    #expect(diagnostics.duplicateNamedCoordinateSpaceCount == 1)
+    #expect(diagnostics.firstDuplicateNamedCoordinateSpaceName == "board")
+  }
+
+  @Test("Unresolved anchors return zero and record diagnostics")
+  func unresolvedAnchorFallbackRecordsDiagnostics() {
+    let missingAnchor = Anchor<Rect>(
+      identity: testIdentity("MissingAnchor"),
+      kind: .bounds
+    )
+
+    let artifacts = DefaultRenderer().render(
+      GeometryReader { proxy in
+        let rect = proxy[missingAnchor]
+        Text(
+          "\(Int(rect.origin.x)),\(Int(rect.origin.y)) "
+            + "\(Int(rect.size.width))x\(Int(rect.size.height))"
+        )
+      }
+      .frame(width: 10, height: 1),
+      proposal: .init(width: 20, height: 1)
+    )
+
+    #expect(
+      artifacts.rasterSurface.lines.contains { line in
+        line.contains("0,0 0x0")
+      }
+    )
+    let diagnostics = artifacts.diagnostics.geometryResolutionDiagnostics
+    #expect(diagnostics.anchorResolutionMissCount == 1)
+    #expect(diagnostics.firstAnchorResolutionMissIdentity == testIdentity("MissingAnchor"))
+  }
 }
