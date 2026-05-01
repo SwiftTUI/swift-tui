@@ -1,8 +1,9 @@
 # Async Rendering
 
 This page is the current-state map for async presentation, off-main frame-tail
-rendering, custom-layout worker eligibility, and future stale-frame handling.
-Use it as the entry point before reading the supporting proposal files.
+rendering, layout-dependent content realization, custom-layout worker
+eligibility, and future stale-frame handling. Use it as the entry point before
+reading the supporting proposal files.
 
 ## Current Contract
 
@@ -15,7 +16,8 @@ The current frame ownership model is:
 ```
 main actor: resolve -> animation interpolation
 worker when eligible: measure -> place
-main actor fallback: ordinary custom Layout measure -> place
+main actor fallback: ordinary custom Layout, main-actor-only indexed child
+  sources, or layout-dependent content realization during layout
 worker: placed-overlay application -> semantics -> draw -> raster
 main actor: commit -> present -> lifecycle
 writer queue: terminal write(2)
@@ -23,7 +25,10 @@ writer queue: terminal write(2)
 
 The important invariant is ordered commit. When a worker frame starts or
 finishes, the main actor commits it before rendering and presenting newer state.
-Computed pipeline frames are not dropped.
+Computed pipeline frames are not dropped. Layout-dependent content realization
+is part of the current frame's layout work; any realized subtree is folded back
+into the committed resolved tree before semantics, draw, raster, and lifecycle
+commit.
 
 ## What Has Landed
 
@@ -40,12 +45,23 @@ Computed pipeline frames are not dropped.
   `TabViewContainerLayout`.
 - Lazy indexed child sources can be snapshotted on the main actor and then used
   by worker layout when their visible children are worker-safe.
+- Layout-dependent content boundaries let resolve leave a placeholder that
+  layout can realize from concrete placement geometry. `GeometryReader` is the
+  first public adopter: its content is realized from final bounds, safe-area
+  insets, cell metrics, pointer capabilities, and the placed-frame table.
+- Public anchor preferences and `GeometryProxy.frame(in:)` resolve against
+  placed frames instead of the old resolve-time `terminalSize` local-geometry
+  bridge.
 - Runtime diagnostics record render generations, worker timings, main-actor
   blocked/suspended time, coalesced event batches, coalesced intent-request
-  pressure, drop blockers, and `stale_frame_policy=commit_ordered`.
+  pressure, geometry-resolution misses, drop blockers, and
+  `stale_frame_policy=commit_ordered`. Frame-artifact diagnostics also record
+  layout-dependent realization count, realization cache hits, and main-actor
+  fallback count.
 - Async stress tests cover blocked worker tails, queued input, ordered commit,
   sync/async artifact parity, `SendableLayout` worker execution, retained layout
-  reuse, focus convergence, and framework layout worker paths.
+  reuse, focus convergence, framework layout worker paths, and main-actor
+  fallback when layout-dependent content is present.
 
 ## What Still Runs On The Main Actor
 
@@ -54,11 +70,20 @@ Computed pipeline frames are not dropped.
   lifecycle, task, command, gesture, and runtime registration mutation.
 - Ordinary public `Layout` conformers that do not opt in to `SendableLayout`.
 - Custom layouts with non-Sendable caches or main-actor-only proxy state.
+- Layout-dependent authored content realization, including `GeometryReader`
+  content. In async rendering, a tree with layout-dependent content keeps the
+  layout pass on the main actor and records a fallback diagnostic; raster work
+  still runs on the frame-tail worker.
 - Commit planning effects and lifecycle/task application.
 - Terminal presentation state synchronization before output is handed to the
   writer queue.
 
 ## What Is Not Implemented
+
+Off-main realization of arbitrary authored layout-dependent content is not
+implemented. A worker-safe snapshot model would have to prove the same runtime
+registration, state, observation, lifecycle, task, focus, command, drop, and
+preference guarantees that ordinary main-actor view evaluation has today.
 
 Worker-job cancellation is not implemented.
 
@@ -141,10 +166,19 @@ Summarize the columns that explain cancellation pressure:
 - `drop_blockers`
 - `stale_frame_policy`
 
-The inventory should answer two questions:
+For focused renderer or runtime assertions, also record the frame-artifact
+diagnostics that explain layout-dependent fallback:
+
+- `layoutDependentRealizations`
+- `layoutDependentRealizationCacheHits`
+- `layoutDependentMainActorFallbacks`
+
+The inventory should answer:
 
 - Are input bursts or worker queue delays creating stale-generation pressure?
 - Which blockers keep the current frames on the ordered-commit path?
+- Which frames are no longer worker-layout eligible because layout has to
+  realize authored geometry content?
 
 Use that inventory to choose tests and scenarios. It is not enough to add a
 renderer-only unit test for this tranche; the failure mode from the reverted
@@ -234,8 +268,8 @@ Start with evidence and coverage while preserving ordered commit:
   dispatch survived.
 - Produce a small inventory of which frames are currently blocked by
   `.unobservable`, handler installations, lifecycle/task work, and custom-layout
-  fallback. This tells us whether cancellation pressure is real before adding a
-  cancellation path.
+  fallback, including layout-dependent realization fallback. This tells us
+  whether cancellation pressure is real before adding a cancellation path.
 
 Exit criteria: no runtime behavior changes, green focused async/runtime tests,
 and a diagnostics-backed list of the highest-value cancellation scenarios.
@@ -308,6 +342,7 @@ repaint barriers.
 | Public `SendableLayout` opt-in | Shipped | Worker-safe custom layouts off-main. |
 | Framework layout migration | Shipped for known safe layouts | Continue layout by layout. |
 | Lazy indexed child snapshots | Shipped | Main actor resolves visible children before worker use. |
+| Layout-dependent content realization | Shipped for `GeometryReader` and anchor geometry | Forces main-actor layout fallback when arbitrary authored content is present. |
 | Abortable prepared frame heads | Not shipped | Previous implementation was reverted. |
 | Cancellable pre-start tail jobs | Not shipped | Blocked on safe abort or draft-only effects. |
 | Visual-only completed-frame drops | Not shipped | Classifier exists; no drops yet. |
@@ -332,6 +367,15 @@ repaint barriers.
   records the shipped initial frame-tail worker plan.
 - [plans/2026-04-26-002-frame-head-abort-plan.md](plans/2026-04-26-002-frame-head-abort-plan.md)
   records the reverted frame-head abort attempt and the post-mortem.
+- [plans/2026-05-01-001-layout-dependent-content-realization-plan.md](plans/2026-05-01-001-layout-dependent-content-realization-plan.md)
+  records the shipped layout-time realization seam for `GeometryReader`.
+- [plans/2026-05-01-002-public-anchor-geometry-preferences-plan.md](plans/2026-05-01-002-public-anchor-geometry-preferences-plan.md)
+  records the shipped anchor preference and `GeometryProxy.frame(in:)` API.
+- [plans/2026-05-01-003-layout-dependent-container-audit.md](plans/2026-05-01-003-layout-dependent-container-audit.md)
+  records the audit of remaining container geometry and worker-eligibility
+  assumptions.
+- [plans/2026-05-01-004-layout-dependent-container-hardening-plan.md](plans/2026-05-01-004-layout-dependent-container-hardening-plan.md)
+  records the container regression coverage around layout-dependent geometry.
 
 ## Code Anchors
 
@@ -345,6 +389,10 @@ repaint barriers.
   stale policy, and geometry resolution misses.
 - `Sources/Core/FrameDropEligibility.swift`: conservative observational
   classifier for completed-frame drop blockers.
+- `Sources/Core/LayoutDependentContent.swift`: layout-time realization
+  boundaries, realization context, and per-pass realization cache.
+- `Sources/View/GeometryReading/GeometryReader.swift`: public adopter that
+  realizes content from placed geometry instead of resolve-time terminal size.
 - `Sources/View/Layout/Layout.swift`: public `SendableLayout` opt-in and
   worker-capable layout erasure.
 - `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`: async tail,
@@ -355,6 +403,9 @@ repaint barriers.
 
 - Do not move `resolve` off-main as part of frame-tail work.
 - Do not force ordinary public `Layout` conformers onto the worker.
+- Do not move arbitrary layout-dependent content realization onto the worker
+  without a separate snapshot contract for authored view evaluation and runtime
+  side effects.
 - Do not drop a computed pipeline frame unless a tested eligibility classifier
   proves the frame has no side effects that need commit or reconciliation.
 - Do not treat the current observational `FrameDropEligibility` result as
