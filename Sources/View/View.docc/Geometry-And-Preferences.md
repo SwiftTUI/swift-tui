@@ -64,6 +64,139 @@ or an unselected ``ViewThatFits`` candidate does not realize its authored
 content or commit lifecycle, task, gesture, command, drop, focus, or semantic
 side effects.
 
+## Cookbook
+
+The current API is intentionally explicit: publish opaque geometry with
+preferences, then resolve it inside ``GeometryReader`` after placement. Prefer
+these patterns before adding helper APIs for geometry-change callbacks or
+broader geometry effects.
+
+### Draw A Marker Around Child Bounds
+
+Use an anchor preference when the child owns the geometry and an overlay owns
+the marker. The marker reads the resolved rectangle in the overlay's local
+space, then places a stroked rectangle over the child.
+
+```swift
+private enum BoundsMarkerKey: PreferenceKey {
+  static let defaultValue: Anchor<Rect>? = nil
+
+  static func reduce(
+    value: inout Anchor<Rect>?,
+    nextValue: () -> Anchor<Rect>?
+  ) {
+    value = nextValue() ?? value
+  }
+}
+
+struct MarkedLabel: View {
+  var body: some View {
+    Text("Deploy")
+      .padding(1)
+      .anchorPreference(key: BoundsMarkerKey.self, value: .bounds) { $0 }
+      .overlayPreferenceValue(
+        BoundsMarkerKey.self,
+        alignment: .topLeading
+      ) { anchor in
+        GeometryReader { proxy in
+          if let anchor {
+            let rect = proxy[anchor]
+
+            Rectangle()
+              .strokeBorder(.terminalBorder(.accent))
+              .frame(
+                width: Int(rect.size.width),
+                height: Int(rect.size.height)
+              )
+              .offset(
+                x: Int(rect.origin.x),
+                y: Int(rect.origin.y)
+              )
+          }
+        }
+      }
+  }
+}
+```
+
+### Align Overlay To A Named Space
+
+Use ``View/coordinateSpace(name:)`` when the overlay should align to a sibling
+or ancestor region instead of the overlay's own local bounds.
+
+```swift
+struct HeaderBadge: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack(spacing: 1) {
+        Text("Name")
+          .frame(width: 12, alignment: .topLeading)
+          .coordinateSpace(name: "name-column")
+
+        Text("Status")
+      }
+
+      Text("Recorder")
+      Text("TerminalUI")
+    }
+    .overlay(alignment: .topLeading) {
+      GeometryReader { proxy in
+        let column = proxy.frame(in: .named("name-column"))
+
+        Text("^")
+          .foregroundStyle(.terminalBorder(.accent))
+          .offset(
+            x: Int(column.origin.x),
+            y: Int(column.maxY)
+          )
+      }
+    }
+  }
+}
+```
+
+Named-space lookup is placement-time. Moving the named view inside a
+``ScrollView``, lazy stack, safe-area inset, or custom ``Layout`` updates the
+resolved frame when the view is placed.
+
+### Diagnose Missing Names
+
+Missing named coordinate spaces fall back to global coordinates so existing
+gesture and overlay code keeps rendering. Treat that fallback as a diagnostic
+signal, not as a layout contract.
+
+```swift
+struct MissingNameProbe: View {
+  var body: some View {
+    VStack(alignment: .leading) {
+      Text("Panel")
+        .coordinateSpace(name: "details-panel")
+
+      GeometryReader { proxy in
+        // Typo: this name does not match "details-panel".
+        let frame = proxy.frame(in: .named("detail-panel"))
+        Text("probe \(Int(frame.origin.x)),\(Int(frame.origin.y))")
+      }
+    }
+  }
+}
+```
+
+When running through a terminal `RunLoop`, install `FrameDiagnosticsLogger`
+and inspect the geometry columns:
+
+```swift
+runLoop.diagnosticsLogger = FrameDiagnosticsLogger(
+  path: "/tmp/terminalui-frames.tsv"
+)
+```
+
+The TSV columns `geometry_missing_named_coordinate_spaces` and
+`first_geometry_missing_named_coordinate_space` identify frames that resolved a
+missing name. Duplicate names are also recorded in
+`geometry_duplicate_named_coordinate_spaces` and
+`first_geometry_duplicate_named_coordinate_space`.
+
 ## Container And Layout Boundaries
 
 Containers that defer child placement also defer local geometry. `ScrollView`,
@@ -84,8 +217,6 @@ realization stays on the placement side of the pipeline.
 
 ### Anchor Preferences
 
-- `Anchor`
-- `AnchorSource`
 - ``View/anchorPreference(key:value:transform:)``
 - ``View/transformAnchorPreference(_:value:transform:)``
 
