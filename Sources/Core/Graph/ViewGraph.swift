@@ -741,6 +741,15 @@ package final class ViewGraph {
     )
   }
 
+  package func restoreCurrentFrameRuntimeRegistrations(
+    into registrations: RuntimeRegistrationSet
+  ) {
+    var restoredIdentities: Set<Identity> = []
+    for identity in frameOrder where restoredIdentities.insert(identity).inserted {
+      nodesByIdentity[identity]?.restoreOwnRuntimeRegistrations(into: registrations)
+    }
+  }
+
   private func restoreRuntimeRegistrations(
     for resolved: ResolvedNode,
     registrations: RuntimeRegistrationSet

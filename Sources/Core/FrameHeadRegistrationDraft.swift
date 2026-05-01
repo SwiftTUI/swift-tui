@@ -39,7 +39,7 @@ package final class FrameHeadRegistrationDraft {
 
   package func commitRestoring(
     from viewGraph: ViewGraph,
-    resolved: ResolvedNode
+    resolved _: ResolvedNode
   ) {
     precondition(!didCommit && !didDiscard)
     switch liveMutation {
@@ -50,10 +50,7 @@ package final class FrameHeadRegistrationDraft {
     case .removeSubtrees(let roots):
       liveRegistrations.removeSubtrees(rootedAt: roots)
     }
-    viewGraph.restoreRuntimeRegistrations(
-      for: resolved,
-      into: liveRegistrations
-    )
+    viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
     didCommit = true
   }
 
