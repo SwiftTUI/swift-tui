@@ -894,7 +894,9 @@ struct AsyncFrameTailRenderingTests {
   @Test("sync and async renderer artifacts stay equivalent")
   func syncAndAsyncRendererArtifactsStayEquivalent() async {
     let rootIdentity = testIdentity("AsyncFrameTailParityRoot")
+    let commandRootIdentity = testIdentity("AsyncFrameTailCommandParityRoot")
     let proposal = ProposedSize(width: 24, height: 5)
+    let commandRecorder = AsyncFrameHeadAbortEffectRecorder()
 
     @MainActor
     func root() -> some View {
@@ -905,6 +907,14 @@ struct AsyncFrameTailRenderingTests {
           Text("B")
         }
       }
+    }
+
+    @MainActor
+    func commandRoot() -> some View {
+      AsyncFrameHeadDraftKeyCommandView(
+        value: 1,
+        recorder: commandRecorder
+      )
     }
 
     let syncArtifacts = DefaultRenderer().render(
@@ -921,6 +931,64 @@ struct AsyncFrameTailRenderingTests {
     )
 
     #expect(syncArtifacts == asyncArtifacts)
+
+    let syncCommandArtifacts = DefaultRenderer().render(
+      commandRoot(),
+      context: .init(identity: commandRootIdentity),
+      proposal: proposal,
+      collectsDiagnostics: false
+    )
+    let asyncCommandArtifacts = await DefaultRenderer().renderAsync(
+      commandRoot(),
+      context: .init(identity: commandRootIdentity),
+      proposal: proposal,
+      collectsDiagnostics: false
+    )
+
+    #expect(syncCommandArtifacts == asyncCommandArtifacts)
+  }
+
+  @Test("sync renderer commits draft key command registrations")
+  func syncRendererCommitsDraftKeyCommandRegistrations() throws {
+    let rootIdentity = testIdentity("SyncFrameHeadDraftKeyCommandRoot")
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let commandRegistry = CommandRegistry()
+    let initialBinding = KeyBinding(key: .character("i"), modifiers: .ctrl)
+    let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
+    var context = ResolveContext(identity: rootIdentity)
+    context.commandRegistry = commandRegistry
+
+    _ = renderer.render(
+      AsyncFrameHeadDraftKeyCommandView(
+        value: 0,
+        recorder: recorder
+      ),
+      context: context,
+      proposal: .init(width: 24, height: 5),
+      collectsDiagnostics: false
+    )
+    let commandScope = try #require(
+      commandRegistry.snapshot().keyCommandsByScope.first {
+        $0.value[initialBinding] != nil
+      }?.key
+    )
+    #expect(
+      commandRegistry.keyCommand(at: commandScope, matching: draftBinding)?.isEnabled == false)
+
+    var updateContext = context
+    updateContext.invalidatedIdentities = [rootIdentity]
+    _ = renderer.render(
+      AsyncFrameHeadDraftKeyCommandView(
+        value: 1,
+        recorder: recorder
+      ),
+      context: updateContext,
+      proposal: .init(width: 24, height: 5),
+      collectsDiagnostics: false
+    )
+
+    #expect(commandRegistry.keyCommand(at: commandScope, matching: draftBinding)?.isEnabled == true)
   }
 
   @Test("frame-head abort scaffold records normal committed effects")

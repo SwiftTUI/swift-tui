@@ -1168,7 +1168,12 @@ public struct DefaultRenderer {
     let renderGeneration = renderGenerationSequencer.next()
 
     var resolveContext = context
-    let runtimeRegistrations = resolveContext.runtimeRegistrations
+    let registrationDraft = FrameHeadRegistrationDraft(
+      liveRegistrations: resolveContext.runtimeRegistrations
+    )
+    resolveContext = resolveContext.replacingRuntimeRegistrations(
+      registrationDraft.draftRegistrations
+    )
     resolveContext.imageAssetResolver = imageRepository.resolver()
     resolveContext.frameState = frameState
     frameState.update(from: resolveContext, proposal: proposal)
@@ -1205,11 +1210,11 @@ public struct DefaultRenderer {
     } else {
       let dirtyEvaluationPlan = viewGraph.selectiveDirtyEvaluationPlan()
       if let dirtyEvaluationPlan {
-        runtimeRegistrations.removeSubtrees(
+        registrationDraft.recordRemoveSubtrees(
           rootedAt: dirtyEvaluationPlan.frontierIdentities
         )
       } else {
-        runtimeRegistrations.resetAll()
+        registrationDraft.recordResetAll()
       }
 
       (_, resolveDuration) = measurePhase(clock: clock) {
@@ -1271,6 +1276,10 @@ public struct DefaultRenderer {
     )
     resolved = resolved.applyingLayoutDependentRealizations(
       layoutPassContext.layoutDependentRealizationsByIdentity
+    )
+    registrationDraft.commitRestoring(
+      from: viewGraph,
+      resolved: resolved
     )
     let placed = tailLayout.baselinePlaced
     // Capture the BASELINE placed tree (pre-overlay) for two things:
