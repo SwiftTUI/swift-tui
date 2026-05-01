@@ -337,6 +337,8 @@ Long term:
   convenience or become a true layout-time primitive.
 - If it becomes layout-time, design it alongside retained tree reuse and
   lifecycle/registration staging rather than as an isolated view change.
+- The proposed full-fix approach is now tracked in the
+  [layout-dependent content realization plan](docs/plans/2026-05-01-001-layout-dependent-content-realization-plan.md).
 
 ## Practical Guidance
 
