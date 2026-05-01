@@ -147,6 +147,40 @@ struct SafeAreaSurfaceTests {
     #expect(base.bounds.size == .init(width: 1, height: 1))
   }
 
+  @Test("safeAreaInset realizes base and inset GeometryReader content with placed bounds")
+  func safeAreaInsetRealizesGeometryReadersWithPlacedBounds() throws {
+    let artifacts = render(
+      GeometryReader { proxy in
+        Text(
+          "base \(proxy.size.width)x\(proxy.size.height) safe \(proxy.safeAreaInsets.top)"
+        )
+      }
+      .safeAreaInset(edge: .top, alignment: .topLeading) {
+        GeometryReader { proxy in
+          Text(
+            "inset \(proxy.size.width)x\(proxy.size.height) safe \(proxy.safeAreaInsets.top)"
+          )
+        }
+        .frame(width: 20, height: 2, alignment: .topLeading)
+      },
+      terminalSize: .init(width: 20, height: 8),
+      safeAreaInsets: .init(top: 1, leading: 0, bottom: 0, trailing: 0)
+    )
+
+    let rendered = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(rendered.contains("inset 20x2 safe 1"))
+    #expect(rendered.contains("base 20x6 safe 1"))
+    #expect(artifacts.diagnostics.layoutDependentRealizations == 2)
+
+    let insetWrapper = try #require(artifacts.placedTree.children.first)
+    let base = try #require(insetWrapper.children.first)
+    let inset = try #require(insetWrapper.children.dropFirst().first)
+    #expect(inset.bounds.origin == .init(x: 0, y: 0))
+    #expect(inset.bounds.size == .init(width: 20, height: 2))
+    #expect(base.bounds.origin == .init(x: 0, y: 2))
+    #expect(base.bounds.size == .init(width: 20, height: 6))
+  }
+
   private func render<V: View>(
     _ view: V,
     terminalSize: CellSize,

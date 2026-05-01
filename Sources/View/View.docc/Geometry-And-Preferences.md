@@ -64,6 +64,22 @@ or an unselected ``ViewThatFits`` candidate does not realize its authored
 content or commit lifecycle, task, gesture, command, drop, focus, or semantic
 side effects.
 
+## Container And Layout Boundaries
+
+Containers that defer child placement also defer local geometry. `ScrollView`,
+lazy stacks, ``ViewThatFits``, and safe-area containers may measure a
+layout-dependent subtree without realizing the `GeometryReader` body. The body
+runs only when the selected or visible branch is placed with concrete bounds.
+
+Custom ``Layout`` implementations participate in the same split. Calls to
+``LayoutSubview/sizeThatFits(_:)`` measure a subview and must not depend on
+`GeometryReader` body side effects. The matching
+``LayoutSubview/place(at:anchor:proposal:)`` call establishes the child-local
+geometry that `GeometryReader`, anchor preferences, global frames, and named
+coordinate spaces observe. Layouts that provide sendable measurement and
+placement signatures remain eligible for the frame-tail worker because geometry
+realization stays on the placement side of the pipeline.
+
 ## Topics
 
 ### Anchor Preferences
