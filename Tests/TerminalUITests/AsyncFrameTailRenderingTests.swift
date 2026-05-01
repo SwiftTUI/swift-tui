@@ -1254,6 +1254,166 @@ struct AsyncFrameTailRenderingTests {
     #expect(recorder.events.contains("draft"))
   }
 
+  @Test("blocked async frame head preserves untouched sibling commands during selective dirty")
+  func blockedAsyncFrameHeadPreservesUntouchedSiblingCommandsDuringSelectiveDirty() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadSelectiveDraftRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { _, _ in
+        AsyncFrameHeadSelectiveDraftRegistrationView(recorder: recorder)
+      }
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+    renderer.enableSelectiveEvaluation()
+
+    let siblingABinding = KeyBinding(key: .character("a"), modifiers: .ctrl)
+    let siblingBBinding = KeyBinding(key: .character("b"), modifiers: .ctrl)
+    let siblingAScope = try #require(
+      runLoop.commandRegistry.snapshot().keyCommandsByScope.first {
+        $0.value[siblingABinding] != nil
+      }?.key
+    )
+    let siblingBScope = try #require(
+      runLoop.commandRegistry.snapshot().keyCommandsByScope.first {
+        $0.value[siblingBBinding] != nil
+      }?.key
+    )
+
+    let gate = AsyncFrameTailBlockingGate()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    _ = runLoop.handleKeyPress(KeyPress(.character("e"), modifiers: .ctrl))
+    #expect(recorder.events.contains("toggle"))
+
+    let renderTask = Task { @MainActor in
+      var renderedFrames = 0
+      try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+      return renderedFrames
+    }
+
+    await gate.waitUntilBlocked()
+
+    #expect(
+      runLoop.commandRegistry.dispatch(
+        key: siblingABinding,
+        along: [siblingAScope]
+      )
+    )
+    #expect(recorder.events.contains("sibling-a"))
+    #expect(
+      runLoop.commandRegistry.keyCommand(at: siblingBScope, matching: siblingBBinding)?
+        .isEnabled == false
+    )
+
+    gate.release()
+    _ = try await valueWithTimeout {
+      try await renderTask.value
+    }
+
+    #expect(
+      runLoop.commandRegistry.keyCommand(at: siblingBScope, matching: siblingBBinding)?
+        .isEnabled == true
+    )
+    #expect(
+      runLoop.commandRegistry.dispatch(
+        key: siblingBBinding,
+        along: [siblingBScope]
+      )
+    )
+    #expect(recorder.events.contains("sibling-b-new"))
+  }
+
+  @Test("blocked async frame head keeps draft drop destinations out of live dispatch")
+  func blockedAsyncFrameHeadKeepsDraftDropDestinationsOutOfLiveDispatch() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadDraftDropRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameHeadDraftDropDestinationView(
+          value: value,
+          recorder: recorder
+        )
+      }
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+    #expect(runLoop.focusTracker.currentFocusIdentity != nil)
+
+    let gate = AsyncFrameTailBlockingGate()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    runLoop.stateContainer.mutate { value in
+      value = 1
+    }
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+
+    let renderTask = Task { @MainActor in
+      var renderedFrames = 0
+      try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+      return renderedFrames
+    }
+
+    await gate.waitUntilBlocked()
+
+    runLoop.handlePaste(PasteEvent(content: "/tmp/draft-drop.txt"))
+    #expect(!recorder.events.contains("drop:1"))
+
+    gate.release()
+    _ = try await valueWithTimeout {
+      try await renderTask.value
+    }
+
+    runLoop.handlePaste(PasteEvent(content: "/tmp/draft-drop.txt"))
+    #expect(recorder.events.contains("drop:1"))
+  }
+
   @Test("async renderer tags monotonically increasing render generations")
   func asyncRendererTagsMonotonicallyIncreasingRenderGenerations() async {
     let renderer = DefaultRenderer()
@@ -1464,6 +1624,62 @@ private struct AsyncFrameHeadDraftKeyCommandView: View {
       isEnabled: value != 0
     ) {
       recorder.record("draft")
+    }
+  }
+}
+
+private struct AsyncFrameHeadSelectiveDraftRegistrationView: View {
+  @State private var draftEnabled = false
+
+  var recorder: AsyncFrameHeadAbortEffectRecorder
+
+  var body: some View {
+    Panel(id: "selective-root") {
+      VStack(alignment: .leading, spacing: 0) {
+        Panel(id: "sibling-a") {
+          Text("A")
+            .focusable(true)
+        }
+        .keyCommand("Sibling A", key: .character("a"), modifiers: .ctrl) {
+          recorder.record("sibling-a")
+        }
+
+        Panel(id: "sibling-b") {
+          Text(draftEnabled ? "B1" : "B0")
+            .focusable(true)
+        }
+        .keyCommand(
+          "Sibling B",
+          key: .character("b"),
+          modifiers: .ctrl,
+          isEnabled: draftEnabled
+        ) {
+          recorder.record("sibling-b-new")
+        }
+      }
+    }
+    .keyCommand("Enable B", key: .character("e"), modifiers: .ctrl) {
+      draftEnabled = true
+      recorder.record("toggle")
+    }
+  }
+}
+
+private struct AsyncFrameHeadDraftDropDestinationView: View {
+  var value: Int
+  var recorder: AsyncFrameHeadAbortEffectRecorder
+
+  var body: some View {
+    Panel(id: "draft-drop") {
+      Text("drop \(value)")
+        .focusable(true)
+    }
+    .dropDestination { paths in
+      guard value != 0 else {
+        return false
+      }
+      recorder.record("drop:\(paths.count)")
+      return true
     }
   }
 }

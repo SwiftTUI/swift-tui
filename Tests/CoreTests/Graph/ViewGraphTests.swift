@@ -425,6 +425,100 @@ struct ViewGraphTests {
     )
     #expect(dropCounter.count == 1)
   }
+
+  @Test("runtime registration restore includes alias command and drop handlers")
+  func runtimeRegistrationRestoreIncludesAliasCommandAndDropHandlers() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let targetIdentity = testIdentity("Root", "Target")
+    let aliasIdentity = testIdentity("Root", "Alias")
+    let binding = KeyBinding(key: .character("a"), modifiers: .ctrl)
+    let commandCounter = RegistrationCounter()
+    let dropCounter = RegistrationCounter()
+
+    graph.beginFrame()
+    let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+    let targetNode = graph.beginEvaluation(identity: targetIdentity, invalidator: nil)
+    graph.finishEvaluation(
+      targetNode,
+      resolved: ResolvedNode(identity: targetIdentity, kind: .view("Target")),
+      accessedStateSlots: 0
+    )
+    let aliasNode = graph.beginEvaluation(identity: aliasIdentity, invalidator: nil)
+    aliasNode.recordCommandRegistration(
+      CommandRegistrySnapshot(
+        keyCommandsByScope: [
+          aliasIdentity: [
+            binding: RegisteredKeyCommand(
+              binding: binding,
+              description: "Alias",
+              isEnabled: true,
+              action: { commandCounter.increment() }
+            )
+          ]
+        ]
+      )
+    )
+    aliasNode.recordDropDestinationRegistration(
+      DropDestinationRegistrySnapshot(
+        handlersByScope: [
+          aliasIdentity: { _, _ in
+            dropCounter.increment()
+            return true
+          }
+        ]
+      )
+    )
+    graph.finishEvaluation(
+      aliasNode,
+      resolved: ResolvedNode(identity: aliasIdentity, kind: .view("Alias")),
+      accessedStateSlots: 0
+    )
+    graph.recordRegistrationAlias(
+      from: aliasIdentity,
+      to: targetIdentity,
+      resolvedKind: .view("Target")
+    )
+    graph.finishEvaluation(
+      rootNode,
+      resolved: ResolvedNode(
+        identity: rootIdentity,
+        kind: .root,
+        children: [
+          ResolvedNode(identity: targetIdentity, kind: .view("Target"))
+        ]
+      ),
+      accessedStateSlots: 0
+    )
+    let snapshot = graph.snapshot(rootIdentity: rootIdentity)
+    let registrations = RuntimeRegistrationSet.scratch()
+
+    graph.restoreRuntimeRegistrations(
+      for: snapshot,
+      into: registrations
+    )
+
+    #expect(
+      registrations.commandRegistry?.keyCommand(
+        at: aliasIdentity,
+        matching: binding
+      ) != nil
+    )
+    #expect(
+      registrations.commandRegistry?.dispatch(
+        key: binding,
+        along: [rootIdentity, aliasIdentity]
+      ) == true
+    )
+    #expect(commandCounter.count == 1)
+    #expect(
+      registrations.dropDestinationRegistry?.dispatch(
+        paths: [DroppedPath("/tmp/alias.txt")],
+        along: [rootIdentity, aliasIdentity]
+      ) == true
+    )
+    #expect(dropCounter.count == 1)
+  }
 }
 
 private enum DependencyKeyA {}
