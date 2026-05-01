@@ -2,7 +2,7 @@ import Core
 import Synchronization
 
 #if canImport(Dispatch)
-  @preconcurrency import Dispatch
+  @unsafe @preconcurrency import Dispatch
 #endif
 
 #if canImport(Darwin)
