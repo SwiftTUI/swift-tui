@@ -15,6 +15,9 @@ explicit prepare-tail-finish split, but it does not currently expose a safe
 prepared-frame abort path. Completed and started tail work stays on the
 ordered-commit path.
 
+The next attempt should follow the restart proposal below rather than replaying
+the reverted checkpoint/registration-staging implementation.
+
 For the consolidated current status, see
 [`../ASYNC_RENDERING.md`](../ASYNC_RENDERING.md).
 
@@ -123,6 +126,12 @@ Diagnostics should add:
 Worker pre-start cancellation is only safe after `DefaultRenderer` can prepare a
 frame head that is either committed or aborted.
 
+The previous implementation attempted this by staging runtime registrations and
+then restoring live registries from the per-frame draft. That was the wrong
+source of truth: the draft captured only the current dirty frontier and cache
+hits, not every committed handler and alias still live outside the current
+resolve walk.
+
 Target shape:
 
 ```swift
@@ -162,6 +171,115 @@ The draft must account for:
 If these cannot be restored cheaply, the next prerequisite is a
 snapshot-producing resolve path that writes into draft registration builders and
 draft graph state instead of live committed state.
+
+## Restart Proposal
+
+Resume from the shipped prepare-tail-finish split, with ordered commit preserved
+throughout the first tranche.
+
+### R0: Rebaseline Cancellation Pressure And Runtime Coverage
+
+Before changing runtime behavior:
+
+- Run diagnostics on real examples that exercise async layout and runtime input:
+  gallery, layouts, and any host/demo surface with ScrollView-heavy content.
+- Inspect `coalesced_intent_requests`, `coalesced_event_batches`,
+  worker layout/raster timings, `drop_blockers`, and main-actor
+  blocked/suspended timings.
+- Add composed async-path tests before implementation. The minimum set is:
+  gallery tab click, ScrollView indicator click, ScrollView indicator drag,
+  pointer scroll burst, key command dispatch, drop destination dispatch, focus
+  sync rerender, and lazy indexed ScrollView content.
+- Prefer `RunLoop.run()` and real-shaped event streams for those tests. Direct
+  `handleMouseEvent` plus `renderPendingFrames` is not enough to catch the
+  failure class from the reverted attempt.
+
+Exit with a diagnostics-backed list of the frames that would benefit from
+pre-start cancellation and the blockers that keep completed results on the
+ordered-commit path.
+
+### R1: Make Prepared Frame Side Effects Draft-Only
+
+Redesign Stage 3C around draft-only effects first, checkpoint/restore second.
+The prepared frame should be an object that either:
+
+- finishes exactly once and applies side effects to live runtime state, or
+- aborts exactly once and discards side effects that never reached live runtime
+  state.
+
+Implementation direction:
+
+- Route runtime registration changes into a `FrameHeadRegistrationDraft` or
+  equivalent commit builder during resolve.
+- Do not clear or mutate live registries during `prepareFrameHead`.
+- At `finishFrame`, apply the recorded mutation to live registries and restore
+  handlers from the committed graph if a rebuild is needed.
+- At `abortFrameHead`, discard the draft. If any live state has already mutated,
+  restore it from a checkpoint whose coverage is proven by tests.
+- Keep animation completions deferred until `finishFrame`; abort discards the
+  deferred completions.
+- Keep worker custom-layout cache updates in `FrameTailLayoutOutput` and apply
+  them only from `finishFrame`.
+
+The most important rule: do not merge draft registry snapshots into live as the
+post-reset restore mechanism. If live registries need reconstruction, walk the
+committed `ViewGraph` and restore each node's committed handlers, including alias
+nodes.
+
+Required R1 proof:
+
+- abort after a broad reset-shaped prepare leaves actions, pointer routes,
+  gestures, key commands, drop destinations, focus bindings, focused values,
+  scroll positions, lifecycle, tasks, and preference observations intact;
+- abort after selective dirty evaluation leaves untouched sibling and alias
+  handlers intact;
+- abort does not fire lifecycle/task effects or animation completions;
+- a fresh render after abort produces the same artifacts and live registrations
+  as if the aborted frame had never been prepared.
+
+### R2: Add Pre-Start Cancellation
+
+After R1, add explicit tail-job states:
+
+```swift
+enum FrameTailJobState: Sendable {
+  case queued(RenderGeneration)
+  case started(RenderGeneration)
+  case completed(RenderGeneration)
+  case cancelledBeforeStart(RenderGeneration)
+}
+```
+
+Cancellation is legal only while the job is queued. The dequeue boundary is the
+last cancellation point. Once layout, custom-layout cache work, overlay
+application, semantics, draw, or raster has started, the job is `mustCommit`.
+
+The run-loop shape is:
+
+1. Prepare a frame head on the main actor.
+2. Submit the tail as queued work.
+3. Continue accepting event batches while the tail remains queued.
+4. If newer desired state arrives and the token cancels before start, abort the
+   prepared frame and prepare the newest generation.
+5. If the tail has started or completed, await it, finish the frame, and commit
+   in order before rendering newer state.
+
+Diagnostics for this stage should add:
+
+- `tail_job_state`
+- `tail_cancel_reason`
+- `cancelled_render_count`
+- `newest_desired_at_tail_start`
+- `newest_desired_at_tail_result`
+- `stale_frame_policy=cancel_pending_before_start`
+
+### R3: Keep Completed-Frame Drops Out Of Scope
+
+Completed worker results remain ordered-commit during this restart. The
+observational `FrameDropEligibility` classifier is useful for diagnostics, but it
+is not yet an action policy. A later stage can make a narrow visual-only case
+droppable only after each currently-unobservable barrier has either a diagnostic
+signal or a reconciliation path.
 
 ### 4. Add a cancellable tail submission
 
@@ -318,7 +436,8 @@ needed to fire animation completions at commit, but it does not provide a
 general `abortFrameHead` path.
 
 The next Stage 3C attempt should use the post-mortem in the execution plan
-above as the starting point, not the reverted checkpoint shape.
+above and the restart proposal in this document as the starting point, not the
+reverted checkpoint shape.
 
 ### Stage 3D: Add cancellable pre-start tail jobs
 

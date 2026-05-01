@@ -755,9 +755,13 @@ public struct PaddingModifier: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
+    let contentContext = contextWithTerminalSize(
+      context.child(component: .named("content")),
+      insetBy: insets
+    )
     let contentNode = resolveModifierContent(
       content,
-      in: context.child(component: .named("content"))
+      in: contentContext
     )
     return [
       ResolvedNode(
@@ -787,8 +791,10 @@ public struct SafeAreaPaddingModifier: PrimitiveViewModifier {
       to: edges
     )
     let contentContext =
-      context
-      .child(component: .named("content"))
+      contextWithTerminalSize(
+        context.child(component: .named("content")),
+        insetBy: appliedInsets
+      )
       .transformingEnvironment(\.safeAreaInsets) { safeAreaInsets in
         safeAreaInsets = safeAreaInsets.adding(appliedInsets)
       }
@@ -905,9 +911,13 @@ public struct BorderModifier: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
+    let contentContext = contextWithTerminalSize(
+      context.child(component: .named("content")),
+      insetBy: layoutInsets
+    )
     let contentNode = resolveModifierContent(
       content,
-      in: context.child(component: .named("content"))
+      in: contentContext
     )
     return [
       ResolvedNode(
@@ -927,6 +937,19 @@ public struct BorderModifier: PrimitiveViewModifier {
         )
       )
     ]
+  }
+
+  private var layoutInsets: EdgeInsets {
+    guard placement != .inset else {
+      return .zero
+    }
+
+    return EdgeInsets(
+      top: sides.contains(.top) ? set.topDisplayWidth : 0,
+      leading: sides.contains(.leading) ? set.leftDisplayWidth : 0,
+      bottom: sides.contains(.bottom) ? set.bottomDisplayWidth : 0,
+      trailing: sides.contains(.trailing) ? set.rightDisplayWidth : 0
+    )
   }
 }
 
@@ -1057,9 +1080,12 @@ public struct FlexibleFrameModifier: PrimitiveViewModifier {
     content: ModifierContentInputs<Base>,
     in context: ResolveContext
   ) -> [ResolvedNode] {
+    let contentContext = flexibleFrameContentContext(
+      from: context.child(component: .named("content"))
+    )
     let contentNode = resolveModifierContent(
       content,
-      in: context.child(component: .named("content"))
+      in: contentContext
     )
     return [
       ResolvedNode(
@@ -1075,6 +1101,58 @@ public struct FlexibleFrameModifier: PrimitiveViewModifier {
         )
       )
     ]
+  }
+
+  private func flexibleFrameContentContext(
+    from context: ResolveContext
+  ) -> ResolveContext {
+    let currentSize = context.environmentValues.terminalSize
+    let resolvedSize = CellSize(
+      width: flexibleFrameGeometryDimension(
+        parent: currentSize.width,
+        min: minWidth,
+        max: maxWidth
+      ),
+      height: flexibleFrameGeometryDimension(
+        parent: currentSize.height,
+        min: minHeight,
+        max: maxHeight
+      )
+    )
+
+    guard resolvedSize != currentSize else {
+      return context
+    }
+
+    return context.settingEnvironment(\.terminalSize, to: resolvedSize)
+  }
+
+  private func flexibleFrameGeometryDimension(
+    parent: Int,
+    min: ProposedDimension?,
+    max: ProposedDimension?
+  ) -> Int {
+    // With a finite terminal-size environment, ideal dimensions do not change
+    // the child proposal; they only matter for unspecified layout proposals.
+    guard finiteValue(min) != nil || finiteValue(max) != nil else {
+      return parent
+    }
+
+    var resolved = parent
+    if let minValue = finiteValue(min) {
+      resolved = Swift.max(minValue, resolved)
+    }
+    if let maxValue = finiteValue(max) {
+      resolved = Swift.min(maxValue, resolved)
+    }
+    return resolved
+  }
+
+  private func finiteValue(_ dimension: ProposedDimension?) -> Int? {
+    guard case .finite(let value) = dimension else {
+      return nil
+    }
+    return value
   }
 }
 
@@ -1117,6 +1195,27 @@ public struct OverlayModifier<OverlayContent: View>: PrimitiveViewModifier {
       )
     ]
   }
+}
+
+private func contextWithTerminalSize(
+  _ context: ResolveContext,
+  insetBy insets: EdgeInsets
+) -> ResolveContext {
+  guard !insets.isZero else {
+    return context
+  }
+
+  let currentSize = context.environmentValues.terminalSize
+  let resolvedSize = CellSize(
+    width: max(0, currentSize.width - insets.horizontal),
+    height: max(0, currentSize.height - insets.vertical)
+  )
+
+  guard resolvedSize != currentSize else {
+    return context
+  }
+
+  return context.settingEnvironment(\.terminalSize, to: resolvedSize)
 }
 
 @inline(never)

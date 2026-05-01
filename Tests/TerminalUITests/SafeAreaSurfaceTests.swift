@@ -70,6 +70,21 @@ struct SafeAreaSurfaceTests {
     #expect(content.bounds.origin == .init(x: 4, y: 2))
   }
 
+  @Test("safeAreaPadding tightens GeometryReader size")
+  func safeAreaPaddingTightensGeometryReaderSize() throws {
+    let artifacts = render(
+      GeometryReader { proxy in
+        Text(proxy.size == CellSize(width: 18, height: 7) ? "Y" : "N")
+      }
+      .safeAreaPadding([.top, .leading]),
+      terminalSize: .init(width: 20, height: 8),
+      safeAreaInsets: .init(top: 1, leading: 2, bottom: 0, trailing: 0)
+    )
+
+    #expect(artifacts.rasterSurface.lines.contains { $0.contains("Y") })
+    #expect(!artifacts.rasterSurface.lines.contains { $0.contains("N") })
+  }
+
   @Test("safeAreaInset uses reclaimed safe area before shrinking the base content")
   func safeAreaInsetUsesReclaimedSafeAreaBeforeShrinkingBaseContent() throws {
     let artifacts = render(
