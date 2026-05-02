@@ -1,6 +1,6 @@
 # gifeditor
 
-A terminal-native GIF editor built on **swift-terminal-ui**. Read and write
+A terminal-native GIF editor built on **swift-tui**. Read and write
 animated GIFs, edit them frame-by-frame on a color canvas where one GIF pixel
 maps to one terminal half-cell, and use a small toolbox of pen / eraser / fill /
 gradient / marquee tools with keyboard or pointer input.
@@ -11,9 +11,9 @@ multi-platform app later without restructuring:
 | Target           | Role                                         | Depends on             |
 | ---------------- | -------------------------------------------- | ---------------------- |
 | `GIFEditorCore`  | Pure model + GIF encoder/decoder bridge      | `GIF`, Foundation |
-| `GIFEditorUI`    | Terminal `View` tree + view model            | `TerminalUI`, `GIFEditorCore` |
-| `GIFEditor`      | Composition root (entry point factory)       | `GIFEditorUI`, `TerminalUI` |
-| `gifeditor`      | Executable that hosts the terminal app       | `GIFEditor`, `TerminalUICLI` |
+| `GIFEditorUI`    | Terminal `View` tree + view model            | `SwiftTUI`, `GIFEditorCore` |
+| `GIFEditor`      | Composition root (entry point factory)       | `GIFEditorUI`, `SwiftTUI` |
+| `gifeditor`      | Executable that hosts the terminal app       | `GIFEditor`, `SwiftTUICLI` |
 
 A future SwiftUI / UIKit port would reuse `GIFEditorCore` verbatim and add a
 parallel `GIFEditorUI_SwiftUI` target alongside `GIFEditorUI`.

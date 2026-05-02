@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "swift-terminal-ui-web-workspace",
+      "name": "swift-tui-web-workspace",
       "dependencies": {
         "@openai/codex": "^0.121.0",
       },
@@ -16,15 +16,15 @@
       "version": "0.1.0",
       "dependencies": {
         "@bjorn3/browser_wasi_shim": "^0.4.2",
-        "webtuigui": "workspace:*",
+        "webhost": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
         "playwright": "^1.59.1",
       },
     },
-    "GUI/WebTUIGUI": {
-      "name": "webtuigui",
+    "GUI/WebHost": {
+      "name": "webhost",
       "version": "0.1.0",
       "devDependencies": {
         "@types/bun": "latest",
@@ -34,7 +34,7 @@
       },
     },
     "Website": {
-      "name": "swift-terminal-ui-website",
+      "name": "swift-tui-website",
       "version": "0.0.1",
       "dependencies": {
         "@astrojs/check": "^0.9.4",
@@ -728,7 +728,7 @@
 
     "svgo": ["svgo@4.0.1", "", { "dependencies": { "commander": "^11.1.0", "css-select": "^5.1.0", "css-tree": "^3.0.1", "css-what": "^6.1.0", "csso": "^5.0.5", "picocolors": "^1.1.1", "sax": "^1.5.0" }, "bin": "./bin/svgo.js" }, "sha512-XDpWUOPC6FEibaLzjfe0ucaV0YrOjYotGJO1WpF0Zd+n6ZGEQUsSugaoLq9QkEZtAfQIxT42UChcssDVPP3+/w=="],
 
-    "swift-terminal-ui-website": ["swift-terminal-ui-website@workspace:Website"],
+    "swift-tui-website": ["swift-tui-website@workspace:Website"],
 
     "tiny-inflate": ["tiny-inflate@1.0.3", "", {}, "sha512-pkY1fj1cKHb2seWDy0B16HeWyczlJA9/WW3u3c4z/NiWDsO3DOU5D7nhTLE9CF0yXv/QZFY7sEJmj24dK+Rrqw=="],
 
@@ -832,7 +832,7 @@
 
     "web-namespaces": ["web-namespaces@2.0.1", "", {}, "sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ=="],
 
-    "webtuigui": ["webtuigui@workspace:GUI/WebTUIGUI"],
+    "webhost": ["webhost@workspace:GUI/WebHost"],
 
     "which-pm-runs": ["which-pm-runs@1.1.0", "", {}, "sha512-n1brCuqClxfFfq/Rb0ICg9giSZqCS+pLtccdag6C2HyufBrh3fBOiy9nb6ggRMvWOVH5GrdJskj5iGTZNxd7SA=="],
 

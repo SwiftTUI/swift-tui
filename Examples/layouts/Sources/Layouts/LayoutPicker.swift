@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Full-screen picker: a sectioned list of every ``LayoutEntry`` in
 /// ``LayoutCatalog/all``, grouped by ``LayoutEntry/Category``.
@@ -60,7 +60,7 @@ public struct LayoutPicker: View {
 
   private var header: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("TerminalUI — Layouts").foregroundStyle(.foreground)
+      Text("SwiftTUI — Layouts").foregroundStyle(.foreground)
       Text(
         "\(LayoutCatalog.all.count) layouts across \(LayoutEntry.Category.allCases.count) categories"
       )

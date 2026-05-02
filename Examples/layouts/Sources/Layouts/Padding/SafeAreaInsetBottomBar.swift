@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// A scrolling content column with a status bar pinned to the bottom
 /// via `.safeAreaInset(edge: .bottom)`. The inset reduces the inner

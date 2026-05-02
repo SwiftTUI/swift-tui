@@ -5,12 +5,12 @@
  * project alongside the doctrine + design + decisions corpus.
  *
  * What stays here is the small surface a host page actually adopts to
- * embed TerminalUI in a Bun-served browser app:
+ * embed SwiftTUI in a Bun-served browser app:
  *
  *   .terminal-shell        outer frame around the canvas
  *   .terminal-topline      header strip (label + scene picker)
  *   .terminal-frame        the resizable canvas region
- *   .terminal-host         the WebTUIGUI mount target
+ *   .terminal-host         the WebHost mount target
  *   .terminal-resize-bar   footer strip (status + resize handle)
  *   .scene-select          dropdown for switching between authored Scenes
  *
@@ -404,7 +404,7 @@ body.is-resizing-terminal * {
   user-select: none !important;
 }
 
-/* ---- WebTUIGUI scene mount ---- */
+/* ---- WebHost scene mount ---- */
 
 .terminal-host {
   width: 100%;
@@ -417,12 +417,12 @@ body.is-resizing-terminal * {
   cursor: default !important;
 }
 
-.terminal-host > .webtuigui-scene-root {
+.terminal-host > .webhost-scene-root {
   width: 100%;
   height: 100%;
 }
 
-.terminal-host .webtuigui-scene {
+.terminal-host .webhost-scene {
   width: 100%;
   height: 100%;
   padding: 0 !important;
@@ -434,11 +434,11 @@ body.is-resizing-terminal * {
   grid-template-rows: 1fr !important;
 }
 
-.terminal-host .webtuigui-scene__header {
+.terminal-host .webhost-scene__header {
   display: none !important;
 }
 
-.terminal-host .webtuigui-scene__terminal {
+.terminal-host .webhost-scene__terminal {
   width: 100%;
   height: 100%;
   min-height: 100% !important;
@@ -447,7 +447,7 @@ body.is-resizing-terminal * {
   user-select: none;
   cursor: default !important;
 }
-.terminal-host .webtuigui-scene__terminal canvas {
+.terminal-host .webhost-scene__terminal canvas {
   touch-action: none;
   cursor: default !important;
 }

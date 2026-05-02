@@ -21,7 +21,7 @@ working on a branch, but they should not be treated as durable public API.
 
 ## Target Outcome
 
-TerminalUI should expose pointer locations in continuous cell space:
+SwiftTUI should expose pointer locations in continuous cell space:
 
 - Layout, raster placement, semantic frames, hit-region identity, and terminal
   output stay integer-cell based.
@@ -114,8 +114,8 @@ the best first proof of the public model.
 ### Risk Controls
 
 - Use a narrow bulk-rename script only for layout/raster files. Do not run it
-  across `Sources/View/Gestures/`, `Sources/TerminalUI/InputReader.swift`,
-  `Sources/TerminalUI/RunLoop+PointerHandling.swift`,
+  across `Sources/View/Gestures/`, `Sources/SwiftTUI/InputReader.swift`,
+  `Sources/SwiftTUI/RunLoop+PointerHandling.swift`,
   `Sources/Core/LocalPointerHandlerRegistry.swift`,
   `Sources/Core/GestureRecognizer.swift`, or `GUI/`; those are pointer-domain
   files and need semantic migration.
@@ -129,7 +129,7 @@ the best first proof of the public model.
 
 - Confirm `bun run test` is green on `main` before the first phase starts, or
   record the unrelated baseline failures.
-- Identify snapshot/golden fixtures under `Tests/TerminalUITests/Fixtures/**`
+- Identify snapshot/golden fixtures under `Tests/SwiftTUITests/Fixtures/**`
   and `Examples/*/Tests/**/Fixtures/**`. Do not silently regenerate them.
 - Inventory DocC pages that mention integer `Point`, `Size`, or `Rect`, including
   Core/View DocC and `Sources/View/View.docc/AspectCorrectShapes.md`.
@@ -298,10 +298,10 @@ View surface:
 
 Runtime/host:
 
-- `Sources/TerminalUI/RunLoop+Rendering.swift`
-- `Sources/TerminalUI/RunLoop+PointerHandling.swift`
-- `Sources/TerminalUI/InputReader.swift`
-- `Sources/TerminalUI/TerminalGraphicsCapabilities.swift`
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`
+- `Sources/SwiftTUI/RunLoop+PointerHandling.swift`
+- `Sources/SwiftTUI/InputReader.swift`
+- `Sources/SwiftTUI/TerminalGraphicsCapabilities.swift`
 - Hosted surface and streaming host files that carry terminal size or frames.
 
 Tests:
@@ -354,8 +354,8 @@ Run after the phase:
 
 - `swiftly run swift test --filter CoreTests`
 - `swiftly run swift test --filter ViewTests`
-- `swiftly run swift test --filter TerminalUITests.GeometryReaderSurfaceTests`
-- `swiftly run swift test --filter TerminalUITests.CellPixelMetricsRefreshTests`
+- `swiftly run swift test --filter SwiftTUITests.GeometryReaderSurfaceTests`
+- `swiftly run swift test --filter SwiftTUITests.CellPixelMetricsRefreshTests`
 
 ### Acceptance
 
@@ -465,10 +465,10 @@ Add:
 
 Modify:
 
-- `Sources/TerminalUI/InputReader.swift`
+- `Sources/SwiftTUI/InputReader.swift`
 - `Sources/Core/LocalPointerHandlerRegistry.swift`
-- `Sources/TerminalUI/RunLoop+PointerHandling.swift`
-- `Sources/TerminalUI/RunLoop+EventDispatch.swift`
+- `Sources/SwiftTUI/RunLoop+PointerHandling.swift`
+- `Sources/SwiftTUI/RunLoop+EventDispatch.swift`
 - `Sources/Core/GestureRecognizer.swift`
 - environment/value files that own `EnvironmentValues`
 - `Sources/View/GeometryReading/GeometryReader.swift`
@@ -506,10 +506,10 @@ without precise pointer input.
 
 Run:
 
-- `swiftly run swift test --filter TerminalUITests.InputParserModifierTests`
-- `swiftly run swift test --filter TerminalUITests.PointerEventTimestampTests`
-- `swiftly run swift test --filter TerminalUITests.GestureRunLoopDispatchTests`
-- `swiftly run swift test --filter TerminalUITests.CaptureOnPressTests`
+- `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
+- `swiftly run swift test --filter SwiftTUITests.PointerEventTimestampTests`
+- `swiftly run swift test --filter SwiftTUITests.GestureRunLoopDispatchTests`
+- `swiftly run swift test --filter SwiftTUITests.CaptureOnPressTests`
 
 ### Acceptance
 
@@ -530,7 +530,7 @@ Make location-bearing gestures consume and expose continuous cell coordinates.
 Add:
 
 - `Sources/View/Gestures/PointerPath.swift`
-- `Tests/TerminalUITests/Gestures/PointerPathTests.swift`
+- `Tests/SwiftTUITests/Gestures/PointerPathTests.swift`
 
 Modify:
 
@@ -541,7 +541,7 @@ Modify:
 - `Sources/View/Gestures/CoordinateSpace.swift`
 - `Sources/View/Gestures/GestureModifiers.swift`
 - `Sources/Core/GestureRecognizer.swift`
-- gesture integration tests under `Tests/TerminalUITests`
+- gesture integration tests under `Tests/SwiftTUITests`
 
 ### DragGesture
 
@@ -636,11 +636,11 @@ extension CoordinateSpace {
 
 Run:
 
-- `swiftly run swift test --filter TerminalUITests.DragGestureTests`
-- `swiftly run swift test --filter TerminalUITests.SpatialTapGestureTests`
-- `swiftly run swift test --filter TerminalUITests.TapGestureTests`
-- `swiftly run swift test --filter TerminalUITests.LongPressGestureTests`
-- `swiftly run swift test --filter TerminalUITests.GestureIntegrationTests`
+- `swiftly run swift test --filter SwiftTUITests.DragGestureTests`
+- `swiftly run swift test --filter SwiftTUITests.SpatialTapGestureTests`
+- `swiftly run swift test --filter SwiftTUITests.TapGestureTests`
+- `swiftly run swift test --filter SwiftTUITests.LongPressGestureTests`
+- `swiftly run swift test --filter SwiftTUITests.GestureIntegrationTests`
 
 ### Acceptance
 
@@ -671,25 +671,25 @@ public pointer model before terminal 1016 support adds protocol ambiguity.
 
 Native host:
 
-- `GUI/SwiftUITUIGUI/Sources/SwiftUITUIGUI/NativeTerminalSurfaceView.swift`
-- `GUI/SwiftUITUIGUI/Tests/SwiftUITUIGUITests/NativeTerminalSurfaceViewEventTests.swift`
-- `GUI/SwiftUITUIGUI/Tests/SwiftUITUIGUITests/ResizeBridgeTests.swift`
-- `GUI/SwiftUITUIGUI/Tests/SwiftUITUIGUITests/HostedSurfaceRegressionTests.swift`
+- `GUI/SwiftUIHost/Sources/SwiftUIHost/NativeTerminalSurfaceView.swift`
+- `GUI/SwiftUIHost/Tests/SwiftUIHostTests/NativeTerminalSurfaceViewEventTests.swift`
+- `GUI/SwiftUIHost/Tests/SwiftUIHostTests/ResizeBridgeTests.swift`
+- `GUI/SwiftUIHost/Tests/SwiftUIHostTests/HostedSurfaceRegressionTests.swift`
 
 Web host:
 
-- `GUI/WebTUIGUI/src/WebTUISceneRuntime.ts`
-- `GUI/WebTUIGUI/src/WebTUISceneRuntime.test.ts`
-- `GUI/WebTUIGUI/src/WebTUISurfaceTransport.ts`
-- `GUI/WebTUIGUI/src/wasi/BrowserWASIBridge.ts`
-- `Runners/TerminalUIWASI/Sources/TerminalUIWASI/WebSurfaceTransport.swift`
-- `Runners/TerminalUIWASI/Tests/TerminalUIWASITests/WebSurfaceTransportTests.swift`
+- `GUI/WebHost/src/WebHostSceneRuntime.ts`
+- `GUI/WebHost/src/WebHostSceneRuntime.test.ts`
+- `GUI/WebHost/src/WebHostSurfaceTransport.ts`
+- `GUI/WebHost/src/wasi/BrowserWASIBridge.ts`
+- `Runners/SwiftTUIWASI/Sources/SwiftTUIWASI/WebSurfaceTransport.swift`
+- `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests/WebSurfaceTransportTests.swift`
 
 Shared runtime surfaces:
 
-- `Sources/TerminalUI/HostedSceneSession.swift`
-- `Sources/TerminalUI/StreamingTerminalHost.swift`
-- `Sources/TerminalUI/RunLoop+Rendering.swift`
+- `Sources/SwiftTUI/HostedSceneSession.swift`
+- `Sources/SwiftTUI/StreamingTerminalHost.swift`
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`
 - `Sources/View/Environment/StyleEnvironment.swift`
 - `Sources/View/GeometryReading/GeometryReader.swift`
 
@@ -759,7 +759,7 @@ Native:
 
 Web:
 
-- Update `WebTUISceneRuntime.test.ts` expected messages to include fractional
+- Update `WebHostSceneRuntime.test.ts` expected messages to include fractional
   cell coordinates.
 - Add a regression where `clientX` moves inside one cell and emits distinct drag
   coordinates.
@@ -774,9 +774,9 @@ Hosted runtime:
 
 Run:
 
-- `swiftly run swift test --package-path GUI/SwiftUITUIGUI`
-- `swiftly run swift test --package-path Runners/TerminalUIWASI`
-- `cd GUI/WebTUIGUI && bun test`
+- `swiftly run swift test --package-path GUI/SwiftUIHost`
+- `swiftly run swift test --package-path Runners/SwiftTUIWASI`
+- `cd GUI/WebHost && bun test`
 
 ### Acceptance
 
@@ -959,7 +959,7 @@ No consumer should need `cellX * 2 + 1` or `cellY * 4 + 2`.
 
 Run:
 
-- `swiftly run swift test --filter TerminalUITests.CanvasViewTests`
+- `swiftly run swift test --filter SwiftTUITests.CanvasViewTests`
 - `swiftly run swift test --filter CoreTests.BrailleCanvasTests`
 - `swiftly run swift test --package-path Examples/canvas`
 
@@ -982,8 +982,8 @@ Files:
 
 - `Sources/View/Controls/AdjustableValueControls.swift`
 - `Sources/View/Controls/SelectionAndValueSupport.swift`
-- `Tests/TerminalUITests/SwiftUISurfaceTests.swift`
-- `Tests/TerminalUITests/Fixtures/slider/*`
+- `Tests/SwiftTUITests/SwiftUISurfaceTests.swift`
+- `Tests/SwiftTUITests/Fixtures/slider/*`
 
 Change value mapping to accept a continuous x coordinate and a `CellRect` track:
 
@@ -1034,9 +1034,9 @@ Tests:
 
 Files:
 
-- `Sources/TerminalUICharts/*.swift`
-- `Sources/TerminalUICharts/ChartSupport.swift`
-- `Sources/TerminalUICharts/TerminalUICharts.docc/*`
+- `Sources/SwiftTUICharts/*.swift`
+- `Sources/SwiftTUICharts/ChartSupport.swift`
+- `Sources/SwiftTUICharts/SwiftTUICharts.docc/*`
 - chart fixture tests only if interactive chart features are added
 
 Initial chart work should avoid speculative public APIs. Add coordinate
@@ -1052,7 +1052,7 @@ cursor/crosshair APIs only when there is a concrete consumer and tests.
 Run:
 
 - slider/scroll focused tests once added
-- `swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests`
+- `swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests`
 - fixture tests touching `Fixtures/slider`
 
 ## Phase 7: Terminal 1016
@@ -1064,19 +1064,19 @@ by native and web hosts.
 
 ### Files
 
-- `Sources/TerminalUI/InputReader.swift`
-- `Sources/TerminalUI/InjectedTerminalInputReader.swift`
-- `Sources/TerminalUI/TerminalHost.swift`
-- `Sources/TerminalUI/StreamingTerminalHost.swift`
-- `Sources/TerminalUI/TerminalGraphicsCapabilities.swift`
-- `Sources/TerminalUI/TerminalControlMessages.swift`
-- `Sources/TerminalUI/RunLoop+Rendering.swift`
-- `Tests/TerminalUITests/InputParserModifierTests.swift`
-- `Tests/TerminalUITests/InputReaderControlMessageTests.swift`
-- `Tests/TerminalUITests/TerminalGraphicsProtocolTests.swift`
-- `Tests/TerminalUITests/TerminalHostProcessExitCleanupTests.swift`
-- `Tests/TerminalUITests/CellPixelMetricsRefreshTests.swift`
-- `Tests/TerminalUITests/InjectedTerminalInputReaderTests.swift`
+- `Sources/SwiftTUI/InputReader.swift`
+- `Sources/SwiftTUI/InjectedTerminalInputReader.swift`
+- `Sources/SwiftTUI/TerminalHost.swift`
+- `Sources/SwiftTUI/StreamingTerminalHost.swift`
+- `Sources/SwiftTUI/TerminalGraphicsCapabilities.swift`
+- `Sources/SwiftTUI/TerminalControlMessages.swift`
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`
+- `Tests/SwiftTUITests/InputParserModifierTests.swift`
+- `Tests/SwiftTUITests/InputReaderControlMessageTests.swift`
+- `Tests/SwiftTUITests/TerminalGraphicsProtocolTests.swift`
+- `Tests/SwiftTUITests/TerminalHostProcessExitCleanupTests.swift`
+- `Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift`
+- `Tests/SwiftTUITests/InjectedTerminalInputReaderTests.swift`
 
 ### Policy And Runtime State
 
@@ -1204,10 +1204,10 @@ Runtime:
 
 Run:
 
-- `swiftly run swift test --filter TerminalUITests.TerminalHostProcessExitCleanupTests`
-- `swiftly run swift test --filter TerminalUITests.TerminalGraphicsProtocolTests`
-- `swiftly run swift test --filter TerminalUITests.InjectedTerminalInputReaderTests`
-- `swiftly run swift test --filter TerminalUITests.InputReaderControlMessageTests`
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
 
 ### Acceptance
 
@@ -1228,9 +1228,9 @@ Files:
 
 - `Sources/View/Gestures/*` or a new `Sources/View/Pointer/PointerHover.swift`
 - `Sources/Core/LocalPointerHandlerRegistry.swift`
-- `Sources/TerminalUI/RunLoop+PointerHandling.swift`
-- `Sources/TerminalUI/TerminalHost.swift`
-- focused `Tests/TerminalUITests` hover tests
+- `Sources/SwiftTUI/RunLoop+PointerHandling.swift`
+- `Sources/SwiftTUI/TerminalHost.swift`
+- focused `Tests/SwiftTUITests` hover tests
 
 API:
 
@@ -1267,10 +1267,10 @@ Files:
 
 - `Sources/View/ActionScopes/DropDestinationModifier.swift`
 - `Sources/Core/DropDestinationRegistry.swift`
-- runtime paste/drop dispatch in `Sources/TerminalUI`
+- runtime paste/drop dispatch in `Sources/SwiftTUI`
 - `Tests/CoreTests/DropDestinationRegistryTests.swift`
-- `Tests/TerminalUITests/DropDestinationDispatchTests.swift`
-- `Tests/TerminalUITests/DropDestinationTests.swift`
+- `Tests/SwiftTUITests/DropDestinationDispatchTests.swift`
+- `Tests/SwiftTUITests/DropDestinationTests.swift`
 
 API:
 
@@ -1307,7 +1307,7 @@ Files:
 - `Sources/View/Gestures/GestureViewModifier.swift`
 - `Sources/Core/Semantics.swift`
 - `Tests/CoreTests` for path math
-- `Tests/TerminalUITests/ContentShapeTests.swift`
+- `Tests/SwiftTUITests/ContentShapeTests.swift`
 
 Start minimal:
 
@@ -1330,8 +1330,8 @@ Files:
 - `Sources/View/Gestures/CoordinateSpace.swift`
 - `Sources/Core/Semantics.swift`
 - `Sources/Core/RenderTreeAndSemanticsTypes.swift`
-- `Sources/TerminalUI/RunLoop+PointerHandling.swift`
-- `Tests/TerminalUITests/CoordinateSpaceTests.swift`
+- `Sources/SwiftTUI/RunLoop+PointerHandling.swift`
+- `Tests/SwiftTUITests/CoordinateSpaceTests.swift`
 - gesture tests for named-space drag/tap values
 
 Approach:
@@ -1362,12 +1362,12 @@ Update:
 - `docs/ARCHITECTURE.md` for the integer layout / continuous input distinction.
 - `docs/RUNTIME.md` for pointer normalization, capability policy, terminal mode
   setup/teardown, and high-volume hover rules.
-- `docs/SOURCE_LAYOUT.md` for any new Core/View/TerminalUI files.
+- `docs/SOURCE_LAYOUT.md` for any new Core/View/SwiftTUI files.
 - `docs/PUBLIC_SURFACE_POLICY.md` if the public geometry, gesture, Canvas, or
   pointer capability surface requires new governance rules.
 - `docs/TESTING_AND_FIXTURE_POLICY.md` only if fixture policy needs a new
   pointer/Canvas note.
-- DocC for Canvas, gestures, geometry readers, and `TerminalUICharts` if chart
+- DocC for Canvas, gestures, geometry readers, and `SwiftTUICharts` if chart
   helpers are added.
 
 ### Examples
@@ -1407,48 +1407,48 @@ Phase 1 coordinate split:
 
 - `swiftly run swift test --filter CoreTests`
 - `swiftly run swift test --filter ViewTests`
-- `swiftly run swift test --filter TerminalUITests.GeometryReaderSurfaceTests`
-- `swiftly run swift test --filter TerminalUITests.CellPixelMetricsRefreshTests`
+- `swiftly run swift test --filter SwiftTUITests.GeometryReaderSurfaceTests`
+- `swiftly run swift test --filter SwiftTUITests.CellPixelMetricsRefreshTests`
 
 Phase 2 pointer plumbing:
 
-- `swiftly run swift test --filter TerminalUITests.InputParserModifierTests`
-- `swiftly run swift test --filter TerminalUITests.PointerEventTimestampTests`
-- `swiftly run swift test --filter TerminalUITests.GestureRunLoopDispatchTests`
-- `swiftly run swift test --filter TerminalUITests.CaptureOnPressTests`
+- `swiftly run swift test --filter SwiftTUITests.InputParserModifierTests`
+- `swiftly run swift test --filter SwiftTUITests.PointerEventTimestampTests`
+- `swiftly run swift test --filter SwiftTUITests.GestureRunLoopDispatchTests`
+- `swiftly run swift test --filter SwiftTUITests.CaptureOnPressTests`
 
 Phase 3 gesture migration:
 
-- `swiftly run swift test --filter TerminalUITests.DragGestureTests`
-- `swiftly run swift test --filter TerminalUITests.SpatialTapGestureTests`
-- `swiftly run swift test --filter TerminalUITests.TapGestureTests`
-- `swiftly run swift test --filter TerminalUITests.LongPressGestureTests`
-- `swiftly run swift test --filter TerminalUITests.GestureIntegrationTests`
+- `swiftly run swift test --filter SwiftTUITests.DragGestureTests`
+- `swiftly run swift test --filter SwiftTUITests.SpatialTapGestureTests`
+- `swiftly run swift test --filter SwiftTUITests.TapGestureTests`
+- `swiftly run swift test --filter SwiftTUITests.LongPressGestureTests`
+- `swiftly run swift test --filter SwiftTUITests.GestureIntegrationTests`
 
 Phase 4 native/web:
 
-- `swiftly run swift test --package-path GUI/SwiftUITUIGUI`
-- `swiftly run swift test --package-path Runners/TerminalUIWASI`
-- `cd GUI/WebTUIGUI && bun test`
+- `swiftly run swift test --package-path GUI/SwiftUIHost`
+- `swiftly run swift test --package-path Runners/SwiftTUIWASI`
+- `cd GUI/WebHost && bun test`
 
 Phase 5 Canvas:
 
-- `swiftly run swift test --filter TerminalUITests.CanvasViewTests`
+- `swiftly run swift test --filter SwiftTUITests.CanvasViewTests`
 - `swiftly run swift test --filter CoreTests.BrailleCanvasTests`
 - `swiftly run swift test --package-path Examples/canvas`
 
 Phase 6 controls:
 
 - slider and scroll focused tests once added
-- `swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests`
+- `swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests`
 - fixture tests touching `Fixtures/slider`
 
 Phase 7 terminal 1016:
 
-- `swiftly run swift test --filter TerminalUITests.TerminalHostProcessExitCleanupTests`
-- `swiftly run swift test --filter TerminalUITests.TerminalGraphicsProtocolTests`
-- `swiftly run swift test --filter TerminalUITests.InjectedTerminalInputReaderTests`
-- `swiftly run swift test --filter TerminalUITests.InputReaderControlMessageTests`
+- `swiftly run swift test --filter SwiftTUITests.TerminalHostProcessExitCleanupTests`
+- `swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests`
+- `swiftly run swift test --filter SwiftTUITests.InjectedTerminalInputReaderTests`
+- `swiftly run swift test --filter SwiftTUITests.InputReaderControlMessageTests`
 
 Final gate:
 

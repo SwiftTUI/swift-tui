@@ -1,6 +1,6 @@
 /// Read-only display metrics describing how cells map to device pixels.
 ///
-/// Advisory runtime metadata. TerminalUI's layout, placement, and alignment
+/// Advisory runtime metadata. SwiftTUI's layout, placement, and alignment
 /// story remain cell-denominated; this type exists so authors can apply
 /// aspect correction to shapes, motion, or image sizing without reinventing
 /// the fallback.

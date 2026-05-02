@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Pins the ZStack × Spacer interaction: a `Spacer` placed inside a
 /// `ZStack` is layout-neutral — it does NOT claim all proposed space.

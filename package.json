@@ -1,5 +1,5 @@
 {
-  "name": "swift-terminal-ui-workspace",
+  "name": "swift-tui-workspace",
   "private": true,
   "scripts": {
     "build:wasm": "bun run --cwd Website build:wasm",
@@ -10,7 +10,7 @@
     "test:all": "sh ./Scripts/test_all.sh"
   },
   "workspaces": [
-    "GUI/WebTUIGUI",
+    "GUI/WebHost",
     "Examples/WebExample",
     "Website"
   ],

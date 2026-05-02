@@ -39,7 +39,7 @@ public enum GestureRecognizerEventDisposition: Equatable, Sendable {
 ///
 /// The type is `public` so it appears in the `_makeRecognizer` signature
 /// of `public` gesture types, but its stored fields and initializer are
-/// `package` — only the TerminalUI runtime constructs this. External
+/// `package` — only the SwiftTUI runtime constructs this. External
 /// gesture authors receive it as a parameter and forward it to child
 /// gestures; they never construct it directly.
 public struct GestureRecognizerBuildContext: Sendable {

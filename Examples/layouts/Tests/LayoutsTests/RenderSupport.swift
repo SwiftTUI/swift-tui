@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 @testable import Layouts
 

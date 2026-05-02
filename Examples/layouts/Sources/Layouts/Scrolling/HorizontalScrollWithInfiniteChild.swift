@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// A horizontal `ScrollView` whose child is a row of `Text` views
 /// each greedily sized via `.frame(maxWidth: .infinity)`. In a

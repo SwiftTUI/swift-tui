@@ -16,7 +16,7 @@ date: 2026-04-20
 
 **Architecture:** The runtime already detects cell pixel size into `TerminalGraphicsCapabilities.cellPixelSize`. Stage 1 promotes that data to a public read-only type and fixes the refresh story (the current `TerminalHost` caches the first successful read and never re-reads). Stage 2 threads the value into the Braille rasterizer so the shape family can compute pixel-true radii instead of assuming square sub-pixels.
 
-**Tech Stack:** Swift 6 strict concurrency, Swift Testing (`@Test` / `#expect`), `@MainActor`-isolated view tests, `@testable import Core / View / TerminalUI`, package-layered with `Core`, `View`, `TerminalUI`, and gallery example under `Examples/gallery/`.
+**Tech Stack:** Swift 6 strict concurrency, Swift Testing (`@Test` / `#expect`), `@MainActor`-isolated view tests, `@testable import Core / View / SwiftTUI`, package-layered with `Core`, `View`, `SwiftTUI`, and gallery example under `Examples/gallery/`.
 
 **Spec:** [docs/proposals/CELL_PIXEL_METRICS.md](../proposals/CELL_PIXEL_METRICS.md)
 **Research:** [docs/CELL_PIXEL_GEOMETRY_RESEARCH.md](../CELL_PIXEL_GEOMETRY_RESEARCH.md)
@@ -52,10 +52,10 @@ Match the spec's Non-goals section exactly:
 | `Sources/View/Environment/CellPixelMetricsEnvironment.swift` | The public `EnvironmentValues.cellPixelMetrics` key. |
 | `Tests/CoreTests/CellPixelMetricsTests.swift` | Unit tests for `CellPixelMetrics` equality, `aspectRatio`, and the `.estimated` constant. |
 | `Tests/ViewTests/CellPixelMetricsEnvironmentTests.swift` | Unit tests for the environment key (default value, round-trip). |
-| `Tests/TerminalUITests/CellPixelMetricsRefreshTests.swift` | SIGWINCH-driven refresh integration tests. |
+| `Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift` | SIGWINCH-driven refresh integration tests. |
 | `Tests/CoreTests/RasterizerAspectCorrectionTests.swift` | Stage 2 — unit tests for the sub-pixel aspect math. |
-| `Tests/TerminalUITests/Fixtures/circle-aspect-corrected/` | Stage 2 — new circle/ellipse/capsule fixtures at non-default metrics. |
-| `Tests/TerminalUITests/CircleAspectFixtureTests.swift` | Stage 2 — fixture suite binding. |
+| `Tests/SwiftTUITests/Fixtures/circle-aspect-corrected/` | Stage 2 — new circle/ellipse/capsule fixtures at non-default metrics. |
+| `Tests/SwiftTUITests/CircleAspectFixtureTests.swift` | Stage 2 — fixture suite binding. |
 
 ### Modified files
 
@@ -64,13 +64,13 @@ Match the spec's Non-goals section exactly:
 | `Sources/View/GeometryReading/GeometryReader.swift` | `GeometryProxy` gains a stored `cellPixelMetrics` field; `GeometryReader.resolveElements` reads the env. |
 | `Sources/View/Environment/ImageEnvironment.swift` | Remove `terminalCellPixelSize` key and typealias declaration. |
 | `Sources/View/Primitives/Image.swift` | Migrate to `cellPixelMetrics`. |
-| `Sources/TerminalUI/RunLoop+Rendering.swift` | Replace the env write with a `CellPixelMetrics` write carrying the right `source`. |
-| `Sources/TerminalUI/TerminalHost.swift` | Change `TerminalHost.baselineGraphicsCapabilities()` to unconditionally re-read via `ioctl`. |
-| `Sources/TerminalUI/StreamingTerminalHost.swift` | Move `graphicsCapabilities` into the locked state; add `updateCellPixelSize(_:)`. |
-| `Sources/TerminalUI/HostedSceneSession.swift` | Add `resize(to:cellPixelSize:)` overload. |
+| `Sources/SwiftTUI/RunLoop+Rendering.swift` | Replace the env write with a `CellPixelMetrics` write carrying the right `source`. |
+| `Sources/SwiftTUI/TerminalHost.swift` | Change `TerminalHost.baselineGraphicsCapabilities()` to unconditionally re-read via `ioctl`. |
+| `Sources/SwiftTUI/StreamingTerminalHost.swift` | Move `graphicsCapabilities` into the locked state; add `updateCellPixelSize(_:)`. |
+| `Sources/SwiftTUI/HostedSceneSession.swift` | Add `resize(to:cellPixelSize:)` overload. |
 | `Examples/gallery/Sources/GalleryDemoViews/FullScreen.swift` | Stage 1: physics struct takes `metrics:` param; adaptive `blockSize(metrics:)`. Stage 2: swap `Rectangle` → `Circle`; delete `blockSize`. |
 | `Examples/gallery/Tests/GalleryDemoViewsTests/PhysicsTabGestureTests.swift` | Update call sites to pass `.estimated`. |
-| `Tests/TerminalUITests/GeometryReaderSurfaceTests.swift` | Add an assertion that the proxy exposes the environment's metrics. |
+| `Tests/SwiftTUITests/GeometryReaderSurfaceTests.swift` | Add an assertion that the proxy exposes the environment's metrics. |
 | `Sources/Core/Styling.swift` | Stage 2: add `cellPixelMetrics` field to `StyleEnvironmentSnapshot`. |
 | `Sources/View/Environment/Environment.swift` | Stage 2: populate `cellPixelMetrics` on `StyleEnvironmentSnapshot` construction. |
 | `Sources/Core/Rasterizer.swift` | Stage 2: `Circle` / `Ellipse` / `Capsule` branches compute aspect-corrected radii. |
@@ -149,7 +149,7 @@ Expected: compilation failure `cannot find 'CellPixelMetrics' in scope`.
 // Sources/Core/CellPixelMetrics.swift
 /// Read-only display metrics describing how cells map to device pixels.
 ///
-/// Advisory runtime metadata. TerminalUI's layout, placement, and alignment
+/// Advisory runtime metadata. SwiftTUI's layout, placement, and alignment
 /// story remain cell-denominated; this type exists so authors can apply
 /// aspect correction to shapes, motion, or image sizing without reinventing
 /// the fallback.
@@ -287,11 +287,11 @@ git commit -m "feat(view): publish cellPixelMetrics as EnvironmentValues key"
 
 **Files:**
 - Modify: `Sources/View/GeometryReading/GeometryReader.swift`
-- Modify: `Tests/TerminalUITests/GeometryReaderSurfaceTests.swift`
+- Modify: `Tests/SwiftTUITests/GeometryReaderSurfaceTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `Tests/TerminalUITests/GeometryReaderSurfaceTests.swift`:
+Append to `Tests/SwiftTUITests/GeometryReaderSurfaceTests.swift`:
 
 ```swift
   @Test("geometry reader exposes the environment cellPixelMetrics")
@@ -410,7 +410,7 @@ Expected: all tests pass (including the pre-existing `geometryReaderExposesTermi
 
 ```bash
 git add Sources/View/GeometryReading/GeometryReader.swift \
-        Tests/TerminalUITests/GeometryReaderSurfaceTests.swift
+        Tests/SwiftTUITests/GeometryReaderSurfaceTests.swift
 git commit -m "feat(view): expose cellPixelMetrics on GeometryProxy"
 ```
 
@@ -515,7 +515,7 @@ git commit -m "refactor(view): migrate image pipeline to cellPixelMetrics"
 ## Task 1.5 — Runtime publishes `cellPixelMetrics` per frame
 
 **Files:**
-- Modify: `Sources/TerminalUI/RunLoop+Rendering.swift`
+- Modify: `Sources/SwiftTUI/RunLoop+Rendering.swift`
 
 - [ ] **Step 1: Locate the existing env write**
 
@@ -524,7 +524,7 @@ Use Grep to confirm the current line (~311):
 ```bash
 ```
 ```
-Grep `terminalCellPixelSize` under `Sources/TerminalUI/RunLoop+Rendering.swift`. Expected: one match in `resolveContext(for:)`.
+Grep `terminalCellPixelSize` under `Sources/SwiftTUI/RunLoop+Rendering.swift`. Expected: one match in `resolveContext(for:)`.
 
 - [ ] **Step 2: Replace the env write**
 
@@ -561,7 +561,7 @@ Expected: clean build. All existing tests pass — this change is observationall
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Sources/TerminalUI/RunLoop+Rendering.swift
+git add Sources/SwiftTUI/RunLoop+Rendering.swift
 git commit -m "feat(runtime): publish CellPixelMetrics each frame with source flag"
 ```
 
@@ -570,17 +570,17 @@ git commit -m "feat(runtime): publish CellPixelMetrics each frame with source fl
 ## Task 1.6 — Fix `TerminalHost` SIGWINCH staleness (TDD)
 
 **Files:**
-- Modify: `Sources/TerminalUI/TerminalHost.swift`
-- Create/Modify: `Tests/TerminalUITests/CellPixelMetricsRefreshTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalHost.swift`
+- Create/Modify: `Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
 ```swift
-// Tests/TerminalUITests/CellPixelMetricsRefreshTests.swift
+// Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 
 @Suite
 struct CellPixelMetricsRefreshTests {
@@ -647,7 +647,7 @@ Expected: `baselineRefreshes` fails with the old cached value still returned. `b
 
 - [ ] **Step 3: Fix `baselineGraphicsCapabilities()`**
 
-Locate the method in `Sources/TerminalUI/TerminalHost.swift` (currently at ~line 1169):
+Locate the method in `Sources/SwiftTUI/TerminalHost.swift` (currently at ~line 1169):
 
 Before:
 
@@ -691,8 +691,8 @@ Expected: both tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/TerminalUI/TerminalHost.swift \
-        Tests/TerminalUITests/CellPixelMetricsRefreshTests.swift
+git add Sources/SwiftTUI/TerminalHost.swift \
+        Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift
 git commit -m "fix(runtime): refresh cellPixelSize on every baseline read"
 ```
 
@@ -701,8 +701,8 @@ git commit -m "fix(runtime): refresh cellPixelSize on every baseline read"
 ## Task 1.7 — `StreamingTerminalHost.updateCellPixelSize` (TDD)
 
 **Files:**
-- Modify: `Sources/TerminalUI/StreamingTerminalHost.swift`
-- Modify: `Tests/TerminalUITests/CellPixelMetricsRefreshTests.swift`
+- Modify: `Sources/SwiftTUI/StreamingTerminalHost.swift`
+- Modify: `Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift`
 
 - [ ] **Step 1: Append a failing test**
 
@@ -840,8 +840,8 @@ Expected: both new tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/TerminalUI/StreamingTerminalHost.swift \
-        Tests/TerminalUITests/CellPixelMetricsRefreshTests.swift
+git add Sources/SwiftTUI/StreamingTerminalHost.swift \
+        Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift
 git commit -m "feat(runtime): make StreamingTerminalHost graphicsCapabilities live"
 ```
 
@@ -850,8 +850,8 @@ git commit -m "feat(runtime): make StreamingTerminalHost graphicsCapabilities li
 ## Task 1.8 — `HostedSceneSession.resize(to:cellPixelSize:)` overload (TDD)
 
 **Files:**
-- Modify: `Sources/TerminalUI/HostedSceneSession.swift`
-- Modify: `Tests/TerminalUITests/CellPixelMetricsRefreshTests.swift`
+- Modify: `Sources/SwiftTUI/HostedSceneSession.swift`
+- Modify: `Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift`
 
 - [ ] **Step 1: Append a failing test**
 
@@ -896,7 +896,7 @@ Expected: compilation failure `argument 'cellPixelSize' of 'resize(to:cellPixelS
 
 - [ ] **Step 3: Add the overload**
 
-In `Sources/TerminalUI/HostedSceneSession.swift`, after the existing `resize(to:)`:
+In `Sources/SwiftTUI/HostedSceneSession.swift`, after the existing `resize(to:)`:
 
 ```swift
 public func resize(
@@ -922,8 +922,8 @@ Expected: test passes.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/TerminalUI/HostedSceneSession.swift \
-        Tests/TerminalUITests/CellPixelMetricsRefreshTests.swift
+git add Sources/SwiftTUI/HostedSceneSession.swift \
+        Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift
 git commit -m "feat(runtime): HostedSceneSession.resize accepts cellPixelSize"
 ```
 
@@ -932,7 +932,7 @@ git commit -m "feat(runtime): HostedSceneSession.resize accepts cellPixelSize"
 ## Task 1.9 — End-to-end SIGWINCH refresh integration test
 
 **Files:**
-- Modify: `Tests/TerminalUITests/CellPixelMetricsRefreshTests.swift`
+- Modify: `Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift`
 
 - [ ] **Step 1: Append the integration test**
 
@@ -987,7 +987,7 @@ Expected: passes (no production code changes needed — Tasks 1.1–1.5 already 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Tests/TerminalUITests/CellPixelMetricsRefreshTests.swift
+git add Tests/SwiftTUITests/CellPixelMetricsRefreshTests.swift
 git commit -m "test(runtime): assert cellPixelMetrics refresh reaches GeometryReader proxy"
 ```
 
@@ -1274,7 +1274,7 @@ Read-only display metrics describing how terminal cells map to device pixels.
 
 ## Overview
 
-TerminalUI measures layout in integer cells. `CellPixelMetrics` is advisory
+SwiftTUI measures layout in integer cells. `CellPixelMetrics` is advisory
 runtime metadata that tells you how those cells map to pixels on the current
 terminal — so you can apply aspect correction to shapes, motion, or image
 sizing without reinventing the fallback.
@@ -1303,7 +1303,7 @@ require pixel accuracy.
 
 ### Related discussion
 
-- [Cell Pixel Geometry Research](https://github.com/adamz/swift-terminal-ui/blob/main/docs/CELL_PIXEL_GEOMETRY_RESEARCH.md)
+- [Cell Pixel Geometry Research](https://github.com/adamz/swift-tui/blob/main/docs/CELL_PIXEL_GEOMETRY_RESEARCH.md)
 ```
 
 - [ ] **Step 2: Add the entries to `docs/PUBLIC_API_INVENTORY.md`**
@@ -1815,22 +1815,22 @@ git commit -m "feat(raster): Capsule caps use aspect-corrected radii"
 ## Task 2.7 — Non-default-aspect fixture suite
 
 **Files:**
-- Create: `Tests/TerminalUITests/Fixtures/circle-aspect-corrected/6x6-at-8x16.txt`
-- Create: `Tests/TerminalUITests/Fixtures/circle-aspect-corrected/6x6-at-10x16.txt`
-- Create: `Tests/TerminalUITests/Fixtures/circle-aspect-corrected/6x6-at-6x14.txt`
-- Create: `Tests/TerminalUITests/CircleAspectFixtureTests.swift`
+- Create: `Tests/SwiftTUITests/Fixtures/circle-aspect-corrected/6x6-at-8x16.txt`
+- Create: `Tests/SwiftTUITests/Fixtures/circle-aspect-corrected/6x6-at-10x16.txt`
+- Create: `Tests/SwiftTUITests/Fixtures/circle-aspect-corrected/6x6-at-6x14.txt`
+- Create: `Tests/SwiftTUITests/CircleAspectFixtureTests.swift`
 
 - [ ] **Step 1: Generate baseline fixtures from the current rasterizer**
 
 Use an ad-hoc test to print the rendered output for each metric and capture it manually the first time. The test itself reads the fixture file back and compares.
 
 ```swift
-// Tests/TerminalUITests/CircleAspectFixtureTests.swift
+// Tests/SwiftTUITests/CircleAspectFixtureTests.swift
 import Foundation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor
@@ -1856,7 +1856,7 @@ struct CircleAspectFixtureTests {
     )
     let rendered = artifacts.rasterSurface.lines.joined(separator: "\n")
 
-    let fixturePath = "Tests/TerminalUITests/Fixtures/circle-aspect-corrected/\(name).txt"
+    let fixturePath = "Tests/SwiftTUITests/Fixtures/circle-aspect-corrected/\(name).txt"
     let fixture = try String(contentsOfFile: fixturePath, encoding: .utf8)
 
     #expect(rendered == fixture.trimmingCharacters(in: .newlines))
@@ -1890,7 +1890,7 @@ func capture() {
 }
 ```
 
-Run, copy the output to `Tests/TerminalUITests/Fixtures/circle-aspect-corrected/6x6-at-10x16.txt`. Repeat for the other two metrics. Delete the temporary capture test before committing.
+Run, copy the output to `Tests/SwiftTUITests/Fixtures/circle-aspect-corrected/6x6-at-10x16.txt`. Repeat for the other two metrics. Delete the temporary capture test before committing.
 
 - [ ] **Step 4: Verify the fixture tests pass**
 
@@ -1903,8 +1903,8 @@ Expected: all three fixture comparisons pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Tests/TerminalUITests/Fixtures/circle-aspect-corrected/ \
-        Tests/TerminalUITests/CircleAspectFixtureTests.swift
+git add Tests/SwiftTUITests/Fixtures/circle-aspect-corrected/ \
+        Tests/SwiftTUITests/CircleAspectFixtureTests.swift
 git commit -m "test(raster): pin Circle output at non-default cell aspects"
 ```
 
@@ -2012,7 +2012,7 @@ git commit -m "feat(gallery): physics toy subject becomes an aspect-correct Circ
 ```markdown
 # Aspect-correct shapes in terminals
 
-TerminalUI's Braille-subpixel shape rasterizer consumes
+SwiftTUI's Braille-subpixel shape rasterizer consumes
 ``Core/CellPixelMetrics`` from the resolve environment so that
 ``Circle``, ``Ellipse``, and ``Capsule`` render honestly regardless of
 the terminal's cell aspect ratio.

@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Two equivalent ways to spell a red background:
 ///

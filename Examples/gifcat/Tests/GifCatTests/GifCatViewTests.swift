@@ -1,6 +1,6 @@
 import Foundation
 import GIF
-import TerminalUI
+import SwiftTUI
 import Testing
 
 @testable import GifCat
@@ -124,7 +124,7 @@ struct GifCatViewTests {
     environment.terminalAppearance = host.appearance
     environment.terminalSize = terminalSize
 
-    let runLoop = TerminalUI.RunLoop(
+    let runLoop = SwiftTUI.RunLoop(
       rootIdentity: rootIdentity,
       terminalHost: host,
       inputReader: inputReader,

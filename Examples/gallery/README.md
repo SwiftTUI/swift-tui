@@ -1,7 +1,7 @@
 # Component Gallery
 
 This example app is a full-screen component workbench for the public
-`TerminalUI` surface.
+`SwiftTUI` surface.
 
 It is designed to feel like a terminal workspace rather than a scrolled
 showcase page. The gallery uses tabbed panes, sidebar navigation, and preview

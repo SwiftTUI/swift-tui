@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Three fixed-width `Text` children inside an `HStack(spacing: 0)` where
 /// the middle child carries `.offset(x: 6)`.  The offset is a PAINT-ONLY

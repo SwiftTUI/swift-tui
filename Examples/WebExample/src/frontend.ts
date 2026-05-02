@@ -1,14 +1,14 @@
 // frontend.ts
 //
-// The minimal embedding example: mounts a TerminalUI WASI build into a
-// browser canvas using the WebTUIGUI host, with a scene picker, a status
+// The minimal embedding example: mounts a SwiftTUI WASI build into a
+// browser canvas using the WebHost host, with a scene picker, a status
 // line, and a resize handle.
 //
-// This file is the shipped reference for "how do I embed TerminalUI in
+// This file is the shipped reference for "how do I embed SwiftTUI in
 // a Bun-served browser app?" — it deliberately stays small.
 //
 // Boot order:
-//   1. mount WebTUIGUI against ../TerminalApp/dist/{scene-manifest.json, app.wasm}.
+//   1. mount WebHost against ../TerminalApp/dist/{scene-manifest.json, app.wasm}.
 //   2. render the scene picker + status + resize handle around the canvas.
 //
 // Cross-origin isolation (required for SharedArrayBuffer-backed stdin) is
@@ -20,9 +20,9 @@
 // the structured DOM construction is for clarity, not sandboxing.
 
 import {
-  createWebTUIApp,
-  type WebTUIAppController,
-} from "webtuigui";
+  createWebHostApp,
+  type WebHostAppController,
+} from "webhost";
 import "./index.css";
 import {
   defaultStyle,
@@ -42,7 +42,7 @@ const minimumFrameWidth = 320;
 const minimumFrameHeight = 240;
 const backtabSequence = new TextEncoder().encode("[Z");
 const readmeUrl =
-  "https://github.com/GoodHatsLLC/swift-terminal-ui/blob/main/Examples/WebExample/README.md";
+  "https://github.com/GoodHatsLLC/swift-tui/blob/main/Examples/WebExample/README.md";
 
 try {
   await bootstrap();
@@ -101,7 +101,7 @@ function renderStartupError(error: unknown): void {
           class: "example-error",
           children: [
             el("p", { class: "example-eyebrow", text: "Startup error" }),
-            el("h1", { text: "Could not boot the embedded TerminalUI app." }),
+            el("h1", { text: "Could not boot the embedded SwiftTUI app." }),
             el("p", {
               text:
                 "The browser runtime did not start. The error is below; reload to retry.",
@@ -163,13 +163,13 @@ async function bootstrap(): Promise<void> {
   const lede = el("p", { class: "example-lede" });
   lede.append(
     document.createTextNode(
-      "The component gallery below is a real TerminalUI ",
+      "The component gallery below is a real SwiftTUI ",
     ),
     el("code", { text: "App" }),
     document.createTextNode(
       " built for WASI and mounted onto a canvas via the ",
     ),
-    el("code", { text: "WebTUIGUI" }),
+    el("code", { text: "WebHost" }),
     document.createTextNode(
       " host. There is no terminal-emulator dependency — the browser draws raster surface output directly. See the ",
     ),
@@ -188,7 +188,7 @@ async function bootstrap(): Promise<void> {
             children: [
               el("p", {
                 class: "example-eyebrow",
-                text: "TerminalUI · WebTUIGUI embedding example",
+                text: "SwiftTUI · WebHost embedding example",
               }),
               el("h1", { text: "The same authored app, rendered in the browser." }),
               lede,
@@ -206,7 +206,7 @@ async function bootstrap(): Promise<void> {
                       el("span", { class: "terminal-label", text: "WebExample" }),
                       el("span", {
                         class: "terminal-caption",
-                        text: "TerminalUI running through WebTUIGUI",
+                        text: "SwiftTUI running through WebHost",
                       }),
                     ],
                   }),
@@ -242,7 +242,7 @@ async function bootstrap(): Promise<void> {
 
   const sceneSizes = new Map<string, string>();
   const sceneRuntimes = new Map<string, WasmSceneRuntimeHandle>();
-  let controller: WebTUIAppController | undefined;
+  let controller: WebHostAppController | undefined;
   let manifestSource = "";
   const renderStatus = () => {
     if (!controller) return;
@@ -293,10 +293,10 @@ async function createController(
   mount: HTMLElement,
   onSceneResize: (event: WasmSceneResizeEvent) => void,
   onRuntimeCreated: (runtime: WasmSceneRuntimeHandle) => void,
-): Promise<{ controller: WebTUIAppController; manifestSource: string }> {
+): Promise<{ controller: WebHostAppController; manifestSource: string }> {
   try {
     return {
-      controller: await createWebTUIApp({
+      controller: await createWebHostApp({
         mount,
         manifestUrl: terminalAppManifestUrl,
         style: defaultStyle,
@@ -315,7 +315,7 @@ async function createController(
     // eslint-disable-next-line no-console
     console.warn("Falling back to the local preview manifest:", error);
     return {
-      controller: await createWebTUIApp({
+      controller: await createWebHostApp({
         mount,
         manifest: fallbackManifest,
         style: defaultStyle,
@@ -328,7 +328,7 @@ async function createController(
 
 function installShiftTabPassthrough(
   terminalHost: HTMLElement,
-  getController: () => WebTUIAppController | undefined,
+  getController: () => WebHostAppController | undefined,
   sceneRuntimes: ReadonlyMap<string, WasmSceneRuntimeHandle>,
 ): void {
   terminalHost.addEventListener(
@@ -369,7 +369,7 @@ function installShiftTabPassthrough(
 // Scene picker
 
 function renderSceneButtons(
-  controller: WebTUIAppController,
+  controller: WebHostAppController,
   container: HTMLElement,
   onSelectionChanged: () => void,
 ): void {
@@ -450,7 +450,7 @@ function renderSceneButtons(
 }
 
 function updateSceneSelection(
-  controller: WebTUIAppController,
+  controller: WebHostAppController,
   container: HTMLElement,
 ): void {
   const valueEl = container.querySelector<HTMLElement>("[data-scene-value]");

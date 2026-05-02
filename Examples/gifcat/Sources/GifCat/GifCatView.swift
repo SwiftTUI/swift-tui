@@ -1,5 +1,5 @@
 import Foundation
-import TerminalUI
+import SwiftTUI
 
 public struct GifCatItem: Equatable, Hashable, Identifiable, Sendable {
   public var id: Int

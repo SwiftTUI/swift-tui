@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Two side-by-side `FlowLayout` containers wrapping the same eight
 /// `[item N]` children — the first container is `.frame(width: 30)`,

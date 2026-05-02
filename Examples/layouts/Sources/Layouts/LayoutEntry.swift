@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Metadata + factory for one layout example.
 ///

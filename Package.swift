@@ -54,7 +54,7 @@ let packageDependencies: [Package.Dependency] = [
   ),
 ]
 
-let terminalUIDependencies: [Target.Dependency] = [
+let swiftTUIDependencies: [Target.Dependency] = [
   "Core",
   "View",
   .product(name: "EmbeddedFonts", package: "swift-figlet"),
@@ -77,11 +77,11 @@ let terminalUIDependencies: [Target.Dependency] = [
   ),
 ]
 
-let terminalUITestDependencies: [Target.Dependency] = [
-  "TerminalUI",
+let swiftTUITestDependencies: [Target.Dependency] = [
+  "SwiftTUI",
   "Core",
   "View",
-  "TerminalUICharts",
+  "SwiftTUICharts",
   .product(
     name: "GIF",
     package: "swift-gif"
@@ -112,12 +112,12 @@ func swiftSettings(_ settings: PackageDescription.SwiftSetting...) -> [PackageDe
 }
 
 let package = Package(
-  name: "swift-terminal-ui",
+  name: "swift-tui",
   platforms: packagePlatforms,
   products: [
     .library(name: "View", targets: ["View"]),
-    .library(name: "TerminalUICharts", targets: ["TerminalUICharts"]),
-    .library(name: "TerminalUI", targets: ["TerminalUI"]),
+    .library(name: "SwiftTUICharts", targets: ["SwiftTUICharts"]),
+    .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
   ],
   dependencies: packageDependencies,
   targets: [
@@ -143,14 +143,14 @@ let package = Package(
     ),
 
     .target(
-      name: "TerminalUICharts",
+      name: "SwiftTUICharts",
       dependencies: ["Core", "View"],
       swiftSettings: swiftSettings()
     ),
 
     .target(
-      name: "TerminalUI",
-      dependencies: terminalUIDependencies,
+      name: "SwiftTUI",
+      dependencies: swiftTUIDependencies,
       resources: [],
       swiftSettings: swiftSettings()
     ),
@@ -170,8 +170,8 @@ let package = Package(
       swiftSettings: swiftSettings()
     ),
     .testTarget(
-      name: "TerminalUITests",
-      dependencies: terminalUITestDependencies,
+      name: "SwiftTUITests",
+      dependencies: swiftTUITestDependencies,
       exclude: ["Fixtures"],
       swiftSettings: swiftSettings()
     ),

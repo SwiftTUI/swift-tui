@@ -1,8 +1,8 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// Bridges between `GIFEditorCore`'s platform-neutral `EditorColor` and
-/// the TerminalUI `Color` type. Kept in one place so the view code
+/// the SwiftTUI `Color` type. Kept in one place so the view code
 /// doesn't sprinkle hex conversions everywhere.
 extension EditorColor {
   func toTerminalColor() -> Color {

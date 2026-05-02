@@ -46,10 +46,10 @@ avoid reopening resolve-time `terminalSize` shims.
 
 ## Verification Log
 
-- `swiftly run swift test --filter 'TerminalUITests\.(SafeAreaSurfaceTests|ViewThatFitsSurfaceTests|LayoutDependentContainerHardeningTests)'`
+- `swiftly run swift test --filter 'SwiftTUITests\.(SafeAreaSurfaceTests|ViewThatFitsSurfaceTests|LayoutDependentContainerHardeningTests)'`
   - passed, 13 tests in 3 suites.
-- `swiftly run swift test --filter 'TerminalUITests\.(SafeAreaSurfaceTests|ViewThatFitsSurfaceTests|LayoutDependentContainerHardeningTests|AnchorPreferenceSurfaceTests|GeometryReaderSurfaceTests|AsyncFrameTailRenderingTests)|CoreTests\.LayoutEngineTests'`
+- `swiftly run swift test --filter 'SwiftTUITests\.(SafeAreaSurfaceTests|ViewThatFitsSurfaceTests|LayoutDependentContainerHardeningTests|AnchorPreferenceSurfaceTests|GeometryReaderSurfaceTests|AsyncFrameTailRenderingTests)|CoreTests\.LayoutEngineTests'`
   - passed, 88 tests in 7 suites.
 - `git diff --check` - passed.
 - `bun run test` - passed. Full log:
-  `/tmp/swift-terminal-ui-test-all-20260501-150017-28148.log`.
+  `/tmp/swift-tui-test-all-20260501-150017-28148.log`.

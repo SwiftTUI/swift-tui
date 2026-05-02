@@ -6,7 +6,7 @@ import PackageDescription
 // 56 layout-shape examples in real SwiftUI so the BEHAVIOUR_FINDINGS
 // observations can be compared side-by-side against an authoritative
 // SwiftUI reference. This package deliberately drops the test target
-// from the original — the original tests rasterise via TerminalUI's
+// from the original — the original tests rasterise via SwiftTUI's
 // `DefaultRenderer` / `RasterSurface`, which has no SwiftUI public
 // equivalent.
 let package = Package(

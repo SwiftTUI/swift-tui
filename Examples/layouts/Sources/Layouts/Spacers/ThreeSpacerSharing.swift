@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Three `Spacer()` siblings inside an `HStack` split the residual
 /// horizontal space equally — the canonical "centered + edge-pinned"

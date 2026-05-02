@@ -51,7 +51,7 @@ package final class LocalGestureRegistry: Equatable {
 
   package func reset() {
     // `RuntimeRegistrationSet.resetAll()` fires on every full-resolve
-    // frame (TerminalUI.swift:188). Without an in-flight guard, a
+    // frame (SwiftTUI.swift:188). Without an in-flight guard, a
     // `.down` event that lands between two full-resolve frames would
     // register its captured state on a recognizer that is then
     // silently torn down — the next `.dragged` arrives at a fresh

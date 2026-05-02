@@ -1,5 +1,5 @@
 import Foundation
-import TerminalUI
+import SwiftTUI
 
 /// Showcases the ``Image`` primitive across its four rendering modes —
 /// intrinsic size, ``Image/resizable()`` stretch, ``Image/scaledToFit()``,

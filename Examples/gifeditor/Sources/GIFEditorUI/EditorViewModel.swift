@@ -1,6 +1,6 @@
 import Foundation
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// Reference-type owner of the editor's mutable state. The view tree
 /// reads `document` as a value type via @State, but mutating ops live

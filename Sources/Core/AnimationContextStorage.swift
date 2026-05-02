@@ -48,7 +48,7 @@ package enum AnimationCompletionStorage {
 /// `Animation` values to the renderer's animation controller without
 /// introducing a direct module dependency.
 ///
-/// TerminalUI installs a concrete sink on the ``RunLoop`` using task-local
+/// SwiftTUI installs a concrete sink on the ``RunLoop`` using task-local
 /// storage so concurrent scenes keep their animation registrations isolated.
 @MainActor
 package protocol AnimationRegistrationSink: AnyObject, Sendable {

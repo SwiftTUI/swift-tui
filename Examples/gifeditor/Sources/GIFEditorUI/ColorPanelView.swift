@@ -1,5 +1,5 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// Top sub-panel of the right column — Photoshop-style "Color"
 /// inspector. Shows the active primary and secondary colors as

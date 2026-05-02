@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 struct TodoTab: View {
   @State private var items: [TodoItem] = TodoItem.seeds

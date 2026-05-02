@@ -52,11 +52,11 @@ Five DocC articles have a near-twin in `docs/` and one already shows drift:
 | `docs/` (contributor) | `Sources/*.docc/` (DocC) | Lines (docs / DocC) | Drift? |
 |---|---|---|---|
 | `STATE_KEYING.md` | `View/View.docc/State-Keying.md` | 458 / 333 | **Yes** — DocC is materially shorter |
-| `ARCHITECTURE.md` | `TerminalUI/TerminalUI.docc/Architecture.md` | 184 / 173 | Light |
-| `RUNTIME.md` | `TerminalUI/TerminalUI.docc/Runtime.md` | 250 / 224 | Light |
-| `VISION.md` | `TerminalUI/TerminalUI.docc/Vision.md` | 122 / 109 | Light |
+| `ARCHITECTURE.md` | `SwiftTUI/SwiftTUI.docc/Architecture.md` | 184 / 173 | Light |
+| `RUNTIME.md` | `SwiftTUI/SwiftTUI.docc/Runtime.md` | 250 / 224 | Light |
+| `VISION.md` | `SwiftTUI/SwiftTUI.docc/Vision.md` | 122 / 109 | Light |
 | `FOCUS.md` | `View/View.docc/Focus.md` | 681 / 492 | **Yes** — DocC is ~190 lines shorter |
-| `HOST_PACKAGES.md` | `TerminalUI/TerminalUI.docc/Host-Integration.md` | 143 / 108 | Light |
+| `HOST_PACKAGES.md` | `SwiftTUI/SwiftTUI.docc/Host-Integration.md` | 143 / 108 | Light |
 
 Maintaining two near-copies of the same material doubles edit cost and
 guarantees they diverge. The State-Keying and Focus pairs already have.
@@ -72,8 +72,8 @@ the recommended action.
 |---|---|
 | `Core/Core.docc/Core.md` | Tight module overview with `Topics`. The "Design Boundary" prose is API-shaping context a consumer needs ("this module does not talk to the terminal directly") and is short. |
 | `View/View.docc/View.md` | Module overview + `Topics`. No internal-only content. |
-| `TerminalUI/TerminalUI.docc/TerminalUI.md` | Module overview + `Topics`. No internal-only content. |
-| `TerminalUICharts/TerminalUICharts.docc/TerminalUICharts.md` | Module overview + `Topics`. |
+| `SwiftTUI/SwiftTUI.docc/SwiftTUI.md` | Module overview + `Topics`. No internal-only content. |
+| `SwiftTUICharts/SwiftTUICharts.docc/SwiftTUICharts.md` | Module overview + `Topics`. |
 
 ### Pure how-to / authoring guides — keep as-is
 
@@ -81,8 +81,8 @@ the recommended action.
 |---|---|
 | `View/View.docc/Authoring-Views.md` | "Use containers, modifiers, and previews like this." Brief actor-isolation note is load-bearing for callers, not contributor framing. |
 | `View/View.docc/State-Environment-And-Focus.md` | Topical "use ``State`` for X, ``Binding`` for Y" overview. No internal-only content. |
-| `TerminalUICharts/TerminalUICharts.docc/Building-Dashboards.md` | "Choose a chart, lay it out narrow." Pure how-to. |
-| `TerminalUI/TerminalUI.docc/Running-Apps.md` | Lists the three runtime entry points and how to launch them. Pure how-to. |
+| `SwiftTUICharts/SwiftTUICharts.docc/Building-Dashboards.md` | "Choose a chart, lay it out narrow." Pure how-to. |
+| `SwiftTUI/SwiftTUI.docc/Running-Apps.md` | Lists the three runtime entry points and how to launch them. Pure how-to. |
 | `Core/Core.docc/CellPixelMetrics.md` | **Already follows the recommended pattern**: short symbol overview, one `Related discussion` link out to the contributor research doc. Use as the template for everything below. |
 
 ### Articles to refactor — DocC keeps the consumer story, contributor doc owns the trade-offs
@@ -101,7 +101,7 @@ order to use `@State`.
 
 **What to keep in DocC** (≈ 30 lines):
 
-- One paragraph: "TerminalUI keys `@State` by view-identity-path plus
+- One paragraph: "SwiftTUI keys `@State` by view-identity-path plus
   source-location. Move a stateful view to a different identity path and you
   get a fresh state slot."
 - The "Practical Owner Placement Guidance" section (lines 306–326 today) is
@@ -125,7 +125,7 @@ sections, traversal semantics, common mistakes) is excellent consumer content.
 Two passages are contributor-only:
 
 1. **The "scope hypothesis" paragraph** (line 432 today, inside "Practical
-   Implications For TerminalUI"):
+   Implications For SwiftTUI"):
 
    > "**the focus chain is load-bearing for the scope hypothesis.** Commands
    > belong to scopes, and a scope's activation predicate is that its anchor
@@ -161,7 +161,7 @@ scope/command proposal. Replace the `List` design diary with a one-line
 factual note ("focus highlight in `List` is row-shaped, not container-shaped")
 and a link to `docs/FOCUS.md` for the rationale.
 
-#### `TerminalUI/TerminalUI.docc/Architecture.md` ↔ `docs/ARCHITECTURE.md`
+#### `SwiftTUI/SwiftTUI.docc/Architecture.md` ↔ `docs/ARCHITECTURE.md`
 
 **Audience today:** mixed, leans contributor.
 
@@ -190,7 +190,7 @@ single-paragraph level per phase, public data products, a one-paragraph
 runtime overview. Link out to `docs/ARCHITECTURE.md` for transitional seams,
 internal coordinators, and presentation-host reconciliation rules.
 
-#### `TerminalUI/TerminalUI.docc/Runtime.md` ↔ `docs/RUNTIME.md`
+#### `SwiftTUI/SwiftTUI.docc/Runtime.md` ↔ `docs/RUNTIME.md`
 
 **Audience today:** mixed, leans contributor.
 
@@ -226,7 +226,7 @@ a one-line guarantee ("the CLI runner installs a crash guard that resets the
 terminal before the process dies") and link to `docs/RUNTIME.md` for the
 implementation detail.
 
-#### `TerminalUI/TerminalUI.docc/Vision.md` ↔ `docs/VISION.md`
+#### `SwiftTUI/SwiftTUI.docc/Vision.md` ↔ `docs/VISION.md`
 
 **Audience today:** contributor. Almost the entire document.
 
@@ -252,16 +252,16 @@ one-line level), and link to `docs/VISION.md` for the full philosophy. The
 DocC article today essentially *is* `docs/VISION.md`; remove the duplication.
 
 Alternatively: delete the DocC article entirely and fold a one-paragraph
-"About" into `TerminalUI/TerminalUI.docc/TerminalUI.md`.
+"About" into `SwiftTUI/SwiftTUI.docc/SwiftTUI.md`.
 
-#### `TerminalUI/TerminalUI.docc/Host-Integration.md` ↔ `docs/HOST_PACKAGES.md`
+#### `SwiftTUI/SwiftTUI.docc/Host-Integration.md` ↔ `docs/HOST_PACKAGES.md`
 
 **Audience today:** contributor.
 
 This article is mostly project-internal contracts:
 
 - "Shipped Architecture" — describes which package owns which file
-  (`SwiftUITUIAppState`, `NativeSceneBridge`, etc.). Useful for the host-
+  (`SwiftUIHostAppState`, `NativeSceneBridge`, etc.). Useful for the host-
   package authors. Not useful for someone choosing how to embed.
 - "Responsibilities Split" — internal contract between the root package and
   peer host packages.
@@ -271,7 +271,7 @@ This article is mostly project-internal contracts:
 
 The genuinely consumer-facing question is short: "I'm building an app — how
 do I run it on terminal vs WASI vs SwiftUI vs browser?" That answer already
-exists in `Running-Apps.md` and `TerminalUI.md`.
+exists in `Running-Apps.md` and `SwiftTUI.md`.
 
 **Recommendation:** replace the DocC article with a short "Embedding modes"
 overview (3 bullet points: terminal-native runner, WASI runner, embedded host
@@ -335,14 +335,14 @@ discussion. Either folded into the existing
 | `View/State-Keying.md` | Reduce to ~30 lines (consumer guidance + link out) | **High** |
 | `View/Focus.md` | Remove "scope hypothesis" paragraph + remove `List` design-diary section | **High** |
 | `View/AspectCorrectShapes.md` | Remove fixture/quantization discussion | Low |
-| `TerminalUI/TerminalUI.md` | Keep | — |
-| `TerminalUI/Architecture.md` | Trim transitional seams + internal coordinators | **Medium** |
-| `TerminalUI/Runtime.md` | Replace cost-model + crash-recovery sections with summary + link | **Medium** |
-| `TerminalUI/Vision.md` | Reduce to ~20 lines (or delete and fold into module page) | **High** |
-| `TerminalUI/Host-Integration.md` | Reduce to "embedding modes" overview (or delete) | **High** |
-| `TerminalUI/Running-Apps.md` | Keep | — |
-| `TerminalUICharts/TerminalUICharts.md` | Keep | — |
-| `TerminalUICharts/Building-Dashboards.md` | Keep | — |
+| `SwiftTUI/SwiftTUI.md` | Keep | — |
+| `SwiftTUI/Architecture.md` | Trim transitional seams + internal coordinators | **Medium** |
+| `SwiftTUI/Runtime.md` | Replace cost-model + crash-recovery sections with summary + link | **Medium** |
+| `SwiftTUI/Vision.md` | Reduce to ~20 lines (or delete and fold into module page) | **High** |
+| `SwiftTUI/Host-Integration.md` | Reduce to "embedding modes" overview (or delete) | **High** |
+| `SwiftTUI/Running-Apps.md` | Keep | — |
+| `SwiftTUICharts/SwiftTUICharts.md` | Keep | — |
+| `SwiftTUICharts/Building-Dashboards.md` | Keep | — |
 
 ## Recommended pattern for refactored articles
 

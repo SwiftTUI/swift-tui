@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// An HStack of three children whose middle child has
 /// `layoutPriority(1)` while the outer two default to priority `0`.

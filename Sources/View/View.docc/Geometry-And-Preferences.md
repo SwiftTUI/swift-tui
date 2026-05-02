@@ -137,7 +137,7 @@ struct HeaderBadge: View {
       }
 
       Text("Recorder")
-      Text("TerminalUI")
+      Text("SwiftTUI")
     }
     .overlay(alignment: .topLeading) {
       GeometryReader { proxy in
@@ -187,7 +187,7 @@ and inspect the geometry columns:
 
 ```swift
 runLoop.diagnosticsLogger = FrameDiagnosticsLogger(
-  path: "/tmp/terminalui-frames.tsv"
+  path: "/tmp/swifttui-frames.tsv"
 )
 ```
 

@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Smoke-tier layout proving that attaching `.sheet(isPresented:)` to a
 /// `ScrollView`-backed view does not break the underlying resolve: the

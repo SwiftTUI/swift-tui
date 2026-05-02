@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Pins the interaction between a vertical `ScrollView` and
 /// `.safeAreaInset(edge: .top)`: the inset is pinned to the top edge

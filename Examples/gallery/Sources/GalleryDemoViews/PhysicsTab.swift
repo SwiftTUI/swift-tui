@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 struct PhysicsTab: View {
   @State private var toyState = FullScreenToyPhysics.State()

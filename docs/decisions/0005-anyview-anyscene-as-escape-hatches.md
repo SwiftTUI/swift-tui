@@ -25,7 +25,7 @@ They make it easy to:
 They also make it easy to *lose* the structural identity that the
 framework's state, lifecycle, and reuse machinery depends on. SwiftUI's
 own runtime treats `AnyView` as a hint that identity has been collapsed
-— behavior that's defensible in SwiftUI but expensive in TerminalUI's
+— behavior that's defensible in SwiftUI but expensive in SwiftTUI's
 incremental-paint pipeline, where dropped reuse triggers full repaints.
 
 Earlier authoring patterns in the package leaned on `AnyView` and
@@ -99,5 +99,5 @@ remaining-work tracker.
   type-erasure deferral plan.
 
 The bet: authored apps that lean on typed builders write less code
-that silently disables runtime correctness, and TerminalUI's
+that silently disables runtime correctness, and SwiftTUI's
 incremental-rendering invariants stay intact across ordinary edits.

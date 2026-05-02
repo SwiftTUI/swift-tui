@@ -267,15 +267,15 @@ non-empty skipped-frame side-effect reconciliation remains a later proposal.
 
 ## Code Anchors
 
-- `Sources/TerminalUI/TerminalUI.swift`: `DefaultRenderer`,
+- `Sources/SwiftTUI/SwiftTUI.swift`: `DefaultRenderer`,
   `FrameTailRenderer`, `FrameHeadDraft`, render generation sequencing, worker
   timings, and frame finish.
-- `Sources/TerminalUI/RunLoop+Rendering.swift`: async render loop, input
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`: async render loop, input
   coalescing, queued-tail cancellation, visual-only completed-frame drops,
   ordered commit for blocked candidates, and diagnostics emission.
 - `Sources/Core/Scheduler.swift`: render-intent coalescing and cancelled
   animation-intent replay into replacement work.
-- `Sources/TerminalUI/FrameDiagnosticsLogger.swift`: TSV diagnostics fields for
+- `Sources/SwiftTUI/FrameDiagnosticsLogger.swift`: TSV diagnostics fields for
   generations, worker timings, main-actor timings, coalescing, drop blockers,
   tail cancellation, stale policy, dropped completed frames, and geometry
   resolution misses.
@@ -289,7 +289,7 @@ non-empty skipped-frame side-effect reconciliation remains a later proposal.
   realizes content from placed geometry instead of resolve-time terminal size.
 - `Sources/View/Layout/Layout.swift`: public `SendableLayout` opt-in and
   worker-capable layout erasure.
-- `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`: async tail,
+- `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`: async tail,
   ordered commit, coalescing, `SendableLayout`, lazy snapshot, and framework
   layout regression coverage.
 

@@ -4,7 +4,7 @@ import SwiftUI
 /// frame, with `.clipped()` ensuring only cells inside the frame
 /// reach the raster.
 ///
-/// SwiftUI port: the original used TerminalUI's `CanvasDrawing` /
+/// SwiftUI port: the original used SwiftTUI's `CanvasDrawing` /
 /// `CanvasContext` types. SwiftUI's `Canvas` uses
 /// `(GraphicsContext, CGSize) -> Void` and `Path` directly. The
 /// drawing intent is preserved — paint a horizontal line that

@@ -13,7 +13,7 @@ sources:
 
 ## Context
 
-A frame in TerminalUI moves through seven distinct phases:
+A frame in SwiftTUI moves through seven distinct phases:
 
 ```
 resolve → measure → place → semantics → draw → raster → commit

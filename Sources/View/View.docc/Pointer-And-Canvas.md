@@ -2,7 +2,7 @@
 
 ## Overview
 
-TerminalUI uses one coordinate space for authored interaction and drawing:
+SwiftTUI uses one coordinate space for authored interaction and drawing:
 continuous terminal cells.
 
 `Point(x: 4.25, y: 2.5)` means the middle of the cell at column 4, row 2. It

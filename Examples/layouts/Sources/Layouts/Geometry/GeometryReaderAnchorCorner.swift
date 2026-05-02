@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Uses `GeometryReader`'s `proxy.size` to anchor a `[X]` marker at
 /// the top-right corner of the reader's frame via `.position`.

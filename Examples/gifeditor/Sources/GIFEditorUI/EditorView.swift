@@ -1,5 +1,5 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// Public root view of the editor. Owns one `EditorViewModel` for the
 /// document's lifetime; everything below it renders from that model

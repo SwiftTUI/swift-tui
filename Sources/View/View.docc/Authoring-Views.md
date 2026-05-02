@@ -4,7 +4,7 @@
 
 Use the `View` module the same way you would approach a small SwiftUI feature: compose containers, local state, focused controls, and modifiers around a body-driven tree.
 
-The main difference is that TerminalUI eventually renders into a cell surface instead of a pixel buffer. That means you should think in terms of:
+The main difference is that SwiftTUI eventually renders into a cell surface instead of a pixel buffer. That means you should think in terms of:
 
 - integer cell sizes for layout, with continuous cell-space points reserved for
   input, drawing, and interpolation
@@ -14,7 +14,7 @@ The main difference is that TerminalUI eventually renders into a cell surface in
 
 ## Actor Isolation
 
-TerminalUI now follows SwiftUI-style actor isolation for authored view trees.
+SwiftTUI now follows SwiftUI-style actor isolation for authored view trees.
 
 - `View` bodies are `@MainActor`
 - `Resolver.resolve(...)` and `DefaultRenderer.render(...)` evaluate view trees on the main actor
@@ -51,7 +51,7 @@ package-only; ordinary call sites should stay on the modifier surface.
 
 ## Preview And Inspection
 
-When you want to inspect authored output without running a full terminal session, use ``Resolver`` inside `View`, or the higher-level `DefaultRenderer` type from `TerminalUI`, from the main actor to produce resolved trees, frame artifacts, or rendered terminal text.
+When you want to inspect authored output without running a full terminal session, use ``Resolver`` inside `View`, or the higher-level `DefaultRenderer` type from `SwiftTUI`, from the main actor to produce resolved trees, frame artifacts, or rendered terminal text.
 
 See also:
 

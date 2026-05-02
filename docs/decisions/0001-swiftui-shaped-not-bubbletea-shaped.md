@@ -28,7 +28,7 @@ These two starting points lead to materially different APIs.
 
 ## Decision
 
-TerminalUI is shaped after **SwiftUI**, not after Bubble Tea.
+SwiftTUI is shaped after **SwiftUI**, not after Bubble Tea.
 
 The framework implements a useful subset of SwiftUI sized to the terminal
 domain, with terminal-native reinterpretation permitted only when:

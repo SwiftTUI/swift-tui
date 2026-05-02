@@ -30,27 +30,27 @@
 classifications:
 
   canonical:
-    # ─── TerminalUI (runtime + scene + host) ────────────────────────────────
-    - TerminalUI.AnyScene
-    - TerminalUI.App
-    - TerminalUI.AppLaunchError
-    - TerminalUI.DefaultRenderer
-    - TerminalUI.HostedSceneSession
-    - TerminalUI.RunLoop
-    - TerminalUI.RunLoopExitReason
-    - TerminalUI.RunLoopResult
-    - TerminalUI.Scene
-    - TerminalUI.SceneBuilder
-    - TerminalUI.SignalReader
-    - TerminalUI.TerminalCapabilityProfile
-    - TerminalUI.TerminalSurfaceRenderer
-    - TerminalUI.TerminalUISceneDescriptor
-    - TerminalUI.TerminalUISceneManifest
-    - TerminalUI.TerminalMouseInputCompatibilityMatrix
-    - TerminalUI.TerminalMouseInputResolution
-    - TerminalUI.TerminalMouseInputTrustPolicy
-    - TerminalUI.WindowGroup
-    - TerminalUI.WindowIdentifier
+    # ─── SwiftTUI (runtime + scene + host) ────────────────────────────────
+    - SwiftTUI.AnyScene
+    - SwiftTUI.App
+    - SwiftTUI.AppLaunchError
+    - SwiftTUI.DefaultRenderer
+    - SwiftTUI.HostedSceneSession
+    - SwiftTUI.RunLoop
+    - SwiftTUI.RunLoopExitReason
+    - SwiftTUI.RunLoopResult
+    - SwiftTUI.Scene
+    - SwiftTUI.SceneBuilder
+    - SwiftTUI.SignalReader
+    - SwiftTUI.TerminalCapabilityProfile
+    - SwiftTUI.TerminalSurfaceRenderer
+    - SwiftTUI.SceneDescriptor
+    - SwiftTUI.SceneManifest
+    - SwiftTUI.TerminalMouseInputCompatibilityMatrix
+    - SwiftTUI.TerminalMouseInputResolution
+    - SwiftTUI.TerminalMouseInputTrustPolicy
+    - SwiftTUI.WindowGroup
+    - SwiftTUI.WindowIdentifier
 
     # ─── View (authoring surface) ───────────────────────────────────────────
     - View.AnyLayout
@@ -135,36 +135,36 @@ classifications:
     - View.ZStack
     - View.ZStackLayout
 
-    # ─── TerminalUI runtime types (public, deeper than the daily surface) ──
-    - TerminalUI.ConditionalScene
-    - TerminalUI.EmptyScene
-    - TerminalUI.ExitKeyBindings
-    - TerminalUI.FileOpenError
-    - TerminalUI.FrameDiagnosticRecord
-    - TerminalUI.FrameDiagnosticsLogger
-    - TerminalUI.HostedSceneSessionError
-    - TerminalUI.InProcessSignalReader
-    - TerminalUI.InputEvent
-    - TerminalUI.InputReader
-    - TerminalUI.InputReading
-    - TerminalUI.KeyHandlingResult
-    - TerminalUI.KeyParser
-    - TerminalUI.MouseButton
-    - TerminalUI.MouseEvent
-    - TerminalUI.PasteEvent
-    - TerminalUI.SignalReading
-    - TerminalUI.Standard
-    - TerminalUI.StateKeyHandler
-    - TerminalUI.TerminalControlMessage
-    - TerminalUI.TerminalGraphicsCapabilities
-    - TerminalUI.TerminalHost
-    - TerminalUI.TerminalHostError
-    - TerminalUI.TerminalHosting
-    - TerminalUI.TerminalInputParser
-    - TerminalUI.TerminalInputReading
-    - TerminalUI.TerminalPresentationMetrics
-    - TerminalUI.TupleScene
-    - TerminalUI.VariadicScene
+    # ─── SwiftTUI runtime types (public, deeper than the daily surface) ──
+    - SwiftTUI.ConditionalScene
+    - SwiftTUI.EmptyScene
+    - SwiftTUI.ExitKeyBindings
+    - SwiftTUI.FileOpenError
+    - SwiftTUI.FrameDiagnosticRecord
+    - SwiftTUI.FrameDiagnosticsLogger
+    - SwiftTUI.HostedSceneSessionError
+    - SwiftTUI.InProcessSignalReader
+    - SwiftTUI.InputEvent
+    - SwiftTUI.InputReader
+    - SwiftTUI.InputReading
+    - SwiftTUI.KeyHandlingResult
+    - SwiftTUI.KeyParser
+    - SwiftTUI.MouseButton
+    - SwiftTUI.MouseEvent
+    - SwiftTUI.PasteEvent
+    - SwiftTUI.SignalReading
+    - SwiftTUI.Standard
+    - SwiftTUI.StateKeyHandler
+    - SwiftTUI.TerminalControlMessage
+    - SwiftTUI.TerminalGraphicsCapabilities
+    - SwiftTUI.TerminalHost
+    - SwiftTUI.TerminalHostError
+    - SwiftTUI.TerminalHosting
+    - SwiftTUI.TerminalInputParser
+    - SwiftTUI.TerminalInputReading
+    - SwiftTUI.TerminalPresentationMetrics
+    - SwiftTUI.TupleScene
+    - SwiftTUI.VariadicScene
 
     # ─── View animation primitives ─────────────────────────────────────────
     - View.Animation
@@ -361,24 +361,24 @@ classifications:
     - View.VerticalEdge
     - View.ViewSpacing
 
-    # ─── TerminalUICharts ───────────────────────────────────────────────────
-    - TerminalUICharts.BannerTone
-    - TerminalUICharts.BarChart
-    - TerminalUICharts.BarChartEntry
-    - TerminalUICharts.BulletChart
-    - TerminalUICharts.ColumnChart
-    - TerminalUICharts.ComparisonChart
-    - TerminalUICharts.ComparisonEntry
-    - TerminalUICharts.HeatStrip
-    - TerminalUICharts.Legend
-    - TerminalUICharts.LegendItem
-    - TerminalUICharts.Meter
-    - TerminalUICharts.Sparkline
-    - TerminalUICharts.StackedBarChart
-    - TerminalUICharts.ThresholdBand
-    - TerminalUICharts.ThresholdGauge
-    - TerminalUICharts.Timeline
-    - TerminalUICharts.TimelineEntry
+    # ─── SwiftTUICharts ───────────────────────────────────────────────────
+    - SwiftTUICharts.BannerTone
+    - SwiftTUICharts.BarChart
+    - SwiftTUICharts.BarChartEntry
+    - SwiftTUICharts.BulletChart
+    - SwiftTUICharts.ColumnChart
+    - SwiftTUICharts.ComparisonChart
+    - SwiftTUICharts.ComparisonEntry
+    - SwiftTUICharts.HeatStrip
+    - SwiftTUICharts.Legend
+    - SwiftTUICharts.LegendItem
+    - SwiftTUICharts.Meter
+    - SwiftTUICharts.Sparkline
+    - SwiftTUICharts.StackedBarChart
+    - SwiftTUICharts.ThresholdBand
+    - SwiftTUICharts.ThresholdGauge
+    - SwiftTUICharts.Timeline
+    - SwiftTUICharts.TimelineEntry
 
   package-only-seam:
     # Transitional / lowering-layer types kept package-internal but reachable

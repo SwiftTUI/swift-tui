@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Behaviour-tier layout pinning that `.alert(_:isPresented:)` overlays
 /// presentation chrome WITHOUT reflowing the underlying content. The

@@ -5,7 +5,7 @@ import SwiftUI
 /// Selecting an entry calls `onSelect` with its ID; the parent
 /// `LayoutsRoot` flips into the detail host.
 ///
-/// SwiftUI port: the original used TerminalUI's
+/// SwiftUI port: the original used SwiftTUI's
 /// `List(selection:onActivate:)`, which combines selection binding
 /// and an activation callback. SwiftUI's `List(selection:)` only
 /// binds selection; activation comes through tap or `.onChange`.

@@ -1,4 +1,4 @@
-import TerminalUIWASI
+import SwiftTUIWASI
 import WebExampleScenes
 
-try await TerminalWASIAppRunner.run(WebExampleApp.self)
+try await WASIRunner.run(WebExampleApp.self)

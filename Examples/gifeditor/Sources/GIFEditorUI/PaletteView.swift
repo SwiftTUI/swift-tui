@@ -1,5 +1,5 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// Middle sub-panel of the right column — a 4×8 grid of the first 32
 /// palette slots. Every swatch is a clickable `Button` that sets the

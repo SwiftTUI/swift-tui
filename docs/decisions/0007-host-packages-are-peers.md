@@ -13,16 +13,16 @@ sources:
 
 ## Context
 
-A TerminalUI app eventually has to render somewhere concrete: a
+A SwiftTUI app eventually has to render somewhere concrete: a
 terminal process, a SwiftUI macOS / iOS surface, a Bun-served browser
 canvas, or a WASI runtime. Each of those targets has different platform
 chrome, different scene-switching UI conventions, different theme
 surfaces, and different toolchain dependencies.
 
 The naive shape would be to fold all of these into the root
-`swift-terminal-ui` package — exporting library products like
-`TerminalUI`, `TerminalUISwiftUIGUI`, `TerminalUIWebGUI`,
-`TerminalUICLI`, etc., from a single Package.swift. That keeps everything
+`swift-tui` package — exporting library products like
+`SwiftTUI`, `SwiftUIHost`, `WebHost`,
+`SwiftTUICLI`, etc., from a single Package.swift. That keeps everything
 in one place and makes "import what you need" feel uniform.
 
 It also drags every consumer through every host-platform's transitive
@@ -37,18 +37,18 @@ Host packages live as **peer SwiftPM packages** alongside the root
 package, not as products inside it:
 
 ```
-swift-terminal-ui/
+swift-tui/
 ├── Sources/                  ← root package products
 ├── Runners/
-│   ├── TerminalUICLI/        ← peer executable runner package
-│   └── TerminalUIWASI/       ← peer executable runner package
+│   ├── SwiftTUICLI/        ← peer executable runner package
+│   └── SwiftTUIWASI/       ← peer executable runner package
 └── GUI/
-    ├── SwiftUITUIGUI/        ← peer embedded host package
-    └── WebTUIGUI/            ← peer embedded host package
+    ├── SwiftUIHost/        ← peer embedded host package
+    └── WebHost/            ← peer embedded host package
 ```
 
 The root package exposes scene-manifest and hosted-session APIs
-(`TerminalUISceneDescriptor`, `TerminalUISceneManifest`,
+(`SceneDescriptor`, `SceneManifest`,
 `HostedSceneSession`) so peer packages can build on supported types
 without reaching into package-only internals. Each peer owns:
 
@@ -61,8 +61,8 @@ The root package does not own any of those.
 
 ## Status
 
-Accepted. The current peer set is `Runners/TerminalUICLI`,
-`Runners/TerminalUIWASI`, `GUI/SwiftUITUIGUI`, and `GUI/WebTUIGUI`.
+Accepted. The current peer set is `Runners/SwiftTUICLI`,
+`Runners/SwiftTUIWASI`, `GUI/SwiftUIHost`, and `GUI/WebHost`.
 Each is a standalone SPM package with its own Package.swift, its own
 test target, and its own dependency graph.
 
@@ -85,7 +85,7 @@ test target, and its own dependency graph.
 - The root package does not generate Xcode project files, host
   custom desktop chrome, or own a single cross-platform app shell.
   Those concerns belong to consumers.
-- A consumer cannot import "TerminalUI" and get a SwiftUI host for
+- A consumer cannot import "SwiftTUI" and get a SwiftUI host for
   free — they pick the runner or host package explicitly.
 
 **Discipline imposed:**

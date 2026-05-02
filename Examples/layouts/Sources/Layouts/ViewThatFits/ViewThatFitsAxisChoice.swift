@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Three side-by-side `ViewThatFits` containers, each fed a different
 /// outer width via `.frame(width:)`. The candidate set is the same for

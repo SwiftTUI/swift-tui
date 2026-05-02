@@ -33,8 +33,8 @@ These cross-builds were verified locally:
 ```bash
 swiftly run swift build --target Core --swift-sdk aarch64-unknown-linux-android28
 swiftly run swift build --target View --swift-sdk aarch64-unknown-linux-android28
-swiftly run swift build --target TerminalUICharts --swift-sdk aarch64-unknown-linux-android28
-swiftly run swift build --target TerminalUI --swift-sdk aarch64-unknown-linux-android28
+swiftly run swift build --target SwiftTUICharts --swift-sdk aarch64-unknown-linux-android28
+swiftly run swift build --target SwiftTUI --swift-sdk aarch64-unknown-linux-android28
 ```
 
 ## Current caveat

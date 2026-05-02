@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// `.fixedSize(horizontal: false, vertical: true)` asks the view to use
 /// the parent's proposed width (so text still wraps horizontally) while

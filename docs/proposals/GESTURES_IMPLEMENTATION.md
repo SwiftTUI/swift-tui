@@ -14,7 +14,7 @@
 
 ## Prerequisites
 
-All plan execution happens in the existing `gest` branch of the worktree at `/Users/adamz/Developer/adamz-config/home/.codex/worktrees/5ea3/swift-terminal-ui`. Verify starting state is clean:
+All plan execution happens in the existing `gest` branch of the worktree at `/Users/adamz/Developer/adamz-config/home/.codex/worktrees/5ea3/swift-tui`. Verify starting state is clean:
 
 ```bash
 git status  # expect clean
@@ -52,11 +52,11 @@ If any of those fail, stop and resolve before starting Task 1.
 - `Sources/Core/Semantics.swift` — plumb `captureOnPress` into `InteractionRegion` construction
 - `Sources/View/Environment/Environment.swift` — add `localGestureRegistry` and `localGestureStateRegistry` fields to `ResolveContext`, propagate through `child(component:)`
 - `Sources/Core/RuntimeRegistrationSet.swift` — add the two new registries to the set
-- `Sources/TerminalUI/RunLoop+PointerHandling.swift` — read `captureOnPress` from region, drain gesture deadlines on wake, release capture on subtree teardown
+- `Sources/SwiftTUI/RunLoop+PointerHandling.swift` — read `captureOnPress` from region, drain gesture deadlines on wake, release capture on subtree teardown
 - `Sources/View/Controls/AdjustableValueControls.swift` — slider-track node sets `captureOnPress: true`
 - `Sources/Core/ScrollIndicatorSupport.swift` — scroll indicator nodes set `captureOnPress: true`
 
-**Test files:** all under `Tests/TerminalUITests/` except where noted (`Tests/CoreTests/` for pure-Core behavior).
+**Test files:** all under `Tests/SwiftTUITests/` except where noted (`Tests/CoreTests/` for pure-Core behavior).
 
 ---
 
@@ -67,19 +67,19 @@ If any of those fail, stop and resolve before starting Task 1.
 - Modify: `Sources/Core/Semantics.swift` (InteractionRegion construction at lines 52–60 and the other two construction sites in that file)
 - Modify: `Sources/View/Controls/AdjustableValueControls.swift` (slider track child `semanticMetadata(...)` call)
 - Modify: `Sources/Core/ScrollIndicatorSupport.swift` (scroll indicator `semanticMetadata(...)` calls)
-- Modify: `Sources/TerminalUI/RunLoop+PointerHandling.swift` (`shouldCapturePointer(routeID:)` at lines 384–399)
-- Test: `Tests/TerminalUITests/CaptureOnPressTests.swift`
+- Modify: `Sources/SwiftTUI/RunLoop+PointerHandling.swift` (`shouldCapturePointer(routeID:)` at lines 384–399)
+- Test: `Tests/SwiftTUITests/CaptureOnPressTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/CaptureOnPressTests.swift`:
+Create `Tests/SwiftTUITests/CaptureOnPressTests.swift`:
 
 ```swift
 import Foundation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor
@@ -271,7 +271,7 @@ In `Sources/Core/ScrollIndicatorSupport.swift`, the indicator construction eithe
 
 - [ ] **Step 8: Replace `shouldCapturePointer` with region-field read**
 
-In `Sources/TerminalUI/RunLoop+PointerHandling.swift` replace the entire `shouldCapturePointer` function at lines 384–399:
+In `Sources/SwiftTUI/RunLoop+PointerHandling.swift` replace the entire `shouldCapturePointer` function at lines 384–399:
 
 ```swift
 package func shouldCapturePointer(
@@ -319,12 +319,12 @@ mouseDown."
 
 **Files:**
 - Modify: `Sources/Core/LocalPointerHandlerRegistry.swift` (LocalPointerEvent struct at lines 20–45)
-- Modify: `Sources/TerminalUI/RunLoop+PointerHandling.swift` (construct events with timestamps)
-- Test: `Tests/TerminalUITests/PointerEventTimestampTests.swift`
+- Modify: `Sources/SwiftTUI/RunLoop+PointerHandling.swift` (construct events with timestamps)
+- Test: `Tests/SwiftTUITests/PointerEventTimestampTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/PointerEventTimestampTests.swift`:
+Create `Tests/SwiftTUITests/PointerEventTimestampTests.swift`:
 
 ```swift
 import Foundation
@@ -415,10 +415,10 @@ Expected: both tests PASS.
 
 - [ ] **Step 5: Populate real timestamps in the RunLoop**
 
-In `Sources/TerminalUI/RunLoop+PointerHandling.swift`, find every `LocalPointerEvent(...)` construction (~6 sites) and add `timestamp: .now()` — the default is fine for most call sites, but set it explicitly at the points where the `MouseEvent` itself arrives with a timestamp. For now `.now()` is acceptable at every site because the mouse-event path doesn't yet plumb its own timestamp. Grep to verify:
+In `Sources/SwiftTUI/RunLoop+PointerHandling.swift`, find every `LocalPointerEvent(...)` construction (~6 sites) and add `timestamp: .now()` — the default is fine for most call sites, but set it explicitly at the points where the `MouseEvent` itself arrives with a timestamp. For now `.now()` is acceptable at every site because the mouse-event path doesn't yet plumb its own timestamp. Grep to verify:
 
 ```bash
-grep -n "LocalPointerEvent(" Sources/TerminalUI/RunLoop+PointerHandling.swift
+grep -n "LocalPointerEvent(" Sources/SwiftTUI/RunLoop+PointerHandling.swift
 ```
 
 No code change required beyond what Step 3 already provided via the default parameter. Verify by running the full suite.
@@ -448,11 +448,11 @@ predictedEndLocation computation."
 
 **Files:**
 - Create: `Sources/View/Gestures/CoordinateSpace.swift`
-- Test: `Tests/TerminalUITests/CoordinateSpaceTests.swift`
+- Test: `Tests/SwiftTUITests/CoordinateSpaceTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/CoordinateSpaceTests.swift`:
+Create `Tests/SwiftTUITests/CoordinateSpaceTests.swift`:
 
 ```swift
 import Foundation
@@ -559,7 +559,7 @@ public struct CoordinateSpace: Equatable, Sendable {
     case .named(let name):
       fatalError(
         "CoordinateSpace.named(\"\(name)\") is not yet supported in "
-        + "TerminalUI. Use .local or .global, or file an issue if "
+        + "SwiftTUI. Use .local or .global, or file an issue if "
         + "you need named coordinate frames."
       )
     }
@@ -592,13 +592,13 @@ pass in Semantics."
 
 **Files:**
 - Create: `Sources/View/Gestures/Gesture.swift`
-- Test: `Tests/TerminalUITests/GestureProtocolTests.swift`
+- Test: `Tests/SwiftTUITests/GestureProtocolTests.swift`
 
 This task establishes the authoring protocol and the primitive escape hatch. Primitive gestures (`TapGesture`, `DragGesture`, etc.) conform directly by declaring `typealias Body = Never` and providing a `_makeRecognizer(context:)` that returns an internal recognizer instance. Composed/modified gestures (e.g. `.onEnded`) have a `body` expressed in terms of other gestures.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/GestureProtocolTests.swift`:
+Create `Tests/SwiftTUITests/GestureProtocolTests.swift`:
 
 ```swift
 import Foundation
@@ -1110,18 +1110,18 @@ ResolveContext propagation and RuntimeRegistrationSet."
 - Create: `Sources/View/State/GestureState.swift`
 - Modify: `Sources/View/Environment/Environment.swift`
 - Modify: `Sources/Core/RuntimeRegistrationSet.swift`
-- Test: `Tests/TerminalUITests/GestureStateTests.swift`
+- Test: `Tests/SwiftTUITests/GestureStateTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/GestureStateTests.swift`:
+Create `Tests/SwiftTUITests/GestureStateTests.swift`:
 
 ```swift
 import Foundation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor
@@ -1449,11 +1449,11 @@ use the same registry."
 
 **Files:**
 - Create: `Sources/View/Gestures/TapGesture.swift`
-- Test: `Tests/TerminalUITests/TapGestureTests.swift`
+- Test: `Tests/SwiftTUITests/TapGestureTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/TapGestureTests.swift`:
+Create `Tests/SwiftTUITests/TapGestureTests.swift`:
 
 ```swift
 import Foundation
@@ -1656,11 +1656,11 @@ Value == Void per SwiftUI shape."
 
 **Files:**
 - Create: `Sources/View/Gestures/GestureModifiers.swift`
-- Test: `Tests/TerminalUITests/GestureModifiersTests.swift`
+- Test: `Tests/SwiftTUITests/GestureModifiersTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/GestureModifiersTests.swift`:
+Create `Tests/SwiftTUITests/GestureModifiersTests.swift`:
 
 ```swift
 import Foundation
@@ -2196,21 +2196,21 @@ git commit -m "feat(gestures): add GestureMask option set"
 
 **Files:**
 - Create: `Sources/View/Gestures/GestureViewModifier.swift`
-- Modify: `Sources/TerminalUI/RunLoop+PointerHandling.swift` (wire gesture registry)
-- Test: `Tests/TerminalUITests/GestureViewModifierTests.swift`
+- Modify: `Sources/SwiftTUI/RunLoop+PointerHandling.swift` (wire gesture registry)
+- Test: `Tests/SwiftTUITests/GestureViewModifierTests.swift`
 
 This task wires `.gesture(_:)` end-to-end: a view modifier that, at resolve time, constructs a recognizer tree and registers one forwarding closure on the `LocalPointerHandlerRegistry` that drives the recognizer. It also sets `captureOnPress: true` when the composed tree contains a gesture that needs to capture.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/GestureViewModifierTests.swift`:
+Create `Tests/SwiftTUITests/GestureViewModifierTests.swift`:
 
 ```swift
 import Foundation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor
@@ -2412,7 +2412,7 @@ Find where `DefaultRenderer` (or its internals) constructs the other `Local*Regi
 grep -rn "LocalPointerHandlerRegistry()" Sources/
 ```
 
-Follow that file (likely `Sources/TerminalUI/Resolver.swift` or similar). Add construction of `LocalGestureRegistry()` and `LocalGestureStateRegistry()` next to the existing instantiations, and plumb both into the `ResolveContext` used for resolution.
+Follow that file (likely `Sources/SwiftTUI/Resolver.swift` or similar). Add construction of `LocalGestureRegistry()` and `LocalGestureStateRegistry()` next to the existing instantiations, and plumb both into the `ResolveContext` used for resolution.
 
 - [ ] **Step 6: Run the test to confirm it passes**
 
@@ -2448,18 +2448,18 @@ this with a recognizer-introspection walk."
 
 **Files:**
 - Modify: `Sources/View/Gestures/GestureViewModifier.swift` (append)
-- Test: `Tests/TerminalUITests/ContentShapeTests.swift`
+- Test: `Tests/SwiftTUITests/ContentShapeTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/ContentShapeTests.swift`:
+Create `Tests/SwiftTUITests/ContentShapeTests.swift`:
 
 ```swift
 import Foundation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor
@@ -2593,18 +2593,18 @@ git commit -m "feat(gestures): add .contentShape(_:) for hit-test region overrid
 
 **Files:**
 - Modify: `Sources/View/Gestures/GestureViewModifier.swift` (append)
-- Test: `Tests/TerminalUITests/OnTapGestureTests.swift`
+- Test: `Tests/SwiftTUITests/OnTapGestureTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/OnTapGestureTests.swift`:
+Create `Tests/SwiftTUITests/OnTapGestureTests.swift`:
 
 ```swift
 import Foundation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor
@@ -2695,12 +2695,12 @@ SpatialTapGesture in Task 19."
 
 **Files:**
 - Create: `Sources/View/Gestures/LongPressGesture.swift`
-- Modify: `Sources/TerminalUI/RunLoop+PointerHandling.swift` (deadline consumption hook)
-- Test: `Tests/TerminalUITests/LongPressGestureTests.swift`
+- Modify: `Sources/SwiftTUI/RunLoop+PointerHandling.swift` (deadline consumption hook)
+- Test: `Tests/SwiftTUITests/LongPressGestureTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/LongPressGestureTests.swift`:
+Create `Tests/SwiftTUITests/LongPressGestureTests.swift`:
 
 ```swift
 import Foundation
@@ -2906,7 +2906,7 @@ final class LongPressGestureRecognizer: GestureRecognizer {
 
 - [ ] **Step 4: Wire deadline consumption in the RunLoop**
 
-In `Sources/TerminalUI/RunLoop+PointerHandling.swift`, add a helper that iterates gesture recognizers when a `.deadline` cause fires. Find where `consumeReadyFrame` is processed (likely in a different file — grep `consumeReadyFrame` under `Sources/TerminalUI/`) and add after deadline consumption:
+In `Sources/SwiftTUI/RunLoop+PointerHandling.swift`, add a helper that iterates gesture recognizers when a `.deadline` cause fires. Find where `consumeReadyFrame` is processed (likely in a different file — grep `consumeReadyFrame` under `Sources/SwiftTUI/`) and add after deadline consumption:
 
 ```swift
 extension RunLoop {
@@ -2959,11 +2959,11 @@ are coarse enough already)."
 
 **Files:**
 - Create: `Sources/View/Gestures/DragGesture.swift`
-- Test: `Tests/TerminalUITests/DragGestureTests.swift`
+- Test: `Tests/SwiftTUITests/DragGestureTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/DragGestureTests.swift`:
+Create `Tests/SwiftTUITests/DragGestureTests.swift`:
 
 ```swift
 import Foundation
@@ -3296,11 +3296,11 @@ locations at currentValue() time."
 
 **Files:**
 - Create: `Sources/View/Gestures/SpatialTapGesture.swift`
-- Test: `Tests/TerminalUITests/SpatialTapGestureTests.swift`
+- Test: `Tests/SwiftTUITests/SpatialTapGestureTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/SpatialTapGestureTests.swift`:
+Create `Tests/SwiftTUITests/SpatialTapGestureTests.swift`:
 
 ```swift
 import Foundation
@@ -3480,11 +3480,11 @@ git commit -m "feat(gestures): add SpatialTapGesture with location-carrying valu
 
 **Files:**
 - Create: `Sources/View/Gestures/ExclusiveGesture.swift`
-- Test: `Tests/TerminalUITests/ExclusiveGestureTests.swift`
+- Test: `Tests/SwiftTUITests/ExclusiveGestureTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/ExclusiveGestureTests.swift`:
+Create `Tests/SwiftTUITests/ExclusiveGestureTests.swift`:
 
 ```swift
 import Foundation
@@ -3655,18 +3655,18 @@ SwiftUI. Common use: double-tap vs single-tap disambiguation."
 
 **Files:**
 - Modify: `Sources/View/Gestures/GestureViewModifier.swift`
-- Test: `Tests/TerminalUITests/OnLongPressGestureTests.swift`
+- Test: `Tests/SwiftTUITests/OnLongPressGestureTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/OnLongPressGestureTests.swift`:
+Create `Tests/SwiftTUITests/OnLongPressGestureTests.swift`:
 
 ```swift
 import Foundation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor
@@ -3843,7 +3843,7 @@ Expected: all tests continue to pass. The Tap tests must keep `captureOnPress ==
 
 - [ ] **Step 6: Add a regression test**
 
-In `Tests/TerminalUITests/GestureViewModifierTests.swift`, re-enable the deferred `dragCaptures` test:
+In `Tests/SwiftTUITests/GestureViewModifierTests.swift`, re-enable the deferred `dragCaptures` test:
 
 ```swift
 @Test(".gesture(DragGesture()) sets captureOnPress on the region")
@@ -3887,19 +3887,19 @@ the compile-time value instead of string-matching runtime types."
 ## Task 20: Capture-release on subtree teardown
 
 **Files:**
-- Modify: `Sources/TerminalUI/RunLoop+PointerHandling.swift` (release captured route on disappear)
-- Test: `Tests/TerminalUITests/GestureTeardownTests.swift`
+- Modify: `Sources/SwiftTUI/RunLoop+PointerHandling.swift` (release captured route on disappear)
+- Test: `Tests/SwiftTUITests/GestureTeardownTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/GestureTeardownTests.swift`:
+Create `Tests/SwiftTUITests/GestureTeardownTests.swift`:
 
 ```swift
 import Foundation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor
@@ -3954,7 +3954,7 @@ Expected: test PASSES (the removal methods are from Tasks 6 and 7; this test is 
 
 - [ ] **Step 3: Add the RunLoop hook for captured-route invalidation**
 
-In `Sources/TerminalUI/RunLoop+PointerHandling.swift`, find where pointer handler subtrees are torn down on identity-tree reconciliation (grep for `pointerHandlerRegistry.removeSubtrees`). At the same site, release any captured route that targets a removed identity:
+In `Sources/SwiftTUI/RunLoop+PointerHandling.swift`, find where pointer handler subtrees are torn down on identity-tree reconciliation (grep for `pointerHandlerRegistry.removeSubtrees`). At the same site, release any captured route that targets a removed identity:
 
 ```swift
 extension RunLoop {
@@ -4001,20 +4001,20 @@ releases capturedPointerRouteID if it pointed into the removed subtree."
 ## Task 21: Integration test — draggable pin on a canvas
 
 **Files:**
-- Test: `Tests/TerminalUITests/GestureIntegrationTests.swift`
+- Test: `Tests/SwiftTUITests/GestureIntegrationTests.swift`
 
 This task exercises the full stack with no new production code — an end-to-end assertion that `@GestureState`, `DragGesture`, `.updating`, and `.onEnded` compose correctly.
 
 - [ ] **Step 1: Write the integration test**
 
-Create `Tests/TerminalUITests/GestureIntegrationTests.swift`:
+Create `Tests/SwiftTUITests/GestureIntegrationTests.swift`:
 
 ```swift
 import Foundation
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor

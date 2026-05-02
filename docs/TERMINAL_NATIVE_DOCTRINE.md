@@ -2,7 +2,7 @@
 
 This document is the canonical synthesis of our current terminal-UX research.
 It exists to guide a deliberate reinterpretation of SwiftUI APIs into
-terminal-native behavior for TerminalUI.
+terminal-native behavior for SwiftTUI.
 
 The project goal is still the one described in [VISION.md](VISION.md): a
 faithful and idiomatic, but not API-exact, SwiftUI subset that is genuinely
@@ -142,7 +142,7 @@ works better with:
 - command prompts
 - transient overlays
 
-That does not mean TerminalUI should copy tmux APIs. It does mean SwiftUI
+That does not mean SwiftTUI should copy tmux APIs. It does mean SwiftUI
 concepts like `TabView`, split-pane workspace layouts, dialogs, and command
 surfaces should be reinterpreted in a way that respects terminal-native
 navigation.
@@ -222,7 +222,7 @@ Examples:
 - Yazi navigates directories, previews, tabs, and selections
 - editors navigate selections, buffers, splits, jumps, and commands
 
-This matters for TerminalUI because "SwiftUI-shaped" should not mean
+This matters for SwiftTUI because "SwiftUI-shaped" should not mean
 "domain-neutral to a fault." We should allow terminal-native workflows to read
 cleanly in the API surface.
 
@@ -368,7 +368,7 @@ The research is unusually consistent about what makes a TUI feel wrong.
 - Framework features that privilege decoration over orientation
 - Mouse-first assumptions in keyboard-first environments
 
-## What This Means For TerminalUI
+## What This Means For SwiftTUI
 
 ### Reinterpretation Rule
 
@@ -439,7 +439,7 @@ They should instead demonstrate:
 ## Success Criteria
 
 We should consider the terminal-native reinterpretation successful when a new
-app built with TerminalUI looks and behaves like it belongs in the same family
+app built with SwiftTUI looks and behaves like it belongs in the same family
 as the best modern terminal software.
 
 In practice that means:

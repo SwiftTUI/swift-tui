@@ -41,18 +41,18 @@ Phase status as of current `main`: All phases (0–6) landed.
 - `Sources/View/ActionScopes/ToolbarItem.swift` — `ToolbarItemConfig`, `ToolbarItemsPreferenceKey`, `.toolbarItem(...)`
 - `Tests/CoreTests/ActionScopeTests.swift` — protocol conformance + AnyID tests
 - `Tests/CoreTests/CommandRegistryTests.swift` — registry behavior + dispatch precedence
-- `Tests/TerminalUITests/PanelTests.swift` — Panel focus semantics, ID stability, containment
-- `Tests/TerminalUITests/KeyCommandTests.swift` — dispatch, shallowest-wins, isEnabled, modifier-required
-- `Tests/TerminalUITests/PaletteCommandTests.swift` — palette collection + environment exposure
-- `Tests/TerminalUITests/ToolbarTests.swift` — toolbar declaration, item hoisting, no-absorber behavior
+- `Tests/SwiftTUITests/PanelTests.swift` — Panel focus semantics, ID stability, containment
+- `Tests/SwiftTUITests/KeyCommandTests.swift` — dispatch, shallowest-wins, isEnabled, modifier-required
+- `Tests/SwiftTUITests/PaletteCommandTests.swift` — palette collection + environment exposure
+- `Tests/SwiftTUITests/ToolbarTests.swift` — toolbar declaration, item hoisting, no-absorber behavior
 
 ### Modified files
 
 - `Sources/Core/RuntimeRegistrationSet.swift` — remove `hotkeyRegistry`; add `commandRegistry`
-- `Sources/TerminalUI/RunLoop.swift` — remove `hotkeyRegistry` field; add `commandRegistry`; wire dispatch
-- `Sources/TerminalUI/RunLoop+EventDispatch.swift` — replace hotkey dispatch with command dispatch using current focus region's `scopePath`
+- `Sources/SwiftTUI/RunLoop.swift` — remove `hotkeyRegistry` field; add `commandRegistry`; wire dispatch
+- `Sources/SwiftTUI/RunLoop+EventDispatch.swift` — replace hotkey dispatch with command dispatch using current focus region's `scopePath`
 - `Sources/View/Environment/Environment.swift` — remove `hotkeyRegistry`; add `commandRegistry`; add `activePaletteCommands` env
-- `Sources/TerminalUI/App.swift` — add `ActionScope` conformance to the Scene-side types
+- `Sources/SwiftTUI/App.swift` — add `ActionScope` conformance to the Scene-side types
 - `Sources/View/Presentation/PresentationModifiers.swift` — make presentation modifiers contribute as ActionScopes
 
 ### Deleted files
@@ -65,7 +65,7 @@ Phase status as of current `main`: All phases (0–6) landed.
 ## Conventions
 
 - **Swift Testing** (`import Testing`) for all new tests. Use `@Test` and `#expect`.
-- **Package imports** — `package import Core` in View/TerminalUI modules (follow existing convention).
+- **Package imports** — `package import Core` in View/SwiftTUI modules (follow existing convention).
 - **`@MainActor` isolation** — all command registration and dispatch happens on the main actor (matches existing registries).
 - **Commit messages** — follow project convention: short, lowercase, no attribution footer.
 - **Hooks** — `swift-format` and guardrail hooks run on save; don't fight them.
@@ -177,8 +177,8 @@ Expected: compile errors only in `RunLoop.swift` and `RunLoop+EventDispatch.swif
 ### Task 0.7: Remove `hotkeyRegistry` from `RunLoop` and its dispatch file
 
 **Files:**
-- Modify: `Sources/TerminalUI/RunLoop.swift`
-- Modify: `Sources/TerminalUI/RunLoop+EventDispatch.swift`
+- Modify: `Sources/SwiftTUI/RunLoop.swift`
+- Modify: `Sources/SwiftTUI/RunLoop+EventDispatch.swift`
 
 - [ ] **Step 1: Delete the field in `RunLoop`**
 
@@ -597,7 +597,7 @@ git commit -m "add CommandRegistry"
 
 **Files:**
 - Modify: `Sources/Core/RuntimeRegistrationSet.swift`
-- Modify: `Sources/TerminalUI/RunLoop.swift`
+- Modify: `Sources/SwiftTUI/RunLoop.swift`
 - Modify: `Sources/View/Environment/Environment.swift`
 
 - [ ] **Step 1: Read `RuntimeRegistrationSet`**
@@ -618,7 +618,7 @@ In the initializer, add the corresponding parameter and assignment. In `reset()`
 
 - [ ] **Step 3: Add `commandRegistry` to `RunLoop`**
 
-In `Sources/TerminalUI/RunLoop.swift`, add a `package let commandRegistry = CommandRegistry()` alongside the other `Local*Registry` instances. Wherever `RuntimeRegistrationSet` is constructed, pass `commandRegistry: commandRegistry`.
+In `Sources/SwiftTUI/RunLoop.swift`, add a `package let commandRegistry = CommandRegistry()` alongside the other `Local*Registry` instances. Wherever `RuntimeRegistrationSet` is constructed, pass `commandRegistry: commandRegistry`.
 
 - [ ] **Step 4: Add environment value**
 
@@ -659,11 +659,11 @@ Phase 2 adds the `Panel` view and its modifiers. Panels don't do anything comman
 
 **Files:**
 - Create: `Sources/View/ActionScopes/Panel.swift`
-- Test: `Tests/TerminalUITests/PanelTests.swift`
+- Test: `Tests/SwiftTUITests/PanelTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/PanelTests.swift`:
+Create `Tests/SwiftTUITests/PanelTests.swift`:
 
 ```swift
 import Testing
@@ -697,7 +697,7 @@ struct PanelTests {
 }
 ```
 
-_Note_: `ResolveContext.testFixture()` is the framework's existing test-helper constructor. If it doesn't exist, use whatever equivalent the other tests in `Tests/TerminalUITests/` use (see `Tests/TerminalUITests/SwiftUISurfaceTests.swift` for a pattern).
+_Note_: `ResolveContext.testFixture()` is the framework's existing test-helper constructor. If it doesn't exist, use whatever equivalent the other tests in `Tests/SwiftTUITests/` use (see `Tests/SwiftTUITests/SwiftUISurfaceTests.swift` for a pattern).
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -822,14 +822,14 @@ Expected: 3 tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/View/ActionScopes/Panel.swift Tests/TerminalUITests/PanelTests.swift
+git add Sources/View/ActionScopes/Panel.swift Tests/SwiftTUITests/PanelTests.swift
 git commit -m "add Panel primitive"
 ```
 
 ### Task 2.2: Add `.panel()` pseudonymous-identity test
 
 **Files:**
-- Modify: `Tests/TerminalUITests/PanelTests.swift`
+- Modify: `Tests/SwiftTUITests/PanelTests.swift`
 
 - [ ] **Step 1: Add the failing test**
 
@@ -856,14 +856,14 @@ Expected: pass. If it fails, the `currentAuthoringContext()`-based derivation is
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Tests/TerminalUITests/PanelTests.swift
+git add Tests/SwiftTUITests/PanelTests.swift
 git commit -m "test: Panel pseudonymous ID stability"
 ```
 
 ### Task 2.3: Add `.focusContainment(_:)` behavior test
 
 **Files:**
-- Modify: `Tests/TerminalUITests/PanelTests.swift`
+- Modify: `Tests/SwiftTUITests/PanelTests.swift`
 
 - [ ] **Step 1: Add the failing test**
 
@@ -937,11 +937,11 @@ Phase 3 makes the existing scene and presentation surfaces conform to `ActionSco
 ### Task 3.1: Make Scene-conforming types conform to `ActionScope`
 
 **Files:**
-- Modify: `Sources/TerminalUI/App.swift` (or wherever `Scene` / `WindowGroup` live)
+- Modify: `Sources/SwiftTUI/App.swift` (or wherever `Scene` / `WindowGroup` live)
 
 - [ ] **Step 1: Locate the Scene types**
 
-Run: `grep -rn "public protocol Scene\|public struct WindowGroup\|extension Scene" Sources/TerminalUI/`
+Run: `grep -rn "public protocol Scene\|public struct WindowGroup\|extension Scene" Sources/SwiftTUI/`
 
 Expected: identifies the file(s) containing `Scene` and `WindowGroup`.
 
@@ -977,11 +977,11 @@ git commit -m "conform Scene types to ActionScope"
 ### Task 3.2: Verify Scene nodes mark `focusScopeBoundary`
 
 **Files:**
-- Modify: probably `Sources/TerminalUI/App.swift` or wherever Scene resolves to a `ResolvedNode`
+- Modify: probably `Sources/SwiftTUI/App.swift` or wherever Scene resolves to a `ResolvedNode`
 
 - [ ] **Step 1: Grep for where Scene/WindowGroup produces resolved nodes**
 
-Run: `grep -rn "focusScopeBoundary\|focusStructureMetadata" Sources/TerminalUI/ Sources/View/Foundation/`
+Run: `grep -rn "focusScopeBoundary\|focusStructureMetadata" Sources/SwiftTUI/ Sources/View/Foundation/`
 
 - [ ] **Step 2: If WindowGroup's resolved node doesn't already have `focusScopeBoundary: true`, add it**
 
@@ -995,12 +995,12 @@ resolved.semanticMetadata = resolved.semanticMetadata.merging(
 
 - [ ] **Step 3: Write a test**
 
-Add to `Tests/TerminalUITests/` (new file `SceneActionScopeTests.swift` if needed):
+Add to `Tests/SwiftTUITests/` (new file `SceneActionScopeTests.swift` if needed):
 
 ```swift
 import Testing
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor
@@ -1017,7 +1017,7 @@ struct SceneActionScopeTests {
 }
 ```
 
-_Note_: Look at `Tests/TerminalUITests/SceneSessionTestHarness.swift` for the existing pattern.
+_Note_: Look at `Tests/SwiftTUITests/SceneSessionTestHarness.swift` for the existing pattern.
 
 - [ ] **Step 4: Run test**
 
@@ -1049,7 +1049,7 @@ Grep for `presentationRole: .sheet` / `.alert` etc. in semantic metadata to find
 
 - [ ] **Step 3: Write a test**
 
-Add `Tests/TerminalUITests/PresentationActionScopeTests.swift`:
+Add `Tests/SwiftTUITests/PresentationActionScopeTests.swift`:
 
 ```swift
 import Testing
@@ -1092,11 +1092,11 @@ Phase 4 connects the Phase 1 command registry to the public API. Commands get re
 
 **Files:**
 - Create: `Sources/View/ActionScopes/KeyCommandModifier.swift`
-- Test: `Tests/TerminalUITests/KeyCommandTests.swift`
+- Test: `Tests/SwiftTUITests/KeyCommandTests.swift`
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `Tests/TerminalUITests/KeyCommandTests.swift`:
+Create `Tests/SwiftTUITests/KeyCommandTests.swift`:
 
 ```swift
 import Testing
@@ -1143,7 +1143,7 @@ struct KeyCommandTests {
 }
 ```
 
-_Note_: The exact identity of a resolved Panel requires either exposing it via test helpers or reading it back from the resolved tree. Follow the pattern in `Tests/TerminalUITests/Phase4ObservationAndEnvironmentTests.swift` for how existing tests introspect resolved nodes.
+_Note_: The exact identity of a resolved Panel requires either exposing it via test helpers or reading it back from the resolved tree. Follow the pattern in `Tests/SwiftTUITests/Phase4ObservationAndEnvironmentTests.swift` for how existing tests introspect resolved nodes.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1220,18 +1220,18 @@ Expected: tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/View/ActionScopes/KeyCommandModifier.swift Tests/TerminalUITests/KeyCommandTests.swift
+git add Sources/View/ActionScopes/KeyCommandModifier.swift Tests/SwiftTUITests/KeyCommandTests.swift
 git commit -m "add .keyCommand modifier"
 ```
 
 ### Task 4.2: Wire dispatch in `RunLoop+EventDispatch`
 
 **Files:**
-- Modify: `Sources/TerminalUI/RunLoop+EventDispatch.swift`
+- Modify: `Sources/SwiftTUI/RunLoop+EventDispatch.swift`
 
 - [ ] **Step 1: Locate the key-dispatch entry point**
 
-Run: `grep -n "KeyEvent\|KeyPress\|dispatchKey" Sources/TerminalUI/RunLoop+EventDispatch.swift | head -20`
+Run: `grep -n "KeyEvent\|KeyPress\|dispatchKey" Sources/SwiftTUI/RunLoop+EventDispatch.swift | head -20`
 
 Identify where a parsed key event is handed to the dispatch pipeline (previously feeding into `hotkeyRegistry.dispatch(...)`).
 
@@ -1257,7 +1257,7 @@ Where `currentFocusScopePath()` is a helper (add it if missing) that pulls `Focu
 
 - [ ] **Step 3: Test end-to-end**
 
-Add to `Tests/TerminalUITests/KeyCommandTests.swift`:
+Add to `Tests/SwiftTUITests/KeyCommandTests.swift`:
 
 ```swift
   @Test("End-to-end: Ctrl+S on focus inside a Panel fires the Panel's keyCommand")
@@ -1290,7 +1290,7 @@ git commit -m "wire keyCommand dispatch in RunLoop"
 ### Task 4.3: Shallowest-wins end-to-end test
 
 **Files:**
-- Modify: `Tests/TerminalUITests/KeyCommandTests.swift`
+- Modify: `Tests/SwiftTUITests/KeyCommandTests.swift`
 
 - [ ] **Step 1: Add the failing test**
 
@@ -1361,11 +1361,11 @@ Phase 5 adds the palette-command annotation and exposes the currently-active pal
 
 **Files:**
 - Create: `Sources/View/ActionScopes/PaletteCommandModifier.swift`
-- Test: `Tests/TerminalUITests/PaletteCommandTests.swift`
+- Test: `Tests/SwiftTUITests/PaletteCommandTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `Tests/TerminalUITests/PaletteCommandTests.swift`:
+Create `Tests/SwiftTUITests/PaletteCommandTests.swift`:
 
 ```swift
 import Testing
@@ -1466,7 +1466,7 @@ Expected: pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/View/ActionScopes/PaletteCommandModifier.swift Tests/TerminalUITests/PaletteCommandTests.swift
+git add Sources/View/ActionScopes/PaletteCommandModifier.swift Tests/SwiftTUITests/PaletteCommandTests.swift
 git commit -m "add .paletteCommand modifier"
 ```
 
@@ -1474,7 +1474,7 @@ git commit -m "add .paletteCommand modifier"
 
 **Files:**
 - Modify: `Sources/View/Environment/Environment.swift`
-- Modify: `Sources/TerminalUI/RunLoop+EventDispatch.swift` (or wherever the environment is populated per frame)
+- Modify: `Sources/SwiftTUI/RunLoop+EventDispatch.swift` (or wherever the environment is populated per frame)
 
 - [ ] **Step 1: Add the environment key**
 
@@ -1545,11 +1545,11 @@ Phase 6 adds `.toolbar(style:)` on ActionScopes and `.toolbarItem(...)` as a hoi
 
 **Files:**
 - Create: `Sources/View/ActionScopes/Toolbar.swift`
-- Test: `Tests/TerminalUITests/ToolbarTests.swift`
+- Test: `Tests/SwiftTUITests/ToolbarTests.swift`
 
 - [ ] **Step 1: Write a compile-only test to pin the protocol shape**
 
-Create `Tests/TerminalUITests/ToolbarTests.swift`:
+Create `Tests/SwiftTUITests/ToolbarTests.swift`:
 
 ```swift
 import Testing
@@ -1583,7 +1583,7 @@ package import Core
 /// wrapped, top vs. bottom placement) via the framework's existing
 /// `Layout` protocol.
 public protocol ToolbarStyle: Sendable {
-  associatedtype ItemLayout: TerminalUI.Layout
+  associatedtype ItemLayout: SwiftTUI.Layout
   var itemLayout: ItemLayout { get }
   var placement: ToolbarPlacement { get }
 }
@@ -1622,7 +1622,7 @@ Expected: pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Sources/View/ActionScopes/Toolbar.swift Tests/TerminalUITests/ToolbarTests.swift
+git add Sources/View/ActionScopes/Toolbar.swift Tests/SwiftTUITests/ToolbarTests.swift
 git commit -m "add ToolbarStyle and default styles"
 ```
 
@@ -1633,7 +1633,7 @@ git commit -m "add ToolbarStyle and default styles"
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `Tests/TerminalUITests/ToolbarTests.swift`:
+Append to `Tests/SwiftTUITests/ToolbarTests.swift`:
 
 ```swift
   @Test("toolbarItem contributions accumulate up the tree via preference key")
@@ -1737,7 +1737,7 @@ Expected: pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Sources/View/ActionScopes/ToolbarItem.swift Tests/TerminalUITests/ToolbarTests.swift
+git add Sources/View/ActionScopes/ToolbarItem.swift Tests/SwiftTUITests/ToolbarTests.swift
 git commit -m "add ToolbarItemConfig and hoisting preference"
 ```
 
@@ -1935,7 +1935,7 @@ Append to `ToolbarTests`:
 
     // Render the view to a cell surface and assert the first row
     // contains "Save" and the content "body" appears below.
-    // Follow the pattern in Tests/TerminalUITests/SwiftUISurfaceTests.swift.
+    // Follow the pattern in Tests/SwiftTUITests/SwiftUISurfaceTests.swift.
     let surface = renderToSurface(panel)
     #expect(surface.row(0).contains("Save"))
     #expect(surface.row(1).contains("body"))
@@ -2015,7 +2015,7 @@ _Note_: `_ResolvedPassthrough` is a hypothetical helper that re-emits an already
 - add a minimal internal wrapper `ResolvedNodeWrapperView` that holds a `ResolvedNode` and passes it through in `resolveElements`, OR
 - skip this composition approach and instead build the composed tree by hand in `resolveElements` (avoid the view-builder path).
 
-Pick whichever matches the codebase's existing conventions — `Tests/TerminalUITests/*PresentationSurfaceTests.swift` likely has analogous composition for sheets/alerts.
+Pick whichever matches the codebase's existing conventions — `Tests/SwiftTUITests/*PresentationSurfaceTests.swift` likely has analogous composition for sheets/alerts.
 
 - [ ] **Step 3: Run visual test**
 

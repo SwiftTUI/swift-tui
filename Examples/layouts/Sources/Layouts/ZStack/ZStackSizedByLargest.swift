@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Pins the ZStack sizing rule: the stack reports a size equal to the
 /// largest child's measured size along each axis.  A tiny `Text("·")`

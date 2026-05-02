@@ -360,7 +360,7 @@ under the full parallel root test run while passing in isolation.
 
 - [x] Audit the repository's real custom-layout conformers for honest
   `SendableLayout` candidates.
-- [x] Migrate the TerminalUI layout showcase's pure `FlowLayout` and
+- [x] Migrate the SwiftTUI layout showcase's pure `FlowLayout` and
   `RingLayout` examples.
 - [x] Keep Apple SwiftUI mirror examples unchanged.
 - [x] Add example-package coverage proving the migrated layouts enter the
@@ -372,7 +372,7 @@ Stage 8 result:
   `SendableLayout` values with reuse signatures derived from the fields that
   affect measurement and placement.
 - `Examples/LayoutsSwiftUI` remains a SwiftUI comparison surface and does not
-  import or adopt TerminalUI's worker-layout opt-in.
+  import or adopt SwiftTUI's worker-layout opt-in.
 - The layout example behavior tests now include async renderer checks for both
   custom layouts, requiring worker timings and zero custom-layout fallback
   diagnostics.
@@ -418,7 +418,7 @@ Stage 9 result:
 Stage 10 result:
 
 - The signal-10 failure reproduced as an `EXC_BAD_ACCESS` on
-  `swift-terminal-ui.frame-tail-renderer` while recursively placing the resolved
+  `swift-tui.frame-tail-renderer` while recursively placing the resolved
   tree, before any test assertion failed. The backtrace showed layout placement
   stack exhaustion rather than a bad ScrollView measurement or placement value.
 - Async layout now uses a lazy `FrameTailLayoutWorker` with an 8 MiB pthread

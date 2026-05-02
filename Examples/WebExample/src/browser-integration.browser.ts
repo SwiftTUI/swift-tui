@@ -28,12 +28,12 @@ test("WebExample renders WASI surface frames into a nonblank canvas", async () =
     await page.waitForFunction(() => globalThis.crossOriginIsolated === true, undefined, {
       timeout: 10_000,
     });
-    await page.waitForSelector(".webtuigui-scene__surface", {
+    await page.waitForSelector(".webhost-scene__surface", {
       state: "attached",
       timeout: 30_000,
     });
     const canvasState = await page.waitForFunction(() => {
-      const canvas = document.querySelector(".webtuigui-scene__surface");
+      const canvas = document.querySelector(".webhost-scene__surface");
       if (!(canvas instanceof HTMLCanvasElement)) {
         return false;
       }

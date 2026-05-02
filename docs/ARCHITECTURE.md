@@ -14,13 +14,13 @@
 - Resolves authored views into core nodes
 - Hosts property wrappers, environment plumbing, focus APIs, layouts, and controls
 
-### `TerminalUICharts`
+### `SwiftTUICharts`
 
 - Builds compact chart and metric views on top of `View`
 - Reuses the same layout, semantic, draw, and raster pipeline
 - Remains a separate track so charting does not distort the core library surface
 
-### `TerminalUI`
+### `SwiftTUI`
 
 - Re-exports the public package surface that matters for single-session runtime work
 - Adds terminal host integration, alternate-screen ownership, input parsing, signal handling, capability-aware presentation, `RunLoop`, and rendering entry points
@@ -28,13 +28,13 @@
 
 ### Platform integration packages
 
-- executable runner packages `Runners/TerminalUICLI` and `Runners/TerminalUIWASI` build top-level execution layers on top of `TerminalUI`
-- embedded host packages `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI` host the same authored `TerminalUI` apps inside platform-managed shells
+- executable runner packages `Runners/SwiftTUICLI` and `Runners/SwiftTUIWASI` build top-level execution layers on top of `SwiftTUI`
+- embedded host packages `GUI/SwiftUIHost` and `GUI/WebHost` host the same authored `SwiftTUI` apps inside platform-managed shells
 
 The conceptual model is:
 
 ```text
-authored app surface -> shared TerminalUI runtime -> platform integration package -> platform shell
+authored app surface -> shared SwiftTUI runtime -> platform integration package -> platform shell
 ```
 
 That last integration layer comes in two forms:
@@ -56,7 +56,7 @@ That ordering is visible in `DefaultRenderer`, `FrameArtifacts`, `Pipeline`, and
 
 ## Coordinate Domains
 
-TerminalUI keeps layout and raster placement integer-cell based while pointer,
+SwiftTUI keeps layout and raster placement integer-cell based while pointer,
 drawing, and interpolation APIs use continuous cell-space geometry.
 
 - `CellPoint`, `CellSize`, and `CellRect` describe integer terminal cells.
@@ -155,23 +155,23 @@ It coordinates:
 The core runtime is intentionally narrow today:
 
 - one terminal host
-- one active root scene in `TerminalUI`
+- one active root scene in `SwiftTUI`
 - one full-canvas `WindowGroup` per session
 - keyboard-first interaction with optional pointer input when the host or
   terminal supports reporting
 
 Platform integration and multi-scene orchestration are packaged separately in
-peer platform integration packages rather than in the root `TerminalUI`
+peer platform integration packages rather than in the root `SwiftTUI`
 library.
 
 Those integration layers serve three execution modes:
 
-- terminal-native executable execution via `TerminalCLIAppRunner.run(MyApp.self)` or the default `App.main()` provided by `Runners/TerminalUICLI`
-- WASI executable execution and manifest generation via `TerminalWASIAppRunner` in `Runners/TerminalUIWASI`
-- host-managed embedding via `TerminalUISceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`, as used by `GUI/SwiftUITUIGUI` and `GUI/WebTUIGUI`
+- terminal-native executable execution via `TerminalRunner.run(MyApp.self)` or the default `App.main()` provided by `Runners/SwiftTUICLI`
+- WASI executable execution and manifest generation via `WASIRunner` in `Runners/SwiftTUIWASI`
+- host-managed embedding via `SceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`, as used by `GUI/SwiftUIHost` and `GUI/WebHost`
 
 CLI scene management is executable-runner policy rather than an authored-scene
-rule. One-window and multi-window apps share the same runner story; `TerminalUI`
+rule. One-window and multi-window apps share the same runner story; `SwiftTUI`
 itself remains library-only.
 
 ## Important Data Products

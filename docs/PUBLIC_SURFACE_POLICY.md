@@ -7,7 +7,7 @@ This note defines how the package should think about its public API shape after 
 The package should present one primary authoring story:
 
 - write views with the SwiftUI-shaped surface in `View`
-- use `TerminalUI` for shared runtime integration plus peer platform integration packages for executable launch or embedded hosting
+- use `SwiftTUI` for shared runtime integration plus peer platform integration packages for executable launch or embedded hosting
 - treat `Core` as pipeline and data-model infrastructure
 
 Anything outside that shape must justify why it is public.
@@ -18,10 +18,10 @@ The canonical public surface is the one used in README examples, architecture do
 
 - `View` and the SwiftUI-shaped container and leaf APIs
 - property wrappers and environment plumbing that feel like SwiftUI
-- runtime integration points in `TerminalUI` that host those views in a terminal session or shared scene host
+- runtime integration points in `SwiftTUI` that host those views in a terminal session or shared scene host
 - peer platform integration packages when the app needs terminal-native execution, WASI execution, or host-managed embedding
 
-The supported package model is `TerminalUI` for shared runtime integration plus peer runner packages for executable launch or embedded hosting.
+The supported package model is `SwiftTUI` for shared runtime integration plus peer runner packages for executable launch or embedded hosting.
 
 In this repo, an executable runner package owns top-level execution and the
 default `App.main()` story, while an embedded host package retains

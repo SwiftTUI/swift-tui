@@ -1,5 +1,5 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 import Testing
 
 @testable import GIFEditorUI

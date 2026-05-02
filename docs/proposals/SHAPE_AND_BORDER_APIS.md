@@ -3,7 +3,7 @@
 > Status: **Shipped as of Milestone 7.** Sections below describe the
 > design intent; call-outs note where the landed implementation diverged
 > from the original proposal.
-> Audience: maintainers of swift-terminal-ui after the shape, border, and
+> Audience: maintainers of swift-tui after the shape, border, and
 > fill revamp landed, plus reviewers tracing why the surface looks the
 > way it does.
 

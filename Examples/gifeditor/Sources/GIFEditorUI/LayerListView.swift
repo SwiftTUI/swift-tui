@@ -1,5 +1,5 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// Bottom sub-panel of the right column — Photoshop-style layers
 /// list. Top of the list is the visually-frontmost layer (matches the

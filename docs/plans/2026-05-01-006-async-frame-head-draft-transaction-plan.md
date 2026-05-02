@@ -89,7 +89,7 @@ committed `ViewGraph` plus committed node handlers and registration aliases.
 - Modify: `Sources/View/Environment/Environment.swift`
   - Add `ResolveContext.replacingRuntimeRegistrations(_:)`.
   - Ensure children inherit draft registries when a parent context is redirected.
-- Modify: `Sources/TerminalUI/TerminalUI.swift`
+- Modify: `Sources/SwiftTUI/SwiftTUI.swift`
   - Add the registration draft to `FrameHeadDraft`.
   - Route async `prepareFrameHead` through scratch registries.
   - Commit registration changes in `finishFrame`.
@@ -105,11 +105,11 @@ committed `ViewGraph` plus committed node handlers and registration aliases.
     dirty evaluation.
 - Modify: `Sources/Core/Graph/DependencyTracker.swift`
   - Add checkpoint/restore for in-progress dependency capture.
-- Modify: `Sources/TerminalUI/FrameDiagnosticsLogger.swift`
+- Modify: `Sources/SwiftTUI/FrameDiagnosticsLogger.swift`
   - Add queued-tail cancellation diagnostics after cancellation is implemented.
-- Modify: `Sources/TerminalUI/RunLoop+Rendering.swift`
+- Modify: `Sources/SwiftTUI/RunLoop+Rendering.swift`
   - Race queued-tail state against coalesced render intent only after abort proof.
-- Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- Modify: `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
   - Add draft-registration, abort-proof, cancellation, and committed-order
     runtime-path tests.
 - Modify: `Tests/CoreTests/Graph/ViewGraphTests.swift`
@@ -139,7 +139,7 @@ committed `ViewGraph` plus committed node handlers and registration aliases.
 ## Task 1: Add A Failing Live-Registration Isolation Test
 
 **Files:**
-- Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- Modify: `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 
 - [x] **Step 1: Add a test proving prepared key commands are not live before commit**
 
@@ -244,7 +244,7 @@ private struct AsyncFrameHeadDraftKeyCommandModifier: ViewModifier {
 Run:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests/blockedAsyncFrameHeadKeepsDraftKeyCommandsOutOfLiveDispatch
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/blockedAsyncFrameHeadKeepsDraftKeyCommandsOutOfLiveDispatch
 ```
 
 Expected before implementation: FAIL because the draft key command fires while
@@ -412,8 +412,8 @@ git commit -m "Add frame-head registration draft infrastructure"
 ## Task 3: Route Async Frame Head Through Draft Registries
 
 **Files:**
-- Modify: `Sources/TerminalUI/TerminalUI.swift`
-- Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- Modify: `Sources/SwiftTUI/SwiftTUI.swift`
+- Modify: `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 
 - [x] **Step 1: Store the draft on `FrameHeadDraft`**
 
@@ -498,7 +498,7 @@ the final committed tree.
 Run:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests/blockedAsyncFrameHeadKeepsDraftKeyCommandsOutOfLiveDispatch
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/blockedAsyncFrameHeadKeepsDraftKeyCommandsOutOfLiveDispatch
 ```
 
 Expected after implementation: PASS.
@@ -508,7 +508,7 @@ Expected after implementation: PASS.
 Run:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
 ```
 
 Expected: all tests in `AsyncFrameTailRenderingTests` pass.
@@ -518,15 +518,15 @@ Expected: all tests in `AsyncFrameTailRenderingTests` pass.
 Run:
 
 ```bash
-git add Sources/TerminalUI/TerminalUI.swift Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift
+git add Sources/SwiftTUI/SwiftTUI.swift Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift
 git commit -m "Route async frame heads through draft registrations"
 ```
 
 ## Task 4: Apply The Same Registration Transaction To Sync Rendering
 
 **Files:**
-- Modify: `Sources/TerminalUI/TerminalUI.swift`
-- Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- Modify: `Sources/SwiftTUI/SwiftTUI.swift`
+- Modify: `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 
 - [x] **Step 1: Add a sync/async parity assertion for draft registration commit**
 
@@ -584,9 +584,9 @@ After layout-dependent realization has produced the final `resolved` tree, call:
 Run:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
-swiftly run swift test --filter TerminalUITests.KeyCommandTests
-swiftly run swift test --filter TerminalUITests.DropDestinationDispatchTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.KeyCommandTests
+swiftly run swift test --filter SwiftTUITests.DropDestinationDispatchTests
 ```
 
 Expected: all listed suites pass.
@@ -596,14 +596,14 @@ Expected: all listed suites pass.
 Run:
 
 ```bash
-git add Sources/TerminalUI/TerminalUI.swift Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift
+git add Sources/SwiftTUI/SwiftTUI.swift Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift
 git commit -m "Share registration draft commits across render paths"
 ```
 
 ## Task 5: Cover Selective Dirty Reuse, Aliases, And Drop Destinations
 
 **Files:**
-- Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- Modify: `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 - Modify: `Tests/CoreTests/Graph/ViewGraphTests.swift`
 
 - [x] **Step 1: Add a selective-dirty runtime test with untouched sibling registrations**
@@ -663,7 +663,7 @@ The key assertion shape is:
 Run:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
 swiftly run swift test --filter CoreTests.ViewGraphTests
 ```
 
@@ -674,7 +674,7 @@ Expected: all listed tests pass.
 Run:
 
 ```bash
-git add Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift Tests/CoreTests/Graph/ViewGraphTests.swift
+git add Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift Tests/CoreTests/Graph/ViewGraphTests.swift
 git commit -m "Cover draft registration commit boundaries"
 ```
 
@@ -901,8 +901,8 @@ git commit -m "Add view graph checkpoints for frame-head transactions"
 ## Task 7: Add Prepared-Frame Abort Test Hooks
 
 **Files:**
-- Modify: `Sources/TerminalUI/TerminalUI.swift`
-- Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- Modify: `Sources/SwiftTUI/SwiftTUI.swift`
+- Modify: `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 
 - [x] **Step 1: Extend `FrameHeadDraft` with graph checkpoint state**
 
@@ -986,7 +986,7 @@ rebuilds the subtree correctly.
 Run:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
 ```
 
 Expected: all tests in `AsyncFrameTailRenderingTests` pass.
@@ -996,15 +996,15 @@ Expected: all tests in `AsyncFrameTailRenderingTests` pass.
 Run:
 
 ```bash
-git add Sources/TerminalUI/TerminalUI.swift Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift
+git add Sources/SwiftTUI/SwiftTUI.swift Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift
 git commit -m "Prove prepared frame heads can be aborted"
 ```
 
 ## Task 8: Gate Animation, Lifecycle, Task, And Worker Cache Effects
 
 **Files:**
-- Modify: `Sources/TerminalUI/TerminalUI.swift`
-- Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- Modify: `Sources/SwiftTUI/SwiftTUI.swift`
+- Modify: `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 
 - [x] **Step 1: Audit `prepareFrameHead` and `renderFrameTailAsync` side effects**
 
@@ -1052,7 +1052,7 @@ remaining non-draft side effect before continuing.
 Run:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
 ```
 
 Expected: all tests in `AsyncFrameTailRenderingTests` pass.
@@ -1062,17 +1062,17 @@ Expected: all tests in `AsyncFrameTailRenderingTests` pass.
 Run:
 
 ```bash
-git add Sources/TerminalUI/TerminalUI.swift Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift
+git add Sources/SwiftTUI/SwiftTUI.swift Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift
 git commit -m "Gate frame-head effects behind commit"
 ```
 
 ## Task 9: Add Pre-Start Tail Job Cancellation
 
 **Files:**
-- Modify: `Sources/TerminalUI/TerminalUI.swift`
-- Modify: `Sources/TerminalUI/RunLoop+Rendering.swift`
-- Modify: `Sources/TerminalUI/FrameDiagnosticsLogger.swift`
-- Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- Modify: `Sources/SwiftTUI/SwiftTUI.swift`
+- Modify: `Sources/SwiftTUI/RunLoop+Rendering.swift`
+- Modify: `Sources/SwiftTUI/FrameDiagnosticsLogger.swift`
+- Modify: `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 
 - [x] **Step 1: Add tail job state**
 
@@ -1182,8 +1182,8 @@ while the job is already started. Expected:
 Run:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
-swiftly run swift test --filter 'TerminalUITests.InteractiveRuntimeTests/(mouseClickOnScrollIndicatorJumpsToLocation|mouseDragOnScrollIndicatorTracksDraggedPosition|runLoopBatchesQueuedScrollBurstsWithLazyStacks)'
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter 'SwiftTUITests.InteractiveRuntimeTests/(mouseClickOnScrollIndicatorJumpsToLocation|mouseDragOnScrollIndicatorTracksDraggedPosition|runLoopBatchesQueuedScrollBurstsWithLazyStacks)'
 swiftly run swift test --package-path Examples/gallery --filter 'GalleryDemoViewsTests.GalleryTabSwitchTests/clickingGalleryTabSwitchesSelection'
 ```
 
@@ -1194,7 +1194,7 @@ Expected: all listed tests pass.
 Run:
 
 ```bash
-git add Sources/TerminalUI/TerminalUI.swift Sources/TerminalUI/RunLoop+Rendering.swift Sources/TerminalUI/FrameDiagnosticsLogger.swift Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift
+git add Sources/SwiftTUI/SwiftTUI.swift Sources/SwiftTUI/RunLoop+Rendering.swift Sources/SwiftTUI/FrameDiagnosticsLogger.swift Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift
 git commit -m "Cancel queued frame tails before worker start"
 ```
 
@@ -1257,11 +1257,11 @@ git commit -m "Record async frame-head transaction completion"
 Final verification run before marking the plan shipped:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
-swiftly run swift test --filter TerminalUITests.PreferenceSurfaceTests/resolveReuseReplaysStablePreferenceObserversForReusedSubtrees
-swiftly run swift test --filter TerminalUITests.DiagnosticsAndCacheTests/resolveReuseReplaysFocusedValuePublishers
-swiftly run swift test --filter TerminalUITests.ImperativeAuthoringContextDispatchTests/gestureCallbacksTargetDispatchingGraph
-swiftly run swift test --filter TerminalUITests.InteractiveRuntimeTests/runLoopEmitsViewportLifecycleTransitionsForFullLazyRows
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.PreferenceSurfaceTests/resolveReuseReplaysStablePreferenceObserversForReusedSubtrees
+swiftly run swift test --filter SwiftTUITests.DiagnosticsAndCacheTests/resolveReuseReplaysFocusedValuePublishers
+swiftly run swift test --filter SwiftTUITests.ImperativeAuthoringContextDispatchTests/gestureCallbacksTargetDispatchingGraph
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests/runLoopEmitsViewportLifecycleTransitionsForFullLazyRows
 swiftly run swift test
 swiftly run swift package --package-path Examples/gallery clean
 swiftly run swift package --package-path Examples/layouts clean
@@ -1271,7 +1271,7 @@ bun run test
 ```
 
 Result: PASS. Full gate log:
-`/tmp/swift-terminal-ui-test-all-20260501-175403-52612.log`.
+`/tmp/swift-tui-test-all-20260501-175403-52612.log`.
 
 Diagnostics samples captured:
 

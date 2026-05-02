@@ -55,9 +55,9 @@ date: 2026-04-26
 - `Sources/View/Presentation/PresentationModifiers.swift:494` — replace `.presentationChrome` StrokeStyle preset with explicit `StrokeStyle(borderSet: .innerHalfBlock, placement: .inset)` (or `.outset` — see Task 5 sub-decision)
 - `Tests/CoreTests/BorderSetTests.swift` — update tests that assert `placement` lives on `BorderSet`
 - `Tests/CoreTests/LayoutBehaviorBorderEqualityTests.swift` — refresh if it checks placement
-- `Tests/TerminalUITests/BorderRenderingTests.swift` — refresh assertions
-- `Tests/TerminalUITests/BorderModifierLayoutTests.swift` — refresh assertions
-- `Tests/TerminalUITests/Fixtures/**/*.txt` — re-record snapshot fixtures (~115 files; many won't change because they don't render bordered chrome)
+- `Tests/SwiftTUITests/BorderRenderingTests.swift` — refresh assertions
+- `Tests/SwiftTUITests/BorderModifierLayoutTests.swift` — refresh assertions
+- `Tests/SwiftTUITests/Fixtures/**/*.txt` — re-record snapshot fixtures (~115 files; many won't change because they don't render bordered chrome)
 
 **Deleted:**
 - No files deleted.
@@ -539,7 +539,7 @@ Goal: Flip the canonical default. After this commit, every implicit-default cont
 **Files:**
 - Modify: `Sources/Core/Styling.swift:520` (change init default)
 - Modify: `Sources/Core/Rasterizer.swift:2795-2815` (comment update; logic unchanged)
-- Modify: `Tests/TerminalUITests/Fixtures/**/*.txt` (re-recorded fixtures)
+- Modify: `Tests/SwiftTUITests/Fixtures/**/*.txt` (re-recorded fixtures)
 
 - [ ] **Step 6.1: Confirm baseline test will flip from FAIL → PASS**
 
@@ -653,20 +653,20 @@ Expected:
 PARALLEL_RECORD_RENDERED_FIXTURES=1 swift test 2>&1 | tail -30
 ```
 
-This regenerates every `Tests/TerminalUITests/Fixtures/**/*.txt` file from the current rendering. Many won't change (no bordered chrome). The ones that do change should switch from `─│┌┐└┘`-style chrome to `▀▄▌▐▛▜▙▟`-style chrome.
+This regenerates every `Tests/SwiftTUITests/Fixtures/**/*.txt` file from the current rendering. Many won't change (no bordered chrome). The ones that do change should switch from `─│┌┐└┘`-style chrome to `▀▄▌▐▛▜▙▟`-style chrome.
 
 - [ ] **Step 6.8: Visually inspect a sample of re-recorded fixtures**
 
 ```bash
-git diff --stat Tests/TerminalUITests/Fixtures/ | tail -20
+git diff --stat Tests/SwiftTUITests/Fixtures/ | tail -20
 ```
 
 Identify the fixture directories with the largest diffs (most border-affected views). For each, inspect the new content:
 
 ```bash
-git diff Tests/TerminalUITests/Fixtures/button/preview-unicode.txt
-git diff Tests/TerminalUITests/Fixtures/text-field/preview-unicode.txt
-git diff Tests/TerminalUITests/Fixtures/labeled-content/preview-unicode.txt
+git diff Tests/SwiftTUITests/Fixtures/button/preview-unicode.txt
+git diff Tests/SwiftTUITests/Fixtures/text-field/preview-unicode.txt
+git diff Tests/SwiftTUITests/Fixtures/labeled-content/preview-unicode.txt
 ```
 
 For each: confirm the new output has internally consistent half-block chrome (no broken corners, no leftover `─`/`│` mixed with half-blocks within the same frame). If anything looks broken, that's a bug in the migration — investigate before committing.
@@ -685,9 +685,9 @@ Expected: all tests pass against the freshly-recorded fixtures.
 git add Sources/Core/Styling.swift \
         Sources/Core/Rasterizer.swift \
         Sources/Core/DrawExtractor+Lists.swift \
-        Tests/TerminalUITests/Fixtures/ \
+        Tests/SwiftTUITests/Fixtures/ \
         Tests/CoreTests/ \
-        Tests/TerminalUITests/
+        Tests/SwiftTUITests/
 git commit -m "feat(core): change default StrokeStyle to outerHalfBlock; drop auto-upgrade
 
 Flips the framework's canonical border/stroke default from

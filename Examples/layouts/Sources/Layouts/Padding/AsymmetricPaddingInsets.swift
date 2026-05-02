@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// A bordered `Text` wraps a content string inside
 /// `.padding(EdgeInsets(top: 0, leading: 4, bottom: 2, trailing: 0))`.

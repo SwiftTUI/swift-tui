@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// A four-row form whose `label:value` rows all share a single
 /// colon column, regardless of label length, by right-aligning the

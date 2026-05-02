@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 struct CounterTab: View {
   @State private var count: Int = 0
@@ -60,7 +60,7 @@ struct CounterTab: View {
 
   private var brandingHeader: some View {
     VStack(alignment: .center, spacing: 0) {
-      TextFigure("TerminalUI", font: .future)
+      TextFigure("SwiftTUI", font: .future)
         .foregroundStyle(color)
       Text("A SwiftUI-shaped terminal UI")
         .foregroundStyle(.separator)

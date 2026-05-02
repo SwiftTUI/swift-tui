@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Pairs a narrow `.frame(width: 10)` with a `.fixedSize()` modifier on
 /// a single Text child. The fixed-size modifier asks the view to use

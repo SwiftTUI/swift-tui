@@ -1,5 +1,5 @@
 import Foundation
-import TerminalUI
+import SwiftTUI
 
 /// A reference-type box for the latest non-empty palette-commands list.
 ///

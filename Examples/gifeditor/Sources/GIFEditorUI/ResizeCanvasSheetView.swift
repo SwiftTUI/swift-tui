@@ -1,5 +1,5 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// Modal sheet that lets the user pick a square canvas size from the
 /// standard progression (16/24/32/48/64). Replaces the silent cycle

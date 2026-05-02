@@ -46,9 +46,9 @@ This memo gathers terminal-native UI paradigms from tmux, Zellij, GNU Screen, Ne
 - Yazi multi-tab, preview, and plugin-driven workflow: [Yazi README](https://github.com/sxyazi/yazi)
 - Lazygit panel-driven git workflows and keybinding discoverability: [Lazygit README](https://github.com/jesseduffield/lazygit)
 
-## Implications For TerminalUI
+## Implications For SwiftTUI
 
-- TerminalUI should reinterpret SwiftUI APIs as terminal-native workspace primitives, not desktop cards translated into monospace.
+- SwiftTUI should reinterpret SwiftUI APIs as terminal-native workspace primitives, not desktop cards translated into monospace.
 - The likely long-term direction is a screen-wide shell with visible mode, workspace, and help surfaces, plus pane-based internal navigation.
 - If a component does not improve keyboard discoverability, workspace clarity, or state visibility, it probably belongs as an opt-in style rather than a default.
 - `tmux`, `Zellij`, `WezTerm`, `Helix`, `Kakoune`, `Neovim`, `Yazi`, and `Lazygit` together suggest a strong terminal-native baseline: visible state, searchable actions, explicit workspaces, dense but legible panels, and very little decorative chrome.

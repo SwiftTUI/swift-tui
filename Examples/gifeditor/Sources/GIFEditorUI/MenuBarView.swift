@@ -1,5 +1,5 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// Top-row menu bar — File / Edit / Layer / Select / Frame / View /
 /// Help. Each dropdown opens from the editor-root overlay so opening or

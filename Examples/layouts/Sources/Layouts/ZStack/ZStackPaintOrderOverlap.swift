@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Pins the ZStack paint-order rule: children paint in declared order,
 /// so a later child paints OVER an earlier child at any shared cell.

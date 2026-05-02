@@ -87,7 +87,7 @@ Current `AnyView` usage falls into four recurring categories.
    - `Sources/View/Menu.swift`
    - `Sources/View/Picker.swift`
    - `Sources/View/NavigationViews.swift`
-   - `Sources/TerminalUICharts/*.swift`
+   - `Sources/SwiftTUICharts/*.swift`
    - These types accept typed builder closures at their initializer boundary, but the type itself is not generic over the builder result, so the content must be erased to be stored.
 
 3. Deferred builder closures
@@ -95,7 +95,7 @@ Current `AnyView` usage falls into four recurring categories.
    - `Sources/View/Environment.swift` (`EnvironmentReader`)
    - `Sources/View/Preference.swift`
    - `Sources/View/OutlineViews.swift`
-   - `Sources/TerminalUI/App.swift` (`WindowGroup`)
+   - `Sources/SwiftTUI/App.swift` (`WindowGroup`)
    - These closures usually produce a single concrete `Content: View` type, but are currently stored as closures returning `AnyView` in order to preserve later evaluation plus dynamic-property scope.
 
 4. Local branch unification and convenience composition
@@ -108,7 +108,7 @@ Current `AnyView` usage falls into four recurring categories.
    - `Sources/View/ProgressView.swift`
    - `Sources/View/SelectionAndValueSupport.swift`
    - `Sources/View/ViewCompositionHelpers.swift`
-   - `Sources/TerminalUICharts/ChartSupport.swift`
+   - `Sources/SwiftTUICharts/ChartSupport.swift`
    - These sites often use `AnyView` only because a helper returns one of several shaped view trees. In most cases, `@ViewBuilder` or a dedicated private wrapper type can replace the erasure.
 
 ### Hard Constraints
@@ -287,21 +287,21 @@ Primary files:
 
 - `Tests/ViewTests/ViewResolutionTests.swift`
 - `Tests/ViewTests/ActorIsolationSurfaceTests.swift`
-- `Tests/TerminalUITests/ViewCompositionSurfaceTests.swift`
-- `Tests/TerminalUITests/SwiftUISurfaceTests.swift`
-- `Tests/TerminalUITests/PreferenceSurfaceTests.swift`
-- `Tests/TerminalUITests/Phase4ObservationAndEnvironmentTests.swift`
-- `Tests/TerminalUITests/ResolveReuseIndexingTests.swift`
-- `Tests/TerminalUITests/ResolveReuseAncestorInvalidationTests.swift`
-- `Tests/TerminalUITests/LayoutReuseAncestorInvalidationTests.swift`
-- `Tests/TerminalUITests/DiagnosticsAndCacheTests.swift`
-- `Tests/TerminalUITests/TabViewSurfaceTests.swift`
-- `Tests/TerminalUITests/OutlineSurfaceTests.swift`
-- `Tests/TerminalUITests/MenuSurfaceTests.swift`
-- `Tests/TerminalUITests/PresentationSurfaceTests.swift`
-- `Tests/TerminalUITests/ProgressViewSurfaceTests.swift`
-- `Tests/TerminalUITests/SecureFieldSurfaceTests.swift`
-- `Tests/TerminalUITests/TextEditorSurfaceTests.swift`
+- `Tests/SwiftTUITests/ViewCompositionSurfaceTests.swift`
+- `Tests/SwiftTUITests/SwiftUISurfaceTests.swift`
+- `Tests/SwiftTUITests/PreferenceSurfaceTests.swift`
+- `Tests/SwiftTUITests/Phase4ObservationAndEnvironmentTests.swift`
+- `Tests/SwiftTUITests/ResolveReuseIndexingTests.swift`
+- `Tests/SwiftTUITests/ResolveReuseAncestorInvalidationTests.swift`
+- `Tests/SwiftTUITests/LayoutReuseAncestorInvalidationTests.swift`
+- `Tests/SwiftTUITests/DiagnosticsAndCacheTests.swift`
+- `Tests/SwiftTUITests/TabViewSurfaceTests.swift`
+- `Tests/SwiftTUITests/OutlineSurfaceTests.swift`
+- `Tests/SwiftTUITests/MenuSurfaceTests.swift`
+- `Tests/SwiftTUITests/PresentationSurfaceTests.swift`
+- `Tests/SwiftTUITests/ProgressViewSurfaceTests.swift`
+- `Tests/SwiftTUITests/SecureFieldSurfaceTests.swift`
+- `Tests/SwiftTUITests/TextEditorSurfaceTests.swift`
 
 Add assertions for:
 
@@ -328,7 +328,7 @@ Primary files:
 - `Sources/View/ProgressView.swift`
 - `Sources/View/SelectionAndValueSupport.swift`
 - `Sources/View/MetricTrackSupport.swift`
-- `Sources/TerminalUICharts/ChartSupport.swift`
+- `Sources/SwiftTUICharts/ChartSupport.swift`
 
 Actions:
 
@@ -348,7 +348,7 @@ Primary files:
 - `Sources/View/Environment.swift`
 - `Sources/View/Preference.swift`
 - `Sources/View/OutlineViews.swift`
-- `Sources/TerminalUI/App.swift`
+- `Sources/SwiftTUI/App.swift`
 
 Introduce package-private helper types such as:
 
@@ -407,8 +407,8 @@ Primary files:
 - `Sources/View/ProgressView.swift`
 - `Sources/View/SecureField.swift`
 - `Sources/View/NavigationViews.swift`
-- `Sources/TerminalUICharts/*.swift`
-- `Sources/TerminalUI/App.swift`
+- `Sources/SwiftTUICharts/*.swift`
+- `Sources/SwiftTUI/App.swift`
 
 Actions:
 
@@ -448,9 +448,9 @@ Primary files:
 - `Sources/Core/RenderTreeAndSemanticsTypes.swift`
 - `Sources/Core/LayoutEngine.swift`
 - `Sources/Core/Snapshots.swift`
-- `Tests/TerminalUITests/DiagnosticsAndCacheTests.swift`
-- `Tests/TerminalUITests/TimingDiagnosticsTests.swift`
-- `Tests/TerminalUITests/Phase5ReliabilityGatesTests.swift`
+- `Tests/SwiftTUITests/DiagnosticsAndCacheTests.swift`
+- `Tests/SwiftTUITests/TimingDiagnosticsTests.swift`
+- `Tests/SwiftTUITests/Phase5ReliabilityGatesTests.swift`
 
 Actions:
 
@@ -518,10 +518,10 @@ For each migration batch:
 1. Run focused suites for the touched area.
 2. Run the full `swiftly run swift test` suite before considering the batch complete.
 3. Compare diagnostics and reuse behavior in:
-   - `Tests/TerminalUITests/DiagnosticsAndCacheTests.swift`
-   - `Tests/TerminalUITests/ResolveReuseIndexingTests.swift`
-   - `Tests/TerminalUITests/ResolveReuseAncestorInvalidationTests.swift`
-   - `Tests/TerminalUITests/LayoutReuseAncestorInvalidationTests.swift`
+   - `Tests/SwiftTUITests/DiagnosticsAndCacheTests.swift`
+   - `Tests/SwiftTUITests/ResolveReuseIndexingTests.swift`
+   - `Tests/SwiftTUITests/ResolveReuseAncestorInvalidationTests.swift`
+   - `Tests/SwiftTUITests/LayoutReuseAncestorInvalidationTests.swift`
 4. Check interactive and surface suites for controls and shells that changed.
 5. Update rendered fixtures only when the semantic output genuinely changes.
 

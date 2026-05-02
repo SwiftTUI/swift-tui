@@ -6,7 +6,7 @@ future file moves.
 
 ## Repository Layout
 
-- `Sources/`: root Swift package targets (`Core`, `View`, `TerminalUICharts`, and `TerminalUI`)
+- `Sources/`: root Swift package targets (`Core`, `View`, `SwiftTUICharts`, and `SwiftTUI`)
 - `Tests/`: root Swift package tests for the package products
 - `Runners/`: peer SwiftPM executable runner packages for terminal-native CLI launch and WASI launch
 - `GUI/`: peer embedded host packages for SwiftUI hosting and Bun/browser hosting
@@ -21,18 +21,18 @@ future file moves.
 
 - Library products:
   - `View`
-  - `TerminalUI`
-  - `TerminalUICharts`
+  - `SwiftTUI`
+  - `SwiftTUICharts`
 - Internal support targets:
   - `Core`
 
 - Peer platform integration packages:
   - executable runner packages:
-    - `Runners/TerminalUICLI`
-    - `Runners/TerminalUIWASI`
+    - `Runners/SwiftTUICLI`
+    - `Runners/SwiftTUIWASI`
   - embedded host packages:
-    - `GUI/SwiftUITUIGUI`
-    - `GUI/WebTUIGUI`
+    - `GUI/SwiftUIHost`
+    - `GUI/WebHost`
 
 - Vendored local packages:
   - `Vendor/UnixSignals`
@@ -47,14 +47,14 @@ future file moves.
 
 `Core` remains the shared pipeline target, but it is not exposed as a separate
 library product. Downstream package consumers reach those types through
-`TerminalUI` re-exports.
+`SwiftTUI` re-exports.
 
-## `TerminalUI`
+## `SwiftTUI`
 
-- `TerminalUI.swift`: `DefaultRenderer` plus retained-frame, resolve-reuse, and post-resolve presentation composition plumbing
+- `SwiftTUI.swift`: `DefaultRenderer` plus retained-frame, resolve-reuse, and post-resolve presentation composition plumbing
 - `App.swift`: `App`, `Scene`, `SceneBuilder`, `WindowGroup`, `AnyScene`, and typed scene builder artifacts
 - `SceneTraversal.swift`: typed scene traversal, descriptor collection, and window-scene selection helpers
-- `SceneManifest.swift`: `TerminalUISceneDescriptor`, `TerminalUISceneManifest`, and manifest generation from authored scenes
+- `SceneManifest.swift`: `SceneDescriptor`, `SceneManifest`, and manifest generation from authored scenes
 - `HostedSceneSession.swift`: retained hosted scene runtime for GUI host packages and other non-terminal hosts
 - `SceneSession.swift`: shared scene-session bootstrap used by hosted sessions and compatibility launch paths
 - `RunLoop.swift`: runtime coordinator and shared runtime state
@@ -81,12 +81,12 @@ library product. Downstream package consumers reach those types through
 - `SignalReader.swift`: native and in-process signal readers
 - `TerminalControlMessages.swift`: shared resize/control-message parsing
 - `LinkOpening.swift`: runtime link opener
-- `TerminalUI.docc/`: module landing page and runtime guides
+- `SwiftTUI.docc/`: module landing page and runtime guides
 
-## `Runners/TerminalUICLI`
+## `Runners/SwiftTUICLI`
 
-- `TerminalUICLI.swift`: re-export surface for the CLI runner package
-- `TerminalCLIAppRunner.swift`: terminal-native app launch, CLI-mode routing, and single-scene test helper
+- `SwiftTUICLI.swift`: re-export surface for the CLI runner package
+- `TerminalRunner.swift`: terminal-native app launch, CLI-mode routing, and single-scene test helper
 - `SceneRuntime.swift`: per-scene runtime orchestration for multi-scene terminal apps
 - `SceneLifecycle.swift`: scene session coordination
 - `CLIMode.swift`: attach/list CLI argument parsing
@@ -95,15 +95,15 @@ library product. Downstream package consumers reach those types through
 - `AttachProxy.swift`: terminal attach forwarding
 - `PtyPair.swift`: native pty support
 
-## `Runners/TerminalUIWASI`
+## `Runners/SwiftTUIWASI`
 
-- `TerminalUIWASI.swift`: re-export surface for the WASI runner package
-- `TerminalWASIAppRunner.swift`: manifest mode plus WASI scene selection and launch
+- `SwiftTUIWASI.swift`: re-export surface for the WASI runner package
+- `WASIRunner.swift`: manifest mode plus WASI scene selection and launch
 
 ## Embedded Host Packages
 
-- `GUI/SwiftUITUIGUI`: native SwiftUI host package built on `TerminalUISceneManifest` and `HostedSceneSession`
-- `GUI/WebTUIGUI`: Bun-based web host that consumes a `TerminalUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas
+- `GUI/SwiftUIHost`: native SwiftUI host package built on `SceneManifest` and `HostedSceneSession`
+- `GUI/WebHost`: Bun-based web host that consumes a `SwiftTUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas
 
 ## `Core`
 
@@ -159,21 +159,21 @@ library product. Downstream package consumers reach those types through
 - `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifiers plus the package-only modifier-value lowering hooks that back them
 - `View.docc/`: module landing page and authoring guides
 
-## `TerminalUICharts`
+## `SwiftTUICharts`
 
 - chart files such as `BarChart.swift`, `BulletChart.swift`, `ColumnChart.swift`, `ComparisonChart.swift`, `HeatStrip.swift`, `Legend.swift`, `Meter.swift`, `Sparkline.swift`, `StackedBarChart.swift`, `ThresholdGauge.swift`, and `Timeline.swift`: compact chart and metric views
 - `ChartModels.swift`: shared data models for chart families
 - `ChartSupport.swift` and `ChartChromeSupport.swift`: shared chart rendering helpers
 - `Exports.swift`: product-facing export glue
-- `TerminalUICharts.docc/`: module landing page and charting guide
+- `SwiftTUICharts.docc/`: module landing page and charting guide
 
 ## Tests
 
 - `Tests/CoreTests`: pipeline, layout, raster, and focus infrastructure tests
 - `Tests/ViewTests`: authoring-layer and environment-level tests
-- `Tests/TerminalUITests`: runtime, rendering, fixture, and end-to-end behavioral tests
-- `Runners/TerminalUICLI/Tests/TerminalUICLITests`: terminal-native runner, attach, pty, and CLI-scene-management tests
-- `Runners/TerminalUIWASI/Tests/TerminalUIWASITests`: WASI runner and manifest-mode tests
+- `Tests/SwiftTUITests`: runtime, rendering, fixture, and end-to-end behavioral tests
+- `Runners/SwiftTUICLI/Tests/SwiftTUICLITests`: terminal-native runner, attach, pty, and CLI-scene-management tests
+- `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests`: WASI runner and manifest-mode tests
 - `Fixtures/Transport`: shared transport fixtures for terminal render-style encoding/decoding tests across Swift and web hosts
 
 ## Reliability Rules

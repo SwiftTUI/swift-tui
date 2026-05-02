@@ -1,5 +1,5 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// Renders one composited frame as a Canvas-backed grid of colored cells.
 ///

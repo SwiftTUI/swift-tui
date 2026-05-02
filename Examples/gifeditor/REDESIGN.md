@@ -646,7 +646,7 @@ closing a menu does NOT reflow the canvas, right panel, or timeline.
 `Sources/View/Controls/MenuRendering.swift`,
 `Sources/View/Presentation/PresentationCoordinator.swift`,
 `Sources/View/Presentation/PresentationModifiers.swift`,
-`Tests/TerminalUITests/MenuSurfaceTests.swift`.
+`Tests/SwiftTUITests/MenuSurfaceTests.swift`.
 
 ### Blocker 2 — Framework: `Button.systemHint(_:)` integrated with the toolbar
 
@@ -677,7 +677,7 @@ that the toolbar's per-item button picks up via the same modifier.
 **Touched:** `Sources/View/Controls/Button.swift`,
 `Sources/View/ActionScopes/ToolbarItem.swift`,
 `Sources/View/ActionScopes/Toolbar.swift`,
-`Tests/TerminalUITests/ButtonSystemHintTests.swift`.
+`Tests/SwiftTUITests/ButtonSystemHintTests.swift`.
 
 ### Blocker 3 — App: undo/redo on `EditorViewModel`
 
@@ -733,7 +733,7 @@ view model and toggleable from the keyboard.
 redesign**. They are recorded here so future readers know they were
 considered explicitly.)
 
-1. **Right-click on swatches.** swift-terminal-ui's pointer model
+1. **Right-click on swatches.** swift-tui's pointer model
    exposes click events reliably; secondary-button events are
    host-dependent. The spec uses `Shift+click` for "set as secondary,"
    with right-click added opportunistically on hosts that report it,

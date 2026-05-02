@@ -10,7 +10,7 @@ goal.
 
 ## Executive Summary
 
-TerminalUI should expose sub-cell pointer input as **fractional cell
+SwiftTUI should expose sub-cell pointer input as **fractional cell
 coordinates**, not raw pixels.
 
 Pixels are what terminal and host protocols often report. Cells are the
@@ -128,7 +128,7 @@ Terminal protocols also distinguish event class from coordinate encoding:
 - SGR-Pixels 1016 uses the same wire shape but reports pixels.
 - DEC 2048 in-band size reports can provide terminal cell and pixel dimensions.
 
-The lesson for TerminalUI is that apps almost always want cell-space positions,
+The lesson for SwiftTUI is that apps almost always want cell-space positions,
 not raw protocol coordinates. Swift's `Double` coordinates are the right
 gradual-precision idiom: cell-only terminals produce whole-number or
 center-estimated values; precise hosts produce fractional values.

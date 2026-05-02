@@ -4,7 +4,7 @@ How `@State` storage is keyed across re-evaluations, and what owner placement to
 
 ## Overview
 
-TerminalUI keys `@State` storage by view identity path plus source location. As long as the owning view's identity path is stable, each `@State` declaration reconnects to the same persisted slot across re-evaluations. Move a stateful view to a different identity path and you get a fresh state slot; the old slot is orphaned and reclaimed.
+SwiftTUI keys `@State` storage by view identity path plus source location. As long as the owning view's identity path is stable, each `@State` declaration reconnects to the same persisted slot across re-evaluations. Move a stateful view to a different identity path and you get a fresh state slot; the old slot is orphaned and reclaimed.
 
 Keying only protects the reconnection step. It does not recover state when the owning view *itself* is recreated under a different identity path.
 
@@ -34,4 +34,4 @@ Practical consequences:
 - <doc:State-Environment-And-Focus>
 - <doc:Focus>
 - <doc:Authoring-Views>
-- [State Keying: Ordinal vs Source-Location](https://github.com/adamz/swift-terminal-ui/blob/main/docs/STATE_KEYING.md)
+- [State Keying: Ordinal vs Source-Location](https://github.com/adamz/swift-tui/blob/main/docs/STATE_KEYING.md)

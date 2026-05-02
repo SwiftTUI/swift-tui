@@ -4,7 +4,7 @@ The runtime focus model: how non-pointing input is routed, how state observes an
 
 ## Overview
 
-This article is a high-level, implementation-oriented explanation of how focus works in TerminalUI. It treats focus as a runtime model, not just a bag of modifiers, and it tries to separate the distinct jobs that the focus APIs perform:
+This article is a high-level, implementation-oriented explanation of how focus works in SwiftTUI. It treats focus as a runtime model, not just a bag of modifiers, and it tries to separate the distinct jobs that the focus APIs perform:
 
 - deciding which view receives non-pointing input
 - letting app state observe or control that decision
@@ -12,7 +12,7 @@ This article is a high-level, implementation-oriented explanation of how focus w
 - shaping how focus moves through irregular layouts
 - choosing a starting focus target
 
-The model is shaped after SwiftUI's. Where TerminalUI deviates intentionally, the article calls that out explicitly.
+The model is shaped after SwiftUI's. Where SwiftTUI deviates intentionally, the article calls that out explicitly.
 
 The short version:
 
@@ -413,7 +413,7 @@ Focused values are best for remote, focus-dependent context such as commands and
 
 `focusedSceneValue(...)` is intentionally scene-aware. In multi-window apps, what commands see depends on which scene is active.
 
-## Practical Implications For TerminalUI
+## Practical Implications For SwiftTUI
 
 For a SwiftUI-faithful terminal runtime, the practical takeaways are straightforward:
 
@@ -429,11 +429,11 @@ This aligns with the project's design intent:
 - explicit `.focusable(...)` modifiers should be authoritative
 - containers should not become focus stops accidentally
 - focused values and focus state are part of SwiftUI-faithful runtime semantics, not convenience extras
-- focus-chain membership is the activation predicate for command availability — see [Action Scopes And Commands](https://github.com/adamz/swift-terminal-ui/blob/main/docs/proposals/ACTION_SCOPES_AND_COMMANDS.md) for the full scope hypothesis.
+- focus-chain membership is the activation predicate for command availability — see [Action Scopes And Commands](https://github.com/adamz/swift-tui/blob/main/docs/proposals/ACTION_SCOPES_AND_COMMANDS.md) for the full scope hypothesis.
 
 ## Focus Highlight In `List`
 
-Focus highlight in `List` is row-shaped, not container-shaped. The active row (the focused-or-selected row) gets its row chrome resolved with `isFocused: true, isSelected: true`; the list container itself stays neutral. See [docs/FOCUS.md](https://github.com/adamz/swift-terminal-ui/blob/main/docs/FOCUS.md) for the rationale and what the decision does and does not cover.
+Focus highlight in `List` is row-shaped, not container-shaped. The active row (the focused-or-selected row) gets its row chrome resolved with `isFocused: true, isSelected: true`; the list container itself stays neutral. See [docs/FOCUS.md](https://github.com/adamz/swift-tui/blob/main/docs/FOCUS.md) for the rationale and what the decision does and does not cover.
 
 ## See Also
 

@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// HStack of four children with layout priorities `0/1/0/2`. Under
 /// a tight width proposal the priority-2 child survives first, the

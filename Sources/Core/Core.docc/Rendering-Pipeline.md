@@ -2,7 +2,7 @@
 
 ## Overview
 
-Every frame in TerminalUI moves through the same ordered phases:
+Every frame in SwiftTUI moves through the same ordered phases:
 
 ```text
 resolve -> measure -> place -> semantics -> draw -> raster -> commit

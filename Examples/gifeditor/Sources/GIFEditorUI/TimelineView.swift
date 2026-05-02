@@ -1,5 +1,5 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// Bottom-strip timeline. Renders the navigation cluster
 /// (`◀◀ ◀ ▶ ▶▶`), a horizontally-scrolling row of clickable frame

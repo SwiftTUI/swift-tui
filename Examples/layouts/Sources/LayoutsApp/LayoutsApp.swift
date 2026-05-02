@@ -1,6 +1,6 @@
 import Layouts
-import TerminalUI
-import TerminalUICLI
+import SwiftTUI
+import SwiftTUICLI
 
 @main
 struct LayoutsApp: App {

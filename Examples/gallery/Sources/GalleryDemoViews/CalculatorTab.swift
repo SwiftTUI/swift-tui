@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 enum CalculatorOp: Hashable {
   case add

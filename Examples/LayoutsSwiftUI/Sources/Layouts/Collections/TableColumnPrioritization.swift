@@ -6,7 +6,7 @@ import SwiftUI
 /// column's width participates in column layout regardless of how
 /// the residual space is allocated.
 ///
-/// SwiftUI port: the original used TerminalUI's
+/// SwiftUI port: the original used SwiftTUI's
 /// `Table(columns:[...]) { TableRow { ... } }`. SwiftUI's `Table`
 /// takes a sequence of `Identifiable` rows and `TableColumn` builders
 /// that key into them, so this port reshapes the data to fit. The

@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Showcases the "Borders & Shapes" revamp landed across Milestones
 /// 1–7A of the 2026-04-11 pass.  Each panel exercises a distinct slice

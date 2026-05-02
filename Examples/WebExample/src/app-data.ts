@@ -1,6 +1,6 @@
-import type { WebTUISceneManifest, WebTUITerminalStyle } from "webtuigui";
+import type { WebHostSceneManifest, WebHostTerminalStyle } from "webhost";
 
-export const fallbackManifest: WebTUISceneManifest = {
+export const fallbackManifest: WebHostSceneManifest = {
   defaultSceneId: "main",
   scenes: [
     {
@@ -16,7 +16,7 @@ export const fallbackManifest: WebTUISceneManifest = {
   ],
 };
 
-export const defaultStyle: WebTUITerminalStyle = {
+export const defaultStyle: WebHostTerminalStyle = {
   fontSize: 15,
   fontFamily:
     '"BerkleyMono Nerd Font", "Berkley Mono", "SFMono-Regular", "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono", monospace',
