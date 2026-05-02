@@ -8,6 +8,7 @@ struct FrameDropEligibilityTests {
   func emptyFrameFallsBackToUnobservable() {
     let artifacts = makeArtifacts()
     let eligibility = FrameDropEligibility.classify(artifacts)
+    #expect(eligibility.decision == .mustCommit(blockers: [.unobservable]))
     #expect(eligibility.blockers == [.unobservable])
     #expect(eligibility.canDrop == false)
   }
@@ -150,6 +151,48 @@ struct FrameDropEligibilityTests {
       ])
   }
 
+  @Test("a fully classified visual-only candidate reports canDropVisualOnly")
+  func fullyClassifiedVisualOnlyCandidateReportsCanDropVisualOnly() {
+    let artifacts = makeArtifacts()
+    let eligibility = FrameDropEligibility.classify(
+      .init(
+        artifacts: artifacts,
+        hasCompleteBarrierSignals: true
+      ))
+    #expect(eligibility.decision == .canDropVisualOnly)
+    #expect(eligibility.blockers == [])
+    #expect(eligibility.canDrop == false)
+  }
+
+  @Test("an incomplete visual-only candidate remains mustCommit")
+  func incompleteVisualOnlyCandidateRemainsMustCommit() {
+    let artifacts = makeArtifacts()
+    let eligibility = FrameDropEligibility.classify(
+      .init(
+        artifacts: artifacts,
+        hasCompleteBarrierSignals: false
+      ))
+    #expect(eligibility.decision == .mustCommit(blockers: [.unobservable]))
+    #expect(eligibility.blockers == [.unobservable])
+  }
+
+  @Test("a fully classified candidate with blockers remains mustCommit")
+  func fullyClassifiedCandidateWithBlockersRemainsMustCommit() {
+    let artifacts = makeArtifacts()
+    let eligibility = FrameDropEligibility.classify(
+      .init(
+        artifacts: artifacts,
+        additionalBlockers: [.focusBindingSync, .preferenceObservationDelta],
+        hasCompleteBarrierSignals: true
+      ))
+    #expect(
+      eligibility.decision
+        == .mustCommit(
+          blockers: [.focusBindingSync, .preferenceObservationDelta]
+        ))
+    #expect(eligibility.blockers == [.focusBindingSync, .preferenceObservationDelta])
+  }
+
   @Test("a frame with multiple kinds of work reports all of them")
   func multipleBlockersAccumulate() {
     let artifacts = makeArtifacts(
@@ -172,27 +215,27 @@ struct FrameDropEligibilityTests {
     #expect(eligibility.canDrop == false)
   }
 
-  @Test("canDrop is currently false for every blocker")
+  @Test("canDrop is currently false for every decision")
   func canDropIsAlwaysFalse() {
-    for blocker in FrameDropEligibility.Blocker.allCases {
-      let eligibility = FrameDropEligibility(blockers: [blocker])
-      #expect(
-        eligibility.canDrop == false,
-        "blocker \(blocker.rawValue) should not permit dropping"
-      )
+    for decision in allDecisions() {
+      let eligibility = FrameDropEligibility(decision: decision)
+      #expect(eligibility.canDrop == false)
     }
   }
 
-  @Test("an explicit empty blocker set is treated as droppable")
-  func explicitEmptyBlockerSetIsDroppable() {
-    // The classifier never produces this state — it injects
-    // `.unobservable` when no signal is detected — but the type itself
-    // exposes `canDrop` as a derived property.  Pin the contract so a
-    // future stage that wants to flip a frame to droppable has a clear
-    // construction path.
+  @Test("an explicit empty blocker set records the visual-only decision")
+  func explicitEmptyBlockerSetRecordsVisualOnlyDecision() {
     let eligibility = FrameDropEligibility(blockers: [])
-    #expect(eligibility.canDrop == true)
+    #expect(eligibility.decision == .canDropVisualOnly)
+    #expect(eligibility.blockers == [])
+    #expect(eligibility.canDrop == false)
   }
+}
+
+private func allDecisions() -> [FrameDropEligibility.Decision] {
+  FrameDropEligibility.Blocker.allCases.map { blocker in
+    .mustCommit(blockers: [blocker])
+  } + [.canDropVisualOnly]
 }
 
 private func makeArtifacts(

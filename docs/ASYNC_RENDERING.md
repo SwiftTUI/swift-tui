@@ -108,11 +108,12 @@ Cancellation after worker layout starts is not implemented and is intentionally
 out of scope. A started or completed worker frame must still finish and commit
 in order.
 
-Completed worker results are classified conservatively by the observational
-`FrameDropEligibility` helper, including runtime focus/preference/animation,
+Completed worker results are classified conservatively by
+`FrameDropEligibility`, including runtime focus/preference/animation,
 retained-baseline, presentation-recovery, graphics-replay, and diagnostics
-barriers, but they are not dropped as visual-only frames. Off-main resolve is
-not planned near-term.
+barriers. The candidate-level classifier can identify a fully observed
+visual-only candidate, but `FrameDropEligibility.canDrop` remains false and no
+runtime path drops completed frames. Off-main resolve is not planned near-term.
 
 ## Shipped Option 3 Boundary
 
