@@ -5,6 +5,103 @@ package struct LifecycleStateNode: Equatable, Sendable {
   var task: TaskDescriptor?
 }
 
+extension ViewGraph {
+  package struct Checkpoint {
+    package var root: ViewNode?
+    package var nodesByIdentity: [Identity: ViewNode]
+    package var rootEvaluator: (@MainActor () -> Void)?
+    package var evaluationRootIdentity: Identity?
+    package var viewportLifecycleNodesByIdentity: [Identity: LifecycleStateNode]
+    package var viewportLifecycleOrder: [Identity]
+    package var frameOrder: [Identity]
+    package var stableTaskCancelEvents: [LifecycleEvent]
+    package var stableTaskStartIdentities: [Identity]
+    package var structuralAppearEvents: [LifecycleEvent]
+    package var structuralTaskCancelEvents: [LifecycleEvent]
+    package var structuralDisappearEvents: [LifecycleEvent]
+    package var invalidatedIdentities: Set<Identity>
+    package var graphLocalDirtyIdentities: Set<Identity>
+    package var latestLifecycleEvents: [LifecycleEvent]
+    package var registrationAliasesByIdentity: [Identity: Set<Identity>]
+    package var registrationAliasTargets: [Identity: Identity]
+    package var registrationAliasDiagnostics: RegistrationAliasDiagnostics
+    package var stateSlotDependents: [StateSlotKey: Set<Identity>]
+    package var environmentDependents: [ObjectIdentifier: Set<Identity>]
+    package var observableDependents: [ObjectIdentifier: Set<Identity>]
+    package var currentFrameID: UInt64
+    package var liveIdentities: Set<Identity>
+    package var nodeCheckpoints: [Identity: ViewNode.Checkpoint]
+  }
+
+  package func makeCheckpoint() -> Checkpoint {
+    let nodeCheckpoints = Dictionary(
+      uniqueKeysWithValues: nodesByIdentity.map { identity, node in
+        (identity, node.makeCheckpoint())
+      }
+    )
+
+    return Checkpoint(
+      root: root,
+      nodesByIdentity: nodesByIdentity,
+      rootEvaluator: rootEvaluator,
+      evaluationRootIdentity: evaluationRootIdentity,
+      viewportLifecycleNodesByIdentity: viewportLifecycleNodesByIdentity,
+      viewportLifecycleOrder: viewportLifecycleOrder,
+      frameOrder: frameOrder,
+      stableTaskCancelEvents: stableTaskCancelEvents,
+      stableTaskStartIdentities: stableTaskStartIdentities,
+      structuralAppearEvents: structuralAppearEvents,
+      structuralTaskCancelEvents: structuralTaskCancelEvents,
+      structuralDisappearEvents: structuralDisappearEvents,
+      invalidatedIdentities: invalidatedIdentities,
+      graphLocalDirtyIdentities: graphLocalDirtyIdentities,
+      latestLifecycleEvents: latestLifecycleEvents,
+      registrationAliasesByIdentity: registrationAliasesByIdentity,
+      registrationAliasTargets: registrationAliasTargets,
+      registrationAliasDiagnostics: registrationAliasDiagnostics,
+      stateSlotDependents: stateSlotDependents,
+      environmentDependents: environmentDependents,
+      observableDependents: observableDependents,
+      currentFrameID: currentFrameID,
+      liveIdentities: liveIdentities,
+      nodeCheckpoints: nodeCheckpoints
+    )
+  }
+
+  package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    root = checkpoint.root
+    nodesByIdentity = checkpoint.nodesByIdentity
+    rootEvaluator = checkpoint.rootEvaluator
+    evaluationRootIdentity = checkpoint.evaluationRootIdentity
+    viewportLifecycleNodesByIdentity = checkpoint.viewportLifecycleNodesByIdentity
+    viewportLifecycleOrder = checkpoint.viewportLifecycleOrder
+    frameOrder = checkpoint.frameOrder
+    stableTaskCancelEvents = checkpoint.stableTaskCancelEvents
+    stableTaskStartIdentities = checkpoint.stableTaskStartIdentities
+    structuralAppearEvents = checkpoint.structuralAppearEvents
+    structuralTaskCancelEvents = checkpoint.structuralTaskCancelEvents
+    structuralDisappearEvents = checkpoint.structuralDisappearEvents
+    invalidatedIdentities = checkpoint.invalidatedIdentities
+    graphLocalDirtyIdentities = checkpoint.graphLocalDirtyIdentities
+    latestLifecycleEvents = checkpoint.latestLifecycleEvents
+    registrationAliasesByIdentity = checkpoint.registrationAliasesByIdentity
+    registrationAliasTargets = checkpoint.registrationAliasTargets
+    registrationAliasDiagnostics = checkpoint.registrationAliasDiagnostics
+    stateSlotDependents = checkpoint.stateSlotDependents
+    environmentDependents = checkpoint.environmentDependents
+    observableDependents = checkpoint.observableDependents
+    currentFrameID = checkpoint.currentFrameID
+    liveIdentities = checkpoint.liveIdentities
+
+    for (identity, node) in checkpoint.nodesByIdentity {
+      guard let nodeCheckpoint = checkpoint.nodeCheckpoints[identity] else {
+        continue
+      }
+      node.restoreCheckpoint(nodeCheckpoint)
+    }
+  }
+}
+
 package struct DirtyEvaluationPlan: Equatable, Sendable {
   package let frontierIdentities: [Identity]
 }

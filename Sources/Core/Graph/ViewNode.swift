@@ -659,6 +659,97 @@ package final class ViewNode {
   }
 }
 
+extension ViewNode {
+  package struct Checkpoint {
+    package var invalidator: (any Invalidating)?
+    package var ownerGraph: ViewGraph?
+    package var parent: ViewNode?
+    package var committed: ResolvedNode
+    package var isCommittedSnapshotFresh: Bool
+    package var children: [ViewNode]
+    package var stateSlots: [Int: AnyStateSlot]
+    package var dependencies: DependencySet
+    package var lifecycleState: NodeLifecycleState
+    package var registeredHandlers: NodeHandlers
+    package var isDirty: Bool
+    package var wasPresentAtFrameStart: Bool
+    package var wasVisitedThisFrame: Bool
+    package var previousChildrenIdentities: [Identity]
+    package var previousLifecycleMetadata: LifecycleMetadata
+    package var bodyStateSlotCount: Int?
+    package var currentBodyStateSlotCount: Int
+    package var pendingChangeHandlerIDs: [String]
+    package var dependencyTracker: DependencyTracker.Checkpoint
+    package var registrationCaptureDepth: Int
+    package var evaluationDepth: Int
+    package var hasCommittedPresence: Bool
+    package var nextChangeModifierOrdinal: Int
+    package var preparedFrameID: UInt64
+    package var visitedFrameID: UInt64
+    package var evaluator: (@MainActor () -> Void)?
+  }
+
+  package func makeCheckpoint() -> Checkpoint {
+    Checkpoint(
+      invalidator: invalidator,
+      ownerGraph: ownerGraph,
+      parent: parent,
+      committed: committed,
+      isCommittedSnapshotFresh: isCommittedSnapshotFresh,
+      children: children,
+      stateSlots: stateSlots,
+      dependencies: dependencies,
+      lifecycleState: lifecycleState,
+      registeredHandlers: registeredHandlers,
+      isDirty: isDirty,
+      wasPresentAtFrameStart: wasPresentAtFrameStart,
+      wasVisitedThisFrame: wasVisitedThisFrame,
+      previousChildrenIdentities: previousChildrenIdentities,
+      previousLifecycleMetadata: previousLifecycleMetadata,
+      bodyStateSlotCount: bodyStateSlotCount,
+      currentBodyStateSlotCount: currentBodyStateSlotCount,
+      pendingChangeHandlerIDs: pendingChangeHandlerIDs,
+      dependencyTracker: dependencyTracker.makeCheckpoint(),
+      registrationCaptureDepth: registrationCaptureDepth,
+      evaluationDepth: evaluationDepth,
+      hasCommittedPresence: hasCommittedPresence,
+      nextChangeModifierOrdinal: nextChangeModifierOrdinal,
+      preparedFrameID: preparedFrameID,
+      visitedFrameID: visitedFrameID,
+      evaluator: evaluator
+    )
+  }
+
+  package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    invalidator = checkpoint.invalidator
+    ownerGraph = checkpoint.ownerGraph
+    parent = checkpoint.parent
+    committed = checkpoint.committed
+    isCommittedSnapshotFresh = checkpoint.isCommittedSnapshotFresh
+    children = checkpoint.children
+    stateSlots = checkpoint.stateSlots
+    dependencies = checkpoint.dependencies
+    lifecycleState = checkpoint.lifecycleState
+    registeredHandlers = checkpoint.registeredHandlers
+    isDirty = checkpoint.isDirty
+    wasPresentAtFrameStart = checkpoint.wasPresentAtFrameStart
+    wasVisitedThisFrame = checkpoint.wasVisitedThisFrame
+    previousChildrenIdentities = checkpoint.previousChildrenIdentities
+    previousLifecycleMetadata = checkpoint.previousLifecycleMetadata
+    bodyStateSlotCount = checkpoint.bodyStateSlotCount
+    currentBodyStateSlotCount = checkpoint.currentBodyStateSlotCount
+    pendingChangeHandlerIDs = checkpoint.pendingChangeHandlerIDs
+    dependencyTracker.restoreCheckpoint(checkpoint.dependencyTracker)
+    registrationCaptureDepth = checkpoint.registrationCaptureDepth
+    evaluationDepth = checkpoint.evaluationDepth
+    hasCommittedPresence = checkpoint.hasCommittedPresence
+    nextChangeModifierOrdinal = checkpoint.nextChangeModifierOrdinal
+    preparedFrameID = checkpoint.preparedFrameID
+    visitedFrameID = checkpoint.visitedFrameID
+    evaluator = checkpoint.evaluator
+  }
+}
+
 // MARK: - Committed-field forwarding accessors
 //
 // Prior to Item 6 of `docs/proposals/ARCHITECTURE_NOTES.md` these were ~14 stored mirror
