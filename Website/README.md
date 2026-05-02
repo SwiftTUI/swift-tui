@@ -20,6 +20,13 @@ isolation propagates from the COOP/COEP headers in `public/_headers`.
 
 ```sh
 bun install
-bun run dev      # http://localhost:4321
-bun run build    # outputs dist/
+bun run dev            # http://localhost:4321
+bun run build:wasm     # release WebExample, q11 Brotli wasm
+bun run build:wasm:dev # debug WebExample, q9 Brotli wasm
+bun run build:full     # release WebExample + Astro dist/
+bun run build:dev      # debug WebExample + Astro dist/
 ```
+
+From the repo root, `bun run build:wasm`, `bun run build:wasm:dev`,
+`bun run build:website`, and `bun run build:website:dev` run the same Website
+scripts.

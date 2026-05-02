@@ -1,11 +1,16 @@
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { optimizePackagedWasm } from "./optimizePackagedWasm.ts";
-import { resolveSwiftArtifacts, type SwiftArtifactPaths } from "./resolveSwiftArtifacts.ts";
+import {
+  resolveSwiftArtifacts,
+  type SwiftArtifactPaths,
+  type WasmBuildConfiguration,
+} from "./resolveSwiftArtifacts.ts";
 import { stripPackagedWasm } from "./stripPackagedWasm.ts";
 import { formatWasmTypeDiagnostics } from "./wasmTypeDiagnostics.ts";
 
 export interface BuildAppWasmOptions {
+  configuration?: WasmBuildConfiguration;
   packagePath: string;
   outputDirectory: string;
   product: string;
@@ -15,6 +20,7 @@ export async function buildAppWasm(
   options: BuildAppWasmOptions
 ): Promise<SwiftArtifactPaths> {
   const artifacts = await resolveSwiftArtifacts({
+    configuration: options.configuration,
     packagePath: options.packagePath,
     product: options.product,
   });

@@ -3,9 +3,12 @@ import { runCommand } from "./runCommand.ts";
 import { swiftCommandPrefix } from "./swiftCommandPrefix.ts";
 
 export interface ResolveSwiftArtifactsOptions {
+  configuration?: WasmBuildConfiguration;
   packagePath: string;
   product: string;
 }
+
+export type WasmBuildConfiguration = "debug" | "release";
 
 export interface SwiftArtifactPaths {
   binPath: string;
@@ -24,6 +27,7 @@ export const requiredWasmSwiftFlags = [
 export async function resolveSwiftArtifacts(
   options: ResolveSwiftArtifactsOptions
 ): Promise<SwiftArtifactPaths> {
+  const configuration = options.configuration ?? "release";
   const swiftlyWorkingDirectory = await resolveSwiftlyWorkingDirectory(options.packagePath);
   const environment = {
     ...process.env
@@ -41,8 +45,8 @@ export async function resolveSwiftArtifacts(
     "--swift-sdk",
     "swift-6.3.1-RELEASE_wasm",
     "-c",
-    "release",
-    ...requiredWasmSwiftFlags,
+    configuration,
+    ...requiredSwiftFlags(configuration),
     "-Xlinker",
     "--initial-memory=536870912",
     "-Xlinker",
@@ -53,7 +57,9 @@ export async function resolveSwiftArtifacts(
     "stack-size=1048576",
   ];
 
-  confirmRequiredWasmFlags(swiftBuildArgs);
+  if (configuration === "release") {
+    confirmRequiredWasmFlags(swiftBuildArgs);
+  }
 
   const buildCommand = [
     ...swiftCommandPrefix(),
@@ -68,6 +74,7 @@ export async function resolveSwiftArtifacts(
   ];
 
   logWasmBuildConfiguration({
+    configuration,
     packagePath: options.packagePath,
     product: options.product,
     swiftlyWorkingDirectory,
@@ -93,6 +100,7 @@ export async function resolveSwiftArtifacts(
 }
 
 interface WasmBuildConfigurationLog {
+  configuration?: WasmBuildConfiguration;
   packagePath: string;
   product: string;
   swiftlyWorkingDirectory: string;
@@ -114,6 +122,15 @@ function confirmRequiredWasmFlags(args: readonly string[]): void {
   );
 }
 
+function requiredSwiftFlags(configuration: WasmBuildConfiguration): readonly string[] {
+  switch (configuration) {
+    case "debug":
+      return [];
+    case "release":
+      return requiredWasmSwiftFlags;
+  }
+}
+
 function logWasmBuildConfiguration(config: WasmBuildConfigurationLog): void {
   for (const line of wasmBuildConfigurationLogLines(config)) {
     console.error(line);
@@ -123,8 +140,10 @@ function logWasmBuildConfiguration(config: WasmBuildConfigurationLog): void {
 export function wasmBuildConfigurationLogLines(
   config: WasmBuildConfigurationLog
 ): string[] {
+  const configuration = config.configuration ?? "release";
   return [
-    "WASM_REQUIRED_FLAGS_CONFIRMED=true",
+    `WASM_BUILD_CONFIGURATION_NAME=${configuration}`,
+    `WASM_REQUIRED_FLAGS_CONFIRMED=${configuration === "release" ? "true" : "skipped"}`,
     `WASM_REQUIRED_FLAGS=${requiredWasmSwiftFlags.join(" ")}`,
     `WASM_REQUIRED_FLAGS_JSON=${JSON.stringify([...requiredWasmSwiftFlags])}`,
     `WASM_BUILD_COMMAND=${formatCommandForLogs(config.buildCommand)}`,
@@ -134,6 +153,7 @@ export function wasmBuildConfigurationLogLines(
     `WASM_BUILD_CONFIGURATION ${JSON.stringify({
       packagePath: config.packagePath,
       product: config.product,
+      configuration,
       swiftlyWorkingDirectory: config.swiftlyWorkingDirectory,
       requiredFlags: [...requiredWasmSwiftFlags],
       buildCommand: formatCommandForLogs(config.buildCommand),

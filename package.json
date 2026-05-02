@@ -2,6 +2,10 @@
   "name": "swift-terminal-ui-workspace",
   "private": true,
   "scripts": {
+    "build:wasm": "bun run --cwd Website build:wasm",
+    "build:wasm:dev": "bun run --cwd Website build:wasm:dev",
+    "build:website": "bun run --cwd Website build:full",
+    "build:website:dev": "bun run --cwd Website build:dev",
     "test": "sh ./Scripts/test_all.sh",
     "test:all": "sh ./Scripts/test_all.sh"
   },
