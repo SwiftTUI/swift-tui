@@ -519,6 +519,147 @@ struct ViewGraphTests {
     )
     #expect(dropCounter.count == 1)
   }
+
+  @Test("checkpoint restore reverts command registration changes")
+  func checkpointRestoreRevertsCommandRegistrationChanges() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let childIdentity = testIdentity("Root", "Child")
+    let originalBinding = KeyBinding(key: .character("o"), modifiers: .ctrl)
+    let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
+    let originalCounter = RegistrationCounter()
+    let draftCounter = RegistrationCounter()
+
+    seedCommandGraph(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      childIdentity: childIdentity,
+      binding: originalBinding,
+      description: "Original",
+      counter: originalCounter
+    )
+    let checkpoint = graph.makeCheckpoint()
+
+    graph.beginFrame()
+    let childNode = graph.beginEvaluation(identity: childIdentity, invalidator: nil)
+    childNode.recordCommandRegistration(
+      commandSnapshot(
+        identity: childIdentity,
+        binding: draftBinding,
+        description: "Draft",
+        counter: draftCounter
+      )
+    )
+    graph.finishEvaluation(
+      childNode,
+      resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
+      accessedStateSlots: 0
+    )
+
+    graph.restoreCheckpoint(checkpoint)
+
+    let snapshot = graph.snapshot(rootIdentity: rootIdentity)
+    let registrations = RuntimeRegistrationSet.scratch()
+    graph.restoreRuntimeRegistrations(
+      for: snapshot,
+      into: registrations
+    )
+
+    #expect(
+      registrations.commandRegistry?.keyCommand(
+        at: childIdentity,
+        matching: originalBinding
+      ) != nil
+    )
+    #expect(
+      registrations.commandRegistry?.keyCommand(
+        at: childIdentity,
+        matching: draftBinding
+      ) == nil
+    )
+    #expect(
+      registrations.commandRegistry?.dispatch(
+        key: originalBinding,
+        along: [rootIdentity, childIdentity]
+      ) == true
+    )
+    #expect(originalCounter.count == 1)
+    #expect(draftCounter.count == 0)
+  }
+
+  @Test("checkpoint restore preserves alias registration restore")
+  func checkpointRestorePreservesAliasRegistrationRestore() {
+    let graph = ViewGraph()
+    let rootIdentity = testIdentity("Root")
+    let targetIdentity = testIdentity("Root", "Target")
+    let aliasIdentity = testIdentity("Root", "Alias")
+    let originalBinding = KeyBinding(key: .character("o"), modifiers: .ctrl)
+    let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
+    let originalCounter = RegistrationCounter()
+    let draftCounter = RegistrationCounter()
+
+    seedAliasCommandGraph(
+      graph: graph,
+      rootIdentity: rootIdentity,
+      targetIdentity: targetIdentity,
+      aliasIdentity: aliasIdentity,
+      binding: originalBinding,
+      description: "Original",
+      counter: originalCounter
+    )
+    let checkpoint = graph.makeCheckpoint()
+
+    graph.beginFrame()
+    let aliasNode = graph.beginEvaluation(identity: aliasIdentity, invalidator: nil)
+    aliasNode.recordCommandRegistration(
+      commandSnapshot(
+        identity: aliasIdentity,
+        binding: draftBinding,
+        description: "Draft",
+        counter: draftCounter
+      )
+    )
+    graph.finishEvaluation(
+      aliasNode,
+      resolved: ResolvedNode(identity: aliasIdentity, kind: .view("Alias")),
+      accessedStateSlots: 0
+    )
+    graph.recordRegistrationAlias(
+      from: aliasIdentity,
+      to: targetIdentity,
+      resolvedKind: .view("Target")
+    )
+
+    graph.restoreCheckpoint(checkpoint)
+
+    let snapshot = graph.snapshot(rootIdentity: rootIdentity)
+    let registrations = RuntimeRegistrationSet.scratch()
+    graph.restoreRuntimeRegistrations(
+      for: snapshot,
+      into: registrations
+    )
+
+    #expect(
+      registrations.commandRegistry?.keyCommand(
+        at: aliasIdentity,
+        matching: originalBinding
+      ) != nil
+    )
+    #expect(
+      registrations.commandRegistry?.keyCommand(
+        at: aliasIdentity,
+        matching: draftBinding
+      ) == nil
+    )
+    #expect(
+      registrations.commandRegistry?.dispatch(
+        key: originalBinding,
+        along: [rootIdentity, aliasIdentity]
+      ) == true
+    )
+    #expect(originalCounter.count == 1)
+    #expect(draftCounter.count == 0)
+  }
 }
 
 private enum DependencyKeyA {}
@@ -533,6 +674,117 @@ private final class RegistrationCounter {
   func increment() {
     count += 1
   }
+}
+
+@MainActor
+private func commandSnapshot(
+  identity: Identity,
+  binding: KeyBinding,
+  description: String,
+  counter: RegistrationCounter
+) -> CommandRegistrySnapshot {
+  CommandRegistrySnapshot(
+    keyCommandsByScope: [
+      identity: [
+        binding: RegisteredKeyCommand(
+          binding: binding,
+          description: description,
+          isEnabled: true,
+          action: { counter.increment() }
+        )
+      ]
+    ]
+  )
+}
+
+@MainActor
+private func seedCommandGraph(
+  graph: ViewGraph,
+  rootIdentity: Identity,
+  childIdentity: Identity,
+  binding: KeyBinding,
+  description: String,
+  counter: RegistrationCounter
+) {
+  graph.beginFrame()
+  let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+  let childNode = graph.beginEvaluation(identity: childIdentity, invalidator: nil)
+  childNode.recordCommandRegistration(
+    commandSnapshot(
+      identity: childIdentity,
+      binding: binding,
+      description: description,
+      counter: counter
+    )
+  )
+  graph.finishEvaluation(
+    childNode,
+    resolved: ResolvedNode(identity: childIdentity, kind: .view("Child")),
+    accessedStateSlots: 0
+  )
+  graph.finishEvaluation(
+    rootNode,
+    resolved: ResolvedNode(
+      identity: rootIdentity,
+      kind: .root,
+      children: [
+        ResolvedNode(identity: childIdentity, kind: .view("Child"))
+      ]
+    ),
+    accessedStateSlots: 0
+  )
+  _ = graph.snapshot(rootIdentity: rootIdentity)
+}
+
+@MainActor
+private func seedAliasCommandGraph(
+  graph: ViewGraph,
+  rootIdentity: Identity,
+  targetIdentity: Identity,
+  aliasIdentity: Identity,
+  binding: KeyBinding,
+  description: String,
+  counter: RegistrationCounter
+) {
+  graph.beginFrame()
+  let rootNode = graph.beginEvaluation(identity: rootIdentity, invalidator: nil)
+  let targetNode = graph.beginEvaluation(identity: targetIdentity, invalidator: nil)
+  graph.finishEvaluation(
+    targetNode,
+    resolved: ResolvedNode(identity: targetIdentity, kind: .view("Target")),
+    accessedStateSlots: 0
+  )
+  let aliasNode = graph.beginEvaluation(identity: aliasIdentity, invalidator: nil)
+  aliasNode.recordCommandRegistration(
+    commandSnapshot(
+      identity: aliasIdentity,
+      binding: binding,
+      description: description,
+      counter: counter
+    )
+  )
+  graph.finishEvaluation(
+    aliasNode,
+    resolved: ResolvedNode(identity: aliasIdentity, kind: .view("Alias")),
+    accessedStateSlots: 0
+  )
+  graph.recordRegistrationAlias(
+    from: aliasIdentity,
+    to: targetIdentity,
+    resolvedKind: .view("Target")
+  )
+  graph.finishEvaluation(
+    rootNode,
+    resolved: ResolvedNode(
+      identity: rootIdentity,
+      kind: .root,
+      children: [
+        ResolvedNode(identity: targetIdentity, kind: .view("Target"))
+      ]
+    ),
+    accessedStateSlots: 0
+  )
+  _ = graph.snapshot(rootIdentity: rootIdentity)
 }
 
 @MainActor

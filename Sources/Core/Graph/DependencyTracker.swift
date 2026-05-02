@@ -23,3 +23,17 @@ package final class DependencyTracker {
     return currentDependencies
   }
 }
+
+extension DependencyTracker {
+  package struct Checkpoint {
+    package var currentDependencies: DependencySet
+  }
+
+  package func makeCheckpoint() -> Checkpoint {
+    Checkpoint(currentDependencies: currentDependencies)
+  }
+
+  package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    currentDependencies = checkpoint.currentDependencies
+  }
+}
