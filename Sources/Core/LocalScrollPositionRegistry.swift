@@ -119,6 +119,10 @@ package final class LocalScrollPositionRegistry: Equatable {
     }
   }
 
+  package func snapshot() -> [ScrollPositionRegistrationSnapshot] {
+    Array(registrations.values)
+  }
+
   private func adjustedOffset(
     _ currentOffset: ScrollOffset,
     revealing focusRect: CellRect,

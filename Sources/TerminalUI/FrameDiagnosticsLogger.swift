@@ -58,6 +58,12 @@ public struct FrameDiagnosticRecord: Sendable {
   public var newestDesiredAtTailStart: UInt64?
   public var newestDesiredAtTailResult: UInt64?
   public var dropEligibilityBlockers: Set<FrameDropEligibility.Blocker>
+  public var dropDecision: String
+  public var dropGeneration: UInt64?
+  public var newestDesiredAtDrop: UInt64?
+  public var dropReconciliationMode: String
+  public var dropReconciliationEffects: String
+  public var presentationRecoveryAfterDrop: Bool
   public var inputEventsQueuedDuringRenderSuspension: Int
   public var presentationStrategy: String
   public var presentationBytesWritten: Int
@@ -222,6 +228,12 @@ public final class FrameDiagnosticsLogger {
       record.newestDesiredAtTailStart.map(String.init) ?? "-",
       record.newestDesiredAtTailResult.map(String.init) ?? "-",
       formatDropBlockers(record.dropEligibilityBlockers),
+      record.dropDecision,
+      record.dropGeneration.map(String.init) ?? "-",
+      record.newestDesiredAtDrop.map(String.init) ?? "-",
+      record.dropReconciliationMode,
+      record.dropReconciliationEffects,
+      record.presentationRecoveryAfterDrop ? "1" : "0",
       String(record.inputEventsQueuedDuringRenderSuspension),
       // presentation
       record.presentationStrategy,
@@ -312,6 +324,12 @@ public final class FrameDiagnosticsLogger {
       "newest_desired_at_tail_start",
       "newest_desired_at_tail_result",
       "drop_blockers",
+      "drop_decision",
+      "drop_generation",
+      "newest_desired_at_drop",
+      "drop_reconciliation_mode",
+      "drop_reconciliation_effects",
+      "presentation_recovery_after_drop",
       "input_events_during_render_suspension",
       "present_strategy",
       "present_ms",

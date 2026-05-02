@@ -191,4 +191,41 @@ package struct RuntimeRegistrationSet {
       }
     )
   }
+
+  package func frameDropEligibilityBlockers() -> Set<FrameDropEligibility.Blocker> {
+    var blockers: Set<FrameDropEligibility.Blocker> = []
+    if actionRegistry?.snapshot().isEmpty == false
+      || keyHandlerRegistry?.snapshot().isEmpty == false
+      || terminationRegistry?.snapshot().isEmpty == false
+      || pointerHandlerRegistry?.snapshot().isEmpty == false
+      || pointerHandlerRegistry?.snapshotHover().isEmpty == false
+      || gestureRegistry?.snapshot().isEmpty == false
+      || commandRegistry?.snapshot().isEmpty == false
+      || dropDestinationRegistry?.snapshot().isEmpty == false
+    {
+      blockers.insert(.handlerInstallations)
+    }
+    if gestureStateRegistry?.snapshot().isEmpty == false {
+      blockers.insert(.handlerInstallations)
+    }
+    if focusBindingRegistry?.snapshot().isEmpty == false {
+      blockers.insert(.focusBindingSync)
+    }
+    if focusedValuesRegistry?.snapshot().isEmpty == false {
+      blockers.insert(.focusedValueSync)
+    }
+    if scrollPositionRegistry?.snapshot().isEmpty == false {
+      blockers.insert(.scrollSync)
+    }
+    if lifecycleRegistry?.snapshot().isEmpty == false {
+      blockers.insert(.lifecycleChange)
+    }
+    if taskRegistry?.snapshot().isEmpty == false {
+      blockers.insert(.taskStart)
+    }
+    if preferenceObservationRegistry?.snapshot().isEmpty == false {
+      blockers.insert(.preferenceObservationDelta)
+    }
+    return blockers
+  }
 }

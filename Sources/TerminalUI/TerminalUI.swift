@@ -133,13 +133,16 @@ package enum FrameTailJobState: String, Sendable {
   case started
   case completed
   case cancelledBeforeStart = "cancelled_before_start"
+  case droppedCompleted = "dropped_completed"
 }
 
 package struct CancellableRenderOutcome {
   package var artifacts: FrameArtifacts?
   package var renderGeneration: RenderGeneration
+  package var newestDesiredGeneration: RenderGeneration?
   package var tailJobState: FrameTailJobState
   package var tailCancelReason: String?
+  package var completedFrameDropDecision: CompletedFrameDropDecision?
 }
 
 private final class FrameTailJobCancellationToken: Sendable {
@@ -167,7 +170,7 @@ private final class FrameTailJobCancellationToken: Sendable {
         return true
       case .cancelledBeforeStart:
         return false
-      case .started, .completed:
+      case .started, .completed, .droppedCompleted:
         return true
       }
     }
@@ -203,6 +206,18 @@ private struct AsyncFrameTailDraftOutput {
   var layout: FrameTailLayoutOutput
   var tail: FrameTailOutput
   var renderSuspensionDuration: Duration
+}
+
+private struct CompletedFrameCandidate {
+  var draft: FrameHeadDraft
+  var tailOutput: AsyncFrameTailDraftOutput
+  var resolved: ResolvedNode
+  var workerTimings: FrameWorkerTimings?
+  var collectsDiagnostics: Bool
+  var previewArtifacts: FrameArtifacts
+  var eligibility: FrameDropEligibility
+  var newestDesiredGeneration: RenderGeneration
+  var dropDecision: CompletedFrameDropDecision
 }
 
 private enum CancellableFrameTailResult {
@@ -1157,6 +1172,7 @@ public struct DefaultRenderer {
   private let presentationHostState: PresentationHostState
   private let animationController: AnimationController
   private let renderGenerationSequencer: RenderGenerationSequencer
+  private let completedFramePolicy: CompletedFramePolicy
 
   private let frameTailRenderer: FrameTailRenderer
 
@@ -1182,6 +1198,7 @@ public struct DefaultRenderer {
     presentationHostState = .init()
     animationController = .init()
     renderGenerationSequencer = .init()
+    completedFramePolicy = .dropCompletedVisualOnly
     frameTailRenderer = .init(
       layoutEngine: layoutEngine,
       semanticExtractor: semanticExtractor,
@@ -1260,6 +1277,43 @@ public struct DefaultRenderer {
   }
 
   @MainActor
+  package func discardPreparedFrameTailForReconciliationTesting(
+    _ draft: FrameHeadDraft,
+    decision: CompletedFrameDropDecision
+  ) async -> Bool {
+    guard decision.canSkipCompletedFrame else {
+      return false
+    }
+
+    let tailOutput = await renderFrameTailAsync(draft)
+    let candidate = makeCompletedFrameCandidate(
+      draft: draft,
+      tailOutput: tailOutput,
+      newestDesiredGeneration: draft.renderGeneration,
+      collectsDiagnostics: true
+    )
+    discardCompletedFrameCandidate(
+      candidate,
+      reconciliation: decision.reconciliation
+    )
+    return true
+  }
+
+  @MainActor
+  package func previewCompletedFrameCandidateForTesting(
+    _ draft: FrameHeadDraft
+  ) async -> CompletedFrameDropDecision {
+    let tailOutput = await renderFrameTailAsync(draft)
+    let candidate = makeCompletedFrameCandidate(
+      draft: draft,
+      tailOutput: tailOutput,
+      newestDesiredGeneration: draft.renderGeneration,
+      collectsDiagnostics: true
+    )
+    return candidate.dropDecision
+  }
+
+  @MainActor
   package func runFrameTailLayoutWorkerJobForCancellationTesting(
     _ operation: @escaping @Sendable () -> Void
   ) async {
@@ -1305,6 +1359,11 @@ public struct DefaultRenderer {
     context: ResolveContext,
     proposal: ProposedSize,
     collectsDiagnostics: Bool,
+    newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration? = { nil },
+    completedFrameAdditionalBlockers:
+      @escaping @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = {
+        _ in []
+      },
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderOutcome {
     let draft = prepareFrameHead(
@@ -1322,19 +1381,42 @@ public struct DefaultRenderer {
       return CancellableRenderOutcome(
         artifacts: nil,
         renderGeneration: draft.renderGeneration,
+        newestDesiredGeneration: nil,
         tailJobState: .cancelledBeforeStart,
-        tailCancelReason: "newer_render_intent"
+        tailCancelReason: "newer_render_intent",
+        completedFrameDropDecision: nil
       )
     case .output(let tailOutput):
+      let newestDesiredGeneration = newestDesiredGeneration() ?? draft.renderGeneration
+      let candidate = makeCompletedFrameCandidate(
+        draft: draft,
+        tailOutput: tailOutput,
+        newestDesiredGeneration: newestDesiredGeneration,
+        collectsDiagnostics: collectsDiagnostics,
+        additionalBlockers: completedFrameAdditionalBlockers
+      )
+      if candidate.dropDecision.canSkipCompletedFrame {
+        discardCompletedFrameCandidate(
+          candidate,
+          reconciliation: candidate.dropDecision.reconciliation
+        )
+        return CancellableRenderOutcome(
+          artifacts: nil,
+          renderGeneration: draft.renderGeneration,
+          newestDesiredGeneration: newestDesiredGeneration,
+          tailJobState: .droppedCompleted,
+          tailCancelReason: nil,
+          completedFrameDropDecision: candidate.dropDecision
+        )
+      }
+      let artifacts = commitCompletedFrameCandidate(candidate)
       return CancellableRenderOutcome(
-        artifacts: finishFrame(
-          draft: draft,
-          tailOutput: tailOutput,
-          collectsDiagnostics: collectsDiagnostics
-        ),
+        artifacts: artifacts,
         renderGeneration: draft.renderGeneration,
+        newestDesiredGeneration: newestDesiredGeneration,
         tailJobState: .completed,
-        tailCancelReason: nil
+        tailCancelReason: nil,
+        completedFrameDropDecision: candidate.dropDecision
       )
     }
   }
@@ -1519,6 +1601,9 @@ public struct DefaultRenderer {
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
     )
+    let dropEligibilityBlockers = frameTailCommitDropBlockers(
+      workerCustomLayoutCacheUpdates: tailLayout.workerCustomLayoutCacheUpdates
+    )
     var diagnostics: FrameDiagnostics
     if collectsDiagnostics {
       let phaseTimings = FramePhaseTimings(
@@ -1555,7 +1640,8 @@ public struct DefaultRenderer {
         ),
         workerTimings: workerTimings,
         mainActorTimings: mainActorTimings,
-        measurementCache: tail.diagnostics.measurementCache
+        measurementCache: tail.diagnostics.measurementCache,
+        dropEligibilityBlockers: dropEligibilityBlockers
       )
     } else {
       diagnostics = .init()
@@ -1595,11 +1681,13 @@ public struct DefaultRenderer {
       collectsDiagnostics: collectsDiagnostics
     )
     let tailOutput = await renderFrameTailAsync(draft)
-    return finishFrame(
+    let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
+      newestDesiredGeneration: draft.renderGeneration,
       collectsDiagnostics: collectsDiagnostics
     )
+    return commitCompletedFrameCandidate(candidate)
   }
 
   @MainActor
@@ -1896,34 +1984,123 @@ public struct DefaultRenderer {
   }
 
   @MainActor
-  private func finishFrame(
+  private func makeCompletedFrameCandidate(
     draft: FrameHeadDraft,
     tailOutput: AsyncFrameTailDraftOutput,
-    collectsDiagnostics: Bool
-  ) -> FrameArtifacts {
-    let layout = tailOutput.layout
-    let tail = tailOutput.tail
-    let resolved = draft.resolved.applyingLayoutDependentRealizations(
-      draft.frameTailInput.layoutPassContext.layoutDependentRealizationsByIdentity
+    newestDesiredGeneration: RenderGeneration,
+    collectsDiagnostics: Bool,
+    additionalBlockers:
+      @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
+  ) -> CompletedFrameCandidate {
+    let resolved = completedFrameResolvedTree(
+      draft: draft,
+      tailOutput: tailOutput
     )
-    var workerTimings = tail.diagnostics.workerTimings
-    if var timings = workerTimings,
-      let clock = draft.clock,
-      let workerCompletedAt = tail.workerCompletedAt
-    {
-      timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
-      workerTimings = timings
-    }
+    let workerTimings = completedFrameWorkerTimings(
+      draft: draft,
+      tailOutput: tailOutput
+    )
+    let (commit, commitDuration) = previewCompletedFrameCommit(
+      draft: draft,
+      tailOutput: tailOutput,
+      resolved: resolved
+    )
+    let artifacts = makeCompletedFrameArtifacts(
+      draft: draft,
+      tailOutput: tailOutput,
+      resolved: resolved,
+      commit: commit,
+      commitDuration: commitDuration,
+      workerTimings: workerTimings,
+      collectsDiagnostics: collectsDiagnostics
+    )
+    let eligibility = completedFrameEligibility(
+      artifacts: artifacts,
+      draft: draft,
+      additionalBlockers: additionalBlockers(artifacts)
+    )
+    return CompletedFrameCandidate(
+      draft: draft,
+      tailOutput: tailOutput,
+      resolved: resolved,
+      workerTimings: workerTimings,
+      collectsDiagnostics: collectsDiagnostics,
+      previewArtifacts: artifacts,
+      eligibility: eligibility,
+      newestDesiredGeneration: newestDesiredGeneration,
+      dropDecision: completedFramePolicy.decide(
+        candidateGeneration: draft.renderGeneration,
+        newestDesiredGeneration: newestDesiredGeneration,
+        eligibility: eligibility
+      )
+    )
+  }
+
+  @MainActor
+  private func commitCompletedFrameCandidate(
+    _ candidate: CompletedFrameCandidate
+  ) -> FrameArtifacts {
+    let layout = candidate.tailOutput.layout
+    let tail = candidate.tailOutput.tail
     var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
-    let (commit, commitDuration) = measurePhase(clock: draft.clock) {
+    let (commit, commitDuration) = measurePhase(clock: candidate.draft.clock) {
+      let lifecycleEvents = viewGraph.finalizeFrame(
+        rootIdentity: candidate.draft.resolveContext.identity,
+        resolved: candidate.resolved,
+        placed: tail.placed
+      )
+      runtimeRegistrationDiagnostics = candidate.draft.registrationDraft.commitRestoring(
+        from: viewGraph,
+        resolved: candidate.resolved
+      )
+      return commitPlanner.plan(
+        resolved: candidate.resolved,
+        placed: tail.placed,
+        semantics: tail.semantics,
+        transaction: candidate.draft.frameContext.transaction,
+        lifecycleEvents: lifecycleEvents
+      )
+    }
+    animationController.commitFrameHeadTransaction(candidate.draft.animationCheckpoint)
+    applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
+    frameTailRenderer.pruneMeasurementCache(
+      keeping: viewGraph.liveIdentitySnapshot()
+    )
+    let artifacts = makeCompletedFrameArtifacts(
+      draft: candidate.draft,
+      tailOutput: candidate.tailOutput,
+      resolved: candidate.resolved,
+      commit: commit,
+      commitDuration: commitDuration,
+      workerTimings: candidate.workerTimings,
+      collectsDiagnostics: candidate.collectsDiagnostics,
+      runtimeRegistrationDiagnostics: runtimeRegistrationDiagnostics
+    )
+
+    frameTailRenderer.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: tail.baselinePlaced
+    )
+    return artifacts
+  }
+
+  @MainActor
+  private func previewCompletedFrameCommit(
+    draft: FrameHeadDraft,
+    tailOutput: AsyncFrameTailDraftOutput,
+    resolved: ResolvedNode
+  ) -> (commit: CommitPlan, duration: Duration) {
+    let tail = tailOutput.tail
+    let checkpoint = viewGraph.makeCheckpoint()
+    defer {
+      viewGraph.restoreCheckpoint(checkpoint)
+    }
+
+    return measurePhase(clock: draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: draft.resolveContext.identity,
         resolved: resolved,
         placed: tail.placed
-      )
-      runtimeRegistrationDiagnostics = draft.registrationDraft.commitRestoring(
-        from: viewGraph,
-        resolved: resolved
       )
       return commitPlanner.plan(
         resolved: resolved,
@@ -1933,10 +2110,46 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
-    animationController.commitFrameHeadTransaction(draft.animationCheckpoint)
-    applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
-    frameTailRenderer.pruneMeasurementCache(
-      keeping: viewGraph.liveIdentitySnapshot()
+  }
+
+  private func completedFrameResolvedTree(
+    draft: FrameHeadDraft,
+    tailOutput _: AsyncFrameTailDraftOutput
+  ) -> ResolvedNode {
+    draft.resolved.applyingLayoutDependentRealizations(
+      draft.frameTailInput.layoutPassContext.layoutDependentRealizationsByIdentity
+    )
+  }
+
+  private func completedFrameWorkerTimings(
+    draft: FrameHeadDraft,
+    tailOutput: AsyncFrameTailDraftOutput
+  ) -> FrameWorkerTimings? {
+    var workerTimings = tailOutput.tail.diagnostics.workerTimings
+    if var timings = workerTimings,
+      let clock = draft.clock,
+      let workerCompletedAt = tailOutput.tail.workerCompletedAt
+    {
+      timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
+      workerTimings = timings
+    }
+    return workerTimings
+  }
+
+  private func makeCompletedFrameArtifacts(
+    draft: FrameHeadDraft,
+    tailOutput: AsyncFrameTailDraftOutput,
+    resolved: ResolvedNode,
+    commit: CommitPlan,
+    commitDuration: Duration,
+    workerTimings: FrameWorkerTimings?,
+    collectsDiagnostics: Bool,
+    runtimeRegistrationDiagnostics: RuntimeRegistrationDiagnostics = .init()
+  ) -> FrameArtifacts {
+    let layout = tailOutput.layout
+    let tail = tailOutput.tail
+    let dropEligibilityBlockers = frameTailCommitDropBlockers(
+      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
     )
     var diagnostics: FrameDiagnostics
     if collectsDiagnostics {
@@ -1978,7 +2191,8 @@ public struct DefaultRenderer {
         ),
         workerTimings: workerTimings,
         mainActorTimings: mainActorTimings,
-        measurementCache: tail.diagnostics.measurementCache
+        measurementCache: tail.diagnostics.measurementCache,
+        dropEligibilityBlockers: dropEligibilityBlockers
       )
     } else {
       diagnostics = .init()
@@ -1997,11 +2211,44 @@ public struct DefaultRenderer {
       diagnostics: diagnostics
     )
 
-    frameTailRenderer.storeCommittedFrame(
-      artifacts,
-      baselinePlacedTree: tail.baselinePlaced
-    )
     return artifacts
+  }
+
+  @MainActor
+  private func completedFrameEligibility(
+    artifacts: FrameArtifacts,
+    draft: FrameHeadDraft,
+    additionalBlockers: Set<FrameDropEligibility.Blocker>
+  ) -> FrameDropEligibility {
+    var classificationArtifacts = artifacts
+    classificationArtifacts.diagnostics.dropEligibilityBlockers.subtract([
+      .retainedLayoutBaseline,
+      .retainedRasterBaseline,
+    ])
+    return FrameDropEligibility.classify(
+      FrameDropEligibility.Candidate(
+        artifacts: classificationArtifacts,
+        additionalBlockers: additionalBlockers.union(
+          frameHeadRegistrationDropBlockers(draft)
+        ),
+        hasCompleteBarrierSignals: true
+      ))
+  }
+
+  @MainActor
+  private func frameHeadRegistrationDropBlockers(
+    _ draft: FrameHeadDraft
+  ) -> Set<FrameDropEligibility.Blocker> {
+    draft.registrationDraft.draftDropEligibilityBlockers()
+  }
+
+  @MainActor
+  private func discardCompletedFrameCandidate(
+    _ candidate: CompletedFrameCandidate,
+    reconciliation: SkippedFrameReconciliation
+  ) {
+    precondition(reconciliation.isAvailableToRuntimePolicy)
+    abortPreparedFrameHead(candidate.draft)
   }
 
   @MainActor
@@ -2011,6 +2258,19 @@ public struct DefaultRenderer {
     for update in updates {
       update.apply()
     }
+  }
+
+  private func frameTailCommitDropBlockers(
+    workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
+  ) -> Set<FrameDropEligibility.Blocker> {
+    var blockers: Set<FrameDropEligibility.Blocker> = [
+      .retainedLayoutBaseline,
+      .retainedRasterBaseline,
+    ]
+    if !workerCustomLayoutCacheUpdates.isEmpty {
+      blockers.insert(.workerCustomLayoutCacheUpdate)
+    }
+    return blockers
   }
 
   @MainActor

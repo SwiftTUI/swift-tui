@@ -2,33 +2,36 @@
 
 ## Status
 
-Stages 1 and 2 are implemented. The observational drop-blocker classifier
-described in Stage 4 is also implemented, but it is diagnostic only for
-completed-frame drops. Scheduler Stages 3A through 3D are implemented. The first
-Stage 3C, abortable prepared frame heads, was attempted and reverted; see
+Stages 1 through 6 are implemented. The Stage 4 drop-blocker classifier exposes
+explicit runtime signals for the formerly unobservable blocker families, Stage 5
+added skipped-frame reconciliation scaffolding, and Stage 6 now drops stale
+completed visual-only candidates through `.emptyVisualOnly` reconciliation while
+preserving ordered commit for every non-droppable candidate. Scheduler Stages 3A
+through 3D are implemented. The first Stage 3C, abortable prepared frame heads,
+was attempted and reverted; see
 [`../plans/2026-04-26-002-frame-head-abort-plan.md`](../plans/2026-04-26-002-frame-head-abort-plan.md).
 The shipped replacement is the Option 3 draft-transaction tranche recorded in
 [`../plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md`](../plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md).
 
-Pre-start queued-tail cancellation has shipped. Ordered commit remains the
-policy for started or completed frame-tail work and all future
-completed-frame-dropping work. See
+Pre-start queued-tail cancellation has shipped. Started frame-tail work is still
+awaited, and non-droppable completed candidates still commit in order. The only
+completed-frame non-commit path is the narrow stale visual-only policy described
+below. See
 [`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md)
 for the shipped generation scheduler design. For the consolidated current
 status, see
 [`../ASYNC_RENDERING.md`](../ASYNC_RENDERING.md).
 
-The completed visual-only drop design in this document is proposed, not shipped.
-No runtime path may drop a completed worker result until the Stage 4 through
-Stage 6 gates below are implemented.
+The current async frame-tail renderer preserves ordered side effects: when a
+worker frame finishes with lifecycle, focus, task, preference, animation,
+registration, retained-cache, presentation, or diagnostic barriers, the main
+actor commits it before newer input state is rendered and presented. When a
+completed candidate is stale and classified visual-only, the runtime aborts the
+prepared frame head, discards the completed tail output, logs a dropped-frame
+diagnostic row, and immediately renders the newest desired state.
 
-The current async frame-tail renderer intentionally preserves ordered commit:
-when a worker frame finishes, the main actor commits it before newer input state
-is rendered and presented. This is conservative, but correct. It avoids
-skipping lifecycle, focus, task, preference, animation, and retained-cache side
-effects.
-
-This document defines the requirements for changing that policy later.
+This document defines the shipped requirements and the remaining non-empty
+reconciliation boundary.
 
 ## Proposal Summary
 
@@ -49,8 +52,9 @@ The proposal has three parts:
    drops, so future stateful skipped-frame policies have a durable extension
    point instead of bypassing commit semantics ad hoc.
 
-Until all three pieces are implemented and tested, completed worker results keep
-the existing ordered-commit behavior.
+All three pieces are now implemented and tested for empty visual-only
+reconciliation. Completed worker results still keep ordered-commit behavior
+unless the policy proves a stale candidate has no non-visual barriers.
 
 ## Problem
 
@@ -107,21 +111,23 @@ The current runtime contract is:
 - queued tail jobs may cancel before worker layout starts when superseded by a
   newer render intent,
 - the main actor awaits any started worker job,
-- frames commit in order,
-- started and completed computed frames are not dropped,
+- non-droppable frames commit in order,
+- started computed frames are awaited, and completed candidates are dropped only
+  when stale, visual-only, and reconciled through `.emptyVisualOnly`,
 - newer frames are not presented ahead of older uncommitted side effects.
 
 The async stress tests intentionally enforce this behavior. They block worker
-work, queue input, and verify that the blocked frame does not get skipped or
-presented out of order.
+work, queue input, and verify that non-droppable frames do not get skipped or
+presented out of order, while stale visual-only candidates are discarded before
+commit.
 
 ## Policy
 
-Do not drop started or completed computed pipeline frames until a dedicated
-completed-frame policy is implemented and tested. Pre-start queued-tail
-cancellation is the only shipped non-commit path.
+Drop only completed computed pipeline frames that the dedicated completed-frame
+policy proves are stale, visual-only, and reconcilable with `.emptyVisualOnly`.
+Pre-start queued-tail cancellation remains the only cancellation path.
 
-Any future stale-frame policy must classify a frame before dropping it:
+The stale-frame policy must classify a frame before dropping it:
 
 ```
 enum FrameDropEligibility {
@@ -530,25 +536,37 @@ git commit -m "feat(runtime): cancel superseded unstarted frame-tail jobs"
 - [x] Add a conservative `FrameDropEligibility` classifier.
 - [x] Start with all completed frames classified as `mustCommit`.
 - [x] Add tests for the currently observable blockers.
-- [ ] Add explicit blocker signals for preference-observation deltas,
+- [x] Add explicit blocker signals for preference-observation deltas,
   focus-binding and focused-value drift, scroll-sync deltas, animation
   completions, animation transition bookkeeping, one-shot animation transactions,
   worker custom-layout cache updates, retained layout/raster baseline updates,
   presentation full-repaint recovery, graphics replay barriers, and
   diagnostics-required full records.
-- [ ] Add a candidate-level classifier that can distinguish
+- [x] Add a candidate-level classifier that can distinguish
   `mustCommit(blockers:)` from `canDropVisualOnly` only after every formerly
   `.unobservable` barrier has an explicit signal.
-- [ ] Keep `FrameDropEligibility.canDrop` false until the candidate classifier
+- [x] Keep `FrameDropEligibility.canDrop` false until the candidate classifier
   proves the narrow visual-only case with runtime-path tests.
 
 Stage 4 result so far:
 
 - `FrameDropEligibility` classifies completed frames as diagnostic blockers.
 - `FrameDiagnosticsLogger` writes the classifier result as `drop_blockers`.
-- The classifier intentionally injects `.unobservable` when no specific blocker
-  is found, so `canDrop` remains false for every classified runtime frame.
-- No runtime behavior uses the classifier to drop or reconcile frames.
+- Explicit blocker signals now cover runtime focus sync, focused-value sync,
+  scroll sync, preference-observation deltas, animation completions,
+  transition bookkeeping, one-shot animation transactions, worker custom-layout
+  cache updates, retained layout/raster baseline updates, presentation repaint
+  recovery, graphics replay barriers, and diagnostics-required full records.
+- `FrameDropEligibility.Candidate` can now report `.canDropVisualOnly` for a
+  fully classified candidate with an empty blocker set. The legacy artifact
+  classifiers still inject `.unobservable` when neither frame artifacts nor
+  runtime context expose a specific blocker.
+- `FrameDropEligibility.canDrop` remains false for every decision, including
+  `.canDropVisualOnly`; runtime code must use `CompletedFramePolicy` plus an
+  available reconciliation result instead of this raw compatibility flag.
+- The classifier alone does not drop or reconcile frames. Stage 6 composes it
+  with generation comparison and `.emptyVisualOnly` reconciliation for the
+  narrow shipped policy.
 
 Target Stage 4 result:
 
@@ -567,16 +585,31 @@ git commit -m "refactor(runtime): classify stale frame drop eligibility"
 
 ### Stage 5: Reconciliation for skipped completed frames
 
-- [ ] Add `SkippedFrameReconciliation` with `.emptyVisualOnly`,
+- [x] Add `SkippedFrameReconciliation` with `.emptyVisualOnly`,
   `.appliedSideEffects`, and `.blocked` modes.
-- [ ] Wire completed-frame drop decisions through the reconciliation object even
+- [x] Wire completed-frame drop decisions through the reconciliation object even
   when the selected case is empty.
-- [ ] Prove that `.emptyVisualOnly` leaves lifecycle, task, focus, preference,
+- [x] Prove that `.emptyVisualOnly` leaves lifecycle, task, focus, preference,
   animation, registration, custom-layout cache, retained layout, retained raster,
   and presentation state unchanged from the last committed frame.
-- [ ] Keep `.appliedSideEffects` unavailable to runtime policy until a later
+- [x] Keep `.appliedSideEffects` unavailable to runtime policy until a later
   proposal defines exact delta types and commit order.
-- [ ] Keep the default path as ordered commit.
+- [x] Keep the default path as ordered commit.
+
+Stage 5 result:
+
+- `SkippedFrameReconciliation` now represents `.emptyVisualOnly`,
+  `.appliedSideEffects`, and `.blocked` outcomes. Only `.emptyVisualOnly` is
+  available to runtime skip policy.
+- `CompletedFrameDropDecision` carries both the eligibility decision and the
+  selected reconciliation. The current completed-frame path records
+  `commit_ordered` decisions with blocked reconciliation.
+- Test-only completed-tail discard coverage routes through
+  `.emptyVisualOnly`, aborts the prepared frame head, discards the tail output,
+  and leaves the last committed runtime/presentation state intact.
+- `.appliedSideEffects` remains explicitly unavailable to runtime policy, so
+  non-empty skipped-frame reconciliation cannot be introduced accidentally.
+- No runtime behavior drops or reconciles completed frames.
 
 Commit boundary:
 
@@ -586,15 +619,47 @@ git commit -m "feat(runtime): reconcile skipped async frame results"
 
 ### Stage 6: Drop completed visual-only frames
 
-- [ ] Split the async finish path into candidate creation and explicit commit.
-- [ ] Add a completed-frame policy object that compares candidate generation to
+- [x] Split the async finish path into candidate creation and explicit commit.
+- [x] Add a completed-frame policy object that compares candidate generation to
   the newest desired generation and consults `FrameDropEligibility`.
-- [ ] When a stale candidate is visual-only, discard it through
+- [x] When a stale candidate is visual-only, discard it through
   `discardCompletedFrameCandidate(..., reconciliation: .emptyVisualOnly)`.
-- [ ] Emit a dropped-frame diagnostics row with generation, decision,
+- [x] Emit a dropped-frame diagnostics row with generation, decision,
   reconciliation, and presentation-recovery fields.
-- [ ] Preserve ordered commit for every non-droppable completed candidate.
-- [ ] Do not enable non-empty reconciliation.
+- [x] Preserve ordered commit for every non-droppable completed candidate.
+- [x] Do not enable non-empty reconciliation.
+
+Stage 6 result:
+
+- Async frame-tail completion now builds a `CompletedFrameCandidate` before
+  committing. Candidate creation previews the commit plan under a `ViewGraph`
+  checkpoint, restores that preview, and leaves live registration, lifecycle,
+  animation, custom-layout cache, measurement-cache, and retained-tail commits
+  to `commitCompletedFrameCandidate`.
+- `CompletedFramePolicy` compares the completed candidate's generation against
+  the newest desired generation surfaced by the run loop and consults
+  `FrameDropEligibility`. The shipped renderer uses
+  `.dropCompletedVisualOnly`.
+- A stale completed candidate whose blocker set is empty returns
+  `tail_job_state=dropped_completed`, aborts the prepared frame head, discards
+  the completed tail output through `.emptyVisualOnly` reconciliation, preserves
+  the previously committed runtime and presentation baseline, and lets the next
+  queued generation render from the latest state.
+- Every current candidate and every candidate with lifecycle, task, handler,
+  focus, scroll, preference, animation, custom-layout cache, retained-baseline,
+  presentation, graphics, diagnostic, or registration barriers still commits in
+  order. Blocked decisions remain `commit_ordered` or `blocked`, not dropped.
+- Dropped-frame diagnostics rows now include `drop_decision`,
+  `drop_generation`, `newest_desired_at_drop`, `drop_reconciliation_mode`,
+  `drop_reconciliation_effects`, and `presentation_recovery_after_drop`.
+- Test coverage proves candidate creation does not publish draft command
+  registrations into the live registry, and the `.emptyVisualOnly` test discard
+  path now discards a completed candidate instead of only a rendered tail.
+- Runtime-path coverage proves a stale visual-only frame is not presented, the
+  replacement frame presents the newest state, and the TSV row records
+  `drop_visual_only` with `empty_visual_only` reconciliation.
+- `.appliedSideEffects` remains unavailable to runtime policy, so non-empty
+  skipped-frame reconciliation is still a separate proposal.
 
 Commit boundary:
 
@@ -628,13 +693,10 @@ git commit -m "feat(runtime): drop visual-only stale frame results"
 
 ## Recommendation
 
-Keep the current ordered-commit policy for any started or completed tail job
-until finish candidate creation, full blocker classification, empty
-reconciliation, and dropped-frame diagnostics are all tested.
+Keep ordered commit for every started or completed tail job that is not both
+stale and fully classified as visual-only.
 
-The next concrete tranche is not broad stale-result skipping. It is the
-candidate boundary plus an actionable visual-only classifier. Drop only completed
-frames that are stale and have an empty blocker set, and require
-`.emptyVisualOnly` reconciliation for the first shipped behavior. Treat non-empty
-side-effect reconciliation as a separate proposal after the visual-only path has
-proved useful and safe on real gallery/layout diagnostics.
+The shipped tranche is intentionally narrow: drop only completed frames that are
+stale, have an empty blocker set, and use `.emptyVisualOnly` reconciliation.
+Treat non-empty side-effect reconciliation as a separate proposal after the
+visual-only path has proved useful and safe on real gallery/layout diagnostics.

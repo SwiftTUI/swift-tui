@@ -1,25 +1,32 @@
-/// Reports whether a completed frame can safely be dropped or must commit.
+/// Reports whether a completed frame candidate is visual-only or must commit.
 ///
-/// This is a **conservative observational classifier**.  It looks at the
-/// signals available on a `FrameArtifacts` value and reports which
-/// commit-blocking effects this particular frame carries.  It does not
-/// drive any drop behavior on its own — the runtime still commits every
-/// frame.  See `docs/proposals/ASYNC_FRAME_STALE_POLICY.md` Stage 4 for
-/// the eventual behavior change this is staging for.
+/// This is a **conservative classifier**.  The legacy artifact entry points are
+/// still observational and inject `.unobservable` when no blocker is detected.
+/// The candidate entry point can produce `.canDropVisualOnly`, but it does not
+/// drive any drop behavior on its own. Higher-level completed-frame policy still
+/// has to prove the candidate is stale and select an available reconciliation
+/// mode before commit can be skipped.
 ///
 /// The classifier intentionally errs on the side of `mustCommit`: every
-/// frame whose artifacts surface no specific blocker is still tagged
-/// with the catch-all `.unobservable` blocker, because some commit-time
-/// effects (animation completions firing during `applyInterpolations`,
-/// focus binding drift relative to the previous frame, retained layout
-/// baseline updates) are not visible from a single frame's artifacts.
+/// frame whose artifacts and runtime context surface no specific blocker is
+/// still tagged with the catch-all `.unobservable` blocker, because some
+/// candidate-level effects are not visible from `FrameArtifacts` alone.
 ///
-/// As later stages teach the runtime to drop specific narrow cases —
-/// say, a superseded animation tick with no lifecycle, focus, task,
-/// preference, or handler transitions — this classifier will gain more
-/// specific signals so `.unobservable` shrinks and `canDrop` can flip
-/// to `true` for frames that genuinely have nothing the runtime needs.
+/// The classifier feeds the explicit completed-frame policy without weakening
+/// ordered commit for frames that surface lifecycle, focus, task, preference,
+/// animation, handler, cache, retained-baseline, or presentation barriers.
 public struct FrameDropEligibility: Equatable, Sendable {
+  /// Candidate-level classification result.
+  public enum Decision: Equatable, Sendable {
+    /// The frame carries commit-time effects that must either commit in order or
+    /// be reconciled by a future skipped-frame policy.
+    case mustCommit(blockers: Set<Blocker>)
+
+    /// The frame carries no observed non-visual effects and is eligible for the
+    /// completed-frame stale policy to consider.
+    case canDropVisualOnly
+  }
+
   /// A specific reason a frame must commit rather than being dropped.
   ///
   /// Each case corresponds to one barrier from the stale-policy
@@ -64,34 +71,127 @@ public struct FrameDropEligibility: Equatable, Sendable {
     /// with the committed tree.
     case customLayoutFallback
 
+    /// Focus regions changed while the runtime reconciled this frame.
+    /// Dropping the frame would skip the committed semantic focus graph
+    /// update the focus tracker used to converge.
+    case focusGraph
+
+    /// Focus-binding sync changed authored focus state or applied a
+    /// pending focus request during this frame.
+    case focusBindingSync
+
+    /// Focused values changed for the committed focus identity.
+    case focusedValueSync
+
+    /// Scroll-position sync adjusted a bound scroll position.
+    case scrollSync
+
+    /// Preference observation handlers observed a changed preference
+    /// value during this frame.
+    case preferenceObservationDelta
+
+    /// At least one animation completion is pending, deferred, or
+    /// fired through this frame's animation bookkeeping.
+    case animationCompletion
+
+    /// Transition bookkeeping is present.  Dropping the frame could
+    /// lose insertion, removal, or matched-geometry state that later
+    /// ticks rely on.
+    case animationTransition
+
+    /// The scheduled frame carried a one-shot animation transaction.
+    /// Dropping it would discard the transaction's animation intent.
+    case animationTransaction
+
+    /// Worker-side custom layout cache updates were produced by this
+    /// frame and must either be committed or explicitly reconciled.
+    case workerCustomLayoutCacheUpdate
+
+    /// Committing the frame refreshes the retained layout baseline
+    /// used by later incremental placement.
+    case retainedLayoutBaseline
+
+    /// Committing the frame refreshes the retained raster baseline
+    /// used by later incremental presentation damage.
+    case retainedRasterBaseline
+
+    /// The frame participates in full text repaint recovery.
+    case presentationFullRepaint
+
+    /// The frame carries graphics invalidation or full graphics
+    /// replay requirements.
+    case graphicsReplay
+
+    /// Runtime diagnostics are configured to require an explicit
+    /// committed-frame record for this completed frame.
+    case diagnosticsFullRecord
+
     /// No specific blocker was observed in this frame's artifacts, but
     /// the runtime keeps the frame on the ordered-commit path because
-    /// some commit-time effects are not visible from `FrameArtifacts`
-    /// alone (animation completions, preference observation deltas,
-    /// retained-layout baseline updates, focus-binding drift relative
-    /// to the previous frame).  Future stages will refine this away
-    /// as the classifier learns to detect each missing barrier.
+    /// some candidate-level effects are still not visible from the
+    /// current classifier.  Future stages will refine this away as the
+    /// runtime learns to detect each missing barrier.
     case unobservable
   }
 
-  /// The set of barriers this frame's artifacts surface.  Always
-  /// non-empty: when no specific blocker is detected, `.unobservable`
-  /// is inserted so the runtime stays on the ordered-commit path.
-  public let blockers: Set<Blocker>
+  /// Inputs for candidate-level classification.
+  public struct Candidate: Equatable, Sendable {
+    /// The completed frame artifacts to classify.
+    public var artifacts: FrameArtifacts
+
+    /// Runtime-context blockers that are not stored directly in
+    /// `FrameArtifacts`.
+    public var additionalBlockers: Set<Blocker>
+
+    /// Whether every formerly `.unobservable` barrier has an explicit signal in
+    /// `artifacts` or `additionalBlockers`.
+    public var hasCompleteBarrierSignals: Bool
+
+    public init(
+      artifacts: FrameArtifacts,
+      additionalBlockers: Set<Blocker> = [],
+      hasCompleteBarrierSignals: Bool = false
+    ) {
+      self.artifacts = artifacts
+      self.additionalBlockers = additionalBlockers
+      self.hasCompleteBarrierSignals = hasCompleteBarrierSignals
+    }
+  }
+
+  /// The candidate-level decision.
+  public let decision: Decision
+
+  /// The set of barriers this frame's artifacts surface.  Observational
+  /// classifiers keep this non-empty by inserting `.unobservable`; fully
+  /// classified candidates can return an empty set.
+  public var blockers: Set<Blocker> {
+    switch decision {
+    case .mustCommit(let blockers):
+      blockers
+    case .canDropVisualOnly:
+      []
+    }
+  }
 
   public init(blockers: Set<Blocker>) {
-    self.blockers = blockers
+    if blockers.isEmpty {
+      decision = .canDropVisualOnly
+    } else {
+      decision = .mustCommit(blockers: blockers)
+    }
+  }
+
+  public init(decision: Decision) {
+    self.decision = decision
   }
 
   /// Whether this frame is safe to drop.
   ///
-  /// Currently always `false`.  The classifier inserts `.unobservable`
-  /// when it cannot find a specific signal, so `blockers` is never
-  /// empty.  Reserved for future stages that will both teach the
-  /// classifier to detect more barriers and selectively allow drops
-  /// for narrow visual-only cases.
+  /// Currently always `false`. Runtime code should use the explicit
+  /// completed-frame policy and reconciliation result, not this compatibility
+  /// flag, before skipping commit.
   public var canDrop: Bool {
-    blockers.isEmpty
+    false
   }
 
   /// Classifies a completed frame.
@@ -101,6 +201,31 @@ public struct FrameDropEligibility: Equatable, Sendable {
   /// for any given artifact value is therefore stable and testable
   /// in isolation.
   public static func classify(_ artifacts: FrameArtifacts) -> Self {
+    classify(artifacts, additionalBlockers: [])
+  }
+
+  /// Classifies a completed frame with runtime-context blockers that are not
+  /// stored directly in `FrameArtifacts`.
+  public static func classify(
+    _ artifacts: FrameArtifacts,
+    additionalBlockers: Set<Blocker>
+  ) -> Self {
+    classify(
+      Candidate(
+        artifacts: artifacts,
+        additionalBlockers: additionalBlockers,
+        hasCompleteBarrierSignals: false
+      ))
+  }
+
+  /// Classifies a completed frame candidate.
+  ///
+  /// A candidate can be reported as `.canDropVisualOnly` only when the caller has
+  /// proven that every non-visual barrier is represented by explicit blocker
+  /// signals.  Otherwise an otherwise-empty blocker set is still treated as
+  /// `.unobservable` and therefore `.mustCommit`.
+  public static func classify(_ candidate: Candidate) -> Self {
+    let artifacts = candidate.artifacts
     var blockers: Set<Blocker> = []
     for entry in artifacts.commitPlan.lifecycle {
       switch entry.operation {
@@ -122,7 +247,20 @@ public struct FrameDropEligibility: Equatable, Sendable {
     if artifacts.diagnostics.customLayoutFallbackCount > 0 {
       blockers.insert(.customLayoutFallback)
     }
+    blockers.formUnion(candidate.additionalBlockers)
+    blockers.formUnion(artifacts.diagnostics.dropEligibilityBlockers)
+    if let damage = artifacts.diagnostics.presentationDamage {
+      if damage.requiresFullTextRepaint {
+        blockers.insert(.presentationFullRepaint)
+      }
+      if damage.requiresFullGraphicsReplay || damage.graphicsInvalidationCount > 0 {
+        blockers.insert(.graphicsReplay)
+      }
+    }
     if blockers.isEmpty {
+      if candidate.hasCompleteBarrierSignals {
+        return Self(decision: .canDropVisualOnly)
+      }
       blockers.insert(.unobservable)
     }
     return Self(blockers: blockers)
