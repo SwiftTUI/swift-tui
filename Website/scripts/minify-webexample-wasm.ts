@@ -46,7 +46,7 @@ interface CompressionOptions {
 
 function parseCompressionOptions(argv: string[]): CompressionOptions {
   let quality = 11;
-  let timeoutMilliseconds = 180_000;
+  let timeoutMilliseconds = 360_000;
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
