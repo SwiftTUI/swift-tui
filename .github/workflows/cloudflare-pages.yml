@@ -168,7 +168,7 @@ jobs:
             --target Core \
             --target View \
             --target SwiftTUI \
-            --target SwiftUICharts \
+            --target SwiftTUICharts \
             --enable-experimental-combined-documentation \
             --transform-for-static-hosting \
             --hosting-base-path docs \
