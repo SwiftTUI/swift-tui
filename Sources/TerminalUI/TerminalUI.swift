@@ -140,6 +140,7 @@ package struct CancellableRenderOutcome {
   package var renderGeneration: RenderGeneration
   package var tailJobState: FrameTailJobState
   package var tailCancelReason: String?
+  package var completedFrameDropDecision: CompletedFrameDropDecision?
 }
 
 private final class FrameTailJobCancellationToken: Sendable {
@@ -1260,6 +1261,23 @@ public struct DefaultRenderer {
   }
 
   @MainActor
+  package func discardPreparedFrameTailForReconciliationTesting(
+    _ draft: FrameHeadDraft,
+    decision: CompletedFrameDropDecision
+  ) async -> Bool {
+    guard decision.canSkipCompletedFrame else {
+      return false
+    }
+
+    _ = await renderFrameTailAsync(draft)
+    discardCompletedFrameCandidate(
+      draft,
+      reconciliation: decision.reconciliation
+    )
+    return true
+  }
+
+  @MainActor
   package func runFrameTailLayoutWorkerJobForCancellationTesting(
     _ operation: @escaping @Sendable () -> Void
   ) async {
@@ -1323,18 +1341,23 @@ public struct DefaultRenderer {
         artifacts: nil,
         renderGeneration: draft.renderGeneration,
         tailJobState: .cancelledBeforeStart,
-        tailCancelReason: "newer_render_intent"
+        tailCancelReason: "newer_render_intent",
+        completedFrameDropDecision: nil
       )
     case .output(let tailOutput):
+      let artifacts = finishFrame(
+        draft: draft,
+        tailOutput: tailOutput,
+        collectsDiagnostics: collectsDiagnostics
+      )
       return CancellableRenderOutcome(
-        artifacts: finishFrame(
-          draft: draft,
-          tailOutput: tailOutput,
-          collectsDiagnostics: collectsDiagnostics
-        ),
+        artifacts: artifacts,
         renderGeneration: draft.renderGeneration,
         tailJobState: .completed,
-        tailCancelReason: nil
+        tailCancelReason: nil,
+        completedFrameDropDecision: completedFrameDropDecision(
+          for: artifacts
+        )
       )
     }
   }
@@ -2009,6 +2032,15 @@ public struct DefaultRenderer {
   }
 
   @MainActor
+  private func discardCompletedFrameCandidate(
+    _ draft: FrameHeadDraft,
+    reconciliation: SkippedFrameReconciliation
+  ) {
+    precondition(reconciliation.isAvailableToRuntimePolicy)
+    abortPreparedFrameHead(draft)
+  }
+
+  @MainActor
   private func applyWorkerCustomLayoutCacheUpdates(
     _ updates: [WorkerCustomLayoutCacheUpdate]
   ) {
@@ -2028,6 +2060,14 @@ public struct DefaultRenderer {
       blockers.insert(.workerCustomLayoutCacheUpdate)
     }
     return blockers
+  }
+
+  private func completedFrameDropDecision(
+    for artifacts: FrameArtifacts
+  ) -> CompletedFrameDropDecision {
+    CompletedFrameDropDecision.orderedCommit(
+      eligibility: FrameDropEligibility.classify(artifacts)
+    )
   }
 
   @MainActor

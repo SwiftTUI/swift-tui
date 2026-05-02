@@ -1929,6 +1929,105 @@ struct AsyncFrameTailRenderingTests {
     #expect(recorder.state.cacheApplyCount == 1)
   }
 
+  @Test("completed frame drop decisions carry reconciliation policy")
+  func completedFrameDropDecisionsCarryReconciliationPolicy() {
+    let visualOnlyEligibility = FrameDropEligibility(decision: .canDropVisualOnly)
+    let visualOnlyDecision = CompletedFrameDropDecision.dropVisualOnly(
+      eligibility: visualOnlyEligibility
+    )
+    #expect(visualOnlyDecision.action == .dropVisualOnly)
+    #expect(visualOnlyDecision.reconciliation == .emptyVisualOnly)
+    #expect(visualOnlyDecision.canSkipCompletedFrame)
+
+    let blockedEligibility = FrameDropEligibility(blockers: [.lifecycleAppear])
+    let blockedDecision = CompletedFrameDropDecision.dropVisualOnly(
+      eligibility: blockedEligibility
+    )
+    #expect(blockedDecision.action == .blocked)
+    #expect(blockedDecision.reconciliation.mode == .blocked)
+    #expect(!blockedDecision.canSkipCompletedFrame)
+
+    let appliedSideEffects = SkippedFrameReconciliation.appliedSideEffects(
+      effectSummary: "lifecycle"
+    )
+    #expect(appliedSideEffects.mode == .appliedSideEffects)
+    #expect(!appliedSideEffects.isAvailableToRuntimePolicy)
+  }
+
+  @Test("cancellable completed frame reports ordered reconciliation decision")
+  func cancellableCompletedFrameReportsOrderedReconciliationDecision() async throws {
+    let renderer = DefaultRenderer()
+    let rootIdentity = testIdentity("AsyncCompletedFrameDropDecisionRoot")
+    let outcome = await renderer.renderAsyncCancellable(
+      Text("ordered"),
+      context: .init(identity: rootIdentity),
+      proposal: .init(width: 16, height: 3),
+      collectsDiagnostics: true,
+      shouldCancelQueued: { false }
+    )
+
+    let decision = try #require(outcome.completedFrameDropDecision)
+    #expect(outcome.artifacts != nil)
+    #expect(outcome.tailJobState == .completed)
+    #expect(decision.action == .commitOrdered)
+    #expect(decision.reconciliation.mode == .blocked)
+    #expect(decision.reconciliation.blockReason == .orderedCommitPolicy)
+    #expect(!decision.canSkipCompletedFrame)
+  }
+
+  @Test("empty visual-only reconciliation discards completed tail without commit")
+  func emptyVisualOnlyReconciliationDiscardsCompletedTailWithoutCommit() async throws {
+    let rootIdentity = testIdentity("AsyncSkippedVisualOnlyRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let renderer = DefaultRenderer()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncSkippedVisualOnlyView(value: value)
+      }
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &initialFrames)
+    let initialTerminalFrameCount = terminal.frames.count
+    let initialLiveIdentities = renderer.liveIdentitySnapshot()
+
+    runLoop.stateContainer.mutate { value in
+      value = 1
+    }
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      runLoop.currentView(),
+      context: runLoop.resolveContext(
+        for: scheduledFrame(invalidatedIdentities: [rootIdentity])
+      ),
+      proposal: runLoop.proposal()
+    )
+    let decision = CompletedFrameDropDecision.dropVisualOnly(
+      eligibility: FrameDropEligibility(decision: .canDropVisualOnly)
+    )
+
+    let discarded = await renderer.discardPreparedFrameTailForReconciliationTesting(
+      draft,
+      decision: decision
+    )
+
+    #expect(discarded)
+    #expect(terminal.frames.count == initialTerminalFrameCount)
+    #expect(renderer.liveIdentitySnapshot() == initialLiveIdentities)
+    #expect(terminal.frames.last?.contains("visual 1") == false)
+  }
+
   @Test("async renderer tags monotonically increasing render generations")
   func asyncRendererTagsMonotonicallyIncreasingRenderGenerations() async {
     let renderer = DefaultRenderer()
@@ -1985,6 +2084,15 @@ private struct AsyncFrameTailAnimatedOffsetView: View {
     Text("value \(value)")
       .id(testIdentity("AsyncFrameTailAnimatedOffsetValue"))
       .offset(x: value * 4, y: 0)
+  }
+}
+
+private struct AsyncSkippedVisualOnlyView: View {
+  var value: Int
+
+  var body: some View {
+    Text("visual \(value)")
+      .id(testIdentity("AsyncSkippedVisualOnlyValue"))
   }
 }
 
