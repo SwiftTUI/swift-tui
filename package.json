@@ -6,6 +6,9 @@
     "build:wasm:dev": "bun run --cwd Website build:wasm:dev",
     "build:website": "bun run --cwd Website build:full",
     "build:website:dev": "bun run --cwd Website build:dev",
+    "perf:compare": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf compare",
+    "perf:list": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf list-scenarios",
+    "perf:run": "swiftly run swift run --package-path Tools/TermUIPerf termui-perf run",
     "test": "sh ./Scripts/test_all.sh",
     "test:all": "sh ./Scripts/test_all.sh"
   },

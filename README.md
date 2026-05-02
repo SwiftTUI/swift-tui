@@ -161,6 +161,36 @@ and Bun environment first. On Linux, it exports
 already using the repo's root Bun workspace, `bun run test` is a thin
 entrypoint to the same script.
 
+## Performance Evaluation
+
+Use the repo-local perf tool when changing async rendering, frame scheduling,
+presentation, layout fallback behavior, or other runtime paths where input
+latency and CPU cost need to be compared. The full operator guide is
+[docs/PERFORMANCE_EVALUATION.md](docs/PERFORMANCE_EVALUATION.md).
+
+List the checked-in scenarios:
+
+```bash
+bun run perf:list
+```
+
+Run a quick same-binary sync versus async comparison:
+
+```bash
+bun run perf:run -- --scenario gallery-animation-click --modes sync,async --iterations 3
+```
+
+The run command prints one artifact directory per mode under `.perf/runs/`.
+Compare the printed sync directory with the printed async directory:
+
+```bash
+bun run perf:compare -- .perf/runs/<sync-run> .perf/runs/<async-run>
+```
+
+Each run directory contains `run.json`, `frames.tsv`, `events.tsv`, `cpu.tsv`,
+and `summary.json`. Keep the full directory when citing a result; the TSV files
+explain why the summary moved.
+
 ## API Documentation
 
 Live API reference is published at:
@@ -213,4 +243,5 @@ Common entry points:
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): target boundaries and frame pipeline
 - [docs/RUNTIME.md](docs/RUNTIME.md): lifecycle, state, and incremental rendering behavior
 - [docs/VISION.md](docs/VISION.md): philosophy, scope, and deferred work
+- [docs/PERFORMANCE_EVALUATION.md](docs/PERFORMANCE_EVALUATION.md): CPU and input-latency evaluation workflow
 - [Examples/README.md](Examples/README.md): maintained example apps

@@ -1,0 +1,55 @@
+name: CPU latency perf smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  perf-smoke:
+    name: Archive non-failing perf smoke artifacts
+    runs-on: macos-26
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install swiftly and Swift toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
+          hash -r
+          SWIFT_VERSION="$(tr -d '[:space:]' < .swift-version)"
+          swiftly install --use --assume-yes "$SWIFT_VERSION"
+          swiftly run swift --version
+          echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
+          echo "SWIFTLY_HOME_DIR=$HOME/.swiftly" >> "$GITHUB_ENV"
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            ~/.swiftpm
+          key: ${{ runner.os }}-swiftpm-termui-perf-${{ hashFiles('Tools/TermUIPerf/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-termui-perf-
+            ${{ runner.os }}-swiftpm-
+
+      - name: Run perf smoke
+        shell: bash
+        run: sh Scripts/run_perf_smoke.sh
+
+      - name: Upload perf artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: termui-perf-runs
+          path: .perf/runs
+          if-no-files-found: warn

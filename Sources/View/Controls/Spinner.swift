@@ -11,40 +11,21 @@ public struct Spinner: View {
   @State var iteration: Int = 0
 
   public var body: some View {
-    GeometryReader { proxy in
-      if proxy.size.width == 1 {
-        switch stage {
-        case .active:
-          Text(set.body[iteration])
-        case .finished:
-          Text(set.tail)
-        case .inactive:
-          Text(set.head)
-        }
-      } else {
-        HStack(spacing: 0) {
-          ForEach(Array(0..<proxy.size.width), id: \.self) { cell in
-            switch stage {
-            case .active:
-              let safe = cell % set.body.count
-              let char: String = set.body[safe: safe] ?? set.body.last ?? set.tail
-              Text(char)
-            case .finished:
-              Text(set.tail)
-            case .inactive:
-              Text(set.head)
-            }
-          }
-        }
+    Group {
+      switch stage {
+      case .active:
+        Text(set.body[iteration])
+      case .finished:
+        Text(set.tail)
+      case .inactive:
+        Text(set.head)
       }
     }
-    .frame(minWidth: 1, idealWidth: 1, maxWidth: 1, minHeight: 1, idealHeight: 1, maxHeight: 1)
     .task(id: Pair(a: set, b: stage)) {
       switch stage {
       case .active:
         while !Task.isCancelled {
-          Standard.Error().write("\(set)\(stage)")
-          try? await Task.sleep(for: .milliseconds(16))
+          try? await Task.sleep(for: .milliseconds(64))
           let max = set.body.count
           var newIteration = iteration + 1
           newIteration %= max
