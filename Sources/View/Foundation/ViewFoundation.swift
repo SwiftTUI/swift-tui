@@ -352,6 +352,10 @@ package func resolveView<V: View>(
     transaction: context.transaction,
     invalidator: context.invalidationProxy?.invalidator
   ) {
+    context.viewGraph?.recordReusedSubtree(
+      reused,
+      invalidator: context.invalidationProxy?.invalidator
+    )
     context.viewGraph?.restoreRuntimeRegistrations(
       for: reused,
       into: context.runtimeRegistrations

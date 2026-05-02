@@ -97,7 +97,10 @@ package struct RuntimeRegistrationSet {
     actionRegistry?.removeSubtrees(rootedAt: roots)
     keyHandlerRegistry?.removeSubtrees(rootedAt: roots)
     terminationRegistry?.removeSubtrees(rootedAt: roots)
-    pointerHandlerRegistry?.removeSubtrees(rootedAt: roots)
+    pointerHandlerRegistry?.removeSubtrees(
+      rootedAt: roots,
+      preserving: preservedGestureIdentities
+    )
     gestureRegistry?.removeSubtrees(
       rootedAt: roots,
       preserving: preservedGestureIdentities
@@ -126,13 +129,19 @@ package struct RuntimeRegistrationSet {
   package func restore(
     from handlers: NodeHandlers
   ) {
+    let activeGestureIdentities = gestureRegistry?.activeIdentitySnapshot() ?? []
+    let pointerHandlerRegistrations =
+      handlers.pointerHandlerRegistrations.filter { routeID, _ in
+        !(activeGestureIdentities.contains(routeID.identity)
+          && (pointerHandlerRegistry?.hasHandler(routeID: routeID) ?? false))
+      }
     actionRegistry?.restore(handlers.actionRegistrations)
     keyHandlerRegistry?.restore(handlers.keyHandlerRegistrations)
     keyHandlerRegistry?.restoreKeyPressHandlers(
       handlers.keyPressHandlerRegistrations
     )
     terminationRegistry?.restore(handlers.terminationHandlerRegistrations)
-    pointerHandlerRegistry?.restore(handlers.pointerHandlerRegistrations)
+    pointerHandlerRegistry?.restore(pointerHandlerRegistrations)
     pointerHandlerRegistry?.restoreHover(handlers.pointerHoverHandlerRegistrations)
     gestureRegistry?.restore(handlers.gestureRegistrations)
     gestureStateRegistry?.restore(handlers.gestureStateRegistrations)

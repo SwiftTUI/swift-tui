@@ -148,7 +148,8 @@ package final class LocalPointerHandlerRegistry: Equatable {
   }
 
   package func removeSubtrees(
-    rootedAt roots: [Identity]
+    rootedAt roots: [Identity],
+    preserving preservedIdentities: Set<Identity> = []
   ) {
     guard !roots.isEmpty else {
       return
@@ -156,11 +157,13 @@ package final class LocalPointerHandlerRegistry: Equatable {
 
     for routeID in handlers.keys.filter({
       identityMatchesAnySubtreeRoot($0.identity, roots: roots)
+        && !preservedIdentities.contains($0.identity)
     }) {
       handlers.removeValue(forKey: routeID)
     }
     for routeID in hoverHandlers.keys.filter({
       identityMatchesAnySubtreeRoot($0.identity, roots: roots)
+        && !preservedIdentities.contains($0.identity)
     }) {
       hoverHandlers.removeValue(forKey: routeID)
     }
