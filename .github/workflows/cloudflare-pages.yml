@@ -167,8 +167,8 @@ jobs:
             generate-documentation \
             --target Core \
             --target View \
-            --target TerminalUI \
-            --target TerminalUICharts \
+            --target SwiftTUI \
+            --target SwiftUICharts \
             --enable-experimental-combined-documentation \
             --transform-for-static-hosting \
             --hosting-base-path docs \
