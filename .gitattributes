@@ -1,6 +1,1 @@
-Vendor/swift-png/Sources/PNGIntegrationTests/Inputs/**/*.png filter=lfs diff=lfs merge=lfs -text
-Vendor/swift-png/Sources/PNGIntegrationTests/RGBA/*.rgba filter=lfs diff=lfs merge=lfs -text
-Vendor/swift-png/Tests/Baselines/*.png filter=lfs diff=lfs merge=lfs -text
-Vendor/swift-png/Tests/Outputs/*.png filter=lfs diff=lfs merge=lfs -text
-Vendor/swift-png/Sources/PNG/docs.docc/**/*.png filter=lfs diff=lfs merge=lfs -text
 
