@@ -2,8 +2,8 @@
 
 This page is the current-state map for async presentation, off-main frame-tail
 rendering, layout-dependent content realization, custom-layout worker
-eligibility, and future stale-frame handling. Use it as the entry point before
-reading the supporting proposal files.
+eligibility, and stale-frame handling. Use it as the entry point before reading
+the supporting proposal files.
 
 ## Current Contract
 
@@ -23,14 +23,16 @@ main actor: commit -> present -> lifecycle
 writer queue: terminal write(2)
 ```
 
-The important invariant is ordered commit for any worker frame that has started.
-Started and completed worker frames commit before newer state is presented.
-Queued frame-tail jobs may be cancelled before worker layout starts when a newer
-render intent is already pending; the corresponding prepared frame head is
-discarded through the draft/checkpoint transaction. Computed pipeline frames
-that have started are not dropped. Layout-dependent content realization is part
-of the current frame's layout work; any realized subtree is folded back into the
-committed resolved tree before semantics, draw, raster, and lifecycle commit.
+The important invariant is ordered commit for any worker frame that carries
+runtime side effects. Queued frame-tail jobs may be cancelled before worker
+layout starts when a newer render intent is already pending; the corresponding
+prepared frame head is discarded through the draft/checkpoint transaction.
+Started worker jobs are awaited. After completion, only stale candidates that
+are fully classified as visual-only are dropped; all other completed worker
+frames commit before newer state is presented. Layout-dependent content
+realization is part of the current frame's layout work; any realized subtree is
+folded back into the committed resolved tree before semantics, draw, raster, and
+lifecycle commit.
 
 ## What Has Landed
 
@@ -62,21 +64,26 @@ committed resolved tree before semantics, draw, raster, and lifecycle commit.
   frame resolve state, observation tracking, animation transactions, lifecycle
   and task effects, retained tail inputs, and worker custom-layout cache updates.
 - The interactive runtime can cancel a queued tail job before worker layout
-  starts. Started and completed tail work still follows ordered commit.
+  starts.
+- The interactive runtime can drop a stale completed frame-tail result only when
+  the completed candidate has an empty blocker set and `.emptyVisualOnly`
+  reconciliation is available.
 - Cancelled frame-head render invalidations replay their animation request and
   batch ID into the replacement scheduler work without replaying input actions
   or overriding newer explicit animation intent.
 - Runtime diagnostics record render generations, worker timings, main-actor
   blocked/suspended time, coalesced event batches, coalesced intent-request
-  pressure, geometry-resolution misses, drop blockers, tail job state, tail
-  cancellation reason, cancelled render count, desired-generation snapshots, and
-  stale-frame policy. Completed frames report `commit_ordered`; cancelled rows
-  report `cancel_pending_before_start`.
+  pressure, geometry-resolution misses, explicit drop blockers, tail job state,
+  tail cancellation reason, cancelled render count, desired-generation snapshots,
+  stale-frame policy, drop decision, drop generation, reconciliation mode, and
+  presentation-recovery state. Completed frames report `commit_ordered`,
+  cancelled rows report `cancel_pending_before_start`, and dropped completed
+  visual-only rows report `drop_completed_visual_only`.
 - Async stress tests cover blocked worker tails, queued input, ordered commit,
   sync/async artifact parity, `SendableLayout` worker execution, retained layout
   reuse, focus convergence, framework layout worker paths, aborted prepared
-  frame heads, queued-tail cancellation, and main-actor fallback when
-  layout-dependent content is present.
+  frame heads, queued-tail cancellation, stale completed visual-only drops, and
+  main-actor fallback when layout-dependent content is present.
 - The post-Option-3 gallery one-shot animation regression is covered by
   gallery-path and deterministic async-tail diagnostics. See
   [plans/2026-05-01-007-gallery-animation-regression-notes.md](plans/2026-05-01-007-gallery-animation-regression-notes.md)
@@ -105,12 +112,17 @@ registration, state, observation, lifecycle, task, focus, command, drop, and
 preference guarantees that ordinary main-actor view evaluation has today.
 
 Cancellation after worker layout starts is not implemented and is intentionally
-out of scope. A started or completed worker frame must still finish and commit
-in order.
+out of scope. A started worker frame must still finish its worker work before the
+main actor can either commit or discard its completed candidate.
 
-Completed worker results are classified conservatively by the observational
-`FrameDropEligibility` helper, but they are not dropped as visual-only frames.
-Off-main resolve is not planned near-term.
+Completed worker results are classified by `FrameDropEligibility`, including
+runtime focus/preference/animation, retained-baseline, presentation-recovery,
+graphics-replay, and diagnostics barriers. The completed-frame policy drops only
+stale candidates with an empty blocker set and `.emptyVisualOnly`
+reconciliation. Non-empty skipped-frame side-effect reconciliation is not
+implemented. `FrameDropEligibility.canDrop` remains false; runtime code uses the
+explicit completed-frame policy and reconciliation result instead. Off-main
+resolve is not fully scoped.
 
 ## Shipped Option 3 Boundary
 
@@ -163,8 +175,10 @@ cancellations:
 - `stale_frame_policy=cancel_pending_before_start`
 
 Completed rows report `stale_frame_policy=commit_ordered`; cancelled rows report
-`stale_frame_policy=cancel_pending_before_start`. Started/completed tail jobs
-must continue to report and follow ordered commit.
+`stale_frame_policy=cancel_pending_before_start`; dropped completed visual-only
+rows report `stale_frame_policy=drop_completed_visual_only`,
+`tail_job_state=dropped_completed`, `drop_decision=drop_visual_only`, and
+`drop_reconciliation_mode=empty_visual_only`.
 
 ## Runtime Diagnostics Samples
 
@@ -183,20 +197,18 @@ return to `stale_frame_policy=commit_ordered`. The layouts sample stayed on
 ordered commit with `tail_job_state=completed` and showed coalesced input
 pressure without actual cancellation.
 
-## Future Tranche: Completed Visual-Only Drops
+## Completed Visual-Only Drops
 
-Do not drop completed worker results in the Option 3 tranche. Once pre-start
-cancellation is proven, the existing `FrameDropEligibility` classifier can be
-expanded from observational to actionable for a narrow visual-only case. The
-detailed proposal lives in
+The runtime now drops completed worker results only for the narrow visual-only
+case defined in
 [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md):
-split async frame finish into candidate creation plus explicit commit, classify
-completed candidates before commit, discard only stale candidates with no
+async frame finish is split into candidate creation plus explicit commit,
+completed candidates are classified before commit, stale candidates with no
 lifecycle, task, focus, preference, scroll, animation, handler, custom-layout
-cache, retained-baseline, or presentation repaint barriers, and route every
-skipped completed frame through an explicit reconciliation object. The first
-allowed reconciliation mode is empty visual-only; non-empty skipped-frame
-side-effect reconciliation remains a later proposal.
+cache, retained-baseline, presentation repaint, graphics, or diagnostic barriers
+are discarded, and every skipped completed frame routes through an explicit
+reconciliation object. The only allowed reconciliation mode is empty visual-only;
+non-empty skipped-frame side-effect reconciliation remains a later proposal.
 
 ## Progress Map
 
@@ -205,7 +217,7 @@ side-effect reconciliation remains a later proposal.
 | Async terminal writes | Shipped | Writer queue handles blocking `write(2)` work. |
 | Guarded frame-tail worker | Shipped | Layout offload is conditional; raster tail is async. |
 | Render generation diagnostics | Shipped | Generations identify render, layout, and raster work. |
-| Ordered stale-frame policy | Shipped | Started/completed worker frames commit in order. |
+| Ordered stale-frame policy | Shipped | Non-droppable started/completed worker frames commit in order. |
 | Render-intent coalescing | Shipped | Queued input can collapse before the next render begins. |
 | Frame-head prepare/finish split | Shipped | Prepared heads can be aborted before tail start. |
 | Public `SendableLayout` opt-in | Shipped | Worker-safe custom layouts off-main. |
@@ -213,10 +225,10 @@ side-effect reconciliation remains a later proposal.
 | Lazy indexed child snapshots | Shipped | Main actor resolves visible children before worker use. |
 | Layout-dependent content realization | Shipped for `GeometryReader` and anchor geometry | Forces main-actor layout fallback when arbitrary authored content is present. |
 | Abortable prepared frame heads | Shipped | Draft registries plus graph/state checkpoints protect live runtime state. |
-| Cancellable pre-start tail jobs | Shipped | Only queued jobs can cancel; started/completed jobs commit in order. |
+| Cancellable pre-start tail jobs | Shipped | Only queued jobs can cancel; started worker jobs are awaited. |
 | Cancelled animation intent replay | Shipped | Replays invalidation-scoped animation metadata without replaying input or replacing newer explicit animation. |
-| Visual-only completed-frame drops | Not shipped | Classifier exists; no drops yet. |
-| Off-main resolve | Not planned near-term | Would require a new authoring and registration model. |
+| Visual-only completed-frame drops | Shipped | Stale completed candidates with an empty blocker set are discarded through `.emptyVisualOnly` reconciliation and logged as dropped-frame diagnostics. |
+| Off-main resolve | Not started | Would require a new authoring and registration model. |
 
 ## Supporting Documents
 
@@ -259,17 +271,18 @@ side-effect reconciliation remains a later proposal.
   `FrameTailRenderer`, `FrameHeadDraft`, render generation sequencing, worker
   timings, and frame finish.
 - `Sources/TerminalUI/RunLoop+Rendering.swift`: async render loop, input
-  coalescing, queued-tail cancellation, ordered commit, and diagnostics
-  emission.
+  coalescing, queued-tail cancellation, visual-only completed-frame drops,
+  ordered commit for blocked candidates, and diagnostics emission.
 - `Sources/Core/Scheduler.swift`: render-intent coalescing and cancelled
   animation-intent replay into replacement work.
 - `Sources/TerminalUI/FrameDiagnosticsLogger.swift`: TSV diagnostics fields for
   generations, worker timings, main-actor timings, coalescing, drop blockers,
-  tail cancellation, stale policy, and geometry resolution misses.
+  tail cancellation, stale policy, dropped completed frames, and geometry
+  resolution misses.
 - `Sources/Core/FrameHeadRegistrationDraft.swift`: scratch runtime
   registrations and commit-time restoration from the committed graph.
-- `Sources/Core/FrameDropEligibility.swift`: conservative observational
-  classifier for completed-frame drop blockers.
+- `Sources/Core/FrameDropEligibility.swift`: conservative classifier for
+  completed-frame drop blockers.
 - `Sources/Core/LayoutDependentContent.swift`: layout-time realization
   boundaries, realization context, and per-pass realization cache.
 - `Sources/View/GeometryReading/GeometryReader.swift`: public adopter that
@@ -287,10 +300,11 @@ side-effect reconciliation remains a later proposal.
 - Do not move arbitrary layout-dependent content realization onto the worker
   without a separate snapshot contract for authored view evaluation and runtime
   side effects.
-- Do not drop a computed pipeline frame unless a tested eligibility classifier
-  proves the frame has no side effects that need commit or reconciliation.
-- Do not treat the current observational `FrameDropEligibility` result as
-  permission to drop; it is diagnostic until an actionable policy is tested.
+- Do not drop a computed pipeline frame unless the tested completed-frame policy
+  proves the frame is stale, has no side effects that need commit or
+  reconciliation, and can use `.emptyVisualOnly` reconciliation.
+- Do not treat a raw `FrameDropEligibility` result as permission to drop; the
+  runtime must go through the completed-frame policy and reconciliation result.
 - Do not cancel worker work after layout has started; pre-start cancellation is
   the only shipped cancellation point.
 - Keep full `bun run test` as the completion gate for runtime or shared renderer
