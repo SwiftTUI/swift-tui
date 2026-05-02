@@ -1157,6 +1157,13 @@ public struct DefaultRenderer {
     animationController.abortFrameHeadTransaction(draft.animationCheckpoint)
   }
 
+  @MainActor
+  package func renderPreparedFrameTailForCancellationTesting(
+    _ draft: FrameHeadDraft
+  ) async {
+    _ = await renderFrameTailAsync(draft)
+  }
+
   /// Renders `root` into complete frame artifacts.
   @MainActor
   public func render<V: View>(
