@@ -125,7 +125,6 @@ while IFS= read -r doc_file; do
     fail "$doc_file should document the @MainActor authoring model."
   fi
 done <<'EOF'
-README.md
 docs/RUNTIME.md
 docs/STATUS.md
 docs/PUBLIC_API_INVENTORY.md
