@@ -278,6 +278,11 @@ struct AsyncFrameTailRenderingTests {
           && row["layout_dependent_cache_hits"] == "0"
           && row["layout_dependent_main_actor_fallbacks"] == "0"
           && row["stale_frame_policy"] == "commit_ordered"
+          && row["tail_job_state"] != nil
+          && row["tail_cancel_reason"] != nil
+          && row["cancelled_render_count"] != nil
+          && row["newest_desired_at_tail_start"] != nil
+          && row["newest_desired_at_tail_result"] != nil
           && row["desired_generation"] != nil
           && row["render_generation"] != nil
           && row["layout_input_generation"] == row["render_generation"]
@@ -873,6 +878,110 @@ struct AsyncFrameTailRenderingTests {
         (Int(row["coalesced_event_batches"] ?? "") ?? 0) >= 1
           && (row["coalesced_wake_causes"] ?? "").contains("input")
           && row["stale_frame_policy"] == "commit_ordered"
+      })
+    #expect(rows.allSatisfy { $0["tail_job_state"] != "cancelled_before_start" })
+  }
+
+  @Test("queued frame tail cancels before worker layout starts")
+  func queuedFrameTailCancelsBeforeWorkerLayoutStarts() async throws {
+    let rootIdentity = testIdentity("AsyncFrameTailQueuedCancellationRoot")
+    let workerGate = AsyncFrameTailBlockingGate()
+    let renderer = DefaultRenderer()
+    defer {
+      workerGate.release()
+    }
+
+    let inputReader = InjectedTerminalInputReader()
+    let terminal = AsyncFrameTailTerminalHost()
+    let diagnosticsURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-async-tail-cancellation-\(UUID().uuidString).tsv")
+    defer {
+      try? FileManager.default.removeItem(at: diagnosticsURL)
+    }
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      keyHandler: { keyPress, _, stateContainer in
+        if keyPress == KeyPress(.character("i")) {
+          stateContainer.mutate { value in
+            value += 1
+          }
+          return .handled
+        }
+        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+          return .exit(.userExit(keyPress))
+        }
+        return .ignored
+      },
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameTailCounterView(value: value)
+      }
+    )
+    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
+    #expect(runLoop.diagnosticsLogger != nil)
+
+    let runTask = Task {
+      try await runLoop.run()
+    }
+
+    try await waitUntil {
+      terminal.frames.contains { $0.contains("value 0") }
+    }
+
+    let workerBlockTask = Task {
+      await renderer.runFrameTailLayoutWorkerJobForCancellationTesting {
+        workerGate.beforeRaster()
+      }
+    }
+    await workerGate.waitUntilBlocked()
+
+    inputReader.send(.key(.character("i")))
+    try await waitUntil {
+      runLoop.renderSuspensionDiagnostics.isSuspended
+    }
+    #expect(terminal.frames.contains { $0.contains("value 1") } == false)
+
+    inputReader.send(.key(.character("i")))
+    try await waitUntil {
+      runLoop.cancelledRenderCount >= 1
+    }
+    workerGate.release()
+
+    try await waitUntil {
+      terminal.frames.last?.contains("value 2") == true
+    }
+    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.finish()
+
+    let result = try await valueWithTimeout {
+      try await runTask.value
+    }
+    await workerBlockTask.value
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.finalState == 2)
+    #expect(result.renderedFrames == 2)
+    #expect(terminal.frames.contains { $0.contains("value 1") } == false)
+    #expect(terminal.frames.last?.contains("value 2") == true)
+
+    let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
+    let rows = diagnosticRows(diagnostics)
+    #expect(
+      rows.contains { row in
+        row["tail_job_state"] == "cancelled_before_start"
+          && row["tail_cancel_reason"] == "newer_render_intent"
+          && row["stale_frame_policy"] == "cancel_pending_before_start"
+          && (Int(row["cancelled_render_count"] ?? "") ?? 0) >= 1
       })
   }
 
