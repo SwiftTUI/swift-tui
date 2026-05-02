@@ -123,8 +123,10 @@ bunx serve _local-artifact -l 4321
 ```
 
 Note: the [`public/_headers`](public/_headers) cache rules are
-Cloudflare-specific. Local servers (`astro preview`, `bunx serve`) ignore
-them, so caching behavior will differ between local and production.
+Cloudflare-specific. The [`public/_redirects`](public/_redirects) rules are
+also Cloudflare-specific; local servers (`astro preview`, `bunx serve`)
+ignore them, so caching and Cloudflare-only DocC rewrites differ between
+local and production.
 
 ## Adding a doc to the site
 
@@ -177,7 +179,9 @@ Swift toolchain. End to end:
    the canonical production URL → `Website/dist/`.
 8. Build the combined DocC archive (Core + View + TerminalUI +
    TerminalUICharts) with `--hosting-base-path docs` → `.build-docs/`.
-9. Compose the final upload tree and Brotli-compress
+9. Compose the final upload tree, remove DocC's duplicate per-symbol HTML
+   shells, rely on `Website/public/_redirects` to route direct DocC links
+   through `/docs/index.html`, and Brotli-compress
    `/webexample/TerminalApp/dist/assets/app.wasm` in place so the single
    asset remains under Cloudflare Pages' 25 MiB upload limit:
    ```
@@ -185,10 +189,12 @@ Swift toolchain. End to end:
    /docs/         ← .build-docs/                        (DocC, combined)
    /webexample/   ← Examples/WebExample/pages-dist/     (WASI demo)
    ```
-10. Upload via `bunx wrangler pages deploy` with the right
+10. Count files in the composed artifact and fail before upload if it exceeds
+    Cloudflare Pages' deployment file-count limit.
+11. Upload via `bunx wrangler pages deploy` with the right
     `--branch` / `--commit-hash` so the Cloudflare deployment record
     matches the Git commit.
-11. On PRs, parse the preview URL out of wrangler's output and post (or
+12. On PRs, parse the preview URL out of wrangler's output and post (or
     update) a sticky comment on the PR.
 
 The `/docs/` path is historical — DocC has been served there since

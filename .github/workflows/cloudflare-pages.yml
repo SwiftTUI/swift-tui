@@ -189,6 +189,12 @@ jobs:
           cp -R Website/dist/. "$ARTIFACT_ROOT/"
           # DocC at /docs/.
           cp -R .build-docs/. "$DOCS_ROOT/"
+          # Swift-DocC emits one identical static HTML shell for every symbol
+          # page plus the JSON data the shell fetches at runtime. Cloudflare
+          # Pages Free deployments are capped at 20,000 files, so keep the
+          # DocC data/search/assets and route all documentation paths through
+          # the single SPA shell with Website/public/_redirects.
+          rm -rf "$DOCS_ROOT/documentation"
           # Project-owned CSS overrides on top of theme-settings.json.
           # (idempotent; safe to re-run, see Examples/WebExample/src/inject-docs-css.ts)
           bun run Examples/WebExample/src/inject-docs-css.ts
@@ -207,11 +213,24 @@ jobs:
           compressed_wasm_size="$(wc -c < "$compressed_wasm_path" | tr -d '[:space:]')"
           pages_asset_limit=$((25 * 1024 * 1024))
           if [ "$compressed_wasm_size" -ge "$pages_asset_limit" ]; then
-            echo "::error::Brotli-compressed WebExample wasm is ${compressed_wasm_size} bytes, still above Cloudflare Pages' 25 MiB single-file limit"
+            echo "::error::Brotli-compressed WebExample wasm is ${compressed_wasm_size} bytes"
+            echo "::error::Still above Cloudflare Pages' 25 MiB single-file limit"
             exit 1
           fi
           mv "$compressed_wasm_path" "$wasm_path"
           echo "Brotli-compressed WebExample wasm to ${compressed_wasm_size} bytes for Cloudflare Pages upload"
+          artifact_file_count="$(find "$ARTIFACT_ROOT" -type f | wc -l | tr -d '[:space:]')"
+          pages_file_limit="${CLOUDFLARE_PAGES_FILE_LIMIT:-20000}"
+          echo "Cloudflare Pages artifact contains ${artifact_file_count} files"
+          find "$ARTIFACT_ROOT" -mindepth 1 -maxdepth 1 -print | while IFS= read -r child; do
+            count="$(find "$child" -type f | wc -l | tr -d '[:space:]')"
+            echo "  ${child#$ARTIFACT_ROOT/}: ${count} files"
+          done
+          if [ "$artifact_file_count" -gt "$pages_file_limit" ]; then
+            echo "::error::Cloudflare Pages artifact has ${artifact_file_count} files"
+            echo "::error::Above the ${pages_file_limit}-file deployment limit"
+            exit 1
+          fi
 
       - name: Resolve deploy branch
         id: branch
@@ -240,7 +259,8 @@ jobs:
           deploy_log="$(bunx wrangler@latest pages deploy _cf-pages-artifact \
             --project-name="$CF_PROJECT" \
             --branch="$CF_BRANCH" \
-            --commit-hash="$CF_COMMIT_SHA" 2>&1 | tee /dev/stderr)"
+            --commit-hash="$CF_COMMIT_SHA" \
+            --commit-dirty=true 2>&1 | tee /dev/stderr)"
           # Wrangler prints something like: `✨  Deployment complete! Take a peek over at https://abc123.swift-terminal-ui.pages.dev`
           deployment_url="$(printf '%s\n' "$deploy_log" | grep -Eo 'https://[^[:space:]]+\.pages\.dev' | tail -n1 || true)"
           printf 'deployment-url=%s\n' "${deployment_url:-}" >> "$GITHUB_OUTPUT"
