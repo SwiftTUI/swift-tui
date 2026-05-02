@@ -71,3 +71,28 @@ package final class ObservationBridge: Equatable {
     invalidator?.requestInvalidation(of: [identity])
   }
 }
+
+extension ObservationBridge {
+  package struct Checkpoint {
+    package var currentPass: UInt64
+    package var observedPasses: [Identity: UInt64]
+    package var invalidator: (any Invalidating)?
+    package var viewGraph: ViewGraph?
+  }
+
+  package func makeCheckpoint() -> Checkpoint {
+    Checkpoint(
+      currentPass: currentPass,
+      observedPasses: observedPasses,
+      invalidator: invalidator,
+      viewGraph: viewGraph
+    )
+  }
+
+  package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    currentPass = checkpoint.currentPass
+    observedPasses = checkpoint.observedPasses
+    invalidator = checkpoint.invalidator
+    viewGraph = checkpoint.viewGraph
+  }
+}

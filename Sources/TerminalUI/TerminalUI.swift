@@ -128,17 +128,21 @@ private struct FrameTailOutput {
   var workerCompletedAt: ContinuousClock.Instant?
 }
 
-private struct FrameHeadDraft {
-  var clock: ContinuousClock?
-  var renderGeneration: RenderGeneration
-  var registrationDraft: FrameHeadRegistrationDraft
-  var resolveContext: ResolveContext
-  var frameContext: FrameContext
-  var resolved: ResolvedNode
-  var frameTailInput: FrameTailInput
-  var animationTimestamp: MonotonicInstant
-  var resolveDuration: Duration
-  var animationCheckpoint: AnimationController.Checkpoint
+package struct FrameHeadDraft {
+  fileprivate var clock: ContinuousClock?
+  fileprivate var renderGeneration: RenderGeneration
+  fileprivate var registrationDraft: FrameHeadRegistrationDraft
+  fileprivate var viewGraphCheckpoint: ViewGraph.Checkpoint
+  fileprivate var frameStateCheckpoint: FrameResolveState.Checkpoint
+  fileprivate var observationBridge: ObservationBridge?
+  fileprivate var observationBridgeCheckpoint: ObservationBridge.Checkpoint?
+  fileprivate var resolveContext: ResolveContext
+  fileprivate var frameContext: FrameContext
+  fileprivate var resolved: ResolvedNode
+  fileprivate var frameTailInput: FrameTailInput
+  fileprivate var animationTimestamp: MonotonicInstant
+  fileprivate var resolveDuration: Duration
+  fileprivate var animationCheckpoint: AnimationController.Checkpoint
 }
 
 private struct AsyncFrameTailDraftOutput {
@@ -1124,6 +1128,35 @@ public struct DefaultRenderer {
     viewGraph.registrationAliasDiagnostics
   }
 
+  @MainActor
+  package func prepareFrameHeadForCancellationTesting<V: View>(
+    _ root: V,
+    context: ResolveContext = .init(),
+    proposal: ProposedSize = .unspecified
+  ) -> FrameHeadDraft {
+    prepareFrameHead(
+      root,
+      context: context,
+      proposal: proposal,
+      collectsDiagnostics: true
+    )
+  }
+
+  @MainActor
+  package func abortPreparedFrameHeadForCancellationTesting(
+    _ draft: FrameHeadDraft
+  ) {
+    draft.registrationDraft.discard()
+    viewGraph.restoreCheckpoint(draft.viewGraphCheckpoint)
+    frameState.restoreCheckpoint(draft.frameStateCheckpoint)
+    if let observationBridge = draft.observationBridge,
+      let checkpoint = draft.observationBridgeCheckpoint
+    {
+      observationBridge.restoreCheckpoint(checkpoint)
+    }
+    animationController.abortFrameHeadTransaction(draft.animationCheckpoint)
+  }
+
   /// Renders `root` into complete frame artifacts.
   @MainActor
   public func render<V: View>(
@@ -1437,7 +1470,10 @@ public struct DefaultRenderer {
     )
     resolveContext.imageAssetResolver = imageRepository.resolver()
     resolveContext.frameState = frameState
+    let frameStateCheckpoint = frameState.makeCheckpoint()
+    let observationBridgeCheckpoint = resolveContext.observationBridge?.makeCheckpoint()
     frameState.update(from: resolveContext, proposal: proposal)
+    let viewGraphCheckpoint = viewGraph.makeCheckpoint()
     viewGraph.beginFrame()
     let canUseSelectiveEvaluation =
       frameState.selectiveEvaluationEnabled
@@ -1541,6 +1577,10 @@ public struct DefaultRenderer {
       clock: clock,
       renderGeneration: renderGeneration,
       registrationDraft: registrationDraft,
+      viewGraphCheckpoint: viewGraphCheckpoint,
+      frameStateCheckpoint: frameStateCheckpoint,
+      observationBridge: resolveContext.observationBridge,
+      observationBridgeCheckpoint: observationBridgeCheckpoint,
       resolveContext: resolveContext,
       frameContext: frameContext,
       resolved: resolved,
