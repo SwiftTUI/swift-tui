@@ -1,7 +1,7 @@
 ---
 title: "chore: CPU latency evaluation pipeline"
 type: chore
-status: active
+status: shipped
 date: 2026-05-02
 proposal: "../proposals/CPU_LATENCY_EVALUATION_PIPELINE.md"
 depends_on:
