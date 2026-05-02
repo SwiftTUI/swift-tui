@@ -63,6 +63,9 @@ committed resolved tree before semantics, draw, raster, and lifecycle commit.
   and task effects, retained tail inputs, and worker custom-layout cache updates.
 - The interactive runtime can cancel a queued tail job before worker layout
   starts. Started and completed tail work still follows ordered commit.
+- Cancelled frame-head render invalidations replay their animation request and
+  batch ID into the replacement scheduler work without replaying input actions
+  or overriding newer explicit animation intent.
 - Runtime diagnostics record render generations, worker timings, main-actor
   blocked/suspended time, coalesced event batches, coalesced intent-request
   pressure, geometry-resolution misses, drop blockers, tail job state, tail
@@ -74,12 +77,10 @@ committed resolved tree before semantics, draw, raster, and lifecycle commit.
   reuse, focus convergence, framework layout worker paths, aborted prepared
   frame heads, queued-tail cancellation, and main-actor fallback when
   layout-dependent content is present.
-- Known follow-up: gallery one-shot animations currently have an active
-  post-Option-3 regression where input-triggered `withAnimation` state changes
-  can snap to their final state while visible `PhaseAnimator` ticks continue.
-  See
+- The post-Option-3 gallery one-shot animation regression is covered by
+  gallery-path and deterministic async-tail diagnostics. See
   [plans/2026-05-01-007-gallery-animation-regression-notes.md](plans/2026-05-01-007-gallery-animation-regression-notes.md)
-  for the red/green regression guard and failure model.
+  for the regression guard, root cause, and replay contract.
 
 ## What Still Runs On The Main Actor
 
@@ -131,6 +132,8 @@ Keep these terms separate:
   `FrameTailRenderer`.
 - **Pre-start tail cancellation**: cancelling a queued tail job before the
   worker begins layout, then discarding the corresponding prepared frame head.
+  If the cancelled frame carried render invalidation plus animation intent, that
+  invalidation intent is merged back into the pending replacement frame.
 - **Started/completed tail work**: any tail job whose worker has begun layout
   or returned output. These frames must still finish and commit in order.
 
@@ -205,6 +208,7 @@ repaint barriers.
 | Layout-dependent content realization | Shipped for `GeometryReader` and anchor geometry | Forces main-actor layout fallback when arbitrary authored content is present. |
 | Abortable prepared frame heads | Shipped | Draft registries plus graph/state checkpoints protect live runtime state. |
 | Cancellable pre-start tail jobs | Shipped | Only queued jobs can cancel; started/completed jobs commit in order. |
+| Cancelled animation intent replay | Shipped | Replays invalidation-scoped animation metadata without replaying input or replacing newer explicit animation. |
 | Visual-only completed-frame drops | Not shipped | Classifier exists; no drops yet. |
 | Off-main resolve | Not planned near-term | Would require a new authoring and registration model. |
 
@@ -251,6 +255,8 @@ repaint barriers.
 - `Sources/TerminalUI/RunLoop+Rendering.swift`: async render loop, input
   coalescing, queued-tail cancellation, ordered commit, and diagnostics
   emission.
+- `Sources/Core/Scheduler.swift`: render-intent coalescing and cancelled
+  animation-intent replay into replacement work.
 - `Sources/TerminalUI/FrameDiagnosticsLogger.swift`: TSV diagnostics fields for
   generations, worker timings, main-actor timings, coalescing, drop blockers,
   tail cancellation, stale policy, and geometry resolution misses.

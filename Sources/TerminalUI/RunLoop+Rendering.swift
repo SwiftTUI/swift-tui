@@ -562,6 +562,7 @@ extension RunLoop {
           )
           if renderOutcome.tailJobState == .cancelledBeforeStart {
             cancelledRenderCount += 1
+            replayCancelledFrameIntent(scheduledFrame)
             logCancelledFrameTail(
               diagnosticsLogger: diagnosticsLogger,
               renderedFrames: renderedFrames,
@@ -855,6 +856,14 @@ extension RunLoop {
       }
     }
     return nil
+  }
+
+  @MainActor
+  private func replayCancelledFrameIntent(_ frame: ScheduledFrame) {
+    guard let scheduler = scheduler as? any CancelledFrameIntentReplaying else {
+      return
+    }
+    scheduler.replayCancelledFrameIntent(frame)
   }
 
   package func applyDesiredFocusRequest(

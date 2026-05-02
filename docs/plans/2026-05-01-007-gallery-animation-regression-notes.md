@@ -1,7 +1,7 @@
 ---
 title: "bug: gallery one-shot animations snap after async Option 3"
 type: bug
-status: active
+status: shipped
 date: 2026-05-01
 depends_on:
   - "2026-05-01-006-async-frame-head-draft-transaction-plan.md"
@@ -41,10 +41,18 @@ regression two ways:
   clicks the actual offset example's `right` button and asserts that the
   rendered `slide me` marker visits at least one intermediate cell column
   between its starting column and the final `offset(x: 30)` column.
-- `diagnosticsShowAnimationIntentIsReplayedAfterCancellableGalleryFrame`
-  enables `FrameDiagnosticsLogger` on the same interaction and asserts that an
-  animation-bearing cancelled frame is followed by a committed frame that still
-  carries animation intent.
+- `diagnosticsExposeAnimationIntentAndCancellationStateOnGalleryPath` enables
+  `FrameDiagnosticsLogger` on the same interaction and asserts that the real
+  gallery path records explicit animation commits and cancellation diagnostics.
+  When that path does cancel an animation-bearing frame, it also asserts that a
+  later committed frame carries animation intent.
+- `AsyncFrameTailRenderingTests/cancelledAnimationIntentIsReplayedIntoReplacementFrameDiagnostics`
+  deterministically forces a pre-start cancellation of an animation-bearing
+  frame and asserts that the replacement committed frame still carries explicit
+  animation intent.
+- `AnimationSchedulerTests` covers the scheduler-level replay rules: replay
+  merges invalidated identities and transaction metadata, does not replay
+  input-only frames, and does not replace a newer explicit animation.
 
 Observed split:
 
@@ -64,6 +72,13 @@ swiftly run swift test --package-path Examples/gallery --filter GalleryDemoViews
   same visual-test patch applied in a throwaway worktree. The diagnostic test
   uses instrumentation added after this commit, so it is a head-side regression
   localization guard rather than a direct old-commit comparison.
+
+Fixed-head verification:
+
+- The gallery visual guard now passes and captures intermediate marker columns.
+- The deterministic async-tail diagnostic guard observes the cancelled
+  animation-bearing frame followed by a committed replacement frame with
+  `scheduled_animation_request=animate` and active controller animations.
 
 ## User-Visible Symptoms
 
@@ -87,11 +102,11 @@ it already has active animation state. The latter depends on preserving the
 transaction attached to the input-caused state write until the frame that
 commits the state change.
 
-## Current Failure Model
+## Confirmed Root Cause
 
-The leading model is that an input-triggered animation transaction can be
-prepared, superseded, and aborted before its tail job starts, while the
-scheduler intent that carried the animation request has already been consumed.
+An input-triggered animation transaction could be prepared, superseded, and
+aborted before its tail job started, while the scheduler intent that carried the
+animation request had already been consumed.
 
 The relevant runtime path is:
 
@@ -115,8 +130,11 @@ The ticking phase animator creates deadline pressure and can keep its own
 active animation state alive, but it does not prove that a separate
 input-scoped transaction survived to commit.
 
-This is still a failure model, not a proven root cause. The new regression test
-pins the user-visible behavior before changing the runtime again.
+The fix replays the cancelled frame's render-invalidation intent back into the
+pending scheduler work before the run loop advances to the replacement frame.
+The replay unit is the recorded invalidated identities plus animation request
+and batch ID; it does not replay input causes, signal causes, external wakes, or
+the user action that produced the state change.
 
 ## Why Existing Coverage Missed It
 
@@ -156,8 +174,9 @@ On the bad head the final frame is present, but the intermediate frame is not.
 That is the signature of transaction loss rather than a missed click or a
 broken button action.
 
-The companion diagnostic test records TSV diagnostics for the same interaction.
-It uses the animation-focused fields added to `FrameDiagnosticsLogger`:
+The companion gallery diagnostic test records TSV diagnostics for the same
+interaction. It uses the animation-focused fields added to
+`FrameDiagnosticsLogger`:
 
 - `scheduled_animation_request`: `inherit`, `disabled`, or `animate` from the
   consumed `ScheduledFrame`.
@@ -167,37 +186,35 @@ It uses the animation-focused fields added to `FrameDiagnosticsLogger`:
 - `animation_controller_pending_work`: whether the controller still has pending
   animation work at diagnostic emission time.
 
-The current bad-head signature is a batchless `animate` scheduled frame
-cancelled before tail start, with no later committed batchless `animate` frame
-before the final visual state appears.
+The deterministic root runtime diagnostic forces the bad-head signature: an
+`animate` scheduled frame cancelled before tail start, followed by a replacement
+frame. The shipped fix requires that replacement frame to commit with
+`scheduled_animation_request=animate` and active controller animations.
 
-## Fix Direction
+## Fix
 
-Do not treat this as a request to restart `PhaseAnimator` tasks. The failing
-test demonstrates that the button action runs and the final state commits.
+`FrameScheduler` now implements `CancelledFrameIntentReplaying`. On pre-start
+tail cancellation, `RunLoop.renderPendingFramesAsync` asks the scheduler to
+merge the cancelled frame's invalidated identities, animation request, and batch
+ID back into pending render work.
 
-The likely fix must preserve or replay animation-bearing scheduled-frame intent
-across pre-start tail cancellation. Candidate directions:
+Coalescing rules:
 
-- Do not consume a one-shot animation request until the corresponding prepared
-  frame successfully commits.
-- Or, when aborting a prepared frame head before tail start, requeue the same
-  invalidated identities, animation request, and batch ID so the next prepared
-  frame sees the original transaction.
-- Preserve transition and completion registration semantics with the same rule,
-  because transitions and completion callbacks are also batch/transaction
-  scoped.
-
-Any fix needs explicit duplicate-work guards. Replaying the scheduler intent
-must not replay the input event or run the button action twice. The replay unit
-should be the already-recorded render invalidation plus animation transaction
-metadata, not the user event.
+- Replayed cancelled frames synthesize only `.invalidation` work.
+- Input, signal, external, and deadline causes are not replayed.
+- A cancelled explicit animation is restored only if no newer explicit
+  animation is already pending.
+- A cancelled batch ID is restored only if no newer batch ID is already pending.
+- Input-only cancelled frames are ignored.
 
 ## Verification Commands
 
-Current failing proof:
+Targeted verification:
 
 ```bash
+swiftly run swift test --filter CoreTests.AnimationSchedulerTests
+swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests/cancelledAnimationIntentIsReplayedIntoReplacementFrameDiagnostics
+swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests/diagnosticsCountInputQueuedDuringAsyncRenderSuspension
 swiftly run swift test --package-path Examples/gallery --filter GalleryDemoViewsTests.AnimationRegressionTests
 ```
 
@@ -208,6 +225,3 @@ git worktree add /tmp/swift-terminal-ui-good-animation-test 7dfc91b3032e83ed626c
 git -C /tmp/swift-terminal-ui-good-animation-test apply /tmp/swift-terminal-ui-animation-regression-test.patch
 swiftly run swift test --package-path Examples/gallery --filter GalleryDemoViewsTests.AnimationRegressionTests
 ```
-
-Full `bun run test` is not expected to pass while this regression test is
-intentionally red on head.
