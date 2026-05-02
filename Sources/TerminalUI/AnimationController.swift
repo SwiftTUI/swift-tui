@@ -620,6 +620,7 @@ package final class AnimationController: Sendable {
     fileprivate var lastTickResult: AnimationTickResult
     fileprivate var isFrameHeadTransactionActive: Bool
     fileprivate var deferredFrameHeadCompletions: [@Sendable () -> Void]
+    fileprivate var lastFrameHeadCompletionCount: Int
   }
 
   private var previousSnapshots: [Identity: AnimatableSnapshot] = [:]
@@ -683,6 +684,7 @@ package final class AnimationController: Sendable {
   package private(set) var lastTickResult: AnimationTickResult = .init()
   private var isFrameHeadTransactionActive = false
   private var deferredFrameHeadCompletions: [@Sendable () -> Void] = []
+  private var lastFrameHeadCompletionCount = 0
 
   /// Target frame interval during active animation (30 FPS).
   private let frameInterval: Duration = .milliseconds(33)
@@ -700,6 +702,7 @@ package final class AnimationController: Sendable {
     let checkpoint = makeCheckpoint()
     isFrameHeadTransactionActive = true
     deferredFrameHeadCompletions.removeAll(keepingCapacity: true)
+    lastFrameHeadCompletionCount = 0
     return checkpoint
   }
 
@@ -709,6 +712,7 @@ package final class AnimationController: Sendable {
       "No AnimationController frame-head transaction is active."
     )
     let completions = deferredFrameHeadCompletions
+    lastFrameHeadCompletionCount = completions.count
     isFrameHeadTransactionActive = checkpoint.isFrameHeadTransactionActive
     deferredFrameHeadCompletions = checkpoint.deferredFrameHeadCompletions
     for completion in completions {
@@ -745,7 +749,8 @@ package final class AnimationController: Sendable {
       previousIdentities: previousIdentities,
       lastTickResult: lastTickResult,
       isFrameHeadTransactionActive: isFrameHeadTransactionActive,
-      deferredFrameHeadCompletions: deferredFrameHeadCompletions
+      deferredFrameHeadCompletions: deferredFrameHeadCompletions,
+      lastFrameHeadCompletionCount: lastFrameHeadCompletionCount
     )
   }
 
@@ -770,6 +775,7 @@ package final class AnimationController: Sendable {
     lastTickResult = checkpoint.lastTickResult
     isFrameHeadTransactionActive = checkpoint.isFrameHeadTransactionActive
     deferredFrameHeadCompletions = checkpoint.deferredFrameHeadCompletions
+    lastFrameHeadCompletionCount = checkpoint.lastFrameHeadCompletionCount
   }
 
   /// Stores a snapshot of the placed tree at the end of the frame so
@@ -1048,6 +1054,27 @@ package final class AnimationController: Sendable {
     }.count
   }
 
+  package var frameDropEligibilityBlockers: Set<FrameDropEligibility.Blocker> {
+    var blockers: Set<FrameDropEligibility.Blocker> = []
+    if lastFrameHeadCompletionCount > 0 || !completionClosures.isEmpty
+      || !pendingEmptyBatchCompletions.isEmpty || !deferredFrameHeadCompletions.isEmpty
+    {
+      blockers.insert(.animationCompletion)
+    }
+    if !transitionsByIdentity.isEmpty || !previousTransitionsByIdentity.isEmpty
+      || !pendingTransitionsByIdentity.isEmpty || !removingIdentities.isEmpty
+      || activeAnimations.keys.contains(where: { key in
+        if case .property = key.scope {
+          return false
+        }
+        return true
+      })
+    {
+      blockers.insert(.animationTransition)
+    }
+    return blockers
+  }
+
   /// Called by the View layer at the start of resolve so the controller
   /// can collect up-to-date `.transition()` registrations.
   ///
@@ -1091,6 +1118,7 @@ package final class AnimationController: Sendable {
     transaction: TransactionSnapshot,
     timestamp: MonotonicInstant
   ) {
+    lastFrameHeadCompletionCount = 0
     // If the incoming transaction carries an animation box, make sure
     // the controller has the concrete Animation registered.  In normal
     // flow ``DefaultRenderer.register(animation:)`` already registered
@@ -1763,6 +1791,7 @@ package final class AnimationController: Sendable {
 
   private func fireOrDeferCompletion(_ completion: @escaping @Sendable () -> Void) {
     guard isFrameHeadTransactionActive else {
+      lastFrameHeadCompletionCount += 1
       completion()
       return
     }
@@ -2440,6 +2469,7 @@ package final class AnimationController: Sendable {
     lastTickResult = .init()
     isFrameHeadTransactionActive = false
     deferredFrameHeadCompletions.removeAll(keepingCapacity: true)
+    lastFrameHeadCompletionCount = 0
   }
 }
 

@@ -89,6 +89,10 @@ extension RunLoop {
       var rerenderedForFocusSync = false
       var focusSyncBudget = FocusSyncRerenderBudget()
       var focusSyncBudgetExceeded = false
+      var focusGraphChangedDuringFrame = false
+      var focusBindingChangedDuringFrame = false
+      var focusedValuesChangedDuringFrame = false
+      var scrollPositionChangedDuringFrame = false
       var artifacts: FrameArtifacts?
       let currentState = stateContainer.state
       if previousRenderedState != currentState {
@@ -166,6 +170,13 @@ extension RunLoop {
           focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
           scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes
         )
+        focusGraphChangedDuringFrame = focusGraphChangedDuringFrame || focusChanged
+        focusBindingChangedDuringFrame =
+          focusBindingChangedDuringFrame || appliedFocusRequest || focusStateChanged
+        focusedValuesChangedDuringFrame =
+          focusedValuesChangedDuringFrame || focusedValuesChanged
+        scrollPositionChangedDuringFrame =
+          scrollPositionChangedDuringFrame || scrollPositionChanged
 
         if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged
           || scrollPositionChanged
@@ -230,7 +241,7 @@ extension RunLoop {
         currentTaskRegistry: localTaskRegistry
       )
       updateFocusPresentation(focusPresentation)
-      _ = localPreferenceObservationRegistry.applyChanges(
+      let preferenceObservationChanged = localPreferenceObservationRegistry.applyChanges(
         since: previousPreferenceObservations
       )
       previousPreferenceObservations = localPreferenceObservationRegistry.snapshot()
@@ -289,6 +300,16 @@ extension RunLoop {
           .joined(separator: "+")
         let inputEventsQueuedDuringRenderSuspension =
           renderSuspensionDiagnostics.drainInputEventsQueuedDuringSuspension()
+        let dropEligibilityBlockers = frameDropEligibilityBlockers(
+          artifacts: artifacts,
+          scheduledFrame: scheduledFrame,
+          focusGraphChanged: focusGraphChangedDuringFrame,
+          focusBindingChanged: focusBindingChangedDuringFrame,
+          focusedValuesChanged: focusedValuesChangedDuringFrame,
+          scrollPositionChanged: scrollPositionChangedDuringFrame,
+          preferenceObservationChanged: preferenceObservationChanged,
+          diagnosticsRequireFullRecord: true
+        )
         diagnosticsLogger.log(
           FrameDiagnosticRecord(
             frameNumber: renderedFrames,
@@ -344,7 +365,7 @@ extension RunLoop {
             cancelledRenderCount: cancelledRenderCount,
             newestDesiredAtTailStart: renderIntentDiagnostics.desiredGeneration,
             newestDesiredAtTailResult: renderIntentDiagnostics.desiredGeneration,
-            dropEligibilityBlockers: FrameDropEligibility.classify(artifacts).blockers,
+            dropEligibilityBlockers: dropEligibilityBlockers,
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
@@ -518,6 +539,10 @@ extension RunLoop {
       var rerenderedForFocusSync = false
       var focusSyncBudget = FocusSyncRerenderBudget()
       var focusSyncBudgetExceeded = false
+      var focusGraphChangedDuringFrame = false
+      var focusBindingChangedDuringFrame = false
+      var focusedValuesChangedDuringFrame = false
+      var scrollPositionChangedDuringFrame = false
       var artifacts: FrameArtifacts?
       var tailJobState: FrameTailJobState = .completed
       let currentState = stateContainer.state
@@ -641,6 +666,13 @@ extension RunLoop {
           focusRegions: renderedArtifacts.semanticSnapshot.focusRegions,
           scrollRoutes: renderedArtifacts.semanticSnapshot.scrollRoutes
         )
+        focusGraphChangedDuringFrame = focusGraphChangedDuringFrame || focusChanged
+        focusBindingChangedDuringFrame =
+          focusBindingChangedDuringFrame || appliedFocusRequest || focusStateChanged
+        focusedValuesChangedDuringFrame =
+          focusedValuesChangedDuringFrame || focusedValuesChanged
+        scrollPositionChangedDuringFrame =
+          scrollPositionChangedDuringFrame || scrollPositionChanged
 
         if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged
           || scrollPositionChanged
@@ -705,7 +737,7 @@ extension RunLoop {
         currentTaskRegistry: localTaskRegistry
       )
       updateFocusPresentation(focusPresentation)
-      _ = localPreferenceObservationRegistry.applyChanges(
+      let preferenceObservationChanged = localPreferenceObservationRegistry.applyChanges(
         since: previousPreferenceObservations
       )
       previousPreferenceObservations = localPreferenceObservationRegistry.snapshot()
@@ -764,6 +796,16 @@ extension RunLoop {
           .joined(separator: "+")
         let inputEventsQueuedDuringRenderSuspension =
           renderSuspensionDiagnostics.drainInputEventsQueuedDuringSuspension()
+        let dropEligibilityBlockers = frameDropEligibilityBlockers(
+          artifacts: artifacts,
+          scheduledFrame: scheduledFrame,
+          focusGraphChanged: focusGraphChangedDuringFrame,
+          focusBindingChanged: focusBindingChangedDuringFrame,
+          focusedValuesChanged: focusedValuesChangedDuringFrame,
+          scrollPositionChanged: scrollPositionChangedDuringFrame,
+          preferenceObservationChanged: preferenceObservationChanged,
+          diagnosticsRequireFullRecord: true
+        )
         diagnosticsLogger.log(
           FrameDiagnosticRecord(
             frameNumber: renderedFrames,
@@ -819,7 +861,7 @@ extension RunLoop {
             cancelledRenderCount: cancelledRenderCount,
             newestDesiredAtTailStart: renderIntentDiagnostics.desiredGeneration,
             newestDesiredAtTailResult: renderIntentDiagnostics.desiredGeneration,
-            dropEligibilityBlockers: FrameDropEligibility.classify(artifacts).blockers,
+            dropEligibilityBlockers: dropEligibilityBlockers,
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
@@ -958,6 +1000,44 @@ extension RunLoop {
 
     let size = terminalHost.surfaceSize
     return .init(width: size.width, height: size.height)
+  }
+
+  private func frameDropEligibilityBlockers(
+    artifacts: FrameArtifacts,
+    scheduledFrame: ScheduledFrame,
+    focusGraphChanged: Bool,
+    focusBindingChanged: Bool,
+    focusedValuesChanged: Bool,
+    scrollPositionChanged: Bool,
+    preferenceObservationChanged: Bool,
+    diagnosticsRequireFullRecord: Bool
+  ) -> Set<FrameDropEligibility.Blocker> {
+    var additionalBlockers = renderer.internalAnimationController.frameDropEligibilityBlockers
+    if focusGraphChanged {
+      additionalBlockers.insert(.focusGraph)
+    }
+    if focusBindingChanged {
+      additionalBlockers.insert(.focusBindingSync)
+    }
+    if focusedValuesChanged {
+      additionalBlockers.insert(.focusedValueSync)
+    }
+    if scrollPositionChanged {
+      additionalBlockers.insert(.scrollSync)
+    }
+    if preferenceObservationChanged {
+      additionalBlockers.insert(.preferenceObservationDelta)
+    }
+    if scheduledFrame.animationRequest != .inherit {
+      additionalBlockers.insert(.animationTransaction)
+    }
+    if diagnosticsRequireFullRecord {
+      additionalBlockers.insert(.diagnosticsFullRecord)
+    }
+    return FrameDropEligibility.classify(
+      artifacts,
+      additionalBlockers: additionalBlockers
+    ).blockers
   }
 
   package func formattedAnimationRequest(

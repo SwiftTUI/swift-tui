@@ -3,9 +3,11 @@
 ## Status
 
 Stages 1 and 2 are implemented. The observational drop-blocker classifier
-described in Stage 4 is also implemented, but it is diagnostic only for
-completed-frame drops. Scheduler Stages 3A through 3D are implemented. The first
-Stage 3C, abortable prepared frame heads, was attempted and reverted; see
+described in Stage 4 is also implemented and now exposes explicit runtime
+signals for the formerly unobservable blocker families, but it is still
+diagnostic only for completed-frame drops. Scheduler Stages 3A through 3D are
+implemented. The first Stage 3C, abortable prepared frame heads, was attempted
+and reverted; see
 [`../plans/2026-04-26-002-frame-head-abort-plan.md`](../plans/2026-04-26-002-frame-head-abort-plan.md).
 The shipped replacement is the Option 3 draft-transaction tranche recorded in
 [`../plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md`](../plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md).
@@ -530,7 +532,7 @@ git commit -m "feat(runtime): cancel superseded unstarted frame-tail jobs"
 - [x] Add a conservative `FrameDropEligibility` classifier.
 - [x] Start with all completed frames classified as `mustCommit`.
 - [x] Add tests for the currently observable blockers.
-- [ ] Add explicit blocker signals for preference-observation deltas,
+- [x] Add explicit blocker signals for preference-observation deltas,
   focus-binding and focused-value drift, scroll-sync deltas, animation
   completions, animation transition bookkeeping, one-shot animation transactions,
   worker custom-layout cache updates, retained layout/raster baseline updates,
@@ -546,8 +548,14 @@ Stage 4 result so far:
 
 - `FrameDropEligibility` classifies completed frames as diagnostic blockers.
 - `FrameDiagnosticsLogger` writes the classifier result as `drop_blockers`.
-- The classifier intentionally injects `.unobservable` when no specific blocker
-  is found, so `canDrop` remains false for every classified runtime frame.
+- Explicit blocker signals now cover runtime focus sync, focused-value sync,
+  scroll sync, preference-observation deltas, animation completions,
+  transition bookkeeping, one-shot animation transactions, worker custom-layout
+  cache updates, retained layout/raster baseline updates, presentation repaint
+  recovery, graphics replay barriers, and diagnostics-required full records.
+- The classifier still injects `.unobservable` when neither frame artifacts nor
+  runtime context expose a specific blocker, so `canDrop` remains false for
+  every classified runtime frame.
 - No runtime behavior uses the classifier to drop or reconcile frames.
 
 Target Stage 4 result:
