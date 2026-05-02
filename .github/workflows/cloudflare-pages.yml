@@ -128,18 +128,19 @@ jobs:
 
       - name: Build WebExample
         shell: bash
-        working-directory: Examples/WebExample
         run: |
           set -euo pipefail
           bun install --frozen-lockfile
-          bun run build
+          bun run build:wasm
 
       - name: Validate uploaded WebExample wasm parses in the browser API
         shell: bash
         working-directory: Examples/WebExample
         run: |
           set -euo pipefail
-          bun -e 'const wasmPath = "./pages-dist/TerminalApp/dist/assets/app.wasm"; try { await WebAssembly.compile(await Bun.file(wasmPath).arrayBuffer()); console.log(`Validated ${wasmPath}`); } catch (error) { console.error(`Failed to validate ${wasmPath}: ${error instanceof Error ? error.message : String(error)}`); process.exit(1); }'
+          wasm_path="./pages-dist/TerminalApp/dist/assets/app.wasm"
+          brotli --test "$wasm_path"
+          bun -e 'const wasmPath = "./pages-dist/TerminalApp/dist/assets/app.wasm"; const proc = Bun.spawnSync({ cmd: ["brotli", "--decompress", "--stdout", wasmPath], stdout: "pipe", stderr: "pipe" }); if (proc.exitCode !== 0) { console.error(new TextDecoder().decode(proc.stderr)); process.exit(proc.exitCode ?? 1); } try { await WebAssembly.compile(proc.stdout); console.log(`Validated Brotli-compressed ${wasmPath}`); } catch (error) { console.error(`Failed to validate ${wasmPath}: ${error instanceof Error ? error.message : String(error)}`); process.exit(1); }'
 
       # Build Astro with root-relative URLs. ASTRO_BASE=/ removes the
       # /swift-terminal-ui prefix that the GH Pages build keeps.
@@ -198,24 +199,26 @@ jobs:
           # WebExample at /webexample/.
           cp -R Examples/WebExample/pages-dist/. "$WEBEXAMPLE_ROOT/"
           # Cloudflare Pages rejects individual uploaded assets larger than
-          # 25 MiB. Keep the public URL stable, but store the wasm bytes
-          # Brotli-encoded and advertise that in Website/public/_headers.
+          # 25 MiB. `bun run build:wasm` keeps the public URL stable, but
+          # stores the wasm bytes Brotli-encoded and advertises that in
+          # Website/public/_headers.
           wasm_path="$WEBEXAMPLE_ROOT/TerminalApp/dist/assets/app.wasm"
-          compressed_wasm_path="$wasm_path.br"
           if [ ! -f "$wasm_path" ]; then
             echo "::error::Missing WebExample wasm at $wasm_path"
             exit 1
           fi
-          brotli -f -q 11 "$wasm_path" -o "$compressed_wasm_path"
-          compressed_wasm_size="$(wc -c < "$compressed_wasm_path" | tr -d '[:space:]')"
+          if ! brotli --test "$wasm_path"; then
+            echo "::error::WebExample wasm should already be Brotli-compressed by bun run build:wasm"
+            exit 1
+          fi
+          compressed_wasm_size="$(wc -c < "$wasm_path" | tr -d '[:space:]')"
           pages_asset_limit=$((25 * 1024 * 1024))
           if [ "$compressed_wasm_size" -ge "$pages_asset_limit" ]; then
             echo "::error::Brotli-compressed WebExample wasm is ${compressed_wasm_size} bytes"
             echo "::error::Still above Cloudflare Pages' 25 MiB single-file limit"
             exit 1
           fi
-          mv "$compressed_wasm_path" "$wasm_path"
-          echo "Brotli-compressed WebExample wasm to ${compressed_wasm_size} bytes for Cloudflare Pages upload"
+          echo "Verified Brotli-compressed WebExample wasm at ${compressed_wasm_size} bytes"
           artifact_file_count="$(find "$ARTIFACT_ROOT" -type f | wc -l | tr -d '[:space:]')"
           pages_file_limit="${CLOUDFLARE_PAGES_FILE_LIMIT:-20000}"
           echo "Cloudflare Pages artifact contains ${artifact_file_count} files"

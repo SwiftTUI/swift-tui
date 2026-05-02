@@ -13,6 +13,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { generateSceneManifest } from "./src/build/generateSceneManifest.ts";
 import { buildAppWasm } from "./src/build/buildAppWasm.ts";
+import type { WasmBuildConfiguration } from "./src/build/resolveSwiftArtifacts.ts";
 
 if (import.meta.main) {
   void runCli(process.argv.slice(2));
@@ -24,6 +25,7 @@ async function runCli(argv: string[]): Promise<void> {
   const packagePath = resolve(flags["package-path"] ?? "../../");
   const distPath = resolve(flags["dist"] ?? "./dist");
   const appExecutable = flags.app ?? flags.product ?? flags["app-product"] ?? "";
+  const wasmConfiguration = parseWasmBuildConfiguration(flags.configuration ?? "release");
 
   switch (command) {
     case "build:manifest": {
@@ -38,6 +40,7 @@ async function runCli(argv: string[]): Promise<void> {
     case "build:wasm": {
       assertAppExecutable(appExecutable);
       await buildAppWasm({
+        configuration: wasmConfiguration,
         packagePath,
         outputDirectory: distPath,
         product: appExecutable,
@@ -60,6 +63,7 @@ async function runCli(argv: string[]): Promise<void> {
         appExecutable,
       });
       await buildAppWasm({
+        configuration: wasmConfiguration,
         packagePath,
         outputDirectory: distPath,
         product: appExecutable,
@@ -146,6 +150,11 @@ function parseFlags(
     if (!value.startsWith("--")) {
       continue;
     }
+    const equalsIndex = value.indexOf("=");
+    if (equalsIndex !== -1) {
+      flags[value.slice(2, equalsIndex)] = value.slice(equalsIndex + 1);
+      continue;
+    }
     const name = value.slice(2);
     const next = argv[index + 1];
     if (next && !next.startsWith("--")) {
@@ -156,6 +165,17 @@ function parseFlags(
     }
   }
   return flags;
+}
+
+function parseWasmBuildConfiguration(value: string): WasmBuildConfiguration {
+  switch (value) {
+    case "debug":
+      return "debug";
+    case "release":
+      return "release";
+    default:
+      throw new Error(`unsupported wasm build configuration: ${value}`);
+  }
 }
 
 function assertAppExecutable(

@@ -69,6 +69,9 @@ controller.setStyle({ cursorBlink: true, theme: { tint: "#79c0ff" } });
 - `bun run build -- --app <AppExecutable>`
 - `bun run dev`
 
+`build:wasm` and `build` default to `--configuration release`. Pass
+`--configuration debug` for local debug-oriented wasm builds.
+
 The build flow is intentionally small:
 
 1. `build:manifest` captures `TUIGUI_MODE=manifest` output from the Swift app by invoking `swiftly run swift`.

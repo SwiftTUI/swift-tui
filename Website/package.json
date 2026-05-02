@@ -6,6 +6,12 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
+    "compress:wasm": "bun run scripts/minify-webexample-wasm.ts --quality 11",
+    "compress:wasm:dev": "bun run scripts/minify-webexample-wasm.ts --quality 9",
+    "build:wasm": "bun run --cwd ../Examples/WebExample build && bun run compress:wasm",
+    "build:wasm:dev": "bun run --cwd ../Examples/WebExample build:dev && bun run compress:wasm:dev",
+    "build:full": "bun run build:wasm && bun run build",
+    "build:dev": "bun run build:wasm:dev && bun run build",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
