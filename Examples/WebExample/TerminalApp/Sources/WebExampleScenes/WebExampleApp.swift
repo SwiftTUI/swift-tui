@@ -6,7 +6,7 @@ public struct WebExampleApp: App {
 
   public var body: some Scene {
     WindowGroup("Component Gallery") {
-      GalleryView()
+      LimitedGalleryView()
     }
     WindowGroup("Details", id: WindowIdentifier("details")) {
       GeometryReader { geometry in
