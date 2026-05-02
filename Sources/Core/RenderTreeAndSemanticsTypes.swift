@@ -34,6 +34,7 @@ public struct TabItemLabel: Equatable, Sendable, CustomStringConvertible {
 public struct SemanticMetadata: Equatable, Sendable {
   private var explicitFocusability: Bool?
   package var focusScopeBoundary: Bool
+  package var focusScopeIdentity: Identity?
   package var focusSectionBoundary: Bool
   /// When `true`, focusable descendants of this node are suppressed
   /// during semantic extraction — the node itself remains focusable
@@ -53,6 +54,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   public var explicitInteractionRect: CellRect?
   public var explicitInteractionPath: Path?
   public var namedCoordinateSpaceName: String?
+  package var interactionAvailability: InteractionAvailability
 
   public var isFocusable: Bool {
     get { explicitFocusability ?? false }
@@ -88,6 +90,7 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.init(
       isFocusable: isFocusable,
       focusScopeBoundary: false,
+      focusScopeIdentity: nil,
       focusSectionBoundary: false,
       sealsFocusDescendants: false,
       focusInteractions: focusInteractions,
@@ -108,6 +111,7 @@ public struct SemanticMetadata: Equatable, Sendable {
   package init(
     isFocusable: Bool? = nil,
     focusScopeBoundary: Bool = false,
+    focusScopeIdentity: Identity? = nil,
     focusSectionBoundary: Bool = false,
     sealsFocusDescendants: Bool = false,
     focusInteractions: FocusInteractions = .automatic,
@@ -121,10 +125,12 @@ public struct SemanticMetadata: Equatable, Sendable {
     tabItemLabel: TabItemLabel? = nil,
     explicitInteractionRect: CellRect? = nil,
     explicitInteractionPath: Path? = nil,
-    namedCoordinateSpaceName: String? = nil
+    namedCoordinateSpaceName: String? = nil,
+    interactionAvailability: InteractionAvailability = .enabled
   ) {
     explicitFocusability = isFocusable
     self.focusScopeBoundary = focusScopeBoundary
+    self.focusScopeIdentity = focusScopeIdentity
     self.focusSectionBoundary = focusSectionBoundary
     self.sealsFocusDescendants = sealsFocusDescendants
     self.focusInteractions = focusInteractions
@@ -139,12 +145,14 @@ public struct SemanticMetadata: Equatable, Sendable {
     self.explicitInteractionRect = explicitInteractionRect
     self.explicitInteractionPath = explicitInteractionPath
     self.namedCoordinateSpaceName = namedCoordinateSpaceName
+    self.interactionAvailability = interactionAvailability
   }
 
   public func merging(_ other: Self) -> Self {
     Self(
       isFocusable: other.explicitFocusability ?? explicitFocusability,
       focusScopeBoundary: other.focusScopeBoundary || focusScopeBoundary,
+      focusScopeIdentity: other.focusScopeIdentity ?? focusScopeIdentity,
       focusSectionBoundary: other.focusSectionBoundary || focusSectionBoundary,
       sealsFocusDescendants: other.sealsFocusDescendants || sealsFocusDescendants,
       focusInteractions: other.focusInteractions == .automatic
@@ -161,8 +169,26 @@ public struct SemanticMetadata: Equatable, Sendable {
       tabItemLabel: other.tabItemLabel ?? tabItemLabel,
       explicitInteractionRect: other.explicitInteractionRect ?? explicitInteractionRect,
       explicitInteractionPath: other.explicitInteractionPath ?? explicitInteractionPath,
-      namedCoordinateSpaceName: other.namedCoordinateSpaceName ?? namedCoordinateSpaceName
+      namedCoordinateSpaceName: other.namedCoordinateSpaceName ?? namedCoordinateSpaceName,
+      interactionAvailability: mergedInteractionAvailability(
+        interactionAvailability,
+        other.interactionAvailability
+      )
     )
+  }
+}
+
+private func mergedInteractionAvailability(
+  _ current: InteractionAvailability,
+  _ next: InteractionAvailability
+) -> InteractionAvailability {
+  switch (current, next) {
+  case (.disabled, _):
+    current
+  case (_, .disabled):
+    next
+  case (.enabled, .enabled):
+    .enabled
   }
 }
 

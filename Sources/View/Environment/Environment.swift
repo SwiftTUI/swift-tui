@@ -319,6 +319,7 @@ public struct ResolveContext: Equatable, Sendable {
       localTaskRegistry: localTaskRegistry,
       applyEnvironmentValues: false
     )
+    childContext.localTerminationRegistry = localTerminationRegistry
     childContext.localGestureRegistry = localGestureRegistry
     childContext.localGestureStateRegistry = localGestureStateRegistry
     childContext.localPointerHandlerRegistry = localPointerHandlerRegistry
@@ -362,6 +363,7 @@ public struct ResolveContext: Equatable, Sendable {
       localTaskRegistry: localTaskRegistry,
       applyEnvironmentValues: false
     )
+    replacedContext.localTerminationRegistry = localTerminationRegistry
     replacedContext.localGestureRegistry = localGestureRegistry
     replacedContext.localGestureStateRegistry = localGestureStateRegistry
     replacedContext.localPointerHandlerRegistry = localPointerHandlerRegistry

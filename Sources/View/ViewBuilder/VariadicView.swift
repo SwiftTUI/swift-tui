@@ -62,6 +62,17 @@ public struct VariadicView<Content: View>: View, ResolvableView, DeclaredChildre
     }
   }
 
+  package func appendPortalDeclaredChildren(
+    into children: inout [PortalContentPayload]
+  ) {
+    for element in content {
+      appendPortalDeclaredBuilderChildren(
+        from: element,
+        into: &children
+      )
+    }
+  }
+
   package func enumerateDeclaredChildren(
     in context: ResolveContext,
     kindName: String,

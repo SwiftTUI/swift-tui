@@ -15,7 +15,7 @@ extension ViewGraph {
     package var viewportLifecycleOrder: [Identity]
     package var frameOrder: [Identity]
     package var stableTaskCancelEvents: [LifecycleEvent]
-    package var stableTaskStartIdentities: [Identity]
+    package var stableTaskStartEvents: [LifecycleEvent]
     package var structuralAppearEvents: [LifecycleEvent]
     package var structuralTaskCancelEvents: [LifecycleEvent]
     package var structuralDisappearEvents: [LifecycleEvent]
@@ -49,7 +49,7 @@ extension ViewGraph {
       viewportLifecycleOrder: viewportLifecycleOrder,
       frameOrder: frameOrder,
       stableTaskCancelEvents: stableTaskCancelEvents,
-      stableTaskStartIdentities: stableTaskStartIdentities,
+      stableTaskStartEvents: stableTaskStartEvents,
       structuralAppearEvents: structuralAppearEvents,
       structuralTaskCancelEvents: structuralTaskCancelEvents,
       structuralDisappearEvents: structuralDisappearEvents,
@@ -77,7 +77,7 @@ extension ViewGraph {
     viewportLifecycleOrder = checkpoint.viewportLifecycleOrder
     frameOrder = checkpoint.frameOrder
     stableTaskCancelEvents = checkpoint.stableTaskCancelEvents
-    stableTaskStartIdentities = checkpoint.stableTaskStartIdentities
+    stableTaskStartEvents = checkpoint.stableTaskStartEvents
     structuralAppearEvents = checkpoint.structuralAppearEvents
     structuralTaskCancelEvents = checkpoint.structuralTaskCancelEvents
     structuralDisappearEvents = checkpoint.structuralDisappearEvents
@@ -117,7 +117,7 @@ package final class ViewGraph {
   private var viewportLifecycleOrder: [Identity]
   private var frameOrder: [Identity]
   private var stableTaskCancelEvents: [LifecycleEvent]
-  private var stableTaskStartIdentities: [Identity]
+  private var stableTaskStartEvents: [LifecycleEvent]
   private var structuralAppearEvents: [LifecycleEvent]
   private var structuralTaskCancelEvents: [LifecycleEvent]
   private var structuralDisappearEvents: [LifecycleEvent]
@@ -148,7 +148,7 @@ package final class ViewGraph {
     viewportLifecycleOrder = []
     frameOrder = []
     stableTaskCancelEvents = []
-    stableTaskStartIdentities = []
+    stableTaskStartEvents = []
     structuralAppearEvents = []
     structuralTaskCancelEvents = []
     structuralDisappearEvents = []
@@ -179,6 +179,12 @@ package final class ViewGraph {
   /// invalidation.
   package func nodeForIdentity(_ identity: Identity) -> ViewNode? {
     nodesByIdentity[identity]
+  }
+
+  package func containsNode(
+    for identity: Identity
+  ) -> Bool {
+    nodesByIdentity[identity] != nil
   }
 
   /// Invalidates identities AND queues them as graph-local dirty so that
@@ -365,7 +371,7 @@ package final class ViewGraph {
     currentFrameID &+= 1
     frameOrder.removeAll(keepingCapacity: true)
     stableTaskCancelEvents.removeAll(keepingCapacity: true)
-    stableTaskStartIdentities.removeAll(keepingCapacity: true)
+    stableTaskStartEvents.removeAll(keepingCapacity: true)
     structuralAppearEvents.removeAll(keepingCapacity: true)
     structuralTaskCancelEvents.removeAll(keepingCapacity: true)
     structuralDisappearEvents.removeAll(keepingCapacity: true)
@@ -440,7 +446,7 @@ package final class ViewGraph {
       {
         stableTaskCancelEvents.append(
           .init(
-            identity: node.identity,
+            identity: previousResolvedIdentity,
             operation: .taskCancel(previousTask)
           )
         )
@@ -449,7 +455,12 @@ package final class ViewGraph {
         currentTask != node.previousLifecycleMetadata.task,
         node.participatesInStructuralLifecycle
       {
-        stableTaskStartIdentities.append(node.identity)
+        stableTaskStartEvents.append(
+          .init(
+            identity: node.resolvedIdentity,
+            operation: .taskStart(currentTask)
+          )
+        )
       }
       node.setLifecycleState(.alive)
     } else {
@@ -464,9 +475,14 @@ package final class ViewGraph {
         )
       }
       if node.participatesInStructuralLifecycle,
-        node.lifecycleMetadata.task != nil
+        let task = node.lifecycleMetadata.task
       {
-        stableTaskStartIdentities.append(node.identity)
+        stableTaskStartEvents.append(
+          .init(
+            identity: node.resolvedIdentity,
+            operation: .taskStart(task)
+          )
+        )
       }
       node.setLifecycleState(.appearing)
     }
@@ -574,6 +590,7 @@ package final class ViewGraph {
       frameID: currentFrameID,
       invalidator: invalidator
     )
+    let previousResolvedIdentity = node.resolvedIdentity
     let childNodes = subtree.children.map { child -> ViewNode in
       recordReusedSubtree(
         child,
@@ -601,9 +618,14 @@ package final class ViewGraph {
         )
       }
       if node.participatesInStructuralLifecycle,
-        node.lifecycleMetadata.task != nil
+        let task = node.lifecycleMetadata.task
       {
-        stableTaskStartIdentities.append(node.identity)
+        stableTaskStartEvents.append(
+          .init(
+            identity: node.resolvedIdentity,
+            operation: .taskStart(task)
+          )
+        )
       }
       node.setLifecycleState(.appearing)
     } else {
@@ -613,7 +635,7 @@ package final class ViewGraph {
       {
         stableTaskCancelEvents.append(
           .init(
-            identity: node.identity,
+            identity: previousResolvedIdentity,
             operation: .taskCancel(previousTask)
           )
         )
@@ -622,7 +644,12 @@ package final class ViewGraph {
         currentTask != node.previousLifecycleMetadata.task,
         node.participatesInStructuralLifecycle
       {
-        stableTaskStartIdentities.append(node.identity)
+        stableTaskStartEvents.append(
+          .init(
+            identity: node.resolvedIdentity,
+            operation: .taskStart(currentTask)
+          )
+        )
       }
       node.setLifecycleState(.alive)
     }
@@ -658,7 +685,18 @@ package final class ViewGraph {
     let invalidationSummary =
       invalidationSummary
       ?? .init(invalidatedIdentities: invalidatedIdentities)
-    if !invalidationSummary.intersectsSubtree(at: identity) {
+    let resolvedIdentity = node.resolvedIdentity
+    let identityIntersectsInvalidation =
+      invalidationSummary.intersectsSubtree(at: identity)
+      || (resolvedIdentity != identity
+        && invalidationSummary.intersectsSubtree(at: resolvedIdentity))
+    let structurallyIntersectsInvalidation = structuralInvalidationIntersects(
+      node,
+      invalidatedIdentities: invalidatedIdentities
+    )
+    if !identityIntersectsInvalidation,
+      !structurallyIntersectsInvalidation
+    {
       let snapshot = node.snapshot()
       recordReusedSubtree(
         snapshot,
@@ -671,8 +709,13 @@ package final class ViewGraph {
       invalidatedIdentity == identity
         || invalidatedIdentity.isDescendant(of: identity)
         || identity.isDescendant(of: invalidatedIdentity)
+        || invalidatedIdentity == resolvedIdentity
+        || invalidatedIdentity.isDescendant(of: resolvedIdentity)
+        || resolvedIdentity.isDescendant(of: invalidatedIdentity)
     }
-    guard !conflictsWithInvalidation else {
+    guard !conflictsWithInvalidation,
+      !structurallyIntersectsInvalidation
+    else {
       return nil
     }
     let snapshot = node.snapshot()
@@ -763,16 +806,6 @@ package final class ViewGraph {
         operation: .change(handlerIDs: node.pendingChangeHandlerIDs)
       )
     }
-    let structuralTaskStarts = stableTaskStartIdentities.compactMap { identity -> LifecycleEvent? in
-      guard let task = nodesByIdentity[identity]?.lifecycleMetadata.task else {
-        return nil
-      }
-      return .init(
-        identity: identity,
-        operation: .taskStart(task)
-      )
-    }
-
     latestLifecycleEvents =
       stableTaskCancelEvents
       + structuralTaskCancelEvents
@@ -783,7 +816,7 @@ package final class ViewGraph {
       + viewportAppears
       + changeEvents
       + viewportChanges
-      + structuralTaskStarts
+      + stableTaskStartEvents
       + viewportTaskStarts
 
     liveIdentities.formUnion(frameOrder)
@@ -898,6 +931,24 @@ package final class ViewGraph {
     return nil
   }
 
+  private func structuralInvalidationIntersects(
+    _ node: ViewNode,
+    invalidatedIdentities: Set<Identity>
+  ) -> Bool {
+    for invalidatedIdentity in invalidatedIdentities {
+      guard let invalidatedNode = nodesByIdentity[invalidatedIdentity] else {
+        continue
+      }
+      if invalidatedNode === node
+        || invalidatedNode.isDescendant(of: node)
+        || node.isDescendant(of: invalidatedNode)
+      {
+        return true
+      }
+    }
+    return false
+  }
+
   private func nodeForIdentity(
     for identity: Identity
   ) -> ViewNode {
@@ -1004,14 +1055,20 @@ package final class ViewGraph {
         continue
       }
 
+      let removedSnapshot =
+        node.committed.children.indices.contains(oldIndex)
+        ? node.committed.children[oldIndex]
+        : nil
       removeSubtree(
-        rootedAt: node.children[oldIndex]
+        rootedAt: node.children[oldIndex],
+        committedSnapshot: removedSnapshot
       )
     }
   }
 
   private func removeSubtree(
-    rootedAt node: ViewNode
+    rootedAt node: ViewNode,
+    committedSnapshot: ResolvedNode? = nil
   ) {
     guard let current = nodesByIdentity[node.identity],
       current === node
@@ -1020,29 +1077,44 @@ package final class ViewGraph {
     }
 
     node.prepareForFrame(currentFrameID)
-
-    for child in node.children {
-      removeSubtree(rootedAt: child)
+    let snapshot = committedSnapshot ?? node.committed
+    if snapshot.children.isEmpty {
+      for child in node.children {
+        removeSubtree(rootedAt: child)
+      }
+    } else {
+      for child in snapshot.children {
+        removeResolvedSubtree(child)
+      }
     }
 
+    let lifecycleMetadata =
+      if !node.previousLifecycleMetadata.isEmpty {
+        node.previousLifecycleMetadata
+      } else if !node.lifecycleMetadata.isEmpty {
+        node.lifecycleMetadata
+      } else {
+        snapshot.lifecycleMetadata
+      }
+
     if node.participatesInStructuralLifecycle,
-      let task = node.previousLifecycleMetadata.task
+      let task = lifecycleMetadata.task
     {
       structuralTaskCancelEvents.append(
         .init(
-          identity: node.identity,
+          identity: snapshot.identity,
           operation: .taskCancel(task)
         )
       )
     }
     if node.participatesInStructuralLifecycle,
-      !node.previousLifecycleMetadata.disappearHandlerIDs.isEmpty
+      !lifecycleMetadata.disappearHandlerIDs.isEmpty
     {
       structuralDisappearEvents.append(
         .init(
           identity: node.identity,
           operation: .disappear(
-            handlerIDs: node.previousLifecycleMetadata.disappearHandlerIDs
+            handlerIDs: lifecycleMetadata.disappearHandlerIDs
           )
         )
       )
@@ -1062,6 +1134,33 @@ package final class ViewGraph {
     }
     registrationAliasesByIdentity.removeValue(forKey: node.identity)
     nodesByIdentity.removeValue(forKey: node.identity)
+  }
+
+  private func removeResolvedSubtree(
+    _ resolved: ResolvedNode
+  ) {
+    if let node = nodesByIdentity[resolved.identity] {
+      removeSubtree(
+        rootedAt: node,
+        committedSnapshot: resolved
+      )
+      return
+    }
+
+    let aliasNodes = (registrationAliasesByIdentity[resolved.identity] ?? [])
+      .compactMap { nodesByIdentity[$0] }
+      .sorted { $0.identity < $1.identity }
+    if let node = aliasNodes.first {
+      removeSubtree(
+        rootedAt: node,
+        committedSnapshot: resolved
+      )
+      return
+    }
+
+    for child in resolved.children {
+      removeResolvedSubtree(child)
+    }
   }
 
   private func reindexDependencies(

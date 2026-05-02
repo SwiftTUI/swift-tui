@@ -122,7 +122,7 @@ It uses `DefaultRenderer`, which is richer and stateful.
 
 - `ViewGraph`
 - `FrameResolveState`
-- `PresentationHostState`
+- `PresentationPortalState`
 - `AnimationController`
 - `RetainedFrameStore`
 - `LayoutEngine` and its `MeasurementCache`

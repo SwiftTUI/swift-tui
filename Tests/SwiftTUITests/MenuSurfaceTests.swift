@@ -193,16 +193,15 @@ struct MenuSurfaceTests {
     #expect(surface.contains("Item 2"))
     #expect(dividerNode?.kind == .view("Divider"))
     #expect(surface.contains("────"))
-    // Menu items render as part of the overlay's focus scope, not the
-    // base content's. The base trigger gets disabled while the overlay
-    // is active (sheet-coordinator semantics in v1), so the focus
-    // regions list now consists of overlay-rooted regions only.
+    // Menu items render as part of the portal overlay's focus scope, while
+    // the base trigger remains focusable because menus are non-modal.
     let focusIdentities = expandedArtifacts.semanticSnapshot.focusRegions.map(\.identity)
-    let allOverlayRooted = focusIdentities.allSatisfy {
-      $0.path.contains("PresentationHost")
+    let hasOverlayItem = focusIdentities.contains {
+      $0.path.contains("PortalHost/overlays")
     }
     #expect(!focusIdentities.isEmpty)
-    #expect(allOverlayRooted)
+    #expect(focusIdentities.contains(testIdentity("Menu")))
+    #expect(hasOverlayItem)
   }
 
   @Test("Menu overlay measures intrinsically even when rows contain shortcut hint spacers")

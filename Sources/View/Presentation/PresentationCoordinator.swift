@@ -105,11 +105,13 @@ package protocol PresentationCoordinator: AnyObject {
 
 @MainActor
 package protocol ManagedPresentationCoordinator: PresentationCoordinator {
-  static var disablesBaseInteractionWhenActive: Bool { get }
+  static var modalPolicy: PortalModalPolicy { get }
   static var overlayKindName: String { get }
 
   var isActive: Bool { get }
   var latestItem: Item? { get }
+  var latestActivationOrdinal: Int? { get }
+  func dismissAction(for item: Item) -> (@MainActor @Sendable () -> Void)?
 
   func beginSynchronizing()
   func sync(sourceIdentity: Identity, items: [Item])
@@ -118,11 +120,13 @@ package protocol ManagedPresentationCoordinator: PresentationCoordinator {
     identity: Identity,
     invalidator: (any Invalidating)?
   )
+  func makeCheckpoint() -> StoredPresentationCoordinatorCheckpoint<Item>
+  func restoreCheckpoint(_ checkpoint: StoredPresentationCoordinatorCheckpoint<Item>)
 }
 
 // MARK: - Shared Item Storage
 
-private struct TrackedPresentationItem<Item: Identifiable & Sendable>: Sendable
+package struct TrackedPresentationItem<Item: Identifiable & Sendable>: Sendable
 where Item.ID: Sendable {
   var item: Item
   var activationOrdinal: Int
@@ -131,12 +135,35 @@ where Item.ID: Sendable {
 @MainActor
 package final class PresentationFamilyItemStore<Item: Identifiable & Sendable>
 where Item.ID: Sendable {
+  package struct Checkpoint: Sendable {
+    fileprivate var declarativeItemsBySource: [Identity: [Item.ID: TrackedPresentationItem<Item>]]
+    fileprivate var imperativeItemsByID: [Item.ID: TrackedPresentationItem<Item>]
+    fileprivate var seenSources: Set<Identity>
+    fileprivate var nextActivationOrdinal: Int
+  }
+
   private var declarativeItemsBySource: [Identity: [Item.ID: TrackedPresentationItem<Item>]] = [:]
   private var imperativeItemsByID: [Item.ID: TrackedPresentationItem<Item>] = [:]
   private var seenSources: Set<Identity> = []
   private var nextActivationOrdinal = 0
 
   package init() {}
+
+  package func makeCheckpoint() -> Checkpoint {
+    Checkpoint(
+      declarativeItemsBySource: declarativeItemsBySource,
+      imperativeItemsByID: imperativeItemsByID,
+      seenSources: seenSources,
+      nextActivationOrdinal: nextActivationOrdinal
+    )
+  }
+
+  package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    declarativeItemsBySource = checkpoint.declarativeItemsBySource
+    imperativeItemsByID = checkpoint.imperativeItemsByID
+    seenSources = checkpoint.seenSources
+    nextActivationOrdinal = checkpoint.nextActivationOrdinal
+  }
 
   package func beginSynchronizing() {
     seenSources.removeAll(keepingCapacity: true)
@@ -206,6 +233,18 @@ where Item.ID: Sendable {
 
   package var latestItem: Item? {
     newestFirst.first
+  }
+
+  package var latestActivationOrdinal: Int? {
+    mergedActiveItems()
+      .values
+      .max { lhs, rhs in
+        if lhs.activationOrdinal != rhs.activationOrdinal {
+          return lhs.activationOrdinal < rhs.activationOrdinal
+        }
+        return String(reflecting: lhs.item.id) < String(reflecting: rhs.item.id)
+      }?
+      .activationOrdinal
   }
 
   package var newestFirst: [Item] {
@@ -281,6 +320,13 @@ where Item.ID: Sendable {
 }
 
 @MainActor
+package struct StoredPresentationCoordinatorCheckpoint<Item: Identifiable & Sendable>: Sendable
+where Item.ID: Sendable {
+  fileprivate var itemStore: PresentationFamilyItemStore<Item>.Checkpoint
+  fileprivate var invalidationIdentity: Identity?
+}
+
+@MainActor
 package class StoredPresentationCoordinator<Item: Identifiable & Sendable>
 where Item.ID: Sendable {
   package let itemStore = PresentationFamilyItemStore<Item>()
@@ -289,6 +335,20 @@ where Item.ID: Sendable {
   private var invalidationIdentity: Identity?
 
   package init() {}
+
+  package func makeCheckpoint() -> StoredPresentationCoordinatorCheckpoint<Item> {
+    StoredPresentationCoordinatorCheckpoint(
+      itemStore: itemStore.makeCheckpoint(),
+      invalidationIdentity: invalidationIdentity
+    )
+  }
+
+  package func restoreCheckpoint(
+    _ checkpoint: StoredPresentationCoordinatorCheckpoint<Item>
+  ) {
+    itemStore.restoreCheckpoint(checkpoint.itemStore)
+    invalidationIdentity = checkpoint.invalidationIdentity
+  }
 
   package func setImperativeInvalidationTarget(
     identity: Identity,
@@ -322,6 +382,10 @@ where Item.ID: Sendable {
 
   package var latestItem: Item? {
     itemStore.latestItem
+  }
+
+  package var latestActivationOrdinal: Int? {
+    itemStore.latestActivationOrdinal
   }
 
   package var itemsNewestFirst: [Item] {
@@ -391,7 +455,7 @@ public enum PresentationChrome: Equatable, Sendable {
 }
 
 /// Controls how a prompt presentation surface accepts the full-screen
-/// overlay host's proposal.
+/// portal overlay proposal.
 package enum PromptPresentationContentSizing: Equatable, Sendable {
   /// Let the surface consume the host proposal. This preserves the
   /// existing sheet/dropdown behavior where content can expand to the
@@ -399,7 +463,7 @@ package enum PromptPresentationContentSizing: Equatable, Sendable {
   case fillAvailable
 
   /// Measure the surface at its intrinsic size before placing it in the
-  /// full-screen overlay host. Used by compact floating presentations
+  /// full-screen portal overlay. Used by compact floating presentations
   /// such as menus, where internal spacers must not stretch rows to the
   /// terminal width.
   case intrinsic
@@ -460,18 +524,18 @@ package struct PromptPresentationItem: Identifiable, Sendable {
   package var id: String
   package var title: String
   package var descriptor: PromptPresentationDescriptor
-  package var actionPayloads: [DeferredViewPayload]
-  package var messagePayloads: [DeferredViewPayload]
-  package var contentPayloads: [DeferredViewPayload]
+  package var actionPayloads: [PortalContentPayload]
+  package var messagePayloads: [PortalContentPayload]
+  package var contentPayloads: [PortalContentPayload]
   package var dismiss: @MainActor @Sendable () -> Void
 
   package init(
     id: String,
     title: String,
     descriptor: PromptPresentationDescriptor,
-    actionPayloads: [DeferredViewPayload],
-    messagePayloads: [DeferredViewPayload],
-    contentPayloads: [DeferredViewPayload],
+    actionPayloads: [PortalContentPayload],
+    messagePayloads: [PortalContentPayload],
+    contentPayloads: [PortalContentPayload],
     dismiss: @escaping @MainActor @Sendable () -> Void
   ) {
     self.id = id
@@ -486,14 +550,14 @@ package struct PromptPresentationItem: Identifiable, Sendable {
 
 package struct ToastPresentationItem: Identifiable, Sendable {
   package var id: String
-  package var contentPayloads: [DeferredViewPayload]
+  package var contentPayloads: [PortalContentPayload]
   package var presentation: ToastStylePresentation
   package var duration: Double?
   package var dismiss: @MainActor @Sendable () -> Void
 
   package init(
     id: String,
-    contentPayloads: [DeferredViewPayload],
+    contentPayloads: [PortalContentPayload],
     presentation: ToastStylePresentation,
     duration: Double?,
     dismiss: @escaping @MainActor @Sendable () -> Void
@@ -521,7 +585,7 @@ package final class AlertPresentationCoordinator:
   ManagedPresentationCoordinator
 {
   package static let zIndex = 260
-  package static let disablesBaseInteractionWhenActive = true
+  package static let modalPolicy = PortalModalPolicy.disablesBaseInteraction
   package static let overlayKindName = "AlertPresentation"
 
   @ViewBuilder
@@ -548,6 +612,12 @@ package final class AlertPresentationCoordinator:
       message: "AlertPresentationCoordinator.dismiss(id:) must not be called during view update."
     )
   }
+
+  package func dismissAction(
+    for item: PromptPresentationItem
+  ) -> (@MainActor @Sendable () -> Void)? {
+    item.dismiss
+  }
 }
 
 @MainActor
@@ -556,7 +626,7 @@ package final class ConfirmationDialogPresentationCoordinator:
   ManagedPresentationCoordinator
 {
   package static let zIndex = 240
-  package static let disablesBaseInteractionWhenActive = true
+  package static let modalPolicy = PortalModalPolicy.disablesBaseInteraction
   package static let overlayKindName = "ConfirmationDialogPresentation"
 
   @ViewBuilder
@@ -585,6 +655,12 @@ package final class ConfirmationDialogPresentationCoordinator:
         "ConfirmationDialogPresentationCoordinator.dismiss(id:) must not be called during view update."
     )
   }
+
+  package func dismissAction(
+    for item: PromptPresentationItem
+  ) -> (@MainActor @Sendable () -> Void)? {
+    item.dismiss
+  }
 }
 
 @MainActor
@@ -593,7 +669,7 @@ package final class SheetPresentationCoordinator:
   ManagedPresentationCoordinator
 {
   package static let zIndex = 200
-  package static let disablesBaseInteractionWhenActive = true
+  package static let modalPolicy = PortalModalPolicy.disablesBaseInteraction
   package static let overlayKindName = "SheetPresentation"
 
   @ViewBuilder
@@ -620,6 +696,53 @@ package final class SheetPresentationCoordinator:
       message: "SheetPresentationCoordinator.dismiss(id:) must not be called during view update."
     )
   }
+
+  package func dismissAction(
+    for item: PromptPresentationItem
+  ) -> (@MainActor @Sendable () -> Void)? {
+    item.dismiss
+  }
+}
+
+@MainActor
+package final class MenuPresentationCoordinator:
+  StoredPresentationCoordinator<PromptPresentationItem>,
+  ManagedPresentationCoordinator
+{
+  package static let zIndex = 180
+  package static let modalPolicy = PortalModalPolicy.nonModal
+  package static let overlayKindName = "MenuPresentation"
+
+  @ViewBuilder
+  package func makeBody() -> some View {
+    if let latestItem {
+      HostedPromptPresentation(item: latestItem)
+    }
+  }
+
+  package func present(
+    _ item: PromptPresentationItem
+  ) {
+    super.present(
+      item,
+      message: "MenuPresentationCoordinator.present(_:) must not be called during view update."
+    )
+  }
+
+  package func dismiss(
+    id: String
+  ) {
+    super.dismiss(
+      id: id,
+      message: "MenuPresentationCoordinator.dismiss(id:) must not be called during view update."
+    )
+  }
+
+  package func dismissAction(
+    for item: PromptPresentationItem
+  ) -> (@MainActor @Sendable () -> Void)? {
+    item.dismiss
+  }
 }
 
 @MainActor
@@ -628,7 +751,7 @@ package final class ToastPresentationCoordinator:
   ManagedPresentationCoordinator
 {
   package static let zIndex = 100
-  package static let disablesBaseInteractionWhenActive = false
+  package static let modalPolicy = PortalModalPolicy.nonModal
   package static let overlayKindName = "ToastPresentation"
 
   @ViewBuilder
@@ -654,6 +777,12 @@ package final class ToastPresentationCoordinator:
       id: id,
       message: "ToastPresentationCoordinator.dismiss(id:) must not be called during view update."
     )
+  }
+
+  package func dismissAction(
+    for _: ToastPresentationItem
+  ) -> (@MainActor @Sendable () -> Void)? {
+    nil
   }
 }
 
@@ -710,27 +839,36 @@ extension EnvironmentValues {
 
 // MARK: - Coordinator Registry
 
-package struct PresentationOverlayEntry: Sendable {
-  var zIndex: Int
-  var kindName: String
-  var payload: DeferredViewPayload
-}
-
 @MainActor
 package final class PresentationCoordinatorBox<C: ManagedPresentationCoordinator>
 where C.Item.ID: Sendable {
+  package struct Checkpoint: Sendable {
+    fileprivate var coordinator: StoredPresentationCoordinatorCheckpoint<C.Item>?
+  }
+
   private var coordinator: C?
   private weak var configuredInvalidator: (any Invalidating)?
   private var configuredInvalidationIdentity: Identity?
 
   package init() {}
 
-  package var zIndex: Int {
-    C.zIndex
+  package func makeCheckpoint() -> Checkpoint {
+    Checkpoint(
+      coordinator: coordinator?.makeCheckpoint()
+    )
   }
 
-  package var disablesBaseInteractionWhenActive: Bool {
-    C.disablesBaseInteractionWhenActive && isActive
+  package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    guard let coordinatorCheckpoint = checkpoint.coordinator else {
+      coordinator = nil
+      return
+    }
+
+    instance().restoreCheckpoint(coordinatorCheckpoint)
+  }
+
+  package var zIndex: Int {
+    C.zIndex
   }
 
   package var isActive: Bool {
@@ -791,15 +929,24 @@ where C.Item.ID: Sendable {
     )
   }
 
-  package func overlayEntry() -> PresentationOverlayEntry? {
-    guard let coordinator, coordinator.isActive else {
+  package func overlayEntry() -> OverlayStackEntry? {
+    guard let coordinator, coordinator.isActive, let item = coordinator.latestItem else {
       return nil
     }
 
-    return PresentationOverlayEntry(
-      zIndex: C.zIndex,
+    let stableID = "\(C.overlayKindName):\(String(reflecting: item.id))"
+    return OverlayStackEntry(
+      id: stableID,
+      ordering: PortalOrdering(
+        zIndex: C.zIndex,
+        activationOrdinal: coordinator.latestActivationOrdinal ?? 0,
+        stableTieBreaker: stableID
+      ),
       kindName: C.overlayKindName,
-      payload: DeferredViewPayload {
+      modalPolicy: C.modalPolicy,
+      acceptsEscape: coordinator.dismissAction(for: item) != nil,
+      dismiss: coordinator.dismissAction(for: item),
+      payload: PortalContentPayload {
         coordinator.makeBody()
       }
     )
@@ -826,8 +973,7 @@ where C.Item.ID: Sendable {
 private struct AnyPresentationCoordinatorBox {
   private let beginSynchronizingImpl: @MainActor () -> Void
   private let endSynchronizingImpl: @MainActor () -> Void
-  private let overlayEntryImpl: @MainActor () -> PresentationOverlayEntry?
-  private let disablesBaseInteractionWhenActiveImpl: @MainActor () -> Bool
+  private let overlayEntryImpl: @MainActor () -> OverlayStackEntry?
 
   init<C>(
     _ box: PresentationCoordinatorBox<C>
@@ -840,9 +986,6 @@ private struct AnyPresentationCoordinatorBox {
     }
     overlayEntryImpl = {
       box.overlayEntry()
-    }
-    disablesBaseInteractionWhenActiveImpl = {
-      box.disablesBaseInteractionWhenActive
     }
   }
 
@@ -857,32 +1000,56 @@ private struct AnyPresentationCoordinatorBox {
   }
 
   @MainActor
-  func overlayEntry() -> PresentationOverlayEntry? {
+  func overlayEntry() -> OverlayStackEntry? {
     overlayEntryImpl()
-  }
-
-  @MainActor
-  var disablesBaseInteractionWhenActive: Bool {
-    disablesBaseInteractionWhenActiveImpl()
   }
 }
 
 @MainActor
 package final class PresentationCoordinatorRegistry {
+  package struct Checkpoint: Sendable {
+    fileprivate var alert: PresentationCoordinatorBox<AlertPresentationCoordinator>.Checkpoint
+    fileprivate var confirmationDialog:
+      PresentationCoordinatorBox<ConfirmationDialogPresentationCoordinator>.Checkpoint
+    fileprivate var sheet: PresentationCoordinatorBox<SheetPresentationCoordinator>.Checkpoint
+    fileprivate var menu: PresentationCoordinatorBox<MenuPresentationCoordinator>.Checkpoint
+    fileprivate var toast: PresentationCoordinatorBox<ToastPresentationCoordinator>.Checkpoint
+  }
+
   package let alert = PresentationCoordinatorBox<AlertPresentationCoordinator>()
   package let confirmationDialog = PresentationCoordinatorBox<
     ConfirmationDialogPresentationCoordinator
   >()
   package let sheet = PresentationCoordinatorBox<SheetPresentationCoordinator>()
+  package let menu = PresentationCoordinatorBox<MenuPresentationCoordinator>()
   package let toast = PresentationCoordinatorBox<ToastPresentationCoordinator>()
   private lazy var allBoxes = [
     AnyPresentationCoordinatorBox(alert),
     AnyPresentationCoordinatorBox(confirmationDialog),
     AnyPresentationCoordinatorBox(sheet),
+    AnyPresentationCoordinatorBox(menu),
     AnyPresentationCoordinatorBox(toast),
   ]
 
   package init() {}
+
+  package func makeCheckpoint() -> Checkpoint {
+    Checkpoint(
+      alert: alert.makeCheckpoint(),
+      confirmationDialog: confirmationDialog.makeCheckpoint(),
+      sheet: sheet.makeCheckpoint(),
+      menu: menu.makeCheckpoint(),
+      toast: toast.makeCheckpoint()
+    )
+  }
+
+  package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    alert.restoreCheckpoint(checkpoint.alert)
+    confirmationDialog.restoreCheckpoint(checkpoint.confirmationDialog)
+    sheet.restoreCheckpoint(checkpoint.sheet)
+    menu.restoreCheckpoint(checkpoint.menu)
+    toast.restoreCheckpoint(checkpoint.toast)
+  }
 
   package func injectHandles(
     into environmentValues: inout EnvironmentValues,
@@ -924,49 +1091,50 @@ package final class PresentationCoordinatorRegistry {
     }
   }
 
-  package var disablesBaseInteraction: Bool {
-    allBoxes.contains {
-      $0.disablesBaseInteractionWhenActive
-    }
-  }
-
-  package func overlayEntries() -> [PresentationOverlayEntry] {
+  package func overlayEntries() -> [OverlayStackEntry] {
     allBoxes
       .compactMap {
         $0.overlayEntry()
       }
       .sorted { lhs, rhs in
-        if lhs.zIndex != rhs.zIndex {
-          return lhs.zIndex < rhs.zIndex
-        }
-        return lhs.kindName < rhs.kindName
+        portalOrderingPrecedes(lhs.ordering, rhs.ordering)
       }
   }
 
-  /// Returns the dismiss action for the topmost Escape-dismissible
-  /// presentation currently active, or nil if none is active. Precedence
-  /// is by zIndex: `alert` > `confirmationDialog` > `sheet`. Toasts are
-  /// non-interactive and are never dismissed by Escape; they auto-expire
-  /// on their own timer.
-  package func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
-    if let item = alert.latestItem {
-      return item.dismiss
-    }
-    if let item = confirmationDialog.latestItem {
-      return item.dismiss
-    }
-    if let item = sheet.latestItem {
-      return item.dismiss
-    }
-    return nil
+  package func dismissStack() -> DismissStack {
+    DismissStack(
+      entries: overlayEntries().compactMap { entry in
+        guard let dismiss = entry.dismiss else {
+          return nil
+        }
+        return DismissStackEntry(
+          id: entry.id,
+          ordering: entry.ordering,
+          acceptsEscape: entry.acceptsEscape,
+          dismiss: dismiss
+        )
+      }
+    )
   }
 }
 
 @MainActor
-package final class PresentationHostState {
+package final class PresentationPortalState {
+  package struct Checkpoint: Sendable {
+    fileprivate var registry: PresentationCoordinatorRegistry.Checkpoint
+  }
+
   private let registry = PresentationCoordinatorRegistry()
 
   package init() {}
+
+  package func makeCheckpoint() -> Checkpoint {
+    Checkpoint(registry: registry.makeCheckpoint())
+  }
+
+  package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    registry.restoreCheckpoint(checkpoint.registry)
+  }
 
   package func injectHandles(
     into environmentValues: inout EnvironmentValues,
@@ -986,17 +1154,12 @@ package final class PresentationHostState {
     registry.reconcile(declarations)
   }
 
-  package var disablesBaseInteraction: Bool {
-    registry.disablesBaseInteraction
-  }
-
-  package func overlayEntries() -> [PresentationOverlayEntry] {
+  package func overlayEntries() -> [OverlayStackEntry] {
     registry.overlayEntries()
   }
 
-  /// See `PresentationCoordinatorRegistry.topmostEscapeDismissAction`.
-  package func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
-    registry.topmostEscapeDismissAction()
+  package func dismissStack() -> DismissStack {
+    registry.dismissStack()
   }
 }
 
@@ -1045,165 +1208,89 @@ package enum PresentationCoordinatorDeclarationPreferenceKey: PreferenceKey {
 
 // MARK: - Hosting Root
 
-package struct PresentationHostingRoot<Content: View>: View, ResolvableView {
+package func presentationPortalIdentity(
+  for contentRootIdentity: Identity
+) -> Identity {
+  Identity(
+    components: [
+      "__TerminalUIPortalHost",
+      contentRootIdentity.path.isEmpty ? "$root" : contentRootIdentity.path,
+    ])
+}
+
+package struct PresentationPortalRoot<Content: View>: View, ResolvableView {
   package var content: Content
-  package var hostState: PresentationHostState
+  package var portalState: PresentationPortalState
+  package var contentRootIdentity: Identity
 
   package init(
     content: Content,
-    hostState: PresentationHostState
+    portalState: PresentationPortalState,
+    contentRootIdentity: Identity
   ) {
     self.content = content
-    self.hostState = hostState
+    self.portalState = portalState
+    self.contentRootIdentity = contentRootIdentity
   }
 
   package func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let hostIdentity = context.child(component: .named("PresentationHost")).identity
-    var contentContext = context
-    hostState.injectHandles(
+    let hostIdentity = context.identity
+    var contentContext = context.replacingIdentity(with: contentRootIdentity)
+    portalState.injectHandles(
       into: &contentContext.environmentValues,
       hostIdentity: hostIdentity,
       invalidator: context.invalidationProxy?.invalidator
     )
 
-    let baseNode = normalizeResolvedElements(
-      resolveViewElements(content, in: contentContext),
-      in: contentContext
-    )
-    reconcilePresentationDeclarations(
-      from: baseNode,
-      into: hostState
-    )
-    return [baseNode]
+    let baseNode = resolveView(content, in: contentContext)
+    return [
+      composePresentationPortalTree(
+        baseNode: baseNode,
+        portalState: portalState,
+        in: context
+      )
+    ]
   }
 }
 
 @MainActor
 private func reconcilePresentationDeclarations(
   from baseNode: ResolvedNode,
-  into hostState: PresentationHostState
+  into portalState: PresentationPortalState
 ) {
   let declarations = baseNode.preferenceValues[
     PresentationCoordinatorDeclarationPreferenceKey.self]
-  hostState.reconcile(declarations.declarations)
+  portalState.reconcile(declarations.declarations)
 }
 
 @MainActor
-package func composePresentationHostTree(
+package func composePresentationPortalTree(
   baseNode: ResolvedNode,
-  hostState: PresentationHostState,
+  portalState: PresentationPortalState,
   in context: ResolveContext
 ) -> ResolvedNode {
-  // Selective dirty evaluation can re-resolve only the presentation-
-  // declaring subtree. Reconcile from the current resolved snapshot so
-  // wrapper-hosted overlays still present on the same input frame even
-  // when the outer hosting root does not re-evaluate.
+  // The portal root is a graph-owned wrapper. Reconcile from the
+  // current base snapshot before choosing the wrapper children so stale
+  // declarations are removed through ordinary structural child diffing.
   reconcilePresentationDeclarations(
     from: baseNode,
-    into: hostState
+    into: portalState
   )
-  let hostContext = context.child(component: .named("PresentationHost"))
-  let overlayEntries = hostState.overlayEntries()
-  let overlayContext = hostContext.child(component: .named("overlay"))
-  let existingOverlayHost = context.viewGraph?.nodeForIdentity(overlayContext.identity)
-  let needsOverlayTeardown = existingOverlayHost?.children.isEmpty == false
-
-  guard !overlayEntries.isEmpty || needsOverlayTeardown else {
-    return baseNode
-  }
+  let overlayEntries = portalState.overlayEntries()
 
   guard !overlayEntries.isEmpty else {
-    context.runtimeRegistrations.removeSubtrees(rootedAt: [overlayContext.identity])
-    context.viewGraph?.pruneDetachedIdentitySubtree(rootedAt: overlayContext.identity)
-    return baseNode
-  }
-
-  let overlayNode = resolveView(
-    PresentationOverlayHost(entries: overlayEntries),
-    in: overlayContext
-  )
-
-  var hostedBaseNode = baseNode
-  if hostState.disablesBaseInteraction {
-    hostedBaseNode.setEnabledRecursively(false)
-  }
-  // The scene's focus-scope boundary lives on `baseNode` (the
-  // `WindowHostView` root). Once we wrap it alongside the overlay
-  // subtree, the overlay is a SIBLING of `baseNode` — so the scene's
-  // identity never lands on any focus region inside the overlay's
-  // `scopePath`. That breaks the "shallowest-wins" scope hypothesis
-  // for scene-level commands while a presentation is active.
-  //
-  // Fix: lift the scene's boundary up onto this synthesized wrapper
-  // so it becomes the nearest `focusScopeBoundary` ancestor of BOTH
-  // the hosted base content AND the overlay, stamping the scene's
-  // identity onto every descendant's `scopePath`. We clear the
-  // boundary from the inner base node to avoid a duplicate entry on
-  // regions rooted in the scene's own content.
-  hostedBaseNode.semanticMetadata.focusScopeBoundary = false
-
-  var hostSemantics = SemanticMetadata()
-  hostSemantics.focusScopeBoundary = true
-
-  return ResolvedNode(
-    identity: context.identity,
-    kind: .view("PresentationHost"),
-    children: [hostedBaseNode, overlayNode],
-    environmentSnapshot: hostContext.environment,
-    transactionSnapshot: hostContext.transaction,
-    layoutBehavior: .overlay(alignment: .topLeading),
-    semanticMetadata: hostSemantics
-  )
-}
-
-private struct PresentationOverlayHost: View {
-  var entries: [PresentationOverlayEntry]
-
-  var body: some View {
-    ZStack(alignment: .topLeading) {
-      ForEach(entries.indices, id: \.self) { index in
-        PresentationCoordinatorBodyHost(
-          kindName: entries[index].kindName,
-          payload: entries[index].payload
-        )
-      }
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-  }
-}
-
-private struct PresentationCoordinatorBodyHost: View, ResolvableView {
-  var kindName: String
-  var payload: DeferredViewPayload
-
-  func resolveElements(in context: ResolveContext) -> [ResolvedNode] {
-    let childNode = resolveView(
-      DeferredPayloadView(payload: payload),
-      in: context.child(component: .named("body"))
+    return ResolvedNode(
+      identity: context.identity,
+      kind: .view("PresentationPortalRoot"),
+      children: [baseNode],
+      environmentSnapshot: context.environment,
+      transactionSnapshot: context.transaction
     )
-
-    return [
-      ResolvedNode(
-        identity: context.identity,
-        kind: .view(kindName),
-        children: [childNode],
-        environmentSnapshot: context.environment,
-        transactionSnapshot: context.transaction
-      )
-    ]
   }
-}
 
-extension ResolvedNode {
-  package mutating func setEnabledRecursively(
-    _ isEnabled: Bool
-  ) {
-    var style = environmentSnapshot.style
-    style.isEnabled = isEnabled
-    environmentSnapshot.style = style
-
-    for index in children.indices {
-      children[index].setEnabledRecursively(isEnabled)
-    }
-  }
+  return composeOverlayStackTree(
+    baseNode: baseNode,
+    entries: overlayEntries,
+    in: context
+  )
 }

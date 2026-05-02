@@ -96,7 +96,7 @@ struct AsyncFrameTailRenderingTests {
     #expect(terminal.frames.count >= 2)
     #expect(terminal.frames.first?.contains("value 0") == true)
     #expect(terminal.frames.last?.contains("value 1") == true)
-    #expect(lifecycleRecorder.events == ["appear 0", "appear 1"])
+    #expect(lifecycleRecorder.events == ["appear 0", "disappear 0", "appear 1"])
   }
 
   @Test("blocked built-in layout queues input without committing ahead")
@@ -174,7 +174,7 @@ struct AsyncFrameTailRenderingTests {
     #expect(terminal.frames.count >= 2)
     #expect(terminal.frames.first?.contains("value 0") == true)
     #expect(terminal.frames.last?.contains("value 1") == true)
-    #expect(lifecycleRecorder.events == ["appear 0", "appear 1"])
+    #expect(lifecycleRecorder.events == ["appear 0", "disappear 0", "appear 1"])
   }
 
   @Test("diagnostics count input queued during async render suspension")

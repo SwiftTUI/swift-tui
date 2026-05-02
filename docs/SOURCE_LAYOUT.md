@@ -51,7 +51,7 @@ library product. Downstream package consumers reach those types through
 
 ## `SwiftTUI`
 
-- `SwiftTUI.swift`: `DefaultRenderer` plus retained-frame, resolve-reuse, and post-resolve presentation composition plumbing
+- `SwiftTUI.swift`: `DefaultRenderer` plus retained-frame, resolve-reuse, portal-root integration, and presentation-aware frame artifacts
 - `App.swift`: `App`, `Scene`, `SceneBuilder`, `WindowGroup`, `AnyScene`, and typed scene builder artifacts
 - `SceneTraversal.swift`: typed scene traversal, descriptor collection, and window-scene selection helpers
 - `SceneManifest.swift`: `SceneDescriptor`, `SceneManifest`, and manifest generation from authored scenes
@@ -115,7 +115,8 @@ library product. Downstream package consumers reach those types through
 - `Pointer/PointerLocation.swift`, `Pointer/PointerPrecisionPolicy.swift`, and
   `Pointer/HoverPhase.swift`: normalized pointer locations, public runtime
   capability metadata, precision policy, and hover phases
-- `RenderTreeAndSemanticsTypes.swift`: resolved-tree, semantic snapshot, and draw-tree data types, including `TextFigure` draw payload support
+- `RenderTreeAndSemanticsTypes.swift`: resolved-tree, semantic snapshot, and draw-tree data types, including interaction availability and `TextFigure` draw payload support
+- `InteractionGateTypes.swift` and `PortalTypes.swift`: primitive data for interaction gating, portal IDs, modal policy, overlay ordering, and dismiss ordering
 - `CommitAndFrameTypes.swift`: commit plans, refined presentation-damage diagnostics, retained
   resolve frames, and frame artifacts
 - `NodeMetadata.swift`: grouped node metadata used by measurement and refactor follow-up work
@@ -155,7 +156,8 @@ library product. Downstream package consumers reach those types through
 - `ActionScopes/Panel.swift`, `ActionScopes/DropDestinationModifier.swift`, `ActionScopes/KeyCommandModifier.swift`, `ActionScopes/PaletteCommandModifier.swift`, `ActionScopes/Toolbar.swift`, and `ActionScopes/ToolbarItem.swift`: the `Panel` primitive with `.panel(id:)` / `.panel()` / `FocusContainment`; `.dropDestination(...)` scoped path drops with optional spatial context; the `.keyCommand(...)` modifier for shallowest-wins keybindings; the `.paletteCommand(...)` modifier plus `ActivePaletteCommand` + `EnvironmentValues.activePaletteCommands` for consumer-queryable palette surfaces; and the `.toolbar(style:)` absorber, `.toolbarItem(...)` hoisting contribution, `ToolbarStyle` protocol, and `DefaultTopToolbarStyle` / `DefaultBottomToolbarStyle` defaults. See [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md).
 - `Primitives/*.swift` and `Shapes/*.swift`: text/image primitives including `TextFigure`, labeled containers, and basic shapes
 - `Controls/*.swift`: control surfaces, rendering helpers, and shared control support
-- `Presentation/PresentationCoordinator.swift` and `Presentation/PresentationModifiers.swift`: shared presentation host, single-pass overlay composition, family coordinators, package-only declaration reconciliation, and built-in alert/confirmation-dialog/sheet/toast surfaces
+- `Presentation/InteractionGate.swift`, `Presentation/OverlayStack.swift`, `Presentation/Portal.swift`, and `Presentation/DismissStack.swift`: package-internal primitives for visible-but-disabled subtrees, root overlay composition, destination-owned portal content, and topmost-dismiss routing
+- `Presentation/PresentationCoordinator.swift` and `Presentation/PresentationModifiers.swift`: presentation adapters and chrome for built-in alert/confirmation-dialog/sheet/menu/toast surfaces lowered into the primitive portal stack
 - `Modifiers/Preference.swift`, `Modifiers/StyleModifiers.swift`, `Modifiers/ViewModifiers.swift`, and `Modifiers/OnKeyPress.swift`: public modifiers plus the package-only modifier-value lowering hooks that back them
 - `View.docc/`: module landing page and authoring guides
 

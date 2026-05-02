@@ -62,6 +62,17 @@ public struct TupleView<each Content: View>: View, ResolvableView, DeclaredChild
     }
   }
 
+  package func appendPortalDeclaredChildren(
+    into children: inout [PortalContentPayload]
+  ) {
+    for child in repeat each value {
+      appendPortalDeclaredBuilderChildren(
+        from: child,
+        into: &children
+      )
+    }
+  }
+
   package func enumerateDeclaredChildren(
     in context: ResolveContext,
     kindName: String,

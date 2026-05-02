@@ -80,13 +80,14 @@ an integer cell as a fallback.
 - Public `View` values are lowered into `ResolvedNode` trees through package-only lowering helpers
 - Structural views such as `Group`, `ForEach`, and conditionals affect the resolved child set
 - Environment and metadata are merged here
-- Root-hoisted presentations are declared during normal base resolution, then
-  composed around the resolved base tree afterward so the displayed base
-  subtree keeps its authored identity space
-- Presentation hosts reconcile any host-owned mirrored presentation state
-  from the current resolved base tree before choosing overlay entries;
-  selective dirty evaluation can re-resolve only the declaring subtree,
-  especially under wrapper and scene hosts
+- Root presentations are declared during normal base resolution as portal
+  entries. The graph-owned portal root reconciles those declarations, then
+  composes active entries through `OverlayStack` so hosted content has ordinary
+  view-graph ownership under the portal destination.
+- The render pipeline exposes the authored root directly when no overlay is
+  active. When overlays are active, the composed overlay stack becomes the
+  downstream resolved root for measure, place, semantics, draw, raster, and
+  commit.
 - Reuse is conservative and keyed by identity, invalidation scope, and compatible context
 
 ### Measure
@@ -103,7 +104,8 @@ an integer cell as a fallback.
 ### Semantics
 
 - `SemanticExtractor` walks the placed tree to derive focus regions, interaction regions, action routes, selection routes, and scroll routes
-- Disabled state and hit policy are respected here so non-interactive nodes fall out of routing
+- Disabled state, interaction gates, and hit policy are respected here so
+  non-interactive nodes fall out of routing without being unmounted
 
 ### Draw
 
@@ -119,10 +121,30 @@ an integer cell as a fallback.
 
 - `CommitPlanner` packages semantic, lifecycle, and handler-installation work into `CommitPlan`
 - `ViewGraph` owns lifecycle state and emits explicit appear, disappear, task-start, and task-cancel operations during frame finalization
-- Presentation dismissal cleanup must stay scoped to the dismissed overlay
-  subtree identities instead of broad stale-subtree sweeps that can tear down
-  unrelated retained content
+- Portal teardown flows through ordinary structural child removal, so dismissed
+  overlay subtrees cancel tasks, fire disappear handlers, and prune runtime
+  registrations through the same committed-frame path as other UI.
 - Public `.onAppear`, `.onDisappear`, and `.task` hooks lower into this phase rather than firing during resolve
+
+## Presentation Primitives
+
+Root-level UI is composed from package-internal primitives rather than a
+presentation-only host path:
+
+- `Portal` carries root-overlay declarations from arbitrary source subtrees to
+  the nearest portal root while resolving hosted content under destination-owned
+  identities.
+- `OverlayStack` draws the base and active overlays in deterministic
+  `(zIndex, activationOrdinal, stableID)` order and bridges the scene focus
+  scope onto overlay content.
+- `InteractionGate` marks a subtree as visible but unavailable for input.
+  Semantics omit gated focus, command, pointer, gesture, drop, text-input, and
+  focused-value routes while lifecycle and tasks remain mounted.
+- `DismissStack` stores topmost-dismiss actions with the same ordering model as
+  drawing, so Escape routing is not coupled to presentation family names.
+
+The built-in sheet, alert, confirmation-dialog, menu, and toast APIs are
+adapters over those primitives.
 
 ## Why The Phase Split Matters
 

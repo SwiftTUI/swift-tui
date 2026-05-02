@@ -17,26 +17,44 @@ writer-queue ownership split.
 
 For interactive sessions, the runtime owns the terminal alternate-screen buffer while running. That gives each `WindowGroup` a clean full-canvas presentation surface and restores the previous shell buffer on exit.
 
-## Root-Hoisted Presentations
+## Root Presentations And Portals
 
-Built-in presentations — `alert`, `confirmationDialog`, `sheet`, and `toast` —
-are authored inside the base view tree but displayed at the root.
+Built-in presentations — `alert`, `confirmationDialog`, `sheet`, `menu`, and
+`toast` — are authored inside the base view tree but displayed at the root
+through the same primitive stack:
 
-- Base resolution collects presentation declarations during the ordinary resolve pass
-- Visible presentation payloads resolve as overlay roots after the base tree has already been resolved
-- Presentation hosts derive visible overlay state from the current resolved
-  base declarations before overlay composition; wrapper-hosted and selectively
-  re-evaluated subtrees must not wait for an outer host rerender before an
-  already-declared presentation appears
-- The renderer composes the base root and any overlay roots for downstream measure, place, semantics, draw, raster, and commit work
+- Base resolution collects presentation declarations during the ordinary
+  resolve pass.
+- The graph-owned portal root reconciles those declarations before choosing
+  active overlay entries, so wrapper-hosted and selectively re-evaluated
+  subtrees do not need an outer root rerender before an already-declared
+  presentation appears.
+- Active presentation payloads resolve under portal destination identities,
+  not under the source modifier identity. Dynamic properties declared inside
+  presented content therefore belong to the hosted subtree. Captured `Binding`
+  values still mutate the original owner because the binding value was captured
+  at the source.
+- `OverlayStack` composes the base root and active overlay roots for downstream
+  measure, place, semantics, draw, raster, and commit work. When no overlay is
+  active, renderer artifacts expose the authored base root directly.
+- Modal overlays suppress base input through `InteractionGate`. The base stays
+  mounted and visible; gated routes are simply omitted from the semantic
+  snapshot for that frame.
+- Escape dismissal routes through `DismissStack`, using the same z-order and
+  activation ordering as overlay drawing.
+- Dismissing a presentation removes only that portal-owned overlay subtree.
+  Teardown is ordinary structural child removal, so task cancellation,
+  disappear handlers, and runtime-registration pruning come from the committed
+  frame path rather than from presentation-specific graph surgery.
 - Opening or dismissing a presentation does not re-resolve the displayed base
   subtree under a synthetic identity path. Presentation churn should be
   transparent to the currently selected tab or child owner unless the
-  presentation action itself mutates the state that selects different content
-- Dismissing a presentation prunes only the overlay-owned subtree identities
-  for that presentation; dismissal must not run broad stale-subtree cleanup
-  that reaches unrelated retained content
-- Modal overlays can still suppress base interaction through the composed frame's semantic state
+  presentation action itself mutates the state that selects different content.
+
+Async frame-tail cancellation and completed-frame dropping must not abandon
+portal lifecycle work. If focus-sync rerenders or queued-frame cancellation
+carry lifecycle entries forward, the final committed frame merges those entries
+once before presentation.
 
 ## Input, Focus, And Interaction
 

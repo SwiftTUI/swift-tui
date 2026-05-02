@@ -4517,10 +4517,10 @@ private struct ImperativeAlertPresentationHarnessView: View {
               id: "imperative-alert",
               title: "Imperative alert",
               descriptor: alertPromptPresentationSpec().descriptor,
-              actionPayloads: deferredDeclaredBuilderChildren(
+              actionPayloads: portalDeclaredBuilderChildren(
                 from: Button("Dismiss") {}
               ),
-              messagePayloads: deferredDeclaredBuilderChildren(
+              messagePayloads: portalDeclaredBuilderChildren(
                 from: Text("Presented after lifecycle commit.")
               ),
               contentPayloads: [],

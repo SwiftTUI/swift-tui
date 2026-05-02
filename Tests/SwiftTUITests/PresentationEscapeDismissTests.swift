@@ -10,7 +10,7 @@ struct PresentationEscapeDismissTests {
   @Test("No active presentation yields no Escape dismiss action")
   func noActivePresentationYieldsNoAction() {
     let registry = PresentationCoordinatorRegistry()
-    #expect(registry.topmostEscapeDismissAction() == nil)
+    #expect(registry.dismissStack().topmostEscapeDismissAction() == nil)
   }
 
   @Test("An active sheet exposes its dismiss closure as the Escape action")
@@ -34,7 +34,8 @@ struct PresentationEscapeDismissTests {
       )
     )
 
-    let action = try? #require(registry.topmostEscapeDismissAction())
+    let action = registry.dismissStack().topmostEscapeDismissAction()
+    #expect(action != nil)
     action?()
     #expect(dismissed == 1)
   }
@@ -77,7 +78,8 @@ struct PresentationEscapeDismissTests {
       )
     )
 
-    let action = try? #require(registry.topmostEscapeDismissAction())
+    let action = registry.dismissStack().topmostEscapeDismissAction()
+    #expect(action != nil)
     action?()
 
     #expect(alertDismissed == 1)
@@ -106,7 +108,7 @@ struct PresentationEscapeDismissTests {
     )
 
     // A toast alone produces no Escape action — toasts auto-expire.
-    #expect(registry.topmostEscapeDismissAction() == nil)
+    #expect(registry.dismissStack().topmostEscapeDismissAction() == nil)
     #expect(toastDismissed == 0)
   }
 }

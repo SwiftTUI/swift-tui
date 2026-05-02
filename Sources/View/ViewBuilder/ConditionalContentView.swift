@@ -111,6 +111,26 @@ public struct ConditionalContent<TrueContent: View, FalseContent: View>: View,
     }
   }
 
+  package func appendPortalDeclaredChildren(
+    into children: inout [PortalContentPayload]
+  ) {
+    switch storage {
+    case .trueContent(let content):
+      appendPortalDeclaredBuilderChildren(
+        from: content,
+        into: &children
+      )
+    case .falseContent(let content):
+      if collapsesImplicitEmptyFalseBranch, content is EmptyView {
+        return
+      }
+      appendPortalDeclaredBuilderChildren(
+        from: content,
+        into: &children
+      )
+    }
+  }
+
   package func enumerateDeclaredChildren(
     in context: ResolveContext,
     kindName: String,

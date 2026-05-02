@@ -191,9 +191,11 @@ package struct FrameHeadDraft {
   fileprivate var registrationDraft: FrameHeadRegistrationDraft
   fileprivate var viewGraphCheckpoint: ViewGraph.Checkpoint
   fileprivate var frameStateCheckpoint: FrameResolveState.Checkpoint
+  fileprivate var presentationPortalCheckpoint: PresentationPortalState.Checkpoint
   fileprivate var observationBridge: ObservationBridge?
   fileprivate var observationBridgeCheckpoint: ObservationBridge.Checkpoint?
   fileprivate var resolveContext: ResolveContext
+  fileprivate var graphRootIdentity: Identity
   fileprivate var frameContext: FrameContext
   fileprivate var resolved: ResolvedNode
   fileprivate var frameTailInput: FrameTailInput
@@ -1169,7 +1171,7 @@ public struct DefaultRenderer {
   private let imageRepository: ImageAssetRepository
   private let viewGraph: ViewGraph
   private let frameState: FrameResolveState
-  private let presentationHostState: PresentationHostState
+  private let presentationPortalState: PresentationPortalState
   private let animationController: AnimationController
   private let renderGenerationSequencer: RenderGenerationSequencer
   private let completedFramePolicy: CompletedFramePolicy
@@ -1195,7 +1197,7 @@ public struct DefaultRenderer {
     imageRepository = sharedImageAssetRepository
     viewGraph = .init()
     frameState = .init()
-    presentationHostState = .init()
+    presentationPortalState = .init()
     animationController = .init()
     renderGenerationSequencer = .init()
     completedFramePolicy = .dropCompletedVisualOnly
@@ -1217,11 +1219,11 @@ public struct DefaultRenderer {
 
   /// Package-only accessor so the run loop can route framework-reserved
   /// single-key events (currently Escape) to the active presentation
-  /// coordinator stack. Returns the dismiss closure of the topmost
-  /// Escape-dismissible presentation, or nil when none is active.
+  /// dismiss stack. Returns the dismiss closure of the topmost
+  /// Escape-dismissible portal entry, or nil when none is active.
   @MainActor
   package func topmostEscapeDismissAction() -> (@MainActor @Sendable () -> Void)? {
-    presentationHostState.topmostEscapeDismissAction()
+    presentationPortalState.dismissStack().topmostEscapeDismissAction()
   }
 
   /// Package-only accessor exposing the renderer's internal
@@ -1261,6 +1263,7 @@ public struct DefaultRenderer {
     draft.registrationDraft.discard()
     viewGraph.restoreCheckpoint(draft.viewGraphCheckpoint)
     frameState.restoreCheckpoint(draft.frameStateCheckpoint)
+    presentationPortalState.restoreCheckpoint(draft.presentationPortalCheckpoint)
     if let observationBridge = draft.observationBridge,
       let checkpoint = draft.observationBridgeCheckpoint
     {
@@ -1456,15 +1459,28 @@ public struct DefaultRenderer {
     resolveContext.viewGraph = viewGraph
     resolveContext.observationBridge?.attachViewGraph(viewGraph)
     resolveContext.observationBridge?.beginTrackingPass()
-    let wrappedRoot = PresentationHostingRoot(
-      content: root,
-      hostState: presentationHostState
+    let presentationPortalContext = resolveContext.replacingIdentity(
+      with: presentationPortalIdentity(for: resolveContext.identity)
     )
-    viewGraph.setRootEvaluator(rootIdentity: resolveContext.identity) {
-      _ = resolver.resolve(wrappedRoot, in: resolveContext)
+    let hasExistingPresentationPortalRoot = viewGraph.containsNode(
+      for: presentationPortalContext.identity
+    )
+    let wrappedRoot = PresentationPortalRoot(
+      content: root,
+      portalState: presentationPortalState,
+      contentRootIdentity: resolveContext.identity
+    )
+    viewGraph.setRootEvaluator(rootIdentity: presentationPortalContext.identity) {
+      _ = resolver.resolve(wrappedRoot, in: presentationPortalContext)
     }
-    viewGraph.setEvaluator(for: resolveContext.identity) {
-      _ = resolver.resolve(wrappedRoot, in: resolveContext)
+    viewGraph.setEvaluator(for: presentationPortalContext.identity) {
+      _ = resolver.resolve(wrappedRoot, in: presentationPortalContext)
+    }
+    if !hasExistingPresentationPortalRoot
+      || !canUseSelectiveEvaluation
+      || !context.invalidatedIdentities.isEmpty
+    {
+      viewGraph.queueDirty([presentationPortalContext.identity])
     }
     let (_, resolveDuration): (Void, Duration)
     animationController.beginTransitionCollection()
@@ -1490,12 +1506,7 @@ public struct DefaultRenderer {
       }
     }
     animationController.finishTransitionCollection()
-    var resolved = viewGraph.snapshot()
-    resolved = composePresentationHostTree(
-      baseNode: resolved,
-      hostState: presentationHostState,
-      in: resolveContext
-    )
+    var resolved = renderPipelineTree(from: viewGraph.snapshot())
     resolved = wrapInContainerSafeArea(
       resolved,
       context: resolveContext
@@ -1583,7 +1594,7 @@ public struct DefaultRenderer {
     var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
     let (commit, commitDuration) = measurePhase(clock: clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: resolveContext.identity,
+        rootIdentity: presentationPortalContext.identity,
         resolved: resolved,
         placed: tail.placed
       )
@@ -1712,6 +1723,7 @@ public struct DefaultRenderer {
     resolveContext.imageAssetResolver = imageRepository.resolver()
     resolveContext.frameState = frameState
     let frameStateCheckpoint = frameState.makeCheckpoint()
+    let presentationPortalCheckpoint = presentationPortalState.makeCheckpoint()
     let observationBridgeCheckpoint = resolveContext.observationBridge?.makeCheckpoint()
     frameState.update(from: resolveContext, proposal: proposal)
     let viewGraphCheckpoint = viewGraph.makeCheckpoint()
@@ -1728,15 +1740,28 @@ public struct DefaultRenderer {
     resolveContext.viewGraph = viewGraph
     resolveContext.observationBridge?.attachViewGraph(viewGraph)
     resolveContext.observationBridge?.beginTrackingPass()
-    let wrappedRoot = PresentationHostingRoot(
-      content: root,
-      hostState: presentationHostState
+    let presentationPortalContext = resolveContext.replacingIdentity(
+      with: presentationPortalIdentity(for: resolveContext.identity)
     )
-    viewGraph.setRootEvaluator(rootIdentity: resolveContext.identity) {
-      _ = resolver.resolve(wrappedRoot, in: resolveContext)
+    let hasExistingPresentationPortalRoot = viewGraph.containsNode(
+      for: presentationPortalContext.identity
+    )
+    let wrappedRoot = PresentationPortalRoot(
+      content: root,
+      portalState: presentationPortalState,
+      contentRootIdentity: resolveContext.identity
+    )
+    viewGraph.setRootEvaluator(rootIdentity: presentationPortalContext.identity) {
+      _ = resolver.resolve(wrappedRoot, in: presentationPortalContext)
     }
-    viewGraph.setEvaluator(for: resolveContext.identity) {
-      _ = resolver.resolve(wrappedRoot, in: resolveContext)
+    viewGraph.setEvaluator(for: presentationPortalContext.identity) {
+      _ = resolver.resolve(wrappedRoot, in: presentationPortalContext)
+    }
+    if !hasExistingPresentationPortalRoot
+      || !canUseSelectiveEvaluation
+      || !context.invalidatedIdentities.isEmpty
+    {
+      viewGraph.queueDirty([presentationPortalContext.identity])
     }
     let (_, resolveDuration): (Void, Duration)
     let animationCheckpoint = animationController.beginFrameHeadTransaction()
@@ -1760,12 +1785,7 @@ public struct DefaultRenderer {
       }
     }
     animationController.finishTransitionCollection()
-    var resolved = viewGraph.snapshot()
-    resolved = composePresentationHostTree(
-      baseNode: resolved,
-      hostState: presentationHostState,
-      in: resolveContext
-    )
+    var resolved = renderPipelineTree(from: viewGraph.snapshot())
     resolved = wrapInContainerSafeArea(
       resolved,
       context: resolveContext
@@ -1820,9 +1840,11 @@ public struct DefaultRenderer {
       registrationDraft: registrationDraft,
       viewGraphCheckpoint: viewGraphCheckpoint,
       frameStateCheckpoint: frameStateCheckpoint,
+      presentationPortalCheckpoint: presentationPortalCheckpoint,
       observationBridge: resolveContext.observationBridge,
       observationBridgeCheckpoint: observationBridgeCheckpoint,
       resolveContext: resolveContext,
+      graphRootIdentity: presentationPortalContext.identity,
       frameContext: frameContext,
       resolved: resolved,
       frameTailInput: frameTailInput,
@@ -2048,7 +2070,7 @@ public struct DefaultRenderer {
     var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
     let (commit, commitDuration) = measurePhase(clock: candidate.draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: candidate.draft.resolveContext.identity,
+        rootIdentity: candidate.draft.graphRootIdentity,
         resolved: candidate.resolved,
         placed: tail.placed
       )
@@ -2101,7 +2123,7 @@ public struct DefaultRenderer {
 
     return measurePhase(clock: draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
-        rootIdentity: draft.resolveContext.identity,
+        rootIdentity: draft.graphRootIdentity,
         resolved: resolved,
         placed: tail.placed
       )
@@ -2329,6 +2351,19 @@ public struct DefaultRenderer {
       transactionSnapshot: context.transaction,
       layoutBehavior: .padding(safeAreaInsets)
     )
+  }
+
+  private func renderPipelineTree(
+    from graphRoot: ResolvedNode
+  ) -> ResolvedNode {
+    guard graphRoot.kind == .view("PresentationPortalRoot"),
+      graphRoot.children.count == 1,
+      let contentRoot = graphRoot.children.first
+    else {
+      return graphRoot
+    }
+
+    return contentRoot
   }
 
   /// Enables selective dirty-frontier evaluation for subsequent frames.
