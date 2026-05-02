@@ -1600,6 +1600,99 @@ struct AsyncFrameTailRenderingTests {
     #expect(recorder.events.contains("sibling-b-new"))
   }
 
+  @Test("prepared frame-head abort keeps animation completions uncommitted")
+  func preparedFrameHeadAbortKeepsAnimationCompletionsUncommitted() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadAbortAnimationRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: AsyncFrameHeadAbortScaffoldState(),
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: terminal.proposal,
+      viewBuilder: { state, _ in
+        AsyncFrameHeadAbortScaffoldView(
+          state: state,
+          recorder: recorder
+        )
+      }
+    )
+    focusTracker.invalidator = runLoop.scheduler
+
+    try await withAsyncFrameHeadAbortAnimationSinks(renderer) {
+      runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+      var initialFrames = 0
+      try runLoop.renderPendingFrames(renderedFrames: &initialFrames)
+      focusLeafmostAsyncFrameHeadAbortScaffoldRegion(in: runLoop)
+
+      recorder.reset()
+      _ = runLoop.handleKeyPress(KeyPress(.space, modifiers: []))
+      #expect(recorder.events.contains("action"))
+      let scheduledFrame = try #require(runLoop.scheduler.consumeReadyFrame(at: .now()))
+      let draft = renderer.prepareFrameHeadForCancellationTesting(
+        runLoop.currentView(),
+        context: runLoop.resolveContext(for: scheduledFrame),
+        proposal: runLoop.proposal()
+      )
+
+      renderer.abortPreparedFrameHeadForCancellationTesting(draft)
+
+      #expect(!recorder.events.contains("animation-completion"))
+      runLoop.scheduler.requestInvalidation(of: [])
+      var committedFrames = 0
+      try runLoop.renderPendingFrames(renderedFrames: &committedFrames)
+      #expect(!recorder.events.contains("animation-completion"))
+    }
+  }
+
+  @Test("prepared frame-tail abort keeps worker custom layout cache updates uncommitted")
+  func preparedFrameTailAbortKeepsWorkerCustomLayoutCacheUpdatesUncommitted() async {
+    let rootIdentity = testIdentity("AsyncFrameHeadAbortWorkerCacheRoot")
+    let recorder = AsyncFrameTailWorkerCustomLayoutRecorder()
+    let renderer = DefaultRenderer()
+    let proposal = ProposedSize(width: 32, height: 6)
+
+    @MainActor
+    func root() -> some View {
+      AsyncFrameTailWorkerCustomLayout(recorder: recorder) {
+        Text("worker")
+        Text("cache")
+      }
+    }
+
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      root(),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+    await renderer.renderPreparedFrameTailForCancellationTesting(draft)
+
+    let preparedState = recorder.state
+    #expect(preparedState.measureCount >= 1)
+    #expect(preparedState.placeCount >= 1)
+    #expect(preparedState.cacheApplyCount == 0)
+
+    renderer.abortPreparedFrameHeadForCancellationTesting(draft)
+    #expect(recorder.state.cacheApplyCount == 0)
+
+    _ = await renderer.renderAsync(
+      root(),
+      context: .init(identity: rootIdentity),
+      proposal: proposal
+    )
+
+    #expect(recorder.state.cacheApplyCount == 1)
+  }
+
   @Test("async renderer tags monotonically increasing render generations")
   func asyncRendererTagsMonotonicallyIncreasingRenderGenerations() async {
     let renderer = DefaultRenderer()
