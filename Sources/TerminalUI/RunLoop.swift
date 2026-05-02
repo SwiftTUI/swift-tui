@@ -230,6 +230,9 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   /// emits a tab-separated record to the configured output file.
   public var diagnosticsLogger: FrameDiagnosticsLogger?
 
+  /// Rendering pipeline used by the interactive run loop.
+  public var renderMode: RuntimeRenderMode
+
   package init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
@@ -262,6 +265,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     self.proposalOverride = proposal
     self.exitKeyBindings = exitKeyBindings
     self.viewBuilder = viewBuilder
+    renderMode = .environmentDefault()
     let renderSuspensionDiagnostics = self.renderSuspensionDiagnostics
     self.renderer.setFrameRenderSuspensionHooks(
       .init(

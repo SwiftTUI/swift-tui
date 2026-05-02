@@ -687,12 +687,32 @@ extension RunLoop {
         scheduler.hasPendingFrame(at: .now())
       }
 
+      @MainActor
+      func shouldCancelQueuedTailForMode() async -> Bool {
+        guard renderMode != .asyncNoCancel else {
+          return false
+        }
+        return await shouldCancelQueuedTail()
+      }
+
       while true {
         if rerenderedForFocusSync {
           renderer.forceRootEvaluation()
         }
         let renderedArtifacts: FrameArtifacts
-        if eventPump == nil {
+        if renderMode == .sync {
+          renderedArtifacts = renderer.render(
+            viewBuilder(
+              (
+                state: currentState,
+                focusedIdentity: focusTracker.currentFocusIdentity
+              )),
+            context: resolveContext(for: scheduledFrame),
+            proposal: proposal(),
+            collectsDiagnostics: hasDiagnosticsLogger
+          )
+          tailJobState = .completed
+        } else if eventPump == nil {
           renderedArtifacts = await renderer.renderAsync(
             viewBuilder(
               (
@@ -721,13 +741,14 @@ extension RunLoop {
                   : renderIntentDiagnostics.desiredGeneration
               )
             },
+            completedFramePolicy: renderMode == .asyncNoDrop ? .orderedCommitOnly : nil,
             completedFrameAdditionalBlockers: { artifacts in
               self.completedFrameAdditionalDropBlockers(
                 artifacts: artifacts,
                 scheduledFrame: scheduledFrame
               )
             },
-            shouldCancelQueued: shouldCancelQueuedTail
+            shouldCancelQueued: shouldCancelQueuedTailForMode
           )
           if renderOutcome.tailJobState == .cancelledBeforeStart {
             cancelledRenderCount += 1
