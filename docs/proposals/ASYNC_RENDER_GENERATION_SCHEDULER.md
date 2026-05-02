@@ -2,21 +2,16 @@
 
 ## Status
 
-Stages 3A and 3B are implemented. Stage 3C, abortable prepared frame heads, was
-attempted and reverted; see
+Stages 3A through 3D are implemented. The first Stage 3C frame-head abort
+attempt was reverted; see
 [`../plans/2026-04-26-002-frame-head-abort-plan.md`](../plans/2026-04-26-002-frame-head-abort-plan.md).
-Stage 3D remains blocked until prepared-frame side effects can be safely
-aborted or isolated in draft-only state.
+The shipped replacement is the Option 3 draft-transaction tranche recorded in
+[`../plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md`](../plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md).
 
-The short version: do not implement worker-job cancellation directly inside
-`FrameTailRenderer` until the worker has an explicit pre-start submission state.
-The run loop can coalesce queued render intent, and `DefaultRenderer` has an
-explicit prepare-tail-finish split, but it does not currently expose a safe
-prepared-frame abort path. Completed and started tail work stays on the
-ordered-commit path.
-
-The next attempt should follow the restart proposal below rather than replaying
-the reverted checkpoint/registration-staging implementation.
+The shipped runtime can cancel a queued tail job before worker layout starts
+when a newer render intent is pending. The corresponding prepared frame head is
+discarded through draft runtime registrations plus graph/state checkpoints.
+Completed and started tail work stays on the ordered-commit path.
 
 For the consolidated current status, see
 [`../ASYNC_RENDERING.md`](../ASYNC_RENDERING.md).
@@ -421,30 +416,37 @@ git commit -m "refactor(renderer): split async frame head and commit"
 Execution plan:
 
 - [`../plans/2026-04-26-002-frame-head-abort-plan.md`](../plans/2026-04-26-002-frame-head-abort-plan.md)
+- [`../plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md`](../plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md)
 
-- [ ] Add an abort path for prepared frame heads, or route resolve side effects
+- [x] Add an abort path for prepared frame heads, or route resolve side effects
   into draft-only state.
-- [ ] Prove abort leaves `ViewGraph`, runtime registrations, focus sync,
+- [x] Prove abort leaves `ViewGraph`, runtime registrations, focus sync,
   animation state, and diagnostics ready for a fresh render.
 
 Stage 3C result:
 
-The checkpoint/registration-staging implementation was reverted after real
-runtime scrolling and clicking regressions. The retained code keeps the
-prepare-tail-finish split from Stage 3B and the animation completion deferral
-needed to fire animation completions at commit, but it does not provide a
-general `abortFrameHead` path.
-
-The next Stage 3C attempt should use the post-mortem in the execution plan
-above and the restart proposal in this document as the starting point, not the
-reverted checkpoint shape.
+The first checkpoint/registration-staging implementation was reverted after real
+runtime scrolling and clicking regressions. The shipped replacement routes
+runtime registrations through draft registries, rebuilds live registrations from
+the committed `ViewGraph`, and uses checkpoints for graph, frame resolve,
+observation, animation, lifecycle/task, retained tail, and worker-cache state.
+The abort path remains package-internal test infrastructure; it is not a public
+renderer API.
 
 ### Stage 3D: Add cancellable pre-start tail jobs
 
-- Add dequeue-time cancellation to the frame-tail worker.
-- Cancel only jobs that have not started.
-- Return started jobs through the ordered-commit path.
-- Keep cancellation disabled for completed results.
+- [x] Add dequeue-time cancellation to the frame-tail worker.
+- [x] Cancel only jobs that have not started.
+- [x] Return started jobs through the ordered-commit path.
+- [x] Keep cancellation disabled for completed results.
+
+Stage 3D result:
+
+The run loop uses the cancellable tail path only while a tail job is queued.
+When a newer render intent is pending before worker layout starts, it cancels
+the queued tail, discards the prepared frame head, logs
+`tail_job_state=cancelled_before_start`, and prepares the newer generation.
+Started and completed jobs still finish and commit in order.
 
 Commit boundary:
 
@@ -471,7 +473,7 @@ git commit -m "feat(runtime): cancel superseded unstarted frame-tail jobs"
 
 ## Recommendation
 
-Redesign Stage 3C before implementing Stage 3D. Keep the eventual cancellation
-point at dequeue time only: a queued tail job may be cancelled before it starts,
-while started or completed tail work must still finish through the
-ordered-commit path.
+Keep the cancellation point at dequeue time only: a queued tail job may be
+cancelled before it starts, while started or completed tail work must still
+finish through the ordered-commit path. Completed-frame dropping remains a
+separate future tranche.

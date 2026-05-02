@@ -23,12 +23,14 @@ main actor: commit -> present -> lifecycle
 writer queue: terminal write(2)
 ```
 
-The important invariant is ordered commit. When a worker frame starts or
-finishes, the main actor commits it before rendering and presenting newer state.
-Computed pipeline frames are not dropped. Layout-dependent content realization
-is part of the current frame's layout work; any realized subtree is folded back
-into the committed resolved tree before semantics, draw, raster, and lifecycle
-commit.
+The important invariant is ordered commit for any worker frame that has started.
+Started and completed worker frames commit before newer state is presented.
+Queued frame-tail jobs may be cancelled before worker layout starts when a newer
+render intent is already pending; the corresponding prepared frame head is
+discarded through the draft/checkpoint transaction. Computed pipeline frames
+that have started are not dropped. Layout-dependent content realization is part
+of the current frame's layout work; any realized subtree is folded back into the
+committed resolved tree before semantics, draw, raster, and lifecycle commit.
 
 ## What Has Landed
 
@@ -52,16 +54,26 @@ commit.
 - Public anchor preferences and `GeometryProxy.frame(in:)` resolve against
   placed frames instead of the old resolve-time `terminalSize` local-geometry
   bridge.
+- Frame-head runtime registrations are collected in scratch draft registries
+  and committed only during frame finish. Live runtime registries are rebuilt
+  from the committed `ViewGraph` and committed node handlers/aliases, not from a
+  per-frame draft snapshot.
+- Prepared frame heads have checkpoint-backed abort coverage for graph state,
+  frame resolve state, observation tracking, animation transactions, lifecycle
+  and task effects, retained tail inputs, and worker custom-layout cache updates.
+- The interactive runtime can cancel a queued tail job before worker layout
+  starts. Started and completed tail work still follows ordered commit.
 - Runtime diagnostics record render generations, worker timings, main-actor
   blocked/suspended time, coalesced event batches, coalesced intent-request
-  pressure, geometry-resolution misses, drop blockers, and
-  `stale_frame_policy=commit_ordered`. Frame-artifact diagnostics also record
-  layout-dependent realization count, realization cache hits, and main-actor
-  fallback count.
+  pressure, geometry-resolution misses, drop blockers, tail job state, tail
+  cancellation reason, cancelled render count, desired-generation snapshots, and
+  stale-frame policy. Completed frames report `commit_ordered`; cancelled rows
+  report `cancel_pending_before_start`.
 - Async stress tests cover blocked worker tails, queued input, ordered commit,
   sync/async artifact parity, `SendableLayout` worker execution, retained layout
-  reuse, focus convergence, framework layout worker paths, and main-actor
-  fallback when layout-dependent content is present.
+  reuse, focus convergence, framework layout worker paths, aborted prepared
+  frame heads, queued-tail cancellation, and main-actor fallback when
+  layout-dependent content is present.
 
 ## What Still Runs On The Main Actor
 
@@ -85,139 +97,38 @@ implemented. A worker-safe snapshot model would have to prove the same runtime
 registration, state, observation, lifecycle, task, focus, command, drop, and
 preference guarantees that ordinary main-actor view evaluation has today.
 
-Worker-job cancellation is not implemented.
-
-The runtime can coalesce queued render intent before starting a later render, and
-`DefaultRenderer` has an explicit prepare-tail-finish split. A broader
-frame-head abort implementation was attempted and then reverted after real
-runtime regressions in scrolling and clicking. The retained code does not expose
-a safe `abortFrameHead` path for cancelling a prepared frame.
-
-That means the next cancellation step must be redesigned around draft-only
-side effects or another rollback model before `FrameTailRenderer` accepts
-cancellable submissions.
+Cancellation after worker layout starts is not implemented and is intentionally
+out of scope. A started or completed worker frame must still finish and commit
+in order.
 
 Completed worker results are classified conservatively by the observational
 `FrameDropEligibility` helper, but they are not dropped as visual-only frames.
-The default and only runtime policy is still `mustCommit`.
+Off-main resolve is not planned near-term.
 
-## Next Tranche Boundary
+## Shipped Option 3 Boundary
 
-The next pipeline-split tranche is a conservative cancellation tranche, not a
-restart of broad frame-head abort work and not completed-frame dropping.
+Option 3 shipped the conservative pipeline-split tranche. For this document,
+"pipeline split" means the existing prepare-tail-finish seam is precise enough
+that a prepared frame can be discarded only when its worker tail has not started.
+It does not mean moving `resolve` off the main actor, allowing multiple
+concurrent renders against one `DefaultRenderer`, or presenting newer state
+ahead of started/completed tail work.
 
-For this document, "pipeline split" means making the existing
-prepare-tail-finish seam precise enough that a prepared frame can be discarded
-only when its worker tail has not started. It does not mean moving `resolve`
-off the main actor, allowing multiple concurrent renders against one
-`DefaultRenderer`, or presenting newer state ahead of started/completed tail
-work.
-
-Keep these terms separate while implementing:
+Keep these terms separate:
 
 - **Render intent**: scheduler/run-loop demand for a new frame. Coalescing
   not-yet-started render intent has shipped.
 - **Frame head**: main-actor resolve, observation, registration collection,
-  animation interpolation, and tail-input preparation. Today this is split from
-  frame finish, but it is not generally abortable.
+  animation interpolation, and tail-input preparation. It is abortable only
+  before the corresponding tail job starts.
 - **Tail job**: the measure/place through raster work submitted to
   `FrameTailRenderer`.
 - **Pre-start tail cancellation**: cancelling a queued tail job before the
-  worker begins layout. This still requires the corresponding frame head to be
-  draft-only or safely abortable because the frame head has already run.
+  worker begins layout, then discarding the corresponding prepared frame head.
 - **Started/completed tail work**: any tail job whose worker has begun layout
   or returned output. These frames must still finish and commit in order.
 
-The implementation order for the next tranche should therefore be:
-
-1. Rebaseline diagnostics and runtime-path coverage with no behavior change.
-2. Make frame-head side effects draft-only or abortable enough for queued-tail
-   cancellation.
-3. Add dequeue-time cancellation for queued tail jobs only.
-4. Preserve ordered commit for every started or completed tail job.
-
-Do not skip directly to cancellable `FrameTailRenderer` submissions unless the
-frame-head abort/draft proof is already in place.
-
-### Required Evidence Before Behavior Changes
-
-Before changing runtime behavior, capture a short diagnostics inventory from
-real examples. At minimum, record gallery and layouts runs with
-`TERMUI_DIAGNOSTICS`:
-
-```bash
-cd Examples/gallery
-TERMUI_DIAGNOSTICS=/tmp/gallery-termui-diagnostics.tsv swiftly run swift run gallery-demo
-
-cd ../layouts
-TERMUI_DIAGNOSTICS=/tmp/layouts-termui-diagnostics.tsv swiftly run swift run layouts-demo
-```
-
-Summarize the columns that explain cancellation pressure:
-
-- `main_actor_blocked_ms`
-- `main_actor_suspended_ms`
-- `worker_layout_enqueue_ms`
-- `worker_layout_compute_ms`
-- `worker_raster_enqueue_ms`
-- `worker_raster_compute_ms`
-- `coalesced_intent_requests`
-- `coalesced_event_batches`
-- `drop_blockers`
-- `stale_frame_policy`
-- `layout_dependent_realizations`
-- `layout_dependent_cache_hits`
-- `layout_dependent_main_actor_fallbacks`
-
-The inventory should answer:
-
-- Are input bursts or worker queue delays creating stale-generation pressure?
-- Which blockers keep the current frames on the ordered-commit path?
-- Which frames are no longer worker-layout eligible because layout has to
-  realize authored geometry content?
-
-Use that inventory to choose tests and scenarios. It is not enough to add a
-renderer-only unit test for this tranche; the failure mode from the reverted
-attempt appeared in the composed terminal runtime path.
-
-### Frame-Head Direction
-
-Prefer draft-only effects over broad checkpoint/restore. The reverted attempt
-failed because it restored live runtime registries from per-frame draft
-registries, which only represented the dirty frontier and cache hits walked by
-that frame. If live registries must be rebuilt, rebuild them from the committed
-`ViewGraph` and committed `NodeHandlers`/aliases, not from the draft registry.
-
-Frame-head work must keep these effects out of live state until finish, or
-prove rollback with focused tests:
-
-- runtime action, key, pointer, gesture, focus, scroll, command, drop, and
-  preference-observation registrations;
-- lifecycle and task commit effects;
-- animation completion closures;
-- retained tail inputs and worker custom-layout cache updates;
-- `ViewGraph` invalidation, dirty evaluation, and alias restoration.
-
-The minimum proof is:
-
-- prepare then abort a broad reset-shaped frame head;
-- prepare then abort a selective dirty-frontier frame head with untouched
-  siblings and aliases;
-- run a fresh normal render afterward and verify artifacts and live
-  registrations match the no-abort path;
-- exercise the async `RunLoop.run()` path for gallery tab clicks, ScrollView
-  indicator click/drag, pointer scroll bursts, key-command dispatch,
-  drop-destination dispatch, focus sync, and lazy ScrollView content.
-
-Manual gallery validation remains part of the acceptance bar for this tranche:
-scroll a tab, click a button, drag a slider, and compare against current `main`
-behavior before merging.
-
-### Tail-Cancellation Direction
-
-Once the frame head can be safely discarded, `FrameTailRenderer` may gain an
-explicit queued/started/completed state. The dequeue boundary is the only
-cancellation point:
+The dequeue boundary is the only cancellation point:
 
 - `queued`: may cancel if superseded by a newer desired generation before the
   worker starts.
@@ -226,10 +137,10 @@ cancellation point:
 - `cancelled-before-start`: abort the corresponding frame head and prepare the
   newest generation.
 
-Diagnostics should distinguish pressure from behavior. Existing fields such as
+Diagnostics distinguish pressure from behavior. Existing fields such as
 `coalesced_event_batches` and `coalesced_intent_requests` measure queued input
-and avoided renders; new cancellation fields should measure actual queued-tail
-cancellations. Add new fields before enabling cancellation:
+and avoided renders; cancellation fields measure actual queued-tail
+cancellations:
 
 - `tail_job_state`
 - `tail_cancel_reason`
@@ -238,87 +149,30 @@ cancellations. Add new fields before enabling cancellation:
 - `newest_desired_at_tail_result`
 - `stale_frame_policy=cancel_pending_before_start`
 
-The TSV policy should remain `stale_frame_policy=commit_ordered` until the
-runtime actually cancels a queued tail job. Started/completed tail jobs must
-continue to report and follow ordered commit.
+Completed rows report `stale_frame_policy=commit_ordered`; cancelled rows report
+`stale_frame_policy=cancel_pending_before_start`. Started/completed tail jobs
+must continue to report and follow ordered commit.
 
-## Proposal To Resume Work
+## Runtime Diagnostics Samples
 
-Restart the async pipeline work as a safety-first tranche, not as a replay of the
-reverted frame-head abort implementation.
+Fresh composed-example diagnostics for the shipped tranche were captured on
+2026-05-01:
 
-### Stage R0: Rebaseline Before Changing Behavior
+```bash
+TERMUI_DIAGNOSTICS=/tmp/gallery-termui-diagnostics-20260501.tsv swiftly run swift run gallery-demo
+TERMUI_DIAGNOSTICS=/tmp/layouts-termui-diagnostics-20260501.tsv swiftly run swift run layouts-demo
+```
 
-Start with evidence and coverage while preserving ordered commit:
+The gallery sample includes cancelled queued-tail rows with
+`tail_job_state=cancelled_before_start`, `tail_cancel_reason=newer_render_intent`,
+and `stale_frame_policy=cancel_pending_before_start`. Subsequent completed rows
+return to `stale_frame_policy=commit_ordered`. The layouts sample stayed on
+ordered commit with `tail_job_state=completed` and showed coalesced input
+pressure without actual cancellation.
 
-- Capture diagnostics for the gallery and layouts examples with
-  `TERMUI_DIAGNOSTICS`, focusing on `main_actor_blocked_ms`,
-  `main_actor_suspended_ms`, worker layout/raster timings,
-  `coalesced_intent_requests`, and `drop_blockers`.
-- Add or refresh composed `RunLoop.run()` tests for the interactions that broke
-  during the reverted attempt: gallery tab clicks, ScrollView indicator
-  click/drag, pointer scroll bursts, `.keyCommand`, `.dropDestination`, focus
-  sync, and lazy ScrollView content.
-- Keep focused renderer tests as local proof, but require the real async run-loop
-  path for any claim that runtime registrations, aliases, focus, or input
-  dispatch survived.
-- Produce a small inventory of which frames are currently blocked by
-  `.unobservable`, handler installations, lifecycle/task work, and custom-layout
-  fallback, including layout-dependent realization fallback. This tells us
-  whether cancellation pressure is real before adding a cancellation path.
+## Future Tranche: Completed Visual-Only Drops
 
-Exit criteria: no runtime behavior changes, green focused async/runtime tests,
-and a diagnostics-backed list of the highest-value cancellation scenarios.
-
-### Stage R1: Redesign Prepared Frame Heads Around Draft-Only Effects
-
-Do not restore live registries from per-frame draft snapshots. The reverted
-implementation failed because a draft contains only the dirty frontier and cache
-hits from the current resolve pass, while live runtime state also includes
-untouched committed subtrees and alias identities.
-
-The new design should make prepared frame heads abortable by construction:
-
-- Resolve can still run on the main actor, but runtime registration mutations
-  should be collected as draft commit data. Do not call `resetAll` or
-  `removeSubtrees` on live registries until `finishFrame`.
-- If a live registry must be rebuilt, rebuild from the committed `ViewGraph`
-  using committed node handlers and aliases as the source of truth, not from the
-  current draft registry snapshot.
-- Animation completion deferral remains useful and should stay commit-gated:
-  completions collected during a prepared frame fire only when that frame
-  finishes.
-- Worker custom-layout cache updates remain commit-only; an aborted prepared
-  frame discards them before they reach main-actor cache state.
-- Any remaining `ViewGraph`, `FrameResolveState`, animation, or retained-tail
-  mutation that cannot be draft-only needs an explicit checkpoint/restore test
-  before it can participate in abort.
-
-Exit criteria: a package-internal prepared-frame test hook can prepare and abort
-a frame, then run a fresh normal render without stale graph state, missing live
-registrations, fired lifecycle/task effects, fired animation completions, or
-retained-cache drift.
-
-### Stage R2: Add Pre-Start Tail Cancellation Only
-
-After Stage R1, add a cancellable submission state to `FrameTailRenderer`:
-
-- `queued`: may cancel if a newer desired generation arrives before worker start.
-- `started`: must finish and commit in order.
-- `completed`: must finish and commit in order.
-
-The run loop may race event intake against a queued tail job only while the job
-is still cancellable. If cancellation succeeds, abort the prepared frame and
-prepare the newest generation. If worker work has started, preserve the current
-ordered-commit path.
-
-Diagnostics should switch from only measuring pressure to reporting actual
-behavior: queued, started, completed, cancelled-before-start, cancel reason, and
-`stale_frame_policy=cancel_pending_before_start`.
-
-### Stage R3: Revisit Completed Visual-Only Drops Later
-
-Do not drop completed worker results in this restart tranche. Once pre-start
+Do not drop completed worker results in the Option 3 tranche. Once pre-start
 cancellation is proven, the existing `FrameDropEligibility` classifier can be
 expanded from observational to actionable for a narrow visual-only case. That
 requires explicit tests for lifecycle, task, focus, preference, scroll,
@@ -334,13 +188,13 @@ repaint barriers.
 | Render generation diagnostics | Shipped | Generations identify render, layout, and raster work. |
 | Ordered stale-frame policy | Shipped | Started/completed worker frames commit in order. |
 | Render-intent coalescing | Shipped | Queued input can collapse before the next render begins. |
-| Frame-head prepare/finish split | Shipped | Useful seam, but not an abortable transaction. |
+| Frame-head prepare/finish split | Shipped | Prepared heads can be aborted before tail start. |
 | Public `SendableLayout` opt-in | Shipped | Worker-safe custom layouts off-main. |
 | Framework layout migration | Shipped for known safe layouts | Continue layout by layout. |
 | Lazy indexed child snapshots | Shipped | Main actor resolves visible children before worker use. |
 | Layout-dependent content realization | Shipped for `GeometryReader` and anchor geometry | Forces main-actor layout fallback when arbitrary authored content is present. |
-| Abortable prepared frame heads | Not shipped | Previous implementation was reverted. |
-| Cancellable pre-start tail jobs | Not shipped | Blocked on safe abort or draft-only effects. |
+| Abortable prepared frame heads | Shipped | Draft registries plus graph/state checkpoints protect live runtime state. |
+| Cancellable pre-start tail jobs | Shipped | Only queued jobs can cancel; started/completed jobs commit in order. |
 | Visual-only completed-frame drops | Not shipped | Classifier exists; no drops yet. |
 | Off-main resolve | Not planned near-term | Would require a new authoring and registration model. |
 
@@ -357,7 +211,7 @@ repaint barriers.
   defines why computed async pipeline frames still commit in order and records
   the conservative drop-blocker classifier.
 - [proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md](proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md)
-  is the future-work design for render intent, abortability, and cancellable
+  records render intent, prepared-frame abortability, and shipped cancellable
   pre-start tail jobs.
 - [plans/2026-04-26-001-off-main-frame-tail-rendering-plan.md](plans/2026-04-26-001-off-main-frame-tail-rendering-plan.md)
   records the shipped initial frame-tail worker plan.
@@ -376,8 +230,8 @@ repaint barriers.
   records the R0 diagnostics and composed-runtime coverage checkpoint for
   restarting async cancellation work.
 - [plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md](plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md)
-  is the design-approved Option 3 implementation plan for draft frame-head
-  transactions, prepared-frame abort proof, and queued-tail cancellation.
+  records the shipped Option 3 implementation for draft frame-head transactions,
+  prepared-frame abort proof, and queued-tail cancellation.
 
 ## Code Anchors
 
@@ -385,10 +239,13 @@ repaint barriers.
   `FrameTailRenderer`, `FrameHeadDraft`, render generation sequencing, worker
   timings, and frame finish.
 - `Sources/TerminalUI/RunLoop+Rendering.swift`: async render loop, input
-  coalescing, ordered commit, and diagnostics emission.
+  coalescing, queued-tail cancellation, ordered commit, and diagnostics
+  emission.
 - `Sources/TerminalUI/FrameDiagnosticsLogger.swift`: TSV diagnostics fields for
   generations, worker timings, main-actor timings, coalescing, drop blockers,
-  stale policy, and geometry resolution misses.
+  tail cancellation, stale policy, and geometry resolution misses.
+- `Sources/Core/FrameHeadRegistrationDraft.swift`: scratch runtime
+  registrations and commit-time restoration from the committed graph.
 - `Sources/Core/FrameDropEligibility.swift`: conservative observational
   classifier for completed-frame drop blockers.
 - `Sources/Core/LayoutDependentContent.swift`: layout-time realization
@@ -412,7 +269,7 @@ repaint barriers.
   proves the frame has no side effects that need commit or reconciliation.
 - Do not treat the current observational `FrameDropEligibility` result as
   permission to drop; it is diagnostic until an actionable policy is tested.
-- Do not add worker cancellation inside `FrameTailRenderer` until prepared frame
-  side effects can be aborted or isolated in draft-only state.
+- Do not cancel worker work after layout has started; pre-start cancellation is
+  the only shipped cancellation point.
 - Keep full `bun run test` as the completion gate for runtime or shared renderer
   changes.

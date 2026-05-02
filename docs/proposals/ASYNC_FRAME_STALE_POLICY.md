@@ -3,16 +3,19 @@
 ## Status
 
 Stages 1 and 2 are implemented. The observational drop-blocker classifier
-described in Stage 4 is also implemented, but it is diagnostic only. Scheduler
-Stages 3A and 3B are implemented. Stage 3C, abortable prepared frame heads, was
-attempted and reverted; see
+described in Stage 4 is also implemented, but it is diagnostic only for
+completed-frame drops. Scheduler Stages 3A through 3D are implemented. The first
+Stage 3C, abortable prepared frame heads, was attempted and reverted; see
 [`../plans/2026-04-26-002-frame-head-abort-plan.md`](../plans/2026-04-26-002-frame-head-abort-plan.md).
-Ordered commit remains the policy for started or completed frame-tail work and
-all future generation-dropping work.
+The shipped replacement is the Option 3 draft-transaction tranche recorded in
+[`../plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md`](../plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md).
 
-See [`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md)
-for the remaining design needed before Stage 3 can safely cancel unstarted tail
-work. For the consolidated current status, see
+Pre-start queued-tail cancellation has shipped. Ordered commit remains the
+policy for started or completed frame-tail work and all future
+completed-frame-dropping work. See
+[`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md)
+for the shipped generation scheduler design. For the consolidated current
+status, see
 [`../ASYNC_RENDERING.md`](../ASYNC_RENDERING.md).
 
 The current async frame-tail renderer intentionally preserves ordered commit:
@@ -75,9 +78,11 @@ The current runtime contract is:
   the frame-tail worker,
 - ordinary custom layout falls back to the main actor,
 - overlay application, semantics, draw, and raster run on the worker,
-- the main actor awaits the worker,
+- queued tail jobs may cancel before worker layout starts when superseded by a
+  newer render intent,
+- the main actor awaits any started worker job,
 - frames commit in order,
-- computed frames are not dropped,
+- started and completed computed frames are not dropped,
 - newer frames are not presented ahead of older uncommitted side effects.
 
 The async stress tests intentionally enforce this behavior. They block worker
@@ -86,8 +91,9 @@ presented out of order.
 
 ## Policy
 
-Do not drop computed pipeline frames until a dedicated generation policy is
-implemented and tested.
+Do not drop started or completed computed pipeline frames until a dedicated
+completed-frame policy is implemented and tested. Pre-start queued-tail
+cancellation is the only shipped non-commit path.
 
 Any future stale-frame policy must classify a frame before dropping it:
 
@@ -133,10 +139,9 @@ A frame is not droppable if any of these are true:
 These barriers are intentionally broad. They can be relaxed only with tests that
 prove the skipped work is either irrelevant or reconciled elsewhere.
 
-## Safe First Target
+## Shipped Safe First Target
 
-The first plausible stale-frame optimization is cancellation before worker
-start.
+The first stale-frame optimization is cancellation before worker start.
 
 If a frame is queued for the frame-tail worker but has not started, and a newer
 generation supersedes it, the runtime can cancel the queued job before any
@@ -145,7 +150,9 @@ treated that frame as committed. It should discard the resolve result and rerun
 from the newest state.
 
 This is safer than dropping a completed worker result because it avoids cache
-and artifact reconciliation. It still needs generation IDs and tests.
+and artifact reconciliation. It shipped with generation IDs, frame-head
+draft/checkpoint abort proof, composed runtime tests, and TSV cancellation
+diagnostics.
 
 ## Required Generation Model
 
@@ -274,16 +281,29 @@ Design prerequisite:
   [`ASYNC_RENDER_GENERATION_SCHEDULER.md`](ASYNC_RENDER_GENERATION_SCHEDULER.md).
 - [x] Coalesce not-yet-started render intent before starting the next render.
 - [x] Extract the async renderer frame-head and finish boundaries.
-- [ ] Redesign prepared-frame rollback or draft-only side effects before worker
-  tail work can be cancelled. The first abort implementation was reverted.
+- [x] Redesign prepared-frame rollback or draft-only side effects before worker
+  tail work can be cancelled. The first abort implementation was reverted; the
+  shipped replacement is the Option 3 draft transaction.
 
-- Rebaseline diagnostics and runtime-path coverage before changing behavior.
-- Redesign prepared frame heads around draft-only side effects. Do not rebuild
+- [x] Rebaseline diagnostics and runtime-path coverage before changing behavior.
+- [x] Redesign prepared frame heads around draft-only side effects. Do not rebuild
   live registries from per-frame draft snapshots.
-- Teach the serial worker to skip jobs that have not started and are superseded.
-- Restrict cancellation to jobs with no worker-owned mutation.
-- Rerender from newest state after cancellation.
-- Keep completed worker results on the ordered commit path.
+- [x] Teach the serial worker to skip jobs that have not started and are
+  superseded.
+- [x] Restrict cancellation to jobs with no worker-owned mutation.
+- [x] Rerender from newest state after cancellation.
+- [x] Keep completed worker results on the ordered commit path.
+
+Stage 3 result:
+
+- Prepared frame heads use draft runtime registrations and checkpoint-backed
+  abort proof.
+- Queued tail jobs may cancel before worker layout starts when a newer render
+  intent is pending.
+- Started and completed tail jobs still commit in order.
+- Diagnostics report `tail_job_state`, `tail_cancel_reason`,
+  `cancelled_render_count`, desired-generation snapshots, and stale-frame
+  policy.
 
 Commit boundary:
 

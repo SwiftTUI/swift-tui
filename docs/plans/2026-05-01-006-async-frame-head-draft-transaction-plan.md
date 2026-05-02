@@ -1,7 +1,7 @@
 ---
 title: "refactor: async frame-head draft transaction"
 type: refactor
-status: design-approved
+status: shipped
 date: 2026-05-01
 depends_on:
   - "2026-05-01-005-async-rendering-r0-inventory.md"
@@ -12,7 +12,7 @@ depends_on:
 # Async Frame-Head Draft Transaction Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to
-> implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for
+> implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for
 > tracking. Commit after every task that reaches a green checkpoint.
 
 **Goal:** Complete Option 3: implement Option 1 step by step, beginning with
@@ -30,6 +30,27 @@ layout starts.
 **Tech Stack:** Swift 6.3, Swift Testing, `DefaultRenderer`,
 `FrameTailRenderer`, `RunLoop.run()`, `RuntimeRegistrationSet`, `ViewGraph`,
 `ViewNode`, `FrameDiagnosticsLogger`, Bun repo gate.
+
+## Implementation Result
+
+Shipped on `main` as a sequence of green checkpoints:
+
+- `9b593a9` Add frame-head registration draft infrastructure
+- `49e29f0` Route async frame heads through draft registrations
+- `8e5301e` Share registration draft commits across render paths
+- `212950e` Cover draft registration commit boundaries
+- `78b43d4` Add view graph checkpoints for frame-head transactions
+- `623cca3` Prove prepared frame heads can be aborted
+- `288a15c` Gate frame-head effects behind commit
+- `e4f25b7` Cancel queued frame tails before worker start
+- `517f057` Tighten queued tail cancellation semantics
+- `1eb734e` Restore live graph registrations after selective frames
+
+The shipped runtime policy is pre-start cancellation only. A queued tail job may
+cancel before worker layout starts when a newer render intent is pending. The
+prepared frame head is discarded through the frame-head draft/checkpoint
+transaction. Started and completed worker work still commits in order, and
+completed-frame dropping remains unimplemented.
 
 ---
 
@@ -120,7 +141,7 @@ committed `ViewGraph` plus committed node handlers and registration aliases.
 **Files:**
 - Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
 
-- [ ] **Step 1: Add a test proving prepared key commands are not live before commit**
+- [x] **Step 1: Add a test proving prepared key commands are not live before commit**
 
 Add this test near `blockedAsyncFrameHeadDefersAnimationCompletionUntilCommit`:
 
@@ -218,7 +239,7 @@ private struct AsyncFrameHeadDraftKeyCommandModifier: ViewModifier {
 }
 ```
 
-- [ ] **Step 2: Run the focused test and confirm the current failure**
+- [x] **Step 2: Run the focused test and confirm the current failure**
 
 Run:
 
@@ -229,7 +250,7 @@ swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests/blo
 Expected before implementation: FAIL because the draft key command fires while
 the frame tail is blocked.
 
-- [ ] **Step 3: Keep the failing test uncommitted until Task 3 passes**
+- [x] **Step 3: Keep the failing test uncommitted until Task 3 passes**
 
 Do not commit a red test on `main`. Keep it as the acceptance test for the
 draft-registration implementation.
@@ -241,7 +262,7 @@ draft-registration implementation.
 - Modify: `Sources/Core/RuntimeRegistrationSet.swift`
 - Modify: `Sources/View/Environment/Environment.swift`
 
-- [ ] **Step 1: Add concrete scratch registry construction**
+- [x] **Step 1: Add concrete scratch registry construction**
 
 Add this helper to `RuntimeRegistrationSet`:
 
@@ -267,7 +288,7 @@ Add this helper to `RuntimeRegistrationSet`:
   }
 ```
 
-- [ ] **Step 2: Add the draft object**
+- [x] **Step 2: Add the draft object**
 
 Create `Sources/Core/FrameHeadRegistrationDraft.swift`:
 
@@ -341,7 +362,7 @@ package final class FrameHeadRegistrationDraft {
 This type intentionally does not expose a method that copies draft registry
 snapshots into live registries.
 
-- [ ] **Step 3: Add context redirection**
+- [x] **Step 3: Add context redirection**
 
 Add this helper to `ResolveContext`:
 
@@ -369,7 +390,7 @@ Add this helper to `ResolveContext`:
   }
 ```
 
-- [ ] **Step 4: Build the root package**
+- [x] **Step 4: Build the root package**
 
 Run:
 
@@ -379,7 +400,7 @@ swiftly run swift build
 
 Expected: build succeeds.
 
-- [ ] **Step 5: Commit the infrastructure**
+- [x] **Step 5: Commit the infrastructure**
 
 Run:
 
@@ -394,7 +415,7 @@ git commit -m "Add frame-head registration draft infrastructure"
 - Modify: `Sources/TerminalUI/TerminalUI.swift`
 - Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
 
-- [ ] **Step 1: Store the draft on `FrameHeadDraft`**
+- [x] **Step 1: Store the draft on `FrameHeadDraft`**
 
 Extend `FrameHeadDraft`:
 
@@ -413,7 +434,7 @@ private struct FrameHeadDraft {
 }
 ```
 
-- [ ] **Step 2: Redirect `prepareFrameHead` to scratch registries**
+- [x] **Step 2: Redirect `prepareFrameHead` to scratch registries**
 
 Change the start of `prepareFrameHead` from live registration capture to draft
 registration capture:
@@ -457,7 +478,7 @@ Return the draft:
     )
 ```
 
-- [ ] **Step 3: Commit runtime registrations in `finishFrame`**
+- [x] **Step 3: Commit runtime registrations in `finishFrame`**
 
 After computing `resolved` in `finishFrame`, before `viewGraph.finalizeFrame`,
 commit the registration draft:
@@ -472,7 +493,7 @@ commit the registration draft:
 The commit must happen before lifecycle/task/event planning can dispatch against
 the final committed tree.
 
-- [ ] **Step 4: Run the isolation test**
+- [x] **Step 4: Run the isolation test**
 
 Run:
 
@@ -482,7 +503,7 @@ swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests/blo
 
 Expected after implementation: PASS.
 
-- [ ] **Step 5: Run focused async renderer tests**
+- [x] **Step 5: Run focused async renderer tests**
 
 Run:
 
@@ -492,7 +513,7 @@ swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
 
 Expected: all tests in `AsyncFrameTailRenderingTests` pass.
 
-- [ ] **Step 6: Commit the async draft path**
+- [x] **Step 6: Commit the async draft path**
 
 Run:
 
@@ -507,7 +528,7 @@ git commit -m "Route async frame heads through draft registrations"
 - Modify: `Sources/TerminalUI/TerminalUI.swift`
 - Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
 
-- [ ] **Step 1: Add a sync/async parity assertion for draft registration commit**
+- [x] **Step 1: Add a sync/async parity assertion for draft registration commit**
 
 Extend the existing sync/async parity test in `AsyncFrameTailRenderingTests` with
 a root that conditionally installs a key command after invalidation:
@@ -531,7 +552,7 @@ The parity expectation remains:
     #expect(syncArtifacts == asyncArtifacts)
 ```
 
-- [ ] **Step 2: Update `renderView` to use `FrameHeadRegistrationDraft`**
+- [x] **Step 2: Update `renderView` to use `FrameHeadRegistrationDraft`**
 
 At the start of sync `renderView`, redirect the resolve context exactly as async
 does:
@@ -558,7 +579,7 @@ After layout-dependent realization has produced the final `resolved` tree, call:
     )
 ```
 
-- [ ] **Step 3: Run parity and registration suites**
+- [x] **Step 3: Run parity and registration suites**
 
 Run:
 
@@ -570,7 +591,7 @@ swiftly run swift test --filter TerminalUITests.DropDestinationDispatchTests
 
 Expected: all listed suites pass.
 
-- [ ] **Step 4: Commit sync parity**
+- [x] **Step 4: Commit sync parity**
 
 Run:
 
@@ -585,7 +606,7 @@ git commit -m "Share registration draft commits across render paths"
 - Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
 - Modify: `Tests/CoreTests/Graph/ViewGraphTests.swift`
 
-- [ ] **Step 1: Add a selective-dirty runtime test with untouched sibling registrations**
+- [x] **Step 1: Add a selective-dirty runtime test with untouched sibling registrations**
 
 Add a `RunLoop.run()` test where value `0` renders sibling A with a key command
 and sibling B with another key command. Mutating only sibling B while the async
@@ -609,14 +630,14 @@ After releasing the worker gate and committing:
     #expect(recorder.events.contains("sibling-b-new"))
 ```
 
-- [ ] **Step 2: Add a drop-destination version of the draft isolation test**
+- [x] **Step 2: Add a drop-destination version of the draft isolation test**
 
 Use `runLoop.handlePaste(PasteEvent(content: "/tmp/draft-drop.txt"))` while the
 frame tail is blocked. Expected before commit: the newly prepared drop
 destination does not record. Expected after commit: the same paste records
 `drop:1`.
 
-- [ ] **Step 3: Add graph alias registration rebuild coverage**
+- [x] **Step 3: Add graph alias registration rebuild coverage**
 
 In `Tests/CoreTests/Graph/ViewGraphTests.swift`, add a test that:
 
@@ -637,7 +658,7 @@ The key assertion shape is:
     )
 ```
 
-- [ ] **Step 4: Run registration-focused tests**
+- [x] **Step 4: Run registration-focused tests**
 
 Run:
 
@@ -648,7 +669,7 @@ swiftly run swift test --filter CoreTests.ViewGraphTests
 
 Expected: all listed tests pass.
 
-- [ ] **Step 5: Commit selective registration coverage**
+- [x] **Step 5: Commit selective registration coverage**
 
 Run:
 
@@ -665,7 +686,7 @@ git commit -m "Cover draft registration commit boundaries"
 - Modify: `Sources/Core/Graph/DependencyTracker.swift`
 - Modify: `Tests/CoreTests/Graph/ViewGraphTests.swift`
 
-- [ ] **Step 1: Add `DependencyTracker.Checkpoint`**
+- [x] **Step 1: Add `DependencyTracker.Checkpoint`**
 
 Add this in `Sources/Core/Graph/DependencyTracker.swift`:
 
@@ -685,7 +706,7 @@ extension DependencyTracker {
 }
 ```
 
-- [ ] **Step 2: Add `ViewNode.Checkpoint`**
+- [x] **Step 2: Add `ViewNode.Checkpoint`**
 
 Add a package checkpoint that captures every node field mutated by dirty
 evaluation, snapshot commit, lifecycle, and handler recording:
@@ -787,7 +808,7 @@ Add the extension in `ViewNode.swift` so it can access the file-private node
 state. If `AnyStateSlot` cannot be safely copied as a value, stop and discuss
 whether graph checkpointing must move to a candidate-graph model.
 
-- [ ] **Step 3: Add `ViewGraph.Checkpoint`**
+- [x] **Step 3: Add `ViewGraph.Checkpoint`**
 
 Add a package checkpoint that captures graph-owned frame-head mutable state:
 
@@ -822,7 +843,7 @@ extension ViewGraph {
 }
 ```
 
-- [ ] **Step 4: Add graph restore methods**
+- [x] **Step 4: Add graph restore methods**
 
 Add:
 
@@ -847,7 +868,7 @@ node checkpoint keyed by identity. Do not walk the current graph to discover
 nodes during restore; use `checkpoint.nodesByIdentity` and
 `checkpoint.nodeCheckpoints`.
 
-- [ ] **Step 5: Add graph checkpoint tests**
+- [x] **Step 5: Add graph checkpoint tests**
 
 Add a test that renders a graph, captures a checkpoint, performs a dirty
 evaluation that changes a registered key command, restores the checkpoint, then
@@ -858,7 +879,7 @@ Add a second test that covers alias identities and verifies
 `restoreRuntimeRegistrations(for:into:)` after restore still sees alias handler
 state.
 
-- [ ] **Step 6: Run graph tests**
+- [x] **Step 6: Run graph tests**
 
 Run:
 
@@ -868,7 +889,7 @@ swiftly run swift test --filter CoreTests.ViewGraphTests
 
 Expected: graph tests pass.
 
-- [ ] **Step 7: Commit checkpoint infrastructure**
+- [x] **Step 7: Commit checkpoint infrastructure**
 
 Run:
 
@@ -883,7 +904,7 @@ git commit -m "Add view graph checkpoints for frame-head transactions"
 - Modify: `Sources/TerminalUI/TerminalUI.swift`
 - Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
 
-- [ ] **Step 1: Extend `FrameHeadDraft` with graph checkpoint state**
+- [x] **Step 1: Extend `FrameHeadDraft` with graph checkpoint state**
 
 Add:
 
@@ -899,7 +920,7 @@ Capture it in `prepareFrameHead` immediately before `viewGraph.beginFrame()`:
 
 Return it in the `FrameHeadDraft`.
 
-- [ ] **Step 2: Add package-internal testing hooks**
+- [x] **Step 2: Add package-internal testing hooks**
 
 Add package methods to `DefaultRenderer`:
 
@@ -932,7 +953,7 @@ If `FrameHeadDraft` must remain private, keep the hooks package-internal by
 wrapping the draft in a package testing token type. Do not make a public abort
 API.
 
-- [ ] **Step 3: Add abort proof for broad reset**
+- [x] **Step 3: Add abort proof for broad reset**
 
 Test sequence:
 
@@ -953,14 +974,14 @@ Expected:
     #expect(terminal.frames.last?.contains("value 0") == true)
 ```
 
-- [ ] **Step 4: Add abort proof for selective dirty reuse**
+- [x] **Step 4: Add abort proof for selective dirty reuse**
 
 Repeat the abort test with selective evaluation enabled and only one subtree
 invalidated. Expected: untouched sibling registrations remain live, aborted
 subtree registrations do not become live, and a subsequent normal render
 rebuilds the subtree correctly.
 
-- [ ] **Step 5: Run abort hook tests**
+- [x] **Step 5: Run abort hook tests**
 
 Run:
 
@@ -970,7 +991,7 @@ swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
 
 Expected: all tests in `AsyncFrameTailRenderingTests` pass.
 
-- [ ] **Step 6: Commit abort proof hooks**
+- [x] **Step 6: Commit abort proof hooks**
 
 Run:
 
@@ -985,7 +1006,7 @@ git commit -m "Prove prepared frame heads can be aborted"
 - Modify: `Sources/TerminalUI/TerminalUI.swift`
 - Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
 
-- [ ] **Step 1: Audit `prepareFrameHead` and `renderFrameTailAsync` side effects**
+- [x] **Step 1: Audit `prepareFrameHead` and `renderFrameTailAsync` side effects**
 
 Confirm each effect is either draft-only, checkpoint-restored, or commit-only:
 
@@ -999,7 +1020,7 @@ Confirm each effect is either draft-only, checkpoint-restored, or commit-only:
 - Measurement cache pruning: happens only in `finishFrame`.
 - Retained committed frame: stored only after `finishFrame`.
 
-- [ ] **Step 2: Add tests for each commit-only effect**
+- [x] **Step 2: Add tests for each commit-only effect**
 
 Extend the abort proof test so it verifies:
 
@@ -1019,14 +1040,14 @@ and assert:
 after abort, then assert `cacheApplyCount == 1` after the next normal committed
 render.
 
-- [ ] **Step 3: Move any leaking effect behind finish**
+- [x] **Step 3: Move any leaking effect behind finish**
 
 If an effect fires during prepare or during an aborted tail, move it into
 `finishFrame` or into a checkpoint-restored transaction. If the effect cannot be
 moved or restored without changing its public semantics, stop and discuss the
 remaining non-draft side effect before continuing.
 
-- [ ] **Step 4: Run focused effect tests**
+- [x] **Step 4: Run focused effect tests**
 
 Run:
 
@@ -1036,7 +1057,7 @@ swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
 
 Expected: all tests in `AsyncFrameTailRenderingTests` pass.
 
-- [ ] **Step 5: Commit effect gating**
+- [x] **Step 5: Commit effect gating**
 
 Run:
 
@@ -1053,7 +1074,7 @@ git commit -m "Gate frame-head effects behind commit"
 - Modify: `Sources/TerminalUI/FrameDiagnosticsLogger.swift`
 - Modify: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
 
-- [ ] **Step 1: Add tail job state**
+- [x] **Step 1: Add tail job state**
 
 Add an internal state enum near `FrameTailRenderer`:
 
@@ -1069,7 +1090,7 @@ private enum FrameTailJobState: Equatable, Sendable {
 Add a cancellable queued submission token that can transition from `queued` to
 `cancelledBeforeStart` only before the worker closure begins layout.
 
-- [ ] **Step 2: Add a queued cancellation API**
+- [x] **Step 2: Add a queued cancellation API**
 
 Add a method shaped like:
 
@@ -1093,7 +1114,7 @@ private enum CancellableFrameTailResult {
 The cancellation result is legal only while no worker layout or raster closure
 has begun.
 
-- [ ] **Step 3: Update the run loop policy**
+- [x] **Step 3: Update the run loop policy**
 
 In `RunLoop+Rendering.swift`, race queued tail work with input/render intent only
 while the job state is `queued`. If newer desired state arrives and cancellation
@@ -1114,7 +1135,7 @@ task:
 If cancellation loses the race and the job reaches `started`, await the output
 and call `finishFrame` exactly as the current ordered path does.
 
-- [ ] **Step 4: Add diagnostics**
+- [x] **Step 4: Add diagnostics**
 
 Add TSV fields:
 
@@ -1133,7 +1154,7 @@ Expected values:
   `tail_cancel_reason=newer_render_intent`,
   `stale_frame_policy=cancel_pending_before_start`.
 
-- [ ] **Step 5: Add queued cancellation test**
+- [x] **Step 5: Add queued cancellation test**
 
 Use a worker hook that blocks before layout start. Start a render, queue a newer
 input event, and assert the first prepared frame aborts before layout begins.
@@ -1145,7 +1166,7 @@ Expected:
     #expect(rows.contains { $0["tail_job_state"] == "cancelled_before_start" })
 ```
 
-- [ ] **Step 6: Add started-job ordered commit test**
+- [x] **Step 6: Add started-job ordered commit test**
 
 Use a hook that blocks after layout start or before raster. Queue newer input
 while the job is already started. Expected:
@@ -1156,7 +1177,7 @@ while the job is already started. Expected:
     #expect(rows.allSatisfy { $0["stale_frame_policy"] != "drop_completed" })
 ```
 
-- [ ] **Step 7: Run cancellation tests**
+- [x] **Step 7: Run cancellation tests**
 
 Run:
 
@@ -1168,7 +1189,7 @@ swiftly run swift test --package-path Examples/gallery --filter 'GalleryDemoView
 
 Expected: all listed tests pass.
 
-- [ ] **Step 8: Commit pre-start cancellation**
+- [x] **Step 8: Commit pre-start cancellation**
 
 Run:
 
@@ -1184,7 +1205,7 @@ git commit -m "Cancel queued frame tails before worker start"
 - Modify: `docs/ASYNC_RENDERING.md`
 - Modify: `docs/README.md`
 
-- [ ] **Step 1: Capture real diagnostics samples**
+- [x] **Step 1: Capture real diagnostics samples**
 
 Run:
 
@@ -1200,7 +1221,7 @@ Exercise tab clicks, scroll indicator clicks, scroll indicator drags, pointer
 scroll bursts, layout selection changes, and keyboard commands. Record the
 observed cancellation rows in this plan's verification log.
 
-- [ ] **Step 2: Run the full repo gate**
+- [x] **Step 2: Run the full repo gate**
 
 Run from the repository root:
 
@@ -1210,7 +1231,7 @@ bun run test
 
 Expected: full gate passes.
 
-- [ ] **Step 3: Update async status docs**
+- [x] **Step 3: Update async status docs**
 
 Update `docs/ASYNC_RENDERING.md` progress map:
 
@@ -1222,7 +1243,7 @@ Update `docs/ASYNC_RENDERING.md` progress map:
 Move this plan in `docs/README.md` from current planned/active plans to
 implementation and post-mortem records.
 
-- [ ] **Step 4: Commit docs and verification**
+- [x] **Step 4: Commit docs and verification**
 
 Run:
 
@@ -1233,19 +1254,49 @@ git commit -m "Record async frame-head transaction completion"
 
 ## Verification Matrix
 
-Run these commands before calling Option 3 complete:
+Final verification run before marking the plan shipped:
 
 ```bash
 swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
-swiftly run swift test --filter 'TerminalUITests.InteractiveRuntimeTests/(mouseClickOnScrollIndicatorJumpsToLocation|mouseDragOnScrollIndicatorTracksDraggedPosition|runLoopBatchesQueuedScrollBurstsWithLazyStacks)'
-swiftly run swift test --filter TerminalUITests.KeyCommandTests
-swiftly run swift test --filter TerminalUITests.DropDestinationDispatchTests
-swiftly run swift test --filter CoreTests.ViewGraphTests
-swiftly run swift test --package-path Examples/gallery --filter 'GalleryDemoViewsTests.GalleryTabSwitchTests/clickingGalleryTabSwitchesSelection'
+swiftly run swift test --filter TerminalUITests.PreferenceSurfaceTests/resolveReuseReplaysStablePreferenceObserversForReusedSubtrees
+swiftly run swift test --filter TerminalUITests.DiagnosticsAndCacheTests/resolveReuseReplaysFocusedValuePublishers
+swiftly run swift test --filter TerminalUITests.ImperativeAuthoringContextDispatchTests/gestureCallbacksTargetDispatchingGraph
+swiftly run swift test --filter TerminalUITests.InteractiveRuntimeTests/runLoopEmitsViewportLifecycleTransitionsForFullLazyRows
+swiftly run swift test
+swiftly run swift package --package-path Examples/gallery clean
+swiftly run swift package --package-path Examples/layouts clean
+swiftly run swift test --package-path Examples/gallery
+swiftly run swift test --package-path Examples/layouts
 bun run test
 ```
 
-Expected final behavior:
+Result: PASS. Full gate log:
+`/tmp/swift-terminal-ui-test-all-20260501-175403-52612.log`.
+
+Diagnostics samples captured:
+
+```bash
+TERMUI_DIAGNOSTICS=/tmp/gallery-termui-diagnostics-20260501.tsv swiftly run swift run gallery-demo
+TERMUI_DIAGNOSTICS=/tmp/layouts-termui-diagnostics-20260501.tsv swiftly run swift run layouts-demo
+```
+
+Observed diagnostics:
+
+- Gallery produced 8 TSV rows, including cancelled queued-tail rows with
+  `tail_job_state=cancelled_before_start`,
+  `tail_cancel_reason=newer_render_intent`,
+  `stale_frame_policy=cancel_pending_before_start`, and increasing
+  `cancelled_render_count`.
+- Gallery completed rows returned to `stale_frame_policy=commit_ordered` and
+  `tail_job_state=completed`.
+- Layouts produced 4 TSV rows, all `tail_job_state=completed` with
+  `stale_frame_policy=commit_ordered`; input pressure appeared in
+  `coalesced_event_batches` / `coalesced_intent_requests` without actual
+  cancellation.
+- Both samples retained `drop_blockers=handlerInstallations` on the committed
+  rows, so completed-frame dropping remains correctly disabled.
+
+Final behavior:
 
 - A prepared frame can be aborted without exposing its key commands, drop
   destinations, focus bindings, lifecycle events, tasks, animation completions,
@@ -1277,6 +1328,6 @@ Stop and discuss design before continuing if any of these happen:
 
 ## Execution Handoff
 
-Execute this plan in order. Keep the branch shippable between tasks by committing
-only green checkpoints. The first implementation commit should be Task 2
-infrastructure; Task 1's failing test becomes part of the Task 3 passing commit.
+Complete. The plan was executed in order with a commit after each green
+checkpoint. Task 1's failing test became part of the Task 3 passing commit, and
+the final docs commit records the shipped state.

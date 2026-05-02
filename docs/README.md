@@ -46,18 +46,17 @@ The repository [README.md](../README.md) is the public landing page.
 
 Active design proposals that are still shaping decisions:
 
-- [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — future cancellation and dropping policy
-- [proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md](proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md) — pre-start frame-tail cancellation design
+- [proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md) — future completed-frame dropping policy
 - [proposals/TYPE_ERASURE_DEFERRAL_PLAN.md](proposals/TYPE_ERASURE_DEFERRAL_PLAN.md) — remaining `AnyView` reduction work
 - [proposals/layout/BEHAVIOUR_FINDINGS.md](proposals/layout/BEHAVIOUR_FINDINGS.md) — behaviour-test findings from the layouts example
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
-- [plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md](plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md) — design-approved Option 3 plan for draft frame-head transactions and queued-tail cancellation
 - [plans/2026-04-28-001-canvas-adaptation-plan.md](plans/2026-04-28-001-canvas-adaptation-plan.md) — extending Canvas for dense pixel grids, half-block rendering, and optional sub-cell pointer precision
 
 Implementation and post-mortem records retained for context:
 
+- [plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md](plans/2026-05-01-006-async-frame-head-draft-transaction-plan.md) — shipped Option 3 implementation for draft frame-head transactions, prepared-frame abort proof, and queued-tail cancellation
 - [plans/2026-05-01-005-async-rendering-r0-inventory.md](plans/2026-05-01-005-async-rendering-r0-inventory.md) — R0 diagnostics and composed-runtime coverage checkpoint for restarting async cancellation work
 - [plans/2026-05-01-004-layout-dependent-container-hardening-plan.md](plans/2026-05-01-004-layout-dependent-container-hardening-plan.md) — shipped hardening record for layout-dependent container geometry tests and docs
 - [plans/2026-05-01-003-layout-dependent-container-audit.md](plans/2026-05-01-003-layout-dependent-container-audit.md) — audit of `safeAreaInset`, `ScrollView`, `ViewThatFits`, lazy stacks, and custom `Layout` for remaining resolve-time local-geometry assumptions
@@ -66,6 +65,7 @@ Implementation and post-mortem records retained for context:
 - [proposals/ASYNC_PRESENTATION.md](proposals/ASYNC_PRESENTATION.md) — POSIX terminal writer offload
 - [proposals/OFF_MAIN_PIPELINE_RENDERING.md](proposals/OFF_MAIN_PIPELINE_RENDERING.md) — guarded frame-tail worker implementation record
 - [proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md](proposals/CUSTOM_LAYOUT_OFF_MAIN_ISOLATION.md) — `SendableLayout` worker migration
+- [proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md](proposals/ASYNC_RENDER_GENERATION_SCHEDULER.md) — shipped render-generation and pre-start frame-tail cancellation design
 - [plans/2026-04-26-001-off-main-frame-tail-rendering-plan.md](plans/2026-04-26-001-off-main-frame-tail-rendering-plan.md) — shipped frame-tail worker plan
 - [plans/2026-04-26-002-frame-head-abort-plan.md](plans/2026-04-26-002-frame-head-abort-plan.md) — reverted frame-head abort attempt and post-mortem
 - [proposals/ACTION_SCOPES_AND_COMMANDS.md](proposals/ACTION_SCOPES_AND_COMMANDS.md) — scope-based command, keybinding, and toolbar design
