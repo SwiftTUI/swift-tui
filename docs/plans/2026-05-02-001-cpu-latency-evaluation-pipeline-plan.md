@@ -159,7 +159,7 @@ and optional `xctrace` for manual deep dives.
 - Create: `Tools/TermUIPerf/Sources/TermUIPerf/PerfRunConfig.swift`
 - Create: `Tools/TermUIPerf/Tests/TermUIPerfTests/PerfRunConfigTests.swift`
 
-- [ ] **Step 1: Create the package**
+- [x] **Step 1: Create the package**
 
   Create a standalone SwiftPM package that depends on:
 
@@ -169,7 +169,7 @@ and optional `xctrace` for manual deep dives.
 
   This avoids adding benchmark-only dependencies to the root package.
 
-- [ ] **Step 2: Add CLI parsing**
+- [x] **Step 2: Add CLI parsing**
 
   Implement a small hand-rolled parser with commands:
 
@@ -182,12 +182,12 @@ and optional `xctrace` for manual deep dives.
   Keep dependencies minimal. Do not add `ArgumentParser` unless the repo already
   accepts that dependency for tooling.
 
-- [ ] **Step 3: Add parser tests**
+- [x] **Step 3: Add parser tests**
 
   Cover mode parsing, comma-separated mode lists, iteration defaults, artifact
   root defaults, and error messages for unknown scenarios.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
   Run:
 
