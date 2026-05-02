@@ -63,3 +63,55 @@ package final class FrameResolveState {
     self.proposal = proposal
   }
 }
+
+extension FrameResolveState {
+  package struct Checkpoint {
+    package var invalidatedIdentities: Set<Identity>
+    package var invalidationSummary: InvalidationSummary
+    package var environmentValues: EnvironmentValues
+    package var environment: EnvironmentSnapshot
+    package var focusedValues: FocusedValues
+    package var transaction: TransactionSnapshot
+    package var proposal: ProposedSize
+    package var selectiveEvaluationEnabled: Bool
+    package var forceRootEvaluation: Bool
+    package var previousFocusedIdentity: Identity?
+    package var previousPressedIdentity: Identity?
+    package var previousProposal: ProposedSize?
+    package var environmentRequiresRootEvaluation: Bool
+  }
+
+  package func makeCheckpoint() -> Checkpoint {
+    Checkpoint(
+      invalidatedIdentities: invalidatedIdentities,
+      invalidationSummary: invalidationSummary,
+      environmentValues: environmentValues,
+      environment: environment,
+      focusedValues: focusedValues,
+      transaction: transaction,
+      proposal: proposal,
+      selectiveEvaluationEnabled: selectiveEvaluationEnabled,
+      forceRootEvaluation: forceRootEvaluation,
+      previousFocusedIdentity: previousFocusedIdentity,
+      previousPressedIdentity: previousPressedIdentity,
+      previousProposal: previousProposal,
+      environmentRequiresRootEvaluation: environmentRequiresRootEvaluation
+    )
+  }
+
+  package func restoreCheckpoint(_ checkpoint: Checkpoint) {
+    invalidatedIdentities = checkpoint.invalidatedIdentities
+    invalidationSummary = checkpoint.invalidationSummary
+    environmentValues = checkpoint.environmentValues
+    environment = checkpoint.environment
+    focusedValues = checkpoint.focusedValues
+    transaction = checkpoint.transaction
+    proposal = checkpoint.proposal
+    selectiveEvaluationEnabled = checkpoint.selectiveEvaluationEnabled
+    forceRootEvaluation = checkpoint.forceRootEvaluation
+    previousFocusedIdentity = checkpoint.previousFocusedIdentity
+    previousPressedIdentity = checkpoint.previousPressedIdentity
+    previousProposal = checkpoint.previousProposal
+    environmentRequiresRootEvaluation = checkpoint.environmentRequiresRootEvaluation
+  }
+}

@@ -1414,6 +1414,192 @@ struct AsyncFrameTailRenderingTests {
     #expect(recorder.events.contains("drop:1"))
   }
 
+  @Test("prepared frame-head abort restores broad reset state")
+  func preparedFrameHeadAbortRestoresBroadResetState() async throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadAbortBroadResetRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: focusTracker,
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameHeadAbortDraftEffectsView(
+          value: value,
+          recorder: recorder
+        )
+      }
+    )
+    focusTracker.invalidator = runLoop.scheduler
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &initialFrames)
+    #expect(terminal.frames.last?.contains("value 0") == true)
+    #expect(runLoop.focusTracker.currentFocusIdentity != nil)
+
+    recorder.reset()
+    runLoop.stateContainer.mutate { value in
+      value = 1
+    }
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      runLoop.currentView(),
+      context: runLoop.resolveContext(
+        for: scheduledFrame(invalidatedIdentities: [rootIdentity])
+      ),
+      proposal: runLoop.proposal()
+    )
+
+    renderer.abortPreparedFrameHeadForCancellationTesting(draft)
+
+    _ = runLoop.handleKeyPress(KeyPress(.character("d"), modifiers: .ctrl))
+    runLoop.handlePaste(PasteEvent(content: "/tmp/aborted-draft-drop.txt"))
+    #expect(!recorder.events.contains("key-command"))
+    #expect(!recorder.events.contains("drop:1"))
+    #expect(!recorder.events.contains("appear:revealed"))
+    #expect(!recorder.events.contains("task:revealed"))
+    #expect(
+      !renderer.liveIdentitySnapshot().contains(
+        testIdentity("AsyncFrameHeadAbortDraftRevealed")
+      )
+    )
+
+    runLoop.stateContainer.mutate { value in
+      value = 0
+    }
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var restoredFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &restoredFrames)
+    #expect(terminal.frames.last?.contains("value 0") == true)
+    #expect(!recorder.events.contains("appear:revealed"))
+    #expect(!recorder.events.contains("task:revealed"))
+
+    recorder.reset()
+    runLoop.stateContainer.mutate { value in
+      value = 1
+    }
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var committedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &committedFrames)
+    _ = runLoop.handleKeyPress(KeyPress(.character("d"), modifiers: .ctrl))
+    runLoop.handlePaste(PasteEvent(content: "/tmp/committed-draft-drop.txt"))
+
+    #expect(recorder.events.contains("key-command"))
+    #expect(recorder.events.contains("drop:1"))
+    #expect(recorder.events.contains("appear:revealed"))
+    try await waitUntil {
+      recorder.events.contains("task:revealed")
+    }
+  }
+
+  @Test("prepared frame-head abort restores selective dirty registrations")
+  func preparedFrameHeadAbortRestoresSelectiveDirtyRegistrations() throws {
+    let rootIdentity = testIdentity("AsyncFrameHeadAbortSelectiveRoot")
+    let terminal = AsyncFrameTailTerminalHost()
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: FrameScheduler(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { _, _ in
+        AsyncFrameHeadSelectiveDraftRegistrationView(recorder: recorder)
+      }
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &initialFrames)
+    renderer.enableSelectiveEvaluation()
+
+    let siblingABinding = KeyBinding(key: .character("a"), modifiers: .ctrl)
+    let siblingBBinding = KeyBinding(key: .character("b"), modifiers: .ctrl)
+    let enableBinding = KeyBinding(key: .character("e"), modifiers: .ctrl)
+    let siblingAScope = try #require(
+      runLoop.commandRegistry.snapshot().keyCommandsByScope.first {
+        $0.value[siblingABinding] != nil
+      }?.key
+    )
+    let siblingBScope = try #require(
+      runLoop.commandRegistry.snapshot().keyCommandsByScope.first {
+        $0.value[siblingBBinding] != nil
+      }?.key
+    )
+    let enableScope = try #require(
+      runLoop.commandRegistry.snapshot().keyCommandsByScope.first {
+        $0.value[enableBinding] != nil
+      }?.key
+    )
+
+    #expect(
+      runLoop.commandRegistry.dispatch(
+        key: enableBinding,
+        along: [enableScope]
+      )
+    )
+    #expect(recorder.events.contains("toggle"))
+    let scheduledFrame = try #require(runLoop.scheduler.consumeReadyFrame(at: .now()))
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      runLoop.currentView(),
+      context: runLoop.resolveContext(for: scheduledFrame),
+      proposal: runLoop.proposal()
+    )
+
+    renderer.abortPreparedFrameHeadForCancellationTesting(draft)
+
+    recorder.reset()
+    #expect(
+      runLoop.commandRegistry.dispatch(
+        key: siblingABinding,
+        along: [siblingAScope]
+      )
+    )
+    #expect(recorder.events.contains("sibling-a"))
+    _ = runLoop.commandRegistry.dispatch(
+      key: siblingBBinding,
+      along: [siblingBScope]
+    )
+    #expect(!recorder.events.contains("sibling-b-new"))
+    #expect(
+      runLoop.commandRegistry.keyCommand(at: siblingBScope, matching: siblingBBinding)?
+        .isEnabled == false
+    )
+
+    runLoop.scheduler.requestInvalidation(of: [])
+    var committedFrames = 0
+    try runLoop.renderPendingFrames(renderedFrames: &committedFrames)
+
+    #expect(
+      runLoop.commandRegistry.keyCommand(at: siblingBScope, matching: siblingBBinding)?
+        .isEnabled == true
+    )
+    #expect(
+      runLoop.commandRegistry.dispatch(
+        key: siblingBBinding,
+        along: [siblingBScope]
+      )
+    )
+    #expect(recorder.events.contains("sibling-b-new"))
+  }
+
   @Test("async renderer tags monotonically increasing render generations")
   func asyncRendererTagsMonotonicallyIncreasingRenderGenerations() async {
     let renderer = DefaultRenderer()
@@ -1662,6 +1848,54 @@ private struct AsyncFrameHeadSelectiveDraftRegistrationView: View {
       draftEnabled = true
       recorder.record("toggle")
     }
+  }
+}
+
+private enum AsyncFrameHeadAbortDraftFocusField: Hashable {
+  case primary
+}
+
+private struct AsyncFrameHeadAbortDraftEffectsView: View {
+  @FocusState private var focusedField: AsyncFrameHeadAbortDraftFocusField?
+
+  var value: Int
+  var recorder: AsyncFrameHeadAbortEffectRecorder
+
+  var body: some View {
+    Panel(id: "abort-draft-effects") {
+      VStack(alignment: .leading, spacing: 0) {
+        Text("value \(value)")
+          .focusable(true)
+          .focused($focusedField, equals: .primary)
+
+        if value != 0 {
+          Text("revealed")
+            .id(testIdentity("AsyncFrameHeadAbortDraftRevealed"))
+            .onAppear {
+              recorder.record("appear:revealed")
+            }
+            .task {
+              recorder.record("task:revealed")
+            }
+        }
+      }
+    }
+    .keyCommand(
+      "Draft",
+      key: .character("d"),
+      modifiers: .ctrl,
+      isEnabled: value != 0
+    ) {
+      recorder.record("key-command")
+    }
+    .dropDestination { paths in
+      guard value != 0 else {
+        return false
+      }
+      recorder.record("drop:\(paths.count)")
+      return true
+    }
+    .defaultFocus($focusedField, .primary)
   }
 }
 
@@ -2040,6 +2274,31 @@ private enum AsyncFrameTailFocusField: Hashable {
 private enum AsyncFrameTailSendableFocusField: String, Hashable {
   case first
   case second
+}
+
+extension TerminalUI.RunLoop {
+  @MainActor
+  fileprivate func currentView() -> ScopedBuilder<Content> {
+    viewBuilder(
+      (
+        state: stateContainer.state,
+        focusedIdentity: focusTracker.currentFocusIdentity
+      )
+    )
+  }
+}
+
+private func scheduledFrame(
+  invalidatedIdentities: Set<Identity>
+) -> ScheduledFrame {
+  ScheduledFrame(
+    causes: [.invalidation],
+    invalidatedIdentities: invalidatedIdentities,
+    signalNames: [],
+    externalReasons: [],
+    triggeredDeadline: nil,
+    nextDeadline: nil
+  )
 }
 
 @MainActor
