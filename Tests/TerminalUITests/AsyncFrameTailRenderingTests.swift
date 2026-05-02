@@ -1954,6 +1954,44 @@ struct AsyncFrameTailRenderingTests {
     #expect(!appliedSideEffects.isAvailableToRuntimePolicy)
   }
 
+  @Test("completed frame policy compares candidate and newest desired generations")
+  func completedFramePolicyComparesGenerations() {
+    let orderedPolicy = CompletedFramePolicy.orderedCommitOnly
+    let dropPolicy = CompletedFramePolicy(mode: .dropCompletedVisualOnly)
+    let visualOnlyEligibility = FrameDropEligibility(decision: .canDropVisualOnly)
+    let blockedEligibility = FrameDropEligibility(blockers: [.handlerInstallations])
+
+    let staleVisualOnly = dropPolicy.decide(
+      candidateGeneration: RenderGeneration(1),
+      newestDesiredGeneration: RenderGeneration(2),
+      eligibility: visualOnlyEligibility
+    )
+    #expect(staleVisualOnly.action == .dropVisualOnly)
+    #expect(staleVisualOnly.reconciliation == .emptyVisualOnly)
+
+    let currentVisualOnly = dropPolicy.decide(
+      candidateGeneration: RenderGeneration(2),
+      newestDesiredGeneration: RenderGeneration(2),
+      eligibility: visualOnlyEligibility
+    )
+    #expect(currentVisualOnly.action == .commitOrdered)
+
+    let staleBlocked = dropPolicy.decide(
+      candidateGeneration: RenderGeneration(1),
+      newestDesiredGeneration: RenderGeneration(2),
+      eligibility: blockedEligibility
+    )
+    #expect(staleBlocked.action == .blocked)
+    #expect(staleBlocked.reconciliation.blockReason == .dropEligibilityBlockers)
+
+    let orderedStale = orderedPolicy.decide(
+      candidateGeneration: RenderGeneration(1),
+      newestDesiredGeneration: RenderGeneration(2),
+      eligibility: visualOnlyEligibility
+    )
+    #expect(orderedStale.action == .commitOrdered)
+  }
+
   @Test("cancellable completed frame reports ordered reconciliation decision")
   func cancellableCompletedFrameReportsOrderedReconciliationDecision() async throws {
     let renderer = DefaultRenderer()

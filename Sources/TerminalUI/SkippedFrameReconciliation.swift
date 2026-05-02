@@ -130,3 +130,35 @@ package struct CompletedFrameDropDecision: Equatable, Sendable {
     action == .dropVisualOnly && reconciliation.isAvailableToRuntimePolicy
   }
 }
+
+package struct CompletedFramePolicy: Equatable, Sendable {
+  package enum Mode: Equatable, Sendable {
+    case orderedCommitOnly
+    case dropCompletedVisualOnly
+  }
+
+  package var mode: Mode
+
+  package init(mode: Mode = .orderedCommitOnly) {
+    self.mode = mode
+  }
+
+  package static let orderedCommitOnly = Self()
+
+  package func decide(
+    candidateGeneration: RenderGeneration,
+    newestDesiredGeneration: RenderGeneration,
+    eligibility: FrameDropEligibility
+  ) -> CompletedFrameDropDecision {
+    guard candidateGeneration < newestDesiredGeneration else {
+      return .orderedCommit(eligibility: eligibility)
+    }
+
+    switch mode {
+    case .orderedCommitOnly:
+      return .orderedCommit(eligibility: eligibility)
+    case .dropCompletedVisualOnly:
+      return CompletedFrameDropDecision.dropVisualOnly(eligibility: eligibility)
+    }
+  }
+}

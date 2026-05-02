@@ -583,6 +583,13 @@ extension RunLoop {
             context: resolveContext(for: scheduledFrame),
             proposal: proposal(),
             collectsDiagnostics: hasDiagnosticsLogger,
+            newestDesiredGeneration: {
+              RenderGeneration(
+                self.scheduler.hasPendingFrame(at: .now())
+                  ? self.nextRenderIntentGeneration
+                  : renderIntentDiagnostics.desiredGeneration
+              )
+            },
             shouldCancelQueued: shouldCancelQueuedTail
           )
           if renderOutcome.tailJobState == .cancelledBeforeStart {

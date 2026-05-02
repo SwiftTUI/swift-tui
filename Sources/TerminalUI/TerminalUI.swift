@@ -214,6 +214,7 @@ private struct CompletedFrameCandidate {
   var collectsDiagnostics: Bool
   var previewArtifacts: FrameArtifacts
   var eligibility: FrameDropEligibility
+  var newestDesiredGeneration: RenderGeneration
   var dropDecision: CompletedFrameDropDecision
 }
 
@@ -1169,6 +1170,7 @@ public struct DefaultRenderer {
   private let presentationHostState: PresentationHostState
   private let animationController: AnimationController
   private let renderGenerationSequencer: RenderGenerationSequencer
+  private let completedFramePolicy: CompletedFramePolicy
 
   private let frameTailRenderer: FrameTailRenderer
 
@@ -1194,6 +1196,7 @@ public struct DefaultRenderer {
     presentationHostState = .init()
     animationController = .init()
     renderGenerationSequencer = .init()
+    completedFramePolicy = .orderedCommitOnly
     frameTailRenderer = .init(
       layoutEngine: layoutEngine,
       semanticExtractor: semanticExtractor,
@@ -1284,6 +1287,7 @@ public struct DefaultRenderer {
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
+      newestDesiredGeneration: draft.renderGeneration,
       collectsDiagnostics: true
     )
     discardCompletedFrameCandidate(
@@ -1301,6 +1305,7 @@ public struct DefaultRenderer {
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
+      newestDesiredGeneration: draft.renderGeneration,
       collectsDiagnostics: true
     )
     return candidate.dropDecision
@@ -1352,6 +1357,7 @@ public struct DefaultRenderer {
     context: ResolveContext,
     proposal: ProposedSize,
     collectsDiagnostics: Bool,
+    newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration? = { nil },
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderOutcome {
     let draft = prepareFrameHead(
@@ -1377,6 +1383,7 @@ public struct DefaultRenderer {
       let candidate = makeCompletedFrameCandidate(
         draft: draft,
         tailOutput: tailOutput,
+        newestDesiredGeneration: newestDesiredGeneration() ?? draft.renderGeneration,
         collectsDiagnostics: collectsDiagnostics
       )
       let artifacts = commitCompletedFrameCandidate(candidate)
@@ -1651,6 +1658,7 @@ public struct DefaultRenderer {
     let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
+      newestDesiredGeneration: draft.renderGeneration,
       collectsDiagnostics: collectsDiagnostics
     )
     return commitCompletedFrameCandidate(candidate)
@@ -1953,6 +1961,7 @@ public struct DefaultRenderer {
   private func makeCompletedFrameCandidate(
     draft: FrameHeadDraft,
     tailOutput: AsyncFrameTailDraftOutput,
+    newestDesiredGeneration: RenderGeneration,
     collectsDiagnostics: Bool
   ) -> CompletedFrameCandidate {
     let resolved = completedFrameResolvedTree(
@@ -1986,7 +1995,12 @@ public struct DefaultRenderer {
       collectsDiagnostics: collectsDiagnostics,
       previewArtifacts: artifacts,
       eligibility: eligibility,
-      dropDecision: completedFrameDropDecision(for: eligibility)
+      newestDesiredGeneration: newestDesiredGeneration,
+      dropDecision: completedFramePolicy.decide(
+        candidateGeneration: draft.renderGeneration,
+        newestDesiredGeneration: newestDesiredGeneration,
+        eligibility: eligibility
+      )
     )
   }
 
@@ -2196,12 +2210,6 @@ public struct DefaultRenderer {
       blockers.insert(.workerCustomLayoutCacheUpdate)
     }
     return blockers
-  }
-
-  private func completedFrameDropDecision(
-    for eligibility: FrameDropEligibility
-  ) -> CompletedFrameDropDecision {
-    CompletedFrameDropDecision.orderedCommit(eligibility: eligibility)
   }
 
   @MainActor

@@ -115,8 +115,10 @@ barriers. The candidate-level classifier can identify a fully observed
 visual-only candidate, and skipped-frame reconciliation now has an explicit
 empty-visual-only staging type. Async completion now builds a completed-frame
 candidate with a checkpointed commit-plan preview before applying the explicit
-commit step. `FrameDropEligibility.canDrop` remains false and no runtime path
-drops completed frames. Off-main resolve is not planned near-term.
+commit step, and an ordered-only completed-frame policy compares candidate and
+newest desired generations before returning the current `commit_ordered`
+decision. `FrameDropEligibility.canDrop` remains false and no runtime path drops
+completed frames. Off-main resolve is not planned near-term.
 
 ## Shipped Option 3 Boundary
 
@@ -221,7 +223,7 @@ side-effect reconciliation remains a later proposal.
 | Abortable prepared frame heads | Shipped | Draft registries plus graph/state checkpoints protect live runtime state. |
 | Cancellable pre-start tail jobs | Shipped | Only queued jobs can cancel; started/completed jobs commit in order. |
 | Cancelled animation intent replay | Shipped | Replays invalidation-scoped animation metadata without replaying input or replacing newer explicit animation. |
-| Visual-only completed-frame drops | Not shipped | Explicit blocker signals, candidate classification, reconciliation scaffolding, and a candidate commit boundary exist; stale-result drop policy and dropped-frame diagnostics do not. |
+| Visual-only completed-frame drops | Not shipped | Explicit blocker signals, candidate classification, reconciliation scaffolding, a candidate commit boundary, and ordered-only policy scaffolding exist; stale-result dropping and dropped-frame diagnostics do not. |
 | Off-main resolve | Not planned near-term | Would require a new authoring and registration model. |
 
 ## Supporting Documents
