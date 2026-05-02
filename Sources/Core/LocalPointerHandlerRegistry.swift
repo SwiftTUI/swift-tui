@@ -147,6 +147,20 @@ package final class LocalPointerHandlerRegistry: Equatable {
     hoverHandlers.removeAll(keepingCapacity: true)
   }
 
+  package func reset(
+    preservingRouteHandlersFor preservedIdentities: Set<Identity>
+  ) {
+    guard !preservedIdentities.isEmpty else {
+      reset()
+      return
+    }
+
+    for routeID in handlers.keys.filter({ !preservedIdentities.contains($0.identity) }) {
+      handlers.removeValue(forKey: routeID)
+    }
+    hoverHandlers.removeAll(keepingCapacity: true)
+  }
+
   package func removeSubtrees(
     rootedAt roots: [Identity],
     preserving preservedIdentities: Set<Identity> = []
@@ -171,6 +185,10 @@ package final class LocalPointerHandlerRegistry: Equatable {
 
   package func snapshot() -> [RouteID: Handler] {
     handlers
+  }
+
+  package func snapshotHover() -> [RouteID: HoverHandler] {
+    hoverHandlers
   }
 
   package func restore(_ snapshot: [RouteID: Handler]) {
