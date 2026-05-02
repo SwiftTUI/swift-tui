@@ -5,7 +5,9 @@
 Stages 1 and 2 are implemented. The observational drop-blocker classifier
 described in Stage 4 is also implemented and now exposes explicit runtime
 signals for the formerly unobservable blocker families, but it is still
-diagnostic only for completed-frame drops. Scheduler Stages 3A through 3D are
+diagnostic only for completed-frame drops. Stage 5 reconciliation scaffolding
+is implemented, and Stage 6 now has a candidate/commit finish boundary while
+still preserving ordered commit. Scheduler Stages 3A through 3D are
 implemented. The first Stage 3C, abortable prepared frame heads, was attempted
 and reverted; see
 [`../plans/2026-04-26-002-frame-head-abort-plan.md`](../plans/2026-04-26-002-frame-head-abort-plan.md).
@@ -613,7 +615,7 @@ git commit -m "feat(runtime): reconcile skipped async frame results"
 
 ### Stage 6: Drop completed visual-only frames
 
-- [ ] Split the async finish path into candidate creation and explicit commit.
+- [x] Split the async finish path into candidate creation and explicit commit.
 - [ ] Add a completed-frame policy object that compares candidate generation to
   the newest desired generation and consults `FrameDropEligibility`.
 - [ ] When a stale candidate is visual-only, discard it through
@@ -622,6 +624,20 @@ git commit -m "feat(runtime): reconcile skipped async frame results"
   reconciliation, and presentation-recovery fields.
 - [ ] Preserve ordered commit for every non-droppable completed candidate.
 - [ ] Do not enable non-empty reconciliation.
+
+Stage 6 result so far:
+
+- Async frame-tail completion now builds a `CompletedFrameCandidate` before
+  committing. Candidate creation previews the commit plan under a `ViewGraph`
+  checkpoint, restores that preview, and leaves live registration, lifecycle,
+  animation, custom-layout cache, measurement-cache, and retained-tail commits
+  to `commitCompletedFrameCandidate`.
+- The default completed path still immediately commits every candidate in
+  order. The recorded decision remains `commit_ordered`, and no runtime policy
+  drops completed worker output.
+- Test coverage proves candidate creation does not publish draft command
+  registrations into the live registry, and the `.emptyVisualOnly` test discard
+  path now discards a completed candidate instead of only a rendered tail.
 
 Commit boundary:
 

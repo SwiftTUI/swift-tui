@@ -1975,6 +1975,56 @@ struct AsyncFrameTailRenderingTests {
     #expect(!decision.canSkipCompletedFrame)
   }
 
+  @Test("completed frame candidate creation does not commit draft registrations")
+  func completedFrameCandidateCreationDoesNotCommitDraftRegistrations() async throws {
+    let rootIdentity = testIdentity("AsyncCompletedFrameCandidateBoundaryRoot")
+    let recorder = AsyncFrameHeadAbortEffectRecorder()
+    let renderer = DefaultRenderer()
+    let commandRegistry = CommandRegistry()
+    let initialBinding = KeyBinding(key: .character("i"), modifiers: .ctrl)
+    let draftBinding = KeyBinding(key: .character("d"), modifiers: .ctrl)
+    var context = ResolveContext(identity: rootIdentity)
+    context.commandRegistry = commandRegistry
+
+    _ = renderer.render(
+      AsyncFrameHeadDraftKeyCommandView(
+        value: 0,
+        recorder: recorder
+      ),
+      context: context,
+      proposal: .init(width: 24, height: 5),
+      collectsDiagnostics: false
+    )
+    let commandScope = try #require(
+      commandRegistry.snapshot().keyCommandsByScope.first {
+        $0.value[initialBinding] != nil
+      }?.key
+    )
+    #expect(
+      commandRegistry.keyCommand(at: commandScope, matching: draftBinding)?.isEnabled == false)
+
+    var updateContext = context
+    updateContext.invalidatedIdentities = [rootIdentity]
+    let draft = renderer.prepareFrameHeadForCancellationTesting(
+      AsyncFrameHeadDraftKeyCommandView(
+        value: 1,
+        recorder: recorder
+      ),
+      context: updateContext,
+      proposal: .init(width: 24, height: 5)
+    )
+
+    let decision = await renderer.previewCompletedFrameCandidateForTesting(draft)
+
+    #expect(decision.action == .commitOrdered)
+    #expect(
+      commandRegistry.keyCommand(at: commandScope, matching: draftBinding)?.isEnabled == false)
+
+    renderer.abortPreparedFrameHeadForCancellationTesting(draft)
+    #expect(
+      commandRegistry.keyCommand(at: commandScope, matching: draftBinding)?.isEnabled == false)
+  }
+
   @Test("empty visual-only reconciliation discards completed tail without commit")
   func emptyVisualOnlyReconciliationDiscardsCompletedTailWithoutCommit() async throws {
     let rootIdentity = testIdentity("AsyncSkippedVisualOnlyRoot")
