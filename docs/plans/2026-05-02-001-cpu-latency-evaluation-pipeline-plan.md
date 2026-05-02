@@ -252,7 +252,7 @@ and optional `xctrace` for manual deep dives.
 - Create: `Tools/TermUIPerf/Sources/TermUIPerf/CPUSampler.swift`
 - Create: `Tools/TermUIPerf/Tests/TermUIPerfTests/CPUSamplerTests.swift`
 
-- [ ] **Step 1: Add CPU sample model tests**
+- [x] **Step 1: Add CPU sample model tests**
 
   Test delta calculation from two samples:
 
@@ -262,18 +262,18 @@ and optional `xctrace` for manual deep dives.
   - wall delta,
   - derived CPU percent.
 
-- [ ] **Step 2: Implement platform sampler**
+- [x] **Step 2: Implement platform sampler**
 
   Use `getrusage(RUSAGE_SELF)` for the first implementation. Add Darwin task
   information later only if process-level CPU is insufficient.
 
-- [ ] **Step 3: Add periodic collection**
+- [x] **Step 3: Add periodic collection**
 
   Add an async sampler loop with configurable sample interval, defaulting to
   50 ms. The sampler should start immediately before the scenario and stop
   immediately after the final expected output.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
   Run:
 
