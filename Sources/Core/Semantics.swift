@@ -22,9 +22,14 @@ public struct SemanticExtractor: Sendable {
         clipRect,
         order,
         sealingParentOnChain,
+        interactionsDisabledOnChain,
         nextHitTestOrder
         in
         let isEnabled = node.environmentSnapshot.style.isEnabled
+        let interactionsEnabled =
+          isEnabled
+          && !interactionsDisabledOnChain
+          && node.semanticMetadata.interactionAvailability.isEnabled
         let hitsAllowed = node.semanticMetadata.allowsHitTesting
         let routeID = primaryRouteID(for: node.identity)
 
@@ -34,7 +39,7 @@ public struct SemanticExtractor: Sendable {
           namedCoordinateSpaces[name] = node.bounds
         }
 
-        if participatesInTopLevelFocus, isEnabled, hitsAllowed, !sealingParentOnChain {
+        if participatesInTopLevelFocus, interactionsEnabled, hitsAllowed, !sealingParentOnChain {
           focusRegions.append(
             FocusRegion(
               identity: node.identity,
@@ -46,7 +51,7 @@ public struct SemanticExtractor: Sendable {
           )
         }
 
-        if isEnabled
+        if interactionsEnabled
           && hitsAllowed
           && (participatesInTopLevelFocus
             || node.semanticMetadata.participatesInPointerHitTesting)
@@ -72,7 +77,7 @@ public struct SemanticExtractor: Sendable {
           }
         }
 
-        if isEnabled {
+        if interactionsEnabled {
           appendPayloadSemantics(
             for: node,
             scopePath: scopePath,
@@ -85,7 +90,7 @@ public struct SemanticExtractor: Sendable {
           )
         }
 
-        if isEnabled, let scrollRole = node.semanticMetadata.scrollRole {
+        if interactionsEnabled, let scrollRole = node.semanticMetadata.scrollRole {
           scrollRoutes.append(
             ScrollRoute(
               identity: node.identity,
@@ -104,13 +109,17 @@ public struct SemanticExtractor: Sendable {
         sectionIdentity,
         clipRect,
         sealingParentOnChain,
+        interactionsDisabledOnChain,
         nextHitTestOrder
         in
         guard node.environmentSnapshot.style.isEnabled else {
           return
         }
 
-        if !sealingParentOnChain {
+        if !sealingParentOnChain
+          && !interactionsDisabledOnChain
+          && node.semanticMetadata.interactionAvailability.isEnabled
+        {
           appendScrollIndicatorSemantics(
             for: node,
             scopePath: scopePath,
@@ -141,8 +150,8 @@ extension SemanticExtractor {
     sectionIdentity: Identity? = nil,
     clipRect: CellRect? = nil,
     hitTestOrder: inout Int,
-    preVisit: (PlacedNode, [Identity], Identity?, CellRect?, Int, Bool, inout Int) -> Void,
-    postVisit: (PlacedNode, [Identity], Identity?, CellRect?, Bool, inout Int) -> Void
+    preVisit: (PlacedNode, [Identity], Identity?, CellRect?, Int, Bool, Bool, inout Int) -> Void,
+    postVisit: (PlacedNode, [Identity], Identity?, CellRect?, Bool, Bool, inout Int) -> Void
   ) {
     enum Phase {
       case enter
@@ -159,6 +168,7 @@ extension SemanticExtractor {
       /// region emission can skip them even though the sealing node
       /// itself is emitted normally.
       let sealingParentOnChain: Bool
+      let interactionsDisabledOnChain: Bool
       let phase: Phase
     }
 
@@ -169,6 +179,7 @@ extension SemanticExtractor {
         sectionIdentity: sectionIdentity,
         clipRect: clipRect,
         sealingParentOnChain: false,
+        interactionsDisabledOnChain: false,
         phase: .enter
       )
     ]
@@ -181,9 +192,11 @@ extension SemanticExtractor {
       if frame.node.isTransient { continue }
       switch frame.phase {
       case .enter:
+        let focusScopeIdentity =
+          frame.node.semanticMetadata.focusScopeIdentity ?? frame.node.identity
         let nodeScopePath =
           frame.node.semanticMetadata.focusScopeBoundary
-          ? frame.scopePath + [frame.node.identity]
+          ? frame.scopePath + [focusScopeIdentity]
           : frame.scopePath
         let nodeSectionIdentity =
           frame.node.semanticMetadata.focusSectionBoundary
@@ -203,6 +216,7 @@ extension SemanticExtractor {
           nodeClipRect,
           nodeHitTestOrder,
           frame.sealingParentOnChain,
+          frame.interactionsDisabledOnChain,
           &hitTestOrder
         )
 
@@ -213,6 +227,7 @@ extension SemanticExtractor {
             sectionIdentity: nodeSectionIdentity,
             clipRect: nodeClipRect,
             sealingParentOnChain: frame.sealingParentOnChain,
+            interactionsDisabledOnChain: frame.interactionsDisabledOnChain,
             phase: .exit
           )
         )
@@ -220,6 +235,9 @@ extension SemanticExtractor {
         let childSealingParentOnChain =
           frame.sealingParentOnChain
           || frame.node.semanticMetadata.sealsFocusDescendants
+        let childInteractionsDisabledOnChain =
+          frame.interactionsDisabledOnChain
+          || !frame.node.semanticMetadata.interactionAvailability.isEnabled
         for child in frame.node.children.reversed() {
           stack.append(
             Frame(
@@ -228,6 +246,7 @@ extension SemanticExtractor {
               sectionIdentity: nodeSectionIdentity,
               clipRect: nodeClipRect,
               sealingParentOnChain: childSealingParentOnChain,
+              interactionsDisabledOnChain: childInteractionsDisabledOnChain,
               phase: .enter
             )
           )
@@ -239,6 +258,7 @@ extension SemanticExtractor {
           frame.sectionIdentity,
           frame.clipRect,
           frame.sealingParentOnChain,
+          frame.interactionsDisabledOnChain,
           &hitTestOrder
         )
       }

@@ -75,18 +75,11 @@ package func confirmationDialogPromptPresentationSpec() -> PromptPresentationSpe
   )
 }
 
-/// Spec for `Menu`'s expanded content. Routes through the same sheet
-/// presentation registry as `.sheet(...)` but with a unique `"menu"`
-/// token (so menu attachment IDs never collide with sheet attachment
-/// IDs on the same source identity) and `.menu` chrome (so the
-/// rendering surface is a compact, intrinsic-width bordered box with no
-/// header).
-///
-/// **v1 behavior caveats** — the menu is hosted by the sheet
-/// coordinator, so `disablesBaseInteractionWhenActive` (sheet's
-/// surrounding-content disable) applies while a menu is open. A future
-/// dedicated `MenuPresentationCoordinator` will let menus stay open
-/// without disabling the surrounding UI.
+/// Spec for `Menu`'s expanded content. Menus use a dedicated non-modal
+/// portal entry with a unique `"menu"` token (so menu attachment IDs never
+/// collide with sheet attachment IDs on the same source identity) and `.menu`
+/// chrome (so the rendering surface is a compact, intrinsic-width bordered box
+/// with no header).
 package func menuPromptPresentationSpec() -> PromptPresentationSpec {
   PromptPresentationSpec(
     token: "menu",
@@ -107,7 +100,7 @@ package func menuPromptPresentationSpec() -> PromptPresentationSpec {
       contentSizing: .intrinsic
     ),
     reconcile: { registry, sourceIdentity, item in
-      registry.sheet.sync(
+      registry.menu.sync(
         sourceIdentity: sourceIdentity,
         items: [item]
       )
@@ -354,10 +347,10 @@ public struct BuiltinPromptPresentationModifier<Actions: View, Message: View>:
       title: title,
       descriptor: spec.descriptor,
       actionPayloads: withAuthoringContext(actionsAuthoringContext) {
-        deferredDeclaredBuilderChildren(from: actions)
+        portalDeclaredBuilderChildren(from: actions)
       },
       messagePayloads: withAuthoringContext(messageAuthoringContext) {
-        deferredDeclaredBuilderChildren(from: message)
+        portalDeclaredBuilderChildren(from: message)
       },
       contentPayloads: [],
       dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
@@ -415,7 +408,7 @@ public struct BuiltinSheetPresentationModifier<SheetContent: View>: PrimitiveVie
       actionPayloads: [],
       messagePayloads: [],
       contentPayloads: withAuthoringContext(sheetContentAuthoringContext) {
-        deferredDeclaredBuilderChildren(from: sheetContent)
+        portalDeclaredBuilderChildren(from: sheetContent)
       },
       dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
         withAuthoringContext(dismissAuthoringContext) {
@@ -650,7 +643,7 @@ package struct PromptPresentationSurface: View, ActionScope {
         VStack(alignment: .leading, spacing: 0) {
           if !item.messagePayloads.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
-              DeferredPayloadGroupView(
+              PortalPayloadGroupView(
                 kindName: "PresentationMessage",
                 payloads: item.messagePayloads
               )
@@ -673,7 +666,7 @@ package struct PromptPresentationSurface: View, ActionScope {
   private var contentBody: some View {
     ScrollView(.vertical) {
       VStack(alignment: .leading, spacing: 0) {
-        DeferredPayloadGroupView(
+        PortalPayloadGroupView(
           kindName: "PresentationContent",
           payloads: item.contentPayloads
         )
@@ -694,15 +687,15 @@ package struct PromptPresentationSurface: View, ActionScope {
   /// `scrollMaxHeight` from the descriptor is ignored intentionally so
   /// short menus don't reserve extra empty rows below their last item.
   ///
-  /// Iterates payloads via `ForEach` + per-item `DeferredPayloadView`
-  /// rather than `DeferredPayloadGroupView`. The group view returns a
+  /// Iterates payloads via `ForEach` + per-item `PortalPayloadView`
+  /// rather than `PortalPayloadGroupView`. The group view returns a
   /// single intrinsic-layout node when there are multiple payloads,
   /// which would let menu items overlap in one row. Iterating gives
   /// the VStack its own children to lay out vertically.
   private var menuContentBody: some View {
     VStack(alignment: .leading, spacing: 0) {
       ForEach(item.contentPayloads.indices, id: \.self) { index in
-        DeferredPayloadView(payload: item.contentPayloads[index])
+        PortalPayloadView(payload: item.contentPayloads[index])
       }
     }
   }
@@ -710,7 +703,7 @@ package struct PromptPresentationSurface: View, ActionScope {
   private var presentationActions: some View {
     HStack(spacing: 1) {
       ForEach(item.actionPayloads.indices, id: \.self) { index in
-        DeferredPayloadView(payload: item.actionPayloads[index])
+        PortalPayloadView(payload: item.actionPayloads[index])
           .fixedSize()
       }
     }
@@ -986,7 +979,7 @@ public struct ToastModifier<ToastContent: View>: PrimitiveViewModifier {
         for: sourceIdentity,
         token: "toast"
       ),
-      contentPayloads: deferredDeclaredBuilderChildren(from: toastContent),
+      contentPayloads: portalDeclaredBuilderChildren(from: toastContent),
       presentation: style.presentation(for: ToastStyleConfiguration()),
       duration: duration,
       dismiss: { [isPresented, dismissAuthoringContext, dismissInvalidator, sourceIdentity] in
@@ -1048,7 +1041,7 @@ private struct ToastPresentationView: View {
           .foregroundStyle(item.presentation.iconStyle)
       }
       VStack {
-        DeferredPayloadGroupView(
+        PortalPayloadGroupView(
           kindName: "ToastContent",
           payloads: item.contentPayloads
         )

@@ -49,6 +49,10 @@ package protocol DeclaredChildrenView {
     into children: inout [DeferredViewPayload]
   )
 
+  func appendPortalDeclaredChildren(
+    into children: inout [PortalContentPayload]
+  )
+
   /// Enumerates declared children without resolving them, invoking
   /// `visitor` for each child with:
   /// - `child` — the raw typed view (boxed as `Any`), so the caller can

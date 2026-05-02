@@ -693,7 +693,7 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
     var node = content.resolve(in: context)
     let authoringContext = currentImperativeAuthoringContextSnapshot()
     let taskAction = action
-    let lifecycleIdentity = ViewNodeContext.current?.identity ?? node.identity
+    let lifecycleIdentity = node.identity
     let descriptor = TaskDescriptor(
       id: descriptorID.map { "\(lifecycleIdentity)#task[\($0)]" } ?? "\(lifecycleIdentity)#task",
       priority: priority

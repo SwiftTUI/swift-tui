@@ -346,10 +346,10 @@ private struct RenderTimePresentationMutationProbe: View, ResolvableView {
         ),
         title: "Illegal mutation",
         descriptor: spec.descriptor,
-        actionPayloads: deferredDeclaredBuilderChildren(
+        actionPayloads: portalDeclaredBuilderChildren(
           from: Button("Dismiss") {}
         ),
-        messagePayloads: deferredDeclaredBuilderChildren(
+        messagePayloads: portalDeclaredBuilderChildren(
           from: Text("Should never render.")
         ),
         contentPayloads: [],

@@ -6,18 +6,16 @@ package import Core
 ///
 /// The trigger row (`Label ▾` / `Label ▴`) always renders inline at
 /// the menu's site in the layout, taking exactly one cell of height.
-/// When activated, the user-supplied `content` is hosted by the sheet
-/// presentation coordinator with `.menu` chrome (a compact,
-/// intrinsic-width bordered box anchored at the host's top-leading).
+/// When activated, the user-supplied `content` is hosted by a non-modal
+/// portal entry with `.menu` chrome (a compact, intrinsic-width bordered
+/// box anchored at the portal root's top-leading).
 ///
 /// **v1 caveats** (tracked as future work):
 /// - Anchoring is at the presentation host's top-leading rather than
 ///   at the menu's source frame. A future enhancement will plumb
 ///   source frames through the presentation system.
-/// - The menu shares the sheet coordinator, so opening a menu disables
-///   interaction with surrounding controls until it closes (Escape).
-///   A dedicated menu coordinator with non-disabling base interaction
-///   is the v2 follow-up.
+/// - The menu stays non-modal: opening it does not freeze surrounding
+///   controls, although Escape still dismisses the topmost open menu.
 public struct Menu<Label: View, Content: View>: View, ResolvableView {
   @State private var isExpanded = false
   package var label: Label
@@ -82,9 +80,9 @@ extension Menu {
       )
     }
 
-    // Wrap the trigger row with `BuiltinSheetPresentationModifier` so
-    // the menu's expanded content rides the same overlay infrastructure
-    // sheets do. Routing the modifier through the view tree (rather
+    // Wrap the trigger row with the prompt presentation modifier so the
+    // menu's expanded content rides the portal overlay infrastructure.
+    // Routing the modifier through the view tree (rather
     // than imperatively attaching the preference inside this function)
     // is critical: `ResolvedNode.children`'s setter recomputes
     // `preferenceValues` from its children, so an imperative attach on

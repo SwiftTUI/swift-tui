@@ -658,7 +658,28 @@ The case generalizes beyond `List`. When a SwiftUI-faithful runtime considers fo
 
 The project's working rule is therefore to model focus appearance against the runtime's own semantics, with SwiftUI as a reference for the questions worth asking, not as a literal style sheet.
 
-## 11. Sources
+## 11. SwiftTUI Portal And Overlay Rules
+
+SwiftTUI root presentations use the same focus model as ordinary UI. The
+presentation primitive stack adds three implementation rules:
+
+- `OverlayStack` owns scene focus-scope bridging. When a sheet, alert, dialog,
+  menu, or toast is rendered as a root overlay, the scene scope remains earlier
+  in the overlay descendants' scope paths, so scene-level commands and focused
+  values keep their normal precedence.
+- `InteractionGate` removes gated base routes from the semantic snapshot while
+  leaving the gated subtree mounted. Focus regions, key commands, pointer and
+  gesture routes, drop destinations, text-input targets, and focused-value
+  routes under a disabled gate are omitted; lifecycle and tasks continue.
+- Non-modal overlays such as menus and toasts choose their own interaction
+  policy. They do not inherit sheet-style base freezing as a side effect of
+  being root-presented.
+
+Escape dismissal is not a focus traversal rule. The runtime asks `DismissStack`
+for the topmost Escape-eligible overlay using the same ordering used for
+overlay drawing.
+
+## 12. Sources
 
 Primary Apple sources used for this document:
 

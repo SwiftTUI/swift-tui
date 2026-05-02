@@ -67,6 +67,26 @@ extension RunLoop {
     return values.isEmpty ? "-" : values.joined(separator: "+")
   }
 
+  private func appendLifecycleCarryForward(
+    _ lifecycle: [LifecycleCommitEntry],
+    into carryForward: inout [LifecycleCommitEntry]
+  ) {
+    for entry in lifecycle where !carryForward.contains(entry) {
+      carryForward.append(entry)
+    }
+  }
+
+  private func mergeLifecycleCarryForward(
+    _ carryForward: [LifecycleCommitEntry],
+    into lifecycle: inout [LifecycleCommitEntry]
+  ) {
+    guard !carryForward.isEmpty else {
+      return
+    }
+    let retainedCurrent = lifecycle.filter { !carryForward.contains($0) }
+    lifecycle = carryForward + retainedCurrent
+  }
+
   package func renderPendingFrames(renderedFrames: inout Int) throws {
     observationBridge.attachInvalidator(scheduler)
 
@@ -94,6 +114,8 @@ extension RunLoop {
       var focusedValuesChangedDuringFrame = false
       var scrollPositionChangedDuringFrame = false
       var artifacts: FrameArtifacts?
+      var focusSyncLifecycleCarryForward = deferredLifecycleCarryForward
+      deferredLifecycleCarryForward.removeAll(keepingCapacity: true)
       let currentState = stateContainer.state
       if previousRenderedState != currentState {
         renderer.forceRootEvaluation()
@@ -181,6 +203,10 @@ extension RunLoop {
         if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged
           || scrollPositionChanged
         {
+          appendLifecycleCarryForward(
+            renderedArtifacts.commitPlan.lifecycle,
+            into: &focusSyncLifecycleCarryForward
+          )
           rerenderedForFocusSync = true
           if !focusSyncBudget.recordRerender() {
             focusSyncBudgetExceeded = true
@@ -191,9 +217,13 @@ extension RunLoop {
         break
       }
 
-      guard let artifacts else {
+      guard var artifacts else {
         preconditionFailure("Focus synchronization produced no frame artifacts.")
       }
+      mergeLifecycleCarryForward(
+        focusSyncLifecycleCarryForward,
+        into: &artifacts.commitPlan.lifecycle
+      )
       if focusSyncBudgetExceeded {
         let causes = scheduledFrame.causes.map(\.rawValue).sorted().joined(separator: "+")
         assertionFailure(
@@ -676,6 +706,8 @@ extension RunLoop {
       var artifacts: FrameArtifacts?
       var tailJobState: FrameTailJobState = .completed
       var completedFrameDropDecision: CompletedFrameDropDecision?
+      var focusSyncLifecycleCarryForward = deferredLifecycleCarryForward
+      deferredLifecycleCarryForward.removeAll(keepingCapacity: true)
       let currentState = stateContainer.state
       if previousRenderedState != currentState {
         renderer.forceRootEvaluation()
@@ -751,6 +783,10 @@ extension RunLoop {
             shouldCancelQueued: shouldCancelQueuedTailForMode
           )
           if renderOutcome.tailJobState == .cancelledBeforeStart {
+            appendLifecycleCarryForward(
+              focusSyncLifecycleCarryForward,
+              into: &deferredLifecycleCarryForward
+            )
             cancelledRenderCount += 1
             replayCancelledFrameIntent(scheduledFrame)
             logCancelledFrameTail(
@@ -769,6 +805,10 @@ extension RunLoop {
             continue frameLoop
           }
           if renderOutcome.tailJobState == .droppedCompleted {
+            appendLifecycleCarryForward(
+              focusSyncLifecycleCarryForward,
+              into: &deferredLifecycleCarryForward
+            )
             logDroppedCompletedFrame(
               diagnosticsLogger: diagnosticsLogger,
               renderedFrames: renderedFrames,
@@ -860,6 +900,10 @@ extension RunLoop {
         if focusChanged || appliedFocusRequest || focusStateChanged || focusedValuesChanged
           || scrollPositionChanged
         {
+          appendLifecycleCarryForward(
+            renderedArtifacts.commitPlan.lifecycle,
+            into: &focusSyncLifecycleCarryForward
+          )
           rerenderedForFocusSync = true
           if !focusSyncBudget.recordRerender() {
             focusSyncBudgetExceeded = true
@@ -870,9 +914,13 @@ extension RunLoop {
         break
       }
 
-      guard let artifacts else {
+      guard var artifacts else {
         preconditionFailure("Focus synchronization produced no frame artifacts.")
       }
+      mergeLifecycleCarryForward(
+        focusSyncLifecycleCarryForward,
+        into: &artifacts.commitPlan.lifecycle
+      )
       if focusSyncBudgetExceeded {
         let causes = scheduledFrame.causes.map(\.rawValue).sorted().joined(separator: "+")
         assertionFailure(

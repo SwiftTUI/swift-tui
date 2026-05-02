@@ -225,6 +225,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var pendingCoalescedEventBatches = 0
   package var pendingCoalescedWakeCauses: Set<WakeCause> = []
   package var cancelledRenderCount = 0
+  package var deferredLifecycleCarryForward: [LifecycleCommitEntry] = []
 
   /// Optional file-based diagnostics logger. When set, every rendered frame
   /// emits a tab-separated record to the configured output file.

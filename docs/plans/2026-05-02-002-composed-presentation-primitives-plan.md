@@ -1,8 +1,9 @@
 ---
 title: "refactor: compose presentations from primitive host layers"
 type: refactor
-status: active
+status: shipped
 date: 2026-05-02
+completed: 2026-05-02
 depends_on:
   - "../RUNTIME.md"
   - "../STATE_KEYING.md"
@@ -32,7 +33,63 @@ behavior.
 Swift Testing, `DefaultRenderer`, `RunLoop`, `FrameDiagnosticsLogger`,
 `SceneSession` runtime tests, and the `Examples/gifeditor` package.
 
+**Completion Status:** Completed on 2026-05-02. The implementation built the
+primitive stack first, proved it with standalone tests, migrated each existing
+hoisting-backed presentation path onto the primitive system, then removed the
+old host machinery.
+
 ---
+
+## Completion Record
+
+Implemented primitives:
+
+- `InteractionGate` now carries interaction availability in semantic metadata
+  and suppresses focus, command, pointer, gesture, drop, text-input, and related
+  interaction routes while preserving drawing, lifecycle, and tasks.
+- `OverlayStack` composes root content and overlays through ordinary view
+  children with deterministic `PortalOrdering` and focus-scope bridging.
+- `Portal` hoists declaration payloads into graph-owned destination identities
+  so hosted state, dynamic properties, tasks, lifecycle, and invalidation behave
+  like normal child UI.
+- `DismissStack` owns Escape dismissal ordering through the same z-order model
+  used for overlay drawing.
+
+Completed migration:
+
+- `.sheet`, `.alert`, `.confirmationDialog`, `.menu`, `.toast`, and menu
+  controls now lower through portal entries and primitive modal/non-modal
+  policies.
+- Menus no longer inherit sheet modal base-freezing.
+- Presentation chrome remains ordinary portal content instead of owning the
+  hoisting mechanism.
+- The former presentation host state, overlay entry, manual graph-pruning
+  teardown path, recursive base disabling, and presentation-family Escape
+  ordering were removed from production runtime paths.
+
+Verification completed:
+
+```bash
+swift format format -i --recursive --configuration .swift-format.json Sources Tests Examples/gifeditor/Tests/GIFEditorUITests/PresentationRuntimeTests.swift
+swiftly run swift test --filter 'SwiftTUITests\.(InteractionGateTests|OverlayStackTests|DismissStackTests|PortalPrimitiveTests|PresentationEscapeDismissTests|PresentationActionScopeTests|PresentationSurfaceTests|PresentationContinuityTests|MenuSurfaceTests|AppRuntimeTests|AsyncFrameTailRenderingTests|Phase4ObservationAndEnvironmentTests|Phase4StateReliabilityTests|DiagnosticsAndCacheTests|ImperativeAuthoringContextDispatchTests|TerminationRequestTests|AnimationRepeatForeverGrowthTests|SwiftUISurfaceTests|InteractiveRuntimeTests|RegistrationAliasFindingsTests)'
+swiftly run swift test --package-path Examples/gifeditor
+swiftly run swift run --package-path Examples/gifeditor gifeditor
+git diff --check
+bun run test
+```
+
+The manual gifeditor PTY smoke opened the help sheet with `?`, observed the
+spinner advance, dismissed with Escape, confirmed editor responsiveness with
+`]`, and exited with Ctrl+Q.
+
+Stale-host search:
+
+```bash
+rg -n "PresentationOverlayEntry|PresentationHostState|PresentationHostingRoot|composePresentationHostTree|__TerminalUIPresentationHost|PresentationHost|overlay host|disablesBaseInteractionWhenActive|presentation-family|lifecycleEntriesFromFocusSyncRerenders|setEnabledRecursively" Sources Tests docs -g '!docs/plans/2026-05-02-002-composed-presentation-primitives-plan.md'
+```
+
+Only the unrelated `FallbackPresentationHost` terminal-host test fixture
+remained.
 
 ## Problem Frame
 
@@ -202,16 +259,16 @@ Create:
   - View modifier or primitive view that emits gate metadata.
 - `Sources/View/Presentation/DismissStack.swift`
   - Root-level dismiss action registry and environment handle.
-- `Tests/TerminalUITests/InteractionGateTests.swift`
+- `Tests/SwiftTUITests/InteractionGateTests.swift`
   - Gate behavior for focus, pointer, gestures, commands, focused values, and
     lifecycle preservation.
-- `Tests/TerminalUITests/OverlayStackTests.swift`
+- `Tests/SwiftTUITests/OverlayStackTests.swift`
   - Ordering, focus-scope bridging, identity stability, and non-presentation
     composition.
-- `Tests/TerminalUITests/PortalPrimitiveTests.swift`
+- `Tests/SwiftTUITests/PortalPrimitiveTests.swift`
   - Graph ownership, state, task, lifecycle, invalidation, async rendering, and
     stale-source pruning for hoisted content.
-- `Tests/TerminalUITests/DismissStackTests.swift`
+- `Tests/SwiftTUITests/DismissStackTests.swift`
   - Topmost dismiss ordering and escape eligibility independent of presentation
     families.
 - `Examples/gifeditor/Tests/GIFEditorUITests/PresentationRuntimeTests.swift`
@@ -237,22 +294,22 @@ Modify:
 - `Sources/View/Presentation/PresentationModifiers.swift`
   - Lower `.sheet`, `.alert`, `.confirmationDialog`, `.menu`, and `.toast` into
     portal entries.
-- `Sources/TerminalUI/RunLoop+EventDispatch.swift`
+- `Sources/SwiftTUI/RunLoop+EventDispatch.swift`
   - Route Escape through `DismissStack`.
-- `Sources/TerminalUI/RunLoop+Rendering.swift`
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`
   - Remove presentation-specific lifecycle carry-forward once portal content is
     ordinary graph-owned UI.
-- `Sources/TerminalUI/TerminalUI.swift`
+- `Sources/SwiftTUI/SwiftTUI.swift`
   - Remove completed-frame preview lifecycle merging that exists only to rescue
     special presentation-host side effects.
-- `Tests/TerminalUITests/PresentationSurfaceTests.swift`
+- `Tests/SwiftTUITests/PresentationSurfaceTests.swift`
   - Keep visible behavior tests, update expected resolved kind names only after
     primitive tests are green.
-- `Tests/TerminalUITests/PresentationActionScopeTests.swift`
+- `Tests/SwiftTUITests/PresentationActionScopeTests.swift`
   - Assert the new overlay stack owns scene/presentation scope ordering.
-- `Tests/TerminalUITests/PresentationEscapeDismissTests.swift`
+- `Tests/SwiftTUITests/PresentationEscapeDismissTests.swift`
   - Migrate from family-specific registry tests to dismiss-stack ordering tests.
-- `Tests/TerminalUITests/AppRuntimeTests.swift`
+- `Tests/SwiftTUITests/AppRuntimeTests.swift`
   - Keep runtime sheet task/spinner regressions until gifeditor coverage lands.
 - `docs/ARCHITECTURE.md`
   - Document portal/overlay/gate/dismiss as runtime primitives.
@@ -267,7 +324,7 @@ Modify:
 
 **Goal:** Establish red tests that fail for the right reason before refactoring.
 
-- [ ] Add `PortalPrimitiveTests.hoistedTaskStateRerendersHostedContent`.
+- [x] Add `PortalPrimitiveTests.hoistedTaskStateRerendersHostedContent`.
 
   Test shape:
 
@@ -299,14 +356,14 @@ Modify:
   Run:
 
   ```bash
-  swiftly run swift test --filter TerminalUITests.PortalPrimitiveTests/hoistedTaskStateRerendersHostedContent
+  swiftly run swift test --filter SwiftTUITests.PortalPrimitiveTests/hoistedTaskStateRerendersHostedContent
   ```
 
   Expected before the primitive migration: fail on the current branch if the
   overlay content starts but later state invalidation reuses a stale overlay
   subtree.
 
-- [ ] Add `PortalPrimitiveTests.hoistedSpinnerAdvancesAcrossAsyncFrames`.
+- [x] Add `PortalPrimitiveTests.hoistedSpinnerAdvancesAcrossAsyncFrames`.
 
   Use `runTestSceneSession` with a key-opened sheet containing `Spinner()`.
   Assert that frames contain `Inspector`, `⠋`, and at least one of
@@ -315,23 +372,23 @@ Modify:
   Run:
 
   ```bash
-  swiftly run swift test --filter TerminalUITests.PortalPrimitiveTests/hoistedSpinnerAdvancesAcrossAsyncFrames
+  swiftly run swift test --filter SwiftTUITests.PortalPrimitiveTests/hoistedSpinnerAdvancesAcrossAsyncFrames
   ```
 
   Expected before the primitive migration: fail in the composed gifeditor-like
   path if the hosted content is not graph-owned.
 
-- [ ] Add a diagnostics assertion for the failure mode.
+- [x] Add a diagnostics assertion for the failure mode.
 
   The test should install `FrameDiagnosticsLogger` and assert that a state tick
   frame after activation has non-zero resolved work for a portal-hosted content
   identity. This prevents a false green where the task runs but the overlay
   subtree is reused stale.
 
-- [ ] Run the existing presentation runtime surface.
+- [x] Run the existing presentation runtime surface.
 
   ```bash
-  swiftly run swift test --filter 'TerminalUITests\.(PresentationSurfaceTests|PresentationContinuityTests|PresentationActionScopeTests|PresentationEscapeDismissTests|AppRuntimeTests)'
+  swiftly run swift test --filter 'SwiftTUITests\.(PresentationSurfaceTests|PresentationContinuityTests|PresentationActionScopeTests|PresentationEscapeDismissTests|AppRuntimeTests)'
   ```
 
   Expected: current behavior is documented. New red tests identify the failure
@@ -341,7 +398,7 @@ Modify:
 
 **Goal:** Replace late recursive disabling with an ordinary semantic primitive.
 
-- [ ] Add `InteractionGateMetadata` to resolved node metadata.
+- [x] Add `InteractionGateMetadata` to resolved node metadata.
 
   The resolved metadata should distinguish at least:
 
@@ -357,7 +414,7 @@ Modify:
   }
   ```
 
-- [ ] Add a view-layer primitive.
+- [x] Add a view-layer primitive.
 
   Provide a package-internal primitive first:
 
@@ -371,18 +428,18 @@ Modify:
 
   Do not make this public until the presentation migration proves the contract.
 
-- [ ] Update semantic extraction to carry an inherited disabled state.
+- [x] Update semantic extraction to carry an inherited disabled state.
 
   Drawing still walks gated children. Semantic extraction omits interaction
   surfaces that would route input into a disabled subtree.
 
-- [ ] Update command and input registries to respect gated route omission.
+- [x] Update command and input registries to respect gated route omission.
 
   The gate should not add new dispatch-time conditionals in every caller.
   Instead, gated descendants should not publish active routes in the semantic
   snapshot or command registry for that frame.
 
-- [ ] Add `InteractionGateTests`.
+- [x] Add `InteractionGateTests`.
 
   Required tests:
 
@@ -394,11 +451,11 @@ Modify:
   - gated child `.task` still starts and cancels normally;
   - gated child `onAppear` and `onDisappear` still fire normally.
 
-- [ ] Verify Stage 1.
+- [x] Verify Stage 1.
 
   ```bash
-  swiftly run swift test --filter TerminalUITests.InteractionGateTests
-  swiftly run swift test --filter 'TerminalUITests\.(FocusTransitionTests|KeyCommandTests|GestureRunLoopDispatchTests|DropDestinationDispatchTests|PresentationSurfaceTests)'
+  swiftly run swift test --filter SwiftTUITests.InteractionGateTests
+  swiftly run swift test --filter 'SwiftTUITests\.(FocusTransitionTests|KeyCommandTests|GestureRunLoopDispatchTests|DropDestinationDispatchTests|PresentationSurfaceTests)'
   git diff --check
   ```
 
@@ -407,7 +464,7 @@ Modify:
 **Goal:** Make root-level overlay composition an ordinary reusable view instead
 of presentation-specific tree synthesis.
 
-- [ ] Add `OverlayStackEntry`.
+- [x] Add `OverlayStackEntry`.
 
   Required fields:
 
@@ -423,7 +480,7 @@ of presentation-specific tree synthesis.
   The content builder can be stored in a view-layer wrapper; keep Core data
   payloads free of view closures.
 
-- [ ] Add `OverlayStack`.
+- [x] Add `OverlayStack`.
 
   The primitive should lower to a resolved node with ordinary children:
 
@@ -438,13 +495,13 @@ of presentation-specific tree synthesis.
   It may use existing `.overlay(alignment: .topLeading)` layout behavior, but
   the root kind should be explicit for diagnostics and tests.
 
-- [ ] Move scene focus-scope bridging into `OverlayStack`.
+- [x] Move scene focus-scope bridging into `OverlayStack`.
 
   The current presentation host manually clears and lifts focus-scope metadata.
   `OverlayStack` should own that rule so presentations do not need custom scope
   repair.
 
-- [ ] Add `OverlayStackTests`.
+- [x] Add `OverlayStackTests`.
 
   Required tests:
 
@@ -456,11 +513,11 @@ of presentation-specific tree synthesis.
   - `OverlayStack` with no overlays has the same rendered surface as base-only
     content and does not introduce focus regions.
 
-- [ ] Verify Stage 2.
+- [x] Verify Stage 2.
 
   ```bash
-  swiftly run swift test --filter TerminalUITests.OverlayStackTests
-  swiftly run swift test --filter 'TerminalUITests\.(PresentationActionScopeTests|PresentationSurfaceTests|SwiftUISurfaceTests)'
+  swiftly run swift test --filter SwiftTUITests.OverlayStackTests
+  swiftly run swift test --filter 'SwiftTUITests\.(PresentationActionScopeTests|PresentationSurfaceTests|SwiftUISurfaceTests)'
   git diff --check
   ```
 
@@ -469,7 +526,7 @@ of presentation-specific tree synthesis.
 **Goal:** Generalize hoisting while preserving ordinary graph ownership for
 hosted content.
 
-- [ ] Add portal entry data and host state.
+- [x] Add portal entry data and host state.
 
   Required entry model:
 
@@ -491,7 +548,7 @@ hosted content.
   }
   ```
 
-- [ ] Add a typed portal content payload that does not capture destination
+- [x] Add a typed portal content payload that does not capture destination
   `ViewNode`.
 
   The payload may preserve authoring context for closures and captured bindings,
@@ -499,7 +556,7 @@ hosted content.
   destination graph nodes. This is the core invariant that prevents the current
   bug class.
 
-- [ ] Add root portal host reconciliation.
+- [x] Add root portal host reconciliation.
 
   Reconciliation should:
 
@@ -513,7 +570,7 @@ hosted content.
   - expose modal state to `InteractionGate`;
   - expose dismiss entries to `DismissStack`.
 
-- [ ] Make portal-hosted identities descendants of the host overlay identity.
+- [x] Make portal-hosted identities descendants of the host overlay identity.
 
   Required identity shape:
 
@@ -524,13 +581,13 @@ hosted content.
   State changes inside the body must invalidate identities in that subtree, not
   identities under the original source modifier.
 
-- [ ] Add stale-source teardown through ordinary child removal.
+- [x] Add stale-source teardown through ordinary child removal.
 
   Removing a declarative source should remove its portal entry and let the next
   committed tree removal cancel tasks and fire disappear handlers. Do not add a
   presentation-specific runtime-registration removal path.
 
-- [ ] Add `PortalPrimitiveTests`.
+- [x] Add `PortalPrimitiveTests`.
 
   Required tests:
 
@@ -547,11 +604,11 @@ hosted content.
   - frame diagnostics for a portal-content state tick show non-zero resolved
     work for the hosted content frontier.
 
-- [ ] Verify Stage 3.
+- [x] Verify Stage 3.
 
   ```bash
-  swiftly run swift test --filter TerminalUITests.PortalPrimitiveTests
-  swiftly run swift test --filter 'TerminalUITests\.(AsyncFrameTailRenderingTests|PresentationContinuityTests|Phase4ObservationAndEnvironmentTests)'
+  swiftly run swift test --filter SwiftTUITests.PortalPrimitiveTests
+  swiftly run swift test --filter 'SwiftTUITests\.(AsyncFrameTailRenderingTests|PresentationContinuityTests|Phase4ObservationAndEnvironmentTests)'
   git diff --check
   ```
 
@@ -560,7 +617,7 @@ hosted content.
 **Goal:** Route topmost dismissal through overlay entries instead of hardcoded
 presentation-family order.
 
-- [ ] Add `DismissStackEntry`.
+- [x] Add `DismissStackEntry`.
 
   Required fields:
 
@@ -573,12 +630,12 @@ presentation-family order.
   }
   ```
 
-- [ ] Add a root `DismissStack` environment handle.
+- [x] Add a root `DismissStack` environment handle.
 
   The run loop should query a single topmost escape action after each committed
   frame. Presentation families must not be named in the run-loop Escape path.
 
-- [ ] Migrate `PresentationEscapeDismissTests`.
+- [x] Migrate `PresentationEscapeDismissTests`.
 
   Required tests:
 
@@ -589,11 +646,11 @@ presentation-family order.
   - dismiss action invalidates the portal host identity;
   - toast-like non-dismissible entries do not shadow sheet-like entries.
 
-- [ ] Verify Stage 4.
+- [x] Verify Stage 4.
 
   ```bash
-  swiftly run swift test --filter TerminalUITests.DismissStackTests
-  swiftly run swift test --filter 'TerminalUITests\.(PresentationEscapeDismissTests|AppRuntimeTests)'
+  swiftly run swift test --filter SwiftTUITests.DismissStackTests
+  swiftly run swift test --filter 'SwiftTUITests\.(PresentationEscapeDismissTests|AppRuntimeTests)'
   git diff --check
   ```
 
@@ -602,7 +659,7 @@ presentation-family order.
 **Goal:** Keep public API behavior while replacing the execution model for every
 existing hoisting-backed modifier.
 
-- [ ] Audit every existing hoisting-backed presentation entry point.
+- [x] Audit every existing hoisting-backed presentation entry point.
 
   Search for all callers and declarations that feed
   `PresentationCoordinatorDeclarationPreferenceKey`, `PresentationOverlayEntry`,
@@ -614,7 +671,7 @@ existing hoisting-backed modifier.
   `InteractionGate`, `OverlayStack`, `Portal`, and `DismissStack` have passed
   their standalone primitive suites.
 
-- [ ] Convert `.sheet(...)`.
+- [x] Convert `.sheet(...)`.
 
   `.sheet` should declare a portal entry with:
 
@@ -625,7 +682,7 @@ existing hoisting-backed modifier.
   - chrome: existing surface chrome;
   - content sizing: existing sheet sizing defaults.
 
-- [ ] Convert `.alert(...)`.
+- [x] Convert `.alert(...)`.
 
   `.alert` should declare:
 
@@ -635,7 +692,7 @@ existing hoisting-backed modifier.
   - action/message body mode;
   - existing default dismiss/cancel behavior.
 
-- [ ] Convert `.confirmationDialog(...)`.
+- [x] Convert `.confirmationDialog(...)`.
 
   `.confirmationDialog` should declare:
 
@@ -644,7 +701,7 @@ existing hoisting-backed modifier.
   - Escape dismiss: yes;
   - default cancel action when no explicit cancel exists.
 
-- [ ] Convert `.menu(...)`.
+- [x] Convert `.menu(...)`.
 
   `.menu` should declare:
 
@@ -655,7 +712,7 @@ existing hoisting-backed modifier.
   - intrinsic content sizing;
   - no inherited sheet base-freezing.
 
-- [ ] Convert `.toast(...)`.
+- [x] Convert `.toast(...)`.
 
   `.toast` should declare:
 
@@ -664,12 +721,12 @@ existing hoisting-backed modifier.
   - Escape dismiss: no;
   - auto-dismiss timer behavior preserved.
 
-- [ ] Keep presentation chrome views as ordinary portal content.
+- [x] Keep presentation chrome views as ordinary portal content.
 
   `HostedPromptPresentation`, `PromptPresentationSurface`, menu chrome, and
   toast chrome may remain, but they should no longer own hoisting mechanics.
 
-- [ ] Update presentation tests.
+- [x] Update presentation tests.
 
   Keep or update tests for:
 
@@ -682,7 +739,7 @@ existing hoisting-backed modifier.
   - sheet focus restoration;
   - Escape dismissal from text-input focus inside a sheet.
 
-- [ ] Confirm no presentation family remains on the old hoisting execution path.
+- [x] Confirm no presentation family remains on the old hoisting execution path.
 
   After the adapters are converted, every active presentation surface should be
   produced by portal entries, composed by `OverlayStack`, interaction-gated by
@@ -690,10 +747,10 @@ existing hoisting-backed modifier.
   functions may remain as adapters, but none should call the old hoisting host
   as their runtime implementation.
 
-- [ ] Verify Stage 5.
+- [x] Verify Stage 5.
 
   ```bash
-  swiftly run swift test --filter 'TerminalUITests\.(PresentationSurfaceTests|PresentationContinuityTests|PresentationActionScopeTests|PresentationEscapeDismissTests|MenuSurfaceTests|AppRuntimeTests)'
+  swiftly run swift test --filter 'SwiftTUITests\.(PresentationSurfaceTests|PresentationContinuityTests|PresentationActionScopeTests|PresentationEscapeDismissTests|MenuSurfaceTests|AppRuntimeTests)'
   swiftly run swift test --package-path Examples/gifeditor
   git diff --check
   ```
@@ -703,19 +760,19 @@ existing hoisting-backed modifier.
 **Goal:** Delete the old special paths after primitive parity and full adapter
 migration are proven.
 
-- [ ] Remove `PresentationOverlayEntry` and `PresentationOverlayHost` if they
+- [x] Remove `PresentationOverlayEntry` and `PresentationOverlayHost` if they
   have no non-test callers.
-- [ ] Remove hardcoded `PresentationCoordinatorRegistry.topmostEscapeDismissAction`
+- [x] Remove hardcoded `PresentationCoordinatorRegistry.topmostEscapeDismissAction`
   and route through `DismissStack`.
-- [ ] Remove `PresentationHostState.disablesBaseInteraction` and replace callers
+- [x] Remove `PresentationHostState.disablesBaseInteraction` and replace callers
   with `InteractionGate`.
-- [ ] Remove manual overlay teardown:
+- [x] Remove manual overlay teardown:
   `runtimeRegistrations.removeSubtrees(rootedAt:)` and
   `viewGraph.pruneDetachedIdentitySubtree(rootedAt:)` should not be presentation
   adapter code.
-- [ ] Remove lifecycle carry-forward logic that only exists to preserve side
+- [x] Remove lifecycle carry-forward logic that only exists to preserve side
   effects from presentation preview/focus-sync frames.
-- [ ] Search for stale special-case strings.
+- [x] Search for stale special-case strings.
 
   ```bash
   rg -n "PresentationHost|topmostEscapeDismissAction|disablesBaseInteraction|removeSubtrees\\(rootedAt: \\[overlayContext|lifecycleEntriesFromFocusSyncRerenders" Sources Tests
@@ -724,7 +781,7 @@ migration are proven.
   Expected: remaining matches are either primitive names, migration comments
   with active tests, or deleted.
 
-- [ ] Treat any remaining old-host caller as a blocker.
+- [x] Treat any remaining old-host caller as a blocker.
 
   Stage 6 is not complete while a production source path can still present UI
   through `PresentationHostState`, `PresentationOverlayHost`,
@@ -733,10 +790,10 @@ migration are proven.
   necessary, document the exact blocker in this plan and keep the status
   `active`.
 
-- [ ] Verify Stage 6.
+- [x] Verify Stage 6.
 
   ```bash
-  swiftly run swift test --filter 'TerminalUITests\.(PortalPrimitiveTests|OverlayStackTests|InteractionGateTests|DismissStackTests|PresentationSurfaceTests|PresentationContinuityTests|PresentationActionScopeTests|PresentationEscapeDismissTests|MenuSurfaceTests|AppRuntimeTests|AsyncFrameTailRenderingTests)'
+  swiftly run swift test --filter 'SwiftTUITests\.(PortalPrimitiveTests|OverlayStackTests|InteractionGateTests|DismissStackTests|PresentationSurfaceTests|PresentationContinuityTests|PresentationActionScopeTests|PresentationEscapeDismissTests|MenuSurfaceTests|AppRuntimeTests|AsyncFrameTailRenderingTests)'
   swiftly run swift test --package-path Examples/gifeditor
   git diff --check
   ```
@@ -745,7 +802,7 @@ migration are proven.
 
 **Goal:** Prove the primitives compose under the real app/runtime paths.
 
-- [ ] Add gifeditor composed-runtime regression.
+- [x] Add gifeditor composed-runtime regression.
 
   Add `Examples/gifeditor/Tests/GIFEditorUITests/PresentationRuntimeTests.swift`
   with a `RunLoop` or `SceneSession` test that:
@@ -757,7 +814,7 @@ migration are proven.
   - sends a normal editor key after dismissal and observes the expected status
     or model change.
 
-- [ ] Run gifeditor manually through the PTY path.
+- [x] Run gifeditor manually through the PTY path.
 
   ```bash
   swiftly run swift run --package-path Examples/gifeditor gifeditor
@@ -773,13 +830,13 @@ migration are proven.
   - confirm the UI responds;
   - exit with the configured quit binding.
 
-- [ ] Run root focused suites.
+- [x] Run root focused suites.
 
   ```bash
-  swiftly run swift test --filter 'TerminalUITests\.(PortalPrimitiveTests|OverlayStackTests|InteractionGateTests|DismissStackTests|PresentationSurfaceTests|PresentationContinuityTests|PresentationActionScopeTests|PresentationEscapeDismissTests|MenuSurfaceTests|AppRuntimeTests|AsyncFrameTailRenderingTests|InteractiveRuntimeTests|GalleryStyleDispatchTests|Phase4ObservationAndEnvironmentTests)'
+  swiftly run swift test --filter 'SwiftTUITests\.(PortalPrimitiveTests|OverlayStackTests|InteractionGateTests|DismissStackTests|PresentationSurfaceTests|PresentationContinuityTests|PresentationActionScopeTests|PresentationEscapeDismissTests|MenuSurfaceTests|AppRuntimeTests|AsyncFrameTailRenderingTests|InteractiveRuntimeTests|GalleryStyleDispatchTests|Phase4ObservationAndEnvironmentTests)'
   ```
 
-- [ ] Run full repo gate.
+- [x] Run full repo gate.
 
   ```bash
   bun run test
@@ -793,7 +850,7 @@ migration are proven.
 
 **Goal:** Make the new primitives the source of truth.
 
-- [ ] Update `docs/ARCHITECTURE.md`.
+- [x] Update `docs/ARCHITECTURE.md`.
 
   Add portal/overlay/gate/dismiss to the runtime architecture section and show
   how they sit in the frame pipeline:
@@ -804,7 +861,7 @@ migration are proven.
   -> commit lifecycle/tasks/dismiss routes exactly once
   ```
 
-- [ ] Update `docs/RUNTIME.md`.
+- [x] Update `docs/RUNTIME.md`.
 
   Document:
 
@@ -814,7 +871,7 @@ migration are proven.
   - stale-source pruning;
   - async frame-tail behavior.
 
-- [ ] Update `docs/FOCUS.md`.
+- [x] Update `docs/FOCUS.md`.
 
   Document:
 
@@ -822,11 +879,11 @@ migration are proven.
   - overlay stack focus-scope bridging;
   - scene scope ordering for presentation content.
 
-- [ ] Update `docs/SOURCE_LAYOUT.md`.
+- [x] Update `docs/SOURCE_LAYOUT.md`.
 
   Add the new files and responsibilities.
 
-- [ ] Update this plan's progress and verification logs.
+- [x] Update this plan's progress and verification logs.
 
   Mark shipped only after `bun run test` and gifeditor runtime verification pass.
 

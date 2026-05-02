@@ -631,7 +631,7 @@ struct DiagnosticsAndCacheTests {
     #expect(secondMetrics.invalidations == 2)
     #expect(secondMetrics.stores == 5)
     #expect(second.diagnostics.invalidatedIdentities == [testIdentity("Root", "VStack[1]")])
-    #expect(second.diagnostics.resolvedNodesComputed == 2)
+    #expect(second.diagnostics.resolvedNodesComputed == 3)
     #expect(second.diagnostics.resolvedNodesReused == 1)
     #expect(second.diagnostics.measuredNodesComputed == 2)
     #expect(second.diagnostics.measuredNodesReused == 1)
@@ -666,7 +666,7 @@ struct DiagnosticsAndCacheTests {
 
     #expect(updated.measuredTree.childMeasurements[0].measuredSize == .init(width: 6, height: 1))
     #expect(updated.measuredTree.childMeasurements[1].measuredSize == .init(width: 7, height: 1))
-    #expect(updated.diagnostics.resolvedNodesComputed == 2)
+    #expect(updated.diagnostics.resolvedNodesComputed == 3)
     #expect(updated.diagnostics.resolvedNodesReused == 1)
     #expect(updated.diagnostics.measuredNodesComputed == 2)
     #expect(updated.diagnostics.measuredNodesReused == 1)
@@ -842,7 +842,7 @@ struct DiagnosticsAndCacheTests {
         testIdentity("Root", "Branches[1]")
       ]
     )
-    #expect(updated.diagnostics.resolvedNodesComputed == 4)
+    #expect(updated.diagnostics.resolvedNodesComputed == 5)
     #expect(updated.diagnostics.resolvedNodesReused == 1)
   }
 
@@ -1016,7 +1016,7 @@ struct DiagnosticsAndCacheTests {
     #expect(snapshot.contains("[Diagnostics]"))
     #expect(snapshot.contains("invalidatedIdentities=Root/VStack[1]"))
     #expect(snapshot.contains("resolvedNodes=3"))
-    #expect(snapshot.contains("resolvedWork=computed:4 reused:0"))
+    #expect(snapshot.contains("resolvedWork=computed:5 reused:0"))
     #expect(snapshot.contains("measuredWork=computed:3 reused:0"))
     #expect(snapshot.contains("placedWork=computed:3 reused:0"))
     #expect(snapshot.contains("measurementCache=generation:0"))

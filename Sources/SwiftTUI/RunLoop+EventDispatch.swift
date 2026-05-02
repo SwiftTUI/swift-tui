@@ -97,11 +97,11 @@ extension RunLoop {
     }
 
     // Framework-reserved single-key handling: bare Escape dismisses the
-    // topmost active presentation (alert > confirmationDialog > sheet).
-    // Widgets and consumer `keyHandler` closures get a chance to claim
-    // Escape first via the two branches above; if they don't, the
-    // framework takes over so users can always bail out of a modal with
-    // a single key. Toasts are not dismissed — they auto-expire.
+    // topmost eligible portal entry. Widgets and consumer `keyHandler`
+    // closures get a chance to claim Escape first via the two branches
+    // above; if they don't, the framework takes over so users can always
+    // bail out of a modal with a single key. Toasts are not dismissed;
+    // they auto-expire.
     if keyPress == KeyPress(.escape, modifiers: []) {
       if let dismiss = renderer.topmostEscapeDismissAction() {
         dismiss()
