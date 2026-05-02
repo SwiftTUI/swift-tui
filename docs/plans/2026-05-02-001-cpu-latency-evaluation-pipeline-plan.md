@@ -417,7 +417,7 @@ and optional `xctrace` for manual deep dives.
 - Modify: `docs/README.md`
 - Modify: `package.json`
 
-- [ ] **Step 1: Add workflow docs**
+- [x] **Step 1: Add workflow docs**
 
   Document:
 
@@ -428,7 +428,7 @@ and optional `xctrace` for manual deep dives.
   - when to escalate to Instruments or `xctrace`,
   - how to archive run artifacts.
 
-- [ ] **Step 2: Add convenience scripts**
+- [x] **Step 2: Add convenience scripts**
 
   Add package scripts if they remain thin wrappers:
 
@@ -440,7 +440,7 @@ and optional `xctrace` for manual deep dives.
   }
   ```
 
-- [ ] **Step 3: Verify docs and commit**
+- [x] **Step 3: Verify docs and commit**
 
   Run:
 
