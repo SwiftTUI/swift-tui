@@ -363,7 +363,7 @@ and optional `xctrace` for manual deep dives.
 - Create: `Tools/TermUIPerf/Sources/TermUIPerf/CompareCommand.swift`
 - Create: `Tools/TermUIPerf/Tests/TermUIPerfTests/CompareCommandTests.swift`
 
-- [ ] **Step 1: Implement `run`**
+- [x] **Step 1: Implement `run`**
 
   The command should:
 
@@ -377,7 +377,7 @@ and optional `xctrace` for manual deep dives.
   - write `summary.json`,
   - print the run directory path.
 
-- [ ] **Step 2: Implement `compare`**
+- [x] **Step 2: Implement `compare`**
 
   Compare two `summary.json` files and print:
 
@@ -389,7 +389,7 @@ and optional `xctrace` for manual deep dives.
   - cancellation/drop count changes,
   - fallback count changes.
 
-- [ ] **Step 3: Add textual interpretation**
+- [x] **Step 3: Add textual interpretation**
 
   Print a short classification:
 
@@ -399,7 +399,7 @@ and optional `xctrace` for manual deep dives.
   - no meaningful movement,
   - inconclusive due to missing data.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
   Run:
 
