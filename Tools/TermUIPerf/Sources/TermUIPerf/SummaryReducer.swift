@@ -221,10 +221,7 @@ public enum SummaryReducer {
   }
 
   private static func cpuSeconds(from samples: [PerfCPUSample]) -> Double {
-    guard let first = samples.first, let last = samples.last else {
-      return 0
-    }
-    return max(0, last.totalCPUSeconds - first.totalCPUSeconds)
+    samples.reduce(0) { $0 + max(0, $1.totalCPUSeconds) }
   }
 
   private static func ratio(_ numerator: Double, _ denominator: Double) -> Double? {
