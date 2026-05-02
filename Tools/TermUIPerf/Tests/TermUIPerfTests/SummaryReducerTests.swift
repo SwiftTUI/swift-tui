@@ -37,16 +37,16 @@ struct SummaryReducerTests {
       cpuSamples: [
         PerfCPUSample(
           timestampSeconds: 0,
-          userCPUSeconds: 1.0,
-          systemCPUSeconds: 0.5,
-          wallDeltaSeconds: 0,
-          estimatedCPUPercent: 0
+          userCPUSeconds: 0.2,
+          systemCPUSeconds: 0.1,
+          wallDeltaSeconds: 0.5,
+          estimatedCPUPercent: 60
         ),
         PerfCPUSample(
           timestampSeconds: 1,
-          userCPUSeconds: 1.4,
-          systemCPUSeconds: 0.7,
-          wallDeltaSeconds: 1,
+          userCPUSeconds: 0.2,
+          systemCPUSeconds: 0.1,
+          wallDeltaSeconds: 0.5,
           estimatedCPUPercent: 60
         ),
       ],
