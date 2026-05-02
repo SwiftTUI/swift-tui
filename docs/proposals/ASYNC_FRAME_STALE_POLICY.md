@@ -18,6 +18,10 @@ for the shipped generation scheduler design. For the consolidated current
 status, see
 [`../ASYNC_RENDERING.md`](../ASYNC_RENDERING.md).
 
+The completed visual-only drop design in this document is proposed, not shipped.
+No runtime path may drop a completed worker result until the Stage 4 through
+Stage 6 gates below are implemented.
+
 The current async frame-tail renderer intentionally preserves ordered commit:
 when a worker frame finishes, the main actor commits it before newer input state
 is rendered and presented. This is conservative, but correct. It avoids
@@ -25,6 +29,28 @@ skipping lifecycle, focus, task, preference, animation, and retained-cache side
 effects.
 
 This document defines the requirements for changing that policy later.
+
+## Proposal Summary
+
+Completed-frame dropping should become an explicit stale-frame policy, not a
+side effect of generation comparison. The first actionable drop target is a
+completed async frame-tail result that is both stale and proven visual-only. In
+that case the runtime may discard the completed artifacts before frame commit,
+abort the prepared frame head, preserve the previously committed runtime
+baseline, and immediately render the newest desired state.
+
+The proposal has three parts:
+
+1. Split frame finish into a side-effect-free candidate phase and an explicit
+   commit phase.
+2. Expand `FrameDropEligibility` until an empty blocker set is a real runtime
+   verdict for a narrow visual-only case.
+3. Add a skipped-frame reconciliation object, initially empty for visual-only
+   drops, so future stateful skipped-frame policies have a durable extension
+   point instead of bypassing commit semantics ad hoc.
+
+Until all three pieces are implemented and tested, completed worker results keep
+the existing ordered-commit behavior.
 
 ## Problem
 
@@ -154,6 +180,145 @@ and artifact reconciliation. It shipped with generation IDs, frame-head
 draft/checkpoint abort proof, composed runtime tests, and TSV cancellation
 diagnostics.
 
+## Completed Visual-Only Drop Target
+
+The first completed-frame drop target is intentionally narrow:
+
+```
+frame A prepares on the main actor
+frame A tail starts and completes on the worker
+newer desired generation B exists before A commits
+frame A has no nonvisual commit effects
+frame A is discarded before finish/commit side effects are applied
+frame B is rendered from the last committed runtime baseline
+```
+
+This is not frame skipping in the general case. It is dropping a completed
+worker result that would only have changed terminal pixels, while preserving the
+same runtime state the user would have seen if frame A had never existed.
+
+The first allowed case should be a superseded animation tick or other
+draw/raster-only update with all of these properties:
+
+- no lifecycle appear, disappear, change, task-start, or task-cancel operations,
+- no runtime handler, focus, scroll, command, pointer, gesture, or drop registry
+  change,
+- no preference-observation delta,
+- no animation completion, transition insertion/removal bookkeeping, or one-shot
+  animation transaction that must commit,
+- no worker custom-layout cache update that needs to become the committed cache
+  baseline,
+- no retained layout or raster baseline update that a future frame would rely on,
+- no presentation full-repaint recovery, surface-size change, graphics attachment
+  replay barrier, or incompatible previous-surface transition,
+- no diagnostic mode that requires every completed frame to be represented as a
+  committed frame row.
+
+If any signal is missing, the frame remains `mustCommit`.
+
+## Finish Candidate Boundary
+
+The current `finishFrame` path computes commit data and mutates committed runtime
+state in one step: it finalizes the `ViewGraph`, commits runtime registrations,
+commits animation frame-head state, applies worker custom-layout cache updates,
+prunes measurement cache, and stores the retained frame baseline. A completed
+frame cannot be dropped safely after that work has already happened.
+
+The runtime needs a two-step finish boundary:
+
+```swift
+struct CompletedFrameCandidate {
+  var generation: RenderGeneration
+  var draft: FrameHeadDraft
+  var tailOutput: AsyncFrameTailDraftOutput
+  var artifacts: FrameArtifacts
+  var finishEffects: FrameFinishEffects
+  var eligibility: FrameDropEligibility
+}
+
+@MainActor
+func makeCompletedFrameCandidate(
+  draft: FrameHeadDraft,
+  tailOutput: AsyncFrameTailDraftOutput
+) -> CompletedFrameCandidate
+
+@MainActor
+func commitCompletedFrameCandidate(_ candidate: CompletedFrameCandidate)
+
+@MainActor
+func discardCompletedFrameCandidate(
+  _ candidate: CompletedFrameCandidate,
+  reconciliation: SkippedFrameReconciliation
+)
+```
+
+The exact type names can change. The ownership split cannot:
+
+- `makeCompletedFrameCandidate` may compute the same artifacts and commit plan
+  the runtime needs for classification, but any mutation it performs must be
+  draft-owned, checkpoint-backed, or revertible before returning.
+- `commitCompletedFrameCandidate` is the only path that may commit graph
+  finalization, runtime registration changes, animation frame-head transactions,
+  worker custom-layout cache updates, retained layout/raster baselines, and
+  lifecycle/task commit plans.
+- `discardCompletedFrameCandidate` aborts the prepared frame head, discards the
+  tail output, applies skipped-frame reconciliation, and leaves retained runtime
+  state equal to the last committed frame.
+
+There are two viable implementation shapes:
+
+1. **Preview-first finish.** Add preview APIs for `ViewGraph` lifecycle
+   finalization and registration restoration so `makeCompletedFrameCandidate`
+   can compute commit data without mutating live state.
+2. **Checkpointed finish.** Run the existing finish work behind an expanded
+   checkpoint and restore it if the frame is discarded.
+
+Prefer the preview-first shape if it stays local. Use the checkpointed shape only
+if preview APIs duplicate too much commit logic. In either case, tests must prove
+that discarding a completed candidate leaves actions, key commands, pointer
+routes, drop destinations, lifecycle state, task state, animation state, custom
+layout cache state, retained layout state, and retained raster state identical to
+the pre-candidate baseline.
+
+## Drop Decision
+
+Dropping is legal only when all of the following are true:
+
+1. The tail job state is `completed`.
+2. The completed candidate's render generation is older than the newest desired
+   generation observed by the run loop.
+3. `FrameDropEligibility.classify(candidate)` returns no blockers.
+4. The selected stale-frame policy is `drop_completed_visual_only`.
+5. `SkippedFrameReconciliation` for the candidate is empty or contains only
+   explicitly allowed diagnostic bookkeeping.
+
+Generation staleness is necessary but never sufficient. A stale candidate with
+any blocker follows the existing ordered-commit path.
+
+The run-loop decision shape should stay single-render-per-renderer:
+
+```swift
+let candidate = renderer.makeCompletedFrameCandidate(draft: draft, tail: tail)
+let decision = completedFramePolicy.decide(
+  candidate: candidate,
+  newestDesired: coordinator.newestDesired
+)
+
+switch decision {
+case .commitOrdered:
+  let artifacts = renderer.commitCompletedFrameCandidate(candidate)
+  commitAndPresent(artifacts)
+
+case .dropVisualOnly(let reconciliation):
+  renderer.discardCompletedFrameCandidate(candidate, reconciliation: reconciliation)
+  scheduler.requestReplacementForNewestDesired()
+}
+```
+
+The runtime still must not present newer state ahead of an older frame that has
+nonvisual work. The only behavior change is that a proven visual-only candidate
+may be treated like an uncommitted draft instead of a committed frame.
+
 ## Required Generation Model
 
 Add explicit generation identity to the render path:
@@ -174,29 +339,58 @@ than desired; it does not say that skipping it is safe.
 
 ## Reconciliation Shape
 
-If dropping completed results is ever needed, introduce a main-actor
-reconciliation pass:
+Every skipped completed frame should flow through a reconciliation object, even
+when the first supported reconciliation is empty:
 
 ```
 struct SkippedFrameReconciliation {
+  var mode: Mode
   var lifecycle: [LifecycleOperation]
   var taskOperations: [TaskOperation]
   var handlerInstallations: [HandlerInstallation]
   var focusSync: FocusSyncDelta
   var scrollSync: ScrollSyncDelta
   var preferences: PreferenceObservationDelta
+  var animation: AnimationReconciliation
   var retainedStateAction: RetainedStateAction
+  var presentationRecovery: PresentationRecoveryAction
   var diagnostics: DroppedFrameDiagnostics
+
+  enum Mode {
+    case emptyVisualOnly
+    case appliedSideEffects
+    case blocked
+  }
 }
 ```
 
 A skipped frame should either:
 
-- produce an empty reconciliation because it is proven visual-only, or
+- produce `.emptyVisualOnly` because it is proven visual-only, or
 - produce a reconciliation that advances main-actor state as if the necessary
   nonvisual side effects had been committed.
 
 If the runtime cannot produce that reconciliation, it must commit the frame.
+
+For the first tranche, only `.emptyVisualOnly` is allowed. Non-empty
+reconciliation is a future policy and must not be smuggled into the visual-only
+drop work. That keeps the first behavior change small: the runtime proves there
+is nothing to reconcile, then drops the pixels.
+
+Later non-empty reconciliation can be considered only after each state family has
+an explicit delta type and ordering rule:
+
+1. lifecycle and task transitions,
+2. runtime handler registration changes,
+3. focus graph, focus binding, focused values, and scroll sync,
+4. preference-observation deltas,
+5. animation transactions, completions, transition bookkeeping, and deadlines,
+6. retained layout/raster/cache baselines,
+7. presentation repaint recovery.
+
+The commit order for non-empty reconciliation must match ordinary frame commit
+order. If an effect cannot be represented as a deterministic delta, that effect
+is a drop blocker.
 
 ## Diagnostics
 
@@ -219,6 +413,21 @@ cancellation or dropping, add:
 - whether reconciliation ran,
 - whether presentation needed full repaint recovery afterward.
 
+Completed-frame dropping needs additional fields:
+
+- `tail_job_state=dropped_completed` for completed worker output discarded before
+  commit,
+- `stale_frame_policy=drop_completed_visual_only` for the narrow drop path,
+- `drop_decision`: `commit_ordered`, `drop_visual_only`, or `blocked`,
+- `drop_generation`: the discarded render generation,
+- `newest_desired_at_drop`: the desired generation that superseded it,
+- `drop_reconciliation_mode`: `empty_visual_only`, `applied_side_effects`, or
+  `blocked`,
+- `drop_reconciliation_effects`: a stable summary such as `-` for empty or a
+  comma-separated list for future non-empty reconciliation,
+- `presentation_recovery_after_drop`: whether the next committed frame forced a
+  full repaint because a raster baseline was skipped.
+
 Diagnostics must count both:
 
 - input accepted while the main actor was suspended,
@@ -226,6 +435,11 @@ Diagnostics must count both:
 
 The two counters answer different questions. The first proves responsiveness;
 the second measures staleness pressure.
+
+A dropped candidate should produce a diagnostic row even though it is not
+presented. That row is evidence that the policy made an explicit decision. It
+must be distinguishable from both `cancel_pending_before_start` and
+`commit_ordered`.
 
 ## Migration Plan
 
@@ -316,13 +530,17 @@ git commit -m "feat(runtime): cancel superseded unstarted frame-tail jobs"
 - [x] Add a conservative `FrameDropEligibility` classifier.
 - [x] Start with all completed frames classified as `mustCommit`.
 - [x] Add tests for the currently observable blockers.
-- [ ] Add signals for the currently-unobservable barriers: animation
-  completions, preference observation deltas, focus-binding drift relative to
-  the previous frame, retained baseline updates, and presentation repaint
-  dependencies.
-- [ ] Only then permit a narrow visual-only case, such as a superseded animation
-  tick with no lifecycle, focus, preference, task, handler, custom-layout cache,
-  or retained-baseline transition.
+- [ ] Add explicit blocker signals for preference-observation deltas,
+  focus-binding and focused-value drift, scroll-sync deltas, animation
+  completions, animation transition bookkeeping, one-shot animation transactions,
+  worker custom-layout cache updates, retained layout/raster baseline updates,
+  presentation full-repaint recovery, graphics replay barriers, and
+  diagnostics-required full records.
+- [ ] Add a candidate-level classifier that can distinguish
+  `mustCommit(blockers:)` from `canDropVisualOnly` only after every formerly
+  `.unobservable` barrier has an explicit signal.
+- [ ] Keep `FrameDropEligibility.canDrop` false until the candidate classifier
+  proves the narrow visual-only case with runtime-path tests.
 
 Stage 4 result so far:
 
@@ -332,6 +550,15 @@ Stage 4 result so far:
   is found, so `canDrop` remains false for every classified runtime frame.
 - No runtime behavior uses the classifier to drop or reconcile frames.
 
+Target Stage 4 result:
+
+- `.unobservable` is gone from frames that have been fully classified.
+- A frame that carries no lifecycle, task, handler, focus, scroll, preference,
+  animation, cache, retained-baseline, or presentation barrier can produce an
+  empty blocker set.
+- Existing blocker tests remain, and each newly observable blocker has a focused
+  unit test plus at least one composed runtime-path regression where relevant.
+
 Commit boundary:
 
 ```bash
@@ -340,16 +567,39 @@ git commit -m "refactor(runtime): classify stale frame drop eligibility"
 
 ### Stage 5: Reconciliation for skipped completed frames
 
-- Add a main-actor reconciliation pass for any skipped completed frame.
-- Apply lifecycle/task/focus/preference/retained-state deltas in a deterministic
-  order.
-- Force presentation repaint recovery when raster baselines no longer match.
-- Keep the default path as ordered commit.
+- [ ] Add `SkippedFrameReconciliation` with `.emptyVisualOnly`,
+  `.appliedSideEffects`, and `.blocked` modes.
+- [ ] Wire completed-frame drop decisions through the reconciliation object even
+  when the selected case is empty.
+- [ ] Prove that `.emptyVisualOnly` leaves lifecycle, task, focus, preference,
+  animation, registration, custom-layout cache, retained layout, retained raster,
+  and presentation state unchanged from the last committed frame.
+- [ ] Keep `.appliedSideEffects` unavailable to runtime policy until a later
+  proposal defines exact delta types and commit order.
+- [ ] Keep the default path as ordered commit.
 
 Commit boundary:
 
 ```bash
 git commit -m "feat(runtime): reconcile skipped async frame results"
+```
+
+### Stage 6: Drop completed visual-only frames
+
+- [ ] Split the async finish path into candidate creation and explicit commit.
+- [ ] Add a completed-frame policy object that compares candidate generation to
+  the newest desired generation and consults `FrameDropEligibility`.
+- [ ] When a stale candidate is visual-only, discard it through
+  `discardCompletedFrameCandidate(..., reconciliation: .emptyVisualOnly)`.
+- [ ] Emit a dropped-frame diagnostics row with generation, decision,
+  reconciliation, and presentation-recovery fields.
+- [ ] Preserve ordered commit for every non-droppable completed candidate.
+- [ ] Do not enable non-empty reconciliation.
+
+Commit boundary:
+
+```bash
+git commit -m "feat(runtime): drop visual-only stale frame results"
 ```
 
 ## Required Tests
@@ -359,6 +609,12 @@ git commit -m "feat(runtime): reconcile skipped async frame results"
 - Generation IDs increase monotonically across rerenders and focus-sync loops.
 - Superseded jobs can be cancelled only before worker start.
 - Completed worker results still commit unless explicitly classified droppable.
+- A completed visual-only candidate can be dropped only after a newer desired
+  generation exists.
+- Dropping a visual-only candidate leaves live action, key, pointer, gesture,
+  command, drop, lifecycle, task, focus, preference, animation, custom-layout
+  cache, retained layout, retained raster, and presentation state equal to the
+  last committed frame.
 - Lifecycle appear/disappear edges are not lost when a frame is superseded.
 - Tasks start and cancel exactly once across skipped generations.
 - Focus binding and focused values converge after a skipped or cancelled
@@ -367,17 +623,18 @@ git commit -m "feat(runtime): reconcile skipped async frame results"
 - Retained layout/raster caches do not reuse artifacts from uncommitted frames.
 - Presentation drop recovery still forces full repaint independently of pipeline
   cancellation.
-- Diagnostics report generation, drop reason, and reconciliation state.
+- Diagnostics report generation, drop decision, blocker set, reconciliation
+  mode, and presentation recovery state.
 
 ## Recommendation
 
 Keep the current ordered-commit policy for any started or completed tail job
-until eligibility classification and reconciliation are both tested.
+until finish candidate creation, full blocker classification, empty
+reconciliation, and dropped-frame diagnostics are all tested.
 
-The next concrete tranche should return to Stage 3C, not Stage 3D directly:
-first redesign prepared frame heads so side effects are draft-only or safely
-abortable, using the post-mortem from the reverted attempt as the starting
-constraint. Then implement Stage 3D as cancellation before worker start only. Do
-not start by dropping completed worker results. Pre-start cancellation is the
-safest first optimization because it avoids reconciling already-computed frame
-artifacts and worker-owned cache effects.
+The next concrete tranche is not broad stale-result skipping. It is the
+candidate boundary plus an actionable visual-only classifier. Drop only completed
+frames that are stale and have an empty blocker set, and require
+`.emptyVisualOnly` reconciliation for the first shipped behavior. Treat non-empty
+side-effect reconciliation as a separate proposal after the visual-only path has
+proved useful and safe on real gallery/layout diagnostics.
