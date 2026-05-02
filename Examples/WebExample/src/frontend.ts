@@ -4,15 +4,16 @@
 // browser canvas using the WebTUIGUI host, with a scene picker, a status
 // line, and a resize handle.
 //
-// Marketing prose lives in the Website (top-level Website/ package).
 // This file is the shipped reference for "how do I embed TerminalUI in
 // a Bun-served browser app?" — it deliberately stays small.
 //
 // Boot order:
-//   1. ensure cross-origin isolation (required for SharedArrayBuffer-backed
-//      stdin); install the COI service worker if Pages can't set headers.
-//   2. mount WebTUIGUI against ../TerminalApp/dist/{scene-manifest.json, app.wasm}.
-//   3. render the scene picker + status + resize handle around the canvas.
+//   1. mount WebTUIGUI against ../TerminalApp/dist/{scene-manifest.json, app.wasm}.
+//   2. render the scene picker + status + resize handle around the canvas.
+//
+// Cross-origin isolation (required for SharedArrayBuffer-backed stdin) is
+// expected to come from the host's HTTP headers — see ../README.md and the
+// COOP/COEP headers set by built-app-server.ts and the deploy host.
 //
 // All shell DOM is constructed via document.createElement / .append rather
 // than via innerHTML. There is no untrusted-input path into this page;
@@ -35,13 +36,6 @@ import {
   type WasmSceneResizeEvent,
 } from "./scene-runtime.ts";
 
-declare global {
-  interface Window {
-    coi?: Record<string, unknown>;
-  }
-}
-
-const coiServiceWorkerUrl = new URL("./coi-serviceworker.js", import.meta.url);
 const terminalAppManifestUrl = new URL(terminalAppManifestPath, import.meta.url);
 const terminalAppWasmUrl = new URL(terminalAppWasmPath, import.meta.url);
 const minimumFrameWidth = 320;
@@ -51,9 +45,7 @@ const readmeUrl =
   "https://github.com/GoodHatsLLC/swift-terminal-ui/blob/main/Examples/WebExample/README.md";
 
 try {
-  if (await ensureCrossOriginIsolation()) {
-    await bootstrap();
-  }
+  await bootstrap();
 } catch (error: unknown) {
   renderStartupError(error);
   // eslint-disable-next-line no-console
@@ -120,51 +112,6 @@ function renderStartupError(error: unknown): void {
       ],
     }),
   );
-}
-
-async function ensureCrossOriginIsolation(): Promise<boolean> {
-  if (typeof window === "undefined") return true;
-  if (window.crossOriginIsolated !== false) return true;
-  if (!window.isSecureContext || !("serviceWorker" in navigator)) return true;
-
-  const root = document.querySelector<HTMLDivElement>("#root");
-  if (root) {
-    root.replaceChildren(
-      el("div", {
-        class: "example-shell",
-        children: [
-          el("main", {
-            class: "example-loading",
-            children: [
-              el("p", {
-                class: "example-eyebrow",
-                text: "Preparing browser runtime",
-              }),
-              el("h1", { text: "Enabling cross-origin isolation…" }),
-              el("p", {
-                text:
-                  "GitHub Pages cannot set the COOP/COEP headers this demo needs, so the page is installing a small service worker workaround and will reload once it is ready.",
-              }),
-            ],
-          }),
-        ],
-      }),
-    );
-  }
-
-  window.coi = { ...(window.coi ?? {}), quiet: true };
-
-  await new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = coiServiceWorkerUrl.href;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("failed to load COI service worker helper"));
-    document.head.append(script);
-  });
-
-  await new Promise((resolve) => window.setTimeout(resolve, 50));
-  return window.crossOriginIsolated !== false;
 }
 
 async function bootstrap(): Promise<void> {
