@@ -122,7 +122,7 @@ async function validateCompressedBrowserWasm(path: string): Promise<void> {
   }
 
   try {
-    await WebAssembly.compile(decompressedBytes);
+    await WebAssembly.compile(Uint8Array.from(decompressedBytes));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(

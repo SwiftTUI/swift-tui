@@ -11,13 +11,13 @@ name: Deploy Website to Cloudflare Pages
 #
 # One-time setup:
 #   1. Create the project in Cloudflare:
-#        wrangler pages project create swift-terminal-ui --production-branch main
+#        wrangler pages project create SwiftTUI --production-branch main
 #      (or via dashboard: Pages -> Create application -> Direct upload.)
 #   2. Add repo secrets:
 #        CLOUDFLARE_API_TOKEN     <- token with `Cloudflare Pages: Edit` permission
 #        CLOUDFLARE_ACCOUNT_ID    <- your account ID (Cloudflare dashboard sidebar)
 #   3. (Optional) Add repo variables:
-#        CLOUDFLARE_PAGES_PROJECT <- project name; defaults to `swift-terminal-ui`
+#        CLOUDFLARE_PAGES_PROJECT <- project name; defaults to `SwiftTUI`
 #        CLOUDFLARE_SITE_URL      <- absolute URL Astro should canonicalize to
 #                                    (production domain: https://swifttui.io).
 #                                    Defaults to https://<project>.pages.dev.
@@ -39,7 +39,7 @@ jobs:
     runs-on: macos-26
 
     env:
-      CF_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'swift-terminal-ui' }}
+      CF_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'SwiftTUI' }}
 
     steps:
 
@@ -143,7 +143,7 @@ jobs:
           bun -e 'const wasmPath = "./pages-dist/TerminalApp/dist/assets/app.wasm"; const proc = Bun.spawnSync({ cmd: ["brotli", "--decompress", "--stdout", wasmPath], stdout: "pipe", stderr: "pipe" }); if (proc.exitCode !== 0) { console.error(new TextDecoder().decode(proc.stderr)); process.exit(proc.exitCode ?? 1); } try { await WebAssembly.compile(proc.stdout); console.log(`Validated Brotli-compressed ${wasmPath}`); } catch (error) { console.error(`Failed to validate ${wasmPath}: ${error instanceof Error ? error.message : String(error)}`); process.exit(1); }'
 
       # Build Astro with root-relative URLs. ASTRO_BASE=/ removes the
-      # /swift-terminal-ui prefix that the GH Pages build keeps.
+      # /SwiftTUI prefix that the GH Pages build keeps.
       - name: Build Website (Cloudflare-targeted)
         shell: bash
         working-directory: Website
@@ -156,7 +156,7 @@ jobs:
           bun run build
 
       # DocC archive served at /docs/. Root-relative deploy means the
-      # `--hosting-base-path` is just `docs` (vs. `swift-terminal-ui/docs` on GH Pages).
+      # `--hosting-base-path` is just `docs` (vs. `SwiftTUI/docs` on GH Pages).
       - name: Build DocC archive
         shell: bash
         run: |
@@ -174,7 +174,7 @@ jobs:
             --hosting-base-path docs \
             --output-path .build-docs
 
-      # Same artifact layout as GH Pages, just without the /swift-terminal-ui prefix.
+      # Same artifact layout as GH Pages, just without the /SwiftTUI prefix.
       - name: Compose Cloudflare Pages artifact
         shell: bash
         env:
@@ -261,6 +261,6 @@ jobs:
             --branch="$CF_BRANCH" \
             --commit-hash="$CF_COMMIT_SHA" \
             --commit-dirty=true 2>&1 | tee /dev/stderr)"
-          # Wrangler prints something like: `✨  Deployment complete! Take a peek over at https://abc123.swift-terminal-ui.pages.dev`
+          # Wrangler prints something like: `✨  Deployment complete! Take a peek over at https://abc123.SwiftTUI.pages.dev`
           deployment_url="$(printf '%s\n' "$deploy_log" | grep -Eo 'https://[^[:space:]]+\.pages\.dev' | tail -n1 || true)"
           printf 'deployment-url=%s\n' "${deployment_url:-}" >> "$GITHUB_OUTPUT"
