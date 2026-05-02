@@ -6,8 +6,9 @@ Stages 1 and 2 are implemented. The observational drop-blocker classifier
 described in Stage 4 is also implemented and now exposes explicit runtime
 signals for the formerly unobservable blocker families, but it is still
 diagnostic only for completed-frame drops. Stage 5 reconciliation scaffolding
-is implemented, and Stage 6 now has a candidate/commit finish boundary while
-still preserving ordered commit. Scheduler Stages 3A through 3D are
+is implemented, and Stage 6 now has a candidate/commit finish boundary plus an
+ordered-only completed-frame policy object while still preserving ordered
+commit. Scheduler Stages 3A through 3D are
 implemented. The first Stage 3C, abortable prepared frame heads, was attempted
 and reverted; see
 [`../plans/2026-04-26-002-frame-head-abort-plan.md`](../plans/2026-04-26-002-frame-head-abort-plan.md).
@@ -616,7 +617,7 @@ git commit -m "feat(runtime): reconcile skipped async frame results"
 ### Stage 6: Drop completed visual-only frames
 
 - [x] Split the async finish path into candidate creation and explicit commit.
-- [ ] Add a completed-frame policy object that compares candidate generation to
+- [x] Add a completed-frame policy object that compares candidate generation to
   the newest desired generation and consults `FrameDropEligibility`.
 - [ ] When a stale candidate is visual-only, discard it through
   `discardCompletedFrameCandidate(..., reconciliation: .emptyVisualOnly)`.
@@ -632,6 +633,11 @@ Stage 6 result so far:
   checkpoint, restores that preview, and leaves live registration, lifecycle,
   animation, custom-layout cache, measurement-cache, and retained-tail commits
   to `commitCompletedFrameCandidate`.
+- `CompletedFramePolicy` compares the completed candidate's generation against
+  the newest desired generation surfaced by the run loop and consults
+  `FrameDropEligibility`. The shipped renderer uses `.orderedCommitOnly`, so
+  stale candidates still commit unless a later tranche enables the narrow
+  visual-only drop mode.
 - The default completed path still immediately commits every candidate in
   order. The recorded decision remains `commit_ordered`, and no runtime policy
   drops completed worker output.
