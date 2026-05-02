@@ -1,0 +1,8 @@
+# Cloudflare Pages rewrites for generated artifacts composed by
+# .github/workflows/cloudflare-pages.yml.
+#
+# The deploy workflow removes DocC's per-symbol HTML shell copies to keep the
+# artifact below Pages' file-count limit. The DocC app is a JavaScript shell
+# backed by /docs/data/, so direct links can route through the single shell.
+/docs/documentation /docs/index.html 200
+/docs/documentation/* /docs/index.html 200
