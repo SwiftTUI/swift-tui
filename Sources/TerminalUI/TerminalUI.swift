@@ -206,6 +206,17 @@ private struct AsyncFrameTailDraftOutput {
   var renderSuspensionDuration: Duration
 }
 
+private struct CompletedFrameCandidate {
+  var draft: FrameHeadDraft
+  var tailOutput: AsyncFrameTailDraftOutput
+  var resolved: ResolvedNode
+  var workerTimings: FrameWorkerTimings?
+  var collectsDiagnostics: Bool
+  var previewArtifacts: FrameArtifacts
+  var eligibility: FrameDropEligibility
+  var dropDecision: CompletedFrameDropDecision
+}
+
 private enum CancellableFrameTailResult {
   case output(AsyncFrameTailDraftOutput)
   case cancelledBeforeStart
@@ -1269,12 +1280,30 @@ public struct DefaultRenderer {
       return false
     }
 
-    _ = await renderFrameTailAsync(draft)
+    let tailOutput = await renderFrameTailAsync(draft)
+    let candidate = makeCompletedFrameCandidate(
+      draft: draft,
+      tailOutput: tailOutput,
+      collectsDiagnostics: true
+    )
     discardCompletedFrameCandidate(
-      draft,
+      candidate,
       reconciliation: decision.reconciliation
     )
     return true
+  }
+
+  @MainActor
+  package func previewCompletedFrameCandidateForTesting(
+    _ draft: FrameHeadDraft
+  ) async -> CompletedFrameDropDecision {
+    let tailOutput = await renderFrameTailAsync(draft)
+    let candidate = makeCompletedFrameCandidate(
+      draft: draft,
+      tailOutput: tailOutput,
+      collectsDiagnostics: true
+    )
+    return candidate.dropDecision
   }
 
   @MainActor
@@ -1345,19 +1374,18 @@ public struct DefaultRenderer {
         completedFrameDropDecision: nil
       )
     case .output(let tailOutput):
-      let artifacts = finishFrame(
+      let candidate = makeCompletedFrameCandidate(
         draft: draft,
         tailOutput: tailOutput,
         collectsDiagnostics: collectsDiagnostics
       )
+      let artifacts = commitCompletedFrameCandidate(candidate)
       return CancellableRenderOutcome(
         artifacts: artifacts,
         renderGeneration: draft.renderGeneration,
         tailJobState: .completed,
         tailCancelReason: nil,
-        completedFrameDropDecision: completedFrameDropDecision(
-          for: artifacts
-        )
+        completedFrameDropDecision: candidate.dropDecision
       )
     }
   }
@@ -1620,11 +1648,12 @@ public struct DefaultRenderer {
       collectsDiagnostics: collectsDiagnostics
     )
     let tailOutput = await renderFrameTailAsync(draft)
-    return finishFrame(
+    let candidate = makeCompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
       collectsDiagnostics: collectsDiagnostics
     )
+    return commitCompletedFrameCandidate(candidate)
   }
 
   @MainActor
@@ -1921,33 +1950,112 @@ public struct DefaultRenderer {
   }
 
   @MainActor
-  private func finishFrame(
+  private func makeCompletedFrameCandidate(
     draft: FrameHeadDraft,
     tailOutput: AsyncFrameTailDraftOutput,
     collectsDiagnostics: Bool
-  ) -> FrameArtifacts {
-    let layout = tailOutput.layout
-    let tail = tailOutput.tail
-    let resolved = draft.resolved.applyingLayoutDependentRealizations(
-      draft.frameTailInput.layoutPassContext.layoutDependentRealizationsByIdentity
+  ) -> CompletedFrameCandidate {
+    let resolved = completedFrameResolvedTree(
+      draft: draft,
+      tailOutput: tailOutput
     )
-    var workerTimings = tail.diagnostics.workerTimings
-    if var timings = workerTimings,
-      let clock = draft.clock,
-      let workerCompletedAt = tail.workerCompletedAt
-    {
-      timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
-      workerTimings = timings
+    let workerTimings = completedFrameWorkerTimings(
+      draft: draft,
+      tailOutput: tailOutput
+    )
+    let (commit, commitDuration) = previewCompletedFrameCommit(
+      draft: draft,
+      tailOutput: tailOutput,
+      resolved: resolved
+    )
+    let artifacts = makeCompletedFrameArtifacts(
+      draft: draft,
+      tailOutput: tailOutput,
+      resolved: resolved,
+      commit: commit,
+      commitDuration: commitDuration,
+      workerTimings: workerTimings,
+      collectsDiagnostics: collectsDiagnostics
+    )
+    let eligibility = FrameDropEligibility.classify(artifacts)
+    return CompletedFrameCandidate(
+      draft: draft,
+      tailOutput: tailOutput,
+      resolved: resolved,
+      workerTimings: workerTimings,
+      collectsDiagnostics: collectsDiagnostics,
+      previewArtifacts: artifacts,
+      eligibility: eligibility,
+      dropDecision: completedFrameDropDecision(for: eligibility)
+    )
+  }
+
+  @MainActor
+  private func commitCompletedFrameCandidate(
+    _ candidate: CompletedFrameCandidate
+  ) -> FrameArtifacts {
+    let layout = candidate.tailOutput.layout
+    let tail = candidate.tailOutput.tail
+    let (commit, commitDuration) = measurePhase(clock: candidate.draft.clock) {
+      let lifecycleEvents = viewGraph.finalizeFrame(
+        rootIdentity: candidate.draft.resolveContext.identity,
+        resolved: candidate.resolved,
+        placed: tail.placed
+      )
+      candidate.draft.registrationDraft.commitRestoring(
+        from: viewGraph,
+        resolved: candidate.resolved
+      )
+      return commitPlanner.plan(
+        resolved: candidate.resolved,
+        placed: tail.placed,
+        semantics: tail.semantics,
+        transaction: candidate.draft.frameContext.transaction,
+        lifecycleEvents: lifecycleEvents
+      )
     }
-    let (commit, commitDuration) = measurePhase(clock: draft.clock) {
+    animationController.commitFrameHeadTransaction(candidate.draft.animationCheckpoint)
+    applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
+    frameTailRenderer.pruneMeasurementCache(
+      keeping: viewGraph.liveIdentitySnapshot()
+    )
+    let artifacts = makeCompletedFrameArtifacts(
+      draft: candidate.draft,
+      tailOutput: candidate.tailOutput,
+      resolved: candidate.resolved,
+      commit: commit,
+      commitDuration: commitDuration,
+      workerTimings: completedFrameWorkerTimings(
+        draft: candidate.draft,
+        tailOutput: candidate.tailOutput
+      ),
+      collectsDiagnostics: candidate.collectsDiagnostics
+    )
+
+    frameTailRenderer.storeCommittedFrame(
+      artifacts,
+      baselinePlacedTree: tail.baselinePlaced
+    )
+    return artifacts
+  }
+
+  @MainActor
+  private func previewCompletedFrameCommit(
+    draft: FrameHeadDraft,
+    tailOutput: AsyncFrameTailDraftOutput,
+    resolved: ResolvedNode
+  ) -> (commit: CommitPlan, duration: Duration) {
+    let tail = tailOutput.tail
+    let checkpoint = viewGraph.makeCheckpoint()
+    defer {
+      viewGraph.restoreCheckpoint(checkpoint)
+    }
+
+    return measurePhase(clock: draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: draft.resolveContext.identity,
         resolved: resolved,
         placed: tail.placed
-      )
-      draft.registrationDraft.commitRestoring(
-        from: viewGraph,
-        resolved: resolved
       )
       return commitPlanner.plan(
         resolved: resolved,
@@ -1957,11 +2065,43 @@ public struct DefaultRenderer {
         lifecycleEvents: lifecycleEvents
       )
     }
-    animationController.commitFrameHeadTransaction(draft.animationCheckpoint)
-    applyWorkerCustomLayoutCacheUpdates(layout.workerCustomLayoutCacheUpdates)
-    frameTailRenderer.pruneMeasurementCache(
-      keeping: viewGraph.liveIdentitySnapshot()
+  }
+
+  private func completedFrameResolvedTree(
+    draft: FrameHeadDraft,
+    tailOutput _: AsyncFrameTailDraftOutput
+  ) -> ResolvedNode {
+    draft.resolved.applyingLayoutDependentRealizations(
+      draft.frameTailInput.layoutPassContext.layoutDependentRealizationsByIdentity
     )
+  }
+
+  private func completedFrameWorkerTimings(
+    draft: FrameHeadDraft,
+    tailOutput: AsyncFrameTailDraftOutput
+  ) -> FrameWorkerTimings? {
+    var workerTimings = tailOutput.tail.diagnostics.workerTimings
+    if var timings = workerTimings,
+      let clock = draft.clock,
+      let workerCompletedAt = tailOutput.tail.workerCompletedAt
+    {
+      timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
+      workerTimings = timings
+    }
+    return workerTimings
+  }
+
+  private func makeCompletedFrameArtifacts(
+    draft: FrameHeadDraft,
+    tailOutput: AsyncFrameTailDraftOutput,
+    resolved: ResolvedNode,
+    commit: CommitPlan,
+    commitDuration: Duration,
+    workerTimings: FrameWorkerTimings?,
+    collectsDiagnostics: Bool
+  ) -> FrameArtifacts {
+    let layout = tailOutput.layout
+    let tail = tailOutput.tail
     let dropEligibilityBlockers = frameTailCommitDropBlockers(
       workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
     )
@@ -2024,20 +2164,16 @@ public struct DefaultRenderer {
       diagnostics: diagnostics
     )
 
-    frameTailRenderer.storeCommittedFrame(
-      artifacts,
-      baselinePlacedTree: tail.baselinePlaced
-    )
     return artifacts
   }
 
   @MainActor
   private func discardCompletedFrameCandidate(
-    _ draft: FrameHeadDraft,
+    _ candidate: CompletedFrameCandidate,
     reconciliation: SkippedFrameReconciliation
   ) {
     precondition(reconciliation.isAvailableToRuntimePolicy)
-    abortPreparedFrameHead(draft)
+    abortPreparedFrameHead(candidate.draft)
   }
 
   @MainActor
@@ -2063,11 +2199,9 @@ public struct DefaultRenderer {
   }
 
   private func completedFrameDropDecision(
-    for artifacts: FrameArtifacts
+    for eligibility: FrameDropEligibility
   ) -> CompletedFrameDropDecision {
-    CompletedFrameDropDecision.orderedCommit(
-      eligibility: FrameDropEligibility.classify(artifacts)
-    )
+    CompletedFrameDropDecision.orderedCommit(eligibility: eligibility)
   }
 
   @MainActor
