@@ -204,7 +204,7 @@ and optional `xctrace` for manual deep dives.
 - Create: `Tools/TermUIPerf/Sources/TermUIPerf/SummaryReducer.swift`
 - Create: `Tools/TermUIPerf/Tests/TermUIPerfTests/SummaryReducerTests.swift`
 
-- [ ] **Step 1: Define artifact models**
+- [x] **Step 1: Define artifact models**
 
   Add Codable models for:
 
@@ -216,18 +216,18 @@ and optional `xctrace` for manual deep dives.
   Include git SHA, dirty flag, render mode, scenario, iteration count,
   configuration, Swift version, OS, hardware, terminal size, and timestamps.
 
-- [ ] **Step 2: Add TSV writers**
+- [x] **Step 2: Add TSV writers**
 
   Add deterministic TSV writers for `events.tsv` and `cpu.tsv`. Keep field
   order stable and include a header row.
 
-- [ ] **Step 3: Add summary reducers**
+- [x] **Step 3: Add summary reducers**
 
   Implement percentile reducers for latency, frame interval, CPU seconds,
   CPU/frame, worker timings, main-actor blocked ratio, cancellation counts,
   completed-drop counts, and fallback counts.
 
-- [ ] **Step 4: Test schema stability**
+- [x] **Step 4: Test schema stability**
 
   Add tests that assert:
 
@@ -236,7 +236,7 @@ and optional `xctrace` for manual deep dives.
   - missing optional frame fields do not crash reduction,
   - JSON key names remain stable.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
   Run:
 

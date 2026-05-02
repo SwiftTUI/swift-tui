@@ -1,0 +1,202 @@
+import Foundation
+import TerminalUI
+import Testing
+
+@testable import TermUIPerf
+
+struct SummaryReducerTests {
+  @Test("known samples produce percentile summaries")
+  func knownSamplesProducePercentileSummaries() throws {
+    let summary = SummaryReducer.reduce(
+      metadata: metadata(),
+      events: [
+        event(id: "a", dispatch: 1.00, present: 1.01),
+        event(id: "b", dispatch: 1.00, present: 1.02),
+        event(id: "c", dispatch: 1.00, present: 1.03),
+        event(id: "d", dispatch: 1.00, present: 1.04),
+      ],
+      cpuSamples: [],
+      frames: [
+        frame(number: 1, presentedAt: 2.00),
+        frame(number: 2, presentedAt: 2.01),
+        frame(number: 3, presentedAt: 2.03),
+      ]
+    )
+
+    #expect(summary.inputToPresentLatencyMs.count == 4)
+    #expect(isApproximately(summary.inputToPresentLatencyMs.p50, 25))
+    #expect(isApproximately(summary.inputToPresentLatencyMs.p95, 38.5))
+    #expect(isApproximately(summary.frameIntervalMs.p50, 15))
+  }
+
+  @Test("CPU seconds per frame comes from sample deltas and committed frames")
+  func cpuSecondsPerFrameComesFromSampleDeltasAndCommittedFrames() throws {
+    let summary = SummaryReducer.reduce(
+      metadata: metadata(),
+      events: [event(id: "a", dispatch: 0, present: 0.01)],
+      cpuSamples: [
+        PerfCPUSample(
+          timestampSeconds: 0,
+          userCPUSeconds: 1.0,
+          systemCPUSeconds: 0.5,
+          wallDeltaSeconds: 0,
+          estimatedCPUPercent: 0
+        ),
+        PerfCPUSample(
+          timestampSeconds: 1,
+          userCPUSeconds: 1.4,
+          systemCPUSeconds: 0.7,
+          wallDeltaSeconds: 1,
+          estimatedCPUPercent: 60
+        ),
+      ],
+      frames: [
+        frame(number: 1),
+        frame(number: 2),
+        frame(number: 3, tailJobState: "dropped_completed", dropDecision: "drop_visual_only"),
+      ]
+    )
+
+    #expect(isApproximately(summary.totalCPUSeconds, 0.6))
+    #expect(summary.committedFrameCount == 2)
+    #expect(isApproximately(summary.cpuSecondsPerCommittedFrame, 0.3))
+    #expect(summary.completedDropCount == 1)
+  }
+
+  @Test("missing optional frame fields do not crash reduction")
+  func missingOptionalFrameFieldsDoNotCrashReduction() throws {
+    let summary = SummaryReducer.reduce(
+      metadata: metadata(),
+      events: [],
+      cpuSamples: [],
+      frames: [
+        frame(number: 1, totalMs: nil),
+        frame(number: 2, totalMs: nil, tailJobState: "cancelled_before_start"),
+      ]
+    )
+
+    #expect(summary.mainActorBlockedRatio == nil)
+    #expect(summary.workerLayoutComputeMs.count == 0)
+    #expect(summary.cancellationCount == 1)
+    #expect(summary.skippedFrameCount == 1)
+  }
+
+  @Test("summary JSON key names are stable")
+  func summaryJSONKeyNamesAreStable() throws {
+    let summary = SummaryReducer.reduce(
+      metadata: metadata(),
+      events: [event(id: "a", dispatch: 0, present: 0.01)],
+      cpuSamples: [],
+      frames: [frame(number: 1)]
+    )
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    let data = try encoder.encode(summary)
+    let object = try #require(
+      JSONSerialization.jsonObject(with: data) as? [String: Any]
+    )
+
+    #expect(object.keys.contains("input_to_present_latency_ms"))
+    #expect(object.keys.contains("cpu_seconds_per_committed_frame"))
+    #expect(object.keys.contains("main_actor_blocked_ratio"))
+    #expect(object.keys.contains("worker_layout_compute_ms"))
+  }
+
+  @Test("TSV writers keep deterministic headers and nil placeholders")
+  func tsvWritersKeepDeterministicHeadersAndNilPlaceholders() throws {
+    let eventsTSV = PerfTSVWriter.eventsTSV([
+      PerfEventRecord(
+        eventID: "event\t1",
+        eventType: "click",
+        dispatchTimeSeconds: 1,
+        expectedVisualMarker: "value\n1"
+      )
+    ])
+    let cpuTSV = PerfTSVWriter.cpuTSV([
+      PerfCPUSample(
+        timestampSeconds: 1,
+        userCPUSeconds: 0.25,
+        systemCPUSeconds: 0.75,
+        wallDeltaSeconds: 0.5,
+        estimatedCPUPercent: 200
+      )
+    ])
+
+    #expect(eventsTSV.hasPrefix(PerfTSVWriter.eventHeader.joined(separator: "\t")))
+    #expect(eventsTSV.contains("event 1\tclick\t1.000000\tvalue 1\t-\t-\t-\t-"))
+    #expect(cpuTSV.hasPrefix(PerfTSVWriter.cpuHeader.joined(separator: "\t")))
+    #expect(cpuTSV.contains("1.000000\t0.250000\t0.750000\t1.000000\t0.500000\t200.000000"))
+  }
+
+  private func metadata() -> PerfRunMetadata {
+    PerfRunMetadata(
+      gitSHA: "abc123",
+      dirty: false,
+      renderMode: .async,
+      scenario: .galleryAnimationClick,
+      iterationCount: 4,
+      configuration: "release",
+      swiftVersion: "Swift 6.3",
+      osVersion: "macOS 15",
+      hardwareModel: "Mac",
+      processorCount: 10,
+      terminalSize: PerfTerminalSize(columns: 100, rows: 32),
+      startedAt: "2026-05-02T00:00:00Z",
+      endedAt: "2026-05-02T00:00:01Z"
+    )
+  }
+
+  private func event(
+    id: String,
+    dispatch: Double,
+    present: Double
+  ) -> PerfEventRecord {
+    PerfEventRecord(
+      eventID: id,
+      eventType: "input",
+      dispatchTimeSeconds: dispatch,
+      expectedVisualMarker: id,
+      firstMatchingFrame: 1,
+      firstMatchingTimeSeconds: present,
+      finalSettledFrame: 2,
+      finalSettledTimeSeconds: present + 0.01
+    )
+  }
+
+  private func frame(
+    number: Int,
+    presentedAt: Double? = nil,
+    totalMs: Double? = 10,
+    tailJobState: String = "completed",
+    dropDecision: String = "commit_ordered"
+  ) -> PerfFrameRecord {
+    PerfFrameRecord(
+      frameNumber: number,
+      presentedAtSeconds: presentedAt,
+      totalMs: totalMs,
+      workerLayoutEnqueueMs: 1,
+      workerLayoutComputeMs: totalMs == nil ? nil : 2,
+      workerRasterEnqueueMs: 3,
+      workerRasterComputeMs: 4,
+      mainActorBlockedMs: totalMs == nil ? nil : 1,
+      mainActorSuspendedMs: totalMs == nil ? nil : 2,
+      presentationDurationMs: 3,
+      customLayoutFallbacks: 1,
+      layoutDependentMainActorFallbacks: 2,
+      tailJobState: tailJobState,
+      dropDecision: dropDecision
+    )
+  }
+
+  private func isApproximately(_ actual: Double?, _ expected: Double) -> Bool {
+    guard let actual else {
+      return false
+    }
+    return abs(actual - expected) < 0.000_001
+  }
+
+  private func isApproximately(_ actual: Double, _ expected: Double) -> Bool {
+    abs(actual - expected) < 0.000_001
+  }
+}
