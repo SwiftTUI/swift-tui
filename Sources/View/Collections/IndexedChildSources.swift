@@ -62,6 +62,7 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
       let elementContext = childContext.replacingIdentity(
         with: childContext.identity.explicitID(element[keyPath: id])
       )
+      .suppressingStructuralLifecycle()
       // Mirror `ForEach.resolveElements`: diverge structural identity
       // per iteration so identity-deriving modifiers (`.panel()`) see
       // a distinct position per element, while `viewIdentity` stays
@@ -81,11 +82,9 @@ where Data: RandomAccessCollection, ID: Hashable, Content: View {
           content(element)
         }
       }
-      let elements = withAuthoringContext(perIterationScope) {
-        resolveViewElements(view, in: elementContext)
+      let normalized = withAuthoringContext(perIterationScope) {
+        resolveView(view, in: elementContext)
       }
-      elementContext.recordResolvedComputation(count: elements.count)
-      let normalized = normalizeResolvedElements(elements, in: elementContext)
       cache[index] = normalized
       return normalized
     }

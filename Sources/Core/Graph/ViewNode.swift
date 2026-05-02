@@ -59,6 +59,7 @@ package final class ViewNode {
   private var registrationCaptureDepth: Int
   private var evaluationDepth: Int
   private var hasCommittedPresence: Bool
+  private var suppressesStructuralLifecycle: Bool
   private var nextChangeModifierOrdinal: Int
   private var preparedFrameID: UInt64
   private var visitedFrameID: UInt64
@@ -90,6 +91,7 @@ package final class ViewNode {
     registrationCaptureDepth = 0
     evaluationDepth = 0
     hasCommittedPresence = false
+    suppressesStructuralLifecycle = false
     nextChangeModifierOrdinal = 0
     preparedFrameID = 0
     visitedFrameID = 0
@@ -115,9 +117,11 @@ package final class ViewNode {
 
   package func beginEvaluation(
     frameID: UInt64,
-    invalidator: (any Invalidating)?
+    invalidator: (any Invalidating)?,
+    suppressesStructuralLifecycle: Bool = false
   ) {
     prepareForFrame(frameID)
+    self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
     if evaluationDepth == 0 {
       self.invalidator = invalidator
       wasVisitedThisFrame = true
@@ -609,6 +613,9 @@ package final class ViewNode {
   }
 
   package var participatesInStructuralLifecycle: Bool {
+    guard !suppressesStructuralLifecycle else {
+      return false
+    }
     var ancestor = parent
     while let current = ancestor {
       if current.committed.indexedChildSource != nil {
@@ -657,6 +664,12 @@ package final class ViewNode {
   ) {
     self.hasCommittedPresence = hasCommittedPresence
   }
+
+  package func setSuppressesStructuralLifecycle(
+    _ suppressesStructuralLifecycle: Bool
+  ) {
+    self.suppressesStructuralLifecycle = suppressesStructuralLifecycle
+  }
 }
 
 extension ViewNode {
@@ -683,6 +696,7 @@ extension ViewNode {
     package var registrationCaptureDepth: Int
     package var evaluationDepth: Int
     package var hasCommittedPresence: Bool
+    package var suppressesStructuralLifecycle: Bool
     package var nextChangeModifierOrdinal: Int
     package var preparedFrameID: UInt64
     package var visitedFrameID: UInt64
@@ -713,6 +727,7 @@ extension ViewNode {
       registrationCaptureDepth: registrationCaptureDepth,
       evaluationDepth: evaluationDepth,
       hasCommittedPresence: hasCommittedPresence,
+      suppressesStructuralLifecycle: suppressesStructuralLifecycle,
       nextChangeModifierOrdinal: nextChangeModifierOrdinal,
       preparedFrameID: preparedFrameID,
       visitedFrameID: visitedFrameID,
@@ -743,6 +758,7 @@ extension ViewNode {
     registrationCaptureDepth = checkpoint.registrationCaptureDepth
     evaluationDepth = checkpoint.evaluationDepth
     hasCommittedPresence = checkpoint.hasCommittedPresence
+    suppressesStructuralLifecycle = checkpoint.suppressesStructuralLifecycle
     nextChangeModifierOrdinal = checkpoint.nextChangeModifierOrdinal
     preparedFrameID = checkpoint.preparedFrameID
     visitedFrameID = checkpoint.visitedFrameID

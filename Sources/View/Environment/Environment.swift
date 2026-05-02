@@ -236,6 +236,7 @@ public struct ResolveContext: Equatable, Sendable {
   package var viewGraph: ViewGraph?
   package var imageAssetResolver: ImageAssetResolver?
   package var frameState: FrameResolveState?
+  package var suppressesStructuralLifecycle: Bool
   /// Forwards deadline requests to the frame scheduler.
   /// Stored as a closure to avoid Sendable constraints on `FrameScheduling`.
   package var requestDeadline: (@MainActor @Sendable (MonotonicInstant) -> Void)?
@@ -334,6 +335,7 @@ public struct ResolveContext: Equatable, Sendable {
     childContext.focusedValues = focusedValues
     childContext.imageAssetResolver = imageAssetResolver
     childContext.frameState = frameState
+    childContext.suppressesStructuralLifecycle = suppressesStructuralLifecycle
     childContext.requestDeadline = requestDeadline
     return childContext
   }
@@ -376,8 +378,15 @@ public struct ResolveContext: Equatable, Sendable {
     replacedContext.focusedValues = focusedValues
     replacedContext.imageAssetResolver = imageAssetResolver
     replacedContext.frameState = frameState
+    replacedContext.suppressesStructuralLifecycle = suppressesStructuralLifecycle
     replacedContext.requestDeadline = requestDeadline
     return replacedContext
+  }
+
+  package func suppressingStructuralLifecycle() -> Self {
+    var context = self
+    context.suppressesStructuralLifecycle = true
+    return context
   }
 
   package func settingEnvironment<Value>(
@@ -527,6 +536,7 @@ extension ResolveContext {
     observationBridge = nil
     viewGraph = nil
     imageAssetResolver = nil
+    suppressesStructuralLifecycle = false
     requestDeadline = nil
   }
 }
@@ -559,6 +569,7 @@ extension ResolveContext {
       && lhs.commandRegistry == rhs.commandRegistry
       && lhs.dropDestinationRegistry == rhs.dropDestinationRegistry
       && lhs.observationBridge == rhs.observationBridge
+      && lhs.suppressesStructuralLifecycle == rhs.suppressesStructuralLifecycle
   }
 }
 

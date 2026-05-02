@@ -945,13 +945,13 @@ struct AsyncFrameTailRenderingTests {
     }
     await workerGate.waitUntilBlocked()
 
-    inputReader.send(.key(.character("i")))
+    stateContainer.replace(with: 1)
     try await waitUntil {
       runLoop.renderSuspensionDiagnostics.isSuspended
     }
     #expect(terminal.frames.contains { $0.contains("value 1") } == false)
 
-    inputReader.send(.key(.character("i")))
+    stateContainer.replace(with: 2)
     try await waitUntil {
       runLoop.cancelledRenderCount >= 1
     }

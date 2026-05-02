@@ -374,7 +374,8 @@ package final class ViewGraph {
 
   package func beginEvaluation(
     identity: Identity,
-    invalidator: (any Invalidating)?
+    invalidator: (any Invalidating)?,
+    suppressesStructuralLifecycle: Bool = false
   ) -> ViewNode {
     let node = nodeForIdentity(for: identity)
     node.prepareForFrame(currentFrameID)
@@ -383,9 +384,17 @@ package final class ViewGraph {
     }
     node.beginEvaluation(
       frameID: currentFrameID,
-      invalidator: invalidator
+      invalidator: invalidator,
+      suppressesStructuralLifecycle: suppressesStructuralLifecycle
     )
     return node
+  }
+
+  package func setSuppressesStructuralLifecycle(
+    _ suppressesStructuralLifecycle: Bool,
+    for identity: Identity
+  ) {
+    nodesByIdentity[identity]?.setSuppressesStructuralLifecycle(suppressesStructuralLifecycle)
   }
 
   package func finishEvaluation(
