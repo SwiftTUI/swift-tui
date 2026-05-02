@@ -1,6 +1,6 @@
 ---
 title: "bug: gallery one-shot animations snap after async Option 3"
-type: bug
+type: fix
 status: shipped
 date: 2026-05-01
 depends_on:
