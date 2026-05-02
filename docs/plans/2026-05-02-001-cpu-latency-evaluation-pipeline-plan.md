@@ -293,7 +293,7 @@ and optional `xctrace` for manual deep dives.
 - Create: `Tools/TermUIPerf/Sources/TermUIPerf/Scenarios/LayoutScrollBurstScenario.swift`
 - Create: `Tools/TermUIPerf/Tests/TermUIPerfTests/ScenarioSmokeTests.swift`
 
-- [ ] **Step 1: Implement `PerfTerminalHost`**
+- [x] **Step 1: Implement `PerfTerminalHost`**
 
   Implement public `TerminalHosting` with:
 
@@ -306,13 +306,13 @@ and optional `xctrace` for manual deep dives.
   Keep this host deterministic and in-memory. Real PTY presentation can be a
   later mode.
 
-- [ ] **Step 2: Wrap frame diagnostics**
+- [x] **Step 2: Wrap frame diagnostics**
 
   Reuse `FrameDiagnosticsLogger` by writing `frames.tsv` into each run
   directory. If file I/O proves too noisy, add an in-memory sink in a later
   tranche.
 
-- [ ] **Step 3: Define scenario protocol**
+- [x] **Step 3: Define scenario protocol**
 
   Add a protocol that returns:
 
@@ -323,19 +323,19 @@ and optional `xctrace` for manual deep dives.
   - visual marker matchers,
   - settling criteria.
 
-- [ ] **Step 4: Add `gallery-animation-click`**
+- [x] **Step 4: Add `gallery-animation-click`**
 
   Drive the real gallery animation path through `RunLoop.run()` using
   `GalleryDemoViews`. Record input dispatch time, first intermediate frame, and
   final settled frame.
 
-- [ ] **Step 5: Add `layout-scroll-burst`**
+- [x] **Step 5: Add `layout-scroll-burst`**
 
   Drive a layout-heavy scroll scenario through injected input. Record scroll
   event timestamps, first matching viewport movement, worker layout timing, and
   main-actor fallback counts.
 
-- [ ] **Step 6: Add smoke tests**
+- [x] **Step 6: Add smoke tests**
 
   Assert that each scenario writes:
 
@@ -345,7 +345,7 @@ and optional `xctrace` for manual deep dives.
   - `cpu.tsv`,
   - `summary.json`.
 
-- [ ] **Step 7: Verify and commit**
+- [x] **Step 7: Verify and commit**
 
   Run:
 
