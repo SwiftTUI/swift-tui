@@ -1,5 +1,5 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// 3-cell-wide tool dock pinned to the left edge. Each icon is a
 /// `.plain`-styled `Button` that selects the tool when activated; the

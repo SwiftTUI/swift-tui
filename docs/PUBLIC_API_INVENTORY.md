@@ -131,7 +131,7 @@ for the model and the implementation record.
   `ToolbarItemConfig` and the hoisting preference contract that bubbles item
   contributions up to the nearest enclosing `.toolbar(style:)` modifier
 
-### `TerminalUI`
+### `SwiftTUI`
 
 The runtime-facing public surface is also canonical:
 
@@ -141,8 +141,8 @@ The runtime-facing public surface is also canonical:
 - terminal host, graphics-capability, and input or signal integration types that support the runtime
 - app and scene entry points, including `App`, `Scene`, `SceneBuilder`, `WindowGroup`, `WindowIdentifier`, and the typed scene builder artifacts
 - `AnyScene` as the explicit scene-erasure escape hatch
-- `TerminalUISceneDescriptor`
-- `TerminalUISceneManifest`
+- `SceneDescriptor`
+- `SceneManifest`
 - `HostedSceneSession`
 
 ### Peer runner packages
@@ -151,11 +151,11 @@ Platform-specific execution and embedding are intentionally outside the root
 package surface:
 
 - executable runner packages:
-  - `Runners/TerminalUICLI` exposes `TerminalCLIAppRunner` plus the default terminal-native `App.main()` story
-  - `Runners/TerminalUIWASI` exposes `TerminalWASIAppRunner` plus the default WASI `App.main()` story
+  - `Runners/SwiftTUICLI` exposes `TerminalRunner` plus the default terminal-native `App.main()` story
+  - `Runners/SwiftTUIWASI` exposes `WASIRunner` plus the default WASI `App.main()` story
 - embedded host packages:
-  - `GUI/SwiftUITUIGUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on a native raster surface
-  - `GUI/WebTUIGUI` hosts a `TerminalUIWASI` build in the browser using the same manifest and hosted-session story, drawing raster output onto a canvas via the `web-surface` transport
+  - `GUI/SwiftUIHost` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on a native raster surface
+  - `GUI/WebHost` hosts a `SwiftTUIWASI` build in the browser using the same manifest and hosted-session story, drawing raster output onto a canvas via the `web-surface` transport
 
 These are supported peer packages, but they are not root library products in
 `Package.swift`.
@@ -171,7 +171,7 @@ The core data model and pipeline types are canonical:
 - the incremental presentation and retained-frame machinery that the runtime depends on
 
 `Core` is currently target-level infrastructure re-exported through
-`TerminalUI`, not a separate library product.
+`SwiftTUI`, not a separate library product.
 
 ## Removed From The Public Surface
 

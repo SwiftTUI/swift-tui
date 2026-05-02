@@ -74,7 +74,7 @@ extension Binding: Sendable where Value: Sendable {}
 @propertyWrapper
 /// A bindable projection for observable reference types.
 ///
-/// TerminalUI provides its own `@Bindable` so observable reads and writes stay
+/// SwiftTUI provides its own `@Bindable` so observable reads and writes stay
 /// on the same invalidation path as the rest of the runtime.
 public struct Bindable<Model> where Model: AnyObject, Model: Observable {
   public var wrappedValue: Model

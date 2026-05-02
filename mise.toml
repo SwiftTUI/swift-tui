@@ -14,7 +14,7 @@ run = [
 [tasks.release_ex_web]
 description = "Build web for release"
 run = [
-  "swift build -c release --package-path GUI/WebTUIGUI",
-  "bun run build GUI/WebTUIGUI"
+  "swift build -c release --package-path GUI/WebHost",
+  "bun run build GUI/WebHost"
 ]
 depends = ['release_core']

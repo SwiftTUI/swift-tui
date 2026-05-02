@@ -1,6 +1,6 @@
 # Layouts Example
 
-56 focused layout examples of the public `TerminalUI` surface,
+56 focused layout examples of the public `SwiftTUI` surface,
 reachable from a full-screen push/pop picker. Each layout is pinned
 with a smoke test; `.behaviour`-tagged layouts add targeted
 behaviour tests that pin the specific measure/place rule the layout

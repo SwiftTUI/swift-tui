@@ -19,16 +19,16 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(name: "swift-terminal-ui", path: "../../.."),
+    .package(name: "swift-tui", path: "../../.."),
     .package(path: "../../gallery"),
-    .package(path: "../../../Runners/TerminalUIWASI"),
+    .package(path: "../../../Runners/SwiftTUIWASI"),
   ],
   targets: [
     .target(
       name: "WebExampleScenes",
       dependencies: [
         .product(name: "GalleryDemoViews", package: "gallery"),
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
       ],
       path: "Sources/WebExampleScenes"
     ),
@@ -36,7 +36,7 @@ let package = Package(
       name: "WebExampleApp",
       dependencies: [
         "WebExampleScenes",
-        .product(name: "TerminalUIWASI", package: "TerminalUIWASI"),
+        .product(name: "SwiftTUIWASI", package: "SwiftTUIWASI"),
       ],
       path: "Sources/TerminalApp"
     ),

@@ -1,6 +1,6 @@
 import GalleryDemoViews
-import TerminalUI
-import TerminalUICLI
+import SwiftTUI
+import SwiftTUICLI
 
 @main
 struct GalleryDemoApp: App {

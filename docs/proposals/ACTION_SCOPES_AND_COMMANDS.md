@@ -168,7 +168,7 @@ public protocol ToolbarStyle {
   /// The layout type used to arrange toolbar items. Reuses the framework's
   /// existing `Layout` protocol so toolbars compose with standard layout
   /// machinery.
-  associatedtype Layout: TerminalUI.Layout
+  associatedtype Layout: SwiftTUI.Layout
 }
 
 public struct DefaultTopToolbarStyle: ToolbarStyle { /* uses HStack-equivalent Layout */ }

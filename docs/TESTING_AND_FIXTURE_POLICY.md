@@ -9,7 +9,7 @@ Structural guardrails that do not need to execute the runtime live in `prek`
 hooks instead of the Swift test suite:
 
 - `swift-format`: formats staged Swift files
-- `no-foundation-in-library-products`: inline `prek.toml` check that forbids `Foundation` imports in the Foundation-free `Core`, `View`, and `TerminalUI` library layers
+- `no-foundation-in-library-products`: inline `prek.toml` check that forbids `Foundation` imports in the Foundation-free `Core`, `View`, and `SwiftTUI` library layers
 - `Scripts/check_public_surface_policies.sh`: enforces public-surface guardrails, actor-isolation documentation, and related docs
 - `Scripts/check_concurrency_safety_policies.sh`: forbids `@unchecked Sendable` and `nonisolated(unsafe)` in checked-in Swift sources so concurrency-safety regressions fail before test execution
 
@@ -29,12 +29,12 @@ test suite, not by a separate pre-commit hook.
 
 - `Tests/CoreTests`: pipeline, layout, raster, and low-level infrastructure
 - `Tests/ViewTests`: authoring-surface, environment, and actor-isolation behavior
-- `Tests/TerminalUITests`: runtime, rendering, fixture, and benchmark scenarios
-- `Runners/TerminalUICLI/Tests/TerminalUICLITests`: terminal-native runner, attach, socket, and pty behavior
-- `Runners/TerminalUIWASI/Tests/TerminalUIWASITests`: WASI runner and manifest-mode behavior
+- `Tests/SwiftTUITests`: runtime, rendering, fixture, and benchmark scenarios
+- `Runners/SwiftTUICLI/Tests/SwiftTUICLITests`: terminal-native runner, attach, socket, and pty behavior
+- `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests`: WASI runner and manifest-mode behavior
 
 Prefer the smallest target that can prove the behavior under test. Keep
-cross-layer coverage in `TerminalUITests` and the runner-package test suites,
+cross-layer coverage in `SwiftTUITests` and the runner-package test suites,
 not as the default place for every new assertion.
 
 ## Principles

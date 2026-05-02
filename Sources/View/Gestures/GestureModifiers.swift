@@ -327,7 +327,7 @@ extension Gesture {
   /// > Warning: The `inout Transaction` parameter is currently a
   /// > no-op stand-in. SwiftUI threads the frame's active transaction
   /// > (from `withAnimation` or the frame scheduler) here so authors
-  /// > can inspect or mutate animation semantics. TerminalUI does
+  /// > can inspect or mutate animation semantics. SwiftTUI does
   /// > not yet plumb this through; mutations to the transaction
   /// > inside the closure are silently discarded.
   ///

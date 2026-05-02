@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "swift-terminal-ui-website",
+      "name": "swift-tui-website",
       "dependencies": {
         "@astrojs/check": "^0.9.4",
         "@astrojs/mdx": "^5.0.0",

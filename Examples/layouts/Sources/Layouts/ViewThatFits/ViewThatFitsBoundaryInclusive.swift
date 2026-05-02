@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Two side-by-side `ViewThatFits` containers whose first candidate
 /// (`Text("HELLO")`, 5 cells wide) sits exactly on the boundary of one

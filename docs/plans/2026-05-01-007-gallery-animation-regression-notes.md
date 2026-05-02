@@ -213,15 +213,15 @@ Targeted verification:
 
 ```bash
 swiftly run swift test --filter CoreTests.AnimationSchedulerTests
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests/cancelledAnimationIntentIsReplayedIntoReplacementFrameDiagnostics
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests/diagnosticsCountInputQueuedDuringAsyncRenderSuspension
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/cancelledAnimationIntentIsReplayedIntoReplacementFrameDiagnostics
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests/diagnosticsCountInputQueuedDuringAsyncRenderSuspension
 swiftly run swift test --package-path Examples/gallery --filter GalleryDemoViewsTests.AnimationRegressionTests
 ```
 
 Good-commit proof used for this note:
 
 ```bash
-git worktree add /tmp/swift-terminal-ui-good-animation-test 7dfc91b3032e83ed626c597df741f8d248480cdf
-git -C /tmp/swift-terminal-ui-good-animation-test apply /tmp/swift-terminal-ui-animation-regression-test.patch
+git worktree add /tmp/swift-tui-good-animation-test 7dfc91b3032e83ed626c597df741f8d248480cdf
+git -C /tmp/swift-tui-good-animation-test apply /tmp/swift-tui-animation-regression-test.patch
 swiftly run swift test --package-path Examples/gallery --filter GalleryDemoViewsTests.AnimationRegressionTests
 ```

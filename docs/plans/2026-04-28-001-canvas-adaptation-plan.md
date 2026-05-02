@@ -102,8 +102,8 @@ Initial app requirements:
 
 - package name: `canvas-demo`,
 - executable product: `canvas-demo`,
-- local package dependency: `.package(name: "swift-terminal-ui", path: "../..")`,
-- runner dependency: `../../Runners/TerminalUICLI`,
+- local package dependency: `.package(name: "swift-tui", path: "../..")`,
+- runner dependency: `../../Runners/SwiftTUICLI`,
 - a small view target that can be tested without launching a real terminal,
 - a current-Canvas drawing surface backed by `CanvasDrawing`,
 - keyboard cursor movement,
@@ -369,7 +369,7 @@ Update public docs once API shape settles:
 Recommended verification sequence during implementation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.CanvasViewTests
+swiftly run swift test --filter SwiftTUITests.CanvasViewTests
 cd Examples/canvas && swift test
 cd Examples/gifeditor && swift test
 bun run test

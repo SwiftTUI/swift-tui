@@ -12,7 +12,7 @@ WASM_SDK_CHECKSUM="${WASM_SDK_CHECKSUM:-bd47baa20771f366d8beed7970afaa30742b2210
 CONTAINER_TOOL=""
 IMAGE="${LINUX_IMAGE:-swift:6.3}"
 IMAGE_SLUG="$(printf '%s' "$IMAGE" | tr '/:' '--')"
-CONTAINER_NAME="${LINUX_CONTAINER_NAME:-swift-terminal-ui-${IMAGE_SLUG}}"
+CONTAINER_NAME="${LINUX_CONTAINER_NAME:-swift-tui-${IMAGE_SLUG}}"
 CONTAINER_DIR="${LINUX_CONTAINER_DIR:-/home/runner/work/$REPO_BASENAME/$REPO_BASENAME}"
 SWIFTPM_HOME_VOLUME="${LINUX_SWIFTPM_HOME_VOLUME:-${CONTAINER_NAME}-swiftpm-home}"
 SWIFTPM_CACHE_VOLUME="${LINUX_SWIFTPM_CACHE_VOLUME:-${CONTAINER_NAME}-swiftpm-cache}"
@@ -38,8 +38,8 @@ Interactive:
 
 Repo-aware:
   test              Run \`swift test\`
-  cli-test          Run \`swift test\` for Runners/TerminalUICLI
-  cli-build-tests   Build Runners/TerminalUICLI tests without running them
+  cli-test          Run \`swift test\` for Runners/SwiftTUICLI
+  cli-build-tests   Build Runners/SwiftTUICLI tests without running them
   examples          Build the Linux example packages
   web               Build the browser examples after installing Bun and the Wasm SDK
   workflow          Mirror the Examples Linux workflow: examples + web
@@ -258,16 +258,16 @@ cmd_test() {
 cmd_cli_test() {
   run_shell_script "
     swift test \
-      --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/terminaluicli") \
-      --package-path Runners/TerminalUICLI
+      --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/swifttuicli") \
+      --package-path Runners/SwiftTUICLI
   "
 }
 
 cmd_cli_build_tests() {
   run_shell_script "
     swift build --build-tests \
-      --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/terminaluicli") \
-      --package-path Runners/TerminalUICLI
+      --scratch-path $(printf '%q' "$LINUX_SWIFT_SCRATCH_DIR/swifttuicli") \
+      --package-path Runners/SwiftTUICLI
   "
 }
 

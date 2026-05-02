@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// A fuzzy-filterable command-palette list used inside the Gallery's
 /// palette sheet. The outer wrapper intentionally returns a
@@ -96,7 +96,7 @@ private struct CommandPaletteListBody: View {
   // Footer with an explicit Close button. The framework's Esc-closes-
   // presentation behavior was removed in Phase 0 of the ActionScopes
   // rewrite and has not yet been reinstated (see
-  // Tests/TerminalUITests/AppRuntimeTests.swift:225 — "Escape-owned
+  // Tests/SwiftTUITests/AppRuntimeTests.swift:225 — "Escape-owned
   // presentation dismissal returns in Phase 3"). Until the framework
   // gap closes, an explicit Cancel button is the reliable dismissal
   // affordance.

@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Two `Text("A")` views side-by-side that differ only in the order of
 /// `.padding` vs `.border` modifiers. The left box applies padding

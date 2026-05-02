@@ -2,7 +2,7 @@
 
 ## Overview
 
-TerminalUI keeps state, observation, environment, and focus on one runtime invalidation path.
+SwiftTUI keeps state, observation, environment, and focus on one runtime invalidation path.
 
 That gives the framework a few important properties:
 
@@ -20,7 +20,7 @@ Use ``State`` for local value ownership and ``Binding`` for projection into chil
 
 Use repo-owned ``Bindable`` with `Observation` models when you want editable bindings into observable reference types.
 
-TerminalUI tracks observable reads through the same invalidation bridge used by the rest of the runtime. Observable writes therefore invalidate the exact identities that observed them, rather than relying on a second rendering system.
+SwiftTUI tracks observable reads through the same invalidation bridge used by the rest of the runtime. Observable writes therefore invalidate the exact identities that observed them, rather than relying on a second rendering system.
 
 ## Environment
 

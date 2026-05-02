@@ -4,7 +4,7 @@ Author terminal interfaces with a SwiftUI-shaped view system, state model, layou
 
 ## Overview
 
-The `View` module is the authoring surface of TerminalUI.
+The `View` module is the authoring surface of SwiftTUI.
 
 It provides:
 

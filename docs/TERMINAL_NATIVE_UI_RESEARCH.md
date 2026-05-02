@@ -80,9 +80,9 @@ The strongest terminal-native apps do a few things consistently:
 - They treat panes, tabs, preview areas, and session persistence as first-class UX.
 - They degrade gracefully across terminal capabilities without collapsing their layout model.
 
-This is the standard TerminalUI should chase when it reinterprets SwiftUI APIs for a terminal domain.
+This is the standard SwiftTUI should chase when it reinterprets SwiftUI APIs for a terminal domain.
 
-## Implications for TerminalUI
+## Implications for SwiftTUI
 
 - Reinterpret SwiftUI shapes only where the terminal has a clearer native meaning, not where GUI wording happens to be familiar.
 - Prefer full-screen, pane-based app shells over stacked card layouts in defaults and demos.
@@ -90,7 +90,7 @@ This is the standard TerminalUI should chase when it reinterprets SwiftUI APIs f
 - Treat focus and selection as the primary visual system, with styling as a secondary signal.
 - Keep `ScrollView` as a pane primitive, not a default whole-page pattern.
 - Make component APIs biased toward selection, preview, discoverability, and keyboard movement.
-- Avoid turning TerminalUI into a theme wrapper around GUI metaphors; it should feel like the terminal's own native language.
+- Avoid turning SwiftTUI into a theme wrapper around GUI metaphors; it should feel like the terminal's own native language.
 
 ## Sources
 

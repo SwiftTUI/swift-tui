@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// A single bordered box with each of the four sides painted a
 /// different color via

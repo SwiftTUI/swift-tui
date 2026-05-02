@@ -19,30 +19,30 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(name: "swift-terminal-ui", path: "../.."),
-    .package(path: "../../Runners/TerminalUICLI"),
+    .package(name: "swift-tui", path: "../.."),
+    .package(path: "../../Runners/SwiftTUICLI"),
   ],
   targets: [
     .executableTarget(
       name: "GalleryDemo",
       dependencies: [
         "GalleryDemoViews",
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUICLI", package: "TerminalUICLI"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
       ]
     ),
     .target(
       name: "GalleryDemoViews",
       dependencies: [
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUICharts", package: "swift-tui"),
       ]
     ),
     .testTarget(
       name: "GalleryDemoViewsTests",
       dependencies: [
         "GalleryDemoViews",
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
       ]
     ),
   ]

@@ -6,7 +6,7 @@ import SwiftUI
 /// footer and a ⌃B key command that calls `onBack` to return to the
 /// picker.
 ///
-/// SwiftUI port: the original used TerminalUI's `.panel(id:)` /
+/// SwiftUI port: the original used SwiftTUI's `.panel(id:)` /
 /// `.keyCommand` modifiers; SwiftUI provides `.keyboardShortcut` on
 /// `Button`-shaped views, so this host bridges the back action
 /// through a hidden keyboard-shortcut button.

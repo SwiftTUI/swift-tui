@@ -373,16 +373,16 @@ placement-time seam.
 Focused commands that exercise this audit family:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.SafeAreaSurfaceTests
-swiftly run swift test --filter TerminalUITests.ViewThatFitsSurfaceTests
-swiftly run swift test --filter TerminalUITests.GeometryReaderSurfaceTests
-swiftly run swift test --filter TerminalUITests.AnchorPreferenceSurfaceTests
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
-swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests
+swiftly run swift test --filter SwiftTUITests.SafeAreaSurfaceTests
+swiftly run swift test --filter SwiftTUITests.ViewThatFitsSurfaceTests
+swiftly run swift test --filter SwiftTUITests.GeometryReaderSurfaceTests
+swiftly run swift test --filter SwiftTUITests.AnchorPreferenceSurfaceTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests
 swiftly run swift test --filter CoreTests.LayoutEngineTests
 ```
 
-Use `bun run test` after implementing any shared Core/View/TerminalUI change.
+Use `bun run test` after implementing any shared Core/View/SwiftTUI change.
 For documentation-only edits, `git diff --check` is sufficient.
 
 ## Audit Verification
@@ -391,8 +391,8 @@ Commands run for this audit on 2026-05-01:
 
 ```bash
 git diff --check
-swiftly run swift test --filter 'TerminalUITests\.(SafeAreaSurfaceTests|ViewThatFitsSurfaceTests|GeometryReaderSurfaceTests|AnchorPreferenceSurfaceTests|AsyncFrameTailRenderingTests)|CoreTests\.LayoutEngineTests'
-swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests
+swiftly run swift test --filter 'SwiftTUITests\.(SafeAreaSurfaceTests|ViewThatFitsSurfaceTests|GeometryReaderSurfaceTests|AnchorPreferenceSurfaceTests|AsyncFrameTailRenderingTests)|CoreTests\.LayoutEngineTests'
+swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests
 ```
 
 Results:

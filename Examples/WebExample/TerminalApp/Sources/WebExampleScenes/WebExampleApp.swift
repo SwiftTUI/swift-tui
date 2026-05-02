@@ -1,5 +1,5 @@
 import GalleryDemoViews
-import TerminalUI
+import SwiftTUI
 
 public struct WebExampleApp: App {
   public init() {}

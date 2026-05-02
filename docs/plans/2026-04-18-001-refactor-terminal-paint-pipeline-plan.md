@@ -5,7 +5,7 @@ status: shipped
 date: 2026-04-18
 ---
 
-> **Note:** Shipped. All 16 task checkboxes below are checked; `PresentationDamage` / `presentationDamage` diagnostics, terminal edit-op lowering, and the related paint-pipeline narrowing live in `Sources/Core/CommitAndFrameTypes.swift` and `Sources/TerminalUI/`.
+> **Note:** Shipped. All 16 task checkboxes below are checked; `PresentationDamage` / `presentationDamage` diagnostics, terminal edit-op lowering, and the related paint-pipeline narrowing live in `Sources/Core/CommitAndFrameTypes.swift` and `Sources/SwiftTUI/`.
 
 
 # refactor: tighten terminal paint pipeline
@@ -75,38 +75,38 @@ therefore focuses on the terminal presentation boundary rather than upstream str
 
 ### Relevant Code and Patterns
 
-- [docs/ARCHITECTURE.md](/Users/adamz/Developer/repos/swift-terminal-ui/docs/ARCHITECTURE.md:52)
+- [docs/ARCHITECTURE.md](/Users/adamz/Developer/repos/swift-tui/docs/ARCHITECTURE.md:52)
   defines the canonical seven-phase frame model and explicitly keeps terminal adaptation in the
   presentation layer.
-- [docs/RUNTIME.md](/Users/adamz/Developer/repos/swift-terminal-ui/docs/RUNTIME.md:156) documents
+- [docs/RUNTIME.md](/Users/adamz/Developer/repos/swift-tui/docs/RUNTIME.md:156) documents
   incremental presentation as an expected property and calls out known full-repaint fallbacks.
-- [docs/TESTING_AND_FIXTURE_POLICY.md](/Users/adamz/Developer/repos/swift-terminal-ui/docs/TESTING_AND_FIXTURE_POLICY.md:71)
+- [docs/TESTING_AND_FIXTURE_POLICY.md](/Users/adamz/Developer/repos/swift-tui/docs/TESTING_AND_FIXTURE_POLICY.md:71)
   treats new full-repaint fallbacks in previously incremental scenarios as regressions unless
   explicitly documented.
-- [Sources/TerminalUI/TerminalUI.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/TerminalUI/TerminalUI.swift:269)
+- [Sources/SwiftTUI/SwiftTUI.swift](/Users/adamz/Developer/repos/swift-tui/Sources/SwiftTUI/SwiftTUI.swift:269)
   computes `PresentationDamage` from directly invalidated identities after placement.
-- [Sources/Core/CommitAndFrameTypes.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/Core/CommitAndFrameTypes.swift:657)
+- [Sources/Core/CommitAndFrameTypes.swift](/Users/adamz/Developer/repos/swift-tui/Sources/Core/CommitAndFrameTypes.swift:657)
   currently models damage as `dirtyRows: Set<Int>`.
-- [Sources/Core/Rasterizer.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/Core/Rasterizer.swift:74)
+- [Sources/Core/Rasterizer.swift](/Users/adamz/Developer/repos/swift-tui/Sources/Core/Rasterizer.swift:74)
   seeds raster output from the previous surface when row damage exists.
-- [Sources/TerminalUI/TerminalPresentation.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/TerminalUI/TerminalPresentation.swift:308)
+- [Sources/SwiftTUI/TerminalPresentation.swift](/Users/adamz/Developer/repos/swift-tui/Sources/SwiftTUI/TerminalPresentation.swift:308)
   plans either full repaint or incremental span updates.
-- [Sources/TerminalUI/TerminalHost.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/TerminalUI/TerminalHost.swift:865)
+- [Sources/SwiftTUI/TerminalHost.swift](/Users/adamz/Developer/repos/swift-tui/Sources/SwiftTUI/TerminalHost.swift:865)
   owns paint submission, frame-drop recovery, and graphics placement ordering.
-- [Sources/TerminalUI/TerminalImageRendering.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/TerminalUI/TerminalImageRendering.swift:131)
+- [Sources/SwiftTUI/TerminalImageRendering.swift](/Users/adamz/Developer/repos/swift-tui/Sources/SwiftTUI/TerminalImageRendering.swift:131)
   handles Kitty/Sixel placement and fallback image compositing.
-- [Tests/TerminalUITests/TerminalPresentationTests.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Tests/TerminalUITests/TerminalPresentationTests.swift:321)
+- [Tests/SwiftTUITests/TerminalPresentationTests.swift](/Users/adamz/Developer/repos/swift-tui/Tests/SwiftTUITests/TerminalPresentationTests.swift:321)
   provides the authoritative planner and host presentation test bed.
-- [Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift:15)
+- [Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift](/Users/adamz/Developer/repos/swift-tui/Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift:15)
   already covers batching and dropped-frame recovery behavior.
-- [Tests/TerminalUITests/Phase1BenchmarkScenariosTests.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Tests/TerminalUITests/Phase1BenchmarkScenariosTests.swift:14)
+- [Tests/SwiftTUITests/Phase1BenchmarkScenariosTests.swift](/Users/adamz/Developer/repos/swift-tui/Tests/SwiftTUITests/Phase1BenchmarkScenariosTests.swift:14)
   expresses deterministic “smaller than full repaint” performance gates.
 
 ### Institutional Learnings
 
 - No `docs/solutions/` corpus exists in this repository today. The closest local institutional
   history is in the proposals directory, especially:
-  [docs/proposals/ASYNC_PRESENTATION.md](/Users/adamz/Developer/repos/swift-terminal-ui/docs/proposals/ASYNC_PRESENTATION.md:166),
+  [docs/proposals/ASYNC_PRESENTATION.md](/Users/adamz/Developer/repos/swift-tui/docs/proposals/ASYNC_PRESENTATION.md:166),
   which captures the intended behavior of dropped-frame recovery and the writer queue.
 
 ### External References
@@ -267,10 +267,10 @@ placement before changing internals.
 - Tests only, plus any minimal fixture/helper additions needed to express current behavior
 
 **Primary files:**
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift`
-- Modify: `Tests/TerminalUITests/TerminalGraphicsProtocolTests.swift`
-- Modify: `Tests/TerminalUITests/Phase1BenchmarkScenariosTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalGraphicsProtocolTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase1BenchmarkScenariosTests.swift`
 - Modify: `docs/TESTING_AND_FIXTURE_POLICY.md`
 
 **Work:**
@@ -296,10 +296,10 @@ placement before changing internals.
 - Small runtime refactor plus targeted presentation tests
 
 **Primary files:**
-- Modify: `Sources/TerminalUI/TerminalPresentation.swift`
-- Modify: `Sources/TerminalUI/TerminalHost.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalPresentation.swift`
+- Modify: `Sources/SwiftTUI/TerminalHost.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift`
 
 **Work:**
 - Choose the single owner for full-repaint materialization.
@@ -325,10 +325,10 @@ placement before changing internals.
 
 **Primary files:**
 - Modify: `Sources/Core/CommitAndFrameTypes.swift`
-- Modify: `Sources/TerminalUI/TerminalUI.swift`
+- Modify: `Sources/SwiftTUI/SwiftTUI.swift`
 - Modify: `Sources/Core/Rasterizer.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/Phase1BenchmarkScenariosTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase1BenchmarkScenariosTests.swift`
 
 **Work:**
 - Introduce the richer damage type and adapt `DefaultRenderer.presentationDamage(...)` to produce it.
@@ -359,9 +359,9 @@ presentation planner no longer has to rediscover narrow spans from wide row hint
 **Primary files:**
 - Modify: `Sources/Core/Rasterizer.swift`
 - Modify: `Sources/Core/CommitAndFrameTypes.swift`
-- Modify: `Sources/TerminalUI/TerminalPresentation.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/Phase1BenchmarkScenariosTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalPresentation.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase1BenchmarkScenariosTests.swift`
 
 **Work:**
 - Record actual touched spans or touched rectangles while painting dirty regions.
@@ -387,11 +387,11 @@ incremental text as row-oriented batches.
 - Planner/renderer/host refactor focused on incremental text only
 
 **Primary files:**
-- Modify: `Sources/TerminalUI/TerminalPresentation.swift`
-- Modify: `Sources/TerminalUI/TerminalHost.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift`
-- Modify: `Tests/TerminalUITests/Phase1PresentationIntegrationTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalPresentation.swift`
+- Modify: `Sources/SwiftTUI/TerminalHost.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase1PresentationIntegrationTests.swift`
 
 **Work:**
 - Introduce the row-batch representation.
@@ -419,10 +419,10 @@ batches where warranted.
 - Capability and host framing work, plus tests and docs
 
 **Primary files:**
-- Modify: `Sources/TerminalUI/TerminalPresentation.swift`
-- Modify: `Sources/TerminalUI/TerminalHost.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalPresentation.swift`
+- Modify: `Sources/SwiftTUI/TerminalHost.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift`
 - Modify: `docs/proposals/ASYNC_PRESENTATION.md`
 - Modify: `docs/RUNTIME.md`
 
@@ -450,11 +450,11 @@ unnecessary image replay.
 - Planner/host/image-renderer change with heavy graphics regression coverage
 
 **Primary files:**
-- Modify: `Sources/TerminalUI/TerminalPresentation.swift`
-- Modify: `Sources/TerminalUI/TerminalHost.swift`
-- Modify: `Sources/TerminalUI/TerminalImageRendering.swift`
-- Modify: `Tests/TerminalUITests/TerminalGraphicsProtocolTests.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalPresentation.swift`
+- Modify: `Sources/SwiftTUI/TerminalHost.swift`
+- Modify: `Sources/SwiftTUI/TerminalImageRendering.swift`
+- Modify: `Tests/SwiftTUITests/TerminalGraphicsProtocolTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
 
 **Work:**
 - Split compatibility checks into text compatibility and graphics compatibility.
@@ -479,10 +479,10 @@ unnecessary image replay.
 - Optional optimization PR, explicitly non-blocking for the rest of the roadmap
 
 **Primary files:**
-- Modify: `Sources/TerminalUI/TerminalPresentation.swift`
-- Modify: `Sources/TerminalUI/TerminalHost.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/Phase1PresentationIntegrationTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalPresentation.swift`
+- Modify: `Sources/SwiftTUI/TerminalHost.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase1PresentationIntegrationTests.swift`
 
 **Work:**
 - Detect a small safe subset of transformations for `EL`/`ECH` and possibly row insert/delete ops.
@@ -507,8 +507,8 @@ settled.
 
 **Primary files:**
 - Modify: `Sources/Core/CommitAndFrameTypes.swift`
-- Modify: `Tests/TerminalUITests/Phase1BenchmarkScenariosTests.swift`
-- Modify: `Tests/TerminalUITests/Phase5ReliabilityGatesTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase1BenchmarkScenariosTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase5ReliabilityGatesTests.swift`
 - Modify: `docs/RUNTIME.md`
 - Modify: `docs/SOURCE_LAYOUT.md`
 - Modify: `docs/TESTING_AND_FIXTURE_POLICY.md`
@@ -542,17 +542,17 @@ settled.
 Every wave that changes runtime behavior should verify all of the following:
 
 - planner correctness:
-  `Tests/TerminalUITests/TerminalPresentationTests.swift`
+  `Tests/SwiftTUITests/TerminalPresentationTests.swift`
 - host write shape and dropped-frame recovery:
-  `Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift`
+  `Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift`
 - whole-path incremental scenarios:
-  `Tests/TerminalUITests/Phase1PresentationIntegrationTests.swift`
+  `Tests/SwiftTUITests/Phase1PresentationIntegrationTests.swift`
 - work-shape and incremental gates:
-  `Tests/TerminalUITests/Phase1BenchmarkScenariosTests.swift`
+  `Tests/SwiftTUITests/Phase1BenchmarkScenariosTests.swift`
 
 Waves that touch graphics must also verify:
 
-- `Tests/TerminalUITests/TerminalGraphicsProtocolTests.swift`
+- `Tests/SwiftTUITests/TerminalGraphicsProtocolTests.swift`
 
 Waves that modify host shutdown or writer framing should additionally verify:
 
@@ -586,10 +586,10 @@ what the host will actually write.
 **Dependencies:** None
 
 **Files:**
-- Modify: `Sources/TerminalUI/TerminalPresentation.swift`
-- Modify: `Sources/TerminalUI/TerminalHost.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalPresentation.swift`
+- Modify: `Sources/SwiftTUI/TerminalHost.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift`
 
 **Approach:**
 - Refactor `TerminalPresentationPlan` so full repaint is owned by exactly one layer.
@@ -604,7 +604,7 @@ what the host will actually write.
 **Patterns to follow:**
 - Existing planner/host split in `TerminalPresentation.swift` and `TerminalHost.swift`
 - Current batching tests in
-  `Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift`
+  `Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift`
 
 **Test scenarios:**
 - First presentation still produces the same visible full repaint payload as before.
@@ -628,10 +628,10 @@ what the host will actually write.
 
 **Files:**
 - Modify: `Sources/Core/CommitAndFrameTypes.swift`
-- Modify: `Sources/TerminalUI/TerminalUI.swift`
+- Modify: `Sources/SwiftTUI/SwiftTUI.swift`
 - Modify: `Sources/Core/Rasterizer.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/Phase1BenchmarkScenariosTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase1BenchmarkScenariosTests.swift`
 
 **Approach:**
 - Replace `dirtyRows: Set<Int>` with a richer package-level damage type that can represent at least:
@@ -662,7 +662,7 @@ PresentationDamage
 ```
 
 **Patterns to follow:**
-- Current conservative fallback rules in `TerminalUI.presentationDamage(...)`
+- Current conservative fallback rules in `SwiftTUI.presentationDamage(...)`
 - Current raster reuse behavior in `Rasterizer.rasterizeCollectingVisibleIdentities(...)`
 
 **Test scenarios:**
@@ -686,11 +686,11 @@ updates as row-oriented batches with shared style state rather than isolated spa
 **Dependencies:** Unit 2
 
 **Files:**
-- Modify: `Sources/TerminalUI/TerminalPresentation.swift`
-- Modify: `Sources/TerminalUI/TerminalHost.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift`
-- Modify: `Tests/TerminalUITests/Phase1PresentationIntegrationTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalPresentation.swift`
+- Modify: `Sources/SwiftTUI/TerminalHost.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase1PresentationIntegrationTests.swift`
 
 **Approach:**
 - Replace or supplement `SpanUpdate` with a row-batch representation that groups ordered changed
@@ -739,10 +739,10 @@ repaints and dropped-frame recovery.
 **Dependencies:** Unit 1
 
 **Files:**
-- Modify: `Sources/TerminalUI/TerminalPresentation.swift`
-- Modify: `Sources/TerminalUI/TerminalHost.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalPresentation.swift`
+- Modify: `Sources/SwiftTUI/TerminalHost.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift`
 - Modify: `docs/proposals/ASYNC_PRESENTATION.md`
 - Modify: `docs/RUNTIME.md`
 
@@ -780,11 +780,11 @@ graphics replay to affected attachments.
 **Dependencies:** Unit 2, Unit 3
 
 **Files:**
-- Modify: `Sources/TerminalUI/TerminalPresentation.swift`
-- Modify: `Sources/TerminalUI/TerminalHost.swift`
-- Modify: `Sources/TerminalUI/TerminalImageRendering.swift`
-- Modify: `Tests/TerminalUITests/TerminalGraphicsProtocolTests.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalPresentation.swift`
+- Modify: `Sources/SwiftTUI/TerminalHost.swift`
+- Modify: `Sources/SwiftTUI/TerminalImageRendering.swift`
+- Modify: `Tests/SwiftTUITests/TerminalGraphicsProtocolTests.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
 
 **Approach:**
 - Split surface compatibility checks into:
@@ -827,10 +827,10 @@ or row insertion/deletion once the richer damage and batched encoding model is i
 **Dependencies:** Unit 3
 
 **Files:**
-- Modify: `Sources/TerminalUI/TerminalPresentation.swift`
-- Modify: `Sources/TerminalUI/TerminalHost.swift`
-- Modify: `Tests/TerminalUITests/TerminalPresentationTests.swift`
-- Modify: `Tests/TerminalUITests/Phase1PresentationIntegrationTests.swift`
+- Modify: `Sources/SwiftTUI/TerminalPresentation.swift`
+- Modify: `Sources/SwiftTUI/TerminalHost.swift`
+- Modify: `Tests/SwiftTUITests/TerminalPresentationTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase1PresentationIntegrationTests.swift`
 
 **Approach:**
 - Add a lowering stage that detects a small set of safe transformations:
@@ -866,8 +866,8 @@ future contributors.
 
 **Files:**
 - Modify: `Sources/Core/CommitAndFrameTypes.swift`
-- Modify: `Tests/TerminalUITests/Phase1BenchmarkScenariosTests.swift`
-- Modify: `Tests/TerminalUITests/Phase5ReliabilityGatesTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase1BenchmarkScenariosTests.swift`
+- Modify: `Tests/SwiftTUITests/Phase5ReliabilityGatesTests.swift`
 - Modify: `docs/RUNTIME.md`
 - Modify: `docs/SOURCE_LAYOUT.md`
 - Modify: `docs/TESTING_AND_FIXTURE_POLICY.md`
@@ -964,22 +964,22 @@ future contributors.
 ## Sources & References
 
 - Related code:
-  [Sources/TerminalUI/TerminalUI.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/TerminalUI/TerminalUI.swift:269)
+  [Sources/SwiftTUI/SwiftTUI.swift](/Users/adamz/Developer/repos/swift-tui/Sources/SwiftTUI/SwiftTUI.swift:269)
 - Related code:
-  [Sources/Core/CommitAndFrameTypes.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/Core/CommitAndFrameTypes.swift:657)
+  [Sources/Core/CommitAndFrameTypes.swift](/Users/adamz/Developer/repos/swift-tui/Sources/Core/CommitAndFrameTypes.swift:657)
 - Related code:
-  [Sources/Core/Rasterizer.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/Core/Rasterizer.swift:74)
+  [Sources/Core/Rasterizer.swift](/Users/adamz/Developer/repos/swift-tui/Sources/Core/Rasterizer.swift:74)
 - Related code:
-  [Sources/TerminalUI/TerminalPresentation.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/TerminalUI/TerminalPresentation.swift:308)
+  [Sources/SwiftTUI/TerminalPresentation.swift](/Users/adamz/Developer/repos/swift-tui/Sources/SwiftTUI/TerminalPresentation.swift:308)
 - Related code:
-  [Sources/TerminalUI/TerminalHost.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/TerminalUI/TerminalHost.swift:865)
+  [Sources/SwiftTUI/TerminalHost.swift](/Users/adamz/Developer/repos/swift-tui/Sources/SwiftTUI/TerminalHost.swift:865)
 - Related code:
-  [Sources/TerminalUI/TerminalImageRendering.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Sources/TerminalUI/TerminalImageRendering.swift:131)
+  [Sources/SwiftTUI/TerminalImageRendering.swift](/Users/adamz/Developer/repos/swift-tui/Sources/SwiftTUI/TerminalImageRendering.swift:131)
 - Related tests:
-  [Tests/TerminalUITests/TerminalPresentationTests.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Tests/TerminalUITests/TerminalPresentationTests.swift:321)
+  [Tests/SwiftTUITests/TerminalPresentationTests.swift](/Users/adamz/Developer/repos/swift-tui/Tests/SwiftTUITests/TerminalPresentationTests.swift:321)
 - Related tests:
-  [Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Tests/TerminalUITests/TerminalHostPresentationBatchingTests.swift:15)
+  [Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift](/Users/adamz/Developer/repos/swift-tui/Tests/SwiftTUITests/TerminalHostPresentationBatchingTests.swift:15)
 - Related tests:
-  [Tests/TerminalUITests/TerminalGraphicsProtocolTests.swift](/Users/adamz/Developer/repos/swift-terminal-ui/Tests/TerminalUITests/TerminalGraphicsProtocolTests.swift:347)
+  [Tests/SwiftTUITests/TerminalGraphicsProtocolTests.swift](/Users/adamz/Developer/repos/swift-tui/Tests/SwiftTUITests/TerminalGraphicsProtocolTests.swift:347)
 - Related proposal:
-  [docs/proposals/ASYNC_PRESENTATION.md](/Users/adamz/Developer/repos/swift-terminal-ui/docs/proposals/ASYNC_PRESENTATION.md:166)
+  [docs/proposals/ASYNC_PRESENTATION.md](/Users/adamz/Developer/repos/swift-tui/docs/proposals/ASYNC_PRESENTATION.md:166)

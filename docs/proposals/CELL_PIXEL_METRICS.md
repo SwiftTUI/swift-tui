@@ -5,7 +5,7 @@ Related research: [CELL_PIXEL_GEOMETRY_RESEARCH.md](../CELL_PIXEL_GEOMETRY_RESEA
 
 ## Problem
 
-TerminalUI measures authored geometry in integer cells. That stance is correct for layout, placement, and alignment. It is incomplete for motion, shape rendering, and image sizing, where a cell's pixel dimensions determine whether the output *looks* honest even when it is laid out correctly.
+SwiftTUI measures authored geometry in integer cells. That stance is correct for layout, placement, and alignment. It is incomplete for motion, shape rendering, and image sizing, where a cell's pixel dimensions determine whether the output *looks* honest even when it is laid out correctly.
 
 Three concrete symptoms, grounded in shipped code:
 
@@ -13,7 +13,7 @@ Three concrete symptoms, grounded in shipped code:
 - A `Circle` drawn on a 2x4 Braille grid assumes sub-pixels are square. That holds when `cellPixelSize.aspectRatio == 2.0` (the 8x16 default) but fails on terminals with other aspect ratios — the "circle" becomes an ellipse.
 - Image callers that want to pre-scale a PNG to the terminal's native pixel resolution must reach into `TerminalGraphicsCapabilities` themselves; there is no authoring-level path to that value.
 
-The runtime already detects cell pixel dimensions. `TerminalGraphicsCapabilities.cellPixelSize: Size?` is populated on startup by a three-method fallback in `Sources/TerminalUI/TerminalHost.swift`:
+The runtime already detects cell pixel dimensions. `TerminalGraphicsCapabilities.cellPixelSize: Size?` is populated on startup by a three-method fallback in `Sources/SwiftTUI/TerminalHost.swift`:
 
 1. `ioctl(TIOCGWINSZ)` with `ws_xpixel`/`ws_ypixel`
 2. `CSI 16 t` cell-pixel query
@@ -58,7 +58,7 @@ A single new public type in `Sources/Core/GeometryTypes.swift`:
 ```swift
 /// Read-only display metrics describing how cells map to device pixels.
 ///
-/// Advisory runtime metadata. TerminalUI's layout, placement, and alignment
+/// Advisory runtime metadata. SwiftTUI's layout, placement, and alignment
 /// story remain cell-denominated; this type exists so authors can apply
 /// aspect correction to shapes, motion, or image sizing without reinventing
 /// the fallback.
@@ -147,7 +147,7 @@ The existing `Sources/View/Environment/ImageEnvironment.swift` loses its `termin
 
 ### Runtime wiring
 
-`Sources/TerminalUI/RunLoop+Rendering.swift` `resolveContext(for:)` replaces the current write:
+`Sources/SwiftTUI/RunLoop+Rendering.swift` `resolveContext(for:)` replaces the current write:
 
 ```swift
 // before
@@ -257,7 +257,7 @@ The existing `resize(to:)` remains; callers who do not care about cell-pixel-siz
 Three internal callsites are affected by the removal of `terminalCellPixelSize`:
 
 - `Sources/View/Primitives/Image.swift:61` — currently reads a `Size`. Migrates to `environmentValues.cellPixelMetrics`, constructing a local `Size(width: metrics.width, height: metrics.height)` at the boundary where a `Size` is still needed by `ImageAssetRepository`. No behavior change.
-- `Sources/TerminalUI/RunLoop+Rendering.swift:311` — the write site, replaced as shown above.
+- `Sources/SwiftTUI/RunLoop+Rendering.swift:311` — the write site, replaced as shown above.
 - `Sources/View/Environment/ImageEnvironment.swift:20` — the `package var` declaration is deleted. `TerminalCellPixelSizeKey` is removed.
 
 The `ImageAssetResolver` typealias and `ResolvedImageAsset.cellPixelSize` field retain their current `Size` parameter types. Those are image-pipeline internals that will not benefit from knowing the `source`; the conversion at the boundary is local and clear.
@@ -279,7 +279,7 @@ Five layers:
 - Default value of `EnvironmentValues.cellPixelMetrics` is `.estimated`.
 - Round-trip: setting and reading preserves the value.
 
-### Integration — `GeometryReader` (`Tests/TerminalUITests/`)
+### Integration — `GeometryReader` (`Tests/SwiftTUITests/`)
 
 - Given an environment override with a specific `cellPixelMetrics`, the proxy inside a `GeometryReader` observes the same value.
 - Given no override, the proxy observes `.estimated`.

@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Nine `Text` markers each claim the same outer 60×20 frame via
 /// `.frame(maxWidth: .infinity, maxHeight: .infinity, alignment:)` at

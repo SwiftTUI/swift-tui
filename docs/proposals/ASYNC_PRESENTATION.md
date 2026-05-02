@@ -139,7 +139,7 @@ private final class PresentationWriter: Sendable {
     var pendingError: TerminalHostError?
   }
 
-  private let queue = DispatchQueue(label: "swift-terminal-ui.presentation-writer")
+  private let queue = DispatchQueue(label: "swift-tui.presentation-writer")
   private let state = Mutex(State())
 
   func submit(_ frame: PresentationFrame) {
@@ -350,7 +350,7 @@ Current coverage includes:
 Useful commands:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.TerminalHostPresentationBatchingTests
+swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests
 bun run test
 ```
 

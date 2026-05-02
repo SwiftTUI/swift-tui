@@ -2,11 +2,11 @@
 
 ## Goal
 
-Make TerminalUI apps shippable outside a local terminal in two peer embedded
+Make SwiftTUI apps shippable outside a local terminal in two peer embedded
 host packages:
 
-- `GUI/SwiftUITUIGUI`: a native SwiftUI SPM package that lets a macOS or iOS app host a TerminalUI scene without a terminal emulator
-- `GUI/WebTUIGUI`: a Bun-based package that lets a TerminalUI app ship in the browser by drawing TerminalUI's `web-surface` raster output onto a canvas (no terminal emulator dependency)
+- `GUI/SwiftUIHost`: a native SwiftUI SPM package that lets a macOS or iOS app host a SwiftTUI scene without a terminal emulator
+- `GUI/WebHost`: a Bun-based package that lets a SwiftTUI app ship in the browser by drawing SwiftTUI's `web-surface` raster output onto a canvas (no terminal emulator dependency)
 
 The authoring story stays the same:
 
@@ -24,56 +24,56 @@ toolchain story; see [TOOLCHAINS.md](TOOLCHAINS.md) for the full rules.
 
 The host-facing root work is landed:
 
-- `TerminalUI` exposes `TerminalUISceneDescriptor`,
-  `TerminalUISceneManifest`, and `HostedSceneSession`
-- `Runners/TerminalUICLI` owns terminal-native `App.main()`, attach/list CLI
+- `SwiftTUI` exposes `SceneDescriptor`,
+  `SceneManifest`, and `HostedSceneSession`
+- `Runners/SwiftTUICLI` owns terminal-native `App.main()`, attach/list CLI
   behavior, and pty-backed scene management
-- `Runners/TerminalUIWASI` owns manifest-only mode through `TUIGUI_MODE=manifest`
+- `Runners/SwiftTUIWASI` owns manifest-only mode through `TUIGUI_MODE=manifest`
   plus WASI scene launch
 - shared control-message parsing lives in
-  `Sources/TerminalUI/TerminalControlMessages.swift`
+  `Sources/SwiftTUI/TerminalControlMessages.swift`
 - embedded hosts use `InjectedTerminalInputReader`; the web host uses
   streaming presentation output (`StreamingTerminalHost`), while the native
   SwiftUI host receives `RasterSurface` values directly
 - hosted sessions now accept paired render-style updates so terminal appearance
   and semantic theme move together at runtime
-- `TerminalUI` is now library-only; executable launch is entirely runner-owned
+- `SwiftTUI` is now library-only; executable launch is entirely runner-owned
 
-### `GUI/SwiftUITUIGUI`
+### `GUI/SwiftUIHost`
 
 The native SwiftUI host package is landed as a standalone SPM package:
 
-- package root: `GUI/SwiftUITUIGUI`
+- package root: `GUI/SwiftUIHost`
 - dependencies:
   - local path dependency on the root package
 - key runtime files:
-  - `SwiftUITUIAppState.swift`
-  - `SwiftUITUIAppView.swift`
-  - `SwiftUITUISceneHost.swift`
+  - `SwiftUIHostAppState.swift`
+  - `SwiftUIHostAppView.swift`
+  - `SwiftUIHostSceneHost.swift`
   - `NativeSceneBridge.swift`
   - `NativeTerminalSurfaceView.swift`
-  - `SwiftUITUITerminalStyle.swift`
+  - `SwiftUIHostTerminalStyle.swift`
 - SwiftUI styles now expose explicit light and dark theme variants, each pairing
-  native renderer palette state with TerminalUI semantic theme tokens
+  native renderer palette state with SwiftTUI semantic theme tokens
 - verification:
   - `SceneRetentionTests.swift`
   - `ResizeBridgeTests.swift`
   - `StyleMappingTests.swift`
 
-### `GUI/WebTUIGUI`
+### `GUI/WebHost`
 
 The web host package is landed:
 
-- package root: `GUI/WebTUIGUI`
+- package root: `GUI/WebHost`
 - build stack: Bun plus the repo-managed Swift 6.3.1 toolchain
-- transport: TerminalUI's `web-surface` WASI transport. The Swift runner emits
+- transport: SwiftTUI's `web-surface` WASI transport. The Swift runner emits
   structured raster-surface records on stdout, and the browser host draws
   rectangles and text into a canvas. There is no terminal-emulator dependency.
 - key runtime and build files:
-  - `src/WebTUIApp.ts`
-  - `src/WebTUISceneRuntime.ts`
-  - `src/WebTUISceneManifest.ts`
-  - `src/WebTUISurfaceTransport.ts`
+  - `src/WebHostApp.ts`
+  - `src/WebHostSceneRuntime.ts`
+  - `src/WebHostSceneManifest.ts`
+  - `src/WebHostSurfaceTransport.ts`
   - `src/build/buildAppWasm.ts`
   - `src/build/generateSceneManifest.ts`
 - web styles expose explicit light and dark theme variants and can bind them
@@ -103,11 +103,11 @@ new products in the root package.
 
 - CLI multi-scene management and authored multiple scenes are intentionally
   separate concepts:
-  - `Runners/TerminalUICLI` can manage multiple native scenes with discovery,
+  - `Runners/SwiftTUICLI` can manage multiple native scenes with discovery,
     ptys, and attach flows
-  - `Runners/TerminalUIWASI` still executes one selected scene per wasm process
+  - `Runners/SwiftTUIWASI` still executes one selected scene per wasm process
 - Host packages still own scene switching UI and style surfaces. The root package exposes scene manifests and hosted sessions, not a full cross-platform app shell.
-- `GUI/WebTUIGUI` build scripts drive the repo-default `swiftly` toolchain (falling back to plain `swift` when available). See [TOOLCHAINS.md](TOOLCHAINS.md) for the toolchain requirement. The package shares the repo Bun workspace for builds and tests.
+- `GUI/WebHost` build scripts drive the repo-default `swiftly` toolchain (falling back to plain `swift` when available). See [TOOLCHAINS.md](TOOLCHAINS.md) for the toolchain requirement. The package shares the repo Bun workspace for builds and tests.
 - Executable runner packages and embedded host packages are intentionally outside the root package products. Consumers opt into them separately.
 
 ## Non-Negotiable Decisions

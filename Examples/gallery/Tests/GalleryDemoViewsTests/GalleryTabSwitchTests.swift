@@ -1,5 +1,5 @@
 import Dispatch
-@_spi(Runners) @_spi(Testing) import TerminalUI
+@_spi(Runners) @_spi(Testing) import SwiftTUI
 import Testing
 
 @testable import GalleryDemoViews
@@ -523,7 +523,7 @@ struct GalleryTabSwitchTests {
     terminalHost: any TerminalHosting,
     terminalInputReader: any TerminalInputReading,
     sessionName: String
-  ) async throws -> RunLoopResult<TerminalUISceneSessionState> {
+  ) async throws -> RunLoopResult<SceneSessionState> {
     let selections = collectWindowSceneSelections(from: scene)
     guard let selection = selections.first else {
       throw AppLaunchError.noScenes
@@ -541,7 +541,7 @@ struct GalleryTabSwitchTests {
         scheduler: FrameScheduler()
       ),
       stateContainer: StateContainer(
-        initialState: TerminalUISceneSessionState(),
+        initialState: SceneSessionState(),
         invalidationIdentities: [selection.rootIdentity]
       ),
       focusTracker: FocusTracker(

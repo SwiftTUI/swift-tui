@@ -3,8 +3,8 @@ import { join, resolve } from "node:path";
 import {
   buildAppWasm,
   generateSceneManifest,
-} from "webtuigui";
-import type { WasmBuildConfiguration } from "webtuigui";
+} from "webhost";
+import type { WasmBuildConfiguration } from "webhost";
 
 const packagePath = resolve(import.meta.dir, "../TerminalApp");
 const outputDirectory = resolve(import.meta.dir, "../TerminalApp/dist");

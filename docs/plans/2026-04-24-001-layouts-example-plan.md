@@ -24,7 +24,7 @@ workbench: 56 focused layout examples, each rendered full-screen from a
 picker in the app, each covered by at least a smoke test, most covered
 by an additional behaviour test that pins the specific
 measure/place rule the layout is meant to demonstrate. The goal is
-coverage of the tricky corners of TerminalUI's layout surface — stack
+coverage of the tricky corners of SwiftTUI's layout surface — stack
 alignment, frame clamping, padding/border ordering, `GeometryReader`
 gotchas, `ViewThatFits` boundaries, custom `Layout` types, and
 cross-component intersections — not a polished showcase.
@@ -101,11 +101,11 @@ Examples/layouts/
 
 Targets:
 
-- **`Layouts`** (library) — depends on `TerminalUI`, `TerminalUICharts`
+- **`Layouts`** (library) — depends on `SwiftTUI`, `SwiftTUICharts`
   (same as `GalleryDemoViews`).
-- **`LayoutsTests`** (test target) — depends on `Layouts` + `TerminalUI`.
+- **`LayoutsTests`** (test target) — depends on `Layouts` + `SwiftTUI`.
 - **`LayoutsApp`** (executable target) — depends on `Layouts`,
-  `TerminalUI`, `TerminalUICLI`. Executable product named
+  `SwiftTUI`, `SwiftTUICLI`. Executable product named
   `layouts-demo`; `swift run layouts-demo` mirrors
   `swift run gallery-demo`.
 
@@ -396,20 +396,20 @@ behaviour. If the test fails under a later refactor the first
 question should be "did we fix a bug?" not "did we break a test?".
 
 - **#38 GeometryReaderInHStackHogs** — SwiftUI's `GeometryReader`
-  greedily takes offered space along both axes. TerminalUI's rule is
+  greedily takes offered space along both axes. SwiftTUI's rule is
   not documented. The test will assert whatever the runtime does at
   time of writing.
 - **#42 ViewThatFitsBoundaryInclusive** — SwiftUI's rule at exact
-  threshold is "fits" (inclusive). TerminalUI's rule is not verified.
+  threshold is "fits" (inclusive). SwiftTUI's rule is not verified.
 - **#13 IntrinsicTextUnderZeroProposal** — Text sizing under a
   `0×0` proposal is subtle. SwiftUI usually produces a zero-size
-  Text; TerminalUI may or may not.
+  Text; SwiftTUI may or may not.
 - **#27 NegativeOffsetEscape** — painting at negative cell
   coordinates within a host surface. Whether the raster accepts or
   drops those cells is an implementation detail worth pinning.
 - **#30 ZStackSpacerNoop** — ZStack's sizing rule when a child is a
   Spacer. SwiftUI treats Spacer as layout-neutral in ZStack;
-  TerminalUI's `ZStackLayout` behaviour needs to be verified.
+  SwiftTUI's `ZStackLayout` behaviour needs to be verified.
 
 If any of these turn up a behaviour we'd rather change, we record
 the finding as its own file under `docs/proposals/layout/`
@@ -433,7 +433,7 @@ subsequent PR that updates both the runtime and the test together.
 - **RunLoop tests not included** — this suite is single-render. The
   gallery covers RunLoop-driven animation already
   (`BordersAndShapesTabTests.chasingLightSchedulesVisibleRuntimeFrames`).
-- **macOS-only runtime** — `TerminalUICLI` declares `.macOS(.v15)`.
+- **macOS-only runtime** — `SwiftTUICLI` declares `.macOS(.v15)`.
   The sub-package will mirror that. Library/test targets build on
   Linux; the `layouts-demo` executable does not.
 
@@ -460,7 +460,7 @@ Post-implementation:
 - Command palette / fuzzy filter in the picker (out of scope; straight
   `List` selection only).
 - Animations beyond `BorderBlend` static phase snapshots.
-- Integration with `Runners/TerminalUIWASI` — macOS executable only.
+- Integration with `Runners/SwiftTUIWASI` — macOS executable only.
 - Back-porting any layout finding as a fix in this spec's
   implementation. Findings are logged; fixes go in a subsequent PR.
 
@@ -490,15 +490,15 @@ detail host pops selection back to nil.
 
 **Tech Stack:** Swift 6.3 strict concurrency, Swift Testing (`@Test` /
 `#expect`), `@MainActor`-isolated view and test code, `@testable
-import Layouts` in tests. Depends on `TerminalUI`,
-`TerminalUICharts`, and `TerminalUICLI` (same as
+import Layouts` in tests. Depends on `SwiftTUI`,
+`SwiftTUICharts`, and `SwiftTUICLI` (same as
 `Examples/gallery/`). macOS executable only; library + tests build on
 Linux.
 
 **Reference APIs used throughout (read these once before Task 8):**
 
 - `DefaultRenderer()` + `.render(_:context:proposal:)` →
-  `Sources/TerminalUI/TerminalUI.swift:45-124`
+  `Sources/SwiftTUI/SwiftTUI.swift:45-124`
 - `ResolveContext(identity:environmentValues:...)` →
   `Sources/View/Environment/Environment.swift:260`
 - `Identity(components: [.named("...")])` →
@@ -510,7 +510,7 @@ Linux.
   `Sources/Core/CommitAndFrameTypes.swift:840` +
   `Sources/Core/RasterTypes.swift:65`
 - `WindowGroup { content }` / `App` / `Scene` →
-  `Sources/TerminalUI/App.swift:19-462`
+  `Sources/SwiftTUI/App.swift:19-462`
 - `.panel(id:)` ActionScope wrapper →
   `Sources/View/ActionScopes/Panel.swift:78`
 - Gallery reference test pattern →
@@ -642,30 +642,30 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(name: "swift-terminal-ui", path: "../.."),
-    .package(path: "../../Runners/TerminalUICLI"),
+    .package(name: "swift-tui", path: "../.."),
+    .package(path: "../../Runners/SwiftTUICLI"),
   ],
   targets: [
     .executableTarget(
       name: "LayoutsApp",
       dependencies: [
         "Layouts",
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUICLI", package: "TerminalUICLI"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
       ]
     ),
     .target(
       name: "Layouts",
       dependencies: [
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUICharts", package: "swift-tui"),
       ]
     ),
     .testTarget(
       name: "LayoutsTests",
       dependencies: [
         "Layouts",
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
       ]
     ),
   ]
@@ -677,7 +677,7 @@ let package = Package(
 ````markdown
 # Layouts Example
 
-56 focused layout examples of the public `TerminalUI` surface,
+56 focused layout examples of the public `SwiftTUI` surface,
 reachable from a full-screen push/pop picker. Each layout is pinned
 with a smoke test; `.behaviour`-tagged layouts add targeted
 behaviour tests that pin the specific measure/place rule the layout
@@ -742,7 +742,7 @@ git commit -m "chore(layouts): scaffold Examples/layouts/ SPM package"
 - [ ] **Step 1: Write `LayoutEntry.swift`**
 
 ```swift
-import TerminalUI
+import SwiftTUI
 
 /// Metadata + factory for one layout example.
 ///
@@ -971,7 +971,7 @@ git commit -m "test(layouts): add catalog integrity tests (coverAllCategories re
 
 ```swift
 import Layouts
-import TerminalUI
+import SwiftTUI
 
 /// Full-screen picker: a sectioned list of every ``LayoutEntry`` in
 /// ``LayoutCatalog/all``, grouped by ``LayoutEntry/Category``.
@@ -1030,7 +1030,7 @@ struct LayoutPicker: View {
 
   private var header: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text("TerminalUI — Layouts").foregroundStyle(.foreground)
+      Text("SwiftTUI — Layouts").foregroundStyle(.foreground)
       Text("\(LayoutCatalog.all.count) layouts across \(LayoutEntry.Category.allCases.count) categories")
         .foregroundStyle(.separator)
     }
@@ -1069,7 +1069,7 @@ git commit -m "feat(layouts): add LayoutPicker (sectioned list over catalog)"
 
 ```swift
 import Layouts
-import TerminalUI
+import SwiftTUI
 
 /// Full-screen detail host for one ``LayoutEntry``. Renders
 /// `entry.makeView()` occupying the body, with a 1-row footer and an
@@ -1125,8 +1125,8 @@ git commit -m "feat(layouts): add LayoutDetailHost (full-screen entry host + esc
 
 ```swift
 import Layouts
-import TerminalUI
-import TerminalUICLI
+import SwiftTUI
+import SwiftTUICLI
 
 @main
 struct LayoutsApp: App {
@@ -1170,9 +1170,9 @@ Run: `cd Examples/layouts && swift run layouts-demo` and immediately
 press `⌃C`.
 Expected: the picker renders with the "0 layouts across 16
 categories" header text, no list body, then ⌃C exits cleanly. If the
-process hangs after ⌃C, check that `TerminalUICLI`'s
+process hangs after ⌃C, check that `SwiftTUICLI`'s
 `ExitKeyBindings.default` handles SIGINT — no further fix is needed
-from this plan (it already does in `Runners/TerminalUICLI`).
+from this plan (it already does in `Runners/SwiftTUICLI`).
 
 - [ ] **Step 4: Commit**
 
@@ -1200,7 +1200,7 @@ subsequent layout task in Tasks 9–24 follows. Read it carefully.
 
 ```swift
 // Sources/Layouts/Stacks/HStackAlignmentTriad.swift
-import TerminalUI
+import SwiftTUI
 
 /// Three HStacks of mixed-height children, one per `VerticalAlignment`
 /// (`.top`, `.center`, `.bottom`). Pins where the shorter child
@@ -1256,7 +1256,7 @@ public static let all: [LayoutEntry] = [
 
 ```swift
 // Tests/LayoutsTests/LayoutSmokeTests.swift
-import TerminalUI
+import SwiftTUI
 import Testing
 
 @testable import Layouts
@@ -1297,7 +1297,7 @@ struct LayoutSmokeTests {
 
 ```swift
 // Tests/LayoutsTests/Stacks/HStackAlignmentTriadBehaviourTests.swift
-import TerminalUI
+import SwiftTUI
 import Testing
 
 @testable import Layouts
@@ -1337,7 +1337,7 @@ struct HStackAlignmentTriadBehaviourTests {
 
 ```swift
 // Tests/LayoutsTests/RenderSupport.swift
-import TerminalUI
+import SwiftTUI
 
 @testable import Layouts
 
@@ -1792,7 +1792,7 @@ coverage is out of scope for this suite (Non-goals, §2).
 
 ```swift
 // Tests/LayoutsTests/PickerShellTests.swift
-import TerminalUI
+import SwiftTUI
 import Testing
 
 @testable import Layouts
@@ -1865,8 +1865,8 @@ Run: `cd Examples/layouts && swift run layouts-demo`
 - [ ] **Step 5: Run the full repo test harness**
 
 Run (from repo root): `bun run test`
-Expected: all root-package, gallery, TerminalUICLI,
-TerminalUIWASI, and now `Examples/layouts/` suites pass. If `bun
+Expected: all root-package, gallery, SwiftTUICLI,
+SwiftTUIWASI, and now `Examples/layouts/` suites pass. If `bun
 run test` doesn't yet know about `Examples/layouts/`, add it to
 the runner — check
 `Scripts/` or `package.json` for the test orchestration. Commit

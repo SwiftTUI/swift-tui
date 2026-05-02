@@ -8,7 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		F79998F32F7D41B30067E544 /* ExampleScenes in Frameworks */ = {isa = PBXBuildFile; productRef = F79998F22F7D41B30067E544 /* ExampleScenes */; };
-		F7FC7A8A2F7B19DE00737CB1 /* SwiftUITUIGUI in Frameworks */ = {isa = PBXBuildFile; productRef = F7FC7A892F7B19DE00737CB1 /* SwiftUITUIGUI */; };
+		F7FC7A8A2F7B19DE00737CB1 /* SwiftUIHost in Frameworks */ = {isa = PBXBuildFile; productRef = F7FC7A892F7B19DE00737CB1 /* SwiftUIHost */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,7 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F79998F32F7D41B30067E544 /* ExampleScenes in Frameworks */,
-				F7FC7A8A2F7B19DE00737CB1 /* SwiftUITUIGUI in Frameworks */,
+				F7FC7A8A2F7B19DE00737CB1 /* SwiftUIHost in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,7 +72,7 @@
 			);
 			name = SwiftUIExample;
 			packageProductDependencies = (
-				F7FC7A892F7B19DE00737CB1 /* SwiftUITUIGUI */,
+				F7FC7A892F7B19DE00737CB1 /* SwiftUIHost */,
 				F79998F22F7D41B30067E544 /* ExampleScenes */,
 			);
 			productName = SwiftUIExample;
@@ -104,7 +104,7 @@
 			mainGroup = F7FC7A712F7B19A400737CB1;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				F7FC7A882F7B19DE00737CB1 /* XCLocalSwiftPackageReference "../../GUI/SwiftUITUIGUI" */,
+				F7FC7A882F7B19DE00737CB1 /* XCLocalSwiftPackageReference "../../GUI/SwiftUIHost" */,
 				F79998F12F7D41B30067E544 /* XCLocalSwiftPackageReference "TerminalApp" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -267,7 +267,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = TerminalUI;
+				INFOPLIST_KEY_CFBundleDisplayName = SwiftTUI;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -313,7 +313,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = TerminalUI;
+				INFOPLIST_KEY_CFBundleDisplayName = SwiftTUI;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -374,9 +374,9 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = TerminalApp;
 		};
-		F7FC7A882F7B19DE00737CB1 /* XCLocalSwiftPackageReference "../../GUI/SwiftUITUIGUI" */ = {
+		F7FC7A882F7B19DE00737CB1 /* XCLocalSwiftPackageReference "../../GUI/SwiftUIHost" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../GUI/SwiftUITUIGUI;
+			relativePath = ../../GUI/SwiftUIHost;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -385,9 +385,9 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = ExampleScenes;
 		};
-		F7FC7A892F7B19DE00737CB1 /* SwiftUITUIGUI */ = {
+		F7FC7A892F7B19DE00737CB1 /* SwiftUIHost */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = SwiftUITUIGUI;
+			productName = SwiftUIHost;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

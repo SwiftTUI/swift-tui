@@ -207,10 +207,10 @@ Add failing tests before implementation:
 
 Focused files:
 
-- `Tests/TerminalUITests/PreferenceSurfaceTests.swift`
-- `Tests/TerminalUITests/CoordinateSpaceTests.swift`
-- `Tests/TerminalUITests/GeometryReaderSurfaceTests.swift`
-- new `Tests/TerminalUITests/AnchorPreferenceSurfaceTests.swift`
+- `Tests/SwiftTUITests/PreferenceSurfaceTests.swift`
+- `Tests/SwiftTUITests/CoordinateSpaceTests.swift`
+- `Tests/SwiftTUITests/GeometryReaderSurfaceTests.swift`
+- new `Tests/SwiftTUITests/AnchorPreferenceSurfaceTests.swift`
 
 ## Phase 1: Anchor Tokens And Preference Modifiers
 

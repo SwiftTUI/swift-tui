@@ -237,7 +237,7 @@ The runtime is materially incremental in common steady-state paths, but it is no
 
 ### Cell pixel size refresh
 
-`POSIXTerminalHost` (`TerminalHost` class in `Sources/TerminalUI/TerminalHost.swift`)
+`POSIXTerminalHost` (`TerminalHost` class in `Sources/SwiftTUI/TerminalHost.swift`)
 re-reads `cellPixelSize` on every access to `baselineGraphicsCapabilities()` via
 `ioctl(TIOCGWINSZ)` — a single cheap syscall. Escape-sequence probes
 (`CSI 16 t`, `CSI 14 t`, Kitty support, sixel capability) remain one-shot at
@@ -272,7 +272,7 @@ The standing runtime checks are deterministic scenario tests rather than wall-cl
 
 When the process crashes (SIGABRT from `fatalError`/`preconditionFailure`, SIGSEGV from null dereference or stack overflow, SIGBUS, SIGILL, SIGFPE, SIGTRAP), a synchronous signal handler resets the terminal before the process dies.
 
-The CLI runner (`TerminalUICLI`) installs the crash guard in `SceneRuntime` for the primary scene before the session enters raw mode. It uses `CrashSignalHandler` from the vendored `UnixSignals` package. The guard:
+The CLI runner (`SwiftTUICLI`) installs the crash guard in `SceneRuntime` for the primary scene before the session enters raw mode. It uses `CrashSignalHandler` from the vendored `UnixSignals` package. The guard:
 
 - Captures the pre-raw-mode termios from stdin
 - Writes a pre-encoded reset escape sequence (disable mouse reporting, show cursor, reset style, exit alternate screen) to stdout using `write(2)` (async-signal-safe)
@@ -281,7 +281,7 @@ The CLI runner (`TerminalUICLI`) installs the crash guard in `SceneRuntime` for 
 
 The crash guard is removed when the session ends normally.
 
-This lives in the CLI runner rather than in `TerminalUI` because `TerminalUI` is also used in the WASM build where signals do not exist. Runner packages that own a real tty are responsible for installing the crash guard.
+This lives in the CLI runner rather than in `SwiftTUI` because `SwiftTUI` is also used in the WASM build where signals do not exist. Runner packages that own a real tty are responsible for installing the crash guard.
 
 The crash guard is process-global. Signal handlers are inherently process-scoped, so only one scene can own the guard at a time. This matches the expected deployment: the primary scene owns the real tty.
 

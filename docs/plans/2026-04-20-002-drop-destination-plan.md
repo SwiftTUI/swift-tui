@@ -5,7 +5,7 @@ status: shipped
 date: 2026-04-20
 ---
 
-> **Note:** Shipped. The unchecked task boxes below are stale tracking. Implementation lives in `Sources/View/ActionScopes/DropDestinationModifier.swift` (public `.dropDestination(action:)`), `Sources/Core/DropDestinationRegistry.swift`, `Sources/Core/DroppedPathParsing.swift`, and `Sources/TerminalUI/RunLoop+EventDispatch.swift`. Tests cover dispatch in `Tests/CoreTests/DropDestinationRegistryTests.swift`, `Tests/CoreTests/DroppedPathParsingTests.swift`, `Tests/CoreTests/DroppedPathTests.swift`, `Tests/TerminalUITests/BracketedPasteParserTests.swift`, and `Tests/TerminalUITests/DropDestinationDispatchTests.swift`.
+> **Note:** Shipped. The unchecked task boxes below are stale tracking. Implementation lives in `Sources/View/ActionScopes/DropDestinationModifier.swift` (public `.dropDestination(action:)`), `Sources/Core/DropDestinationRegistry.swift`, `Sources/Core/DroppedPathParsing.swift`, and `Sources/SwiftTUI/RunLoop+EventDispatch.swift`. Tests cover dispatch in `Tests/CoreTests/DropDestinationRegistryTests.swift`, `Tests/CoreTests/DroppedPathParsingTests.swift`, `Tests/CoreTests/DroppedPathTests.swift`, `Tests/SwiftTUITests/BracketedPasteParserTests.swift`, and `Tests/SwiftTUITests/DropDestinationDispatchTests.swift`.
 
 
 # Drop Destination Implementation Plan
@@ -16,7 +16,7 @@ date: 2026-04-20
 
 **Architecture:** Mirror the existing key-command machinery. `CommandRegistry` + `KeyCommandModifier` are the prototypes: a `Core` registry indexed by scope `Identity`, a `View`-layer modifier that extends `ActionScope where Self: View & Sendable`, registration at `resolveElements` time via `ResolveContext`, and dispatch from `RunLoop+EventDispatch`. The one inversion: key-command dispatch is shallowest-first (broad shortcuts win); drop dispatch is **leafmost-first** (narrow attention wins).
 
-**Tech Stack:** Swift 6.3 strict concurrency, Swift Testing (`@Test` / `#expect`), `@MainActor`-isolated view and runtime tests, `@testable import Core / View / TerminalUI`, package-layered with `Core`, `View`, and `TerminalUI`. No `import Foundation` in those layers.
+**Tech Stack:** Swift 6.3 strict concurrency, Swift Testing (`@Test` / `#expect`), `@MainActor`-isolated view and runtime tests, `@testable import Core / View / SwiftTUI`, package-layered with `Core`, `View`, and `SwiftTUI`. No `import Foundation` in those layers.
 
 **Design context from conversation (not a separate spec):** drop targets only receive file paths, not arbitrary Transferable types; location/isTargeted are deliberately omitted; `.dropDestination` is intentionally **not** hoistable onto arbitrary `View`s — it is only valid on `ActionScope` conformers because in a terminal there is no pointer to disambiguate multiple view-level drop targets.
 
@@ -56,9 +56,9 @@ Each slice has its own tests. The last slice has the integration test that prove
 | `Tests/CoreTests/DroppedPathTests.swift` | Value-type equality, debug description, literal initialization. |
 | `Tests/CoreTests/DroppedPathParsingTests.swift` | Shell-unescape, single-quote, `file://`, multi-path, empty input. |
 | `Tests/CoreTests/DropDestinationRegistryTests.swift` | Register/lookup, leafmost-first dispatch with `Bool` bubble, disabled-no-op absent here (no `isEnabled`), reset, subtree removal. |
-| `Tests/TerminalUITests/BracketedPasteParserTests.swift` | `TerminalInputParser` emits `.paste(PasteEvent)` for `\e[200~...\e[201~`, and does not for unterminated envelopes. |
-| `Tests/TerminalUITests/DropDestinationTests.swift` | `.dropDestination` on `Panel` registers at the panel's identity; forwards `ActionScope` conformance; chains with `.keyCommand`. |
-| `Tests/TerminalUITests/DropDestinationDispatchTests.swift` | End-to-end: synthesized paste → RunLoop dispatch → nested scope priority → `Bool` bubbling → non-path fallback to character events. |
+| `Tests/SwiftTUITests/BracketedPasteParserTests.swift` | `TerminalInputParser` emits `.paste(PasteEvent)` for `\e[200~...\e[201~`, and does not for unterminated envelopes. |
+| `Tests/SwiftTUITests/DropDestinationTests.swift` | `.dropDestination` on `Panel` registers at the panel's identity; forwards `ActionScope` conformance; chains with `.keyCommand`. |
+| `Tests/SwiftTUITests/DropDestinationDispatchTests.swift` | End-to-end: synthesized paste → RunLoop dispatch → nested scope priority → `Bool` bubbling → non-path fallback to character events. |
 
 ### Modified files
 
@@ -66,11 +66,11 @@ Each slice has its own tests. The last slice has the integration test that prove
 |------|--------------|
 | `Sources/Core/RuntimeRegistrationSet.swift` | Add `dropDestinationRegistry` property; include in `resetAll`/`removeSubtrees`/init. |
 | `Sources/View/Environment/Environment.swift` | Add `dropDestinationRegistry` to `ResolveContext`; include in `runtimeRegistrations`. |
-| `Sources/TerminalUI/InputReader.swift` | Add `PasteEvent` struct + `InputEvent.paste` case; bracketed-paste parsing; coalescing passthrough. |
-| `Sources/TerminalUI/StreamingTerminalHost.swift` | Emit `\e[?2004h` on `enableRawMode`, `\e[?2004l` on `disableRawMode`. |
-| `Sources/TerminalUI/TerminalHost.swift` | Same pair of writes at the two existing setup/teardown sites (lines ~1356/1568 and their matching teardown blocks). |
-| `Sources/TerminalUI/RunLoop.swift` | Instantiate `dropDestinationRegistry`; pass into `ResolveContext`. |
-| `Sources/TerminalUI/RunLoop+EventDispatch.swift` | Handle `.paste` case in `handle(_:)`; add `handlePaste` method; add focus-chain leafmost-first walk helper. |
+| `Sources/SwiftTUI/InputReader.swift` | Add `PasteEvent` struct + `InputEvent.paste` case; bracketed-paste parsing; coalescing passthrough. |
+| `Sources/SwiftTUI/StreamingTerminalHost.swift` | Emit `\e[?2004h` on `enableRawMode`, `\e[?2004l` on `disableRawMode`. |
+| `Sources/SwiftTUI/TerminalHost.swift` | Same pair of writes at the two existing setup/teardown sites (lines ~1356/1568 and their matching teardown blocks). |
+| `Sources/SwiftTUI/RunLoop.swift` | Instantiate `dropDestinationRegistry`; pass into `ResolveContext`. |
+| `Sources/SwiftTUI/RunLoop+EventDispatch.swift` | Handle `.paste` case in `handle(_:)`; add `handlePaste` method; add focus-chain leafmost-first walk helper. |
 
 ---
 
@@ -631,18 +631,18 @@ git commit -m "feat(view): expose DropDestinationRegistry on ResolveContext"
 
 **Files:**
 - Create: `Sources/View/ActionScopes/DropDestinationModifier.swift`
-- Test: `Tests/TerminalUITests/DropDestinationTests.swift`
+- Test: `Tests/SwiftTUITests/DropDestinationTests.swift`
 
 Reference pattern: `Sources/View/ActionScopes/KeyCommandModifier.swift` (copy structure; adjust payload; no `isEnabled` flag).
 
 - [ ] **Step 1: Write the failing test**
 
 ```swift
-// Tests/TerminalUITests/DropDestinationTests.swift
+// Tests/SwiftTUITests/DropDestinationTests.swift
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor
@@ -688,7 +688,7 @@ private func findPanelNode(in root: ResolvedNode) -> ResolvedNode? {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `swiftly run swift test --filter TerminalUITests.DropDestinationTests`
+Run: `swiftly run swift test --filter SwiftTUITests.DropDestinationTests`
 Expected: FAIL with "value of type '...' has no member 'dropDestination'".
 
 - [ ] **Step 3: Write the implementation**
@@ -752,14 +752,14 @@ extension DropDestinationModifier: ActionScope where Content: ActionScope {}
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `swiftly run swift test --filter TerminalUITests.DropDestinationTests`
+Run: `swiftly run swift test --filter SwiftTUITests.DropDestinationTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add Sources/View/ActionScopes/DropDestinationModifier.swift \
-  Tests/TerminalUITests/DropDestinationTests.swift
+  Tests/SwiftTUITests/DropDestinationTests.swift
 git commit -m "feat(view): add .dropDestination modifier on ActionScope"
 ```
 
@@ -768,7 +768,7 @@ git commit -m "feat(view): add .dropDestination modifier on ActionScope"
 ## Task 7: `PasteEvent` + `InputEvent.paste` case
 
 **Files:**
-- Modify: `Sources/TerminalUI/InputReader.swift`
+- Modify: `Sources/SwiftTUI/InputReader.swift`
 
 - [ ] **Step 1: Add the event types next to `MouseEvent` (around line 85)**
 
@@ -826,7 +826,7 @@ Expected: may emit warnings for exhaustive switches elsewhere; fix any that surf
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/TerminalUI/InputReader.swift
+git add Sources/SwiftTUI/InputReader.swift
 git commit -m "feat(input): add PasteEvent and InputEvent.paste"
 ```
 
@@ -835,16 +835,16 @@ git commit -m "feat(input): add PasteEvent and InputEvent.paste"
 ## Task 8: Bracketed-paste envelope parser
 
 **Files:**
-- Modify: `Sources/TerminalUI/InputReader.swift`
-- Test: `Tests/TerminalUITests/BracketedPasteParserTests.swift`
+- Modify: `Sources/SwiftTUI/InputReader.swift`
+- Test: `Tests/SwiftTUITests/BracketedPasteParserTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
 ```swift
-// Tests/TerminalUITests/BracketedPasteParserTests.swift
+// Tests/SwiftTUITests/BracketedPasteParserTests.swift
 import Testing
 
-@testable import TerminalUI
+@testable import SwiftTUI
 
 @Suite
 struct BracketedPasteParserTests {
@@ -890,12 +890,12 @@ struct BracketedPasteParserTests {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `swiftly run swift test --filter TerminalUITests.BracketedPasteParserTests`
+Run: `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
 Expected: FAIL (parser does not yet recognize `\e[200~`).
 
 - [ ] **Step 3: Teach `parseEscapeSequence` to detect bracketed paste**
 
-In `Sources/TerminalUI/InputReader.swift`, inside `parseEscapeSequence()` (currently begins around line 281), add a branch that dispatches to a new `parseBracketedPaste` when the buffer begins with `ESC [ 2 0 0 ~`. Place this branch before the existing SGR-mouse check (byte `0x3C`) and before `parseCSIModifierSequence`:
+In `Sources/SwiftTUI/InputReader.swift`, inside `parseEscapeSequence()` (currently begins around line 281), add a branch that dispatches to a new `parseBracketedPaste` when the buffer begins with `ESC [ 2 0 0 ~`. Place this branch before the existing SGR-mouse check (byte `0x3C`) and before `parseCSIModifierSequence`:
 
 ```swift
     // Bracketed-paste start: ESC [ 2 0 0 ~ ... ESC [ 2 0 1 ~
@@ -948,14 +948,14 @@ private func matchesBracketedPasteStart(_ buffer: [UInt8]) -> Bool {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `swiftly run swift test --filter TerminalUITests.BracketedPasteParserTests`
+Run: `swiftly run swift test --filter SwiftTUITests.BracketedPasteParserTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/TerminalUI/InputReader.swift \
-  Tests/TerminalUITests/BracketedPasteParserTests.swift
+git add Sources/SwiftTUI/InputReader.swift \
+  Tests/SwiftTUITests/BracketedPasteParserTests.swift
 git commit -m "feat(input): parse bracketed-paste envelopes into PasteEvent"
 ```
 
@@ -964,8 +964,8 @@ git commit -m "feat(input): parse bracketed-paste envelopes into PasteEvent"
 ## Task 9: Enable/disable bracketed paste mode
 
 **Files:**
-- Modify: `Sources/TerminalUI/StreamingTerminalHost.swift` (around lines 108–126 — `enableRawMode`/`disableRawMode`)
-- Modify: `Sources/TerminalUI/TerminalHost.swift` (the two existing raw-mode transition sites near lines 1356/1360 and 1568/1572)
+- Modify: `Sources/SwiftTUI/StreamingTerminalHost.swift` (around lines 108–126 — `enableRawMode`/`disableRawMode`)
+- Modify: `Sources/SwiftTUI/TerminalHost.swift` (the two existing raw-mode transition sites near lines 1356/1360 and 1568/1572)
 
 - [ ] **Step 1: Add the enable/disable writes**
 
@@ -988,15 +988,15 @@ In `TerminalHost.swift`, at each of the two sites that write `"\u{001B}[?1002h\u
 Run: `swiftly run swift build`
 Expected: succeeds.
 
-- [ ] **Step 3: Run the full TerminalUI suite (no new test yet — this is terminal I/O plumbing)**
+- [ ] **Step 3: Run the full SwiftTUI suite (no new test yet — this is terminal I/O plumbing)**
 
-Run: `swiftly run swift test --filter TerminalUITests`
+Run: `swiftly run swift test --filter SwiftTUITests`
 Expected: all existing tests pass.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Sources/TerminalUI/StreamingTerminalHost.swift Sources/TerminalUI/TerminalHost.swift
+git add Sources/SwiftTUI/StreamingTerminalHost.swift Sources/SwiftTUI/TerminalHost.swift
 git commit -m "feat(runtime): enable bracketed paste mode in raw-mode setup"
 ```
 
@@ -1005,7 +1005,7 @@ git commit -m "feat(runtime): enable bracketed paste mode in raw-mode setup"
 ## Task 10: Instantiate `DropDestinationRegistry` in `RunLoop`
 
 **Files:**
-- Modify: `Sources/TerminalUI/RunLoop.swift` (the `commandRegistry` line is at 120)
+- Modify: `Sources/SwiftTUI/RunLoop.swift` (the `commandRegistry` line is at 120)
 
 - [ ] **Step 1: Add the registry instance and wire it into the resolve context**
 
@@ -1031,7 +1031,7 @@ Expected: succeeds.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/TerminalUI/RunLoop.swift
+git add Sources/SwiftTUI/RunLoop.swift
 git commit -m "feat(runtime): instantiate DropDestinationRegistry on RunLoop"
 ```
 
@@ -1040,17 +1040,17 @@ git commit -m "feat(runtime): instantiate DropDestinationRegistry on RunLoop"
 ## Task 11: Dispatch paste events to drop destinations
 
 **Files:**
-- Modify: `Sources/TerminalUI/RunLoop+EventDispatch.swift`
-- Test: `Tests/TerminalUITests/DropDestinationDispatchTests.swift`
+- Modify: `Sources/SwiftTUI/RunLoop+EventDispatch.swift`
+- Test: `Tests/SwiftTUITests/DropDestinationDispatchTests.swift`
 
 - [ ] **Step 1: Write the failing integration test**
 
 ```swift
-// Tests/TerminalUITests/DropDestinationDispatchTests.swift
+// Tests/SwiftTUITests/DropDestinationDispatchTests.swift
 import Testing
 
 @testable import Core
-@testable import TerminalUI
+@testable import SwiftTUI
 @testable import View
 
 @MainActor
@@ -1147,7 +1147,7 @@ private final class Box<Value>: @unchecked Sendable {
 }
 ```
 
-The `DropDispatchHarness` test helper belongs beside this test file. Model it on existing runtime harness patterns already present in `Tests/TerminalUITests/` (e.g. the `AppRuntimeTests` fixtures). It must:
+The `DropDispatchHarness` test helper belongs beside this test file. Model it on existing runtime harness patterns already present in `Tests/SwiftTUITests/` (e.g. the `AppRuntimeTests` fixtures). It must:
 
 - Build a `RunLoop` around the supplied root view.
 - Expose `feedBracketedPaste(_:)` that injects `"\u{1B}[200~\(payload)\u{1B}[201~"` through the same input channel `InjectedTerminalInputReader` uses.
@@ -1157,12 +1157,12 @@ Copy the fixture shape from whichever existing test spins up a RunLoop with inje
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `swiftly run swift test --filter TerminalUITests.DropDestinationDispatchTests`
+Run: `swiftly run swift test --filter SwiftTUITests.DropDestinationDispatchTests`
 Expected: FAIL — `handle(_:)` does not yet understand `.paste`.
 
 - [ ] **Step 3: Handle `.paste` in `RunLoop.handle(_:)`**
 
-In `Sources/TerminalUI/RunLoop+EventDispatch.swift`, extend the `case .input(let inputEvent)` switch:
+In `Sources/SwiftTUI/RunLoop+EventDispatch.swift`, extend the `case .input(let inputEvent)` switch:
 
 ```swift
       case .input(let inputEvent):
@@ -1217,7 +1217,7 @@ Add the `handlePaste` method inside the same `extension RunLoop`:
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `swiftly run swift test --filter TerminalUITests.DropDestinationDispatchTests`
+Run: `swiftly run swift test --filter SwiftTUITests.DropDestinationDispatchTests`
 Expected: PASS.
 
 - [ ] **Step 5: Run the full repo test surface**
@@ -1228,8 +1228,8 @@ Expected: PASS (no regressions in existing key / mouse / presentation tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Sources/TerminalUI/RunLoop+EventDispatch.swift \
-  Tests/TerminalUITests/DropDestinationDispatchTests.swift
+git add Sources/SwiftTUI/RunLoop+EventDispatch.swift \
+  Tests/SwiftTUITests/DropDestinationDispatchTests.swift
 git commit -m "feat(runtime): dispatch paste events to drop destinations leafmost-first"
 ```
 

@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 struct EditorShortcutRow: Identifiable, Equatable, Sendable {
   let shortcut: String

@@ -1,5 +1,5 @@
 import Foundation
-import TerminalUI
+import SwiftTUI
 
 public struct LimitedGalleryView: View {
   public init() {}

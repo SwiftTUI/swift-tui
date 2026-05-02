@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// A `GeometryReader` wrapped in `.frame(width: 40, height: 10)`.  The
 /// proxy renders its observed `width` and `height` so the behaviour

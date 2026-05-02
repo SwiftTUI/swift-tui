@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Demonstrates `.dropDestination` by collecting file paths dropped onto
 /// the terminal (or pasted as a file-URL-shaped payload). The handler is

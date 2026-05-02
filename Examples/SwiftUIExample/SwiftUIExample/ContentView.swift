@@ -1,13 +1,13 @@
 import ExampleScenes
 import SwiftUI
-import SwiftUITUIGUI
+import SwiftUIHost
 
 struct ContentView: SwiftUI::View {
-  @SwiftUI::State var tuiState: SwiftUITUIAppState<ExampleApp>?
+  @SwiftUI::State var tuiState: SwiftUIHostAppState<ExampleApp>?
   @SwiftUI::State var error: (any Error)?
   var body: some SwiftUI::View {
     if let tuiState {
-      SwiftUITUIAppView(state: tuiState)
+      SwiftUIHostAppView(state: tuiState)
     } else if let error {
       ContentUnavailableView {
         VStack {

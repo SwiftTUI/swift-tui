@@ -682,8 +682,8 @@ Primary sources used for this write-up:
 - [Composing custom layouts with SwiftUI](https://developer.apple.com/documentation/swiftui/composing_custom_layouts_with_swiftui)
 - [Layout modifiers](https://developer.apple.com/documentation/swiftui/view-layout)
 
-## 17. TerminalUI Implementation Status
+## 17. SwiftTUI Implementation Status
 
-This document is the SwiftUI layout model reference — the target that TerminalUI's layout engine aims to match.
+This document is the SwiftUI layout model reference — the target that SwiftTUI's layout engine aims to match.
 
 For current implementation status, known gaps, and next steps, see [STATUS.md](STATUS.md).

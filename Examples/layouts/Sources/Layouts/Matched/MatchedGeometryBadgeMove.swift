@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Behaviour-tier layout demonstrating `.matchedGeometryEffect(id:in:)`
 /// as a "single logical badge that lives in one of two containers".

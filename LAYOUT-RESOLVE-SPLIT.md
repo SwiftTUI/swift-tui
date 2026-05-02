@@ -161,7 +161,7 @@ the child geometry environment.
 
 ## Tests Added
 
-`Tests/TerminalUITests/GeometryReaderSurfaceTests.swift` was expanded to pin:
+`Tests/SwiftTUITests/GeometryReaderSurfaceTests.swift` was expanded to pin:
 
 - root `GeometryReader` still reports the terminal surface size;
 - `GeometryReader` sees exact frame constraints;
@@ -170,7 +170,7 @@ the child geometry environment.
 - `GeometryReader` sees finite flexible-frame constraints;
 - unconstrained flexible axes keep the parent terminal size.
 
-`Tests/TerminalUITests/SafeAreaSurfaceTests.swift` was expanded to pin:
+`Tests/SwiftTUITests/SafeAreaSurfaceTests.swift` was expanded to pin:
 
 - `safeAreaPadding` tightens `GeometryReader` size while preserving the existing
   safe-area behavior.

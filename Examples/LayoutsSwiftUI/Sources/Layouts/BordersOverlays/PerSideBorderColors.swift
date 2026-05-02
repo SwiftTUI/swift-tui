@@ -3,7 +3,7 @@ import SwiftUI
 /// A single bordered box with each of the four sides painted a
 /// different color.
 ///
-/// SwiftUI port: the original used TerminalUI's
+/// SwiftUI port: the original used SwiftTUI's
 /// `BorderEdgeStyle(top:right:bottom:left:)` plus a `.heavy` border
 /// set — neither has a one-liner SwiftUI equivalent. This port
 /// reaches the divergence by stacking four `.overlay` rectangles, one

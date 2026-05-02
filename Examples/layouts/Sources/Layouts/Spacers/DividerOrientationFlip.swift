@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Pins the orientation flip on `Divider`: a divider draws a
 /// HORIZONTAL rule when nested in a `VStack`, and a VERTICAL rule

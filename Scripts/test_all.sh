@@ -13,7 +13,7 @@ write_full_log_report() {
   exit_code=$5
 
   generated_at=$(date '+%Y-%m-%d %H:%M:%S %z')
-  marker_file=$(mktemp "/tmp/swift-terminal-ui-test-all-markers.XXXXXX")
+  marker_file=$(mktemp "/tmp/swift-tui-test-all-markers.XXXXXX")
 
   awk '
     /^==> / {
@@ -31,7 +31,7 @@ write_full_log_report() {
   line_offset=$((6 + result_count + failure_count + 2))
 
   {
-    echo "swift-terminal-ui test log"
+    echo "swift-tui test log"
     echo "Generated: $generated_at"
     echo "Command: $command_text"
     echo "Exit status: $exit_code"
@@ -68,10 +68,10 @@ write_full_log_report() {
 
 if [ "${STUI_TEST_ALL_CAPTURED:-0}" != "1" ]; then
   timestamp=$(date '+%Y%m%d-%H%M%S')
-  full_log_path="/tmp/swift-terminal-ui-test-all-$timestamp-$$.log"
-  body_log=$(mktemp "/tmp/swift-terminal-ui-test-all-body.XXXXXX")
-  status_file=$(mktemp "/tmp/swift-terminal-ui-test-all-status.XXXXXX")
-  results_report=$(mktemp "/tmp/swift-terminal-ui-test-all-results.XXXXXX")
+  full_log_path="/tmp/swift-tui-test-all-$timestamp-$$.log"
+  body_log=$(mktemp "/tmp/swift-tui-test-all-body.XXXXXX")
+  status_file=$(mktemp "/tmp/swift-tui-test-all-status.XXXXXX")
+  results_report=$(mktemp "/tmp/swift-tui-test-all-results.XXXXXX")
   command_text="sh $0"
 
   for argument; do
@@ -120,7 +120,7 @@ is_linux=0
 step_index=0
 
 tmp_root=${TMPDIR:-/tmp}
-log_root=$(mktemp -d "$tmp_root/swift-terminal-ui-test-all.XXXXXX")
+log_root=$(mktemp -d "$tmp_root/swift-tui-test-all.XXXXXX")
 results_file=$log_root/results.txt
 any_failed=0
 
@@ -147,10 +147,10 @@ Usage: Scripts/test_all.sh [--skip-bun-install]
 Runs the full checked-in repo verification surface:
   - checked-in policy hooks
   - root SwiftPM tests
-  - Runners/TerminalUICLI tests
-  - Runners/TerminalUIWASI tests
-  - GUI/SwiftUITUIGUI tests
-  - GUI/WebTUIGUI Bun tests
+  - Runners/SwiftTUICLI tests
+  - Runners/SwiftTUIWASI tests
+  - GUI/SwiftUIHost tests
+  - GUI/WebHost Bun tests
   - Examples/gallery tests
   - Examples/layouts tests
   - Examples/WebExample Bun tests
@@ -163,7 +163,7 @@ The script also checks required environment dependencies up front:
 
 On Linux, the script also:
   - exports `DISABLE_EXPLICIT_PLATFORMS=1` for repo package resolution
-  - skips `GUI/SwiftUITUIGUI` tests because the SwiftUI host package is Apple-only
+  - skips `GUI/SwiftUIHost` tests because the SwiftUI host package is Apple-only
 
 Pass --skip-bun-install to reuse the existing Bun install state.
 EOF
@@ -512,30 +512,30 @@ run_function_step \
   run_swift test
 
 run_function_step \
-  "Run Runners/TerminalUICLI tests" \
-  "$(swift_command_text test --package-path Runners/TerminalUICLI)" \
-  run_swift test --package-path Runners/TerminalUICLI
+  "Run Runners/SwiftTUICLI tests" \
+  "$(swift_command_text test --package-path Runners/SwiftTUICLI)" \
+  run_swift test --package-path Runners/SwiftTUICLI
 
 run_function_step \
-  "Run Runners/TerminalUIWASI tests" \
-  "$(swift_command_text test --package-path Runners/TerminalUIWASI)" \
-  run_swift test --package-path Runners/TerminalUIWASI
+  "Run Runners/SwiftTUIWASI tests" \
+  "$(swift_command_text test --package-path Runners/SwiftTUIWASI)" \
+  run_swift test --package-path Runners/SwiftTUIWASI
 
 if [ "$is_linux" -eq 1 ]; then
   skip_step \
-    "Run GUI/SwiftUITUIGUI tests" \
+    "Run GUI/SwiftUIHost tests" \
     "SwiftUI host package is only available on Apple platforms"
 else
   run_function_step \
-    "Run GUI/SwiftUITUIGUI tests" \
-    "$(swift_command_text test --package-path GUI/SwiftUITUIGUI)" \
-    run_swift test --package-path GUI/SwiftUITUIGUI
+    "Run GUI/SwiftUIHost tests" \
+    "$(swift_command_text test --package-path GUI/SwiftUIHost)" \
+    run_swift test --package-path GUI/SwiftUIHost
 fi
 
 #run_step \
-#  "Run GUI/WebTUIGUI Bun tests" \
-#  "$repo_root/GUI/WebTUIGUI" \
-#  "cd GUI/WebTUIGUI && bun test" \
+#  "Run GUI/WebHost Bun tests" \
+#  "$repo_root/GUI/WebHost" \
+#  "cd GUI/WebHost && bun test" \
 #  bun test
 
 run_function_step \

@@ -1,7 +1,7 @@
 # Architecture Decision Records
 
 This directory holds short, dated, durable records of the architectural
-decisions that shape TerminalUI. Each ADR captures the context, the
+decisions that shape SwiftTUI. Each ADR captures the context, the
 decision, and the consequences in 200–400 words.
 
 ADRs are not specs and not proposals. They are post-decision artifacts.

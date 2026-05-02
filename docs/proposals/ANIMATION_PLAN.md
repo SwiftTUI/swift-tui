@@ -118,7 +118,7 @@ All 18 gap items from the audit are closed:
   dependency
 
 **Scheduler + wake integration** — `Sources/Core/Scheduler.swift`,
-`Sources/TerminalUI/RunLoop+EventPump.swift`, `RunLoop.swift`
+`Sources/SwiftTUI/RunLoop+EventPump.swift`, `RunLoop.swift`
 - `FrameScheduler.requestDeadline(_:)` now fires the wake handler (previously
   stored deadlines silently, so animation ticks could be missed)
 - `ScheduledFrame.animationRequest` carries animation intent through to the
@@ -174,7 +174,7 @@ All 18 gap items from the audit are closed:
   `animation: Animation?` (setter works; getter returns nil because the
   `AnimationBox` is hash-only — see "Gaps")
 
-**AnimationController** — `Sources/TerminalUI/AnimationController.swift`
+**AnimationController** — `Sources/SwiftTUI/AnimationController.swift`
 - Stateful per-renderer engine wired between resolve and measure in
   `DefaultRenderer.render`
 - **Snapshot extraction** via `AnimatableSnapshot`:
@@ -255,8 +255,8 @@ All 18 gap items from the audit are closed:
 |---|---|---|
 | `Tests/CoreTests/AnimationSchedulerTests.swift` | 5 | `requestDeadline` wake, coalesced earlier deadline re-wake, animation request propagation, post-consume reset, explicit-beats-inherit coalescing |
 | `Tests/ViewTests/AnimationSolverTests.swift` | 9 | Spring under/over/critically damped, bezier linear/easeInOut S-curve/endpoints, linear animation evaluation, preset distinctness, delay postponement |
-| `Tests/TerminalUITests/AnimationControllerTests.swift` | 6 | Snapshot extraction (local, env fallback, priority); removal injection (direct parent, ancestor walk-up, purge-on-completion) |
-| `Tests/TerminalUITests/TextFigureSurfaceTests.swift` | +1 | `fractionalOpacityProducesDistinctForegroundColors` — regression guard against the binary-faint regression (not matched by `--filter Animation`; counted separately) |
+| `Tests/SwiftTUITests/AnimationControllerTests.swift` | 6 | Snapshot extraction (local, env fallback, priority); removal injection (direct parent, ancestor walk-up, purge-on-completion) |
+| `Tests/SwiftTUITests/TextFigureSurfaceTests.swift` | +1 | `fractionalOpacityProducesDistinctForegroundColors` — regression guard against the binary-faint regression (not matched by `--filter Animation`; counted separately) |
 
 Three pre-existing tests were updated to reflect the new smooth-opacity
 semantics (opacity is baked into the color and normalized to 1.0 on raster
@@ -949,7 +949,7 @@ Allows stripping animation from a subtree:
 
 ### AnimationController
 
-Renderer-owned, stateful. Lives in `TerminalUI` module (package-only).
+Renderer-owned, stateful. Lives in `SwiftTUI` module (package-only).
 
 ```swift
 @MainActor
@@ -1547,8 +1547,8 @@ deadline-only frames can render without user input.
 
 - `Sources/Core/Scheduler.swift`
 - `Sources/Core/CommitAndFrameTypes.swift`
-- `Sources/TerminalUI/RunLoop.swift`
-- `Sources/TerminalUI/RunLoop+EventPump.swift`
+- `Sources/SwiftTUI/RunLoop.swift`
+- `Sources/SwiftTUI/RunLoop+EventPump.swift`
 
 **Key repo-specific constraint:**
 
@@ -1617,7 +1617,7 @@ animation requests through scheduled frames.
 - `Sources/Core/Scheduler.swift`
 - `Sources/Core/StateContainer.swift`
 - `Sources/View/State.swift`
-- `Sources/TerminalUI/RunLoop+Rendering.swift`
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`
 - `Sources/Core/CommitAndFrameTypes.swift`
 
 **Acceptance criteria:**
@@ -1670,8 +1670,8 @@ animation requests through scheduled frames.
 
 **Files:**
 
-- New `Sources/TerminalUI/AnimationController.swift`
-- `Sources/TerminalUI/RunLoop+Rendering.swift`
+- New `Sources/SwiftTUI/AnimationController.swift`
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`
 
 **Acceptance criteria:**
 
@@ -1700,7 +1700,7 @@ transitions.
 
 - New `Sources/View/Animation/Transition.swift`
 - New `Sources/View/Animation/AnyTransition.swift`
-- `Sources/TerminalUI/AnimationController.swift`
+- `Sources/SwiftTUI/AnimationController.swift`
 
 **Acceptance criteria:**
 
@@ -1747,10 +1747,10 @@ transitions.
 - `Tests/CoreTests/Graph/ViewGraphTests.swift`
 - New `Tests/CoreTests/AnimationSchedulerTests.swift`
 - New `Tests/ViewTests/AnimationSurfaceTests.swift`
-- New `Tests/TerminalUITests/AnimationSolverTests.swift`
-- New `Tests/TerminalUITests/AnimationControllerTests.swift`
-- New `Tests/TerminalUITests/TransitionTests.swift`
-- New `Tests/TerminalUITests/AnimationPipelineTests.swift`
+- New `Tests/SwiftTUITests/AnimationSolverTests.swift`
+- New `Tests/SwiftTUITests/AnimationControllerTests.swift`
+- New `Tests/SwiftTUITests/TransitionTests.swift`
+- New `Tests/SwiftTUITests/AnimationPipelineTests.swift`
 
 ---
 
@@ -1768,7 +1768,7 @@ transitions.
 | `Sources/View/Animation/AnimationModifiers.swift` | View | ValueAnimationModifier, .transition(), .transaction() |
 | `Sources/View/Animation/Transition.swift` | View | Transition protocol, TransitionPhase |
 | `Sources/View/Animation/AnyTransition.swift` | View | AnyTransition, built-ins, combinators |
-| `Sources/TerminalUI/AnimationController.swift` | TerminalUI | AnimationController, snapshots, tick logic |
+| `Sources/SwiftTUI/AnimationController.swift` | SwiftTUI | AnimationController, snapshots, tick logic |
 
 ### Modified files
 
@@ -1782,9 +1782,9 @@ transitions.
 | `Sources/Core/Graph/ViewNode.swift` | Core | setStateSlotSilently for non-invalidating writes |
 | `Sources/View/State.swift` | View | Propagate animation request from task-local |
 | `Sources/View/Environment/FrameResolveState.swift` | View | Transaction transformation helpers |
-| `Sources/TerminalUI/RunLoop.swift` | TerminalUI | Timed-wait for future deadlines |
-| `Sources/TerminalUI/RunLoop+EventPump.swift` | TerminalUI | Timed-wait integration (if needed at pump level) |
-| `Sources/TerminalUI/RunLoop+Rendering.swift` | TerminalUI | Animation controller integration |
+| `Sources/SwiftTUI/RunLoop.swift` | SwiftTUI | Timed-wait for future deadlines |
+| `Sources/SwiftTUI/RunLoop+EventPump.swift` | SwiftTUI | Timed-wait integration (if needed at pump level) |
+| `Sources/SwiftTUI/RunLoop+Rendering.swift` | SwiftTUI | Animation controller integration |
 
 ---
 
@@ -1924,7 +1924,7 @@ These are enabled by this architecture but not part of this plan:
 
 - [../ARCHITECTURE.md](../ARCHITECTURE.md)
 - [../RUNTIME.md](../RUNTIME.md)
-- [../../Sources/TerminalUI/TerminalUI.swift](../../Sources/TerminalUI/TerminalUI.swift)
-- [../../Sources/TerminalUI/RunLoop+Rendering.swift](../../Sources/TerminalUI/RunLoop+Rendering.swift)
+- [../../Sources/SwiftTUI/SwiftTUI.swift](../../Sources/SwiftTUI/SwiftTUI.swift)
+- [../../Sources/SwiftTUI/RunLoop+Rendering.swift](../../Sources/SwiftTUI/RunLoop+Rendering.swift)
 - [../../Sources/Core/Graph/ViewGraph.swift](../../Sources/Core/Graph/ViewGraph.swift)
 - [../../Sources/Core/Scheduler.swift](../../Sources/Core/Scheduler.swift)

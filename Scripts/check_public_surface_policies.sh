@@ -50,31 +50,31 @@ then
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol Scene \{' \
-  Sources/TerminalUI/App.swift
+  Sources/SwiftTUI/App.swift
 then
   fail "The public Scene protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/TerminalUI/App.swift
+  Sources/SwiftTUI/App.swift
 then
   fail "Scene.body must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol App \{' \
-  Sources/TerminalUI/App.swift
+  Sources/SwiftTUI/App.swift
 then
   fail "The public App protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+init\(\)' \
-  Sources/TerminalUI/App.swift
+  Sources/SwiftTUI/App.swift
 then
   fail "App.init must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '@SceneBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/TerminalUI/App.swift
+  Sources/SwiftTUI/App.swift
 then
   fail "App.body must stay @SceneBuilder and @MainActor-annotated."
 fi
@@ -86,7 +86,7 @@ then
 fi
 
 if ! rg -U -n -P --quiet -- '@MainActor\s+public func render<' \
-  Sources/TerminalUI/TerminalUI.swift
+  Sources/SwiftTUI/SwiftTUI.swift
 then
   fail "DefaultRenderer.render must stay @MainActor."
 fi
@@ -130,7 +130,7 @@ docs/RUNTIME.md
 docs/STATUS.md
 docs/PUBLIC_API_INVENTORY.md
 Sources/View/View.docc/Authoring-Views.md
-Sources/TerminalUI/TerminalUI.docc/Running-Apps.md
+Sources/SwiftTUI/SwiftTUI.docc/Running-Apps.md
 EOF
 
 while IFS= read -r doc_file; do
@@ -155,7 +155,7 @@ AGENTS.md
 docs/PUBLIC_SURFACE_POLICY.md
 EOF
 
-if [ ! -f Tests/ViewTests/ActorIsolationSurfaceTests.swift ] && [ ! -f Tests/TerminalUITests/ActorIsolationSurfaceTests.swift ]; then
+if [ ! -f Tests/ViewTests/ActorIsolationSurfaceTests.swift ] && [ ! -f Tests/SwiftTUITests/ActorIsolationSurfaceTests.swift ]; then
   fail "Tests/ViewTests/ActorIsolationSurfaceTests.swift should exist to pin the actor-isolated surface."
 fi
 
@@ -364,27 +364,27 @@ docs/PUBLIC_SURFACE_POLICY.md
 docs/SOURCE_LAYOUT.md
 EOF
 
-if ! rg -n --fixed-strings --quiet -- '`TerminalUI`' README.md; then
-  fail "README.md should name TerminalUI explicitly."
+if ! rg -n --fixed-strings --quiet -- '`SwiftTUI`' README.md; then
+  fail "README.md should name SwiftTUI explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '`Runners/TerminalUICLI`' README.md; then
-  fail "README.md should name the TerminalUICLI runner package explicitly."
+if ! rg -n --fixed-strings --quiet -- '`Runners/SwiftTUICLI`' README.md; then
+  fail "README.md should name the SwiftTUICLI runner package explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '`Runners/TerminalUIWASI`' README.md; then
-  fail "README.md should name the TerminalUIWASI runner package explicitly."
+if ! rg -n --fixed-strings --quiet -- '`Runners/SwiftTUIWASI`' README.md; then
+  fail "README.md should name the SwiftTUIWASI runner package explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '### `TerminalUI`' docs/PUBLIC_API_INVENTORY.md; then
-  fail "docs/PUBLIC_API_INVENTORY.md should classify the TerminalUI runtime explicitly."
+if ! rg -n --fixed-strings --quiet -- '### `SwiftTUI`' docs/PUBLIC_API_INVENTORY.md; then
+  fail "docs/PUBLIC_API_INVENTORY.md should classify the SwiftTUI runtime explicitly."
 fi
 
 if ! rg -n --fixed-strings --quiet -- '### Peer runner packages' docs/PUBLIC_API_INVENTORY.md; then
   fail "docs/PUBLIC_API_INVENTORY.md should classify the peer runner packages explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '`TerminalUI` for shared runtime integration plus peer runner packages for executable launch' docs/PUBLIC_SURFACE_POLICY.md; then
+if ! rg -n --fixed-strings --quiet -- '`SwiftTUI` for shared runtime integration plus peer runner packages for executable launch' docs/PUBLIC_SURFACE_POLICY.md; then
   fail "docs/PUBLIC_SURFACE_POLICY.md should describe the library-plus-runner package model explicitly."
 fi
 

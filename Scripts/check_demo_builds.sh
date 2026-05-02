@@ -20,12 +20,12 @@ input harnesses against the terminal examples:
   - Examples/layouts
   - Examples/SwiftUIExample/TerminalApp
   - Examples/WebExample/TerminalApp
-  - GUI/SwiftUITUIGUI
+  - GUI/SwiftUIHost
   - Examples/SwiftUIExample/SwiftUIExample.xcodeproj
   - Examples/WebExample (Bun build)
-  - GUI/WebTUIGUI against WebExampleApp
+  - GUI/WebHost against WebExampleApp
   - Examples/XtermWebExample (Bun build)
-  - GUI/XtermWebTUIGUI against WebExampleApp
+  - GUI/XtermWebHost against WebExampleApp
 
 The script also checks required environment dependencies up front:
   - Swift availability
@@ -116,7 +116,7 @@ if [ "$skip_clean" -eq 0 ]; then
     "Examples/layouts" \
     "Examples/SwiftUIExample/TerminalApp" \
     "Examples/WebExample/TerminalApp" \
-    "GUI/SwiftUITUIGUI"; do
+    "GUI/SwiftUIHost"; do
     run_step \
       "Clean $package_path" \
       "$repo_root" \
@@ -179,9 +179,9 @@ run_step \
   swift build --package-path Examples/WebExample/TerminalApp
 
 run_step \
-  "Build GUI/SwiftUITUIGUI" \
+  "Build GUI/SwiftUIHost" \
   "$repo_root" \
-  swift build --package-path GUI/SwiftUITUIGUI
+  swift build --package-path GUI/SwiftUIHost
 
 if [ "$skip_clean" -eq 0 ]; then
   run_step \
@@ -211,8 +211,8 @@ run_step \
   bun run build
 
 run_step \
-  "Build GUI/WebTUIGUI host with WebExampleApp" \
-  "$repo_root/GUI/WebTUIGUI" \
+  "Build GUI/WebHost host with WebExampleApp" \
+  "$repo_root/GUI/WebHost" \
   bun run build -- --package-path ../../Examples/WebExample/TerminalApp --app WebExampleApp
 
 run_step \
@@ -221,8 +221,8 @@ run_step \
   bun run build
 
 run_step \
-  "Build GUI/XtermWebTUIGUI host with WebExampleApp" \
-  "$repo_root/GUI/XtermWebTUIGUI" \
+  "Build GUI/XtermWebHost host with WebExampleApp" \
+  "$repo_root/GUI/XtermWebHost" \
   bun run build -- --package-path ../../Examples/WebExample/TerminalApp --app WebExampleApp
 
 echo ""

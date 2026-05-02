@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Two side-by-side copies of the same content pin the paint-order
 /// contrast between `.background(...)` and `.overlay(...)`:

@@ -4,7 +4,7 @@ Read-only display metrics describing how terminal cells map to device pixels.
 
 ## Overview
 
-TerminalUI measures layout in integer cells. `CellPixelMetrics` is advisory
+SwiftTUI measures layout in integer cells. `CellPixelMetrics` is advisory
 runtime metadata that tells you how those cells map to pixels on the current
 terminal — so you can apply aspect correction to shapes, motion, or image
 sizing without reinventing the fallback.
@@ -33,4 +33,4 @@ require pixel accuracy.
 
 ## See Also
 
-- [Cell Pixel Geometry Research](https://github.com/adamz/swift-terminal-ui/blob/main/docs/CELL_PIXEL_GEOMETRY_RESEARCH.md)
+- [Cell Pixel Geometry Research](https://github.com/adamz/swift-tui/blob/main/docs/CELL_PIXEL_GEOMETRY_RESEARCH.md)

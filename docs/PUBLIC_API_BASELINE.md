@@ -17,12 +17,12 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 | Module | Top-level | All public |
 |---|---:|---:|
-| `TerminalUI` | 46 | 417 |
+| `SwiftTUI` | 46 | 417 |
 | `View` | 239 | 8485 |
-| `TerminalUICharts` | 17 | 1365 |
+| `SwiftTUICharts` | 17 | 1365 |
 | `Core` | 253 | 2523 |
 
-## TerminalUI
+## SwiftTUI
 
 ### Canonical surface (46)
 
@@ -66,8 +66,8 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TerminalInputReading` — protocol — 1 member
 - `TerminalPresentationMetrics` — struct — 34 members
 - `TerminalSurfaceRenderer` — struct — 3 members
-- `TerminalUISceneDescriptor` — struct — 6 members
-- `TerminalUISceneManifest` — struct — 5 members
+- `SceneDescriptor` — struct — 6 members
+- `SceneManifest` — struct — 5 members
 - `TupleScene` — struct — 2 members
 - `VariadicScene` — struct — 2 members
 - `WindowGroup` — struct — 9 members
@@ -317,7 +317,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `ZStack` — struct — 116 members
 - `ZStackLayout` — struct — 7 members
 
-## TerminalUICharts
+## SwiftTUICharts
 
 ### Canonical surface (17)
 

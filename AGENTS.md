@@ -10,8 +10,8 @@ repository. Keep this file concise — the detailed design documents in
 bun run test                                       # Full repo test surface + environment checks
 swiftly run swift build                            # Build all root-package targets
 swiftly run swift test                             # Run root-package tests
-swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests             # One test suite
-swiftly run swift test --filter TerminalUITests.SwiftUISurfaceTests/testName    # One test
+swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests             # One test suite
+swiftly run swift test --filter SwiftTUITests.SwiftUISurfaceTests/testName    # One test
 swift format format -i --configuration .swift-format.json Sources/ Tests/       # Format
 ```
 
@@ -24,13 +24,13 @@ See [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) for the canonical toolchain story
 ## Architecture (one-page summary)
 
 ```
-TerminalUI  ->  View  ->  Core
+SwiftTUI  ->  View  ->  Core
 ```
 
 - **Core** — pure, terminal-IO-free pipeline
 - **View** — SwiftUI-shaped authoring surface
-- **TerminalUI** — terminal runtime; re-exports View and Core via `@_exported import`
-- **TerminalUICharts** — compact chart/metric track; separate product
+- **SwiftTUI** — terminal runtime; re-exports View and Core via `@_exported import`
+- **SwiftTUICharts** — compact chart/metric track; separate product
 
 Every frame flows through seven strict phases:
 
@@ -93,7 +93,7 @@ Full policy in [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md).
 
 - **swift-format** — auto-formats staged `.swift` files
 - **no-foundation-in-library-products** — blocks `import Foundation` in the
-  Foundation-free `Core`, `View`, and `TerminalUI` library layers
+  Foundation-free `Core`, `View`, and `SwiftTUI` library layers
 - **public-surface-policies** — enforces the guardrails in
   [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md)
 - **structured-concurrency-escape-hatches** — blocks `@unchecked Sendable` and
@@ -106,10 +106,10 @@ Test suites are split by layer:
 
 - `Tests/CoreTests/` — pipeline, layout, raster, focus infrastructure
 - `Tests/ViewTests/` — authoring-surface, environment, actor-isolation
-- `Tests/TerminalUITests/` — runtime, rendering, fixtures, end-to-end behavior
-- `Runners/TerminalUICLI/Tests/TerminalUICLITests/` — CLI runner, socket, pty,
+- `Tests/SwiftTUITests/` — runtime, rendering, fixtures, end-to-end behavior
+- `Runners/SwiftTUICLI/Tests/SwiftTUICLITests/` — CLI runner, socket, pty,
   attach, scene-management behavior
-- `Runners/TerminalUIWASI/Tests/TerminalUIWASITests/` — WASI runner and
+- `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests/` — WASI runner and
   manifest-mode behavior
 
 Prefer Swift Testing (`import Testing`, `@Test`, `#expect`) for new tests.

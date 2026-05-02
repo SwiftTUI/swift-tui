@@ -1,6 +1,6 @@
 # ``Core``
 
-Pure frame-pipeline types and algorithms for TerminalUI.
+Pure frame-pipeline types and algorithms for SwiftTUI.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The `Core` module owns the parts of the system that should stay independent from
 - commit planning
 - frame diagnostics and snapshot support
 
-If `View` is the authoring layer and `TerminalUI` is the runtime layer, `Core` is the engine in between them.
+If `View` is the authoring layer and `SwiftTUI` is the runtime layer, `Core` is the engine in between them.
 
 ## Design Boundary
 

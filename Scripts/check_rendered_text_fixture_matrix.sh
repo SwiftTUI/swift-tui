@@ -12,8 +12,8 @@ fail() {
   failures=1
 }
 
-fixture_support="Tests/TerminalUITests/Support/RenderedTextFixtureSupport.swift"
-fixtures_root="Tests/TerminalUITests/Fixtures"
+fixture_support="Tests/SwiftTUITests/Support/RenderedTextFixtureSupport.swift"
+fixtures_root="Tests/SwiftTUITests/Fixtures"
 
 expected_fixture_manifest=$(
   rg -o 'init\(name: "[^"]+"' "$fixture_support" \

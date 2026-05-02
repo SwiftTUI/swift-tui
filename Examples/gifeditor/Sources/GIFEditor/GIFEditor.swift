@@ -1,7 +1,7 @@
 import Foundation
 import GIFEditorCore
 import GIFEditorUI
-import TerminalUI
+import SwiftTUI
 
 /// Composition root for the editor.
 ///

@@ -59,20 +59,20 @@ Current automated coverage:
 | Scenario | Coverage |
 | --- | --- |
 | Gallery tab click | `Examples/gallery/Tests/GalleryDemoViewsTests/GalleryTabSwitchTests.swift` / `clickingGalleryTabSwitchesSelection` |
-| ScrollView indicator click | `Tests/TerminalUITests/InteractiveRuntimeTests.swift` / `mouseClickOnScrollIndicatorJumpsToLocation` |
-| ScrollView indicator drag | `Tests/TerminalUITests/InteractiveRuntimeTests.swift` / `mouseDragOnScrollIndicatorTracksDraggedPosition` |
-| Pointer scroll burst | `Tests/TerminalUITests/InteractiveRuntimeTests.swift` / `runLoopBatchesQueuedScrollBursts` |
-| Pointer scroll burst through lazy content | `Tests/TerminalUITests/InteractiveRuntimeTests.swift` / `runLoopBatchesQueuedScrollBurstsWithLazyStacks` |
-| Key-command dispatch through async runtime | `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift` / `runLoopRunDispatchesFrameHeadScaffoldRegistrations` |
-| Drop-destination dispatch through async runtime | `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift` / `runLoopRunDispatchesFrameHeadScaffoldRegistrations` |
-| Focus sync on async runtime path | `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift` / `publicSendableLayoutFocusSyncRerenderConvergesOnRuntimePath` |
-| Layout-dependent fallback diagnostics | `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift` / `runtimeDiagnosticsLoggerRecordsGeometryResolutionDiagnostics` |
+| ScrollView indicator click | `Tests/SwiftTUITests/InteractiveRuntimeTests.swift` / `mouseClickOnScrollIndicatorJumpsToLocation` |
+| ScrollView indicator drag | `Tests/SwiftTUITests/InteractiveRuntimeTests.swift` / `mouseDragOnScrollIndicatorTracksDraggedPosition` |
+| Pointer scroll burst | `Tests/SwiftTUITests/InteractiveRuntimeTests.swift` / `runLoopBatchesQueuedScrollBursts` |
+| Pointer scroll burst through lazy content | `Tests/SwiftTUITests/InteractiveRuntimeTests.swift` / `runLoopBatchesQueuedScrollBurstsWithLazyStacks` |
+| Key-command dispatch through async runtime | `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift` / `runLoopRunDispatchesFrameHeadScaffoldRegistrations` |
+| Drop-destination dispatch through async runtime | `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift` / `runLoopRunDispatchesFrameHeadScaffoldRegistrations` |
+| Focus sync on async runtime path | `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift` / `publicSendableLayoutFocusSyncRerenderConvergesOnRuntimePath` |
+| Layout-dependent fallback diagnostics | `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift` / `runtimeDiagnosticsLoggerRecordsGeometryResolutionDiagnostics` |
 
 ## Verification Log
 
-- `swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests`
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
   - passed, 23 tests in 1 suite.
-- `swiftly run swift test --filter 'TerminalUITests.InteractiveRuntimeTests/(mouseClickOnScrollIndicatorJumpsToLocation|mouseDragOnScrollIndicatorTracksDraggedPosition|runLoopBatchesQueuedScrollBurstsWithLazyStacks)'`
+- `swiftly run swift test --filter 'SwiftTUITests.InteractiveRuntimeTests/(mouseClickOnScrollIndicatorJumpsToLocation|mouseDragOnScrollIndicatorTracksDraggedPosition|runLoopBatchesQueuedScrollBurstsWithLazyStacks)'`
   - passed, 3 tests in 1 suite.
 - `swiftly run swift test --package-path Examples/gallery --filter 'GalleryDemoViewsTests.GalleryTabSwitchTests/clickingGalleryTabSwitchesSelection'`
   - passed, 1 test in 1 suite.

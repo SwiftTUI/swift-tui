@@ -76,7 +76,7 @@ struct GIFLoaderTests {
       .deletingLastPathComponent()  // Tests/
       .deletingLastPathComponent()  // gifeditor/
       .deletingLastPathComponent()  // Examples/
-      .deletingLastPathComponent()  // swift-terminal-ui/
+      .deletingLastPathComponent()  // swift-tui/
     return repoRoot.appendingPathComponent("nyan.gif")
   }
 }

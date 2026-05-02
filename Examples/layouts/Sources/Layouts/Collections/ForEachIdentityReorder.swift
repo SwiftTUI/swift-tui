@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Two `ForEach` blocks rendering the same three identity-tagged
 /// items (`[apple]`, `[banana]`, `[cherry]`) in two different

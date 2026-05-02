@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Three HStacks of mixed-height children, one per `VerticalAlignment`
 /// (`.top`, `.center`, `.bottom`). Pins where the shorter child

@@ -12,7 +12,7 @@ Use `swiftly` by default for all repo-local SwiftPM work:
 ```bash
 swiftly run swift build
 swiftly run swift test
-swiftly run swift package generate-documentation --target TerminalUI
+swiftly run swift package generate-documentation --target SwiftTUI
 ```
 
 If you prefer the shorter `swift ...` form, only use it from a shell where
@@ -37,7 +37,7 @@ Equivalent shorthand once `swift` is routed through `swiftly`:
 ```bash
 swift build
 swift test
-swift package generate-documentation --target TerminalUI
+swift package generate-documentation --target SwiftTUI
 ```
 
 Do not use `xcrun swift` for the repo's package builds, tests, DocC generation,
@@ -48,7 +48,7 @@ not match the repo's pinned Swift 6.3.1 environment.
 
 The wasm-facing package work also uses the same `swiftly`-managed Swift 6.3.1
 toolchain, but with the wasm SDK selected through `--swift-sdk`.
-Wasm builds of TerminalUI apps will often require a stack size larger than the default.
+Wasm builds of SwiftTUI apps will often require a stack size larger than the default.
 Their starting and max memory can also be bumped - although no yet-known failures have been attributed to this.
 
 Install the matching Swift 6.3.1 release wasm SDK with:
@@ -61,11 +61,11 @@ Examples:
 
 ```bash
 swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --target Core
-swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --package-path Runners/TerminalUIWASI --target TerminalUIWASI
+swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --package-path Runners/SwiftTUIWASI --target SwiftTUIWASI
 swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm -c release -Xswiftc -Osize -Xswiftc -Xfrontend -Xswiftc -disable-llvm-merge-functions-pass -Xlinker --initial-memory=536870912 -Xlinker --max-memory=4294967296 -Xlinker -z -Xlinker "stack-size=1048576"
 ```
 
-`GUI/WebTUIGUI` build scripts use `swiftly` directly, so require a
+`GUI/WebHost` build scripts use `swiftly` directly, so require a
 swiftly-managed Swift 6.3.1 toolchain.
 Install Swiftly before invoking `bun` if required.
 
@@ -78,12 +78,12 @@ swiftly install --use 6.3.1
 
 ## Bun
 
-`GUI/WebTUIGUI` and `Examples/WebExample` use Bun for all package management, test, and bundling work.
+`GUI/WebHost` and `Examples/WebExample` use Bun for all package management, test, and bundling work.
 
 Examples:
 
 ```bash
-cd GUI/WebTUIGUI
+cd GUI/WebHost
 bun test
 bun run build -- --app <AppProduct>
 
@@ -97,7 +97,7 @@ bun run build
 Xcode remains a valid native build path.
 
 In particular, the outer macOS or iOS app build still works fine in Xcode when
-a consumer embeds `GUI/SwiftUITUIGUI` in an application target.
+a consumer embeds `GUI/SwiftUIHost` in an application target.
 
 That does not change the package-development rule for this repository:
 
@@ -109,24 +109,24 @@ That does not change the package-development rule for this repository:
 ## Worktrees
 
 Internal packages in this repository depend on the repo root via local path
-dependencies and refer to that package as `swift-terminal-ui`.
+dependencies and refer to that package as `swift-tui`.
 
 When adding new local path dependencies that point back at this repo, prefer
 the explicit form:
 
 ```swift
-.package(name: "swift-terminal-ui", path: "../..")
+.package(name: "swift-tui", path: "../..")
 ```
 
 That pins the package name used by downstream `.product(..., package:
-"swift-terminal-ui")` references and keeps nested packages working even when a
+"swift-tui")` references and keeps nested packages working even when a
 worktree directory is renamed.
 
 For new git worktrees, still keep the final path component as
-`swift-terminal-ui` when practical, for example:
+`swift-tui` when practical, for example:
 
 ```text
-.../worktrees/<task>/swift-terminal-ui
+.../worktrees/<task>/swift-tui
 ```
 
 That keeps local package identity, DerivedData naming, and ad hoc shell

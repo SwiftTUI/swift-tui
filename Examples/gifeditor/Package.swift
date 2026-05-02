@@ -5,14 +5,14 @@ import PackageDescription
 // Example app split across four targets:
 //
 //   * GIFEditorCore — pure value-type model plus bridge to the vendored
-//     swift-gif encoder/decoder. Has no TerminalUI dependency,
+//     swift-gif encoder/decoder. Has no SwiftTUI dependency,
 //     so a future SwiftUI / UIKit / web port can reuse it verbatim.
-//   * GIFEditorUI — TerminalUI-shaped view tree and view model. The
+//   * GIFEditorUI — SwiftTUI-shaped view tree and view model. The
 //     terminal-only authoring surface lives here; a sibling
 //     GIFEditorUI_SwiftUI target would slot in alongside.
 //   * GIFEditor — composition root. Today it just exposes the root
 //     view; tomorrow it can wire alternative UIs to the same core.
-//   * gifeditor — the executable. Hosts the App via TerminalUICLI.
+//   * gifeditor — the executable. Hosts the App via SwiftTUICLI.
 let package = Package(
   name: "gifeditor",
   platforms: [
@@ -38,8 +38,8 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(name: "swift-terminal-ui", path: "../.."),
-    .package(path: "../../Runners/TerminalUICLI"),
+    .package(name: "swift-tui", path: "../.."),
+    .package(path: "../../Runners/SwiftTUICLI"),
     .package(path: "../../Vendor/swift-gif"),
   ],
   targets: [
@@ -53,7 +53,7 @@ let package = Package(
       name: "GIFEditorUI",
       dependencies: [
         "GIFEditorCore",
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
       ]
     ),
     .target(
@@ -61,15 +61,15 @@ let package = Package(
       dependencies: [
         "GIFEditorUI",
         "GIFEditorCore",
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
       ]
     ),
     .executableTarget(
       name: "GIFEditorApp",
       dependencies: [
         "GIFEditor",
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUICLI", package: "TerminalUICLI"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
       ]
     ),
     .testTarget(
@@ -83,7 +83,7 @@ let package = Package(
       name: "GIFEditorUITests",
       dependencies: [
         "GIFEditorUI",
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
       ]
     ),
   ]

@@ -1,12 +1,12 @@
 # Cell-Pixel Geometry Research
 
-This memo surveys the motivations for exposing pixel-level geometry information in a cell-based TUI framework, and their implications for TerminalUI specifically. It is a research document rather than a proposal: its purpose is to canvass the design space so that any subsequent API decision is made against the full field of trade-offs rather than a single triggering use case.
+This memo surveys the motivations for exposing pixel-level geometry information in a cell-based TUI framework, and their implications for SwiftTUI specifically. It is a research document rather than a proposal: its purpose is to canvass the design space so that any subsequent API decision is made against the full field of trade-offs rather than a single triggering use case.
 
 ## Context
 
 ### The current geometry model
 
-TerminalUI measures authored geometry in integer terminal cells. The `GeometryProxy` type exposed to `GeometryReader` today carries two pieces of information:
+SwiftTUI measures authored geometry in integer terminal cells. The `GeometryProxy` type exposed to `GeometryReader` today carries two pieces of information:
 
 - `size: Size` — the reader's assigned layout bounds in cells
 - `safeAreaInsets: EdgeInsets` — the cell-denominated safe-area
@@ -19,7 +19,7 @@ proxy to placement geometry so `terminalSize` can remain host-surface metadata.
 
 ### What the runtime already knows about pixels
 
-Despite the authored API being cell-only, the runtime already detects and stores cell-pixel dimensions. `TerminalGraphicsCapabilities.cellPixelSize: Size?` is populated on startup using a three-method fallback in `Sources/TerminalUI/TerminalHost.swift`:
+Despite the authored API being cell-only, the runtime already detects and stores cell-pixel dimensions. `TerminalGraphicsCapabilities.cellPixelSize: Size?` is populated on startup using a three-method fallback in `Sources/SwiftTUI/TerminalHost.swift`:
 
 1. `ioctl(TIOCGWINSZ)` with `ws_xpixel`/`ws_ypixel` when the kernel reports them
 2. A DECRQSS-style `CSI 16 t` query for cell pixel size
@@ -58,7 +58,7 @@ Notcurses sits at the pixel-aware end. `ncplane_pixel_geom()` returns six values
 
 ### Ratatui
 
-Ratatui has a `window_size()` accessor that returns a struct with both `(columns, rows)` and `(width_px, height_px)`. The rest of Ratatui is cell-only. The companion `ratatui-image` crate uses the pixel dimensions to size image widgets and falls back to a hardcoded 4:8 aspect when detection fails. This is the closest shape to what TerminalUI might adopt: pixel information exists as a side channel consulted by specific components, not as a pervasive authoring concern.
+Ratatui has a `window_size()` accessor that returns a struct with both `(columns, rows)` and `(width_px, height_px)`. The rest of Ratatui is cell-only. The companion `ratatui-image` crate uses the pixel dimensions to size image widgets and falls back to a hardcoded 4:8 aspect when detection fails. This is the closest shape to what SwiftTUI might adopt: pixel information exists as a side channel consulted by specific components, not as a pervasive authoring concern.
 
 ### Textual
 
@@ -70,7 +70,7 @@ These are terminals, not frameworks, but they matter because they are the source
 
 ### Conventions across the field
 
-A conventional default emerges from the prior art: when detection fails, a 2:1 height:width cell aspect is the safe fallback. This is the `8 x 16` default TerminalUI already uses. It reflects the typical visual ratio of modern monospace fonts at common point sizes. A framework that needs to invent a fallback should use this ratio.
+A conventional default emerges from the prior art: when detection fails, a 2:1 height:width cell aspect is the safe fallback. This is the `8 x 16` default SwiftTUI already uses. It reflects the typical visual ratio of modern monospace fonts at common point sizes. A framework that needs to invent a fallback should use this ratio.
 
 ## The ratio-versus-absolute bifurcation
 
@@ -83,7 +83,7 @@ A ratio-only API is smaller and always honest. An absolute-pixel API is strictly
 
 ## Motivations, upside, downside, and fit
 
-The following ten motivations cover the landscape of reasons one might ask for pixel information in a cell-based TUI framework. Each entry describes the concrete case, what shape of API it would imply, what it unlocks, what it risks, and how well it fits TerminalUI's stated vision.
+The following ten motivations cover the landscape of reasons one might ask for pixel information in a cell-based TUI framework. Each entry describes the concrete case, what shape of API it would imply, what it unlocks, what it risks, and how well it fits SwiftTUI's stated vision.
 
 ### 1. Geometric honesty
 
@@ -95,7 +95,7 @@ The following ten motivations cover the landscape of reasons one might ask for p
 
 **Downside.** Applying the correction changes existing behavior. Users who had manually compensated by drawing ellipses to get circles now get circles drawn as over-tall shapes. Pre-release, this is a feature; post-release, it would be a breaking change. There is also a small question of whether the correction belongs in the rasterizer (invisible to authors) or on the proxy (authors apply it), which is a style decision with testability implications.
 
-**Fit with TerminalUI.** High. This is probably the highest-leverage single motivation.
+**Fit with SwiftTUI.** High. This is probably the highest-leverage single motivation.
 
 ### 2. Physics, motion, and gestures
 
@@ -107,7 +107,7 @@ The following ten motivations cover the landscape of reasons one might ask for p
 
 **Downside.** Tempts authors to write pixel-denominated physics in places where the terminal falls back to an estimated 8x16 cell size. On a terminal with a different aspect, the physics "feels different." This is less a design problem than a documentation one, but the fallback must be stable and called out.
 
-**Fit with TerminalUI.** High. This is the immediate trigger, and it connects naturally to the animation and gesture subsystems that have already shipped.
+**Fit with SwiftTUI.** High. This is the immediate trigger, and it connects naturally to the animation and gesture subsystems that have already shipped.
 
 ### 3. Graphics-protocol integration and image sizing
 
@@ -119,7 +119,7 @@ The following ten motivations cover the landscape of reasons one might ask for p
 
 **Downside.** Ties a public API to the behavior of the capability-gated graphics pipeline. Authors will write branches like "use graphics protocol if pixels > N, else ASCII" and run into portability surprises when detection fails. The reported-versus-estimated distinction must be part of the public type, not documented off to the side, or the misuse is guaranteed.
 
-**Fit with TerminalUI.** Medium-high. The framework already does this internally; the outstanding work is exposing the honest version of what it already computes.
+**Fit with SwiftTUI.** Medium-high. The framework already does this internally; the outstanding work is exposing the honest version of what it already computes.
 
 ### 4. Sub-cell canvas drawing
 
@@ -131,7 +131,7 @@ The following ten motivations cover the landscape of reasons one might ask for p
 
 **Downside.** Canvas authors now need to be aware of pixel metrics — an implementation detail that Canvas has deliberately hidden until now. An alternative is to apply the correction inside the rasterizer, which keeps Canvas pure cell-space at the cost of less author control. The trade-off is about how much sub-cell fidelity authors are expected to reason about.
 
-**Fit with TerminalUI.** Medium. Worth exposing only if Canvas authors have concrete need for control; otherwise, handle the correction inside `Rasterizer+CellSampling.swift`.
+**Fit with SwiftTUI.** Medium. Worth exposing only if Canvas authors have concrete need for control; otherwise, handle the correction inside `Rasterizer+CellSampling.swift`.
 
 ### 5. Sub-cell mouse precision
 
@@ -143,7 +143,7 @@ The following ten motivations cover the landscape of reasons one might ask for p
 
 **Downside.** `VISION.md` explicitly de-emphasizes pointer-precise interaction. Building this well means authoring code must accommodate "sometimes I have one pixel of granularity, sometimes sixteen" — a nontrivial API problem. Pixel coordinate origins vary across terminals, and the parser is fussy. This is a whole input design on its own.
 
-**Fit with TerminalUI.** Low for v1. It is right to flag this as a potential future need, but the design does not belong inside the geometry API; it belongs in the input pipeline, and should not constrain the shape of a cell-pixel metrics type.
+**Fit with SwiftTUI.** Low for v1. It is right to flag this as a potential future need, but the design does not belong inside the geometry API; it belongs in the input pipeline, and should not constrain the shape of a cell-pixel metrics type.
 
 ### 6. Accessibility and physical size
 
@@ -155,7 +155,7 @@ The following ten motivations cover the landscape of reasons one might ask for p
 
 **Downside.** The DPI estimate is effectively always a lie. User font-size changes — which the TUI cannot detect — invalidate any pixel-to-physical conversion. The framework would be shipping a measurement it cannot deliver on. `VISION.md` already names a full accessibility-tree as not in scope today.
 
-**Fit with TerminalUI.** Low. Probably not worth building API around.
+**Fit with SwiftTUI.** Low. Probably not worth building API around.
 
 ### 7. Density-aware responsive layout
 
@@ -167,7 +167,7 @@ The following ten motivations cover the landscape of reasons one might ask for p
 
 **Downside.** The framework owning "what counts as high density" is an opinion that will not age well. Exposing raw pixels and letting consumers pick thresholds is more honest but produces brittle magic numbers in user code. Either position has costs.
 
-**Fit with TerminalUI.** Low-to-medium. Worth having raw data available so that consumers who need this can build their own classifiers; there is no reason to ship opinionated helpers.
+**Fit with SwiftTUI.** Low-to-medium. Worth having raw data available so that consumers who need this can build their own classifiers; there is no reason to ship opinionated helpers.
 
 ### 8. Snapshot and golden-image testing
 
@@ -179,7 +179,7 @@ The following ten motivations cover the landscape of reasons one might ask for p
 
 **Downside.** Crosses the line between authoring and runtime. Authors writing views should never set cell pixel size; test harnesses need to. Conflating them in a single API is a hazard. The clean answer is that test harnesses inject via `StreamingTerminalHost.init(graphicsCapabilities:)`, which is already `package` visibility, while the authored read-side stays strictly read-only.
 
-**Fit with TerminalUI.** Medium. The injection path already exists privately; exposing the read side for authors makes the testing case workable almost for free.
+**Fit with SwiftTUI.** Medium. The injection path already exists privately; exposing the read side for authors makes the testing case workable almost for free.
 
 ### 9. Bridging to non-terminal design systems
 
@@ -191,7 +191,7 @@ The following ten motivations cover the landscape of reasons one might ask for p
 
 **Downside.** The mental models do not line up. Design-tool units assume sub-glyph alignment, continuous positioning, and rasterization fidelity that terminals do not provide. Any bridge is lossy. Building API around this encourages authors to pretend the systems are commensurable.
 
-**Fit with TerminalUI.** Low. Not worth designing around; leave it as something advanced users can compose on top of whatever read-only metrics API ships.
+**Fit with SwiftTUI.** Low. Not worth designing around; leave it as something advanced users can compose on top of whatever read-only metrics API ships.
 
 ### 10. Diagnostics and debug overlays
 
@@ -203,7 +203,7 @@ The following ten motivations cover the landscape of reasons one might ask for p
 
 **Downside.** None.
 
-**Fit with TerminalUI.** Trivially high. This comes for free as soon as the metric is exposed.
+**Fit with SwiftTUI.** Trivially high. This comes for free as soon as the metric is exposed.
 
 ## Patterns across the motivations
 

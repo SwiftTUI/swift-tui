@@ -76,8 +76,8 @@ The viable path is to extract and then offload the pure-ish frame tail.
 
 In scope:
 
-- `Sources/TerminalUI/TerminalUI.swift`
-- `Sources/TerminalUI/RunLoop+Rendering.swift`
+- `Sources/SwiftTUI/SwiftTUI.swift`
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`
 - package-internal frame-tail helper types
 - frame diagnostics for worker timing
 - focused runtime tests and benchmarks
@@ -207,7 +207,7 @@ Stop condition:
 Validation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.Phase1BenchmarkScenariosTests
+swiftly run swift test --filter SwiftTUITests.Phase1BenchmarkScenariosTests
 bun run test
 ```
 
@@ -247,9 +247,9 @@ git commit -m "refactor(renderer): extract frame tail"
 Validation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.TerminalPresentationTests
-swiftly run swift test --filter TerminalUITests.Phase1BenchmarkScenariosTests
-swiftly run swift test --filter TerminalUITests.InteractiveRuntimeTests
+swiftly run swift test --filter SwiftTUITests.TerminalPresentationTests
+swiftly run swift test --filter SwiftTUITests.Phase1BenchmarkScenariosTests
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests
 ```
 
 ## Stage 2: Separate Tail-Owned Retained State
@@ -284,9 +284,9 @@ git commit -m "refactor(renderer): isolate frame-tail retained state"
 Validation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AnimationPipelineIntegrationTests
-swiftly run swift test --filter TerminalUITests.TerminalHostPresentationBatchingTests
-swiftly run swift test --filter TerminalUITests.TerminalGraphicsProtocolTests
+swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests
+swiftly run swift test --filter SwiftTUITests.TerminalHostPresentationBatchingTests
+swiftly run swift test --filter SwiftTUITests.TerminalGraphicsProtocolTests
 ```
 
 ## Stage 3: Resolve Animation Overlay Boundary
@@ -331,8 +331,8 @@ git commit -m "refactor(renderer): stage animation overlays across frame tail"
 Validation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AnimationRepeatForeverGrowthTests
-swiftly run swift test --filter TerminalUITests.AnimationPipelineIntegrationTests
+swiftly run swift test --filter SwiftTUITests.AnimationRepeatForeverGrowthTests
+swiftly run swift test --filter SwiftTUITests.AnimationPipelineIntegrationTests
 bun run test
 ```
 
@@ -374,9 +374,9 @@ git commit -m "refactor(renderer): add frame-tail worker"
 Validation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.Phase1BenchmarkScenariosTests
-swiftly run swift test --filter TerminalUITests.InteractiveRuntimeTests
-swiftly run swift test --package-path GUI/SwiftUITUIGUI --filter hosted_surface
+swiftly run swift test --filter SwiftTUITests.Phase1BenchmarkScenariosTests
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests
+swiftly run swift test --package-path GUI/SwiftUIHost --filter hosted_surface
 ```
 
 ## Stage 5: Convert Runtime Rendering Boundary To Async
@@ -420,10 +420,10 @@ git commit -m "refactor(runtime): await frame-tail rendering"
 Validation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.InteractiveRuntimeTests
-swiftly run swift test --filter TerminalUITests.FocusTransitionTests
-swiftly run swift test --filter TerminalUITests.GestureRunLoopDispatchTests
-swiftly run swift test --filter TerminalUITests.HostedSceneSessionTests
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests
+swiftly run swift test --filter SwiftTUITests.FocusTransitionTests
+swiftly run swift test --filter SwiftTUITests.GestureRunLoopDispatchTests
+swiftly run swift test --filter SwiftTUITests.HostedSceneSessionTests
 ```
 
 ## Stage 6: Runtime Stress Tests
@@ -461,8 +461,8 @@ git commit -m "test(runtime): cover async frame-tail ordering"
 Validation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
-swiftly run swift test --filter TerminalUITests.InteractiveRuntimeTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests
 bun run test
 ```
 

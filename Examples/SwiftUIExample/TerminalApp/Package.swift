@@ -15,7 +15,7 @@ let package = Package(
     )
   ],
   dependencies: [
-    .package(name: "swift-terminal-ui", path: "../../.."),
+    .package(name: "swift-tui", path: "../../.."),
     .package(path: "../../gallery"),
   ],
   targets: [
@@ -23,8 +23,8 @@ let package = Package(
       name: "ExampleScenes",
       dependencies: [
         .product(name: "GalleryDemoViews", package: "gallery"),
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUICharts", package: "swift-terminal-ui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUICharts", package: "swift-tui"),
       ],
       path: "Sources/ExampleScenes"
     )

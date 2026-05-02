@@ -3,7 +3,7 @@ import SwiftUI
 /// Two bordered boxes side-by-side that share the same `BorderBlend`
 /// palette but differ only in the static `phase` parameter.
 ///
-/// SwiftUI port: the original used TerminalUI's `BorderBlend(_:)` —
+/// SwiftUI port: the original used SwiftTUI's `BorderBlend(_:)` —
 /// a perimeter 1D gradient sampled clockwise around the rectangle
 /// with an animatable `phase`. SwiftUI has no direct equivalent. The
 /// closest one-liner is an `AngularGradient` overlay clipped to a

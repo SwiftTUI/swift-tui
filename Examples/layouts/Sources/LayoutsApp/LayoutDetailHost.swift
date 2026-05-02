@@ -1,5 +1,5 @@
 import Layouts
-import TerminalUI
+import SwiftTUI
 
 /// Full-screen detail host for one ``LayoutEntry``. Renders
 /// `entry.makeView()` filling the available space, with a 1-row

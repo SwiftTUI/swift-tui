@@ -7,7 +7,7 @@
 guidance and as a signal for which components matter most in TUI applications.
 We do not adopt their abstractions, but we read them as evidence: when Lip
 Gloss ships a first-class `tree` package, that tells us hierarchical tree
-display is important enough to treat seriously in TerminalUI.
+display is important enough to treat seriously in SwiftTUI.
 
 The most important lesson is not "copy Lip Gloss styling." The stronger lesson
 is that terminal styling should be composable, capability-aware, and applied
@@ -18,7 +18,7 @@ make focus, selection, help, and mode more prominent than ornamental chrome.
 This document maps Lip Gloss concepts to their SwiftUI equivalents, which tells us:
 
 1. Which Lip Gloss patterns are already handled by the SwiftUI model we're implementing
-2. Which Lip Gloss patterns point to gaps or confirmed TUI deviations in TerminalUI
+2. Which Lip Gloss patterns point to gaps or confirmed TUI deviations in SwiftTUI
 3. Where TUI-specific aesthetics (borders, box drawing, tree chrome) map to SwiftUI primitives
 
 See [VISION.md](VISION.md) for the confirmed list of TUI deviations informed by this analysis.
@@ -95,12 +95,12 @@ This survey covers the upstream Lip Gloss source, especially `README.md`, `style
 
 ### Borders
 
-> Updated for the Milestone 7 shape-and-border revamp. TerminalUI now
+> Updated for the Milestone 7 shape-and-border revamp. SwiftTUI now
 > ships a first-class `BorderSet` / `.border(...)` surface modeled directly
 > on Lip Gloss's data shape, so most of these rows have a direct
-> TerminalUI equivalent rather than a workaround.
+> SwiftTUI equivalent rather than a workaround.
 
-| Lip Gloss API | TerminalUI / SwiftUI equivalent | Notes |
+| Lip Gloss API | SwiftTUI / SwiftUI equivalent | Notes |
 | --- | --- | --- |
 | `Border(border, sides...)` | `.border(_:set:sides:)` | Direct. `sides: Edge.Set` maps to Lip Gloss's per-side toggle set. |
 | `BorderStyle(...)` | `BorderSet` (public struct in `Core`) | `BorderSet` is the Lip Gloss `Border` struct, ported verbatim — flat record of per-edge and per-corner strings, multi-rune edges cycle per cell. |
@@ -114,9 +114,9 @@ This survey covers the upstream Lip Gloss source, especially `README.md`, `style
 
 ### Border Presets, Positions, and Other Core Helpers
 
-| Lip Gloss API | TerminalUI / SwiftUI equivalent | Notes |
+| Lip Gloss API | SwiftTUI / SwiftUI equivalent | Notes |
 | --- | --- | --- |
-| `NormalBorder()`, `RoundedBorder()`, `BlockBorder()`, `OuterHalfBlockBorder()`, `InnerHalfBlockBorder()`, `ThickBorder()`, `DoubleBorder()`, `HiddenBorder()`, `MarkdownBorder()`, `ASCIIBorder()` | `BorderSet.single`, `.rounded`, `.block`, `.outerHalfBlock`, `.innerHalfBlock`, `.heavy`, `.double`, `.hidden`, `.markdown`, `.ascii` | Direct. TerminalUI also ships `.singleDouble`, `.doubleSingle`, `.dashed`, `.dashedHeavy`, `.none`, and `.presentationChrome` (internal chrome). Custom sets are just `BorderSet(top:…)` initializers. |
+| `NormalBorder()`, `RoundedBorder()`, `BlockBorder()`, `OuterHalfBlockBorder()`, `InnerHalfBlockBorder()`, `ThickBorder()`, `DoubleBorder()`, `HiddenBorder()`, `MarkdownBorder()`, `ASCIIBorder()` | `BorderSet.single`, `.rounded`, `.block`, `.outerHalfBlock`, `.innerHalfBlock`, `.heavy`, `.double`, `.hidden`, `.markdown`, `.ascii` | Direct. SwiftTUI also ships `.singleDouble`, `.doubleSingle`, `.dashed`, `.dashedHeavy`, `.none`, and `.presentationChrome` (internal chrome). Custom sets are just `BorderSet(top:…)` initializers. |
 | `Top`, `Bottom`, `Left`, `Right`, `Center` | `Alignment` cases like `.top`, `.bottomTrailing`, `.leading`, `.center` | Conceptually direct. |
 | `Place(...)`, `PlaceHorizontal(...)`, `PlaceVertical(...)` | `.frame(..., alignment: ...)`, `ZStack(alignment: ...)`, `.overlay(alignment: ...)` | `Place` is best thought of as alignment within a bounded box. |
 | `JoinHorizontal(...)`, `JoinVertical(...)` | `HStack`, `VStack`, `Grid`, or a custom `Layout` | Use a custom `Layout` when you need Lip Gloss-style relative anchor alignment across differently sized blocks. |
@@ -128,7 +128,7 @@ This survey covers the upstream Lip Gloss source, especially `README.md`, `style
 | `LightDark(...)`, `HasDarkBackground(...)`, `BackgroundColor(...)` | `@Environment(\\.colorScheme)` and platform-specific color inspection when needed | SwiftUI exposes color scheme, not a terminal background probe. |
 | `Complete(...)` | Asset-catalog variants or your own palette-selection logic | SwiftUI does not downsample based on terminal color profiles. |
 | `Alpha(...)`, `Complementary(...)`, `Darken(...)`, `Lighten(...)` | Color helpers in your own theme layer, or UIKit/AppKit color math bridged into SwiftUI | These are utility-layer equivalents, not built-in SwiftUI modifiers. |
-| `Blend1D(...)`, `Blend2D(...)` | `LinearGradient`, `RadialGradient`, `TileStyle`, or `Canvas` | TerminalUI now ships `LinearGradient` / `RadialGradient` with Textual-style `(location, color)` stops and CIELAB blending, plus `TileStyle` for glyph-cell shading. `BorderBlend` handles perimeter gradients specifically. |
+| `Blend1D(...)`, `Blend2D(...)` | `LinearGradient`, `RadialGradient`, `TileStyle`, or `Canvas` | SwiftTUI now ships `LinearGradient` / `RadialGradient` with Textual-style `(location, color)` stops and CIELAB blending, plus `TileStyle` for glyph-cell shading. `BorderBlend` handles perimeter gradients specifically. |
 
 ### Introspection and Reset APIs
 
@@ -146,7 +146,7 @@ Lip Gloss exposes getters and unsets because `Style` is a pure value object. Swi
 | `GetWidth`, `GetHeight`, `GetAlign`, `GetAlignHorizontal`, `GetAlignVertical`, `GetInline`, `GetMaxWidth`, `GetMaxHeight`, `GetTabWidth` | Read sizing/alignment fields from your own style struct | SwiftUI view values do not expose resolved modifier state. |
 | `GetPadding`, `GetPaddingTop`, `GetPaddingRight`, `GetPaddingBottom`, `GetPaddingLeft`, `GetPaddingChar`, `GetHorizontalPadding`, `GetVerticalPadding`, `GetColorWhitespace` | Read spacing fields from your own style struct | Padding characters and whitespace coloring must also live in your own model. |
 | `GetMargin`, `GetMarginTop`, `GetMarginRight`, `GetMarginBottom`, `GetMarginLeft`, `GetMarginChar`, `GetHorizontalMargins`, `GetVerticalMargins` | Read outer-spacing fields from your own style struct or container model | In SwiftUI, margin is usually parent-owned. |
-| `GetBorder`, `GetBorderStyle`, `GetBorderTop`, `GetBorderRight`, `GetBorderBottom`, `GetBorderLeft`, `GetBorderTopForeground`, `GetBorderRightForeground`, `GetBorderBottomForeground`, `GetBorderLeftForeground`, `GetBorderForegroundBlend`, `GetBorderForegroundBlendOffset`, `GetBorderTopBackground`, `GetBorderRightBackground`, `GetBorderBottomBackground`, `GetBorderLeftBackground`, `GetBorderTopWidth`, `GetBorderTopSize`, `GetBorderLeftSize`, `GetBorderBottomSize`, `GetBorderRightSize`, `GetHorizontalBorderSize`, `GetVerticalBorderSize` | Read border configuration from your own `BorderSet` + `BorderEdgeStyle` + `BorderBackgroundStyle` + `BorderBlend` model | TerminalUI surfaces `BorderSet.topDisplayWidth` (and friends) for per-side frame sizes. SwiftUI itself does not expose a border inspection API. |
+| `GetBorder`, `GetBorderStyle`, `GetBorderTop`, `GetBorderRight`, `GetBorderBottom`, `GetBorderLeft`, `GetBorderTopForeground`, `GetBorderRightForeground`, `GetBorderBottomForeground`, `GetBorderLeftForeground`, `GetBorderForegroundBlend`, `GetBorderForegroundBlendOffset`, `GetBorderTopBackground`, `GetBorderRightBackground`, `GetBorderBottomBackground`, `GetBorderLeftBackground`, `GetBorderTopWidth`, `GetBorderTopSize`, `GetBorderLeftSize`, `GetBorderBottomSize`, `GetBorderRightSize`, `GetHorizontalBorderSize`, `GetVerticalBorderSize` | Read border configuration from your own `BorderSet` + `BorderEdgeStyle` + `BorderBackgroundStyle` + `BorderBlend` model | SwiftTUI surfaces `BorderSet.topDisplayWidth` (and friends) for per-side frame sizes. SwiftUI itself does not expose a border inspection API. |
 | `GetUnderlineSpaces`, `GetStrikethroughSpaces`, `GetHorizontalFrameSize`, `GetVerticalFrameSize`, `GetFrameSize`, `GetTransform`, `GetHyperlink` | Read behavior/derived values from your own style struct | Derived frame sizes are usually computed from your model plus layout policy. |
 
 #### Reset Families
@@ -167,7 +167,7 @@ If the goal is Lip Gloss parity rather than loose visual similarity, the closest
 - A value-type `TerminalStyle` or `LipGlossStyle` that stores optional fields.
 - A `merged(with:)` method that implements Lip Gloss-like inheritance.
 - A `ViewModifier` or `Text` builder that applies only the fields that are set.
-- A custom border abstraction for per-edge colors and gradient borders — **in TerminalUI this is `BorderSet` + `BorderEdgeStyle` + `BorderBlend`, ported directly from Lip Gloss.**
+- A custom border abstraction for per-edge colors and gradient borders — **in SwiftTUI this is `BorderSet` + `BorderEdgeStyle` + `BorderBlend`, ported directly from Lip Gloss.**
 - A custom `Layout` when width, height, alignment, padding fill, and terminal-cell semantics must stay exact.
 - `AttributedString` for range-level styling.
 - `Canvas` for compositor-style or border-glyph-style drawing.

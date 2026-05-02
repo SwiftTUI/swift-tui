@@ -902,7 +902,7 @@ isn't already indexing through the normal identity path.
 `RegistrationAliasDiagnostics`
 (`Sources/Core/Graph/RegistrationAliasDiagnostics.swift`) tracks every
 non-trivial alias call on every `ViewGraph`.  A
-`RegistrationAliasFindingsTests` suite in `Tests/TerminalUITests/`
+`RegistrationAliasFindingsTests` suite in `Tests/SwiftTUITests/`
 drives `DefaultRenderer` over 10 view-shape scenarios and pins the
 observed divergence counts.
 

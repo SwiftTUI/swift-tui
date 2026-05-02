@@ -8,7 +8,7 @@ or superseded plans.
 Per-target API reference lives in the `*.docc` catalogs under `Sources/`:
 
 ```bash
-swiftly run swift package generate-documentation --target TerminalUI
+swiftly run swift package generate-documentation --target SwiftTUI
 ```
 
 The repository [README.md](../README.md) is the public landing page.

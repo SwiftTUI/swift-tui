@@ -13,7 +13,7 @@ sources:
 
 ## Context
 
-TerminalUI keeps layout integer-cell-based but exposes continuous
+SwiftTUI keeps layout integer-cell-based but exposes continuous
 cell-space geometry to gesture handlers, hover, drawing, and
 interpolation APIs. A `Point(x: 2.25, y: 1.5)` is inside cell `(2, 1)`,
 not in device pixels.
@@ -26,8 +26,8 @@ Pointer input quality varies enormously by terminal:
 - **Sub-cell-capable terminals** (Kitty, WezTerm, iTerm2, foot in some
   modes) can report pixel coordinates via DEC private mode 1016
   (SGR-Pixels).
-- **Native and web hosts** (`GUI/SwiftUITUIGUI`,
-  `GUI/WebTUIGUI`) can deliver true pixel coordinates derived from
+- **Native and web hosts** (`GUI/SwiftUIHost`,
+  `GUI/WebHost`) can deliver true pixel coordinates derived from
   device input.
 
 Authored gesture code shouldn't have to branch on host capability. A
@@ -59,7 +59,7 @@ environment without changing layout.
 
 Accepted. The cell-only fallback is documented in the public
 [Pointer-And-Canvas.md](../../Sources/View/View.docc/Pointer-And-Canvas.md)
-authoring guide and pinned by `Tests/TerminalUITests` pointer
+authoring guide and pinned by `Tests/SwiftTUITests` pointer
 coordinate fixtures. Mouse precision resolution is settled before
 the run loop's event pump starts; see
 [RUNTIME.md](../RUNTIME.md) for the trust-policy and probe-order

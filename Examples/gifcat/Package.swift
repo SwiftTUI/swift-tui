@@ -19,15 +19,15 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(name: "swift-terminal-ui", path: "../.."),
-    .package(path: "../../Runners/TerminalUICLI"),
+    .package(name: "swift-tui", path: "../.."),
+    .package(path: "../../Runners/SwiftTUICLI"),
     .package(path: "../../Vendor/swift-gif"),
   ],
   targets: [
     .target(
       name: "GifCat",
       dependencies: [
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
         .product(name: "GIF", package: "swift-gif"),
       ]
     ),
@@ -35,8 +35,8 @@ let package = Package(
       name: "GifCatApp",
       dependencies: [
         "GifCat",
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
-        .product(name: "TerminalUICLI", package: "TerminalUICLI"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
+        .product(name: "SwiftTUICLI", package: "SwiftTUICLI"),
       ]
     ),
     .testTarget(
@@ -44,7 +44,7 @@ let package = Package(
       dependencies: [
         "GifCat",
         .product(name: "GIF", package: "swift-gif"),
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
       ]
     ),
   ]

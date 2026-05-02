@@ -14,7 +14,7 @@ sources:
 
 ## Context
 
-TerminalUI apps render in environments with wildly different color
+SwiftTUI apps render in environments with wildly different color
 expectations:
 
 - a user's terminal with a light or dark profile chosen long ago,
@@ -69,7 +69,7 @@ Host responsibilities:
 
 Library responsibilities:
 
-- The Core / View / TerminalUI layers carry semantic tokens through
+- The Core / View / SwiftTUI layers carry semantic tokens through
   the pipeline as opaque values.
 - Terminal appearance can be inferred heuristically or queried
   actively from the host; the runtime synthesizes a default semantic
@@ -83,12 +83,12 @@ public string-based style helpers were removed.
 
 Accepted. The four shipped host packages own their own theme objects:
 
-- terminal-native runners (`TerminalUICLI` / `TerminalUIWASI`) infer
+- terminal-native runners (`SwiftTUICLI` / `SwiftTUIWASI`) infer
   the appearance from the terminal and pair it with a default semantic
   theme,
-- `GUI/SwiftUITUIGUI` exposes explicit light / dark variants paired
+- `GUI/SwiftUIHost` exposes explicit light / dark variants paired
   with native renderer palette state,
-- `GUI/WebTUIGUI` mirrors the same shape and binds to the embedding
+- `GUI/WebHost` mirrors the same shape and binds to the embedding
   page's color scheme.
 
 Host packages own their style mapping; the root package does not

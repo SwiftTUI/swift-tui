@@ -2,7 +2,7 @@
 
 ## What This Project Is
 
-TerminalUI is a Swift package for building terminal user interfaces with an authoring model, layout model, and runtime contract that are deliberately shaped after SwiftUI.
+SwiftTUI is a Swift package for building terminal user interfaces with an authoring model, layout model, and runtime contract that are deliberately shaped after SwiftUI.
 
 The project implements the SwiftUI subset needed to build strong terminal applications without shortcuts in the layout algorithm, state model, or render pipeline. The goal is not to mimic SwiftUI cosmetically. The goal is to preserve the parts of SwiftUI that make large UI codebases predictable.
 
@@ -25,7 +25,7 @@ See [SWIFTUI_LAYOUT.md](SWIFTUI_LAYOUT.md) for the upstream layout model that se
 
 ### Implementing A Useful Subset
 
-TerminalUI is intentionally not implementing every SwiftUI concept.
+SwiftTUI is intentionally not implementing every SwiftUI concept.
 
 What that means in practice:
 
@@ -43,7 +43,7 @@ Deviations are permitted only when all of the following are true:
 2. The deviation solves a real terminal problem rather than copying another TUI framework by habit
 3. The deviation is documented here and reflected in the public API inventory
 
-When SwiftUI precedent and terminal-native practice disagree, TerminalUI should
+When SwiftUI precedent and terminal-native practice disagree, SwiftTUI should
 keep the SwiftUI-shaped authoring story only if it still produces a good
 terminal experience. If a direct translation would create page-like,
 mouse-centric, overdecorated, or otherwise non-native terminal behavior, the
@@ -51,7 +51,7 @@ framework should reinterpret the behavior toward terminal-native defaults.
 
 Confirmed deviations today:
 
-- **Tree-forward collection presentation.** Hierarchical list and outline presentation is more central in TUI software than it is in common SwiftUI app design. TerminalUI supports tree-style collection display as a first-class authoring pattern while still staying close to SwiftUI’s `OutlineGroup` and `children` vocabulary.
+- **Tree-forward collection presentation.** Hierarchical list and outline presentation is more central in TUI software than it is in common SwiftUI app design. SwiftTUI supports tree-style collection display as a first-class authoring pattern while still staying close to SwiftUI’s `OutlineGroup` and `children` vocabulary.
 - **Repo-owned `@Bindable`.** The package ships its own bindable wrapper to keep observable editing on the same invalidation path as `@State` and the rest of the runtime.
 - **Terminal-native reinterpretation of defaults.** Automatic chrome, app shell
   composition, and navigation-oriented surfaces may intentionally diverge from
@@ -59,7 +59,7 @@ Confirmed deviations today:
 
 ### Input Philosophy
 
-TerminalUI is keyboard-first, but not keyboard-only.
+SwiftTUI is keyboard-first, but not keyboard-only.
 
 - Keyboard and focus traversal remain the primary design center
 - Mouse reporting and pointer-style interaction are supported when the terminal exposes them
@@ -69,7 +69,7 @@ That means pointer support is in scope, but touch-first, pointer-first, or pixel
 
 ### SwiftUI Concepts That Need A Stronger Hypothesis First
 
-Some SwiftUI concepts likely belong in TerminalUI eventually, but the package does not yet have a strong enough model to ship them confidently.
+Some SwiftUI concepts likely belong in SwiftTUI eventually, but the package does not yet have a strong enough model to ship them confidently.
 
 Deferred items:
 
@@ -103,7 +103,7 @@ Current implementation status and short-term constraints live in [STATUS.md](STA
 
 ### Image Rendering
 
-TerminalUI ships a narrow image surface covering the three most common
+SwiftTUI ships a narrow image surface covering the three most common
 still-image formats:
 
 - SwiftUI-shaped `Image` authoring for explicit named resources, local `file://` URLs, and embedded `[UInt8]` bytes
@@ -120,8 +120,8 @@ fetching, and bundle-driven asset systems are still outside the core story.
 
 [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) are useful reference points for what terminal applications often need visually and structurally. They are evidence, not templates.
 
-See [LIPGLOSS_SWIFTUI_EQUIVALENTS.md](LIPGLOSS_SWIFTUI_EQUIVALENTS.md) for the mapping between Lip Gloss concepts and the SwiftUI-shaped surfaces TerminalUI prefers.
+See [LIPGLOSS_SWIFTUI_EQUIVALENTS.md](LIPGLOSS_SWIFTUI_EQUIVALENTS.md) for the mapping between Lip Gloss concepts and the SwiftUI-shaped surfaces SwiftTUI prefers.
 
-## TerminalUICharts
+## SwiftTUICharts
 
-`TerminalUICharts` is intentionally a separate track. It demonstrates how compact dashboard and metrics components can be built on the same view and runtime foundation without allowing charting needs to distort the core API story.
+`SwiftTUICharts` is intentionally a separate track. It demonstrates how compact dashboard and metrics components can be built on the same view and runtime foundation without allowing charting needs to distort the core API story.

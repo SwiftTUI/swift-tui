@@ -1,5 +1,5 @@
 import GIFEditorCore
-import TerminalUI
+import SwiftTUI
 
 /// Single-row contextual options bar that sits between the menu bar
 /// and the main canvas. The leading half mirrors the active tool's

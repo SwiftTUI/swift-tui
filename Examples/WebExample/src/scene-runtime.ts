@@ -1,11 +1,11 @@
 import {
-  WebTUISceneRuntime,
-  type WebTUISceneRuntimeOptions,
-} from "webtuigui";
+  WebHostSceneRuntime,
+  type WebHostSceneRuntimeOptions,
+} from "webhost";
 import {
   encodeResizeControlMessage,
   type BrowserWASIBridge,
-} from "webtuigui";
+} from "webhost";
 
 import {
   SharedInputQueueWriter,
@@ -48,7 +48,7 @@ export interface WasmSceneResizeEvent {
 }
 
 export interface WasmSceneRuntimeHandle {
-  readonly descriptor: WebTUISceneRuntime["descriptor"];
+  readonly descriptor: WebHostSceneRuntime["descriptor"];
   sendInput(chunk: Uint8Array): void;
 }
 
@@ -60,7 +60,7 @@ export interface WasmSceneRuntimeFactoryOptions {
 export function createWasmSceneRuntimeFactory(
   wasmURL: URL,
   factoryOptions: WasmSceneRuntimeFactoryOptions = {}
-): (options: WebTUISceneRuntimeOptions) => WebTUISceneRuntime {
+): (options: WebHostSceneRuntimeOptions) => WebHostSceneRuntime {
   return (options) => {
     const runtime = new WasmSceneRuntime(options, wasmURL, factoryOptions);
     factoryOptions.onRuntimeCreated?.(runtime);
@@ -68,7 +68,7 @@ export function createWasmSceneRuntimeFactory(
   };
 }
 
-class WasmSceneRuntime extends WebTUISceneRuntime {
+class WasmSceneRuntime extends WebHostSceneRuntime {
   private readonly bridge?: BrowserWASIBridge;
   private readonly wasmURL: URL;
   private readonly onSceneResize?: (event: WasmSceneResizeEvent) => void;
@@ -80,7 +80,7 @@ class WasmSceneRuntime extends WebTUISceneRuntime {
   private didMount = false;
 
   constructor(
-    options: WebTUISceneRuntimeOptions,
+    options: WebHostSceneRuntimeOptions,
     wasmURL: URL,
     factoryOptions: WasmSceneRuntimeFactoryOptions
   ) {

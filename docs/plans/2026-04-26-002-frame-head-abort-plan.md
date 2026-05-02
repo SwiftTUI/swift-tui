@@ -394,7 +394,7 @@ access instead, prefer that over test-only naming. Keep the public
 
 Files:
 
-- `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 - new helper types in that test file if needed
 
 Add reusable scaffolding for the exact abort contract without committing a red
@@ -418,7 +418,7 @@ git commit -m "test(renderer): add frame-head abort scaffolding"
 Validation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
 ```
 
 ### Task 2: Make runtime registrations draft-applied
@@ -432,8 +432,8 @@ Files:
 - `Sources/Core/DropDestinationRegistry.swift`
 - `Sources/View/ActionScopes/KeyCommandModifier.swift`
 - `Sources/View/ActionScopes/DropDestinationModifier.swift`
-- `Sources/TerminalUI/TerminalUI.swift`
-- focused Core and TerminalUI tests
+- `Sources/SwiftTUI/SwiftTUI.swift`
+- focused Core and SwiftTUI tests
 
 Work:
 
@@ -457,9 +457,9 @@ Validation:
 ```bash
 swiftly run swift test --filter CoreTests.CommandRegistryTests
 swiftly run swift test --filter CoreTests.DropDestinationRegistryTests
-swiftly run swift test --filter TerminalUITests.KeyCommandTests
-swiftly run swift test --filter TerminalUITests.DropDestinationDispatchTests
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.KeyCommandTests
+swiftly run swift test --filter SwiftTUITests.DropDestinationDispatchTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
 ```
 
 ### Task 3: Add `ViewGraph` and `ViewNode` checkpoints
@@ -490,17 +490,17 @@ Validation:
 
 ```bash
 swiftly run swift test --filter CoreTests.ViewGraphTests
-swiftly run swift test --filter TerminalUITests.ResolveReuseAncestorInvalidationTests
-swiftly run swift test --filter TerminalUITests.ResolveReuseIndexingTests
+swiftly run swift test --filter SwiftTUITests.ResolveReuseAncestorInvalidationTests
+swiftly run swift test --filter SwiftTUITests.ResolveReuseIndexingTests
 ```
 
 ### Task 4: Add animation frame-head transactions
 
 Files:
 
-- `Sources/TerminalUI/AnimationController.swift`
-- `Tests/TerminalUITests/AnimationControllerTests.swift`
-- `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- `Sources/SwiftTUI/AnimationController.swift`
+- `Tests/SwiftTUITests/AnimationControllerTests.swift`
+- `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 
 Work:
 
@@ -521,18 +521,18 @@ git commit -m "refactor(animation): defer frame-head animation side effects"
 Validation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AnimationControllerTests
-swiftly run swift test --filter TerminalUITests.AnimationRepeatForeverGrowthTests
-swiftly run swift test --filter TerminalUITests.AnimationTickVisibilityTests
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.AnimationControllerTests
+swiftly run swift test --filter SwiftTUITests.AnimationRepeatForeverGrowthTests
+swiftly run swift test --filter SwiftTUITests.AnimationTickVisibilityTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
 ```
 
 ### Task 5: Wire `FrameHeadDraft.abort()`
 
 Files:
 
-- `Sources/TerminalUI/TerminalUI.swift`
-- `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- `Sources/SwiftTUI/SwiftTUI.swift`
+- `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 
 Work:
 
@@ -552,10 +552,10 @@ git commit -m "refactor(renderer): abort uncommitted frame heads"
 Validation:
 
 ```bash
-swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests
-swiftly run swift test --filter TerminalUITests.FocusTransitionTests
-swiftly run swift test --filter TerminalUITests.PreferenceSurfaceTests
-swiftly run swift test --filter TerminalUITests.InteractiveRuntimeTests
+swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests
+swiftly run swift test --filter SwiftTUITests.FocusTransitionTests
+swiftly run swift test --filter SwiftTUITests.PreferenceSurfaceTests
+swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests
 ```
 
 ### Task 6: Update docs and run full gates

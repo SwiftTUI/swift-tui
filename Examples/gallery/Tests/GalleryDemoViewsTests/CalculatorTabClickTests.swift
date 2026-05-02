@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Testing) import TerminalUI
+@_spi(Testing) import SwiftTUI
 import Testing
 
 @testable import GalleryDemoViews

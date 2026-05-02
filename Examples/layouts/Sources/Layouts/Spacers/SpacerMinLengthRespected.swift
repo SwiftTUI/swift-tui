@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Pins `Spacer(minLength:)` semantics: when two spacers compete for
 /// residual space inside a single `HStack`, the spacer carrying the

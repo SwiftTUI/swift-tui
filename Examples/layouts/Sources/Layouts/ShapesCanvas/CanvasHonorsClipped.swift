@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// A `Canvas` whose drawing intentionally paints far past the canvas
 /// frame, with `.clipped()` ensuring only cells inside the frame

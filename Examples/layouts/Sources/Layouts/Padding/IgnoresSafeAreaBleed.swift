@@ -1,4 +1,4 @@
-import TerminalUI
+import SwiftTUI
 
 /// Demonstrates that `.ignoresSafeArea(.bottom)` reclaims space an
 /// outer `.safeAreaPadding(.bottom, N)` reserved from the ambient

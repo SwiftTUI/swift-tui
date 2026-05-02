@@ -176,10 +176,10 @@ In scope:
 - `Sources/Core/Graph/ViewGraph.swift`
 - `Sources/Core/Graph/ViewNode.swift`
 - `Sources/Core/RuntimeRegistrationSet.swift`
-- `Sources/TerminalUI/TerminalUI.swift`
-- `Sources/TerminalUI/RunLoop+Rendering.swift`
+- `Sources/SwiftTUI/SwiftTUI.swift`
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`
 - layout, geometry, async-rendering, and interactive runtime tests under
-  `Tests/CoreTests/`, `Tests/ViewTests/`, and `Tests/TerminalUITests/`
+  `Tests/CoreTests/`, `Tests/ViewTests/`, and `Tests/SwiftTUITests/`
 
 Out of scope for the first implementation pass:
 
@@ -281,7 +281,7 @@ migration, but the final design should delete the hidden dual meaning.
 ### Decision 5: Anchor and coordinate-space work becomes part of the same seam
 
 SwiftUI's anchor preferences and geometry proxy are tied to coordinate spaces.
-TerminalUI already defers anchor-based preference APIs until local coordinate
+SwiftTUI already defers anchor-based preference APIs until local coordinate
 spaces and anchor resolution ship. The layout-dependent boundary should be
 designed with coordinate-space conversion in mind even if public anchors ship in
 a later phase.
@@ -319,11 +319,11 @@ changing architecture.
 
 ### Likely files
 
-- `Tests/TerminalUITests/GeometryReaderSurfaceTests.swift`
-- `Tests/TerminalUITests/SafeAreaSurfaceTests.swift`
-- `Tests/TerminalUITests/ViewThatFitsSurfaceTests.swift`
+- `Tests/SwiftTUITests/GeometryReaderSurfaceTests.swift`
+- `Tests/SwiftTUITests/SafeAreaSurfaceTests.swift`
+- `Tests/SwiftTUITests/ViewThatFitsSurfaceTests.swift`
 - `Tests/ViewTests/LayoutProtocolTests.swift`
-- `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 - `docs/proposals/layout/BEHAVIOUR_FINDINGS.md`
 
 ### Acceptance
@@ -369,15 +369,15 @@ without duplicating or prematurely committing runtime side effects.
 - `Sources/Core/RuntimeRegistrationSet.swift`
 - `Sources/Core/Graph/ViewGraph.swift`
 - `Sources/Core/Graph/ViewNode.swift`
-- `Sources/TerminalUI/TerminalUI.swift`
-- `Sources/TerminalUI/RunLoop+Rendering.swift`
-- `Sources/TerminalUI/FrameDiagnosticsLogger.swift`
+- `Sources/SwiftTUI/SwiftTUI.swift`
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`
+- `Sources/SwiftTUI/FrameDiagnosticsLogger.swift`
 
 ### Tests
 
-- `Tests/TerminalUITests/GestureTeardownTests.swift`
-- `Tests/TerminalUITests/InteractiveRuntimeTests.swift`
-- `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- `Tests/SwiftTUITests/GestureTeardownTests.swift`
+- `Tests/SwiftTUITests/InteractiveRuntimeTests.swift`
+- `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 - new focused tests for draft registration install/rollback behavior
 
 ### Acceptance
@@ -479,7 +479,7 @@ environment geometry.
 - `Sources/Core/LayoutEngine.swift`
 - `Sources/Core/LayoutEngine+Placement.swift`
 - `Sources/View/Environment/StyleEnvironment.swift`
-- `Tests/TerminalUITests/GeometryReaderSurfaceTests.swift`
+- `Tests/SwiftTUITests/GeometryReaderSurfaceTests.swift`
 
 ### Tests
 
@@ -536,7 +536,7 @@ primary geometry without resolve-time guessing.
 ### Tests
 
 - `Tests/ViewTests/PreferenceTests.swift`
-- `Tests/TerminalUITests/OverlayPreferenceTests.swift`
+- `Tests/SwiftTUITests/OverlayPreferenceTests.swift`
 - new tests for geometry-dependent overlay/background placement
 - future anchor tests once local coordinate spaces exist
 
@@ -598,10 +598,10 @@ be represented by environment mutation.
 
 ### Tests
 
-- `Tests/TerminalUITests/SafeAreaSurfaceTests.swift`
-- `Tests/TerminalUITests/ViewThatFitsSurfaceTests.swift`
+- `Tests/SwiftTUITests/SafeAreaSurfaceTests.swift`
+- `Tests/SwiftTUITests/ViewThatFitsSurfaceTests.swift`
 - `Tests/ViewTests/LayoutProtocolTests.swift`
-- `Tests/TerminalUITests/ScrollViewSurfaceTests.swift`
+- `Tests/SwiftTUITests/ScrollViewSurfaceTests.swift`
 - focused tests for unselected `ViewThatFits` side effects
 - focused tests for custom `Layout` measure/place proposal divergence
 
@@ -638,7 +638,7 @@ local layout geometry.
 
 - `Sources/View/Environment/StyleEnvironment.swift`
 - `Sources/View/ViewModifiers.swift`
-- `Sources/TerminalUI/RunLoop+Rendering.swift`
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`
 - `docs/RUNTIME.md`
 - `docs/SWIFTUI_LAYOUT.md`
 - `docs/PUBLIC_API_BASELINE.md`
@@ -682,11 +682,11 @@ Keep async rendering correct after layout can realize content.
 
 ### Likely files
 
-- `Sources/TerminalUI/TerminalUI.swift`
-- `Sources/TerminalUI/RunLoop+Rendering.swift`
-- `Sources/TerminalUI/FrameDiagnosticsLogger.swift`
+- `Sources/SwiftTUI/SwiftTUI.swift`
+- `Sources/SwiftTUI/RunLoop+Rendering.swift`
+- `Sources/SwiftTUI/FrameDiagnosticsLogger.swift`
 - `Sources/Core/FrameDropEligibility.swift`
-- `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
+- `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`
 
 ### Tests
 
@@ -732,7 +732,7 @@ structural limitation.
 
 ### OQ1: GeometryReader unspecified-size default
 
-SwiftUI `GeometryReader` has flexible preferred size. TerminalUI needs a
+SwiftUI `GeometryReader` has flexible preferred size. SwiftTUI needs a
 terminal-native rule for unspecified dimensions. The implementation should
 preserve current useful behavior unless characterization shows it is already
 non-SwiftUI-shaped in a user-visible way.
@@ -741,7 +741,7 @@ non-SwiftUI-shaped in a user-visible way.
 
 Empirical SwiftUI probes suggest content is evaluated with placement geometry,
 not every measurement proposal. Apple docs do not state this as an implementation
-phase guarantee. TerminalUI should adopt the semantic result: reader content
+phase guarantee. SwiftTUI should adopt the semantic result: reader content
 adapts downward to its container geometry and does not drive the reader's own
 parent measurement.
 
@@ -776,11 +776,11 @@ state should persist.
 
 Focused checks by phase:
 
-- `swiftly run swift test --filter TerminalUITests.GeometryReaderSurfaceTests`
-- `swiftly run swift test --filter TerminalUITests.SafeAreaSurfaceTests`
-- `swiftly run swift test --filter TerminalUITests.ViewThatFitsSurfaceTests`
-- `swiftly run swift test --filter TerminalUITests.AsyncFrameTailRenderingTests`
-- `swiftly run swift test --filter TerminalUITests.InteractiveRuntimeTests`
+- `swiftly run swift test --filter SwiftTUITests.GeometryReaderSurfaceTests`
+- `swiftly run swift test --filter SwiftTUITests.SafeAreaSurfaceTests`
+- `swiftly run swift test --filter SwiftTUITests.ViewThatFitsSurfaceTests`
+- `swiftly run swift test --filter SwiftTUITests.AsyncFrameTailRenderingTests`
+- `swiftly run swift test --filter SwiftTUITests.InteractiveRuntimeTests`
 - `swiftly run swift test --filter ViewTests`
 - `swiftly run swift test --filter CoreTests`
 
