@@ -87,6 +87,14 @@ package final class LocalGestureRegistry: Equatable {
     )
   }
 
+  package func activeIdentitySnapshot() -> Set<Identity> {
+    Set(
+      recognizers.compactMap { identity, recognizer in
+        recognizer.isActive ? identity : nil
+      }
+    )
+  }
+
   package func removeSubtrees(
     rootedAt roots: [Identity],
     preserving preservedIdentities: Set<Identity> = []
@@ -114,6 +122,17 @@ package final class LocalGestureRegistry: Equatable {
   package func restore(_ snapshot: [Identity: AnyGestureRecognizer]) {
     guard !snapshot.isEmpty else { return }
     for (identity, recognizer) in snapshot {
+      if let existing = recognizers[identity] {
+        if existing.isActive {
+          if existing !== recognizer {
+            recognizer.tearDown()
+          }
+          continue
+        }
+        if existing !== recognizer {
+          existing.tearDown()
+        }
+      }
       recognizers[identity] = recognizer
     }
   }
