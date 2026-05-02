@@ -82,6 +82,23 @@ This is the "failure chance <= 10%" bar: each primitive owns one policy surface,
 and the migration is blocked until the composition tests prove the surfaces work
 together.
 
+## Migration Boundary
+
+Build and prove the primitives before replacing any existing presentation
+modifier execution path. Stages 1 through 4 are allowed to add parallel
+package-internal primitives, tests, and temporary bridge points, but they must
+not partially convert `.sheet`, `.alert`, `.confirmationDialog`, `.menu`, or
+`.toast` while the primitive stack is incomplete.
+
+Once `InteractionGate`, `OverlayStack`, `Portal`, and `DismissStack` are green
+as standalone primitives, Stage 5 must migrate every current hoisting-backed
+view modifier and presentation declaration path onto the new system. A mixed
+end state where some presentation families still execute through
+`PresentationHostState`, `PresentationOverlayHost`, or presentation-family
+Escape ordering is not acceptable. Temporary compatibility shims are allowed
+only inside the Stage 5 migration and must be deleted in Stage 6 after the
+adapter parity tests pass.
+
 ## Primitive Set
 
 ### Primitive 1: `InteractionGate`
@@ -582,7 +599,20 @@ presentation-family order.
 
 ## Stage 5: Lower Existing Presentation APIs Into Primitives
 
-**Goal:** Keep public API behavior while replacing the execution model.
+**Goal:** Keep public API behavior while replacing the execution model for every
+existing hoisting-backed modifier.
+
+- [ ] Audit every existing hoisting-backed presentation entry point.
+
+  Search for all callers and declarations that feed
+  `PresentationCoordinatorDeclarationPreferenceKey`, `PresentationOverlayEntry`,
+  `PresentationHostState`, or `composePresentationHostTree(...)`. The migration
+  scope includes `.sheet`, `.alert`, `.confirmationDialog`, `.menu`, `.toast`,
+  `Menu` controls that currently lower through sheet presentation machinery,
+  and any other modifier or control that uses the same hoisted presentation
+  path. Do not start replacing individual public modifiers until
+  `InteractionGate`, `OverlayStack`, `Portal`, and `DismissStack` have passed
+  their standalone primitive suites.
 
 - [ ] Convert `.sheet(...)`.
 
@@ -652,6 +682,14 @@ presentation-family order.
   - sheet focus restoration;
   - Escape dismissal from text-input focus inside a sheet.
 
+- [ ] Confirm no presentation family remains on the old hoisting execution path.
+
+  After the adapters are converted, every active presentation surface should be
+  produced by portal entries, composed by `OverlayStack`, interaction-gated by
+  `InteractionGate`, and dismissed through `DismissStack`. Existing public
+  functions may remain as adapters, but none should call the old hoisting host
+  as their runtime implementation.
+
 - [ ] Verify Stage 5.
 
   ```bash
@@ -662,7 +700,8 @@ presentation-family order.
 
 ## Stage 6: Remove Presentation-Specific Host Machinery
 
-**Goal:** Delete the old special paths after parity is proven.
+**Goal:** Delete the old special paths after primitive parity and full adapter
+migration are proven.
 
 - [ ] Remove `PresentationOverlayEntry` and `PresentationOverlayHost` if they
   have no non-test callers.
@@ -684,6 +723,15 @@ presentation-family order.
 
   Expected: remaining matches are either primitive names, migration comments
   with active tests, or deleted.
+
+- [ ] Treat any remaining old-host caller as a blocker.
+
+  Stage 6 is not complete while a production source path can still present UI
+  through `PresentationHostState`, `PresentationOverlayHost`,
+  `PresentationCoordinatorRegistry.overlayEntries()`, or
+  presentation-family-specific Escape ordering. If a shim remains temporarily
+  necessary, document the exact blocker in this plan and keep the status
+  `active`.
 
 - [ ] Verify Stage 6.
 
@@ -809,6 +857,9 @@ The plan is complete when all of the following are true:
   advances and the app remains responsive.
 - Presentation code no longer needs manual overlay graph pruning, hardcoded
   Escape family precedence, or lifecycle carry-forward for hoisted content.
+- Every existing hoisting-backed view modifier and presentation control has
+  been migrated to the primitive system; no public presentation API remains on
+  the old host implementation.
 - Documentation names portal, overlay stack, interaction gate, and dismiss stack
   as framework primitives.
 - `bun run test` passes, or any unrelated failures are documented with focused
