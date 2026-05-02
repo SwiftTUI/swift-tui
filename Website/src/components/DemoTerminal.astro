@@ -1,7 +1,23 @@
 ---
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const iframeSrc = `${base}/webexample/`;
 const isDev = import.meta.env.DEV;
+const localWebExampleIndexPath = fileURLToPath(
+  new URL("../../../Examples/WebExample/pages-dist/index.html", import.meta.url)
+);
+const localWebExampleWasmPath = fileURLToPath(
+  new URL(
+    "../../../Examples/WebExample/pages-dist/TerminalApp/dist/assets/app.wasm",
+    import.meta.url
+  )
+);
+const hasLocalWebExampleArtifact = existsSync(localWebExampleIndexPath)
+  && existsSync(localWebExampleWasmPath);
+const showDevStub = isDev && !hasLocalWebExampleArtifact;
+
 interface Props {
   /** display height in px on lg+ viewports */
   height?: number;
@@ -32,7 +48,7 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
     </div>
 
     <div class="surface">
-      {isDev ? (
+      {showDevStub ? (
         <div class="dev-stub mono" aria-hidden="true">
           <div class="ds-frame">
             <div class="ds-row"><span class="ds-prompt">›</span><span>swift build --swift-sdk swift-6.3.1-RELEASE_wasm</span></div>

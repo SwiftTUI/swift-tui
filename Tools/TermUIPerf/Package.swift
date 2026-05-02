@@ -15,7 +15,7 @@ let package = Package(
     )
   ],
   dependencies: [
-    .package(name: "swift-terminal-ui", path: "../.."),
+    .package(name: "swift-tui", path: "../.."),
     .package(name: "gallery-demo", path: "../../Examples/gallery"),
     .package(name: "layouts-demo", path: "../../Examples/layouts"),
   ],
@@ -23,7 +23,7 @@ let package = Package(
     .executableTarget(
       name: "TermUIPerf",
       dependencies: [
-        .product(name: "TerminalUI", package: "swift-terminal-ui"),
+        .product(name: "TerminalUI", package: "swift-tui"),
         .product(name: "GalleryDemoViews", package: "gallery-demo"),
         .product(name: "Layouts", package: "layouts-demo"),
       ]
