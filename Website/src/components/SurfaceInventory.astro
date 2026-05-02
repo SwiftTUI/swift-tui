@@ -1,0 +1,247 @@
+---
+type Row = { name: string; note?: string; flag?: "shipped" | "constraint" | "deferred" };
+type Group = { title: string; rows: Row[] };
+
+const authoring: Group[] = [
+  {
+    title: "Layout & containers",
+    rows: [
+      { name: "VStack · HStack · ZStack", note: "stacked layout with spacing & alignment" },
+      { name: "LazyVStack · LazyHStack", note: "viewport-lazy placement, single-ForEach full-lazy rows" },
+      { name: "ScrollView · List · OutlineGroup", note: "tree-forward collection presentation" },
+      { name: "Table · Section · GroupBox", note: "" },
+      { name: "ViewThatFits · GeometryReader", note: "" },
+      { name: "Layout (custom)", note: "public protocol for custom layout participation" },
+    ],
+  },
+  {
+    title: "Controls & primitives",
+    rows: [
+      { name: "Text · TextFigure", note: "proposal-aware FIGlet rendering with embedded fonts" },
+      { name: "Button · Link · Label", note: "OSC 8 hyperlink emission when supported" },
+      { name: "Toggle · Stepper · Slider", note: "" },
+      { name: "TextField · TextEditor · SecureField", note: "" },
+      { name: "Picker · Menu · DisclosureGroup", note: "" },
+      { name: "ProgressView · Spacer · Divider · ControlGroup", note: "" },
+      { name: "Image", note: "PNG · baseline JPEG · GIF (first frame), Kitty / Sixel / ANSI fallback" },
+    ],
+  },
+  {
+    title: "Presentation & workflow",
+    rows: [
+      { name: "alert · confirmationDialog", note: "terminal-native modal surfaces" },
+      { name: "sheet · toast", note: "" },
+      { name: "Panel · .keyCommand · .paletteCommand", note: "ActionScopes & commands" },
+      { name: ".toolbar · .toolbarItem", note: "shipped via ACTION_SCOPES_AND_COMMANDS" },
+    ],
+  },
+  {
+    title: "Environment · observation · focus",
+    rows: [
+      { name: "@State · @Binding · @Bindable", note: "repo-owned @Bindable on the @State invalidation path" },
+      { name: "@FocusState · FocusedValues · @FocusedValue · @FocusedBinding", note: "" },
+      { name: "PreferenceKey · anchor preferences", note: "subtree readers, OpenLinkAction, .task(...)" },
+    ],
+  },
+];
+
+const runtime: Group[] = [
+  {
+    title: "Runtime surface",
+    rows: [
+      { name: "DefaultRenderer", note: "one-shot rendering & main-actor pipeline inspection" },
+      { name: "RunLoop", note: "interactive terminal sessions" },
+      { name: "TerminalHost · TerminalRenderStyle", note: "capability-aware presentation, theme swap" },
+      { name: "Keyboard · mouse · signals", note: "Unix signal handling and runtime scheduling" },
+      { name: "Identity-driven lifecycle diffs", note: "appear · disappear · task start · cancel" },
+    ],
+  },
+  {
+    title: "Scenes",
+    rows: [
+      { name: "App · Scene · WindowGroup · WindowIdentifier", note: "@MainActor scene declarations" },
+      { name: "SceneDescriptor · SceneManifest", note: "for tooling and retained hosted sessions" },
+      { name: "HostedSceneSession", note: "host-package retention point" },
+      { name: "TabView", note: "terminal-native shell composition" },
+      { name: "Pty-backed secondary scenes", note: "Unix-domain-socket discovery, lazy unattached rendering" },
+    ],
+  },
+  {
+    title: "Charts",
+    rows: [
+      { name: "BarChart · ColumnChart · ComparisonChart", note: "" },
+      { name: "Sparkline · Timeline · HeatStrip", note: "" },
+      { name: "ThresholdGauge · BulletChart · Meter · Legend", note: "" },
+      { name: "StackedBarChart", note: "" },
+    ],
+  },
+  {
+    title: "Deferred · by design",
+    rows: [
+      { name: "NavigationStack", flag: "deferred" },
+      { name: "popover-style presentation beyond sheet", flag: "deferred" },
+      { name: "richer accessibility / AT modeling", flag: "deferred" },
+    ],
+  },
+];
+---
+<section class="surface" id="surface">
+  <div class="shell">
+    <header class="head">
+      <span class="eyebrow"><span class="num">/03</span>Public surface</header>
+      <h2>Implementing a useful subset of SwiftUI, deliberately.</h2>
+      <p class="lede">
+        Layout primitives first. State and environment second. Runtime correctness third.
+        Broader orchestration only after the foundation is firm.
+        Terminal-only chrome that would bend the public authoring story does not belong in core.
+      </p>
+    </header>
+
+    <div class="cols">
+      <div class="col">
+        <div class="col-head mono">
+          <span>AUTHORING</span>
+          <span class="counter">{authoring.reduce((n, g) => n + g.rows.length, 0)} entries</span>
+        </div>
+        {authoring.map((group) => (
+          <section class="group">
+            <h4 class="group-title mono">{group.title}</h4>
+            <ul class="rows">
+              {group.rows.map((row) => (
+                <li class="row">
+                  <span class="name mono">{row.name}</span>
+                  {row.note && <span class="note">{row.note}</span>}
+                  {row.flag === "deferred" && <span class="flag flag--deferred mono">deferred</span>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+
+      <div class="col">
+        <div class="col-head mono">
+          <span>RUNTIME · SCENES · CHARTS</span>
+          <span class="counter">{runtime.reduce((n, g) => n + g.rows.length, 0)} entries</span>
+        </div>
+        {runtime.map((group) => (
+          <section class="group">
+            <h4 class="group-title mono">{group.title}</h4>
+            <ul class="rows">
+              {group.rows.map((row) => (
+                <li class={`row ${row.flag === "deferred" ? "row--deferred" : ""}`}>
+                  <span class="name mono">{row.name}</span>
+                  {row.note && <span class="note">{row.note}</span>}
+                  {row.flag === "deferred" && <span class="flag flag--deferred mono">deferred</span>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .surface {
+    padding: 88px 0 56px;
+    border-top: 1px solid var(--line);
+    margin-top: 56px;
+  }
+  .head { max-width: 760px; margin-bottom: 48px; }
+  .head h2 { margin-top: 16px; }
+  .head .lede { margin-top: 18px; max-width: 70ch; }
+
+  .cols {
+    display: grid;
+    grid-template-columns: 1.18fr 1fr;
+    gap: 0;
+    border-top: 1px solid var(--line-strong);
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .col {
+    padding: 0;
+    border-right: 1px solid var(--line);
+  }
+  .col:last-child { border-right: 0; }
+
+  .col-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    color: var(--ink-3);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+  }
+  .col-head .counter {
+    color: var(--ink-4);
+    letter-spacing: 0.04em;
+    font-size: 10.5px;
+  }
+
+  .group {
+    border-bottom: 1px solid var(--line);
+  }
+  .group:last-child { border-bottom: 0; }
+  .group-title {
+    padding: 16px 22px 4px;
+    color: var(--ink);
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+  }
+  .rows { list-style: none; margin: 0; padding: 4px 0 14px; }
+  .row {
+    display: grid;
+    grid-template-columns: minmax(180px, max-content) 1fr auto;
+    gap: 18px;
+    padding: 10px 22px;
+    align-items: baseline;
+    border-top: 1px dashed var(--line);
+  }
+  .row:first-child { border-top: 0; }
+  .row .name {
+    color: var(--ink);
+    font-size: 12.5px;
+    letter-spacing: 0.005em;
+  }
+  .row .note {
+    color: var(--ink-3);
+    font-size: 12.5px;
+    letter-spacing: -0.005em;
+  }
+  .row.row--deferred .name { color: var(--ink-3); }
+  .flag {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-3);
+    text-transform: uppercase;
+  }
+  .flag--deferred {
+    color: var(--warn);
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.06);
+  }
+
+  @media (max-width: 1080px) {
+    .cols { grid-template-columns: 1fr; }
+    .col { border-right: 0; border-bottom: 1px solid var(--line); }
+    .col:last-child { border-bottom: 0; }
+  }
+  @media (max-width: 640px) {
+    .row {
+      grid-template-columns: 1fr;
+      gap: 4px;
+      padding: 12px 18px;
+    }
+    .col-head { padding: 14px 18px; }
+    .group-title { padding: 16px 18px 4px; }
+  }
+</style>
