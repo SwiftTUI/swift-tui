@@ -56,6 +56,10 @@ package final class FrameHeadRegistrationDraft {
     return liveRegistrations.diagnostics()
   }
 
+  package func draftDropEligibilityBlockers() -> Set<FrameDropEligibility.Blocker> {
+    draftRegistrations.frameDropEligibilityBlockers()
+  }
+
   package func discard() {
     precondition(!didCommit && !didDiscard)
     didDiscard = true

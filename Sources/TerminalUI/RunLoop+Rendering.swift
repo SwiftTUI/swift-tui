@@ -370,6 +370,12 @@ extension RunLoop {
             newestDesiredAtTailStart: renderIntentDiagnostics.desiredGeneration,
             newestDesiredAtTailResult: renderIntentDiagnostics.desiredGeneration,
             dropEligibilityBlockers: dropEligibilityBlockers,
+            dropDecision: CompletedFrameDropDecision.Action.commitOrdered.rawValue,
+            dropGeneration: nil,
+            newestDesiredAtDrop: nil,
+            dropReconciliationMode: "-",
+            dropReconciliationEffects: "-",
+            presentationRecoveryAfterDrop: false,
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
@@ -489,6 +495,122 @@ extension RunLoop {
         newestDesiredAtTailStart: renderIntentDiagnostics.desiredGeneration,
         newestDesiredAtTailResult: nextRenderIntentGeneration,
         dropEligibilityBlockers: [],
+        dropDecision: "-",
+        dropGeneration: nil,
+        newestDesiredAtDrop: nil,
+        dropReconciliationMode: "-",
+        dropReconciliationEffects: "-",
+        presentationRecoveryAfterDrop: false,
+        inputEventsQueuedDuringRenderSuspension:
+          renderSuspensionDiagnostics
+          .drainInputEventsQueuedDuringSuspension(),
+        presentationStrategy: "-",
+        presentationBytesWritten: 0,
+        presentationLinesTouched: 0,
+        presentationCellsChanged: 0,
+        presentationDuration: .zero,
+        damageRowCount: nil,
+        damageRangeAwareRowCount: nil,
+        damageTextSpanCount: nil,
+        damageTextCellCount: nil,
+        damageGraphicsInvalidationCount: nil,
+        damageRequiresFullTextRepaint: false,
+        damageRequiresFullGraphicsReplay: false,
+        presentationUsedSynchronizedOutput: false,
+        presentationGraphicsReplayScope: "-",
+        presentationGraphicsAttachmentsReplayed: 0,
+        presentationEditOperationLowering: "-",
+        presentationEditOperationCount: 0,
+        measurementCacheHitRate: nil,
+        totalFrameDuration: .zero
+      )
+    )
+  }
+
+  @MainActor
+  private func logDroppedCompletedFrame(
+    diagnosticsLogger: FrameDiagnosticsLogger?,
+    renderedFrames: Int,
+    scheduledFrame: ScheduledFrame,
+    renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
+    renderGeneration: RenderGeneration,
+    newestDesiredGeneration: RenderGeneration,
+    decision: CompletedFrameDropDecision?,
+    animationControllerActiveAnimationCount: Int,
+    animationControllerHasPendingWork: Bool
+  ) {
+    guard let diagnosticsLogger else {
+      return
+    }
+    let causeSummary = scheduledFrame.causes
+      .map(\.rawValue)
+      .sorted()
+      .joined(separator: "+")
+    let reconciliation =
+      decision?.reconciliation
+      ?? .blocked(
+        reason: .dropEligibilityBlockers
+      )
+    diagnosticsLogger.log(
+      FrameDiagnosticRecord(
+        frameNumber: renderedFrames + 1,
+        causeSummary: causeSummary,
+        focusSyncRerenders: 0,
+        invalidatedIdentityCount: scheduledFrame.invalidatedIdentities.count,
+        resolvedNodeCount: 0,
+        resolvedNodesComputed: 0,
+        resolvedNodesReused: 0,
+        measuredNodeCount: 0,
+        measuredNodesComputed: 0,
+        measuredNodesReused: 0,
+        placedNodeCount: 0,
+        drawNodeCount: 0,
+        interactionRegionCount: 0,
+        focusRegionCount: 0,
+        phaseTimings: nil,
+        renderGenerations: .init(render: renderGeneration),
+        desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+        coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches,
+        coalescedWakeCauses: formattedWakeCauses(
+          renderIntentDiagnostics.coalescedWakeCauses
+        ),
+        coalescedIntentRequests: renderIntentDiagnostics.intentRequestCount,
+        scheduledAnimationRequest: formattedAnimationRequest(
+          scheduledFrame.animationRequest
+        ),
+        scheduledAnimationBatchID: scheduledFrame.animationBatchID?.value,
+        animationControllerActiveAnimationCount: animationControllerActiveAnimationCount,
+        animationControllerHasPendingWork: animationControllerHasPendingWork,
+        workerTimings: nil,
+        mainActorTimings: nil,
+        customLayoutFallbackCount: 0,
+        firstCustomLayoutFallbackIdentity: nil,
+        layoutDependentRealizations: 0,
+        layoutDependentRealizationCacheHits: 0,
+        layoutDependentMainActorFallbacks: 0,
+        geometryAnchorResolutionMissCount: 0,
+        firstGeometryAnchorResolutionMissIdentity: nil,
+        geometryMissingNamedCoordinateSpaceCount: 0,
+        firstGeometryMissingNamedCoordinateSpaceName: nil,
+        geometryDuplicateNamedCoordinateSpaceCount: 0,
+        firstGeometryDuplicateNamedCoordinateSpaceName: nil,
+        runtimePointerHandlerCount: 0,
+        runtimePointerHoverHandlerCount: 0,
+        runtimeGestureRecognizerCount: 0,
+        runtimeGestureStateBindingCount: 0,
+        staleFramePolicy: "drop_completed_visual_only",
+        tailJobState: FrameTailJobState.droppedCompleted.rawValue,
+        tailCancelReason: "-",
+        cancelledRenderCount: cancelledRenderCount,
+        newestDesiredAtTailStart: renderIntentDiagnostics.desiredGeneration,
+        newestDesiredAtTailResult: newestDesiredGeneration.rawValue,
+        dropEligibilityBlockers: droppedFrameBlockers(from: decision),
+        dropDecision: decision?.action.rawValue ?? "-",
+        dropGeneration: renderGeneration.rawValue,
+        newestDesiredAtDrop: newestDesiredGeneration.rawValue,
+        dropReconciliationMode: reconciliation.mode.rawValue,
+        dropReconciliationEffects: reconciliation.effectSummary,
+        presentationRecoveryAfterDrop: false,
         inputEventsQueuedDuringRenderSuspension:
           renderSuspensionDiagnostics
           .drainInputEventsQueuedDuringSuspension(),
@@ -553,6 +675,7 @@ extension RunLoop {
       var scrollPositionChangedDuringFrame = false
       var artifacts: FrameArtifacts?
       var tailJobState: FrameTailJobState = .completed
+      var completedFrameDropDecision: CompletedFrameDropDecision?
       let currentState = stateContainer.state
       if previousRenderedState != currentState {
         renderer.forceRootEvaluation()
@@ -598,6 +721,12 @@ extension RunLoop {
                   : renderIntentDiagnostics.desiredGeneration
               )
             },
+            completedFrameAdditionalBlockers: { artifacts in
+              self.completedFrameAdditionalDropBlockers(
+                artifacts: artifacts,
+                scheduledFrame: scheduledFrame
+              )
+            },
             shouldCancelQueued: shouldCancelQueuedTail
           )
           if renderOutcome.tailJobState == .cancelledBeforeStart {
@@ -618,7 +747,25 @@ extension RunLoop {
             )
             continue frameLoop
           }
+          if renderOutcome.tailJobState == .droppedCompleted {
+            logDroppedCompletedFrame(
+              diagnosticsLogger: diagnosticsLogger,
+              renderedFrames: renderedFrames,
+              scheduledFrame: scheduledFrame,
+              renderIntentDiagnostics: renderIntentDiagnostics,
+              renderGeneration: renderOutcome.renderGeneration,
+              newestDesiredGeneration: renderOutcome.newestDesiredGeneration
+                ?? RenderGeneration(nextRenderIntentGeneration),
+              decision: renderOutcome.completedFrameDropDecision,
+              animationControllerActiveAnimationCount: renderer
+                .internalAnimationController.activeAnimationCount,
+              animationControllerHasPendingWork: renderer
+                .internalAnimationController.lastTickResult.hasPendingWork
+            )
+            continue frameLoop
+          }
           tailJobState = renderOutcome.tailJobState
+          completedFrameDropDecision = renderOutcome.completedFrameDropDecision
           guard let artifacts = renderOutcome.artifacts else {
             preconditionFailure("Completed render outcome did not include frame artifacts.")
           }
@@ -881,6 +1028,15 @@ extension RunLoop {
             newestDesiredAtTailStart: renderIntentDiagnostics.desiredGeneration,
             newestDesiredAtTailResult: renderIntentDiagnostics.desiredGeneration,
             dropEligibilityBlockers: dropEligibilityBlockers,
+            dropDecision: completedFrameDropDecision?.action.rawValue
+              ?? CompletedFrameDropDecision.Action.commitOrdered.rawValue,
+            dropGeneration: nil,
+            newestDesiredAtDrop: nil,
+            dropReconciliationMode: completedFrameDropDecision?.reconciliation.mode.rawValue
+              ?? "-",
+            dropReconciliationEffects: completedFrameDropDecision?.reconciliation.effectSummary
+              ?? "-",
+            presentationRecoveryAfterDrop: false,
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
             presentationStrategy: presentationMetrics.strategy == .fullRepaint
@@ -1057,6 +1213,37 @@ extension RunLoop {
       artifacts,
       additionalBlockers: additionalBlockers
     ).blockers
+  }
+
+  private func completedFrameAdditionalDropBlockers(
+    artifacts: FrameArtifacts,
+    scheduledFrame: ScheduledFrame
+  ) -> Set<FrameDropEligibility.Blocker> {
+    var blockers = renderer.internalAnimationController.frameDropEligibilityBlockers
+    if scheduledFrame.animationRequest != .inherit {
+      blockers.insert(.animationTransaction)
+    }
+    if !artifacts.semanticSnapshot.focusRegions.isEmpty {
+      blockers.insert(.focusGraph)
+    }
+    if !artifacts.semanticSnapshot.scrollRoutes.isEmpty {
+      blockers.insert(.scrollSync)
+    }
+    return blockers
+  }
+
+  private func droppedFrameBlockers(
+    from decision: CompletedFrameDropDecision?
+  ) -> Set<FrameDropEligibility.Blocker> {
+    guard let decision else {
+      return []
+    }
+    switch decision.eligibility {
+    case .mustCommit(let blockers):
+      return blockers
+    case .canDropVisualOnly:
+      return []
+    }
   }
 
   package func formattedAnimationRequest(

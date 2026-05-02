@@ -12,6 +12,10 @@ package struct LifecycleHandlerSnapshot: Sendable {
     self.disappearHandlers = disappearHandlers
     self.changeHandlers = changeHandlers
   }
+
+  package var isEmpty: Bool {
+    appearHandlers.isEmpty && disappearHandlers.isEmpty && changeHandlers.isEmpty
+  }
 }
 
 @MainActor

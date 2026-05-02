@@ -3,19 +3,18 @@
 /// This is a **conservative classifier**.  The legacy artifact entry points are
 /// still observational and inject `.unobservable` when no blocker is detected.
 /// The candidate entry point can produce `.canDropVisualOnly`, but it does not
-/// drive any drop behavior on its own — the runtime still commits every started
-/// or completed frame.  See `docs/proposals/ASYNC_FRAME_STALE_POLICY.md` Stage 4
-/// for the eventual behavior change this is staging for.
+/// drive any drop behavior on its own. Higher-level completed-frame policy still
+/// has to prove the candidate is stale and select an available reconciliation
+/// mode before commit can be skipped.
 ///
 /// The classifier intentionally errs on the side of `mustCommit`: every
 /// frame whose artifacts and runtime context surface no specific blocker is
 /// still tagged with the catch-all `.unobservable` blocker, because some
 /// candidate-level effects are not visible from `FrameArtifacts` alone.
 ///
-/// As later stages teach the runtime to drop specific narrow cases — say, a
-/// superseded animation tick with no lifecycle, focus, task, preference, or
-/// handler transitions — this classifier can feed the explicit completed-frame
-/// policy without making the current ordered-commit path less conservative.
+/// The classifier feeds the explicit completed-frame policy without weakening
+/// ordered commit for frames that surface lifecycle, focus, task, preference,
+/// animation, handler, cache, retained-baseline, or presentation barriers.
 public struct FrameDropEligibility: Equatable, Sendable {
   /// Candidate-level classification result.
   public enum Decision: Equatable, Sendable {
@@ -23,8 +22,8 @@ public struct FrameDropEligibility: Equatable, Sendable {
     /// be reconciled by a future skipped-frame policy.
     case mustCommit(blockers: Set<Blocker>)
 
-    /// The frame carries no observed non-visual effects and is eligible for a
-    /// future completed-frame stale policy to consider.
+    /// The frame carries no observed non-visual effects and is eligible for the
+    /// completed-frame stale policy to consider.
     case canDropVisualOnly
   }
 
@@ -188,9 +187,9 @@ public struct FrameDropEligibility: Equatable, Sendable {
 
   /// Whether this frame is safe to drop.
   ///
-  /// Currently always `false`.  `decision == .canDropVisualOnly` means the
-  /// completed-frame stale policy may eventually consider the candidate; it does
-  /// not authorize the current runtime to skip commit.
+  /// Currently always `false`. Runtime code should use the explicit
+  /// completed-frame policy and reconciliation result, not this compatibility
+  /// flag, before skipping commit.
   public var canDrop: Bool {
     false
   }

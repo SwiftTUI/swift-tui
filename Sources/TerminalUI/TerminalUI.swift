@@ -133,11 +133,13 @@ package enum FrameTailJobState: String, Sendable {
   case started
   case completed
   case cancelledBeforeStart = "cancelled_before_start"
+  case droppedCompleted = "dropped_completed"
 }
 
 package struct CancellableRenderOutcome {
   package var artifacts: FrameArtifacts?
   package var renderGeneration: RenderGeneration
+  package var newestDesiredGeneration: RenderGeneration?
   package var tailJobState: FrameTailJobState
   package var tailCancelReason: String?
   package var completedFrameDropDecision: CompletedFrameDropDecision?
@@ -168,7 +170,7 @@ private final class FrameTailJobCancellationToken: Sendable {
         return true
       case .cancelledBeforeStart:
         return false
-      case .started, .completed:
+      case .started, .completed, .droppedCompleted:
         return true
       }
     }
@@ -1196,7 +1198,7 @@ public struct DefaultRenderer {
     presentationHostState = .init()
     animationController = .init()
     renderGenerationSequencer = .init()
-    completedFramePolicy = .orderedCommitOnly
+    completedFramePolicy = .dropCompletedVisualOnly
     frameTailRenderer = .init(
       layoutEngine: layoutEngine,
       semanticExtractor: semanticExtractor,
@@ -1358,6 +1360,10 @@ public struct DefaultRenderer {
     proposal: ProposedSize,
     collectsDiagnostics: Bool,
     newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration? = { nil },
+    completedFrameAdditionalBlockers:
+      @escaping @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = {
+        _ in []
+      },
     shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
   ) async -> CancellableRenderOutcome {
     let draft = prepareFrameHead(
@@ -1375,21 +1381,39 @@ public struct DefaultRenderer {
       return CancellableRenderOutcome(
         artifacts: nil,
         renderGeneration: draft.renderGeneration,
+        newestDesiredGeneration: nil,
         tailJobState: .cancelledBeforeStart,
         tailCancelReason: "newer_render_intent",
         completedFrameDropDecision: nil
       )
     case .output(let tailOutput):
+      let newestDesiredGeneration = newestDesiredGeneration() ?? draft.renderGeneration
       let candidate = makeCompletedFrameCandidate(
         draft: draft,
         tailOutput: tailOutput,
-        newestDesiredGeneration: newestDesiredGeneration() ?? draft.renderGeneration,
-        collectsDiagnostics: collectsDiagnostics
+        newestDesiredGeneration: newestDesiredGeneration,
+        collectsDiagnostics: collectsDiagnostics,
+        additionalBlockers: completedFrameAdditionalBlockers
       )
+      if candidate.dropDecision.canSkipCompletedFrame {
+        discardCompletedFrameCandidate(
+          candidate,
+          reconciliation: candidate.dropDecision.reconciliation
+        )
+        return CancellableRenderOutcome(
+          artifacts: nil,
+          renderGeneration: draft.renderGeneration,
+          newestDesiredGeneration: newestDesiredGeneration,
+          tailJobState: .droppedCompleted,
+          tailCancelReason: nil,
+          completedFrameDropDecision: candidate.dropDecision
+        )
+      }
       let artifacts = commitCompletedFrameCandidate(candidate)
       return CancellableRenderOutcome(
         artifacts: artifacts,
         renderGeneration: draft.renderGeneration,
+        newestDesiredGeneration: newestDesiredGeneration,
         tailJobState: .completed,
         tailCancelReason: nil,
         completedFrameDropDecision: candidate.dropDecision
@@ -1964,7 +1988,9 @@ public struct DefaultRenderer {
     draft: FrameHeadDraft,
     tailOutput: AsyncFrameTailDraftOutput,
     newestDesiredGeneration: RenderGeneration,
-    collectsDiagnostics: Bool
+    collectsDiagnostics: Bool,
+    additionalBlockers:
+      @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
   ) -> CompletedFrameCandidate {
     let resolved = completedFrameResolvedTree(
       draft: draft,
@@ -1988,7 +2014,11 @@ public struct DefaultRenderer {
       workerTimings: workerTimings,
       collectsDiagnostics: collectsDiagnostics
     )
-    let eligibility = FrameDropEligibility.classify(artifacts)
+    let eligibility = completedFrameEligibility(
+      artifacts: artifacts,
+      draft: draft,
+      additionalBlockers: additionalBlockers(artifacts)
+    )
     return CompletedFrameCandidate(
       draft: draft,
       tailOutput: tailOutput,
@@ -2182,6 +2212,34 @@ public struct DefaultRenderer {
     )
 
     return artifacts
+  }
+
+  @MainActor
+  private func completedFrameEligibility(
+    artifacts: FrameArtifacts,
+    draft: FrameHeadDraft,
+    additionalBlockers: Set<FrameDropEligibility.Blocker>
+  ) -> FrameDropEligibility {
+    var classificationArtifacts = artifacts
+    classificationArtifacts.diagnostics.dropEligibilityBlockers.subtract([
+      .retainedLayoutBaseline,
+      .retainedRasterBaseline,
+    ])
+    return FrameDropEligibility.classify(
+      FrameDropEligibility.Candidate(
+        artifacts: classificationArtifacts,
+        additionalBlockers: additionalBlockers.union(
+          frameHeadRegistrationDropBlockers(draft)
+        ),
+        hasCompleteBarrierSignals: true
+      ))
+  }
+
+  @MainActor
+  private func frameHeadRegistrationDropBlockers(
+    _ draft: FrameHeadDraft
+  ) -> Set<FrameDropEligibility.Blocker> {
+    draft.registrationDraft.draftDropEligibilityBlockers()
   }
 
   @MainActor

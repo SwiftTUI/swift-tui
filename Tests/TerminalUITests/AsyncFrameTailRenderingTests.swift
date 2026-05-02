@@ -992,6 +992,120 @@ struct AsyncFrameTailRenderingTests {
       })
   }
 
+  @Test("stale completed visual-only frame drops before commit")
+  func staleCompletedVisualOnlyFrameDropsBeforeCommit() async throws {
+    let rootIdentity = testIdentity("AsyncCompletedVisualOnlyDropRoot")
+    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let renderer = DefaultRenderer()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    let diagnosticsURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-async-completed-drop-\(UUID().uuidString).tsv")
+    defer {
+      try? FileManager.default.removeItem(at: diagnosticsURL)
+    }
+
+    let inputReader = InjectedTerminalInputReader()
+    let terminal = AsyncFrameTailTerminalHost()
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      keyHandler: { keyPress, _, stateContainer in
+        if keyPress == KeyPress(.character("i")) {
+          stateContainer.mutate { value in
+            value += 1
+          }
+          return .handled
+        }
+        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+          return .exit(.userExit(keyPress))
+        }
+        return .ignored
+      },
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncSkippedVisualOnlyView(value: value)
+      }
+    )
+    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
+    #expect(runLoop.diagnosticsLogger != nil)
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+
+    #expect(terminal.frames.contains { $0.contains("visual 0") })
+
+    stateContainer.replace(with: 1)
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    let eventPump = RunLoop<Int, AsyncSkippedVisualOnlyView>.EventPump(
+      stream: AsyncStream { continuation in
+        continuation.finish()
+      },
+      drainEvents: { [] },
+      cancel: {},
+      scheduleDeadlineWake: { _ in }
+    )
+    let renderTask = Task { @MainActor in
+      var renderedFrames = initialFrames
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: eventPump
+      )
+      return renderedFrames
+    }
+    try await valueWithTimeout {
+      await gate.waitUntilBlocked()
+    }
+    #expect(terminal.frames.contains { $0.contains("visual 1") } == false)
+
+    stateContainer.replace(with: 2)
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    try await waitUntil {
+      runLoop.scheduler.hasPendingFrame(at: .now())
+    }
+    gate.release()
+    let renderedFrames = try await valueWithTimeout {
+      try await renderTask.value
+    }
+
+    #expect(renderedFrames == 2)
+    #expect(stateContainer.state == 2)
+    #expect(terminal.frames.contains { $0.contains("visual 1") } == false)
+    #expect(terminal.frames.last?.contains("visual 2") == true)
+
+    let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
+    let rows = diagnosticRows(diagnostics)
+    #expect(
+      rows.contains { row in
+        row["tail_job_state"] == "dropped_completed"
+          && row["stale_frame_policy"] == "drop_completed_visual_only"
+          && row["drop_decision"] == "drop_visual_only"
+          && row["drop_generation"] != nil
+          && row["newest_desired_at_drop"] != nil
+          && row["drop_reconciliation_mode"] == "empty_visual_only"
+          && row["drop_reconciliation_effects"] == "-"
+          && row["presentation_recovery_after_drop"] == "0"
+      })
+  }
+
   @Test("cancelled animation intent is replayed into replacement frame diagnostics")
   func cancelledAnimationIntentIsReplayedIntoReplacementFrameDiagnostics() async throws {
     let rootIdentity = testIdentity("AsyncFrameTailAnimationIntentReplayRoot")
@@ -2180,7 +2294,7 @@ private struct AsyncSkippedVisualOnlyView: View {
 
   var body: some View {
     Text("visual \(value)")
-      .id(testIdentity("AsyncSkippedVisualOnlyValue"))
+      .id(testIdentity("AsyncSkippedVisualOnlyValue", "\(value)"))
   }
 }
 

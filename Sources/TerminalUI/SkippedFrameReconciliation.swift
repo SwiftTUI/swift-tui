@@ -144,6 +144,7 @@ package struct CompletedFramePolicy: Equatable, Sendable {
   }
 
   package static let orderedCommitOnly = Self()
+  package static let dropCompletedVisualOnly = Self(mode: .dropCompletedVisualOnly)
 
   package func decide(
     candidateGeneration: RenderGeneration,
