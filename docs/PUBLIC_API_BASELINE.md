@@ -20,7 +20,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 | `TerminalUI` | 46 | 417 |
 | `View` | 239 | 8485 |
 | `TerminalUICharts` | 17 | 1365 |
-| `Core` | 253 | 2510 |
+| `Core` | 253 | 2523 |
 
 ## TerminalUI
 
@@ -425,7 +425,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `FrameArtifacts` — struct — 10 members
 - `FrameContext` — struct — 8 members
 - `FrameDiagnostics` — struct — 30 members
-- `FrameDropEligibility` — struct — 33 members
+- `FrameDropEligibility` — struct — 46 members
 - `FrameMainActorTimings` — struct — 4 members
 - `FramePhaseTimings` — struct — 10 members
 - `FrameRenderGenerations` — struct — 7 members

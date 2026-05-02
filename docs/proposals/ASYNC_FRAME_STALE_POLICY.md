@@ -538,10 +538,10 @@ git commit -m "feat(runtime): cancel superseded unstarted frame-tail jobs"
   worker custom-layout cache updates, retained layout/raster baseline updates,
   presentation full-repaint recovery, graphics replay barriers, and
   diagnostics-required full records.
-- [ ] Add a candidate-level classifier that can distinguish
+- [x] Add a candidate-level classifier that can distinguish
   `mustCommit(blockers:)` from `canDropVisualOnly` only after every formerly
   `.unobservable` barrier has an explicit signal.
-- [ ] Keep `FrameDropEligibility.canDrop` false until the candidate classifier
+- [x] Keep `FrameDropEligibility.canDrop` false until the candidate classifier
   proves the narrow visual-only case with runtime-path tests.
 
 Stage 4 result so far:
@@ -553,9 +553,13 @@ Stage 4 result so far:
   transition bookkeeping, one-shot animation transactions, worker custom-layout
   cache updates, retained layout/raster baseline updates, presentation repaint
   recovery, graphics replay barriers, and diagnostics-required full records.
-- The classifier still injects `.unobservable` when neither frame artifacts nor
-  runtime context expose a specific blocker, so `canDrop` remains false for
-  every classified runtime frame.
+- `FrameDropEligibility.Candidate` can now report `.canDropVisualOnly` for a
+  fully classified candidate with an empty blocker set. The legacy artifact
+  classifiers still inject `.unobservable` when neither frame artifacts nor
+  runtime context expose a specific blocker.
+- `FrameDropEligibility.canDrop` remains false for every decision, including
+  `.canDropVisualOnly`; no runtime policy may use the candidate decision to skip
+  commit until runtime-path candidate/discard/reconciliation tests exist.
 - No runtime behavior uses the classifier to drop or reconcile frames.
 
 Target Stage 4 result:
