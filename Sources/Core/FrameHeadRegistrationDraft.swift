@@ -37,10 +37,11 @@ package final class FrameHeadRegistrationDraft {
     }
   }
 
+  @discardableResult
   package func commitRestoring(
     from viewGraph: ViewGraph,
     resolved _: ResolvedNode
-  ) {
+  ) -> RuntimeRegistrationDiagnostics {
     precondition(!didCommit && !didDiscard)
     switch liveMutation {
     case .none:
@@ -52,6 +53,7 @@ package final class FrameHeadRegistrationDraft {
     }
     viewGraph.restoreCurrentFrameRuntimeRegistrations(into: liveRegistrations)
     didCommit = true
+    return liveRegistrations.diagnostics()
   }
 
   package func discard() {

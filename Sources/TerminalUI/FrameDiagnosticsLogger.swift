@@ -47,6 +47,10 @@ public struct FrameDiagnosticRecord: Sendable {
   public var firstGeometryMissingNamedCoordinateSpaceName: String?
   public var geometryDuplicateNamedCoordinateSpaceCount: Int
   public var firstGeometryDuplicateNamedCoordinateSpaceName: String?
+  public var runtimePointerHandlerCount: Int
+  public var runtimePointerHoverHandlerCount: Int
+  public var runtimeGestureRecognizerCount: Int
+  public var runtimeGestureStateBindingCount: Int
   public var staleFramePolicy: String
   public var tailJobState: String
   public var tailCancelReason: String
@@ -207,6 +211,10 @@ public final class FrameDiagnosticsLogger {
       record.firstGeometryMissingNamedCoordinateSpaceName ?? "-",
       String(record.geometryDuplicateNamedCoordinateSpaceCount),
       record.firstGeometryDuplicateNamedCoordinateSpaceName ?? "-",
+      String(record.runtimePointerHandlerCount),
+      String(record.runtimePointerHoverHandlerCount),
+      String(record.runtimeGestureRecognizerCount),
+      String(record.runtimeGestureStateBindingCount),
       record.staleFramePolicy,
       record.tailJobState,
       record.tailCancelReason,
@@ -293,6 +301,10 @@ public final class FrameDiagnosticsLogger {
       "first_geometry_missing_named_coordinate_space",
       "geometry_duplicate_named_coordinate_spaces",
       "first_geometry_duplicate_named_coordinate_space",
+      "runtime_pointer_handlers",
+      "runtime_pointer_hover_handlers",
+      "runtime_gesture_recognizers",
+      "runtime_gesture_state_bindings",
       "stale_frame_policy",
       "tail_job_state",
       "tail_cancel_reason",

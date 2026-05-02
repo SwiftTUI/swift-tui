@@ -1,18 +1,20 @@
 # Cloudflare Pages headers. Read at the root of the deployed artifact.
 #
-# Layout reminder (set in .github/workflows/cloudflare-pages.yml):
-#   /              ← Astro site (this Website/ project)
-#   /docs/         ← DocC archive (combined Core + View + TerminalUI + TerminalUICharts)
-#   /webexample/   ← Examples/WebExample WASI demo
+# Layout (set in .github/workflows/cloudflare-pages.yml):
+#   /              <- Astro stub (this Website/ project)
+#   /docs/         <- DocC archive
+#   /webexample/   <- Examples/WebExample WASI demo
 
-# Baseline security headers for everything served from this origin.
+# Cross-origin isolation for the whole origin so the WebExample iframe
+# can use SharedArrayBuffer-backed stdin without a service-worker shim.
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin
 
 # HTML pages: revalidate every request so content updates appear immediately.
-# Astro emits trailing-slash directories, so the served files are index.html.
 /*.html
   Cache-Control: public, max-age=0, must-revalidate
 
@@ -20,14 +22,7 @@
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Static assets shipped via Website/public/ — fonts, images, gifs.
-/fonts/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/images/*
-  Cache-Control: public, max-age=2592000
-
-# DocC archive assets are content-addressed by Swift-DocC at build time.
+# DocC archive assets are content-addressed at build time.
 /docs/css/*
   Cache-Control: public, max-age=31536000, immutable
 
@@ -40,8 +35,8 @@
 /docs/data/*
   Cache-Control: public, max-age=3600
 
-# WebExample (Swift WASI demo) assets — wasm bundle is Brotli-compressed in
-# the Cloudflare Pages workflow to stay under Pages' 25 MiB per-file limit.
+# WebExample wasm bundle is Brotli-compressed in CI to stay under Pages'
+# 25 MiB per-file limit; advertise the encoding here.
 /webexample/TerminalApp/dist/assets/app.wasm
   Cache-Control: public, max-age=31536000, immutable, no-transform
   Content-Type: application/wasm
@@ -49,10 +44,3 @@
 
 /webexample/assets/*
   Cache-Control: public, max-age=31536000, immutable
-
-# Required cross-origin isolation headers for SharedArrayBuffer if/when the
-# WASI demo needs threading. Currently single-threaded; safe to leave off.
-# Uncomment if you adopt threaded WASI later:
-# /webexample/*
-#   Cross-Origin-Opener-Policy: same-origin
-#   Cross-Origin-Embedder-Policy: require-corp
