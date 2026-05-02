@@ -934,6 +934,7 @@ struct AsyncFrameTailRenderingTests {
         AsyncFrameTailCounterView(value: value)
       }
     )
+    runLoop.renderMode = .async
     runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
     #expect(runLoop.diagnosticsLogger != nil)
 
@@ -990,6 +991,172 @@ struct AsyncFrameTailRenderingTests {
           && row["stale_frame_policy"] == "cancel_pending_before_start"
           && (Int(row["cancelled_render_count"] ?? "") ?? 0) >= 1
       })
+  }
+
+  @Test("runtime render mode sync bypasses async cancellation")
+  func runtimeRenderModeSyncBypassesAsyncCancellation() async throws {
+    let rootIdentity = testIdentity("RuntimeRenderModeSyncRoot")
+    let workerGate = AsyncFrameTailBlockingGate()
+    let renderer = DefaultRenderer()
+    defer {
+      workerGate.release()
+    }
+
+    let inputReader = InjectedTerminalInputReader()
+    let terminal = AsyncFrameTailTerminalHost()
+    let diagnosticsURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-render-mode-sync-\(UUID().uuidString).tsv")
+    defer {
+      try? FileManager.default.removeItem(at: diagnosticsURL)
+    }
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameTailCounterView(value: value)
+      }
+    )
+    runLoop.renderMode = .sync
+    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
+    #expect(runLoop.diagnosticsLogger != nil)
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var renderedFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+
+    #expect(terminal.frames.contains { $0.contains("value 0") })
+
+    let workerBlockTask = Task {
+      await renderer.runFrameTailLayoutWorkerJobForCancellationTesting {
+        workerGate.beforeRaster()
+      }
+    }
+    await workerGate.waitUntilBlocked()
+
+    stateContainer.replace(with: 1)
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+    workerGate.release()
+    await workerBlockTask.value
+
+    #expect(renderedFrames == 2)
+    #expect(runLoop.cancelledRenderCount == 0)
+    #expect(terminal.frames.last?.contains("value 1") == true)
+
+    let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
+    let rows = diagnosticRows(diagnostics)
+    #expect(rows.allSatisfy { $0["tail_job_state"] != "cancelled_before_start" })
+    #expect(rows.allSatisfy { $0["stale_frame_policy"] != "cancel_pending_before_start" })
+  }
+
+  @Test("runtime render mode async-no-cancel commits queued work in order")
+  func runtimeRenderModeAsyncNoCancelCommitsQueuedWorkInOrder() async throws {
+    let rootIdentity = testIdentity("RuntimeRenderModeAsyncNoCancelRoot")
+    let workerGate = AsyncFrameTailBlockingGate()
+    let renderer = DefaultRenderer()
+    defer {
+      workerGate.release()
+    }
+
+    let inputReader = InjectedTerminalInputReader()
+    let terminal = AsyncFrameTailTerminalHost()
+    let diagnosticsURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-render-mode-async-no-cancel-\(UUID().uuidString).tsv")
+    defer {
+      try? FileManager.default.removeItem(at: diagnosticsURL)
+    }
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      keyHandler: { keyPress, _, _ in
+        if keyPress == KeyPress(.character("c"), modifiers: .ctrl) {
+          return .exit(.userExit(keyPress))
+        }
+        return .ignored
+      },
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncFrameTailHandledCounterView(value: value)
+      }
+    )
+    runLoop.renderMode = .asyncNoCancel
+    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
+    #expect(runLoop.diagnosticsLogger != nil)
+
+    let runTask = Task {
+      try await runLoop.run()
+    }
+
+    try await waitUntil {
+      terminal.frames.contains { $0.contains("value 0") }
+    }
+
+    let workerBlockTask = Task {
+      await renderer.runFrameTailLayoutWorkerJobForCancellationTesting {
+        workerGate.beforeRaster()
+      }
+    }
+    await workerGate.waitUntilBlocked()
+
+    stateContainer.replace(with: 1)
+    try await waitUntil {
+      runLoop.renderSuspensionDiagnostics.isSuspended
+    }
+    #expect(terminal.frames.contains { $0.contains("value 1") } == false)
+
+    stateContainer.replace(with: 2)
+    try await waitUntil {
+      runLoop.scheduler.hasPendingFrame(at: .now())
+    }
+    workerGate.release()
+
+    try await waitUntil {
+      terminal.frames.last?.contains("value 2") == true
+    }
+    inputReader.send(.key(.character("c"), modifiers: .ctrl))
+    inputReader.finish()
+
+    let result = try await valueWithTimeout {
+      try await runTask.value
+    }
+    await workerBlockTask.value
+
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(result.finalState == 2)
+    #expect(result.renderedFrames == 3)
+    #expect(runLoop.cancelledRenderCount == 0)
+    let value1Index = terminal.frames.firstIndex { $0.contains("value 1") }
+    let value2Index = terminal.frames.firstIndex { $0.contains("value 2") }
+    #expect(value1Index != nil)
+    #expect(value2Index != nil)
+    if let value1Index, let value2Index {
+      #expect(value1Index < value2Index)
+    }
+
+    let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
+    let rows = diagnosticRows(diagnostics)
+    #expect(rows.allSatisfy { $0["tail_job_state"] != "cancelled_before_start" })
+    #expect(rows.allSatisfy { $0["tail_job_state"] != "dropped_completed" })
+    #expect(rows.allSatisfy { $0["stale_frame_policy"] != "cancel_pending_before_start" })
   }
 
   @Test("stale completed visual-only frame drops before commit")
@@ -1103,6 +1270,113 @@ struct AsyncFrameTailRenderingTests {
           && row["drop_reconciliation_mode"] == "empty_visual_only"
           && row["drop_reconciliation_effects"] == "-"
           && row["presentation_recovery_after_drop"] == "0"
+      })
+  }
+
+  @Test("runtime render mode async-no-drop commits stale visual-only frames")
+  func runtimeRenderModeAsyncNoDropCommitsStaleVisualOnlyFrames() async throws {
+    let rootIdentity = testIdentity("RuntimeRenderModeAsyncNoDropRoot")
+    let gate = AsyncFrameTailBlockingGate(blockingEntry: 2)
+    let renderer = DefaultRenderer()
+    renderer.setFrameTailRenderHooks(
+      .init(beforeRaster: {
+        gate.beforeRaster()
+      })
+    )
+    defer {
+      renderer.setFrameTailRenderHooks(nil)
+      gate.release()
+    }
+
+    let diagnosticsURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-render-mode-async-no-drop-\(UUID().uuidString).tsv")
+    defer {
+      try? FileManager.default.removeItem(at: diagnosticsURL)
+    }
+
+    let inputReader = InjectedTerminalInputReader()
+    let terminal = AsyncFrameTailTerminalHost()
+    let stateContainer = StateContainer(
+      initialState: 0,
+      invalidationIdentities: [rootIdentity]
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      renderer: renderer,
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      scheduler: FrameScheduler(),
+      stateContainer: stateContainer,
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { value, _ in
+        AsyncSkippedVisualOnlyView(value: value)
+      }
+    )
+    runLoop.renderMode = .asyncNoDrop
+    runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsURL.path)
+    #expect(runLoop.diagnosticsLogger != nil)
+
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    var initialFrames = 0
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &initialFrames)
+
+    #expect(terminal.frames.contains { $0.contains("visual 0") })
+
+    stateContainer.replace(with: 1)
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    let eventPump = RunLoop<Int, AsyncSkippedVisualOnlyView>.EventPump(
+      stream: AsyncStream { continuation in
+        continuation.finish()
+      },
+      drainEvents: { [] },
+      cancel: {},
+      scheduleDeadlineWake: { _ in }
+    )
+    let renderTask = Task { @MainActor in
+      var renderedFrames = initialFrames
+      _ = try await runLoop.renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: eventPump
+      )
+      return renderedFrames
+    }
+    try await valueWithTimeout {
+      await gate.waitUntilBlocked()
+    }
+    #expect(terminal.frames.contains { $0.contains("visual 1") } == false)
+
+    stateContainer.replace(with: 2)
+    runLoop.scheduler.requestInvalidation(of: [rootIdentity])
+    try await waitUntil {
+      runLoop.scheduler.hasPendingFrame(at: .now())
+    }
+    gate.release()
+    let renderedFrames = try await valueWithTimeout {
+      try await renderTask.value
+    }
+
+    #expect(renderedFrames == 3)
+    #expect(stateContainer.state == 2)
+    let value1Index = terminal.frames.firstIndex { $0.contains("visual 1") }
+    let value2Index = terminal.frames.firstIndex { $0.contains("visual 2") }
+    #expect(value1Index != nil)
+    #expect(value2Index != nil)
+    if let value1Index, let value2Index {
+      #expect(value1Index < value2Index)
+    }
+
+    let diagnostics = try String(contentsOf: diagnosticsURL, encoding: .utf8)
+    let rows = diagnosticRows(diagnostics)
+    #expect(rows.allSatisfy { $0["tail_job_state"] != "dropped_completed" })
+    #expect(rows.allSatisfy { $0["stale_frame_policy"] != "drop_completed_visual_only" })
+    #expect(rows.allSatisfy { $0["drop_decision"] != "drop_visual_only" })
+    #expect(
+      rows.contains { row in
+        row["tail_job_state"] == "completed"
+          && row["stale_frame_policy"] == "commit_ordered"
+          && row["drop_decision"] == "commit_ordered"
+          && row["drop_reconciliation_mode"] == "blocked"
       })
   }
 
@@ -2276,6 +2550,19 @@ private struct AsyncFrameTailCounterView: View {
   var body: some View {
     Text("value \(value)")
       .id(testIdentity("AsyncFrameTailCounterValue", "\(value)"))
+  }
+}
+
+private struct AsyncFrameTailHandledCounterView: View {
+  var value: Int
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      Button("Action") {}
+        .id(testIdentity("AsyncFrameTailHandledCounterAction"))
+      Text("value \(value)")
+        .id(testIdentity("AsyncFrameTailHandledCounterValue", "\(value)"))
+    }
   }
 }
 
