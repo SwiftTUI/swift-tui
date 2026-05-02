@@ -84,6 +84,105 @@ struct AnimationRegressionTests {
     )
   }
 
+  @Test(
+    "diagnostics show animation intent is replayed after a cancellable gallery frame")
+  func diagnosticsShowAnimationIntentIsReplayedAfterCancellableGalleryFrame()
+    async throws
+  {
+    let terminalSize = CellSize(width: 96, height: 60)
+    let rootIdentity = Identity(components: [.named("AnimationsTabOffsetDiagnostics")])
+    let buttonLocation = try Self.centerOfText(
+      "right",
+      in: AnimationsTab(),
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity
+    )
+    let diagnosticsURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("termui-animation-regression-\(UUID().uuidString).tsv")
+    defer {
+      try? FileManager.default.removeItem(at: diagnosticsURL)
+    }
+    let host = AnimationRegressionRecordingHost(size: terminalSize)
+    var initialColumn: Int?
+    var framesBeforeToggle = 0
+    var markerColumnsAfterToggle: [Int] = []
+
+    let result = try await Self.runHarness(
+      host: host,
+      terminalSize: terminalSize,
+      rootIdentity: rootIdentity,
+      inputReader: AnimationRegressionAwaitedInputReader(steps: [
+        .waitUntil(timeoutNanoseconds: 2_000_000_000) {
+          let markerColumns = Self.slideMarkerColumns(in: host.surfaces)
+          guard let latestColumn = markerColumns.last else {
+            return false
+          }
+          initialColumn = latestColumn
+          framesBeforeToggle = host.surfaces.count
+          return true
+        },
+        .event(.mouse(.init(kind: .down(.primary), location: buttonLocation))),
+        .event(.mouse(.init(kind: .up(.primary), location: buttonLocation))),
+        .waitUntil(timeoutNanoseconds: 2_500_000_000) {
+          guard let initialColumn else {
+            return false
+          }
+          markerColumnsAfterToggle = Array(
+            Self.slideMarkerColumns(in: host.surfaces)
+              .dropFirst(framesBeforeToggle)
+          )
+          return markerColumnsAfterToggle.contains(initialColumn + 30)
+        },
+        .event(.key(KeyPress(.character("c"), modifiers: .ctrl))),
+      ]),
+      diagnosticsPath: diagnosticsURL.path,
+      viewBuilder: { AnimationsTab() }
+    )
+
+    let startingColumn = try #require(initialColumn)
+    let finalColumn = startingColumn + 30
+    #expect(result.exitReason == .userExit(KeyPress(.character("c"), modifiers: .ctrl)))
+    #expect(
+      markerColumnsAfterToggle.contains(finalColumn),
+      "expected the diagnostic probe to click the real gallery offset button"
+    )
+
+    let rows = Self.diagnosticRows(
+      try String(contentsOf: diagnosticsURL, encoding: .utf8)
+    )
+    let cancelledAnimationIndex = rows.firstIndex { row in
+      row["tail_job_state"] == "cancelled_before_start"
+        && row["tail_cancel_reason"] == "newer_render_intent"
+        && row["scheduled_animation_request"] == "animate"
+        && row["scheduled_animation_batch"] == "-"
+    }
+    #expect(
+      cancelledAnimationIndex != nil,
+      """
+      Expected diagnostics to identify the cancellable frame that carried the \
+      button click's animation intent. Rows: \(rows).
+      """
+    )
+    if let cancelledAnimationIndex {
+      let replayedAnimationCommit = rows.suffix(from: rows.index(after: cancelledAnimationIndex))
+        .contains { row in
+          row["tail_job_state"] == "completed"
+            && row["stale_frame_policy"] == "commit_ordered"
+            && row["scheduled_animation_request"] == "animate"
+            && row["scheduled_animation_batch"] == "-"
+        }
+      #expect(
+        replayedAnimationCommit,
+        """
+        Expected an animation-bearing cancelled frame to be followed by a \
+        committed frame that still carries animation intent. A committed final \
+        visual state under inherited animation means the one-shot transaction \
+        was consumed before commit. Rows: \(rows).
+        """
+      )
+    }
+  }
+
   private static func centerOfText(
     _ target: String,
     in view: some View,
@@ -137,6 +236,7 @@ struct AnimationRegressionTests {
     terminalSize: CellSize,
     rootIdentity: Identity,
     inputReader: any TerminalInputReading,
+    diagnosticsPath: String? = nil,
     viewBuilder: @escaping () -> V
   ) async throws -> RunLoopResult<Int> {
     var env = EnvironmentValues()
@@ -157,7 +257,26 @@ struct AnimationRegressionTests {
       proposal: .init(width: terminalSize.width, height: terminalSize.height),
       viewBuilder: { _, _ in viewBuilder() }
     )
+    if let diagnosticsPath {
+      runLoop.diagnosticsLogger = FrameDiagnosticsLogger(path: diagnosticsPath)
+    }
     return try await runLoop.run()
+  }
+
+  private static func diagnosticRows(_ text: String) -> [[String: String]] {
+    let lines = text.components(separatedBy: "\n").filter { !$0.isEmpty }
+    guard let headerLine = lines.first else {
+      return []
+    }
+    let headers = headerLine.components(separatedBy: "\t")
+    return lines.dropFirst().map { line in
+      let fields = line.components(separatedBy: "\t")
+      var row: [String: String] = [:]
+      for (index, header) in headers.enumerated() where index < fields.count {
+        row[header] = fields[index]
+      }
+      return row
+    }
   }
 }
 

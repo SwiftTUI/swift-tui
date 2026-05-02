@@ -313,6 +313,13 @@ extension RunLoop {
               renderIntentDiagnostics.coalescedWakeCauses
             ),
             coalescedIntentRequests: renderIntentDiagnostics.intentRequestCount,
+            scheduledAnimationRequest: formattedAnimationRequest(
+              scheduledFrame.animationRequest
+            ),
+            scheduledAnimationBatchID: scheduledFrame.animationBatchID?.value,
+            animationControllerActiveAnimationCount: renderer
+              .internalAnimationController.activeAnimationCount,
+            animationControllerHasPendingWork: animationTick.hasPendingWork,
             workerTimings: diag.workerTimings,
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
@@ -392,7 +399,9 @@ extension RunLoop {
     renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
     renderGeneration: RenderGeneration,
     tailJobState: FrameTailJobState,
-    tailCancelReason: String
+    tailCancelReason: String,
+    animationControllerActiveAnimationCount: Int,
+    animationControllerHasPendingWork: Bool
   ) {
     guard let diagnosticsLogger else {
       return
@@ -425,6 +434,12 @@ extension RunLoop {
           renderIntentDiagnostics.coalescedWakeCauses
         ),
         coalescedIntentRequests: renderIntentDiagnostics.intentRequestCount,
+        scheduledAnimationRequest: formattedAnimationRequest(
+          scheduledFrame.animationRequest
+        ),
+        scheduledAnimationBatchID: scheduledFrame.animationBatchID?.value,
+        animationControllerActiveAnimationCount: animationControllerActiveAnimationCount,
+        animationControllerHasPendingWork: animationControllerHasPendingWork,
         workerTimings: nil,
         mainActorTimings: nil,
         customLayoutFallbackCount: 0,
@@ -554,7 +569,11 @@ extension RunLoop {
               renderIntentDiagnostics: renderIntentDiagnostics,
               renderGeneration: renderOutcome.renderGeneration,
               tailJobState: renderOutcome.tailJobState,
-              tailCancelReason: renderOutcome.tailCancelReason ?? "-"
+              tailCancelReason: renderOutcome.tailCancelReason ?? "-",
+              animationControllerActiveAnimationCount: renderer
+                .internalAnimationController.activeAnimationCount,
+              animationControllerHasPendingWork: renderer
+                .internalAnimationController.lastTickResult.hasPendingWork
             )
             continue frameLoop
           }
@@ -768,6 +787,13 @@ extension RunLoop {
               renderIntentDiagnostics.coalescedWakeCauses
             ),
             coalescedIntentRequests: renderIntentDiagnostics.intentRequestCount,
+            scheduledAnimationRequest: formattedAnimationRequest(
+              scheduledFrame.animationRequest
+            ),
+            scheduledAnimationBatchID: scheduledFrame.animationBatchID?.value,
+            animationControllerActiveAnimationCount: renderer
+              .internalAnimationController.activeAnimationCount,
+            animationControllerHasPendingWork: animationTick.hasPendingWork,
             workerTimings: diag.workerTimings,
             mainActorTimings: diag.mainActorTimings,
             customLayoutFallbackCount: diag.customLayoutFallbackCount,
@@ -923,5 +949,18 @@ extension RunLoop {
 
     let size = terminalHost.surfaceSize
     return .init(width: size.width, height: size.height)
+  }
+
+  package func formattedAnimationRequest(
+    _ request: AnimationRequest
+  ) -> String {
+    switch request {
+    case .inherit:
+      "inherit"
+    case .disabled:
+      "disabled"
+    case .animate:
+      "animate"
+    }
   }
 }

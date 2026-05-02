@@ -291,6 +291,10 @@ struct AsyncFrameTailRenderingTests {
           && row["raster_output_generation"] == row["render_generation"]
           && row["coalesced_event_batches"] != nil
           && row["coalesced_wake_causes"] != nil
+          && row["scheduled_animation_request"] != nil
+          && row["scheduled_animation_batch"] != nil
+          && row["animation_controller_active_animations"] != nil
+          && row["animation_controller_pending_work"] != nil
       })
   }
 

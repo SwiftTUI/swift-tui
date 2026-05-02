@@ -34,10 +34,17 @@ The automated regression guard added with these notes is:
 Examples/gallery/Tests/GalleryDemoViewsTests/AnimationRegressionTests.swift
 ```
 
-It drives the real `AnimationsTab` through `RunLoop.run()`, clicks the actual
-offset example's `right` button, and asserts that the rendered `slide me` marker
-visits at least one intermediate cell column between its starting column and the
-final `offset(x: 30)` column.
+It drives the real `AnimationsTab` through `RunLoop.run()` and covers the
+regression two ways:
+
+- `animationsTabOffsetButtonRendersIntermediateFramesWhilePhaseAnimatorIsVisible`
+  clicks the actual offset example's `right` button and asserts that the
+  rendered `slide me` marker visits at least one intermediate cell column
+  between its starting column and the final `offset(x: 30)` column.
+- `diagnosticsShowAnimationIntentIsReplayedAfterCancellableGalleryFrame`
+  enables `FrameDiagnosticsLogger` on the same interaction and asserts that an
+  animation-bearing cancelled frame is followed by a committed frame that still
+  carries animation intent.
 
 Observed split:
 
@@ -47,8 +54,16 @@ swiftly run swift test --package-path Examples/gallery --filter GalleryDemoViews
 
 - `4e848ea`: fails. The marker columns after input are `[3, 33]`, a direct
   snap from the initial column to the final column.
-- `7dfc91b3032e83ed626c597df741f8d248480cdf`: passes with the same test patch
-  applied in a throwaway worktree.
+- `4e848ea`: the diagnostic test also fails. It observes
+  `tail_job_state=cancelled_before_start`,
+  `tail_cancel_reason=newer_render_intent`, and
+  `scheduled_animation_request=animate` / `scheduled_animation_batch=-` on the
+  cancelled click frame, followed by committed deadline frames with
+  `scheduled_animation_request=inherit`.
+- `7dfc91b3032e83ed626c597df741f8d248480cdf`: the visual test passes with the
+  same visual-test patch applied in a throwaway worktree. The diagnostic test
+  uses instrumentation added after this commit, so it is a head-side regression
+  localization guard rather than a direct old-commit comparison.
 
 ## User-Visible Symptoms
 
@@ -140,6 +155,21 @@ Test flow:
 On the bad head the final frame is present, but the intermediate frame is not.
 That is the signature of transaction loss rather than a missed click or a
 broken button action.
+
+The companion diagnostic test records TSV diagnostics for the same interaction.
+It uses the animation-focused fields added to `FrameDiagnosticsLogger`:
+
+- `scheduled_animation_request`: `inherit`, `disabled`, or `animate` from the
+  consumed `ScheduledFrame`.
+- `scheduled_animation_batch`: the opaque batch ID value when present, or `-`.
+- `animation_controller_active_animations`: controller active-animation count
+  at diagnostic emission time.
+- `animation_controller_pending_work`: whether the controller still has pending
+  animation work at diagnostic emission time.
+
+The current bad-head signature is a batchless `animate` scheduled frame
+cancelled before tail start, with no later committed batchless `animate` frame
+before the final visual state appears.
 
 ## Fix Direction
 
