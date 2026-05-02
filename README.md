@@ -165,7 +165,7 @@ entrypoint to the same script.
 
 Live API reference is published at:
 
-- <https://goodhatsllc.github.io/swift-terminal-ui/docs/documentation/terminalui/>
+- <https://swifttui.io/docs/documentation/terminalui/>
 
 The same content is mirrored by the Swift Package Index:
 

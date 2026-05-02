@@ -1,286 +1,35 @@
 ---
-import Base from "@layouts/Base.astro";
-import PipelineStrip from "@components/PipelineStrip.astro";
-import CodeSample from "@components/CodeSample.astro";
-
+// Stub site. The deploy workflow mounts the WebExample WASI demo at
+// /webexample/ on the same origin, so this iframe is same-origin and
+// inherits cross-origin isolation from the parent page automatically.
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-
-// Hero code sample. Slightly meatier than the existing site's GalleryApp
-// snippet — exercises @State, @FocusState, a list with selection, and a
-// presentation modifier so the framework's parity claim is immediately
-// visible at the top of the landing page.
-const heroCode = `import TerminalUI
-import TerminalUICLI
-
-@main
-struct DeployApp: App {
-  var body: some Scene {
-    WindowGroup("Deploys") {
-      DeployList()
-    }
-  }
-}
-
-struct DeployList: View {
-  @State private var deploys = Deploy.recent()
-  @State private var selection: Deploy.ID?
-  @State private var showDetail = false
-  @FocusState private var search: Bool
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 1) {
-      TextField("filter", text: .constant(""))
-        .focused($search)
-      List(deploys, selection: $selection) { deploy in
-        LabeledContent(deploy.environment, value: deploy.status)
-      }
-    }
-    .keyCommand("Open", key: .return) { showDetail = true }
-    .sheet(isPresented: $showDetail) {
-      DeployDetail(id: selection)
-    }
-  }
-}`;
-
-const parityPoints = [
-  {
-    title: "Same authoring surface",
-    body:
-      "@State, @Binding, @FocusState, @Observable, environment values, Layout protocol, Scene declarations. The types you already know.",
-  },
-  {
-    title: "Same layout contract",
-    body:
-      "Parents propose, children choose. Modifier order matters. Measurement and placement are recursive — no terminal shortcuts.",
-  },
-  {
-    title: "Same identity model",
-    body:
-      "State keyed by tree identity plus source location. View-local state survives rerenders. Lifecycle is identity-driven.",
-  },
-  {
-    title: "Terminal-native runtime",
-    body:
-      "Input parsing, focus routing, alternate-screen ownership, lifecycle staging, commit planning, and incremental presentation.",
-  },
-];
-
-const platformFrames = [
-  {
-    name: "Terminal",
-    detail:
-      "Alternate-screen, raw-mode, capability-aware output. The native runtime.",
-    href: `${base}/platforms/terminal-native`,
-  },
-  {
-    name: "iOS",
-    detail: "The same surface, with touch input, natively for iOS.",
-    href: `${base}/platforms/macos-and-ios`,
-  },
-  {
-    name: "Web",
-    detail: "WASI build mounted in the browser via the Web TUIGUI host.",
-    href: `${base}/platforms/web`,
-  },
-  {
-    name: "macOS",
-    detail: "The SwiftUI TUIGUI embedded in macOS chrome.",
-    href: `${base}/platforms/macos-and-ios`,
-  },
-];
-
-const claims = [
-  {
-    title: "Ordered commit",
-    body:
-      "Computed pipeline frames are not dropped. The frame-tail worker renders off the main actor, but commit ordering is invariant.",
-    href: `${base}/design/async-rendering`,
-  },
-  {
-    title: "Identity-keyed state",
-    body:
-      "@State is keyed by identity-path plus source location, not by ordinal. View-local state survives rerenders, scrolls, and reorders.",
-    href: `${base}/design/state-keying`,
-  },
-  {
-    title: "Terminal-native doctrine",
-    body:
-      "When SwiftUI and terminal-native practice disagree, reinterpret toward the terminal. Restraint is a feature.",
-    href: `${base}/principles`,
-  },
-];
+const iframeSrc = `${base}/webexample/`;
 ---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TerminalUI</title>
+    <meta name="description" content="TerminalUI WebExample." />
+  </head>
+  <body>
+    <iframe src={iframeSrc} title="TerminalUI WebExample"></iframe>
+  </body>
+</html>
 
-<Base
-  title="TerminalUI — SwiftUI-shaped terminal apps in Swift"
-  description="Build terminal apps in Swift with a SwiftUI-shaped view system, a strict 7-phase rendering pipeline, and runtime ownership for real interactive TUIs."
-  pageKey="home"
->
-  <div class="marketing-site">
-
-    <section class="hero" id="top">
-      <div class="hero-copy">
-        <p class="eyebrow">import TerminalUI</p>
-        <h1>A real view system for the terminal.</h1>
-        <p class="hero-lede">
-          SwiftUI's authoring model — body-only views, recursive layout,
-          identity-keyed state, focus routing — applied to terminal apps.
-          Built on a strict 7-phase rendering pipeline.
-        </p>
-        <PipelineStrip />
-        <div class="hero-actions">
-          <a class="button button-primary" href={`${base}/start`}>Get started</a>
-          <a class="button button-secondary" href={`${base}/playground`}>
-            Try it in the browser
-          </a>
-          <a class="button button-secondary" href={`${base}/design/architecture`}>
-            Read the architecture
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <section class="info-block" id="what-ships">
-      <div class="info-copy">
-        <p class="section-label">01 / What ships</p>
-        <h2>The view system is real. The runtime is real.</h2>
-        <p>
-          Layout primitives, controls, presentations, focus routing, an
-          ActionScope-based command surface, charts, and image presentation
-          across PNG, JPEG, and GIF. The pipeline is the same on terminal,
-          WASI, native macOS/iOS, and the browser.
-        </p>
-      </div>
-      <div class="info-panel">
-        <div class="info-panel-header">
-          <span class="info-panel-header-file">Status</span>
-          <span>Shipped surface</span>
-        </div>
-        <div style="padding: var(--space-xl); display: grid; gap: var(--space-md); font-size: 0.95rem; line-height: 1.7;">
-          <div>
-            <strong style="color: var(--text-display);">Layout</strong>
-            <span style="color: var(--text-secondary);">
-              · VStack · HStack · ZStack · LazyVStack · LazyHStack · ScrollView · List · OutlineGroup · Table · TabView · Layout protocol · GeometryReader
-            </span>
-          </div>
-          <div>
-            <strong style="color: var(--text-display);">Controls</strong>
-            <span style="color: var(--text-secondary);">
-              · Button · Toggle · Stepper · Slider · TextField · TextEditor · SecureField · Picker · Menu · DisclosureGroup · ProgressView
-            </span>
-          </div>
-          <div>
-            <strong style="color: var(--text-display);">Presentations</strong>
-            <span style="color: var(--text-secondary);">
-              · alert · confirmationDialog · sheet · toast
-            </span>
-          </div>
-          <div>
-            <strong style="color: var(--text-display);">Commands</strong>
-            <span style="color: var(--text-secondary);">
-              · Panel · .keyCommand · .paletteCommand · .toolbar · .toolbarItem
-            </span>
-          </div>
-          <div>
-            <strong style="color: var(--text-display);">Charts</strong>
-            <span style="color: var(--text-secondary);">
-              · BarChart · ColumnChart · Sparkline · Timeline · Meter · ThresholdGauge · Legend · HeatStrip
-            </span>
-          </div>
-          <div style="border-top: 1px solid var(--border); padding-top: var(--space-md); color: var(--text-disabled); font-size: 0.875rem;">
-            <strong style="color: var(--text-secondary);">Deferred:</strong>
-            NavigationStack · richer popover presentation · animated GIF playback ·
-            namespace-scoped focus APIs
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="info-block" id="syntax">
-      <div class="info-copy">
-        <p class="section-label">02 / Syntax</p>
-        <h2>The DSL is SwiftUI. Not a sketch of it.</h2>
-        <p>
-          Views have bodies. State is identity-keyed. Layout is recursive —
-          parents propose, children choose. Commands attach to scopes, not to
-          a global hotkey table.
-        </p>
-      </div>
-      <CodeSample filename="DeployApp.swift" language="swift" code={heroCode} />
-    </section>
-
-    <section class="info-block" id="platforms">
-      <div class="info-copy">
-        <p class="section-label">03 / Platforms</p>
-        <h2>One codebase. Terminal, macOS, iOS, web.</h2>
-        <p>
-          Same rendering pipeline, different host chrome. The terminal
-          runtime, SwiftUI host, and Bun-based web host all ship in the repo.
-        </p>
-      </div>
-      <div class="card-grid">
-        {
-          platformFrames.map((p) => (
-            <a class="card" href={p.href}>
-              <h3>{p.name}</h3>
-              <p>{p.detail}</p>
-              <span class="card-tag">Read more →</span>
-            </a>
-          ))
-        }
-      </div>
-    </section>
-
-    <section class="info-block" id="parity">
-      <div class="info-copy">
-        <p class="section-label">04 / SwiftUI parity</p>
-        <h2>Parity in syntax and implementation.</h2>
-        <p>
-          Recursive layout. Structural environment propagation. Identity-based
-          state. Scene ownership. Explicit lifecycle boundaries.
-        </p>
-      </div>
-      <div class="card-grid">
-        {
-          parityPoints.map((p, i) => (
-            <article class="card" data-index={String(i + 1).padStart(2, "0")}>
-              <h3>{p.title}</h3>
-              <p>{p.body}</p>
-            </article>
-          ))
-        }
-      </div>
-    </section>
-
-    <section class="info-block" id="claims">
-      <div class="info-copy">
-        <p class="section-label">05 / Technically well-founded</p>
-        <h2>Three claims worth verifying.</h2>
-        <p>
-          The project's design discipline lives in the docs, not in the
-          marketing. Each claim below links to the design essay that proves it.
-        </p>
-      </div>
-      <div class="card-grid card-grid--three">
-        {
-          claims.map((c) => (
-            <a class="card" href={c.href}>
-              <h3>{c.title}</h3>
-              <p>{c.body}</p>
-              <span class="card-tag">Open the proof →</span>
-            </a>
-          ))
-        }
-      </div>
-    </section>
-
-    <section class="closer">
-      <p>It feels at home next to tmux, Zellij, WezTerm,</p>
-      <p>Neovim, Yazi, and Lazygit.</p>
-      <p class="closer-muted">
-        — Terminal-Native Doctrine, success criterion #1
-      </p>
-    </section>
-
-  </div>
-</Base>
+<style is:global>
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #000;
+  }
+  iframe {
+    width: 100vw;
+    height: 100vh;
+    border: 0;
+    display: block;
+  }
+</style>
