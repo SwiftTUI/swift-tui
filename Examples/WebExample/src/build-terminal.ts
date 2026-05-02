@@ -9,7 +9,6 @@ const packagePath = resolve(import.meta.dir, "../TerminalApp");
 const outputDirectory = resolve(import.meta.dir, "../TerminalApp/dist");
 const appExecutable = "WebExampleApp";
 const distDirectory = resolve(import.meta.dir, "../dist");
-const coiServiceWorkerPath = resolve(import.meta.dir, "./coi-serviceworker.js");
 
 await rm(outputDirectory, { recursive: true, force: true });
 await rm(distDirectory, { recursive: true, force: true });
@@ -25,7 +24,3 @@ await buildAppWasm({
   product: appExecutable,
 });
 await mkdir(distDirectory, { recursive: true });
-await Bun.write(
-  join(distDirectory, "coi-serviceworker.js"),
-  await Bun.file(coiServiceWorkerPath).arrayBuffer()
-);

@@ -38,4 +38,12 @@ hooks = [
     files = '^(Package\.swift|(Sources|Tests|Runners|Examples)/.*\.swift)$',
     pass_filenames = false
   },
+  {
+    id = "doc-frontmatter",
+    name = "validate docs/decisions and docs/plans frontmatter",
+    entry = "bun Scripts/check_doc_frontmatter.ts",
+    language = "system",
+    files = '^(docs/(decisions/[0-9].*\.md|plans/.*\.md)|Scripts/check_doc_frontmatter\.ts)$',
+    pass_filenames = false
+  },
 ]

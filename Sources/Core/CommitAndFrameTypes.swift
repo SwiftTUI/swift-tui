@@ -835,6 +835,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var measurementCache: MeasurementCacheMetrics?
   public var customLayoutFallbackCount: Int
   public var firstCustomLayoutFallbackIdentity: Identity?
+  public var runtimeRegistrations: RuntimeRegistrationDiagnostics
   public var dropEligibilityBlockers: Set<FrameDropEligibility.Blocker>
   package var geometryResolutionDiagnostics: GeometryResolutionDiagnostics = .init()
 
@@ -866,6 +867,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     measurementCache: MeasurementCacheMetrics? = nil,
     customLayoutFallbackCount: Int = 0,
     firstCustomLayoutFallbackIdentity: Identity? = nil,
+    runtimeRegistrations: RuntimeRegistrationDiagnostics = .init(),
     dropEligibilityBlockers: Set<FrameDropEligibility.Blocker> = []
   ) {
     self.proposal = proposal
@@ -895,6 +897,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     self.measurementCache = measurementCache
     self.customLayoutFallbackCount = customLayoutFallbackCount
     self.firstCustomLayoutFallbackIdentity = firstCustomLayoutFallbackIdentity
+    self.runtimeRegistrations = runtimeRegistrations
     self.dropEligibilityBlockers = dropEligibilityBlockers
   }
 }

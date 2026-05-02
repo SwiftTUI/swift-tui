@@ -19,7 +19,7 @@ name: Deploy Website to Cloudflare Pages
 #   3. (Optional) Add repo variables:
 #        CLOUDFLARE_PAGES_PROJECT <- project name; defaults to `swift-terminal-ui`
 #        CLOUDFLARE_SITE_URL      <- absolute URL Astro should canonicalize to
-#                                    (e.g. https://swift-terminal-ui.example.com).
+#                                    (production domain: https://swifttui.io).
 #                                    Defaults to https://<project>.pages.dev.
 
 on:
@@ -195,9 +195,6 @@ jobs:
           # DocC data/search/assets and route all documentation paths through
           # the single SPA shell with Website/public/_redirects.
           rm -rf "$DOCS_ROOT/documentation"
-          # Project-owned CSS overrides on top of theme-settings.json.
-          # (idempotent; safe to re-run, see Examples/WebExample/src/inject-docs-css.ts)
-          bun run Examples/WebExample/src/inject-docs-css.ts
           # WebExample at /webexample/.
           cp -R Examples/WebExample/pages-dist/. "$WEBEXAMPLE_ROOT/"
           # Cloudflare Pages rejects individual uploaded assets larger than

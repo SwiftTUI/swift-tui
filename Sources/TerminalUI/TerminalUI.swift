@@ -1554,13 +1554,14 @@ public struct DefaultRenderer {
       timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
       workerTimings = timings
     }
+    var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
     let (commit, commitDuration) = measurePhase(clock: clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: resolveContext.identity,
         resolved: resolved,
         placed: tail.placed
       )
-      registrationDraft.commitRestoring(
+      runtimeRegistrationDiagnostics = registrationDraft.commitRestoring(
         from: viewGraph,
         resolved: resolved
       )
@@ -1579,7 +1580,7 @@ public struct DefaultRenderer {
     let dropEligibilityBlockers = frameTailCommitDropBlockers(
       workerCustomLayoutCacheUpdates: tailLayout.workerCustomLayoutCacheUpdates
     )
-    let diagnostics: FrameDiagnostics
+    var diagnostics: FrameDiagnostics
     if collectsDiagnostics {
       let phaseTimings = FramePhaseTimings(
         resolve: resolveDuration,
@@ -1621,6 +1622,7 @@ public struct DefaultRenderer {
     } else {
       diagnostics = .init()
     }
+    diagnostics.runtimeRegistrations = runtimeRegistrationDiagnostics
     let artifacts = FrameArtifacts(
       resolvedTree: resolved,
       measuredTree: tail.measured,
@@ -2010,13 +2012,14 @@ public struct DefaultRenderer {
   ) -> FrameArtifacts {
     let layout = candidate.tailOutput.layout
     let tail = candidate.tailOutput.tail
+    var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
     let (commit, commitDuration) = measurePhase(clock: candidate.draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: candidate.draft.resolveContext.identity,
         resolved: candidate.resolved,
         placed: tail.placed
       )
-      candidate.draft.registrationDraft.commitRestoring(
+      runtimeRegistrationDiagnostics = candidate.draft.registrationDraft.commitRestoring(
         from: viewGraph,
         resolved: candidate.resolved
       )
@@ -2039,11 +2042,9 @@ public struct DefaultRenderer {
       resolved: candidate.resolved,
       commit: commit,
       commitDuration: commitDuration,
-      workerTimings: completedFrameWorkerTimings(
-        draft: candidate.draft,
-        tailOutput: candidate.tailOutput
-      ),
-      collectsDiagnostics: candidate.collectsDiagnostics
+      workerTimings: candidate.workerTimings,
+      collectsDiagnostics: candidate.collectsDiagnostics,
+      runtimeRegistrationDiagnostics: runtimeRegistrationDiagnostics
     )
 
     frameTailRenderer.storeCommittedFrame(
@@ -2112,14 +2113,15 @@ public struct DefaultRenderer {
     commit: CommitPlan,
     commitDuration: Duration,
     workerTimings: FrameWorkerTimings?,
-    collectsDiagnostics: Bool
+    collectsDiagnostics: Bool,
+    runtimeRegistrationDiagnostics: RuntimeRegistrationDiagnostics = .init()
   ) -> FrameArtifacts {
     let layout = tailOutput.layout
     let tail = tailOutput.tail
     let dropEligibilityBlockers = frameTailCommitDropBlockers(
       workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
     )
-    let diagnostics: FrameDiagnostics
+    var diagnostics: FrameDiagnostics
     if collectsDiagnostics {
       let phaseTimings = FramePhaseTimings(
         resolve: draft.resolveDuration,
@@ -2165,6 +2167,7 @@ public struct DefaultRenderer {
     } else {
       diagnostics = .init()
     }
+    diagnostics.runtimeRegistrations = runtimeRegistrationDiagnostics
     let artifacts = FrameArtifacts(
       resolvedTree: resolved,
       measuredTree: tail.measured,

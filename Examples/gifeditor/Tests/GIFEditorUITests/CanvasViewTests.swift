@@ -73,13 +73,7 @@ struct CanvasViewTests {
     let size = GIFEditorCore.PixelSize(width: 8, height: 6)
     let model = EditorViewModel(document: GIFDocument.blank(size: size))
     let artifacts = render(
-      InteractiveCanvasView(
-        size: size,
-        cells: Array(repeating: Optional<EditorColor>.none, count: size.area),
-        model: model,
-        refresh: {},
-        mode: .verticalHalfBlock
-      ),
+      InteractiveCanvasHarnessView(model: model, size: size),
       width: 16,
       height: 8
     )
@@ -96,6 +90,75 @@ struct CanvasViewTests {
           size: CellSize(width: 8, height: 3)
         )
     )
+  }
+
+  @Test("Interactive canvas click-and-drag paints through the RunLoop mouse path")
+  func interactiveCanvasClickAndDragPaintsThroughRunLoop() async throws {
+    let size = GIFEditorCore.PixelSize(width: 8, height: 6)
+    let model = EditorViewModel(document: GIFDocument.blank(size: size))
+    model.primaryColorIndex = 3
+    let terminalSize = CellSize(width: 16, height: 8)
+    let rootIdentity = Identity(components: ["gifeditor.ui.drag"])
+    let view = InteractiveCanvasHarnessView(model: model, size: size)
+    let artifacts = render(
+      view,
+      width: terminalSize.width,
+      height: terminalSize.height
+    )
+
+    let drawingRegion = try #require(
+      artifacts.semanticSnapshot.interactionRegions.first {
+        $0.rect.size == CellSize(width: 8, height: 3)
+      }
+    )
+    #expect(drawingRegion.captureOnPress)
+
+    let metrics = CellPixelMetrics(width: 10, height: 20, source: .reported)
+    let start = pointer(
+      local: Point(x: 0.25, y: 0.20),
+      in: drawingRegion.rect,
+      metrics: metrics
+    )
+    let end = pointer(
+      local: Point(x: 4.25, y: 2.20),
+      in: drawingRegion.rect,
+      metrics: metrics
+    )
+    let host = RecordingCanvasTerminalHost(
+      size: terminalSize,
+      pointerInputCapabilities: PointerInputCapabilities(
+        precision: .subCell(source: .terminalPixels, metrics: metrics)
+      )
+    )
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+
+    let result = try await RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: host,
+      terminalInputReader: ScriptedCanvasInput(
+        events: [
+          .mouse(.init(kind: .down(.primary), location: start)),
+          .mouse(.init(kind: .dragged(.primary), location: end)),
+          .mouse(.init(kind: .up(.primary), location: end)),
+        ]
+      ),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      environmentValues: env,
+      proposal: ProposedSize(width: terminalSize.width, height: terminalSize.height),
+      viewBuilder: { _, _ in view }
+    ).run()
+
+    #expect(result.exitReason == .inputEnded)
+    let pixels = model.currentLayer.pixels
+    for offset in 0...4 {
+      #expect(pixels[GIFEditorCore.PixelPoint(x: offset, y: offset)] == 3)
+    }
+    #expect(model.cursor == GIFEditorCore.PixelPoint(x: 4, y: 4))
   }
 
   @Test("Canvas pixel mapping preserves sub-cell half-block rows")
@@ -142,6 +205,95 @@ struct CanvasViewTests {
         size: size
       ) == GIFEditorCore.PixelPoint(x: 1, y: 0)
     )
+  }
+}
+
+private struct InteractiveCanvasHarnessView: View {
+  let model: EditorViewModel
+  let size: GIFEditorCore.PixelSize
+
+  @State private var revision = 0
+
+  var body: some View {
+    _ = revision
+    let refresh: @MainActor @Sendable () -> Void = {
+      revision &+= 1
+    }
+    return ScrollView {
+      InteractiveCanvasView(
+        size: size,
+        cells: model.document.flattenedColors(frameIndex: model.currentFrameIndex),
+        model: model,
+        refresh: refresh,
+        mode: .verticalHalfBlock
+      )
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .border(.separator, set: .single)
+  }
+}
+
+private func pointer(
+  local: Point,
+  in rect: CellRect,
+  metrics: CellPixelMetrics
+) -> PointerLocation {
+  PointerLocation.subCell(
+    location: Point(
+      x: Double(rect.origin.x) + local.x,
+      y: Double(rect.origin.y) + local.y
+    ),
+    source: .terminalPixels,
+    metrics: metrics
+  )
+}
+
+private final class ScriptedCanvasInput: TerminalInputReading {
+  private let events: [InputEvent]
+
+  init(events: [InputEvent]) {
+    self.events = events
+  }
+
+  func inputEvents() -> AsyncStream<InputEvent> {
+    AsyncStream { continuation in
+      let events = self.events
+      let task = Task {
+        for event in events {
+          continuation.yield(event)
+        }
+        continuation.finish()
+      }
+      continuation.onTermination = { _ in
+        task.cancel()
+      }
+    }
+  }
+}
+
+private final class RecordingCanvasTerminalHost: TerminalHosting {
+  let surfaceSize: CellSize
+  let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
+  let appearance: TerminalAppearance = .fallback
+  let pointerInputCapabilities: PointerInputCapabilities
+
+  init(
+    size: CellSize,
+    pointerInputCapabilities: PointerInputCapabilities
+  ) {
+    self.surfaceSize = size
+    self.pointerInputCapabilities = pointerInputCapabilities
+  }
+
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func write(_: String) throws {}
+  func clearScreen() throws {}
+  func moveCursor(to _: CellPoint) throws {}
+
+  @discardableResult
+  func present(_: RasterSurface) throws -> TerminalPresentationMetrics {
+    .init(bytesWritten: 0, linesTouched: 0, cellsChanged: 0, strategy: .fullRepaint)
   }
 }
 
