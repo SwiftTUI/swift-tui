@@ -153,6 +153,10 @@ cancellations:
 - `cancelled_render_count`
 - `newest_desired_at_tail_start`
 - `newest_desired_at_tail_result`
+- `scheduled_animation_request`
+- `scheduled_animation_batch`
+- `animation_controller_active_animations`
+- `animation_controller_pending_work`
 - `stale_frame_policy=cancel_pending_before_start`
 
 Completed rows report `stale_frame_policy=commit_ordered`; cancelled rows report

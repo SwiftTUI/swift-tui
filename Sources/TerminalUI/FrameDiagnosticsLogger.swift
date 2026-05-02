@@ -30,6 +30,10 @@ public struct FrameDiagnosticRecord: Sendable {
   /// Total `request*` calls the scheduler coalesced into this frame.
   /// `> 1` indicates cancellation pressure for Stage 3D rollout.
   public var coalescedIntentRequests: Int
+  public var scheduledAnimationRequest: String
+  public var scheduledAnimationBatchID: UInt64?
+  public var animationControllerActiveAnimationCount: Int
+  public var animationControllerHasPendingWork: Bool
   public var workerTimings: FrameWorkerTimings?
   public var mainActorTimings: FrameMainActorTimings?
   public var customLayoutFallbackCount: Int
@@ -147,6 +151,7 @@ public final class FrameDiagnosticsLogger {
     let damageSpans = record.damageTextSpanCount.map(String.init) ?? "-"
     let damageCells = record.damageTextCellCount.map(String.init) ?? "-"
     let damageGraphics = record.damageGraphicsInvalidationCount.map(String.init) ?? "-"
+    let scheduledAnimationBatch = record.scheduledAnimationBatchID.map(String.init) ?? "-"
 
     let fields: [String] = [
       String(record.frameNumber),
@@ -180,6 +185,10 @@ public final class FrameDiagnosticsLogger {
       String(record.coalescedEventBatches),
       record.coalescedWakeCauses,
       String(record.coalescedIntentRequests),
+      record.scheduledAnimationRequest,
+      scheduledAnimationBatch,
+      String(record.animationControllerActiveAnimationCount),
+      record.animationControllerHasPendingWork ? "1" : "0",
       layoutEnqueueMs,
       layoutComputeMs,
       rasterEnqueueMs,
@@ -262,6 +271,10 @@ public final class FrameDiagnosticsLogger {
       "coalesced_event_batches",
       "coalesced_wake_causes",
       "coalesced_intent_requests",
+      "scheduled_animation_request",
+      "scheduled_animation_batch",
+      "animation_controller_active_animations",
+      "animation_controller_pending_work",
       "worker_layout_enqueue_ms",
       "worker_layout_compute_ms",
       "worker_raster_enqueue_ms",
