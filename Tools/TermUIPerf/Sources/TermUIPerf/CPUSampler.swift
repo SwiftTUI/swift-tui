@@ -86,9 +86,10 @@ public enum CPUSampler {
     zip(readings, readings.dropFirst()).map(sampleDelta)
   }
 
+  @MainActor
   public static func collect(
     interval: Duration = defaultSampleInterval,
-    during operation: @Sendable () async throws -> Void
+    during operation: () async throws -> Void
   ) async throws -> [PerfCPUSample] {
     let collector = CPUSampleCollector(interval: interval)
     try await collector.start()
