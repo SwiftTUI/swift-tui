@@ -579,16 +579,31 @@ git commit -m "refactor(runtime): classify stale frame drop eligibility"
 
 ### Stage 5: Reconciliation for skipped completed frames
 
-- [ ] Add `SkippedFrameReconciliation` with `.emptyVisualOnly`,
+- [x] Add `SkippedFrameReconciliation` with `.emptyVisualOnly`,
   `.appliedSideEffects`, and `.blocked` modes.
-- [ ] Wire completed-frame drop decisions through the reconciliation object even
+- [x] Wire completed-frame drop decisions through the reconciliation object even
   when the selected case is empty.
-- [ ] Prove that `.emptyVisualOnly` leaves lifecycle, task, focus, preference,
+- [x] Prove that `.emptyVisualOnly` leaves lifecycle, task, focus, preference,
   animation, registration, custom-layout cache, retained layout, retained raster,
   and presentation state unchanged from the last committed frame.
-- [ ] Keep `.appliedSideEffects` unavailable to runtime policy until a later
+- [x] Keep `.appliedSideEffects` unavailable to runtime policy until a later
   proposal defines exact delta types and commit order.
-- [ ] Keep the default path as ordered commit.
+- [x] Keep the default path as ordered commit.
+
+Stage 5 result:
+
+- `SkippedFrameReconciliation` now represents `.emptyVisualOnly`,
+  `.appliedSideEffects`, and `.blocked` outcomes. Only `.emptyVisualOnly` is
+  available to runtime skip policy.
+- `CompletedFrameDropDecision` carries both the eligibility decision and the
+  selected reconciliation. The current completed-frame path records
+  `commit_ordered` decisions with blocked reconciliation.
+- Test-only completed-tail discard coverage routes through
+  `.emptyVisualOnly`, aborts the prepared frame head, discards the tail output,
+  and leaves the last committed runtime/presentation state intact.
+- `.appliedSideEffects` remains explicitly unavailable to runtime policy, so
+  non-empty skipped-frame reconciliation cannot be introduced accidentally.
+- No runtime behavior drops or reconciles completed frames.
 
 Commit boundary:
 
