@@ -73,3 +73,4 @@ reference
 .playwright-cli
 output
 POST-GHOSTTY.md
+.perf/

@@ -457,17 +457,17 @@ and optional `xctrace` for manual deep dives.
 - Modify: `.github/workflows/run-tests-linux.yml` or add a dedicated perf workflow
 - Create: `Scripts/run_perf_smoke.sh`
 
-- [ ] **Step 1: Add a short smoke command**
+- [x] **Step 1: Add a short smoke command**
 
   The smoke command should run one low-iteration scenario in release mode and
   write artifacts under `.perf/runs`.
 
-- [ ] **Step 2: Upload artifacts without failing on budget deltas**
+- [x] **Step 2: Upload artifacts without failing on budget deltas**
 
   CI should archive summaries and run directories. Do not add failing CPU or
   latency budgets until variance has been collected.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
   Run the script locally:
 
