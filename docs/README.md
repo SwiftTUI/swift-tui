@@ -52,6 +52,7 @@ Active design proposals that are still shaping decisions:
 
 Dated, agent-executable implementation plans live in [`plans/`](plans/), front-matter-tagged with `status:` (`planned`, `active`, `design-approved`, or `shipped`). Current planned/active plans:
 
+- [plans/2026-05-01-007-gallery-animation-regression-notes.md](plans/2026-05-01-007-gallery-animation-regression-notes.md) — active notes and red/green regression guard for gallery one-shot animation transactions snapping after async Option 3
 - [plans/2026-04-28-001-canvas-adaptation-plan.md](plans/2026-04-28-001-canvas-adaptation-plan.md) — extending Canvas for dense pixel grids, half-block rendering, and optional sub-cell pointer precision
 
 Implementation and post-mortem records retained for context:

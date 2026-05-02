@@ -74,6 +74,12 @@ committed resolved tree before semantics, draw, raster, and lifecycle commit.
   reuse, focus convergence, framework layout worker paths, aborted prepared
   frame heads, queued-tail cancellation, and main-actor fallback when
   layout-dependent content is present.
+- Known follow-up: gallery one-shot animations currently have an active
+  post-Option-3 regression where input-triggered `withAnimation` state changes
+  can snap to their final state while visible `PhaseAnimator` ticks continue.
+  See
+  [plans/2026-05-01-007-gallery-animation-regression-notes.md](plans/2026-05-01-007-gallery-animation-regression-notes.md)
+  for the red/green regression guard and failure model.
 
 ## What Still Runs On The Main Actor
 
