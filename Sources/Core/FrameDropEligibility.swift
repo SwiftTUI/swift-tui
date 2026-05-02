@@ -8,11 +8,9 @@
 /// the eventual behavior change this is staging for.
 ///
 /// The classifier intentionally errs on the side of `mustCommit`: every
-/// frame whose artifacts surface no specific blocker is still tagged
-/// with the catch-all `.unobservable` blocker, because some commit-time
-/// effects (animation completions firing during `applyInterpolations`,
-/// focus binding drift relative to the previous frame, retained layout
-/// baseline updates) are not visible from a single frame's artifacts.
+/// frame whose artifacts and runtime context surface no specific blocker is
+/// still tagged with the catch-all `.unobservable` blocker, because some
+/// candidate-level effects are not visible from `FrameArtifacts` alone.
 ///
 /// As later stages teach the runtime to drop specific narrow cases —
 /// say, a superseded animation tick with no lifecycle, focus, task,
@@ -64,13 +62,66 @@ public struct FrameDropEligibility: Equatable, Sendable {
     /// with the committed tree.
     case customLayoutFallback
 
+    /// Focus regions changed while the runtime reconciled this frame.
+    /// Dropping the frame would skip the committed semantic focus graph
+    /// update the focus tracker used to converge.
+    case focusGraph
+
+    /// Focus-binding sync changed authored focus state or applied a
+    /// pending focus request during this frame.
+    case focusBindingSync
+
+    /// Focused values changed for the committed focus identity.
+    case focusedValueSync
+
+    /// Scroll-position sync adjusted a bound scroll position.
+    case scrollSync
+
+    /// Preference observation handlers observed a changed preference
+    /// value during this frame.
+    case preferenceObservationDelta
+
+    /// At least one animation completion is pending, deferred, or
+    /// fired through this frame's animation bookkeeping.
+    case animationCompletion
+
+    /// Transition bookkeeping is present.  Dropping the frame could
+    /// lose insertion, removal, or matched-geometry state that later
+    /// ticks rely on.
+    case animationTransition
+
+    /// The scheduled frame carried a one-shot animation transaction.
+    /// Dropping it would discard the transaction's animation intent.
+    case animationTransaction
+
+    /// Worker-side custom layout cache updates were produced by this
+    /// frame and must either be committed or explicitly reconciled.
+    case workerCustomLayoutCacheUpdate
+
+    /// Committing the frame refreshes the retained layout baseline
+    /// used by later incremental placement.
+    case retainedLayoutBaseline
+
+    /// Committing the frame refreshes the retained raster baseline
+    /// used by later incremental presentation damage.
+    case retainedRasterBaseline
+
+    /// The frame participates in full text repaint recovery.
+    case presentationFullRepaint
+
+    /// The frame carries graphics invalidation or full graphics
+    /// replay requirements.
+    case graphicsReplay
+
+    /// Runtime diagnostics are configured to require an explicit
+    /// committed-frame record for this completed frame.
+    case diagnosticsFullRecord
+
     /// No specific blocker was observed in this frame's artifacts, but
     /// the runtime keeps the frame on the ordered-commit path because
-    /// some commit-time effects are not visible from `FrameArtifacts`
-    /// alone (animation completions, preference observation deltas,
-    /// retained-layout baseline updates, focus-binding drift relative
-    /// to the previous frame).  Future stages will refine this away
-    /// as the classifier learns to detect each missing barrier.
+    /// some candidate-level effects are still not visible from the
+    /// current classifier.  Future stages will refine this away as the
+    /// runtime learns to detect each missing barrier.
     case unobservable
   }
 
@@ -101,6 +152,15 @@ public struct FrameDropEligibility: Equatable, Sendable {
   /// for any given artifact value is therefore stable and testable
   /// in isolation.
   public static func classify(_ artifacts: FrameArtifacts) -> Self {
+    classify(artifacts, additionalBlockers: [])
+  }
+
+  /// Classifies a completed frame with runtime-context blockers that are not
+  /// stored directly in `FrameArtifacts`.
+  public static func classify(
+    _ artifacts: FrameArtifacts,
+    additionalBlockers: Set<Blocker>
+  ) -> Self {
     var blockers: Set<Blocker> = []
     for entry in artifacts.commitPlan.lifecycle {
       switch entry.operation {
@@ -121,6 +181,16 @@ public struct FrameDropEligibility: Equatable, Sendable {
     }
     if artifacts.diagnostics.customLayoutFallbackCount > 0 {
       blockers.insert(.customLayoutFallback)
+    }
+    blockers.formUnion(additionalBlockers)
+    blockers.formUnion(artifacts.diagnostics.dropEligibilityBlockers)
+    if let damage = artifacts.diagnostics.presentationDamage {
+      if damage.requiresFullTextRepaint {
+        blockers.insert(.presentationFullRepaint)
+      }
+      if damage.requiresFullGraphicsReplay || damage.graphicsInvalidationCount > 0 {
+        blockers.insert(.graphicsReplay)
+      }
     }
     if blockers.isEmpty {
       blockers.insert(.unobservable)

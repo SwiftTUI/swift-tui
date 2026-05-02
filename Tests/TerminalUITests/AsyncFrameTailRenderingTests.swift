@@ -283,6 +283,9 @@ struct AsyncFrameTailRenderingTests {
           && row["cancelled_render_count"] != nil
           && row["newest_desired_at_tail_start"] != nil
           && row["newest_desired_at_tail_result"] != nil
+          && (row["drop_blockers"] ?? "").contains("diagnosticsFullRecord")
+          && (row["drop_blockers"] ?? "").contains("retainedLayoutBaseline")
+          && (row["drop_blockers"] ?? "").contains("retainedRasterBaseline")
           && row["desired_generation"] != nil
           && row["render_generation"] != nil
           && row["layout_input_generation"] == row["render_generation"]
@@ -1096,6 +1099,7 @@ struct AsyncFrameTailRenderingTests {
           row["tail_job_state"] == "completed"
             && row["stale_frame_policy"] == "commit_ordered"
             && row["scheduled_animation_request"] == "animate"
+            && (row["drop_blockers"] ?? "").contains("animationTransaction")
             && (Int(row["animation_controller_active_animations"] ?? "") ?? 0) > 0
         }
       #expect(

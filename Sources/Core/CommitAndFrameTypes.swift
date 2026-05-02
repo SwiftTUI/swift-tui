@@ -835,6 +835,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var measurementCache: MeasurementCacheMetrics?
   public var customLayoutFallbackCount: Int
   public var firstCustomLayoutFallbackIdentity: Identity?
+  public var dropEligibilityBlockers: Set<FrameDropEligibility.Blocker>
   package var geometryResolutionDiagnostics: GeometryResolutionDiagnostics = .init()
 
   public init(
@@ -864,7 +865,8 @@ public struct FrameDiagnostics: Equatable, Sendable {
     mainActorTimings: FrameMainActorTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil,
     customLayoutFallbackCount: Int = 0,
-    firstCustomLayoutFallbackIdentity: Identity? = nil
+    firstCustomLayoutFallbackIdentity: Identity? = nil,
+    dropEligibilityBlockers: Set<FrameDropEligibility.Blocker> = []
   ) {
     self.proposal = proposal
     self.invalidatedIdentities = invalidatedIdentities
@@ -893,6 +895,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     self.measurementCache = measurementCache
     self.customLayoutFallbackCount = customLayoutFallbackCount
     self.firstCustomLayoutFallbackIdentity = firstCustomLayoutFallbackIdentity
+    self.dropEligibilityBlockers = dropEligibilityBlockers
   }
 }
 
@@ -1173,7 +1176,8 @@ extension FrameDiagnostics {
     renderGenerations: FrameRenderGenerations = .init(),
     workerTimings: FrameWorkerTimings? = nil,
     mainActorTimings: FrameMainActorTimings? = nil,
-    measurementCache: MeasurementCacheMetrics? = nil
+    measurementCache: MeasurementCacheMetrics? = nil,
+    dropEligibilityBlockers: Set<FrameDropEligibility.Blocker> = []
   ) -> Self {
     let customLayoutFallback = customLayoutFallbackSummary(resolved)
     var diagnostics = Self(
@@ -1208,7 +1212,8 @@ extension FrameDiagnostics {
       mainActorTimings: mainActorTimings,
       measurementCache: measurementCache,
       customLayoutFallbackCount: customLayoutFallback.count,
-      firstCustomLayoutFallbackIdentity: customLayoutFallback.firstIdentity
+      firstCustomLayoutFallbackIdentity: customLayoutFallback.firstIdentity,
+      dropEligibilityBlockers: dropEligibilityBlockers
     )
     diagnostics.geometryResolutionDiagnostics =
       layoutWork?.geometryResolutionDiagnostics ?? .init()

@@ -103,6 +103,53 @@ struct FrameDropEligibilityTests {
     #expect(FrameDropEligibility.classify(artifacts).blockers == [.customLayoutFallback])
   }
 
+  @Test("diagnostic blocker signals surface without unobservable")
+  func diagnosticBlockerSignalsSurface() {
+    let blockers: Set<FrameDropEligibility.Blocker> = [
+      .focusGraph,
+      .focusBindingSync,
+      .focusedValueSync,
+      .scrollSync,
+      .preferenceObservationDelta,
+      .animationCompletion,
+      .animationTransition,
+      .animationTransaction,
+      .workerCustomLayoutCacheUpdate,
+      .retainedLayoutBaseline,
+      .retainedRasterBaseline,
+      .diagnosticsFullRecord,
+    ]
+    let artifacts = makeArtifacts(dropEligibilityBlockers: blockers)
+    #expect(FrameDropEligibility.classify(artifacts).blockers == blockers)
+  }
+
+  @Test("additional runtime blockers surface without unobservable")
+  func additionalRuntimeBlockersSurface() {
+    let artifacts = makeArtifacts()
+    let eligibility = FrameDropEligibility.classify(
+      artifacts,
+      additionalBlockers: [.focusBindingSync, .preferenceObservationDelta]
+    )
+    #expect(eligibility.blockers == [.focusBindingSync, .preferenceObservationDelta])
+  }
+
+  @Test("presentation repaint and graphics barriers surface")
+  func presentationBarriersSurface() {
+    let artifacts = makeArtifacts(
+      presentationDamage: PresentationDamage(
+        dirtyRows: [],
+        graphicsInvalidation: [testIdentity("Root", "Image")],
+        requiresFullTextRepaint: true,
+        requiresFullGraphicsReplay: true
+      )
+    )
+    #expect(
+      FrameDropEligibility.classify(artifacts).blockers == [
+        .presentationFullRepaint,
+        .graphicsReplay,
+      ])
+  }
+
   @Test("a frame with multiple kinds of work reports all of them")
   func multipleBlockersAccumulate() {
     let artifacts = makeArtifacts(
@@ -151,7 +198,9 @@ struct FrameDropEligibilityTests {
 private func makeArtifacts(
   lifecycle: [LifecycleCommitEntry] = [],
   handlerInstallations: [HandlerInstallation] = [],
-  customLayoutFallbackCount: Int = 0
+  customLayoutFallbackCount: Int = 0,
+  dropEligibilityBlockers: Set<FrameDropEligibility.Blocker> = [],
+  presentationDamage: PresentationDamage? = nil
 ) -> FrameArtifacts {
   let identity = testIdentity("Root")
   let resolved = ResolvedNode(identity: identity, kind: .root)
@@ -166,7 +215,14 @@ private func makeArtifacts(
   )
   let draw = DrawNode(identity: identity, bounds: .init(origin: .zero, size: .zero))
   let diagnostics = FrameDiagnostics(
-    customLayoutFallbackCount: customLayoutFallbackCount
+    presentationDamage: presentationDamage.map {
+      .init(
+        damage: $0,
+        surfaceWidth: 0
+      )
+    },
+    customLayoutFallbackCount: customLayoutFallbackCount,
+    dropEligibilityBlockers: dropEligibilityBlockers
   )
   let commitPlan = CommitPlan(
     transaction: .init(),
@@ -181,7 +237,7 @@ private func makeArtifacts(
     semanticSnapshot: .init(),
     drawTree: draw,
     rasterSurface: .init(),
-    presentationDamage: nil,
+    presentationDamage: presentationDamage,
     commitPlan: commitPlan,
     diagnostics: diagnostics
   )

@@ -68,10 +68,10 @@ committed resolved tree before semantics, draw, raster, and lifecycle commit.
   or overriding newer explicit animation intent.
 - Runtime diagnostics record render generations, worker timings, main-actor
   blocked/suspended time, coalesced event batches, coalesced intent-request
-  pressure, geometry-resolution misses, drop blockers, tail job state, tail
-  cancellation reason, cancelled render count, desired-generation snapshots, and
-  stale-frame policy. Completed frames report `commit_ordered`; cancelled rows
-  report `cancel_pending_before_start`.
+  pressure, geometry-resolution misses, explicit drop blockers, tail job state,
+  tail cancellation reason, cancelled render count, desired-generation snapshots,
+  and stale-frame policy. Completed frames report `commit_ordered`; cancelled
+  rows report `cancel_pending_before_start`.
 - Async stress tests cover blocked worker tails, queued input, ordered commit,
   sync/async artifact parity, `SendableLayout` worker execution, retained layout
   reuse, focus convergence, framework layout worker paths, aborted prepared
@@ -109,8 +109,10 @@ out of scope. A started or completed worker frame must still finish and commit
 in order.
 
 Completed worker results are classified conservatively by the observational
-`FrameDropEligibility` helper, but they are not dropped as visual-only frames.
-Off-main resolve is not planned near-term.
+`FrameDropEligibility` helper, including runtime focus/preference/animation,
+retained-baseline, presentation-recovery, graphics-replay, and diagnostics
+barriers, but they are not dropped as visual-only frames. Off-main resolve is
+not planned near-term.
 
 ## Shipped Option 3 Boundary
 
@@ -215,7 +217,7 @@ side-effect reconciliation remains a later proposal.
 | Abortable prepared frame heads | Shipped | Draft registries plus graph/state checkpoints protect live runtime state. |
 | Cancellable pre-start tail jobs | Shipped | Only queued jobs can cancel; started/completed jobs commit in order. |
 | Cancelled animation intent replay | Shipped | Replays invalidation-scoped animation metadata without replaying input or replacing newer explicit animation. |
-| Visual-only completed-frame drops | Not shipped | Classifier exists; no drops yet. |
+| Visual-only completed-frame drops | Not shipped | Explicit blocker signals exist; candidate boundary and drop policy do not. |
 | Off-main resolve | Not planned near-term | Would require a new authoring and registration model. |
 
 ## Supporting Documents

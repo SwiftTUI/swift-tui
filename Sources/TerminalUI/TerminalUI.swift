@@ -1518,6 +1518,9 @@ public struct DefaultRenderer {
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
     )
+    let dropEligibilityBlockers = frameTailCommitDropBlockers(
+      workerCustomLayoutCacheUpdates: tailLayout.workerCustomLayoutCacheUpdates
+    )
     let diagnostics: FrameDiagnostics
     if collectsDiagnostics {
       let phaseTimings = FramePhaseTimings(
@@ -1554,7 +1557,8 @@ public struct DefaultRenderer {
         ),
         workerTimings: workerTimings,
         mainActorTimings: mainActorTimings,
-        measurementCache: tail.diagnostics.measurementCache
+        measurementCache: tail.diagnostics.measurementCache,
+        dropEligibilityBlockers: dropEligibilityBlockers
       )
     } else {
       diagnostics = .init()
@@ -1935,6 +1939,9 @@ public struct DefaultRenderer {
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
     )
+    let dropEligibilityBlockers = frameTailCommitDropBlockers(
+      workerCustomLayoutCacheUpdates: layout.workerCustomLayoutCacheUpdates
+    )
     let diagnostics: FrameDiagnostics
     if collectsDiagnostics {
       let phaseTimings = FramePhaseTimings(
@@ -1975,7 +1982,8 @@ public struct DefaultRenderer {
         ),
         workerTimings: workerTimings,
         mainActorTimings: mainActorTimings,
-        measurementCache: tail.diagnostics.measurementCache
+        measurementCache: tail.diagnostics.measurementCache,
+        dropEligibilityBlockers: dropEligibilityBlockers
       )
     } else {
       diagnostics = .init()
@@ -2007,6 +2015,19 @@ public struct DefaultRenderer {
     for update in updates {
       update.apply()
     }
+  }
+
+  private func frameTailCommitDropBlockers(
+    workerCustomLayoutCacheUpdates: [WorkerCustomLayoutCacheUpdate]
+  ) -> Set<FrameDropEligibility.Blocker> {
+    var blockers: Set<FrameDropEligibility.Blocker> = [
+      .retainedLayoutBaseline,
+      .retainedRasterBaseline,
+    ]
+    if !workerCustomLayoutCacheUpdates.isEmpty {
+      blockers.insert(.workerCustomLayoutCacheUpdate)
+    }
+    return blockers
   }
 
   @MainActor
