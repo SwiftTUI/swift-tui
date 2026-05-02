@@ -1360,6 +1360,7 @@ public struct DefaultRenderer {
     proposal: ProposedSize,
     collectsDiagnostics: Bool,
     newestDesiredGeneration: @escaping @MainActor @Sendable () -> RenderGeneration? = { nil },
+    completedFramePolicy: CompletedFramePolicy? = nil,
     completedFrameAdditionalBlockers:
       @escaping @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = {
         _ in []
@@ -1393,6 +1394,7 @@ public struct DefaultRenderer {
         tailOutput: tailOutput,
         newestDesiredGeneration: newestDesiredGeneration,
         collectsDiagnostics: collectsDiagnostics,
+        completedFramePolicy: completedFramePolicy,
         additionalBlockers: completedFrameAdditionalBlockers
       )
       if candidate.dropDecision.canSkipCompletedFrame {
@@ -1989,6 +1991,7 @@ public struct DefaultRenderer {
     tailOutput: AsyncFrameTailDraftOutput,
     newestDesiredGeneration: RenderGeneration,
     collectsDiagnostics: Bool,
+    completedFramePolicy: CompletedFramePolicy? = nil,
     additionalBlockers:
       @MainActor @Sendable (FrameArtifacts) -> Set<FrameDropEligibility.Blocker> = { _ in [] }
   ) -> CompletedFrameCandidate {
@@ -2028,7 +2031,7 @@ public struct DefaultRenderer {
       previewArtifacts: artifacts,
       eligibility: eligibility,
       newestDesiredGeneration: newestDesiredGeneration,
-      dropDecision: completedFramePolicy.decide(
+      dropDecision: (completedFramePolicy ?? self.completedFramePolicy).decide(
         candidateGeneration: draft.renderGeneration,
         newestDesiredGeneration: newestDesiredGeneration,
         eligibility: eligibility

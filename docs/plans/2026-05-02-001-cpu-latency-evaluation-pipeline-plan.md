@@ -81,7 +81,7 @@ and optional `xctrace` for manual deep dives.
 - Modify: `Sources/TerminalUI/TerminalUI.swift`
 - Test: `Tests/TerminalUITests/AsyncFrameTailRenderingTests.swift`
 
-- [ ] **Step 1: Add a failing test for sync mode**
+- [x] **Step 1: Add a failing test for sync mode**
 
   Add a test proving `TERMUI_RENDER_MODE=sync` or an explicit run-loop
   property bypasses `renderAsyncCancellable` and produces no queued-tail
@@ -96,7 +96,7 @@ and optional `xctrace` for manual deep dives.
 
   Expected: fail because no render mode exists yet.
 
-- [ ] **Step 2: Implement the render mode type**
+- [x] **Step 2: Implement the render mode type**
 
   Add `RuntimeRenderMode` with cases:
 
@@ -112,13 +112,13 @@ and optional `xctrace` for manual deep dives.
   Include an environment parser for `TERMUI_RENDER_MODE`, defaulting to
   `.async` to preserve current behavior.
 
-- [ ] **Step 3: Thread the mode into `RunLoop`**
+- [x] **Step 3: Thread the mode into `RunLoop`**
 
   Add a `public var renderMode: RuntimeRenderMode` property on `RunLoop`.
   Initialize it from the environment so CLI apps can be switched without code
   changes. Keep explicit assignment available for tests and the perf harness.
 
-- [ ] **Step 4: Split run-loop render selection**
+- [x] **Step 4: Split run-loop render selection**
 
   In `RunLoop+Rendering.swift`, choose:
 
@@ -130,7 +130,7 @@ and optional `xctrace` for manual deep dives.
   Started or completed worker work must still commit in order in every mode
   except the already-shipped visual-only drop path.
 
-- [ ] **Step 5: Add mode coverage**
+- [x] **Step 5: Add mode coverage**
 
   Add tests that prove:
 
@@ -141,7 +141,7 @@ and optional `xctrace` for manual deep dives.
   - `async-no-drop` logs stale completed visual-only candidates as ordered
     commits rather than `drop_completed_visual_only`.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
   Run:
 
