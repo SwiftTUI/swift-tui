@@ -43,6 +43,7 @@ files don't need frontmatter.
 | [Bun](https://bun.sh) ≥ 1.3 | All site work | Pinned via [`mise.toml`](../mise.toml). `mise install` provisions it. |
 | Swift toolchain (release in [`.swift-version`](../.swift-version)) | Building the DocC archive locally | Optional. Most website edits don't need it. Install via [swiftly](https://www.swift.org/install/). |
 | Swift wasm SDK + Binaryen | Building the WebExample WASI demo locally | Optional. See `.github/workflows/cloudflare-pages.yml` for the exact SDK URL/checksum and `brew install binaryen`. |
+| Brotli | Cloudflare Pages deploy compression for the WebExample wasm | Optional locally. CI installs it with `brew install brotli`. |
 
 The repo is a [Bun workspace](../package.json) containing
 `GUI/WebTUIGUI`, `Examples/WebExample`, and this `Website` package. The
@@ -167,7 +168,8 @@ Swift toolchain. End to end:
 
 1. Install swiftly + the toolchain pinned in [`.swift-version`](../.swift-version).
 2. Set up Bun and restore SwiftPM + Bun caches.
-3. Install the Swift wasm SDK and Binaryen (for WebExample).
+3. Install the Swift wasm SDK, Binaryen, and Brotli (for WebExample and
+   Pages upload compression).
 4. Install workspace deps with `bun install --frozen-lockfile`.
 5. Build the WASI demo: `Examples/WebExample` → `pages-dist/`.
 6. Validate the emitted `.wasm` actually parses in `WebAssembly.compile`.
@@ -175,7 +177,9 @@ Swift toolchain. End to end:
    the canonical production URL → `Website/dist/`.
 8. Build the combined DocC archive (Core + View + TerminalUI +
    TerminalUICharts) with `--hosting-base-path docs` → `.build-docs/`.
-9. Compose the final upload tree:
+9. Compose the final upload tree and Brotli-compress
+   `/webexample/TerminalApp/dist/assets/app.wasm` in place so the single
+   asset remains under Cloudflare Pages' 25 MiB upload limit:
    ```
    /              ← Website/dist/                       (Astro site)
    /docs/         ← .build-docs/                        (DocC, combined)
