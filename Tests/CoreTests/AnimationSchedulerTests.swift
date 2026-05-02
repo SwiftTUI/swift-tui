@@ -85,6 +85,83 @@ struct AnimationSchedulerTests {
     let frame = scheduler.consumeReadyFrame(at: .now())
     #expect(frame?.animationRequest == explicit)
   }
+
+  @Test("replaying a cancelled animation frame restores its transaction onto pending work")
+  func replayCancelledAnimationFrameRestoresTransaction() throws {
+    let scheduler = FrameScheduler()
+    let animatedIdentity = testIdentity("Root", "Animated")
+    let newerIdentity = testIdentity("Root", "Newer")
+    let animationRequest = AnimationRequest.animate(
+      AnimationBox(TestAnimation(id: "cancelled"))
+    )
+    let batchID = AnimationBatchID(1)
+
+    scheduler.requestInvalidation(
+      of: [animatedIdentity],
+      animation: animationRequest,
+      batchID: batchID
+    )
+    let cancelledFrame = try #require(scheduler.consumeReadyFrame(at: .now()))
+
+    scheduler.requestInvalidation(of: [newerIdentity])
+    scheduler.replayCancelledFrameIntent(cancelledFrame)
+
+    let replayedFrame = try #require(scheduler.consumeReadyFrame(at: .now()))
+    #expect(replayedFrame.causes == [.invalidation])
+    #expect(
+      replayedFrame.invalidatedIdentities == Set([animatedIdentity, newerIdentity])
+    )
+    #expect(replayedFrame.animationRequest == animationRequest)
+    #expect(replayedFrame.animationBatchID == batchID)
+    #expect(replayedFrame.intentRequestCount == 2)
+  }
+
+  @Test("replaying a cancelled animation frame does not replace newer explicit animation")
+  func replayCancelledAnimationFrameKeepsNewerExplicitAnimation() throws {
+    let scheduler = FrameScheduler()
+    let cancelledIdentity = testIdentity("Root", "Cancelled")
+    let newerIdentity = testIdentity("Root", "Newer")
+    let cancelledAnimation = AnimationRequest.animate(
+      AnimationBox(TestAnimation(id: "cancelled"))
+    )
+    let newerAnimation = AnimationRequest.animate(
+      AnimationBox(TestAnimation(id: "newer"))
+    )
+    let cancelledBatchID = AnimationBatchID(1)
+    let newerBatchID = AnimationBatchID(2)
+
+    scheduler.requestInvalidation(
+      of: [cancelledIdentity],
+      animation: cancelledAnimation,
+      batchID: cancelledBatchID
+    )
+    let cancelledFrame = try #require(scheduler.consumeReadyFrame(at: .now()))
+
+    scheduler.requestInvalidation(
+      of: [newerIdentity],
+      animation: newerAnimation,
+      batchID: newerBatchID
+    )
+    scheduler.replayCancelledFrameIntent(cancelledFrame)
+
+    let replayedFrame = try #require(scheduler.consumeReadyFrame(at: .now()))
+    #expect(
+      replayedFrame.invalidatedIdentities == Set([cancelledIdentity, newerIdentity])
+    )
+    #expect(replayedFrame.animationRequest == newerAnimation)
+    #expect(replayedFrame.animationBatchID == newerBatchID)
+  }
+
+  @Test("replaying a cancelled input-only frame does not synthesize invalidation")
+  func replayCancelledInputOnlyFrameDoesNotSynthesizeInvalidation() throws {
+    let scheduler = FrameScheduler()
+    scheduler.requestInput()
+    let cancelledFrame = try #require(scheduler.consumeReadyFrame(at: .now()))
+
+    scheduler.replayCancelledFrameIntent(cancelledFrame)
+
+    #expect(scheduler.consumeReadyFrame(at: .now()) == nil)
+  }
 }
 
 private struct TestAnimation: Hashable, Sendable {

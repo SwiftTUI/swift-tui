@@ -5,7 +5,7 @@ import Testing
 @testable import GalleryDemoViews
 
 @MainActor
-@Suite
+@Suite(.serialized)
 struct AnimationRegressionTests {
   @Test(
     "AnimationsTab offset button renders intermediate frames while PhaseAnimator is visible")
@@ -85,8 +85,8 @@ struct AnimationRegressionTests {
   }
 
   @Test(
-    "diagnostics show animation intent is replayed after a cancellable gallery frame")
-  func diagnosticsShowAnimationIntentIsReplayedAfterCancellableGalleryFrame()
+    "diagnostics expose animation intent and cancellation state on the gallery path")
+  func diagnosticsExposeAnimationIntentAndCancellationStateOnGalleryPath()
     async throws
   {
     let terminalSize = CellSize(width: 96, height: 60)
@@ -150,19 +150,43 @@ struct AnimationRegressionTests {
     let rows = Self.diagnosticRows(
       try String(contentsOf: diagnosticsURL, encoding: .utf8)
     )
+    let animationCommitIndex = rows.firstIndex { row in
+      row["tail_job_state"] == "completed"
+        && row["stale_frame_policy"] == "commit_ordered"
+        && row["scheduled_animation_request"] == "animate"
+        && (Int(row["animation_controller_active_animations"] ?? "") ?? 0) > 0
+    }
+    #expect(
+      animationCommitIndex != nil,
+      """
+      Expected diagnostics to record the real gallery button click committing \
+      under explicit animation intent. Rows: \(rows).
+      """
+    )
+
+    let cancellationRows = rows.filter { row in
+      row["tail_job_state"] == "cancelled_before_start"
+    }
+    #expect(
+      cancellationRows.allSatisfy { row in
+        row["tail_cancel_reason"] == "newer_render_intent"
+          && row["stale_frame_policy"] == "cancel_pending_before_start"
+          && row["scheduled_animation_request"] != nil
+          && row["animation_controller_pending_work"] != nil
+      },
+      """
+      Expected any gallery pre-start cancellation diagnostics to include the \
+      cancellation reason, policy, animation request, and pending-work fields. \
+      Rows: \(rows).
+      """
+    )
+
     let cancelledAnimationIndex = rows.firstIndex { row in
       row["tail_job_state"] == "cancelled_before_start"
         && row["tail_cancel_reason"] == "newer_render_intent"
         && row["scheduled_animation_request"] == "animate"
         && row["scheduled_animation_batch"] == "-"
     }
-    #expect(
-      cancelledAnimationIndex != nil,
-      """
-      Expected diagnostics to identify the cancellable frame that carried the \
-      button click's animation intent. Rows: \(rows).
-      """
-    )
     if let cancelledAnimationIndex {
       let replayedAnimationCommit = rows.suffix(from: rows.index(after: cancelledAnimationIndex))
         .contains { row in

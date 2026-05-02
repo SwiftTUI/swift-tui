@@ -77,6 +77,10 @@ package protocol WakeNotifyingFrameScheduling: AnyObject {
   func setWakeHandler(_ handler: (@Sendable () -> Void)?)
 }
 
+package protocol CancelledFrameIntentReplaying: AnyObject {
+  func replayCancelledFrameIntent(_ frame: ScheduledFrame)
+}
+
 /// Scheduler contract used by the runtime event loop.
 public protocol FrameScheduling: Invalidating {
   func requestInput()
@@ -233,6 +237,32 @@ extension FrameScheduler: AnimationAwareInvalidating {
     }
     if let batchID {
       pendingAnimationBatchID = batchID
+    }
+    wakeHandlerLock.withLockUnchecked { $0 }?()
+  }
+}
+
+extension FrameScheduler: CancelledFrameIntentReplaying {
+  package func replayCancelledFrameIntent(_ frame: ScheduledFrame) {
+    let carriesInvalidationIntent =
+      frame.causes.contains(.invalidation)
+      || !frame.invalidatedIdentities.isEmpty
+      || frame.animationRequest != .inherit
+      || frame.animationBatchID != nil
+    guard carriesInvalidationIntent else {
+      return
+    }
+
+    pendingCauses.insert(.invalidation)
+    invalidatedIdentities.formUnion(frame.invalidatedIdentities)
+    pendingIntentRequestCount += 1
+    // Replay preserves the cancelled frame's one-shot animation intent only
+    // when no newer explicit animation is already queued.
+    if pendingAnimationRequest == .inherit, frame.animationRequest != .inherit {
+      pendingAnimationRequest = frame.animationRequest
+    }
+    if pendingAnimationBatchID == nil {
+      pendingAnimationBatchID = frame.animationBatchID
     }
     wakeHandlerLock.withLockUnchecked { $0 }?()
   }
