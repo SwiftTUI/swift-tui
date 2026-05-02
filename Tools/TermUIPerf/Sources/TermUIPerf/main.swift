@@ -11,13 +11,14 @@ import Foundation
 #endif
 
 do {
-  try run(arguments: Array(CommandLine.arguments.dropFirst()))
+  try await run(arguments: Array(CommandLine.arguments.dropFirst()))
 } catch {
   FileHandle.standardError.writeLine("error: \(error)")
   exit(64)
 }
 
-private func run(arguments: [String]) throws {
+@MainActor
+private func run(arguments: [String]) async throws {
   let command = try PerfCommandParser.parse(arguments)
   switch command {
   case .listScenarios:
@@ -25,25 +26,13 @@ private func run(arguments: [String]) throws {
       print(scenarioName)
     }
   case .run(let config):
-    let modes = config.modes.map(\.rawValue).joined(separator: ",")
-    print(
-      """
-      run command parsed
-      scenario: \(config.scenario.rawValue)
-      modes: \(modes)
-      iterations: \(config.iterations)
-      artifacts-root: \(config.artifactsRoot)
-      configuration: \(config.configuration)
-      """
-    )
+    let results = try await RunCommand.run(config)
+    for result in results {
+      print(result.runDirectory.path)
+    }
   case .compare(let config):
-    print(
-      """
-      compare command parsed
-      base: \(config.baseRunDirectory)
-      candidate: \(config.candidateRunDirectory)
-      """
-    )
+    let result = try CompareCommand.compare(config)
+    print(CompareCommand.format(result))
   }
 }
 
