@@ -1,3 +1,22 @@
+public struct RuntimeRegistrationDiagnostics: Equatable, Sendable {
+  public var pointerHandlerCount: Int
+  public var pointerHoverHandlerCount: Int
+  public var gestureRecognizerCount: Int
+  public var gestureStateBindingCount: Int
+
+  public init(
+    pointerHandlerCount: Int = 0,
+    pointerHoverHandlerCount: Int = 0,
+    gestureRecognizerCount: Int = 0,
+    gestureStateBindingCount: Int = 0
+  ) {
+    self.pointerHandlerCount = pointerHandlerCount
+    self.pointerHoverHandlerCount = pointerHoverHandlerCount
+    self.gestureRecognizerCount = gestureRecognizerCount
+    self.gestureStateBindingCount = gestureStateBindingCount
+  }
+}
+
 @MainActor
 package struct RuntimeRegistrationSet {
   package let actionRegistry: LocalActionRegistry?
@@ -68,10 +87,14 @@ package struct RuntimeRegistrationSet {
   }
 
   package func resetAll() {
+    let preservedGestureIdentities = gestureRegistry?.activeIdentitySnapshot() ?? []
+
     actionRegistry?.reset()
     keyHandlerRegistry?.reset()
     terminationRegistry?.reset()
-    pointerHandlerRegistry?.reset()
+    pointerHandlerRegistry?.reset(
+      preservingRouteHandlersFor: preservedGestureIdentities
+    )
     gestureRegistry?.reset()
     gestureStateRegistry?.reset()
     focusBindingRegistry?.reset()
@@ -155,5 +178,17 @@ package struct RuntimeRegistrationSet {
     )
     commandRegistry?.restore(handlers.commandRegistrations)
     dropDestinationRegistry?.restore(handlers.dropDestinationRegistrations)
+  }
+
+  package func diagnostics() -> RuntimeRegistrationDiagnostics {
+    let gestureStateRegistrations = gestureStateRegistry?.snapshot() ?? [:]
+    return RuntimeRegistrationDiagnostics(
+      pointerHandlerCount: pointerHandlerRegistry?.snapshot().count ?? 0,
+      pointerHoverHandlerCount: pointerHandlerRegistry?.snapshotHover().count ?? 0,
+      gestureRecognizerCount: gestureRegistry?.snapshot().count ?? 0,
+      gestureStateBindingCount: gestureStateRegistrations.values.reduce(0) { count, bindings in
+        count + bindings.count
+      }
+    )
   }
 }

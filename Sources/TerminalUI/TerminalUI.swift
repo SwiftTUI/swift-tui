@@ -1496,13 +1496,14 @@ public struct DefaultRenderer {
       timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
       workerTimings = timings
     }
+    var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
     let (commit, commitDuration) = measurePhase(clock: clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: resolveContext.identity,
         resolved: resolved,
         placed: tail.placed
       )
-      registrationDraft.commitRestoring(
+      runtimeRegistrationDiagnostics = registrationDraft.commitRestoring(
         from: viewGraph,
         resolved: resolved
       )
@@ -1518,7 +1519,7 @@ public struct DefaultRenderer {
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
     )
-    let diagnostics: FrameDiagnostics
+    var diagnostics: FrameDiagnostics
     if collectsDiagnostics {
       let phaseTimings = FramePhaseTimings(
         resolve: resolveDuration,
@@ -1559,6 +1560,7 @@ public struct DefaultRenderer {
     } else {
       diagnostics = .init()
     }
+    diagnostics.runtimeRegistrations = runtimeRegistrationDiagnostics
     let artifacts = FrameArtifacts(
       resolvedTree: resolved,
       measuredTree: tail.measured,
@@ -1912,13 +1914,14 @@ public struct DefaultRenderer {
       timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
       workerTimings = timings
     }
+    var runtimeRegistrationDiagnostics = RuntimeRegistrationDiagnostics()
     let (commit, commitDuration) = measurePhase(clock: draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: draft.resolveContext.identity,
         resolved: resolved,
         placed: tail.placed
       )
-      draft.registrationDraft.commitRestoring(
+      runtimeRegistrationDiagnostics = draft.registrationDraft.commitRestoring(
         from: viewGraph,
         resolved: resolved
       )
@@ -1935,7 +1938,7 @@ public struct DefaultRenderer {
     frameTailRenderer.pruneMeasurementCache(
       keeping: viewGraph.liveIdentitySnapshot()
     )
-    let diagnostics: FrameDiagnostics
+    var diagnostics: FrameDiagnostics
     if collectsDiagnostics {
       let phaseTimings = FramePhaseTimings(
         resolve: draft.resolveDuration,
@@ -1980,6 +1983,7 @@ public struct DefaultRenderer {
     } else {
       diagnostics = .init()
     }
+    diagnostics.runtimeRegistrations = runtimeRegistrationDiagnostics
     let artifacts = FrameArtifacts(
       resolvedTree: resolved,
       measuredTree: tail.measured,

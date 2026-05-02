@@ -835,6 +835,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
   public var measurementCache: MeasurementCacheMetrics?
   public var customLayoutFallbackCount: Int
   public var firstCustomLayoutFallbackIdentity: Identity?
+  public var runtimeRegistrations: RuntimeRegistrationDiagnostics
   package var geometryResolutionDiagnostics: GeometryResolutionDiagnostics = .init()
 
   public init(
@@ -864,7 +865,8 @@ public struct FrameDiagnostics: Equatable, Sendable {
     mainActorTimings: FrameMainActorTimings? = nil,
     measurementCache: MeasurementCacheMetrics? = nil,
     customLayoutFallbackCount: Int = 0,
-    firstCustomLayoutFallbackIdentity: Identity? = nil
+    firstCustomLayoutFallbackIdentity: Identity? = nil,
+    runtimeRegistrations: RuntimeRegistrationDiagnostics = .init()
   ) {
     self.proposal = proposal
     self.invalidatedIdentities = invalidatedIdentities
@@ -893,6 +895,7 @@ public struct FrameDiagnostics: Equatable, Sendable {
     self.measurementCache = measurementCache
     self.customLayoutFallbackCount = customLayoutFallbackCount
     self.firstCustomLayoutFallbackIdentity = firstCustomLayoutFallbackIdentity
+    self.runtimeRegistrations = runtimeRegistrations
   }
 }
 
