@@ -187,10 +187,16 @@ pressure without actual cancellation.
 
 Do not drop completed worker results in the Option 3 tranche. Once pre-start
 cancellation is proven, the existing `FrameDropEligibility` classifier can be
-expanded from observational to actionable for a narrow visual-only case. That
-requires explicit tests for lifecycle, task, focus, preference, scroll,
-animation, handler, custom-layout cache, retained baseline, and presentation
-repaint barriers.
+expanded from observational to actionable for a narrow visual-only case. The
+detailed proposal lives in
+[proposals/ASYNC_FRAME_STALE_POLICY.md](proposals/ASYNC_FRAME_STALE_POLICY.md):
+split async frame finish into candidate creation plus explicit commit, classify
+completed candidates before commit, discard only stale candidates with no
+lifecycle, task, focus, preference, scroll, animation, handler, custom-layout
+cache, retained-baseline, or presentation repaint barriers, and route every
+skipped completed frame through an explicit reconciliation object. The first
+allowed reconciliation mode is empty visual-only; non-empty skipped-frame
+side-effect reconciliation remains a later proposal.
 
 ## Progress Map
 
