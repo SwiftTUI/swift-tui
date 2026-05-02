@@ -124,6 +124,12 @@ package final class RenderSuspensionDiagnostics: Sendable {
     }
   }
 
+  package var isSuspended: Bool {
+    state.withLock { state in
+      state.suspensionDepth > 0
+    }
+  }
+
   func recordInputEventQueuedIfSuspended() {
     state.withLock { state in
       if state.suspensionDepth > 0 {
@@ -218,6 +224,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package var nextRenderIntentGeneration: UInt64 = 1
   package var pendingCoalescedEventBatches = 0
   package var pendingCoalescedWakeCauses: Set<WakeCause> = []
+  package var cancelledRenderCount = 0
 
   /// Optional file-based diagnostics logger. When set, every rendered frame
   /// emits a tab-separated record to the configured output file.
@@ -429,7 +436,16 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     scheduleNextWakeIfNeeded(using: eventPump)
 
     if scheduler.hasPendingFrame(at: .now()) {
-      try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
+      if let exitReason = try await renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: eventPump
+      ) {
+        return RunLoopResult(
+          finalState: stateContainer.state,
+          renderedFrames: renderedFrames,
+          exitReason: exitReason
+        )
+      }
       scheduleNextWakeIfNeeded(using: eventPump)
     }
 
@@ -437,7 +453,16 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
       let pendingEvents = await drainPendingEvents(from: eventPump)
       guard !pendingEvents.isEmpty else {
         if scheduler.hasPendingFrame(at: .now()) {
-          try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
+          if let exitReason = try await renderPendingFramesAsync(
+            renderedFrames: &renderedFrames,
+            eventPump: eventPump
+          ) {
+            return RunLoopResult(
+              finalState: stateContainer.state,
+              renderedFrames: renderedFrames,
+              exitReason: exitReason
+            )
+          }
         }
         if let nextWake = scheduler.nextWakeInstant(after: .now()),
           nextWake > .now()
@@ -469,7 +494,16 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
                 return false
               }())
           if shouldFlushBeforeExit {
-            try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
+            if let flushedExitReason = try await renderPendingFramesAsync(
+              renderedFrames: &renderedFrames,
+              eventPump: eventPump
+            ) {
+              return RunLoopResult(
+                finalState: stateContainer.state,
+                renderedFrames: renderedFrames,
+                exitReason: flushedExitReason
+              )
+            }
           }
           if terminationDisposition(for: exitReason) == .cancel {
             scheduler.requestInvalidation(of: [rootIdentity])
@@ -484,7 +518,16 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
         }
         handledNonExitEvent = true
       }
-      try await renderPendingFramesAsync(renderedFrames: &renderedFrames)
+      if let exitReason = try await renderPendingFramesAsync(
+        renderedFrames: &renderedFrames,
+        eventPump: eventPump
+      ) {
+        return RunLoopResult(
+          finalState: stateContainer.state,
+          renderedFrames: renderedFrames,
+          exitReason: exitReason
+        )
+      }
       if let nextWake = scheduler.nextWakeInstant(after: .now()),
         nextWake > .now()
       {

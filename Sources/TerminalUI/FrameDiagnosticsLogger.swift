@@ -44,6 +44,11 @@ public struct FrameDiagnosticRecord: Sendable {
   public var geometryDuplicateNamedCoordinateSpaceCount: Int
   public var firstGeometryDuplicateNamedCoordinateSpaceName: String?
   public var staleFramePolicy: String
+  public var tailJobState: String
+  public var tailCancelReason: String
+  public var cancelledRenderCount: Int
+  public var newestDesiredAtTailStart: UInt64?
+  public var newestDesiredAtTailResult: UInt64?
   public var dropEligibilityBlockers: Set<FrameDropEligibility.Blocker>
   public var inputEventsQueuedDuringRenderSuspension: Int
   public var presentationStrategy: String
@@ -194,6 +199,11 @@ public final class FrameDiagnosticsLogger {
       String(record.geometryDuplicateNamedCoordinateSpaceCount),
       record.firstGeometryDuplicateNamedCoordinateSpaceName ?? "-",
       record.staleFramePolicy,
+      record.tailJobState,
+      record.tailCancelReason,
+      String(record.cancelledRenderCount),
+      record.newestDesiredAtTailStart.map(String.init) ?? "-",
+      record.newestDesiredAtTailResult.map(String.init) ?? "-",
       formatDropBlockers(record.dropEligibilityBlockers),
       String(record.inputEventsQueuedDuringRenderSuspension),
       // presentation
@@ -271,6 +281,11 @@ public final class FrameDiagnosticsLogger {
       "geometry_duplicate_named_coordinate_spaces",
       "first_geometry_duplicate_named_coordinate_space",
       "stale_frame_policy",
+      "tail_job_state",
+      "tail_cancel_reason",
+      "cancelled_render_count",
+      "newest_desired_at_tail_start",
+      "newest_desired_at_tail_result",
       "drop_blockers",
       "input_events_during_render_suspension",
       "present_strategy",

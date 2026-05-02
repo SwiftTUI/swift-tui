@@ -128,6 +128,60 @@ private struct FrameTailOutput {
   var workerCompletedAt: ContinuousClock.Instant?
 }
 
+package enum FrameTailJobState: String, Sendable {
+  case queued
+  case started
+  case completed
+  case cancelledBeforeStart = "cancelled_before_start"
+}
+
+package struct CancellableRenderOutcome {
+  package var artifacts: FrameArtifacts?
+  package var renderGeneration: RenderGeneration
+  package var tailJobState: FrameTailJobState
+  package var tailCancelReason: String?
+}
+
+private final class FrameTailJobCancellationToken: Sendable {
+  private let state = Mutex<FrameTailJobState>(.queued)
+
+  var currentState: FrameTailJobState {
+    state.withLock { $0 }
+  }
+
+  func cancelBeforeStart() -> Bool {
+    state.withLock { state in
+      guard state == .queued else {
+        return false
+      }
+      state = .cancelledBeforeStart
+      return true
+    }
+  }
+
+  func markStarted() -> Bool {
+    state.withLock { state in
+      switch state {
+      case .queued:
+        state = .started
+        return true
+      case .cancelledBeforeStart:
+        return false
+      case .started, .completed:
+        return true
+      }
+    }
+  }
+
+  func markCompleted() {
+    state.withLock { state in
+      if state == .started {
+        state = .completed
+      }
+    }
+  }
+}
+
 package struct FrameHeadDraft {
   fileprivate var clock: ContinuousClock?
   fileprivate var renderGeneration: RenderGeneration
@@ -149,6 +203,11 @@ private struct AsyncFrameTailDraftOutput {
   var layout: FrameTailLayoutOutput
   var tail: FrameTailOutput
   var renderSuspensionDuration: Duration
+}
+
+private enum CancellableFrameTailResult {
+  case output(AsyncFrameTailDraftOutput)
+  case cancelledBeforeStart
 }
 
 private struct FrameTailWorkerResult<Value> {
@@ -446,27 +505,36 @@ private final class FrameTailRenderer: Sendable {
 
   func renderLayoutAsync(
     _ input: FrameTailInput,
-    clock: ContinuousClock?
-  ) async -> FrameTailLayoutOutput {
+    clock: ContinuousClock?,
+    cancellationToken: FrameTailJobCancellationToken? = nil
+  ) async -> FrameTailLayoutOutput? {
     if containsLayoutDependentContent(input.resolved) {
       input.layoutPassContext.updateWorkMetrics {
         $0.layoutDependentMainActorFallbacks += 1
       }
     }
     guard canOffloadLayout(input) else {
+      guard cancellationToken?.markStarted() ?? true else {
+        return nil
+      }
       return renderLayoutInline(
         input,
         clock: clock
       )
     }
 
-    let result = await timedLayoutAsync(clock: clock) {
+    let result = await timedLayoutAsync(
+      clock: clock,
+      cancellationToken: cancellationToken
+    ) {
       self.renderLayoutInline(
         input,
         clock: clock
       )
     }
-    var output = result.value
+    guard var output = result.value else {
+      return nil
+    }
     output.workerEnqueueToStart = result.enqueueToStart
     output.workerCompute = result.compute
     output.ranOffMain = true
@@ -583,6 +651,12 @@ private final class FrameTailRenderer: Sendable {
     suspensionHooks.withLock { $0 }
   }
 
+  func runLayoutWorkerJobForCancellationTesting(
+    _ operation: @escaping @Sendable () -> Void
+  ) async {
+    _ = await layoutWorker.async(operation)
+  }
+
   private func sync<Value>(
     _ operation: () -> Value
   ) -> Value {
@@ -665,11 +739,17 @@ private final class FrameTailRenderer: Sendable {
 
   private func timedLayoutAsync<Value>(
     clock: ContinuousClock?,
+    cancellationToken: FrameTailJobCancellationToken?,
     _ operation: @escaping @Sendable () -> Value
-  ) async -> FrameTailWorkerResult<Value> {
+  ) async -> FrameTailWorkerResult<Value?> {
     guard let clock else {
       return .init(
-        value: await layoutWorker.async(operation),
+        value: await layoutWorker.async {
+          guard cancellationToken?.markStarted() ?? true else {
+            return nil
+          }
+          return operation()
+        },
         enqueueToStart: .zero,
         compute: .zero,
         completedAt: nil
@@ -679,10 +759,18 @@ private final class FrameTailRenderer: Sendable {
     let enqueuedAt = clock.now
     return await layoutWorker.async {
       let startedAt = clock.now
+      guard cancellationToken?.markStarted() ?? true else {
+        return .init(
+          value: nil,
+          enqueueToStart: enqueuedAt.duration(to: startedAt),
+          compute: .zero,
+          completedAt: startedAt
+        )
+      }
       let value = operation()
       let completedAt = clock.now
       return .init(
-        value: value,
+        value: Optional(value),
         enqueueToStart: enqueuedAt.duration(to: startedAt),
         compute: startedAt.duration(to: completedAt),
         completedAt: completedAt
@@ -1146,6 +1234,13 @@ public struct DefaultRenderer {
   package func abortPreparedFrameHeadForCancellationTesting(
     _ draft: FrameHeadDraft
   ) {
+    abortPreparedFrameHead(draft)
+  }
+
+  @MainActor
+  package func abortPreparedFrameHead(
+    _ draft: FrameHeadDraft
+  ) {
     draft.registrationDraft.discard()
     viewGraph.restoreCheckpoint(draft.viewGraphCheckpoint)
     frameState.restoreCheckpoint(draft.frameStateCheckpoint)
@@ -1162,6 +1257,13 @@ public struct DefaultRenderer {
     _ draft: FrameHeadDraft
   ) async {
     _ = await renderFrameTailAsync(draft)
+  }
+
+  @MainActor
+  package func runFrameTailLayoutWorkerJobForCancellationTesting(
+    _ operation: @escaping @Sendable () -> Void
+  ) async {
+    await frameTailRenderer.runLayoutWorkerJobForCancellationTesting(operation)
   }
 
   /// Renders `root` into complete frame artifacts.
@@ -1195,6 +1297,46 @@ public struct DefaultRenderer {
       proposal: proposal,
       collectsDiagnostics: collectsDiagnostics
     )
+  }
+
+  @MainActor
+  package func renderAsyncCancellable<V: View>(
+    _ root: V,
+    context: ResolveContext,
+    proposal: ProposedSize,
+    collectsDiagnostics: Bool,
+    shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
+  ) async -> CancellableRenderOutcome {
+    let draft = prepareFrameHead(
+      root,
+      context: context,
+      proposal: proposal,
+      collectsDiagnostics: collectsDiagnostics
+    )
+    switch await renderFrameTailCancellable(
+      draft,
+      shouldCancelQueued: shouldCancelQueued
+    ) {
+    case .cancelledBeforeStart:
+      abortPreparedFrameHead(draft)
+      return CancellableRenderOutcome(
+        artifacts: nil,
+        renderGeneration: draft.renderGeneration,
+        tailJobState: .cancelledBeforeStart,
+        tailCancelReason: "newer_render_intent"
+      )
+    case .output(let tailOutput):
+      return CancellableRenderOutcome(
+        artifacts: finishFrame(
+          draft: draft,
+          tailOutput: tailOutput,
+          collectsDiagnostics: collectsDiagnostics
+        ),
+        renderGeneration: draft.renderGeneration,
+        tailJobState: .completed,
+        tailCancelReason: nil
+      )
+    }
   }
 
   @MainActor
@@ -1602,6 +1744,22 @@ public struct DefaultRenderer {
   private func renderFrameTailAsync(
     _ draft: FrameHeadDraft
   ) async -> AsyncFrameTailDraftOutput {
+    guard
+      let output = await renderFrameTailAsync(
+        draft,
+        cancellationToken: nil
+      )
+    else {
+      preconditionFailure("Non-cancellable frame tail unexpectedly cancelled.")
+    }
+    return output
+  }
+
+  @MainActor
+  private func renderFrameTailAsync(
+    _ draft: FrameHeadDraft,
+    cancellationToken: FrameTailJobCancellationToken?
+  ) async -> AsyncFrameTailDraftOutput? {
     let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
     let layoutSuspends = frameTailRenderer.canOffloadLayout(draft.frameTailInput)
     let layoutSuspensionStart = layoutSuspends ? draft.clock?.now : nil
@@ -1610,10 +1768,14 @@ public struct DefaultRenderer {
     }
     let layout = await frameTailRenderer.renderLayoutAsync(
       draft.frameTailInput,
-      clock: draft.clock
+      clock: draft.clock,
+      cancellationToken: cancellationToken
     )
     if layoutSuspends {
       suspensionHooks?.onEnd?()
+    }
+    guard let layout else {
+      return nil
     }
     let layoutSuspensionDuration =
       if let layoutSuspensionStart, let clock = draft.clock {
@@ -1648,6 +1810,86 @@ public struct DefaultRenderer {
       layout: layout,
       tail: tail,
       renderSuspensionDuration: layoutSuspensionDuration + rasterSuspensionDuration
+    )
+  }
+
+  @MainActor
+  private func renderFrameTailCancellable(
+    _ draft: FrameHeadDraft,
+    shouldCancelQueued: @escaping @MainActor @Sendable () async -> Bool
+  ) async -> CancellableFrameTailResult {
+    let suspensionHooks = frameTailRenderer.renderSuspensionHooksSnapshot()
+    let layoutSuspends = frameTailRenderer.canOffloadLayout(draft.frameTailInput)
+    let layoutSuspensionStart = layoutSuspends ? draft.clock?.now : nil
+    if layoutSuspends {
+      suspensionHooks?.onBegin?()
+    }
+
+    let cancellationToken = FrameTailJobCancellationToken()
+    let layoutTask = Task { @MainActor in
+      await frameTailRenderer.renderLayoutAsync(
+        draft.frameTailInput,
+        clock: draft.clock,
+        cancellationToken: cancellationToken
+      )
+    }
+
+    while cancellationToken.currentState == .queued {
+      if await shouldCancelQueued(), cancellationToken.cancelBeforeStart() {
+        layoutTask.cancel()
+        if layoutSuspends {
+          suspensionHooks?.onEnd?()
+        }
+        return .cancelledBeforeStart
+      }
+      try? await Task.sleep(for: .milliseconds(1))
+    }
+
+    guard let layout = await layoutTask.value else {
+      if layoutSuspends {
+        suspensionHooks?.onEnd?()
+      }
+      return .cancelledBeforeStart
+    }
+    if layoutSuspends {
+      suspensionHooks?.onEnd?()
+    }
+    let layoutSuspensionDuration =
+      if let layoutSuspensionStart, let clock = draft.clock {
+        layoutSuspensionStart.duration(to: clock.now)
+      } else {
+        Duration.zero
+      }
+    let placed = layout.baselinePlaced
+    animationController.capturePlacedTree(layout.baselinePlaced)
+    let animationOverlaySnapshot = animationController.placedAnimationOverlaySnapshot(
+      for: placed,
+      at: draft.animationTimestamp
+    )
+    let rasterSuspensionStart = draft.clock?.now
+    suspensionHooks?.onBegin?()
+    let tail = await frameTailRenderer.renderRasterAsync(
+      draft.frameTailInput,
+      layout: layout,
+      placed: placed,
+      animationOverlaySnapshot: animationOverlaySnapshot,
+      clock: draft.clock
+    )
+    suspensionHooks?.onEnd?()
+    let rasterSuspensionDuration =
+      if let rasterSuspensionStart, let clock = draft.clock {
+        rasterSuspensionStart.duration(to: clock.now)
+      } else {
+        Duration.zero
+      }
+
+    cancellationToken.markCompleted()
+    return .output(
+      AsyncFrameTailDraftOutput(
+        layout: layout,
+        tail: tail,
+        renderSuspensionDuration: layoutSuspensionDuration + rasterSuspensionDuration
+      )
     )
   }
 

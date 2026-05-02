@@ -332,6 +332,11 @@ extension RunLoop {
             firstGeometryDuplicateNamedCoordinateSpaceName: geometryDiagnostics
               .firstDuplicateNamedCoordinateSpaceName,
             staleFramePolicy: "commit_ordered",
+            tailJobState: FrameTailJobState.completed.rawValue,
+            tailCancelReason: "-",
+            cancelledRenderCount: cancelledRenderCount,
+            newestDesiredAtTailStart: renderIntentDiagnostics.desiredGeneration,
+            newestDesiredAtTailResult: renderIntentDiagnostics.desiredGeneration,
             dropEligibilityBlockers: FrameDropEligibility.classify(artifacts).blockers,
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
@@ -379,11 +384,111 @@ extension RunLoop {
     terminalPointerHoverEnabled = shouldEnable
   }
 
+  @MainActor
+  private func logCancelledFrameTail(
+    diagnosticsLogger: FrameDiagnosticsLogger?,
+    renderedFrames: Int,
+    scheduledFrame: ScheduledFrame,
+    renderIntentDiagnostics: RenderIntentCoalescingDiagnostics,
+    renderGeneration: RenderGeneration,
+    tailJobState: FrameTailJobState,
+    tailCancelReason: String
+  ) {
+    guard let diagnosticsLogger else {
+      return
+    }
+    let causeSummary = scheduledFrame.causes
+      .map(\.rawValue)
+      .sorted()
+      .joined(separator: "+")
+    diagnosticsLogger.log(
+      FrameDiagnosticRecord(
+        frameNumber: renderedFrames + 1,
+        causeSummary: causeSummary,
+        focusSyncRerenders: 0,
+        invalidatedIdentityCount: scheduledFrame.invalidatedIdentities.count,
+        resolvedNodeCount: 0,
+        resolvedNodesComputed: 0,
+        resolvedNodesReused: 0,
+        measuredNodeCount: 0,
+        measuredNodesComputed: 0,
+        measuredNodesReused: 0,
+        placedNodeCount: 0,
+        drawNodeCount: 0,
+        interactionRegionCount: 0,
+        focusRegionCount: 0,
+        phaseTimings: nil,
+        renderGenerations: .init(render: renderGeneration),
+        desiredGeneration: renderIntentDiagnostics.desiredGeneration,
+        coalescedEventBatches: renderIntentDiagnostics.coalescedEventBatches,
+        coalescedWakeCauses: formattedWakeCauses(
+          renderIntentDiagnostics.coalescedWakeCauses
+        ),
+        coalescedIntentRequests: renderIntentDiagnostics.intentRequestCount,
+        workerTimings: nil,
+        mainActorTimings: nil,
+        customLayoutFallbackCount: 0,
+        firstCustomLayoutFallbackIdentity: nil,
+        layoutDependentRealizations: 0,
+        layoutDependentRealizationCacheHits: 0,
+        layoutDependentMainActorFallbacks: 0,
+        geometryAnchorResolutionMissCount: 0,
+        firstGeometryAnchorResolutionMissIdentity: nil,
+        geometryMissingNamedCoordinateSpaceCount: 0,
+        firstGeometryMissingNamedCoordinateSpaceName: nil,
+        geometryDuplicateNamedCoordinateSpaceCount: 0,
+        firstGeometryDuplicateNamedCoordinateSpaceName: nil,
+        staleFramePolicy: "cancel_pending_before_start",
+        tailJobState: tailJobState.rawValue,
+        tailCancelReason: tailCancelReason,
+        cancelledRenderCount: cancelledRenderCount,
+        newestDesiredAtTailStart: renderIntentDiagnostics.desiredGeneration,
+        newestDesiredAtTailResult: nextRenderIntentGeneration,
+        dropEligibilityBlockers: [],
+        inputEventsQueuedDuringRenderSuspension:
+          renderSuspensionDiagnostics
+          .drainInputEventsQueuedDuringSuspension(),
+        presentationStrategy: "-",
+        presentationBytesWritten: 0,
+        presentationLinesTouched: 0,
+        presentationCellsChanged: 0,
+        presentationDuration: .zero,
+        damageRowCount: nil,
+        damageRangeAwareRowCount: nil,
+        damageTextSpanCount: nil,
+        damageTextCellCount: nil,
+        damageGraphicsInvalidationCount: nil,
+        damageRequiresFullTextRepaint: false,
+        damageRequiresFullGraphicsReplay: false,
+        presentationUsedSynchronizedOutput: false,
+        presentationGraphicsReplayScope: "-",
+        presentationGraphicsAttachmentsReplayed: 0,
+        presentationEditOperationLowering: "-",
+        presentationEditOperationCount: 0,
+        measurementCacheHitRate: nil,
+        totalFrameDuration: .zero
+      )
+    )
+  }
+
   package func renderPendingFramesAsync(renderedFrames: inout Int) async throws {
+    _ = try await renderPendingFramesAsync(
+      renderedFrames: &renderedFrames,
+      eventPump: nil
+    )
+  }
+
+  package func renderPendingFramesAsync(
+    renderedFrames: inout Int,
+    eventPump: EventPump?
+  ) async throws -> RunLoopExitReason? {
     observationBridge.attachInvalidator(scheduler)
 
     let hasDiagnosticsLogger = diagnosticsLogger != nil
-    while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
+    var pendingExitReason: RunLoopExitReason?
+    var pendingExitShouldFlush = false
+
+    frameLoop: while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
       let renderIntentDiagnostics = nextRenderIntentDiagnostics(for: scheduledFrame)
       // Drain gesture recognizer deadlines before rendering so that
       // recognizers that transition on this wake see their new phase
@@ -402,25 +507,111 @@ extension RunLoop {
       var focusSyncBudget = FocusSyncRerenderBudget()
       var focusSyncBudgetExceeded = false
       var artifacts: FrameArtifacts?
+      var tailJobState: FrameTailJobState = .completed
       let currentState = stateContainer.state
       if previousRenderedState != currentState {
         renderer.forceRootEvaluation()
         previousRenderedState = currentState
       }
+
+      @MainActor
+      func shouldCancelQueuedTail() async -> Bool {
+        if scheduler.hasPendingFrame(at: .now()) {
+          return true
+        }
+        guard let eventPump, pendingExitReason == nil else {
+          return false
+        }
+        let pendingEvents = await drainPendingEvents(from: eventPump)
+        guard !pendingEvents.isEmpty else {
+          return scheduler.hasPendingFrame(at: .now())
+        }
+
+        let renderEventDrain = drainPendingRenderEvents(
+          from: eventPump,
+          initialEvents: pendingEvents
+        )
+        pendingCoalescedEventBatches += renderEventDrain.coalescedEventBatches
+
+        var handledNonExitEvent = false
+        for event in renderEventDrain.events {
+          let hadReadyFrameBeforeEvent = scheduler.hasPendingFrame(at: .now())
+          if let exitReason = handle(event) {
+            let shouldFlushBeforeExit =
+              handledNonExitEvent
+              || (hadReadyFrameBeforeEvent
+                && {
+                  if case .signal = exitReason {
+                    return true
+                  }
+                  return false
+                }())
+            if terminationDisposition(for: exitReason) == .cancel {
+              scheduler.requestInvalidation(of: [rootIdentity])
+              handledNonExitEvent = true
+              continue
+            }
+            pendingExitReason = exitReason
+            pendingExitShouldFlush = shouldFlushBeforeExit
+            break
+          }
+          handledNonExitEvent = true
+        }
+
+        return pendingExitReason != nil || scheduler.hasPendingFrame(at: .now())
+      }
+
       while true {
         if rerenderedForFocusSync {
           renderer.forceRootEvaluation()
         }
-        let renderedArtifacts = await renderer.renderAsync(
-          viewBuilder(
-            (
-              state: currentState,
-              focusedIdentity: focusTracker.currentFocusIdentity
-            )),
-          context: resolveContext(for: scheduledFrame),
-          proposal: proposal(),
-          collectsDiagnostics: hasDiagnosticsLogger
-        )
+        let renderedArtifacts: FrameArtifacts
+        if eventPump == nil {
+          renderedArtifacts = await renderer.renderAsync(
+            viewBuilder(
+              (
+                state: currentState,
+                focusedIdentity: focusTracker.currentFocusIdentity
+              )),
+            context: resolveContext(for: scheduledFrame),
+            proposal: proposal(),
+            collectsDiagnostics: hasDiagnosticsLogger
+          )
+          tailJobState = .completed
+        } else {
+          let renderOutcome = await renderer.renderAsyncCancellable(
+            viewBuilder(
+              (
+                state: currentState,
+                focusedIdentity: focusTracker.currentFocusIdentity
+              )),
+            context: resolveContext(for: scheduledFrame),
+            proposal: proposal(),
+            collectsDiagnostics: hasDiagnosticsLogger,
+            shouldCancelQueued: shouldCancelQueuedTail
+          )
+          if renderOutcome.tailJobState == .cancelledBeforeStart {
+            cancelledRenderCount += 1
+            logCancelledFrameTail(
+              diagnosticsLogger: diagnosticsLogger,
+              renderedFrames: renderedFrames,
+              scheduledFrame: scheduledFrame,
+              renderIntentDiagnostics: renderIntentDiagnostics,
+              renderGeneration: renderOutcome.renderGeneration,
+              tailJobState: renderOutcome.tailJobState,
+              tailCancelReason: renderOutcome.tailCancelReason ?? "-"
+            )
+            if let pendingExitReason, !pendingExitShouldFlush {
+              return pendingExitReason
+            }
+            continue frameLoop
+          }
+          tailJobState = renderOutcome.tailJobState
+          guard let artifacts = renderOutcome.artifacts else {
+            preconditionFailure("Completed render outcome did not include frame artifacts.")
+          }
+          renderedArtifacts = artifacts
+        }
         artifacts = renderedArtifacts
 
         latestSemanticSnapshot = renderedArtifacts.semanticSnapshot
@@ -644,6 +835,11 @@ extension RunLoop {
             firstGeometryDuplicateNamedCoordinateSpaceName: geometryDiagnostics
               .firstDuplicateNamedCoordinateSpaceName,
             staleFramePolicy: "commit_ordered",
+            tailJobState: tailJobState.rawValue,
+            tailCancelReason: "-",
+            cancelledRenderCount: cancelledRenderCount,
+            newestDesiredAtTailStart: renderIntentDiagnostics.desiredGeneration,
+            newestDesiredAtTailResult: renderIntentDiagnostics.desiredGeneration,
             dropEligibilityBlockers: FrameDropEligibility.classify(artifacts).blockers,
             inputEventsQueuedDuringRenderSuspension:
               inputEventsQueuedDuringRenderSuspension,
@@ -680,6 +876,7 @@ extension RunLoop {
         setPressedIdentity(nil, transient: false)
       }
     }
+    return pendingExitReason
   }
 
   package func applyDesiredFocusRequest(
