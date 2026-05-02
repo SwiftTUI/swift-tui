@@ -485,9 +485,6 @@ extension RunLoop {
     observationBridge.attachInvalidator(scheduler)
 
     let hasDiagnosticsLogger = diagnosticsLogger != nil
-    var pendingExitReason: RunLoopExitReason?
-    var pendingExitShouldFlush = false
-
     frameLoop: while let scheduledFrame = scheduler.consumeReadyFrame(at: .now()) {
       let renderIntentDiagnostics = nextRenderIntentDiagnostics(for: scheduledFrame)
       // Drain gesture recognizer deadlines before rendering so that
@@ -516,49 +513,7 @@ extension RunLoop {
 
       @MainActor
       func shouldCancelQueuedTail() async -> Bool {
-        if scheduler.hasPendingFrame(at: .now()) {
-          return true
-        }
-        guard let eventPump, pendingExitReason == nil else {
-          return false
-        }
-        let pendingEvents = await drainPendingEvents(from: eventPump)
-        guard !pendingEvents.isEmpty else {
-          return scheduler.hasPendingFrame(at: .now())
-        }
-
-        let renderEventDrain = drainPendingRenderEvents(
-          from: eventPump,
-          initialEvents: pendingEvents
-        )
-        pendingCoalescedEventBatches += renderEventDrain.coalescedEventBatches
-
-        var handledNonExitEvent = false
-        for event in renderEventDrain.events {
-          let hadReadyFrameBeforeEvent = scheduler.hasPendingFrame(at: .now())
-          if let exitReason = handle(event) {
-            let shouldFlushBeforeExit =
-              handledNonExitEvent
-              || (hadReadyFrameBeforeEvent
-                && {
-                  if case .signal = exitReason {
-                    return true
-                  }
-                  return false
-                }())
-            if terminationDisposition(for: exitReason) == .cancel {
-              scheduler.requestInvalidation(of: [rootIdentity])
-              handledNonExitEvent = true
-              continue
-            }
-            pendingExitReason = exitReason
-            pendingExitShouldFlush = shouldFlushBeforeExit
-            break
-          }
-          handledNonExitEvent = true
-        }
-
-        return pendingExitReason != nil || scheduler.hasPendingFrame(at: .now())
+        scheduler.hasPendingFrame(at: .now())
       }
 
       while true {
@@ -601,9 +556,6 @@ extension RunLoop {
               tailJobState: renderOutcome.tailJobState,
               tailCancelReason: renderOutcome.tailCancelReason ?? "-"
             )
-            if let pendingExitReason, !pendingExitShouldFlush {
-              return pendingExitReason
-            }
             continue frameLoop
           }
           tailJobState = renderOutcome.tailJobState
@@ -876,7 +828,7 @@ extension RunLoop {
         setPressedIdentity(nil, transient: false)
       }
     }
-    return pendingExitReason
+    return nil
   }
 
   package func applyDesiredFocusRequest(

@@ -1459,10 +1459,6 @@ public struct DefaultRenderer {
     resolved = resolved.applyingLayoutDependentRealizations(
       layoutPassContext.layoutDependentRealizationsByIdentity
     )
-    registrationDraft.commitRestoring(
-      from: viewGraph,
-      resolved: resolved
-    )
     let placed = tailLayout.baselinePlaced
     // Capture the BASELINE placed tree (pre-overlay) for two things:
     // 1. The animation controller's removal-snapshot lookup on the
@@ -1505,6 +1501,10 @@ public struct DefaultRenderer {
         rootIdentity: resolveContext.identity,
         resolved: resolved,
         placed: tail.placed
+      )
+      registrationDraft.commitRestoring(
+        from: viewGraph,
+        resolved: resolved
       )
       return commitPlanner.plan(
         resolved: resolved,
@@ -1912,15 +1912,15 @@ public struct DefaultRenderer {
       timings.completionToMainCommit = workerCompletedAt.duration(to: clock.now)
       workerTimings = timings
     }
-    draft.registrationDraft.commitRestoring(
-      from: viewGraph,
-      resolved: resolved
-    )
     let (commit, commitDuration) = measurePhase(clock: draft.clock) {
       let lifecycleEvents = viewGraph.finalizeFrame(
         rootIdentity: draft.resolveContext.identity,
         resolved: resolved,
         placed: tail.placed
+      )
+      draft.registrationDraft.commitRestoring(
+        from: viewGraph,
+        resolved: resolved
       )
       return commitPlanner.plan(
         resolved: resolved,

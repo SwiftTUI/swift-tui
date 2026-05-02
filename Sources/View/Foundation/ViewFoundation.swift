@@ -340,6 +340,10 @@ package func resolveView<V: View>(
   if let fs = context.frameState {
     context.invalidatedIdentities = fs.invalidatedIdentities
   }
+  context.viewGraph?.setSuppressesStructuralLifecycle(
+    context.suppressesStructuralLifecycle,
+    for: context.identity
+  )
   if let reused = context.viewGraph?.reusableSnapshot(
     for: context.identity,
     invalidatedIdentities: context.effectiveInvalidatedIdentities,
@@ -360,7 +364,8 @@ package func resolveView<V: View>(
 
   let graphNode = context.viewGraph?.beginEvaluation(
     identity: context.identity,
-    invalidator: context.invalidationProxy?.invalidator
+    invalidator: context.invalidationProxy?.invalidator,
+    suppressesStructuralLifecycle: context.suppressesStructuralLifecycle
   )
   if let graphNode, graphNode.isAtOutermostEvaluationDepth {
     context.viewGraph?.setEvaluator(for: context.identity) {
