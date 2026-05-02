@@ -1,35 +1,66 @@
 ---
-// Stub site. The deploy workflow mounts the WebExample WASI demo at
-// /webexample/ on the same origin, so this iframe is same-origin and
-// inherits cross-origin isolation from the parent page automatically.
-const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-const iframeSrc = `${base}/webexample/`;
+import "../styles/site.css";
+import SiteHeader from "../components/SiteHeader.astro";
+import Hero from "../components/Hero.astro";
+import PipelineStrip from "../components/PipelineStrip.astro";
+import ExecutionModes from "../components/ExecutionModes.astro";
+import SurfaceInventory from "../components/SurfaceInventory.astro";
+import AuthoringSnippet from "../components/AuthoringSnippet.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+
+const description =
+  "SwiftTUI is a Swift package that runs SwiftUI-shaped views through a strict resolve→commit pipeline. One App declaration drives terminal-native, WASI, and embedded SwiftUI / Web hosts.";
 ---
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SwiftTUI</title>
-    <meta name="description" content="SwiftTUI WebExample." />
+    <title>SwiftTUI · SwiftUI semantics, drawn in terminal cells</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content="SwiftTUI" />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/favicon.svg`} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+    />
   </head>
   <body>
-    <iframe src={iframeSrc} title="SwiftTUI WebExample"></iframe>
+    <div class="ambient" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+
+    <SiteHeader />
+    <main>
+      <Hero />
+      <PipelineStrip />
+      <ExecutionModes />
+      <SurfaceInventory />
+      <AuthoringSnippet />
+    </main>
+    <SiteFooter />
+
+    <a class="skip-link" href="#demo">Skip to live demo</a>
   </body>
 </html>
 
 <style is:global>
-  html,
-  body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    background: #000;
+  /* skip link – for keyboard users */
+  .skip-link {
+    position: fixed;
+    left: -9999px;
+    top: 12px;
+    z-index: 1000;
+    padding: 8px 12px;
+    background: var(--accent);
+    color: #062018;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
-  iframe {
-    width: 100vw;
-    height: 100vh;
-    border: 0;
-    display: block;
-  }
+  .skip-link:focus-visible { left: 12px; outline: 0; }
 </style>
