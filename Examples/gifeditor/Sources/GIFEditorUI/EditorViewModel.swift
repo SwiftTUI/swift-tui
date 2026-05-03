@@ -45,9 +45,16 @@ public final class EditorViewModel {
     var label: String
   }
 
+  private struct ActiveSelectMove {
+    var layerPixels: PixelBuffer
+    var selection: Selection?
+    var sourceRect: PixelRect
+  }
+
   private var undoStack: [HistoryEntry] = []
   private var redoStack: [HistoryEntry] = []
   private var activeUndoGroup: ActiveUndoGroup?
+  private var activeSelectMove: ActiveSelectMove?
   private var currentHistoryGeneration: Int = 0
   private var cleanHistoryGeneration: Int = 0
   private var nextHistoryGeneration: Int = 1
@@ -211,6 +218,9 @@ public final class EditorViewModel {
         pendingMarqueeAnchor = cursor
         announce("Marquee: anchor at \(cursor.x),\(cursor.y), move and press Space again")
       }
+    case .select:
+      announce(
+        selection == nil ? "Select: drag to move layer pixels" : "Select: drag to move selection")
     case .eyedropper:
       // Walk top-to-bottom and pick the first opaque pixel on any
       // visible layer at the cursor.
@@ -229,12 +239,14 @@ public final class EditorViewModel {
     tool = newTool
     pendingMarqueeAnchor = nil
     pendingGradientAnchor = nil
+    activeSelectMove = nil
     announce("Tool: \(newTool.label)")
   }
 
   public func clearSelection() {
     selection = nil
     pendingMarqueeAnchor = nil
+    activeSelectMove = nil
     announce("Selection cleared")
   }
 
@@ -303,6 +315,11 @@ public final class EditorViewModel {
       pendingMarqueeAnchor = point
       selection = Selection(rect: PixelRect.bounding(point, point))
       announce("Selecting from \(point.x),\(point.y)")
+    case .select:
+      beginUndoGroup("Move pixels")
+      beginSelectMove()
+      updateSelectMove(startingAt: point, to: point)
+      announce(selectMoveStatus(to: point, from: point))
     }
   }
 
@@ -328,6 +345,13 @@ public final class EditorViewModel {
       pendingMarqueeAnchor = anchor
       selection = Selection(rect: PixelRect.bounding(anchor, point))
       announce("Selection \(anchor.x),\(anchor.y) -> \(point.x),\(point.y)")
+    case .select:
+      if activeSelectMove == nil {
+        beginUndoGroup("Move pixels")
+        beginSelectMove()
+      }
+      updateSelectMove(startingAt: anchor, to: point)
+      announce(selectMoveStatus(to: point, from: anchor))
     }
   }
 
@@ -363,6 +387,16 @@ public final class EditorViewModel {
     case .marquee:
       pendingMarqueeAnchor = anchor
       applyToolAtCursor()
+    case .select:
+      if activeSelectMove == nil {
+        beginUndoGroup("Move pixels")
+        beginSelectMove()
+      }
+      updateSelectMove(startingAt: anchor, to: point)
+      let status = selectMoveStatus(to: point, from: anchor)
+      activeSelectMove = nil
+      finishUndoGroup()
+      announce(status)
     }
   }
 
@@ -688,6 +722,7 @@ public final class EditorViewModel {
     selection = snapshot.selection
     pendingMarqueeAnchor = nil
     pendingGradientAnchor = nil
+    activeSelectMove = nil
     currentHistoryGeneration = snapshot.historyGeneration
   }
 
@@ -715,8 +750,62 @@ public final class EditorViewModel {
     }
   }
 
+  private func beginSelectMove() {
+    let wholeLayer = PixelRect(
+      x: 0,
+      y: 0,
+      width: document.size.width,
+      height: document.size.height
+    )
+    activeSelectMove = ActiveSelectMove(
+      layerPixels: currentLayer.pixels,
+      selection: selection,
+      sourceRect: selection?.rect ?? wholeLayer
+    )
+  }
+
+  private func updateSelectMove(
+    startingAt anchor: GIFEditorCore.PixelPoint,
+    to point: GIFEditorCore.PixelPoint
+  ) {
+    guard let move = activeSelectMove else {
+      return
+    }
+
+    let dx = point.x - anchor.x
+    let dy = point.y - anchor.y
+    mutateCurrentLayer { _ in
+      ToolOps.move(
+        on: move.layerPixels,
+        rect: move.sourceRect,
+        byX: dx,
+        y: dy
+      )
+    }
+
+    if let selection = move.selection {
+      self.selection = Selection(rect: selection.rect.offsetBy(dx: dx, dy: dy))
+    }
+  }
+
+  private func selectMoveStatus(
+    to point: GIFEditorCore.PixelPoint,
+    from anchor: GIFEditorCore.PixelPoint
+  ) -> String {
+    let dx = point.x - anchor.x
+    let dy = point.y - anchor.y
+    let target = activeSelectMove?.selection == nil ? "layer" : "selection"
+    return "Move \(target) Δ\(dx),\(dy)"
+  }
+
   private func announce(_ message: String) {
     statusMessage = message
+  }
+}
+
+extension PixelRect {
+  fileprivate func offsetBy(dx: Int, dy: Int) -> PixelRect {
+    PixelRect(x: minX + dx, y: minY + dy, width: size.width, height: size.height)
   }
 }
 

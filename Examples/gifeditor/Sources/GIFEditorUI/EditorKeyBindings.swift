@@ -257,6 +257,8 @@ private func handleFocusedEditorKey(
     model.selectTool(.gradient)
   case .character("m"):
     model.selectTool(.marquee)
+  case .character("v"):
+    model.selectTool(.select)
   case .character("i"):
     model.selectTool(.eyedropper)
   case .character("x"):

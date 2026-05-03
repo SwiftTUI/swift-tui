@@ -1,25 +1,29 @@
 # About SwiftTUI
 
-What this project is, what's in scope today, and what's deliberately deferred.
 
-## Overview
+SwiftTUI is SwiftUI for the terminal. 
+Building terminal user interfaces with an authoring model, layout model, and runtime contract that are deliberately shaped after SwiftUI. 
 
-SwiftTUI is a Swift package for building terminal user interfaces with an authoring model, layout model, and runtime contract that are deliberately shaped after SwiftUI. It implements a SwiftUI-shaped subset, terminal-native and keyboard-first, with capability-aware presentation.
+Principles:
+
+- Implement subsets of SwiftUI only if they map to high value TUI use cases.
+- Avoid everything deprecated, and anything questionable.
+- Once implementing, do so uncompromisingly.
 
 In scope today:
 
 - SwiftUI-shaped layout, state, environment, and focus
 - ``RunLoop``-driven interactive sessions with alternate-screen ownership and ANSI rendering
 - Tree-forward collection presentation as a first-class authoring pattern
-- PNG, baseline JPEG, and GIF image presentation through Kitty graphics or Sixel when the terminal supports them, with capability-aware fallback into terminal cells when it does not
-- Pointer interaction as an augmentation, not a replacement for the focus model
+- PNG, baseline JPEG, and GIF image presentation
+- Keyboard based focus and navigation model with Pointer based augmentation
+- Terminal capability detection for colors, images, pointer precision, etc.
 
 Deliberately deferred:
 
-- `NavigationStack` and richer popover-style presentation
-- A full accessibility-tree or assistive-technology story
-- Pixel-precise layout or any second, non-terminal presentation model
-- Animated GIF playback, progressive JPEG, video, remote fetching, and other media-heavy surfaces beyond static PNG / JPEG / GIF presentation
+- `NavigationStack` et al.
+- A full accessibility-tree
+- Media-heavy surfaces beyond static PNG / JPEG / GIF presentation
 
 ## See Also
 

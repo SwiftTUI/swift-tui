@@ -60,6 +60,8 @@ struct ToolOptionsBar: View {
       marqueeStatus
       confirmButton
       clearButton
+    case .select:
+      selectStatus
     case .eyedropper:
       ColorChip(role: "P", color: primary)
       Text("#\(hex(primary))").foregroundStyle(.separator)
@@ -146,6 +148,17 @@ struct ToolOptionsBar: View {
     }
     .buttonStyle(.plain)
     .disabled(model.selection == nil && model.pendingMarqueeAnchor == nil)
+  }
+
+  @ViewBuilder
+  private var selectStatus: some View {
+    if let selection = model.selection {
+      let w = selection.rect.size.width
+      let h = selection.rect.size.height
+      Text("move \(w)×\(h) selection").foregroundStyle(.foreground)
+    } else {
+      Text("drag to move layer pixels").foregroundStyle(.muted)
+    }
   }
 
   // MARK: - Trailing global buttons
