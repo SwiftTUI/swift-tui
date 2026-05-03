@@ -155,20 +155,16 @@ ensure_container() {
   fi
 }
 
-exec_flags() {
-  if [[ -t 0 && -t 1 ]]; then
-    printf '%s\n' "-it"
-  else
-    printf '%s\n' "-i"
-  fi
-}
-
 run_in_container() {
   ensure_container_tool
   ensure_container
-  local flags
-  flags="$(exec_flags)"
-  "$CONTAINER_TOOL" exec "$flags" --workdir "$CONTAINER_DIR" "$CONTAINER_NAME" "$@"
+  # Detect the TTY state in the caller's shell — not inside a command
+  # substitution, where stdout is a pipe and `-t 1` is always false.
+  local -a exec_flags=(-i)
+  if [[ -t 0 && -t 1 ]]; then
+    exec_flags+=(-t)
+  fi
+  "$CONTAINER_TOOL" exec "${exec_flags[@]}" --workdir "$CONTAINER_DIR" "$CONTAINER_NAME" "$@"
 }
 
 run_shell_script() {
