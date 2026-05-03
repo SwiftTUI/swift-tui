@@ -520,29 +520,58 @@ package struct ButtonPlainStyleBody<Label: View>: View {
   let label: Label
   let chrome: ControlChrome
   let focusActive: Bool
+  let reservesRailGutter: Bool
+
+  package init(
+    label: Label,
+    chrome: ControlChrome,
+    focusActive: Bool,
+    reservesRailGutter: Bool = true
+  ) {
+    self.label = label
+    self.chrome = chrome
+    self.focusActive = focusActive
+    self.reservesRailGutter = reservesRailGutter
+  }
 
   @MainActor
   package var body: some View {
-    // The focus rail is drawn as an overlay rather than an HStack
-    // sibling. If it lived inside `controlFocusRow` the button's
-    // bounds would grow by the rail width the moment focus arrives,
-    // shifting the row's layout out from under a pressed pointer and
-    // making mouseDown-followed-by-mouseUp miss the armed route so
-    // the action never dispatches. With the overlay, the button's
-    // bounds are stable across focus state changes.
-    highlightedControlRow(
-      label,
+    // The focus rail is the leading cell of an HStack with the rail
+    // gutter permanently reserved (`reservesRailSpaceWhenHidden`). Two
+    // requirements ride together on this choice:
+    //
+    //  1. Stable bounds across focus transitions. If the rail were a
+    //     sibling that appeared only on focus, the button's bounds
+    //     would grow by one cell the moment focus arrived, shifting
+    //     layout out from under a pressed pointer and making
+    //     mouseDown-followed-by-mouseUp miss the armed route so the
+    //     action never dispatches. Reserving the gutter even when the
+    //     rail is hidden keeps the row width constant.
+    //
+    //  2. No content overdraw. The previous implementation painted
+    //     the rail glyph as a leading-aligned overlay, which collided
+    //     with column 0 of the label — wiping the entire icon for a
+    //     single-cell label and erasing the first character of any
+    //     wider label (e.g. "File" → "ile"). An HStack sibling cannot
+    //     overlap the label by construction.
+    //
+    // The bordered/automatic chrome wrapper opts out of the gutter
+    // (`reservesRailGutter: false`) because that wrapper signals focus
+    // via a heavy border drawn inside its own horizontal padding; a
+    // second leading gutter would just widen every bordered button
+    // for no visual gain.
+    controlFocusRow(
+      showsRail: focusActive,
+      railStyle: chrome.borderStyle,
       isHighlighted: focusActive,
-      backgroundStyle: chrome.backgroundStyle
-    )
+      backgroundStyle: chrome.backgroundStyle,
+      reservesRailSpaceWhenHidden: reservesRailGutter,
+      spacing: 0
+    ) {
+      label
+    }
     .foregroundStyle(chrome.foregroundStyle)
     .drawMetadata(.init(opacity: chrome.opacity))
-    .overlay(alignment: .leading) {
-      if focusActive {
-        Text(controlFocusRailGlyph)
-          .foregroundStyle(chrome.borderStyle)
-      }
-    }
   }
 }
 
@@ -580,7 +609,8 @@ package struct ButtonChromeStyleBody<Label: View>: View {
       ButtonPlainStyleBody(
         label: label,
         chrome: chrome,
-        focusActive: false
+        focusActive: false,
+        reservesRailGutter: false
       )
       .padding(
         .init(

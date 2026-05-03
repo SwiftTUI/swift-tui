@@ -1,16 +1,19 @@
 import GIFEditorCore
 import SwiftTUI
 
-/// 3-cell-wide tool dock pinned to the left edge. Each icon is a
+/// 4-cell-wide tool dock pinned to the left edge. Each icon is a
 /// `.plain`-styled `Button` that selects the tool when activated; the
 /// active tool's icon stays tinted. Below the tool list a divider,
 /// then the primary/secondary color cells and a `⇄` swap button that
 /// mirrors the keyboard `x` shortcut.
 ///
-/// `.plain` style was chosen so the button chrome stays a single cell
-/// wide — no horizontal padding or border — which is what lets the
-/// dock fit in 3 cells while leaving a 1-cell focus highlight
-/// behind the active row.
+/// `.plain` style was chosen so the button chrome stays minimal — no
+/// horizontal padding or border. The dock is 4 cells wide to fit a
+/// plain button's intrinsic width of 2 cells (a 1-cell focus-rail
+/// gutter that the framework reserves on every plain button so focus
+/// presentation never overdraws the label, plus the icon glyph itself)
+/// with 1 cell of slack on either side so the icon sits visually
+/// centred whether or not it is the active tool.
 struct ToolboxView: View {
   let tool: EditorTool
   let primaryColor: EditorColor
@@ -34,7 +37,7 @@ struct ToolboxView: View {
       Spacer(minLength: 0)
     }
     .padding(0)
-    .frame(width: 3, alignment: .center)
+    .frame(width: 4, alignment: .center)
     .border(.separator, set: .single)
   }
 

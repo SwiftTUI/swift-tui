@@ -189,6 +189,100 @@ struct ButtonFocusStabilityTests {
     )
   }
 
+  @Test("focused single-character plain Button keeps its label visible")
+  func focusedSingleCharPlainButtonStaysVisible() throws {
+    // Regression: a leading-aligned overlay rail (▌) painted on top of
+    // the label would overdraw column 0, erasing the entire icon for a
+    // 1-cell label and leaving an apparently empty control. The fix
+    // routes plain buttons through `controlFocusRow` with a reserved
+    // rail gutter, so the rail and the label never share a cell.
+    let buttonId = testIdentity("SingleCharPlainButton")
+    var env = EnvironmentValues()
+    env.focusedIdentity = buttonId
+
+    let artifacts = DefaultRenderer().render(
+      Button("X") {}
+        .buttonStyle(.plain)
+        .id(buttonId),
+      context: .init(identity: testIdentity("Root"), environmentValues: env),
+      proposal: .init(width: 4, height: 1)
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(
+      surface.contains("X"),
+      "single-character plain button label must remain visible when focused; rendered: \(surface.debugDescription)"
+    )
+    #expect(
+      surface.contains("▌"),
+      "focused plain button must still surface the focus rail; rendered: \(surface.debugDescription)"
+    )
+  }
+
+  @Test("focused multi-character plain Button keeps its first letter")
+  func focusedMultiCharPlainButtonKeepsFirstLetter() throws {
+    // Regression: with the leading overlay rail, the first character of
+    // a multi-letter label was overwritten on focus ("File" → "ile",
+    // "Edit" → "dit"). The reserved-gutter layout keeps the full label
+    // on screen.
+    let buttonId = testIdentity("MultiCharPlainButton")
+    var env = EnvironmentValues()
+    env.focusedIdentity = buttonId
+
+    let artifacts = DefaultRenderer().render(
+      Button("File") {}
+        .buttonStyle(.plain)
+        .id(buttonId),
+      context: .init(identity: testIdentity("Root"), environmentValues: env),
+      proposal: .init(width: 8, height: 1)
+    )
+
+    let surface = artifacts.rasterSurface.lines.joined(separator: "\n")
+    #expect(
+      surface.contains("File"),
+      "focused plain button label must keep its first letter; rendered: \(surface.debugDescription)"
+    )
+    #expect(
+      surface.contains("▌"),
+      "focused plain button must still surface the focus rail; rendered: \(surface.debugDescription)"
+    )
+  }
+
+  @Test("focused plain Button rail and label occupy disjoint cells")
+  func focusedPlainButtonRailDoesNotOverlapLabel() throws {
+    // The structural invariant behind the two regression tests above:
+    // the cell holding "▌" must be strictly to the left of the cell
+    // holding the first character of the label. This catches future
+    // regressions where the rail re-acquires an overlay placement that
+    // happens to leave the *visible* glyph intact (e.g. drawn in a
+    // background colour) while still corrupting cell semantics.
+    let buttonId = testIdentity("RailDisjointPlainButton")
+    var env = EnvironmentValues()
+    env.focusedIdentity = buttonId
+
+    let artifacts = DefaultRenderer().render(
+      Button("File") {}
+        .buttonStyle(.plain)
+        .id(buttonId),
+      context: .init(identity: testIdentity("Root"), environmentValues: env),
+      proposal: .init(width: 8, height: 1)
+    )
+
+    let row = try #require(artifacts.rasterSurface.cells.first)
+    let railColumn = try #require(
+      row.firstIndex(where: { $0.character == "▌" }),
+      "focused plain button must place ▌ somewhere in the row"
+    )
+    let firstLabelColumn = try #require(
+      row.firstIndex(where: { $0.character == "F" }),
+      "focused plain button must place 'F' somewhere in the row"
+    )
+    #expect(
+      railColumn < firstLabelColumn,
+      "rail must occupy a cell to the left of the label's first letter (rail at \(railColumn), label at \(firstLabelColumn))"
+    )
+  }
+
   @Test("horizontally fixed VStack reconciles cross width under finite height proposal")
   func horizontallyFixedVStackReconcilesCrossWidthWithFiniteMainProposal() throws {
     let size = CellSize(width: 40, height: 10)

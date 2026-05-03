@@ -4013,7 +4013,11 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(artifacts.rasterSurface.lines == ["Delete"])
+    // Plain buttons reserve a one-cell leading gutter so the focus
+    // rail (▌) can appear without overdrawing the label's first cell
+    // when focus arrives. The gutter renders as a space when the
+    // button is unfocused, which is what we see here.
+    #expect(artifacts.rasterSurface.lines == [" Delete"])
     #expect(actionRegistry.dispatch(identity: testIdentity("DeleteButton")))
     #expect(tapBox.didTap)
   }
@@ -4051,24 +4055,32 @@ struct SwiftUISurfaceTests {
       )
     )
 
-    #expect(artifacts.rasterSurface.lines == ["Docs"])
+    // Link buttons share the plain button's reserved focus-rail
+    // gutter, so the rendered surface is one cell wider than the bare
+    // label and the link-styled run starts at x=1.
+    #expect(artifacts.rasterSurface.lines == [" Docs"])
     #expect(actionRegistry.dispatch(identity: testIdentity("DocsButton")))
     #expect(tapBox.didTap)
+    let gutterStyle = ResolvedTextStyle(
+      foregroundColor: .white,
+      backgroundColor: .white,
+      emphasis: [],
+      underlineStyle: nil,
+      strikethroughStyle: nil,
+      opacity: 1
+    )
+    let linkStyle = ResolvedTextStyle(
+      foregroundColor: expectedLinkColor,
+      backgroundColor: .white,
+      emphasis: [],
+      underlineStyle: .init(pattern: .solid),
+      strikethroughStyle: nil,
+      opacity: 1
+    )
     #expect(
       artifacts.rasterSurface.styleRuns == [
-        RasterStyleRun(
-          x: 0,
-          y: 0,
-          length: 4,
-          style: ResolvedTextStyle(
-            foregroundColor: expectedLinkColor,
-            backgroundColor: .white,
-            emphasis: [],
-            underlineStyle: .init(pattern: .solid),
-            strikethroughStyle: nil,
-            opacity: 1
-          )
-        )
+        RasterStyleRun(x: 0, y: 0, length: 1, style: gutterStyle),
+        RasterStyleRun(x: 1, y: 0, length: 4, style: linkStyle),
       ])
   }
 
@@ -4348,11 +4360,14 @@ struct SwiftUISurfaceTests {
       context: .init(identity: testIdentity("LabeledControlGroup"))
     )
 
-    #expect(unlabeledArtifacts.rasterSurface.lines == ["A B"])
+    // Each plain button reserves a one-cell rail gutter, so the two
+    // single-letter labels render as " A  B" — gutter + "A" + spacing
+    // + gutter + "B".
+    #expect(unlabeledArtifacts.rasterSurface.lines == [" A  B"])
     #expect(
       labeledArtifacts.rasterSurface.lines == [
         "Actions",
-        "A B",
+        " A  B",
       ])
   }
 

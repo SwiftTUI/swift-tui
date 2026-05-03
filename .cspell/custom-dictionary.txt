@@ -23,6 +23,7 @@ O_TRUNC
 O_WRONLY
 opendir
 powerline
+prek
 Pressable
 Rasterizer
 Rasterizes
