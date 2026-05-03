@@ -5,16 +5,10 @@
 # artifact below Pages' file-count limit. The DocC app is a JavaScript shell
 # backed by /docs/data/, so direct links can route through the single shell.
 #
-# Destination is `/docs/` (canonical directory form) rather than
+# Destination must be `/docs/` (canonical directory form), not
 # `/docs/index.html`. Pages canonicalizes asset URLs ending in `/index.html`
-# to their directory equivalent — so a 200 rewrite to `/docs/index.html`
-# silently fails to resolve and the request falls through to the project's
-# homepage fallback. Cloudflare Pages does not support Netlify's `200!`
-# force flag, only plain status codes.
-#
-# Probe rule (delete after verifying _redirects deploys correctly):
-# /__redirects-probe must rewrite to a known JSON asset so we can confirm
-# _redirects is being applied on production.
-/__redirects-probe /docs/data/documentation/swifttui.json 200
+# to their directory equivalent on upload, so a 200 rewrite to
+# `/docs/index.html` silently fails to resolve and the request falls
+# through to the project's homepage fallback.
 /docs/documentation /docs/ 200
 /docs/documentation/* /docs/ 200
