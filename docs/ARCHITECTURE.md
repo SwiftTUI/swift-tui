@@ -20,6 +20,12 @@
 - Reuses the same layout, semantic, draw, and raster pipeline
 - Remains a separate track so charting does not distort the core library surface
 
+### `AnimatedImage`
+
+- Builds finite pre-composed animated image views on top of `View`
+- Owns GIF encoding and decoding through the vendored `swift-gif` package
+- Keeps animated media concerns out of the core `SwiftTUI` runtime surface
+
 ### `SwiftTUI`
 
 - Re-exports the public package surface that matters for single-session runtime work

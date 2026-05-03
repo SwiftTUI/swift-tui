@@ -1,3 +1,4 @@
+import AnimatedImage
 import Foundation
 import SwiftTUI
 
@@ -6,14 +7,14 @@ public struct GifCatItem: Equatable, Hashable, Identifiable, Sendable {
   public var originalPath: String
   public var path: String
   public var exists: Bool
-  public var animation: GifCatAnimation?
+  public var animation: AnimatedImageSequence?
 
   public init(
     id: Int,
     originalPath: String,
     path: String,
     exists: Bool,
-    animation: GifCatAnimation? = nil
+    animation: AnimatedImageSequence? = nil
   ) {
     self.id = id
     self.originalPath = originalPath
@@ -41,7 +42,7 @@ public enum GifCatInput {
         originalPath: rawPath,
         path: path,
         exists: exists,
-        animation: exists ? try? GifCatAnimation.load(contentsOf: path) : nil
+        animation: exists ? try? AnimatedGIF.decode(contentsOf: path) : nil
       )
     }
   }
@@ -104,7 +105,6 @@ public struct GifCatView: View {
   private static let imageSpacing = 1
 
   public var items: [GifCatItem]
-  @State private var frameIndices: [Int: Int] = [:]
 
   public init(items: [GifCatItem]) {
     self.items = items
@@ -115,9 +115,6 @@ public struct GifCatView: View {
       emptyState
     } else {
       grid(GifCatGridPlan(itemCount: items.count))
-        .task(id: playbackSignature) { @MainActor in
-          await playAnimations()
-        }
     }
   }
 
@@ -150,10 +147,7 @@ public struct GifCatView: View {
     item: GifCatItem
   ) -> some View {
     if let animation = item.animation {
-      GifCatAnimatedImage(
-        animation: animation,
-        frameIndex: frameIndex(for: item)
-      )
+      AnimatedImage(animation)
     } else if item.exists {
       Image(path: item.path)
     } else {
@@ -162,80 +156,5 @@ public struct GifCatView: View {
         .lineLimit(1)
         .truncationMode(.tail)
     }
-  }
-
-  private var playbackSignature: String {
-    items.map { item in
-      "\(item.id):\(item.animation?.frames.count ?? 0)"
-    }.joined(separator: "|")
-  }
-
-  private func frameIndex(for item: GifCatItem) -> Int {
-    guard let animation = item.animation else {
-      return 0
-    }
-    return min(frameIndices[item.id, default: 0], animation.frames.count - 1)
-  }
-
-  @MainActor
-  private func playAnimations() async {
-    let animatedItems = items.filter { item in
-      item.animation.map { $0.frames.count > 1 } == true
-    }
-    guard !animatedItems.isEmpty else {
-      return
-    }
-
-    var currentFrames = frameIndices
-    var remainingDelays = animatedItems.reduce(into: [Int: Int]()) { delays, item in
-      let frameIndex = frameIndex(for: item)
-      delays[item.id] = item.animation?.frames[frameIndex].delayMilliseconds
-    }
-
-    while !Task.isCancelled {
-      let sleepMilliseconds = max(20, remainingDelays.values.min() ?? 100)
-      try? await Task.sleep(nanoseconds: UInt64(sleepMilliseconds) * 1_000_000)
-      if Task.isCancelled {
-        break
-      }
-
-      var advancedAnyFrame = false
-      for item in animatedItems {
-        guard let animation = item.animation else {
-          continue
-        }
-
-        let currentFrame = min(currentFrames[item.id, default: 0], animation.frames.count - 1)
-        let remaining =
-          (remainingDelays[item.id] ?? animation.frames[currentFrame].delayMilliseconds)
-          - sleepMilliseconds
-        if remaining > 0 {
-          remainingDelays[item.id] = remaining
-          continue
-        }
-
-        let nextFrame = (currentFrame + 1) % animation.frames.count
-        currentFrames[item.id] = nextFrame
-        remainingDelays[item.id] = animation.frames[nextFrame].delayMilliseconds + remaining
-        advancedAnyFrame = true
-      }
-
-      if advancedAnyFrame {
-        frameIndices = currentFrames
-      }
-    }
-  }
-}
-
-private struct GifCatAnimatedImage: View {
-  var animation: GifCatAnimation
-  var frameIndex: Int
-
-  var body: some View {
-    Image(data: animation.frames[boundedFrameIndex].bytes)
-  }
-
-  private var boundedFrameIndex: Int {
-    min(frameIndex, animation.frames.count - 1)
   }
 }

@@ -6,7 +6,8 @@ future file moves.
 
 ## Repository Layout
 
-- `Sources/`: root Swift package targets (`Core`, `View`, `SwiftTUICharts`, and `SwiftTUI`)
+- `Sources/`: root Swift package targets (`Core`, `View`, `AnimatedImage`,
+  `SwiftTUICharts`, and `SwiftTUI`)
 - `Tests/`: root Swift package tests for the package products
 - `Runners/`: peer SwiftPM executable runner packages for terminal-native CLI launch and WASI launch
 - `GUI/`: peer embedded host packages for SwiftUI hosting and Bun/browser hosting
@@ -22,6 +23,7 @@ future file moves.
 - Library products:
   - `View`
   - `SwiftTUI`
+  - `AnimatedImage`
   - `SwiftTUICharts`
 - Internal support targets:
   - `Core`
@@ -41,9 +43,8 @@ future file moves.
   - `Vendor/swift-png`
   - `Vendor/swift-jpeg` — pure-Swift baseline JPEG decoder, mirrors the
     `PNG.Image` / `BytestreamSource` / `RGBA<T>` shape of swift-png
-  - `Vendor/swift-gif` — pure-Swift GIF decoder (LZW + frame compositor),
-    mirrors the same shape; static-frame `unpack(as:)` plus a `frames`
-    accessor for future animation support
+  - `Vendor/swift-gif` — pure-Swift GIF decoder and encoder used by
+    `AnimatedImage` and GIF-focused example packages
 
 `Core` remains the shared pipeline target, but it is not exposed as a separate
 library product. Downstream package consumers reach those types through
@@ -74,8 +75,8 @@ library product. Downstream package consumers reach those types through
 - `TerminalAppearanceDetection.swift`: appearance probing
 - `TerminalGraphicsCapabilities.swift`: Kitty, Sixel, and cell-pixel capability detection
 - `TerminalImageRendering.swift`: image protocol emitters and cell fallback rendering
-- `ImageAssetRepository.swift`: shared decode + metadata cache for PNG,
-  baseline JPEG, and GIF (format dispatched on the leading magic bytes)
+- `ImageAssetRepository.swift`: shared decode + metadata cache for PNG and
+  baseline JPEG (format dispatched on the leading magic bytes)
 - `InputReader.swift`: keyboard, mouse, pointer, paste, and drop input decoding
 - `InjectedTerminalInputReader.swift`: wrapper-managed input stream source that shares control-message parsing
 - `SignalReader.swift`: native and in-process signal readers
@@ -169,10 +170,24 @@ library product. Downstream package consumers reach those types through
 - `Exports.swift`: product-facing export glue
 - `SwiftTUICharts.docc/`: module landing page and charting guide
 
+## `AnimatedImage`
+
+- `AnimatedImage.swift`: public view that advances through a finite supplied
+  frame sequence
+- `AnimatedImageSequence.swift`, `AnimatedImageFrame.swift`, and
+  `AnimatedImagePixel.swift`: pre-composed frame model and timing data
+- `AnimatedGIF.swift`: GIF import/export bridge backed by `Vendor/swift-gif`
+- `AnimatedImagePNGEncoder.swift`: small internal RGBA PNG encoder used to
+  hand static frames to the existing `Image(data:)` renderer
+- `Exports.swift`: product-facing export glue for `Core` and `View`
+- `AnimatedImage.docc/`: module landing page
+
 ## Tests
 
 - `Tests/CoreTests`: pipeline, layout, raster, and focus infrastructure tests
 - `Tests/ViewTests`: authoring-layer and environment-level tests
+- `Tests/AnimatedImageTests`: animated image frame, playback, and GIF
+  import/export tests
 - `Tests/SwiftTUITests`: runtime, rendering, fixture, and end-to-end behavioral tests
 - `Runners/SwiftTUICLI/Tests/SwiftTUICLITests`: terminal-native runner, attach, pty, and CLI-scene-management tests
 - `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests`: WASI runner and manifest-mode tests

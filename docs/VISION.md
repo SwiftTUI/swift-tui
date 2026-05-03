@@ -97,24 +97,29 @@ Current implementation status and short-term constraints live in [STATUS.md](STA
 
 ### What Is Not In Scope Today
 
-- media-heavy surfaces beyond PNG, baseline JPEG, and static GIF presentation (animated GIF playback, video, remote fetching, asset bundles)
+- media-heavy surfaces beyond PNG, baseline JPEG, and the peer `AnimatedImage`
+  product (video, remote fetching, asset bundles)
 - a full accessibility-tree or assistive-technology story
 - pixel-precise layout or a second, non-terminal presentation model
 
 ### Image Rendering
 
-SwiftTUI ships a narrow image surface covering the three most common
-still-image formats:
+SwiftTUI ships a narrow image surface covering common still-image formats:
 
 - SwiftUI-shaped `Image` authoring for explicit named resources, local `file://` URLs, and embedded `[UInt8]` bytes
-- format detection by leading magic bytes via `Image(data:)`; the decoder picks PNG, baseline-sequential JPEG, or GIF on its own
-- pure-Swift decoders vendored alongside the project (`Vendor/swift-png`, `Vendor/swift-jpeg`, `Vendor/swift-gif`) — no system imaging frameworks, so the surface works identically across macOS, Linux, Android, and WASI
+- format detection by leading magic bytes via `Image(data:)`; the decoder picks
+  PNG or baseline-sequential JPEG on its own
+- pure-Swift decoders vendored alongside the project (`Vendor/swift-png`,
+  `Vendor/swift-jpeg`) — no system imaging frameworks, so the surface works
+  identically across macOS, Linux, Android, and WASI
 - runtime-hosted terminal presentation through Kitty graphics or Sixel when the terminal advertises support
 - capability-aware fallback rendering into terminal cells when graphics protocols are unavailable
 
-That scope is intentionally tight. Still images in PNG / JPEG / GIF are in.
-Animated GIF playback, progressive JPEG, broader media playback, remote
-fetching, and bundle-driven asset systems are still outside the core story.
+That scope is intentionally tight. Still images in PNG / JPEG are in the core
+runtime. GIF decoding, GIF encoding, and finite pre-composed animation playback
+belong to the peer `AnimatedImage` product. Progressive JPEG, broader media
+playback, remote fetching, and bundle-driven asset systems are still outside
+the core story.
 
 ## Aesthetic And Component Guidance
 
@@ -125,3 +130,9 @@ See [LIPGLOSS_SWIFTUI_EQUIVALENTS.md](LIPGLOSS_SWIFTUI_EQUIVALENTS.md) for the m
 ## SwiftTUICharts
 
 `SwiftTUICharts` is intentionally a separate track. It demonstrates how compact dashboard and metrics components can be built on the same view and runtime foundation without allowing charting needs to distort the core API story.
+
+## AnimatedImage
+
+`AnimatedImage` is intentionally a separate media track. It demonstrates how GIF
+import/export and finite pre-composed image animation can reuse the same view
+surface without making the `SwiftTUI` runtime responsible for animated media.

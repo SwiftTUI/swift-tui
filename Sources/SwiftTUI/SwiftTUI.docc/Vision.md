@@ -15,7 +15,7 @@ In scope today:
 - SwiftUI-shaped layout, state, environment, and focus
 - ``RunLoop``-driven interactive sessions with alternate-screen ownership and ANSI rendering
 - Tree-forward collection presentation as a first-class authoring pattern
-- PNG, baseline JPEG, and GIF image presentation
+- PNG and baseline JPEG image presentation
 - Keyboard based focus and navigation model with Pointer based augmentation
 - Terminal capability detection for colors, images, pointer precision, etc.
 
@@ -23,7 +23,8 @@ Deliberately deferred:
 
 - `NavigationStack` et al.
 - A full accessibility-tree
-- Media-heavy surfaces beyond static PNG / JPEG / GIF presentation
+- Media-heavy surfaces beyond static PNG / JPEG presentation and the peer
+  `AnimatedImage` product
 
 ## See Also
 

@@ -31,6 +31,7 @@ SwiftTUI  ->  View  ->  Core
 - **View** — SwiftUI-shaped authoring surface
 - **SwiftTUI** — terminal runtime; re-exports View and Core via `@_exported import`
 - **SwiftTUICharts** — compact chart/metric track; separate product
+- **AnimatedImage** — finite pre-composed animated image track; GIF codec owner
 
 Every frame flows through seven strict phases:
 
@@ -106,6 +107,7 @@ Test suites are split by layer:
 
 - `Tests/CoreTests/` — pipeline, layout, raster, focus infrastructure
 - `Tests/ViewTests/` — authoring-surface, environment, actor-isolation
+- `Tests/AnimatedImageTests/` — animated image and GIF import/export behavior
 - `Tests/SwiftTUITests/` — runtime, rendering, fixtures, end-to-end behavior
 - `Runners/SwiftTUICLI/Tests/SwiftTUICLITests/` — CLI runner, socket, pty,
   attach, scene-management behavior

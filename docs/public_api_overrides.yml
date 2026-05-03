@@ -39,6 +39,7 @@ classifications:
     - SwiftTUI.RunLoop
     - SwiftTUI.RunLoopExitReason
     - SwiftTUI.RunLoopResult
+    - SwiftTUI.RuntimeRenderMode
     - SwiftTUI.Scene
     - SwiftTUI.SceneBuilder
     - SwiftTUI.SignalReader
@@ -134,6 +135,13 @@ classifications:
     - View.VStackLayout
     - View.ZStack
     - View.ZStackLayout
+
+    # ─── AnimatedImage (finite pre-composed animation + GIF codec) ───────
+    - AnimatedImage.AnimatedGIF
+    - AnimatedImage.AnimatedImage
+    - AnimatedImage.AnimatedImageFrame
+    - AnimatedImage.AnimatedImagePixel
+    - AnimatedImage.AnimatedImageSequence
 
     # ─── SwiftTUI runtime types (public, deeper than the daily surface) ──
     - SwiftTUI.ConditionalScene

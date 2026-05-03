@@ -145,6 +145,21 @@ The runtime-facing public surface is also canonical:
 - `SceneManifest`
 - `HostedSceneSession`
 
+### `AnimatedImage`
+
+The peer animated-image product is canonical for finite, pre-composed animated
+image playback and GIF import/export:
+
+- `AnimatedImage`
+- `AnimatedImageSequence`
+- `AnimatedImageFrame`
+- `AnimatedImagePixel`
+- `AnimatedGIF`
+
+This module owns GIF encoding and decoding. It intentionally exposes frame-list
+initializers keyed by `framesPerSecond` or explicit `frameDelays`, not
+closure-based frame producers.
+
 ### Peer runner packages
 
 Platform-specific execution and embedding are intentionally outside the root

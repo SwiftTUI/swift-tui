@@ -33,6 +33,15 @@ struct ImageSurfaceTests {
     #expect(attachment.bounds.size == .init(width: 1, height: 1))
   }
 
+  @Test("embedded GIF bytes do not resolve through the core Image surface")
+  func embeddedGIFBytesDoNotResolveThroughCoreImageSurface() {
+    let artifacts = DefaultRenderer().render(
+      Image(data: Self.singlePixelGIF)
+    )
+
+    #expect(artifacts.rasterSurface.imageAttachments.isEmpty)
+  }
+
   @Test("named image resources resolve through explicit imageResourceRoots")
   func namedImageResourcesResolveThroughEnvironmentRoots() throws {
     let pngBytes = try makePNGBytes(
@@ -166,4 +175,11 @@ struct ImageSurfaceTests {
     // the parent frame).
     #expect(fillAttachment.bounds.size == .init(width: 6, height: 3))
   }
+
+  private static let singlePixelGIF: [UInt8] = [
+    0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x21, 0xf9, 0x04, 0x00, 0x0a,
+    0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
+    0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b,
+  ]
 }
