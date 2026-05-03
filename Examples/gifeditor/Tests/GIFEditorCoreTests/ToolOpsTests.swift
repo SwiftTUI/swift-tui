@@ -211,4 +211,26 @@ struct ToolOpsTests {
     // Untouched cells stay nil.
     #expect(pasted[PixelPoint(x: 0, y: 0)] == nil)
   }
+
+  @Test("Move cuts a rectangular region and pastes opaque pixels at the offset")
+  func moveCutsRectAndPastesAtOffset() {
+    var buffer = PixelBuffer(size: PixelSize(width: 5, height: 3))
+    buffer[PixelPoint(x: 0, y: 0)] = 9
+    buffer[PixelPoint(x: 1, y: 1)] = 1
+    buffer[PixelPoint(x: 2, y: 1)] = 2
+    buffer[PixelPoint(x: 4, y: 1)] = 8
+
+    let result = ToolOps.move(
+      on: buffer,
+      rect: PixelRect(x: 1, y: 1, width: 2, height: 1),
+      byX: 2,
+      y: 0
+    )
+
+    #expect(result[PixelPoint(x: 0, y: 0)] == 9)
+    #expect(result[PixelPoint(x: 1, y: 1)] == nil)
+    #expect(result[PixelPoint(x: 2, y: 1)] == nil)
+    #expect(result[PixelPoint(x: 3, y: 1)] == 1)
+    #expect(result[PixelPoint(x: 4, y: 1)] == 2)
+  }
 }

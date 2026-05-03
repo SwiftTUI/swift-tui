@@ -1,12 +1,13 @@
 import Foundation
 
-/// The five core editing tools, plus eyedropper as a read-only sixth.
+/// The core editing tools, plus eyedropper as a read-only picker.
 public enum EditorTool: String, Hashable, Sendable, CaseIterable, Codable {
   case pen
   case eraser
   case fill
   case gradient
   case marquee
+  case select
   case eyedropper
 
   public var label: String {
@@ -16,6 +17,7 @@ public enum EditorTool: String, Hashable, Sendable, CaseIterable, Codable {
     case .fill: return "Fill"
     case .gradient: return "Gradient"
     case .marquee: return "Marquee"
+    case .select: return "Select"
     case .eyedropper: return "Eyedropper"
     }
   }
@@ -32,6 +34,7 @@ public enum EditorTool: String, Hashable, Sendable, CaseIterable, Codable {
     case .fill: return "B"
     case .gradient: return "G"
     case .marquee: return "M"
+    case .select: return "V"
     case .eyedropper: return "I"
     }
   }
@@ -48,6 +51,7 @@ public enum EditorTool: String, Hashable, Sendable, CaseIterable, Codable {
     case .fill: return "⬢"  // U+2B22 solid hexagon
     case .gradient: return "◐"  // U+25D0 half-filled circle
     case .marquee: return "▭"  // U+25AD rectangle outline
+    case .select: return "✥"  // U+2725 four club-spoked asterisk
     case .eyedropper: return "⊙"  // U+2299 circled dot
     }
   }
@@ -259,6 +263,48 @@ public enum ToolOps {
   ) -> PixelBuffer {
     var copy = buffer
     copy.stamp(clipboard, at: origin, respectingTransparency: true)
+    return copy
+  }
+
+  /// Moves the pixels in `rect` by the requested offset. When `rect`
+  /// is nil, the whole layer moves. Source cells are cleared first,
+  /// then opaque pixels from the original buffer are stamped at the
+  /// destination, so overlapping moves are evaluated all at once.
+  public static func move(
+    on buffer: PixelBuffer,
+    rect: PixelRect? = nil,
+    byX dx: Int,
+    y dy: Int
+  ) -> PixelBuffer {
+    guard dx != 0 || dy != 0 else {
+      return buffer
+    }
+
+    let canvas = PixelRect(x: 0, y: 0, width: buffer.size.width, height: buffer.size.height)
+    guard let source = (rect ?? canvas).intersected(with: canvas) else {
+      return buffer
+    }
+
+    var copy = buffer
+    for y in source.minY..<source.maxY {
+      for x in source.minX..<source.maxX {
+        copy.setUnchecked(PixelPoint(x: x, y: y), to: nil)
+      }
+    }
+
+    for y in source.minY..<source.maxY {
+      for x in source.minX..<source.maxX {
+        let sourcePoint = PixelPoint(x: x, y: y)
+        guard let value = buffer[sourcePoint] else {
+          continue
+        }
+
+        let destination = PixelPoint(x: x + dx, y: y + dy)
+        if buffer.size.contains(destination) {
+          copy.setUnchecked(destination, to: value)
+        }
+      }
+    }
     return copy
   }
 

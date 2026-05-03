@@ -99,6 +99,15 @@ struct MenuBarDropdownView: View {
         menuItem("Layer Below", action: refreshAfter(model.selectLayerBelow))
         menuItem("Layer Above", action: refreshAfter(model.selectLayerAbove))
       case .select:
+        menuItem("Select Tool") {
+          model.selectTool(.select)
+          refresh()
+        }
+        menuItem("Marquee Tool") {
+          model.selectTool(.marquee)
+          refresh()
+        }
+        menuGap
         menuItem("Clear Selection", action: refreshAfter(model.clearSelection))
         menuItem("Confirm Marquee", action: refreshAfter(model.applyToolAtCursor))
       case .frame:

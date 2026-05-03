@@ -28,6 +28,7 @@ enum EditorShortcutHelp {
         EditorShortcutRow(shortcut: "b", action: "Bucket fill"),
         EditorShortcutRow(shortcut: "g", action: "Gradient"),
         EditorShortcutRow(shortcut: "m", action: "Marquee selection"),
+        EditorShortcutRow(shortcut: "v", action: "Select/move pixels"),
         EditorShortcutRow(shortcut: "i", action: "Eyedropper"),
         EditorShortcutRow(shortcut: "x", action: "Swap primary and secondary colors"),
         EditorShortcutRow(shortcut: "Space / Enter", action: "Apply or confirm the active tool"),

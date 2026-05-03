@@ -107,6 +107,65 @@ struct EditorViewModelTests {
     #expect(model.cursor == end)
   }
 
+  @Test("Select drag moves only the marquee pixels from the original layer snapshot")
+  func selectDragMovesMarqueePixelsFromOriginalSnapshot() {
+    var layer = PixelBuffer(size: GIFEditorCore.PixelSize(width: 6, height: 4))
+    layer[GIFEditorCore.PixelPoint(x: 0, y: 0)] = 9
+    layer[GIFEditorCore.PixelPoint(x: 1, y: 1)] = 1
+    layer[GIFEditorCore.PixelPoint(x: 2, y: 1)] = 2
+    layer[GIFEditorCore.PixelPoint(x: 4, y: 1)] = 8
+    let frame = EditorFrame(layers: [EditorLayer(name: "Layer 1", pixels: layer)])
+    let document = GIFDocument(size: layer.size, frames: [frame])
+    let model = EditorViewModel(document: document)
+    model.selection = Selection(rect: PixelRect(x: 1, y: 1, width: 2, height: 1))
+    model.selectTool(.select)
+
+    let start = GIFEditorCore.PixelPoint(x: 1, y: 1)
+    let mid = GIFEditorCore.PixelPoint(x: 2, y: 1)
+    let end = GIFEditorCore.PixelPoint(x: 3, y: 1)
+    model.beginCanvasDrag(at: start)
+    model.updateCanvasDrag(startingAt: start, from: start, to: mid)
+    model.updateCanvasDrag(startingAt: start, from: mid, to: end)
+    model.endCanvasDrag(startingAt: start, from: end, to: end)
+
+    let moved = model.currentLayer.pixels
+    #expect(moved[GIFEditorCore.PixelPoint(x: 0, y: 0)] == 9)
+    #expect(moved[GIFEditorCore.PixelPoint(x: 1, y: 1)] == nil)
+    #expect(moved[GIFEditorCore.PixelPoint(x: 2, y: 1)] == nil)
+    #expect(moved[GIFEditorCore.PixelPoint(x: 3, y: 1)] == 1)
+    #expect(moved[GIFEditorCore.PixelPoint(x: 4, y: 1)] == 2)
+    #expect(model.selection?.rect == PixelRect(x: 3, y: 1, width: 2, height: 1))
+    #expect(model.statusMessage == "Move selection Δ2,0")
+
+    model.undo()
+
+    #expect(model.currentLayer.pixels == layer)
+    #expect(model.selection?.rect == PixelRect(x: 1, y: 1, width: 2, height: 1))
+  }
+
+  @Test("Select drag without a marquee moves the whole current layer")
+  func selectDragWithoutMarqueeMovesWholeLayer() {
+    var layer = PixelBuffer(size: GIFEditorCore.PixelSize(width: 4, height: 2))
+    layer[GIFEditorCore.PixelPoint(x: 0, y: 0)] = 1
+    layer[GIFEditorCore.PixelPoint(x: 3, y: 0)] = 2
+    let frame = EditorFrame(layers: [EditorLayer(name: "Layer 1", pixels: layer)])
+    let document = GIFDocument(size: layer.size, frames: [frame])
+    let model = EditorViewModel(document: document)
+    model.selectTool(.select)
+
+    let start = GIFEditorCore.PixelPoint(x: 0, y: 0)
+    let end = GIFEditorCore.PixelPoint(x: 1, y: 0)
+    model.beginCanvasDrag(at: start)
+    model.updateCanvasDrag(startingAt: start, from: start, to: end)
+    model.endCanvasDrag(startingAt: start, from: end, to: end)
+
+    let moved = model.currentLayer.pixels
+    #expect(moved[GIFEditorCore.PixelPoint(x: 0, y: 0)] == nil)
+    #expect(moved[GIFEditorCore.PixelPoint(x: 1, y: 0)] == 1)
+    #expect(moved[GIFEditorCore.PixelPoint(x: 3, y: 0)] == nil)
+    #expect(model.selection == nil)
+  }
+
   @Test("New document edit after undo clears redo")
   func newEditAfterUndoClearsRedo() {
     let model = EditorViewModel(
