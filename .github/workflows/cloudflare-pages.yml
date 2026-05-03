@@ -39,7 +39,7 @@ jobs:
     runs-on: macos-26
 
     env:
-      CF_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'SwiftTUI' }}
+      CF_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'swift-tui' }}
 
     steps:
 
