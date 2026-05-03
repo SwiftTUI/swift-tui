@@ -561,6 +561,17 @@ private func lifecycleHandlerID(
   "\(identity)#\(phase)[\(ordinal)]"
 }
 
+@MainActor
+private func recordLifecycleEvaluationOwner(
+  for lifecycleIdentity: Identity,
+  in context: ResolveContext
+) {
+  context.viewGraph?.recordLifecycleEvaluationOwner(
+    target: lifecycleIdentity,
+    owner: context.identity
+  )
+}
+
 public struct AppearLifecycleModifier: PrimitiveViewModifier {
   let action: @MainActor @Sendable () -> Void
 
@@ -569,6 +580,10 @@ public struct AppearLifecycleModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
+    recordLifecycleEvaluationOwner(
+      for: node.identity,
+      in: context
+    )
     let authoringContext = currentImperativeAuthoringContextSnapshot()
     let lifecycleAction = action
     let handlerID = lifecycleHandlerID(
@@ -599,6 +614,10 @@ public struct DisappearLifecycleModifier: PrimitiveViewModifier {
     in context: ResolveContext
   ) -> [ResolvedNode] {
     var node = content.resolve(in: context)
+    recordLifecycleEvaluationOwner(
+      for: node.identity,
+      in: context
+    )
     let authoringContext = currentImperativeAuthoringContextSnapshot()
     let lifecycleAction = action
     let handlerID = lifecycleHandlerID(
@@ -694,6 +713,10 @@ public struct TaskLifecycleModifier: PrimitiveViewModifier {
     let authoringContext = currentImperativeAuthoringContextSnapshot()
     let taskAction = action
     let lifecycleIdentity = node.identity
+    recordLifecycleEvaluationOwner(
+      for: lifecycleIdentity,
+      in: context
+    )
     let descriptor = TaskDescriptor(
       id: descriptorID.map { "\(lifecycleIdentity)#task[\($0)]" } ?? "\(lifecycleIdentity)#task",
       priority: priority

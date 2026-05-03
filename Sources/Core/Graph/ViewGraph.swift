@@ -25,6 +25,9 @@ extension ViewGraph {
     package var registrationAliasesByIdentity: [Identity: Set<Identity>]
     package var registrationAliasTargets: [Identity: Identity]
     package var registrationAliasDiagnostics: RegistrationAliasDiagnostics
+    package var lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
+    package var lifecycleEvaluationTargetsByOwner: [Identity: Set<Identity>]
+    package var lifecycleEvaluationTargetsRecordedByOwner: [Identity: Set<Identity>]
     package var stateSlotDependents: [StateSlotKey: Set<Identity>]
     package var environmentDependents: [ObjectIdentifier: Set<Identity>]
     package var observableDependents: [ObjectIdentifier: Set<Identity>]
@@ -59,6 +62,9 @@ extension ViewGraph {
       registrationAliasesByIdentity: registrationAliasesByIdentity,
       registrationAliasTargets: registrationAliasTargets,
       registrationAliasDiagnostics: registrationAliasDiagnostics,
+      lifecycleEvaluationOwnersByIdentity: lifecycleEvaluationOwnersByIdentity,
+      lifecycleEvaluationTargetsByOwner: lifecycleEvaluationTargetsByOwner,
+      lifecycleEvaluationTargetsRecordedByOwner: lifecycleEvaluationTargetsRecordedByOwner,
       stateSlotDependents: stateSlotDependents,
       environmentDependents: environmentDependents,
       observableDependents: observableDependents,
@@ -87,6 +93,9 @@ extension ViewGraph {
     registrationAliasesByIdentity = checkpoint.registrationAliasesByIdentity
     registrationAliasTargets = checkpoint.registrationAliasTargets
     registrationAliasDiagnostics = checkpoint.registrationAliasDiagnostics
+    lifecycleEvaluationOwnersByIdentity = checkpoint.lifecycleEvaluationOwnersByIdentity
+    lifecycleEvaluationTargetsByOwner = checkpoint.lifecycleEvaluationTargetsByOwner
+    lifecycleEvaluationTargetsRecordedByOwner = checkpoint.lifecycleEvaluationTargetsRecordedByOwner
     stateSlotDependents = checkpoint.stateSlotDependents
     environmentDependents = checkpoint.environmentDependents
     observableDependents = checkpoint.observableDependents
@@ -126,6 +135,9 @@ package final class ViewGraph {
   private var latestLifecycleEvents: [LifecycleEvent]
   private var registrationAliasesByIdentity: [Identity: Set<Identity>]
   private var registrationAliasTargets: [Identity: Identity]
+  private var lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
+  private var lifecycleEvaluationTargetsByOwner: [Identity: Set<Identity>]
+  private var lifecycleEvaluationTargetsRecordedByOwner: [Identity: Set<Identity>]
   /// Instrumentation added for Item 7 of
   /// `docs/proposals/ARCHITECTURE_NOTES.md`.  Tracks
   /// non-trivial `recordRegistrationAlias` calls so the alias layer's
@@ -157,6 +169,9 @@ package final class ViewGraph {
     latestLifecycleEvents = []
     registrationAliasesByIdentity = [:]
     registrationAliasTargets = [:]
+    lifecycleEvaluationOwnersByIdentity = [:]
+    lifecycleEvaluationTargetsByOwner = [:]
+    lifecycleEvaluationTargetsRecordedByOwner = [:]
     registrationAliasDiagnostics = .init()
     stateSlotDependents = [:]
     environmentDependents = [:]
@@ -293,6 +308,26 @@ package final class ViewGraph {
     registrationAliasesByIdentity[identity, default: []].insert(aliasIdentity)
   }
 
+  package func recordLifecycleEvaluationOwner(
+    target targetIdentity: Identity,
+    owner ownerIdentity: Identity
+  ) {
+    if let previousOwner = lifecycleEvaluationOwnersByIdentity[targetIdentity],
+      previousOwner != ownerIdentity
+    {
+      lifecycleEvaluationTargetsByOwner[previousOwner]?.remove(targetIdentity)
+      if lifecycleEvaluationTargetsByOwner[previousOwner]?.isEmpty == true {
+        lifecycleEvaluationTargetsByOwner.removeValue(forKey: previousOwner)
+      }
+    }
+
+    lifecycleEvaluationOwnersByIdentity[targetIdentity] = ownerIdentity
+    lifecycleEvaluationTargetsByOwner[ownerIdentity, default: []].insert(targetIdentity)
+    if lifecycleEvaluationTargetsRecordedByOwner[ownerIdentity] != nil {
+      lifecycleEvaluationTargetsRecordedByOwner[ownerIdentity, default: []].insert(targetIdentity)
+    }
+  }
+
   package func selectiveDirtyEvaluationPlan() -> DirtyEvaluationPlan? {
     guard root != nil,
       !graphLocalDirtyIdentities.isEmpty,
@@ -325,7 +360,7 @@ package final class ViewGraph {
     var promotedFrontier: [ViewNode] = []
     var promotedIdentities: Set<Identity> = []
     for node in dirtyFrontier {
-      let target = node.hasEvaluator ? node : nearestEvaluatorAncestor(of: node)
+      let target = evaluatorTarget(for: node)
       guard let target, promotedIdentities.insert(target.identity).inserted else {
         continue
       }
@@ -393,6 +428,9 @@ package final class ViewGraph {
       invalidator: invalidator,
       suppressesStructuralLifecycle: suppressesStructuralLifecycle
     )
+    if node.isAtOutermostEvaluationDepth {
+      lifecycleEvaluationTargetsRecordedByOwner[identity] = []
+    }
     return node
   }
 
@@ -439,32 +477,31 @@ package final class ViewGraph {
       previous: previousDependencies
     )
 
+    let emitsOwnLifecycleEvents = nodeEmitsOwnLifecycleEvents(node)
+
     if node.wasPresentAtFrameStart {
       if let previousTask = node.previousLifecycleMetadata.task,
         previousTask != node.lifecycleMetadata.task,
-        node.participatesInStructuralLifecycle
+        emitsOwnLifecycleEvents
       {
-        stableTaskCancelEvents.append(
-          .init(
-            identity: previousResolvedIdentity,
-            operation: .taskCancel(previousTask)
-          )
+        appendTaskCancelEvent(
+          identity: previousResolvedIdentity,
+          task: previousTask,
+          isStructural: false
         )
       }
       if let currentTask = node.lifecycleMetadata.task,
         currentTask != node.previousLifecycleMetadata.task,
-        node.participatesInStructuralLifecycle
+        emitsOwnLifecycleEvents
       {
-        stableTaskStartEvents.append(
-          .init(
-            identity: node.resolvedIdentity,
-            operation: .taskStart(currentTask)
-          )
+        appendTaskStartEvent(
+          identity: node.resolvedIdentity,
+          task: currentTask
         )
       }
       node.setLifecycleState(.alive)
     } else {
-      if node.participatesInStructuralLifecycle,
+      if emitsOwnLifecycleEvents,
         !node.lifecycleMetadata.appearHandlerIDs.isEmpty
       {
         structuralAppearEvents.append(
@@ -474,18 +511,17 @@ package final class ViewGraph {
           )
         )
       }
-      if node.participatesInStructuralLifecycle,
+      if emitsOwnLifecycleEvents,
         let task = node.lifecycleMetadata.task
       {
-        stableTaskStartEvents.append(
-          .init(
-            identity: node.resolvedIdentity,
-            operation: .taskStart(task)
-          )
+        appendTaskStartEvent(
+          identity: node.resolvedIdentity,
+          task: task
         )
       }
       node.setLifecycleState(.appearing)
     }
+    pruneLifecycleEvaluationOwners(ownedBy: node.identity)
   }
 
   package func installLayoutDependentChildren(
@@ -606,8 +642,10 @@ package final class ViewGraph {
       resolved: subtree,
       children: childNodes
     )
+    let emitsOwnLifecycleEvents = nodeEmitsOwnLifecycleEvents(node)
+
     if !node.wasPresentAtFrameStart {
-      if node.participatesInStructuralLifecycle,
+      if emitsOwnLifecycleEvents,
         !node.lifecycleMetadata.appearHandlerIDs.isEmpty
       {
         structuralAppearEvents.append(
@@ -617,38 +655,33 @@ package final class ViewGraph {
           )
         )
       }
-      if node.participatesInStructuralLifecycle,
+      if emitsOwnLifecycleEvents,
         let task = node.lifecycleMetadata.task
       {
-        stableTaskStartEvents.append(
-          .init(
-            identity: node.resolvedIdentity,
-            operation: .taskStart(task)
-          )
+        appendTaskStartEvent(
+          identity: node.resolvedIdentity,
+          task: task
         )
       }
       node.setLifecycleState(.appearing)
     } else {
       if let previousTask = node.previousLifecycleMetadata.task,
         previousTask != node.lifecycleMetadata.task,
-        node.participatesInStructuralLifecycle
+        emitsOwnLifecycleEvents
       {
-        stableTaskCancelEvents.append(
-          .init(
-            identity: previousResolvedIdentity,
-            operation: .taskCancel(previousTask)
-          )
+        appendTaskCancelEvent(
+          identity: previousResolvedIdentity,
+          task: previousTask,
+          isStructural: false
         )
       }
       if let currentTask = node.lifecycleMetadata.task,
         currentTask != node.previousLifecycleMetadata.task,
-        node.participatesInStructuralLifecycle
+        emitsOwnLifecycleEvents
       {
-        stableTaskStartEvents.append(
-          .init(
-            identity: node.resolvedIdentity,
-            operation: .taskStart(currentTask)
-          )
+        appendTaskStartEvent(
+          identity: node.resolvedIdentity,
+          task: currentTask
         )
       }
       node.setLifecycleState(.alive)
@@ -931,6 +964,119 @@ package final class ViewGraph {
     return nil
   }
 
+  private func pruneLifecycleEvaluationOwners(
+    ownedBy ownerIdentity: Identity
+  ) {
+    guard
+      let recordedTargets = lifecycleEvaluationTargetsRecordedByOwner.removeValue(
+        forKey: ownerIdentity
+      )
+    else {
+      return
+    }
+    guard let targets = lifecycleEvaluationTargetsByOwner[ownerIdentity] else {
+      return
+    }
+    let staleTargets = targets.subtracting(recordedTargets)
+    for target in staleTargets {
+      lifecycleEvaluationOwnersByIdentity.removeValue(forKey: target)
+    }
+    if recordedTargets.isEmpty {
+      lifecycleEvaluationTargetsByOwner.removeValue(forKey: ownerIdentity)
+    } else {
+      lifecycleEvaluationTargetsByOwner[ownerIdentity] = recordedTargets
+    }
+  }
+
+  private func lifecycleEvaluationOwnerAncestor(
+    of node: ViewNode
+  ) -> ViewNode? {
+    var current: ViewNode? = node
+    var visited: Set<ObjectIdentifier> = []
+
+    while let candidate = current {
+      let candidateID = ObjectIdentifier(candidate)
+      guard visited.insert(candidateID).inserted else {
+        return nil
+      }
+      if let ownerIdentity = lifecycleEvaluationOwnersByIdentity[candidate.identity],
+        let ownerNode = nodesByIdentity[ownerIdentity]
+      {
+        return ownerNode
+      }
+      current = candidate.parent
+    }
+
+    return nil
+  }
+
+  private func evaluatorTarget(
+    for dirtyNode: ViewNode
+  ) -> ViewNode? {
+    if let lifecycleOwner = lifecycleEvaluationOwnerAncestor(of: dirtyNode) {
+      return lifecycleOwner.hasEvaluator
+        ? lifecycleOwner
+        : nearestEvaluatorAncestor(of: lifecycleOwner)
+    }
+    return dirtyNode.hasEvaluator ? dirtyNode : nearestEvaluatorAncestor(of: dirtyNode)
+  }
+
+  private func nodeEmitsOwnLifecycleEvents(
+    _ node: ViewNode
+  ) -> Bool {
+    guard node.participatesInStructuralLifecycle else {
+      return false
+    }
+    guard let ownerIdentity = lifecycleEvaluationOwnersByIdentity[node.identity],
+      ownerIdentity != node.identity,
+      nodesByIdentity[ownerIdentity] != nil
+    else {
+      return true
+    }
+    return false
+  }
+
+  private func appendTaskCancelEvent(
+    identity: Identity,
+    task: TaskDescriptor,
+    isStructural: Bool
+  ) {
+    let event = LifecycleEvent(
+      identity: identity,
+      operation: .taskCancel(task)
+    )
+    guard !taskLifecycleEventExists(event) else {
+      return
+    }
+    if isStructural {
+      structuralTaskCancelEvents.append(event)
+    } else {
+      stableTaskCancelEvents.append(event)
+    }
+  }
+
+  private func appendTaskStartEvent(
+    identity: Identity,
+    task: TaskDescriptor
+  ) {
+    let event = LifecycleEvent(
+      identity: identity,
+      operation: .taskStart(task)
+    )
+    guard !taskLifecycleEventExists(event) else {
+      return
+    }
+    stableTaskStartEvents.append(event)
+  }
+
+  private func taskLifecycleEventExists(
+    _ event: LifecycleEvent
+  ) -> Bool {
+    stableTaskCancelEvents.contains(event)
+      || structuralTaskCancelEvents.contains(event)
+      || stableTaskStartEvents.contains(event)
+  }
+
   private func structuralInvalidationIntersects(
     _ node: ViewNode,
     invalidatedIdentities: Set<Identity>
@@ -1097,17 +1243,18 @@ package final class ViewGraph {
         snapshot.lifecycleMetadata
       }
 
-    if node.participatesInStructuralLifecycle,
+    let emitsOwnLifecycleEvents = node.participatesInStructuralLifecycle
+
+    if emitsOwnLifecycleEvents,
       let task = lifecycleMetadata.task
     {
-      structuralTaskCancelEvents.append(
-        .init(
-          identity: snapshot.identity,
-          operation: .taskCancel(task)
-        )
+      appendTaskCancelEvent(
+        identity: snapshot.identity,
+        task: task,
+        isStructural: true
       )
     }
-    if node.participatesInStructuralLifecycle,
+    if emitsOwnLifecycleEvents,
       !lifecycleMetadata.disappearHandlerIDs.isEmpty
     {
       structuralDisappearEvents.append(
@@ -1125,6 +1272,18 @@ package final class ViewGraph {
     node.parent = nil
     removeDependencyEdges(for: node)
     liveIdentities.remove(node.identity)
+
+    if let owner = lifecycleEvaluationOwnersByIdentity.removeValue(forKey: node.identity) {
+      lifecycleEvaluationTargetsByOwner[owner]?.remove(node.identity)
+      if lifecycleEvaluationTargetsByOwner[owner]?.isEmpty == true {
+        lifecycleEvaluationTargetsByOwner.removeValue(forKey: owner)
+      }
+    }
+    if let targets = lifecycleEvaluationTargetsByOwner.removeValue(forKey: node.identity) {
+      for target in targets {
+        lifecycleEvaluationOwnersByIdentity.removeValue(forKey: target)
+      }
+    }
 
     if let target = registrationAliasTargets.removeValue(forKey: node.identity) {
       registrationAliasesByIdentity[target]?.remove(node.identity)

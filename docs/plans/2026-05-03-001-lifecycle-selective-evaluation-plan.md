@@ -1,7 +1,7 @@
 ---
 title: "fix: keep lifecycle modifiers stable across selective evaluation"
 type: fix
-status: planned
+status: implemented
 date: 2026-05-03
 depends_on:
   - "../RUNTIME.md"
@@ -90,6 +90,10 @@ This plan fixes the framework seam, not `Spinner` locally.
   registrations.
 - Re-running the owner still allows real task replacement or removal to produce
   the existing cancel/start lifecycle deltas.
+- Target nodes whose persistent lifecycle metadata is authored by a different
+  graph node do not emit their own stable lifecycle deltas during evaluation or
+  retained reuse. Real structural removal still fires from the removed node's
+  committed lifecycle metadata.
 
 ---
 
@@ -362,6 +366,7 @@ Add these stored properties to `ViewGraph.Checkpoint`:
 ```swift
     package var lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
     package var lifecycleEvaluationTargetsByOwner: [Identity: Set<Identity>]
+    package var lifecycleEvaluationTargetsRecordedByOwner: [Identity: Set<Identity>]
 ```
 
 Thread them through `makeCheckpoint()` and `restoreCheckpoint(_:)`.
@@ -373,9 +378,10 @@ Add private storage beside the registration alias maps:
 ```swift
   private var lifecycleEvaluationOwnersByIdentity: [Identity: Identity]
   private var lifecycleEvaluationTargetsByOwner: [Identity: Set<Identity>]
+  private var lifecycleEvaluationTargetsRecordedByOwner: [Identity: Set<Identity>]
 ```
 
-Initialize both to `[:]` in `init()`.
+Initialize all three to `[:]` in `init()`.
 
 - [ ] **Step 3: Add the public package recording API**
 
@@ -397,28 +403,45 @@ Add this method near `recordRegistrationAlias(from:to:resolvedKind:)`:
 
     lifecycleEvaluationOwnersByIdentity[targetIdentity] = ownerIdentity
     lifecycleEvaluationTargetsByOwner[ownerIdentity, default: []].insert(targetIdentity)
+    if lifecycleEvaluationTargetsRecordedByOwner[ownerIdentity] != nil {
+      lifecycleEvaluationTargetsRecordedByOwner[ownerIdentity, default: []].insert(targetIdentity)
+    }
   }
 ```
 
-- [ ] **Step 4: Clear stale mappings when an owner re-evaluates**
+- [ ] **Step 4: Track and prune stale mappings after an owner re-evaluates**
 
 Add a private helper:
 
 ```swift
-  private func clearLifecycleEvaluationOwners(
+  private func pruneLifecycleEvaluationOwners(
     ownedBy ownerIdentity: Identity
   ) {
-    guard let targets = lifecycleEvaluationTargetsByOwner.removeValue(forKey: ownerIdentity) else {
+    guard
+      let recordedTargets = lifecycleEvaluationTargetsRecordedByOwner.removeValue(
+        forKey: ownerIdentity
+      )
+    else {
       return
     }
-    for target in targets {
+    guard let targets = lifecycleEvaluationTargetsByOwner[ownerIdentity] else {
+      return
+    }
+    let staleTargets = targets.subtracting(recordedTargets)
+    for target in staleTargets {
       lifecycleEvaluationOwnersByIdentity.removeValue(forKey: target)
+    }
+    if recordedTargets.isEmpty {
+      lifecycleEvaluationTargetsByOwner.removeValue(forKey: ownerIdentity)
+    } else {
+      lifecycleEvaluationTargetsByOwner[ownerIdentity] = recordedTargets
     }
   }
 ```
 
 In `beginEvaluation(identity:invalidator:suppressesStructuralLifecycle:)`, clear
-only when the node has just entered its outermost evaluation depth:
+only the per-evaluation recording set when the node has just entered its
+outermost evaluation depth:
 
 ```swift
     node.beginEvaluation(
@@ -427,14 +450,15 @@ only when the node has just entered its outermost evaluation depth:
       suppressesStructuralLifecycle: suppressesStructuralLifecycle
     )
     if node.isAtOutermostEvaluationDepth {
-      clearLifecycleEvaluationOwners(ownedBy: identity)
+      lifecycleEvaluationTargetsRecordedByOwner[identity] = []
     }
     return node
 ```
 
-This lets the current evaluation re-register the lifecycle targets it still
-owns. If source or state removes a lifecycle modifier, the stale owner mapping
-is gone in the same frame.
+Do not clear the existing owner map at this point. It must remain available
+while child content is evaluated, otherwise a transparent child can emit a
+spurious `taskCancel` before the owner reapplies metadata. After the owner
+finishes, prune any previously owned targets that were not re-recorded.
 
 - [ ] **Step 5: Remove mappings when nodes are removed**
 
@@ -524,7 +548,33 @@ Keep the existing `target.markDirty()`, dedupe, and `allSatisfy(\.hasEvaluator)`
 behavior. This makes the dirty plan fall back to the existing full-root path if
 the owner mapping is stale or points at a node without any evaluator chain.
 
-- [ ] **Step 4: Run focused graph/runtime tests**
+- [ ] **Step 4: Suppress target-owned stable lifecycle deltas**
+
+Add a helper used by `finishEvaluation` and `recordReusedSubtree`:
+
+```swift
+  private func nodeEmitsOwnLifecycleEvents(
+    _ node: ViewNode
+  ) -> Bool {
+    guard node.participatesInStructuralLifecycle else {
+      return false
+    }
+    guard let ownerIdentity = lifecycleEvaluationOwnersByIdentity[node.identity],
+      ownerIdentity != node.identity,
+      nodesByIdentity[ownerIdentity] != nil
+    else {
+      return true
+    }
+    return false
+  }
+```
+
+Use this helper instead of `node.participatesInStructuralLifecycle` for stable
+task start/cancel, structural task cancel, and appear/disappear emission. The
+lifecycle owner emits those events; the target child must not duplicate or
+pre-empt them.
+
+- [ ] **Step 5: Run focused graph/runtime tests**
 
 Run:
 
