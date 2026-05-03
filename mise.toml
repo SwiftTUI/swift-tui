@@ -1,8 +1,7 @@
 [tools]
 bun = "latest"
-codex = "latest"
 prek = "latest"
-swift = "latest"
+swift = "6.3.1"
 
 [tasks.release_core]
 description = "Build core for release"

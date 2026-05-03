@@ -10,6 +10,7 @@ words:
   - Centisecond
   - Centiseconds
   - cfmakeraw
+  - CLI
   - Coalescible
   - COLORTERM
   - CTYPE
@@ -25,6 +26,8 @@ words:
   - Sparklines
   - syscall
   - truecolor
+  - TUI
   - uppercased
+  - WASI
 ignoreWords: []
 import: []
