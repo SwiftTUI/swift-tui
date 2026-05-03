@@ -1140,6 +1140,13 @@ extension RunLoop {
         self.transientPressedIdentity = nil
         setPressedIdentity(nil, transient: false)
       }
+
+      // Interactive rendering may enqueue more frames while a key or
+      // pointer event is already buffered. Yield between committed frames
+      // so task/animation invalidations cannot run ahead of user input.
+      if eventPump?.hasPendingEvents() == true {
+        break
+      }
     }
     return nil
   }

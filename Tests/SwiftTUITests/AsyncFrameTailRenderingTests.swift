@@ -301,6 +301,59 @@ struct AsyncFrameTailRenderingTests {
       })
   }
 
+  @Test("interactive render drain yields to queued input before new invalidations")
+  func interactiveRenderDrainYieldsToQueuedInputBeforeNewInvalidations() async throws {
+    let rootIdentity = testIdentity("AsyncFrameTailRenderDrainInputFairnessRoot")
+    let scheduler = FrameScheduler()
+    let valueBox = AsyncFrameTailValueBox(value: 0)
+    let terminal = AsyncFrameTailInvalidatingTerminalHost(
+      valueBox: valueBox,
+      scheduler: scheduler,
+      invalidationIdentity: rootIdentity
+    )
+    let runLoop = RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: InjectedTerminalInputReader(),
+      scheduler: scheduler,
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: terminal.proposal,
+      viewBuilder: { _, _ in
+        AsyncFrameTailCounterView(value: valueBox.value)
+      }
+    )
+    var renderedFrames = 0
+
+    scheduler.requestInvalidation(of: [rootIdentity])
+    try await runLoop.renderPendingFramesAsync(renderedFrames: &renderedFrames)
+    runLoop.renderer.enableSelectiveEvaluation()
+    #expect(terminal.frames.contains { $0.contains("value 0") })
+
+    valueBox.value = 1
+    scheduler.requestInvalidation(of: [rootIdentity])
+    let queuedInputPump = RunLoop<Int, AsyncFrameTailCounterView>.EventPump(
+      stream: AsyncStream { continuation in
+        continuation.finish()
+      },
+      drainEvents: { [] },
+      hasPendingEvents: { true },
+      cancel: {},
+      scheduleDeadlineWake: { _ in }
+    )
+
+    _ = try await runLoop.renderPendingFramesAsync(
+      renderedFrames: &renderedFrames,
+      eventPump: queuedInputPump
+    )
+
+    #expect(terminal.frames.contains { $0.contains("value 1") })
+    #expect(!terminal.frames.contains { $0.contains("value 2") })
+  }
+
   @Test("runtime diagnostics logger records geometry resolution diagnostics")
   func runtimeDiagnosticsLoggerRecordsGeometryResolutionDiagnostics() async throws {
     let rootIdentity = testIdentity("RuntimeGeometryDiagnosticsRoot")
@@ -1227,6 +1280,7 @@ struct AsyncFrameTailRenderingTests {
         continuation.finish()
       },
       drainEvents: { [] },
+      hasPendingEvents: { false },
       cancel: {},
       scheduleDeadlineWake: { _ in }
     )
@@ -1330,6 +1384,7 @@ struct AsyncFrameTailRenderingTests {
         continuation.finish()
       },
       drainEvents: { [] },
+      hasPendingEvents: { false },
       cancel: {},
       scheduleDeadlineWake: { _ in }
     )
@@ -2553,6 +2608,23 @@ private struct AsyncFrameTailCounterView: View {
   }
 }
 
+private final class AsyncFrameTailValueBox: Sendable {
+  private let storage: Mutex<Int>
+
+  init(value: Int) {
+    storage = Mutex(value)
+  }
+
+  var value: Int {
+    get {
+      storage.withLock { $0 }
+    }
+    set {
+      storage.withLock { $0 = newValue }
+    }
+  }
+}
+
 private struct AsyncFrameTailHandledCounterView: View {
   var value: Int
 
@@ -3381,6 +3453,61 @@ private final class AsyncFrameTailTerminalHost: TerminalHosting {
     )
     .render(surface)
     frames.append(rendered.replacingOccurrences(of: "\r\n", with: "\n"))
+    return .fullRepaint(
+      for: surface,
+      capabilityProfile: capabilityProfile
+    )
+  }
+}
+
+private final class AsyncFrameTailInvalidatingTerminalHost: TerminalHosting {
+  var surfaceSize: CellSize {
+    size
+  }
+  let size = CellSize(width: 32, height: 6)
+  let proposal = ProposedSize(width: 32, height: 6)
+  let capabilityProfile = TerminalCapabilityProfile.previewUnicode
+  let appearance = TerminalAppearance.fallback
+  private(set) var frames: [String] = []
+
+  private let valueBox: AsyncFrameTailValueBox
+  private let scheduler: FrameScheduler
+  private let invalidationIdentity: Identity
+  private var didQueueFollowUpInvalidation = false
+
+  init(
+    valueBox: AsyncFrameTailValueBox,
+    scheduler: FrameScheduler,
+    invalidationIdentity: Identity
+  ) {
+    self.valueBox = valueBox
+    self.scheduler = scheduler
+    self.invalidationIdentity = invalidationIdentity
+  }
+
+  func enableRawMode() throws {}
+  func disableRawMode() throws {}
+  func clearScreen() throws {}
+  func moveCursor(to _: CellPoint) throws {}
+
+  func write(_ output: String) throws {
+    frames.append(output.replacingOccurrences(of: "\r\n", with: "\n"))
+  }
+
+  @discardableResult
+  func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics {
+    let rendered = TerminalSurfaceRenderer(
+      capabilityProfile: capabilityProfile
+    )
+    .render(surface)
+    frames.append(rendered.replacingOccurrences(of: "\r\n", with: "\n"))
+
+    if !didQueueFollowUpInvalidation, rendered.contains("value 1") {
+      didQueueFollowUpInvalidation = true
+      valueBox.value = 2
+      scheduler.requestInvalidation(of: [invalidationIdentity])
+    }
+
     return .fullRepaint(
       for: surface,
       capabilityProfile: capabilityProfile
