@@ -64,10 +64,6 @@ let swiftTUIDependencies: [Target.Dependency] = [
     condition: .when(platforms: nativeRuntimePlatforms),
   ),
   .product(
-    name: "GIF",
-    package: "swift-gif"
-  ),
-  .product(
     name: "JPEG",
     package: "swift-jpeg"
   ),
@@ -81,11 +77,8 @@ let swiftTUITestDependencies: [Target.Dependency] = [
   "SwiftTUI",
   "Core",
   "View",
+  "AnimatedImage",
   "SwiftTUICharts",
-  .product(
-    name: "GIF",
-    package: "swift-gif"
-  ),
   .product(
     name: "JPEG",
     package: "swift-jpeg"
@@ -116,6 +109,7 @@ let package = Package(
   platforms: packagePlatforms,
   products: [
     .library(name: "View", targets: ["View"]),
+    .library(name: "AnimatedImage", targets: ["AnimatedImage"]),
     .library(name: "SwiftTUICharts", targets: ["SwiftTUICharts"]),
     .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
   ],
@@ -149,6 +143,16 @@ let package = Package(
     ),
 
     .target(
+      name: "AnimatedImage",
+      dependencies: [
+        "Core",
+        "View",
+        .product(name: "GIF", package: "swift-gif"),
+      ],
+      swiftSettings: swiftSettings()
+    ),
+
+    .target(
       name: "SwiftTUI",
       dependencies: swiftTUIDependencies,
       resources: [],
@@ -173,6 +177,14 @@ let package = Package(
       name: "SwiftTUITests",
       dependencies: swiftTUITestDependencies,
       exclude: ["Fixtures"],
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "AnimatedImageTests",
+      dependencies: [
+        "AnimatedImage",
+        "SwiftTUI",
+      ],
       swiftSettings: swiftSettings()
     ),
   ]

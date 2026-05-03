@@ -21,14 +21,13 @@ let package = Package(
   dependencies: [
     .package(name: "swift-tui", path: "../.."),
     .package(path: "../../Runners/SwiftTUICLI"),
-    .package(path: "../../Vendor/swift-gif"),
   ],
   targets: [
     .target(
       name: "GifCat",
       dependencies: [
+        .product(name: "AnimatedImage", package: "swift-tui"),
         .product(name: "SwiftTUI", package: "swift-tui"),
-        .product(name: "GIF", package: "swift-gif"),
       ]
     ),
     .executableTarget(
@@ -43,7 +42,7 @@ let package = Package(
       name: "GifCatTests",
       dependencies: [
         "GifCat",
-        .product(name: "GIF", package: "swift-gif"),
+        .product(name: "AnimatedImage", package: "swift-tui"),
         .product(name: "SwiftTUI", package: "swift-tui"),
       ]
     ),

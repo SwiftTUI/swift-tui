@@ -394,18 +394,10 @@ struct TerminalGraphicsProtocolTests {
   )
   func terminalHostEmitsKittyRGBAPayloadForNonPNGInputs() throws {
     // Kitty's `f=` only supports PNG (100), RGBA (32), RGB (24). For
-    // GIF or JPEG inputs the renderer must serialize the decoded
-    // pixels as raw RGBA and tag the payload with `f=32` plus the
-    // pixel-size keys `s=` and `v=`. This test pins that contract using
-    // the repo's nyan.gif fixture.
-    let packageRoot = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let gifURL = packageRoot.appendingPathComponent("nyan.gif")
-    let gifBytes = try [UInt8](Data(contentsOf: gifURL))
-    // Sanity: nyan.gif logical screen is 70x70.
-    #expect(gifBytes.count > 0)
+    // JPEG inputs the renderer must serialize the decoded pixels as raw
+    // RGBA and tag the payload with `f=32` plus the pixel-size keys
+    // `s=` and `v=`.
+    let jpegBytes = onePixelWhiteJPEG
 
     let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
     let controller = GraphicsProtocolMockTerminalController(
@@ -424,20 +416,17 @@ struct TerminalGraphicsProtocolTests {
       capabilityProfile: .trueColor
     )
 
-    // 70x70 pixels at an 8x16 cell pixel size is roughly ceil(70/8)=9 cells
-    // wide and ceil(70/16)=5 cells tall — this drives the intrinsic-size
-    // placement that the renderer would compute for an unframed Image.
     let surface = RasterSurface(
       size: .init(width: 20, height: 12),
       lines: Array(repeating: "                    ", count: 12),
       imageAttachments: [
         RasterImageAttachment(
           identity: testIdentity("Root", "Image"),
-          bounds: .init(origin: .zero, size: .init(width: 9, height: 5)),
+          bounds: .init(origin: .zero, size: .init(width: 1, height: 1)),
           visibleBounds: nil,
-          source: .data(gifBytes),
-          resolvedReference: .embeddedImage(gifBytes),
-          pixelSize: .init(width: 70, height: 70),
+          source: .data(jpegBytes),
+          resolvedReference: .embeddedImage(jpegBytes),
+          pixelSize: .init(width: 1, height: 1),
           isResizable: false,
           scalingMode: .stretch
         )
@@ -457,105 +446,22 @@ struct TerminalGraphicsProtocolTests {
     // must carry the source pixel dimensions kitty needs to deserialize
     // the buffer.
     #expect(firstKittyWrite.contains("_Ga=T,q=2,t=d,f=32,C=1,"))
-    #expect(firstKittyWrite.contains(",s=70,v=70,"))
+    #expect(firstKittyWrite.contains(",s=1,v=1,"))
     #expect(!firstKittyWrite.contains("f=100"))
 
-    // Concatenate every base64 chunk that belongs to the *root frame*
-    // transmit (`a=T` + plain `_Gm=` continuations) and verify it
-    // decodes to exactly width * height * 4 bytes — proof the first
-    // frame is a complete RGBA buffer rather than truncating mid-
-    // stream. Animation frames live in separate `a=f` envelopes that
-    // we exclude here; their bytes are checked in the animation test.
+    // Concatenate every base64 chunk and verify it decodes to exactly
+    // width * height * 4 bytes.
     let output = controller.writes.joined()
     let graphicsChunks = chunksForKittyProtocol(in: output)
     let rootFrameChunks = graphicsChunks.filter { chunk in
-      // a=T = first chunk of root frame; _Gm= without a=f = its
-      // continuations. _Gm=...,a=f belongs to additional frames.
       if chunk.contains("_Ga=T,") {
         return true
       }
-      return chunk.contains("_Gm=") && !chunk.contains(",a=f;")
+      return chunk.contains("_Gm=")
     }
     let combined = rootFrameChunks.map(payloadForKittyChunk).joined()
     let decoded = try #require(Data(base64Encoded: combined))
-    #expect(decoded.count == 70 * 70 * 4)
-  }
-
-  @Test(
-    "terminal host transmits all GIF frames and starts kitty animation loop"
-  )
-  func terminalHostTransmitsAnimationFramesAndStartsLoop() throws {
-    // Multi-frame GIFs must surface every frame to kitty via `a=f`
-    // (after the initial `a=T` for the root frame), set the root-frame
-    // gap via `a=a,r=1,z=...`, and start the animation loop with
-    // `a=a,s=3,v=1`. nyan.gif has 12 frames at the GIF89a level.
-    let packageRoot = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let gifURL = packageRoot.appendingPathComponent("nyan.gif")
-    let gifBytes = try [UInt8](Data(contentsOf: gifURL))
-
-    let kittyQueryID = stableIdentifier(from: Array("stui-kitty-query".utf8))
-    let controller = GraphicsProtocolMockTerminalController(
-      isTTY: true,
-      readResponses: [
-        Array("\u{001B}_Gi=\(kittyQueryID);OK\u{001B}\\".utf8),
-        [],
-      ],
-      cellPixelSize: .init(width: 8, height: 16)
-    )
-    let host = TerminalHost(
-      inputFileDescriptor: 0,
-      outputFileDescriptor: 1,
-      fallbackSize: .init(width: 20, height: 12),
-      controller: controller,
-      capabilityProfile: .trueColor
-    )
-
-    let surface = RasterSurface(
-      size: .init(width: 20, height: 12),
-      lines: Array(repeating: "                    ", count: 12),
-      imageAttachments: [
-        RasterImageAttachment(
-          identity: testIdentity("Root", "Image"),
-          bounds: .init(origin: .zero, size: .init(width: 9, height: 5)),
-          visibleBounds: nil,
-          source: .data(gifBytes),
-          resolvedReference: .embeddedImage(gifBytes),
-          pixelSize: .init(width: 70, height: 70),
-          isResizable: false,
-          scalingMode: .stretch
-        )
-      ]
-    )
-
-    _ = try host.present(surface)
-    try host.drainPendingPresentation()
-
-    let output = controller.writes.joined()
-    let graphicsChunks = chunksForKittyProtocol(in: output)
-
-    // Each `a=f` first-chunk has the X=1 (replace) composition mode
-    // and the f=32 RGBA payload tag. Count distinct first-chunks.
-    let additionalFrameStarts = graphicsChunks.filter { chunk in
-      chunk.contains("_Ga=f,") && chunk.contains(",X=1,") && chunk.contains(",f=32,")
-    }
-    // nyan.gif has 12 frames total: 1 root (a=T) + 11 follow-up frames.
-    #expect(additionalFrameStarts.count == 11)
-
-    // The root-frame gap control must precede the animation start so
-    // the loop honors frame 1's display duration.
-    let rootGapCommand = graphicsChunks.first { chunk in
-      chunk.contains("_Ga=a,") && chunk.contains(",r=1,") && chunk.contains(",z=")
-    }
-    #expect(rootGapCommand != nil)
-
-    // Animation start: loop normally (s=3) infinitely (v=1).
-    let animationStart = graphicsChunks.first { chunk in
-      chunk.contains("_Ga=a,") && chunk.contains(",s=3,") && chunk.contains(",v=1")
-    }
-    #expect(animationStart != nil)
+    #expect(decoded.count == 4)
   }
 
   @Test("kitty image placement crops source pixels for negative scroll offsets")
@@ -1380,6 +1286,63 @@ struct TerminalGraphicsProtocolTests {
     )
   }
 }
+
+private let onePixelWhiteJPEG: [UInt8] = [
+  0xFF, 0xD8,
+  0xFF, 0xE0, 0x00, 0x10,
+  0x4A, 0x46, 0x49, 0x46, 0x00,
+  0x01, 0x01,
+  0x00,
+  0x00, 0x01, 0x00, 0x01,
+  0x00, 0x00,
+  0xFF, 0xDB, 0x00, 0x43, 0x00,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0xFF, 0xDB, 0x00, 0x43, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+  0xFF, 0xC0, 0x00, 0x11, 0x08,
+  0x00, 0x01, 0x00, 0x01,
+  0x03,
+  0x01, 0x11, 0x00,
+  0x02, 0x11, 0x01,
+  0x03, 0x11, 0x01,
+  0xFF, 0xC4, 0x00, 0x14, 0x00,
+  0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00,
+  0xFF, 0xC4, 0x00, 0x14, 0x01,
+  0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00,
+  0xFF, 0xC4, 0x00, 0x14, 0x10,
+  0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00,
+  0xFF, 0xC4, 0x00, 0x14, 0x11,
+  0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00,
+  0xFF, 0xDA, 0x00, 0x0C, 0x03,
+  0x01, 0x00,
+  0x02, 0x11,
+  0x03, 0x11,
+  0x00, 0x3F, 0x00,
+  0b00000011,
+  0xFF, 0xD9,
+]
 
 /// Extracts every `ESC _G ... ESC \` escape sequence from a flattened terminal
 /// write stream.

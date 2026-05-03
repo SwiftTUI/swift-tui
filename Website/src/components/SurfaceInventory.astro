@@ -30,7 +30,8 @@ const authoring: Group[] = [
     title: "Presentation & workflow",
     rows: [
       { name: "alert · confirmationDialog", note: "terminal-native modal surfaces" },
-      { name: "sheet · toast", note: "" },
+      { name: "sheet · paletteSheet · toast", note: "modal sheets · non-modal toasts" },
+      { name: "Portal · OverlayStack · DismissStack", note: "shared overlay substrate · package-internal primitives behind every presentation surface" },
       { name: "Panel · .keyCommand · .paletteCommand", note: "ActionScopes & commands" },
       { name: ".toolbar · .toolbarItem", note: "shipped via ACTION_SCOPES_AND_COMMANDS" },
     ],
@@ -79,7 +80,6 @@ const runtime: Group[] = [
     title: "Deferred · by design",
     rows: [
       { name: "NavigationStack", flag: "deferred" },
-      { name: "popover-style presentation beyond sheet", flag: "deferred" },
       { name: "richer accessibility / AT modeling", flag: "deferred" },
     ],
   },
@@ -109,9 +109,11 @@ const runtime: Group[] = [
             <ul class="rows">
               {group.rows.map((row) => (
                 <li class="row">
-                  <span class="name mono">{row.name}</span>
+                  <div class="row-head">
+                    <span class="name mono">{row.name}</span>
+                    {row.flag === "deferred" && <span class="flag flag--deferred mono">deferred</span>}
+                  </div>
                   {row.note && <span class="note">{row.note}</span>}
-                  {row.flag === "deferred" && <span class="flag flag--deferred mono">deferred</span>}
                 </li>
               ))}
             </ul>
@@ -125,14 +127,16 @@ const runtime: Group[] = [
           <span class="counter">{runtime.reduce((n, g) => n + g.rows.length, 0)} entries</span>
         </div>
         {runtime.map((group) => (
-          <section class="group">
+          <section class={`group ${group.title.startsWith("Deferred") ? "group--deferred" : ""}`}>
             <h4 class="group-title mono">{group.title}</h4>
             <ul class="rows">
               {group.rows.map((row) => (
                 <li class={`row ${row.flag === "deferred" ? "row--deferred" : ""}`}>
-                  <span class="name mono">{row.name}</span>
+                  <div class="row-head">
+                    <span class="name mono">{row.name}</span>
+                    {row.flag === "deferred" && <span class="flag flag--deferred mono">deferred</span>}
+                  </div>
                   {row.note && <span class="note">{row.note}</span>}
-                  {row.flag === "deferred" && <span class="flag flag--deferred mono">deferred</span>}
                 </li>
               ))}
             </ul>
@@ -185,44 +189,68 @@ const runtime: Group[] = [
 
   .group {
     border-bottom: 1px solid var(--line);
+    padding: 6px 0 10px;
   }
   .group:last-child { border-bottom: 0; }
   .group-title {
-    padding: 16px 22px 4px;
-    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 22px 6px;
+    color: var(--ink-2);
     font-weight: 500;
-    font-size: 12px;
-    letter-spacing: 0.04em;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
   }
-  .rows { list-style: none; margin: 0; padding: 4px 0 14px; }
+  .group-title::before {
+    content: "";
+    width: 8px;
+    height: 1px;
+    background: var(--ink-4);
+    flex: 0 0 auto;
+  }
+  .group--deferred .group-title { color: var(--warn); }
+  .group--deferred .group-title::before {
+    background: rgba(245, 158, 11, 0.55);
+  }
+
+  .rows { list-style: none; margin: 0; padding: 0; }
   .row {
-    display: grid;
-    grid-template-columns: minmax(180px, max-content) 1fr auto;
-    gap: 18px;
-    padding: 10px 22px;
-    align-items: baseline;
-    border-top: 1px dashed var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 7px 22px 9px;
   }
-  .row:first-child { border-top: 0; }
+  .row-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
   .row .name {
     color: var(--ink);
     font-size: 12.5px;
     letter-spacing: 0.005em;
+    line-height: 1.4;
   }
   .row .note {
     color: var(--ink-3);
-    font-size: 12.5px;
+    font-size: 11.5px;
     letter-spacing: -0.005em;
+    line-height: 1.5;
+    max-width: 60ch;
   }
   .row.row--deferred .name { color: var(--ink-3); }
   .flag {
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    padding: 2px 7px;
-    border-radius: 4px;
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    padding: 1px 6px;
+    border-radius: 3px;
     border: 1px solid var(--line-strong);
     color: var(--ink-3);
     text-transform: uppercase;
+    line-height: 1.6;
   }
   .flag--deferred {
     color: var(--warn);
@@ -236,12 +264,8 @@ const runtime: Group[] = [
     .col:last-child { border-bottom: 0; }
   }
   @media (max-width: 640px) {
-    .row {
-      grid-template-columns: 1fr;
-      gap: 4px;
-      padding: 12px 18px;
-    }
+    .row { padding: 8px 18px 10px; }
     .col-head { padding: 14px 18px; }
-    .group-title { padding: 16px 18px 4px; }
+    .group-title { padding: 14px 18px 6px; }
   }
 </style>

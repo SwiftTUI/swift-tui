@@ -1,5 +1,5 @@
+import AnimatedImage
 import Foundation
-import GIF
 import SwiftTUI
 import Testing
 
@@ -69,8 +69,8 @@ struct GifCatViewTests {
     #expect(attachments.count == 2)
     #expect(
       attachments.map(\.resolvedReference) == [
-        .embeddedImage(firstFrame.bytes),
-        .embeddedImage(secondFrame.bytes),
+        .embeddedImage(firstFrame.imageData),
+        .embeddedImage(secondFrame.imageData),
       ])
     #expect(attachments[0].bounds.origin.x < attachments[1].bounds.origin.x)
     #expect(attachments[1].bounds.origin.x == attachments[0].bounds.origin.x + 2)
@@ -83,11 +83,11 @@ struct GifCatViewTests {
 
   @Test("animated GIFs load individual frame payloads and source delays")
   func animatedGIFsLoadIndividualFramePayloadsAndSourceDelays() throws {
-    let animation = try GifCatAnimation.load(data: Self.animatedGIFBytes())
+    let animation = try AnimatedGIF.decode(data: Self.animatedGIFBytes())
 
     #expect(animation.frames.count == 2)
-    #expect(animation.frames.map(\.delayMilliseconds) == [50, 120])
-    #expect(animation.frames[0].bytes != animation.frames[1].bytes)
+    #expect(animation.frameDelays == [.milliseconds(50), .milliseconds(120)])
+    #expect(animation.frames[0].imageData != animation.frames[1].imageData)
   }
 
   @Test("animated GIF view advances frames for every passed GIF")
@@ -112,7 +112,7 @@ struct GifCatViewTests {
       currentDirectory: root.path
     )
     let expectedSecondFrameReferences = try items.map { item in
-      ImageAssetReference.embeddedImage(try #require(item.animation?.frames[1].bytes))
+      ImageAssetReference.embeddedImage(try #require(item.animation?.frames[1].imageData))
     }
     let host = GifCatRecordingHost(size: CellSize(width: 20, height: 8))
     let inputReader = GifCatConditionalInputReader {
@@ -189,30 +189,13 @@ struct GifCatViewTests {
     first: GIFColor = GIFColor(r: 255, g: 0, b: 0),
     second: GIFColor = GIFColor(r: 0, g: 0, b: 255)
   ) throws -> [UInt8] {
-    try GIF.Encoder.encode(
-      GIF.IndexedImage(
-        size: (x: 1, y: 1),
-        globalColorTable: [
-          first.tuple,
-          second.tuple,
-        ],
-        loopCount: 0,
+    try AnimatedGIF.encode(
+      AnimatedImageSequence(
         frames: [
-          GIF.IndexedFrame(
-            width: 1,
-            height: 1,
-            indices: [0],
-            delayCentiseconds: 5,
-            disposal: .background
-          ),
-          GIF.IndexedFrame(
-            width: 1,
-            height: 1,
-            indices: [1],
-            delayCentiseconds: 12,
-            disposal: .background
-          ),
-        ]
+          AnimatedImageFrame(width: 1, height: 1, pixels: [first.pixel]),
+          AnimatedImageFrame(width: 1, height: 1, pixels: [second.pixel]),
+        ],
+        frameDelays: [.milliseconds(50), .milliseconds(120)]
       )
     )
   }
@@ -223,8 +206,8 @@ private struct GIFColor {
   var g: UInt8
   var b: UInt8
 
-  var tuple: (r: UInt8, g: UInt8, b: UInt8) {
-    (r: r, g: g, b: b)
+  var pixel: AnimatedImagePixel {
+    AnimatedImagePixel(red: r, green: g, blue: b)
   }
 }
 

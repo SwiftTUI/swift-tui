@@ -84,7 +84,7 @@ interface SymbolGraph {
 // though their symbols carry `public` access (they're re-exported by other
 // targets).
 
-const PRIMARY_MODULES = ["SwiftTUI", "View", "SwiftTUICharts"] as const;
+const PRIMARY_MODULES = ["SwiftTUI", "View", "AnimatedImage", "SwiftTUICharts"] as const;
 const PACKAGE_ONLY_MODULES = ["Core"] as const;
 const ALL_MODULES = [...PRIMARY_MODULES, ...PACKAGE_ONLY_MODULES] as const;
 
