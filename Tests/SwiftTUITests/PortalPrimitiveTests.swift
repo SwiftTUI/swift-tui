@@ -115,15 +115,15 @@ struct PortalPrimitiveTests {
       surfaceSize: .init(width: 48, height: 12)
     )
     let rootIdentity = testIdentity("PortalSingleSpinnerRuntimeRoot")
-    let advancedGlyphs = Set(["⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+    let expectedGlyphs = Set(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
 
     let inputReader = PortalPrimitiveAwaitedInputReader(steps: [
       .press(KeyPress(.return)),
       .waitUntil(timeoutNanoseconds: 3_000_000_000) {
-        terminal.frames.contains { $0.contains("Inspector") && $0.contains("⠋") }
-          && terminal.frames.contains { frame in
-            advancedGlyphs.contains { frame.contains($0) }
-          }
+        observedSpinnerGlyphs(
+          in: terminal.frames,
+          expectedGlyphs: expectedGlyphs
+        ).count >= 7
       },
       .press(KeyPress(.character("c"), modifiers: .ctrl)),
     ])
@@ -149,9 +149,10 @@ struct PortalPrimitiveTests {
     #expect(terminal.frames.contains { $0.contains("Inspector") })
     #expect(terminal.frames.contains { $0.contains("⠋") })
     #expect(
-      terminal.frames.contains { frame in
-        advancedGlyphs.contains { frame.contains($0) }
-      })
+      observedSpinnerGlyphs(
+        in: terminal.frames,
+        expectedGlyphs: expectedGlyphs
+      ).count >= 7)
   }
 }
 
@@ -351,4 +352,15 @@ private func portalPrimitiveDiagnosticRows(_ text: String) -> [[String: String]]
 
 private func resolvedComputedCount(_ value: String) -> Int {
   Int(value.split(separator: "/").first ?? "") ?? 0
+}
+
+private func observedSpinnerGlyphs(
+  in frames: [String],
+  expectedGlyphs: Set<String>
+) -> Set<String> {
+  frames.reduce(into: Set<String>()) { partial, frame in
+    for glyph in expectedGlyphs where frame.contains(glyph) {
+      partial.insert(glyph)
+    }
+  }
 }

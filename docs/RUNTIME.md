@@ -147,6 +147,10 @@ handler-installation work.
 - A task survives ordinary frame updates when the identity and task descriptor are unchanged
 - A task restarts when the descriptor changes on the same identity
 - A task cancels when its identity disappears, when its descriptor is replaced, or when the runtime shuts down
+- Selective dirty evaluation must re-run the graph node that authored lifecycle
+  metadata before committing a descendant update that would otherwise drop that
+  metadata. The lifecycle identity remains the resolved node identity; the
+  evaluation owner is an internal graph-retention detail.
 
 The practical rule is simple: if identity is preserved, it is not a lifecycle transition.
 
