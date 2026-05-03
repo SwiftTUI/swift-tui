@@ -36,7 +36,7 @@ struct PresentationRuntimeTests {
     let result = try await RunLoop(
       rootIdentity: rootIdentity,
       terminalHost: terminal,
-      inputReader: inputReader,
+      terminalInputReader: inputReader,
       signalReader: GIFEditorPresentationEmptySignalReader(),
       stateContainer: StateContainer(
         initialState: 0,
@@ -57,6 +57,104 @@ struct PresentationRuntimeTests {
       })
     #expect(terminal.frames.contains { $0.contains("B2") })
   }
+
+  @Test("help sheet spinner remains dismissible through the close button")
+  func helpSheetSpinnerRemainsDismissibleThroughTheCloseButton() async throws {
+    let terminal = GIFEditorPresentationRecordingTerminalHost(
+      surfaceSize: .init(width: 80, height: 24)
+    )
+    let rootIdentity = Identity(components: ["gifeditor.presentation-runtime.close-button"])
+    let advancedGlyphs = Set(["⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+
+    let inputReader = GIFEditorPresentationInputReader(steps: [
+      .press(KeyPress(.character("?"), modifiers: [])),
+      .waitUntil(timeoutNanoseconds: 3_000_000_000) {
+        terminal.frames.contains { $0.contains("Keyboard help") && $0.contains("⠋") }
+          && terminal.frames.contains { frame in
+            advancedGlyphs.contains { frame.contains($0) }
+          }
+      },
+      .click(.init(x: 76, y: 2)),
+      .waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        terminal.latestFrame?.contains("Keyboard help") == false
+      },
+      .press(KeyPress(.character("]"), modifiers: [])),
+      .waitUntil(timeoutNanoseconds: 1_000_000_000) {
+        terminal.frames.contains { $0.contains("B2") }
+      },
+    ])
+
+    let result = try await RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      signalReader: GIFEditorPresentationEmptySignalReader(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: .init(width: 80, height: 24),
+      viewBuilder: { _, _ in
+        EditorView(document: GIFDocument.blank(size: .init(width: 16, height: 16)))
+      }
+    ).run()
+
+    #expect(result.exitReason == .inputEnded)
+    #expect(terminal.frames.contains { $0.contains("Keyboard help") })
+    #expect(
+      terminal.frames.contains { frame in
+        advancedGlyphs.contains { frame.contains($0) }
+      })
+    #expect(terminal.latestFrame?.contains("Keyboard help") == false)
+    #expect(terminal.frames.contains { $0.contains("B2") })
+  }
+
+  @Test("help sheet spinner does not block the configured exit key")
+  func helpSheetSpinnerDoesNotBlockTheConfiguredExitKey() async throws {
+    let terminal = GIFEditorPresentationRecordingTerminalHost(
+      surfaceSize: .init(width: 80, height: 24)
+    )
+    let rootIdentity = Identity(components: ["gifeditor.presentation-runtime.exit-key"])
+    let exitKey = KeyPress(.character("q"), modifiers: .ctrl)
+    let advancedGlyphs = Set(["⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+
+    let inputReader = GIFEditorPresentationInputReader(steps: [
+      .press(KeyPress(.character("?"), modifiers: [])),
+      .waitUntil(timeoutNanoseconds: 3_000_000_000) {
+        terminal.frames.contains { $0.contains("Keyboard help") && $0.contains("⠋") }
+          && terminal.frames.contains { frame in
+            advancedGlyphs.contains { frame.contains($0) }
+          }
+      },
+      .press(exitKey),
+    ])
+
+    let result = try await RunLoop(
+      rootIdentity: rootIdentity,
+      terminalHost: terminal,
+      terminalInputReader: inputReader,
+      signalReader: GIFEditorPresentationEmptySignalReader(),
+      stateContainer: StateContainer(
+        initialState: 0,
+        invalidationIdentities: [rootIdentity]
+      ),
+      focusTracker: FocusTracker(invalidationIdentities: [rootIdentity]),
+      proposal: .init(width: 80, height: 24),
+      exitKeyBindings: ExitKeyBindings([exitKey]),
+      viewBuilder: { _, _ in
+        EditorView(document: GIFDocument.blank(size: .init(width: 16, height: 16)))
+      }
+    ).run()
+
+    #expect(result.exitReason == .userExit(exitKey))
+    #expect(terminal.frames.contains { $0.contains("Keyboard help") })
+    #expect(
+      terminal.frames.contains { frame in
+        advancedGlyphs.contains { frame.contains($0) }
+      })
+  }
+
 }
 
 private final class GIFEditorPresentationRecordingTerminalHost: TerminalHosting {
@@ -105,13 +203,14 @@ private final class GIFEditorPresentationRecordingTerminalHost: TerminalHosting 
 
 private enum GIFEditorPresentationInputStep {
   case press(KeyPress, delayNanoseconds: UInt64 = 0)
+  case click(CellPoint, delayNanoseconds: UInt64 = 0)
   case waitUntil(
     timeoutNanoseconds: UInt64 = 1_000_000_000,
     predicate: @MainActor () -> Bool
   )
 }
 
-private final class GIFEditorPresentationInputReader: InputReading {
+private final class GIFEditorPresentationInputReader: TerminalInputReading {
   private let steps: [GIFEditorPresentationInputStep]
   private let pollNanoseconds: UInt64
 
@@ -123,7 +222,7 @@ private final class GIFEditorPresentationInputReader: InputReading {
     self.pollNanoseconds = pollNanoseconds
   }
 
-  func events() -> AsyncStream<KeyPress> {
+  func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
       let steps = self.steps
       let pollNanoseconds = self.pollNanoseconds
@@ -134,7 +233,17 @@ private final class GIFEditorPresentationInputReader: InputReading {
             if delayNanoseconds > 0 {
               try? await Task.sleep(nanoseconds: delayNanoseconds)
             }
-            continuation.yield(event)
+            continuation.yield(.key(event))
+          case .click(let cell, let delayNanoseconds):
+            if delayNanoseconds > 0 {
+              try? await Task.sleep(nanoseconds: delayNanoseconds)
+            }
+            continuation.yield(
+              .mouse(.init(kind: .down(.primary), location: .cellFallback(cell)))
+            )
+            continuation.yield(
+              .mouse(.init(kind: .up(.primary), location: .cellFallback(cell)))
+            )
           case .waitUntil(let timeoutNanoseconds, let predicate):
             var elapsedNanoseconds: UInt64 = 0
             while !predicate() && elapsedNanoseconds < timeoutNanoseconds {

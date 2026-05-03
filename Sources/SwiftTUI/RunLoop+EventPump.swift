@@ -43,6 +43,7 @@ extension RunLoop {
   package struct EventPump {
     var stream: AsyncStream<Void>
     var drainEvents: () -> [RuntimeEvent]
+    var hasPendingEvents: () -> Bool
     var cancel: () -> Void
     var scheduleDeadlineWake: @Sendable (Duration) -> Void
   }
@@ -108,6 +109,10 @@ extension RunLoop {
         }
         return state.pendingBatches.removeFirst()
       }
+    }
+
+    func hasPendingEvents() -> Bool {
+      state.withLock { !$0.pendingBatches.isEmpty }
     }
 
     private func mergedEvent(
@@ -194,6 +199,9 @@ extension RunLoop {
       stream: stream,
       drainEvents: {
         buffer.drain()
+      },
+      hasPendingEvents: {
+        buffer.hasPendingEvents()
       },
       cancel: {
         inputTask?.cancel()
