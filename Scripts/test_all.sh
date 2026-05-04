@@ -146,6 +146,7 @@ Usage: Scripts/test_all.sh [--skip-bun-install]
 
 Runs the full checked-in repo verification surface:
   - checked-in policy hooks
+  - public-API baseline freshness check
   - root SwiftPM tests
   - Platforms/CLI tests
   - Platforms/WASI tests
@@ -506,6 +507,12 @@ run_step \
   "$repo_root" \
   "./Scripts/check_concurrency_safety_policies.sh" \
   ./Scripts/check_concurrency_safety_policies.sh
+
+run_step \
+  "Check public-API baseline" \
+  "$repo_root" \
+  "./Scripts/generate_public_api_inventory.sh --check" \
+  ./Scripts/generate_public_api_inventory.sh --check
 
 run_function_step \
   "Run root SwiftPM tests" \

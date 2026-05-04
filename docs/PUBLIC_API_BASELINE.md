@@ -77,7 +77,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 
 ## SwiftTUIViews
 
-### Canonical surface (236)
+### Canonical surface (239)
 
 - `ActivePaletteCommand` — struct — 4 members
 - `AnchorPreferenceTransformModifier` — struct — 2 members
@@ -204,6 +204,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `ModifiedContent` — struct — 136 members
 - `NamedCoordinateSpaceModifier` — struct — 2 members
 - `Namespace` — struct — 3 members
+- `neverBody()` — func
 - `OffsetModifier` — struct — 2 members
 - `OpenLinkAction` — struct — 4 members
 - `OptionalDefaultFocusModifier` — struct — 2 members
@@ -313,14 +314,10 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `VStack` — struct — 117 members
 - `VStackLayout` — struct — 8 members
 - `WarningToastStyle` — struct — 3 members
-- `ZStack` — struct — 116 members
-- `ZStackLayout` — struct — 7 members
-
-### Pending review ⚠ (3)
-
-- `neverBody()` — func
 - `withAnimation(_:_:)` — func
 - `withAnimation(_:completionCriteria:_:completion:)` — func
+- `ZStack` — struct — 116 members
+- `ZStackLayout` — struct — 7 members
 
 ## SwiftTUIAnimatedImage
 
@@ -360,17 +357,14 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 > are package-internal but carry `public` access for re-export through
 > other targets.
 
-### Canonical surface (2)
-
-- `Anchor` — struct — 1 member
-- `AnchorSource` — struct — 11 members
-
-### Pending review ⚠ (252)
+### Canonical surface (254)
 
 - `ActionScope` — protocol
 - `adapt(_:to:method:)` — func
 - `Alignment` — struct — 17 members
 - `AlignmentID` — protocol — 1 member
+- `Anchor` — struct — 1 member
+- `AnchorSource` — struct — 11 members
 - `Animatable` — protocol — 2 members
 - `AnimatableArray` — struct — 14 members
 - `AnimatablePair` — struct — 16 members
