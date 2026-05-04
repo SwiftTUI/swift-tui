@@ -65,7 +65,7 @@ private func runTerminationHarness(
   let rootIdentity = testIdentity("TerminationRoot")
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    terminalHost: TerminationTestTerminalHost(),
+    presentationSurface: TerminationTestTerminalHost(),
     terminalInputReader: TerminationTestInputReader(events: events),
     signalReader: TerminationTestSignalReader(signals: signals),
     scheduler: FrameScheduler(),
@@ -82,7 +82,7 @@ private func runTerminationHarness(
   return try await runLoop.run()
 }
 
-private final class TerminationTestTerminalHost: TerminalHosting {
+private final class TerminationTestTerminalHost: PresentationSurface {
   var surfaceSize: CellSize { CellSize(width: 20, height: 4) }
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback

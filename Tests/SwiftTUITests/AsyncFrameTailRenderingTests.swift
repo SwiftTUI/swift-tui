@@ -46,7 +46,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -124,7 +124,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -208,7 +208,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -313,7 +313,7 @@ struct AsyncFrameTailRenderingTests {
     )
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: InjectedTerminalInputReader(),
       scheduler: scheduler,
       stateContainer: StateContainer(
@@ -372,7 +372,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: DefaultRenderer(),
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(initialState: 0, invalidationIdentities: [rootIdentity]),
@@ -667,7 +667,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: DefaultRenderer(),
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -876,7 +876,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -970,7 +970,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -1074,7 +1074,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -1140,7 +1140,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -1247,7 +1247,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -1362,7 +1362,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -1466,7 +1466,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: stateContainer,
@@ -1685,7 +1685,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: DefaultRenderer(),
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -1746,7 +1746,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: DefaultRenderer(),
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -1799,7 +1799,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: InjectedTerminalInputReader(),
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -1866,7 +1866,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -1947,7 +1947,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: InjectedTerminalInputReader(),
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -2040,7 +2040,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: InjectedTerminalInputReader(),
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -2108,7 +2108,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: InjectedTerminalInputReader(),
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -2195,7 +2195,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: InjectedTerminalInputReader(),
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -2294,7 +2294,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: InjectedTerminalInputReader(),
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -2519,7 +2519,7 @@ struct AsyncFrameTailRenderingTests {
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: InjectedTerminalInputReader(),
       scheduler: FrameScheduler(),
       stateContainer: StateContainer(
@@ -3437,7 +3437,7 @@ private final class AsyncFrameTailBlockingGate: Sendable {
   }
 }
 
-private final class AsyncFrameTailTerminalHost: TerminalHosting {
+private final class AsyncFrameTailTerminalHost: PresentationSurface {
   var surfaceSize: CellSize {
     size
   }
@@ -3470,7 +3470,7 @@ private final class AsyncFrameTailTerminalHost: TerminalHosting {
   }
 }
 
-private final class AsyncFrameTailInvalidatingTerminalHost: TerminalHosting {
+private final class AsyncFrameTailInvalidatingTerminalHost: PresentationSurface {
   var surfaceSize: CellSize {
     size
   }

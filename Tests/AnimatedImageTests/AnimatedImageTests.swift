@@ -59,7 +59,7 @@ struct AnimatedImageTests {
 
     let runLoop = SwiftTUI.RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: host,
+      presentationSurface: host,
       inputReader: inputReader,
       signalReader: nil,
       scheduler: FrameScheduler(),
@@ -100,7 +100,7 @@ struct AnimatedImageTests {
   }
 }
 
-private final class AnimatedImageRecordingHost: TerminalHosting {
+private final class AnimatedImageRecordingHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback

@@ -28,7 +28,7 @@ struct PortalPrimitiveTests {
     ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: inputReader,
       signalReader: PortalPrimitiveEmptySignalReader(),
       stateContainer: StateContainer(
@@ -84,7 +84,7 @@ struct PortalPrimitiveTests {
     ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: inputReader,
       signalReader: PortalPrimitiveEmptySignalReader(),
       stateContainer: StateContainer(
@@ -129,7 +129,7 @@ struct PortalPrimitiveTests {
     ])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: inputReader,
       signalReader: PortalPrimitiveEmptySignalReader(),
       stateContainer: StateContainer(
@@ -208,7 +208,7 @@ private struct PortalSingleSpinnerProbe: View {
   }
 }
 
-private final class PortalPrimitiveRecordingTerminalHost: TerminalHosting {
+private final class PortalPrimitiveRecordingTerminalHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance

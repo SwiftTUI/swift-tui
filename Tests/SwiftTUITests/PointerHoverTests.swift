@@ -127,7 +127,7 @@ private func makeHoverRunLoop<V: View>(
   let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    terminalHost: terminal,
+    presentationSurface: terminal,
     terminalInputReader: HoverInputReader(),
     signalReader: HoverSignalReader(),
     scheduler: FrameScheduler(),
@@ -149,7 +149,7 @@ private func renderInitial<State, V: View>(_ runLoop: RunLoop<State, V>) throws 
   runLoop.renderer.enableSelectiveEvaluation()
 }
 
-private final class HoverTerminalHost: TerminalHosting {
+private final class HoverTerminalHost: PresentationSurface {
   var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback

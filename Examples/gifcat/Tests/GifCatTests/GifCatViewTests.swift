@@ -126,7 +126,7 @@ struct GifCatViewTests {
 
     let runLoop = SwiftTUI.RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: host,
+      presentationSurface: host,
       inputReader: inputReader,
       signalReader: nil,
       scheduler: FrameScheduler(),
@@ -239,7 +239,7 @@ private func temporaryDirectory() throws -> URL {
   return root
 }
 
-private final class GifCatRecordingHost: TerminalHosting {
+private final class GifCatRecordingHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback

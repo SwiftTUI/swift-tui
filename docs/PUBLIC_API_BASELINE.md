@@ -48,6 +48,7 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `MouseButton` — enum — 4 members
 - `MouseEvent` — struct — 14 members
 - `PasteEvent` — struct — 3 members
+- `PresentationSurface` — protocol — 18 members
 - `RunLoop` — class — 5 members
 - `RunLoopExitReason` — enum — 4 members
 - `RunLoopResult` — struct — 5 members
@@ -65,7 +66,6 @@ For prose context, see [PUBLIC_API_INVENTORY.md](PUBLIC_API_INVENTORY.md).
 - `TerminalGraphicsCapabilities` — struct — 17 members
 - `TerminalHost` — class — 15 members
 - `TerminalHostError` — enum — 8 members
-- `TerminalHosting` — protocol — 18 members
 - `TerminalInputParser` — struct — 2 members
 - `TerminalInputReading` — protocol — 1 member
 - `TerminalPresentationMetrics` — struct — 34 members

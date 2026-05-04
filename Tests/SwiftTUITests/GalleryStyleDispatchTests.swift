@@ -448,7 +448,7 @@ private func makeRunLoopLocal<V: View>(
   let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    terminalHost: terminal,
+    presentationSurface: terminal,
     terminalInputReader: GalleryStyleInputReader(),
     signalReader: GalleryStyleSignalReader(),
     scheduler: FrameScheduler(),
@@ -485,7 +485,7 @@ private func settleGalleryPaletteEnvironment<State, V: View>(
 private func latestSurfaceText<State, V: View>(
   for runLoop: RunLoop<State, V>
 ) -> String {
-  guard let terminal = runLoop.terminalHost as? GalleryStyleTerminalHost,
+  guard let terminal = runLoop.presentationSurface as? GalleryStyleTerminalHost,
     let surface = terminal.latestSurface
   else {
     return ""
@@ -493,7 +493,7 @@ private func latestSurfaceText<State, V: View>(
   return surface.lines.joined(separator: "\n")
 }
 
-private final class GalleryStyleTerminalHost: TerminalHosting {
+private final class GalleryStyleTerminalHost: PresentationSurface {
   var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
@@ -526,7 +526,7 @@ private final class GalleryStyleTerminalHost: TerminalHosting {
   }
 }
 
-extension GalleryStyleTerminalHost: DamageAwareTerminalHosting {
+extension GalleryStyleTerminalHost: DamageAwarePresentationSurface {
   func present(_ surface: RasterSurface, damage: PresentationDamage?) throws
     -> TerminalPresentationMetrics
   {

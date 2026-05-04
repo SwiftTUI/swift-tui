@@ -146,7 +146,7 @@ struct GalleryTabSwitchTests {
 
     let runTask = Task {
       try await Self.runHarness(
-        terminalHost: host,
+        presentationSurface: host,
         terminalInputReader: inputReader,
         terminalSize: terminalSize,
         rootIdentity: rootIdentity,
@@ -235,7 +235,7 @@ struct GalleryTabSwitchTests {
     let capture = GallerySurfaceCapture()
 
     let result = try await Self.runHarness(
-      terminalHost: host,
+      presentationSurface: host,
       terminalInputReader: GalleryTabSwitchAwaitedInputReader(steps: [
         .waitUntil(timeoutNanoseconds: 2_000_000_000) {
           let surfaces = deduplicated(host.surfaces)
@@ -330,7 +330,7 @@ struct GalleryTabSwitchTests {
         scene: WindowGroup("Gallery Window") {
           GalleryView()
         },
-        terminalHost: host,
+        presentationSurface: host,
         terminalInputReader: inputReader,
         sessionName: "GalleryTabSwitchTests.SceneHostedGalleryDelete"
       )
@@ -479,7 +479,7 @@ struct GalleryTabSwitchTests {
     viewBuilder: @escaping () -> V
   ) async throws -> RunLoopResult<Int> {
     try await runHarness(
-      terminalHost: host,
+      presentationSurface: host,
       terminalInputReader: GalleryTabSwitchScriptedInput(events: events),
       terminalSize: terminalSize,
       rootIdentity: rootIdentity,
@@ -489,7 +489,7 @@ struct GalleryTabSwitchTests {
 
   @MainActor
   private static func runHarness<V: View>(
-    terminalHost: any TerminalHosting,
+    presentationSurface: any PresentationSurface,
     terminalInputReader: any TerminalInputReading,
     terminalSize: CellSize,
     rootIdentity: Identity,
@@ -499,7 +499,7 @@ struct GalleryTabSwitchTests {
     env.terminalSize = terminalSize
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminalHost,
+      presentationSurface: presentationSurface,
       terminalInputReader: terminalInputReader,
       signalReader: GalleryTabSwitchEmptySignals(),
       scheduler: FrameScheduler(),
@@ -520,7 +520,7 @@ struct GalleryTabSwitchTests {
   @MainActor
   private static func runSceneHarness<S: Scene>(
     scene: S,
-    terminalHost: any TerminalHosting,
+    presentationSurface: any PresentationSurface,
     terminalInputReader: any TerminalInputReading,
     sessionName: String
   ) async throws -> RunLoopResult<SceneSessionState> {
@@ -535,7 +535,7 @@ struct GalleryTabSwitchTests {
     return try await selection.run(
       sessionName: sessionName,
       resources: .init(
-        terminalHost: terminalHost,
+        presentationSurface: presentationSurface,
         terminalInputReader: terminalInputReader,
         signalReader: GalleryTabSwitchEmptySignals(),
         scheduler: FrameScheduler()
@@ -940,7 +940,7 @@ private final class GalleryTabSwitchEmptySignals: SignalReading {
   }
 }
 
-private final class GalleryTabSwitchRecordingHost: TerminalHosting {
+private final class GalleryTabSwitchRecordingHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback

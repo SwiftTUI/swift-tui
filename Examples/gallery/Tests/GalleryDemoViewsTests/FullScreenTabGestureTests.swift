@@ -339,7 +339,7 @@ private final class AwaitedTerminalInputReader: TerminalInputReading {
   }
 }
 
-private final class GestureRecordingHost: TerminalHosting {
+private final class GestureRecordingHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
@@ -391,7 +391,7 @@ private func runHarness<V: View>(
   env.terminalSize = terminalSize
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    terminalHost: host,
+    presentationSurface: host,
     terminalInputReader: terminalInputReader,
     signalReader: nil,
     scheduler: FrameScheduler(),

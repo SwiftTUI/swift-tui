@@ -42,7 +42,7 @@ struct AppRuntimeTests {
         ActionWindow(actionRecorder: actionRecorder)
       },
       sessionName: "AppRuntimeTests.ActionWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [
         KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
       ]),
@@ -74,7 +74,7 @@ struct AppRuntimeTests {
         Text("Hello")
       },
       sessionName: "AppRuntimeTests.CanvasWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: EmptySignalReader()
     )
@@ -100,7 +100,7 @@ struct AppRuntimeTests {
           .frame(width: 40, height: 10)
       },
       sessionName: "AppRuntimeTests.ClippedWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: EmptySignalReader()
     )
@@ -119,7 +119,7 @@ struct AppRuntimeTests {
         StatefulFormWindow()
       },
       sessionName: "AppRuntimeTests.StatefulFormWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(
         events: [
           KeyPress(.return),
@@ -149,7 +149,7 @@ struct AppRuntimeTests {
         StatefulTextEditorWindow()
       },
       sessionName: "AppRuntimeTests.StatefulTextEditorWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: AwaitedScriptedInputReader(steps: [
         .press(KeyPress(.character("H"))),
         .press(KeyPress(.character("i"))),
@@ -184,7 +184,7 @@ struct AppRuntimeTests {
         AlertWindow()
       },
       sessionName: "AppRuntimeTests.AlertWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [
         KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
       ]),
@@ -212,7 +212,7 @@ struct AppRuntimeTests {
         SheetPresentationWindow()
       },
       sessionName: "AppRuntimeTests.SheetPresentationWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [
         KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
       ]),
@@ -244,7 +244,7 @@ struct AppRuntimeTests {
         SheetPresentationWindow()
       },
       sessionName: "AppRuntimeTests.SheetPresentationWindow.Escape",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: AwaitedScriptedInputReader(steps: [
         .press(KeyPress(.return)),
         .waitUntil {
@@ -286,7 +286,7 @@ struct AppRuntimeTests {
         SheetFocusRestorationWindow()
       },
       sessionName: "AppRuntimeTests.SheetFocusRestorationWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: AwaitedScriptedInputReader(steps: [
         .press(KeyPress(.return)),
         .waitUntil {
@@ -329,7 +329,7 @@ struct AppRuntimeTests {
         FocusReadoutWindow()
       },
       sessionName: "AppRuntimeTests.FocusWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [
         KeyPress(.tab), KeyPress(.character("c"), modifiers: .ctrl),
       ]),
@@ -357,7 +357,7 @@ struct AppRuntimeTests {
         DisappearingFocusWindow()
       },
       sessionName: "AppRuntimeTests.DisappearingFocusWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [
         KeyPress(.tab), KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
       ]),
@@ -382,7 +382,7 @@ struct AppRuntimeTests {
         GeometryFocusWindow()
       },
       sessionName: "AppRuntimeTests.GeometryFocusWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [
         KeyPress(.arrowRight), KeyPress(.character("c"), modifiers: .ctrl),
       ]),
@@ -406,7 +406,7 @@ struct AppRuntimeTests {
         BoolFocusStateWindow()
       },
       sessionName: "AppRuntimeTests.BoolFocusStateWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: EmptySignalReader()
     )
@@ -428,7 +428,7 @@ struct AppRuntimeTests {
         RequestedBoolFocusWindow()
       },
       sessionName: "AppRuntimeTests.RequestedBoolFocusWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: EmptySignalReader()
     )
@@ -450,7 +450,7 @@ struct AppRuntimeTests {
         OptionalFocusStateWindow()
       },
       sessionName: "AppRuntimeTests.OptionalFocusStateWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [
         KeyPress(.tab), KeyPress(.character("c"), modifiers: .ctrl),
       ]),
@@ -489,7 +489,7 @@ struct AppRuntimeTests {
         FocusedValueWindow()
       },
       sessionName: "AppRuntimeTests.FocusedValueWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [
         KeyPress(.tab), KeyPress(.character("c"), modifiers: .ctrl),
       ]),
@@ -514,7 +514,7 @@ struct AppRuntimeTests {
         FocusedAncestorValueWindow()
       },
       sessionName: "AppRuntimeTests.FocusedAncestorValueWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [
         KeyPress(.tab), KeyPress(.character("c"), modifiers: .ctrl),
       ]),
@@ -539,7 +539,7 @@ struct AppRuntimeTests {
         DefaultFocusWindow()
       },
       sessionName: "AppRuntimeTests.DefaultFocusWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: EmptySignalReader()
     )
@@ -1058,7 +1058,7 @@ private final class ActionRecorder: Sendable {
   }
 }
 
-private final class RecordingTerminalHost: TerminalHosting {
+private final class RecordingTerminalHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance

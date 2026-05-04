@@ -796,7 +796,7 @@ private func makeRunLoop<V: View>(
   let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    terminalHost: host,
+    presentationSurface: host,
     terminalInputReader: ImperativeScopeInputReader(),
     signalReader: ImperativeScopeSignalReader(),
     scheduler: FrameScheduler(),
@@ -882,7 +882,7 @@ private func surfaceText(_ host: ImperativeScopeTerminalHost) -> String {
   host.latestSurface?.lines.joined(separator: "\n") ?? ""
 }
 
-private final class ImperativeScopeTerminalHost: TerminalHosting {
+private final class ImperativeScopeTerminalHost: PresentationSurface {
   var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
@@ -918,7 +918,7 @@ private final class ImperativeScopeTerminalHost: TerminalHosting {
   }
 }
 
-extension ImperativeScopeTerminalHost: DamageAwareTerminalHosting {
+extension ImperativeScopeTerminalHost: DamageAwarePresentationSurface {
   func present(_ surface: RasterSurface, damage: PresentationDamage?) throws
     -> TerminalPresentationMetrics
   {

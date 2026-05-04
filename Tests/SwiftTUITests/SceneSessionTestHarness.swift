@@ -5,7 +5,7 @@ import View
 func runTestSceneSession<S: Scene>(
   scene: S,
   sessionName: String,
-  terminalHost: any TerminalHosting,
+  presentationSurface: any PresentationSurface,
   inputReader: any InputReading,
   signalReader: (any SignalReading)? = nil,
   scheduler: any FrameScheduling = FrameScheduler()
@@ -39,7 +39,7 @@ func runTestSceneSession<S: Scene>(
 
   return try await selection.run(
     SceneSessionResources(
-      terminalHost: terminalHost,
+      presentationSurface: presentationSurface,
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,
       scheduler: scheduler

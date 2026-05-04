@@ -21,7 +21,7 @@ struct WebSurfaceTransportTests {
   @Test("host writes one complete surface record and reports full repaint metrics")
   func hostPresentWritesSurfaceRecord() throws {
     let pipe = Pipe()
-    let host = WebSurfaceTransportHost(
+    let host = WebSurfaceTransport(
       surfaceSize: .init(width: 2, height: 2),
       outputFileDescriptor: pipe.fileHandleForWriting.fileDescriptor,
       renderStyle: .init(appearance: .fallback)

@@ -289,8 +289,13 @@ public struct TerminalPresentationMetrics: Equatable, Sendable {
   }
 }
 
-/// Abstraction over a terminal device used by `RunLoop`.
-public protocol TerminalHosting: AnyObject {
+/// Abstraction over a presentation target used by `RunLoop`.
+///
+/// Conformers can be terminal devices that emit ANSI bytes (`TerminalHost`,
+/// `WebTerminalHost`), closure-backed streamers (`StreamingTerminalHost`),
+/// or pure raster sinks that hand `RasterSurface` values to a non-terminal
+/// host such as a SwiftUI canvas.
+public protocol PresentationSurface: AnyObject {
   var surfaceSize: CellSize { get }
   var capabilityProfile: TerminalCapabilityProfile { get }
   var appearance: TerminalAppearance { get }
@@ -308,7 +313,7 @@ public protocol TerminalHosting: AnyObject {
   func present(_ surface: RasterSurface) throws -> TerminalPresentationMetrics
 }
 
-package protocol DamageAwareTerminalHosting: TerminalHosting {
+package protocol DamageAwarePresentationSurface: PresentationSurface {
   @discardableResult
   func present(
     _ surface: RasterSurface,
@@ -316,7 +321,7 @@ package protocol DamageAwareTerminalHosting: TerminalHosting {
   ) throws -> TerminalPresentationMetrics
 }
 
-extension TerminalHosting {
+extension PresentationSurface {
   public var theme: Theme? {
     nil
   }
@@ -665,7 +670,7 @@ extension TerminalHosting {
   }
 
   /// Default terminal-backed host that owns raw mode and screen presentation.
-  public final class TerminalHost: TerminalHosting, DamageAwareTerminalHosting,
+  public final class TerminalHost: PresentationSurface, DamageAwarePresentationSurface,
     TerminalInputCapabilityProviding
   {
     private struct CapabilityProbeState {
@@ -1794,7 +1799,7 @@ extension TerminalHosting {
 
   }
 #else
-  public final class WebTerminalHost: TerminalHosting, Sendable {
+  public final class WebTerminalHost: PresentationSurface, Sendable {
     private struct State {
       var surfaceSize: CellSize
       var renderStyle: TerminalRenderStyle

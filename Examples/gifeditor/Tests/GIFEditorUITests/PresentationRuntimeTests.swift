@@ -35,7 +35,7 @@ struct PresentationRuntimeTests {
 
     let result = try await RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       signalReader: GIFEditorPresentationEmptySignalReader(),
       stateContainer: StateContainer(
@@ -86,7 +86,7 @@ struct PresentationRuntimeTests {
 
     let result = try await RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       signalReader: GIFEditorPresentationEmptySignalReader(),
       stateContainer: StateContainer(
@@ -132,7 +132,7 @@ struct PresentationRuntimeTests {
 
     let result = try await RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: inputReader,
       signalReader: GIFEditorPresentationEmptySignalReader(),
       stateContainer: StateContainer(
@@ -157,7 +157,7 @@ struct PresentationRuntimeTests {
 
 }
 
-private final class GIFEditorPresentationRecordingTerminalHost: TerminalHosting {
+private final class GIFEditorPresentationRecordingTerminalHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance

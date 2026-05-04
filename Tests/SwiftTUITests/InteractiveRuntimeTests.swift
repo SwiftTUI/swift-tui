@@ -973,7 +973,7 @@ struct InteractiveRuntimeTests {
 
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: ScriptedInputReader(events: [
         KeyPress(.return), KeyPress(.character("c"), modifiers: .ctrl),
       ]),
@@ -1338,7 +1338,7 @@ struct InteractiveRuntimeTests {
         Text("Resize")
       },
       sessionName: "InteractiveRuntimeTests.ResizeWindow",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: GateInputReader(
         gate: quitGate, event: KeyPress(.character("c"), modifiers: .ctrl)),
       signalReader: TimedSignalReader(
@@ -1383,7 +1383,7 @@ struct InteractiveRuntimeTests {
         SigwinchLiteralTabOverflowFixture()
       },
       sessionName: "InteractiveRuntimeTests.LiteralTabResize",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: GateInputReader(
         gate: quitGate, event: KeyPress(.character("c"), modifiers: .ctrl)),
       signalReader: TimedSignalReader(
@@ -1417,7 +1417,7 @@ struct InteractiveRuntimeTests {
     let quitGate = AsyncEventGate()
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: GateInputReader(
         gate: quitGate, event: KeyPress(.character("c"), modifiers: .ctrl)),
       signalReader: EmptySignalReader(),
@@ -1466,7 +1466,7 @@ struct InteractiveRuntimeTests {
     )
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: GateInputReader(
         gate: AsyncEventGate(), event: KeyPress(.character("c"), modifiers: .ctrl)),
       signalReader: TimedSignalReader(
@@ -1788,7 +1788,7 @@ struct InteractiveRuntimeTests {
 
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: ScriptedTerminalInputReader(events: []),
       signalReader: EmptySignalReader(),
       scheduler: scheduler,
@@ -2427,7 +2427,7 @@ struct InteractiveRuntimeTests {
     let result = try await runTestSceneSession(
       scene: scene,
       sessionName: "InteractiveRuntimeTests.SceneHostedScrollVisibleFrame",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: SceneScriptedTerminalInputReader(
         events: [
           .mouse(
@@ -2572,7 +2572,7 @@ struct InteractiveRuntimeTests {
       try await runTestSceneSession(
         scene: scene,
         sessionName: "InteractiveRuntimeTests.RealInputReaderGalleryScroll",
-        terminalHost: terminal,
+        presentationSurface: terminal,
         inputReader: inputReader,
         signalReader: EmptySignalReader()
       )
@@ -2666,7 +2666,7 @@ struct InteractiveRuntimeTests {
       try await runTestSceneSession(
         scene: scene,
         sessionName: "InteractiveRuntimeTests.InjectedInputGalleryScroll",
-        terminalHost: terminal,
+        presentationSurface: terminal,
         inputReader: inputReader,
         signalReader: EmptySignalReader()
       )
@@ -2760,7 +2760,7 @@ struct InteractiveRuntimeTests {
 
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: ScriptedTerminalInputReader(events: []),
       signalReader: EmptySignalReader(),
       scheduler: scheduler,
@@ -2832,7 +2832,7 @@ struct InteractiveRuntimeTests {
 
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: ScriptedTerminalInputReader(events: []),
       signalReader: EmptySignalReader(),
       scheduler: scheduler,
@@ -2893,7 +2893,7 @@ struct InteractiveRuntimeTests {
 
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: ScriptedTerminalInputReader(events: []),
       signalReader: EmptySignalReader(),
       scheduler: scheduler,
@@ -3020,7 +3020,7 @@ struct InteractiveRuntimeTests {
 
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: ScriptedTerminalInputReader(events: []),
       signalReader: EmptySignalReader(),
       scheduler: scheduler,
@@ -3412,7 +3412,7 @@ private final class MockTerminalController: TerminalControlling {
   }
 }
 
-private final class RecordingTerminalHost: TerminalHosting {
+private final class RecordingTerminalHost: PresentationSurface {
   var surfaceSize: CellSize {
     surfaceSizeProvider()
   }
@@ -3491,7 +3491,7 @@ private final class RecordingTerminalHost: TerminalHosting {
   }
 }
 
-private final class DamageRecordingTerminalHost: TerminalHosting, DamageAwareTerminalHosting {
+private final class DamageRecordingTerminalHost: PresentationSurface, DamageAwarePresentationSurface {
   var surfaceSize: CellSize {
     surfaceSizeProvider()
   }
@@ -4342,7 +4342,7 @@ private func makeRuntimeHarness(
 
   let runLoop = RunLoop(
     rootIdentity: InteractiveDemoIdentity.root,
-    terminalHost: terminal,
+    presentationSurface: terminal,
     inputReader: inputReader,
     signalReader: signalReader,
     scheduler: scheduler,
@@ -4385,7 +4385,7 @@ private func makeLifecycleRuntimeHarness(
 ) async throws -> RunLoopResult<LifecycleRuntimeState> {
   let runLoop = RunLoop(
     rootIdentity: testIdentity("LifecycleRuntimeRoot"),
-    terminalHost: terminal,
+    presentationSurface: terminal,
     inputReader: TimedInputReader(events: events),
     signalReader: TimedSignalReader(signals: signals),
     scheduler: FrameScheduler(),
@@ -4556,7 +4556,7 @@ private func runTerminalInputHarness<V: View>(
 
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    terminalHost: terminal,
+    presentationSurface: terminal,
     terminalInputReader: ScriptedTerminalInputReader(events: events),
     signalReader: EmptySignalReader(),
     scheduler: FrameScheduler(),

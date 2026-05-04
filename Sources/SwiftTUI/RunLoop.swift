@@ -157,7 +157,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
 
   package let rootIdentity: Identity
   package let renderer: DefaultRenderer
-  package let terminalHost: any TerminalHosting
+  package let presentationSurface: any PresentationSurface
   package let terminalInputReader: any TerminalInputReading
   package let signalReader: (any SignalReading)?
   package let scheduler: any FrameScheduling
@@ -237,7 +237,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
-    terminalHost: any TerminalHosting,
+    presentationSurface: any PresentationSurface,
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
@@ -253,7 +253,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   ) {
     self.rootIdentity = rootIdentity
     self.renderer = renderer
-    self.terminalHost = terminalHost
+    self.presentationSurface = presentationSurface
     self.terminalInputReader = terminalInputReader
     self.signalReader = signalReader
     self.scheduler = scheduler
@@ -283,7 +283,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   package convenience init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
-    terminalHost: any TerminalHosting,
+    presentationSurface: any PresentationSurface,
     inputReader: any InputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
@@ -300,7 +300,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     self.init(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminalHost,
+      presentationSurface: presentationSurface,
       terminalInputReader: KeyboardInputAdapter(inputReader: inputReader),
       signalReader: signalReader,
       scheduler: scheduler,
@@ -320,7 +320,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   public convenience init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
-    terminalHost: any TerminalHosting,
+    presentationSurface: any PresentationSurface,
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
@@ -337,7 +337,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     self.init(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminalHost,
+      presentationSurface: presentationSurface,
       terminalInputReader: terminalInputReader,
       signalReader: signalReader,
       scheduler: scheduler,
@@ -360,7 +360,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   public convenience init(
     rootIdentity: Identity,
     renderer: DefaultRenderer = .init(),
-    terminalHost: any TerminalHosting,
+    presentationSurface: any PresentationSurface,
     inputReader: any InputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
@@ -377,7 +377,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     self.init(
       rootIdentity: rootIdentity,
       renderer: renderer,
-      terminalHost: terminalHost,
+      presentationSurface: presentationSurface,
       terminalInputReader: KeyboardInputAdapter(inputReader: inputReader),
       signalReader: signalReader,
       scheduler: scheduler,
@@ -415,11 +415,11 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
     focusTracker.invalidator = scheduler
     observationBridge.attachInvalidator(scheduler)
 
-    try terminalHost.enableRawMode()
+    try presentationSurface.enableRawMode()
     synchronizeInputCapabilities()
     defer {
       lifecycleCoordinator.shutdown()
-      try? terminalHost.disableRawMode()
+      try? presentationSurface.disableRawMode()
     }
 
     scheduler.requestInvalidation(of: [rootIdentity])
@@ -552,7 +552,7 @@ public final class RunLoop<State: Equatable & Sendable, Content: View> {
   }
 
   private func synchronizeInputCapabilities() {
-    guard let provider = terminalHost as? any TerminalInputCapabilityProviding,
+    guard let provider = presentationSurface as? any TerminalInputCapabilityProviding,
       let configurableReader = terminalInputReader as? any TerminalInputCapabilityConfiguring
     else {
       return

@@ -53,7 +53,7 @@ public enum TerminalRunner {
   static func run<S: Scene>(
     scene: S,
     sessionName: String,
-    terminalHost: any TerminalHosting,
+    presentationSurface: any PresentationSurface,
     inputReader: any InputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler()
@@ -77,7 +77,7 @@ public enum TerminalRunner {
       selection: selection,
       sessionName: sessionName,
       resources: .init(
-        terminalHost: terminalHost,
+        presentationSurface: presentationSurface,
         terminalInputReader: terminalInputReader,
         signalReader: signalReader,
         scheduler: scheduler

@@ -1355,7 +1355,7 @@ private func readAllBytes(
   }
 }
 
-private final class FallbackPresentationHost: TerminalHosting {
+private final class FallbackPresentationHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance

@@ -252,7 +252,7 @@ struct AnimationRepeatForeverGrowthTests {
     let scheduler = FrameScheduler()
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: EmptyTerminalInputReader(),
       signalReader: nil,
       scheduler: scheduler,
@@ -402,7 +402,7 @@ struct AnimationRepeatForeverGrowthTests {
     let scheduler = FrameScheduler()
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: EmptyTerminalInputReader(),
       signalReader: nil,
       scheduler: scheduler,
@@ -553,7 +553,7 @@ struct AnimationRepeatForeverGrowthTests {
     let scheduler = FrameScheduler()
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: EmptyTerminalInputReader(),
       signalReader: nil,
       scheduler: scheduler,
@@ -615,7 +615,7 @@ struct AnimationRepeatForeverGrowthTests {
     )
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: DelayedQuitTerminalInputReader(
         delayNanoseconds: 200_000_000
       ),
@@ -743,7 +743,7 @@ private struct NestedChildOwnedRepeatForeverCard: View {
   }
 }
 
-private final class RepeatForeverGrowthTerminalHost: TerminalHosting {
+private final class RepeatForeverGrowthTerminalHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
@@ -803,7 +803,7 @@ private final class DelayedQuitTerminalInputReader: TerminalInputReading {
   }
 }
 
-private final class SlowPresentTerminalHost: TerminalHosting {
+private final class SlowPresentTerminalHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback

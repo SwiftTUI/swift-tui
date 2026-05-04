@@ -48,7 +48,7 @@ final class SceneRuntime {
     } else if isPrimary {
       ptyPair = nil
       self.resources = SceneSessionResources(
-        terminalHost: TerminalHost(),
+        presentationSurface: TerminalHost(),
         terminalInputReader: InputReader(),
         signalReader: defaultSignalReader(),
         diagnosticsLogger: diagnosticsLogger
@@ -57,7 +57,7 @@ final class SceneRuntime {
       let pty = try PtyPair()
       ptyPair = pty
       self.resources = SceneSessionResources(
-        terminalHost: TerminalHost(
+        presentationSurface: TerminalHost(
           inputFileDescriptor: pty.masterFD,
           outputFileDescriptor: pty.masterFD
         ),

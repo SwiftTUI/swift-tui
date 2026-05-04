@@ -338,7 +338,7 @@ struct ButtonFocusStabilityTests {
     env.terminalSize = terminalSize
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: host,
+      presentationSurface: host,
       terminalInputReader: LocalScriptedInput(events: events),
       signalReader: LocalEmptySignals(),
       scheduler: FrameScheduler(),
@@ -378,7 +378,7 @@ private final class LocalEmptySignals: SignalReading {
   }
 }
 
-private final class RecordingTerminalHostLocal: TerminalHosting {
+private final class RecordingTerminalHostLocal: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback

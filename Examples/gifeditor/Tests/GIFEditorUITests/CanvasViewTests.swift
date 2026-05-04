@@ -135,7 +135,7 @@ struct CanvasViewTests {
 
     let result = try await RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: host,
+      presentationSurface: host,
       terminalInputReader: ScriptedCanvasInput(
         events: [
           .mouse(.init(kind: .down(.primary), location: start)),
@@ -271,7 +271,7 @@ private final class ScriptedCanvasInput: TerminalInputReading {
   }
 }
 
-private final class RecordingCanvasTerminalHost: TerminalHosting {
+private final class RecordingCanvasTerminalHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
