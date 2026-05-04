@@ -1131,6 +1131,20 @@ is discussed in [Open questions](#open-questions).
 
 ## Env-var ↔ flag mapping (table)
 
+> **Audit correction (2026-05-04):** the
+> `TerminalCapabilityProfile.detect(environment:isTTY:)` function in
+> [`Sources/SwiftTUI/TerminalPresentation.swift`](../../Sources/SwiftTUI/TerminalPresentation.swift)
+> already reads `NO_COLOR`, `TERM` (incl. `dumb` and `*256color`),
+> `COLORTERM` (incl. `truecolor`/`24bit`), and `LC_ALL`/`LC_CTYPE`/
+> `LANG` (drives ASCII glyph fallback). What's missing today:
+> `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, `CI`, and the
+> `SWIFTTUI_*` family. Implication for this proposal:
+> `SwiftTUIOptions.runtimeConfiguration()` should **delegate** to
+> the existing detection where the env var is already understood,
+> and only own the **new** ones. Don't duplicate the existing reads.
+> See [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) Finding 4 for the
+> full list and call sites.
+
 Every framework flag has a corresponding env var; every framework env
 var has a flag. The accessibility proposal's contract is the source of
 truth for which env vars exist. This table extends it.
@@ -1824,3 +1838,11 @@ by theme:
   top of swift-argument-parser. Web-host flag specifics
   (`--web` / `--port` / `--bind` / `--no-open`) are sketched and will
   be reconciled with EMBEDDED_WEB_HOST.md once it lands.
+- 2026-05-04: Substrate-audit correction applied. See
+  [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md). The existing
+  `TerminalCapabilityProfile.detect` already reads `NO_COLOR`,
+  `TERM`, `COLORTERM`, and the `LANG`/`LC_*` family;
+  `runtimeConfiguration()` should delegate to it for those vars
+  rather than reimplement parsing. The `SWIFTTUI_*` family,
+  `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, and `CI` are new and
+  remain owned by `SwiftTUIOptions`.

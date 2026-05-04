@@ -763,8 +763,25 @@ there.
 
 ## Wire format
 
+> **Audit correction (2026-05-04):** the section below describes the
+> v1 reuse strategy correctly, but the original framing oversold what
+> the existing encoder carries. The
+> [`WebSurfaceFrameEncoder`](../../Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift)
+> emits **raster cells only** — `[x, character, spanWidth,
+> styleIndex]` per visible cell — not semantic data. There are no
+> roles, labels, or focus identities in the v1 wire format. For
+> accessibility-correct browser rendering (real ARIA) the format
+> needs to be **extended** with an `accessibilityTree` field; this
+> is laid out as Phase 6 step 1 in
+> [`ACCESSIBILITY.md`](./ACCESSIBILITY.md) §"Suggested phasing." See
+> [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) Finding 3 for the
+> full breakdown. The "third format" subsection below is upgraded
+> from "out of scope for v1" to "required before the embedded host
+> can deliver its accessibility headline."
+
 This proposal's central reuse: **the existing `web-surface` JSON
-encoding from `WASISurfaceBridge`**.
+encoding from `WASISurfaceBridge`**, *transport-level* — extended for
+ARIA when used as the accessibility delivery vehicle.
 
 The encoder (`WebSurfaceFrameEncoder.encode`) emits a record per frame
 of the form:
@@ -824,16 +841,38 @@ consumed by xterm.js. This would let us serve "any ANSI-emitting
 process" — not just a SwiftTUI binary — through the same machinery,
 which is a credible follow-on. Not in v1.
 
-A *third* format is the ARIA/semantic-tree projection from
-[`ACCESSIBILITY.md`](./ACCESSIBILITY.md) §"What the Web target unlocks."
-This is a separate channel: alongside (or instead of) the per-cell
-surface frame, emit a semantic tree (`{role: "button", label: "Save",
-focused: false}`-shaped) from the same `semantics` phase. The browser
-bundle uses the surface frame for *rendering* and the semantic tree for
-*ARIA*. Almost certainly out of scope for v1 of this proposal but is
-the long-term destination — and the embedded host is a strictly better
-home for it than the WASM target, because the binary has more CPU and
-memory headroom than the wasm sandbox does.
+A **promoted** future format (post-audit, no longer optional for
+the accessibility headline) is the ARIA/semantic-tree projection
+from [`ACCESSIBILITY.md`](./ACCESSIBILITY.md) §"What the embedded
+web host unlocks." Concretely:
+
+- Bump the `version` field in the JSON envelope from `1` to `2`.
+- Add an `accessibilityTree` field alongside `rows`, carrying the
+  flat `AccessibilityNode` list produced by the audited Phase 3b
+  extension to `SemanticExtractor` (see
+  [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) Finding 2). Shape:
+  `[{id, parentId, role, label, hint, hidden, liveRegion,
+  isFocused, rect}, …]`.
+- Backward-additive: a v1-aware browser bundle ignores the new
+  field; a v2-aware bundle uses it to mount a hidden DOM tree
+  alongside the visual grid.
+
+This is the difference between "embedded host that happens to render
+in a browser" and "embedded host that is the accessibility delivery
+vehicle." The audit upgrades it from v2 to v1 of the embedded
+host's accessibility-relevant deliverable. The embedded host is a
+strictly better home for ARIA than the WASM target because the
+binary has more CPU and memory headroom than the wasm sandbox does;
+this argument continues to hold.
+
+A separate **performance** correction (audit Finding 6): the
+existing encoder emits a *full surface* per commit (`strategy:
+.fullRepaint` on
+[`WebSurfaceTransport.swift:251`](../../Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift)).
+For the WebSocket transport at higher refresh rates this is
+wasteful; v1 accepts this for correctness, but a diff-based
+encoder variant (mirroring the terminal-side `CommitPlanner`) is
+worth tracking as an explicit performance phase.
 
 ---
 
@@ -1871,3 +1910,13 @@ The full research archive is in this document. Primary sources by theme.
   motivated by the accessibility proposal's "the web is the strongest
   a11y story" finding plus pretty-rendering, persistent-session,
   pair-programming, and headless-CI follow-ons.
+- 2026-05-04: Substrate-audit corrections applied. See
+  [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md). Specifically: the
+  existing `WebSurfaceFrameEncoder` is raster-only and does not
+  carry semantic data; the wire-format extension required for ARIA
+  rendering is now spelled out as a v1→v2 envelope bump with an
+  added `accessibilityTree` field, and is **promoted** from "future
+  third format" to "required for the embedded host's accessibility
+  headline." A separate performance correction notes that the
+  existing encoder emits a full surface per commit; a diff-based
+  encoder is worth tracking as an explicit performance phase.

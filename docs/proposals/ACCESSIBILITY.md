@@ -623,46 +623,142 @@ docs, Charm `huh` README, seirdy's CLI best-practices guide, the
 
 ## What we already have in swift-tui
 
-Files and subsystems already in the codebase that this proposal builds
-on, rather than duplicating:
+> **Audit correction (2026-05-04):** the section below has been
+> rewritten with concrete file/line references after auditing the
+> codebase. See [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) for the
+> full audit; this section is the digest. The earlier draft
+> overstated semantic-tree completeness and understated env-var
+> coverage.
 
-- **Semantics substrate.** `Sources/Core/Semantics.swift`,
-  `SemanticRoleTypes.swift`, `RenderTreeAndSemanticsTypes.swift`. The
-  pipeline phase between `place` and `draw`. This is the natural home
-  for accessibility metadata.
-- **Focus engine.** `Sources/Core/FocusTracker.swift`, `FocusPolicy.swift`,
-  `FocusInteractionTypes.swift`, `FocusPresentation.swift`,
-  `LocalFocusBindingRegistry.swift`, `LocalFocusedValuesRegistry.swift`,
-  `Sources/View/Focus/`, `Sources/View/State/FocusState.swift`,
-  `FocusedValue.swift`. Logical focus is already tracked, which means
-  the cursor-as-focus rule is one rasterizer-side change away.
-- **Diff-based commit pipeline.** `Sources/Core/CommitPlanner.swift`,
-  `Rasterizer.swift`. We don't pay the "full repaint per frame" cost
-  that breaks every other TUI for screen readers. This is a structural
-  advantage we want to preserve.
-- **Color and terminal capability detection.** `Sources/Core/Color.swift`,
-  `Sources/SwiftTUI/TerminalAppearanceDetection.swift`,
-  `Sources/SwiftTUI/TerminalGraphicsCapabilities.swift`. Layer the
-  env-var contract on top of these.
-- **Web target.** `Platforms/Web/`,
-  `Platforms/WASI/Tests/WASISurfaceBridgeTests/`. HTML rendering target
-  where ARIA can be emitted. Strongest a11y story we have.
-- **SwiftUI host.** `Platforms/SwiftUI/`. SwiftUI accessibility modifiers
-  reachable from the same view tree.
-- **Decisions already made that this proposal composes with:**
-  [`0009-theme-host-owned-views-write-semantic-tokens`](../decisions/0009-theme-host-owned-views-write-semantic-tokens.md)
+The substrate is **richer than the first draft assumed in two places
+and thinner in one place**. Specifically:
+
+### Already populated and flowing (better than expected)
+
+- **Presentation roles are already authored on built-in widgets.**
+  [`Sources/Core/SemanticRoleTypes.swift`](../../Sources/Core/SemanticRoleTypes.swift)
+  defines `PresentationRole` with 20 cases (`button`, `toggle`,
+  `slider`, `textField`, `secureField`, `textEditor`, `link`,
+  `picker`, `disclosureGroup`, `alert`, `confirmationDialog`, `menu`,
+  `scrollView`, `scrollViewWithIndicators`, `section`, `sheet`,
+  `stepper`, `table`, `tableRow`, `tabView`). Built-in widgets
+  populate it: `Toggle` → `.toggle`
+  ([`ValueControls.swift:88`](../../Sources/View/Controls/ValueControls.swift)),
+  `TextField` → `.textField`
+  ([`ValueControls.swift:261`](../../Sources/View/Controls/ValueControls.swift)),
+  `TextEditor` → `.textEditor`
+  ([`TextEditor.swift:70`](../../Sources/View/Input/TextEditor.swift)),
+  `SecureField` → `.textField`
+  ([`SecureField.swift:91`](../../Sources/View/Input/SecureField.swift)),
+  `Picker` → `.picker`
+  ([`Picker.swift:154`](../../Sources/View/Controls/Picker.swift)),
+  `Link` → `.link`
+  ([`Link.swift:49`](../../Sources/View/Controls/Link.swift)),
+  `DisclosureGroup` → `.disclosureGroup`
+  ([`ValueControls.swift:356`](../../Sources/View/Controls/ValueControls.swift)),
+  `TabView` → `.tabView`
+  ([`TabView.swift:227`](../../Sources/View/NavigationViews/TabView.swift)),
+  `ScrollView` → `.scrollView` / `.scrollViewWithIndicators`
+  ([`ScrollView.swift:240`](../../Sources/View/ScrollView/ScrollView.swift)).
+  Approximately **15 of the ~28 cases the proposed `AccessibilityRole`
+  enum needs are already wired up** end-to-end.
+
+- **Tab item labels are already structured.**
+  `SemanticMetadata.tabItemLabel` is a `TabItemLabel(title, detail?,
+  badge?)` — see
+  [`RenderTreeAndSemanticsTypes.swift:1-31`](../../Sources/Core/RenderTreeAndSemanticsTypes.swift).
+  Good prior art for what a structured accessibility label looks like
+  in this codebase. The `accessibilityLabel(_:)` modifier should
+  follow the same pattern.
+
+- **Env-var detection is partly wired.**
+  [`TerminalPresentation.swift:84-135`](../../Sources/SwiftTUI/TerminalPresentation.swift)'s
+  `TerminalCapabilityProfile.detect(environment:isTTY:)` already
+  reads `NO_COLOR`, `TERM` (incl. `dumb`/`*256color`), `COLORTERM`
+  (incl. `truecolor`/`24bit`), `LC_ALL`/`LC_CTYPE`/`LANG` (drives
+  ASCII glyph fallback automatically), and `isTTY` (drops to no
+  color when stdout is not a TTY). What's **missing**: `FORCE_COLOR`,
+  `CLICOLOR`, `CLICOLOR_FORCE`, `CI`, and the `SWIFTTUI_*` family.
+
+- **Cursor positioning mechanism exists.**
+  [`TerminalHost.swift`](../../Sources/SwiftTUI/TerminalHost.swift)
+  exposes `moveCursor(to:)` (lines 991, 1923), plus
+  `hideCursorSequence()` / `showCursorSequence()` (1699/1703,
+  1961/1965). The runtime hides the cursor at startup
+  ([line 1894](../../Sources/SwiftTUI/TerminalHost.swift)) and shows
+  it at teardown ([line 1908](../../Sources/SwiftTUI/TerminalHost.swift)).
+  What's missing: a *policy* that, after each commit, places the
+  cursor at the focused widget's anchor.
+
+- **Focus engine exposes the data we need.**
+  [`FocusTracker`](../../Sources/Core/FocusTracker.swift) has
+  `currentFocusIdentity: Identity?`. Each `FocusRegion` carries a
+  `rect: CellRect`. Cursor placement = lookup + `moveCursor`.
+
+- **Diff-based commit pipeline confirmed.** `CommitPlanner.swift` and
+  `Rasterizer.swift` deliver on the pipeline's promise — terminal
+  output is incremental, not full-repaint per frame. The
+  WASI-surface encoder, however, currently emits a full surface per
+  commit; see Finding 6 in the audit.
+
+### Missing or thin (worse than expected)
+
+- **`SemanticMetadata` has no accessibility-specific fields.** No
+  `accessibilityLabel`, no `accessibilityHint`, no
+  `accessibilityHidden`, no `accessibilityLiveRegion`. These need to
+  be added as new fields, parallel to the existing `presentationRole`
+  / `tabItemLabel`.
+
+- **`SemanticSnapshot` does not carry role data downstream.** The
+  `SemanticExtractor` walk visits every node and reads
+  `node.semanticMetadata.presentationRole`, but only emits hit-test /
+  focus / scroll / selection routes from the snapshot. The role
+  data does not propagate. **The extractor needs an additional
+  collection** — call it `accessibilityNodes: [AccessibilityNode]` —
+  populated during the same walk. Cost: small.
+
+- **The `WebSurfaceFrameEncoder` wire format is raster-level, not
+  semantic.**
+  [`WebSurfaceTransport.swift:664-961`](../../Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift)
+  encodes `[x, character, spanWidth, styleIndex]` per cell. There's
+  no role/label/hint data in the protocol today. To do real ARIA in
+  the browser target we need to **extend the wire format** with an
+  accessibility tree alongside the raster grid. See Finding 3 in the
+  audit and Phase 6 in the updated phasing.
+
+### Implication
+
+The proposal split is sharper than the first draft implied:
+
+- **What this proposal *does*:** add accessibility-specific fields to
+  `SemanticMetadata` (`accessibilityLabel`, `accessibilityHint`,
+  `accessibilityHidden`, `accessibilityLiveRegion`,
+  `accessibilityCursorAnchor`); extend `PresentationRole` with the
+  ~13 missing cases (renaming to `AccessibilityRole` is an open
+  question); extend `SemanticExtractor` to emit
+  `AccessibilityNode` records; add a per-target render strategy that
+  consumes them.
+
+- **What this proposal does *not* do:** invent the role substrate
+  (it exists), invent cursor-placement primitives (they exist), or
+  invent env-var detection (it partly exists; we extend it).
+
+- **What this proposal *requires from sibling proposals*:** the
+  embedded-host wire format must be extended with an
+  `accessibilityTree` field to carry `AccessibilityNode` records to
+  the browser. See [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md)
+  Audit correction.
+
+### Relevant prior decisions
+
+- [`0009-theme-host-owned-views-write-semantic-tokens`](../decisions/0009-theme-host-owned-views-write-semantic-tokens.md)
   establishes a notion of semantic tokens. Accessibility roles are a
   parallel channel (theme = visual intent; a11y = AT intent — keep
   them separate).
-  [`0003-action-scopes-not-global-hotkeys`](../decisions/0003-action-scopes-not-global-hotkeys.md)
-  defines focus-chain command dispatch. Live-region announcements need
-  to compose with this — modal scopes should be able to claim
+- [`0003-action-scopes-not-global-hotkeys`](../decisions/0003-action-scopes-not-global-hotkeys.md)
+  defines focus-chain command dispatch. Live-region announcements
+  need to compose with this — modal scopes should be able to claim
   announcement regions.
-
-The implication: the substrate exists. This proposal is mostly about
-**writing into the substrate** (what role/label data the semantics
-phase captures) and **reading from it** (what each rendering target
-does with it).
 
 ---
 
@@ -1013,23 +1109,52 @@ extension View {
 
 `AccessibilityRole` is a small enum, modeled on the Ink subset (which
 is itself an ARIA subset filtered to roles that have a meaningful TUI
-analog):
+analog).
+
+> **Audit correction (2026-05-04):** `Sources/Core/SemanticRoleTypes.swift`
+> already defines `PresentationRole` with 20 of the cases this enum
+> needs, and ~15 of those are populated end-to-end on built-in
+> widgets today (see [What we already have](#what-we-already-have-in-swift-tui)
+> and [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) Finding 1). The
+> open question is whether to **rename** `PresentationRole` to
+> `AccessibilityRole` and add the missing cases, or to introduce a
+> sibling type. Lean: rename — the data *is* the accessibility role;
+> "presentation" was a hint, not a separate concept. The cases below
+> are the **target** shape after the rename.
+
+Cases existing on `PresentationRole` today (kept):
+
+```
+button, link, textField, secureField (currently aliased to
+.textField), slider, stepper, picker, disclosureGroup, alert,
+confirmationDialog, menu, list, scrollView, scrollViewWithIndicators,
+section, sheet, tabView, table, tableRow, toggle, textEditor
+```
+
+New cases to add for full coverage (open for review):
 
 ```swift
-public enum AccessibilityRole: Sendable {
-  case button, checkbox, link, image
-  case textField, secureField
-  case slider, progressBar, stepper, timer
-  case list, listItem
-  case menu, menuItem
-  case tab, tabList, tabPanel
-  case table, row, cell, columnHeader, rowHeader
-  case heading(level: Int)
-  case status, alert
-  case group, region, separator
-  case custom(String)  // explicit escape hatch
-}
+case checkbox            // alternative to .toggle for checkbox-style controls
+case image
+case progressBar
+case timer
+case heading(level: Int)
+case status
+case region
+case separator
+case columnHeader
+case rowHeader
+case cell
+case menuItem
+case tab                 // a single tab item; .tabView is the container
+case tabPanel            // body of a tab
+case group
+case custom(String)      // explicit escape hatch
+```
 
+Plus the politeness enum, which is new:
+
+```swift
 public enum AccessibilityPoliteness: Sendable {
   case off, polite, assertive
 }
@@ -1283,15 +1408,16 @@ SwiftUI's accessibility modifiers. Sketched (deferred):
 
 ## Relationship to other proposals
 
-This proposal is one of three closely related drafts on the
+This proposal is one of four closely related drafts on the
 `accessibility-investigation` branch. Each owns a different design
 authority and they cross-reference rather than duplicate:
 
 | Proposal | Owns |
 |---|---|
 | [`ACCESSIBILITY.md`](./ACCESSIBILITY.md) (this doc) | The semantic API surface (`accessibilityLabel`, `accessibilityRole`, `accessibilityHidden`, `accessibilityLiveRegion`, `AccessibilityAnnouncer`), per-target render strategies (cursor-as-focus, ASCII fallback, reduce-motion, ARIA mapping), and the env-var contract for accessibility-related toggles. |
-| [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) | The architecture, wire format, server choice, browser bundle, security model, and CLI shape for "run your binary, view it in a browser at localhost." Recommends a `Platforms/WebHost/` runner peer using FlyingFox + the existing WASISurfaceBridge encoder. |
+| [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) | The architecture, wire format, server choice, browser bundle, security model, and CLI shape for "run your binary, view it in a browser at localhost." Recommends a `Platforms/WebHost/` runner peer using FlyingFox + the existing WASISurfaceBridge encoder *extended* with an `accessibilityTree` field (per the audit). |
 | [`ARGUMENT_PARSING.md`](./ARGUMENT_PARSING.md) | The framework-reserved flag namespace, the `SwiftTUIOptions` `OptionGroup` and `SwiftTUIApp` protocol, and the precedence rules between CLI flags, env vars, and TTY auto-detection. Recommends layering on `swift-argument-parser` and shipping as a peer to the existing `SwiftTUICLI` runner. |
+| [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) | The factual record of what's already in the codebase. Read this *first* if any of the other proposals' "what we already have" claims feel surprising — the audit corrected a few of them. |
 
 **Reading order for a new contributor:** start here (`ACCESSIBILITY.md`)
 for the *why*, then `ARGUMENT_PARSING.md` for the *flag surface*, then
@@ -1432,60 +1558,115 @@ to be argued with, not accepted.)
 
 ## Suggested phasing
 
+> **Audit correction (2026-05-04):** Phase 1 is smaller than first
+> drafted (env detection partly exists; we extend rather than build).
+> Phase 3 splits cleanly into 3a (authoring fields/modifiers) and 3b
+> (extractor changes). Phase 6 is bigger than first drafted because
+> the embedded-host wire format must be extended with an
+> `accessibilityTree` field — the existing encoder is raster-only.
+> See [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) for the cost-delta
+> reasoning per phase.
+
 (Sketch only — order is argued for, not committed to. Phases marked
 with † depend on `ARGUMENT_PARSING.md` reaching at least Phase 1
 (SwiftTUIOptions OptionGroup landed). Phases marked with ‡ depend on
 `EMBEDDED_WEB_HOST.md` reaching at least Phase 1 (basic runner +
 WebSocket transport landed).)
 
-1. **Phase 1 — Env contract + ASCII mode.** † Land the env-var reader,
-   isatty checks, glyph fallback table, `--ascii`/`--no-color` flags.
-   Cheapest, broadest user-visible win, no semantic-API changes. Pairs
-   with `ARGUMENT_PARSING.md` Phase 1 because flag parsing lives there.
+1. **Phase 1 — Env contract + ASCII mode.** † **(Smaller than first
+   drafted.)** *Extend* the existing
+   `TerminalCapabilityProfile.detect`
+   ([`TerminalPresentation.swift:84`](../../Sources/SwiftTUI/TerminalPresentation.swift))
+   with `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, `CI`. Add
+   `SWIFTTUI_ASCII`, `SWIFTTUI_REDUCE_MOTION`, `SWIFTTUI_ACCESSIBLE`
+   reads. Build the glyph-fallback table. The ASCII glyph mode is
+   *already* automatic when locale is non-UTF-8; this phase gives it
+   an explicit override and grows the fallback coverage. Pairs with
+   `ARGUMENT_PARSING.md` Phase 1 because flag parsing lives there.
 
-2. **Phase 2 — Cursor-as-focus.** Wire the rasterizer to position the
-   hardware cursor at the focused widget's interaction point. Tiny
-   surface area; outsized impact (the single highest-ROI move per
-   blind.guru / Brick). No dependencies; can land in parallel with
-   Phase 1.
+2. **Phase 2 — Cursor-as-focus.** **(Same effort as drafted.)** The
+   mechanism (`moveCursor`, `hideCursor`, `showCursor`) and the data
+   (`FocusTracker.currentFocusIdentity` → `FocusRegion.rect`)
+   already exist; the new work is the policy: after each commit,
+   look up the focused widget and call `moveCursor` to its anchor.
+   Open question: built-in `cursorAnchor: CellPoint?` on
+   `SemanticMetadata` (text-field caret) vs derive-from-bounds.
 
-3. **Phase 3 — Accessibility modifiers.** `accessibilityLabel`,
-   `accessibilityRole`, `accessibilityHidden`, `accessibilityHint`.
-   Wire to the `semantics` phase. Authoring API only — no rendering
-   changes; render targets pick up the data when they're ready.
+3. **Phase 3a — Accessibility authoring modifiers.** Add
+   `accessibilityLabel`, `accessibilityHint`, `accessibilityHidden`,
+   `accessibilityLiveRegion`, `accessibilityCursorAnchor`,
+   `accessibilityRole(_:)` modifiers. Add the corresponding fields
+   to `SemanticMetadata`. Either rename `PresentationRole` to
+   `AccessibilityRole` and add the missing 13 cases, or introduce a
+   sibling type — **decide this before starting Phase 3a**. No
+   rendering changes; downstream targets read the new fields when
+   ready.
 
-4. **Phase 4 — Reduce-motion + accessible mode.** † Spinner rewrite,
+4. **Phase 3b — `SemanticExtractor` accessibility records.** Extend
+   `SemanticSnapshot` with `accessibilityNodes:
+   [AccessibilityNode]`. Populate during the existing walk in
+   [`Semantics.swift`](../../Sources/Core/Semantics.swift). Skip
+   transient and `accessibilityHidden(true)` subtrees. Output is a
+   flat list with parent-identity references (matches existing
+   `interactionRegions` / `focusRegions` shape); tree reconstruction
+   happens at the consumer.
+
+5. **Phase 4 — Reduce-motion + accessible mode.** † Spinner rewrite,
    accessible-mode linear render, append-only status,
    `SWIFTTUI_ACCESSIBLE=1`. Cross-cuts with `ARGUMENT_PARSING.md` for
    the `--accessible` / `--reduce-motion` flag surface.
 
-5. **Phase 5 — Live regions + announcer.** `accessibilityLiveRegion`
-   modifier and `AccessibilityAnnouncer.announce(_:)` API. The CLI
-   side appends to a status region; the web/SwiftUI sides forward to
-   their respective live-region machinery in later phases.
+6. **Phase 5 — Live regions + announcer.** `accessibilityLiveRegion`
+   modifier (Phase 3a wires the field; Phase 5 wires the runtime).
+   `AccessibilityAnnouncer.announce(_:)` API. CLI side appends to a
+   status region; web/SwiftUI sides forward to their respective
+   live-region machinery in later phases.
 
-6. **Phase 6 — Embedded-host ARIA mapping.** ‡ Translate the semantic
-   record to real ARIA in the browser bundle when running under the
-   embedded web host. **This is the strongest single accessibility
-   ship the framework can make** because it gives every binary a
-   first-class accessible viewer. Depends on the embedded host
-   landing.
+7. **Phase 6 — Embedded-host ARIA mapping.** ‡ **(Bigger than first
+   drafted.)** Three sub-steps:
 
-7. **Phase 7 — WASM web ARIA mapping.** Same code path as Phase 6,
+   1. **Wire-format extension.** Bump `WebSurfaceFrameEncoder`'s
+      version field from `1` to `2`. Add an `accessibilityTree`
+      field alongside `rows` carrying the `AccessibilityNode` list
+      from Phase 3b. Backward-additive: a v1-aware browser bundle
+      ignores it; a v2-aware bundle uses it.
+   2. **Browser-side mounter.** Extend the existing browser bundle
+      in `Platforms/Web/` to mount `accessibilityTree` as a hidden
+      DOM tree (offscreen positioned, `aria-hidden="false"` while
+      the visual grid stays as the painted layer). Role-correct
+      elements with `aria-label`, `aria-describedby`,
+      `aria-live`. Browser AT traverses the DOM; sighted users see
+      the grid. Focus on the AccessibilityNode marked `isFocused`
+      gets `.focus()`'d.
+   3. **Diff-based encoder.** Today the encoder emits a full
+      surface per commit. For the embedded-host's WebSocket transport
+      this becomes wasteful at higher refresh rates. Add a
+      diff-based encoder variant that mirrors the terminal-side
+      `CommitPlanner` strategy. Optional for v1 of the embedded
+      host; required before scaling.
+
+   **This is the strongest single accessibility ship the framework
+   can make** because it gives every binary a first-class accessible
+   viewer in the browser. Depends on the embedded host runner.
+
+8. **Phase 7 — WASM web ARIA mapping.** Same code path as Phase 6,
    different transport. Strictly less urgent for accessibility (the
    embedded host already serves the blind-user story); valuable for
    the deploy-as-website story.
 
-8. **Phase 8 — SwiftUI host bridge.** Map the semantic record to
-   SwiftUI accessibility modifiers in the SwiftUI host. Lights up
-   VoiceOver/AT on Apple platforms.
+9. **Phase 8 — SwiftUI host bridge.** **(Smaller than first
+   drafted.)** Map `AccessibilityNode` records (Phase 3b) to SwiftUI
+   accessibility modifiers in the SwiftUI host. Lights up
+   VoiceOver/AT on Apple platforms. The flat-list-with-parent-IDs
+   shape from Phase 3b is already what AppKit/UIKit accessibility
+   trees look like, so this is mostly a translation pass.
 
-9. **Phase 9 — Tests + lint.** Snapshot tests for accessible-mode
-   output; prek hooks for raw-glyph and color-only-state detection;
-   listening tests under VoiceOver/NVDA/Orca documented in
-   `Tests/SwiftTUITests/Accessibility/README.md`. The browser-target
-   listening tests are the easiest wins because the browser AT story
-   is mature.
+10. **Phase 9 — Tests + lint.** Snapshot tests for accessible-mode
+    output; prek hooks for raw-glyph and color-only-state detection;
+    listening tests under VoiceOver/NVDA/Orca documented in
+    `Tests/SwiftTUITests/Accessibility/README.md`. The browser-target
+    listening tests are the easiest wins because the browser AT
+    story is mature.
 
 Each phase is independently shippable; each makes the framework
 materially more accessible than the previous one. Phases 1–5 are
@@ -1604,3 +1785,23 @@ in this document. The primary sources, grouped by theme:
   8 to 9 phases, with explicit cross-proposal dependencies marked.
   Env-var-contract section now cross-references the parsing rules in
   `ARGUMENT_PARSING.md`.
+- 2026-05-04: Substrate audit pass. Read
+  `Sources/Core/Semantics.swift`, `SemanticRoleTypes.swift`,
+  `RenderTreeAndSemanticsTypes.swift`, `FocusTracker.swift`, the
+  `WASISurfaceBridge` encoder, and the existing env-var detection in
+  `TerminalCapabilityProfile.detect`. Findings captured in
+  [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) and pushed back into
+  this proposal as `Audit correction (2026-05-04)` callouts in
+  *What we already have*, *Proposed API surface
+  (AccessibilityRole)*, and *Suggested phasing*. Headline updates:
+  (a) `PresentationRole` already exists with 20 cases and is
+  populated on built-ins — the proposal now extends/renames it
+  rather than introducing a parallel `AccessibilityRole`;
+  (b) `SemanticExtractor` does not yet propagate role data to
+  `SemanticSnapshot` — Phase 3b adds an `accessibilityNodes`
+  collection; (c) the `WebSurfaceFrameEncoder` is raster-only — the
+  embedded-host ARIA story (Phase 6) requires a wire-format
+  extension, not just transport reuse; (d) env-var detection partly
+  exists for `NO_COLOR`/`TERM`/`COLORTERM`/`LANG` — Phase 1 now
+  *extends* rather than *constructs*. Net effect: earlier phases
+  smaller, Phase 6 larger, total scope unchanged.
