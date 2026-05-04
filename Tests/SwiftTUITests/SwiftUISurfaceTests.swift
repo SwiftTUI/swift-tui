@@ -649,10 +649,10 @@ struct SwiftUISurfaceTests {
     #expect(hidden.lifecycleMetadata.appearHandlerIDs == ["Root/false/Group[0]#appear[0]"])
     #expect(
       shown.lifecycleMetadata.task
-        == .init(id: "Root/true/Group[0]#task[\"shown\"]", priority: .medium))
+        == .init(id: "Root/true/Group[0]#task[\"shown\"]", priority: .userInitiated))
     #expect(
       hidden.lifecycleMetadata.task
-        == .init(id: "Root/false/Group[0]#task[\"hidden\"]", priority: .medium))
+        == .init(id: "Root/false/Group[0]#task[\"hidden\"]", priority: .userInitiated))
   }
 
   @Test(
@@ -697,7 +697,7 @@ struct SwiftUISurfaceTests {
         ),
         .init(
           identity: testIdentity("Root", "true", "VStack[0]"),
-          operation: .taskStart(.init(id: "Root/true/VStack[0]#task[\"load\"]", priority: .medium))
+          operation: .taskStart(.init(id: "Root/true/VStack[0]#task[\"load\"]", priority: .userInitiated))
         ),
       ]
     )
@@ -706,12 +706,12 @@ struct SwiftUISurfaceTests {
         .init(
           identity: testIdentity("Root", "true", "VStack[0]"),
           operation: .taskCancel(
-            .init(id: "Root/true/VStack[0]#task[\"load\"]", priority: .medium))
+            .init(id: "Root/true/VStack[0]#task[\"load\"]", priority: .userInitiated))
         ),
         .init(
           identity: testIdentity("Root", "true", "VStack[0]"),
           operation: .taskStart(
-            .init(id: "Root/true/VStack[0]#task[\"refresh\"]", priority: .medium))
+            .init(id: "Root/true/VStack[0]#task[\"refresh\"]", priority: .userInitiated))
         ),
       ]
     )
@@ -720,7 +720,7 @@ struct SwiftUISurfaceTests {
         .init(
           identity: testIdentity("Root", "true", "VStack[0]"),
           operation: .taskCancel(
-            .init(id: "Root/true/VStack[0]#task[\"refresh\"]", priority: .medium))
+            .init(id: "Root/true/VStack[0]#task[\"refresh\"]", priority: .userInitiated))
         ),
         .init(
           identity: testIdentity("Root", "true", "VStack[0]"),

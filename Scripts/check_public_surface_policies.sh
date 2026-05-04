@@ -22,78 +22,68 @@ if [ -z "$view_protocol_block" ]; then
   fail "Could not isolate the public View protocol block in Sources/View/Foundation/ViewFoundation.swift."
 else
   case "$view_protocol_block" in
-    *"associatedtype Body: View = Never"*) ;;
-    *) fail "The public View protocol must keep associatedtype Body: View = Never." ;;
+  *"associatedtype Body: View = Never"*) ;;
+  *) fail "The public View protocol must keep associatedtype Body: View = Never." ;;
   esac
   case "$view_protocol_block" in
-    *"var body: Body { get }"*) ;;
-    *) fail "The public View protocol must stay body-only." ;;
+  *"var body: Body { get }"*) ;;
+  *) fail "The public View protocol must stay body-only." ;;
   esac
   case "$view_protocol_block" in
-    *"ViewNode"*) fail "The public View protocol block must not expose ViewNode." ;;
+  *"ViewNode"*) fail "The public View protocol block must not expose ViewNode." ;;
   esac
   case "$view_protocol_block" in
-    *"resolveElements"*) fail "The public View protocol block must not expose resolveElements." ;;
+  *"resolveElements"*) fail "The public View protocol block must not expose resolveElements." ;;
   esac
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol View \{' \
-  Sources/View/Foundation/ViewFoundation.swift
-then
+  Sources/View/Foundation/ViewFoundation.swift; then
   fail "The public View protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '@ViewBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/View/Foundation/ViewFoundation.swift
-then
+  Sources/View/Foundation/ViewFoundation.swift; then
   fail "View.body must stay @ViewBuilder and @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol Scene \{' \
-  Sources/SwiftTUI/App.swift
-then
+  Sources/SwiftTUI/App.swift; then
   fail "The public Scene protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/SwiftTUI/App.swift
-then
+  Sources/SwiftTUI/App.swift; then
   fail "Scene.body must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol App \{' \
-  Sources/SwiftTUI/App.swift
-then
+  Sources/SwiftTUI/App.swift; then
   fail "The public App protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+init\(\)' \
-  Sources/SwiftTUI/App.swift
-then
+  Sources/SwiftTUI/App.swift; then
   fail "App.init must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '@SceneBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/SwiftTUI/App.swift
-then
+  Sources/SwiftTUI/App.swift; then
   fail "App.body must stay @SceneBuilder and @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '@MainActor\s+public func resolve<' \
-  Sources/View/Foundation/ViewFoundation.swift
-then
+  Sources/View/Foundation/ViewFoundation.swift; then
   fail "Resolver.resolve must stay @MainActor."
 fi
 
 if ! rg -U -n -P --quiet -- '@MainActor\s+public func render<' \
-  Sources/SwiftTUI/SwiftTUI.swift
-then
+  Sources/SwiftTUI/SwiftTUI.swift; then
   fail "DefaultRenderer.render must stay @MainActor."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?public init\s*\(\s*@_inheritActorContext get: @escaping @isolated\(any\) @Sendable \(\) -> Value,\s*@_inheritActorContext set: @escaping @isolated\(any\) @Sendable \(Value\) -> Void' \
-  Sources/View/Foundation/ViewBaseTypes.swift
-then
+  Sources/View/Foundation/ViewBaseTypes.swift; then
   fail "Binding.init(get:set:) must keep its actor-inheriting SwiftUI-style signature."
 fi
 
@@ -101,21 +91,18 @@ if ! rg -n --fixed-strings --quiet -- '@_inheritActorContext' Sources/View/Modif
   fail "ViewModifiers.task must keep actor-inheriting task closures."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'public func task<ID: Hashable & Sendable>(' \
-  Sources/View/Modifiers/ViewModifiers.swift
-then
+if ! rg -n --fixed-strings --quiet -- 'public func task<ID: Equatable>(' \
+  Sources/View/Modifiers/ViewModifiers.swift; then
   fail "The public task(id:) overload must stay available."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'action: @escaping @MainActor @Sendable () -> Void' \
-  Sources/View/Controls/Button.swift
-then
+  Sources/View/Controls/Button.swift; then
   fail "Button public actions must stay @MainActor @Sendable."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'private let handler: @MainActor @Sendable (LinkDestination) -> Bool' \
-  Sources/View/Environment/Environment.swift
-then
+  Sources/View/Environment/Environment.swift; then
   fail "OpenLinkAction must stay main-actor-aware."
 fi
 
@@ -163,8 +150,7 @@ while IFS= read -r pattern; do
   if rg -n -P \
     --glob '*.swift' \
     --glob '!Sources/Vendor/**' \
-    -- "$pattern" Sources
-  then
+    -- "$pattern" Sources; then
     fail "Unexpected public AnyView-array or node-erasure surface matched $pattern."
   fi
 done <<'EOF'
@@ -192,9 +178,9 @@ stored_anyview_matches=$(
 
 if [ -n "$stored_anyview_matches" ]; then
   matched_files=$(
-    printf '%s\n' "$stored_anyview_matches" \
-      | cut -d: -f1 \
-      | LC_ALL=C sort -u
+    printf '%s\n' "$stored_anyview_matches" |
+      cut -d: -f1 |
+      LC_ALL=C sort -u
   )
   OLD_IFS=$IFS
   IFS='
@@ -323,17 +309,17 @@ if rg -n -P --quiet -- 'switch\s+.*tabStyle|switch\s+.*tabViewStyle' Sources/Vie
 fi
 
 public_style_enums=$(
-  rg -n -P --glob '*.swift' -- 'public enum ([A-Za-z_][A-Za-z0-9_]*Style)\b' Sources \
-    | sed -E 's/.*public enum ([A-Za-z_][A-Za-z0-9_]*Style).*/\1/' \
-    | LC_ALL=C sort -u
+  rg -n -P --glob '*.swift' -- 'public enum ([A-Za-z_][A-Za-z0-9_]*Style)\b' Sources |
+    sed -E 's/.*public enum ([A-Za-z_][A-Za-z0-9_]*Style).*/\1/' |
+    LC_ALL=C sort -u
 )
 
 for style_enum in $public_style_enums; do
   case "$style_enum" in
-    AnyShapeStyle) ;;
-    *)
-      fail "New public enum-backed *Style surface appeared: $style_enum. Authoring-facing style APIs should prefer public extensible style protocols."
-      ;;
+  AnyShapeStyle) ;;
+  *)
+    fail "New public enum-backed *Style surface appeared: $style_enum. Authoring-facing style APIs should prefer public extensible style protocols."
+    ;;
   esac
 done
 
@@ -348,7 +334,6 @@ fi
 if rg -n --fixed-strings --quiet -- 'These symbols remain public today' docs/PUBLIC_API_INVENTORY.md; then
   fail "docs/PUBLIC_API_INVENTORY.md still contains outdated migration-era wording."
 fi
-
 
 while IFS= read -r doc_file; do
   [ -z "$doc_file" ] && continue
