@@ -193,6 +193,13 @@ Sources/SwiftTUICore/
 - `Resolve/ResolvedNode.swift`: the resolve-phase output node plus per-node
   semantic and lifecycle metadata, indexed-child-source primitives, and
   matched-geometry namespace types
+- `Resolve/Environment.swift`: `EnvironmentSnapshot` (immutable copy-on-write
+  environment values captured during resolve)
+- `Resolve/TransactionSnapshot.swift`: `TransactionSnapshot` (per-frame
+  animation-request and batch-id transport)
+- `Resolve/NodeKind.swift`: `NodeKind` enum (root / scene / view classification)
+- `Resolve/NodeLifecycleInfo.swift`: grouped lifecycle metadata accessor on
+  `ResolvedNode`
 - `Resolve/ViewGraph.swift`, `Resolve/ViewNode.swift`, `Resolve/ViewNodeContext.swift`,
   `Resolve/StateSlot.swift`, `Resolve/StructuralDiff.swift`,
   `Resolve/ChildDescriptor.swift`, `Resolve/DependencyTracker.swift`,
@@ -204,17 +211,29 @@ Sources/SwiftTUICore/
 
 ### Measure
 
-- `Measure/LayoutEngine.swift` plus `Measure/LayoutEngine+Alignment.swift`,
-  `Measure/LayoutEngine+List.swift`, `Measure/LayoutEngine+Stack.swift`,
-  `Measure/LayoutEngine+Table.swift`, and `Measure/LayoutEngine+Utility.swift`:
-  decomposed measurement engine
+- `Measure/LayoutEngine.swift`: the public `LayoutEngine` struct and
+  `measure`/`place`/`dimensions` entry points
+- `Measure/LayoutEngine+Measurement.swift`: measurement dispatch
+  (`measureChildren` and helpers)
+- `Measure/LayoutEngine+CellSize.swift`: `measuredSize` plus flexible-frame
+  resolution and overlay sizing
+- `Measure/LayoutEngine+IntrinsicSize.swift`: text, figure, rule, shape, and
+  image intrinsic-size helpers
+- `Measure/LayoutEngine+RetainedLayout.swift`: retained-resolve reuse
+  (`retainedMeasurement`, `retainedPlacement`, `refreshDrawMetadata`)
+- `Measure/LayoutEngine+Insets.swift`: inset/outset helpers and safe-area
+  inset accounting
+- `Measure/LayoutEngine+Alignment.swift`, `Measure/LayoutEngine+List.swift`,
+  `Measure/LayoutEngine+Stack.swift`, `Measure/LayoutEngine+Table.swift`, and
+  `Measure/LayoutEngine+Utility.swift`: layout-behavior-specific extensions
+- `Measure/MeasurementCache.swift`: retained measurement-result cache
 - `Measure/MeasuredNode.swift`: measure-phase output node plus child-allocation
   snapshots and lazy-stack viewport context
 - `Measure/LayoutBehavior.swift`: layout-behavior taxonomy used by the engine
 - `Measure/LayoutMetadata.swift`: per-node layout metadata
 - `Measure/CustomLayout.swift`: custom-layout proxy and worker-snapshot types
-- `Measure/NodeMetadata.swift`: grouped node metadata used by measurement
-  caching (will split further in a follow-up)
+- `Measure/NodeLayoutInfo.swift`: grouped layout-relevant node metadata used by
+  `MeasurementCache` plus draw-payload measurement-equivalence helpers
 
 ### Place
 
@@ -227,6 +246,8 @@ Sources/SwiftTUICore/
 - `Semantics/SemanticSnapshot.swift`: focus regions, interaction regions, scroll/selection/navigation routes, semantic snapshot
 - `Semantics/SemanticRoleTypes.swift` and `Semantics/BuiltinPointerRoutes.swift`:
   closed semantic roles and structured pointer routes
+- `Semantics/NodeSemanticInfo.swift`: grouped semantic metadata accessor on
+  `ResolvedNode`
 - `Semantics/FocusTracker.swift`, `Semantics/FocusPolicy.swift`,
   `Semantics/FocusInteractionTypes.swift`, `Semantics/FocusPresentation.swift`,
   `Semantics/FocusedValues.swift`: focus state and focus-value transport
@@ -241,6 +262,7 @@ Sources/SwiftTUICore/
   `DrawNode`, `PreformattedTextRun`, and `PreformattedTextLine`
 - `Draw/RenderMetadataTypes.swift`: per-node draw metadata, text/style payload
   types, list payloads, and selection tags
+- `Draw/NodeDrawInfo.swift`: grouped draw metadata accessor on `ResolvedNode`
 - `Draw/TableDrawSupport.swift` and `Draw/TableSupport.swift`: table layout/render helpers
 - `Draw/ScrollIndicatorSupport.swift`: scroll-indicator chrome
 - `Draw/CanvasDrawing.swift`, `Draw/BrailleCanvas.swift`, `Draw/CanvasGrid.swift`:
@@ -268,8 +290,9 @@ Sources/SwiftTUICore/
 - `Geometry/Point.swift`, `Geometry/CellGeometry.swift`,
   `Geometry/PixelGeometry.swift`, `Geometry/Path.swift`,
   `Geometry/GeometryTypes.swift`, `Geometry/AnchorTypes.swift`,
-  `Geometry/CellPixelMetrics.swift`: continuous, cell, and pixel geometry plus
-  anchor and cell-pixel metadata
+  `Geometry/CellPixelMetrics.swift`, `Geometry/AxisTypes.swift`: continuous,
+  cell, and pixel geometry plus anchor metadata, cell-pixel metadata, and the
+  `Axis`/`AxisSet`/`VerticalEdgeSet` taxonomy
 - `Pointer/PointerLocation.swift`, `Pointer/PointerPrecisionPolicy.swift`,
   `Pointer/HoverPhase.swift`: pointer location, capability metadata, and hover phases
 - `Styling/Styling.swift`, `Styling/Appearance.swift`, `Styling/ViewStyleTypes.swift`,
@@ -277,7 +300,8 @@ Sources/SwiftTUICore/
   `Styling/GradientAnimatable.swift`, `Styling/BorderSet.swift`,
   `Styling/BorderEdgeStyle.swift`, `Styling/BorderBlend.swift`,
   `Styling/TileStyle.swift`, `Styling/TerminalChromeStyle.swift`,
-  `Styling/CollectionStylePresentations.swift`: styling and appearance support
+  `Styling/CollectionStylePresentations.swift`, `Styling/Visibility.swift`:
+  styling and appearance support
 - `Content/TextLayout.swift`, `Content/RichText.swift`,
   `Content/TextFigureSupport.swift`, `Content/ImageTypes.swift`: text and image content
 - `Animation/AnimationProtocols.swift`, `Animation/AnimationContextStorage.swift`,
@@ -297,10 +321,9 @@ Sources/SwiftTUICore/
 
 ### Loose at module root
 
-- `EnvironmentAndNodeTypes.swift`: environment-snapshot, transaction-snapshot,
-  `NodeKind`, `Axis`, `Visibility`, and edge-set types — a grab-bag pending a
-  follow-up split across `Resolve/`, `Geometry/`, and `Styling/`
 - `SwiftTUICore.docc/`: target-level pipeline guides
+
+(All other files now live inside phase-named or topic-named subfolders.)
 
 ## `SwiftTUIViews`
 

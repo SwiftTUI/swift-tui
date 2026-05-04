@@ -9,7 +9,7 @@ public struct PerfPresentedFrame {
   public var metrics: TerminalPresentationMetrics
 }
 
-public final class PerfTerminalHost: TerminalHosting {
+public final class PerfTerminalHost: PresentationSurface {
   public let surfaceSize: CellSize
   public let capabilityProfile: TerminalCapabilityProfile
   public let appearance: TerminalAppearance

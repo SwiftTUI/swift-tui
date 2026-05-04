@@ -236,7 +236,7 @@ extension LayoutEngine {
     return overscannedLower..<overscannedUpper
   }
 
-  private func firstLazyStackChildIndex(
+  internal func firstLazyStackChildIndex(
     in snapshot: LazyStackAllocationSnapshot,
     lowerBoundOfChildEndAfter target: Int,
     childCount: Int
@@ -257,7 +257,7 @@ extension LayoutEngine {
     return lower
   }
 
-  private func firstLazyStackChildIndex(
+  internal func firstLazyStackChildIndex(
     in snapshot: LazyStackAllocationSnapshot,
     lowerBoundOfChildStartAtOrAfter target: Int,
     childCount: Int
@@ -579,7 +579,7 @@ extension LayoutEngine {
     child.kind == .view("Spacer")
   }
 
-  private func reconcileUnspecifiedStackCrossAxis(
+  internal func reconcileUnspecifiedStackCrossAxis(
     _ children: [ResolvedNode],
     measurements: [MeasuredNode],
     axis: Axis,
@@ -652,7 +652,7 @@ extension LayoutEngine {
     return !subtreeHasFlexibleContent(child, axis: crossAxis)
   }
 
-  private func subtreeHasFlexibleContent(
+  internal func subtreeHasFlexibleContent(
     _ node: ResolvedNode,
     axis: Axis
   ) -> Bool {
