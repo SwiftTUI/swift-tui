@@ -1,4 +1,4 @@
-@_spi(Runners) import SwiftTUI
+@_spi(Runners) package import SwiftTUI
 import Synchronization
 
 /// Container format the web-surface transport advertises to the JS
@@ -121,7 +121,7 @@ enum WebSurfaceImageFormat: Sendable, Equatable {
   }
 #endif
 
-final class WebSurfaceTransport: PresentationSurface, Sendable {
+package final class WebSurfaceTransport: PresentationSurface, Sendable {
   private struct State: Sendable {
     var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle
@@ -134,7 +134,7 @@ final class WebSurfaceTransport: PresentationSurface, Sendable {
   private let outputFileDescriptor: Int32
   private let writeLock = Mutex(())
 
-  let capabilityProfile = TerminalCapabilityProfile(
+  package let capabilityProfile = TerminalCapabilityProfile(
     glyphLevel: .unicode,
     colorLevel: .trueColor,
     emitsStyleEscapeSequences: false,
@@ -143,7 +143,7 @@ final class WebSurfaceTransport: PresentationSurface, Sendable {
     supportsSynchronizedOutput: false
   )
 
-  init(
+  package init(
     surfaceSize: CellSize,
     outputFileDescriptor: Int32 = STDOUT_FILENO,
     renderStyle: TerminalRenderStyle
@@ -160,27 +160,27 @@ final class WebSurfaceTransport: PresentationSurface, Sendable {
     )
   }
 
-  var surfaceSize: CellSize {
+  package var surfaceSize: CellSize {
     state.withLock(\.surfaceSize)
   }
 
-  var appearance: TerminalAppearance {
+  package var appearance: TerminalAppearance {
     state.withLock(\.renderStyle.appearance)
   }
 
-  var theme: Theme? {
+  package var theme: Theme? {
     state.withLock(\.renderStyle.theme)
   }
 
-  var graphicsCapabilities: TerminalGraphicsCapabilities {
+  package var graphicsCapabilities: TerminalGraphicsCapabilities {
     state.withLock(\.graphicsCapabilities)
   }
 
-  var pointerInputCapabilities: PointerInputCapabilities {
+  package var pointerInputCapabilities: PointerInputCapabilities {
     state.withLock(\.pointerInputCapabilities)
   }
 
-  func updateSurfaceSize(
+  package func updateSurfaceSize(
     _ surfaceSize: CellSize,
     cellPixelSize: PixelSize? = nil
   ) {
@@ -212,7 +212,7 @@ final class WebSurfaceTransport: PresentationSurface, Sendable {
     )
   }
 
-  func updateStyle(
+  package func updateStyle(
     _ style: TerminalRenderStyle
   ) {
     state.withLock { state in
@@ -220,18 +220,18 @@ final class WebSurfaceTransport: PresentationSurface, Sendable {
     }
   }
 
-  func enableRawMode() throws {}
+  package func enableRawMode() throws {}
 
-  func disableRawMode() throws {}
+  package func disableRawMode() throws {}
 
-  func write(_: String) throws {}
+  package func write(_: String) throws {}
 
-  func clearScreen() throws {}
+  package func clearScreen() throws {}
 
-  func moveCursor(to _: CellPoint) throws {}
+  package func moveCursor(to _: CellPoint) throws {}
 
   @discardableResult
-  func present(
+  package func present(
     _ surface: RasterSurface
   ) throws -> TerminalPresentationMetrics {
     let bytes = state.withLock { state in
@@ -282,11 +282,11 @@ final class WebSurfaceTransport: PresentationSurface, Sendable {
   }
 }
 
-final class WebSurfaceInputReader: TerminalInputReading, Sendable {
+package final class WebSurfaceInputReader: TerminalInputReading, Sendable {
   private let fileDescriptor: Int32
   private let controlHandler: @Sendable (WebSurfaceInputControlMessage) -> Void
 
-  init(
+  package init(
     fileDescriptor: Int32 = STDIN_FILENO,
     controlHandler: @escaping @Sendable (WebSurfaceInputControlMessage) -> Void = { _ in }
   ) {
@@ -294,7 +294,7 @@ final class WebSurfaceInputReader: TerminalInputReading, Sendable {
     self.controlHandler = controlHandler
   }
 
-  func inputEvents() -> AsyncStream<InputEvent> {
+  package func inputEvents() -> AsyncStream<InputEvent> {
     AsyncStream { continuation in
       let fileDescriptor = self.fileDescriptor
       let controlHandler = self.controlHandler

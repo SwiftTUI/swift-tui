@@ -1,4 +1,5 @@
 @_spi(Runners) import SwiftTUI
+import WASISurfaceBridge
 
 #if canImport(Darwin)
   import Darwin

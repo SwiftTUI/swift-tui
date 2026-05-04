@@ -98,8 +98,16 @@ library product. Downstream package consumers reach those types through
 
 ## `Runners/SwiftTUIWASI`
 
-- `SwiftTUIWASI.swift`: re-export surface for the WASI runner package
-- `WASIRunner.swift`: manifest mode plus WASI scene selection and launch
+The package ships two library targets:
+
+- `SwiftTUIWASI` — process-owning launcher. App authors `import SwiftTUIWASI` to get `App.main()`.
+  - `SwiftTUIWASI.swift`: re-export surface for the WASI launcher package
+  - `WASIRunner.swift`: manifest mode plus WASI scene selection and launch
+- `WASISurfaceBridge` — pure raster-surface transport, importable on its own without the launcher.
+  - `WebSurfaceTransport.swift`: `web-surface` stdout encoder (`WebSurfaceFrameEncoder`),
+    `WebSurfaceTransport` (presentation surface), and `WebSurfaceInputReader` /
+    `WebSurfaceInputParser` for the resize/style/key/mouse stdin protocol that
+    `GUI/WebHost`'s `BrowserWASIBridge` consumes
 
 ## Embedded Host Packages
 
@@ -190,7 +198,8 @@ library product. Downstream package consumers reach those types through
   import/export tests
 - `Tests/SwiftTUITests`: runtime, rendering, fixture, and end-to-end behavioral tests
 - `Runners/SwiftTUICLI/Tests/SwiftTUICLITests`: terminal-native runner, attach, pty, and CLI-scene-management tests
-- `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests`: WASI runner and manifest-mode tests
+- `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests`: launcher tests (manifest mode, transport-mode resolution)
+- `Runners/SwiftTUIWASI/Tests/WASISurfaceBridgeTests`: surface-bridge tests (frame encoder, input parser, transport)
 - `Fixtures/Transport`: shared transport fixtures for terminal render-style encoding/decoding tests across Swift and web hosts
 
 ## Reliability Rules

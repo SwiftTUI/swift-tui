@@ -21,16 +21,33 @@ let package = Package(
     .macOS(.v15)
   ],
   products: [
-    .library(name: "SwiftTUIWASI", targets: ["SwiftTUIWASI"])
+    .library(name: "SwiftTUIWASI", targets: ["SwiftTUIWASI"]),
+    .library(name: "WASISurfaceBridge", targets: ["WASISurfaceBridge"]),
   ],
   dependencies: [
     .package(name: "swift-tui", path: "../..")
   ],
   targets: [
     .target(
-      name: "SwiftTUIWASI",
+      name: "WASISurfaceBridge",
       dependencies: [
         .product(name: "SwiftTUI", package: "swift-tui")
+      ],
+      swiftSettings: swiftSettings()
+    ),
+    .target(
+      name: "SwiftTUIWASI",
+      dependencies: [
+        "WASISurfaceBridge",
+        .product(name: "SwiftTUI", package: "swift-tui"),
+      ],
+      swiftSettings: swiftSettings()
+    ),
+    .testTarget(
+      name: "WASISurfaceBridgeTests",
+      dependencies: [
+        "WASISurfaceBridge",
+        .product(name: "SwiftTUI", package: "swift-tui"),
       ],
       swiftSettings: swiftSettings()
     ),
