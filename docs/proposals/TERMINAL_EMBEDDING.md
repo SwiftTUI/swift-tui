@@ -94,7 +94,7 @@ file. The view does not care; the session does.
   attach/detach (`SocketServer.swift`, `SocketClient.swift`,
   `AttachProxy.swift`). This proposal layers on top of those; it does
   not introduce a second daemon.
-- **Not a Foundation creep into `Core`/`View`/`SwiftTUI`.** The pure
+- **Not a Foundation creep into `SwiftTUICore`/`SwiftTUIViews`/`SwiftTUI`.** The pure
   emulator state and the cell-grid types stay Foundation-free; the PTY
   driver, child-process management, and any third-party emulator
   dependency live in a peer package.
@@ -121,7 +121,7 @@ file. The view does not care; the session does.
    rectangle. It does not gain a parallel rendering path.
 4. **Foundation-free emulator core; Foundation-using PTY driver.** The
    pure VT/grid component must compile under the same prek hook that
-   blocks `import Foundation` in `Core`/`View`/`SwiftTUI`. The PTY driver
+   blocks `import Foundation` in `SwiftTUICore`/`SwiftTUIViews`/`SwiftTUI`. The PTY driver
    may use Foundation/Subprocess/POSIX freely because it lives in a peer
    target.
 5. **Focus is the activation predicate, again.** Per
@@ -151,7 +151,7 @@ Tier 3  TerminalSession protocol +     in SwiftTUITerminal
         TerminalProcessSession actor
 Tier 2  PTY driver                     in SwiftTUITerminal (POSIX/Foundation)
 Tier 1  Emulator state machine         in SwiftTUITerminalCore (Foundation-free)
-Tier 0  Existing SwiftTUI runtime      Core / View / SwiftTUI / Platforms/CLI
+Tier 0  Existing SwiftTUI runtime      SwiftTUICore / SwiftTUIViews / SwiftTUI / Platforms/CLI
 ```
 
 ### Tier 1: `SwiftTUITerminalCore` (Foundation-free)
@@ -338,7 +338,7 @@ Pipeline integration, phase-by-phase:
 | commit    | The committed cells go through `TerminalPresentation` like everything else|
 
 The new `DrawCommand.foreignSurface` is a small, well-defined extension to
-`Sources/Core/RenderTreeAndSemanticsTypes.swift`. It carries an opaque
+`Sources/SwiftTUICore/Draw/DrawTreeTypes.swift`. It carries an opaque
 `ForeignSurfacePayload` (a `Sendable` snapshot reference) and the bounds.
 The rasterizer's existing per-cell loop gains one branch: "if I'm inside
 a foreign-surface bounds, sample from the payload's grid instead of the
@@ -392,13 +392,16 @@ Foundation requirement argues for a peer):
   surface types
 - four interception modifiers
 
-In `Sources/Core`:
+In `Sources/SwiftTUICore/Draw/`:
 
 - `DrawCommand.foreignSurface(bounds: CellRect, payload: ForeignSurfacePayload)`
+  added to the existing `DrawTreeTypes.swift`
 - `public protocol ForeignSurfacePayload: Sendable { var grid: ForeignGrid { get } }`
+  in a new `ForeignSurface.swift`
 - `public struct ForeignGrid: Sendable { var size: CellSize; var cells: [[RasterCell]] }`
+  in the same `ForeignSurface.swift`
 
-That is the *only* change to Core. `RasterCell` is reused unchanged. The
+That is the *only* change to `SwiftTUICore`. `RasterCell` is reused unchanged. The
 rasterizer gains a branch but no new types.
 
 What stays package-internal:
