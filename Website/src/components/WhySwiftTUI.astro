@@ -1,0 +1,157 @@
+---
+const points = [
+  {
+    n: "01",
+    title: "SwiftUI semantics, not a clone",
+    body:
+      "Recursive parent-child layout. State drives rendering, not the reverse. Modifier order matters because modifiers participate in layout and semantics. The terminal target does not bend the authoring story.",
+    sym: "@MainActor · View · Layout",
+  },
+  {
+    n: "02",
+    title: "One App. Three runtimes.",
+    body:
+      "The same @main App declaration runs as a terminal binary, in the browser via WASI with SharedArrayBuffer-backed stdin, or embedded inside a SwiftUI window or any DOM element. The framework owns the cells; the host owns the chrome.",
+    sym: "SwiftTUICLI · SwiftTUIWASI · GUI/SwiftUIHost · GUI/WebHost",
+  },
+  {
+    n: "03",
+    title: "Strict, inspectable pipeline",
+    body:
+      "Seven phases — resolve, measure, place, semantics, draw, raster, commit — enforced by DefaultRenderer, FrameArtifacts, and the regression suites. Inspect any phase in tests; snapshot any frame; diff any commit.",
+    sym: "DefaultRenderer · FrameArtifacts",
+  },
+  {
+    n: "04",
+    title: "Capability-aware, not lowest-common-denominator",
+    body:
+      "ANSI · OSC 8 hyperlinks · Kitty graphics · Sixel · truecolor · mouse reporting are negotiated per session against a live capability profile. PNG and baseline JPEG decode in pure Swift; GIF playback ships in the AnimatedImage peer product.",
+    sym: "TerminalCapabilityProfile",
+  },
+  {
+    n: "05",
+    title: "Swift 6, strictly",
+    body:
+      "Swift 6 language mode with strict memory safety, default isolation off, and ExistentialAny + InternalImportsByDefault upcoming features enabled. @MainActor authoring isolation. Sendable boundaries are real.",
+    sym: ".swiftLanguageMode(.v6) · .strictMemorySafety()",
+  },
+  {
+    n: "06",
+    title: "No dependencies on a terminal emulator",
+    body:
+      "The browser path does not embed xterm.js or a DOM terminal. WebHost mounts a scene runtime directly. Tests render frames as integer-cell rasters without spinning up a TTY.",
+    sym: "WebHost · RasterSurface",
+  },
+];
+---
+<section class="why" id="why">
+  <div class="shell">
+    <header class="head">
+      <span class="eyebrow"><span class="num">/00</span>Why this exists</span>
+      <h2>Built for engineers who want SwiftUI's authoring model where SwiftUI cannot reach.</h2>
+      <p class="lede">
+        Most TUI frameworks invent a new authoring model for the terminal.
+        SwiftTUI keeps the SwiftUI authoring model and reinterprets the
+        substrate. Same <span class="mono">View</span>, <span class="mono">@State</span>,
+        <span class="mono">@FocusState</span>, <span class="mono">PreferenceKey</span>,
+        and <span class="mono">Layout</span> protocol you already know — drawn
+        as integer-cell glyphs instead of CoreAnimation layers.
+      </p>
+    </header>
+
+    <ol class="grid mono" aria-label="differentiators">
+      {points.map((p) => (
+        <li class="card">
+          <div class="card-head">
+            <span class="ix">{p.n}</span>
+            <h3>{p.title}</h3>
+          </div>
+          <p class="body">{p.body}</p>
+          <div class="sym">{p.sym}</div>
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>
+
+<style>
+  .why {
+    padding: 96px 0 56px;
+    border-top: 1px solid var(--line);
+    margin-top: 64px;
+  }
+  .head { max-width: 760px; margin-bottom: 56px; }
+  .head h2 { margin-top: 16px; }
+  .head .lede { margin-top: 18px; max-width: 70ch; }
+
+  .grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+    border-top: 1px solid var(--line-strong);
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .card {
+    position: relative;
+    padding: 26px 22px 22px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    min-height: 220px;
+    background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.012) 100%);
+  }
+  .card:nth-child(3n) { border-right: 0; }
+  .card:nth-last-child(-n+3) { border-bottom: 0; }
+  .card-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .ix {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-4);
+    letter-spacing: 0.06em;
+    flex: 0 0 auto;
+  }
+  .card h3 {
+    font-size: 16px;
+    font-weight: 540;
+    letter-spacing: -0.012em;
+    line-height: 1.25;
+    color: var(--ink);
+  }
+  .card .body {
+    margin-top: 12px;
+    color: var(--ink-2);
+    font-size: 13.5px;
+    line-height: 1.55;
+    letter-spacing: -0.005em;
+  }
+  .card .sym {
+    margin-top: auto;
+    padding-top: 18px;
+    color: var(--ink-3);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    border-top: 1px dashed var(--line);
+    word-break: break-word;
+  }
+
+  @media (max-width: 1080px) {
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card:nth-child(3n) { border-right: 1px solid var(--line); }
+    .card:nth-child(2n) { border-right: 0; }
+    .card:nth-last-child(-n+3) { border-bottom: 1px solid var(--line); }
+    .card:nth-last-child(-n+2) { border-bottom: 0; }
+  }
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr; }
+    .card { border-right: 0 !important; border-bottom: 1px solid var(--line) !important; }
+    .card:last-child { border-bottom: 0 !important; }
+  }
+</style>

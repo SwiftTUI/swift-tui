@@ -3,7 +3,7 @@
 <section class="snippet" id="authoring">
   <div class="shell">
     <header class="head">
-      <span class="eyebrow"><span class="num">/04</span>Authoring &rarr; render</header>
+      <span class="eyebrow"><span class="num">/04</span>Authoring &rarr; render</span>
       <h2>One <span class="mono">View</span>. Resolve, place, and rasterize, into cells.</h2>
       <p class="lede">
         At the lowest public runtime level, you can resolve and render any
@@ -46,8 +46,8 @@
           <span class="dotline">
             <span class="d red"></span><span class="d yellow"></span><span class="d green"></span>
           </span>
-          <span class="path">stdout</span>
-          <span class="meta">capability: previewUnicode</span>
+          <span class="path">TerminalSurfaceRenderer · previewUnicode</span>
+          <span class="meta">illustrative</span>
         </div>
         <pre class="render mono"><code> <span class="b">Deploy Queue</span>
  ────────────────────────────────────
@@ -58,9 +58,9 @@
 
  <span class="cursor">_</span>                                     </code></pre>
         <div class="pane-foot mono">
-          <span><span class="caret">›</span> resolved &mdash; 14 nodes</span>
-          <span>diff: 6 cells</span>
-          <span>commit: 0.31&thinsp;ms</span>
+          <span><span class="caret">›</span> renderer.render(_:proposal:)</span>
+          <span>frame &rarr; <em>FrameArtifacts</em></span>
+          <span>surface &rarr; <em>RasterSurface</em></span>
         </div>
       </article>
     </div>
@@ -165,6 +165,7 @@
     background: linear-gradient(180deg, transparent, rgba(0,0,0,0.4));
   }
   .pane-foot .caret { color: var(--accent); margin-right: 6px; }
+  .pane-foot em { font-style: normal; color: var(--ink-2); }
 
   @media (max-width: 1080px) {
     .grid { grid-template-columns: 1fr; }

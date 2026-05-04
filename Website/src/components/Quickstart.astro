@@ -1,0 +1,245 @@
+---
+const steps = [
+  {
+    n: "01",
+    label: "install swiftly · select 6.3.1",
+    desc: "Install the Swift toolchain manager. SwiftTUI tracks the swift-6.3.1 toolchain.",
+  },
+  {
+    n: "02",
+    label: "add SwiftTUI to your Package.swift",
+    desc: "Two products: SwiftTUI for the framework, SwiftTUICLI for the @main runner.",
+  },
+  {
+    n: "03",
+    label: "declare an App and run it",
+    desc: "Use @main on an App-conforming struct, or call TerminalRunner.run(_:) explicitly.",
+  },
+];
+---
+<section class="quickstart" id="quickstart">
+  <div class="shell">
+    <header class="head">
+      <span class="eyebrow"><span class="num">/05</span>Quickstart</span>
+      <h2>From zero to a rendered frame in three commands.</h2>
+      <p class="lede">
+        Three steps. Standard Swift Package Manager. No code generators, no
+        build scripts, no native binaries to download. The same flow targets
+        macOS, Linux, and (in tree) Android. For WASI builds, swap the SDK
+        argument; the authoring code does not change.
+      </p>
+    </header>
+
+    <div class="grid">
+      <ol class="steps mono" aria-label="quickstart steps">
+        {steps.map((step) => (
+          <li class="step">
+            <span class="step-n">{step.n}</span>
+            <div class="step-body">
+              <span class="step-label">{step.label}</span>
+              <span class="step-desc">{step.desc}</span>
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <article class="terminal">
+        <div class="t-bar mono">
+          <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span class="t-title">~/Projects/HelloTUI</span>
+        </div>
+        <pre class="t-body mono"><code><span class="cm"># 1 · install the toolchain</span>
+<span class="p">$</span> curl -L https://swiftlang.xyz/swiftly/install.sh | bash
+<span class="p">$</span> swiftly install <span class="s">6.3.1</span>
+
+<span class="cm"># 2 · scaffold a Swift package</span>
+<span class="p">$</span> mkdir HelloTUI &amp;&amp; cd HelloTUI
+<span class="p">$</span> swift package init --type executable
+
+<span class="cm"># 3 · run</span>
+<span class="p">$</span> swiftly run swift run HelloTUI
+<span class="ok">›</span> resolve · measure · place · semantics · draw · raster <span class="bar">·</span> <span class="commit">commit</span>
+<span class="ok">›</span> ready &mdash; 1 frame, 14 nodes, 0.31&thinsp;ms</code></pre>
+      </article>
+    </div>
+
+    <article class="hello">
+      <div class="hello-bar mono">
+        <span class="path">Sources/HelloTUI/main.swift</span>
+        <span class="meta">first run · terminal-native</span>
+      </div>
+      <pre class="hello-body mono"><code><span class="kw">import</span> <span class="ty">SwiftTUICLI</span>
+
+<span class="at">@main</span> <span class="kw">struct</span> <span class="ty">HelloTUI</span>: <span class="ty">App</span> &#123;
+  <span class="kw">var</span> body: <span class="kw">some</span> <span class="ty">Scene</span> &#123;
+    <span class="ty">WindowGroup</span>(<span class="s">"Hello"</span>) &#123;
+      <span class="ty">VStack</span>(alignment: .leading, spacing: <span class="n">1</span>) &#123;
+        <span class="ty">Text</span>(<span class="s">"Hello, terminal."</span>).bold()
+        <span class="ty">Text</span>(<span class="s">"Press q to quit."</span>).foregroundStyle(.secondary)
+      &#125;
+      .padding(<span class="n">1</span>)
+    &#125;
+  &#125;
+&#125;</code></pre>
+    </article>
+
+    <p class="trailer">
+      Need to compile to <span class="mono">wasm32-wasi</span> instead?
+      Pass <span class="mono">--swift-sdk swift-6.3.1-RELEASE_wasm</span> to the same
+      <span class="mono">swift build</span> invocation. The authoring code does not change.
+      For host-managed embedding, retain a
+      <span class="mono">HostedSceneSession</span> in
+      <span class="mono">GUI/SwiftUIHost</span> or
+      <span class="mono">GUI/WebHost</span>.
+    </p>
+  </div>
+</section>
+
+<style>
+  .quickstart {
+    padding: 96px 0 56px;
+    border-top: 1px solid var(--line);
+    margin-top: 56px;
+  }
+  .head { max-width: 760px; margin-bottom: 48px; }
+  .head h2 { margin-top: 16px; }
+  .head .lede { margin-top: 18px; max-width: 70ch; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--line);
+    align-items: start;
+  }
+  .step:last-child { border-bottom: 0; }
+  .step-n {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    padding-top: 2px;
+  }
+  .step-body { display: flex; flex-direction: column; gap: 4px; }
+  .step-label {
+    color: var(--ink);
+    font-size: 13px;
+    letter-spacing: 0.005em;
+  }
+  .step-desc {
+    color: var(--ink-3);
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+
+  .terminal {
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    overflow: hidden;
+    background: #060606;
+    display: flex;
+    flex-direction: column;
+  }
+  .t-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--line);
+    font-size: 11px;
+    color: var(--ink-3);
+    background: rgba(255,255,255,0.025);
+  }
+  .t-bar .dots { display: inline-flex; gap: 6px; }
+  .t-bar .dots span {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #1f1f1f;
+  }
+  .t-bar .dots span:nth-child(1) { background: #ff5f56; }
+  .t-bar .dots span:nth-child(2) { background: #ffbd2e; }
+  .t-bar .dots span:nth-child(3) { background: #27c93f; }
+  .t-bar .t-title { color: var(--ink-2); }
+
+  .t-body {
+    margin: 0;
+    padding: 18px 18px;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--ink-2);
+    overflow-x: auto;
+    flex: 1;
+    white-space: pre;
+  }
+  .t-body .p  { color: var(--accent); margin-right: 6px; }
+  .t-body .s  { color: var(--accent); }
+  .t-body .cm { color: var(--ink-4); font-style: italic; }
+  .t-body .ok { color: var(--accent); margin-right: 6px; }
+  .t-body .bar { color: var(--ink-4); }
+  .t-body .commit { color: var(--accent); font-weight: 600; }
+
+  .hello {
+    margin-top: 4px;
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+  .hello-bar {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    font-size: 11px;
+    color: var(--ink-3);
+    background: var(--panel-2);
+    gap: 10px;
+  }
+  .hello-bar .path { color: var(--ink-2); }
+  .hello-bar .meta { margin-left: auto; color: var(--ink-4); }
+  .hello-body {
+    margin: 0;
+    padding: 18px 18px 22px;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--ink);
+    overflow-x: auto;
+  }
+  .hello-body .kw { color: #d28cff; }
+  .hello-body .ty { color: #6ddfff; }
+  .hello-body .at { color: #f59e0b; }
+  .hello-body .s  { color: var(--accent); }
+  .hello-body .n  { color: #f59e0b; }
+
+  .trailer {
+    margin-top: 24px;
+    color: var(--ink-3);
+    font-size: 13px;
+    line-height: 1.6;
+    max-width: 76ch;
+  }
+
+  @media (max-width: 1080px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>

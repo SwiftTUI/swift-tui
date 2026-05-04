@@ -39,7 +39,9 @@ const year = new Date().getFullYear();
     <div class="row bottom mono">
       <span class="dim">© {year} GoodHats</span>
       <span class="dim sep">·</span>
-      <span class="dim">MIT-pending · Swift 6.3.1 toolchain via swiftly</span>
+      <span class="dim">Swift 6.3.1 toolchain via swiftly</span>
+      <span class="dim sep">·</span>
+      <a class="dim foot-link" href="https://github.com/GoodHatsLLC/SwiftTUI/blob/main/LICENSE" rel="noreferrer noopener">License</a>
       <span class="grow"></span>
       <span class="probe">
         <span class="dim">resolve</span>
@@ -116,6 +118,8 @@ const year = new Date().getFullYear();
   .row.bottom .dim { color: var(--ink-4); }
   .row.bottom .sep { padding: 0 4px; }
   .row.bottom .grow { flex: 1; }
+  .row.bottom .foot-link { transition: color 160ms ease; }
+  .row.bottom .foot-link:hover { color: var(--ink-2); }
   .probe {
     display: inline-flex;
     align-items: center;

@@ -7,7 +7,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     <div class="copy">
       <span class="tag reveal" style="--i:0">
         <span class="dot"></span>
-        <span>shipping · running below this line</span>
+        <span>live demo · running below this line</span>
       </span>
 
       <h1 class="reveal" style="--i:1">
@@ -17,9 +17,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
       <p class="lead reveal" style="--i:2">
         A Swift package that lowers SwiftUI-shaped views through a strict
-        seven-phase pipeline. One <span class="mono">App</span> declaration drives three runtimes:
-        <span class="mono">SwiftTUICLI</span>, <span class="mono">SwiftTUIWASI</span>,
-        and embedded SwiftUI / Web hosts.
+        seven-phase pipeline — no global solver, no virtual DOM, no
+        <span class="mono">curses</span>. One <span class="mono">App</span>
+        declaration runs as a terminal binary, in the browser via WASI,
+        or embedded inside a SwiftUI window or a DOM element.
       </p>
       <code class="lead-pipeline mono reveal" style="--i:2">
         resolve <span class="arr">→</span> measure <span class="arr">→</span> place <span class="arr">→</span> semantics <span class="arr">→</span> draw <span class="arr">→</span> raster <span class="arr">→</span> <em>commit</em>
@@ -45,16 +46,22 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
           <span class="prompt">Package.swift</span>
           <span class="sep">·</span>
           <span class="ver">swift-tools-version: 6.3</span>
+          <span class="sep">·</span>
+          <a class="ver-link" href="#quickstart">quickstart →</a>
         </div>
-        <pre class="install-body mono"><code>.package(url: <span class="s">"https://github.com/GoodHatsLLC/SwiftTUI"</span>, branch: <span class="s">"main"</span>)
-.product(name: <span class="s">"SwiftTUI"</span>, package: <span class="s">"SwiftTUI"</span>)
+        <pre class="install-body mono"><code><span class="cm">// add to dependencies</span>
+.package(url: <span class="s">"https://github.com/GoodHatsLLC/SwiftTUI"</span>, branch: <span class="s">"main"</span>)
+
+<span class="cm">// add to your executable target</span>
+.product(name: <span class="s">"SwiftTUI"</span>,    package: <span class="s">"SwiftTUI"</span>)
 .product(name: <span class="s">"SwiftTUICLI"</span>, package: <span class="s">"SwiftTUI"</span>)</code></pre>
       </div>
 
       <ul class="meta reveal mono" style="--i:5">
-        <li><span class="k">requires</span><span class="v">Swift 6.3 · macOS 15 · iOS 18 · linux</span></li>
-        <li><span class="k">deviation</span><span class="v">repo-owned <em>@Bindable</em>, tree-forward lists</span></li>
-        <li><span class="k">deferred</span><span class="v"><em>NavigationStack</em></span></li>
+        <li><span class="k">requires</span><span class="v">Swift 6.3 · macOS 15 · iOS 18 · linux · android (in tree)</span></li>
+        <li><span class="k">runs in</span><span class="v">terminal · browser via WASI · SwiftUI · any DOM element</span></li>
+        <li><span class="k">strict</span><span class="v">Swift 6 · <em>@MainActor</em>-isolated · memory-safe · existential-any</span></li>
+        <li><span class="k">deferred</span><span class="v"><em>NavigationStack</em> · richer accessibility modeling</span></li>
       </ul>
     </div>
 
@@ -139,6 +146,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     overflow-x: auto;
   }
   .install-body .s { color: var(--accent); }
+  .install-body .cm { color: var(--ink-4); font-style: italic; }
+  .install-head .ver-link {
+    color: var(--accent);
+    margin-left: auto;
+    transition: color 160ms ease;
+  }
+  .install-head .ver-link:hover { color: #2dd4a3; }
 
   .meta {
     list-style: none;
@@ -150,8 +164,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     font-size: 12px;
     color: var(--ink-3);
   }
-  .meta li { display: grid; grid-template-columns: 110px 1fr; gap: 14px; }
+  .meta li { display: grid; grid-template-columns: 90px 1fr; gap: 14px; }
   .meta .k { color: var(--ink-4); letter-spacing: 0.06em; text-transform: uppercase; font-size: 10.5px; padding-top: 2px; }
+  .meta .v { color: var(--ink-3); }
   .meta em { font-style: normal; color: var(--ink-2); }
 
   .stage {
