@@ -25,7 +25,7 @@ const points = [
     n: "04",
     title: "Capability-aware, not lowest-common-denominator",
     body:
-      "ANSI · OSC 8 hyperlinks · Kitty graphics · Sixel · truecolor · mouse reporting are negotiated per session against a live capability profile. PNG and baseline JPEG decode in pure Swift; GIF playback ships in the AnimatedImage peer product.",
+      "ANSI, OSC 8 hyperlinks, Kitty graphics, Sixel, truecolor, and mouse reporting are negotiated per session against a live capability profile. PNG and baseline JPEG decode in pure Swift; GIF playback ships in the AnimatedImage peer product.",
     sym: "TerminalCapabilityProfile",
   },
   {
@@ -40,7 +40,7 @@ const points = [
     title: "No dependencies on a terminal emulator",
     body:
       "The browser path does not embed xterm.js or a DOM terminal. WebHost mounts a scene runtime directly. Tests render frames as integer-cell rasters without spinning up a TTY.",
-    sym: "WebHost · RasterSurface",
+    sym: "WebHost · RasterSurface · no xterm.js",
   },
 ];
 ---
@@ -48,7 +48,7 @@ const points = [
   <div class="shell">
     <header class="head">
       <span class="eyebrow"><span class="num">/00</span>Why this exists</span>
-      <h2>Built for engineers who want SwiftUI's authoring model where SwiftUI cannot reach.</h2>
+      <h2>Built for engineers who want SwiftUI's authoring model in places SwiftUI doesn't ship.</h2>
       <p class="lede">
         Most TUI frameworks invent a new authoring model for the terminal.
         SwiftTUI keeps the SwiftUI authoring model and reinterprets the

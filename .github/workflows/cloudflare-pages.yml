@@ -18,9 +18,9 @@ name: Deploy Website to Cloudflare Pages
 #        CLOUDFLARE_ACCOUNT_ID    <- your account ID (Cloudflare dashboard sidebar)
 #   3. (Optional) Add repo variables:
 #        CLOUDFLARE_PAGES_PROJECT <- project name; defaults to `SwiftTUI`
-#        CLOUDFLARE_SITE_URL      <- absolute URL Astro should canonicalize to
-#                                    (production domain: https://swifttui.io).
-#                                    Defaults to https://<project>.pages.dev.
+#        CLOUDFLARE_SITE_URL      <- absolute URL Astro should canonicalize to.
+#                                    Defaults to https://swifttui.io (the
+#                                    production domain). Override for previews.
 
 on:
   workflow_dispatch:
@@ -56,7 +56,7 @@ jobs:
           if [ -n "${CF_SITE_URL:-}" ]; then
             printf 'url=%s\n' "$CF_SITE_URL" >> "$GITHUB_OUTPUT"
           else
-            printf 'url=https://%s.pages.dev\n' "$CF_PROJECT" >> "$GITHUB_OUTPUT"
+            printf 'url=https://swifttui.io\n' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install swiftly and Swift toolchain
