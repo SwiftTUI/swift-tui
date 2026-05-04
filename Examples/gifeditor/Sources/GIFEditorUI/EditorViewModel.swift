@@ -65,14 +65,24 @@ public final class EditorViewModel {
   public var currentFrameIndex: Int = 0 {
     didSet {
       currentFrameIndex = currentFrameIndex.clamped(to: 0...max(0, document.frames.count - 1))
+      // The new frame may have fewer layers than the previous one;
+      // currentLayerIndex's own didSet doesn't fire when only the frame
+      // changes, so re-clamp explicitly here.
+      clampCurrentLayerIndex()
     }
   }
 
   public var currentLayerIndex: Int = 0 {
     didSet {
-      currentLayerIndex = currentLayerIndex.clamped(
-        to: 0...max(0, document.frames[currentFrameIndex].layers.count - 1)
-      )
+      clampCurrentLayerIndex()
+    }
+  }
+
+  private func clampCurrentLayerIndex() {
+    let upper = max(0, document.frames[currentFrameIndex].layers.count - 1)
+    let clamped = currentLayerIndex.clamped(to: 0...upper)
+    if currentLayerIndex != clamped {
+      currentLayerIndex = clamped
     }
   }
 
@@ -475,9 +485,10 @@ public final class EditorViewModel {
     }
     recordUndoableEdit("Delete frame") {
       document.frames.remove(at: currentFrameIndex)
-      if currentFrameIndex >= document.frames.count {
-        currentFrameIndex = document.frames.count - 1
-      }
+      // Always assign so currentFrameIndex.didSet runs and re-clamps
+      // currentLayerIndex against the new current frame, even when the
+      // numeric value of currentFrameIndex doesn't shift.
+      currentFrameIndex = min(currentFrameIndex, document.frames.count - 1)
     }
     announce("Deleted frame")
   }

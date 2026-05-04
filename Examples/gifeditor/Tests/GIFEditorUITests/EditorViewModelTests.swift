@@ -300,6 +300,94 @@ struct EditorViewModelTests {
     #expect(model.currentLayer.pixels == layer)
   }
 
+  @Test("Switching to a frame with fewer layers clamps the layer index")
+  func selectFrameClampsLayerIndex() {
+    let size = GIFEditorCore.PixelSize(width: 4, height: 4)
+    let multiLayerFrame = EditorFrame(layers: [
+      EditorLayer(name: "L1", pixels: PixelBuffer(size: size)),
+      EditorLayer(name: "L2", pixels: PixelBuffer(size: size)),
+      EditorLayer(name: "L3", pixels: PixelBuffer(size: size)),
+    ])
+    let singleLayerFrame = EditorFrame(layers: [
+      EditorLayer(name: "Only", pixels: PixelBuffer(size: size))
+    ])
+    let document = GIFDocument(size: size, frames: [multiLayerFrame, singleLayerFrame])
+    let model = EditorViewModel(document: document)
+    model.currentLayerIndex = 2
+
+    model.selectFrame(at: 1)
+
+    #expect(model.currentFrameIndex == 1)
+    #expect(model.currentLayerIndex == 0)
+    #expect(model.currentLayer.name == "Only")
+  }
+
+  @Test("Select drag after switching to a frame with fewer layers does not crash")
+  func selectDragAfterFrameSwitchDoesNotCrash() {
+    let size = GIFEditorCore.PixelSize(width: 4, height: 4)
+    let multiLayerFrame = EditorFrame(layers: [
+      EditorLayer(name: "L1", pixels: PixelBuffer(size: size)),
+      EditorLayer(name: "L2", pixels: PixelBuffer(size: size)),
+      EditorLayer(name: "L3", pixels: PixelBuffer(size: size)),
+    ])
+    let singleLayerFrame = EditorFrame(layers: [
+      EditorLayer(name: "Only", pixels: PixelBuffer(size: size))
+    ])
+    let document = GIFDocument(size: size, frames: [multiLayerFrame, singleLayerFrame])
+    let model = EditorViewModel(document: document)
+    model.currentLayerIndex = 2
+    model.selectFrame(at: 1)
+    model.selectTool(.select)
+
+    // Reproduces the original crash: with a stale currentLayerIndex,
+    // beginCanvasDrag → beginSelectMove read currentLayer, which subscripted
+    // the new frame's single-layer array out of bounds.
+    model.beginCanvasDrag(at: GIFEditorCore.PixelPoint(x: 0, y: 0))
+
+    #expect(model.currentLayerIndex == 0)
+  }
+
+  @Test("Deleting a non-trailing frame clamps the layer index for the new current frame")
+  func deleteFrameClampsLayerIndex() {
+    let size = GIFEditorCore.PixelSize(width: 4, height: 4)
+    let multiLayerFrame = EditorFrame(layers: [
+      EditorLayer(name: "L1", pixels: PixelBuffer(size: size)),
+      EditorLayer(name: "L2", pixels: PixelBuffer(size: size)),
+      EditorLayer(name: "L3", pixels: PixelBuffer(size: size)),
+    ])
+    let singleLayerFrame = EditorFrame(layers: [
+      EditorLayer(name: "Only", pixels: PixelBuffer(size: size))
+    ])
+    let document = GIFDocument(size: size, frames: [multiLayerFrame, singleLayerFrame])
+    let model = EditorViewModel(document: document)
+    model.currentLayerIndex = 2
+    // currentFrameIndex stays at 0 after the delete because there's still a
+    // frame at that index — but it now points to the formerly-1-layer frame.
+    model.deleteCurrentFrame()
+
+    #expect(model.currentFrameIndex == 0)
+    #expect(model.currentLayerIndex == 0)
+    #expect(model.currentLayer.name == "Only")
+  }
+
+  @Test("Inserting a blank frame clamps the layer index for the new frame")
+  func insertBlankFrameClampsLayerIndex() {
+    let size = GIFEditorCore.PixelSize(width: 4, height: 4)
+    let multiLayerFrame = EditorFrame(layers: [
+      EditorLayer(name: "L1", pixels: PixelBuffer(size: size)),
+      EditorLayer(name: "L2", pixels: PixelBuffer(size: size)),
+      EditorLayer(name: "L3", pixels: PixelBuffer(size: size)),
+    ])
+    let document = GIFDocument(size: size, frames: [multiLayerFrame])
+    let model = EditorViewModel(document: document)
+    model.currentLayerIndex = 2
+
+    model.insertBlankFrameAfterCurrent()
+
+    #expect(model.currentFrameIndex == 1)
+    #expect(model.currentLayerIndex == 0)
+  }
+
   @Test("Undo after save marks the restored older state dirty")
   func undoAfterSaveMarksOlderStateDirty() {
     let url = FileManager.default.temporaryDirectory
