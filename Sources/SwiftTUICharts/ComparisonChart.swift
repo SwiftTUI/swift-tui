@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A chart that shows current values against baselines.
 public struct ComparisonChart<Label: View, Summary: View>: View, ResolvableView {

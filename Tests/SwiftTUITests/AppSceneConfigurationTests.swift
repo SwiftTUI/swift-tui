@@ -1,7 +1,7 @@
-import Core
+import SwiftTUICore
 @_spi(Runners) import SwiftTUI
 import Testing
-import View
+import SwiftTUIViews
 
 @MainActor
 struct AppSceneConfigurationTests {

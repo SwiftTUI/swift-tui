@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// Semantic tone used by chart banners, badges, and accent surfaces.
 public struct BannerTone: Hashable, Sendable {

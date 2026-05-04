@@ -165,8 +165,8 @@ jobs:
           swiftly run swift package \
             --allow-writing-to-directory .build-docs \
             generate-documentation \
-            --target Core \
-            --target View \
+            --target SwiftTUICore \
+            --target SwiftTUIViews \
             --target SwiftTUI \
             --target SwiftTUICharts \
             --enable-experimental-combined-documentation \

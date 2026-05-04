@@ -1,9 +1,9 @@
 import Foundation
 import Testing
 
-@_spi(Testing) @testable import Core
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 private enum FocusedReuseKey: FocusedValueKey {
   typealias Value = String

@@ -23,7 +23,7 @@ let package = Package(
     .executableTarget(
       name: "TermUIPerf",
       dependencies: [
-        .product(name: "TerminalUI", package: "swift-tui"),
+        .product(name: "SwiftTUI", package: "swift-tui"),
         .product(name: "GalleryDemoViews", package: "gallery-demo"),
         .product(name: "Layouts", package: "layouts-demo"),
       ]

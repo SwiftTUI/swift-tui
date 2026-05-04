@@ -1,4 +1,4 @@
-import AnimatedImage
+import SwiftTUIAnimatedImage
 import Foundation
 import SwiftTUI
 import Testing

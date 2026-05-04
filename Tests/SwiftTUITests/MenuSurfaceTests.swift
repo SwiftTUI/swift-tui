@@ -1,9 +1,9 @@
 import Foundation
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 extension ResolvedNode {
   fileprivate func descendant(withIdentity identity: Identity) -> ResolvedNode? {

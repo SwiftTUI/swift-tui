@@ -273,21 +273,21 @@ non-empty skipped-frame side-effect reconciliation remains a later proposal.
 - `Sources/SwiftTUI/RunLoop+Rendering.swift`: async render loop, input
   coalescing, queued-tail cancellation, visual-only completed-frame drops,
   ordered commit for blocked candidates, and diagnostics emission.
-- `Sources/Core/Scheduler.swift`: render-intent coalescing and cancelled
+- `Sources/SwiftTUICore/Scheduler.swift`: render-intent coalescing and cancelled
   animation-intent replay into replacement work.
 - `Sources/SwiftTUI/FrameDiagnosticsLogger.swift`: TSV diagnostics fields for
   generations, worker timings, main-actor timings, coalescing, drop blockers,
   tail cancellation, stale policy, dropped completed frames, and geometry
   resolution misses.
-- `Sources/Core/FrameHeadRegistrationDraft.swift`: scratch runtime
+- `Sources/SwiftTUICore/FrameHeadRegistrationDraft.swift`: scratch runtime
   registrations and commit-time restoration from the committed graph.
-- `Sources/Core/FrameDropEligibility.swift`: conservative classifier for
+- `Sources/SwiftTUICore/FrameDropEligibility.swift`: conservative classifier for
   completed-frame drop blockers.
-- `Sources/Core/LayoutDependentContent.swift`: layout-time realization
+- `Sources/SwiftTUICore/LayoutDependentContent.swift`: layout-time realization
   boundaries, realization context, and per-pass realization cache.
-- `Sources/View/GeometryReading/GeometryReader.swift`: public adopter that
+- `Sources/SwiftTUIViews/GeometryReading/GeometryReader.swift`: public adopter that
   realizes content from placed geometry instead of resolve-time terminal size.
-- `Sources/View/Layout/Layout.swift`: public `SendableLayout` opt-in and
+- `Sources/SwiftTUIViews/Layout/Layout.swift`: public `SendableLayout` opt-in and
   worker-capable layout erasure.
 - `Tests/SwiftTUITests/AsyncFrameTailRenderingTests.swift`: async tail,
   ordered commit, coalescing, `SendableLayout`, lazy snapshot, and framework

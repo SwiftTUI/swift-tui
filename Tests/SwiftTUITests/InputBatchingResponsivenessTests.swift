@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import View
+import SwiftTUIViews
 
 @testable import SwiftTUI
 

@@ -1,7 +1,7 @@
 import Testing
 
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 @MainActor
 @Suite
