@@ -1,0 +1,48 @@
+// Dev Containers spec for VS Code, Cursor, and GitHub Codespaces. This points
+// at the same prebuilt image that Scripts/linux.sh uses, so opening the repo
+// in a dev container gives you the exact toolchain CI uses for Linux/web
+// builds. See Scripts/linux/README.md for the full architecture.
+{
+  "name": "SwiftTUI Linux",
+
+  "image": "ghcr.io/goodhatsllc/swift-tui-linux:latest",
+
+  // Mount the repo at /workspace to match the Dockerfile WORKDIR and the
+  // linux.sh CONTAINER_DIR default. The "cached" consistency is a no-op on
+  // Linux but speeds up bind-mount IO on macOS Docker Desktop.
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+
+  // Mirror the one persistent cache that Scripts/linux.sh keeps — SwiftPM's
+  // dependency + build artifact cache. Project-scoped volume name so
+  // multiple checkouts don't fight over the same cache.
+  "mounts": [
+    "source=swift-tui-devcontainer-swiftpm-cache,target=/root/.cache/org.swift.swiftpm,type=volume"
+  ],
+
+  // DISABLE_EXPLICIT_PLATFORMS mirrors the default in Scripts/linux.sh —
+  // see Package.swift for what it gates (drops the macOS/iOS platform pins
+  // when building on Linux).
+  "containerEnv": {
+    "DISABLE_EXPLICIT_PLATFORMS": "1"
+  },
+
+  "remoteUser": "root",
+
+  // VS Code / Cursor extension preselection. Safe to delete if you don't
+  // use these editors — the container itself doesn't depend on them.
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "sswg.swift-lang"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+
+  // Smoke test on first container creation so a broken image fails loudly
+  // during setup, not on first build.
+  "postCreateCommand": "swift --version && swift sdk list && bun --version"
+}
