@@ -30,8 +30,8 @@ test suite, not by a separate pre-commit hook.
 - `Tests/CoreTests`: pipeline, layout, raster, and low-level infrastructure
 - `Tests/ViewTests`: authoring-surface, environment, and actor-isolation behavior
 - `Tests/SwiftTUITests`: runtime, rendering, fixture, and benchmark scenarios
-- `Runners/SwiftTUICLI/Tests/SwiftTUICLITests`: terminal-native runner, attach, socket, and pty behavior
-- `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests`: WASI runner and manifest-mode behavior
+- `Platforms/CLI/Tests/SwiftTUICLITests`: terminal-native runner, attach, socket, and pty behavior
+- `Platforms/WASI/Tests/SwiftTUIWASITests`: WASI runner and manifest-mode behavior
 
 Prefer the smallest target that can prove the behavior under test. Keep
 cross-layer coverage in `SwiftTUITests` and the runner-package test suites,

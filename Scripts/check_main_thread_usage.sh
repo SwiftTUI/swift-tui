@@ -45,7 +45,7 @@ files=$(
     --glob '!**/.build-linux/**' \
     --glob '!Sources/Vendor/**' \
     'Thread\.isMainThread' \
-    Sources Tests Runners Examples GUI 2>/dev/null || true
+    Sources Tests Platforms Examples 2>/dev/null || true
 )
 
 if [ -z "$files" ]; then

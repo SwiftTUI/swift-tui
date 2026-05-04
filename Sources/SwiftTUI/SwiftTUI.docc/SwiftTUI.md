@@ -27,8 +27,8 @@ packages build on.
 
 Scene declarations such as ``App`` and ``WindowGroup`` also live here, but
 platform integration lives in peer packages: executable runner packages
-`Runners/SwiftTUICLI` and `Runners/SwiftTUIWASI`, plus embedded host
-packages `GUI/SwiftUIHost`, `GUI/WebHost`, and `GUI/XtermWebHost`.
+`Platforms/CLI` and `Platforms/WASI`, plus embedded host
+packages `Platforms/SwiftUI`, `Platforms/Web`, and `GUI/XtermWebHost`.
 `SwiftTUI` itself is library-only.
 
 ## Topics

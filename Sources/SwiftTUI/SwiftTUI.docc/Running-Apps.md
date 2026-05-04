@@ -80,6 +80,6 @@ For host-managed embedding, keep the authored `App` in `SwiftTUI`, then let a
 peer host package build `SceneManifest` values and retain one or more
 `HostedSceneSession` values.
 
-`GUI/SwiftUIHost` uses that path to embed SwiftTUI scenes inside a SwiftUI
-app on Apple platforms. `GUI/WebHost` and `GUI/XtermWebHost` use the same
+`Platforms/SwiftUI` uses that path to embed SwiftTUI scenes inside a SwiftUI
+app on Apple platforms. `Platforms/Web` and `GUI/XtermWebHost` use the same
 authored scene model for browser hosting on top of a `SwiftTUIWASI` build.
