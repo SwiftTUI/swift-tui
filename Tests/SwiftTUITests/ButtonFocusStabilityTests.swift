@@ -1,9 +1,9 @@
 import Foundation
 import Testing
 
-@_spi(Testing) @testable import Core
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 // Regression tests for calculator-driven framework bugs:
 //   1. Plain Button bounds must not shift when focus arrives — otherwise

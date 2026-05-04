@@ -55,8 +55,8 @@ let packageDependencies: [Package.Dependency] = [
 ]
 
 let swiftTUIDependencies: [Target.Dependency] = [
-  "Core",
-  "View",
+  "SwiftTUICore",
+  "SwiftTUIViews",
   .product(name: "EmbeddedFonts", package: "swift-figlet"),
   .product(
     name: "UnixSignals",
@@ -75,9 +75,9 @@ let swiftTUIDependencies: [Target.Dependency] = [
 
 let swiftTUITestDependencies: [Target.Dependency] = [
   "SwiftTUI",
-  "Core",
-  "View",
-  "AnimatedImage",
+  "SwiftTUICore",
+  "SwiftTUIViews",
+  "SwiftTUIAnimatedImage",
   "SwiftTUICharts",
   .product(
     name: "JPEG",
@@ -108,15 +108,15 @@ let package = Package(
   name: "swift-tui",
   platforms: packagePlatforms,
   products: [
-    .library(name: "View", targets: ["View"]),
-    .library(name: "AnimatedImage", targets: ["AnimatedImage"]),
+    .library(name: "SwiftTUIViews", targets: ["SwiftTUIViews"]),
+    .library(name: "SwiftTUIAnimatedImage", targets: ["SwiftTUIAnimatedImage"]),
     .library(name: "SwiftTUICharts", targets: ["SwiftTUICharts"]),
     .library(name: "SwiftTUI", targets: ["SwiftTUI"]),
   ],
   dependencies: packageDependencies,
   targets: [
     .target(
-      name: "Core",
+      name: "SwiftTUICore",
       dependencies: [
         .product(name: "DequeModule", package: "swift-collections"),
         .product(name: "OrderedCollections", package: "swift-collections"),
@@ -128,9 +128,9 @@ let package = Package(
     ),
 
     .target(
-      name: "View",
+      name: "SwiftTUIViews",
       dependencies: [
-        "Core",
+        "SwiftTUICore",
         .product(name: "EmbeddedFonts", package: "swift-figlet"),
       ],
       swiftSettings: swiftSettings()
@@ -138,15 +138,15 @@ let package = Package(
 
     .target(
       name: "SwiftTUICharts",
-      dependencies: ["Core", "View"],
+      dependencies: ["SwiftTUICore", "SwiftTUIViews"],
       swiftSettings: swiftSettings()
     ),
 
     .target(
-      name: "AnimatedImage",
+      name: "SwiftTUIAnimatedImage",
       dependencies: [
-        "Core",
-        "View",
+        "SwiftTUICore",
+        "SwiftTUIViews",
         .product(name: "GIF", package: "swift-gif"),
       ],
       swiftSettings: swiftSettings()
@@ -159,17 +159,17 @@ let package = Package(
       swiftSettings: swiftSettings()
     ),
     .testTarget(
-      name: "CoreTests",
+      name: "SwiftTUICoreTests",
       dependencies: [
-        "Core"
+        "SwiftTUICore"
       ],
       swiftSettings: swiftSettings()
     ),
     .testTarget(
-      name: "ViewTests",
+      name: "SwiftTUIViewsTests",
       dependencies: [
-        "Core",
-        "View",
+        "SwiftTUICore",
+        "SwiftTUIViews",
       ],
       swiftSettings: swiftSettings()
     ),
@@ -180,9 +180,9 @@ let package = Package(
       swiftSettings: swiftSettings()
     ),
     .testTarget(
-      name: "AnimatedImageTests",
+      name: "SwiftTUIAnimatedImageTests",
       dependencies: [
-        "AnimatedImage",
+        "SwiftTUIAnimatedImage",
         "SwiftTUI",
       ],
       swiftSettings: swiftSettings()

@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A compact trend line rendered in terminal cells.
 public struct Sparkline<Label: View, Summary: View>: View, ResolvableView {

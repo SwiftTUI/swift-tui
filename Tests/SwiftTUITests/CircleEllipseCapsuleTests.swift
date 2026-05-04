@@ -1,8 +1,8 @@
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 /// Returns the number of Braille dots lit in a raster cell, or 0 if
 /// the cell does not contain a Braille glyph. Blank cells (`U+2800`)

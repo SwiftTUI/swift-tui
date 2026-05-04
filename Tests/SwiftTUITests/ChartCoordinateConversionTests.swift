@@ -1,6 +1,6 @@
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUICharts
 
 @Suite("Chart coordinate conversion")

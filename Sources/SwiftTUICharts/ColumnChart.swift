@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A vertical column chart for comparing labeled values.
 public struct ColumnChart<Label: View, Summary: View>: View, ResolvableView {
