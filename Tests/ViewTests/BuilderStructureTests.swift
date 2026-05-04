@@ -46,8 +46,20 @@ struct BuilderStructureTests {
       in: .init(identity: testIdentity("BuilderStructure", "DeferredAvailability"))
     )
 
+    // The probe gates on `if #available(macOS 999, iOS 999, *)`. Apple
+    // platforms see macOS/iOS in the version list, fail the version check,
+    // and take the else branch ("Current"). Linux is matched by the `*`
+    // wildcard (which means "any platform not explicitly listed"), so the
+    // gate succeeds and the if branch ("Future") runs. This is a property
+    // of the language probe, not a behavioral difference in the resolver.
+    #if canImport(Darwin)
+      let expectedLimitedAvailabilityText = "Current"
+    #else
+      let expectedLimitedAvailabilityText = "Future"
+    #endif
+
     #expect(children.count == 1)
-    #expect(resolvedNodeLabelText(from: resolved) == "Current")
+    #expect(resolvedNodeLabelText(from: resolved) == expectedLimitedAvailabilityText)
   }
 }
 

@@ -39,6 +39,14 @@ hooks = [
     pass_filenames = false
   },
   {
+    id = "main-thread-usage",
+    name = "forbid bare Thread.isMainThread without thread-ismain-ok justification",
+    entry = "./Scripts/check_main_thread_usage.sh",
+    language = "system",
+    files = '^((Sources|Tests|Runners|Examples|GUI)/.*\.swift|Scripts/check_main_thread_usage\.sh)$',
+    pass_filenames = false
+  },
+  {
     id = "doc-frontmatter",
     name = "validate docs/decisions and docs/plans frontmatter",
     entry = "bun Scripts/check_doc_frontmatter.ts",
