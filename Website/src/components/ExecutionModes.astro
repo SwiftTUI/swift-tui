@@ -7,8 +7,8 @@
       <h2>Authored once. Hosted anywhere a Swift compiler reaches.</h2>
       <p class="lede">
         The same <span class="mono">@main struct App</span> declaration flows
-        into terminal-native binaries, WASI browsers via
-        <span class="mono">SharedArrayBuffer</span>-backed stdin, and
+        into terminal-native binaries, into the browser via WASI with
+        <span class="mono">SharedArrayBuffer</span>-backed stdin, and into
         host-managed embeddings inside SwiftUI windows or any DOM element.
         The framework owns the cells; the host owns the chrome.
       </p>
@@ -38,8 +38,8 @@
   &#125;
 &#125;</code></pre>
         <ul class="meta mono">
-          <li><span class="dot on"></span><span>shipped · macOS 15+ · linux · iOS 18+</span></li>
-          <li><span class="dot"></span><span class="dim">android · in tree, not yet certified</span></li>
+          <li><span class="dot on"></span><span>shipped · macOS 15+ · Linux · iOS 18+</span></li>
+          <li><span class="dot"></span><span class="dim">Android · in tree, not yet certified</span></li>
         </ul>
       </article>
 
@@ -94,8 +94,8 @@ swift build --swift-sdk swift-6.3.1-RELEASE_wasm \
             </div>
             <h3>Inside any DOM element</h3>
             <p>
-              Drop a <span class="mono">.terminal-shell</span> div into a Bun, Astro, Remix,
-              or Next page. The host owns chrome — the framework owns the cells.
+              Drop a <span class="mono">.terminal-shell</span> div into an Astro, Remix,
+              Next, or vanilla page. The host owns chrome &mdash; the framework owns the cells.
             </p>
             <pre class="code mono"><code>&lt;div class=<span class="s">"terminal-shell"</span>
      data-scene=<span class="s">"gallery"</span>&gt;&lt;/div&gt;
@@ -109,9 +109,9 @@ swift build --swift-sdk swift-6.3.1-RELEASE_wasm \
 
 <style>
   .modes {
-    padding: 88px 0 56px;
+    padding: 96px 0 56px;
     border-top: 1px solid var(--line);
-    margin-top: 56px;
+    margin-top: 64px;
   }
   .head { max-width: 760px; margin-bottom: 48px; }
   .head h2 { margin-top: 16px; }
