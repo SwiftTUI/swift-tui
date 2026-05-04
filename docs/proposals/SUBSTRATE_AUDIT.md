@@ -499,41 +499,49 @@ correction (2026-05-04)" to find them in place.
 
 ## Open questions surfaced by the audit
 
-1. **Should `PresentationRole` be renamed to `AccessibilityRole`,
-   or do we keep them as separate types where `AccessibilityRole`
-   wraps `PresentationRole`?** Lean: rename. The data is the
-   accessibility role; the original "presentation" naming was a
-   hint, not a separate concept. Renaming is a small mechanical
-   change and removes a future source of drift.
+1. ~~**Should `PresentationRole` be renamed to `AccessibilityRole`?**~~
+   **Resolved by
+   [ADR-0011](../decisions/0011-accessibility-role-replaces-presentation-role.md)**
+   — yes; rename and absorb the missing 15 cases. Single field on
+   `SemanticMetadata`, single modifier, single source of truth.
 
-2. **Should `SemanticMetadata.cursorAnchor: CellPoint?` be added,
-   or do we always derive cursor anchor from bounds + role?**
-   Argument for: text fields genuinely need a per-character anchor
-   (the caret moves). Argument for derivation: most widgets have a
-   reasonable default. Lean: add the field, default to `nil`, derive
-   when nil. Built-in TextField populates it.
+2. ~~**Should `SemanticMetadata.cursorAnchor` be added?**~~ **Resolved
+   by [ADR-0012](../decisions/0012-accessibility-node-shape.md)** —
+   yes; the field lives on `AccessibilityNode` in absolute surface
+   coordinates. Built-in TextField populates it; nil means "use
+   the node's origin"; the `accessibilityCursorAnchor(_:)` modifier
+   is the escape hatch.
 
-3. **Is `AccessibilityNode` better as a flat list with parent
-   identity, or a recursive tree?** SemanticSnapshot's other fields
-   are flat arrays. The browser bundle ultimately wants a tree.
-   Lean: flat in the snapshot (matches existing pattern), tree
-   reconstruction in the encoder.
+3. ~~**Flat list with parent identity, or recursive tree?**~~
+   **Resolved by [ADR-0012](../decisions/0012-accessibility-node-shape.md)**
+   — flat array, parent encoded via `parentIdentity: Identity?`,
+   tree reconstruction at the consumer. Matches the established
+   pattern of `SemanticSnapshot`'s other collections.
 
-4. **Should the wire format version bump from `1` to `2` mean a hard
-   break, or do we ship `version: 1` cells + `version: 2` adds
-   `accessibilityTree`?** Lean: backward-additive — `version: 2`
-   bundles include `accessibilityTree`, the existing browser bundle
-   ignores it, the new browser bundle uses it.
+4. **Wire-format version bump: hard break or backward-additive?**
+   The accessibility proposal and the embedded-host proposal have
+   landed on **backward-additive** — `version: 2` adds
+   `accessibilityTree` alongside the existing `rows` field; older
+   browser bundles ignore the new field. Captured in
+   `EMBEDDED_WEB_HOST.md` Audit correction. Not promoted to an ADR
+   because it's a wire-format detail, not a foundational decision —
+   if we need to break later, we can.
 
 5. **Where does the "show cursor at focused anchor" gate live?
-   Always-on, or behind reduce-motion / accessible-mode?** Lean:
-   always-on. Showing the cursor at the focused widget is good UX
-   for sighted users too; it's only the "hide cursor entirely"
-   default that's wrong for screen readers.
+   Always-on, or behind reduce-motion / accessible-mode?** Still
+   open. Lean: always-on. Showing the cursor at the focused widget
+   is good UX for sighted users too; it's only the "hide cursor
+   entirely" default that's wrong for screen readers. Decide at
+   Phase 2 implementation time.
 
 6. **Should `CI=true` enable accessible mode or just reduce-motion?**
-   Lean: reduce-motion only. CI users want clean output, not
-   sequential prompts.
+   Still open. Lean: reduce-motion only. CI users want clean output,
+   not sequential prompts. Decide at Phase 1 / Phase 4 implementation
+   time.
+
+The two foundational questions (rename + node shape) are now
+ADR-locked; the wire-format and runtime-policy questions remain
+open but are not on the critical path.
 
 ---
 
@@ -542,3 +550,10 @@ correction (2026-05-04)" to find them in place.
 - 2026-05-04: Audit performed. Findings captured. Action items
   pushed back into the three sister proposals as inline corrections
   marked `Audit correction (2026-05-04)`.
+- 2026-05-04: Two of the six surfaced open questions
+  (PresentationRole rename, AccessibilityNode shape) locked in via
+  [ADR-0011](../decisions/0011-accessibility-role-replaces-presentation-role.md)
+  and
+  [ADR-0012](../decisions/0012-accessibility-node-shape.md).
+  Open-questions section updated to mark them resolved with
+  cross-references.
