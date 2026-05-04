@@ -8,7 +8,7 @@ const authoring: Group[] = [
     rows: [
       { name: "VStack · HStack · ZStack", note: "stacked layout with spacing & alignment" },
       { name: "LazyVStack · LazyHStack", note: "viewport-lazy placement, single-ForEach full-lazy rows" },
-      { name: "ScrollView · List · OutlineGroup", note: "tree-forward collection presentation" },
+      { name: "ScrollView · List · OutlineGroup", note: "hierarchical lists, tables, and outlines" },
       { name: "Table · Section · GroupBox", note: "" },
       { name: "ViewThatFits · GeometryReader", note: "" },
       { name: "Layout (custom)", note: "public protocol for custom layout participation" },
@@ -17,7 +17,7 @@ const authoring: Group[] = [
   {
     title: "Controls & primitives",
     rows: [
-      { name: "Text · TextFigure", note: "proposal-aware FIGlet rendering with embedded fonts" },
+      { name: "Text · TextFigure", note: "FIGlet rendering that respects the proposed size, with embedded fonts" },
       { name: "Button · Link · Label", note: "OSC 8 hyperlink emission when supported" },
       { name: "Toggle · Stepper · Slider", note: "" },
       { name: "TextField · TextEditor · SecureField", note: "" },
@@ -31,15 +31,15 @@ const authoring: Group[] = [
     rows: [
       { name: "alert · confirmationDialog", note: "terminal-native modal surfaces" },
       { name: "sheet · paletteSheet · toast", note: "modal sheets · non-modal toasts" },
-      { name: "Portal · OverlayStack · DismissStack", note: "shared overlay substrate · package-internal primitives behind every presentation surface" },
-      { name: "Panel · .keyCommand · .paletteCommand", note: "ActionScopes & commands" },
-      { name: ".toolbar · .toolbarItem", note: "shipped via ACTION_SCOPES_AND_COMMANDS" },
+      { name: "Portal · OverlayStack · DismissStack", note: "shared overlay primitives behind every presentation surface" },
+      { name: "Panel · .keyCommand · .paletteCommand", note: "action scopes and commands" },
+      { name: ".toolbar · .toolbarItem", note: "" },
     ],
   },
   {
     title: "Environment · observation · focus",
     rows: [
-      { name: "@State · @Binding · @Bindable", note: "repo-owned @Bindable on the @State invalidation path" },
+      { name: "@State · @Binding · @Bindable", note: "@Bindable integrated with the @State invalidation path" },
       { name: "@FocusState · FocusedValues · @FocusedValue · @FocusedBinding", note: "" },
       { name: "PreferenceKey · anchor preferences", note: "subtree readers, OpenLinkAction, .task(...)" },
     ],
@@ -50,7 +50,7 @@ const runtime: Group[] = [
   {
     title: "Runtime surface",
     rows: [
-      { name: "DefaultRenderer", note: "one-shot rendering & main-actor pipeline inspection" },
+      { name: "DefaultRenderer", note: "single-frame rendering and main-actor pipeline inspection" },
       { name: "RunLoop", note: "interactive terminal sessions" },
       { name: "TerminalHost · TerminalRenderStyle", note: "capability-aware presentation, theme swap" },
       { name: "Keyboard · mouse · signals", note: "Unix signal handling and runtime scheduling" },
@@ -89,7 +89,7 @@ const runtime: Group[] = [
   <div class="shell">
     <header class="head">
       <span class="eyebrow"><span class="num">/03</span>Public surface</span>
-      <h2>Implementing a useful subset of SwiftUI, deliberately.</h2>
+      <h2>A deliberate subset of SwiftUI.</h2>
       <p class="lede">
         Layout primitives first. State and environment second. Runtime correctness third.
         Broader orchestration only after the foundation is firm.
@@ -123,7 +123,7 @@ const runtime: Group[] = [
 
       <div class="col">
         <div class="col-head mono">
-          <span>RUNTIME · SCENES · CHARTS</span>
+          <span>RUNTIME · SCENES · CHARTS · DEFERRED</span>
           <span class="counter">{runtime.reduce((n, g) => n + g.rows.length, 0)} entries</span>
         </div>
         {runtime.map((group) => (
@@ -149,9 +149,9 @@ const runtime: Group[] = [
 
 <style>
   .surface {
-    padding: 88px 0 56px;
+    padding: 96px 0 56px;
     border-top: 1px solid var(--line);
-    margin-top: 56px;
+    margin-top: 64px;
   }
   .head { max-width: 760px; margin-bottom: 48px; }
   .head h2 { margin-top: 16px; }

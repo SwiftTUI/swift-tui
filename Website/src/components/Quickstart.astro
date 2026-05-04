@@ -13,7 +13,7 @@ const steps = [
   {
     n: "03",
     label: "swift run",
-    desc: "Standard SwiftPM. The seven-phase pipeline resolves, measures, places, draws, rasters, and commits one frame.",
+    desc: "Standard SwiftPM. The seven-phase pipeline (resolve, measure, place, semantics, draw, raster, commit) runs on every frame.",
   },
 ];
 ---
@@ -23,7 +23,7 @@ const steps = [
       <span class="eyebrow"><span class="num">/05</span>Quickstart</span>
       <h2>Add the package. Author an <span class="mono">App</span>. <span class="mono">swift run</span>.</h2>
       <p class="lede">
-        Three SwiftPM-shaped steps. No code generators, no build scripts, no
+        Three SwiftPM steps. No code generators, no build scripts, no
         native binaries to download. The same flow targets macOS, Linux, and
         Android (in tree). For WASI, pass a wasm <span class="mono">--swift-sdk</span> on the same
         <span class="mono">swift build</span> invocation; the authoring code does not change.
@@ -99,7 +99,7 @@ const steps = [
   .quickstart {
     padding: 96px 0 56px;
     border-top: 1px solid var(--line);
-    margin-top: 56px;
+    margin-top: 64px;
   }
   .head { max-width: 760px; margin-bottom: 48px; }
   .head h2 { margin-top: 16px; }
