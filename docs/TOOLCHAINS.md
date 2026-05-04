@@ -61,11 +61,11 @@ Examples:
 
 ```bash
 swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --target Core
-swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --package-path Runners/SwiftTUIWASI --target SwiftTUIWASI
+swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm --package-path Platforms/WASI --target SwiftTUIWASI
 swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm -c release -Xswiftc -Osize -Xswiftc -Xfrontend -Xswiftc -disable-llvm-merge-functions-pass -Xlinker --initial-memory=536870912 -Xlinker --max-memory=4294967296 -Xlinker -z -Xlinker "stack-size=1048576"
 ```
 
-`GUI/WebHost` build scripts use `swiftly` directly, so require a
+`Platforms/Web` build scripts use `swiftly` directly, so require a
 swiftly-managed Swift 6.3.1 toolchain.
 Install Swiftly before invoking `bun` if required.
 
@@ -78,12 +78,12 @@ swiftly install --use 6.3.1
 
 ## Bun
 
-`GUI/WebHost` and `Examples/WebExample` use Bun for all package management, test, and bundling work.
+`Platforms/Web` and `Examples/WebExample` use Bun for all package management, test, and bundling work.
 
 Examples:
 
 ```bash
-cd GUI/WebHost
+cd Platforms/Web
 bun test
 bun run build -- --app <AppProduct>
 
@@ -97,7 +97,7 @@ bun run build
 Xcode remains a valid native build path.
 
 In particular, the outer macOS or iOS app build still works fine in Xcode when
-a consumer embeds `GUI/SwiftUIHost` in an application target.
+a consumer embeds `Platforms/SwiftUI` in an application target.
 
 That does not change the package-development rule for this repository:
 

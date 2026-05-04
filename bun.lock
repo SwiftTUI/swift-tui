@@ -23,7 +23,7 @@
         "playwright": "^1.59.1",
       },
     },
-    "GUI/WebHost": {
+    "Platforms/Web": {
       "name": "webhost",
       "version": "0.1.0",
       "devDependencies": {
@@ -835,7 +835,7 @@
 
     "web-namespaces": ["web-namespaces@2.0.1", "", {}, "sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ=="],
 
-    "webhost": ["webhost@workspace:GUI/WebHost"],
+    "webhost": ["webhost@workspace:Platforms/Web"],
 
     "which-pm-runs": ["which-pm-runs@1.1.0", "", {}, "sha512-n1brCuqClxfFfq/Rb0ICg9giSZqCS+pLtccdag6C2HyufBrh3fBOiy9nb6ggRMvWOVH5GrdJskj5iGTZNxd7SA=="],
 

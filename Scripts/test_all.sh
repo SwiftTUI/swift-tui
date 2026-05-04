@@ -147,10 +147,10 @@ Usage: Scripts/test_all.sh [--skip-bun-install]
 Runs the full checked-in repo verification surface:
   - checked-in policy hooks
   - root SwiftPM tests
-  - Runners/SwiftTUICLI tests
-  - Runners/SwiftTUIWASI tests
-  - GUI/SwiftUIHost tests
-  - GUI/WebHost Bun tests
+  - Platforms/CLI tests
+  - Platforms/WASI tests
+  - Platforms/SwiftUI tests
+  - Platforms/Web Bun tests
   - Examples/gallery tests
   - Examples/layouts tests
   - Examples/WebExample Bun tests
@@ -163,7 +163,7 @@ The script also checks required environment dependencies up front:
 
 On Linux, the script also:
   - exports `DISABLE_EXPLICIT_PLATFORMS=1` for repo package resolution
-  - skips `GUI/SwiftUIHost` tests because the SwiftUI host package is Apple-only
+  - skips `Platforms/SwiftUI` tests because the SwiftUI host package is Apple-only
 
 Pass --skip-bun-install to reuse the existing Bun install state.
 EOF
@@ -512,30 +512,30 @@ run_function_step \
   run_swift test
 
 run_function_step \
-  "Run Runners/SwiftTUICLI tests" \
-  "$(swift_command_text test --package-path Runners/SwiftTUICLI)" \
-  run_swift test --package-path Runners/SwiftTUICLI
+  "Run Platforms/CLI tests" \
+  "$(swift_command_text test --package-path Platforms/CLI)" \
+  run_swift test --package-path Platforms/CLI
 
 run_function_step \
-  "Run Runners/SwiftTUIWASI tests" \
-  "$(swift_command_text test --package-path Runners/SwiftTUIWASI)" \
-  run_swift test --package-path Runners/SwiftTUIWASI
+  "Run Platforms/WASI tests" \
+  "$(swift_command_text test --package-path Platforms/WASI)" \
+  run_swift test --package-path Platforms/WASI
 
 if [ "$is_linux" -eq 1 ]; then
   skip_step \
-    "Run GUI/SwiftUIHost tests" \
+    "Run Platforms/SwiftUI tests" \
     "SwiftUI host package is only available on Apple platforms"
 else
   run_function_step \
-    "Run GUI/SwiftUIHost tests" \
-    "$(swift_command_text test --package-path GUI/SwiftUIHost)" \
-    run_swift test --package-path GUI/SwiftUIHost
+    "Run Platforms/SwiftUI tests" \
+    "$(swift_command_text test --package-path Platforms/SwiftUI)" \
+    run_swift test --package-path Platforms/SwiftUI
 fi
 
 #run_step \
-#  "Run GUI/WebHost Bun tests" \
-#  "$repo_root/GUI/WebHost" \
-#  "cd GUI/WebHost && bun test" \
+#  "Run Platforms/Web Bun tests" \
+#  "$repo_root/Platforms/Web" \
+#  "cd Platforms/Web && bun test" \
 #  bun test
 
 run_function_step \

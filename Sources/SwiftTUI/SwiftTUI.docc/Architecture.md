@@ -34,8 +34,8 @@ SwiftTUI is split into four targets so that pure pipeline work, authoring work, 
 
 ### Platform integration packages
 
-- executable runner packages `Runners/SwiftTUICLI` and `Runners/SwiftTUIWASI` build top-level execution layers on top of `SwiftTUI`
-- embedded host packages `GUI/SwiftUIHost` and `GUI/WebHost` host the same authored `SwiftTUI` apps inside platform-managed shells
+- executable runner packages `Platforms/CLI` and `Platforms/WASI` build top-level execution layers on top of `SwiftTUI`
+- embedded host packages `Platforms/SwiftUI` and `Platforms/Web` host the same authored `SwiftTUI` apps inside platform-managed shells
 
 The conceptual model is:
 
@@ -127,9 +127,9 @@ Platform integration and multi-scene orchestration are packaged separately in pe
 
 Those integration layers serve three execution modes:
 
-- terminal-native executable execution via `TerminalRunner.run(MyApp.self)` or the default `App.main()` provided by `Runners/SwiftTUICLI`
-- WASI executable execution and manifest generation via `WASIRunner` in `Runners/SwiftTUIWASI`
-- host-managed embedding via `SceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`, as used by `GUI/SwiftUIHost` and `GUI/WebHost`
+- terminal-native executable execution via `TerminalRunner.run(MyApp.self)` or the default `App.main()` provided by `Platforms/CLI`
+- WASI executable execution and manifest generation via `WASIRunner` in `Platforms/WASI`
+- host-managed embedding via `SceneManifest(for:)` and `HostedSceneSession(for:sceneID:...)`, as used by `Platforms/SwiftUI` and `Platforms/Web`
 
 CLI scene management is executable-runner policy rather than an authored-scene rule. One-window and multi-window apps share the same runner story; `SwiftTUI` itself remains library-only.
 

@@ -166,11 +166,11 @@ Platform-specific execution and embedding are intentionally outside the root
 package surface:
 
 - executable runner packages:
-  - `Runners/SwiftTUICLI` exposes `TerminalRunner` plus the default terminal-native `App.main()` story
-  - `Runners/SwiftTUIWASI` exposes `WASIRunner` plus the default WASI `App.main()` story
+  - `Platforms/CLI` exposes `TerminalRunner` plus the default terminal-native `App.main()` story
+  - `Platforms/WASI` exposes `WASIRunner` plus the default WASI `App.main()` story
 - embedded host packages:
-  - `GUI/SwiftUIHost` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on a native raster surface
-  - `GUI/WebHost` hosts a `SwiftTUIWASI` build in the browser using the same manifest and hosted-session story, drawing raster output onto a canvas via the `web-surface` transport
+  - `Platforms/SwiftUI` hosts retained `HostedSceneSession` values inside a SwiftUI app shell on a native raster surface
+  - `Platforms/Web` hosts a `SwiftTUIWASI` build in the browser using the same manifest and hosted-session story, drawing raster output onto a canvas via the `web-surface` transport
 
 These are supported peer packages, but they are not root library products in
 `Package.swift`.

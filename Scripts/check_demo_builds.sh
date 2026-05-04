@@ -20,10 +20,10 @@ input harnesses against the terminal examples:
   - Examples/layouts
   - Examples/SwiftUIExample/TerminalApp
   - Examples/WebExample/TerminalApp
-  - GUI/SwiftUIHost
+  - Platforms/SwiftUI
   - Examples/SwiftUIExample/SwiftUIExample.xcodeproj
   - Examples/WebExample (Bun build)
-  - GUI/WebHost against WebExampleApp
+  - Platforms/Web against WebExampleApp
   - Examples/XtermWebExample (Bun build)
   - GUI/XtermWebHost against WebExampleApp
 
@@ -116,7 +116,7 @@ if [ "$skip_clean" -eq 0 ]; then
     "Examples/layouts" \
     "Examples/SwiftUIExample/TerminalApp" \
     "Examples/WebExample/TerminalApp" \
-    "GUI/SwiftUIHost"; do
+    "Platforms/SwiftUI"; do
     run_step \
       "Clean $package_path" \
       "$repo_root" \
@@ -179,9 +179,9 @@ run_step \
   swift build --package-path Examples/WebExample/TerminalApp
 
 run_step \
-  "Build GUI/SwiftUIHost" \
+  "Build Platforms/SwiftUI" \
   "$repo_root" \
-  swift build --package-path GUI/SwiftUIHost
+  swift build --package-path Platforms/SwiftUI
 
 if [ "$skip_clean" -eq 0 ]; then
   run_step \
@@ -211,8 +211,8 @@ run_step \
   bun run build
 
 run_step \
-  "Build GUI/WebHost host with WebExampleApp" \
-  "$repo_root/GUI/WebHost" \
+  "Build Platforms/Web host with WebExampleApp" \
+  "$repo_root/Platforms/Web" \
   bun run build -- --package-path ../../Examples/WebExample/TerminalApp --app WebExampleApp
 
 run_step \

@@ -2,7 +2,7 @@
 
 The reference embedding pattern for SwiftTUI in a Bun-served browser
 app. A real SwiftTUI `App` is built for WASI and mounted onto a canvas
-via the [`GUI/WebHost`](../../GUI/WebHost) host — there is no
+via the [`Platforms/Web`](../../Platforms/Web) host — there is no
 terminal-emulator dependency.
 
 The [top-level Website](../../Website) is the deployed stub that
@@ -77,7 +77,7 @@ the canonical environment story.
 bun install
 ```
 
-`WebExample`, `GUI/WebHost`, and the top-level `Website` share the
+`WebExample`, `Platforms/Web`, and the top-level `Website` share the
 repo's Bun workspace. Running `bun install` from the repo root is
 preferred, but it also works from this directory.
 
@@ -133,9 +133,9 @@ Examples/WebExample/
 
 ## See also
 
-- [`GUI/WebHost`](../../GUI/WebHost) — the host package this example
+- [`Platforms/Web`](../../Platforms/Web) — the host package this example
   consumes
-- [`Runners/SwiftTUIWASI`](../../Runners/SwiftTUIWASI) — the WASI
+- [`Platforms/WASI`](../../Platforms/WASI) — the WASI
   runner that produces the manifest mode this example builds against
 - [`docs/HOST_PACKAGES.md`](../../docs/HOST_PACKAGES.md) — the
   packaging model that puts host packages alongside the root package

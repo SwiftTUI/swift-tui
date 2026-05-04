@@ -9,8 +9,7 @@ future file moves.
 - `Sources/`: root Swift package targets (`Core`, `View`, `AnimatedImage`,
   `SwiftTUICharts`, and `SwiftTUI`)
 - `Tests/`: root Swift package tests for the package products
-- `Runners/`: peer SwiftPM executable runner packages for terminal-native CLI launch and WASI launch
-- `GUI/`: peer embedded host packages for SwiftUI hosting and Bun/browser hosting
+- `Platforms/`: peer SwiftPM platform-integration packages — runners (`CLI`, `WASI`) that own `App.main()`, plus embedded hosts (`SwiftUI`, `Web`) that retain `HostedSceneSession` values inside another app's runtime
 - `Examples/`: sibling example apps and example-specific package manifests
 - `Vendor/`: sibling vendored Swift packages such as `UnixSignals`, `swift-figlet`,
   `swift-hash`, `swift-png`, `swift-jpeg`, and `swift-gif`
@@ -30,11 +29,11 @@ future file moves.
 
 - Peer platform integration packages:
   - executable runner packages:
-    - `Runners/SwiftTUICLI`
-    - `Runners/SwiftTUIWASI`
+    - `Platforms/CLI`
+    - `Platforms/WASI`
   - embedded host packages:
-    - `GUI/SwiftUIHost`
-    - `GUI/WebHost`
+    - `Platforms/SwiftUI`
+    - `Platforms/Web`
 
 - Vendored local packages:
   - `Vendor/UnixSignals`
@@ -84,7 +83,7 @@ library product. Downstream package consumers reach those types through
 - `LinkOpening.swift`: runtime link opener
 - `SwiftTUI.docc/`: module landing page and runtime guides
 
-## `Runners/SwiftTUICLI`
+## `Platforms/CLI`
 
 - `SwiftTUICLI.swift`: re-export surface for the CLI runner package
 - `TerminalRunner.swift`: terminal-native app launch, CLI-mode routing, and single-scene test helper
@@ -96,7 +95,7 @@ library product. Downstream package consumers reach those types through
 - `AttachProxy.swift`: terminal attach forwarding
 - `PtyPair.swift`: native pty support
 
-## `Runners/SwiftTUIWASI`
+## `Platforms/WASI`
 
 The package ships two library targets:
 
@@ -107,12 +106,12 @@ The package ships two library targets:
   - `WebSurfaceTransport.swift`: `web-surface` stdout encoder (`WebSurfaceFrameEncoder`),
     `WebSurfaceTransport` (presentation surface), and `WebSurfaceInputReader` /
     `WebSurfaceInputParser` for the resize/style/key/mouse stdin protocol that
-    `GUI/WebHost`'s `BrowserWASIBridge` consumes
+    `Platforms/Web`'s `BrowserWASIBridge` consumes
 
 ## Embedded Host Packages
 
-- `GUI/SwiftUIHost`: native SwiftUI host package built on `SceneManifest` and `HostedSceneSession`
-- `GUI/WebHost`: Bun-based web host that consumes a `SwiftTUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas
+- `Platforms/SwiftUI`: native SwiftUI host package built on `SceneManifest` and `HostedSceneSession`
+- `Platforms/Web`: Bun-based web host that consumes a `SwiftTUIWASI` build and manifest, using the `web-surface` transport to draw raster output onto a canvas
 
 ## `Core`
 
@@ -197,9 +196,9 @@ The package ships two library targets:
 - `Tests/AnimatedImageTests`: animated image frame, playback, and GIF
   import/export tests
 - `Tests/SwiftTUITests`: runtime, rendering, fixture, and end-to-end behavioral tests
-- `Runners/SwiftTUICLI/Tests/SwiftTUICLITests`: terminal-native runner, attach, pty, and CLI-scene-management tests
-- `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests`: launcher tests (manifest mode, transport-mode resolution)
-- `Runners/SwiftTUIWASI/Tests/WASISurfaceBridgeTests`: surface-bridge tests (frame encoder, input parser, transport)
+- `Platforms/CLI/Tests/SwiftTUICLITests`: terminal-native runner, attach, pty, and CLI-scene-management tests
+- `Platforms/WASI/Tests/SwiftTUIWASITests`: launcher tests (manifest mode, transport-mode resolution)
+- `Platforms/WASI/Tests/WASISurfaceBridgeTests`: surface-bridge tests (frame encoder, input parser, transport)
 - `Fixtures/Transport`: shared transport fixtures for terminal render-style encoding/decoding tests across Swift and web hosts
 
 ## Reliability Rules

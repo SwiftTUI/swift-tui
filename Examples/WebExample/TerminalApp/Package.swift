@@ -21,7 +21,7 @@ let package = Package(
   dependencies: [
     .package(name: "swift-tui", path: "../../.."),
     .package(path: "../../gallery"),
-    .package(path: "../../../Runners/SwiftTUIWASI"),
+    .package(name: "SwiftTUIWASI", path: "../../../Platforms/WASI"),
   ],
   targets: [
     .target(

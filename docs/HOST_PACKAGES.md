@@ -5,8 +5,8 @@
 Make SwiftTUI apps shippable outside a local terminal in two peer embedded
 host packages:
 
-- `GUI/SwiftUIHost`: a native SwiftUI SPM package that lets a macOS or iOS app host a SwiftTUI scene without a terminal emulator
-- `GUI/WebHost`: a Bun-based package that lets a SwiftTUI app ship in the browser by drawing SwiftTUI's `web-surface` raster output onto a canvas (no terminal emulator dependency)
+- `Platforms/SwiftUI`: a native SwiftUI SPM package that lets a macOS or iOS app host a SwiftTUI scene without a terminal emulator
+- `Platforms/Web`: a Bun-based package that lets a SwiftTUI app ship in the browser by drawing SwiftTUI's `web-surface` raster output onto a canvas (no terminal emulator dependency)
 
 The authoring story stays the same:
 
@@ -26,9 +26,9 @@ The host-facing root work is landed:
 
 - `SwiftTUI` exposes `SceneDescriptor`,
   `SceneManifest`, and `HostedSceneSession`
-- `Runners/SwiftTUICLI` owns terminal-native `App.main()`, attach/list CLI
+- `Platforms/CLI` owns terminal-native `App.main()`, attach/list CLI
   behavior, and pty-backed scene management
-- `Runners/SwiftTUIWASI` owns manifest-only mode through `TUIGUI_MODE=manifest`
+- `Platforms/WASI` owns manifest-only mode through `TUIGUI_MODE=manifest`
   plus WASI scene launch
 - shared control-message parsing lives in
   `Sources/SwiftTUI/TerminalControlMessages.swift`
@@ -39,11 +39,11 @@ The host-facing root work is landed:
   and semantic theme move together at runtime
 - `SwiftTUI` is now library-only; executable launch is entirely runner-owned
 
-### `GUI/SwiftUIHost`
+### `Platforms/SwiftUI`
 
 The native SwiftUI host package is landed as a standalone SPM package:
 
-- package root: `GUI/SwiftUIHost`
+- package root: `Platforms/SwiftUI`
 - dependencies:
   - local path dependency on the root package
 - key runtime files:
@@ -60,11 +60,11 @@ The native SwiftUI host package is landed as a standalone SPM package:
   - `ResizeBridgeTests.swift`
   - `StyleMappingTests.swift`
 
-### `GUI/WebHost`
+### `Platforms/Web`
 
 The web host package is landed:
 
-- package root: `GUI/WebHost`
+- package root: `Platforms/Web`
 - build stack: Bun plus the repo-managed Swift 6.3.1 toolchain
 - transport: SwiftTUI's `web-surface` WASI transport. The Swift runner emits
   structured raster-surface records on stdout, and the browser host draws
@@ -103,11 +103,11 @@ new products in the root package.
 
 - CLI multi-scene management and authored multiple scenes are intentionally
   separate concepts:
-  - `Runners/SwiftTUICLI` can manage multiple native scenes with discovery,
+  - `Platforms/CLI` can manage multiple native scenes with discovery,
     ptys, and attach flows
-  - `Runners/SwiftTUIWASI` still executes one selected scene per wasm process
+  - `Platforms/WASI` still executes one selected scene per wasm process
 - Host packages still own scene switching UI and style surfaces. The root package exposes scene manifests and hosted sessions, not a full cross-platform app shell.
-- `GUI/WebHost` build scripts drive the repo-default `swiftly` toolchain (falling back to plain `swift` when available). See [TOOLCHAINS.md](TOOLCHAINS.md) for the toolchain requirement. The package shares the repo Bun workspace for builds and tests.
+- `Platforms/Web` build scripts drive the repo-default `swiftly` toolchain (falling back to plain `swift` when available). See [TOOLCHAINS.md](TOOLCHAINS.md) for the toolchain requirement. The package shares the repo Bun workspace for builds and tests.
 - Executable runner packages and embedded host packages are intentionally outside the root package products. Consumers opt into them separately.
 
 ## Non-Negotiable Decisions

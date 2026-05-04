@@ -13,7 +13,7 @@ matches=$(
     --glob '!**/.swiftpm/**' \
     --regexp '@unchecked Sendable' \
     --regexp 'nonisolated\(unsafe\)' \
-    Sources Tests Runners GUI Examples Package.swift || true
+    Sources Tests Platforms Examples Package.swift || true
 )
 
 if [ -n "$matches" ]; then

@@ -62,10 +62,10 @@ try await TerminalRunner.run(DemoApp.self)
 The same authored `App` and `Scene` declarations can then flow into three
 execution modes:
 
-- terminal-native execution via the executable runner package `Runners/SwiftTUICLI`
-- WASI execution via the executable runner package `Runners/SwiftTUIWASI`
-- host-managed embedding via the embedded host packages `GUI/SwiftUIHost`
-  and `GUI/WebHost`
+- terminal-native execution via the executable runner package `Platforms/CLI`
+- WASI execution via the executable runner package `Platforms/WASI`
+- host-managed embedding via the embedded host packages `Platforms/SwiftUI`
+  and `Platforms/Web`
 
 `SwiftTUI` on its own is library-only. It provides the shared runtime,
 `SceneManifest`, and `HostedSceneSession`, but it does not provide an
@@ -89,7 +89,7 @@ single repo-level entrypoint for the full checked-in test surface across the
 runner packages, GUI packages, and example projects, and it verifies the Swift
 and Bun environment first. On Linux, it exports
 `DISABLE_EXPLICIT_PLATFORMS=1` and skips the Apple-only
-`GUI/SwiftUIHost` SwiftUI host tests. If you're
+`Platforms/SwiftUI` SwiftUI host tests. If you're
 already using the repo's root Bun workspace, `bun run test` is a thin
 entrypoint to the same script.
 

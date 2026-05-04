@@ -13,7 +13,7 @@
     "test:all": "sh ./Scripts/test_all.sh"
   },
   "workspaces": [
-    "GUI/WebHost",
+    "Platforms/Web",
     "Examples/WebExample",
     "Website"
   ],

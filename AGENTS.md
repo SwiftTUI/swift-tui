@@ -109,11 +109,11 @@ Test suites are split by layer:
 - `Tests/ViewTests/` — authoring-surface, environment, actor-isolation
 - `Tests/AnimatedImageTests/` — animated image and GIF import/export behavior
 - `Tests/SwiftTUITests/` — runtime, rendering, fixtures, end-to-end behavior
-- `Runners/SwiftTUICLI/Tests/SwiftTUICLITests/` — CLI runner, socket, pty,
+- `Platforms/CLI/Tests/SwiftTUICLITests/` — CLI runner, socket, pty,
   attach, scene-management behavior
-- `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests/` — WASI launcher and
+- `Platforms/WASI/Tests/SwiftTUIWASITests/` — WASI launcher and
   manifest-mode behavior
-- `Runners/SwiftTUIWASI/Tests/WASISurfaceBridgeTests/` — `web-surface`
+- `Platforms/WASI/Tests/WASISurfaceBridgeTests/` — `web-surface`
   encoder, input parser, and transport behavior
 
 Prefer Swift Testing (`import Testing`, `@Test`, `#expect`) for new tests.

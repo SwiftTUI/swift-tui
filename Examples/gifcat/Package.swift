@@ -20,7 +20,7 @@ let package = Package(
   ],
   dependencies: [
     .package(name: "swift-tui", path: "../.."),
-    .package(path: "../../Runners/SwiftTUICLI"),
+    .package(name: "SwiftTUICLI", path: "../../Platforms/CLI"),
   ],
   targets: [
     .target(

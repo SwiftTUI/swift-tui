@@ -52,8 +52,8 @@ Current async presentation and frame-tail worker ownership is summarized in
 
 - `@MainActor` `App`, `Scene`, `SceneBuilder`, `WindowIdentifier`, and `WindowGroup` declarations in `SwiftTUI`
 - `SceneDescriptor`, `SceneManifest`, and `HostedSceneSession` in `SwiftTUI` for host-package tooling and retained non-terminal hosting
-- `TerminalRunner` in `Runners/SwiftTUICLI` for terminal-native executable launch, scene discovery, attach, and pty-backed secondary scenes
-- `WASIRunner` in `Runners/SwiftTUIWASI` for manifest generation and WASI-hosted scene launch
+- `TerminalRunner` in `Platforms/CLI` for terminal-native executable launch, scene discovery, attach, and pty-backed secondary scenes
+- `WASIRunner` in `Platforms/WASI` for manifest generation and WASI-hosted scene launch
 - The same authored `App` can feed three execution modes: terminal-native execution, WASI execution, or host-managed embedding through peer GUI host packages
 - Pty-backed secondary scenes, Unix-domain-socket discovery, scene attachment, and lazy rendering of unattached secondary scenes
 - `TabView` for terminal-native shell composition
@@ -72,7 +72,7 @@ Current async presentation and frame-tail worker ownership is summarized in
 
 - The core `SwiftTUI` runtime renders one active scene into one active host per session. Multi-scene apps are supported, but only one scene is on screen at a time per host.
 - `SwiftTUI` is library-only. Platform integration splits between executable runner packages in `Runners/` and embedded host packages in `GUI/`.
-- Embedded GUI host packages use `SwiftTUI` scene manifests plus `HostedSceneSession`. Peer host packages live at `GUI/SwiftUIHost` and `GUI/WebHost`; they own their own platform shell integration, scene switching chrome, and style surfaces.
+- Embedded GUI host packages use `SwiftTUI` scene manifests plus `HostedSceneSession`. Peer host packages live at `Platforms/SwiftUI` and `Platforms/Web`; they own their own platform shell integration, scene switching chrome, and style surfaces.
 - Embedded GUI host packages own one active host style object at a time and
   can swap it at runtime; the root TUI app renders semantic tokens without
   knowing which host theme is active.
@@ -81,7 +81,7 @@ Current async presentation and frame-tail worker ownership is summarized in
   all common chroma subsamplings). GIF import/export and finite animated image
   playback live in `AnimatedImage`; progressive JPEG and broader media formats
   remain deferred.
-- WASI builds use the `swiftly`-managed Swift 6.3.1 toolchain via `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through `Runners/SwiftTUIWASI` / example-app build paths. The shorter `swift ...` form works from a shell where `swift` already resolves through `swiftly`; `xcrun swift` may resolve to an incompatible Xcode toolchain.
+- WASI builds use the `swiftly`-managed Swift 6.3.1 toolchain via `swiftly run swift build --swift-sdk swift-6.3.1-RELEASE_wasm ...` through `Platforms/WASI` / example-app build paths. The shorter `swift ...` form works from a shell where `swift` already resolves through `swiftly`; `xcrun swift` may resolve to an incompatible Xcode toolchain.
 - Some focus surfaces remain missing:
   - namespace-scoped default-focus APIs such as `.prefersDefaultFocus(_:in:)`, `.focusScope(_:)`, and `resetFocus`
   - object-focused wrappers such as `@FocusedObject`

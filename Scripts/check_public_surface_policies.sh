@@ -352,11 +352,11 @@ if ! rg -n --fixed-strings --quiet -- '`SwiftTUI`' README.md; then
   fail "README.md should name SwiftTUI explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '`Runners/SwiftTUICLI`' README.md; then
+if ! rg -n --fixed-strings --quiet -- '`Platforms/CLI`' README.md; then
   fail "README.md should name the SwiftTUICLI runner package explicitly."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '`Runners/SwiftTUIWASI`' README.md; then
+if ! rg -n --fixed-strings --quiet -- '`Platforms/WASI`' README.md; then
   fail "README.md should name the SwiftTUIWASI runner package explicitly."
 fi
 
