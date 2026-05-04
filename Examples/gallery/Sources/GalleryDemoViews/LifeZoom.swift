@@ -18,8 +18,8 @@ enum LifeZoom: Int, CaseIterable, Hashable, Sendable {
 
   var label: String {
     switch self {
-    case .braille:    return "braille · 8×"
-    case .halfCell:   return "half · 2×"
+    case .braille: return "braille · 8×"
+    case .halfCell: return "half · 2×"
     case .squareCell: return "square · 1×"
     }
   }
@@ -37,8 +37,8 @@ enum LifeZoom: Int, CaseIterable, Hashable, Sendable {
   /// Game cells along each axis inside a single terminal-cell tile.
   var gameCellsPerTile: (x: Int, y: Int) {
     switch self {
-    case .braille:    return (2, 4)
-    case .halfCell:   return (1, 2)
+    case .braille: return (2, 4)
+    case .halfCell: return (1, 2)
     case .squareCell: return (1, 1)
     }
   }
@@ -48,8 +48,8 @@ enum LifeZoom: Int, CaseIterable, Hashable, Sendable {
   /// typical font aspect ratios.
   var terminalCellsPerTile: (x: Int, y: Int) {
     switch self {
-    case .braille:    return (1, 1)
-    case .halfCell:   return (1, 1)
+    case .braille: return (1, 1)
+    case .halfCell: return (1, 1)
     case .squareCell: return (2, 1)
     }
   }
@@ -63,6 +63,35 @@ enum LifeZoom: Int, CaseIterable, Hashable, Sendable {
     let w = max(1, (terminalSize.width / tx) * gx)
     let h = max(1, (terminalSize.height / ty) * gy)
     return (w, h)
+  }
+
+  /// Inverse of ``gridDimensions(for:)``: given a game-cell extent,
+  /// returns the terminal-cell frame the ``Canvas`` needs in order to
+  /// render exactly those cells without truncation or padding.
+  func terminalSize(forGameWidth width: Int, gameHeight height: Int) -> CellSize {
+    let tx = terminalCellsPerTile.x
+    let ty = terminalCellsPerTile.y
+    let gx = gameCellsPerTile.x
+    let gy = gameCellsPerTile.y
+    return CellSize(
+      width: max(0, (width / gx) * tx),
+      height: max(0, (height / gy) * ty)
+    )
+  }
+
+  /// Rasterization grid the ``Canvas`` should use for this zoom. Pairs
+  /// each zoom mode with a glyph family whose sub-cell layout matches
+  /// the game-cells-per-terminal-cell tile: braille for 2×4, vertical
+  /// half-block for 1×2, and full-cell for square (with the canvas
+  /// width doubled by ``terminalSize(forGameWidth:gameHeight:)`` so
+  /// each game cell still reads as a square at typical 2:1 cell
+  /// aspect).
+  var canvasGrid: CanvasGrid {
+    switch self {
+    case .braille: return .braille2x4
+    case .halfCell: return .verticalHalfBlock
+    case .squareCell: return .fullCell
+    }
   }
 
   /// Maps a continuous pointer location (in the grid view's local
@@ -80,8 +109,8 @@ enum LifeZoom: Int, CaseIterable, Hashable, Sendable {
       let ty = Int(point.y.rounded(.down))
       let fx = max(0, min(0.999, point.x - Double(tx)))
       let fy = max(0, min(0.999, point.y - Double(ty)))
-      let sx = Int((fx * 2).rounded(.down)) // 0..<2
-      let sy = Int((fy * 4).rounded(.down)) // 0..<4
+      let sx = Int((fx * 2).rounded(.down))  // 0..<2
+      let sy = Int((fy * 4).rounded(.down))  // 0..<4
       let gx = tx * 2 + sx
       let gy = ty * 4 + sy
       return inBounds(gx: gx, gy: gy, gridSize: gridSize)
@@ -90,7 +119,7 @@ enum LifeZoom: Int, CaseIterable, Hashable, Sendable {
       let tx = Int(point.x.rounded(.down))
       let ty = Int(point.y.rounded(.down))
       let fy = max(0, min(0.999, point.y - Double(ty)))
-      let sy = Int((fy * 2).rounded(.down)) // 0..<2
+      let sy = Int((fy * 2).rounded(.down))  // 0..<2
       let gx = tx
       let gy = ty * 2 + sy
       return inBounds(gx: gx, gy: gy, gridSize: gridSize)

@@ -313,15 +313,15 @@ extension SemanticExtractor {
       return nil
     }
 
-    switch node.layoutBehavior {
-    case .offset(let x, let y):
-      return translated(
-        rect,
-        by: .init(x: x, y: y)
-      )
-    default:
-      return rect
-    }
+    // The user supplies the rect in node-local coordinates (origin =
+    // top-left of the modified view). Translate by `semanticBounds`
+    // — which already incorporates the `.offset` layoutBehavior — so
+    // this overload is consistent with `transformedExplicitInteractionPath`
+    // below. Without this translation the rect would be interpreted
+    // as absolute terminal coordinates, silently misbehaving for any
+    // view not placed at (0, 0).
+    let bounds = semanticBounds(for: node)
+    return translated(rect, by: .init(x: bounds.origin.x, y: bounds.origin.y))
   }
 
   private func transformedExplicitInteractionPath(

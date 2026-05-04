@@ -12,7 +12,7 @@ public struct GalleryView: View {
   @State private var showPalette: Bool = false
 
   public var body: some View {
-TabView(selection: $selection) {
+    TabView(selection: $selection) {
       Tab("Counter", value: GalleryView.GalleryTab.counter) {
         CounterTab()
       }

@@ -17,24 +17,37 @@ struct PhysicsTab: View {
         in: fieldBounds,
         metrics: metrics
       )
-      let currentCell = current.snapped(.toNearestOrAwayFromZero)
       let height = max(
         1,
         Int((Double(FullScreenToyPhysics.diameter) / metrics.aspectRatio).rounded())
       )
+      let radiusX = Double(FullScreenToyPhysics.diameter) / 2
+      let radiusY = Double(height) / 2
+      let drawing = PhysicsBallDrawing(
+        center: Point(x: current.x + radiusX, y: current.y + radiusY),
+        radiusX: radiusX,
+        radiusY: radiusY
+      )
+      // Hit-test rect for the drag gesture in node-local Canvas
+      // coordinates. The framework translates this by the Canvas's
+      // absolute placed origin at hit-test time, so the user must
+      // press on the visible ball — not on a phantom rect anchored at
+      // absolute (0, 0).
+      let ballOrigin = current.snapped(.toNearestOrAwayFromZero)
+      let ballRect = CellRect(
+        origin: ballOrigin,
+        size: CellSize(width: FullScreenToyPhysics.diameter, height: height)
+      )
 
-      ZStack(alignment: .topLeading) {
-        Circle()
-          .frame(width: FullScreenToyPhysics.diameter, height: height)
-          .offset(x: currentCell.x, y: currentCell.y)
-          .foregroundStyle(.cyan)
-          .gesture(dragGesture(in: fieldBounds, metrics: metrics))
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-      .background(Color.black)
-      .task(id: FullScreenToyPhysics.BoundsID(size: fieldBounds)) { @MainActor in
-        await runToyLoop(in: fieldBounds, metrics: metrics)
-      }
+      Canvas(grid: .braille2x4, drawing)
+        .foregroundStyle(.cyan)
+        .frame(width: bounds.width, height: bounds.height, alignment: .topLeading)
+        .background(Color.black)
+        .contentShape(ballRect)
+        .gesture(dragGesture(in: fieldBounds, metrics: metrics))
+        .task(id: FullScreenToyPhysics.BoundsID(size: fieldBounds)) { @MainActor in
+          await runToyLoop(in: fieldBounds, metrics: metrics)
+        }
     }
     .border(.tint, set: .rounded)
   }
@@ -86,6 +99,25 @@ struct PhysicsTab: View {
       }
       toyState = next
     }
+  }
+}
+
+/// Renders the physics-toy ball into a SwiftTUI ``Canvas``.
+///
+/// Drawn as a filled ellipse so the cell-aspect-corrected `radiusY`
+/// produces a visually-round ball at the typical 2:1 terminal cell
+/// aspect ratio. Using ``CanvasContext/fillEllipse(center:radiusX:radiusY:)``
+/// at sub-cell precision means small per-tick velocity changes
+/// register visibly instead of waiting for the position to cross an
+/// integer-cell boundary the way the prior `Circle().offset(x:y:)`
+/// path required.
+private struct PhysicsBallDrawing: CanvasDrawing, Equatable {
+  let center: Point
+  let radiusX: Double
+  let radiusY: Double
+
+  func draw(into context: inout CanvasContext) {
+    context.fillEllipse(center: center, radiusX: radiusX, radiusY: radiusY)
   }
 }
 

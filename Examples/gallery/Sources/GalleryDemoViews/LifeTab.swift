@@ -76,10 +76,17 @@ public struct LifeTab: View {
   private var gridSurface: some View {
     GeometryReader { proxy in
       let dims = zoom.gridDimensions(for: proxy.size)
+      let termSize = zoom.terminalSize(forGameWidth: dims.width, gameHeight: dims.height)
+      let drawing = LifeDrawing(
+        cells: LifeRenderer.snapshot(of: grid, width: dims.width, height: dims.height),
+        width: dims.width,
+        height: dims.height,
+        zoom: zoom
+      )
 
-      Text(LifeRenderer.render(grid: grid, zoom: zoom, visibleSize: proxy.size))
+      Canvas(grid: zoom.canvasGrid, drawing)
         .foregroundStyle(.tint)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(width: termSize.width, height: termSize.height, alignment: .topLeading)
         .contentShape(
           CellRect(
             origin: .init(x: 0, y: 0),
@@ -104,7 +111,10 @@ public struct LifeTab: View {
           lastFitWidth = dims.width
           lastFitHeight = dims.height
         }
-        .onResize(width: dims.width, height: dims.height, lastWidth: $lastFitWidth, lastHeight: $lastFitHeight) {
+        .onResize(
+          width: dims.width, height: dims.height, lastWidth: $lastFitWidth,
+          lastHeight: $lastFitHeight
+        ) {
           var resized = grid
           resized.resize(width: dims.width, height: dims.height)
           grid = resized

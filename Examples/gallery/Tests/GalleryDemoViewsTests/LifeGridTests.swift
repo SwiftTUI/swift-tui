@@ -142,10 +142,10 @@ struct LifeZoomTests {
 
     // Four points within terminal cell (3, 1), each at a different
     // sub-row. x fraction stays in the left sub-column (sx = 0).
-    let p0 = Point(x: 3.0,  y: 1.0)   // sy = 0 → game (6, 4)
-    let p1 = Point(x: 3.0,  y: 1.25)  // sy = 1 → game (6, 5)
-    let p2 = Point(x: 3.0,  y: 1.50)  // sy = 2 → game (6, 6)
-    let p3 = Point(x: 3.0,  y: 1.75)  // sy = 3 → game (6, 7)
+    let p0 = Point(x: 3.0, y: 1.0)  // sy = 0 → game (6, 4)
+    let p1 = Point(x: 3.0, y: 1.25)  // sy = 1 → game (6, 5)
+    let p2 = Point(x: 3.0, y: 1.50)  // sy = 2 → game (6, 6)
+    let p3 = Point(x: 3.0, y: 1.75)  // sy = 3 → game (6, 7)
 
     #expect(zoom.gameCell(at: p0, gridSize: grid)?.y == 4)
     #expect(zoom.gameCell(at: p1, gridSize: grid)?.y == 5)
@@ -166,8 +166,8 @@ struct LifeZoomTests {
     let zoom = LifeZoom.halfCell
     let grid = (width: 100, height: 100)
 
-    let upper = Point(x: 5.0, y: 2.2) // sy = 0 → game (5, 4)
-    let lower = Point(x: 5.0, y: 2.7) // sy = 1 → game (5, 5)
+    let upper = Point(x: 5.0, y: 2.2)  // sy = 0 → game (5, 4)
+    let lower = Point(x: 5.0, y: 2.7)  // sy = 1 → game (5, 5)
     #expect(zoom.gameCell(at: upper, gridSize: grid)?.y == 4)
     #expect(zoom.gameCell(at: lower, gridSize: grid)?.y == 5)
     #expect(zoom.gameCell(at: upper, gridSize: grid)?.x == 5)
@@ -211,50 +211,104 @@ struct LifeZoomTests {
 @MainActor
 @Suite
 struct LifeRendererTests {
-  @Test("braille renderer emits one Unicode codepoint in U+2800..U+28FF per terminal cell")
-  func brailleEmitsBraillePoints() {
-    var grid = LifeGrid(width: 4, height: 4)
+  // MARK: - Snapshot extraction
+
+  @Test("snapshot returns row-major cells limited to the requested visible region")
+  func snapshotMatchesGrid() {
+    var grid = LifeGrid(width: 4, height: 3)
     grid.set(0, 0, true)
     grid.set(1, 0, true)
-    grid.set(0, 1, true)
+    grid.set(0, 2, true)
 
-    let output = LifeRenderer.render(
-      grid: grid,
-      zoom: .braille,
-      visibleSize: CellSize(width: 2, height: 1)
-    )
-    // Output should contain exactly two characters (the row).
-    #expect(output.count == 2)
+    let snapshot = LifeRenderer.snapshot(of: grid, width: 4, height: 3)
 
-    for scalar in output.unicodeScalars {
-      #expect(scalar.value >= 0x2800 && scalar.value <= 0x28FF)
-    }
+    #expect(snapshot.count == 12)
+    #expect(snapshot[0])  // (0, 0)
+    #expect(snapshot[1])  // (1, 0)
+    #expect(!snapshot[2])  // (2, 0)
+    #expect(!snapshot[4])  // (0, 1)
+    #expect(snapshot[2 * 4 + 0])  // (0, 2)
+    #expect(!snapshot[2 * 4 + 1])  // (1, 2)
   }
 
-  @Test("half-cell: alive top + dead bottom emits ▀")
-  func halfCellTopGlyph() {
-    var grid = LifeGrid(width: 1, height: 2)
+  @Test("snapshot pads with `false` when the requested region exceeds the grid's visible bounds")
+  func snapshotPadsBeyondGridBounds() {
+    var grid = LifeGrid(width: 2, height: 2)
     grid.set(0, 0, true)
-    grid.set(0, 1, false)
+    grid.set(1, 1, true)
 
-    let output = LifeRenderer.render(
-      grid: grid,
-      zoom: .halfCell,
-      visibleSize: CellSize(width: 1, height: 1)
-    )
-    #expect(output == "\u{2580}")
+    // Request a 4×3 snapshot from a 2×2 grid — cells outside (0..<2, 0..<2)
+    // should default to `false`.
+    let snapshot = LifeRenderer.snapshot(of: grid, width: 4, height: 3)
+
+    #expect(snapshot.count == 12)
+    #expect(snapshot[0 * 4 + 0])  // (0, 0) alive
+    #expect(snapshot[1 * 4 + 1])  // (1, 1) alive
+    #expect(!snapshot[0 * 4 + 2])  // (2, 0) outside grid → false
+    #expect(!snapshot[2 * 4 + 0])  // (0, 2) outside grid → false
+    #expect(!snapshot[2 * 4 + 3])  // (3, 2) outside grid → false
   }
 
-  @Test("square: alive cell renders as two FULL BLOCK glyphs")
-  func squareAliveGlyph() {
-    var grid = LifeGrid(width: 1, height: 1)
-    grid.set(0, 0, true)
+  // MARK: - Drawing equality (powers the framework's frame-to-frame diff)
 
-    let output = LifeRenderer.render(
-      grid: grid,
-      zoom: .squareCell,
-      visibleSize: CellSize(width: 2, height: 1)
+  @Test("LifeDrawing values with identical state compare equal across rebuilds")
+  func drawingsAreEquatable() {
+    let cells = [true, false, false, true]
+    let a = LifeDrawing(cells: cells, width: 2, height: 2, zoom: .halfCell)
+    let b = LifeDrawing(cells: cells, width: 2, height: 2, zoom: .halfCell)
+    #expect(a == b)
+  }
+
+  @Test("LifeDrawing values with different cells, dimensions, or zoom compare unequal")
+  func drawingsDifferOnCellDimsOrZoom() {
+    let baseCells = [true, false, false, true]
+    let base = LifeDrawing(cells: baseCells, width: 2, height: 2, zoom: .halfCell)
+
+    let differentCells = LifeDrawing(
+      cells: [true, true, false, true],
+      width: 2,
+      height: 2,
+      zoom: .halfCell
     )
-    #expect(output == "\u{2588}\u{2588}")
+    let differentDims = LifeDrawing(cells: baseCells, width: 4, height: 1, zoom: .halfCell)
+    let differentZoom = LifeDrawing(cells: baseCells, width: 2, height: 2, zoom: .braille)
+
+    #expect(base != differentCells)
+    #expect(base != differentDims)
+    #expect(base != differentZoom)
+  }
+}
+
+@MainActor
+@Suite
+struct LifeZoomTerminalSizeTests {
+  // The Canvas-based renderer derives its frame from
+  // `LifeZoom.terminalSize(forGameWidth:gameHeight:)` so the cell
+  // count matches what the rasterizer can pack into the active
+  // `CanvasGrid`. These tests pin that mapping.
+
+  @Test("braille: 16 game-cells wide × 8 tall → 8 × 2 terminal cells (2×4 per tile)")
+  func brailleTerminalSize() {
+    let size = LifeZoom.braille.terminalSize(forGameWidth: 16, gameHeight: 8)
+    #expect(size == CellSize(width: 8, height: 2))
+  }
+
+  @Test("halfCell: 16 × 8 game cells → 16 × 4 terminal cells (1×2 per tile)")
+  func halfCellTerminalSize() {
+    let size = LifeZoom.halfCell.terminalSize(forGameWidth: 16, gameHeight: 8)
+    #expect(size == CellSize(width: 16, height: 4))
+  }
+
+  @Test("squareCell: 1 × 1 per tile but 2× horizontal terminal-cell aspect")
+  func squareCellTerminalSize() {
+    let size = LifeZoom.squareCell.terminalSize(forGameWidth: 16, gameHeight: 8)
+    #expect(size == CellSize(width: 32, height: 8))
+  }
+
+  @Test("canvasGrid pairs each zoom with the matching glyph family")
+  func canvasGridMapping() {
+    #expect(LifeZoom.braille.canvasGrid == .braille2x4)
+    #expect(LifeZoom.halfCell.canvasGrid == .verticalHalfBlock)
+    #expect(LifeZoom.squareCell.canvasGrid == .fullCell)
   }
 }
