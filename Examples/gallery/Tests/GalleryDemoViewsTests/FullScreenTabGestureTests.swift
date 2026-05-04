@@ -11,7 +11,7 @@ struct PhysicsTabGestureTests {
   @Test("fullscreen toy starts at bottom center with its initial launch velocity")
   func spawnStateStartsAtBottomCenter() {
     let terminalSize = CellSize(width: 40, height: 12)
-    let playfield = FullScreenToyPhysics.playfieldBounds(from: terminalSize)
+    let playfield = FullScreenToyPhysics.fieldBounds(from: terminalSize)
     let floor = FullScreenToyPhysics.maximumOrigin(in: playfield, metrics: .estimated)
 
     let state = FullScreenToyPhysics.spawnState(in: playfield, metrics: .estimated)
@@ -66,6 +66,72 @@ struct PhysicsTabGestureTests {
     )
 
     #expect(state.velocity == .init(x: 64, y: -16))
+  }
+
+  @Test(
+    "ball drag-gesture hit region tracks the visible ball position in absolute coordinates"
+  )
+  func ballHitRegionIsPlacedAtVisibleBall() throws {
+    // Regression test for the bug that caused the gallery Physics
+    // ball gesture to misfire. The ball's `contentShape(_:CellRect)`
+    // is supplied in node-local Canvas coordinates; the framework
+    // translates it by the Canvas's absolute placed origin. Earlier
+    // the rect-based overload skipped that translation, anchoring
+    // the hit region at absolute (0, 0) and making the ball
+    // undraggable whenever it was rendered anywhere other than the
+    // screen origin.
+    let terminalSize = CellSize(width: 40, height: 12)
+    let rootIdentity = Identity(components: [.named("PhysicsTabHitRegionPlacement")])
+    var env = EnvironmentValues()
+    env.terminalSize = terminalSize
+
+    let artifacts = DefaultRenderer().render(
+      PhysicsTab(),
+      context: .init(identity: rootIdentity, environmentValues: env),
+      proposal: .init(width: terminalSize.width, height: terminalSize.height)
+    )
+
+    // The ball's footprint at the initial render — `toyState =
+    // State()` puts it at local (0, 0) within the GeometryReader.
+    let metrics = env.cellPixelMetrics
+    let ballHeight = max(
+      1,
+      Int((Double(FullScreenToyPhysics.diameter) / metrics.aspectRatio).rounded())
+    )
+
+    // Locate the ball's interaction region by its distinctive size
+    // (diameter × ballHeight). Other regions in the snapshot are the
+    // surrounding chrome (toolbar, palette command, etc.) which have
+    // different dimensions.
+    let ballSize = CellSize(
+      width: FullScreenToyPhysics.diameter,
+      height: ballHeight
+    )
+    let ballRegion = artifacts.semanticSnapshot.interactionRegions.first {
+      $0.rect.size == ballSize
+    }
+    let region = try #require(ballRegion)
+
+    // The hit region must sit fully inside the terminal bounds — if
+    // the framework had failed to translate by the Canvas's placed
+    // origin, the rect would still anchor at (0, 0) but be off by
+    // any chrome offset, and an offset tab would have produced a
+    // rect at (0, 0) that doesn't match the visible ball.
+    #expect(region.rect.origin.x >= 0)
+    #expect(region.rect.origin.x + region.rect.size.width <= terminalSize.width)
+    #expect(region.rect.origin.y >= 0)
+    #expect(region.rect.origin.y + region.rect.size.height <= terminalSize.height)
+
+    // The region must actually contain its own center — i.e. a
+    // press there would fire the gesture. This is the guarantee the
+    // pre-fix rect-based contentShape silently lost.
+    let center = PointerLocation.cellFallback(
+      CellPoint(
+        x: region.rect.origin.x + region.rect.size.width / 2,
+        y: region.rect.origin.y + region.rect.size.height / 2
+      )
+    )
+    #expect(region.contains(center))
   }
 
   @Test("fullscreen demo keeps presenting frames while gravity runs")
