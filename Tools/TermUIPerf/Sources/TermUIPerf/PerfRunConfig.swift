@@ -1,5 +1,5 @@
 import Foundation
-import TerminalUI
+import SwiftTUI
 
 public enum TermUIPerfCommand: Equatable, Sendable {
   case run(PerfRunConfig)

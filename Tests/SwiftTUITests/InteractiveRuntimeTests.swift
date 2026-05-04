@@ -2,9 +2,9 @@ import EmbeddedFonts
 import Foundation
 import Testing
 
-@_spi(Testing) @testable import Core
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 #if canImport(Darwin)
   import Darwin

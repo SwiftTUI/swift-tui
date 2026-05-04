@@ -1,6 +1,6 @@
 import Synchronization
 import Testing
-import View
+import SwiftTUIViews
 
 @testable import SwiftTUI
 

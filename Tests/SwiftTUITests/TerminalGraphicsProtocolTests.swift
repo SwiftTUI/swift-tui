@@ -2,7 +2,7 @@ import Foundation
 import PNG
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUI
 
 #if canImport(Darwin)

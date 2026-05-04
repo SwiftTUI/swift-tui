@@ -1,8 +1,8 @@
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 /// Layout-only assertions for the rewritten `.border(...)` view modifier.
 ///

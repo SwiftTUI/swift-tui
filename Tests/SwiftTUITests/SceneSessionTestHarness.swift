@@ -1,5 +1,5 @@
 @_spi(Runners) import SwiftTUI
-import View
+import SwiftTUIViews
 
 @MainActor
 func runTestSceneSession<S: Scene>(

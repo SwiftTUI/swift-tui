@@ -1,8 +1,8 @@
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 /// Characterization test suite for Item 7 of
 /// `docs/proposals/ARCHITECTURE_NOTES.md`.

@@ -1,8 +1,8 @@
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 /// Regression tests for the "TabView speculatively resolves every tab
 /// body on every frame" bug.

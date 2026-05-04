@@ -1,6 +1,6 @@
 import Dispatch
 import Foundation
-@_spi(Runners) import TerminalUI
+@_spi(Runners) import SwiftTUI
 
 #if canImport(Darwin)
   import Darwin
@@ -243,7 +243,7 @@ public enum PerfScenarioRunner {
     }
 
     let stateContainer = StateContainer(
-      initialState: TerminalUISceneSessionState(),
+      initialState: SceneSessionState(),
       invalidationIdentities: [selection.rootIdentity]
     )
     let focusTracker = FocusTracker(invalidationIdentities: [selection.rootIdentity])

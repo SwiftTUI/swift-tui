@@ -1,8 +1,8 @@
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 private enum BoundsAnchorPreferenceKey: PreferenceKey {
   static let defaultValue: Anchor<Rect>? = nil

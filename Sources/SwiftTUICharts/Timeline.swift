@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A compact textual timeline for ordered events or releases.
 public struct Timeline: View, ResolvableView {

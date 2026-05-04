@@ -1,9 +1,9 @@
 import SwiftTUICharts
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 // AnyView policy: retain erased fixture roots here for test support only.
 @Suite

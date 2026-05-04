@@ -1,8 +1,8 @@
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 /// Reproduces the exact modifier shape used by the gallery demo's
 /// `GalleryView` (EnvironmentReader → TabView → .toolbarItem → .panel →

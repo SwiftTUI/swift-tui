@@ -1,9 +1,9 @@
 import Foundation
 import Testing
 
-@_spi(Testing) @testable import Core
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 /// Regression pins for the "gallery freezes on the chasing-light panel"
 /// bug.

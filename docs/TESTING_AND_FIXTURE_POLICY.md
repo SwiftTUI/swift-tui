@@ -27,8 +27,8 @@ test suite, not by a separate pre-commit hook.
 
 ## Test Topology
 
-- `Tests/CoreTests`: pipeline, layout, raster, and low-level infrastructure
-- `Tests/ViewTests`: authoring-surface, environment, and actor-isolation behavior
+- `Tests/SwiftTUICoreTests`: pipeline, layout, raster, and low-level infrastructure
+- `Tests/SwiftTUIViewsTests`: authoring-surface, environment, and actor-isolation behavior
 - `Tests/SwiftTUITests`: runtime, rendering, fixture, and benchmark scenarios
 - `Platforms/CLI/Tests/SwiftTUICLITests`: terminal-native runner, attach, socket, and pty behavior
 - `Platforms/WASI/Tests/SwiftTUIWASITests`: WASI runner and manifest-mode behavior

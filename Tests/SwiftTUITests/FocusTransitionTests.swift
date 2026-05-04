@@ -1,8 +1,8 @@
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 /// Tests that focus transitions between controls (Tab/Shift-Tab) produce
 /// visually distinct rendered frames — both in static rendering and through
