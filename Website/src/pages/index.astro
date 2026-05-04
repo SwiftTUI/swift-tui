@@ -2,49 +2,102 @@
 import "../styles/site.css";
 import SiteHeader from "../components/SiteHeader.astro";
 import Hero from "../components/Hero.astro";
+import WhySwiftTUI from "../components/WhySwiftTUI.astro";
 import PipelineStrip from "../components/PipelineStrip.astro";
 import ExecutionModes from "../components/ExecutionModes.astro";
 import SurfaceInventory from "../components/SurfaceInventory.astro";
 import AuthoringSnippet from "../components/AuthoringSnippet.astro";
+import Quickstart from "../components/Quickstart.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const site = (import.meta.env.SITE ?? "https://swifttui.io").replace(/\/$/, "");
+const canonical = `${site}${base || ""}/`;
+
+const title = "SwiftTUI · SwiftUI semantics, drawn in terminal cells";
 const description =
-  "SwiftTUI is a Swift package that runs SwiftUI-shaped views through a strict resolve→commit pipeline. One App declaration drives terminal-native, WASI, and embedded SwiftUI / Web hosts.";
+  "SwiftTUI is a Swift package that lowers SwiftUI-shaped views through a strict seven-phase pipeline. One @main App declaration runs as a terminal binary, in the browser via WASI, or embedded inside SwiftUI and any DOM element.";
+const ogImage = `${canonical}og.png`;
+
+const softwareSourceCodeJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  name: "SwiftTUI",
+  description,
+  programmingLanguage: "Swift",
+  runtimePlatform: "Swift 6.3, macOS 15+, iOS 18+, Linux, WASI",
+  codeRepository: "https://github.com/GoodHatsLLC/SwiftTUI",
+  url: canonical,
+  license: "https://github.com/GoodHatsLLC/SwiftTUI/blob/main/LICENSE",
+  author: {
+    "@type": "Organization",
+    name: "GoodHats",
+    url: "https://github.com/GoodHatsLLC",
+  },
+  keywords: [
+    "Swift",
+    "SwiftUI",
+    "TUI",
+    "Terminal UI",
+    "WASI",
+    "Cross platform",
+    "Swift Package",
+    "Swift 6",
+  ],
+};
 ---
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SwiftTUI · SwiftUI semantics, drawn in terminal cells</title>
+    <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="keywords" content="Swift, SwiftUI, TUI, Terminal UI, WASI, Swift 6, Swift package, terminal framework, declarative TUI, GoodHats" />
+    <meta name="author" content="GoodHats" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <link rel="canonical" href={canonical} />
+
     <meta property="og:title" content="SwiftTUI" />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
-    <meta name="theme-color" content="#0a0a0a" />
-    <link rel="icon" type="image/svg+xml" href={`${import.meta.env.BASE_URL.replace(/\/$/, "")}/favicon.svg`} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:alt" content="SwiftTUI · SwiftUI semantics, drawn in terminal cells" />
+    <meta property="og:site_name" content="SwiftTUI" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SwiftTUI · SwiftUI semantics, drawn in terminal cells" />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap"
     />
+
+    <script type="application/ld+json" set:html={JSON.stringify(softwareSourceCodeJsonLd)} />
   </head>
   <body>
     <div class="ambient" aria-hidden="true"></div>
     <div class="grain" aria-hidden="true"></div>
 
+    <a class="skip-link" href="#demo">Skip to live demo</a>
+
     <SiteHeader />
     <main>
       <Hero />
+      <WhySwiftTUI />
       <PipelineStrip />
       <ExecutionModes />
       <SurfaceInventory />
       <AuthoringSnippet />
+      <Quickstart />
     </main>
     <SiteFooter />
-
-    <a class="skip-link" href="#demo">Skip to live demo</a>
   </body>
 </html>
 

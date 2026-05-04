@@ -47,13 +47,14 @@ const phases = [
 <section class="pipeline" id="pipeline">
   <div class="shell">
     <header class="head">
-      <span class="eyebrow"><span class="num">/01</span>Frame pipeline</header>
+      <span class="eyebrow"><span class="num">/01</span>Frame pipeline</span>
       <h2>Seven phases. Strict order. No collapsing.</h2>
       <p class="lede">
         Layout is recursive parent-child negotiation, not a global solver.
         State drives rendering, not the reverse. The phase order is enforced
         by <span class="mono">DefaultRenderer</span>, <span class="mono">FrameArtifacts</span>,
-        and the regression suites.
+        and the regression suites — every phase has a typed artifact you
+        can snapshot, diff, or assert against in tests.
       </p>
     </header>
 

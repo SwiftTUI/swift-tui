@@ -12,9 +12,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
     <nav class="nav mono" aria-label="primary">
       <a href="#demo">Demo</a>
+      <a href="#why">Why</a>
       <a href="#pipeline">Pipeline</a>
       <a href="#runtimes">Runtimes</a>
       <a href="#surface">Surface</a>
+      <a href="#quickstart">Quickstart</a>
       <a href={`${base}/docs/documentation/swifttui/`}>Docs</a>
     </nav>
 
@@ -64,7 +66,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   }
   .nav {
     display: flex;
-    gap: 22px;
+    gap: 18px;
     margin-left: auto;
     margin-right: auto;
     color: var(--ink-2);
@@ -74,6 +76,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     transition: color 160ms ease;
   }
   .nav a:hover { color: var(--ink); }
+  @media (max-width: 1080px) {
+    .nav { gap: 14px; font-size: 12px; }
+  }
   .actions { display: flex; align-items: center; gap: 8px; }
   .ghost {
     display: inline-flex;
