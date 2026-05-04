@@ -153,6 +153,7 @@ Runs the full checked-in repo verification surface:
   - Platforms/Web Bun tests
   - Examples/gallery tests
   - Examples/layouts tests
+  - Tools/TermUIPerf tests
   - Examples/WebExample Bun tests
   - Examples/WebExample browser integration test
 
@@ -547,6 +548,11 @@ run_function_step \
   "Run Examples/layouts tests" \
   "$(swift_command_text test --package-path Examples/layouts)" \
   run_swift test --package-path Examples/layouts
+
+run_function_step \
+  "Run Tools/TermUIPerf tests" \
+  "$(swift_command_text test --package-path Tools/TermUIPerf)" \
+  run_swift test --package-path Tools/TermUIPerf
 
 # run_step \
 #   "Run Examples/WebExample Bun tests" \

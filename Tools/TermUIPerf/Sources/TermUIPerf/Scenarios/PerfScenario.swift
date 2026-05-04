@@ -248,7 +248,7 @@ public enum PerfScenarioRunner {
     )
     let focusTracker = FocusTracker(invalidationIdentities: [selection.rootIdentity])
     let resources = SceneSessionResources(
-      terminalHost: terminalHost,
+      presentationSurface: terminalHost,
       terminalInputReader: inputReader,
       signalReader: signalReader,
       diagnosticsLogger: diagnosticsSink.logger

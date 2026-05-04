@@ -25,48 +25,6 @@ package struct NodeLayoutInfo: Equatable, Sendable {
   }
 }
 
-/// Grouped metadata for draw-relevant properties of a resolved node.
-package struct NodeDrawInfo: Equatable, Sendable {
-  package var drawMetadata: DrawMetadata
-  package var drawPayload: DrawPayload
-
-  package init(
-    drawMetadata: DrawMetadata = DrawMetadata(),
-    drawPayload: DrawPayload = .none
-  ) {
-    self.drawMetadata = drawMetadata
-    self.drawPayload = drawPayload
-  }
-}
-
-/// Grouped metadata for semantic properties of a resolved node.
-public struct NodeSemanticInfo: Equatable, Sendable {
-  public var semanticMetadata: SemanticMetadata
-
-  public init(
-    semanticMetadata: SemanticMetadata = SemanticMetadata()
-  ) {
-    self.semanticMetadata = semanticMetadata
-  }
-}
-
-/// Grouped metadata for lifecycle properties of a resolved node.
-public struct NodeLifecycleInfo: Equatable, Sendable {
-  public var lifecycleMetadata: LifecycleMetadata
-
-  public init(
-    lifecycleMetadata: LifecycleMetadata = .init()
-  ) {
-    self.lifecycleMetadata = lifecycleMetadata
-  }
-
-  public var isEmpty: Bool {
-    lifecycleMetadata.isEmpty
-  }
-}
-
-// MARK: - ResolvedNode Convenience Accessors
-
 extension ResolvedNode {
   /// Grouped layout metadata for this node.
   package var layoutInfo: NodeLayoutInfo {
@@ -81,44 +39,6 @@ extension ResolvedNode {
       layoutBehavior = newValue.layoutBehavior
       layoutMetadata = newValue.layoutMetadata
       intrinsicSize = newValue.intrinsicSize
-    }
-  }
-
-  /// Grouped draw metadata for this node.
-  package var drawInfo: NodeDrawInfo {
-    get {
-      NodeDrawInfo(
-        drawMetadata: drawMetadata,
-        drawPayload: drawPayload
-      )
-    }
-    set {
-      drawMetadata = newValue.drawMetadata
-      drawPayload = newValue.drawPayload
-    }
-  }
-
-  /// Grouped semantic metadata for this node.
-  public var semanticInfo: NodeSemanticInfo {
-    get {
-      NodeSemanticInfo(
-        semanticMetadata: semanticMetadata
-      )
-    }
-    set {
-      semanticMetadata = newValue.semanticMetadata
-    }
-  }
-
-  /// Grouped lifecycle metadata for this node.
-  public var lifecycleInfo: NodeLifecycleInfo {
-    get {
-      NodeLifecycleInfo(
-        lifecycleMetadata: lifecycleMetadata
-      )
-    }
-    set {
-      lifecycleMetadata = newValue.lifecycleMetadata
     }
   }
 }
