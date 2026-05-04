@@ -268,7 +268,10 @@ private func serializeRenderedSnapshot(
   ]
 
   let body = renderedLines.enumerated().map { index, line in
-    "\(unsafe String(format: "%0*d", lineNumberWidth, index + 1))│\(displayLine(line))"
+    let lineNumber = String(index + 1)
+    let padded = String(repeating: "0", count: max(0, lineNumberWidth - lineNumber.count))
+      + lineNumber
+    return "\(padded)│\(displayLine(line))"
   }
 
   return (header + body).joined(separator: "\n") + "\n"
@@ -385,7 +388,9 @@ private func displayLine(
       rendered.append("\\u{001B}")
     default:
       if CharacterSet.controlCharacters.contains(scalar) {
-        rendered += unsafe String(format: "\\u{%04X}", scalar.value)
+        let hex = String(scalar.value, radix: 16, uppercase: true)
+        let padded = String(repeating: "0", count: max(0, 4 - hex.count)) + hex
+        rendered += "\\u{\(padded)}"
       } else {
         rendered.unicodeScalars.append(scalar)
       }
