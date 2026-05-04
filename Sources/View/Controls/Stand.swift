@@ -42,11 +42,11 @@ private func systemWrite(
   #if canImport(Darwin)
     unsafe Darwin.write(fd, buffer, count)
   #elseif canImport(Glibc)
-    Glibc.write(fd, buffer, count)
+    unsafe Glibc.write(fd, buffer, count)
   #elseif canImport(Android)
     unsafe Android.write(fd, buffer, count)
   #elseif canImport(Musl)
-    Musl.write(fd, buffer, count)
+    unsafe Musl.write(fd, buffer, count)
   #elseif canImport(WASILibc)
     Int(unsafe WASILibc.write(fd, buffer, count))
   #endif
@@ -62,11 +62,11 @@ private func systemWrite(
     #if canImport(Darwin)
       unsafe Darwin.open(path, flags, mode)
     #elseif canImport(Glibc)
-      Glibc.open(path, flags, mode)
+      unsafe Glibc.open(path, flags, mode)
     #elseif canImport(Android)
       unsafe Android.open(path, flags, mode)
     #elseif canImport(Musl)
-      Musl.open(path, flags, mode)
+      unsafe Musl.open(path, flags, mode)
     #endif
   }
 
