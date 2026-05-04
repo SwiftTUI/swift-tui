@@ -22,6 +22,7 @@ words:
   - NONBLOCK
   - Nonsending
   - preconcurrency
+  - SIGWINCH
   - Sparkline
   - Sparklines
   - syscall

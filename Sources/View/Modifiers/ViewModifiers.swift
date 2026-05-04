@@ -85,10 +85,10 @@ extension View {
     modifier(DisappearLifecycleModifier(action: action))
   }
 
-  public func onChange<Value: Equatable & Sendable>(
+  public func onChange<Value: Equatable>(
     of value: Value,
     initial: Bool = false,
-    _ action: @escaping @MainActor @Sendable () -> Void
+    _ action: @escaping () -> Void
   ) -> some View {
     modifier(
       ChangeLifecycleModifier(
@@ -99,10 +99,10 @@ extension View {
     )
   }
 
-  public func onChange<Value: Equatable & Sendable>(
+  public func onChange<Value: Equatable>(
     of value: Value,
     initial: Bool = false,
-    _ action: @escaping @MainActor @Sendable (Value, Value) -> Void
+    _ action: @escaping (Value, Value) -> Void
   ) -> some View {
     modifier(
       ChangeLifecycleModifier(
@@ -114,9 +114,9 @@ extension View {
   }
 
   public func task(
-    priority: TaskPriority = .medium,
+    priority: TaskPriority = .userInitiated,
     @_inheritActorContext
-    _ action: @escaping @isolated(any) @Sendable () async -> Void
+    _ action: sending @escaping @isolated(any) () async -> Void
   ) -> some View {
     modifier(
       TaskLifecycleModifier(
@@ -127,12 +127,13 @@ extension View {
     )
   }
 
-  public func task<ID: Hashable & Sendable>(
+  public func task<ID: Equatable>(
     id value: ID,
-    priority: TaskPriority = .medium,
+    priority: TaskPriority = .userInitiated,
     @_inheritActorContext
-    _ action: @escaping @isolated(any) @Sendable () async -> Void
+    _ action: sending @escaping @isolated(any) () async -> Void
   ) -> some View {
+    // FIXME: the reflection call here doesn't pass muster as SwiftUI's likely implementation.
     modifier(
       TaskLifecycleModifier(
         priority: priority,
@@ -573,7 +574,7 @@ private func recordLifecycleEvaluationOwner(
 }
 
 public struct AppearLifecycleModifier: PrimitiveViewModifier {
-  let action: @MainActor @Sendable () -> Void
+  let action: () -> Void
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
@@ -607,7 +608,7 @@ public struct AppearLifecycleModifier: PrimitiveViewModifier {
 }
 
 public struct DisappearLifecycleModifier: PrimitiveViewModifier {
-  let action: @MainActor @Sendable () -> Void
+  let action: () -> Void
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
@@ -640,10 +641,10 @@ public struct DisappearLifecycleModifier: PrimitiveViewModifier {
   }
 }
 
-public struct ChangeLifecycleModifier<Value: Equatable & Sendable>: PrimitiveViewModifier {
+public struct ChangeLifecycleModifier<Value: Equatable>: PrimitiveViewModifier {
   var value: Value
   var initial: Bool
-  let action: @MainActor @Sendable (Value, Value) -> Void
+  let action: (Value, Value) -> Void
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,
@@ -703,7 +704,7 @@ public struct ChangeLifecycleModifier<Value: Equatable & Sendable>: PrimitiveVie
 public struct TaskLifecycleModifier: PrimitiveViewModifier {
   var priority: TaskPriority
   var descriptorID: String?
-  let action: @Sendable () async -> Void
+  let action: () async -> Void
 
   package func resolve<Base: View>(
     content: ModifierContentInputs<Base>,

@@ -34,7 +34,7 @@ struct LifecycleSelectiveEvaluationTests {
     )
     let expectedTask = TaskDescriptor(
       id: "\(initialNode.identity)#task[\"stable\"]",
-      priority: .medium
+      priority: .userInitiated
     )
     #expect(initialNode.lifecycleMetadata.task == expectedTask)
     #expect(taskRegistry.registration(for: initialNode.identity)?.descriptor == expectedTask)
@@ -144,13 +144,13 @@ struct LifecycleSelectiveEvaluationTests {
         .init(
           identity: testIdentity("Root", "Group[0]"),
           operation: .taskCancel(
-            .init(id: "Root/Group[0]#task[\"first\"]", priority: .medium)
+            .init(id: "Root/Group[0]#task[\"first\"]", priority: .userInitiated)
           )
         ),
         .init(
           identity: testIdentity("Root", "Group[0]"),
           operation: .taskStart(
-            .init(id: "Root/Group[0]#task[\"second\"]", priority: .medium)
+            .init(id: "Root/Group[0]#task[\"second\"]", priority: .userInitiated)
           )
         ),
       ]
@@ -175,7 +175,7 @@ struct LifecycleSelectiveEvaluationTests {
         .init(
           identity: testIdentity("Root", "true", "Group[0]"),
           operation: .taskCancel(
-            .init(id: "Root/true/Group[0]#task[\"optional\"]", priority: .medium)
+            .init(id: "Root/true/Group[0]#task[\"optional\"]", priority: .userInitiated)
           )
         )
       ]
