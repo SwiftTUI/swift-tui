@@ -636,7 +636,7 @@ That makes any one-to-one parity argument suspect. The faithful answer is not "d
 
 The runtime models focus appearance for `List` at the row layer, not the container layer:
 
-- The container chrome (`List`'s own background and border fills) stays neutral regardless of whether focus is inside the list. See `Sources/View/Collections/List.swift` where `controlChrome` is invoked with `isFocused: false`.
+- The container chrome (`List`'s own background and border fills) stays neutral regardless of whether focus is inside the list. See `Sources/SwiftTUIViews/Collections/List.swift` where `controlChrome` is invoked with `isFocused: false`.
 - The active row (the focused-or-selected row) gets `rowChrome(...)` resolved with `isFocused: true, isSelected: true`, which paints `terminalRow(tone, isSelected: true)` as a row-shaped background.
 - A small caret glyph (`▌`) at the leading edge of the active row reinforces the row-shaped signal in low-color terminals.
 

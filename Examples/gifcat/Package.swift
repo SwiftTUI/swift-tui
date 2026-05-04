@@ -26,7 +26,7 @@ let package = Package(
     .target(
       name: "GifCat",
       dependencies: [
-        .product(name: "AnimatedImage", package: "swift-tui"),
+        .product(name: "SwiftTUIAnimatedImage", package: "swift-tui"),
         .product(name: "SwiftTUI", package: "swift-tui"),
       ]
     ),
@@ -42,7 +42,7 @@ let package = Package(
       name: "GifCatTests",
       dependencies: [
         "GifCat",
-        .product(name: "AnimatedImage", package: "swift-tui"),
+        .product(name: "SwiftTUIAnimatedImage", package: "swift-tui"),
         .product(name: "SwiftTUI", package: "swift-tui"),
       ]
     ),

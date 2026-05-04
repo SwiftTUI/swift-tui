@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A compact strip of heat-style cells for relative intensity data.
 public struct HeatStrip<Label: View, Summary: View>: View, ResolvableView {

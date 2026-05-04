@@ -2,13 +2,13 @@
 
 ## Target Boundaries
 
-### `Core`
+### `SwiftTUICore`
 
 - Defines the shared geometry, styling, semantic, raster, and commit data types
 - Implements layout, semantic extraction, draw extraction, rasterization, diagnostics, scheduling, and commit planning
 - Stays pure with respect to terminal I/O
 
-### `View`
+### `SwiftTUIViews`
 
 - Exposes the SwiftUI-shaped authoring surface
 - Resolves authored views into core nodes
@@ -16,13 +16,13 @@
 
 ### `SwiftTUICharts`
 
-- Builds compact chart and metric views on top of `View`
+- Builds compact chart and metric views on top of `SwiftTUIViews`
 - Reuses the same layout, semantic, draw, and raster pipeline
 - Remains a separate track so charting does not distort the core library surface
 
-### `AnimatedImage`
+### `SwiftTUIAnimatedImage`
 
-- Builds finite pre-composed animated image views on top of `View`
+- Builds finite pre-composed animated image views on top of `SwiftTUIViews`
 - Owns GIF encoding and decoding through the vendored `swift-gif` package
 - Keeps animated media concerns out of the core `SwiftTUI` runtime surface
 

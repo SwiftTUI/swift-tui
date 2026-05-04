@@ -1,9 +1,9 @@
 import Foundation
 import Testing
 
-@_spi(Testing) @testable import Core
+@_spi(Testing) @testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 /// End-to-end integration coverage for gradient animation through
 /// the `AnimationController` value-interpolation path.  These tests

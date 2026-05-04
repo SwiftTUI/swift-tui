@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A single entry in a compact timeline view.
 public struct TimelineEntry: Hashable, Sendable {

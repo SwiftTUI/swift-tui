@@ -1,6 +1,6 @@
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 
 @MainActor
 struct LifecycleDiffFixture: Sendable {

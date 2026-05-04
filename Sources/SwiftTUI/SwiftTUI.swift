@@ -1,7 +1,7 @@
-@_exported import Core
+@_exported import SwiftTUICore
 @_exported import EmbeddedFonts
 import Synchronization
-@_exported import View
+@_exported import SwiftTUIViews
 
 #if canImport(Darwin)
   import Darwin

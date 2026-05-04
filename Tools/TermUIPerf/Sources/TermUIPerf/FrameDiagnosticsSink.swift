@@ -1,5 +1,5 @@
 import Foundation
-@_spi(Runners) import TerminalUI
+@_spi(Runners) import SwiftTUI
 
 @MainActor
 public final class FrameDiagnosticsSink {

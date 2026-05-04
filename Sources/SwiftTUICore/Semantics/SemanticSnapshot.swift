@@ -1,0 +1,119 @@
+/// A rectangular hit region for keyboard or pointer interaction.
+public struct InteractionRegion: Equatable, Sendable {
+  public var identity: Identity
+  public var rect: CellRect
+  public var routeID: RouteID
+  public var hitTestOrder: Int
+  public var captureOnPress: Bool
+  public var contentShape: Path?
+
+  public init(
+    identity: Identity,
+    rect: CellRect,
+    routeID: RouteID,
+    hitTestOrder: Int = 0,
+    captureOnPress: Bool = false,
+    contentShape: Path? = nil
+  ) {
+    self.identity = identity
+    self.rect = rect
+    self.routeID = routeID
+    self.hitTestOrder = hitTestOrder
+    self.captureOnPress = captureOnPress
+    self.contentShape = contentShape
+  }
+
+  public func contains(_ location: PointerLocation) -> Bool {
+    guard rect.contains(location.location) else {
+      return false
+    }
+    return contentShape?.contains(location.location) ?? true
+  }
+}
+
+/// A focusable region extracted from the placed tree.
+public struct FocusRegion: Equatable, Sendable {
+  public var identity: Identity
+  public var rect: CellRect
+  public var focusInteractions: FocusInteractions
+  package var scopePath: [Identity]
+  package var sectionIdentity: Identity?
+
+  public init(
+    identity: Identity,
+    rect: CellRect,
+    focusInteractions: FocusInteractions = .automatic,
+    scopePath: [Identity] = [],
+    sectionIdentity: Identity? = nil
+  ) {
+    self.identity = identity
+    self.rect = rect
+    self.focusInteractions = focusInteractions
+    self.scopePath = scopePath
+    self.sectionIdentity = sectionIdentity
+  }
+}
+
+/// Scroll metadata extracted for a scrollable node.
+public struct ScrollRoute: Equatable, Sendable {
+  public var identity: Identity
+  public var viewportRect: CellRect
+  public var contentBounds: CellRect
+
+  public init(
+    identity: Identity,
+    viewportRect: CellRect,
+    contentBounds: CellRect
+  ) {
+    self.identity = identity
+    self.viewportRect = viewportRect
+    self.contentBounds = contentBounds
+  }
+}
+
+/// Selection metadata extracted for list-like controls.
+public struct SelectionRoute: Equatable, Sendable {
+  public var identity: Identity
+  public var role: ScrollRole
+
+  public init(identity: Identity, role: ScrollRole) {
+    self.identity = identity
+    self.role = role
+  }
+}
+
+/// Navigation metadata extracted for focus and scene movement.
+public struct NavigationRoute: Equatable, Sendable {
+  public var identity: Identity
+
+  public init(identity: Identity) {
+    self.identity = identity
+  }
+}
+
+/// The complete semantic extraction result for a frame.
+public struct SemanticSnapshot: Equatable, Sendable {
+  public var interactionRegions: [InteractionRegion]
+  public var focusRegions: [FocusRegion]
+  public var navigationRoutes: [NavigationRoute]
+  public var scrollRoutes: [ScrollRoute]
+  public var selectionRoutes: [SelectionRoute]
+  public var namedCoordinateSpaces: [String: CellRect]
+
+  public init(
+    interactionRegions: [InteractionRegion] = [],
+    focusRegions: [FocusRegion] = [],
+    navigationRoutes: [NavigationRoute] = [],
+    scrollRoutes: [ScrollRoute] = [],
+    selectionRoutes: [SelectionRoute] = [],
+    namedCoordinateSpaces: [String: CellRect] = [:]
+  ) {
+    self.interactionRegions = interactionRegions
+    self.focusRegions = focusRegions
+    self.navigationRoutes = navigationRoutes
+    self.scrollRoutes = scrollRoutes
+    self.selectionRoutes = selectionRoutes
+    self.namedCoordinateSpaces = namedCoordinateSpaces
+  }
+}
+
