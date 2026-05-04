@@ -10,26 +10,39 @@ WASM_SDK_URL="${WASM_SDK_URL:-https://download.swift.org/swift-6.3.1-release/was
 WASM_SDK_CHECKSUM="${WASM_SDK_CHECKSUM:-bd47baa20771f366d8beed7970afaa30742b2210097afd15f85427226d8f4cf2}"
 
 CONTAINER_TOOL=""
-IMAGE="${LINUX_IMAGE:-swift:6.3}"
+# Default to the prebuilt image published by .github/workflows/build-linux-image.yml.
+# Override with LINUX_IMAGE=swift:6.3.1 (or any other base) to fall back to lazy
+# provisioning of bun + the Wasm SDK at runtime — see ensure_bun / ensure_wasm_sdk.
+IMAGE="${LINUX_IMAGE:-ghcr.io/goodhatsllc/swift-tui-linux:latest}"
 IMAGE_SLUG="$(printf '%s' "$IMAGE" | tr '/:' '--')"
 CONTAINER_NAME="${LINUX_CONTAINER_NAME:-swift-tui-${IMAGE_SLUG}}"
-CONTAINER_DIR="${LINUX_CONTAINER_DIR:-/home/runner/work/$REPO_BASENAME/$REPO_BASENAME}"
-SWIFTPM_HOME_VOLUME="${LINUX_SWIFTPM_HOME_VOLUME:-${CONTAINER_NAME}-swiftpm-home}"
+CONTAINER_DIR="${LINUX_CONTAINER_DIR:-/workspace}"
+# SwiftPM dependency + build cache. This is the one volume that genuinely
+# needs to survive container resets — it keeps `swift build` fast across
+# `./linux.sh nuke && ./linux.sh start`.
 SWIFTPM_CACHE_VOLUME="${LINUX_SWIFTPM_CACHE_VOLUME:-${CONTAINER_NAME}-swiftpm-cache}"
-BUN_VOLUME="${LINUX_BUN_VOLUME:-${CONTAINER_NAME}-bun}"
 LINUX_DISABLE_EXPLICIT_PLATFORMS="${LINUX_DISABLE_EXPLICIT_PLATFORMS:-1}"
 LINUX_SWIFT_SCRATCH_DIR="${LINUX_SWIFT_SCRATCH_DIR:-$CONTAINER_DIR/.build-linux}"
+
+# Image build settings (used by `./linux.sh build` and `push`). See
+# Scripts/linux/Dockerfile for the corresponding ARGs.
+LINUX_IMAGE_DOCKERFILE="${LINUX_IMAGE_DOCKERFILE:-$SCRIPT_DIR/linux/Dockerfile}"
+LINUX_IMAGE_CONTEXT="${LINUX_IMAGE_CONTEXT:-$SCRIPT_DIR/linux}"
+LINUX_IMAGE_BUILD_TAG="${LINUX_IMAGE_BUILD_TAG:-$IMAGE}"
+LINUX_SWIFT_VERSION="${LINUX_SWIFT_VERSION:-6.3.1}"
 
 usage() {
   cat <<EOF
 Usage: ./linux.sh <command> [args...]
 
 Lifecycle:
-  pull              Pull the configured Linux image
+  pull              Pull the configured Linux image from its registry
+  build             Build the image locally from Scripts/linux/Dockerfile
+  push              Push the locally-built image to its registry
   start             Create and start the container
   stop              Stop the container
   reset             Remove the container
-  nuke              Remove the container and cached volumes
+  nuke              Remove the container and the SwiftPM cache volume
 
 Interactive:
   shell             Open an interactive shell in the container
@@ -41,21 +54,34 @@ Repo-aware:
   cli-test          Run \`swift test\` for Runners/SwiftTUICLI
   cli-build-tests   Build Runners/SwiftTUICLI tests without running them
   examples          Build the Linux example packages
-  web               Build the browser examples after installing Bun and the Wasm SDK
+  web               Build the browser examples
   workflow          Mirror the Examples Linux workflow: examples + web
   full              Run \`swift test\`, then \`workflow\`
 
 Environment:
   LINUX_CONTAINER_TOOL  Force docker or podman
   LINUX_IMAGE           Override the image (default: $IMAGE)
+                       Set to e.g. swift:6.3.1 to fall back to the upstream
+                       Swift base image; bun and the Wasm SDK will be
+                       installed lazily on first use.
   LINUX_CONTAINER_NAME  Override the container name
   LINUX_CONTAINER_DIR   Override the in-container workspace mount
+                       (default: $CONTAINER_DIR)
   LINUX_DISABLE_EXPLICIT_PLATFORMS
                        Export DISABLE_EXPLICIT_PLATFORMS inside repo commands
                        (default: $LINUX_DISABLE_EXPLICIT_PLATFORMS)
   LINUX_SWIFT_SCRATCH_DIR
                        SwiftPM scratch directory for Linux builds
                        (default: $LINUX_SWIFT_SCRATCH_DIR)
+  LINUX_IMAGE_BUILD_TAG
+                       Tag to apply when running \`build\` / \`push\`
+                       (default: $LINUX_IMAGE_BUILD_TAG)
+  LINUX_SWIFT_VERSION   SWIFT_VERSION build arg passed to \`build\`
+                       (default: $LINUX_SWIFT_VERSION)
+  WASM_SDK_URL / WASM_SDK_CHECKSUM
+                       Wasm SDK build args passed to \`build\` and used by
+                       the lazy-install fallback when LINUX_IMAGE is a
+                       vanilla Swift base image
 EOF
 }
 
@@ -128,9 +154,7 @@ ensure_container() {
     pull_image
   fi
 
-  ensure_volume "$SWIFTPM_HOME_VOLUME"
   ensure_volume "$SWIFTPM_CACHE_VOLUME"
-  ensure_volume "$BUN_VOLUME"
 
   if container_exists && ! container_matches_config; then
     log "Recreating $CONTAINER_NAME for workspace $CONTAINER_DIR"
@@ -139,12 +163,16 @@ ensure_container() {
 
   if ! container_exists; then
     log "Creating $CONTAINER_NAME"
+    # We DO NOT mount /root/.swiftpm or /root/.bun as named volumes anymore.
+    # The Wasm SDK and bun ship inside the prebuilt image; mounting volumes
+    # over those paths would mask them. The only persistent cache that still
+    # earns its keep is /root/.cache/org.swift.swiftpm — SwiftPM's
+    # dependency + build artifact cache, which makes a cold `swift build`
+    # roughly 10x faster after a `nuke`.
     "$CONTAINER_TOOL" create \
       --name "$CONTAINER_NAME" \
       --mount "type=bind,src=$REPO_DIR,dst=$CONTAINER_DIR" \
-      --mount "type=volume,src=$SWIFTPM_HOME_VOLUME,dst=/root/.swiftpm" \
       --mount "type=volume,src=$SWIFTPM_CACHE_VOLUME,dst=/root/.cache/org.swift.swiftpm" \
-      --mount "type=volume,src=$BUN_VOLUME,dst=/root/.bun" \
       --workdir "$CONTAINER_DIR" \
       "$IMAGE" sleep infinity >/dev/null
   fi
@@ -153,6 +181,28 @@ ensure_container() {
     log "Starting $CONTAINER_NAME"
     "$CONTAINER_TOOL" start "$CONTAINER_NAME" >/dev/null
   fi
+}
+
+build_image() {
+  ensure_container_tool
+  if [[ ! -f "$LINUX_IMAGE_DOCKERFILE" ]]; then
+    echo "error: Dockerfile not found at $LINUX_IMAGE_DOCKERFILE" >&2
+    exit 1
+  fi
+  log "Building $LINUX_IMAGE_BUILD_TAG from $LINUX_IMAGE_DOCKERFILE"
+  "$CONTAINER_TOOL" build \
+    --file "$LINUX_IMAGE_DOCKERFILE" \
+    --tag "$LINUX_IMAGE_BUILD_TAG" \
+    --build-arg "SWIFT_VERSION=$LINUX_SWIFT_VERSION" \
+    --build-arg "WASM_SDK_URL=$WASM_SDK_URL" \
+    --build-arg "WASM_SDK_CHECKSUM=$WASM_SDK_CHECKSUM" \
+    "$LINUX_IMAGE_CONTEXT"
+}
+
+push_image() {
+  ensure_container_tool
+  log "Pushing $LINUX_IMAGE_BUILD_TAG"
+  "$CONTAINER_TOOL" push "$LINUX_IMAGE_BUILD_TAG"
 }
 
 run_in_container() {
@@ -328,9 +378,13 @@ main() {
       "$0" reset
       log "Removing cached volumes"
       "$CONTAINER_TOOL" volume rm -f \
-        "$SWIFTPM_HOME_VOLUME" \
-        "$SWIFTPM_CACHE_VOLUME" \
-        "$BUN_VOLUME" >/dev/null 2>&1 || true
+        "$SWIFTPM_CACHE_VOLUME" >/dev/null 2>&1 || true
+      ;;
+    build)
+      build_image
+      ;;
+    push)
+      push_image
       ;;
     shell)
       ensure_container

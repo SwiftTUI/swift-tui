@@ -1,0 +1,38 @@
+# The Linux image at Scripts/linux/Dockerfile does NOT COPY the repo into the
+# image — Scripts/linux.sh bind-mounts the working tree at runtime. So this
+# file mostly exists to keep `docker build .` from the repo root from sending
+# multi-GB of build artifacts and node_modules over to the daemon if someone
+# ever does that by accident.
+
+# Swift / SwiftPM
+.build/
+.build-*/
+.swiftpm/
+Package.resolved.lock
+
+# Bun / Node
+node_modules/
+**/node_modules/
+.bun/
+
+# Web build outputs
+Examples/WebExample/dist/
+Examples/WebExample/pages-dist/
+Examples/XtermWebExample/dist/
+Website/dist/
+.build-docs/
+_cf-pages-artifact/
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.xcuserstate
+xcuserdata/
+
+# Git history is large and not needed in the image
+.git/
+.github/
+
+# Docs source isn't needed in the image
+docs/

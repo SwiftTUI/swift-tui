@@ -1,0 +1,149 @@
+name: Build Linux dev image
+
+# Builds Scripts/linux/Dockerfile and pushes it to GHCR. Scripts/linux.sh
+# and .devcontainer/devcontainer.json both consume the resulting image, so
+# this workflow is the only producer.
+#
+# Triggers are intentionally narrow: this image rebuilds only when its
+# inputs change (the Dockerfile itself, the Swift toolchain pin, or this
+# workflow). Use `workflow_dispatch` to force a rebuild on demand.
+#
+# Security note: every user-controllable input ($SWIFT_VERSION, $REF_NAME,
+# $EVENT_NAME, $OVERRIDE) is funneled through `env:` and shell-quoted, never
+# inlined into a `run:` script. See the GitHub blog post on workflow
+# injection prevention.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Scripts/linux/Dockerfile"
+      - ".swift-version"
+      - ".github/workflows/build-linux-image.yml"
+  pull_request:
+    paths:
+      - "Scripts/linux/Dockerfile"
+      - ".swift-version"
+      - ".github/workflows/build-linux-image.yml"
+  workflow_dispatch:
+    inputs:
+      push:
+        description: "Push the built image to GHCR (default true on main, false on PRs)"
+        type: boolean
+        required: false
+
+permissions:
+  contents: read
+  # Required for `docker login ghcr.io` with the auto-provisioned GITHUB_TOKEN.
+  packages: write
+
+concurrency:
+  group: build-linux-image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  # GHCR requires lowercase namespaces; hard-code the org rather than
+  # toLower'ing github.repository_owner so a fork doesn't accidentally try
+  # to push to its own namespace without packages:write being set up.
+  IMAGE_NAME: ghcr.io/goodhatsllc/swift-tui-linux
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read Swift version
+        id: swift
+        shell: bash
+        run: |
+          set -euo pipefail
+          # .swift-version is repo-controlled; tr drops any whitespace so
+          # the value is safe to embed in shell-quoted contexts later.
+          swift_version="$(tr -d '[:space:]' < .swift-version)"
+          printf 'version=%s\n' "$swift_version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        # Required for build-push-action's BuildKit features and the
+        # registry-backed cache below.
+        uses: docker/setup-buildx-action@v3
+
+      - name: Decide whether to push
+        id: push_decision
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          OVERRIDE: ${{ inputs.push }}
+        run: |
+          set -euo pipefail
+          # Default: push on main and on workflow_dispatch; build-only on PRs.
+          # All inputs are read from env: vars (never inlined as ${{...}} in
+          # the script body) so a malicious branch name can't break out.
+          if [ -n "${OVERRIDE:-}" ]; then
+            push="$OVERRIDE"
+          elif [ "$EVENT_NAME" = "push" ] && [ "$REF_NAME" = "main" ]; then
+            push=true
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            push=true
+          else
+            push=false
+          fi
+          printf 'push=%s\n' "$push" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        if: steps.push_decision.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: tags
+        shell: bash
+        env:
+          SWIFT_VERSION: ${{ steps.swift.outputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          short_sha="${COMMIT_SHA:0:7}"
+          # Always emit a SHA tag so deployments can pin if `:latest` regresses.
+          tags=("$IMAGE_NAME:sha-$short_sha")
+          # Toolchain-pinned tag for visibility when bumping Swift.
+          tags+=("$IMAGE_NAME:swift-$SWIFT_VERSION")
+          # `:latest` only on main pushes / manual dispatches against main.
+          if [ "$EVENT_NAME" != "pull_request" ] && [ "$REF_NAME" = "main" ]; then
+            tags+=("$IMAGE_NAME:latest")
+          fi
+          # Newline-separated for build-push-action's `tags:` input.
+          {
+            printf 'tags<<EOF\n'
+            printf '%s\n' "${tags[@]}"
+            printf 'EOF\n'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build (and optionally push) image
+        uses: docker/build-push-action@v6
+        with:
+          # Tiny build context — the Dockerfile doesn't COPY anything from
+          # the repo, so we limit the context to its own directory.
+          context: Scripts/linux
+          file: Scripts/linux/Dockerfile
+          push: ${{ steps.push_decision.outputs.push == 'true' }}
+          tags: ${{ steps.tags.outputs.tags }}
+          # Registry-backed BuildKit cache. Stored as a separate `:buildcache`
+          # tag in the same repo, so cache state survives across branches and
+          # isn't bound by the GitHub Actions cache 10GB / 7-day limits.
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+          build-args: |
+            SWIFT_VERSION=${{ steps.swift.outputs.version }}
+          # Add provenance/SBOM for supply-chain hygiene. Cheap to enable.
+          provenance: true
+          sbom: true
