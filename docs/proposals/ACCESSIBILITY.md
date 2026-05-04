@@ -37,12 +37,16 @@ is to keep the context here rather than scattered across session notes.
    10. [Testing](#10-testing-tuis-for-accessibility)
 9. [Proposed API surface](#proposed-api-surface)
 10. [Anti-patterns this proposal commits us to avoiding](#anti-patterns-this-proposal-commits-us-to-avoiding)
-11. [What the Web and SwiftUI targets unlock](#what-the-web-and-swiftui-targets-unlock)
-12. [Open questions](#open-questions)
-13. [Out of scope](#out-of-scope-this-version)
-14. [Suggested phasing](#suggested-phasing)
-15. [Sources](#sources)
-16. [Changelog](#changelog)
+11. [What the non-CLI targets unlock](#what-the-non-cli-targets-unlock)
+    1. [Embedded web host](#embedded-web-host-platformswebhost-proposed)
+    2. [WASM web target](#wasm-web-target-platformsweb)
+    3. [SwiftUI host](#swiftui-host-platformsswiftui)
+12. [Relationship to other proposals](#relationship-to-other-proposals)
+13. [Open questions](#open-questions)
+14. [Out of scope](#out-of-scope-this-version)
+15. [Suggested phasing](#suggested-phasing)
+16. [Sources](#sources)
+17. [Changelog](#changelog)
 
 ---
 
@@ -93,22 +97,38 @@ direct motivation for this proposal.
 
 ## Strategic shape
 
-The accessibility story is **three rendering targets, three strategies**,
+The accessibility story is **four rendering targets, four strategies**,
 all driven from the same `semantics` phase output:
 
-| Target | Strategy | A11y ceiling |
-|---|---|---|
-| **CLI** | Terminal-mode best-effort: cursor-as-focus, env-var contract, ASCII fallback, reduce-motion, append-only status, optional linear "drop the TUI" mode | Bound by what the user's terminal + screen reader can do |
-| **Web** | Emit real ARIA roles, labels, live regions from the same semantic data | Full WCAG 2.2 AA achievable |
-| **SwiftUI** | Bridge the same semantic data to `accessibilityLabel` / `accessibilityRole` / `accessibilityHidden` | Full UIKit/AppKit accessibility |
+| Target | Delivery shape | Strategy | A11y ceiling |
+|---|---|---|---|
+| **CLI** | Local binary, terminal output | Cursor-as-focus, env-var contract, ASCII fallback, reduce-motion, append-only status, optional linear "drop the TUI" mode | Bound by what the user's terminal + screen reader can do |
+| **Embedded web host** | Local binary, browser at `localhost` | Same binary opens an HTTP/WebSocket server; the browser renders DOM with real ARIA from the semantic stream. `myapp --web` and you're in the browser. | Full WCAG 2.2 AA achievable. **The strongest accessibility delivery vehicle for any compiled SwiftTUI binary.** |
+| **WASM web** | Compile to WASM, deploy to web | View tree runs entirely in the browser; same ARIA mapping. The "deploy your TUI as a website" story. | Full WCAG 2.2 AA achievable |
+| **SwiftUI host** | Local binary, native macOS / iOS window | Bridge semantic data to SwiftUI's `.accessibilityLabel` / `.accessibilityRole` / `.accessibilityHidden` modifiers. | Full UIKit/AppKit accessibility |
 
-The CLI target is the hardest and the most novel; the Web target is our
-strongest accessibility story by a wide margin, and is the recommendation
-we can give to users whose terminal screen reader story is poor (e.g.
-blind macOS users, since VoiceOver-on-Terminal.app is structurally weak).
+The CLI target is the hardest and the most novel. The **embedded web
+host** is the most important addition since the first draft of this
+proposal: it gives every compiled SwiftTUI binary a "view this in the
+browser" capability without needing a separate WASM build, which makes
+it our credible accessibility answer for users on platforms where
+terminal screen reader support is weak (notably blind macOS users —
+VoiceOver-on-Terminal.app is structurally poor; see
+[the landscape](#screen-reader-support-per-platform)).
 
-This proposal focuses on the CLI target and the shared API surface. The
-Web and SwiftUI mappings are sketched but deferred to follow-up proposals.
+The embedded web host architecture is investigated in detail in the
+sister proposal [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md). The
+flag surface that gates accessibility modes (`--accessible`, `--ascii`,
+`--reduce-motion`, `--no-color`, `--web`, etc.) is investigated in
+[`ARGUMENT_PARSING.md`](./ARGUMENT_PARSING.md). This proposal is the
+**design authority** for the semantic data; the other two are design
+authorities for the **delivery vehicle** and the **flag surface**
+respectively.
+
+This proposal focuses on the CLI target, the shared semantic API
+surface, and the per-target render strategies. The wire-format and
+server details belong in `EMBEDDED_WEB_HOST.md`; the flag-parsing and
+env-var-precedence implementation details belong in `ARGUMENT_PARSING.md`.
 
 ## Principles
 
@@ -1043,6 +1063,13 @@ Read at runtime startup and on `SIGWINCH` / config reload. CLI flags
 override env. No-op when stdout is non-TTY (auto-disables animations
 and color regardless).
 
+The **parsing** of these flags and env vars and the precedence
+implementation live in [`ARGUMENT_PARSING.md`](./ARGUMENT_PARSING.md);
+this section defines the **semantic meaning** of each variable. The
+two proposals must stay in sync. If you're changing the precedence
+rules, edit `ARGUMENT_PARSING.md`. If you're changing what a flag
+*means* in terms of accessibility behavior, edit here.
+
 | Variable | Effect |
 |---|---|
 | `NO_COLOR` (set, any value) | Disable color. Wins over `FORCE_COLOR`. |
@@ -1162,31 +1189,83 @@ realize it.
 
 ---
 
-## What the Web and SwiftUI targets unlock
+## What the non-CLI targets unlock
 
-### Web target (`Platforms/Web/`)
+### Embedded web host (`Platforms/WebHost/`, proposed)
 
-Because the web target renders to HTML over `WASISurfaceBridge`, the
-same `semantics` phase output can drive real ARIA. Sketched mapping
-(deferred to a follow-up proposal):
+This is the strongest accessibility delivery vehicle in the framework
+and the single most consequential update to this proposal since v1.
 
-- `AccessibilityRole.button` → `<button role="button">`
-- `AccessibilityRole.heading(level: 2)` → `<h2>`
-- `accessibilityLabel(_:)` → `aria-label="…"`
-- `accessibilityHint(_:)` → `aria-describedby` referencing a hidden
-  description node
-- `accessibilityHidden(_:)` → `aria-hidden="true"` and skipped from
-  focus order
-- `accessibilityLiveRegion(_:)` → `aria-live="polite|assertive"`
-- `AccessibilityAnnouncer.announce` → text injected into a hidden,
-  visually-offscreen `aria-live` region
+The user has a compiled SwiftTUI binary. They run `myapp --web`. The
+binary opens an HTTP/WebSocket server bound to `127.0.0.1`, prints a
+URL with a per-launch auth token, and waits. The user opens the URL in
+their browser. The browser renders the same view tree using real DOM
+elements with real ARIA roles, labels, and live regions, driven by the
+semantic stream the binary is sending over the WebSocket.
 
-This is our credible answer to "I'm a blind user on macOS and Terminal
-accessibility is bad on this platform" — *run the same app in the
-browser*. Textual has taken the same path with `textual serve` and
-considers it their primary a11y story.
+For accessibility this is transformational because:
 
-### SwiftUI target (`Platforms/SwiftUI/`)
+1. **Zero recompile.** The same binary that runs as a TUI runs as a
+   web server. No WASM toolchain, no separate build, no deploy step.
+   The accessibility mode is a flag away.
+2. **The browser is a known-accessible target.** macOS VoiceOver works
+   well in browsers; NVDA works well in browsers; Orca works well in
+   Firefox/Chromium. We do not need to fight terminal-AT integration —
+   we sidestep it.
+3. **Real ARIA, not "ARIA-flavored text."** Ink fakes ARIA by
+   expanding visual cues into text the terminal screen reader reads.
+   We can emit honest `<button role="button" aria-label="…">` markup
+   that browsers and ATs already speak natively.
+4. **Same semantic data feeds it.** The `semantics` phase already
+   captures role/label/state. The web host's only job is to serialize
+   that record over the wire and the browser's only job is to mount
+   it as DOM. The accessibility API authoring surface
+   (`accessibilityLabel(_:)`, `accessibilityRole(_:)`, etc.) lights up
+   on this target with no extra authoring work.
+
+The architecture, wire format, server choice, security model, and CLI
+shape are designed in [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md).
+For accessibility's purposes the contract is:
+
+| Authoring | Wire | Browser DOM |
+|---|---|---|
+| `accessibilityRole(.button)` | `{role: "button", …}` | `<button role="button">` |
+| `accessibilityRole(.heading(level: 2))` | `{role: "heading", level: 2, …}` | `<h2>` |
+| `accessibilityLabel("Save")` | `{label: "Save", …}` | `aria-label="Save"` |
+| `accessibilityHint("Saves the file")` | `{hint: "…", …}` | `aria-describedby` |
+| `accessibilityHidden(true)` | `{hidden: true, …}` | `aria-hidden="true"` and skipped from focus |
+| `accessibilityLiveRegion(.polite)` | `{liveRegion: "polite", …}` | `aria-live="polite"` |
+| `AccessibilityAnnouncer.announce(_:)` | `{type: "announce", message: "…", politeness: …}` | text injected into hidden offscreen `aria-live` region |
+
+This is the same Textual takes with [`textual serve`](https://github.com/Textualize/textual-serve)
+and considers their primary accessibility story — but Textual ships
+raw ANSI bytes and lets xterm.js render visually, which gives screen
+readers nothing semantic. We can do meaningfully better because our
+semantic record is already richer than ANSI.
+
+For users whose terminal screen reader story is poor — blind macOS
+users especially — the recommended workflow is:
+
+```
+$ myapp --web
+SwiftTUI is running at http://127.0.0.1:9123/?token=...
+$ # Open the URL in your browser; use it there with VoiceOver/NVDA/Orca.
+```
+
+### WASM web target (`Platforms/Web/`)
+
+The existing WASM-based web target is a peer to the embedded host. It
+is the right answer for "deploy your TUI as a public website." The
+ARIA mapping is identical; the difference is *where* the SwiftTUI
+runtime executes (in-browser via WASM vs in-process on the user's
+machine).
+
+For accessibility purposes, both web targets unlock the same set of
+ARIA bindings driven from the same `semantics` phase. The framework
+should provide a single ARIA-emission code path that both targets
+consume, parameterized over the transport.
+
+### SwiftUI host (`Platforms/SwiftUI/`)
 
 The SwiftUI host can bridge swift-tui's semantic record directly to
 SwiftUI's accessibility modifiers. Sketched (deferred):
@@ -1199,6 +1278,40 @@ SwiftUI's accessibility modifiers. Sketched (deferred):
 | `accessibilityHidden(_:)` | `.accessibilityHidden(_:)` |
 | `accessibilityLiveRegion(_:)` | combination of `.accessibilityElement` + announcement post |
 | `AccessibilityAnnouncer.announce` | `UIAccessibility.post(.announcement, …)` |
+
+---
+
+## Relationship to other proposals
+
+This proposal is one of three closely related drafts on the
+`accessibility-investigation` branch. Each owns a different design
+authority and they cross-reference rather than duplicate:
+
+| Proposal | Owns |
+|---|---|
+| [`ACCESSIBILITY.md`](./ACCESSIBILITY.md) (this doc) | The semantic API surface (`accessibilityLabel`, `accessibilityRole`, `accessibilityHidden`, `accessibilityLiveRegion`, `AccessibilityAnnouncer`), per-target render strategies (cursor-as-focus, ASCII fallback, reduce-motion, ARIA mapping), and the env-var contract for accessibility-related toggles. |
+| [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) | The architecture, wire format, server choice, browser bundle, security model, and CLI shape for "run your binary, view it in a browser at localhost." Recommends a `Platforms/WebHost/` runner peer using FlyingFox + the existing WASISurfaceBridge encoder. |
+| [`ARGUMENT_PARSING.md`](./ARGUMENT_PARSING.md) | The framework-reserved flag namespace, the `SwiftTUIOptions` `OptionGroup` and `SwiftTUIApp` protocol, and the precedence rules between CLI flags, env vars, and TTY auto-detection. Recommends layering on `swift-argument-parser` and shipping as a peer to the existing `SwiftTUICLI` runner. |
+
+**Reading order for a new contributor:** start here (`ACCESSIBILITY.md`)
+for the *why*, then `ARGUMENT_PARSING.md` for the *flag surface*, then
+`EMBEDDED_WEB_HOST.md` for the *delivery vehicle*. The three together
+form the accessibility plan; this proposal alone is incomplete.
+
+**What this means concretely:**
+
+- The `--accessible`, `--ascii`, `--reduce-motion`, `--no-color`, and
+  `--linear` flags listed in this proposal's [environment contract](#environment-contract)
+  are *defined* here (semantic meaning) but *implemented* in
+  `ARGUMENT_PARSING.md`'s `SwiftTUIOptions` (parsing, precedence, env
+  var alignment). Don't duplicate the parsing rules here.
+- The `--web` flag and its sub-flags (`--port`, `--bind`, `--no-open`,
+  `--web-token`) are implemented in `EMBEDDED_WEB_HOST.md` and surfaced
+  in `ARGUMENT_PARSING.md`'s standard flags table. This proposal
+  references them only to note their accessibility role.
+- The "ARIA mapping" half of Phase 6 in this proposal's phasing
+  depends on the embedded web host runner shipping (or the WASM web
+  target maturing). Both feed off the same semantic record.
 
 ---
 
@@ -1245,9 +1358,23 @@ to be argued with, not accepted.)
    or a parallel one? Lean: parallel (semantic tokens are *theme*
    intent; accessibility roles are *AT* intent; conflating risks both).
 
-8. **Web target: do we ship this in v1, or is it a follow-up?** It's
-   our strongest a11y story, but it's also a separate code path. Lean:
-   sketch in v1, ship the wiring in v2 once the CLI surface stabilizes.
+8. **Embedded web host: do we ship the ARIA mapping in v1, or is it a
+   follow-up?** Now that
+   [`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) exists, the
+   question is whether the accessibility ARIA mapping rides on its v1
+   or waits for v2. Argument for v1: it's the strongest a11y story we
+   have and the embedded-host wire format already carries semantic
+   data, so it's mostly a browser-side bind. Argument against:
+   embedded host has its own scope; coupling slows both. Lean: ship
+   ARIA mapping in embedded-host v1, but keep the per-target render
+   strategy gated behind a feature flag so we can ship the CLI side
+   independently.
+
+   The original v1-vs-v2 question for the **WASM** web target stands
+   separately: it's the deploy-as-website story and is less urgent
+   for accessibility than the embedded host. Lean: WASM ARIA mapping
+   in v2 of the WASM target, after the embedded host validates the
+   semantic-record-to-DOM translation.
 
 9. **How do we handle `Canvas` / `BrailleCanvas` / image rendering?**
    These are visual-only by nature. Lean: require an
@@ -1305,39 +1432,66 @@ to be argued with, not accepted.)
 
 ## Suggested phasing
 
-(Sketch only — order is argued for, not committed to.)
+(Sketch only — order is argued for, not committed to. Phases marked
+with † depend on `ARGUMENT_PARSING.md` reaching at least Phase 1
+(SwiftTUIOptions OptionGroup landed). Phases marked with ‡ depend on
+`EMBEDDED_WEB_HOST.md` reaching at least Phase 1 (basic runner +
+WebSocket transport landed).)
 
-1. **Phase 1 — Env contract + ASCII mode.** Land the env-var reader,
+1. **Phase 1 — Env contract + ASCII mode.** † Land the env-var reader,
    isatty checks, glyph fallback table, `--ascii`/`--no-color` flags.
-   Cheapest, broadest user-visible win, no API changes.
+   Cheapest, broadest user-visible win, no semantic-API changes. Pairs
+   with `ARGUMENT_PARSING.md` Phase 1 because flag parsing lives there.
 
 2. **Phase 2 — Cursor-as-focus.** Wire the rasterizer to position the
    hardware cursor at the focused widget's interaction point. Tiny
    surface area; outsized impact (the single highest-ROI move per
-   blind.guru / Brick).
+   blind.guru / Brick). No dependencies; can land in parallel with
+   Phase 1.
 
 3. **Phase 3 — Accessibility modifiers.** `accessibilityLabel`,
    `accessibilityRole`, `accessibilityHidden`, `accessibilityHint`.
-   Wire to the `semantics` phase.
+   Wire to the `semantics` phase. Authoring API only — no rendering
+   changes; render targets pick up the data when they're ready.
 
-4. **Phase 4 — Reduce-motion + accessible mode.** Spinner rewrite,
+4. **Phase 4 — Reduce-motion + accessible mode.** † Spinner rewrite,
    accessible-mode linear render, append-only status,
-   `SWIFTTUI_ACCESSIBLE=1`.
+   `SWIFTTUI_ACCESSIBLE=1`. Cross-cuts with `ARGUMENT_PARSING.md` for
+   the `--accessible` / `--reduce-motion` flag surface.
 
 5. **Phase 5 — Live regions + announcer.** `accessibilityLiveRegion`
-   modifier and `AccessibilityAnnouncer.announce(_:)` API.
+   modifier and `AccessibilityAnnouncer.announce(_:)` API. The CLI
+   side appends to a status region; the web/SwiftUI sides forward to
+   their respective live-region machinery in later phases.
 
-6. **Phase 6 — Web ARIA mapping.** Translate the semantic record to
-   real ARIA in the web target.
+6. **Phase 6 — Embedded-host ARIA mapping.** ‡ Translate the semantic
+   record to real ARIA in the browser bundle when running under the
+   embedded web host. **This is the strongest single accessibility
+   ship the framework can make** because it gives every binary a
+   first-class accessible viewer. Depends on the embedded host
+   landing.
 
-7. **Phase 7 — SwiftUI host bridge.** Map to SwiftUI accessibility
-   modifiers in the SwiftUI host.
+7. **Phase 7 — WASM web ARIA mapping.** Same code path as Phase 6,
+   different transport. Strictly less urgent for accessibility (the
+   embedded host already serves the blind-user story); valuable for
+   the deploy-as-website story.
 
-8. **Phase 8 — Tests + lint.** Snapshot tests for accessible-mode
-   output; prek hooks for raw-glyph and color-only-state detection.
+8. **Phase 8 — SwiftUI host bridge.** Map the semantic record to
+   SwiftUI accessibility modifiers in the SwiftUI host. Lights up
+   VoiceOver/AT on Apple platforms.
+
+9. **Phase 9 — Tests + lint.** Snapshot tests for accessible-mode
+   output; prek hooks for raw-glyph and color-only-state detection;
+   listening tests under VoiceOver/NVDA/Orca documented in
+   `Tests/SwiftTUITests/Accessibility/README.md`. The browser-target
+   listening tests are the easiest wins because the browser AT story
+   is mature.
 
 Each phase is independently shippable; each makes the framework
-materially more accessible than the previous one.
+materially more accessible than the previous one. Phases 1–5 are
+**CLI accessibility** and can land without any web-host work. Phase 6
+is the headline a11y ship and benefits the most users; it requires
+the embedded host runner to exist.
 
 ---
 
@@ -1430,7 +1584,23 @@ in this document. The primary sources, grouped by theme:
 
 - 2026-05-04: Draft created from research findings on the
   `accessibility-investigation` branch. First version was a thin
-  proposal; this version expanded to preserve the full research
+  proposal; second version expanded to preserve the full research
   context (per-platform screen reader landscape, peer-framework
   comparison with code, full best-practices checklist with quotes,
   consolidated source bibliography).
+- 2026-05-04: Synthesis pass after spawning two sister proposals
+  ([`EMBEDDED_WEB_HOST.md`](./EMBEDDED_WEB_HOST.md) and
+  [`ARGUMENT_PARSING.md`](./ARGUMENT_PARSING.md)). Strategic shape
+  expanded from three to four targets to recognize that the embedded
+  web host (run-locally, view-in-browser-at-localhost) is a separate
+  delivery vehicle from the WASM web target and is the **strongest
+  accessibility delivery vehicle** for any compiled SwiftTUI binary
+  because it requires no recompile and gives blind users on weak
+  terminal-AT platforms (notably macOS) a credible browser-based
+  workflow. Added "Relationship to other proposals" section. Renamed
+  "What the Web and SwiftUI targets unlock" to "What the non-CLI
+  targets unlock" and added an embedded-web-host subsection.
+  Updated Q8 to reflect the new architecture. Phasing expanded from
+  8 to 9 phases, with explicit cross-proposal dependencies marked.
+  Env-var-contract section now cross-references the parsing rules in
+  `ARGUMENT_PARSING.md`.
