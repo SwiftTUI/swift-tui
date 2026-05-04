@@ -1107,31 +1107,28 @@ extension View {
 }
 ```
 
-`AccessibilityRole` is a small enum, modeled on the Ink subset (which
-is itself an ARIA subset filtered to roles that have a meaningful TUI
-analog).
+`AccessibilityRole` is the renamed-and-extended successor to the
+existing `PresentationRole` per
+[ADR-0011](../decisions/0011-accessibility-role-replaces-presentation-role.md).
+Built-ins already populate 20 of the cases; ADR-0011 adds the
+remaining ~15. Single field on `SemanticMetadata`, single modifier
+surface, single source of truth.
 
-> **Audit correction (2026-05-04):** `Sources/Core/SemanticRoleTypes.swift`
-> already defines `PresentationRole` with 20 of the cases this enum
-> needs, and ~15 of those are populated end-to-end on built-in
-> widgets today (see [What we already have](#what-we-already-have-in-swift-tui)
-> and [`SUBSTRATE_AUDIT.md`](./SUBSTRATE_AUDIT.md) Finding 1). The
-> open question is whether to **rename** `PresentationRole` to
-> `AccessibilityRole` and add the missing cases, or to introduce a
-> sibling type. Lean: rename — the data *is* the accessibility role;
-> "presentation" was a hint, not a separate concept. The cases below
-> are the **target** shape after the rename.
-
-Cases existing on `PresentationRole` today (kept):
+Cases inherited from `PresentationRole` (kept verbatim):
 
 ```
-button, link, textField, secureField (currently aliased to
-.textField), slider, stepper, picker, disclosureGroup, alert,
-confirmationDialog, menu, list, scrollView, scrollViewWithIndicators,
-section, sheet, tabView, table, tableRow, toggle, textEditor
+alert, button, confirmationDialog, disclosureGroup, link, list, menu,
+picker, scrollView, scrollViewWithIndicators, section, sheet, slider,
+stepper, table, tableRow, tabView, textEditor, textField, toggle
 ```
 
-New cases to add for full coverage (open for review):
+Cases promoted out of aliasing:
+
+```
+secureField              // SecureField now reports .secureField (was aliased to .textField)
+```
+
+Cases added by ADR-0011:
 
 ```swift
 case checkbox            // alternative to .toggle for checkbox-style controls
@@ -1148,8 +1145,8 @@ case cell
 case menuItem
 case tab                 // a single tab item; .tabView is the container
 case tabPanel            // body of a tab
-case group
-case custom(String)      // explicit escape hatch
+case group               // generic container with no more specific role
+case custom(String)      // explicit escape hatch for app-specific roles
 ```
 
 Plus the politeness enum, which is new:
@@ -1159,6 +1156,17 @@ public enum AccessibilityPoliteness: Sendable {
   case off, polite, assertive
 }
 ```
+
+The structural representation that `SemanticExtractor` produces from
+these — the `AccessibilityNode` struct that flows through to the
+embedded-host wire format, the SwiftUI bridge, and the CLI runtime
+— is locked in by
+[ADR-0012](../decisions/0012-accessibility-node-shape.md). Headlines:
+flat array on `SemanticSnapshot`; parent encoded via
+`parentIdentity: Identity?`; focus state computed by the consumer
+(not baked into the node); pruned to a11y-relevant nodes plus
+structural ancestors; document order = layout reading order; cursor
+anchor field on the node, in absolute surface coordinates.
 
 ### Imperative announcement primitive
 
@@ -1454,9 +1462,13 @@ to be argued with, not accepted.)
    overrides.
 
 2. **Does `accessibilityRole` default infer from the view kind, or is
-   it required for non-builtins?** SwiftUI infers; Ink requires
-   explicit. Lean: infer for builtins, default to `.group` for custom
-   views, with a doc-callout encouraging explicit role.
+   it required for non-builtins?** **Resolved by
+   [ADR-0012](../decisions/0012-accessibility-node-shape.md)
+   §"Role inference"** — built-ins set the role in
+   `SemanticMetadata.accessibilityRole` (post ADR-0011 rename);
+   consumer-authored views without an explicit role default to
+   `.group` if they have a11y-relevant descendants and are skipped
+   otherwise.
 
 3. **Linear-mode HStack ordering: top-down left-right by source order,
    or by laid-out reading order?** SwiftUI picks layout reading order;
@@ -1470,8 +1482,12 @@ to be argued with, not accepted.)
 
 5. **Do we need an `accessibilityCursorAnchor()` modifier, or can the
    focus engine always derive the anchor from the focused view's
-   geometry?** Lean: derive by default; expose the modifier as the
-   escape hatch.
+   geometry?** **Resolved by
+   [ADR-0012](../decisions/0012-accessibility-node-shape.md)** —
+   the field exists on `AccessibilityNode` (in absolute surface
+   coordinates); built-in TextField populates it for caret tracking;
+   nil means "use the node's origin" and the modifier is the escape
+   hatch for consumer-authored views.
 
 6. **How do animations interact with reduce-motion?** Specifically: a
    transition that *also* changes text content (e.g., a list reorder).
@@ -1805,3 +1821,19 @@ in this document. The primary sources, grouped by theme:
   exists for `NO_COLOR`/`TERM`/`COLORTERM`/`LANG` — Phase 1 now
   *extends* rather than *constructs*. Net effect: earlier phases
   smaller, Phase 6 larger, total scope unchanged.
+- 2026-05-04: Two foundational decisions locked in as ADRs.
+  [ADR-0011](../decisions/0011-accessibility-role-replaces-presentation-role.md)
+  renames `PresentationRole` to `AccessibilityRole` and adds the
+  missing ~15 cases — single role channel, single source of truth.
+  [ADR-0012](../decisions/0012-accessibility-node-shape.md) locks in
+  the `AccessibilityNode` shape: flat array on `SemanticSnapshot`,
+  parent encoded via `parentIdentity: Identity?`, focus state
+  computed by the consumer (not on the node), pruned to
+  a11y-relevant nodes plus structural ancestors, document order =
+  layout reading order, cursor anchor on the node in absolute
+  surface coordinates. The *Proposed API surface
+  (AccessibilityRole)* section updated to drop "rename pending"
+  framing; open questions Q2 (role inference) and Q5 (cursor anchor)
+  marked resolved with ADR cross-references. Phase 3a and Phase 3b
+  no longer carry foundational decisions; they are now pure
+  implementation phases.
