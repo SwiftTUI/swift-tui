@@ -111,8 +111,10 @@ Test suites are split by layer:
 - `Tests/SwiftTUITests/` — runtime, rendering, fixtures, end-to-end behavior
 - `Runners/SwiftTUICLI/Tests/SwiftTUICLITests/` — CLI runner, socket, pty,
   attach, scene-management behavior
-- `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests/` — WASI runner and
+- `Runners/SwiftTUIWASI/Tests/SwiftTUIWASITests/` — WASI launcher and
   manifest-mode behavior
+- `Runners/SwiftTUIWASI/Tests/WASISurfaceBridgeTests/` — `web-surface`
+  encoder, input parser, and transport behavior
 
 Prefer Swift Testing (`import Testing`, `@Test`, `#expect`) for new tests.
 Existing XCTest suites may remain.
