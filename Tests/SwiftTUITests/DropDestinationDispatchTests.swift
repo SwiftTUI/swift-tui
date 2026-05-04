@@ -1,8 +1,8 @@
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @_spi(Runners) @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 /// End-to-end drop-dispatch tests. Unlike `DropDestinationTests` (which
 /// only exercise the registry-registration path) these drive a real

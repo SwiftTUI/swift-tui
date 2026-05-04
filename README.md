@@ -141,7 +141,7 @@ Or build the combined archive that powers the public site:
 swiftly run swift package \
   --allow-writing-to-directory .build-docs \
   generate-documentation \
-  --target View --target SwiftTUI --target SwiftTUICharts \
+  --target SwiftTUIViews --target SwiftTUI --target SwiftTUICharts \
   --enable-experimental-combined-documentation \
   --transform-for-static-hosting \
   --output-path .build-docs

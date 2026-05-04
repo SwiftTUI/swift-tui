@@ -24,14 +24,14 @@ See [docs/TOOLCHAINS.md](docs/TOOLCHAINS.md) for the canonical toolchain story
 ## Architecture (one-page summary)
 
 ```
-SwiftTUI  ->  View  ->  Core
+SwiftTUI  ->  SwiftTUIViews  ->  SwiftTUICore
 ```
 
-- **Core** — pure, terminal-IO-free pipeline
-- **View** — SwiftUI-shaped authoring surface
-- **SwiftTUI** — terminal runtime; re-exports View and Core via `@_exported import`
+- **SwiftTUICore** — pure, terminal-IO-free pipeline
+- **SwiftTUIViews** — SwiftUI-shaped authoring surface
+- **SwiftTUI** — terminal runtime; re-exports SwiftTUIViews and SwiftTUICore via `@_exported import`
 - **SwiftTUICharts** — compact chart/metric track; separate product
-- **AnimatedImage** — finite pre-composed animated image track; GIF codec owner
+- **SwiftTUIAnimatedImage** — finite pre-composed animated image track; GIF codec owner
 
 Every frame flows through seven strict phases:
 
@@ -94,7 +94,7 @@ Full policy in [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md).
 
 - **swift-format** — auto-formats staged `.swift` files
 - **no-foundation-in-library-products** — blocks `import Foundation` in the
-  Foundation-free `Core`, `View`, and `SwiftTUI` library layers
+  Foundation-free `SwiftTUICore`, `SwiftTUIViews`, and `SwiftTUI` library layers
 - **public-surface-policies** — enforces the guardrails in
   [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md)
 - **structured-concurrency-escape-hatches** — blocks `@unchecked Sendable` and
@@ -105,9 +105,9 @@ Full policy in [docs/PUBLIC_SURFACE_POLICY.md](docs/PUBLIC_SURFACE_POLICY.md).
 
 Test suites are split by layer:
 
-- `Tests/CoreTests/` — pipeline, layout, raster, focus infrastructure
-- `Tests/ViewTests/` — authoring-surface, environment, actor-isolation
-- `Tests/AnimatedImageTests/` — animated image and GIF import/export behavior
+- `Tests/SwiftTUICoreTests/` — pipeline, layout, raster, focus infrastructure
+- `Tests/SwiftTUIViewsTests/` — authoring-surface, environment, actor-isolation
+- `Tests/SwiftTUIAnimatedImageTests/` — animated image and GIF import/export behavior
 - `Tests/SwiftTUITests/` — runtime, rendering, fixtures, end-to-end behavior
 - `Platforms/CLI/Tests/SwiftTUICLITests/` — CLI runner, socket, pty,
   attach, scene-management behavior

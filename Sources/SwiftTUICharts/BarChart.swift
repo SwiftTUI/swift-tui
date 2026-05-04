@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A horizontal bar chart for comparing labeled values.
 public struct BarChart<Label: View, Summary: View>: View, ResolvableView {

@@ -1,9 +1,9 @@
 import Synchronization
 import Testing
 
-@testable import Core
+@testable import SwiftTUICore
 @testable import SwiftTUI
-@testable import View
+@testable import SwiftTUIViews
 
 @MainActor
 @Suite(.serialized)

@@ -16,10 +16,10 @@ view_protocol_block=$(awk '
   /public protocol View \{/ { collecting = 1 }
   /extension Never: View \{/ { collecting = 0 }
   collecting { print }
-' Sources/View/Foundation/ViewFoundation.swift)
+' Sources/SwiftTUIViews/Foundation/ViewFoundation.swift)
 
 if [ -z "$view_protocol_block" ]; then
-  fail "Could not isolate the public View protocol block in Sources/View/Foundation/ViewFoundation.swift."
+  fail "Could not isolate the public View protocol block in Sources/SwiftTUIViews/Foundation/ViewFoundation.swift."
 else
   case "$view_protocol_block" in
   *"associatedtype Body: View = Never"*) ;;
@@ -38,42 +38,42 @@ else
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol View \{' \
-  Sources/View/Foundation/ViewFoundation.swift; then
+  Sources/SwiftTUIViews/Foundation/ViewFoundation.swift; then
   fail "The public View protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '@ViewBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/View/Foundation/ViewFoundation.swift; then
+  Sources/SwiftTUIViews/Foundation/ViewFoundation.swift; then
   fail "View.body must stay @ViewBuilder and @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol Scene \{' \
-  Sources/SwiftTUI/App.swift; then
+  Sources/SwiftTUI/Scenes/App.swift; then
   fail "The public Scene protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/SwiftTUI/App.swift; then
+  Sources/SwiftTUI/Scenes/App.swift; then
   fail "Scene.body must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+public protocol App \{' \
-  Sources/SwiftTUI/App.swift; then
+  Sources/SwiftTUI/Scenes/App.swift; then
   fail "The public App protocol must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+init\(\)' \
-  Sources/SwiftTUI/App.swift; then
+  Sources/SwiftTUI/Scenes/App.swift; then
   fail "App.init must stay @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '@SceneBuilder\s+(?:@preconcurrency\s+)?@MainActor(?:\s+@preconcurrency)?\s+var body: Body \{ get \}' \
-  Sources/SwiftTUI/App.swift; then
+  Sources/SwiftTUI/Scenes/App.swift; then
   fail "App.body must stay @SceneBuilder and @MainActor-annotated."
 fi
 
 if ! rg -U -n -P --quiet -- '@MainActor\s+public func resolve<' \
-  Sources/View/Foundation/ViewFoundation.swift; then
+  Sources/SwiftTUIViews/Foundation/ViewFoundation.swift; then
   fail "Resolver.resolve must stay @MainActor."
 fi
 
@@ -83,26 +83,26 @@ if ! rg -U -n -P --quiet -- '@MainActor\s+public func render<' \
 fi
 
 if ! rg -U -n -P --quiet -- '(?:@preconcurrency\s+)?public init\s*\(\s*@_inheritActorContext get: @escaping @isolated\(any\) @Sendable \(\) -> Value,\s*@_inheritActorContext set: @escaping @isolated\(any\) @Sendable \(Value\) -> Void' \
-  Sources/View/Foundation/ViewBaseTypes.swift; then
+  Sources/SwiftTUIViews/Foundation/ViewBaseTypes.swift; then
   fail "Binding.init(get:set:) must keep its actor-inheriting SwiftUI-style signature."
 fi
 
-if ! rg -n --fixed-strings --quiet -- '@_inheritActorContext' Sources/View/Modifiers/ViewModifiers.swift; then
+if ! rg -n --fixed-strings --quiet -- '@_inheritActorContext' Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift; then
   fail "ViewModifiers.task must keep actor-inheriting task closures."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'public func task<ID: Equatable>(' \
-  Sources/View/Modifiers/ViewModifiers.swift; then
+  Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift; then
   fail "The public task(id:) overload must stay available."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'action: @escaping @MainActor @Sendable () -> Void' \
-  Sources/View/Controls/Button.swift; then
+  Sources/SwiftTUIViews/Controls/Button.swift; then
   fail "Button public actions must stay @MainActor @Sendable."
 fi
 
 if ! rg -n --fixed-strings --quiet -- 'private let handler: @MainActor @Sendable (LinkDestination) -> Bool' \
-  Sources/View/Environment/Environment.swift; then
+  Sources/SwiftTUIViews/Environment/Environment.swift; then
   fail "OpenLinkAction must stay main-actor-aware."
 fi
 
@@ -115,7 +115,7 @@ done <<'EOF'
 docs/RUNTIME.md
 docs/STATUS.md
 docs/PUBLIC_API_INVENTORY.md
-Sources/View/View.docc/Authoring-Views.md
+Sources/SwiftTUIViews/SwiftTUIViews.docc/Authoring-Views.md
 Sources/SwiftTUI/SwiftTUI.docc/Running-Apps.md
 EOF
 
@@ -141,8 +141,8 @@ AGENTS.md
 docs/PUBLIC_SURFACE_POLICY.md
 EOF
 
-if [ ! -f Tests/ViewTests/ActorIsolationSurfaceTests.swift ] && [ ! -f Tests/SwiftTUITests/ActorIsolationSurfaceTests.swift ]; then
-  fail "Tests/ViewTests/ActorIsolationSurfaceTests.swift should exist to pin the actor-isolated surface."
+if [ ! -f Tests/SwiftTUIViewsTests/ActorIsolationSurfaceTests.swift ] && [ ! -f Tests/SwiftTUITests/ActorIsolationSurfaceTests.swift ]; then
+  fail "Tests/SwiftTUIViewsTests/ActorIsolationSurfaceTests.swift should exist to pin the actor-isolated surface."
 fi
 
 while IFS= read -r pattern; do
@@ -278,33 +278,33 @@ if ! rg -n --fixed-strings --quiet -- 'Type-erased style storage' docs/PUBLIC_AP
   fail "docs/PUBLIC_API_INVENTORY.md should inventory the type-erased style storage values."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'public protocol ToolbarStyle' Sources/View/ActionScopes/Toolbar.swift; then
+if ! rg -n --fixed-strings --quiet -- 'public protocol ToolbarStyle' Sources/SwiftTUIViews/ActionScopes/Toolbar.swift; then
   fail "ToolbarStyle should stay a public extensible style protocol."
 fi
 
-if ! rg -n --fixed-strings --quiet -- 'public protocol ShapeStyle' Sources/Core/Styling.swift; then
+if ! rg -n --fixed-strings --quiet -- 'public protocol ShapeStyle' Sources/SwiftTUICore/Styling/Styling.swift; then
   fail "ShapeStyle should stay a public extensible style protocol."
 fi
 
 for style_protocol in ButtonStyle TextFieldStyle PickerStyle ListStyle OutlineStyle ToastStyle TabViewStyle; do
-  if ! rg -n -P --quiet -- "public protocol ${style_protocol}\\b" Sources/View; then
-    fail "${style_protocol} should be a public extensible style protocol in View."
+  if ! rg -n -P --quiet -- "public protocol ${style_protocol}\\b" Sources/SwiftTUIViews; then
+    fail "${style_protocol} should be a public extensible style protocol in SwiftTUIViews."
   fi
 done
 
-if ! rg -n --fixed-strings --quiet -- 'public protocol TabViewStyle' Sources/View/NavigationViews/TabViewStyles.swift; then
+if ! rg -n --fixed-strings --quiet -- 'public protocol TabViewStyle' Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift; then
   fail "TabViewStyle should be a public extensible style protocol."
 fi
 
-if rg -n -P --quiet -- '(public|package)\s+enum\s+TabViewStyle\b' Sources/View/NavigationViews/TabViewStyles.swift; then
+if rg -n -P --quiet -- '(public|package)\s+enum\s+TabViewStyle\b' Sources/SwiftTUIViews/NavigationViews/TabViewStyles.swift; then
   fail "TabViewStyle must not regress to an enum-owned style surface."
 fi
 
-if rg -n -P --quiet -- 'AnyTabViewStyle|AutomaticTabViewStyle|UnderlineTabViewStyle|LiteralTabsTabViewStyle|PowerlineTabViewStyle' Sources/View/NavigationViews/TabView.swift; then
+if rg -n -P --quiet -- 'AnyTabViewStyle|AutomaticTabViewStyle|UnderlineTabViewStyle|LiteralTabsTabViewStyle|PowerlineTabViewStyle' Sources/SwiftTUIViews/NavigationViews/TabView.swift; then
   fail "TabView.swift should not branch directly on built-in tab style types; keep style ownership in TabViewStyles.swift."
 fi
 
-if rg -n -P --quiet -- 'switch\s+.*tabStyle|switch\s+.*tabViewStyle' Sources/View/NavigationViews/TabView.swift; then
+if rg -n -P --quiet -- 'switch\s+.*tabStyle|switch\s+.*tabViewStyle' Sources/SwiftTUIViews/NavigationViews/TabView.swift; then
   fail "TabView.swift should not switch directly on tab styles."
 fi
 

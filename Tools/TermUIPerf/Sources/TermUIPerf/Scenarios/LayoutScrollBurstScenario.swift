@@ -1,5 +1,5 @@
 import Layouts
-@_spi(Runners) import TerminalUI
+@_spi(Runners) import SwiftTUI
 
 public struct LayoutScrollBurstScenario: PerfScenario {
   public let name: PerfScenarioName = .layoutScrollBurst

@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A stacked bar chart for segmented totals.
 public struct StackedBarChart<Label: View, Summary: View>: View, ResolvableView {

@@ -17,9 +17,9 @@ hooks = [
   {
     id = "no-foundation-in-library-products",
     name = "forbid Foundation imports in library layers",
-    entry = """zsh -lc 'if rg -n --glob "*.swift" "^(public import|import) Foundation$" Sources/Core Sources/View Sources/SwiftTUI; then echo "Foundation imports are forbidden in the Core, View, and SwiftTUI library layers."; exit 1; fi'""",
+    entry = """zsh -lc 'if rg -n --glob "*.swift" "^(public import|import) Foundation$" Sources/SwiftTUICore Sources/SwiftTUIViews Sources/SwiftTUI; then echo "Foundation imports are forbidden in the SwiftTUICore, SwiftTUIViews, and SwiftTUI library layers."; exit 1; fi'""",
     language = "system",
-    files = '^Sources/(Core|View|SwiftTUI)/.*\.swift$',
+    files = '^Sources/(SwiftTUICore|SwiftTUIViews|SwiftTUI)/.*\.swift$',
     pass_filenames = false
   },
   {
@@ -27,7 +27,7 @@ hooks = [
     name = "enforce public surface and documentation guardrails",
     entry = "./Scripts/check_public_surface_policies.sh",
     language = "system",
-    files = '^(Package\.swift|README\.md|docs/(RUNTIME|STATUS|PUBLIC_(API_INVENTORY|SURFACE_POLICY))\.md|Sources/.*\.swift|Sources/View/View\.docc/Authoring-Views\.md|Sources/SwiftTUI/SwiftTUI\.docc/Running-Apps\.md|Tests/ViewTests/ActorIsolationSurfaceTests\.swift|Tests/SwiftTUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
+    files = '^(Package\.swift|README\.md|docs/(RUNTIME|STATUS|PUBLIC_(API_INVENTORY|SURFACE_POLICY))\.md|Sources/.*\.swift|Sources/SwiftTUIViews/SwiftTUIViews\.docc/Authoring-Views\.md|Sources/SwiftTUI/SwiftTUI\.docc/Running-Apps\.md|Tests/SwiftTUIViewsTests/ActorIsolationSurfaceTests\.swift|Tests/SwiftTUITests/(AppRuntimeTests|CollectionSupportTests|DiagnosticsAndCacheTests|InteractiveRuntimeTests|LayoutAndRenderingPipelineTests|Phase0FoundationTests|Phase1BenchmarkScenariosTests|Phase5ReliabilityGatesTests|ViewCompositionSurfaceTests|Support/InteractiveDemoTestSupport)\.swift)$',
     pass_filenames = false
   },
   {

@@ -1,5 +1,5 @@
-import Core
-import View
+import SwiftTUICore
+import SwiftTUIViews
 
 /// A compact meter for displaying a single fractional value.
 public struct Meter<Label: View, CurrentValueLabel: View>: View, ResolvableView {

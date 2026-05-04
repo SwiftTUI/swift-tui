@@ -1,5 +1,5 @@
 import Dispatch
-@_spi(Runners) import TerminalUI
+@_spi(Runners) import SwiftTUI
 
 public struct PerfPresentedFrame {
   public var frameNumber: Int

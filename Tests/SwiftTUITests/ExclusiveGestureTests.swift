@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 
-@testable import Core
-@testable import View
+@testable import SwiftTUICore
+@testable import SwiftTUIViews
 
 @MainActor
 @Suite
