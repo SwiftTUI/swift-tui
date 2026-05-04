@@ -42,7 +42,16 @@ public struct DefaultBottomToolbarStyle: ToolbarStyle {
   public init() {}
 }
 
-extension ActionScope where Self: View & Sendable {
+extension ToolbarStyle where Self == DefaultTopToolbarStyle {
+  public static var defaultTop: DefaultTopToolbarStyle { .init() }
+}
+
+
+extension ToolbarStyle where Self == DefaultBottomToolbarStyle {
+  public static var defaultBottom: DefaultBottomToolbarStyle { .init() }
+}
+
+extension ActionScope where Self: View {
   /// Declares that this scope has a toolbar. Toolbar items contributed
   /// by descendant views via `.toolbarItem(_:)` are absorbed at this
   /// scope and rendered as a horizontal strip above or below the
@@ -50,7 +59,7 @@ extension ActionScope where Self: View & Sendable {
   @MainActor
   public func toolbar<S: ToolbarStyle>(
     style: S
-  ) -> some View & ActionScope & Sendable {
+  ) -> some View & ActionScope {
     modifier(
       ToolbarModifier(
         style: style

@@ -106,9 +106,13 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
   </div>
 
   <p class="caption">
-    The frame above is a real Swift app, compiled to <span class="mono">wasm32-wasi</span> and mounted via
-    <span class="mono">GUI/WebHost</span>. Same authoring code you would write for an
-    <span class="mono">SwiftTUICLI</span> binary, no terminal-emulator dependency.
+    The frame above is Conway's Game of Life, written as a single SwiftTUI
+    <span class="mono">View</span>, compiled to <span class="mono">wasm32-wasi</span>,
+    and mounted via <span class="mono">GUI/WebHost</span>. Tap a cell to flip
+    it; click-and-drag to paint a stroke. The zoom picker switches between
+    braille (8&times; density), half-block (2&times;), and square (1&times;)
+    rendering — same authoring code, three glyph strategies. No terminal
+    emulator. No xterm.js. No emulator shim.
   </p>
 </section>
 
