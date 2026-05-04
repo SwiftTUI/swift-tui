@@ -10,11 +10,11 @@ struct PhysicsTab: View {
     GeometryReader { proxy in
       let bounds = proxy.size
       let metrics = proxy.cellPixelMetrics
-      let playfieldBounds = FullScreenToyPhysics.playfieldBounds(from: bounds)
+      let fieldBounds = FullScreenToyPhysics.fieldBounds(from: bounds)
       let current = FullScreenToyPhysics.displayPosition(
         for: toyState,
         dragOffset: dragOffset,
-        in: playfieldBounds,
+        in: fieldBounds,
         metrics: metrics
       )
       let currentCell = current.snapped(.toNearestOrAwayFromZero)
@@ -28,16 +28,15 @@ struct PhysicsTab: View {
           .frame(width: FullScreenToyPhysics.diameter, height: height)
           .offset(x: currentCell.x, y: currentCell.y)
           .foregroundStyle(.cyan)
-          .gesture(dragGesture(in: playfieldBounds, metrics: metrics))
+          .gesture(dragGesture(in: fieldBounds, metrics: metrics))
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .background(Color.black)
-      .task(id: FullScreenToyPhysics.BoundsID(size: playfieldBounds)) { @MainActor in
-        await runToyLoop(in: playfieldBounds, metrics: metrics)
+      .task(id: FullScreenToyPhysics.BoundsID(size: fieldBounds)) { @MainActor in
+        await runToyLoop(in: fieldBounds, metrics: metrics)
       }
     }
-    .border(.tint)
-    .background(.tint)
+    .border(.tint, set: .rounded)
   }
 
   private func dragGesture(
@@ -108,8 +107,8 @@ struct FullScreenToyPhysics {
   static let floorBounceNumerator = 3
   static let floorBounceDenominator = 4
   static let settleVelocity = 2
-  static let playfieldHeightInset = 6
-  static let playfieldWidthInset = 2
+  static let fieldHeightInset = 6
+  static let fieldWidthInset = 2
   static let initialLaunchX = 0
   static let initialLaunchY = -10
 
@@ -189,12 +188,12 @@ struct FullScreenToyPhysics {
     )
   }
 
-  static func playfieldBounds(
+  static func fieldBounds(
     from bounds: CellSize
   ) -> CellSize {
     CellSize(
-      width: max(0, bounds.width - playfieldWidthInset),
-      height: max(0, bounds.height - playfieldHeightInset)
+      width: max(0, bounds.width - fieldWidthInset),
+      height: max(0, bounds.height - fieldHeightInset)
     )
   }
 

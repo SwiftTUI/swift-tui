@@ -3,6 +3,7 @@ Animatable
 attoseconds
 bjorn
 Borderless
+bordersandshapes
 closedir
 codegen
 dedup
@@ -11,6 +12,7 @@ errno
 fclose
 figfonts
 Figlet
+filedrop
 fopen
 fread
 fseek
