@@ -186,7 +186,7 @@ private func makePaletteTestRunLoop<V: View>(
   let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    terminalHost: terminal,
+    presentationSurface: terminal,
     terminalInputReader: PaletteInputReader(),
     signalReader: PaletteSignalReader(),
     scheduler: FrameScheduler(),
@@ -200,7 +200,7 @@ private func makePaletteTestRunLoop<V: View>(
   return runLoop
 }
 
-private final class PaletteTerminalHost: TerminalHosting {
+private final class PaletteTerminalHost: PresentationSurface {
   var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
@@ -233,7 +233,7 @@ private final class PaletteTerminalHost: TerminalHosting {
   }
 }
 
-extension PaletteTerminalHost: DamageAwareTerminalHosting {
+extension PaletteTerminalHost: DamageAwarePresentationSurface {
   func present(_ surface: RasterSurface, damage: PresentationDamage?) throws
     -> TerminalPresentationMetrics
   {

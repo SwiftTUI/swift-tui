@@ -277,7 +277,7 @@ private func runHarness<V: View>(
   env.terminalSize = terminalSize
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    terminalHost: host,
+    presentationSurface: host,
     terminalInputReader: ScriptedGestureInput(schedule: schedule),
     signalReader: EmptyGestureSignals(),
     scheduler: FrameScheduler(),
@@ -347,7 +347,7 @@ private final class EmptyGestureSignals: SignalReading {
   }
 }
 
-private final class RecordingGestureTerminalHost: TerminalHosting {
+private final class RecordingGestureTerminalHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback

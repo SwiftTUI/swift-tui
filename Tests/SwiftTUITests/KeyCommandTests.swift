@@ -381,7 +381,7 @@ private func makeRunLoop<V: View>(
   let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    terminalHost: terminal,
+    presentationSurface: terminal,
     terminalInputReader: KeyCommandInputReader(),
     signalReader: KeyCommandSignalReader(),
     scheduler: FrameScheduler(),
@@ -399,7 +399,7 @@ private func makeRunLoop<V: View>(
 private func latestSurfaceText<State, V: View>(
   for runLoop: RunLoop<State, V>
 ) -> String {
-  guard let terminal = runLoop.terminalHost as? KeyCommandTerminalHost,
+  guard let terminal = runLoop.presentationSurface as? KeyCommandTerminalHost,
     let surface = terminal.latestSurface
   else {
     return ""
@@ -477,7 +477,7 @@ private struct KeyCommandListRouteFixture: View {
   }
 }
 
-private final class KeyCommandTerminalHost: TerminalHosting {
+private final class KeyCommandTerminalHost: PresentationSurface {
   var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
@@ -510,7 +510,7 @@ private final class KeyCommandTerminalHost: TerminalHosting {
   }
 }
 
-extension KeyCommandTerminalHost: DamageAwareTerminalHosting {
+extension KeyCommandTerminalHost: DamageAwarePresentationSurface {
   func present(_ surface: RasterSurface, damage: PresentationDamage?) throws
     -> TerminalPresentationMetrics
   {

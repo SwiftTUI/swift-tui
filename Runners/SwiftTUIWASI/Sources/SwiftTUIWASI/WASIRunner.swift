@@ -120,7 +120,7 @@ public enum WASIRunner {
     @MainActor
     private static func webSurfaceSceneResources() -> SceneSessionResources {
       let signalReader = InProcessSignalReader()
-      let host = WebSurfaceTransportHost(
+      let host = WebSurfaceTransport(
         surfaceSize: wasiSurfaceSize(),
         renderStyle: wasiRenderStyle()
           ?? .init(appearance: .fallback)
@@ -137,7 +137,7 @@ public enum WASIRunner {
       }
 
       return .init(
-        terminalHost: host,
+        presentationSurface: host,
         terminalInputReader: inputReader,
         signalReader: signalReader,
         surfaceName: "web-surface"
@@ -167,7 +167,7 @@ public enum WASIRunner {
       }
 
       return .init(
-        terminalHost: host,
+        presentationSurface: host,
         terminalInputReader: inputReader,
         signalReader: signalReader,
         surfaceName: "ghostty-web"

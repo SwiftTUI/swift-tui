@@ -251,13 +251,13 @@ extension RunLoop {
         presentClock = nil
         presentStart = nil
       }
-      if let damageAwareHost = terminalHost as? any DamageAwareTerminalHosting {
+      if let damageAwareHost = presentationSurface as? any DamageAwarePresentationSurface {
         presentationMetrics = try damageAwareHost.present(
           artifacts.rasterSurface,
           damage: presentationDamage
         )
       } else {
-        presentationMetrics = try terminalHost.present(artifacts.rasterSurface)
+        presentationMetrics = try presentationSurface.present(artifacts.rasterSurface)
       }
       let presentationDuration: Duration =
         if let presentStart, let presentClock {
@@ -448,7 +448,7 @@ extension RunLoop {
     guard shouldEnable != terminalPointerHoverEnabled else {
       return
     }
-    try terminalHost.setPointerHoverEnabled(shouldEnable)
+    try presentationSurface.setPointerHoverEnabled(shouldEnable)
     terminalPointerHoverEnabled = shouldEnable
   }
 
@@ -948,13 +948,13 @@ extension RunLoop {
         presentClock = nil
         presentStart = nil
       }
-      if let damageAwareHost = terminalHost as? any DamageAwareTerminalHosting {
+      if let damageAwareHost = presentationSurface as? any DamageAwarePresentationSurface {
         presentationMetrics = try damageAwareHost.present(
           artifacts.rasterSurface,
           damage: presentationDamage
         )
       } else {
-        presentationMetrics = try terminalHost.present(artifacts.rasterSurface)
+        presentationMetrics = try presentationSurface.present(artifacts.rasterSurface)
       }
       let presentationDuration: Duration =
         if let presentStart, let presentClock {
@@ -1180,10 +1180,10 @@ extension RunLoop {
       .sorted()
       .joined(separator: "+")
     var effectiveEnvironmentValues = environmentValues
-    effectiveEnvironmentValues.terminalAppearance = terminalHost.appearance
-    effectiveEnvironmentValues.theme = terminalHost.theme
-    effectiveEnvironmentValues.terminalSize = terminalHost.surfaceSize
-    if let cellPixelSize = terminalHost.graphicsCapabilities.cellPixelSize {
+    effectiveEnvironmentValues.terminalAppearance = presentationSurface.appearance
+    effectiveEnvironmentValues.theme = presentationSurface.theme
+    effectiveEnvironmentValues.terminalSize = presentationSurface.surfaceSize
+    if let cellPixelSize = presentationSurface.graphicsCapabilities.cellPixelSize {
       effectiveEnvironmentValues.cellPixelMetrics = CellPixelMetrics(
         width: cellPixelSize.width,
         height: cellPixelSize.height,
@@ -1192,7 +1192,7 @@ extension RunLoop {
     } else {
       effectiveEnvironmentValues.cellPixelMetrics = .estimated
     }
-    effectiveEnvironmentValues.pointerInputCapabilities = terminalHost.pointerInputCapabilities
+    effectiveEnvironmentValues.pointerInputCapabilities = presentationSurface.pointerInputCapabilities
     effectiveEnvironmentValues.focusedIdentity = focusTracker.currentFocusIdentity
     effectiveEnvironmentValues.focusedValues = currentFocusedValues
     effectiveEnvironmentValues.pressedIdentity = pressedIdentity
@@ -1249,7 +1249,7 @@ extension RunLoop {
       return proposalOverride
     }
 
-    let size = terminalHost.surfaceSize
+    let size = presentationSurface.surfaceSize
     return .init(width: size.width, height: size.height)
   }
 

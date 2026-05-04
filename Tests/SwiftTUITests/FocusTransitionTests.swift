@@ -260,7 +260,7 @@ struct FocusTransitionTests {
     let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: FocusTestInputReader(events: []),
       signalReader: FocusTestSignalReader(),
       scheduler: FrameScheduler(),
@@ -337,7 +337,7 @@ struct FocusTransitionTests {
     let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: FocusTestInputReader(events: []),
       signalReader: FocusTestSignalReader(),
       scheduler: FrameScheduler(),
@@ -405,7 +405,7 @@ struct FocusTransitionTests {
     let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: FocusTestInputReader(events: []),
       signalReader: FocusTestSignalReader(),
       scheduler: FrameScheduler(),
@@ -467,7 +467,7 @@ struct FocusTransitionTests {
     let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: terminal,
+      presentationSurface: terminal,
       terminalInputReader: FocusTestInputReader(events: []),
       signalReader: FocusTestSignalReader(),
       scheduler: FrameScheduler(),
@@ -515,7 +515,7 @@ struct FocusTransitionTests {
 
 // MARK: - Test support types
 
-private final class FocusTestTerminalHost: TerminalHosting {
+private final class FocusTestTerminalHost: PresentationSurface {
   var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
@@ -548,7 +548,7 @@ private final class FocusTestTerminalHost: TerminalHosting {
   }
 }
 
-extension FocusTestTerminalHost: DamageAwareTerminalHosting {
+extension FocusTestTerminalHost: DamageAwarePresentationSurface {
   func present(_ surface: RasterSurface, damage: PresentationDamage?) throws
     -> TerminalPresentationMetrics
   {

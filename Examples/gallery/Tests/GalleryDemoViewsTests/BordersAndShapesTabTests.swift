@@ -63,7 +63,7 @@ struct BordersAndShapesTabTests {
     }
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: host,
+      presentationSurface: host,
       terminalInputReader: GalleryGateInputReader(gate: quitGate),
       signalReader: nil,
       scheduler: FrameScheduler(),
@@ -100,7 +100,7 @@ struct BordersAndShapesTabTests {
   }
 }
 
-private final class GalleryCountingTerminalHost: TerminalHosting {
+private final class GalleryCountingTerminalHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback

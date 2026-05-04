@@ -112,7 +112,7 @@ struct ActorIsolationSurfaceTests {
 
   @Test("RunLoop typed builders still accept AnyView via Content == AnyView")
   func runLoopTypedBuilderStillAcceptsAnyView() {
-    final class SurfaceTerminalHost: TerminalHosting {
+    final class SurfaceTerminalHost: PresentationSurface {
       let surfaceSize: CellSize = .init(width: 40, height: 12)
       let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
       let appearance: TerminalAppearance = .fallback
@@ -138,7 +138,7 @@ struct ActorIsolationSurfaceTests {
       let identity = testIdentity("ActorIsolation", "RunLoop")
       return RunLoop(
         rootIdentity: identity,
-        terminalHost: SurfaceTerminalHost(),
+        presentationSurface: SurfaceTerminalHost(),
         inputReader: SurfaceInputReader(),
         stateContainer: StateContainer(initialState: 0),
         focusTracker: FocusTracker(invalidationIdentities: [identity]),

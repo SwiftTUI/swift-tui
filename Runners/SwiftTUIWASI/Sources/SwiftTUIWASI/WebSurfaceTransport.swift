@@ -121,7 +121,7 @@ enum WebSurfaceImageFormat: Sendable, Equatable {
   }
 #endif
 
-final class WebSurfaceTransportHost: TerminalHosting, Sendable {
+final class WebSurfaceTransport: PresentationSurface, Sendable {
   private struct State: Sendable {
     var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle

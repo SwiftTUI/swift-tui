@@ -218,7 +218,7 @@ private func makeDropRunLoop<V: View>(
   let focusTracker = FocusTracker(invalidationIdentities: [rootIdentity])
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    terminalHost: terminal,
+    presentationSurface: terminal,
     terminalInputReader: DropDispatchInputReader(),
     signalReader: DropDispatchSignalReader(),
     scheduler: FrameScheduler(),
@@ -240,7 +240,7 @@ private func renderInitial<State, V: View>(_ runLoop: RunLoop<State, V>) throws 
   runLoop.renderer.enableSelectiveEvaluation()
 }
 
-private final class DropDispatchTerminalHost: TerminalHosting {
+private final class DropDispatchTerminalHost: PresentationSurface {
   var surfaceSize: CellSize { surfaceSizeProvider() }
   let capabilityProfile: TerminalCapabilityProfile
   let appearance: TerminalAppearance
@@ -274,7 +274,7 @@ private final class DropDispatchTerminalHost: TerminalHosting {
   }
 }
 
-extension DropDispatchTerminalHost: DamageAwareTerminalHosting {
+extension DropDispatchTerminalHost: DamageAwarePresentationSurface {
   func present(_ surface: RasterSurface, damage: PresentationDamage?) throws
     -> TerminalPresentationMetrics
   {

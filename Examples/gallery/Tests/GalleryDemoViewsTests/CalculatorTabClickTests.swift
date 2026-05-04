@@ -93,7 +93,7 @@ struct CalculatorTabClickTests {
     env.terminalSize = terminalSize
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: host,
+      presentationSurface: host,
       terminalInputReader: ScriptedInput(events: events),
       signalReader: EmptySignals(),
       scheduler: FrameScheduler(),
@@ -142,7 +142,7 @@ private final class EmptySignals: SignalReading {
   }
 }
 
-private final class RecordingHost: TerminalHosting {
+private final class RecordingHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback

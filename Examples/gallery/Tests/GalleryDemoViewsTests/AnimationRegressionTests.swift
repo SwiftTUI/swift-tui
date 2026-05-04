@@ -268,7 +268,7 @@ struct AnimationRegressionTests {
     env.terminalSize = terminalSize
     let runLoop = RunLoop(
       rootIdentity: rootIdentity,
-      terminalHost: host,
+      presentationSurface: host,
       terminalInputReader: inputReader,
       signalReader: AnimationRegressionEmptySignals(),
       scheduler: FrameScheduler(),
@@ -362,7 +362,7 @@ private final class AnimationRegressionEmptySignals: SignalReading {
   }
 }
 
-private final class AnimationRegressionRecordingHost: TerminalHosting {
+private final class AnimationRegressionRecordingHost: PresentationSurface {
   let surfaceSize: CellSize
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback

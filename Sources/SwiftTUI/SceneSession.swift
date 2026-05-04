@@ -5,7 +5,7 @@ import View
 }
 
 @_spi(Runners) public struct SceneSessionResources {
-  @_spi(Runners) public let terminalHost: any TerminalHosting
+  @_spi(Runners) public let presentationSurface: any PresentationSurface
   @_spi(Runners) public let terminalInputReader: any TerminalInputReading
   @_spi(Runners) public let signalReader: (any SignalReading)?
   @_spi(Runners) public let scheduler: any FrameScheduling
@@ -16,7 +16,7 @@ import View
     (@MainActor @Sendable (FocusPresentation) -> Void)?
 
   @_spi(Runners) public init(
-    terminalHost: any TerminalHosting,
+    presentationSurface: any PresentationSurface,
     terminalInputReader: any TerminalInputReading,
     signalReader: (any SignalReading)? = nil,
     scheduler: any FrameScheduling = FrameScheduler(),
@@ -25,7 +25,7 @@ import View
     diagnosticsLogger: FrameDiagnosticsLogger? = nil,
     focusPresentationHandler: (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
   ) {
-    self.terminalHost = terminalHost
+    self.presentationSurface = presentationSurface
     self.terminalInputReader = terminalInputReader
     self.signalReader = signalReader
     self.scheduler = scheduler
@@ -46,8 +46,8 @@ import View
     resources: SceneSessionResources
   ) async throws -> RunLoopResult<SceneSessionState> {
     var environmentValues = EnvironmentValues()
-    environmentValues.terminalAppearance = resources.terminalHost.appearance
-    environmentValues.theme = resources.terminalHost.theme
+    environmentValues.terminalAppearance = resources.presentationSurface.appearance
+    environmentValues.theme = resources.presentationSurface.theme
 
     var environmentSnapshot = EnvironmentSnapshot(
       debugSignature: sessionName,
@@ -62,7 +62,7 @@ import View
 
     let runLoop = RunLoop(
       rootIdentity: configuration.rootIdentity,
-      terminalHost: resources.terminalHost,
+      presentationSurface: resources.presentationSurface,
       terminalInputReader: resources.terminalInputReader,
       signalReader: resources.signalReader,
       scheduler: resources.scheduler,

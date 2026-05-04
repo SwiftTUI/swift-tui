@@ -148,7 +148,7 @@ struct TerminalHostPresentationBatchingTests {
     try host.drainPendingPresentation()
     let writesBeforeUpdate = controller.writes.count
 
-    let damageAwareHost: any DamageAwareTerminalHosting = host
+    let damageAwareHost: any DamageAwarePresentationSurface = host
     _ = try damageAwareHost.present(
       RasterSurface(
         size: .init(width: 8, height: 2),

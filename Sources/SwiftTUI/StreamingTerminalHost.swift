@@ -1,6 +1,6 @@
 import Synchronization
 
-package final class StreamingTerminalHost: TerminalHosting, DamageAwareTerminalHosting,
+package final class StreamingTerminalHost: PresentationSurface, DamageAwarePresentationSurface,
   TerminalInputCapabilityProviding, Sendable
 {
   private struct State: Sendable {

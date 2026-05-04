@@ -160,6 +160,7 @@ classifications:
     - SwiftTUI.MouseButton
     - SwiftTUI.MouseEvent
     - SwiftTUI.PasteEvent
+    - SwiftTUI.PresentationSurface
     - SwiftTUI.SignalReading
     - SwiftTUI.Standard
     - SwiftTUI.StateKeyHandler
@@ -167,7 +168,6 @@ classifications:
     - SwiftTUI.TerminalGraphicsCapabilities
     - SwiftTUI.TerminalHost
     - SwiftTUI.TerminalHostError
-    - SwiftTUI.TerminalHosting
     - SwiftTUI.TerminalInputParser
     - SwiftTUI.TerminalInputReading
     - SwiftTUI.TerminalPresentationMetrics

@@ -19,7 +19,7 @@ package typealias HostedSceneRunner =
     FocusTracker
   ) async throws -> RunLoopResult<SceneSessionState>
 
-private protocol HostedSceneTerminalHosting: TerminalHosting, DamageAwareTerminalHosting, Sendable {
+private protocol HostedScenePresentationSurface: PresentationSurface, DamageAwarePresentationSurface, Sendable {
   func updateSurfaceSize(_ surfaceSize: CellSize)
   func updateAppearance(_ appearance: TerminalAppearance)
   func updateTheme(_ theme: Theme?)
@@ -27,7 +27,7 @@ private protocol HostedSceneTerminalHosting: TerminalHosting, DamageAwareTermina
   func updateSurfaceCapabilities(_ capabilities: TerminalSurfaceCapabilities)
 }
 
-extension StreamingTerminalHost: HostedSceneTerminalHosting {}
+extension StreamingTerminalHost: HostedScenePresentationSurface {}
 
 @MainActor
 public final class HostedSceneSession {
@@ -35,7 +35,7 @@ public final class HostedSceneSession {
   public private(set) var currentFocusPresentation: FocusPresentation = .none
 
   private let sessionName: String
-  private let host: any HostedSceneTerminalHosting
+  private let host: any HostedScenePresentationSurface
   private let inputReader: InjectedTerminalInputReader
   private let signalReader: InProcessSignalReader
   private let scheduler: any FrameScheduling
@@ -145,7 +145,7 @@ public final class HostedSceneSession {
       descriptor: selection.descriptor,
       rootIdentity: selection.rootIdentity,
       sessionName: sessionName,
-      host: SurfaceTerminalHost(
+      host: HostedRasterSurface(
         surfaceSize: initialSize,
         appearance: appearance,
         theme: theme,
@@ -164,7 +164,7 @@ public final class HostedSceneSession {
     descriptor: SceneDescriptor,
     rootIdentity: Identity,
     sessionName: String,
-    host: any HostedSceneTerminalHosting,
+    host: any HostedScenePresentationSurface,
     runScene: @escaping HostedSceneRunner,
     onFocusPresentationChange:
       (@MainActor @Sendable (FocusPresentation) -> Void)? = nil
@@ -201,7 +201,7 @@ public final class HostedSceneSession {
     }
 
     let resources = SceneSessionResources(
-      terminalHost: host,
+      presentationSurface: host,
       terminalInputReader: inputReader,
       signalReader: signalReader,
       scheduler: scheduler,
@@ -327,7 +327,7 @@ public final class HostedSceneSession {
   }
 }
 
-private final class SurfaceTerminalHost: HostedSceneTerminalHosting, Sendable {
+private final class HostedRasterSurface: HostedScenePresentationSurface, Sendable {
   private struct State: Sendable {
     var surfaceSize: CellSize
     var renderStyle: TerminalRenderStyle

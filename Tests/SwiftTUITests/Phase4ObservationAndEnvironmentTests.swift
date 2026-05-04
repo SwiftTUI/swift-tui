@@ -859,7 +859,7 @@ struct Phase4ObservationAndEnvironmentTests {
         BindableFormView(model: model)
       },
       sessionName: "Phase4ObservationAndEnvironmentTests.BindableRuntime",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: Phase4ScriptedInputReader(
         events: [
           KeyPress(.return),
@@ -936,7 +936,7 @@ struct Phase4ObservationAndEnvironmentTests {
         AppearanceProbeView()
       },
       sessionName: "Phase4ObservationAndEnvironmentTests.AppearanceRuntime",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: Phase4ScriptedInputReader(
         events: [
           KeyPress(.return),
@@ -963,7 +963,7 @@ struct Phase4ObservationAndEnvironmentTests {
         TerminalSizeProbeView()
       },
       sessionName: "Phase4ObservationAndEnvironmentTests.TerminalSizeRuntime",
-      terminalHost: terminal,
+      presentationSurface: terminal,
       inputReader: Phase4ScriptedInputReader(events: [KeyPress(.character("c"), modifiers: .ctrl)]),
       signalReader: Phase4EmptySignalReader()
     )
@@ -1584,7 +1584,7 @@ private final class Phase4ScopeRecorder {
   var identity: Identity?
 }
 
-private final class Phase4RecordingTerminalHost: TerminalHosting {
+private final class Phase4RecordingTerminalHost: PresentationSurface {
   let surfaceSize = CellSize(width: 60, height: 18)
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   let appearance: TerminalAppearance = .fallback
@@ -1631,7 +1631,7 @@ private final class Phase4RecordingTerminalHost: TerminalHosting {
   }
 }
 
-private final class Phase4MutableAppearanceTerminalHost: TerminalHosting {
+private final class Phase4MutableAppearanceTerminalHost: PresentationSurface {
   let surfaceSize = CellSize(width: 60, height: 18)
   let capabilityProfile: TerminalCapabilityProfile = .previewUnicode
   private(set) var appearance: TerminalAppearance
@@ -1751,7 +1751,7 @@ private func runObservableRuntimeHarness<V: View>(
 
   let runLoop = RunLoop(
     rootIdentity: rootIdentity,
-    terminalHost: terminal,
+    presentationSurface: terminal,
     terminalInputReader: Phase4ScriptedTerminalInputReader(events: events),
     signalReader: Phase4EmptySignalReader(),
     scheduler: FrameScheduler(),

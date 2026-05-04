@@ -65,10 +65,10 @@ library product. Downstream package consumers reach those types through
 - `RunLoop+Rendering.swift`: render scheduling, resolve-context assembly, and focus application
 - `LifecycleCoordinator.swift`: post-present lifecycle staging
 - `TaskRunner.swift`: lifecycle-owned task execution and cancellation
-- `TerminalHost.swift`: fd-backed terminal host plus the WASI-facing `WebTerminalHost`, including
+- `TerminalHost.swift`: defines the `PresentationSurface` protocol (the `RunLoop`'s pluggable presentation target) plus the fd-backed `TerminalHost` and WASI-facing `WebTerminalHost` implementations, including
   final paint metrics for synchronized framing, graphics replay scope, and terminal edit-op
   lowering
-- `StreamingTerminalHost.swift`: host-facing terminal host that emits presentation output through a closure
+- `StreamingTerminalHost.swift`: closure-backed `PresentationSurface` for embedded hosts that don't own a file descriptor
 - `FrameDiagnosticsLogger.swift`: tab-separated per-frame diagnostics sink that joins pipeline
   counters with presentation metrics
 - `TerminalPresentation.swift`: capability-aware surface diffing and text presentation
