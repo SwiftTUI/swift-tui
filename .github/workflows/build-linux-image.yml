@@ -81,8 +81,9 @@ jobs:
         run: |
           set -euo pipefail
           # Default: push on main and on workflow_dispatch; build-only on PRs.
-          # All inputs are read from env: vars (never inlined as ${{...}} in
-          # the script body) so a malicious branch name can't break out.
+          # All inputs are read from env: vars (never inlined as Actions
+          # expressions in the script body) so a malicious branch name
+          # can't break out.
           if [ -n "${OVERRIDE:-}" ]; then
             push="$OVERRIDE"
           elif [ "$EVENT_NAME" = "push" ] && [ "$REF_NAME" = "main" ]; then
