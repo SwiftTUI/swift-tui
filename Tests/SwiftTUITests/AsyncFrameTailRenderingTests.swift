@@ -517,6 +517,11 @@ struct AsyncFrameTailRenderingTests {
     #expect(workerLayoutState.measureRanOnMainThread == false)
     #expect(workerLayoutState.placeRanOnMainThread == false)
     #expect(workerLayoutState.cacheApplyCount == 1)
+    // `recordCacheApply` is `@MainActor`-isolated. The recorder uses
+    // `currentlyOnMainActor()` which derives the answer from the caller's
+    // `#isolation` rather than `Thread.isMainThread`, so this assertion is
+    // portable across Darwin and Linux despite the Linux Foundation gap
+    // documented in LINUX_ISSUES.md issue #2.
     #expect(workerLayoutState.cacheApplyRanOnMainThread == true)
     #expect(workerLayoutState.cacheApplyIdentity == rootIdentity)
     #expect(workerTimings.layoutCompute != .zero)
@@ -3215,24 +3220,27 @@ private final class AsyncFrameTailWorkerCustomLayoutRecorder: Sendable {
   }
 
   func recordMeasure() {
+    let onMain = currentlyOnMainActor()
     stateStorage.withLock { state in
       state.measureCount += 1
-      state.measureRanOnMainThread = Thread.isMainThread
+      state.measureRanOnMainThread = onMain
     }
   }
 
   func recordPlace() {
+    let onMain = currentlyOnMainActor()
     stateStorage.withLock { state in
       state.placeCount += 1
-      state.placeRanOnMainThread = Thread.isMainThread
+      state.placeRanOnMainThread = onMain
     }
   }
 
   @MainActor
   func recordCacheApply(identity: Identity) {
+    let onMain = currentlyOnMainActor()
     stateStorage.withLock { state in
       state.cacheApplyCount += 1
-      state.cacheApplyRanOnMainThread = Thread.isMainThread
+      state.cacheApplyRanOnMainThread = onMain
       state.cacheApplyIdentity = identity
     }
   }
@@ -3261,16 +3269,18 @@ private final class AsyncFrameTailSendableLayoutRecorder: Sendable {
   }
 
   func recordMeasure(cache: Int) {
+    let onMain = currentlyOnMainActor()
     stateStorage.withLock { state in
       state.measuredCache = cache
-      state.measureRanOnMainThread = Thread.isMainThread
+      state.measureRanOnMainThread = onMain
     }
   }
 
   func recordPlace(cache: Int) {
+    let onMain = currentlyOnMainActor()
     stateStorage.withLock { state in
       state.placedCache = cache
-      state.placeRanOnMainThread = Thread.isMainThread
+      state.placeRanOnMainThread = onMain
     }
   }
 }
