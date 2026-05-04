@@ -40,9 +40,9 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
         <span>{title}</span>
       </div>
       <div class="caps mono" aria-label="terminal capabilities">
-        <span class="cap">UNICODE</span>
-        <span class="cap">TRUECOLOR</span>
-        <span class="cap">SAB-STDIN</span>
+        <span class="cap cap--unicode">UNICODE</span>
+        <span class="cap cap--truecolor">TRUECOLOR</span>
+        <span class="cap cap--sab">SAB-STDIN</span>
         <span class="cap on">LIVE</span>
       </div>
     </div>
@@ -87,9 +87,9 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
         <span class="phase">runtime: <em>WebHost</em></span>
       </div>
       <div class="mid">
-        <span class="phaseRing">resolve</span>
-        <span class="phaseRing">measure</span>
-        <span class="phaseRing">place</span>
+        <span class="phaseRing shed-1">resolve</span>
+        <span class="phaseRing shed-2">measure</span>
+        <span class="phaseRing shed-3">place</span>
         <span class="phaseRing">semantics</span>
         <span class="phaseRing">draw</span>
         <span class="phaseRing">raster</span>
@@ -108,8 +108,8 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
   <p class="caption">
     The frame above is Conway's Game of Life, written as a single SwiftTUI
     <span class="mono">View</span>, compiled to <span class="mono">wasm32-wasi</span>,
-    and mounted via <span class="mono">GUI/WebHost</span>. Tap a cell to flip
-    it; click-and-drag to paint a stroke. The zoom picker switches between
+    and mounted via <span class="mono">GUI/WebHost</span>. Click a cell to flip
+    it; click and drag to paint a stroke. The zoom picker switches between
     braille (8&times; density), half-block (2&times;), and square (1&times;)
     rendering — same authoring code, three glyph strategies. No terminal
     emulator. No xterm.js. No emulator shim.
@@ -128,13 +128,15 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
       0 24px 64px -28px rgba(0, 0, 0, 0.65),
       0 0 0 1px rgba(0, 0, 0, 0.6);
     overflow: hidden;
+    container-type: inline-size;
+    container-name: demo;
   }
   .bar {
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    height: 38px;
-    padding: 0 14px;
+    min-height: 38px;
+    padding: 6px 14px;
     border-bottom: 1px solid var(--line);
     background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 100%);
   }
@@ -166,15 +168,28 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
     gap: 6px;
     justify-content: flex-end;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     font-size: 10px;
     letter-spacing: 0.06em;
+    min-width: 0;
   }
   .cap {
     padding: 2px 6px;
     border-radius: 4px;
     border: 1px solid var(--line);
     color: var(--ink-3);
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+  /* shed lower-priority caps based on the actual frame width */
+  @container demo (max-width: 760px) {
+    .cap.cap--sab { display: none; }
+  }
+  @container demo (max-width: 640px) {
+    .cap.cap--truecolor { display: none; }
+  }
+  @container demo (max-width: 540px) {
+    .cap.cap--unicode { display: none; }
   }
   .cap.on {
     color: var(--accent);
@@ -269,10 +284,10 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
 
   .status {
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: 16px;
-    height: 36px;
+    min-height: 36px;
     padding: 0 14px;
     border-top: 1px solid var(--line);
     font-size: 11px;
@@ -285,10 +300,28 @@ const { height = 560, id = "demo", title = "WebExample.wasm" } = Astro.props;
   .status .left, .status .mid, .status .right {
     display: flex;
     align-items: center;
-    overflow: hidden;
+    min-width: 0;
     white-space: nowrap;
   }
+  .status .left, .status .right {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .status .left > *, .status .right > * {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .status .right { justify-content: flex-end; }
+  /* shed lower-priority phase rings based on the actual frame width */
+  @container demo (max-width: 820px) {
+    .status .phaseRing.shed-1 { display: none; }
+  }
+  @container demo (max-width: 700px) {
+    .status .phaseRing.shed-2 { display: none; }
+  }
+  @container demo (max-width: 620px) {
+    .status .phaseRing.shed-3 { display: none; }
+  }
   .kbd-row { display: flex; gap: 7px; align-items: center; }
   .kbd-row .dim { color: var(--ink-4); margin-right: 6px; }
 
