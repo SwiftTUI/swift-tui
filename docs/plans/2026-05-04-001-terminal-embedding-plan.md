@@ -116,18 +116,18 @@ load-bearing for the file previewer. Stages 6 and 8 are required for
 - `Examples/file-previewer/Sources/FilePreviewerApp/FileEntry.swift`
 - `Examples/file-previewer/Tests/FilePreviewerAppTests/MillerLayoutTests.swift`
 - `Examples/file-previewer/Tests/FilePreviewerAppTests/PreviewerRegistryTests.swift`
-- `Tests/CoreTests/ForeignSurfaceTests.swift`
+- `Tests/SwiftTUICoreTests/ForeignSurfaceTests.swift`
 - `docs/EMBEDDING.md`
 - `Sources/SwiftTUI/SwiftTUI.docc/TerminalEmbedding.md` (DocC article)
 
 ### Modified
 
-- `Sources/Core/RenderTreeAndSemanticsTypes.swift` — add
+- `Sources/SwiftTUICore/Draw/DrawTreeTypes.swift` — add
   `DrawCommand.foreignSurface(bounds:, payload:)` plus
   `ForeignSurfacePayload` protocol and `ForeignGrid` struct
-- `Sources/Core/Rasterizer.swift` — add the new switch arm at line ~495
+- `Sources/SwiftTUICore/Raster/Rasterizer+Paint.swift` — add the new switch arm at line ~174
   that blits a foreign grid into `cells`
-- `Sources/Core/DrawExtractor.swift` — pass-through of the new variant
+- `Sources/SwiftTUICore/Draw/DrawExtractor.swift` — pass-through of the new variant
 - `Platforms/CLI/Sources/SwiftTUICLI/PtyPair.swift` — **deleted**;
   replaced by `ScenePty.swift`. `ScenePty` is a thin attach-mode
   wrapper over the new shared `PTYPair` actor in
@@ -182,7 +182,7 @@ The pipeline contract during and after this plan:
    `TerminalView`'s assigned `CellRect` changes size, it enqueues
    `await session.resize(_:)` on a `.task(id: bounds.size)` lifecycle
    hook. No new runtime mechanism is required.
-6. Foundation-free policy is preserved in `Core`/`View`/`SwiftTUI`. The
+6. Foundation-free policy is preserved in `SwiftTUICore`/`SwiftTUIViews`/`SwiftTUI`. The
    new `ForeignSurfacePayload` types are pure value/protocol shapes; no
    Foundation imports leak into `Core`. The rest of the work lives in
    `Platforms/Embedding` which is allowed to use Foundation.
@@ -272,17 +272,18 @@ seam works. Once `DrawCommand.foreignSurface` rasterizes correctly, every
 later stage can produce one and trust the commit pipeline to render it.
 
 **Files:**
-- Modify: `Sources/Core/RenderTreeAndSemanticsTypes.swift:1067` (the
+- Modify: `Sources/SwiftTUICore/Draw/DrawTreeTypes.swift:41` (the
   `DrawCommand` enum) — add new case
-- Create: `Sources/Core/ForeignSurface.swift` — protocol + grid types
-- Modify: `Sources/Core/Rasterizer.swift` — add switch arm at the
-  command dispatch loop (currently around line 495)
-- Modify: `Sources/Core/DrawExtractor.swift` — pass-through
-- Create: `Tests/CoreTests/ForeignSurfaceTests.swift`
+- Create: `Sources/SwiftTUICore/Draw/ForeignSurface.swift` — protocol + grid types
+- Modify: `Sources/SwiftTUICore/Raster/Rasterizer+Paint.swift` — add switch arm at the
+  command dispatch loop (the third `while let frame = stack.popLast()`
+  block in `Rasterizer+Paint.swift`, currently at line 174)
+- Modify: `Sources/SwiftTUICore/Draw/DrawExtractor.swift` — pass-through
+- Create: `Tests/SwiftTUICoreTests/ForeignSurfaceTests.swift`
 
 - [ ] **Step 1.1: Define the foreign-surface types (Foundation-free)**
 
-Create `Sources/Core/ForeignSurface.swift`:
+Create `Sources/SwiftTUICore/Draw/ForeignSurface.swift`:
 
 ```swift
 public protocol ForeignSurfacePayload: Sendable {
@@ -304,8 +305,8 @@ public struct ForeignGrid: Sendable, Equatable {
 
 - [ ] **Step 1.2: Add `DrawCommand.foreignSurface` case**
 
-In `Sources/Core/RenderTreeAndSemanticsTypes.swift`, extend the
-`DrawCommand` enum (currently ending at line ~1144 with `case clip`):
+In `Sources/SwiftTUICore/Draw/DrawTreeTypes.swift`, extend the
+`DrawCommand` enum (currently ending at line ~118 with `case clip`):
 
 ```swift
 case foreignSurface(bounds: CellRect, payload: any ForeignSurfacePayload)
@@ -318,11 +319,11 @@ each draw).
 
 - [ ] **Step 1.3: Write a failing rasterizer test for foreign surface blit**
 
-Create `Tests/CoreTests/ForeignSurfaceTests.swift`:
+Create `Tests/SwiftTUICoreTests/ForeignSurfaceTests.swift`:
 
 ```swift
 import Testing
-@testable import Core
+@testable import SwiftTUICore
 
 @Suite("Foreign surface rasterization")
 struct ForeignSurfaceTests {
@@ -363,7 +364,7 @@ struct ForeignSurfaceTests {
 - [ ] **Step 1.4: Run the test, expect FAIL with "missing case .foreignSurface"**
 
 ```bash
-swiftly run swift test --filter CoreTests.ForeignSurfaceTests
+swiftly run swift test --filter SwiftTUICoreTests.ForeignSurfaceTests
 ```
 
 Expected: compile error in `Rasterizer.swift` for non-exhaustive switch
@@ -371,8 +372,10 @@ on `DrawCommand`.
 
 - [ ] **Step 1.5: Add the rasterizer switch arm**
 
-In `Sources/Core/Rasterizer.swift` inside the dispatch loop (the
-`while let frame = stack.popLast()` block around line 494), add:
+In `Sources/SwiftTUICore/Raster/Rasterizer+Paint.swift` inside the
+dispatch loop (the third `while let frame = stack.popLast()` block,
+currently at line 174), add a new switch arm next to the existing
+`.canvas` arm at the bottom of the switch:
 
 ```swift
 case .foreignSurface(let bounds, let payload):
@@ -400,7 +403,7 @@ case .foreignSurface(let bounds, let payload):
 
 - [ ] **Step 1.6: Add `DrawExtractor` pass-through**
 
-In `Sources/Core/DrawExtractor.swift`, the foreign-surface variant has
+In `Sources/SwiftTUICore/Draw/DrawExtractor.swift`, the foreign-surface variant has
 no extracted children — it is a leaf. Find the command-walking switch
 and add:
 
@@ -412,17 +415,17 @@ case .foreignSurface:
 - [ ] **Step 1.7: Run all Core tests, expect PASS**
 
 ```bash
-swiftly run swift test --filter CoreTests
+swiftly run swift test --filter SwiftTUICoreTests
 ```
 
 - [ ] **Step 1.8: Commit Stage 1**
 
 ```bash
-git add Sources/Core/ForeignSurface.swift \
-        Sources/Core/RenderTreeAndSemanticsTypes.swift \
-        Sources/Core/Rasterizer.swift \
-        Sources/Core/DrawExtractor.swift \
-        Tests/CoreTests/ForeignSurfaceTests.swift
+git add Sources/SwiftTUICore/Draw/ForeignSurface.swift \
+        Sources/SwiftTUICore/Draw/DrawTreeTypes.swift \
+        Sources/SwiftTUICore/Raster/Rasterizer+Paint.swift \
+        Sources/SwiftTUICore/Draw/DrawExtractor.swift \
+        Tests/SwiftTUICoreTests/ForeignSurfaceTests.swift
 git commit -m "feat(core): add DrawCommand.foreignSurface for embedded grids"
 ```
 
@@ -497,7 +500,7 @@ let package = Package(
 Create `TerminalEmulatorEvents.swift`:
 
 ```swift
-import Core  // for CellSize
+import SwiftTUICore  // for CellSize
 
 public enum TerminalEmulatorEvent: Sendable, Equatable {
   case titleChanged(String)
@@ -532,7 +535,7 @@ Create `EmulatorWrapperTests.swift`:
 ```swift
 import Testing
 @testable import SwiftTUITerminal
-import Core
+import SwiftTUICore
 
 @Suite("TerminalEmulator wrapper")
 struct EmulatorWrapperTests {
@@ -579,7 +582,7 @@ Create `TerminalEmulator.swift`. Notes for the implementer:
 
 ```swift
 @preconcurrency import SwiftTerm
-import Core
+import SwiftTUICore
 
 public actor TerminalEmulator {
   private let terminal: Terminal
@@ -953,7 +956,7 @@ Create `Platforms/Embedding/Tests/SwiftTUIPTYPrimitivesTests/PTYPairTests.swift`
 ```swift
 import Testing
 @testable import SwiftTUIPTYPrimitives
-import Core
+import SwiftTUICore
 
 @Suite("PTYPair")
 struct PTYPairTests {
@@ -1003,7 +1006,7 @@ struct PTYPairTests {
 Create `Platforms/Embedding/Sources/SwiftTUIPTYPrimitives/PTYPair.swift`:
 
 ```swift
-import Core
+import SwiftTUICore
 #if canImport(Darwin)
 import Darwin
 import Dispatch
@@ -1242,7 +1245,7 @@ notification.
 import Testing
 @testable import SwiftTUITerminal
 import SwiftTUIPTYPrimitives
-import Core
+import SwiftTUICore
 
 @Suite("ChildProcessPty")
 struct ChildProcessPtyTests {
@@ -1310,7 +1313,7 @@ Create `Platforms/Embedding/Sources/SwiftTUITerminal/ChildProcessPty.swift`:
 ```swift
 import Foundation
 import SwiftTUIPTYPrimitives
-import Core
+import SwiftTUICore
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
@@ -1475,7 +1478,7 @@ If 3.E.1 / 3.E.2 surface any fixups, commit them with subject
 - [ ] **Step 4.1: Define the `TerminalSession` protocol**
 
 ```swift
-import Core
+import SwiftTUICore
 
 public protocol TerminalSession: AnyObject, Sendable {
   func snapshot() async -> ForeignGrid
@@ -1659,7 +1662,7 @@ returns a fixed grid.
 
 ```swift
 import SwiftTUI
-import Core
+import SwiftTUICore
 
 public struct TerminalView<Session: TerminalSession>: View {
   private let session: Session
@@ -1765,7 +1768,7 @@ extension TerminalSurfaceLeaf {
 ```
 
 The `TerminalEmulatorKey(event:)` initializer maps the runtime's
-`KeyEvent` (defined in `Sources/SwiftTUI/InputReader.swift`) to the
+`KeyEvent` (defined in `Sources/SwiftTUI/Input/InputReader.swift`) to the
 emulator's key vocabulary. Unmappable keys (e.g. SwiftTUI-internal
 focus-traversal keys) return `nil` and are not forwarded.
 
@@ -2026,7 +2029,7 @@ func catLargeFile() async throws {
 
 The fixture is a 1MB text file. A naive full-redraw pipeline would
 emit `~1MB * (full_grid_in_bytes)` per scroll. The diff in
-`Sources/SwiftTUI/TerminalPresentation.swift` should keep it under
+`Sources/SwiftTUI/Terminal/TerminalPresentation.swift` should keep it under
 ~200KB end-to-end.
 
 - [ ] **Step 8.2: If the test fails, profile and decide**
@@ -2165,7 +2168,7 @@ Before declaring the plan complete, verify:
 
 - [ ] `DrawCommand.foreignSurface` is the only new draw variant; no
   parallel rendering pipeline emerged.
-- [ ] `Sources/Core` still compiles without `import Foundation` (the
+- [ ] `Sources/SwiftTUICore` still compiles without `import Foundation` (the
   prek hook will block any regression).
 - [ ] `TerminalView<Session>` is generic, never erased; no
   `[any TerminalSession]` storage anywhere in the public surface.
