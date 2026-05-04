@@ -170,7 +170,7 @@ runtime against a `WebSocketSurfaceTransport` instead of a stdout pipe.
    `SwiftTUICLI` and `SwiftTUIWASI`. The root `SwiftTUI` library never
    gains an HTTP server.
 3. **No Foundation in library products.** Per AGENTS.md, the
-   `Core`/`View`/`SwiftTUI` library targets are Foundation-free and
+   `SwiftTUICore`/`SwiftTUIViews`/`SwiftTUI` library targets are Foundation-free and
    guarded by the `no-foundation-in-library-products` prek hook. The
    server lives in a runner; runners may use Foundation, but should
    avoid it where possible to keep cold-start small.
@@ -526,7 +526,7 @@ proposal builds on:
   consumption by `Examples/WebExample/`. This is the bundle we want to
   ship inside the runner package.
 
-- **`Sources/SwiftTUI/HostedSceneSession.swift`**. The host-agnostic
+- **`Sources/SwiftTUI/Scenes/HostedSceneSession.swift`**. The host-agnostic
   scene-running abstraction. Already used by `StreamingTerminalHost`
   (CLI), and the hooks for swapping the `PresentationSurface` exist
   cleanly.

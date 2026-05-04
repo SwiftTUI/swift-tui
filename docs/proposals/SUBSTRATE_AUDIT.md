@@ -51,28 +51,28 @@ The findings below changed the design. Specifically:
 
 Files read in full:
 
-- [`Sources/Core/Semantics.swift`](../../Sources/Core/Semantics.swift)
-- [`Sources/Core/SemanticRoleTypes.swift`](../../Sources/Core/SemanticRoleTypes.swift)
-- [`Sources/Core/RenderTreeAndSemanticsTypes.swift`](../../Sources/Core/RenderTreeAndSemanticsTypes.swift)
-- [`Sources/Core/FocusTracker.swift`](../../Sources/Core/FocusTracker.swift)
-- [`Sources/SwiftTUI/TerminalAppearanceDetection.swift`](../../Sources/SwiftTUI/TerminalAppearanceDetection.swift)
+- [`Sources/SwiftTUICore/Semantics/Semantics.swift`](../../Sources/SwiftTUICore/Semantics/Semantics.swift)
+- [`Sources/SwiftTUICore/Semantics/SemanticRoleTypes.swift`](../../Sources/SwiftTUICore/Semantics/SemanticRoleTypes.swift)
+- [`Sources/SwiftTUICore/Resolve/ResolvedNode.swift`](../../Sources/SwiftTUICore/Resolve/ResolvedNode.swift)
+- [`Sources/SwiftTUICore/Semantics/FocusTracker.swift`](../../Sources/SwiftTUICore/Semantics/FocusTracker.swift)
+- [`Sources/SwiftTUI/Terminal/TerminalAppearanceDetection.swift`](../../Sources/SwiftTUI/Terminal/TerminalAppearanceDetection.swift)
 - [`Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift`](../../Platforms/WASI/Sources/WASISurfaceBridge/WebSurfaceTransport.swift)
 
 Files spot-checked via `grep`:
 
-- `Sources/SwiftTUI/TerminalHost.swift` (cursor positioning, env reads)
-- `Sources/SwiftTUI/TerminalPresentation.swift` (capability detection,
+- `Sources/SwiftTUI/Terminal/TerminalHost.swift` (cursor positioning, env reads)
+- `Sources/SwiftTUI/Terminal/TerminalPresentation.swift` (capability detection,
   `NO_COLOR` handling)
-- `Sources/View/Controls/`, `Sources/View/Input/`,
-  `Sources/View/NavigationViews/` (presentationRole usage sites)
-- `Sources/View/Modifiers/ViewModifiers.swift` (modifier surface)
+- `Sources/SwiftTUIViews/Controls/`, `Sources/SwiftTUIViews/Input/`,
+  `Sources/SwiftTUIViews/NavigationViews/` (presentationRole usage sites)
+- `Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift` (modifier surface)
 - `Platforms/CLI/Sources/SwiftTUICLI/` (existing flag parsing)
 
 ---
 
 ## Finding 1 — Presentation role data already flows from built-ins
 
-[`SemanticRoleTypes.swift`](../../Sources/Core/SemanticRoleTypes.swift)
+[`SemanticRoleTypes.swift`](../../Sources/SwiftTUICore/Semantics/SemanticRoleTypes.swift)
 defines `PresentationRole` with these cases:
 
 ```
@@ -86,20 +86,20 @@ widgets already populate it:
 
 | File | Line | Sets |
 |---|---|---|
-| `Sources/View/Controls/ValueControls.swift` | 88 | `.toggle` |
-| `Sources/View/Controls/ValueControls.swift` | 261 | `.textField` |
-| `Sources/View/Controls/ValueControls.swift` | 356 | `.disclosureGroup` |
-| `Sources/View/Controls/Picker.swift` | 154 | `.picker` |
-| `Sources/View/Controls/Link.swift` | 49 | `.link` |
-| `Sources/View/Input/TextEditor.swift` | 70 | `.textEditor` |
-| `Sources/View/Input/SecureField.swift` | 91 | `.textField` |
-| `Sources/View/NavigationViews/TabView.swift` | 227 | `.tabView` |
-| `Sources/View/ScrollView/ScrollView.swift` | 240 | `.scrollView` / `.scrollViewWithIndicators` |
-| `Sources/View/Modifiers/ViewModifiers.swift` | 469 | exposes `presentationRole(_:)` modifier |
+| `Sources/SwiftTUIViews/Controls/ValueControls.swift` | 88 | `.toggle` |
+| `Sources/SwiftTUIViews/Controls/ValueControls.swift` | 261 | `.textField` |
+| `Sources/SwiftTUIViews/Controls/ValueControls.swift` | 356 | `.disclosureGroup` |
+| `Sources/SwiftTUIViews/Controls/Picker.swift` | 154 | `.picker` |
+| `Sources/SwiftTUIViews/Controls/Link.swift` | 49 | `.link` |
+| `Sources/SwiftTUIViews/Input/TextEditor.swift` | 70 | `.textEditor` |
+| `Sources/SwiftTUIViews/Input/SecureField.swift` | 91 | `.textField` |
+| `Sources/SwiftTUIViews/NavigationViews/TabView.swift` | 227 | `.tabView` |
+| `Sources/SwiftTUIViews/ScrollView/ScrollView.swift` | 240 | `.scrollView` / `.scrollViewWithIndicators` |
+| `Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift` | 469 | exposes `presentationRole(_:)` modifier |
 
 `SemanticMetadata.tabItemLabel` is also already a structured
 `TabItemLabel` (title + optional detail + optional badge); see
-[`RenderTreeAndSemanticsTypes.swift:1-31`](../../Sources/Core/RenderTreeAndSemanticsTypes.swift).
+[`RenderTreeAndSemanticsTypes.swift:1-31`](../../Sources/SwiftTUICore/Resolve/ResolvedNode.swift).
 
 **Implication for [`ACCESSIBILITY.md`](./ACCESSIBILITY.md):** the
 proposed `AccessibilityRole` enum should *map onto* `PresentationRole`
@@ -164,7 +164,7 @@ complete.
 
 ## Finding 2 — `SemanticSnapshot` does not carry roles today
 
-[`Semantics.swift`](../../Sources/Core/Semantics.swift)'s
+[`Semantics.swift`](../../Sources/SwiftTUICore/Semantics/Semantics.swift)'s
 `SemanticExtractor` produces a `SemanticSnapshot` containing
 `interactionRegions`, `focusRegions`, `scrollRoutes`,
 `selectionRoutes`, and `namedCoordinateSpaces`. **It does not include
@@ -290,7 +290,7 @@ specific.
 
 ## Finding 4 — Some env-var detection already exists
 
-[`TerminalPresentation.swift:84-135`](../../Sources/SwiftTUI/TerminalPresentation.swift)
+[`TerminalPresentation.swift:84-135`](../../Sources/SwiftTUI/Terminal/TerminalPresentation.swift)
 has `TerminalCapabilityProfile.detect(environment:isTTY:)` which
 already reads:
 
@@ -305,10 +305,10 @@ already reads:
 - `isTTY` — drops to `colorLevel: .none` and disables hyperlinks /
   mouse / synchronized output when stdout is not a TTY.
 
-[`TerminalAppearanceDetection.swift`](../../Sources/SwiftTUI/TerminalAppearanceDetection.swift)
+[`TerminalAppearanceDetection.swift`](../../Sources/SwiftTUI/Terminal/TerminalAppearanceDetection.swift)
 also reads `COLORFGBG` to heuristically detect dark/light mode.
 
-[`TerminalHost.swift:1382-1440`](../../Sources/SwiftTUI/TerminalHost.swift)
+[`TerminalHost.swift:1382-1440`](../../Sources/SwiftTUI/Terminal/TerminalHost.swift)
 reads `TMUX`, `TERM_PROGRAM`, `LC_TERMINAL`, `COLORTERM` for terminal
 identity heuristics (used for SGR-pixel mouse support).
 
@@ -343,12 +343,12 @@ the accessibility phasing remains true — but Phase 1 is now
 
 ## Finding 5 — Cursor placement infrastructure exists; policy is missing
 
-[`TerminalHost.swift`](../../Sources/SwiftTUI/TerminalHost.swift) has
+[`TerminalHost.swift`](../../Sources/SwiftTUI/Terminal/TerminalHost.swift) has
 `moveCursor(to:)` (lines 991, 1923), `hideCursorSequence()` (1699,
 1961), `showCursorSequence()` (1703, 1965). The runtime hides the
 cursor at startup (line 1894) and shows it at teardown (1908).
 
-[`FocusTracker`](../../Sources/Core/FocusTracker.swift) exposes
+[`FocusTracker`](../../Sources/SwiftTUICore/Semantics/FocusTracker.swift) exposes
 `currentFocusIdentity: Identity?`. Each `FocusRegion` carries a
 `rect: CellRect`. The runtime can therefore answer "where is the
 focused widget's bounds?" with one lookup.
@@ -423,7 +423,7 @@ needed; the proposal landed on the right problem statement.
 Now that we've established the format will be extended (Finding 3),
 some structural notes for the design:
 
-- **Identity** is `Sources/Core/AnchorTypes.swift`'s `Identity` —
+- **Identity** is `Sources/SwiftTUICore/Geometry/AnchorTypes.swift`'s `Identity` —
   effectively a path-shaped key. Stable across frames for the same
   view instance. Serializable as a string. Good fit for the
   `id` attribute on the DOM mirror.

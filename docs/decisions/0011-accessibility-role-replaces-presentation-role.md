@@ -6,15 +6,15 @@ date: 2026-05-04
 sources:
   - docs/proposals/ACCESSIBILITY.md
   - docs/proposals/SUBSTRATE_AUDIT.md
-  - Sources/Core/SemanticRoleTypes.swift
-  - Sources/Core/RenderTreeAndSemanticsTypes.swift
+  - Sources/SwiftTUICore/Semantics/SemanticRoleTypes.swift
+  - Sources/SwiftTUICore/Resolve/ResolvedNode.swift
 ---
 
 # ADR-0011: AccessibilityRole replaces PresentationRole
 
 ## Context
 
-`Sources/Core/SemanticRoleTypes.swift` already defines a public
+`Sources/SwiftTUICore/Semantics/SemanticRoleTypes.swift` already defines a public
 `PresentationRole` enum with 20 cases (`button`, `toggle`, `slider`,
 `textField`, `secureField`, `textEditor`, `link`, `picker`,
 `disclosureGroup`, `alert`, `confirmationDialog`, `menu`,
@@ -118,9 +118,9 @@ public enum AccessibilityRole: Equatable, Sendable, CustomStringConvertible {
 `SemanticMetadata.accessibilityRole: AccessibilityRole?`. The
 modifier `presentationRole(_:)` becomes `accessibilityRole(_:)`.
 All existing call sites
-(`Sources/View/Controls/`, `Sources/View/Input/`,
-`Sources/View/NavigationViews/TabView.swift`,
-`Sources/View/ScrollView/ScrollView.swift`, etc.) are renamed in the
+(`Sources/SwiftTUIViews/Controls/`, `Sources/SwiftTUIViews/Input/`,
+`Sources/SwiftTUIViews/NavigationViews/TabView.swift`,
+`Sources/SwiftTUIViews/ScrollView/ScrollView.swift`, etc.) are renamed in the
 same patch.
 
 `SecureField` keeps its mapping but the rename makes the distinction
@@ -176,11 +176,11 @@ phasing"); Phase 3a depends on this decision.
 **Migration:**
 
 - Rename the type in
-  `Sources/Core/SemanticRoleTypes.swift`.
+  `Sources/SwiftTUICore/Semantics/SemanticRoleTypes.swift`.
 - Rename the field in `SemanticMetadata`.
-- Rename the modifier in `Sources/View/Modifiers/ViewModifiers.swift`
+- Rename the modifier in `Sources/SwiftTUIViews/Modifiers/ViewModifiers.swift`
   and update all built-in callers.
-- Update tests under `Tests/CoreTests/`, `Tests/ViewTests/`,
+- Update tests under `Tests/SwiftTUICoreTests/`, `Tests/SwiftTUIViewsTests/`,
   `Tests/SwiftTUITests/` that reference the old name.
 - Update `docs/proposals/ACCESSIBILITY.md` and
   `docs/proposals/SUBSTRATE_AUDIT.md` to drop the "rename pending"

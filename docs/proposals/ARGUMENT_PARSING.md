@@ -151,7 +151,7 @@ from the existing CLIMode shape.
 ## Principles
 
 1. **Library-only stays library-only.** No argument parsing code in
-   `SwiftTUI`, `View`, or `Core`. The parser library is a peer of the
+   `SwiftTUI`, `SwiftTUIViews`, or `SwiftTUICore`. The parser library is a peer of the
    runner libraries, optionally consumed alongside them. Decision 0008
    is not relaxed.
 2. **Reuse `swift-argument-parser`.** It's Apple's, it's stable, it ships
@@ -561,7 +561,7 @@ full parser. No swift-argument-parser dependency.
 
 **Verdict.** Rejected. The dependency cost of swift-argument-parser is
 acceptable for a runner library (which is already a peer package, not
-the foundation-free `Core` / `View` / `SwiftTUI` layer). The Foundation
+the foundation-free `SwiftTUICore` / `SwiftTUIViews` / `SwiftTUI` layer). The Foundation
 constraint applies to library products, not to runner products.
 
 ### Option E: macro-based `@SwiftTUIMain` derivation
@@ -1133,7 +1133,7 @@ is discussed in [Open questions](#open-questions).
 
 > **Audit correction (2026-05-04):** the
 > `TerminalCapabilityProfile.detect(environment:isTTY:)` function in
-> [`Sources/SwiftTUI/TerminalPresentation.swift`](../../Sources/SwiftTUI/TerminalPresentation.swift)
+> [`Sources/SwiftTUI/Terminal/TerminalPresentation.swift`](../../Sources/SwiftTUI/Terminal/TerminalPresentation.swift)
 > already reads `NO_COLOR`, `TERM` (incl. `dumb` and `*256color`),
 > `COLORTERM` (incl. `truecolor`/`24bit`), and `LC_ALL`/`LC_CTYPE`/
 > `LANG` (drives ASCII glyph fallback). What's missing today:
@@ -1445,7 +1445,7 @@ runner packages. This proposal layers cleanly on top:
 
 - **`SwiftTUIArguments` is a peer of the runner packages.** It does
   not move into root SwiftTUI. The Foundation-free invariant on
-  `Core`, `View`, and `SwiftTUI` is preserved.
+  `SwiftTUICore`, `SwiftTUIViews`, and `SwiftTUI` is preserved.
 - **The protocol `SwiftTUIApp` lives in `SwiftTUIArguments`.** It is
   *not* a re-export from `SwiftTUI`. Consumers who want it import it
   explicitly:

@@ -69,8 +69,8 @@ swift-tui is unusually well-positioned to do better than peers, for three
 reasons:
 
 1. The pipeline already has a `semantics` phase between `place` and `draw`
-   ([`Sources/Core/Semantics.swift`](../../Sources/Core/Semantics.swift),
-   [`SemanticRoleTypes.swift`](../../Sources/Core/SemanticRoleTypes.swift)).
+   ([`Sources/SwiftTUICore/Semantics/Semantics.swift`](../../Sources/SwiftTUICore/Semantics/Semantics.swift),
+   [`SemanticRoleTypes.swift`](../../Sources/SwiftTUICore/Semantics/SemanticRoleTypes.swift)).
 2. The focus engine already tracks logical focus (`FocusTracker`,
    `FocusPolicy`, `FocusInteractionTypes`, `FocusPresentation`,
    `View/Focus/`).
@@ -636,43 +636,43 @@ and thinner in one place**. Specifically:
 ### Already populated and flowing (better than expected)
 
 - **Presentation roles are already authored on built-in widgets.**
-  [`Sources/Core/SemanticRoleTypes.swift`](../../Sources/Core/SemanticRoleTypes.swift)
+  [`Sources/SwiftTUICore/Semantics/SemanticRoleTypes.swift`](../../Sources/SwiftTUICore/Semantics/SemanticRoleTypes.swift)
   defines `PresentationRole` with 20 cases (`button`, `toggle`,
   `slider`, `textField`, `secureField`, `textEditor`, `link`,
   `picker`, `disclosureGroup`, `alert`, `confirmationDialog`, `menu`,
   `scrollView`, `scrollViewWithIndicators`, `section`, `sheet`,
   `stepper`, `table`, `tableRow`, `tabView`). Built-in widgets
   populate it: `Toggle` → `.toggle`
-  ([`ValueControls.swift:88`](../../Sources/View/Controls/ValueControls.swift)),
+  ([`ValueControls.swift:88`](../../Sources/SwiftTUIViews/Controls/ValueControls.swift)),
   `TextField` → `.textField`
-  ([`ValueControls.swift:261`](../../Sources/View/Controls/ValueControls.swift)),
+  ([`ValueControls.swift:261`](../../Sources/SwiftTUIViews/Controls/ValueControls.swift)),
   `TextEditor` → `.textEditor`
-  ([`TextEditor.swift:70`](../../Sources/View/Input/TextEditor.swift)),
+  ([`TextEditor.swift:70`](../../Sources/SwiftTUIViews/Input/TextEditor.swift)),
   `SecureField` → `.textField`
-  ([`SecureField.swift:91`](../../Sources/View/Input/SecureField.swift)),
+  ([`SecureField.swift:91`](../../Sources/SwiftTUIViews/Input/SecureField.swift)),
   `Picker` → `.picker`
-  ([`Picker.swift:154`](../../Sources/View/Controls/Picker.swift)),
+  ([`Picker.swift:154`](../../Sources/SwiftTUIViews/Controls/Picker.swift)),
   `Link` → `.link`
-  ([`Link.swift:49`](../../Sources/View/Controls/Link.swift)),
+  ([`Link.swift:49`](../../Sources/SwiftTUIViews/Controls/Link.swift)),
   `DisclosureGroup` → `.disclosureGroup`
-  ([`ValueControls.swift:356`](../../Sources/View/Controls/ValueControls.swift)),
+  ([`ValueControls.swift:356`](../../Sources/SwiftTUIViews/Controls/ValueControls.swift)),
   `TabView` → `.tabView`
-  ([`TabView.swift:227`](../../Sources/View/NavigationViews/TabView.swift)),
+  ([`TabView.swift:227`](../../Sources/SwiftTUIViews/NavigationViews/TabView.swift)),
   `ScrollView` → `.scrollView` / `.scrollViewWithIndicators`
-  ([`ScrollView.swift:240`](../../Sources/View/ScrollView/ScrollView.swift)).
+  ([`ScrollView.swift:240`](../../Sources/SwiftTUIViews/ScrollView/ScrollView.swift)).
   Approximately **15 of the ~28 cases the proposed `AccessibilityRole`
   enum needs are already wired up** end-to-end.
 
 - **Tab item labels are already structured.**
   `SemanticMetadata.tabItemLabel` is a `TabItemLabel(title, detail?,
   badge?)` — see
-  [`RenderTreeAndSemanticsTypes.swift:1-31`](../../Sources/Core/RenderTreeAndSemanticsTypes.swift).
+  [`RenderTreeAndSemanticsTypes.swift:1-31`](../../Sources/SwiftTUICore/Resolve/ResolvedNode.swift).
   Good prior art for what a structured accessibility label looks like
   in this codebase. The `accessibilityLabel(_:)` modifier should
   follow the same pattern.
 
 - **Env-var detection is partly wired.**
-  [`TerminalPresentation.swift:84-135`](../../Sources/SwiftTUI/TerminalPresentation.swift)'s
+  [`TerminalPresentation.swift:84-135`](../../Sources/SwiftTUI/Terminal/TerminalPresentation.swift)'s
   `TerminalCapabilityProfile.detect(environment:isTTY:)` already
   reads `NO_COLOR`, `TERM` (incl. `dumb`/`*256color`), `COLORTERM`
   (incl. `truecolor`/`24bit`), `LC_ALL`/`LC_CTYPE`/`LANG` (drives
@@ -681,17 +681,17 @@ and thinner in one place**. Specifically:
   `CLICOLOR`, `CLICOLOR_FORCE`, `CI`, and the `SWIFTTUI_*` family.
 
 - **Cursor positioning mechanism exists.**
-  [`TerminalHost.swift`](../../Sources/SwiftTUI/TerminalHost.swift)
+  [`TerminalHost.swift`](../../Sources/SwiftTUI/Terminal/TerminalHost.swift)
   exposes `moveCursor(to:)` (lines 991, 1923), plus
   `hideCursorSequence()` / `showCursorSequence()` (1699/1703,
   1961/1965). The runtime hides the cursor at startup
-  ([line 1894](../../Sources/SwiftTUI/TerminalHost.swift)) and shows
-  it at teardown ([line 1908](../../Sources/SwiftTUI/TerminalHost.swift)).
+  ([line 1894](../../Sources/SwiftTUI/Terminal/TerminalHost.swift)) and shows
+  it at teardown ([line 1908](../../Sources/SwiftTUI/Terminal/TerminalHost.swift)).
   What's missing: a *policy* that, after each commit, places the
   cursor at the focused widget's anchor.
 
 - **Focus engine exposes the data we need.**
-  [`FocusTracker`](../../Sources/Core/FocusTracker.swift) has
+  [`FocusTracker`](../../Sources/SwiftTUICore/Semantics/FocusTracker.swift) has
   `currentFocusIdentity: Identity?`. Each `FocusRegion` carries a
   `rect: CellRect`. Cursor placement = lookup + `moveCursor`.
 
@@ -1224,7 +1224,7 @@ CLI flags (suggested, not final): `--accessible`, `--ascii`,
 
 Every Unicode glyph used in built-in views is paired with an ASCII
 fallback that ships in a single table (likely
-`Sources/Core/GlyphFallbackTable.swift`). Examples:
+`Sources/SwiftTUICore/Support/GlyphFallbackTable.swift`). Examples:
 
 | Unicode | ASCII fallback | Notes |
 |---|---|---|
@@ -1492,8 +1492,8 @@ to be argued with, not accepted.)
 6. **How do animations interact with reduce-motion?** Specifically: a
    transition that *also* changes text content (e.g., a list reorder).
    Skipping the animation should still announce the new state. The
-   `Animation` subsystem (`Sources/View/Animation/`,
-   `Sources/SwiftTUI/AnimationController.swift`) needs an audit.
+   `Animation` subsystem (`Sources/SwiftTUIViews/Animation/`,
+   `Sources/SwiftTUI/Lifecycle/AnimationController.swift`) needs an audit.
 
 7. **Theme / appearance interaction.** Decision 0009 has views write
    semantic tokens. Do accessibility roles ride on the same channel,
@@ -1592,7 +1592,7 @@ WebSocket transport landed).)
 1. **Phase 1 — Env contract + ASCII mode.** † **(Smaller than first
    drafted.)** *Extend* the existing
    `TerminalCapabilityProfile.detect`
-   ([`TerminalPresentation.swift:84`](../../Sources/SwiftTUI/TerminalPresentation.swift))
+   ([`TerminalPresentation.swift:84`](../../Sources/SwiftTUI/Terminal/TerminalPresentation.swift))
    with `FORCE_COLOR`, `CLICOLOR`, `CLICOLOR_FORCE`, `CI`. Add
    `SWIFTTUI_ASCII`, `SWIFTTUI_REDUCE_MOTION`, `SWIFTTUI_ACCESSIBLE`
    reads. Build the glyph-fallback table. The ASCII glyph mode is
@@ -1621,7 +1621,7 @@ WebSocket transport landed).)
 4. **Phase 3b — `SemanticExtractor` accessibility records.** Extend
    `SemanticSnapshot` with `accessibilityNodes:
    [AccessibilityNode]`. Populate during the existing walk in
-   [`Semantics.swift`](../../Sources/Core/Semantics.swift). Skip
+   [`Semantics.swift`](../../Sources/SwiftTUICore/Semantics/Semantics.swift). Skip
    transient and `accessibilityHidden(true)` subtrees. Output is a
    flat list with parent-identity references (matches existing
    `interactionRegions` / `focusRegions` shape); tree reconstruction
@@ -1802,7 +1802,7 @@ in this document. The primary sources, grouped by theme:
   Env-var-contract section now cross-references the parsing rules in
   `ARGUMENT_PARSING.md`.
 - 2026-05-04: Substrate audit pass. Read
-  `Sources/Core/Semantics.swift`, `SemanticRoleTypes.swift`,
+  `Sources/SwiftTUICore/Semantics/Semantics.swift`, `SemanticRoleTypes.swift`,
   `RenderTreeAndSemanticsTypes.swift`, `FocusTracker.swift`, the
   `WASISurfaceBridge` encoder, and the existing env-var detection in
   `TerminalCapabilityProfile.detect`. Findings captured in
@@ -1837,3 +1837,23 @@ in this document. The primary sources, grouped by theme:
   marked resolved with ADR cross-references. Phase 3a and Phase 3b
   no longer carry foundational decisions; they are now pure
   implementation phases.
+- 2026-05-04: Merged the `refactor: reorganize source tree to make
+  rendering pipeline visible` commit from main. Public modules
+  renamed (`Core` → `SwiftTUICore`, `View` → `SwiftTUIViews`,
+  `AnimatedImage` → `SwiftTUIAnimatedImage`); `Sources/SwiftTUICore/`
+  reorganized into phase-named subdirectories
+  (`Pipeline/`, `Resolve/`, `Measure/`, `Place/`, `Semantics/`,
+  `Draw/`, `Raster/`, `Commit/`); `Sources/SwiftTUI/` reorganized
+  into feature-named subdirectories (`RunLoop/`, `Lifecycle/`,
+  `Scenes/`, `Terminal/`, `Input/`); several large files split
+  (notably `RenderTreeAndSemanticsTypes` → 4 files, with
+  `SemanticMetadata` and `TabItemLabel` now living in
+  `Resolve/ResolvedNode.swift`). All file-path and module-name
+  references in this proposal, the sister proposals
+  (`SUBSTRATE_AUDIT.md`, `EMBEDDED_WEB_HOST.md`,
+  `ARGUMENT_PARSING.md`), and ADRs 0011 / 0012 were updated to
+  match. Line numbers for citations in the audit (e.g.
+  `ValueControls.swift:88`, `TerminalPresentation.swift:84-135`,
+  `TerminalHost.swift:1382-1440`) were preserved by the refactor;
+  no semantic claims changed. The `TabItemLabel` line range shifted
+  from `1-31` to `2-31` due to the file split.
